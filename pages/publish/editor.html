@@ -28,13 +28,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .editor-field label { display: block; margin-bottom: 6px; color: var(--text-2); font-size: 12px; font-weight: 600; }
   .editor-field input, .editor-field textarea, .editor-field select { width: 100%; }
   .editor-field textarea { min-height: 88px; resize: vertical; }
-  .editor-ai { display: flex; align-items: center; gap: 10px; padding: 12px; margin: 14px 0 0; border: 1px solid var(--accent-line); border-radius: var(--r-m); background: var(--primary-soft); }
-  .editor-ai svg { width: 20px; color: var(--primary-dim); }
-  .editor-ai-main { flex: 1; min-width: 0; }
-  .editor-ai-title { font-size: 13px; font-weight: 600; }
-  .editor-ai-sub { margin-top: 2px; color: var(--text-3); font-size: 11px; }
-  .editor-ai button { min-height: 36px; padding: 0 12px; }
+  .editor-ai { display: flex; align-items: center; gap: 8px; padding: 9px 10px; margin: 12px 0 0; border: 1px solid var(--accent-line); border-radius: var(--r-m); background: linear-gradient(135deg, var(--primary-soft), var(--accent-soft)); position: relative; overflow: hidden; }
+  .editor-ai::before { content: ''; position: absolute; top: -20px; right: -10px; width: 60px; height: 60px; border-radius: 50%; background: radial-gradient(circle, var(--primary) 0%, transparent 70%); opacity: .15; }
+  .editor-ai svg { width: 16px; height: 16px; color: var(--primary-dim); flex: none; position: relative; z-index: 1; }
+  .editor-ai-main { flex: 1; min-width: 0; position: relative; z-index: 1; }
+  .editor-ai-title { font-size: 11.5px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .editor-ai-sub { margin-top: 1px; color: var(--text-3); font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .editor-ai button { min-height: 28px; padding: 0 10px; font-size: 11px; flex: none; position: relative; z-index: 1; }
   .editor-agree { display: flex; gap: 8px; align-items: flex-start; padding: 12px; margin-top: 15px; border: 1px solid var(--line); border-radius: var(--r-m); color: var(--text-2); font-size: 11px; line-height: 1.6; }
+  /* 快捷选项标签 */
+  .quick-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .quick-tags span { padding: 4px 9px; border-radius: var(--r-full); background: var(--bg-card); border: 1px solid var(--line); color: var(--text-2); font-size: 10.5px; cursor: pointer; transition: all var(--d-fast); user-select: none; }
+  .quick-tags span:hover { border-color: var(--primary); color: var(--primary-dim); background: var(--primary-soft); }
+  .quick-tags span.active { border-color: var(--primary); color: var(--primary-dim); background: var(--primary-soft); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -67,10 +73,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <section class="editor-group">
         <div class="editor-group-label"><svg class="ic"><use href="#i-doc"/></svg>基础信息</div>
         <div class="editor-field"><label for="f-title">标题 <span class="req">*</span></label><input class="input" id="f-title" required placeholder="例如：急需商品混凝土 C30/C40"></div>
-        <div class="editor-field"><label for="f-category">品类</label><select class="input" id="f-category"><option>材料</option><option>劳务</option><option>设备</option><option>项目合作</option><option>中介服务</option></select></div>
+        <div class="editor-field"><label for="f-category">品类</label><select class="input" id="f-category"><option>材料</option><option>劳务</option><option>设备</option><option>项目合作</option><option>中介服务</option></select>
+          <div class="quick-tags" data-target="f-category"><span>材料</span><span>劳务</span><span>设备</span><span>项目合作</span></div></div>
         <div class="editor-field"><label for="f-sub">子类 / 品名</label><input class="input" id="f-sub" placeholder="例如：C30商品混凝土 / 盘扣脚手架"></div>
         <div class="editor-field"><label for="f-location">城市 · 区域</label><input class="input" id="f-location" placeholder="例如：成都市·天府新区"></div>
-        <div class="editor-field"><label for="f-unit">计量单位</label><input class="input" id="f-unit" placeholder="例如：方 / 吨 / 米 / 天 / 人"></div>
+        <div class="editor-field"><label for="f-unit">计量单位</label><input class="input" id="f-unit" placeholder="例如：方 / 吨 / 米 / 天 / 人">
+          <div class="quick-tags" data-target="f-unit"><span>方</span><span>吨</span><span>米</span><span>天</span><span>人</span><span>次</span></div></div>
         <div class="editor-field"><label for="f-qty">数量 / 规模</label><input class="input" id="f-qty" placeholder="例如：3000 方 / 500 吨"></div>
       </section>
 
@@ -197,6 +205,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   }
   setRole(role);
+  /* 快捷选项标签交互 */
+  document.querySelectorAll('.quick-tags').forEach(function (tagGroup) {
+    var targetId = tagGroup.dataset.target;
+    var targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+    tagGroup.querySelectorAll('span').forEach(function (tag) {
+      tag.addEventListener('click', function () {
+        var val = tag.textContent.trim();
+        if (targetEl.tagName === 'SELECT') {
+          for (var i = 0; i < targetEl.options.length; i++) {
+            if (targetEl.options[i].text === val) { targetEl.selectedIndex = i; break; }
+          }
+        } else {
+          targetEl.value = val;
+        }
+        tagGroup.querySelectorAll('span').forEach(function (t) { t.classList.remove('active'); });
+        tag.classList.add('active');
+      });
+    });
+  });
   /* 无 draft/record 时预填示例 */
   if (!draftId && !recordId) fillDemo();
   document.getElementById('ai-fill').addEventListener('click', function () { fillDemo(); UI.toast('已填入示例，请确认后保存', 'ok'); });
