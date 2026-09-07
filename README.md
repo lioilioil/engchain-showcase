@@ -71,8 +71,10 @@
 
 > 本仓库通过 GitHub Pages 托管，可直接在线体验：
 
-- **App 总览演示**：[`preview.html`](preview.html)（推荐入口）— 单台 iPhone 真机外壳 + 左侧全页面导航 + 演示状态控制台；亦可直接访问 [`home.html`](home.html)（工作台主页）。
-- **管理后台 demo**：[`admin/index.html`](admin/index.html) — 数据总览 / 供需 / 分销 / 财务 / 风险等运营后台（与 App 同源 Mock 数据层联动）。
+- **App 总览演示**（推荐入口）：<https://lioilioil.github.io/engchain-showcase/preview.html>
+  — 单台 iPhone 真机外壳 + 左侧全页面导航 + 演示状态控制台；亦可直接访问 <https://lioilioil.github.io/engchain-showcase/home.html>（工作台主页）。
+- **管理后台 demo**：<https://lioilioil.github.io/engchain-showcase/admin/index.html>
+  — 数据总览 / 供需 / 分销 / 财务 / 风险等运营后台（与 App 同源 Mock 数据层联动）。
 
 ## 八、Vibe Coding 说明
 
