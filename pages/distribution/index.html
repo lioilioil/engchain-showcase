@@ -147,6 +147,99 @@ if(!resident && !isInd){
   return;
 }
 
+/* ========================================================================
+   案例数据预填充：企业入驻 + 合伙人类型（完整二级分销）时，
+   若邀请关系和返佣记录为空，则预填充演示数据，便于展示收益明细和团队
+   ======================================================================== */
+(function seedDemoData() {
+  var isPartnerType = resident && (acc.types && acc.types.indexOf('partner') >= 0);
+  if (!isPartnerType) return;
+  var me2 = DataBus.current();
+  var myUid = me2 ? me2.id : '';
+  if (!myUid) return;
+
+  var DAY = 86400000;
+  var now = Date.now();
+
+  /* 0. 同步用户表中的 entryTypes，确保 safeDistTier() 能正确识别为 full 档位
+     （safeDistTier 从 DataBus 用户表读取，而非当前登录态 EntryStore） */
+  var users = DataBus.users();
+  var userUpdated = false;
+  users.forEach(function(u) {
+    if (u.id === myUid) {
+      if (!u.identity) u.identity = {};
+      if (!u.identity.entryTypes || u.identity.entryTypes.indexOf('partner') < 0) {
+        u.identity.entryTypes = ['partner'];
+        userUpdated = true;
+      }
+      if (!u.entry) u.entry = {};
+      u.entry.types = ['partner'];
+      u.entry.type = 'partner';
+      u.entry.status = 'active';
+      u.entry.active = true;
+    }
+  });
+  if (userUpdated) {
+    try { localStorage.setItem('engchain-users', JSON.stringify(users)); } catch(e) {}
+  }
+
+  /* 1. 预填充邀请关系（团队成员） */
+  var links = Referral.all();
+  if (!links || links.length === 0) {
+    var demoLinks = [
+      { id: 'RF001', inviterId: myUid, inviteeId: 'u2', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 45, code: 'ENG2', channel: 'register' },
+      { id: 'RF002', inviterId: myUid, inviteeId: 'u4', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 30, code: 'ENG4', channel: 'register' },
+      { id: 'RF003', inviterId: myUid, inviteeId: 'u5', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 18, code: 'ENG5', channel: 'register' },
+      /* 二级关系：inviterId 为顶级邀请人（当前用户），level=2 */
+      { id: 'RF004', inviterId: myUid, inviteeId: 'u3', level: 2, rootId: myUid, status: 'active', boundAt: now - DAY * 20, code: 'ENG3', channel: 'register' }
+    ];
+    Referral._write(demoLinks);
+  }
+
+  /* 2. 预填充返佣记录（收益明细） */
+  var rebates = Rebate.all();
+  if (!rebates || rebates.length === 0) {
+    var demoRebates = [
+      /* 已发放 - 一级 - 订单返佣 */
+      { id: 'RB001', beneficiaryId: myUid, sourceUserId: 'u2', level: 1, tier: 'full',
+        sourceType: 'order', sourceOrderId: 'ORD20240815001', baseAmount: 128000, rate: 12, fee: 15360,
+        status: 'paid', frozenUntil: now - DAY * 20, createdAt: now - DAY * 25, settledAt: now - DAY * 22, paidAt: now - DAY * 20,
+        walletTxnId: 'TXN001', clawbackOf: '', idemKey: 'order|ORD20240815001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
+      /* 已发放 - 一级 - 充值返佣 */
+      { id: 'RB002', beneficiaryId: myUid, sourceUserId: 'u4', level: 1, tier: 'full',
+        sourceType: 'recharge', sourceOrderId: 'RC20240820001', baseAmount: 580, rate: 12, fee: 69.6,
+        status: 'paid', frozenUntil: now - DAY * 15, createdAt: now - DAY * 18, settledAt: now - DAY * 16, paidAt: now - DAY * 15,
+        walletTxnId: 'TXN002', clawbackOf: '', idemKey: 'recharge|RC20240820001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
+      /* 已结算 - 一级 - 入驻返佣 */
+      { id: 'RB003', beneficiaryId: myUid, sourceUserId: 'u5', level: 1, tier: 'full',
+        sourceType: 'entry', sourceOrderId: 'ENT20240901001', baseAmount: 14999, rate: 12, fee: 1799.88,
+        status: 'settled', frozenUntil: now - DAY * 2, createdAt: now - DAY * 5, settledAt: now - DAY * 2, paidAt: 0,
+        walletTxnId: '', clawbackOf: '', idemKey: 'entry|ENT20240901001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
+      /* 冻结中 - 一级 - 订单返佣 */
+      { id: 'RB004', beneficiaryId: myUid, sourceUserId: 'u2', level: 1, tier: 'full',
+        sourceType: 'order', sourceOrderId: 'ORD20240905002', baseAmount: 56000, rate: 12, fee: 6720,
+        status: 'frozen', frozenUntil: now + DAY * 1, createdAt: now - DAY * 1, settledAt: 0, paidAt: 0,
+        walletTxnId: '', clawbackOf: '', idemKey: 'order|ORD20240905002|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
+      /* 已发放 - 二级 - 订单返佣（u3 由 u2 邀请，u2 是我的一级） */
+      { id: 'RB005', beneficiaryId: myUid, sourceUserId: 'u3', level: 2, tier: 'full',
+        sourceType: 'order', sourceOrderId: 'ORD20240825003', baseAmount: 89000, rate: 3, fee: 2670,
+        status: 'paid', frozenUntil: now - DAY * 10, createdAt: now - DAY * 14, settledAt: now - DAY * 11, paidAt: now - DAY * 10,
+        walletTxnId: 'TXN003', clawbackOf: '', idemKey: 'order|ORD20240825003|' + myUid + '|2', ruleSnapshot: { tier: 'full', rate: 3 } },
+      /* 冻结中 - 二级 - 充值返佣 */
+      { id: 'RB006', beneficiaryId: myUid, sourceUserId: 'u3', level: 2, tier: 'full',
+        sourceType: 'recharge', sourceOrderId: 'RC20240903002', baseAmount: 1280, rate: 3, fee: 38.4,
+        status: 'frozen', frozenUntil: now + DAY * 3, createdAt: now - DAY * 1, settledAt: 0, paidAt: 0,
+        walletTxnId: '', clawbackOf: '', idemKey: 'recharge|RC20240903002|' + myUid + '|2', ruleSnapshot: { tier: 'full', rate: 3 } },
+      /* 已结算 - 一级 - 充值返佣（今日） */
+      { id: 'RB007', beneficiaryId: myUid, sourceUserId: 'u4', level: 1, tier: 'full',
+        sourceType: 'recharge', sourceOrderId: 'RC20240907001', baseAmount: 1280, rate: 12, fee: 153.6,
+        status: 'settled', frozenUntil: now - 3600000, createdAt: now - 7200000, settledAt: now - 3600000, paidAt: 0,
+        walletTxnId: '', clawbackOf: '', idemKey: 'recharge|RC20240907001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } }
+    ];
+    Rebate._write(demoRebates);
+  }
+})();
+
 /* 单一来源：档位取 entryAccess().distTier，费率全部走 RULE()（后台可配，不写死） */
 var tier=acc.distTier;
 var tr=RULE('distribution.tiers.'+tier,{t1:0,t2:0});

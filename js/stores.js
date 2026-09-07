@@ -75,15 +75,17 @@
     { balance: 0, logs: [], quota: { month: '', used: 0 } },
     'engchain:credits');
   CreditStore.monthKey = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1); };
-  CreditStore.add = function (credits, reason) {
+  CreditStore.add = function (credits, reason, meta) {
     var s = this.read(); s.balance += credits;
-    s.logs.unshift({ type: 'recharge', credits: credits, reason: reason || '充值到账', ts: Date.now() });
+    var rec = Object.assign({ type: 'recharge', credits: credits, reason: reason || '充值到账', ts: Date.now(), status: 'success' }, meta || {});
+    s.logs.unshift(rec);
     return this.write(s);
   };
-  CreditStore.consume = function (cost, reason) {
+  CreditStore.consume = function (cost, reason, meta) {
     var s = this.read(); if (s.balance < cost) return null;
     s.balance -= cost;
-    s.logs.unshift({ type: 'unlock', credits: -cost, reason: reason || '信息解锁', ts: Date.now() });
+    var rec = Object.assign({ type: 'unlock', credits: -cost, reason: reason || '信息解锁', ts: Date.now(), status: 'success' }, meta || {});
+    s.logs.unshift(rec);
     return this.write(s);
   };
   CreditStore.freeUsed = function () {
