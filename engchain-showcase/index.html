@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程链 ENGCHAIN · 全屏展示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #F4F2EE; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+  [data-theme="dark"] body, body.dark { background: #1A1816; }
+
+  .showcase-wrap { width: 100%; height: 100%; display: flex; justify-content: center; align-items: stretch; position: relative; }
+
+  /* iframe 容器：最大手机宽度，居中，窗口小时自适应 */
+  .showcase-frame {
+    width: min(100%, 430px);
+    height: 100%;
+    border: none;
+    display: block;
+    background: #F4F2EE;
+    box-shadow: 0 0 40px rgba(0,0,0,.08);
+  }
+  [data-theme="dark"] .showcase-frame, body.dark .showcase-frame { background: #1A1816; box-shadow: 0 0 40px rgba(0,0,0,.3); }
+
+  /* 返回 preview 模式的浮动按钮 */
+  .back-to-preview {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 9999;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(28,26,20,.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.15);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity .2s, transform .2s;
+    opacity: .5;
+  }
+  .back-to-preview:hover { opacity: 1; transform: translateY(-1px); }
+</style>
+</head>
+<body>
+  <a href="../preview.html" class="back-to-preview" title="返回带 iPhone 模型的预览模式">← 预览模式</a>
+  <div class="showcase-wrap">
+    <iframe id="app-frame" class="showcase-frame" src="../home.html" title="工程链 ENGCHAIN" allow="clipboard-read; clipboard-write"></iframe>
+  </div>
+<script>
+  // 同步主题：读取 localStorage 中的主题设置，应用到 body
+  (function() {
+    try {
+      var state = JSON.parse(localStorage.getItem('engchain-state') || '{}');
+      if (state.theme === 'dark' || document.documentElement.getAttribute('data-theme') === 'dark') {
+        document.body.classList.add('dark');
+      }
+    } catch(e) {}
+  })();
+
+  // 监听 iframe 内的主题切换，同步到外层 body
+  document.getElementById('app-frame').addEventListener('load', function() {
+    try {
+      var innerDoc = this.contentDocument;
+      if (innerDoc) {
+        var syncTheme = function() {
+          var innerTheme = innerDoc.documentElement.getAttribute('data-theme');
+          if (innerTheme === 'dark') {
+            document.body.classList.add('dark');
+          } else {
+            document.body.classList.remove('dark');
+          }
+        };
+        syncTheme();
+        // 监听 iframe 内的主题变化
+        var observer = new MutationObserver(syncTheme);
+        observer.observe(innerDoc.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      }
+    } catch(e) {}
+  });
+</script>
+</body>
+</html>
