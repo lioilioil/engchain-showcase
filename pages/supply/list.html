@@ -31,9 +31,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 
-  <!-- 业务场景筛选行 -->
-  <div id="filter-row" style="display:flex;gap:8px;padding:0 16px 6px;flex-wrap:wrap;flex:0 0 auto;"></div>
-
   <div class="scroll no-pad" style="padding-top:8px;padding-bottom:100px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 16px;">
       <span class="text-2 fs-12" id="count"></span>
@@ -125,26 +122,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     });
   });
 
-  // 业务场景 chips（与新口径二级分类一致：项目合作/材料/设备/劳务/中介）
-  var bizMap = { '项目合作': 'cooperation', '材料': 'material', '设备': 'equipment', '劳务': 'labor', '中介': 'agency' };
-  var cats = ['全部'].concat(Object.keys(bizMap));
-  var curCat = '全部';
+  // 业务分类（完整9类，与 BIZ_MAP 归一化口径一致）
+  var bizMap = { '项目合作': 'cooperation', '材料': 'material', '设备': 'equipment', '劳务': 'labor', '中介': 'agency', '资质招商': 'franchise', '建企买卖': 'trade', '企业招聘': 'personnel', '人才求职': 'talent' };
   var catP = params.get('cat');
-  if (catP) { for (var _k in bizMap) { if (bizMap[_k] === catP) { curCat = _k; break; } } }
-  var fr = document.getElementById('filter-row');
-  fr.innerHTML = cats.map(function (c) { return '<span class="chip" data-c="' + c + '" style="padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer;border:1px solid var(--line);color:var(--text-2);background:var(--bg-card)">' + c + '</span>'; }).join('');
-  fr.querySelectorAll('.chip').forEach(function (ch) {
-    if (ch.dataset.c === curCat) { ch.style.color = 'var(--primary)'; ch.style.background = 'var(--primary-soft)'; ch.style.borderColor = 'var(--primary)'; }
-    ch.addEventListener('click', function () {
-      curCat = ch.dataset.c;
-      fr.querySelectorAll('.chip').forEach(function (x) {
-        x.style.color = 'var(--text-2)'; x.style.background = 'var(--bg-card)'; x.style.borderColor = 'var(--line)';
-      });
-      if (curCat !== '全部') { ch.style.color = 'var(--primary)'; ch.style.background = 'var(--primary-soft)'; ch.style.borderColor = 'var(--primary)'; }
-      render();
-      history.replaceState({}, '', '?type=' + type + (curCat !== '全部' ? '&cat=' + bizMap[curCat] : ''));
-    });
-  });
+  var initCat = '全部';
+  if (catP) { for (var _k in bizMap) { if (bizMap[_k] === catP) { initCat = _k; break; } } }
 
   var sortNewest = true;
   document.getElementById('sort-btn').addEventListener('click', function () {
@@ -153,14 +135,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     render();
   });
 
-  /* ---- 筛选面板：地区 / 预算 / 认证 ---- */
+  /* ---- 筛选面板：分类 / 地区 / 预算 / 认证 ---- */
   var FILTER_GROUPS = [
+    { key: 'category', label: '分类', options: ['全部'].concat(Object.keys(bizMap)) },
     { key: 'city', label: '地区', options: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'] },
     { key: 'budget', label: '预算', options: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'] },
     { key: 'verified', label: '认证', options: ['全部', '已认证', '未认证'] }
   ];
-  var filterState = { city: '全部', budget: '全部', verified: '全部' };
-  var filterDraft = { city: '全部', budget: '全部', verified: '全部' };
+  var filterState = { category: initCat, city: '全部', budget: '全部', verified: '全部' };
+  var filterDraft = { category: initCat, city: '全部', budget: '全部', verified: '全部' };
 
   function renderFilterGroups() {
     var html = FILTER_GROUPS.map(function (g) {
@@ -180,7 +163,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   window.openFilter = function () {
-    filterDraft = { city: filterState.city, budget: filterState.budget, verified: filterState.verified };
+    filterDraft = { category: filterState.category, city: filterState.city, budget: filterState.budget, verified: filterState.verified };
     renderFilterGroups();
     var ov = document.getElementById('filter-overlay');
     ov.style.display = 'block';
@@ -191,17 +174,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     setTimeout(function () { document.getElementById('filter-overlay').style.display = 'none'; }, 300);
   };
   window.resetFilter = function () {
-    filterDraft = { city: '全部', budget: '全部', verified: '全部' };
+    filterDraft = { category: '全部', city: '全部', budget: '全部', verified: '全部' };
     renderFilterGroups();
   };
   window.applyFilter = function () {
-    filterState = { city: filterDraft.city, budget: filterDraft.budget, verified: filterDraft.verified };
+    filterState = { category: filterDraft.category, city: filterDraft.city, budget: filterDraft.budget, verified: filterDraft.verified };
     updateFilterBadge();
     render();
+    history.replaceState({}, '', '?type=' + type + (filterState.category !== '全部' ? '&cat=' + bizMap[filterState.category] : ''));
     closeFilter();
   };
   function updateFilterBadge() {
     var cnt = 0;
+    if (filterState.category !== '全部') cnt++;
     if (filterState.city !== '全部') cnt++;
     if (filterState.budget !== '全部') cnt++;
     if (filterState.verified !== '全部') cnt++;
@@ -228,7 +213,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function render() {
     var list = mergedList();
     if (type !== 'all') list = list.filter(function (s) { return s.dir === type; });
-    if (curCat !== '全部') list = list.filter(function (s) { return s.bizKey === bizMap[curCat]; });
+    if (filterState.category !== '全部') list = list.filter(function (s) { return s.bizKey === bizMap[filterState.category]; });
     /* 筛选面板：地区 / 预算 / 认证 */
     if (filterState.city !== '全部') list = list.filter(function (s) { return (s.city || s.location || '') === filterState.city || (s.city || s.location || '').indexOf(filterState.city) >= 0; });
     if (filterState.budget !== '全部') list = list.filter(function (s) { return matchBudget(s, filterState.budget); });
