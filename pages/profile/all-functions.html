@@ -363,6 +363,7 @@ body, .phone { background: var(--af-bg); }
 </div>
 
 <script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
 <script>
 (function(){
   window.__ROOT__ = '../../';
@@ -374,6 +375,30 @@ body, .phone { background: var(--af-bg); }
   } catch(e) {}
 
   window.go = function(url) { location.href = url; };
+
+  /* 动态权限解锁：根据用户身份解锁对应功能 */
+  (function() {
+    try {
+      var idy = window.deriveIdentity ? deriveIdentity() : { primary: 'guest' };
+      var primary = idy.primary;
+      /* 分销中心：入驻企业 / 个人合伙人专享 */
+      var distUnlocked = primary === 'partner' || primary === 'resident';
+      /* 简历投递：pro及以上解锁 */
+      var resumeUnlocked = primary === 'pro' || primary === 'partner' || primary === 'enterprise' || primary === 'resident';
+
+      function unlockItem(gridSelector, href) {
+        var item = document.querySelector(gridSelector + ' .af-item');
+        if (!item) return;
+        item.classList.remove('locked');
+        item.onclick = function() { location.href = href; };
+        var lockIcon = item.querySelector('.af-lock');
+        if (lockIcon) lockIcon.style.display = 'none';
+      }
+
+      if (distUnlocked) unlockItem('.af-grid[data-group="partner"]', '../distribution/index.html');
+      if (resumeUnlocked) unlockItem('.af-grid[data-group="talent"]', '../personnel/index.html');
+    } catch(e) {}
+  })();
 
   window.showLocked = function(name) {
     if (window.UI && UI.dialog) {

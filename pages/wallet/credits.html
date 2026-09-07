@@ -12,42 +12,188 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>我的积分 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* 积分余额 Hero 卡片 */
+  .credits-hero {
+    margin: 0 16px 14px;
+    padding: 20px 18px 16px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #2A2318 0%, #3D3220 45%, #4A3A22 100%);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(42,35,24,.25);
+  }
+  .credits-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,175,55,.18) 0%, transparent 70%);
+  }
+  .credits-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -30px; left: -20px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(212,175,55,.1) 0%, transparent 70%);
+  }
+  .ch-label { font-size: 12px; color: rgba(255,255,255,.55); letter-spacing: .04em; }
+  .ch-balance { font-size: 36px; font-weight: 800; color: #F0D9A0; font-family: var(--font-num); margin-top: 4px; letter-spacing: -.02em; }
+  .ch-balance .unit { font-size: 14px; font-weight: 500; color: rgba(255,255,255,.5); margin-left: 4px; }
+  .ch-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; position: relative; z-index: 1; }
+  .ch-disc { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: rgba(212,175,55,.18); color: #E8C97A; font-size: 11px; font-weight: 600; }
+  .ch-free { font-size: 11px; color: rgba(255,255,255,.5); }
+  .ch-free b { color: #F0D9A0; font-weight: 600; }
+  .ch-progress { height: 4px; border-radius: 999px; background: rgba(255,255,255,.12); margin-top: 8px; overflow: hidden; position: relative; z-index: 1; }
+  .ch-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #D4AF37, #F0D9A0); transition: width .4s ease; }
+
+  /* 积分包卡片 */
+  .pack-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0 16px; }
+  .pack-card {
+    padding: 14px 8px 12px;
+    border-radius: 14px;
+    background: var(--bg-card);
+    border: 1.5px solid var(--line);
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s ease;
+    position: relative;
+  }
+  .pack-card:active { transform: scale(.97); }
+  .pack-card.selected { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 4px 12px rgba(212,175,55,.15); }
+  .pack-card .pk-price { font-size: 18px; font-weight: 700; color: var(--text-1); font-family: var(--font-num); }
+  .pack-card .pk-credits { font-size: 14px; font-weight: 700; color: var(--primary); margin-top: 2px; }
+  .pack-card .pk-gain { font-size: 10px; color: var(--success); margin-top: 3px; font-weight: 600; }
+  .pack-card .pk-gain.empty { visibility: hidden; }
+  .pack-card .pk-check {
+    position: absolute; top: -1px; right: -1px;
+    width: 20px; height: 20px;
+    background: var(--primary);
+    border-radius: 0 12px 0 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .pack-card.selected .pk-check { display: flex; }
+  .pack-card .pk-check svg { width: 11px; height: 11px; stroke: #fff; stroke-width: 3; fill: none; }
+
+  /* 支付方式 */
+  .pay-methods { padding: 0 16px; margin-top: 14px; }
+  .pm-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 10px; }
+  .pm-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg-card);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .pm-item:active { transform: scale(.99); }
+  .pm-item.selected { border-color: var(--primary); background: var(--primary-soft); }
+  .pm-item .pm-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .pm-item .pm-icon svg { width: 18px; height: 18px; }
+  .pm-item .pm-body { flex: 1; min-width: 0; }
+  .pm-item .pm-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .pm-item .pm-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .pm-item .pm-radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .pm-item.selected .pm-radio { border-color: var(--primary); }
+  .pm-item.selected .pm-radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+
+  /* 积分明细 */
+  .log-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-hairline);
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-icon {
+    width: 38px; height: 38px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  .log-icon svg { width: 18px; height: 18px; }
+  .log-icon.type-recharge { background: rgba(46,125,80,.1); color: #2E7D50; }
+  .log-icon.type-unlock { background: rgba(212,175,55,.1); color: #B8960C; }
+  .log-icon.type-bonus { background: rgba(230,126,34,.1); color: #E67E22; }
+  .log-icon.type-refund { background: rgba(52,152,219,.1); color: #3498DB; }
+  .log-icon.type-transfer { background: rgba(155,89,182,.1); color: #9B59B6; }
+  .log-body { flex: 1; min-width: 0; }
+  .log-title { font-size: 13.5px; font-weight: 600; color: var(--text-1); display: flex; align-items: center; gap: 6px; }
+  .log-title .log-counterparty { font-size: 11px; color: var(--text-3); font-weight: 400; }
+  .log-meta { font-size: 11px; color: var(--text-3); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .log-meta .log-source { display: inline-flex; align-items: center; gap: 3px; }
+  .log-meta .log-status { padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .log-meta .log-status.success { background: rgba(46,125,80,.1); color: #2E7D50; }
+  .log-meta .log-status.pending { background: rgba(230,160,34,.1); color: #E6A022; }
+  .log-amount { text-align: right; flex: none; }
+  .log-amount .la-num { font-size: 15px; font-weight: 700; font-family: var(--font-num); }
+  .log-amount .la-num.income { color: #2E7D50; }
+  .log-amount .la-num.expense { color: var(--text-1); }
+  .log-amount .la-label { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+
+  /* 充值成功弹窗 */
+  .recharge-success { text-align: center; padding: 10px 0; }
+  .rs-icon { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #2E7D50, #4CAF7D); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .rs-icon svg { width: 28px; height: 28px; stroke: #fff; stroke-width: 2.5; fill: none; }
+  .rs-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
+  .rs-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.6; }
+  .rs-amount { font-size: 28px; font-weight: 800; color: var(--primary); font-family: var(--font-num); margin-top: 12px; }
+
+  /* 空状态 */
+  .empty-logs { padding: 40px 20px; text-align: center; }
+  .empty-logs .el-icon { width: 48px; height: 48px; border-radius: 14px; background: var(--bg-card-2); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+  .empty-logs .el-icon svg { width: 24px; height: 24px; color: var(--text-3); }
+  .empty-logs .el-title { font-size: 14px; font-weight: 600; color: var(--text-2); }
+  .empty-logs .el-desc { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+</style>
 </head>
 <body>
 <div class="phone">
   <div class="navbar" style="height:50px;">
     <button class="nav-back" onclick="history.back()">‹</button>
     <div class="nav-title">我的积分</div>
-    <div class="nav-right"></div>
+    <div class="nav-right"><a href="credits-rules.html" style="font-size:12px;color:var(--text-2);text-decoration:none;">规则</a></div>
   </div>
 
-  <div class="scroll" style="padding-top:8px;">
-    <!-- 余额卡片 -->
-    <div class="ai-folder" style="margin-bottom:14px;">
-      <div class="fb-between">
-        <div><div class="af-sub">当前积分余额</div><div class="fw-700" style="font-size:26px;color:var(--primary);font-family:var(--font-num);" id="bal-num">0</div></div>
-        <span class="tag tag-primary" id="disc-tag">无折扣</span>
+  <div class="scroll" style="padding-top:12px;padding-bottom:120px;">
+    <!-- 积分余额 Hero 卡片 -->
+    <div class="credits-hero">
+      <div class="ch-label">当前积分余额</div>
+      <div class="ch-balance"><span id="bal-num">0</span><span class="unit">积分</span></div>
+      <div class="ch-row">
+        <span class="ch-disc" id="disc-tag">入驻享折扣</span>
+        <span class="ch-free">本月免费解锁 <b id="free-remain">5</b> 条</span>
       </div>
-      <div class="text-3 fs-12" style="margin-top:8px;">实名及以上用户每月享 <b id="free-monthly">5</b> 条免费解锁；入驻会员解锁享积分折扣</div>
+      <div class="ch-progress"><div class="ch-progress-fill" id="free-bar" style="width:0%"></div></div>
     </div>
 
-    <!-- 获取积分任务区（v1.3） -->
+    <!-- 获取积分任务区 -->
     <div id="task-wrap"></div>
 
-    <!-- 免费额度 -->
-    <div class="card" style="margin-bottom:14px;">
-      <div class="fb-between" style="margin-bottom:8px;"><span class="fw-600 fs-14">本月免费额度</span><span class="text-2 fs-12" id="free-txt"></span></div>
-      <div style="height:6px;border-radius:999px;background:var(--bg-card-2);overflow:hidden;"><div style="height:100%;width:0%;border-radius:999px;background:var(--primary);transition:width .4s;" id="free-bar"></div></div>
+    <!-- 充值积分 -->
+    <div class="section-title" style="margin-top:18px;"><div class="st-left">充值积分</div><span class="more" id="recharge-note">¥1 ≈ 1 积分起</span></div>
+    <div class="pack-grid" id="pack-list"></div>
+
+    <!-- 支付方式 -->
+    <div class="pay-methods">
+      <div class="pm-label">选择支付方式</div>
+      <div id="pm-list"></div>
     </div>
 
-    <!-- 充值三档 -->
-    <div class="section-title"><div class="st-left">充值积分</div><span class="more" id="recharge-note">¥1 ≈ 1 积分起</span></div>
-    <div id="pack-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"></div>
-    <div class="text-3 fs-12" style="margin-top:8px;color:var(--text-3);">充值积分用于解锁供需详情；建企转让按 ¥5,000 可退保证金（不走积分）。</div>
+    <!-- 积分明细 -->
+    <div class="section-title" style="margin-top:20px;"><div class="st-left">积分明细</div><span class="more" id="log-count"></span></div>
+    <div class="card" style="margin:0 16px;padding:0;" id="log-card">
+      <div id="log-list"></div>
+    </div>
+  </div>
 
-    <!-- 消费记录 -->
-    <div class="section-title" style="margin-top:18px;"><div class="st-left">积分明细</div></div>
-    <div id="log-list"></div>
+  <!-- 底部固定充值按钮 -->
+  <div class="fixed-cta">
+    <button class="btn btn-primary btn-block btn-lg" id="cta" onclick="doRecharge()">立即充值</button>
   </div>
 </div>
 
@@ -55,125 +201,269 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script>
-(function(){window.__ROOT__='../../';
-var packs=(MOCK.business.credits&&MOCK.business.credits.packages)||[{id:'single',price:98,credits:98},{id:'pack10',price:580,credits:1000},{id:'pack30',price:1280,credits:3000}];
-var monthly=(MOCK.business.credits&&MOCK.business.credits.freeQuota&&MOCK.business.credits.freeQuota.monthly)||5;
-if(window.ModeStore&&ModeStore.isBreakIn())monthly+=((MOCK.business.breakin||{}).registerBonus)||0;
-document.getElementById('free-monthly').textContent=monthly;
-var entry=EntryStore.read();
-var disc=window.creditDiscount?creditDiscount():1;
-var discTag=document.getElementById('disc-tag');
-if(entry.type&&entry.active){
-  var t=MOCK.entryTypeById(entry.type);
-  discTag.textContent=(t?t.label:'入驻')+' · '+Math.round(disc*10)+' 折';
-}else{discTag.textContent='入驻享折扣';}
+(function(){
+window.__ROOT__='../../';
 
-function render(){
-  var c=CreditStore.read();
-  document.getElementById('bal-num').textContent=c.balance.toLocaleString();
-  var used=CreditStore.freeUsed();
-  var remain=Math.max(monthly-used,0);
-  document.getElementById('free-txt').textContent='已用 '+used+' / 共 '+monthly+' 条 · 剩 '+remain+' 条';
-  document.getElementById('free-bar').style.width=Math.min(used/monthly*100,100)+'%';
-  var logs=c.logs||[];
-  var box=document.getElementById('log-list');
-  if(!logs.length){box.innerHTML='<div class="card"><div class="text-3 fs-12">暂无积分记录</div></div>';return;}
-  box.innerHTML=logs.slice(0,12).map(function(l){
-    var d=new Date(l.ts);var ds=(d.getMonth()+1)+'月'+d.getDate()+'日 '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
-    var sign=l.credits>=0?'+':'';
-    var col=l.credits>=0?'var(--success)':'var(--text-1)';
-    return '<div class="card" style="margin-bottom:8px;"><div class="fb-between"><div><div class="fw-600 fs-13">'+l.reason+'</div><div class="text-3 fs-11 mt-1">'+ds+' · '+(l.type==='recharge'?'充值':'解锁')+'</div></div><span class="mono fw-700" style="color:'+col+';">'+sign+l.credits+'</span></div></div>';
+/* ---- 数据初始化 ---- */
+var packs = (MOCK.business.credits && MOCK.business.credits.packages) || [
+  { id:'single', price:98, credits:98 },
+  { id:'pack10', price:580, credits:1000 },
+  { id:'pack30', price:1280, credits:3000 }
+];
+var monthly = (MOCK.business.credits && MOCK.business.credits.freeQuota && MOCK.business.credits.freeQuota.monthly) || 5;
+if(window.ModeStore && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
+
+var selectedPack = 0;
+var selectedPay = 'balance';
+
+/* ---- 支付方式定义 ---- */
+var payMethods = [
+  { id:'balance', name:'余额支付', desc:'可用余额 ¥' + (BalanceStore.read().balance || 0).toFixed(2), icon:'i-wallet', color:'#2E7D50' },
+  { id:'wechat', name:'微信支付', desc:'推荐使用', icon:'i-chat', color:'#07C160' },
+  { id:'alipay', name:'支付宝', desc:'安全便捷', icon:'i-box', color:'#1677FF' }
+];
+
+/* ---- 渲染积分包 ---- */
+function renderPacks() {
+  var box = document.getElementById('pack-list');
+  box.innerHTML = packs.map(function(p, i) {
+    var gain = p.price >= 580 ? '多送' + Math.round((p.credits - p.price) / p.price * 100) + '%' : '';
+    var selected = i === selectedPack;
+    return '<div class="pack-card' + (selected ? ' selected' : '') + '" onclick="selectPack(' + i + ')">' +
+      '<div class="pk-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+      '<div class="pk-price">¥' + p.price + '</div>' +
+      '<div class="pk-credits">' + p.credits + ' 积分</div>' +
+      '<div class="pk-gain' + (gain ? '' : ' empty') + '">' + (gain || 'placeholder') + '</div>' +
+    '</div>';
   }).join('');
 }
-render();
+window.selectPack = function(i) { selectedPack = i; renderPacks(); updateCTA(); };
 
-/* ---- 获取积分任务区（v1.3：签到/实名/入驻/邀请） ---- */
+/* ---- 渲染支付方式 ---- */
+function renderPayMethods() {
+  var box = document.getElementById('pm-list');
+  var bal = BalanceStore.read().balance || 0;
+  payMethods[0].desc = '可用余额 ¥' + bal.toFixed(2);
+  box.innerHTML = payMethods.map(function(pm) {
+    var selected = pm.id === selectedPay;
+    return '<div class="pm-item' + (selected ? ' selected' : '') + '" onclick="selectPay(\'' + pm.id + '\')">' +
+      '<div class="pm-icon" style="background:' + pm.color + '15;color:' + pm.color + ';">' +
+        '<svg class="ic"><use href="#' + pm.icon + '"/></svg>' +
+      '</div>' +
+      '<div class="pm-body"><div class="pm-name">' + pm.name + '</div><div class="pm-desc">' + pm.desc + '</div></div>' +
+      '<div class="pm-radio"></div>' +
+    '</div>';
+  }).join('');
+}
+window.selectPay = function(id) { selectedPay = id; renderPayMethods(); updateCTA(); };
+
+/* ---- 更新底部按钮状态 ---- */
+function updateCTA() {
+  var btn = document.getElementById('cta');
+  var p = packs[selectedPack];
+  var bal = BalanceStore.read().balance || 0;
+  if (selectedPay === 'balance' && bal < p.price) {
+    btn.textContent = '余额不足，去充值';
+    btn.style.opacity = '.7';
+  } else {
+    btn.textContent = '确认充值 ¥' + p.price + ' · ' + p.credits + '积分';
+    btn.style.opacity = '1';
+  }
+}
+
+/* ---- 执行充值 ---- */
+window.doRecharge = function() {
+  var p = packs[selectedPack];
+  var bal = BalanceStore.read().balance || 0;
+  if (selectedPay === 'balance' && bal < p.price) {
+    UI.toast('余额不足，请先充值余额或选择其他支付方式', 'warn');
+    return;
+  }
+  /* 余额支付：扣减余额 */
+  if (selectedPay === 'balance') {
+    var bs = BalanceStore.read();
+    bs.balance = Math.round((bs.balance - p.price) * 100) / 100;
+    bs.logs.unshift({ type:'consume', amount:-p.price, reason:'积分充值 · ' + p.credits + '积分', ts:Date.now(), status:'success' });
+    BalanceStore.write(bs);
+  }
+  /* 积分到账 */
+  var payName = selectedPay === 'balance' ? '余额支付' : (selectedPay === 'wechat' ? '微信支付' : '支付宝');
+  CreditStore.add(p.credits, '积分充值到账', {
+    type:'recharge',
+    source: payName,
+    orderId: 'CR' + Date.now(),
+    status:'success',
+    fromUser: '平台'
+  });
+  /* 显示成功弹窗 */
+  showRechargeSuccess(p);
+  render();
+  renderPayMethods();
+  updateCTA();
+};
+
+/* ---- 充值成功弹窗 ---- */
+function showRechargeSuccess(p) {
+  var sh = UI.sheet();
+  sh.setClosable(false);
+  sh.html(
+    '<div class="recharge-success">' +
+      '<div class="rs-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+      '<div class="rs-title">充值成功</div>' +
+      '<div class="rs-desc">' + p.credits + ' 积分已到账，可用于解锁供需详情、联系洽谈等</div>' +
+      '<div class="rs-amount">+' + p.credits + ' 积分</div>' +
+      '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="UI.closeSheet()">完成</button>' +
+    '</div>'
+  ).show();
+}
+
+/* ---- 渲染主数据 ---- */
+function render() {
+  var c = CreditStore.read();
+  document.getElementById('bal-num').textContent = c.balance.toLocaleString();
+
+  /* 折扣标签 */
+  var entry = EntryStore.read();
+  var disc = window.creditDiscount ? creditDiscount() : 1;
+  var discTag = document.getElementById('disc-tag');
+  if (entry.type && entry.active) {
+    var t = MOCK.entryTypeById(entry.type);
+    discTag.textContent = (t ? t.label : '入驻') + ' · ' + Math.round(disc * 10) + ' 折';
+  } else if (window.deriveIdentity && deriveIdentity().partner) {
+    discTag.textContent = '个人合伙人 · 8 折';
+  } else {
+    discTag.textContent = '入驻享折扣';
+  }
+
+  /* 免费额度 */
+  var used = CreditStore.freeUsed();
+  var remain = Math.max(monthly - used, 0);
+  document.getElementById('free-remain').textContent = remain;
+  document.getElementById('free-bar').style.width = Math.min(used / monthly * 100, 100) + '%';
+
+  /* 积分明细 */
+  renderLogs(c.logs || []);
+}
+
+/* ---- 积分明细类型配置 ---- */
+var logTypeConfig = {
+  recharge: { icon:'i-wallet', label:'充值' },
+  unlock: { icon:'i-eye', label:'解锁' },
+  bonus: { icon:'i-star', label:'奖励' },
+  refund: { icon:'i-rotate', label:'退款' },
+  transfer: { icon:'i-share', label:'转出' }
+};
+
+/* ---- 渲染积分明细 ---- */
+function renderLogs(logs) {
+  var box = document.getElementById('log-list');
+  var countEl = document.getElementById('log-count');
+  countEl.textContent = logs.length ? '共 ' + logs.length + ' 条' : '';
+
+  if (!logs.length) {
+    box.innerHTML = '<div class="empty-logs">' +
+      '<div class="el-icon"><svg class="ic"><use href="#i-doc"/></svg></div>' +
+      '<div class="el-title">暂无积分记录</div>' +
+      '<div class="el-desc">充值或解锁后将在此显示明细</div>' +
+    '</div>';
+    return;
+  }
+
+  box.innerHTML = logs.slice(0, 20).map(function(l) {
+    var cfg = logTypeConfig[l.type] || logTypeConfig.unlock;
+    var isIncome = l.credits >= 0;
+    var d = new Date(l.ts);
+    var ds = (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var counterparty = l.toUser ? ('→ ' + l.toUser) : (l.fromUser ? ('← ' + l.fromUser) : '');
+    var source = l.source || (l.type === 'recharge' ? '平台充值' : (l.type === 'bonus' ? '任务奖励' : '平台'));
+    var statusText = l.status === 'pending' ? '处理中' : (l.status === 'failed' ? '失败' : '成功');
+    var statusClass = l.status || 'success';
+
+    return '<div class="log-item">' +
+      '<div class="log-icon type-' + l.type + '"><svg class="ic"><use href="#' + cfg.icon + '"/></svg></div>' +
+      '<div class="log-body">' +
+        '<div class="log-title">' + cfg.label + ' · ' + l.reason +
+          (counterparty ? '<span class="log-counterparty">' + counterparty + '</span>' : '') +
+        '</div>' +
+        '<div class="log-meta">' +
+          '<span>' + ds + '</span>' +
+          '<span class="log-source">' + source + '</span>' +
+          (l.orderId ? '<span>单号 ' + l.orderId + '</span>' : '') +
+          '<span class="log-status ' + statusClass + '">' + statusText + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="log-amount">' +
+        '<div class="la-num ' + (isIncome ? 'income' : 'expense') + '">' + (isIncome ? '+' : '') + l.credits + '</div>' +
+        '<div class="la-label">积分</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ---- 获取积分任务区（保持原有功能） ---- */
 window.addEventListener('engchain:credits', render);
 window.addEventListener('engchain:mode', render);
 window.addEventListener('engchain:store-change', render);
+
 var RW = (MOCK.business.credits && MOCK.business.credits.rewards) || {};
-function renderTasks(){
-  var box=document.getElementById('task-wrap');
-  if(!box)return;
-  var st=(window.UI&&UI.state)?UI.state.get():{};
-  if(st.loggedIn===false){
-    box.innerHTML='<div class="section-title" style="margin-top:18px;"><div class="st-left">获取积分</div></div>'+
-      '<div class="card" style="padding:16px;text-align:center;"><div class="fw-600 fs-14">登录后获取积分</div>'+
-      '<div class="text-3 fs-12" style="margin-top:6px;line-height:1.7;">签到、实名认证、企业入驻、邀请好友均可获取积分</div>'+
+function renderTasks() {
+  var box = document.getElementById('task-wrap');
+  if (!box) return;
+  var st = (window.UI && UI.state) ? UI.state.get() : {};
+  if (st.loggedIn === false) {
+    box.innerHTML = '<div class="section-title" style="margin-top:18px;"><div class="st-left">获取积分</div></div>' +
+      '<div class="card" style="margin:0 16px;padding:16px;text-align:center;"><div class="fw-600 fs-14">登录后获取积分</div>' +
+      '<div class="text-3 fs-12" style="margin-top:6px;line-height:1.7;">签到、实名认证、企业入驻、邀请好友均可获取积分</div>' +
       '<a href="../auth/login.html" class="btn btn-primary" style="margin-top:12px;display:inline-flex;">去登录</a></div>';
     return;
   }
-  var a=AuthStore.read();
-  var e=EntryStore.read();
-  var ci=CheckinStore.read();
-  var checked=CheckinStore.checkedToday();
-  var realDone=!!(a.realname&&a.realname.ok);
-  var entryDone=!!(e.type&&e.active);
-  var realClaimed=CreditStore.claimed('realname');
-  var entryClaimed=CreditStore.claimed('entry');
-  var cards=[
-    { icon:'i-clock', name:'每日签到', rw:'+'+((RW.checkin)||10), state: checked?'已签到':'签到', desc: checked?('今日已签 · 连续 '+ci.count+' 天'):('签到得积分，连续 '+(RW.checkinStreakDays||7)+' 天额外 +'+(RW.checkinStreak||50)), tap: checked?null:'checkin' },
-    { icon:'i-user', name:'实名认证', rw:'+'+((RW.realname)||100), state: realClaimed?'已完成':(realDone?'领取':'去认证'), desc: realClaimed?'已获得实名奖励':(realDone?'认证已完成，领取奖励':'完成实名认证，免费领积分'), tap: realClaimed?null:(realDone?'claimReal':'../profile/auth-personal.html') },
-    { icon:'i-bank', name:'企业入驻', rw:'+'+((RW.entry)||500), state: entryClaimed?'已完成':(entryDone?'领取':'去入驻'), desc: entryClaimed?'已获得入驻奖励':(entryDone?'入驻已生效，领取奖励':'入驻企业专享奖励'), tap: entryClaimed?null:(entryDone?'claimEntry':'../profile/entry.html') },
-    { icon:'i-chat', name:'邀请好友', rw:'+'+((RW.invite)||50), state:'复制邀请码', desc:'好友注册填写您的邀请码，双方各得积分', tap:'copyInvite' }
+  var a = AuthStore.read();
+  var e = EntryStore.read();
+  var ci = CheckinStore.read();
+  var checked = CheckinStore.checkedToday();
+  var realDone = !!(a.realname && a.realname.ok);
+  var entryDone = !!(e.type && e.active);
+  var realClaimed = CreditStore.claimed('realname');
+  var entryClaimed = CreditStore.claimed('entry');
+  var cards = [
+    { icon:'i-clock', name:'每日签到', rw:'+' + ((RW.checkin) || 10), state: checked ? '已签到' : '签到', desc: checked ? ('今日已签 · 连续 ' + ci.count + ' 天') : ('签到得积分，连续 ' + (RW.checkinStreakDays || 7) + ' 天额外 +' + (RW.checkinStreak || 50)), tap: checked ? null : 'checkin' },
+    { icon:'i-user', name:'实名认证', rw:'+' + ((RW.realname) || 100), state: realClaimed ? '已完成' : (realDone ? '领取' : '去认证'), desc: realClaimed ? '已获得实名奖励' : (realDone ? '认证已完成，领取奖励' : '完成实名认证，免费领积分'), tap: realClaimed ? null : (realDone ? 'claimReal' : '../profile/auth-personal.html') },
+    { icon:'i-bank', name:'企业入驻', rw:'+' + ((RW.entry) || 500), state: entryClaimed ? '已完成' : (entryDone ? '领取' : '去入驻'), desc: entryClaimed ? '已获得入驻奖励' : (entryDone ? '入驻已生效，领取奖励' : '入驻企业专享奖励'), tap: entryClaimed ? null : (entryDone ? 'claimEntry' : '../profile/entry.html') },
+    { icon:'i-chat', name:'邀请好友', rw:'+' + ((RW.invite) || 50), state:'复制邀请码', desc:'好友注册填写您的邀请码，双方各得积分', tap:'copyInvite' }
   ];
-  var h='<div class="section-title" style="margin-top:18px;"><div class="st-left">获取积分</div></div>';
-  h+=cards.map(function(c){
+  var h = '<div class="section-title" style="margin-top:18px;"><div class="st-left">获取积分</div></div>';
+  h += '<div style="padding:0 16px;">' + cards.map(function(c) {
     var btn;
-    if(c.tap===null){btn='<span class="text-3 fs-12" style="flex:none;">'+c.state+'</span>';}
-    else if(c.state==='去认证'||c.state==='去入驻'){btn='<a class="btn btn-primary" style="padding:6px 14px;font-size:12px;flex:none;display:inline-flex;" href="'+c.tap+'">'+c.state+'</a>';}
-    else{btn='<button class="btn btn-primary" style="padding:6px 14px;font-size:12px;flex:none;" onclick="taskTap(\''+c.tap+'\')">'+c.state+'</button>';}
-    return '<div class="card" style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;">'+
-      '<span class="tx-ic" style="flex:none;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-2);color:var(--primary);"><svg class="ic" style="width:19px;height:19px;"><use href="#'+c.icon+'"/></svg></span>'+
-      '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">'+c.name+' <span style="color:var(--primary);font-size:11px;">'+c.rw+'</span></div>'+
-      '<div class="text-3 fs-11" style="margin-top:2px;">'+c.desc+'</div></div>'+btn+'</div>';
-  }).join('');
-  box.innerHTML=h;
+    if (c.tap === null) { btn = '<span class="text-3 fs-12" style="flex:none;">' + c.state + '</span>'; }
+    else if (c.state === '去认证' || c.state === '去入驻') { btn = '<a class="btn btn-primary" style="padding:6px 14px;font-size:12px;flex:none;display:inline-flex;" href="' + c.tap + '">' + c.state + '</a>'; }
+    else { btn = '<button class="btn btn-primary" style="padding:6px 14px;font-size:12px;flex:none;" onclick="taskTap(\'' + c.tap + '\')">' + c.state + '</button>'; }
+    return '<div class="card" style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;">' +
+      '<span class="tx-ic" style="flex:none;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-2);color:var(--primary);"><svg class="ic" style="width:19px;height:19px;"><use href="#' + c.icon + '"/></svg></span>' +
+      '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">' + c.name + ' <span style="color:var(--primary);font-size:11px;">' + c.rw + '</span></div>' +
+      '<div class="text-3 fs-11" style="margin-top:2px;">' + c.desc + '</div></div>' + btn + '</div>';
+  }).join('') + '</div>';
+  box.innerHTML = h;
 }
-window.taskTap=function(t){
-  if(t==='checkin'){var r=CheckinStore.checkin();if(r.ok){UI.toast('签到成功 +'+r.credits+' 分','ok');}else{UI.toast('今日已签到','warn');}}
-  else if(t==='claimReal'){if(CreditStore.claim('realname',null,'实名认证奖励')){UI.toast('领取成功','ok');}else{UI.toast('已领取过','warn');}}
-  else if(t==='claimEntry'){if(CreditStore.claim('entry',null,'企业入驻奖励')){UI.toast('领取成功','ok');}else{UI.toast('已领取过','warn');}}
-  else if(t==='copyInvite'){
-    var acct=((window.UI&&UI.state)?UI.state.get():{}).account||'demo@engchain.cn';
-    function done(){UI.toast('邀请码已复制','ok');}
-    function fb(){var ta=document.createElement('textarea');ta.value=acct;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(ta);done();}
-    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(acct).then(done,fb);}else{fb();}
+window.taskTap = function(t) {
+  if (t === 'checkin') { var r = CheckinStore.checkin(); if (r.ok) { UI.toast('签到成功 +' + r.credits + ' 分', 'ok'); } else { UI.toast('今日已签到', 'warn'); } }
+  else if (t === 'claimReal') { if (CreditStore.claim('realname', null, '实名认证奖励')) { UI.toast('领取成功', 'ok'); } else { UI.toast('已领取过', 'warn'); } }
+  else if (t === 'claimEntry') { if (CreditStore.claim('entry', null, '企业入驻奖励')) { UI.toast('领取成功', 'ok'); } else { UI.toast('已领取过', 'warn'); } }
+  else if (t === 'copyInvite') {
+    var acct = ((window.UI && UI.state) ? UI.state.get() : {}).account || 'demo@engchain.cn';
+    function done() { UI.toast('邀请码已复制', 'ok'); }
+    function fb() { var ta = document.createElement('textarea'); ta.value = acct; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); done(); }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(acct).then(done, fb); } else { fb(); }
   }
-  setTimeout(function(){renderTasks();render();},400);
+  setTimeout(function() { renderTasks(); render(); }, 400);
 };
-renderTasks();
 
-var plist=document.getElementById('pack-list');
-plist.innerHTML=packs.map(function(p,i){
-  var gain=p.price>=580?'多送'+((p.credits-p.price)/p.price*100).toFixed(0)+'%':'';
-  return '<div class="card" style="padding:12px 8px;text-align:center;cursor:pointer;" onclick="recharge('+i+')">'+
-    '<div class="mono fw-700" style="font-size:16px;color:var(--text-1);">¥'+p.price+'</div>'+
-    '<div class="fw-600" style="font-size:13px;color:var(--primary);margin-top:2px;">'+p.credits+' 积分</div>'+
-    (gain?'<div class="text-3" style="font-size:10px;margin-top:2px;">'+gain+'</div>':'<div class="text-3" style="font-size:10px;margin-top:2px;">&nbsp;</div>')+
-    '<div class="btn btn-primary" style="margin-top:8px;padding:5px 0;font-size:11px;width:100%;">充值</div>'+
-  '</div>';
-}).join('');
-window.packs=packs;
-window.recharge=function(i){
-  var p=window.packs[i];
-  var sh=UI.sheet(); sh.setText('充值确认'); sh.html(
-    '<div style="text-align:center;padding:6px 0 2px;">'+
-      '<div style="font-size:13px;color:var(--text-2);">支付 ¥'+p.price+'</div>'+
-      '<div class="mono fw-700" style="font-size:22px;color:var(--primary);margin-top:6px;">'+p.credits+' 积分</div>'+
-      '<div style="font-size:11px;color:var(--text-3);margin-top:6px;">模拟支付 · 到账即时可用 · 积分有效期 1 年</div>'+
-    '</div>'+
-    '<button class="btn btn-primary btn-block btn-lg" style="margin-top:16px;" onclick="__doRecharge('+i+')">确认支付 ¥'+p.price+'</button>'+
-    '<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button>'
-  ).show();
-};
-window.__doRecharge=function(i){
-  var p=window.packs[i];
-  CreditStore.add(p.credits,'充值 ¥'+p.price);
-  UI.closeSheet();
-  UI.toast('充值成功 · 到账 '+p.credits+' 积分','ok');
-  setTimeout(function(){render();},500);
-};
+/* ---- 初始化 ---- */
+renderPacks();
+renderPayMethods();
+renderTasks();
+render();
+updateCTA();
+
 })();
 </script>
 </body>
