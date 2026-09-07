@@ -1,4 +1,4 @@
-/* 工程链 · 单一供需详情引擎 (按业务场景分发，复用统一 shell) */
+﻿/* 工程链 · 单一供需详情引擎 (按业务场景分发，复用统一 shell) */
 window.DETAIL = (function () {
   function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + name + '"/></svg>'; }
   function mt(iconName, txt) { return icon(iconName) + txt; }
@@ -193,10 +193,21 @@ window.DETAIL = (function () {
   function guaranteeSec(rec) {
     var items = GUARANTEE[rec.bizKey];
     if (!items || !items.length) return '';
+    /* P3-8：成交类详情页增加平台佣金费率说明，提升成交信任 */
+    var dealTypes = ['cooperation', 'material', 'equipment', 'labor'];
+    var commHtml = '';
+    if (dealTypes.indexOf(rec.bizKey) >= 0) {
+      var cm = (MOCK.business && MOCK.business.commission) || {};
+      var tiers = cm.tier || [];
+      var isBreakin = !!(window.ModeStore && ModeStore.isBreakIn());
+      var firstRate = isBreakin ? ((MOCK.business.breakin || {}).commissionFirstTier || 0.05) : (tiers[0] ? tiers[0].rate : 0.08);
+      var tierText = tiers.map(function(t) { return (t.min / 10000) + '万以上 ' + (t.rate * 100) + '%'; }).join(' / ');
+      commHtml = '<div style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border:1px solid var(--accent-line);border-radius:8px;"><div style="font-size:11px;font-weight:600;color:var(--primary-dim);margin-bottom:3px;">平台服务费（成交后收取）</div><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;">阶梯费率：' + tierText + '%，最低 ' + (cm.minCommission || 10000).toLocaleString() + ' 元' + (isBreakin ? '；<b style="color:var(--accent);">破冰期首档优惠至 ' + (firstRate * 100) + '%（5万以下成交）</b>' : '') + '</div></div>';
+    }
     var rows = items.map(function (x) {
       return '<div style="display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" style="width:13px;height:13px;flex:none;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' + x + '</div>';
     }).join('');
-    return sec(GUARANTEE_TITLE[rec.bizKey] || '平台保障', '<div class="ds-text"><div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-2);line-height:1.6;">' + rows + '</div></div>');
+    return sec(GUARANTEE_TITLE[rec.bizKey] || '平台保障', '<div class="ds-text"><div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-2);line-height:1.6;">' + rows + '</div>' + commHtml + '</div>');
   }
 
   /* ---- 通用：相关推荐（同业务类型，同子类/同城优先，人才/招聘各自有推荐则跳过） ---- */
@@ -858,11 +869,11 @@ window.DETAIL = (function () {
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('服务顾问', cfgText(ac.name || '专属顾问')) +
-        row('咨询电话', Lock.partial(ac.phone || '', locked)) +
-        row('微信号', Lock.full(ac.wechat || '', locked)) +
-        row('机构地址', Lock.partial(ac.addr || r.location || '', locked, cfgText(r.location) + ' · 详细地址免费咨询后可见')) +
+        row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">免费咨询后可见完整号码</span>') : ac.phone) +
+        row('微信号', locked ? '<span style="color:var(--text-3)">扫码或免费咨询后获取</span>' : ac.wechat) +
+        row('机构地址', locked ? (cfgText(r.location) + ' · <span style="font-size:10px;color:var(--text-4)">免费咨询后可见详细地址</span>') : (ac.addr || r.location)) +
       '</div>' +
-      Lock.inline(locked, '免费提交咨询需求后查看联系方式', '专属顾问 1 对 1 · 电话 / 微信 · 全程不收取信息费', '免费咨询') +
+      '<div class="pw-inline" data-pw-unlock style="background:var(--success-soft);border:1px solid rgba(43,107,79,.2);"><div class="pw-inline-l"><div class="pw-inline-ic" style="background:rgba(43,107,79,.12);color:var(--success);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div><div class="pw-inline-t" style="color:var(--success);">免费提交咨询需求后查看联系方式</div><div class="pw-inline-s">专属顾问 1 对 1 · 电话 / 微信 · 全程不收取信息费</div></div></div><div class="pw-inline-price" style="color:var(--success);">免费咨询</div></div>' +
       '</div>';
   }
   function agencyBody(r, c) {
@@ -1520,7 +1531,7 @@ window.DETAIL = (function () {
     unlockItems: function () { return ['班组长完整姓名与带班履历', '精确计件 / 日工 / 月工资', '详细结算与节点条款', '生活费预支与工资专户信息', '完整联系电话 / 微信', '资质证书与项目业绩全文', '班组精确驻地']; }
   };
   byType.franchise = {
-    label: '招商加盟', inlineLock: true, verified: '企业已认证',
+    label: '招商加盟', inlineLock: true, verified: '企业已认证', consultMode: true, ctaLocked: '免费咨询',
     hero: function (r, c) {
       var tag = r.type === 'qualification' ? ('资质招商 · ' + (r.qualLevel || '') + '·' + (r.qualType || '')) : ('机会 · ' + r.sub);
       var vh = r.type === 'qualification' ? (r.verified ? '企业已认证' : '') : (r.verified ? '品牌已认证' : '');
@@ -1926,8 +1937,7 @@ window.DETAIL = (function () {
 
   byType.talent = {
     label: '人才简历详情', cta: '立即解锁', verified: '证书已核验', inlineLock: true,
-    ctaLocked: '立即解锁 29 积分 · 查看联系方式',
-    ctaText: function (r, unlocked) { return unlocked ? '查看联系方式' : '立即解锁 29 积分'; },
+    ctaText: function (r, unlocked) { return unlocked ? '查看联系方式' : payGoLabel(unlockPriceOf(r)); },
     hero: talentHero,
     sections: function (r, c) { return talentBody(r, c); },
     unlockItems: function () { return ['真实姓名', '手机号', '微信号', '注册单位全称', '完整工作履历', '项目详情', '学历院校']; },
@@ -1948,7 +1958,7 @@ window.DETAIL = (function () {
     var key = rec && rec.bizKey;
     if (key === 'talent') return { price: cons.talent || 29, original: null, tiered: false, mode: 'credit' };
     if (key === 'trade') return { price: (MOCK.business.credits || {}).tradeDeposit || 5000, original: null, tiered: false, mode: 'deposit' };
-    if (key === 'agency' || key === 'personnel') return { price: 0, original: null, tiered: false, mode: 'free' };
+    if (key === 'agency' || key === 'personnel' || key === 'franchise') return { price: 0, original: null, tiered: false, mode: 'free' };
     if (key === 'franchise') {
       var ft = cons.franchise || { t1: { price: 49, original: 99 }, t2: { price: 39, original: 79 }, t3: { price: 29, original: 59 } };
       var tk = franchiseTier(rec); var tier = ft[tk] || ft.t1;
@@ -1962,7 +1972,7 @@ window.DETAIL = (function () {
   /* M3：本用户可用免费解锁额度（实名及以上每月 freeQuota.monthly 条；破冰期注册赠 registerBonus 计入当月） */
   function freeQuotaInfo() {
     var st = window.deriveStatus ? deriveStatus() : 'registered';
-    var allow = (st === 'realname' || st === 'pro' || st === 'enterprise' || st === 'resident');
+    var allow = (st === 'realname' || st === 'pro' || st === 'enterprise' || st === 'resident' || st === 'partner');
     var monthly = (MOCK.business.credits && MOCK.business.credits.freeQuota) ? MOCK.business.credits.freeQuota.monthly : 5;
     if (window.ModeStore && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
     var used = window.CreditStore ? CreditStore.freeUsed() : 0;
@@ -1993,10 +2003,11 @@ window.DETAIL = (function () {
   /* 转化漏斗前置门（手册§8.2）：游客→登录/注册；注册未实名→免费实名认证；实名及以上直接放行 */
   function identityGate() {
     var st = window.deriveStatus ? deriveStatus() : 'registered';
-    var authed = (st === 'realname' || st === 'pro' || st === 'enterprise' || st === 'resident');
+    var authed = (st === 'realname' || st === 'pro' || st === 'enterprise' || st === 'resident' || st === 'partner');
     if (authed) return { pass: true };
-    var demo = {}; try { demo = JSON.parse(localStorage.getItem('engchain-state') || '{}'); } catch (e) {}
-    var isGuest = demo.status === 'guest';
+    /* P1-1：统一以 deriveIdentity().isGuest 为权威来源，localStorage.status 仅作回退 */
+    var isGuest = false;
+    try { if (window.deriveIdentity) { isGuest = !!deriveIdentity().isGuest; } else { var _d = JSON.parse(localStorage.getItem('engchain-state') || '{}'); isGuest = _d.status === 'guest'; } } catch (e) { try { var _d2 = JSON.parse(localStorage.getItem('engchain-state') || '{}'); isGuest = _d2.status === 'guest'; } catch (e2) {} }
     return { pass: false, isGuest: isGuest, label: isGuest ? '登录 / 注册后解锁完整信息' : '实名认证后免费解锁' };
   }
   function gateAct(g) {
@@ -2145,7 +2156,7 @@ window.DETAIL = (function () {
     var cur = payw.currency;
     /* 底部主按钮文案：付费/积分类对游客与未实名用户先做登录/实名引导；就近打码类未解锁显示「立即解锁 ¥XX」，解锁后切换为对接动作；免费留资/投递类沿用原 CTA */
     var gate = identityGate();
-    var needGate = !unlocked && rec.bizKey !== 'personnel' && rec.bizKey !== 'agency';
+    var needGate = !unlocked && rec.bizKey !== 'personnel' && rec.bizKey !== 'agency' && rec.bizKey !== 'franchise';
     /* P1-1：成熟期（非破冰期）游客主体全打码 —— 标题可见，主体参数/描述/联系方式全部遮罩 + 登录引导 CTA */
     var isMatureGuest = !unlocked && gate.isGuest && !(window.ModeStore && ModeStore.isBreakIn());
     if (isMatureGuest) {
@@ -2188,13 +2199,29 @@ window.DETAIL = (function () {
     /* G2：破冰期游客免费示例条数 */
     var gs = guestSampleInfo();
     var guestFreeAvail = needGate && gate.isGuest && gs.available;
-    var ctaText = unlocked
-      ? (t.ctaText ? t.ctaText(rec, true) : (t.cta || '联系TA'))
-      : (guestFreeAvail
-          ? '免费查看（游客福利 ' + (gs.used + 1) + '/' + gs.total + '）'
-          : ((needGate && !gate.pass)
-              ? gate.label
-              : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta)));
+    /* P1-3：personnel CTA 按身份状态前置提示，避免点击后才拦截 */
+    function personnelCta() {
+      try {
+        if (gate.isGuest) return '登录后投递';
+        if (window.DataBus && DataBus.canDeliverResume) {
+          var r = DataBus.canDeliverResume();
+          if (r.can) return '立即投递';
+          if (r.reason && r.reason.indexOf('简历') >= 0) return '完善简历后投递';
+          return '完成入驻后投递';
+        }
+      } catch (e) {}
+      return '立即投递';
+    }
+    /* P1-3：personnel 始终走动态 CTA（isFree已解锁不等于可投递，需单独检查投递权限） */
+    var ctaText = (rec.bizKey === 'personnel')
+      ? personnelCta()
+      : (unlocked
+          ? (t.ctaText ? t.ctaText(rec, true) : (t.cta || '联系TA'))
+          : (guestFreeAvail
+              ? '免费查看（游客福利 ' + (gs.used + 1) + '/' + gs.total + '）'
+              : ((needGate && !gate.pass)
+                  ? gate.label
+                  : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta))));
     if ($('actionbar')) $('actionbar').innerHTML = actionbarHtml(ctaText);
     var origLine = up.tiered ? '<span style="font-size:13px;color:var(--text-3);text-decoration:line-through;margin-left:8px;">¥' + up.original + '</span>' : '';
 
@@ -2515,8 +2542,17 @@ window.DETAIL = (function () {
       if (fqG.allow && fqG.remain > 0) { CreditStore.freeSpend(1); UI.toast('已使用免费解锁额度 1 条 · 本月剩 ' + (fqG.remain - 1), 'ok'); unlock(); return; }
       var costG = Math.round(up.price * creditDiscountRate());
       if (window.CreditStore && CreditStore.read().balance >= costG) { CreditStore.consume(costG, '解锁' + ((rec.title || rec.name || '') + '').slice(0, 12)); UI.toast('已扣 ' + costG + ' 积分解锁', 'ok'); unlock(); return; }
-      UI.toast('积分不足，请先充值', 'warn');
-      setTimeout(function () { location.href = '../../pages/wallet/credits.html'; }, 700);
+      /* P2-6：积分不足时先展示积分包选项，再引导充值 */
+      var pkgs = (MOCK.business.credits && MOCK.business.credits.packages) || [];
+      var pkgHtml = pkgs.map(function(p) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-card-2);border-radius:8px;margin-bottom:6px;"><span style="font-size:12.5px;font-weight:600;color:var(--text-1);">' + p.credits + ' 积分</span><span style="font-size:13px;font-weight:700;color:var(--primary-dim);font-family:var(--font-num);">¥' + p.price + '</span></div>';
+      }).join('');
+      UI.dialog({
+        title: '积分不足',
+        text: '当前余额 <b>' + (window.CreditStore ? CreditStore.read().balance : 0) + '</b> 积分，本次解锁需 <b>' + costG + '</b> 积分。充值后立即可用：<br><br>' + pkgHtml,
+        ok: '去充值', cancel: '再看看',
+        onOk: function () { location.href = '../../pages/wallet/credits.html'; }
+      });
     }
     function tryUnlock() {
       if (unlocked) { UI.toast(t.consultMode ? '已提交意向，可直接联系招商顾问' : '信息已解锁，可直接对接', 'ok'); return; }
