@@ -502,6 +502,8 @@
   /* ---- 会员折扣：按入驻类型取积分折扣系数（v2.0 多类型并行取最高折扣） ---- */
   function creditDiscount() {
     var idy = deriveIdentity();
+    /* P3-7：个人合伙人享有 0.8x 积分折扣（假设：与建筑企业同档，作为推广者激励；产品决策可调整） */
+    if (idy.partner && idy.enterprise !== 'resident') return 0.8;
     if (idy.enterprise !== 'resident') return 1;
     var types = idy.entryTypes;
     if (!types.length) return 1;

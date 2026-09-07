@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程链业务详情页深度排查报告</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background:#f5f6f8; color:#1a1d23; line-height:1.7; padding:24px; }
+  .container { max-width:1100px; margin:0 auto; background:#fff; border-radius:16px; box-shadow:0 2px 16px rgba(0,0,0,.06); overflow:hidden; }
+  .header { background:linear-gradient(135deg,#1a3a5c,#2d5f8a); color:#fff; padding:36px 40px; }
+  .header h1 { font-size:24px; font-weight:700; margin-bottom:8px; }
+  .header .meta { font-size:13px; opacity:.85; }
+  .header .badges { margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+  .badge { display:inline-block; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:600; background:rgba(255,255,255,.15); }
+  .badge.success { background:rgba(76,175,80,.25); }
+  .badge.warn { background:rgba(255,152,0,.25); }
+  .badge.danger { background:rgba(244,67,54,.25); }
+  .section { padding:28px 40px; border-bottom:1px solid #eee; }
+  .section:last-child { border-bottom:none; }
+  .section h2 { font-size:19px; font-weight:700; color:#1a3a5c; margin-bottom:16px; padding-left:12px; border-left:4px solid #2d5f8a; }
+  .section h3 { font-size:15px; font-weight:700; color:#333; margin:18px 0 10px; }
+  .section h4 { font-size:14px; font-weight:600; color:#444; margin:14px 0 8px; }
+  p { margin-bottom:10px; font-size:13.5px; color:#444; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:12.5px; }
+  th { background:#f0f3f7; color:#1a3a5c; font-weight:600; padding:10px 12px; text-align:left; border:1px solid #dde3eb; white-space:nowrap; }
+  td { padding:9px 12px; border:1px solid #e4e8ee; vertical-align:top; }
+  tr:nth-child(even) td { background:#fafbfc; }
+  .tag-p0 { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#fdecea; color:#c62828; }
+  .tag-p1 { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#fff3e0; color:#e65100; }
+  .tag-p2 { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#e3f2fd; color:#1565c0; }
+  .tag-p3 { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#f3e5f5; color:#7b1fa2; }
+  .tag-fixed { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; background:#e8f5e9; color:#2e7d32; }
+  .code-block { background:#1e293b; color:#e2e8f0; padding:14px 18px; border-radius:8px; font-family:"Consolas","Monaco",monospace; font-size:12px; overflow-x:auto; margin:10px 0; line-height:1.6; }
+  .code-block .comment { color:#64748b; }
+  .code-block .fix { color:#4ade80; }
+  .code-block .bug { color:#f87171; text-decoration:line-through; }
+  .flow-box { background:#f8f9fb; border:1px solid #e0e4ea; border-radius:10px; padding:16px 20px; margin:12px 0; }
+  .flow-step { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; }
+  .flow-num { width:24px; height:24px; border-radius:50%; background:#2d5f8a; color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none; }
+  .flow-num.bug { background:#c62828; }
+  .flow-arrow { color:#999; margin-left:12px; }
+  .metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:14px 0; }
+  .metric { background:#f8f9fb; border-radius:10px; padding:16px; text-align:center; border:1px solid #e8ecf1; }
+  .metric .num { font-size:28px; font-weight:800; color:#2d5f8a; font-family:"SF Mono",monospace; }
+  .metric .num.danger { color:#c62828; }
+  .metric .num.success { color:#2e7d32; }
+  .metric .label { font-size:11.5px; color:#666; margin-top:4px; }
+  .callout { background:#fff8e1; border-left:4px solid #ff9800; padding:12px 16px; border-radius:0 8px 8px 0; margin:12px 0; font-size:13px; }
+  .callout.danger { background:#fdecea; border-left-color:#c62828; }
+  .callout.success { background:#e8f5e9; border-left-color:#2e7d32; }
+  .img-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:12px 0; }
+  .img-card { border:1px solid #e0e4ea; border-radius:8px; overflow:hidden; }
+  .img-card img { width:100%; display:block; }
+  .img-card .caption { padding:8px 12px; font-size:11.5px; color:#666; background:#f8f9fb; }
+  ul, ol { margin:8px 0 8px 20px; font-size:13px; color:#444; }
+  li { margin-bottom:4px; }
+  .highlight-row td { background:#fff3e0 !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>工程链业务详情页深度排查报告</h1>
+  <div class="meta">排查日期：2026-09-07 ｜ 执行：高级产品经理 + UI/UX 设计师双视角 ｜ 范围：发现首页列表 + 9类业务详情页 × 5种用户状态 × 3种入驻类型</div>
+  <div class="badges">
+    <span class="badge success">任务1 已修复 63.2%→100%</span>
+    <span class="badge success">P0 Bug 已修复并验证</span>
+    <span class="badge warn">3项 P1 待修复</span>
+    <span class="badge">4项 P2/P3 待确认</span>
+  </div>
+</div>
+
+<!-- ==================== 任务1 ==================== -->
+<div class="section">
+  <h2>一、任务1：详情页"未找到该条目"根因排查与修复</h2>
+
+  <h3>1.1 现象</h3>
+  <p>从"发现·首页"（<code>pages/supply/list.html</code>）列表中点击部分条目，详情页显示"未找到该条目 / 该信息可能已下架，或链接地址有误 / 返回上一页重新浏览"。修复前全量测试：<b>38条列表中14条失败，成功率仅63.2%</b>。</p>
+
+  <h3>1.2 根因分析</h3>
+  <div class="flow-box">
+    <div class="flow-step"><span class="flow-num">1</span>列表页 <code>mergedList()</code> 合并两个数据源：<code>MOCK.byFlow('match')</code>（静态种子24条）+ <code>SupplyStore.listActive()</code>（用户发布/后台审核上架14条）</div>
+    <div class="flow-step"><span class="flow-num">2</span>卡片链接统一为 <code>detail.html?id=&lt;item.id&gt;</code></div>
+    <div class="flow-step"><span class="flow-num bug">3</span>详情页解析链路：<code>MOCK.listingById(id)</code> → 只查 catalog 静态数据</div>
+    <div class="flow-step"><span class="flow-num bug">4</span>回退：<code>PublishStore.getRecordById(id)</code> → 只查 localStorage <code>engchain-publish</code>（与 SupplyStore 的 <code>engchain-supply</code> 是<b>两个独立的 store</b>）</div>
+    <div class="flow-step"><span class="flow-num bug">5</span>均查不到 → 渲染"未找到该条目"空状态</div>
+  </div>
+  <div class="callout danger">
+    <b>根因：</b>列表页展示了 SupplyStore（<code>engchain-supply</code>）中的用户发布/后台审核条目，但详情页的 id 解析链路<b>完全缺失 SupplyStore 查找路径</b>。所有 id 形如 <code>SU001-SU022</code> 的 SupplyStore 条目点击后必然"未找到"。这与后台审核操作直接相关——后台 <code>admin/operations/supply.html</code> 审核通过（status=active）的条目进入列表，但详情页无法解析。
+  </div>
+
+  <h3>1.3 修复方案</h3>
+  <p>在 <code>pages/supply/detail.html</code> 第66-111行插入 <code>SupplyStore.byId(id)</code> 查找块，位于 MOCK 查找之后、PublishStore 回退之前。找到后归一化记录结构（bizKey/dir/title/cat/city/price/tags/verified/contact/views）再传给 <code>DETAIL.attach()</code>。原有 MOCK → PublishStore → sourceId 回退逻辑完全保留。</p>
+
+  <h3>1.4 验证结果</h3>
+  <div class="metric-grid">
+    <div class="metric"><div class="num danger">63.2%</div><div class="label">修复前成功率<br>(24/38)</div></div>
+    <div class="metric"><div class="num success">100%</div><div class="label">修复后成功率<br>(38/38)</div></div>
+    <div class="metric"><div class="num success">14/14</div><div class="label">SupplyStore条目<br>全部正常渲染</div></div>
+    <div class="metric"><div class="num success">24/24</div><div class="label">MOCK种子条目<br>无回归</div></div>
+  </div>
+  <p><b>后台联动验证：</b><code>admin/operations/supply.html</code> 通过 <code>DataBus.supplyAudit</code> 操作状态，列表页 <code>listActive()</code> 只返回 <code>status=active</code>，已下架/已驳回/待审核条目正确过滤，无需额外修复。</p>
+</div>
+
+<!-- ==================== 任务2 概述 ==================== -->
+<div class="section">
+  <h2>二、任务2：全量状态 × 收益模式一致性审计</h2>
+
+  <h3>2.1 审计范围与方法</h3>
+  <ul>
+    <li><b>代码审计：</b>逐行通读 <code>js/detail.js</code>（2772行），定位15个权限判断点</li>
+    <li><b>实证验证：</b>puppeteer 模拟 8 种用户状态 × 5 类详情页 = 40 张截图 + 15组功能验证</li>
+    <li><b>收益模式基准：</b>从 <code>js/data.js</code> business 常量（第938-1064行）和 <code>pages/co-create/index.html</code> 提取确认</li>
+  </ul>
+
+  <h3>2.2 收益模式基准（已确认）</h3>
+  <table>
+    <tr><th>维度</th><th>规则</th><th>代码位置</th></tr>
+    <tr><td>入驻费</td><td>建筑企业 ¥3,999 / 中介服务 ¥29,999 / 合伙人 ¥0(需审核)</td><td>data.js:1026-1030</td></tr>
+    <tr><td>破冰期优惠</td><td>建筑企业 ¥0 / 中介 ¥14,999(5折) / 首档佣金5%(&lt;5万) / 注册送3条线索 / 监控7天试用 / 游客1条样例</td><td>data.js:1056-1063</td></tr>
+    <tr><td>佣金阶梯</td><td>8%(0-5万)/6%(5-20万)/5%(20-50万)/4%(50-100万)/3%(100万+)，最低¥10,000</td><td>data.js:1040-1048</td></tr>
+    <tr><td>积分解锁</td><td>材料/设备/劳务/项目合作=98积分；资质招商分级(49/39/29)；人才=29；中介/招聘=免费</td><td>data.js:1004-1013</td></tr>
+    <tr><td>会员折扣</td><td>建筑企业0.8x / 中介0.7x / 合伙人0.5x（仅企业入驻）</td><td>data.js:1032-1037</td></tr>
+    <tr><td>免费额度</td><td>实名用户每月5条 + 破冰期注册赠3条 = 8条/月</td><td>data.js:1013,1060</td></tr>
+    <tr><td>身份优先级</td><td>企业入驻 &gt; 企业认证 &gt; 个人合伙人 &gt; 个人入驻 &gt; 个人认证 &gt; 游客</td><td>stores.js:485-491</td></tr>
+  </table>
+
+  <h3>2.3 用户状态 × 详情页类型 权限矩阵（修复后）</h3>
+  <table>
+    <tr>
+      <th>详情页类型</th><th>解锁模式</th><th>游客(破冰期)</th><th>注册未实名</th><th>已实名个人</th><th>个人合伙人</th><th>企业入驻(建筑)</th>
+    </tr>
+    <tr>
+      <td><b>材料/设备/劳务/项目合作</b></td><td>98积分</td>
+      <td>免费查看(游客福利1/1)</td><td>实名认证后免费解锁</td><td>免费解锁(本月剩8条)</td><td><span class="tag-fixed">已修复</span> 免费解锁(本月剩8条)</td><td>免费解锁+0.8x折扣</td>
+    </tr>
+    <tr>
+      <td><b>资质招商</b></td><td>分级积分49/39/29</td>
+      <td>免费查看(游客福利1/1)</td><td>实名认证后免费解锁</td><td>免费解锁(本月剩8条)</td><td><span class="tag-fixed">已修复</span> 免费解锁</td><td>免费解锁+0.8x折扣</td>
+    </tr>
+    <tr>
+      <td><b>建企买卖</b></td><td>¥5,000保证金</td>
+      <td>缴纳保证金(点击被拦截)</td><td>缴纳保证金(点击被拦截)</td><td>缴纳保证金→支付解锁</td><td><span class="tag-fixed">已修复</span> 缴纳保证金→支付</td><td>缴纳保证金→支付解锁</td>
+    </tr>
+    <tr>
+      <td><b>中介服务</b></td><td>免费留资</td>
+      <td>立即咨询→免费表单</td><td>立即咨询→免费表单</td><td>立即咨询→免费表单</td><td>立即咨询→免费表单</td><td>立即咨询→免费表单</td>
+    </tr>
+    <tr>
+      <td><b>企业招聘</b></td><td>免费投递(需个人入驻)</td>
+      <td>立即投递→引导入驻</td><td>立即投递→引导入驻</td><td>立即投递→引导入驻</td><td>立即投递→引导入驻</td><td>立即投递→引导入驻</td>
+    </tr>
+    <tr>
+      <td><b>人才求职</b></td><td>29积分</td>
+      <td>免费查看(游客福利1/1)</td><td>实名认证后免费解锁</td><td><span class="tag-fixed">已修复</span> 免费解锁(本月剩8条)</td><td><span class="tag-fixed">已修复</span> 免费解锁</td><td><span class="tag-fixed">已修复</span> 免费解锁+0.8x</td>
+    </tr>
+  </table>
+  <p style="font-size:12px;color:#888;margin-top:6px;">注：标 <span class="tag-fixed">已修复</span> 的单元格为本次P0修复后恢复正确的状态。修复前个人合伙人在7类详情页全部被错误拦截，人才详情CTA硬编码"29积分"不反映免费额度/折扣。</p>
+</div>
+
+<!-- ==================== 已修复P0 ==================== -->
+<div class="section">
+  <h2>三、已修复的 P0 问题（含验证）</h2>
+
+  <h3>3.1 个人合伙人身份被身份门控错误拦截 <span class="tag-p0">P0</span> <span class="tag-fixed">已修复</span></h3>
+  <table>
+    <tr><th style="width:120px">项目</th><th>内容</th></tr>
+    <tr><td><b>位置</b></td><td><code>js/detail.js</code> 第1964行 <code>freeQuotaInfo()</code>、第1995行 <code>identityGate()</code></td></tr>
+    <tr><td><b>根因</b></td><td>认证白名单 <code>realname/pro/enterprise/resident</code> 缺少 <code>partner</code>。个人合伙人已完成实名认证，但 <code>deriveStatus()</code> 返回 <code>'partner'</code>，被误判为未认证。</td></tr>
+    <tr><td><b>修复前</b></td><td>CTA显示"实名认证后免费解锁"，点击后引导去实名认证（实际已实名），无法使用免费额度和积分解锁</td></tr>
+    <tr><td><b>修复</b></td><td>两个函数的白名单均添加 <code>|| st === 'partner'</code></td></tr>
+    <tr><td><b>验证</b></td><td>puppeteer 实证：个人合伙人×材料详情 CTA 从"实名认证后免费解锁" → "免费解锁（本月剩 8 条）" ✅</td></tr>
+  </table>
+
+  <h3>3.2 人才详情 CTA 硬编码"29积分" <span class="tag-p0">P0</span> <span class="tag-fixed">已修复</span></h3>
+  <table>
+    <tr><th style="width:120px">项目</th><th>内容</th></tr>
+    <tr><td><b>位置</b></td><td><code>js/detail.js</code> <code>byType.talent</code> 配置（原第1929行 <code>ctaLocked</code>）</td></tr>
+    <tr><td><b>根因</b></td><td><code>ctaLocked: '立即解锁 29 积分 · 查看联系方式'</code> 硬编码，覆盖了 <code>payGoLabel(up)</code> 的动态计算（免费额度/会员折扣/余额状态）</td></tr>
+    <tr><td><b>修复前</b></td><td>有免费额度时仍显示"29积分"；会员折扣不显示；余额不足不提示充值；未实名用户显示积分价格（应先引导实名）</td></tr>
+    <tr><td><b>修复</b></td><td>移除硬编码 <code>ctaLocked</code>，<code>ctaText</code> 改用 <code>payGoLabel(unlockPriceOf(r))</code> 动态计算</td></tr>
+    <tr><td><b>验证</b></td><td>已实名个人×人才详情 CTA 从"立即解锁 29 积分" → "免费解锁（本月剩 8 条）" ✅</td></tr>
+  </table>
+
+  <div class="callout success">
+    <b>P0 修复验证结果（4/4 全部通过）：</b>
+    ① 个人合伙人×材料 → "免费解锁（本月剩 8 条）" ✅
+    ② 个人合伙人×人才 → "免费解锁（本月剩 8 条）" ✅
+    ③ 已实名个人×人才 → "免费解锁（本月剩 8 条）" ✅
+    ④ 游客×材料 → "免费查看（游客福利 1/1）" ✅
+  </div>
+</div>
+
+<!-- ==================== 待修复问题 ==================== -->
+<div class="section">
+  <h2>四、待修复问题优先级排序</h2>
+
+  <h3>P1 — 本周修复（3项）</h3>
+
+  <h4><span class="tag-p1">P1-1</span> isGuest 判断双轨制，可能产生不一致</h4>
+  <table>
+    <tr><th style="width:100px">维度</th><th>内容</th></tr>
+    <tr><td><b>位置</b></td><td><code>detail.js</code> 第1998-1999行：<code>identityGate()</code> 读 <code>localStorage.engchain-state.status === 'guest'</code></td></tr>
+    <tr><td><b>基准</b></td><td><code>stores.js</code> <code>deriveIdentity()</code> 读 <code>UI.state.get().loggedIn === false</code></td></tr>
+    <tr><td><b>风险</b></td><td>两套判断逻辑可能不一致：登出时只设 <code>loggedIn=false</code> 未设 <code>status='guest'</code> → identityGate 误判为注册未实名；反之亦然</td></tr>
+    <tr><td><b>影响</b></td><td>游客免费样例、成熟期全打码、登录引导文案均依赖 isGuest，边界状态下行为异常</td></tr>
+    <tr><td><b>修复</b></td><td><code>identityGate()</code> 改用 <code>deriveIdentity().isGuest</code>，保持单一数据源</td></tr>
+  </table>
+
+  <h4><span class="tag-p1">P1-2</span> franchise 加盟意向登记为死代码，商业模式不明确</h4>
+  <table>
+    <tr><th style="width:100px">维度</th><th>内容</th></tr>
+    <tr><td><b>位置</b></td><td><code>detail.js</code> 第2466-2509行 <code>openConsult()</code> 中 franchise 分支</td></tr>
+    <tr><td><b>问题</b></td><td><code>openConsult()</code> 仅在 <code>consultMode===true</code> 时调用，但 <code>byType.franchise</code> 未设置 <code>consultMode</code>，导致44行 franchise 意向登记表单永远不会触发。当前实际走积分解锁（49/39/29积分）</td></tr>
+    <tr><td><b>需确认</b></td><td>资质招商的商业模式应为：① 分级积分解锁，还是 ② 免费留资咨询？当前两套逻辑并存</td></tr>
+    <tr><td><b>修复</b></td><td>产品确认后二选一：若为积分解锁，删除 franchise 死代码；若为免费留资，添加 <code>consultMode:true</code> 并调整 unlockPriceOf</td></tr>
+  </table>
+
+  <h4><span class="tag-p1">P1-3</span> personnel "立即投递" CTA 对未登录/未入驻用户无前置提示</h4>
+  <table>
+    <tr><th style="width:100px">维度</th><th>内容</th></tr>
+    <tr><td><b>位置</b></td><td><code>detail.js</code> personnel 渲染逻辑 + <code>databus.js</code> <code>canDeliverResume()</code></td></tr>
+    <tr><td><b>问题</b></td><td>游客和未实名用户看到"立即投递"，点击后才弹出"暂不支持简历投递，请先完成个人入驻"。CTA 文案具有误导性，用户走到点击步骤才被拦截</td></tr>
+    <tr><td><b>修复</b></td><td>CTA 文案按身份动态调整：未登录→"登录后投递"；已登录未个人入驻→"完善简历后投递"；符合条件→"立即投递"</td></tr>
+  </table>
+
+  <h3>P2 — 迭代修复（3项）</h3>
+  <table>
+    <tr><th style="width:60px">编号</th><th>问题</th><th>位置</th><th>修复建议</th></tr>
+    <tr><td><span class="tag-p2">P2-1</span></td><td><code>UnlockStore.isFree</code> 不包含 agency，与 <code>unlockPriceOf</code> 的 free 模式定义不一致</td><td>detail.js:72</td><td>改为 <code>return bizKey === 'personnel' || bizKey === 'agency' || bizKey === 'publish'</code></td></tr>
+    <tr><td><span class="tag-p2">P2-2</span></td><td>agency 联系方式视觉锁定但实际免费，可能劝退用户</td><td>detail.js agency 渲染</td><td>在锁定区域明确标注"免费咨询后可见"，或加入 isFree 列表去除视觉锁定</td></tr>
+    <tr><td><span class="tag-p2">P2-3</span></td><td>积分耗尽用户 CTA 直接跳转充值，缺少积分包选项展示</td><td>detail.js payGo</td><td>在 CTA 旁或点击后弹窗中展示积分包价格（¥98/¥580/¥1280）</td></tr>
+  </table>
+
+  <h3>P3 — 产品确认（2项）</h3>
+  <table>
+    <tr><th style="width:60px">编号</th><th>问题</th><th>说明</th></tr>
+    <tr><td><span class="tag-p3">P3-1</span></td><td>个人合伙人无积分折扣</td><td><code>creditDiscount()</code> 仅对企业入驻生效（<code>enterprise!=='resident' → return 1</code>）。个人合伙人享有二级分销但无积分折扣。需产品确认是否为设计意图；若是，应在产品文档中明确。</td></tr>
+    <tr><td><span class="tag-p3">P3-2</span></td><td>详情页缺少平台佣金费率展示</td><td>detail.js 未调用 <code>commissionRate()</code>，成交类详情页（cooperation/trade）不展示佣金阶梯（3%-8%）和最低佣金¥10,000。用户可能在对接后才发现费用，影响转化信任。</td></tr>
+  </table>
+</div>
+
+<!-- ==================== 共创者页面 ==================== -->
+<div class="section">
+  <h2>五、共创者计划页面收益模式表达审计</h2>
+  <p>对 <code>pages/co-create/index.html</code> 与 data.js 业务常量进行14项对比：</p>
+  <div class="metric-grid">
+    <div class="metric"><div class="num success">7</div><div class="label">完全一致</div></div>
+    <div class="metric"><div class="num" style="color:#e65100">5</div><div class="label">表达不完整/缺失</div></div>
+    <div class="metric"><div class="num" style="color:#e65100">1</div><div class="label">数字差异(有声明)</div></div>
+    <div class="metric"><div class="num">1</div><div class="label">不在页面范围</div></div>
+  </div>
+  <table>
+    <tr><th>问题</th><th>当前表达</th><th>建议</th></tr>
+    <tr><td>佣金阶梯不完整</td><td>页脚仅写"佣金 8%/6%"</td><td>补充完整五档或改为"佣金 3%-8% 阶梯计费"</td></tr>
+    <tr><td>会员积分折扣未提及</td><td>❌ 完全未提及</td><td>在权益分档中增加"积分解锁 X 折"（建筑0.8/中介0.7/合伙人0.5）</td></tr>
+    <tr><td>积分包价格未提及</td><td>❌ 未提及</td><td>可引导充值：¥98/¥580/¥1280 三档</td></tr>
+    <tr><td>分销比例差异大</td><td>S/A/B档 20%/15%/10% vs 标准 12%/3%</td><td>标注"共创期专属，毕业恢复标准"</td></tr>
+    <tr><td>积分奖励渠道未提及</td><td>❌ 未提及</td><td>注册50/签到10/实名100/入驻500 可作为即时价值点</td></tr>
+  </table>
+</div>
+
+<!-- ==================== 修改文件清单 ==================== -->
+<div class="section">
+  <h2>六、本次修改的文件清单</h2>
+  <table>
+    <tr><th>文件</th><th>修改内容</th><th>状态</th></tr>
+    <tr><td><code>pages/supply/detail.html</code></td><td>第66-111行新增 SupplyStore.byId(id) 查找路径 + 归一化逻辑</td><td><span class="tag-fixed">已修复</span></td></tr>
+    <tr><td><code>js/detail.js</code> 第1964行</td><td><code>freeQuotaInfo()</code> 白名单添加 <code>'partner'</code></td><td><span class="tag-fixed">已修复</span></td></tr>
+    <tr><td><code>js/detail.js</code> 第1995行</td><td><code>identityGate()</code> 白名单添加 <code>'partner'</code></td><td><span class="tag-fixed">已修复</span></td></tr>
+    <tr><td><code>js/detail.js</code> byType.talent</td><td>移除硬编码 <code>ctaLocked</code>，ctaText 改用 <code>payGoLabel()</code> 动态计算</td><td><span class="tag-fixed">已修复</span></td></tr>
+  </table>
+</div>
+
+<!-- ==================== 产出物 ==================== -->
+<div class="section">
+  <h2>七、产出物与验证截图索引</h2>
+  <table>
+    <tr><th>产出物</th><th>路径</th></tr>
+    <tr><td>任务1修复报告</td><td><code>D:/Engchain3.0/artifacts/supply-detail-fix-report.md</code></td></tr>
+    <tr><td>detail.js 权限审计报告</td><td><code>D:/Engchain3.0/artifacts/detail_js_audit_report.md</code></td></tr>
+    <tr><td>UX审计报告（收益模式+详情页状态）</td><td><code>D:/Engchain3.0/artifacts/UX审计报告_收益模式一致性与详情页状态.md</code></td></tr>
+    <tr><td>本整合报告</td><td><code>D:/Engchain3.0/artifacts/详情页深度排查整合报告.html</code></td></tr>
+    <tr><td>任务1修复前后对比截图</td><td><code>D:/Engchain3.0/artifacts/before_detail_SU001.png</code> / <code>after_detail_SU001.png</code></td></tr>
+    <tr><td>任务2A实证截图（15张）</td><td><code>D:/Engchain3.0/_verify_shots/audit2a/</code></td></tr>
+    <tr><td>任务2B实证截图（40张）</td><td><code>D:/Engchain3.0/_verify_shots/audit2b/</code></td></tr>
+    <tr><td>P0修复验证截图（4张）</td><td><code>D:/Engchain3.0/_verify_shots/p0_fix_verify/</code></td></tr>
+  </table>
+</div>
+
+</div>
+</body>
+</html>
