@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程链 ENGCHAIN · 高保真交互原型(总览)</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/iphone-frame.css">
+<script type="module" src="vendor/browser-window.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text-1); }
+  .pv-wrap { display: flex; min-height: 100vh; }
+
+  /* ---- 左侧导航 / 控制台 ---- */
+  .pv-side { width: 320px; flex: 0 0 320px; border-right: 1px solid var(--line); background: var(--bg-elev); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  .pv-side-hd { padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
+  .pv-side-hd .brand { font-size: 21px; font-weight: 800; letter-spacing: -.02em; }
+  .pv-side-hd .brand span { color: var(--primary); }
+  .pv-side-hd .sub { color: var(--text-2); font-size: 12px; margin-top: 5px; line-height: 1.5; }
+
+  /* 演示状态控制台 */
+  .pv-state { margin: 14px 16px 6px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-card); padding: 12px 12px 6px; }
+  .pv-state .ss-title { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+  .pv-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+  .pv-row .k { font-size: 12.5px; color: var(--text-2); }
+  .seg { display: inline-flex; background: var(--bg-card-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+  .seg button { border: 0; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; transition: background var(--d-fast), color var(--d-fast); }
+  .seg button.on { background: var(--primary); color: var(--text-inv); font-weight: 600; }
+  .btn-xs { flex: none; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); font-size: 11.5px; padding: 5px 11px; border-radius: var(--r-s); cursor: pointer; }
+  .btn-xs:active { transform: scale(.97); }
+  .pv-select { flex: none; max-width: 148px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-1); font-size: 12px; padding: 5px 8px; border-radius: var(--r-s); cursor: pointer; }
+  .pv-note { margin: 2px 0 8px; font-size: 11px; color: var(--text-2); line-height: 1.65; background: var(--bg-subtle); border-radius: var(--r-s); padding: 8px 10px; }
+  .pv-note b { color: var(--text-1); font-weight: 600; }
+
+  /* 设备整体比例缩放 */
+  .zoom-ctl { display: inline-flex; align-items: center; gap: 4px; }
+  .zoom-ctl button { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); border-radius: var(--r-s); font-size: 15px; line-height: 1; cursor: pointer; }
+  .zoom-ctl button:active { transform: scale(.92); }
+  .zoom-ctl .zn { min-width: 46px; text-align: center; font-size: 12px; font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+  .zoom-ctl .zr { width: auto; padding: 0 8px; font-size: 11px; }
+
+  /* 走查提示 */
+  .pv-tip { margin: 0 16px 12px; font-size: 11px; color: var(--text-3); line-height: 1.7; padding: 0 2px; }
+
+  /* 可滚动区：品牌头固定，其下（控制台 + 提示 + 目录树）整体滚动 */
+  .pv-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+  .pv-scroll::-webkit-scrollbar { width: 6px; }
+  .pv-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+  .pv-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+  /* 用户状态行：下拉选择 + 重置按钮 小间距并排 */
+  .pv-state-right { display: inline-flex; align-items: center; gap: 8px; }
+
+  /* 页面分组导航（随 .pv-scroll 整体滚动，不再独立滚动） */
+  .pv-nav { padding: 8px 16px 40px; }
+
+  /* 目录树统计行 */
+  .pv-nav-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 16px 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+  }
+  .nh-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .nh-title::before {
+    content: "";
+    width: 3px;
+    height: 11px;
+    background: var(--primary);
+    border-radius: 1px;
+  }
+  .nh-stats {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nh-total {
+    font-size: 11px;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .nh-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    letter-spacing: .02em;
+  }
+  .nh-app {
+    background: var(--primary-soft);
+    color: var(--primary-dim);
+  }
+  .nh-admin {
+    background: rgba(100,116,139,0.12);
+    color: var(--text-2);
+  }
+  .pv-group { margin-bottom: 14px; }
+  .pv-group .g-name { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin: 4px 2px 6px; }
+  .pv-group .g-name::before { content: ""; width: 3px; height: 10px; background: var(--primary); border-radius: 1px; }
+  .pv-group .links { display: flex; flex-direction: column; gap: 2px; }
+  .pl { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-s); color: var(--text-2); font-size: 13px; cursor: pointer; transition: background var(--d-fast), color var(--d-fast); }
+  .pl:hover { background: var(--bg-card-2); color: var(--text-1); }
+  .pl.on { background: var(--primary-soft); color: var(--primary-dim); font-weight: 600; }
+  .pl .ic { opacity: .75; }
+  .pl .pl-name { flex: none; min-width: 0; white-space: nowrap; }
+  .pl .pl-right { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+  .pl .pl-path { flex: 0 1 auto; min-width: 0; max-width: 100%; font-family: var(--font-num); font-size: 10.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .78; transition: color var(--d-fast); }
+  .pl:hover .pl-path { color: var(--text-2); }
+  .pl-copy { flex: none; display: inline-flex; border: 0; background: none; color: var(--text-3); cursor: pointer; padding: 2px; border-radius: 5px; transition: color var(--d-fast), transform var(--d-fast), background var(--d-fast); }
+  .pl-copy:active { transform: scale(.82); }
+  .pl-copy svg { width: 15px; height: 15px; }
+  .pl-copy:hover { color: var(--text-1); background: var(--bg-card-2); }
+  .pl-copy.ok { color: var(--success); }
+  .pl-copy.ok .ci-copy { display: none; }
+  .pl-copy.ok .ci-check { display: block; }
+
+  /* 父子二级：父节点可折叠 */
+  .pl-parent { font-weight: 600; }
+  .pl-parent .pl-name { color: var(--text-1); }
+  .pl-caret { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; font-size: 10px; color: var(--text-3); cursor: pointer; transition: transform var(--d-fast); flex: none; margin-right: 2px; }
+  .pl-parent.collapsed .pl-caret { transform: rotate(-90deg); }
+  .pl-kids { display: flex; flex-direction: column; gap: 2px; margin-left: 14px; padding-left: 10px; border-left: 1px solid var(--line); }
+  .pl-parent.collapsed + .pl-kids { display: none; }
+  .pl-sub { font-size: 12.5px; padding: 6px 10px; }
+
+  /* ---- 右侧设备 ---- */
+  .pv-stage { flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 44px; padding: 40px 40px 120px; background: radial-gradient(1100px 720px at 50% -18%, rgba(201, 169, 97, .12), transparent 55%), radial-gradient(900px 600px at 88% 110%, rgba(201, 169, 97, .06), transparent 60%), var(--bg-alp); }
+  .device { transform: scale(.82); transform-origin: top center; margin-bottom: -96px; }
+  /* Web 浏览器模型：browser-window 组件直接作为舞台一部分（与 iPhone 壳同层次），不再嵌入 demo.html */
+  .browser-stage { width: min(920px, 100%); transform: scale(.82); transform-origin: top center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .browser-stage[hidden] { display: none; }
+  .browser-stage .stage-head { width: 100%; text-align: center; }
+  .browser-stage .stage-title { font-size: 15px; font-weight: 800; letter-spacing: .03em; }
+  .browser-stage .stage-title em { font-style: normal; color: var(--gold, #C9A961); }
+  .browser-stage .stage-sub { font-size: 12px; color: var(--text-3); margin-top: 7px; line-height: 1.7; }
+  .browser-stage .stage-ctrl { margin-top: 11px; display: flex; gap: 8px; justify-content: center; }
+  .browser-stage .stage-ctrl button { height: 30px; padding: 0 13px; border-radius: 9px; font-size: 12px; cursor: pointer; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); }
+  .browser-stage .stage-ctrl button:hover { border-color: var(--gold, #C9A961); color: var(--gold, #C9A961); }
+  /* 注意：必须保持 flex column（与组件 :host 布局一致），否则内容区 flex:1 塌缩、iframe 视口不跟随窗口尺寸 */
+  #bw-admin { width: 100%; height: 660px; display: flex; flex-direction: column; }
+  .stage-label { font-size: 12px; font-weight: 700; color: var(--text-2); letter-spacing: .04em; }
+  .stage-label em { font-style: normal; color: var(--gold, #C9A961); }
+</style>
+</head>
+<body>
+<div class="pv-wrap">
+  <aside class="pv-side">
+    <div class="pv-side-hd">
+      <div class="brand">工程链 <span>ENGCHAIN</span></div>
+      <div class="sub">建筑供需匹配 · AI 全链路 · 高保真交互原型</div>
+    </div>
+
+    <!-- 可滚动区：演示状态控制台 + 走查提示 + 目录树整体上下滚动，为目录树让出纵向空间 -->
+    <div class="pv-scroll">
+      <!-- 演示状态控制台 (localStorage 持久化) -->
+      <div class="pv-state">
+        <div class="ss-title">演示状态 · 模拟账号与应用切换</div>
+        <div class="pv-row"><span class="k">设备比例</span>
+          <span class="zoom-ctl">
+            <button id="zoom-out" title="缩小">−</button>
+            <span class="zn" id="zoom-num">82%</span>
+            <button id="zoom-in" title="放大">＋</button>
+            <button id="zoom-reset" class="zr" title="重置">重置</button>
+          </span>
+        </div>
+        <div class="pv-row"><span class="k">主题</span>
+          <span class="seg" id="seg-theme">
+            <button data-v="light">明亮</button>
+            <button data-v="dark">暗色</button>
+          </span>
+        </div>
+        <div class="pv-row"><span class="k">用户状态</span>
+          <span class="pv-state-right">
+            <select class="pv-select" id="sel-status"></select>
+            <button class="btn-xs" id="reset-state" type="button">重置演示</button>
+          </span>
+        </div>
+        <div class="pv-row"><span class="k">运营周期</span>
+          <span class="seg" id="seg-mode">
+            <button data-v="breakin">破冰期</button>
+            <button data-v="normal">成熟期</button>
+          </span>
+        </div>
+        <div class="pv-note" id="mode-note" style="background:var(--bg-subtle);"></div>
+        <div class="pv-row"><span class="k">入驻类型</span>
+          <select class="pv-select" id="sel-entrytype" disabled>
+            <option value="">选择企业类型…</option>
+            <option value="construction">建筑企业 ¥3,999</option>
+            <option value="agency">中介服务 ¥29,999</option>
+            <option value="partner">合伙人 · 后台审核</option>
+          </select>
+        </div>
+        <div class="pv-note" id="entry-note"></div>
+        <div class="pv-note" id="status-note"></div>
+        <div class="pv-note" id="kpi-note" style="background:var(--bg-subtle);"></div>
+      </div>
+
+      <div class="pv-tip">
+        点击右侧任一页面，加载到唯一 iPhone 真机外壳中。主题 / 账号经 localStorage 持久化。用户是供需综合体，同一账号可同时发布供应与需求，无需切换身份。设备比例可放大 / 缩小。
+      </div>
+
+      <!-- 目录树统计行 -->
+      <div class="pv-nav-hd">
+        <div class="nh-title">目录树</div>
+        <div class="nh-stats">
+          <span class="nh-total" id="nh-total">共 0 页</span>
+          <span class="nh-badge nh-app" id="nh-app">App 0</span>
+          <span class="nh-badge nh-admin" id="nh-admin">后台 0</span>
+        </div>
+      </div>
+
+      <nav class="pv-nav" id="pv-nav"></nav>
+    </div>
+  </aside>
+
+  <main class="pv-stage">
+    <div class="device">
+      <div class="iphone"><div class="ip-btn mute"></div><div class="ip-btn action"></div><div class="ip-btn vol-up"></div><div class="ip-btn vol-down"></div><div class="ip-btn power"></div><div class="ip-btn camera"></div>
+        <div class="ip-screen"><iframe id="frame" src="home.html" title="工程链"></iframe></div>
+        <div class="ip-label" id="device-label">iPhone 16 Pro · 全流程</div>
+      </div>
+    </div>
+    <div class="browser-stage" id="browser-stage" hidden>
+      <div class="stage-head">
+        <div class="stage-title">工程链 · 管理后台 —— <em>Web 端演示窗口</em></div>
+        <div class="stage-sub">基于 &lt;browser-window&gt; 组件的桌面浏览器窗口演示：真实 Safari 风格窗口 chrome（地址栏 / 红绿灯 / 分享 / 代码查看 / 最大化），iframe 内加载后台首页。</div>
+        <div class="stage-ctrl">
+          <button id="btn-bw-theme" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> 暗色</button>
+          <button id="btn-bw-open" type="button">新标签页打开后台</button>
+        </div>
+      </div>
+      <browser-window id="bw-admin" url="https://admin.engchain.cn/console" title="工程链 · 管理后台" shadow></browser-window>
+      <div class="stage-label" id="browser-label">Web 浏览器 · <em>后台管理</em></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/common.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/databus.js"></script>
+<script>
+(function () {
+  var STATE_KEY = 'engchain-state';
+  var THEME_KEY = 'engchain-theme';
+
+  /* ---- 页面分组（共 79 条目 / 71 个去重页面；支持父子二级，父节点可折叠） ---- */
+  var MODULES = [
+    { name:'工作台', pages:[
+      ['home.html','App首页'],
+      ['index.html','App首页·认证引导']
+    ]},
+    { name:'共创计划', pages:[
+      ['pages/co-create/index.html','共创者计划·破冰期']
+    ]},
+    { name:'供需·匹配', pages:[
+      { name:'发现·首页', src:'pages/supply/list.html', children:[
+        ['pages/supply/detail.html?id=1001','详情·材料采购'],
+        ['pages/supply/detail.html?id=1009','详情·材料供应'],
+        ['pages/supply/detail.html?id=1004','详情·劳务用工'],
+        ['pages/supply/detail.html?id=1005','详情·设备租赁'],
+        ['pages/supply/detail.html?id=cp1','详情·建筑合作'],
+        ['pages/supply/detail.html?id=a1','详情·中介服务']
+      ]}
+    ]},
+    { name:'资源·机会', pages:[
+      { name:'资质招商·首页', src:'pages/franchise/index.html', children:[
+        ['pages/supply/detail.html?id=fc1','资质招商·企业详情']
+      ]},
+      { name:'建企买卖·首页', src:'pages/trade/index.html', children:[
+        ['pages/supply/detail.html?id=t1','企业买卖·M&A']
+      ]},
+      { name:'人员招聘·首页', src:'pages/personnel/index.html', children:[
+        ['pages/supply/detail.html?id=p1','企业招聘·需求详情'],
+        ['pages/supply/detail.html?id=talent1','人才详情·一级建造师'],
+        ['pages/personnel/clue-pack.html','积分兑换线索包']
+      ]}
+    ]},
+    { name:'认证卡', pages:[
+      ['pages/company/index.html?id=c-znzjs','企业认证主页'],
+      ['pages/personal/index.html?id=p-jzs1','个人认证主页']
+    ]},
+    { name:'发布', pages:[
+      { name:'信息工作台', src:'pages/publish/index.html', children:[
+        ['pages/publish/editor.html?role=demand','发布需求·编辑'],
+        ['pages/publish/editor.html?role=supply','发布供应·编辑'],
+        ['pages/publish/records.html','我的发布'],
+        ['pages/publish/drafts.html','草稿箱'],
+        ['pages/publish/unlocked.html','已解锁线索'],
+        ['pages/publish/success.html','发布成功']
+      ]}
+    ]},
+    { name:'搜索', pages:[
+      { name:'AI自然语言搜索', src:'pages/search/index.html', children:[
+        ['pages/search/result.html','搜索结果·匹配%']
+      ]}
+    ]},
+    { name:'消息', pages:[
+      { name:'会话列表', src:'pages/message/index.html', children:[
+        ['pages/message/chat.html','聊天窗口']
+      ]},
+      ['pages/message/system.html','系统消息']
+    ]},
+    { name:'钱包', pages:[
+      ['pages/wallet/index.html','钱包·首页'],
+      ['pages/wallet/credits.html','积分账户·充值解锁'],
+      ['pages/wallet/recharge.html','余额充值'],
+      ['pages/wallet/withdraw.html','提现'],
+      ['pages/wallet/payment-method.html','支付方式'],
+      { name:'发票管理', src:'pages/wallet/invoice.html', children:[
+        ['pages/wallet/invoice-record.html','发票详情'],
+        ['pages/wallet/invoice-info.html','开票信息管理'],
+        ['pages/wallet/invoice-info-edit.html','编辑开票信息'],
+        ['pages/wallet/invoice-title-new.html','新增抬头']
+      ]},
+      { name:'对公转账', src:'pages/wallet/corporate-pay.html', children:[
+        ['pages/wallet/corp-pay.html','对公转账确认支付']
+      ]}
+    ]},
+    { name:'个人中心', pages:[
+      { name:'我的·个人中心', src:'pages/profile/index.html', children:[
+        ['pages/profile/edit.html','编辑资料'],
+        ['pages/profile/contact.html','联系方式']
+      ]},
+      { name:'认证中心', src:'pages/profile/auth.html', children:[
+        ['pages/profile/auth-enterprise.html','企业工商认证'],
+        ['pages/profile/auth-personal.html','个人实名认证'],
+        ['pages/profile/auth-payment.html','资金账户认证'],
+        ['pages/profile/auth-qualification.html','资质认证'],
+        ['pages/profile/auth-result.html','认证结果·成功'],
+        ['pages/profile/auth-result.html?state=reviewing','认证结果·审核中'],
+        ['pages/profile/auth-partner.html','个人合伙人申请'],
+        ['pages/profile/auth-prep.html','认证资料准备'],
+        ['pages/profile/entry.html','企业入驻·三类'],
+        ['pages/profile/entry-form.html?type=construction','入驻申请·建筑'],
+        ['pages/profile/entry-review.html','入驻审核·合伙人'],
+        ['pages/profile/entry-result.html','入驻成功'],
+        ['pages/profile/entry-personal-result.html','个人入驻·结果']
+      ]},
+      { name:'设置', src:'pages/profile/settings.html', children:[
+        ['pages/profile/general-setting.html','通用设置'],
+        ['pages/profile/security.html','账号与安全'],
+        ['pages/profile/notify.html','送达方式']
+      ]},
+      ['pages/profile/about.html','关于我们·合规资质']
+    ]},
+    { name:'分销', pages:[
+      { name:'分销中心', src:'pages/distribution/index.html', children:[
+        ['pages/distribution/earnings.html','收益'],
+        ['pages/distribution/team.html','我的团队'],
+        ['pages/distribution/poster.html','推广海报']
+      ]}
+    ]},
+    { name:'订单', pages:[
+      { name:'我的订单', src:'pages/order/index.html', children:[
+        ['pages/order/detail.html','订单详情']
+      ]}
+    ]},
+    { name:'中介服务', pages:[
+      { name:'服务广场', src:'pages/agency/index.html', children:[
+        ['pages/agency/order.html?svc=0','在线下单·劳务派遣'],
+        ['pages/agency/order.html?svc=2','在线下单·造价咨询'],
+        ['pages/agency/order-detail.html','订单详情'],
+        ['pages/agency/seller-board.html','服务商工作台']
+      ]}
+    ]},
+    { name:'企业监控', pages:[
+      ['pages/monitor/index.html','企业监控·风险雷达']
+    ]},
+    { name:'收藏', pages:[
+      ['pages/favorite/index.html','我的收藏']
+    ]},
+    { name:'协议', pages:[
+      ['pages/agreement/user.html','用户协议'],
+      ['pages/agreement/privacy.html','隐私政策']
+    ]},
+    { name:'注册登录', pages:[
+      ['pages/auth/login.html','登录'],
+      ['pages/auth/register.html','注册']
+    ]},
+    { name:'其他', pages:[
+      ['pages/help/index.html','帮助中心'],
+      { name:'退款规则', src:'pages/refund/index.html', children:[
+        ['pages/refund/appeal.html','申请退款']
+      ]},
+      ['pages/guide/index.html','新手指引'],
+      ['pages/state/index.html','页面状态']
+    ]},
+    { name:'样式预览', pages:[
+      ['pages/cards/index.html','9类卡片·样式总览']
+    ]},
+    { name:'后台', pages:[
+      ['admin/index.html','后台 · 数据总览'],
+      { name:'运营中心', src:'admin/operations/supply.html', children:[
+        ['admin/operations/orders.html','订单管理'],
+        ['admin/operations/messages.html','消息中心']
+      ]},
+      { name:'用户中心', src:'admin/users/users.html', children:[
+        ['admin/users/auth-review.html','认证审核'],
+        ['admin/users/entry-review.html','入驻审核']
+      ]},
+      { name:'资金中心', src:'admin/finance/wallet.html', children:[
+        ['admin/finance/recharge.html','充值 / 对公审批'],
+        ['admin/finance/withdraw.html','提现审批'],
+        ['admin/finance/credits.html','积分管理'],
+        ['admin/finance/commission.html','佣金结算'],
+        ['admin/finance/invoice.html','发票管理']
+      ]},
+      { name:'分销中心', src:'admin/distribution/overview.html', children:[
+        ['admin/distribution/team.html','团队管理'],
+        ['admin/distribution/payout.html','佣金发放']
+      ]},
+      { name:'中介服务', src:'admin/mediation/orders.html', children:[
+        ['admin/mediation/sellers.html','服务商管理'],
+        ['admin/mediation/escrow.html','托管资金台账']
+      ]},
+      { name:'风控合规', src:'admin/risk/audit.html', children:[
+        ['admin/risk/monitor.html','企业监控'],
+        ['admin/risk/compliance.html','合规管理'],
+        ['admin/risk/logs.html','操作日志']
+      ]},
+      { name:'系统设置', src:'admin/system/pricing.html', children:[
+        ['admin/system/phase.html','运营周期'],
+        ['admin/system/roles.html','角色权限']
+      ]},
+      ['admin/design-system.html','设计系统·参考']
+    ]}
+  ];
+
+  /* ---- 导航渲染（支持叶子节点 / 父节点可折叠） ---- */
+  var nav = document.getElementById('pv-nav');
+  var frame = document.getElementById('frame');
+  var label = document.getElementById('device-label');
+
+  /* 从当前页面 URL 推导项目根绝对路径（Windows 格式，如 D:/Engchain3.0/） */
+  var ABS_ROOT = (function () {
+    var root = location.href.replace(/\/preview\.html.*$/, '/'); // file:///d%3A/Engchain3.0/
+    root = root.replace(/^file:\/+/, '');                          // d%3A/Engchain3.0/
+    root = decodeURIComponent(root);                                // d:/Engchain3.0/（解码 %3A → : 等）
+    if (/^[a-z]:/.test(root)) root = root.charAt(0).toUpperCase() + root.slice(1); // D:/Engchain3.0/
+    return root;
+  })();
+
+  function leafHtml(src, name, extraCls, isParent) {
+    var abs = ABS_ROOT + src;
+    var caret = isParent ? '<span class="pl-caret" role="button" title="展开/收起">▾</span>' : '';
+    return '<a class="pl ' + extraCls + '" data-src="' + src + '" data-name="' + name + '" data-abs="' + abs + '">' +
+      '<span class="ic">›</span>' +
+      '<span class="pl-name">' + name + '</span>' +
+      '<span class="pl-right">' +
+        '<span class="pl-path" title="绝对路径：' + abs + '">' + src + '</span>' +
+        caret +
+        '<span class="pl-copy" role="button" title="复制地址">' +
+          '<svg class="ci-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>' +
+          '<svg class="ci-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:none"><path d="m5 13 4 4L19 7"/></svg>' +
+        '</span>' +
+      '</span>' +
+    '</a>';
+  }
+  function itemHtml(it) {
+    if (Array.isArray(it)) return leafHtml(it[0], it[1], '', false);
+    var kids = it.children.map(function (c) { return leafHtml(c[0], c[1], 'pl-sub', false); }).join('');
+    return leafHtml(it.src, it.name, 'pl-parent', true) + '<div class="pl-kids">' + kids + '</div>';
+  }
+
+  /* ---- 统计目录树页面总数（App / 后台分类） ---- */
+  (function countPages() {
+    var appCount = 0, adminCount = 0;
+    function countItem(it) {
+      if (Array.isArray(it)) {
+        var src = it[0];
+        if (src.indexOf('admin/') === 0) adminCount++;
+        else appCount++;
+      } else if (it && it.src) {
+        if (it.src.indexOf('admin/') === 0) adminCount++;
+        else appCount++;
+        if (it.children) it.children.forEach(countItem);
+      }
+    }
+    MODULES.forEach(function (m) { m.pages.forEach(countItem); });
+    var total = appCount + adminCount;
+    var elTotal = document.getElementById('nh-total');
+    var elApp = document.getElementById('nh-app');
+    var elAdmin = document.getElementById('nh-admin');
+    if (elTotal) elTotal.textContent = '共 ' + total + ' 页';
+    if (elApp) elApp.textContent = 'App ' + appCount;
+    if (elAdmin) elAdmin.textContent = '后台 ' + adminCount;
+  })();
+
+  nav.innerHTML = MODULES.map(function (m) {
+    var links = m.pages.map(itemHtml).join('');
+    return '<div class="pv-group"><div class="g-name">' + m.name + '</div><div class="links">' + links + '</div></div>';
+  }).join('');
+
+  /* 折叠状态恢复（localStorage 记忆） */
+  (function restoreCollapse() {
+    var collapsed = [];
+    try { collapsed = JSON.parse(localStorage.getItem('engchain-nav-collapse') || '[]'); } catch (e) {}
+    document.querySelectorAll('.pl-parent').forEach(function (p) {
+      if (collapsed.indexOf(p.dataset.src) > -1) p.classList.add('collapsed');
+    });
+  })();
+  /* 复制页面地址：命名（地址） */
+  function copyText(text) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(function () { return Promise.resolve(); }, fallback);
+    }
+    return fallback();
+  }
+  function flashCopy(el) {
+    el.classList.add('ok');
+    setTimeout(function () { el.classList.remove('ok'); }, 1300);
+  }
+  nav.addEventListener('click', function (e) {
+    /* 折叠箭头：仅切换展开/收起，不加载页面 */
+    var caret = e.target.closest('.pl-caret');
+    if (caret) {
+      e.preventDefault(); e.stopPropagation();
+      var parent = caret.closest('.pl-parent');
+      if (parent) {
+        parent.classList.toggle('collapsed');
+        var collapsed = [];
+        document.querySelectorAll('.pl-parent.collapsed').forEach(function (p) { collapsed.push(p.dataset.src); });
+        try { localStorage.setItem('engchain-nav-collapse', JSON.stringify(collapsed)); } catch (e) {}
+      }
+      return;
+    }
+    var cp = e.target.closest('.pl-copy');
+    if (cp) {
+      e.preventDefault(); e.stopPropagation();
+      var a = cp.closest('.pl');
+      if (!a) return;
+      copyText('"' + a.dataset.name + '（' + a.dataset.abs + '）"').then(function () { flashCopy(cp); });
+      return;
+    }
+    var a = e.target.closest('.pl');
+    if (!a) return;
+    nav.querySelectorAll('.pl').forEach(function (x) { x.classList.remove('on'); });
+    a.classList.add('on');
+    /* 双模型框切换：后台类页面（admin/）→ Web 浏览器模型（browser-window 组件，舞台一部分）；其余 → iPhone 模型 */
+    var isAdmin = a.dataset.src.indexOf('admin/') === 0;
+    var dev = document.querySelector('.device');
+    var bstage = document.getElementById('browser-stage');
+    if (isAdmin) {
+      dev.style.display = 'none';
+      bstage.hidden = false;
+      var bw = document.getElementById('bw-admin');
+      if (bw) bw.setAttribute('src', a.dataset.src);
+      document.getElementById('browser-label').innerHTML = 'Web 浏览器 · <em>' + a.dataset.name + '</em>';
+    } else {
+      bstage.hidden = true;
+      dev.style.display = '';
+      frame.src = a.dataset.src;
+      label.textContent = 'iPhone 16 Pro · ' + a.dataset.name;
+    }
+  });
+
+  /* ---- 随内嵌页加载/跳转自动高亮目录树并垂直居中 ----
+     跨源下父页读不到 iframe 的 URL（file:// 为 opaque origin），由内嵌页经 postMessage 上报 engchain:nav 携带自身 href，
+     这里据此匹配到目录树条目：设 .on 高亮，并在侧边栏滚动区 .pv-scroll 内做一次垂直居中。 */
+  function relFromHref(href) {
+    if (typeof href !== 'string' || !href) return '';
+    var r = href;
+    try { r = decodeURIComponent(r); } catch (e) {}
+    r = r.replace(/^file:\/+/, '');
+    if (r.toLowerCase().indexOf(ABS_ROOT.toLowerCase()) === 0) return r.slice(ABS_ROOT.length);
+    return r.replace(/^[a-z]:[\\/]*/i, '');
+  }
+  function selectNavByHref(href) {
+    var rel = relFromHref(href);
+    if (!rel) return null;
+    var qi = rel.indexOf('?');
+    var path = qi > -1 ? rel.slice(0, qi) : rel;
+    var q = qi > -1 ? rel.slice(qi) : '';
+    function baseOf(s) { var i = s.indexOf('?'); return i > -1 ? s.slice(0, i) : s; }
+    var els = Array.prototype.slice.call(nav.querySelectorAll('.pl'));
+    var i;
+    /* ① 精确命中（含查询串，如 detail.html?id=1009 区分不同参数页） */
+    for (i = 0; i < els.length; i++) if (els[i].dataset.src === rel) return els[i];
+    /* ② 同页基础路径命中：无查询时任意条目；带查询时仅匹配「自身无查询」的条目（如 index.html?tab=1 仍高亮钱包首页） */
+    if (q) { for (i = 0; i < els.length; i++) if (els[i].dataset.src.indexOf('?') === -1 && els[i].dataset.src === path) return els[i]; }
+    else   { for (i = 0; i < els.length; i++) if (baseOf(els[i].dataset.src) === path) return els[i]; }
+    /* ③ 兜底：未列出的页面 → 高亮其父分组首页节点 */
+    for (i = 0; i < els.length; i++) {
+      if (!els[i].classList.contains('pl-parent')) continue;
+      var dir = baseOf(els[i].dataset.src);
+      dir = dir.slice(0, dir.lastIndexOf('/') + 1);
+      if (path.indexOf(dir) === 0) return els[i];
+    }
+    return null;
+  }
+  function centerNav(el) {
+    var scroll = document.querySelector('.pv-scroll');
+    if (!scroll || !el) return;
+    var sRect = scroll.getBoundingClientRect();
+    var eRect = el.getBoundingClientRect();
+    var delta = (eRect.top - sRect.top) - (sRect.height - eRect.height) / 2;
+    var top = scroll.scrollTop + delta;
+    var mq = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+    if (mq && mq.matches) { scroll.scrollTop = top; }
+    else { try { scroll.scrollTo({ top: top, behavior: 'smooth' }); } catch (err) { scroll.scrollTop = top; } }
+  }
+  function setActiveFromHref(href) {
+    var el = selectNavByHref(href);
+    nav.querySelectorAll('.pl').forEach(function (x) { x.classList.remove('on'); });
+    if (el) { el.classList.add('on'); centerNav(el); }
+  }
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!(d && d.type === 'engchain:nav' && typeof d.href === 'string')) return;
+    /* 过滤：目录树同时被 iPhone frame（App 页）与 browser-window（后台页）两套 iframe 上报 engchain:nav。
+       按 href 是否 admin/ 判断来源，再按浏览器舞台可见性放行 —— 避免隐藏的后台窗口
+       （初始 src 或已加载的 admin 页）晚于 App 页上报时覆盖正确高亮。 */
+    var rel = relFromHref(d.href);
+    var bstage = document.getElementById('browser-stage');
+    if (rel.indexOf('admin/') === 0) {
+      if (bstage && bstage.hidden) return;   // 后台窗口隐藏时，忽略后台页上报
+    } else {
+      if (bstage && !bstage.hidden) return;  // 后台窗口显示时，忽略 App 页上报
+    }
+    setActiveFromHref(d.href);
+  });
+  /* 首帧兜底：iframe 初次加载可能在 listener 就绪前已上报，按当前 src 同步一次 */
+  setActiveFromHref(frame.getAttribute('src') || 'home.html');
+
+  /* ---- localStorage 状态读写 ---- */
+  function rawState() {
+    var s = {}; try { s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch (e) {}
+    return s;
+  }
+  function loadState() {
+    return Object.assign({ user:'陈建国', company:'四川省××建设有限公司', status:'registered', member:false, account:'demo@engchain.cn', loggedIn:true }, rawState());
+  }
+  function saveState(s) { try { localStorage.setItem(STATE_KEY, JSON.stringify(s)); } catch (e) {} }
+  /* 登录态判定：无任何状态（全新）默认已登录；有状态时以显式 loggedIn 为准（退出后缺失 → 未登录） */
+  function sideLoggedIn() {
+    var s = rawState();
+    if (!s || Object.keys(s).length === 0) return true;
+    return !!s.loggedIn;
+  }
+
+  /* ---- 用户状态（账号权益分级）：单一数据源 = data.js MOCK.statuses，与页面一致 ---- */
+  var STATUS_LIST = (window.MOCK && MOCK.statuses) ? MOCK.statuses
+    : [{ id:'registered', label:'注册会员', level:1, desc:'基础账号能力', rights:['浏览 / 收藏','限量发布','基础推荐触达'] }];
+  function statusById(id) {
+    for (var i = 0; i < STATUS_LIST.length; i++) if (STATUS_LIST[i].id === id) return STATUS_LIST[i];
+    return STATUS_LIST[1] || STATUS_LIST[0];
+  }
+  /* v2.0：统一调用 stores.js deriveIdentity()，不再重复实现身份推导逻辑 */
+  function deriveSideStatus() {
+    if (window.deriveIdentity) return deriveIdentity().primary;
+    if (!sideLoggedIn()) return 'guest';
+    return 'registered';
+  }
+  /* 获取双线并行身份对象 */
+  function sideIdentity() {
+    if (window.deriveIdentity) return deriveIdentity();
+    return { personal: 'none', enterprise: 'none', entryTypes: [], isGuest: true, primary: 'guest' };
+  }
+
+  /* 状态选择器选项 */
+  var sel = document.getElementById('sel-status');
+  sel.innerHTML = STATUS_LIST.map(function (x) { return '<option value="' + x.id + '">' + x.label + '</option>'; }).join('');
+
+  function renderState() {
+    var idy = sideIdentity();
+    var id = idy.primary;
+    var cur = statusById(id);
+    sel.value = id;
+    var loggedIn = sideLoggedIn();
+    /* v2.0 双线并行展示：个人线 + 企业线独立显示 */
+    var P_LABEL = { none: '未认证', verified: '个人认证', professional: '个人专业入驻' };
+    var E_LABEL = { none: '未认证', verified: '企业认证', resident: '企业入驻' };
+    var entryText = idy.entryTypes.length ? idy.entryTypes.map(function(t){return {construction:'建筑',agency:'中介',partner:'合伙人'}[t]||t;}).join('+') : '无';
+    var chain = [
+      '登录' + (loggedIn ? '✓' : '✗'),
+      '个人线·' + (P_LABEL[idy.personal] || idy.personal),
+      '企业线·' + (E_LABEL[idy.enterprise] || idy.enterprise),
+      '入驻类型·' + entryText
+    ];
+    var rights = (cur.rights || []).join(' / ');
+    var titleText = loggedIn ? cur.label : '游客（未登录）';
+    document.getElementById('status-note').innerHTML =
+      '当前 · <b>' + titleText + '</b>｜' + (cur.desc || '') +
+      '<br>双线身份 · 个人:' + (P_LABEL[idy.personal]||idy.personal) + ' / 企业:' + (E_LABEL[idy.enterprise]||idy.enterprise) +
+      '<br>持久化 · ' + chain.join(' ｜ ') +
+      '<br>权益 · ' + rights;
+  }
+  function reloadFrame() { frame.src = frame.src; }
+
+  /* 设备比例缩放 */
+  var SCALE_KEY = 'engchain-scale';
+  var scale = 0.82;
+  try { scale = parseFloat(localStorage.getItem(SCALE_KEY) || '0.82'); } catch (e) {}
+  function clampScale(v) { return Math.max(0.4, Math.min(1.35, Math.round(v * 20) / 20)); }
+  function saveScale() { try { localStorage.setItem(SCALE_KEY, String(scale)); } catch (e) {} }
+  function applyScale() {
+    scale = clampScale(scale);
+    var dev = document.querySelector('.device');
+    var bst = document.getElementById('browser-stage');
+    if (dev) {
+      dev.style.transform = 'scale(' + scale + ')';
+      dev.style.marginBottom = Math.round(-117 * scale) + 'px';
+    }
+    if (bst) bst.style.transform = 'scale(' + scale + ')';
+    document.getElementById('zoom-num').textContent = Math.round(scale * 100) + '%';
+  }
+  document.getElementById('zoom-in').addEventListener('click', function () { scale = clampScale(scale + 0.05); applyScale(); saveScale(); });
+  document.getElementById('zoom-out').addEventListener('click', function () { scale = clampScale(scale - 0.05); applyScale(); saveScale(); });
+  document.getElementById('zoom-reset').addEventListener('click', function () { scale = 0.82; applyScale(); saveScale(); });
+  applyScale();
+
+  /* 主题 */
+  /* 后台浏览器模型的明暗同步：跟随 preview 主题（engchain-theme） */
+  function applyAdminTheme() {
+    var dark = !!document.documentElement.dataset.theme;
+    var bw = document.getElementById('bw-admin');
+    if (bw) bw.setAttribute('mode', dark ? 'dark' : 'light');
+    var t = document.getElementById('btn-bw-theme');
+    if (t) t.innerHTML = dark ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg> 明亮' : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg> 暗色';
+  }
+  document.getElementById('seg-theme').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.v === 'dark') document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem(THEME_KEY, b.dataset.v); } catch (e2) {}
+    document.querySelectorAll('#seg-theme button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    applyAdminTheme();
+    /* 主题只切换风格：经 postMessage 实时下发到演示 iframe，不再整页重载（避免重载导致页面状态/滚动回退）。iframe 跨源时静默，下次加载自取 localStorage */
+    try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:theme', theme: b.dataset.v }, '*'); } catch (e3) {}
+  });
+  /* browser-stage 内明暗按钮：与左侧 seg-theme 共用同一套状态（点击对应 seg 按钮触发完整联动） */
+  var btnBwTheme = document.getElementById('btn-bw-theme');
+  if (btnBwTheme) btnBwTheme.addEventListener('click', function () {
+    var dark = !!document.documentElement.dataset.theme;
+    var b = document.querySelector('#seg-theme button[data-v="' + (dark ? 'light' : 'dark') + '"]');
+    if (b) b.click();
+  });
+  var btnBwOpen = document.getElementById('btn-bw-open');
+  if (btnBwOpen) btnBwOpen.addEventListener('click', function () { window.open('admin/index.html', '_blank'); });
+  /* 用户状态 (选择 → 持久化 + 联动 member + 刷新设备) */
+  /* M5补：把演示身份同步到业务 Store（engchain-auth/entry），否则详情/钱包/订单页 deriveStatus 读不到，付费墙/折扣/免费额度无法随状态联动 */
+  var selEntrySync = document.getElementById('sel-entrytype');
+  function syncBusinessState(status) {
+    if (!window.AuthStore || !window.EntryStore) return;
+    var now = Date.now(), Y = now + 365 * 864e5;
+    var rn = { ok: false, ts: 0 }, en = { ok: false, expireAt: 0 }, ql = { ok: false, list: [] };
+    var entry = { type: null, orderId: null, status: null, active: false, paidAt: 0, expireAt: 0 };
+    if (status === 'realname') { rn = { ok: true, ts: now }; }
+    else if (status === 'pro') { rn = { ok: true, ts: now }; ql = { ok: true, list: ['一级建造师 · 建筑工程'] }; }
+    else if (status === 'enterprise') { rn = { ok: true, ts: now }; en = { ok: true, expireAt: Y }; }
+    else if (status === 'resident') {
+      rn = { ok: true, ts: now }; en = { ok: true, expireAt: Y }; ql = { ok: true, list: ['建筑业企业资质'] };
+      var et = (selEntrySync && selEntrySync.value) || 'construction';
+      entry = { type: et, orderId: 'DEMO' + now.toString().slice(-6), status: 'active', active: true, paidAt: now, expireAt: Y };
+    }
+    AuthStore.write({ realname: rn, enterprise: en, qual: ql });
+    EntryStore.write(entry);
+    /* 切换身份后清空旧解锁记录与免费额度计数，付费墙按新身份重新评估 */
+    try { localStorage.removeItem('engchain-unlocked'); } catch (e) {}
+    if (window.CreditStore) { var c = CreditStore.read(); c.quota = { month: new Date().getFullYear() + '-' + (new Date().getMonth() + 1), used: 0 }; CreditStore.write(c); }
+  }
+  sel.addEventListener('change', function (e) {
+    var v = e.target.value;
+    var s = loadState();
+    s.status = v;
+    s.loggedIn = v !== 'guest';   /* 游客 = 未登录；其余身份均为已登录 */
+    s.member = statusById(v).level >= 3; /* 达到个人专业入驻及以上才解锁 */
+    saveState(s);
+    syncBusinessState(v);
+    renderState(); renderEntry(); renderKPI(); reloadFrame();
+  });
+  /* ---- M5：运营周期（破冰期/成熟期）切换 + 两周期逻辑差异说明 ---- */
+  function renderMode(){
+    var m = window.ModeStore ? ModeStore.read() : {phase:'breakin'};
+    var isB = m.phase === 'breakin';
+    document.querySelectorAll('#seg-mode button').forEach(function(x){ x.classList.toggle('on', x.dataset.v === m.phase); });
+    /* 入驻类型下拉文案随周期取价（单一数据源 data.js breakin.entry / entryTypes） */
+    var bi = (MOCK.business && MOCK.business.breakin && MOCK.business.breakin.entry) || {};
+    var fe = (MOCK.business && MOCK.business.entryTypes) || {};
+    function fmt(n){return n===0?'¥0':('¥'+Number(n).toLocaleString());}
+    var optCon=document.querySelector('#sel-entrytype option[value="construction"]');
+    var optAge=document.querySelector('#sel-entrytype option[value="agency"]');
+    if(optCon)optCon.textContent='建筑企业 '+(isB?fmt(bi.construction):fmt(fe.construction.fee));
+    if(optAge)optAge.textContent='中介服务 '+(isB?fmt(bi.agency):fmt(fe.agency.fee));
+    var note = document.getElementById('mode-note');
+    if (note) note.innerHTML = isB
+      ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>¥0</b> / 中介 <b>¥14,999</b>（5折）<br>首档佣金 <b>5%</b>｜实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
+      : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>¥3,999</b> / 中介 <b>¥29,999</b><br>首档佣金 <b>8%</b>｜实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
+  }
+  document.getElementById('seg-mode').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (window.ModeStore) ModeStore.switch(b.dataset.v);
+    UI.toast((b.dataset.v==='breakin'?'已切换：破冰期（建筑 0 元入驻/中介 5 折/首档佣金 5%/注册送 3 条解锁）':'已切换：成熟期（标准定价/首档佣金 8%）'), 'ok');
+    renderMode(); renderKPI(); reloadFrame();
+  });
+  /* ---- M5：入驻类型（resident 联动 EntryStore）----
+     身份门控：仅「企业认证 / 企业入驻」存在入驻类型区分；
+     游客 / 注册 / 实名 / 专业认证 4 身份下禁用并置空，避免身份与类型错配。 */
+  var selEntry = document.getElementById('sel-entrytype');
+  function entryTypeName(id) { return ({construction:'建筑企业', agency:'中介服务企业', partner:'合伙人企业'})[id] || ''; }
+  function entryTypeBadge(id) { return ({construction:'蓝V', agency:'金V', partner:'专属'})[id] || ''; }
+  function renderEntry() {
+    var id = deriveSideStatus();
+    var e = window.EntryStore ? EntryStore.read() : {type:null};
+    var note = document.getElementById('entry-note');
+    var allowed = (id === 'enterprise' || id === 'resident');
+    selEntry.disabled = !allowed;
+    if (allowed) {
+      if (id === 'resident') {
+        /* 已入驻：类型由 EntryStore 回填（必有值） */
+        selEntry.value = e.type || selEntry.value || 'construction';
+        if (note) note.innerHTML = '当前入驻 · <b>' + (entryTypeName(e.type) || '未选择') + '</b>'
+          + (entryTypeBadge(e.type) ? '（' + entryTypeBadge(e.type) + '）' : '');
+      } else {
+        /* 认证企业：可预选，选中即完成入驻（entry 未写入 → 置占位） */
+        selEntry.value = e.type || '';
+        if (note) note.innerHTML = '<b>已具备入驻资格</b> · 选择企业类型即完成入驻';
+      }
+    } else {
+      selEntry.value = '';
+      if (note) note.innerHTML = '入驻类型仅认证企业 / 入驻企业身份可选';
+    }
+  }
+  selEntry.addEventListener('change', function () {
+    if (selEntry.disabled || !selEntry.value) { selEntry.value = ''; return; } /* 门控防御：仅启用态可选 */
+    var st = loadState(); st.status='resident'; saveState(st);
+    syncBusinessState('resident'); /* 统一写入 auth 前提 + entry（取当前已选类型） */
+    var label = entryTypeName(selEntry.value) || '';
+    UI.toast('已设为：' + label + '（企业入驻）','ok');
+    renderState(); renderEntry(); renderKPI(); reloadFrame();
+  });
+  /* ---- M5：KPI 仪表（五收入流）---- */
+  function renderKPI(){
+    var a=window.AuthStore?AuthStore.read():{};
+    var e=window.EntryStore?EntryStore.read():{};
+    var c=window.CreditStore?CreditStore.read():{balance:0};
+    var o=window.AgencyOrderStore?AgencyOrderStore.read():{list:[]};
+    var cm=window.CommissionStore?CommissionStore.read():{flows:[]};
+    var entLabel={construction:'建筑',agency:'中介',partner:'合伙人'}[e.type]||'未入驻';
+    var feeTotal=0; for(var i=0;i<cm.flows.length;i++)feeTotal+=cm.flows[i].fee||0;
+    var html='<b style="color:var(--text-1);">五收入流 KPI</b><br>'+
+      '认证费：'+(a.enterprise&&a.enterprise.ok?'企业 ¥999/年 ✓':'实名免费 · 企业未认证')+'｜'+
+      '入驻费：'+(e.active?(entLabel+' ✓'):'未入驻')+'<br>'+
+      '积分余额：<b>'+c.balance.toLocaleString()+'</b> ｜ 免费解锁：'+((c.quota&&c.quota.used)||0)+' 条'+
+      '｜ 佣金累计：<b>¥'+feeTotal.toLocaleString()+'</b>（'+cm.flows.length+' 单）<br>'+
+      '中介订单：'+o.list.length+' 单（'+(o.list.filter(function(x){return x.state==='settled';}).length)+' 已结算）';
+    var kpi=document.getElementById('kpi-note');
+    if(kpi)kpi.innerHTML=html;
+  }
+  /* 重置：调用 DataBus.resetAll() 恢复全部用户初始状态（仅业务数据，保留主题偏好） */
+  document.getElementById('reset-state').addEventListener('click', function () {
+    if (!confirm('确定重置全部演示数据？\n\n将恢复 8 类用户的初始状态（认证/入驻/余额/积分/订单/供需/消息等），当前演示操作记录将被清除。\n\n主题偏好不会被重置。')) return;
+    var result = null;
+    try {
+      if (window.DataBus && DataBus.resetAll) {
+        result = DataBus.resetAll();
+      } else {
+        /* fallback：清业务键（保留主题） */
+        var KEEP = ['engchain-theme', 'engchain-sidenav'];
+        var keys = [];
+        for (var i2 = 0; i2 < localStorage.length; i2++) { var k = localStorage.key(i2); if (k && k.indexOf('engchain-') === 0 && KEEP.indexOf(k) === -1) keys.push(k); }
+        keys.forEach(function (k) { localStorage.removeItem(k); });
+      }
+    } catch (e) {}
+    renderState(); renderMode(); renderEntry(); renderKPI(); reloadFrame();
+    var msg = result ? ('已重置 ' + result.removed + ' 项数据，恢复 ' + result.users + ' 用户初始状态') : '已重置全部演示数据';
+    UI.toast(msg, 'ok');
+  });
+
+  /* 首屏主题 & 状态 */
+  var t0; try { t0 = localStorage.getItem(THEME_KEY); } catch (e) {}
+  if (t0 !== 'light') document.documentElement.dataset.theme = 'dark';
+  document.querySelectorAll('#seg-theme button').forEach(function (x) { x.classList.toggle('on', (document.documentElement.dataset.theme ? 'dark' : 'light') === x.dataset.v); });
+  applyAdminTheme();
+  /* 首屏业务 Store 对齐：仅当认证/入驻全部为空时按已存状态推入，绝不覆盖页面内已完成的真实认证/入驻 */
+  (function alignOnLoad() {
+    var a = window.AuthStore ? AuthStore.read() : {};
+    var e = window.EntryStore ? EntryStore.read() : {};
+    var anyAuth = (a.realname && a.realname.ok) || (a.enterprise && a.enterprise.ok) || (a.qual && a.qual.ok);
+    var anyEntry = !!(e.type && e.active);
+    if (!anyAuth && !anyEntry) {
+      var st = rawState().status;
+      syncBusinessState(st && st !== 'guest' ? st : 'registered');
+    }
+  })();
+  renderState();
+  /* 实时镜像：iframe 页内登录/认证/入驻/退出（storage 跨文档事件）+ 本窗口 store 事件 → 侧栏自动同步 */
+  function refreshAll() { renderState(); renderMode(); renderEntry(); renderKPI(); }
+  window.addEventListener('storage', refreshAll);
+  window.addEventListener('engchain:state', refreshAll);
+  window.addEventListener('engchain:auth', refreshAll);
+  window.addEventListener('engchain:entry', refreshAll);
+  renderMode(); renderEntry(); renderKPI();
+})();
+</script>
+</body>
+</html>

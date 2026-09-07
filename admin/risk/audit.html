@@ -1,0 +1,363 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合规审计 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="risk/audit.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>合规审计</h1>
+        <div class="sub">风控合规中心 · 合规审计事件（资质过期 / 违规行为 / 异常操作）· 组合违规记录 + 资质核验 + 操作日志，支持标记处理与生成处罚</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">合规审计事件列表</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var EVENT_TYPE = { violation: '违规行为', qual_expire: '资质过期', abnormal: '异常操作', qual_low: '资质低评分' };
+  var RISK_LEVEL = { high: '高风险', medium: '中风险', low: '低风险' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { type: '', level: '', status: '', date_start: '', date_end: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); } catch (e) { return '-'; }
+  }
+  function fmtDate(ts) { try { return new Date(ts).toISOString().slice(0, 10); } catch (e) { return ''; } }
+
+  function buildEvents() {
+    var events = [];
+    var now = Date.now();
+    var DAY = 86400000;
+
+    try {
+      var violations = (window.DataBus && DataBus.violations) ? DataBus.violations() : [];
+      violations.forEach(function (v) {
+        events.push({
+          id: v.id,
+          type: 'violation',
+          typeLabel: EVENT_TYPE.violation,
+          level: v.level === 'serious' ? 'high' : 'medium',
+          levelLabel: v.level === 'serious' ? '高风险' : '中风险',
+          object: v.userName + ' · ' + v.company,
+          target: v.userName,
+          desc: v.desc,
+          status: v.status === 'open' ? 'pending' : 'handled',
+          statusLabel: v.status === 'open' ? '待处理' : '已处理',
+          ts: v.ts ? new Date(v.ts).getTime() : now,
+          source: 'violations',
+          raw: v
+        });
+      });
+    } catch (e) {}
+
+    try {
+      var quals = (window.DataBus && DataBus.qualifications) ? DataBus.qualifications() : [];
+      quals.forEach(function (q) {
+        if (q.geo < 85) {
+          events.push({
+            id: q.id + '_low',
+            type: 'qual_low',
+            typeLabel: EVENT_TYPE.qual_low,
+            level: q.geo < 80 ? 'high' : 'medium',
+            levelLabel: q.geo < 80 ? '高风险' : '中风险',
+            object: q.company,
+            target: q.company,
+            desc: 'GEO 评分 ' + q.geo + ' 分，低于合规阈值 85 分，建议复核资质材料',
+            status: 'pending',
+            statusLabel: '待处理',
+            ts: q.ts ? new Date(q.ts).getTime() : now,
+            source: 'qualifications',
+            raw: q
+          });
+        }
+      });
+    } catch (e) {}
+
+    try {
+      var logs = [];
+      try { logs = JSON.parse(localStorage.getItem('engchain-audit') || '[]'); } catch (e) {}
+      var abnormalKeywords = ['封禁', '驳回', '处罚', '重置', '切换周期', '删除'];
+      logs.forEach(function (l) {
+        var isAbnormal = abnormalKeywords.some(function (kw) { return (l.action || '').indexOf(kw) >= 0; });
+        if (isAbnormal) {
+          events.push({
+            id: 'log_' + l.ts,
+            type: 'abnormal',
+            typeLabel: EVENT_TYPE.abnormal,
+            level: 'low',
+            levelLabel: '低风险',
+            object: l.target || l.operator,
+            target: l.target || '',
+            desc: l.action + ' · ' + (l.extra || ''),
+            status: 'handled',
+            statusLabel: '已记录',
+            ts: l.ts,
+            source: 'audit_log',
+            raw: l
+          });
+        }
+      });
+    } catch (e) {}
+
+    events.sort(function (a, b) { return b.ts - a.ts; });
+    return events;
+  }
+
+  function filteredList() {
+    return buildEvents().filter(function (ev) {
+      if (filters.type && ev.type !== filters.type) return false;
+      if (filters.level && ev.level !== filters.level) return false;
+      if (filters.status && ev.status !== filters.status) return false;
+      if (filters.date_start && ev.ts < new Date(filters.date_start).getTime()) return false;
+      if (filters.date_end && ev.ts > new Date(filters.date_end).getTime() + 86400000) return false;
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        if ((ev.object + ev.desc + ev.target).toLowerCase().indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKPI() {
+    var all = buildEvents();
+    var pending = all.filter(function (e) { return e.status === 'pending'; }).length;
+    var highRisk = all.filter(function (e) { return e.level === 'high'; }).length;
+    var weekAgo = Date.now() - 7 * 86400000;
+    var weekNew = all.filter(function (e) { return e.ts >= weekAgo; }).length;
+    var handled = all.filter(function (e) { return e.status === 'handled'; }).length;
+    var cards = [
+      ['待处理', pending, 'warn', '需风控介入'],
+      ['高风险', highRisk, 'down', 'serious / 低评分'],
+      ['本周新增', weekNew, 'gold', '近 7 天事件'],
+      ['已处理', handled, 'up', '已完成处置']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'type', label: '事件类型', type: 'select', options: [
+          { value: 'violation', label: '违规行为' },
+          { value: 'qual_expire', label: '资质过期' },
+          { value: 'qual_low', label: '资质低评分' },
+          { value: 'abnormal', label: '异常操作' }
+        ]},
+        { key: 'level', label: '风险等级', type: 'select', options: [
+          { value: 'high', label: '高风险' },
+          { value: 'medium', label: '中风险' },
+          { value: 'low', label: '低风险' }
+        ]},
+        { key: 'status', label: '处理状态', type: 'select', options: [
+          { value: 'pending', label: '待处理' },
+          { value: 'handled', label: '已处理' }
+        ]},
+        { key: 'date', label: '发生时间', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '对象 / 描述' }
+      ],
+      onFilter: function (vals) {
+        filters.type = vals.type || ''; filters.level = vals.level || '';
+        filters.status = vals.status || '';
+        filters.date_start = vals.date_start || ''; filters.date_end = vals.date_end || '';
+        filters.keyword = vals.keyword || ''; page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 条事件');
+      },
+      onReset: function () {
+        filters = { type: '', level: '', status: '', date_start: '', date_end: '', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function levelBadge(level) {
+    var m = { high: ['badge-danger', '高风险'], medium: ['badge-warning', '中风险'], low: ['badge-info', '低风险'] };
+    var v = m[level] || ['badge-outline', level];
+    return '<span class="badge ' + v[0] + '">' + v[1] + '</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = '筛选 ' + list.length + ' / 共 ' + buildEvents().length + ' 条事件';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'id', label: '事件ID', width: '110px', render: function (row) { return '<span class="tx-mono tx-muted-sm">' + esc(row.id) + '</span>'; } },
+        { key: 'type', label: '类型', width: '100px', render: function (row) { return '<span class="badge badge-primary">' + esc(row.typeLabel) + '</span>'; } },
+        { key: 'level', label: '风险等级', width: '90px', render: function (row) { return levelBadge(row.level); } },
+        { key: 'object', label: '对象', width: '160px', render: function (row) { return '<span class="tx-semibold">' + esc(row.object) + '</span>'; } },
+        { key: 'desc', label: '事件描述', render: function (row) { return '<span class="tx-muted-sm">' + esc(row.desc) + '</span>'; } },
+        { key: 'status', label: '状态', width: '80px', render: function (row) {
+          return row.status === 'pending' ? '<span class="badge badge-warning">待处理</span>' : '<span class="badge badge-success">已处理</span>';
+        }},
+        { key: 'ts', label: '时间', width: '130px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.ts) + '</span>'; } },
+        { key: 'ops', label: '操作', width: '160px', render: function (row) {
+          if (row.status === 'pending' && row.source === 'violations') {
+            return '<button class="btn btn-sm btn-primary" data-perm="ban" data-act="punish" data-id="' + row.id + '">生成处罚</button>' +
+              '<button class="btn btn-sm btn-outline" data-perm="ban" data-act="handle" data-id="' + row.id + '">标记已处理</button>';
+          }
+          if (row.status === 'pending') {
+            return '<button class="btn btn-sm btn-outline" data-perm="ban" data-act="handle" data-id="' + row.id + '">标记已处理</button>';
+          }
+          return '<span class="tx-muted-sm">—</span>';
+        }}
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '暂无合规审计事件'
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function openDetail(ev) {
+    var raw = ev.raw || {};
+    var body = '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">事件ID</div><div class="v">' + esc(ev.id) + '</div></div>' +
+      '<div class="dg"><div class="k">事件类型</div><div class="v">' + esc(ev.typeLabel) + '</div></div>' +
+      '<div class="dg"><div class="k">风险等级</div><div class="v">' + levelBadge(ev.level) + '</div></div>' +
+      '<div class="dg"><div class="k">处理状态</div><div class="v">' + (ev.status === 'pending' ? '<span class="badge badge-warning">待处理</span>' : '<span class="badge badge-success">已处理</span>') + '</div></div>' +
+      '<div class="dg"><div class="k">事件对象</div><div class="v">' + esc(ev.object) + '</div></div>' +
+      '<div class="dg"><div class="k">发生时间</div><div class="v">' + fmtTime(ev.ts) + '</div></div>' +
+      '</div>' +
+      '<div class="mt-14"><div class="tx-label-sm">事件描述</div>' +
+      '<div class="detail-box">' + esc(ev.desc) + '</div></div>';
+
+    if (ev.source === 'violations' && raw.punish) {
+      body += '<div class="mt-14"><div class="tx-label-sm">处理记录</div>' +
+        '<div class="timeline"><div class="tl-item"><span class="tl-dot"></span><div><div class="tl-t">处罚：' + esc(raw.punish.action || '') + '</div><div class="tl-s">' + fmtTime(raw.punish.at) + ' · ' + esc(raw.punish.operator || '') + '</div></div></div></div></div>';
+    }
+
+    var footer = '';
+    if (ev.status === 'pending' && ev.source === 'violations') {
+      footer = '<button class="btn btn-primary" data-perm="ban" id="d-punish">生成处罚</button><button class="btn btn-outline" data-perm="ban" id="d-handle">标记已处理</button>';
+    } else if (ev.status === 'pending') {
+      footer = '<button class="btn btn-outline" data-perm="ban" id="d-handle">标记已处理</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '合规事件详情 · ' + ev.id, content: body, footer: footer, width: '520px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    if (footer) {
+      var fb = drawer.panel.querySelector('.drawer-footer');
+      if (fb) {
+        var pBtn = fb.querySelector('#d-punish');
+        if (pBtn) pBtn.onclick = function () { drawer.close(); punishDialog(ev); };
+        var hBtn = fb.querySelector('#d-handle');
+        if (hBtn) hBtn.onclick = function () { drawer.close(); handleEvent(ev); };
+      }
+    }
+  }
+
+  function punishDialog(ev) {
+    var steps = (window.DataBus && DataBus.PUNISH_STEPS) ? DataBus.PUNISH_STEPS : [];
+    var optionsHtml = steps.map(function (s) { return '<option value="' + esc(s.label) + '">' + esc(s.label) + '</option>'; }).join('');
+    Admin.confirm({
+      title: '生成处罚 · ' + ev.object,
+      body: '<div class="form-item"><label>处罚动作</label><select class="select" id="punish-step">' + optionsHtml + '</select></div>' +
+        '<div class="calc-tip mt-8">对「' + esc(ev.object) + '」执行处罚，将写入违规记录并广播 engchain:violations 事件。</div>',
+      ok: '确认处罚', danger: true,
+      onYes: function () {
+        var action = '';
+        try { action = document.getElementById('punish-step').value; } catch (e) {}
+        var r = DataBus.violationPunish(ev.id, action);
+        if (r) {
+          Admin.toast('已执行处罚：' + action);
+          Admin.log('合规处罚', '合规审计', ev.object, action + ' · ' + ev.desc);
+        } else { Admin.toast('操作失败'); }
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function handleEvent(ev) {
+    Admin.confirm({
+      title: '标记已处理 · ' + ev.id,
+      body: '将事件「' + esc(ev.desc) + '」标记为已处理？',
+      ok: '确认标记',
+      onYes: function () {
+        Admin.toast('已标记为已处理');
+        Admin.log('合规事件处理', '合规审计', ev.object, ev.desc);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows = list.map(function (ev) {
+      return [ev.id, ev.typeLabel, ev.levelLabel, ev.object, ev.desc, ev.statusLabel, fmtTime(ev.ts)];
+    });
+    var ok = Admin.exportCSV('合规审计.csv', ['事件ID', '类型', '风险等级', '对象', '描述', '状态', '时间'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '合规审计', '', '合规审计.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var id = b.getAttribute('data-id');
+      var ev = null;
+      buildEvents().forEach(function (x) { if (x.id === id) ev = x; });
+      if (!ev) return;
+      if (b.getAttribute('data-act') === 'punish') punishDialog(ev);
+      else if (b.getAttribute('data-act') === 'handle') handleEvent(ev);
+    });
+    window.addEventListener('engchain:violations', function () { renderKPI(); renderTable(); });
+    window.addEventListener('engchain:audit', function () { renderKPI(); renderTable(); });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

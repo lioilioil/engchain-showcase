@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>资料准备 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title" id="ap-nav-title">资料准备</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll ap-scroll">
+    <!-- 顶部说明 -->
+    <div class="ap-intro">
+      <div class="ap-intro-ic"><svg class="ic" style="width:22px;height:22px;"><use href="#i-doc"/></svg></div>
+      <div class="ap-intro-text">
+        <div class="fw-700 fs-15" id="ap-intro-title">资料准备</div>
+        <div class="text-3 fs-12" id="ap-intro-sub" style="margin-top:3px;line-height:1.6;">提前准备好以下资料，填写更顺畅</div>
+      </div>
+    </div>
+
+    <!-- 资料清单卡片 -->
+    <div class="card ap-doc-card">
+      <div class="ap-card-head">
+        <div class="fw-700 fs-14">需准备的资料</div>
+        <span class="ap-doc-count" id="ap-doc-count">共 0 项</span>
+      </div>
+      <div class="ap-doc-list" id="ap-doc-list"></div>
+    </div>
+
+    <!-- AI 协助填写卡片 -->
+    <div class="card ap-ai-card">
+      <div class="ap-card-head">
+        <div class="fw-700 fs-14">AI 协助填写</div>
+        <span class="ap-ai-badge">智能辅助</span>
+      </div>
+      <div class="ap-ai-grid">
+        <!-- AI 语音指引 -->
+        <div class="ap-ai-option" id="ai-voice-btn">
+          <div class="ap-ai-ic ap-ai-ic-voice">
+            <svg class="ic" style="width:20px;height:20px;"><use href="#i-mic"/></svg>
+          </div>
+          <div class="ap-ai-name">AI 语音指引</div>
+          <div class="ap-ai-desc">边听边填，语音讲解每一步</div>
+          <!-- 初始提示 -->
+          <div class="ap-voice-hint" id="ap-voice-hint">点击播放</div>
+          <!-- 播放状态指示 -->
+          <div class="ap-voice-status" id="ap-voice-status" style="display:none;">
+            <div class="ap-wave">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <span class="ap-voice-label" id="ap-voice-label">播放中</span>
+          </div>
+        </div>
+        <!-- AI 文字自动填充 -->
+        <div class="ap-ai-option" id="ai-fill-btn">
+          <div class="ap-ai-ic ap-ai-ic-fill">
+            <svg class="ic" style="width:20px;height:20px;"><use href="#i-sparkle"/></svg>
+          </div>
+          <div class="ap-ai-name">AI 文字填充</div>
+          <div class="ap-ai-desc">智能生成示例，表单一键填入</div>
+          <div class="ap-fill-thinking" id="ap-fill-thinking" style="display:none;">
+            <span class="ap-dot"></span><span class="ap-dot"></span><span class="ap-dot"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 语音字幕区 -->
+      <div class="ap-subtitle" id="ap-subtitle" style="display:none;">
+        <div class="ap-subtitle-head">
+          <span class="ap-subtitle-label">语音字幕</span>
+          <div class="ap-subtitle-ctrl">
+            <button class="ap-ctrl-btn" id="ap-ctrl-play">暂停</button>
+            <button class="ap-ctrl-btn" id="ap-ctrl-replay">重播</button>
+          </div>
+        </div>
+        <div class="ap-subtitle-text" id="ap-subtitle-text"></div>
+      </div>
+    </div>
+
+    <!-- 温馨提示 -->
+    <div class="ap-tip">
+      <svg class="ic" style="width:14px;height:14px;color:var(--primary);flex:none;margin-top:1px;"><use href="#i-shield"/></svg>
+      <span>所有资料仅用于平台审核，加密存储不对外泄露。准备好后点击下方按钮开始填写。</span>
+    </div>
+  </div>
+
+  <!-- 底部固定按钮 -->
+  <div class="ap-bottom-bar">
+    <button class="btn btn-primary btn-block btn-lg" onclick="goFill()">我已准备好，开始填写</button>
+  </div>
+</div>
+
+<audio id="ap-audio" preload="auto" src="../../assets/audio/ai-guide-realname.wav"></audio>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+
+/* ===== 5种认证类型配置 ===== */
+var TYPES={
+  realname:{
+    title:'个人认证',navTitle:'个人认证 · 资料准备',
+    sub:'实名认证与人脸核验，全程免费，约 3 分钟完成',
+    redirect:'auth-personal.html',
+    docs:[
+      {icon:'form',name:'身份证人像面',desc:'清晰免冠、四角完整、无反光无遮挡',eg:'示例：本人手持身份证正面照片'},
+      {icon:'folder',name:'身份证国徽面',desc:'清晰完整、在有效期内、信息可辨',eg:'示例：身份证背面（国徽面）照片'},
+      {icon:'doc',name:'本人手机号',desc:'实名登记手机号，用于接收核验结果通知',eg:'示例：138****8888'}
+    ],
+    subtitle:'您好，我是您的AI助手。个人认证需要准备身份证正反面和本人手机号。填写时请确保姓名与身份证一致，手机号可正常接收短信。上传照片时注意光线充足、四角完整。人脸核验时请正对屏幕、免冠、保持表情自然。整个过程约3分钟，全程免费。'
+  },
+  qualification:{
+    title:'个人入驻',navTitle:'个人入驻 · 资料准备',
+    sub:'上传专业资质并完善简历，解锁人才展示与岗位匹配',
+    redirect:'auth-qualification.html',
+    docs:[
+      {icon:'shield',name:'专业资质证书',desc:'建造师、造价师等，清晰可辨编号与有效期',eg:'示例：一级建造师注册证书照片'},
+      {icon:'doc',name:'个人简历',desc:'完整工作经历与项目经验，必填项',eg:'示例：含近5年工作经历的PDF简历'},
+      {icon:'user',name:'个人照片',desc:'近期免冠正面照，用于人才主页展示',eg:'示例：白底或蓝底证件照'}
+    ],
+    subtitle:'您好，我是您的AI助手。个人入驻需要准备三项资料：专业资质证书、个人简历和个人照片。资质证书请确保编号和有效期清晰可见。简历建议包含近五年的工作经历和主要项目经验。个人照片使用近期免冠正面照即可。填写完成后平台将在24小时内完成审核。'
+  },
+  partner:{
+    title:'个人合伙人',navTitle:'个人合伙人 · 资料准备',
+    sub:'登记推广渠道与分销意向，享有二级分销权益与专属支持',
+    redirect:'auth-partner.html',
+    docs:[
+      {icon:'sparkle',name:'推广渠道说明',desc:'描述主要推广渠道、方式与预期推广规模',eg:'示例：微信群推广、朋友圈、行业论坛等'},
+      {icon:'briefcase',name:'行业经验介绍',desc:'相关行业经验、人脉资源与合作意向',eg:'示例：5年建筑行业经验，拥有施工方资源'}
+    ],
+    subtitle:'您好，我是您的AI助手。申请个人合伙人需要准备两项资料：推广渠道说明和行业经验介绍。推广渠道请详细描述您主要通过哪些方式进行推广，比如微信群、朋友圈、行业论坛等，以及预期的推广规模。行业经验介绍请说明您在相关领域的工作经验和拥有的人脉资源。这些信息将帮助平台评估您的合伙人资格。'
+  },
+  enterprise:{
+    title:'企业认证',navTitle:'企业认证 · 资料准备',
+    sub:'提交工商信息完成企业核验，年费 ¥999，人工审核 1-3 个工作日',
+    redirect:'auth-enterprise.html',
+    docs:[
+      {icon:'form',name:'营业执照',desc:'四角完整、在有效期内、统一社会信用代码清晰可辨',eg:'示例：营业执照正本或副本扫描件'},
+      {icon:'user',name:'法人身份证',desc:'企业法人本人身份证正反面，信息清晰',eg:'示例：法人身份证人像面+国徽面'},
+      {icon:'shield',name:'企业公章（可选）',desc:'加盖公章的授权委托书，非必填但可加快审核',eg:'示例：加盖企业公章的认证授权书'}
+    ],
+    subtitle:'您好，我是您的AI助手。企业认证需要准备营业执照、法人身份证和可选的企业公章材料。营业执照请确保四角完整、在有效期内，统一社会信用代码清晰可辨。法人身份证需要正反面照片。如果有加盖公章的授权委托书，上传后可以加快审核进度。认证费用为每年999元，人工审核需要1到3个工作日。'
+  },
+  entry:{
+    title:'企业入驻',navTitle:'企业入驻 · 资料准备',
+    sub:'选择企业类型并提交资料，缴费后进入审核，解锁经营权益',
+    redirect:'entry.html',
+    docs:[
+      {icon:'shield',name:'企业资质证书',desc:'建筑业企业资质、中介服务资质等相关证书',eg:'示例：建筑工程施工总承包资质证书'},
+      {icon:'doc',name:'企业介绍资料',desc:'公司简介、业务范围、核心优势等说明文档',eg:'示例：含公司简介和业务范围的PDF文档'},
+      {icon:'folder',name:'案例图片',desc:'过往项目案例照片，最多 9 张，展示企业实力',eg:'示例：项目现场照片、完工案例图等'},
+      {icon:'bank',name:'对公账户信息',desc:'企业对公银行账户，用于平台结算与缴费',eg:'示例：开户行名称+对公账号'}
+    ],
+    subtitle:'您好，我是您的AI助手。企业入驻需要准备四项资料：企业资质证书、企业介绍资料、案例图片和对公账户信息。资质证书请上传与您企业类型相关的资质证明。企业介绍资料建议包含公司简介、业务范围和核心优势。案例图片最多上传9张，用于展示企业过往项目实力。对公账户信息用于平台后续的结算和缴费。提交并缴费后平台将进行审核。'
+  }
+};
+
+/* ===== 解析 type 参数 ===== */
+function getType(){
+  var m=/[?&]type=([^&]+)/.exec(location.search);
+  var t=m?decodeURIComponent(m[1]):'';
+  return TYPES[t]?t:'realname';
+}
+
+var curType=getType();
+var cfg=TYPES[curType];
+
+/* ===== 渲染页面 ===== */
+document.getElementById('ap-nav-title').textContent=cfg.navTitle;
+document.getElementById('ap-intro-title').textContent=cfg.title;
+document.getElementById('ap-intro-sub').textContent=cfg.sub;
+document.title=cfg.navTitle+' · 工程链';
+
+/* 资料清单 */
+var docHtml=cfg.docs.map(function(d,i){
+  return '<div class="ap-doc-item">'+
+    '<span class="ap-doc-ic"><svg class="ic" style="width:17px;height:17px;"><use href="#i-'+d.icon+'"/></svg></span>'+
+    '<div class="ap-doc-info">'+
+      '<div class="ap-doc-name"><span class="ap-doc-idx">'+(i+1)+'</span>'+d.name+'</div>'+
+      '<div class="ap-doc-desc">'+d.desc+'</div>'+
+      '<div class="ap-doc-eg">'+d.eg+'</div>'+
+    '</div>'+
+  '</div>';
+}).join('');
+document.getElementById('ap-doc-list').innerHTML=docHtml;
+document.getElementById('ap-doc-count').textContent='共 '+cfg.docs.length+' 项';
+
+/* 字幕文本 */
+document.getElementById('ap-subtitle-text').textContent=cfg.subtitle;
+
+/* ===== 跳转 ===== */
+window.goFill=function(){
+  location.href=cfg.redirect;
+};
+
+/* ===== AI 语音指引 ===== */
+var audio=document.getElementById('ap-audio');
+var playing=false;
+
+function toggleVoice(){
+  if(!audio){return;}
+  if(playing){
+    audio.pause();
+    playing=false;
+    updateVoiceUI(false);
+  }else{
+    audio.play().then(function(){
+      playing=true;
+      updateVoiceUI(true);
+    }).catch(function(){
+      /* 播放失败（自动播放策略/文件缺失）：不伪装播放中，显示字幕并提示 */
+      playing=false;
+      updateVoiceUI(false);
+      showSubtitleOnly();
+      try{UI.toast('音频播放受限，已显示文字字幕','warn');}catch(e){}
+    });
+  }
+}
+
+function replayVoice(){
+  if(!audio){return;}
+  audio.currentTime=0;
+  audio.play().then(function(){
+    playing=true;
+    updateVoiceUI(true);
+  }).catch(function(){
+    playing=false;
+    updateVoiceUI(false);
+    showSubtitleOnly();
+  });
+}
+
+function updateVoiceUI(isPlaying){
+  var status=document.getElementById('ap-voice-status');
+  var hint=document.getElementById('ap-voice-hint');
+  var subtitle=document.getElementById('ap-subtitle');
+  var ctrlPlay=document.getElementById('ap-ctrl-play');
+  var voiceLabel=document.getElementById('ap-voice-label');
+  if(!status||!hint||!subtitle||!ctrlPlay||!voiceLabel){return;}
+  if(isPlaying){
+    status.style.display='flex';
+    hint.style.display='none';
+    subtitle.style.display='block';
+    ctrlPlay.textContent='暂停';
+    voiceLabel.textContent='播放中';
+  }else{
+    status.style.display='none';
+    hint.style.display='block';
+    hint.textContent='点击播放';
+    ctrlPlay.textContent='播放';
+    voiceLabel.textContent='已暂停';
+  }
+}
+
+/* 播放失败时仅展示字幕，不显示播放中状态 */
+function showSubtitleOnly(){
+  var subtitle=document.getElementById('ap-subtitle');
+  var hint=document.getElementById('ap-voice-hint');
+  if(subtitle){subtitle.style.display='block';}
+  if(hint){hint.style.display='block';hint.textContent='点击播放';}
+}
+
+if(audio){
+  audio.addEventListener('ended',function(){
+    playing=false;
+    updateVoiceUI(false);
+    var voiceLabel=document.getElementById('ap-voice-label');
+    if(voiceLabel){voiceLabel.textContent='播放完成';}
+    var hint=document.getElementById('ap-voice-hint');
+    if(hint){hint.style.display='block';hint.textContent='重新播放';}
+  });
+}
+
+/* ===== AI 文字自动填充 ===== */
+var filling=false;
+function aiFill(){
+  if(filling){return;}
+  filling=true;
+  var thinking=document.getElementById('ap-fill-thinking');
+  if(!thinking){filling=false;return;}
+  thinking.style.display='flex';
+  setTimeout(function(){
+    thinking.style.display='none';
+    filling=false;
+    try{
+      UI.toast('AI已为您准备示例信息，进入表单后可一键填充','ok');
+    }catch(e){
+      /* 兜底：toast不可用时不阻塞 */
+    }
+  },1200);
+}
+
+/* ===== 事件绑定（addEventListener，避免内联onclick作用域问题）===== */
+var voiceBtn=document.getElementById('ai-voice-btn');
+if(voiceBtn){voiceBtn.addEventListener('click',toggleVoice);}
+var fillBtn=document.getElementById('ai-fill-btn');
+if(fillBtn){fillBtn.addEventListener('click',aiFill);}
+var ctrlPlay=document.getElementById('ap-ctrl-play');
+if(ctrlPlay){ctrlPlay.addEventListener('click',function(e){e.stopPropagation();toggleVoice();});}
+var ctrlReplay=document.getElementById('ap-ctrl-replay');
+if(ctrlReplay){ctrlReplay.addEventListener('click',function(e){e.stopPropagation();replayVoice();});}
+
+/* 初始化UI状态 */
+updateVoiceUI(false);
+
+/* ===== 入场动效 ===== */
+document.querySelectorAll('.ap-intro,.ap-doc-card,.ap-ai-card,.ap-tip').forEach(function(el,i){
+  el.style.opacity='0';el.style.transform='translateY(10px)';
+  setTimeout(function(){el.style.transition='all .4s var(--e-out)';el.style.opacity='1';el.style.transform='none';},80*i);
+});
+})();
+</script>
+<style>
+.ap-scroll{padding-top:14px;padding-bottom:100px;}
+
+/* ========== 顶部说明 ========== */
+.ap-intro{display:flex;align-items:center;gap:12px;padding:16px;margin-bottom:14px;
+  border-radius:16px;background:linear-gradient(135deg,rgba(201,169,97,.08),var(--bg-card));
+  border:1px solid rgba(201,169,97,.2);}
+.ap-intro-ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:var(--primary-soft);color:var(--primary);flex:none;}
+.ap-intro-text{flex:1;min-width:0;}
+
+/* ========== 卡片通用 ========== */
+.ap-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.ap-doc-card{padding:16px;margin-bottom:14px;}
+.ap-doc-count{font-size:11px;color:var(--text-3);background:var(--bg-card-2);padding:3px 10px;border-radius:999px;}
+
+/* ========== 资料清单 ========== */
+.ap-doc-list{display:flex;flex-direction:column;gap:12px;}
+.ap-doc-item{display:flex;gap:11px;padding:12px;border-radius:11px;background:var(--bg-card-2);
+  border:1px solid var(--line-hairline);transition:all .2s ease;}
+.ap-doc-item:active{transform:scale(.99);background:rgba(201,169,97,.04);}
+.ap-doc-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:var(--primary-soft);color:var(--primary);flex:none;}
+.ap-doc-info{flex:1;min-width:0;}
+.ap-doc-name{font-size:13px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:7px;}
+.ap-doc-idx{width:18px;height:18px;border-radius:50%;background:var(--primary);color:var(--text-inv);font-size:10px;
+  font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;font-family:var(--font-num);}
+.ap-doc-desc{font-size:12px;color:var(--text-2);margin-top:4px;line-height:1.6;}
+.ap-doc-eg{font-size:11px;color:var(--text-3);margin-top:3px;line-height:1.5;
+  padding-left:8px;border-left:2px solid var(--line);}
+
+/* ========== AI 协助卡片 ========== */
+.ap-ai-card{padding:16px;margin-bottom:14px;}
+.ap-ai-badge{font-size:10px;color:var(--primary);background:var(--primary-soft);padding:3px 9px;border-radius:999px;font-weight:600;letter-spacing:.03em;}
+.ap-ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ap-ai-option{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:16px 10px 14px;border-radius:13px;border:1px solid var(--line);background:var(--bg-card);
+  cursor:pointer;transition:all .2s ease;min-height:130px;}
+.ap-ai-option:active{transform:scale(.97);border-color:rgba(201,169,97,.4);background:rgba(201,169,97,.03);}
+.ap-ai-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:9px;}
+.ap-ai-ic-voice{background:rgba(91,141,184,.12);color:#5B8DB8;}
+.ap-ai-ic-fill{background:var(--primary-soft);color:var(--primary);}
+.ap-ai-name{font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:4px;}
+.ap-ai-desc{font-size:11px;color:var(--text-3);line-height:1.5;}
+
+/* 语音播放状态 */
+.ap-voice-hint{font-size:11px;color:var(--text-3);margin-top:10px;display:flex;align-items:center;gap:4px;}
+.ap-voice-hint::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--primary);opacity:.5;}
+.ap-voice-status{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px;width:100%;}
+.ap-wave{display:flex;align-items:flex-end;gap:2px;height:18px;}
+.ap-wave span{width:3px;border-radius:2px;background:var(--primary);animation:ap-wave 1s ease-in-out infinite;}
+.ap-wave span:nth-child(1){height:6px;animation-delay:0s;}
+.ap-wave span:nth-child(2){height:12px;animation-delay:.15s;}
+.ap-wave span:nth-child(3){height:16px;animation-delay:.3s;}
+.ap-wave span:nth-child(4){height:10px;animation-delay:.45s;}
+.ap-wave span:nth-child(5){height:7px;animation-delay:.6s;}
+@keyframes ap-wave{0%,100%{transform:scaleY(.4);}50%{transform:scaleY(1);}}
+.ap-voice-label{font-size:10px;color:var(--primary);font-weight:500;}
+
+/* AI填充思考动效 */
+.ap-fill-thinking{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:10px;height:18px;}
+.ap-dot{width:6px;height:6px;border-radius:50%;background:var(--primary);animation:ap-dot-bounce 1.2s ease-in-out infinite;}
+.ap-dot:nth-child(2){animation-delay:.2s;}
+.ap-dot:nth-child(3){animation-delay:.4s;}
+@keyframes ap-dot-bounce{0%,80%,100%{transform:translateY(0);opacity:.4;}40%{transform:translateY(-5px);opacity:1;}}
+
+/* ========== 语音字幕 ========== */
+.ap-subtitle{margin-top:14px;padding:12px 13px;border-radius:11px;background:rgba(91,141,184,.06);
+  border:1px solid rgba(91,141,184,.18);}
+.ap-subtitle-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.ap-subtitle-label{font-size:11px;font-weight:600;color:#5B8DB8;}
+.ap-subtitle-ctrl{display:flex;gap:6px;}
+.ap-ctrl-btn{font-size:11px;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);
+  padding:4px 11px;border-radius:7px;cursor:pointer;transition:all .15s ease;min-height:28px;}
+.ap-ctrl-btn:active{background:var(--bg-card-2);transform:scale(.96);}
+.ap-subtitle-text{font-size:12px;color:var(--text-2);line-height:1.8;}
+
+/* ========== 温馨提示 ========== */
+.ap-tip{display:flex;gap:8px;align-items:flex-start;padding:12px 14px;font-size:12px;color:var(--text-3);line-height:1.7;
+  background:var(--bg-card-2);border-radius:12px;margin:0 2px;}
+
+/* ========== 底部固定按钮 ========== */
+.ap-bottom-bar{position:fixed;left:0;right:0;bottom:0;padding:12px var(--page-pad) calc(12px + env(safe-area-inset-bottom));
+  background:linear-gradient(180deg,transparent,var(--bg) 30%);z-index:50;}
+.ap-bottom-bar .btn{box-shadow:0 6px 20px rgba(201,169,97,.3);}
+
+/* ========== 375px 适配 ========== */
+@media(max-width:375px){
+  .ap-ai-grid{gap:8px;}
+  .ap-ai-option{padding:14px 8px 12px;min-height:125px;}
+  .ap-ai-name{font-size:12px;}
+  .ap-ai-desc{font-size:10px;}
+  .ap-doc-item{padding:10px;gap:9px;}
+  .ap-doc-ic{width:32px;height:32px;}
+  .ap-doc-name{font-size:12px;}
+  .ap-doc-desc{font-size:11px;}
+  .ap-doc-eg{font-size:10px;}
+  .ap-intro{padding:14px;gap:10px;}
+  .ap-intro-ic{width:38px;height:38px;}
+}
+</style>
+</body>
+</html>

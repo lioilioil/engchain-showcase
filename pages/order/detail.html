@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/order/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>订单详情 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">订单详情</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:90px;">
+    <div id="detail-content"></div>
+  </div>
+
+  <div class="fixed-cta" id="cta-bar" style="display:none;">
+    <div id="cta-buttons" style="display:flex;gap:8px;"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+window.__ROOT__='../../';
+window.contact = function(){ location.href='../message/chat.html'; };
+
+var STATUS_MAP = {
+  pending: { label: '待支付', cls: 'tag-primary', desc: '等待支付确认' },
+  serving: { label: '服务中', cls: 'tag-warning', desc: '服务进行中' },
+  await_accept: { label: '待验收', cls: 'tag-gold', desc: '等待需方验收确认' },
+  settled: { label: '已完成', cls: 'tag-success', desc: '订单已结算完成' },
+  cancelled: { label: '已取消', cls: 'tag-gray', desc: '订单已取消' },
+  refunded: { label: '已退款', cls: 'tag-gray', desc: '订单已退款' }
+};
+var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
+
+function getOrderId() {
+  var m = /[?&]id=([^&]+)/.exec(location.search);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/* ---- 直接读写订单（用于 refunded 等 orderTransition 不支持的状态） ---- */
+function loadOrdersRaw() {
+  try { return JSON.parse(localStorage.getItem('engchain-orders') || '[]'); } catch (e) { return []; }
+}
+function saveOrdersRaw(a) { try { localStorage.setItem('engchain-orders', JSON.stringify(a)); } catch (e) {} }
+function patchOrder(id, patch) {
+  var a = loadOrdersRaw(), i;
+  for (i = 0; i < a.length; i++) if (a[i].id === id) {
+    for (var k in patch) if (patch.hasOwnProperty(k)) a[i][k] = patch[k];
+    a[i].updatedAt = Date.now();
+    saveOrdersRaw(a);
+    window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: id, status: a[i].status } }));
+    return a[i];
+  }
+  return null;
+}
+
+/* ---- 操作按钮渲染 ---- */
+function renderActions(o) {
+  var box = document.getElementById('cta-buttons');
+  var btns = [];
+  if (o.status === 'pending') {
+    btns.push({ text: '返回', cls: 'btn-ghost', action: 'back' });
+    btns.push({ text: '前往查看', cls: 'btn-primary', action: 'view' });
+  } else if (o.status === 'serving') {
+    btns.push({ text: '申请退款', cls: 'btn-ghost', action: 'refund' });
+    btns.push({ text: '确认验收', cls: 'btn-primary', action: 'accept' });
+  } else if (o.status === 'await_accept') {
+    btns.push({ text: '申请退款', cls: 'btn-ghost', action: 'refund' });
+    btns.push({ text: '确认验收', cls: 'btn-primary', action: 'accept' });
+  } else if (o.status === 'settled') {
+    btns.push({ text: '申请退款', cls: 'btn-ghost', action: 'refund' });
+    btns.push({ text: '再次购买', cls: 'btn-primary', action: 'rebuy' });
+  } else if (o.status === 'cancelled' || o.status === 'refunded') {
+    btns.push({ text: '再次购买', cls: 'btn-primary', action: 'rebuy' });
+  }
+  box.innerHTML = btns.map(function (b, i) {
+    return '<button class="btn ' + b.cls + '" style="flex:' + (i === btns.length - 1 ? '1.45' : '1') + ';" data-action="' + b.action + '">' + b.text + '</button>';
+  }).join('');
+  box.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () { handleAction(o, btn.getAttribute('data-action')); });
+  });
+}
+
+function handleAction(o, action) {
+  if (action === 'back') {
+    history.back();
+    return;
+  }
+  if (action === 'view') {
+    /* 前往查看供需详情 */
+    location.href = '../supply/detail.html?id=' + (o.supplyId || o.id);
+    return;
+  }
+  if (action === 'pay') {
+    UI.dialog({
+      title: '确认支付', text: '订单金额 <b style="color:var(--primary)">¥' + Number(o.amount).toLocaleString() + '</b>，将从钱包余额扣除。', ok: '确认支付', cancel: '取消',
+      onOk: function () {
+        /* 模拟支付：余额扣款 */
+        try {
+          if (window.BalanceStore) {
+            var bal = BalanceStore.read();
+            if (bal.balance < o.amount) { UI.toast('余额不足，请先充值', 'err'); return; }
+            BalanceStore.withdraw(o.amount, 'order', { remark: '订单支付 · ' + (o.title || o.id) });
+          }
+        } catch (e) {}
+        var r = DataBus.orderTransition(o.id, 'serving');
+        if (r && !r.error) { UI.toast('支付成功，订单已进入服务中', 'ok'); }
+        else { UI.toast('支付失败：' + (r && r.error ? r.error : '未知错误'), 'err'); }
+      }
+    });
+  } else if (action === 'cancel') {
+    UI.dialog({
+      title: '取消订单', text: '确定取消该订单吗？取消后不可恢复。', ok: '确认取消', cancel: '再想想', danger: true,
+      onOk: function () {
+        var r = DataBus.orderTransition(o.id, 'cancelled');
+        if (r && !r.error) {
+          /* 已支付订单取消需退款 */
+          if (o.status !== 'pending' && window.BalanceStore) {
+            BalanceStore.recharge(o.amount, 'refund', { remark: '订单取消退款 · ' + (o.title || o.id) });
+          }
+          UI.toast('订单已取消', 'ok');
+        } else { UI.toast('取消失败', 'err'); }
+      }
+    });
+  } else if (action === 'accept') {
+    /* serving → await_accept（服务完成待验收）；await_accept → settled（确认验收并结算） */
+    var nextStatus = (o.status === 'serving') ? 'await_accept' : 'settled';
+    var titleText = (o.status === 'serving') ? '确认服务完成' : '确认验收';
+    var descText = (o.status === 'serving') ? '确认服务已完成，进入待验收阶段？' : '确认服务已完成并验收通过？验收后订单将进入结算流程。';
+    UI.dialog({
+      title: titleText, text: descText, ok: '确认', cancel: '取消',
+      onOk: function () {
+        var r = DataBus.orderTransition(o.id, nextStatus);
+        if (r && !r.error) {
+          if (nextStatus === 'settled') {
+            /* 触发佣金结算 */
+            try { if (window.DataBus && DataBus.commissionSettle) DataBus.commissionSettle(o.id); } catch (e) {}
+          }
+          UI.toast((nextStatus === 'settled') ? '验收成功，订单已完成' : '已进入待验收阶段', 'ok');
+        } else { UI.toast('操作失败：' + (r && r.error ? r.error : '未知错误'), 'err'); }
+      }
+    });
+  } else if (action === 'refund') {
+    UI.dialog({
+      title: '申请退款', text: '确定申请退款吗？退款申请将提交平台审核。', ok: '提交申请', cancel: '取消', danger: true,
+      onOk: function () {
+        var r = patchOrder(o.id, { status: 'refunded', refundAt: Date.now(), refundNote: '用户申请退款' });
+        if (r) {
+          /* 退款到余额 */
+          try { if (window.BalanceStore) BalanceStore.recharge(o.amount, 'refund', { remark: '订单退款 · ' + (o.title || o.id) }); } catch (e) {}
+          UI.toast('退款申请已提交，资金将原路退回', 'ok');
+        } else { UI.toast('退款申请失败', 'err'); }
+      }
+    });
+  } else if (action === 'rebuy') {
+    location.href = '../supply/list.html';
+  }
+}
+
+function render() {
+  var id = getOrderId();
+  var box = document.getElementById('detail-content');
+  var cta = document.getElementById('cta-bar');
+  if (!id) {
+    box.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-3);font-size:13px;">订单不存在</div>';
+    return;
+  }
+  var orders = [];
+  try { orders = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders')||'[]'); } catch (e) {}
+  var o = null;
+  for (var i = 0; i < orders.length; i++) { if (orders[i].id === id) { o = orders[i]; break; } }
+  if (!o) {
+    box.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-3);font-size:13px;">订单不存在或已删除</div>';
+    return;
+  }
+  var st = STATUS_MAP[o.status] || STATUS_MAP.pending;
+  var type = TYPE_MAP[o.type] || o.type;
+  var amt = o.amount ? '¥' + Number(o.amount).toLocaleString() + '.00' : '面议';
+  var fee = o.fee ? '¥' + Number(o.fee).toLocaleString() : '¥0.00';
+  /* 判断付款状态：已付/免费 → 隐藏电话 */
+  var isPaid = o.status !== 'pending' && o.status !== 'draft';
+  var isFree = !o.amount || Number(o.amount) === 0;
+  var hidePhone = isPaid || isFree;
+  /* 快照中的联系电话（有则显示，无则占位） */
+  var contactPhone = o.phone || o.contactPhone || '138****8888';
+  var contactName = o.counterparty || o.sellerName || '对接方';
+
+  cta.style.display = 'block';
+  renderActions(o);
+  box.innerHTML =
+    '<div class="card" style="text-align:center;">' +
+      '<div style="font-size:12px;color:var(--text-2);">订单金额</div>' +
+      '<div class="mono fw-700" style="font-size:32px;margin:10px 0 8px;">' + amt + '</div>' +
+      '<span class="tag ' + st.cls + '">' + st.label + '</span>' +
+      '<div class="text-3 fs-11" style="margin-top:10px;">' + st.desc + '</div>' +
+    '</div>' +
+    /* ---- 订单快照 ---- */
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">订单快照</div></div>' +
+    '<div class="card" style="padding:0;overflow:hidden;">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--line);">' +
+        '<div class="fw-600 fs-14" style="margin-bottom:6px;">' + (o.title || '供需信息') + '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<span class="tag tag-gold">' + type + '</span>' +
+          (o.location ? '<span class="tag tag-gray"><svg class="ic" style="width:10px;height:10px;vertical-align:-1px;"><use href="#i-pin"/></svg> ' + o.location + '</span>' : '') +
+          (isFree ? '<span class="tag tag-success">免费</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 16px;">' +
+        '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<div style="width:36px;height:36px;border-radius:50%;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<svg class="ic" style="width:18px;height:18px;color:var(--text-3);"><use href="#i-user"/></svg>' +
+          '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div class="fw-600 fs-13">' + contactName + '</div>' +
+            (hidePhone
+              ? '<div class="text-3 fs-11" style="margin-top:2px;">联系电话已隐藏</div>'
+              : '<div class="mono fs-12" style="margin-top:2px;color:var(--text-2);">' + contactPhone + '</div>'
+            ) +
+          '</div>' +
+          (hidePhone
+            ? '<span class="tag tag-gray" style="flex-shrink:0;"><svg class="ic" style="width:10px;height:10px;vertical-align:-1px;"><use href="#i-lock"/></svg>已隐藏</span>'
+            : '<button class="btn btn-ghost btn-sm" style="flex-shrink:0;padding:4px 10px;font-size:11px;" onclick="UI.toast(\'号码已复制\',\'ok\')">复制</button>'
+          ) +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">订单信息</div></div>' +
+    '<div class="group">' +
+      '<div class="row"><span class="label text-2">订单编号</span><span class="value mono">' + o.id + '</span></div>' +
+      '<div class="row"><span class="label text-2">创建时间</span><span class="value">' + (o.ts || '') + '</span></div>' +
+      '<div class="row"><span class="label text-2">订单类型</span><span class="value">' + type + '</span></div>' +
+      '<div class="row"><span class="label text-2">需求名称</span><span class="value">' + (o.title || '') + '</span></div>' +
+      '<div class="row"><span class="label text-2">对接方</span><span class="value">' + (o.counterparty || '') + '</span></div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">费用明细</div></div>' +
+    '<div class="group">' +
+      '<div class="row"><span class="label text-2">订单金额</span><span class="value mono">' + amt + '</span></div>' +
+      '<div class="row"><span class="label text-2">平台服务费</span><span class="value mono">' + fee + '</span></div>' +
+      '<div class="fb-between" style="padding:14px 16px;border-top:1px solid var(--line);"><span class="fw-600">实付金额</span><span class="mono fw-700">' + amt + '</span></div>' +
+    '</div>';
+}
+
+window.addEventListener('engchain:orders', render);
+window.addEventListener('engchain:store-change', render);
+render();
+</script>
+</body>
+</html>

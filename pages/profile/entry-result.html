@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>入驻成功 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">入驻信息</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll es-scroll" id="root"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var feats={
+  construction:['供需发布不限','招标报价权限','基础分销（一级）','蓝V 专属标识'],
+  agency:['服务橱窗展示','线上订单 + 佣金通道','履约保证金机制','金V 专属标识'],
+  partner:['专属合伙人标识','完整二级分销','优先撮合与运营支持','后台专属通道']
+};
+function fmtD(t){if(!t)return '—';var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function val(v){return (v===undefined||v===null||v==='')?'—':esc(v);}
+/* 长文本折叠：默认3行，展开/收起切换 */
+function clamp(text,id){
+  if(!text){return '<div class="er-empty"><svg class="ic" style="width:28px;height:28px;opacity:.35;"><use href="#i-doc"/></svg><span>暂无内容</span></div>';}
+  var t=esc(text);
+  return '<div class="clamp-box"><div class="clamp-text" id="'+id+'">'+t+'</div>'+
+    '<span class="clamp-toggle" onclick="var el=document.getElementById(\''+id+'\');el.classList.toggle(\'open\');this.textContent=el.classList.contains(\'open\')?\'收起\':\'展开全文\';">展开全文</span></div>';
+}
+function emptyState(msg){
+  return '<div class="er-empty"><svg class="ic" style="width:30px;height:30px;opacity:.35;"><use href="#i-doc"/></svg><span>'+msg+'</span></div>';
+}
+/* 企业信息区 */
+function renderEnterpriseInfo(ent){
+  var a=AuthStore.read();
+  var en=a.enterprise||{};
+  var intro=ent.intro||{};
+  return '<div class="section-title"><div class="st-left">企业信息</div></div>'+
+    '<div class="group ap-group">'+
+      row('企业全称',en.co||'—')+
+      row('企业简称',en.shortName||'—')+
+      row('统一社会信用代码',en.code||'—',true)+
+      row('法定代表人',en.legal||'—')+
+      row('成立年份',intro.founded?intro.founded+' 年':'—')+
+      row('注册资本',intro.capital?intro.capital+' 万元':'—')+
+      row('员工规模',intro.staffSize||'—')+
+    '</div>';
+}
+/* 建筑资质区 */
+function renderQualifications(qs){
+  var html='<div class="section-title"><div class="st-left">建筑资质</div></div>';
+  if(!qs||!qs.length){return html+emptyState('暂无资质信息');}
+  html+='<div class="er-card-list">';
+  qs.forEach(function(q,i){
+    html+='<div class="er-card">'+
+      '<div class="er-card-head">'+
+        '<span class="er-card-title">'+esc(q.name||'未命名资质')+'</span>'+
+        (q.level?'<span class="tag tag-gold">'+esc(q.level)+'</span>':'')+
+      '</div>'+
+      '<div class="er-card-meta">'+
+        (q.no?'<span>证书编号：<b class="mono">'+esc(q.no)+'</b></span>':'')+
+        (q.expireAt?'<span>有效期至：'+esc(q.expireAt)+'</span>':'')+
+      '</div>'+
+      (q.image?'<div class="er-thumb"><img src="'+esc(q.image)+'" alt="证书影像"></div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 企业介绍区 */
+function renderIntro(intro){
+  var html='<div class="section-title"><div class="st-left">企业介绍</div></div>';
+  if(!intro||!intro.desc){return html+emptyState('暂无企业介绍');}
+  return html+'<div class="er-card">'+clamp(intro.desc,'er-intro')+'</div>';
+}
+/* 企业案例区 */
+function renderCases(cs){
+  var html='<div class="section-title"><div class="st-left">企业案例</div></div>';
+  if(!cs||!cs.length){return html+emptyState('暂无案例信息');}
+  html+='<div class="er-card-list">';
+  cs.forEach(function(c,i){
+    var imgs=(c.images||[]).slice(0,3).map(function(img){
+      return '<div class="er-case-img"><img src="'+esc(img)+'" alt="案例图"></div>';
+    }).join('');
+    html+='<div class="er-card">'+
+      '<div class="er-card-head">'+
+        '<span class="er-card-title">'+esc(c.name||'未命名案例')+'</span>'+
+        (c.type?'<span class="tag tag-gold">'+esc(c.type)+'</span>':'')+
+      '</div>'+
+      '<div class="er-card-meta">'+
+        (c.amount?'<span>项目金额：<b>'+esc(c.amount)+' 万元</b></span>':'')+
+        ((c.startDate||c.endDate)?'<span>项目时间：'+esc(c.startDate||'—')+' ~ '+esc(c.endDate||'—')+'</span>':'')+
+      '</div>'+
+      (c.desc?'<div class="er-card-desc">'+clamp(c.desc,'er-case-'+i)+'</div>':'')+
+      (imgs?'<div class="er-case-imgs">'+imgs+'</div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 联系经营区 */
+function renderContact(ent){
+  var addr=ent.address||{};
+  var addrStr=[addr.province,addr.city,addr.district,addr.detail].filter(Boolean).join('');
+  return '<div class="section-title"><div class="st-left">联系经营</div></div>'+
+    '<div class="group ap-group">'+
+      row('联系人',ent.contact||'—')+
+      row('联系电话',ent.tel||'—',true)+
+      '<div class="ap-field ap-field-ro" style="align-items:flex-start;"><label style="padding-top:1px;">经营范围</label><div class="er-scope">'+clamp(ent.scope,'er-scope')+'</div></div>'+
+      row('办公地址',addrStr||'—')+
+      '<div class="ap-field ap-field-ro"><label>企业官网</label><b class="fs-13">'+(ent.website?'<a href="'+esc(ent.website)+'" target="_blank" rel="noopener" class="er-link">'+esc(ent.website)+'</a>':'—')+'</b></div>'+
+    '</div>';
+}
+function row(k,v,mono){return '<div class="ap-field ap-field-ro"><label>'+k+'</label><b class="fs-13 text-2 '+(mono?'mono':'')+'">'+v+'</b></div>';}
+function render(){
+  var e=EntryStore.read();
+  var type=e.type||new URLSearchParams(location.search).get('type')||'construction';
+  var t=MOCK.entryTypeById(type);
+  var root=document.getElementById('root');
+  /* 尚未生效 → 回到审核状态页 */
+  if(!(e.active&&e.status==='active')){location.replace('entry-review.html');return;}
+  var label=t?t.label:'入驻企业';
+  root.innerHTML=
+    '<div class="es-hero"><span class="es-glow"></span>'+
+    '<span class="es-h-ic"><svg class="ic" style="width:28px;height:28px;"><use href="#i-check"/></svg></span>'+
+    '<div class="fw-700 fs-19" style="color:#fff;margin-top:13px;">入驻成功</div>'+
+    '<div class="fs-12" style="color:rgba(255,255,255,.72);margin-top:6px;line-height:1.7;">您已成为工程链'+label+'<br>'+(t&&t.badge?t.badge+' 标识与经营权益已生效':'')+'</div></div>'+
+    '<div class="group ap-group">'+
+      row('企业类型',label+' · '+(t&&t.badge?t.badge:''))+
+      row('入驻订单',e.orderId||'—',true)+
+      row('入驻费',type==='partner'?'¥0 · 后台审核制':'¥'+Number(e.fee||0).toLocaleString()+' · 按次')+
+      row('生效时间',fmtD(e.paidAt))+
+      row('有效期至',fmtD(e.expireAt))+
+      '<div class="ap-field ap-field-ro" style="border:none;"><label>履约保证金</label><b class="fs-13 text-2">'+(e.depositPaid?('¥'+Number(e.depositPaid).toLocaleString()+'（'+({basic:'基础档',engineering:'工程档',high:'高值档'}[e.depositType]||e.depositType)+'）'):'—')+'</b></div>'+
+    '</div>'+
+    renderEnterpriseInfo(e)+
+    renderQualifications(e.qualifications)+
+    renderIntro(e.intro)+
+    renderCases(e.cases)+
+    renderContact(e)+
+    '<div class="section-title"><div class="st-left">已开通权益</div></div>'+
+    '<div class="es-feats">'+(feats[type]||[]).map(function(f){return '<div class="es-feat"><i>✓</i>'+f+'</div>';}).join('')+'</div>'+
+    '<div class="ar-reward es-rw"><svg class="ic" style="width:16px;height:16px;"><use href="#i-wallet"/></svg> 入驻奖励 <b>+'+((MOCK.business.credits&&MOCK.business.credits.rewards&&MOCK.business.credits.rewards.entry)||500)+' 积分</b> 已发放</div>'+
+    '<div class="fixed-cta es-cta">'+
+      '<a href="../../pages/supply/list.html" class="btn btn-primary btn-block btn-lg">开始经营</a>'+
+      '<a href="entry-form.html?mode=edit" class="btn btn-ghost btn-block" style="margin-top:9px;">编辑资料</a>'+
+      '<a href="auth.html" class="btn btn-ghost btn-block" style="margin-top:9px;">返回认证中心</a>'+
+    '</div>';
+}
+render();
+window.addEventListener('storage',function(ev){if(['engchain-users','engchain-entry','engchain-auth'].indexOf(ev.key)>=0)render();});
+window.addEventListener('engchain:entry',render);
+window.addEventListener('engchain:auth',render);
+})();
+</script>
+<style>
+.es-scroll{padding-top:12px;padding-bottom:160px;}
+.es-hero{position:relative;overflow:hidden;border-radius:20px;padding:30px 22px 28px;text-align:center;margin-bottom:14px;
+  background:radial-gradient(130% 120% at 85% -10%,rgba(238,214,151,.25),transparent 55%),linear-gradient(150deg,#252C35,#151A22 50%,#0B0E13);
+  box-shadow:0 10px 28px rgba(22,22,22,.14);}
+.es-glow{position:absolute;right:-36px;top:-36px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,.3),transparent 70%);}
+.es-h-ic{position:relative;width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(201,169,97,.4);}
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ap-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.ap-field:last-child{border-bottom:none;}
+.ap-field label{flex:none;width:88px;font-size:13px;color:var(--text-2);}
+.ap-field-ro b{flex:1;text-align:right;font-weight:600;min-width:0;}
+.es-feats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
+.es-feat{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:12.5px;color:var(--text-2);display:flex;align-items:center;gap:7px;}
+.es-feat i{color:var(--primary);font-style:normal;}
+.es-rw{margin-bottom:14px;}
+.ar-reward{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--text-2);background:var(--primary-soft);border-radius:12px;padding:11px;}
+.ar-reward b{color:var(--primary);}
+.es-cta{left:14px;right:14px;}
+/* 详情卡片 */
+.er-card-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.er-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+.er-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.er-card-title{font-size:14px;font-weight:600;color:var(--text-1);flex:1;min-width:0;word-break:break-all;}
+.er-card-meta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-2);margin-bottom:8px;}
+.er-card-meta b{color:var(--text-1);font-weight:500;}
+.er-card-desc{font-size:13px;color:var(--text-2);line-height:1.7;margin-top:4px;}
+.er-thumb{margin-top:8px;}
+.er-thumb img{width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:block;}
+.er-case-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;}
+.er-case-img{aspect-ratio:1;overflow:hidden;border-radius:8px;background:var(--bg-card-2);}
+.er-case-img img{width:100%;height:100%;object-fit:cover;display:block;}
+/* 空态 */
+.er-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 16px;color:var(--text-3);font-size:13px;background:var(--bg-card);border:1px dashed var(--line);border-radius:14px;margin-bottom:14px;}
+/* 长文本折叠 */
+.clamp-box{position:relative;}
+.clamp-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;color:var(--text-2);line-height:1.7;transition:all .3s ease;}
+.clamp-text.open{-webkit-line-clamp:unset;}
+.clamp-toggle{display:inline-block;color:var(--primary);font-size:12px;cursor:pointer;margin-top:6px;font-weight:500;}
+.er-scope{flex:1;text-align:right;min-width:0;}
+.er-scope .clamp-text{text-align:left;}
+.er-link{color:var(--primary);text-decoration:none;word-break:break-all;}
+.mono{font-family:var(--font-mono);}
+</style>
+</body>
+</html>

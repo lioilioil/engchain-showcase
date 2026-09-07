@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>发票记录 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">发票记录</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="seg" style="margin:10px 14px;">
+    <span class="seg-item is-on" data-filter="all">全部</span>
+    <span class="seg-item" data-filter="pending">待审核</span>
+    <span class="seg-item" data-filter="issued">已开票</span>
+    <span class="seg-item" data-filter="rejected">已驳回</span>
+  </div>
+
+  <div class="scroll" style="padding-top:4px;">
+    <div id="rec-list"></div>
+    <div id="rec-empty" style="display:none;text-align:center;padding:60px 20px;color:var(--text-3);font-size:13px;">
+      暂无发票记录
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var currentFilter = 'all';
+
+  var ST_MAP = {
+    pending:  { label: '待审核', cls: 'tag-warning' },
+    issued:   { label: '已开票', cls: 'tag-success' },
+    rejected: { label: '已驳回', cls: 'tag-gray' }
+  };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    function p(x) { return ('0' + x).slice(-2); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function getList() {
+    var list = [];
+    try { list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []); } catch (e) {}
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    return list.filter(function (x) { return !x.uid || x.uid === uid; });
+  }
+
+  function render() {
+    var all = getList();
+    var filtered = all;
+    if (currentFilter !== 'all') {
+      filtered = all.filter(function (x) { return x.status === currentFilter; });
+    }
+    var list = document.getElementById('rec-list');
+    var empty = document.getElementById('rec-empty');
+    if (!filtered.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = filtered.map(function (x) {
+      var st = ST_MAP[x.status] || ST_MAP.pending;
+      var date = x.ts ? fmtDate(x.ts) : (x.applyAt || '');
+      var issuedDate = x.issuedAt ? fmtDate(x.issuedAt) : '';
+      var html = '<div class="card" style="margin-bottom:10px;">' +
+        '<div class="fb-between" style="margin-bottom:8px;"><span class="text-3 fs-11">' + date + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="fw-600 fs-14">' + esc(x.title || '') + '</div>' +
+        '<div class="text-2 fs-12 mt-1">' + esc(x.type || '增值税普通发票') + ' · ' + money(x.amount) + '</div>' +
+        (x.orderId ? '<div class="text-3 fs-11 mt-1">关联订单：' + esc(x.orderId) + '</div>' : '') +
+        (x.email ? '<div class="text-3 fs-11 mt-1">接收邮箱：' + esc(x.email) + '</div>' : '');
+      if (x.status === 'issued') {
+        html += '<div class="text-3 fs-11 mt-1">发票号：' + esc(x.invoiceNo || '') + (issuedDate ? ' · 开票日期 ' + issuedDate : '') + '</div>';
+        html += '<div class="mt-3 fb-between">' +
+          '<button class="btn btn-ghost" style="height:34px;padding:0 14px;font-size:12px;" onclick="UI.toast(\'发票已下载\',\'ok\')">下载发票</button>' +
+          '<button class="btn btn-ghost" style="height:34px;padding:0 14px;font-size:12px;" onclick="UI.toast(\'已重新发送至邮箱\',\'ok\')">重新发送</button>' +
+          '</div>';
+      } else if (x.status === 'rejected') {
+        html += '<div class="text-3 fs-11 mt-2" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote || '资料不完整') + '</div>';
+      } else if (x.status === 'pending') {
+        html += '<div class="mt-3 fb-between"><span class="text-3 fs-12">财务审核中，预计 1-2 个工作日</span>' +
+          '<button class="btn btn-ghost" style="height:34px;padding:0 14px;font-size:12px;" onclick="UI.toast(\'已催开票，财务将加急处理\',\'ok\')">催开票</button></div>';
+      }
+      html += '</div>';
+      return html;
+    }).join('');
+  }
+
+  document.querySelectorAll('.seg-item').forEach(function (el) {
+    el.onclick = function () {
+      document.querySelectorAll('.seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+      el.classList.add('is-on');
+      currentFilter = el.getAttribute('data-filter');
+      render();
+    };
+  });
+
+  window.addEventListener('engchain:invoice', render);
+  window.addEventListener('engchain:store-change', render);
+  render();
+})();
+</script>
+</body>
+</html>

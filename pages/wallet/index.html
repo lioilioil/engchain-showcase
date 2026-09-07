@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的钱包 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* ═══════════ 钱包 · 金融范式版式（页面级，双主题自适应） ═══════════ */
+  /* ① 账户概览数据带 */
+  .ov-grid { display: flex; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; padding: 11px 4px; box-sizing: border-box; }
+  .ov-cell { flex: 1; min-width: 0; text-align: center; }
+  .ov-cell + .ov-cell { border-left: 1px solid var(--line); }
+  .ov-label { font-size: 10px; color: var(--text-3); white-space: nowrap; }
+  .ov-val { font-family: var(--font-num); font-size: 17px; font-weight: 700; color: var(--text-1); margin-top: 3px; white-space: nowrap; }
+  /* ② 主卡轮播：当前卡完整 + 另一张露 20%（两卡同向滑动，间距 12px） */
+  .car-wrap { position: relative; overflow: hidden; border-radius: 20px; margin-top: 12px; }
+  .car-track { display: flex; transition: transform .56s cubic-bezier(.22,1,.36,1); will-change: transform; }
+  .car-panel { flex: 0 0 auto; width: calc(83.333% - 10px); min-width: 0; box-sizing: border-box; margin-right: 12px; perspective: 1200px; transform-origin: 50% 58%; display: flex; transition: transform .56s cubic-bezier(.22,1,.36,1), opacity .56s cubic-bezier(.22,1,.36,1); }
+  .car-panel:last-child { margin-right: 0; }
+  .car-panel.is-active { z-index: 2; }
+  .car-panel.is-inactive { opacity: .88; }
+  .car-panel.is-inactive .wal-card { filter: saturate(.92) brightness(.9); box-shadow: 0 12px 26px -18px rgba(0,0,0,.5); }
+
+  /* 高级金融卡面：金属分层 + 金色光晕 + 顶部反光发丝线 + 高光扫掠 + 指针光泽 + 3D 轻倾斜 */
+  .wal-card{
+    position:relative; overflow:hidden; border-radius:20px; padding:16px; box-sizing:border-box; flex:1; display:flex; flex-direction:column;
+    background:
+      radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.20) 0%, transparent 55%),
+      linear-gradient(150deg, #252C35 0%, #151A22 46%, #0B0E13 100%);
+    border:1px solid rgba(240,226,190,.28);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.07),
+      inset 0 -16px 34px -26px rgba(233,196,120,.5),
+      0 26px 50px -22px rgba(0,0,0,.58),
+      0 18px 40px -18px rgba(201,169,97,.34);
+    transform: rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+    transition: transform .6s cubic-bezier(.22,1,.36,1), box-shadow .6s cubic-bezier(.22,1,.36,1), filter .5s cubic-bezier(.22,1,.36,1);
+    will-change: transform;
+    font-family: var(--font-display);
+  }
+  .wal-card::after{ content:""; position:absolute; left:10px; right:10px; top:0; height:1px; z-index:3; pointer-events:none; border-radius:1px; background:linear-gradient(90deg, transparent, rgba(244,231,200,.6), transparent); }
+  .wc-glow{ position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; background: radial-gradient(130% 100% at 86% -12%, rgba(238,214,151,.24) 0%, transparent 52%), radial-gradient(100% 80% at 6% 116%, rgba(200,169,97,.14) 0%, transparent 56%); }
+  .wc-grain{ position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; opacity:.45; mix-blend-mode:soft-light; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"); }
+  .wc-spec{ position:absolute; inset:0; z-index:1; pointer-events:none; border-radius:inherit; opacity:var(--spec-o,0); transition:opacity .4s; background:radial-gradient(120% 95% at var(--mx,64%) var(--my,36%), rgba(249,233,197,.22) 0%, transparent 54%); }
+  .wc-sheen{ position:absolute; inset:-30%; z-index:1; pointer-events:none; mix-blend-mode:screen; background:linear-gradient(72deg, transparent 44%, rgba(255,244,220,.13) 50%, transparent 56%); animation:wc-sheen 7.6s cubic-bezier(.4,0,.2,1) infinite; }
+  .car-panel:nth-child(2) .wc-sheen{ animation-delay:-3.4s; }
+  @keyframes wc-sheen{ 0%{ transform:translateX(-64%);} 52%{ transform:translateX(64%);} 100%{ transform:translateX(64%);} }
+  .wc-content{ position:relative; z-index:2; flex:1; display:flex; flex-direction:column; }
+  .wc-mark{ position:absolute; right:12px; bottom:5px; z-index:1; pointer-events:none; font-family:var(--font-display); font-size:15px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:#F4F2EE; opacity:.05; }
+
+  .wc-top{ display:flex; align-items:center; justify-content:space-between; }
+  .wc-tright{ display:flex; align-items:center; gap:8px; }
+  .wc-brand{ display:flex; align-items:center; gap:8px; font-size:10px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:#CBB87F; }
+  .wc-brand::before{ content:""; width:14px; height:1px; background:#E8D5A3; opacity:.55; }
+  .wc-contact{ width:20px; height:13px; color:#CFB15F; opacity:.9; } .wc-contact svg{ width:100%; height:100%; }
+  .wc-badge{ font-size:9px; font-weight:700; letter-spacing:.06em; color:#2A1810; background:linear-gradient(135deg,#F0E2BE,#C9A961); border-radius:6px; padding:3px 9px; white-space:nowrap; box-shadow:0 2px 8px -3px rgba(201,169,97,.7); border:1px solid rgba(255,255,255,.4); }
+  .wc-amt{ margin-top:9px; display:flex; align-items:baseline; gap:4px; font-family:var(--font-num); font-weight:800; font-size:30px; line-height:1; color:#E8D5A3; letter-spacing:-.01em; font-feature-settings:"tnum" 1,"ss01" 1; text-shadow:0 1px 0 rgba(0,0,0,.35); min-height:1em; }
+  .wc-amt .cur{ font-size:14px; font-weight:600; color:#C9B27E; }
+  .wc-mid{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+  .wc-chip{ width:42px; height:30px; border-radius:6px; position:relative; box-shadow: inset 0 1px 1px rgba(255,255,255,.55), inset 0 -2px 5px rgba(0,0,0,.32), 0 6px 14px -8px rgba(0,0,0,.7); background:linear-gradient(135deg,#F1E3BE,#C9A961 55%,#A8862F); }
+  .wc-chip svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .wc-num{ font-family:var(--font-num); font-size:12.5px; color:#CFC7B7; letter-spacing:.16em; font-feature-settings:"tnum" 1; }
+  .wc-sub{ display:flex; align-items:center; gap:8px; margin-top:auto; padding-top:13px; font-size:10.5px; letter-spacing:.02em; color:rgba(207,199,183,.74); }
+  .wc-sub b{ font-family:var(--font-num); font-weight:700; color:#E8D5A3; }
+  .wc-subsep{ color:rgba(207,199,183,.4); }
+  .wp-txt{ font-size:10.5px; letter-spacing:.02em; color:rgba(207,199,183,.74); }
+  .wp-bar{ height:5px; background:rgba(212,184,118,.16); border-radius:99px; margin-top:7px; overflow:hidden; }
+  .wp-fill{ height:100%; background:linear-gradient(90deg,#C9A961,#E8D5A3); border-radius:99px; transition:width .6s cubic-bezier(.22,1,.36,1); position:relative; overflow:hidden; }
+  .wp-fill::after{ content:""; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent); animation:wc-shimmer 2.4s linear infinite; transform:translateX(-100%); }
+  @keyframes wc-shimmer{ 0%{ transform:translateX(-100%);} 100%{ transform:translateX(100%);} }
+  .wc-meta{ margin-top:10px; font-size:10.5px; letter-spacing:.02em; color:rgba(207,199,183,.74); }
+  .wc-meta b{ font-family:var(--font-num); font-weight:700; }
+
+  /* 积分卡：祖母绿金属变体 */
+  .wal-card--credits{
+    background:
+      radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.18) 0%, transparent 55%),
+      radial-gradient(120% 90% at 10% 114%, rgba(82,183,136,.18) 0%, transparent 55%),
+      linear-gradient(150deg, #1A2E28 0%, #0F201B 46%, #07110E 100%);
+    border-color: rgba(240,226,190,.24);
+  }
+  .wal-card--credits .wc-brand{ color:#B7C9A6; }
+  .wal-card--credits .wc-sub b, .wal-card--credits .wc-meta b{ color:#DCC9A0; }
+
+  @media (prefers-reduced-motion: reduce){
+    .car-track, .car-panel, .wal-card, .wp-fill{ transition:none; }
+    .wc-sheen, .wp-fill::after{ animation:none; }
+  }
+  /* ③ 指示点 */
+  .dots{ display:flex; justify-content:center; align-items:center; gap:7px; margin-top:12px; }
+  .dot{ width:6px; height:6px; border-radius:99px; background:var(--text-3); opacity:.5; border:0; padding:0; cursor:pointer; transition:all .3s cubic-bezier(.22,1,.36,1); }
+  .dot.on{ width:20px; background:linear-gradient(90deg,var(--primary),var(--primary-strong)); opacity:1; box-shadow:0 2px 8px -2px rgba(201,169,97,.6); }
+  /* ④ 主操作（拇指区） */
+  .act-row { display: flex; gap: 10px; margin-top: 12px; }
+  .btn-main { flex: 1; height: 44px; border-radius: 12px; background: var(--primary); color: var(--text-inv); font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 10px 22px -10px rgba(201,169,97,.55); }
+  .btn-sub { flex: 1; height: 44px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--bg-card); color: var(--text-1); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+  .btn-sub small { font-size: 10px; font-weight: 400; color: var(--text-3); margin-left: 5px; font-family: var(--font-num); }
+  /* ⑤ 金刚区（碎片化收敛） */
+  .quick-grid { display: flex; margin-top: 14px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; padding: 13px 4px 11px; box-sizing: border-box; }
+  .quick-item { flex: 1; text-align: center; cursor: pointer; border: 0; background: none; padding: 0; }
+  .quick-ic { width: 38px; height: 38px; margin: 0 auto; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--primary-soft); color: var(--primary-dim); }
+  .quick-ic svg { width: 19px; height: 19px; }
+  .quick-item:nth-child(2) .quick-ic, .quick-item:nth-child(3) .quick-ic { background: var(--bg-inset); color: var(--text-2); }
+  .quick-item:nth-child(4) .quick-ic { background: rgba(82,183,136,.14); color: var(--success); }
+  .quick-name { font-size: 10.5px; color: var(--text-2); margin-top: 6px; }
+  /* 积分态金刚区：祖母绿系配色 */
+  .quick-grid--credits .quick-item:nth-child(1) .quick-ic { background: rgba(82,183,136,.14); color: var(--success); }
+  .quick-grid--credits .quick-item:nth-child(2) .quick-ic { background: var(--primary-soft); color: var(--primary-dim); }
+  .quick-grid--credits .quick-item:nth-child(3) .quick-ic { background: var(--bg-inset); color: var(--text-2); }
+  .quick-grid--credits .quick-item:nth-child(4) .quick-ic { background: rgba(124,91,189,.12); color: #7C5BBD; }
+  /* 积分明细标签色 */
+  .tx-tag--earn { color: var(--success); background: rgba(82,196,26,.1); }
+  .tx-tag--spend { color: var(--danger); background: rgba(234,102,104,.1); }
+  .tx-tag--free { color: var(--primary-dim); background: var(--primary-soft); }
+  /* ⑥ 收支明细 */
+  .tx-head { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 2px 4px; }
+  .tx-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+  .tx-row.tx-click { cursor: pointer; }
+  .tx-row.tx-click:active { opacity: .72; }
+  .tx-ic { width: 38px; height: 38px; border-radius: 11px; flex: none; display: flex; align-items: center; justify-content: center; }
+  .tx-ic svg { width: 19px; height: 19px; }
+  .tx-main { flex: 1; min-width: 0; }
+  .tx-title { font-size: 14px; font-weight: 600; }
+  .tx-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .tx-tag { font-size: 10px; padding: 1px 6px; border-radius: var(--r-full); flex: none; }
+  .tx-act { margin-top: 7px; display: flex; }
+  .tx-btn { font-size: 11px; padding: 4px 11px; border-radius: var(--r-full); border: 1px solid var(--line); background: var(--bg-card); color: var(--text-1); cursor: pointer; }
+  .tx-btn--primary { border-color: var(--primary); color: var(--primary-dim); background: var(--primary-soft); }
+  .tx-amt { font-family: var(--font-num); font-weight: 700; font-size: 14px; flex: none; padding-top: 4px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的钱包</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:10px;">
+    <!-- ══════════ ① 账户概览数据带（随卡片切换联动） ══════════ -->
+    <div class="ov-grid">
+      <div class="ov-cell"><div class="ov-label" id="ov-la">可用余额</div><div class="ov-val" id="ov-a">—</div></div>
+      <div class="ov-cell"><div class="ov-label" id="ov-lb">冻结</div><div class="ov-val" id="ov-b">—</div></div>
+      <div class="ov-cell"><div class="ov-label" id="ov-lc">累计消费</div><div class="ov-val" id="ov-c">—</div></div>
+    </div>
+
+    <!-- ══════════ ② 主卡轮播：余额卡 ⇄ 积分卡（左右切换） ══════════ -->
+    <div class="car-wrap" id="car-wrap">
+      <div class="car-track" id="car-track">
+        <!-- 余额卡（高仿真银行卡 · 金属分层 / 高光扫掠 / 3D 轻倾斜） -->
+        <div class="car-panel">
+          <div class="wal-card">
+            <i class="wc-glow"></i><i class="wc-grain"></i><i class="wc-spec"></i><i class="wc-sheen"></i><span class="wc-mark">ENGCHAIN</span>
+            <div class="wc-content">
+              <div class="wc-top">
+                <div class="wc-brand">工程链 · 余额账户</div>
+                <div class="wc-tright">
+                  <span class="wc-contact" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.9 15.6a4 4 0 0 0 0-7.2"/><path d="M12 18.1a7.4 7.4 0 0 0 0-12.2"/><path d="M5.8 13.4a1.7 1.7 0 0 0 0-2.8"/></svg></span>
+                  <div class="wc-badge">金 V</div>
+                </div>
+              </div>
+              <div class="wc-amt"><span class="cur">¥</span><span id="balance">—</span></div>
+              <div class="wc-mid">
+                <div class="wc-chip"><svg viewBox="0 0 42 30" fill="none" stroke="rgba(88,62,16,.5)" stroke-width="1"><path d="M13 .5v9M29 .5v9M13 20.5v9M29 20.5v9M.5 15h12M29.5 15h12M21 .5v29M.5 7.5h8M33.5 22.5h8"/></svg></div>
+                <div class="wc-num">**** **** **** 1286</div>
+              </div>
+              <div class="wc-sub">
+                <span>冻结 <b id="bal-frozen">—</b></span>
+                <span class="wc-subsep">·</span>
+                <span>累计入账 <b id="bal-total">—</b></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 积分卡（高仿真会员卡 · 祖母绿金属变体） -->
+        <div class="car-panel">
+          <div class="wal-card wal-card--credits">
+            <i class="wc-glow"></i><i class="wc-grain"></i><i class="wc-spec"></i><i class="wc-sheen"></i><span class="wc-mark">积分</span>
+            <div class="wc-content">
+              <div class="wc-top">
+                <div class="wc-brand">积分 · 解锁货币</div>
+                <div class="wc-tright">
+                  <span class="wc-contact" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.9 15.6a4 4 0 0 0 0-7.2"/><path d="M12 18.1a7.4 7.4 0 0 0 0-12.2"/><path d="M5.8 13.4a1.7 1.7 0 0 0 0-2.8"/></svg></span>
+                  <div class="wc-badge" id="disc-txt">—</div>
+                </div>
+              </div>
+              <div class="wc-amt"><span id="bal-credits">—</span><span class="cur">分</span></div>
+              <div class="wc-mid">
+                <div class="wc-chip"><svg viewBox="0 0 42 30" fill="none" stroke="rgba(88,62,16,.5)" stroke-width="1"><path d="M13 .5v9M29 .5v9M13 20.5v9M29 20.5v9M.5 15h12M29.5 15h12M21 .5v29M.5 7.5h8M33.5 22.5h8"/></svg></div>
+                <div class="wc-num">EC · **** 0008</div>
+              </div>
+              <div class="wp-txt" id="free-txt">—</div>
+              <div class="wp-bar"><div class="wp-fill" id="free-bar" style="width:0%;"></div></div>
+              <div class="wc-meta">解锁供需详情 · <b style="color:var(--warning);">不可提现</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 指示点 -->
+    <div class="dots">
+      <button class="dot on" data-i="0" aria-label="余额账户"></button>
+      <button class="dot" data-i="1" aria-label="积分账户"></button>
+    </div>
+
+    <!-- ④ 主操作（拇指区，随卡片切换） -->
+    <div class="act-row">
+      <a class="btn-main" id="btn-main" href="recharge.html">充余额</a>
+      <a class="btn-sub" id="btn-sub" href="withdraw.html">提现<small id="sub-note">—</small></a>
+    </div>
+
+    <!-- ⑤ 金刚区：随卡片切换联动（余额态/积分态各4项） -->
+    <div class="quick-grid" id="quick-grid"></div>
+
+    <!-- ⑥ 收支明细（对公四态置顶 + 余额账流水） -->
+    <div class="tx-head">
+      <span class="fw-600 fs-14" style="color:var(--text-1);" id="tx-title">收支明细</span>
+      <span class="text-3 fs-11" id="tx-subtitle">对公审批 · 余额流水</span>
+    </div>
+    <div class="card" style="padding-top:2px;padding-bottom:2px;">
+      <div id="tx-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* ---- 游客态：未登录时显示登录引导，不展示余额 ---- */
+  function isLoggedIn() {
+    try { var st = UI.state.get(); return !!(st && st.loggedIn); } catch (e) { return false; }
+  }
+  function ensureGuestGate() {
+    if (isLoggedIn()) return;
+    var phone = document.querySelector('.phone');
+    if (!phone) return;
+    var gate = document.createElement('div');
+    gate.style.cssText = 'position:absolute;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;';
+    gate.innerHTML =
+      '<svg class="ic" viewBox="0 0 24 24" style="width:46px;height:46px;margin-bottom:14px;color:var(--text-2);" aria-hidden="true"><use href="#i-lock"></use></svg>' +
+      '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">登录后查看钱包</div>' +
+      '<div style="font-size:12px;color:var(--text-3);text-align:center;margin-bottom:24px;">余额、积分、交易记录仅对登录用户可见</div>' +
+      '<a href="../auth/login.html" style="display:inline-block;padding:12px 40px;background:var(--primary);color:var(--text-inv);border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;">去登录</a>';
+    phone.appendChild(gate);
+  }
+
+  var METHOD = {
+    pay: { icon: 'wallet', name: '余额支付', tint: 'rgba(22,22,22,.06)', color: 'var(--text-2)' },
+    in: { icon: 'wallet', name: '订单收款', tint: 'rgba(22,22,22,.06)', color: 'var(--text-2)' },
+    recharge: { icon: 'chat', name: '微信充值', tint: 'rgba(201,169,97,.16)', color: 'var(--primary-dim)' },
+    withdraw: { icon: 'bank', name: '银行卡提现', tint: 'rgba(37,99,235,.12)', color: '#2563EB' },
+    corp: { icon: 'bank', name: '对公入账', tint: 'rgba(124,91,189,.14)', color: '#7C5BBD' }
+  };
+  var CORP = { icon: 'bank', name: '对公转账', tint: 'rgba(124,91,189,.14)', color: '#7C5BBD' };
+  var CORP_STATUS = {
+    pending: { color: 'var(--primary-dim)', bg: 'var(--primary-soft)' },
+    submitted: { color: 'var(--text-2)', bg: 'var(--bg-inset)' },
+    approved: { color: 'var(--success)', bg: 'rgba(82,196,26,.12)' },
+    rejected: { color: 'var(--danger)', bg: 'rgba(234,102,104,.12)' }
+  };
+  var list = document.getElementById('tx-list');
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  /* ---------- 数据带（余额态/积分态 缓存 + 填充） ---------- */
+  var cache = { b: { a: '—', b: '—', c: '—' }, c: { a: '—', b: '—', c: '—' } };
+  function fillOv(la, lb, lc, v) {
+    document.getElementById('ov-la').textContent = la;
+    document.getElementById('ov-lb').textContent = lb;
+    document.getElementById('ov-lc').textContent = lc;
+    document.getElementById('ov-a').textContent = v.a;
+    document.getElementById('ov-b').textContent = v.b;
+    document.getElementById('ov-c').textContent = v.c;
+  }
+
+  /* ---------- 主卡切换（点击指示点 / 左右滑动 同一条通路） ----------
+     轨道 = [余额卡, 积分卡] 并排；视口宽 = 卡宽 + 12 + 20%卡宽。
+     余额态：轨道 x=0  → 余额卡完整 + 积分卡露右 20%；
+     积分态：轨道 x=-0.8×卡宽 → 积分卡完整 + 余额卡露左 20%。 */
+  /* ---------- 卡片动效工具：弹簧吸附 / 激活态 / 数值翻滚 / 3D 倾斜 ---------- */
+  var REDUCE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var suppressTilt = false;
+  function panelStates() {
+    var ps = document.querySelectorAll('.car-panel');
+    for (var k = 0; k < ps.length; k++) { ps[k].classList.toggle('is-active', k === tab); ps[k].classList.toggle('is-inactive', k !== tab); }
+  }
+  function fmtBal(n) { return UI.money(n); }
+  function fmtCred(n) { return Math.round(n).toLocaleString('zh-CN'); }
+  function countUp(el, to, fmt) {
+    if (!el) return;
+    if (REDUCE) { el.textContent = fmt(to); return; }
+    var t0 = null, dur = 650;
+    function step(ts) { if (t0 === null) t0 = ts; var p = Math.min((ts - t0) / dur, 1); var e = 1 - Math.pow(1 - p, 3); el.textContent = fmt(to * e); if (p < 1) requestAnimationFrame(step); else el.textContent = fmt(to); }
+    requestAnimationFrame(step);
+  }
+  function resetAllTilt() {
+    var cards = document.querySelectorAll('.wal-card');
+    Array.prototype.forEach.call(cards, function (c) { c.style.setProperty('--rx', '0deg'); c.style.setProperty('--ry', '0deg'); c.style.setProperty('--spec-o', '0'); });
+  }
+  function bindTilt() {
+    var cards = document.querySelectorAll('.wal-card');
+    function reset(card) { card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg'); card.style.setProperty('--spec-o', '0'); }
+    Array.prototype.forEach.call(cards, function (card) {
+      card.addEventListener('pointermove', function (e) {
+        if (suppressTilt) return;
+        var r = card.getBoundingClientRect(); if (!r.width) return;
+        var cx = (e.clientX - r.left) / r.width, cy = (e.clientY - r.top) / r.height;
+        card.style.setProperty('--rx', ((cy - .5) * -10).toFixed(2) + 'deg');
+        card.style.setProperty('--ry', ((cx - .5) * 12).toFixed(2) + 'deg');
+        card.style.setProperty('--mx', (cx * 100).toFixed(1) + '%');
+        card.style.setProperty('--my', (cy * 100).toFixed(1) + '%');
+        card.style.setProperty('--spec-o', '1');
+      }, { passive: true });
+      card.addEventListener('pointerleave', function () { reset(card); });
+      card.addEventListener('pointerup', function () { reset(card); });
+    });
+  }
+
+  var tab = 0;
+  var track = document.getElementById('car-track');
+  var wrap = document.getElementById('car-wrap');
+  var dots = document.querySelectorAll('.dot');
+  function cardGeom() {
+    var w = wrap.clientWidth || 390;
+    return { cardW: (w - 12) / 1.2, off: 0.8 * ((w - 12) / 1.2) };
+  }
+  function applyPos(smooth) {
+    var g = cardGeom();
+    var x = tab === 0 ? 0 : -g.off;
+    track.style.transition = smooth ? '' : 'none';
+    track.style.transform = 'translateX(' + x + 'px)';
+    if (!smooth) { void track.offsetWidth; track.style.transition = ''; }
+  }
+  function switchTab(i) {
+    if (i === tab) return;
+    tab = i;
+    applyPos(true);
+    panelStates();
+    resetAllTilt();
+    for (var k = 0; k < dots.length; k++) dots[k].classList.toggle('on', k === i);
+    var main = document.getElementById('btn-main');
+    var sub = document.getElementById('btn-sub');
+    /* 金刚区随卡片切换 */
+    renderQuickItems(i);
+    /* 收支明细标题+内容随卡片切换 */
+    var txTitle = document.getElementById('tx-title');
+    var txSub = document.getElementById('tx-subtitle');
+    if (i === 0) {
+      fillOv('可用余额', '冻结', '累计消费', cache.b);
+      main.textContent = '充余额'; main.href = 'recharge.html';
+      sub.href = 'withdraw.html';
+      sub.innerHTML = '提现<small id="sub-note">' + cache.b.a + '</small>';
+      countUp(document.getElementById('balance'), Math.round(BalanceStore.read().balance * 100) / 100, fmtBal);
+      if (txTitle) txTitle.textContent = '收支明细';
+      if (txSub) txSub.textContent = '对公审批 · 余额流水';
+      renderTx();
+    } else {
+      fillOv('当前积分', '本月已用', '免费剩余', cache.c);
+      main.textContent = '充积分'; main.href = 'credits.html';
+      sub.href = '../supply/list.html';
+      sub.innerHTML = '去解锁';
+      countUp(document.getElementById('bal-credits'), CreditStore.read().balance || 0, fmtCred);
+      if (txTitle) txTitle.textContent = '积分明细';
+      if (txSub) txSub.textContent = '获取 · 消费 · 免费解锁';
+      renderCreditTx();
+    }
+  }
+  dots.forEach(function (d) {
+    d.addEventListener('click', function () { switchTab(parseInt(d.dataset.i, 10)); });
+  });
+  /* 点击卡片切换：点击非激活卡片时切换到该卡片 */
+  var justSwiped = false;
+  document.querySelectorAll('.car-panel').forEach(function (panel, i) {
+    panel.addEventListener('click', function () {
+      if (justSwiped) { justSwiped = false; return; }
+      if (i !== tab) switchTab(i);
+    });
+  });
+  /* 滑动切换：跟手位移 + 松手吸附（第二条通路，同一 switchTab） */
+  (function () {
+    var drag = { startX: 0, base: 0, active: false, startY: 0 };
+    wrap.addEventListener('touchstart', function (e) {
+      var t = e.touches[0];
+      drag.startX = t.clientX; drag.startY = t.clientY;
+      drag.base = tab === 0 ? 0 : -cardGeom().off;
+      drag.active = true;
+      suppressTilt = false;
+      track.style.transition = 'none';
+    }, { passive: true });
+    wrap.addEventListener('touchmove', function (e) {
+      if (!drag.active) return;
+      var t = e.touches[0];
+      var dx = t.clientX - drag.startX;
+      var dy = t.clientY - drag.startY;
+      if (Math.abs(dx) > Math.abs(dy) * 1.2) e.preventDefault();
+      if (Math.abs(dx) > 6) suppressTilt = true;
+      var x = drag.base + dx;
+      if (tab === 0) x = Math.min(x, 0);
+      else x = Math.max(x, -cardGeom().off);
+      track.style.transform = 'translateX(' + x + 'px)';
+    }, { passive: false });
+    wrap.addEventListener('touchend', function (e) {
+      if (!drag.active) return;
+      drag.active = false;
+      suppressTilt = false;
+      resetAllTilt();
+      var _dx = e.changedTouches[0].clientX - drag.startX;
+      if (Math.abs(_dx) > 10) justSwiped = true;
+      var t = e.changedTouches[0];
+      var dx = t.clientX - drag.startX;
+      if (dx < -40 && tab === 0) switchTab(1);
+      else if (dx > 40 && tab === 1) switchTab(0);
+      else applyPos(true);
+    }, { passive: true });
+    window.addEventListener('resize', function () { applyPos(false); });
+  })();
+
+  /* ---- 余额三数值：真账本渲染（含累计消费派生） ---- */
+  function renderBalance() {
+    var b = BalanceStore.read();
+    document.getElementById('balance').textContent = UI.money(b.balance);
+    document.getElementById('bal-frozen').textContent = UI.money(b.frozen);
+    document.getElementById('bal-total').textContent = UI.money(b.totalIn);
+    var spend = 0;
+    (b.logs || []).forEach(function (l) { if (l.amount < 0) spend += Math.abs(l.amount); });
+    spend = Math.round(spend * 100) / 100;
+    cache.b = { a: UI.money(BalanceStore.available()), b: UI.money(b.frozen), c: UI.money(spend) };
+    if (tab === 0) { fillOv('可用余额', '冻结', '累计消费', cache.b); var note = document.getElementById('sub-note'); if (note) note.textContent = cache.b.a; }
+  }
+
+  /* ---- 收支明细：对公记录（4 态）+ 余额账流水 ---- */
+  function renderTx() {
+    var html = '';
+    (CorpPay.list()).forEach(function (r) {
+      var st = CORP_STATUS[r.status] || CORP_STATUS.pending;
+      var tag = '<span class="tx-tag" style="color:' + st.color + ';background:' + st.bg + ';">' + (CorpPay.STATUS[r.status] || '待上传凭证') + '</span>';
+      var btn = '';
+      if (r.status === 'pending') {
+        btn = '<button class="tx-btn tx-btn--primary" onclick="event.stopPropagation();location.href=\'corp-pay.html?id=' + r.id + '\'">上传凭证</button>';
+      } else if (r.status === 'submitted') {
+        btn = '<button class="tx-btn" onclick="event.stopPropagation();location.href=\'corp-pay.html?id=' + r.id + '\'">查看审批状态</button>';
+      } else if (r.status === 'rejected') {
+        btn = '<button class="tx-btn tx-btn--primary" onclick="event.stopPropagation();location.href=\'corp-pay.html?id=' + r.id + '\'">重新提交</button>';
+      }
+      var d = new Date(r.createdAt);
+      var date = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      html += '<div class="tx-row tx-click" onclick="location.href=\'corp-pay.html?id=' + r.id + '\'">' +
+        '<span class="tx-ic" style="background:' + CORP.tint + ';color:' + CORP.color + ';"><svg class="ic"><use href="#i-' + CORP.icon + '"/></svg></span>' +
+        '<div class="tx-main"><div class="tx-title">' + CORP.name + '</div>' +
+        '<div class="tx-sub">充值 · ' + date + tag + '</div>' +
+        '<div class="tx-act">' + btn + '</div></div>' +
+        '<div class="tx-amt" style="color:var(--primary-dim);">' + UI.money(r.amount) + '</div></div>';
+    });
+
+    (BalanceStore.read().logs || []).forEach(function (l) {
+      var m = METHOD[l.method === 'corp' ? 'corp' : l.type] || METHOD.pay;
+      var sign = l.amount > 0 ? '+' : '';
+      var d2 = new Date(l.ts);
+      var date2 = d2.getFullYear() + '-' + pad(d2.getMonth() + 1) + '-' + pad(d2.getDate()) + ' ' + pad(d2.getHours()) + ':' + pad(d2.getMinutes());
+      html += '<div class="tx-row">' +
+        '<span class="tx-ic" style="background:' + m.tint + ';color:' + m.color + ';"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></span>' +
+        '<div class="tx-main"><div class="tx-title">' + m.name + '</div>' +
+        '<div class="tx-sub">' + (l.reason || m.name) + ' · ' + date2 + '</div></div>' +
+        '<div class="tx-amt" style="color:' + (l.amount > 0 ? 'var(--success)' : 'var(--text-1)') + ';">' + sign + '¥' + Math.abs(l.amount).toLocaleString() + '</div></div>';
+    });
+
+    list.innerHTML = html || '<div class="text-3 fs-12" style="padding:8px 0;">暂无收支记录</div>';
+  }
+
+
+  /* ---- 金刚区配置：余额态/积分态各4项 ---- */
+  var QUICK_ITEMS = {
+    0: [
+      { icon: 'bank', name: '对公转账', action: "location.href='corp-pay.html'" },
+      { icon: 'card', name: '支付方式', action: "location.href='payment-method.html'" },
+      { icon: 'doc', name: '发票', action: "location.href='invoice.html'" },
+      { icon: 'shield', name: '资金托管', action: "UI.toast('资金由中国建设银行第三方托管','ok')" }
+    ],
+    1: [
+      { icon: 'eye', name: '解锁记录', action: "location.href='unlock-records.html'" },
+      { icon: 'sparkle', name: '积分规则', action: "location.href='credits-rules.html'" },
+      { icon: 'gift', name: '免费额度', action: "location.href='free-quota.html'" },
+      { icon: 'tag', name: '积分商城', action: "location.href='credits-mall.html'" }
+    ]
+  };
+  function renderQuickItems(t) {
+    var grid = document.getElementById('quick-grid');
+    if (!grid) return;
+    grid.className = 'quick-grid' + (t === 1 ? ' quick-grid--credits' : '');
+    var items = QUICK_ITEMS[t] || QUICK_ITEMS[0];
+    grid.innerHTML = items.map(function (it) {
+      return '<button class="quick-item" onclick="' + it.action + '">' +
+        '<div class="quick-ic"><svg class="ic"><use href="#i-' + it.icon + '"/></svg></div>' +
+        '<div class="quick-name">' + it.name + '</div></button>';
+    }).join('');
+  }
+
+  /* ---- 积分收支明细：获取/消费/免费解锁 ---- */
+  var CREDIT_TX = [
+    { type: 'earn', icon: 'sparkle', title: '每日签到奖励', sub: '连续签到第3天 · 2026-09-05 09:12', amount: 20 },
+    { type: 'spend', icon: 'eye', title: '解锁供需详情', sub: '成都地区混凝土供应 · 2026-09-04 14:32', amount: -10 },
+    { type: 'free', icon: 'tag', title: '免费解锁详情', sub: '使用本月免费额度 · 2026-09-03 10:15', amount: 0 },
+    { type: 'earn', icon: 'bolt', title: '完善资料奖励', sub: '完成个人实名认证 · 2026-09-01 16:40', amount: 50 },
+    { type: 'spend', icon: 'eye', title: '解锁供需详情', sub: '劳务班组需求信息 · 2026-08-28 11:20', amount: -10 },
+    { type: 'earn', icon: 'chat', title: '邀请好友奖励', sub: '好友注册并完成实名 · 2026-08-25 09:00', amount: 100 }
+  ];
+  var CREDIT_TX_META = {
+    earn: { label: '获取', cls: 'tx-tag--earn', color: 'var(--success)' },
+    spend: { label: '消费', cls: 'tx-tag--spend', color: 'var(--danger)' },
+    free: { label: '免费', cls: 'tx-tag--free', color: 'var(--primary-dim)' }
+  };
+  function renderCreditTx() {
+    var el = document.getElementById('tx-list');
+    if (!el) return;
+    var html = CREDIT_TX.map(function (r) {
+      var meta = CREDIT_TX_META[r.type] || CREDIT_TX_META.spend;
+      var sign = r.amount > 0 ? '+' : (r.amount < 0 ? '' : '');
+      var amtText = r.amount === 0 ? '免费' : sign + Math.abs(r.amount) + ' 分';
+      var amtColor = r.amount > 0 ? 'var(--success)' : (r.amount < 0 ? 'var(--text-1)' : 'var(--primary-dim)');
+      return '<div class="tx-row">' +
+        '<span class="tx-ic" style="background:' + (r.type === 'earn' ? 'rgba(82,196,26,.1)' : r.type === 'free' ? 'var(--primary-soft)' : 'rgba(234,102,104,.08)') + ';color:' + meta.color + ';"><svg class="ic"><use href="#i-' + r.icon + '"/></svg></span>' +
+        '<div class="tx-main"><div class="tx-title">' + r.title + '</div>' +
+        '<div class="tx-sub">' + r.sub + '<span class="tx-tag ' + meta.cls + '">' + meta.label + '</span></div></div>' +
+        '<div class="tx-amt" style="color:' + amtColor + ';">' + amtText + '</div></div>';
+    }).join('');
+    el.innerHTML = html || '<div class="text-3 fs-12" style="padding:8px 0;">暂无积分记录</div>';
+  }
+
+  ensureGuestGate();
+  BalanceStore.seedLogs();
+  renderBalance();
+  renderTx();
+  renderQuickItems(0);
+
+  /* ---- 积分卡：真实账本（engchain-credits）+ 免费额度 + 入驻折扣 ---- */
+  function renderCredits() {
+    try {
+      var c = CreditStore.read();
+      document.getElementById('bal-credits').textContent = (c.balance || 0).toLocaleString();
+      var monthly = (MOCK.business.credits && MOCK.business.credits.freeQuota && MOCK.business.credits.freeQuota.monthly) || 5;
+      if (window.ModeStore && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
+      var used = CreditStore.freeUsed();
+      var remain = Math.max(monthly - used, 0);
+      document.getElementById('free-txt').textContent = '已用 ' + used + ' / 共 ' + monthly + ' 条 · 剩 ' + remain + ' 条';
+      document.getElementById('free-bar').style.width = Math.min(used / monthly * 100, 100) + '%';
+      var en = EntryStore.read();
+      var disc = window.creditDiscount ? creditDiscount() : 1;
+      var discEl = document.getElementById('disc-txt');
+      if (en.type && en.active) {
+        var t = MOCK.entryTypeById ? MOCK.entryTypeById(en.type) : null;
+        discEl.textContent = (t ? t.label : '入驻') + ' · 解锁 ' + Math.round(disc * 10) + ' 折';
+      } else {
+        discEl.textContent = '入驻享解锁折扣';
+      }
+      cache.c = { a: (c.balance || 0).toLocaleString() + ' 分', b: '已用 ' + used + ' 条', c: '剩 ' + remain + ' 条' };
+      if (tab === 1) fillOv('当前积分', '本月已用', '免费剩余', cache.c);
+    } catch (e) {}
+  }
+  renderCredits();
+
+  /* ---- 卡片动效初始化：激活态 + 3D 倾斜 + 首屏数值翻滚 ---- */
+  panelStates();
+  bindTilt();
+  countUp(document.getElementById('balance'), Math.round(BalanceStore.read().balance * 100) / 100, fmtBal);
+
+  /* ---- 账本事件联动：充值/提现/审批入账/积分变动后即时刷新 ---- */
+  window.addEventListener('engchain:balance', function () { renderBalance(); renderTx(); });
+  window.addEventListener('engchain:credits', function () { renderCredits(); });
+  window.addEventListener('engchain:store-change', function () { renderBalance(); renderTx(); renderCredits(); });
+})();
+</script>
+</body>
+</html>

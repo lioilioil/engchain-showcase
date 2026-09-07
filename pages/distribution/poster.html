@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/distribution/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>推广海报 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">推广海报</div>
+    <div class="nav-right"><button onclick="share()" style="color:var(--primary);font-size:13px;font-weight:600;">分享</button></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <!-- 模板缩略图选择 -->
+    <div class="tpl-bar" id="tpl-bar"></div>
+
+    <!-- 海报预览卡 -->
+    <div class="poster-card" id="poster">
+      <span class="pg-glow" aria-hidden="true"></span>
+      <span class="pg-sheen" aria-hidden="true"></span>
+      <span class="pg-line" aria-hidden="true"></span>
+      <div class="poster-brand">
+        <div class="poster-logo">链</div>
+        <div class="poster-brand-t">
+          <div class="poster-title">工程链 ENGCHAIN</div>
+          <div class="poster-sub" id="poster-sub">供需匹配 · AI 赋能</div>
+        </div>
+        <span class="poster-tag">二级分销 · 合规</span>
+      </div>
+      <div class="poster-slogan" id="poster-slogan">把工程需求，<br>交给 AI 来撮合</div>
+      <div class="poster-benefits" id="poster-benefits"></div>
+      <div class="poster-qr">
+        <div class="qr-box">
+          <div class="qr-wrap">
+            <div class="qr-fake" id="qr-fake"></div>
+            <span class="qr-corner qr-c1"></span><span class="qr-corner qr-c2"></span><span class="qr-corner qr-c3"></span><span class="qr-corner qr-c4"></span>
+          </div>
+          <div class="qr-code">我的专属邀请码 <b class="mono" id="invite-code">—</b> <button class="qr-copy" onclick="copyCode()">复制</button></div>
+          <div class="qr-hint">好友注册填写即绑定 · 消费后自动返佣</div>
+        </div>
+      </div>
+      <div class="poster-foot">扫码 / 填码 · 立即注册绑定</div>
+    </div>
+
+    <!-- 操作条 -->
+    <div class="poster-actions">
+      <button class="pa-btn" onclick="savePoster()">
+        <span class="pa-ic"><svg class="ic"><use href="#i-download"/></svg></span>
+        <span>保存海报</span>
+      </button>
+      <button class="pa-btn" onclick="share()">
+        <span class="pa-ic pa-gold"><svg class="ic"><use href="#i-share"/></svg></span>
+        <span>分享邀请</span>
+      </button>
+      <button class="pa-btn" onclick="copy()">
+        <span class="pa-ic pa-green"><svg class="ic"><use href="#i-clip"/></svg></span>
+        <span>复制链接</span>
+      </button>
+    </div>
+    <div class="poster-tip">长按海报可保存到相册 · 好友扫码或填码注册即绑定关系</div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered'};
+if(!acc.isResident){
+  var ph=document.querySelector('.phone');
+  if(ph){ph.innerHTML='<div style="padding:88px 28px;text-align:center;">'+
+    '<svg class="ic" style="width:42px;height:42px;color:var(--primary);margin-bottom:14px;"><use href="#i-share"/></svg>'+
+    '<div class="fw-700 fs-17" style="margin-bottom:8px;">推广海报 · 入驻企业专享</div>'+
+    '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:26px;">完成企业入驻后生成专属邀请码与海报。</div>'+
+    '<button class="btn btn-primary btn-block" onclick="location.href=\''+(acc.statusId==='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId==='guest'?'去登录':'去入驻')+'</button></div>';}
+  return;
+}
+var me=DataBus.current();
+var CODE=Referral.codeOf(me.id);
+var LINK=location.origin+location.pathname.replace(/pages\/distribution\/[^/]+$/,'')+'pages/auth/register.html?invite='+CODE+'&ch=poster';
+document.getElementById('invite-code').textContent=CODE;
+var TPL=[
+  {name:'AI 撮合',sub:'供需匹配 · AI 赋能',slogan:'把工程需求，<br>交给 AI 来撮合',b:['智能补全','精准匹配','高效对接','分销赚钱']},
+  {name:'资金托管',sub:'中介托管 · 资金保障',slogan:'在线托管成交，<br>履约验收再结算',b:['资金托管','里程碑交付','防跳单','返佣共赢']},
+  {name:'入驻招商',sub:'入驻招商 · 共创共赢',slogan:'建筑·中介·合伙人，<br>一站入驻享权益',b:['蓝V建筑','金V中介','合伙人','二级分销']}
+];
+var ti=0;
+function renderTpl(){
+  var t=TPL[ti];
+  document.getElementById('poster-sub').innerHTML=t.sub;
+  document.getElementById('poster-slogan').innerHTML=t.slogan;
+  document.getElementById('poster-benefits').innerHTML=t.b.map(function(x){return '<div class="pb-item"><svg class="ic"><use href="#i-check"/></svg>'+x+'</div>';}).join('');
+  document.getElementById('tpl-bar').innerHTML=TPL.map(function(x,i){
+    return '<button class="tpl-thumb'+(i===ti?' on':'')+'" onclick="switchTpl('+i+')">'+
+      '<span class="tt-name">'+x.name+'</span>'+
+      '<span class="tt-tag">模板 '+(i+1)+'</span>'+
+      '<span class="tt-dot"></span></button>';
+  }).join('');
+}
+window.switchTpl=function(i){ti=i;renderTpl();};
+renderTpl();
+function copyText(txt,ok){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(ok);}else{var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){}document.body.removeChild(ta);}}
+window.copy=function(){UI.closeSheet&&UI.closeSheet();copyText(LINK,function(){UI.toast('邀请链接已复制','ok');});};
+window.copyCode=function(){copyText(CODE,function(){UI.toast('邀请码 '+CODE+' 已复制','ok');});};
+window.savePoster=function(){UI.toast('海报已保存到相册（原型演示）','ok');};
+window.share=function(){
+  UI.sheet().html(
+    '<div style="padding:8px 0 14px;text-align:center;">'+
+    '<div class="fw-700 fs-16" style="margin-bottom:16px;">分享邀请</div>'+
+    '<div class="share-row">'+
+      '<button class="share-cell" onclick="UI.closeSheet();UI.toast(\'已调起微信分享\',\'ok\')"><span class="share-ic sh-wechat"><svg class="ic"><use href="#i-chat"/></svg></span><span>微信好友</span></button>'+
+      '<button class="share-cell" onclick="copy()"><span class="share-ic sh-copy"><svg class="ic"><use href="#i-clip"/></svg></span><span>复制链接</span></button>'+
+      '<button class="share-cell" onclick="copyCode()"><span class="share-ic sh-code"><svg class="ic"><use href="#i-tag"/></svg></span><span>复制邀请码</span></button>'+
+    '</div>'+
+    '<div class="text-3 fs-11" style="margin-top:14px;">好友注册填写邀请码 <b style="color:var(--primary-dim);">'+CODE+'</b> 即绑定，消费后自动返佣</div>'+
+    '</div>').show();
+};
+})();
+</script>
+<style>
+/* ===== 模板缩略图 ===== */
+.tpl-bar{display:flex;gap:10px;padding:0 2px 14px;}
+.tpl-thumb{position:relative;flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;border-radius:14px;background:var(--bg-card);border:1.5px solid var(--line);overflow:hidden;cursor:pointer;transition:all var(--d-fast);min-height:64px;}
+.tpl-thumb::before{content:"";position:absolute;right:-14px;top:-14px;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,.14),transparent 70%);}
+.tpl-thumb.on{border-color:var(--primary);box-shadow:0 6px 16px rgba(201,169,97,.18);}
+.tpl-thumb.on .tt-name{color:var(--primary-dim);}
+.tpl-thumb:active{transform:scale(.97);}
+.tt-name{font-size:13px;font-weight:700;color:var(--text-1);}
+.tt-tag{font-size:10px;color:var(--text-3);}
+.tt-dot{position:absolute;right:10px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--line);}
+.tpl-thumb.on .tt-dot{background:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
+
+/* ===== 海报卡 ===== */
+.poster-card{position:relative;overflow:hidden;background:radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.16) 0%, transparent 55%),linear-gradient(160deg,#0b0f1a,#101a2e 60%,#0f2418);border:1px solid rgba(201,169,97,.25);border-radius:22px;padding:24px;color:#F4F2EE;box-shadow:0 14px 34px rgba(16,26,46,.28);animation:pg-in .5s var(--e-out) both;}
+@keyframes pg-in{from{opacity:0;transform:translateY(10px) scale(.99);}to{opacity:1;transform:none;}}
+.pg-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 100% at 100% 0%, rgba(238,214,151,.14) 0%, transparent 55%);}
+.pg-sheen{position:absolute;inset:-30%;pointer-events:none;mix-blend-mode:screen;background:linear-gradient(72deg, transparent 44%, rgba(255,244,220,.07) 50%, transparent 56%);animation:dh-sheen 8.5s cubic-bezier(.4,0,.2,1) infinite;}
+.pg-line{position:absolute;left:12px;right:12px;top:0;height:1px;pointer-events:none;background:linear-gradient(90deg, transparent, rgba(244,231,200,.5), transparent);}
+@keyframes dh-sheen{0%,100%{transform:translateX(-18%);}55%,85%{transform:translateX(18%);}}
+.poster-brand{display:flex;align-items:center;gap:12px;position:relative;}
+.poster-logo{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:22px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(201,169,97,.35);}
+.poster-brand-t{flex:1;min-width:0;}
+.poster-title{font-weight:700;font-size:15px;color:#F4F2EE;}
+.poster-sub{font-size:11px;color:rgba(244,242,238,.58);margin-top:2px;}
+.poster-tag{font-size:9px;font-weight:700;letter-spacing:.05em;color:#2A1810;background:linear-gradient(135deg,#F0E2BE,#C9A961);border-radius:6px;padding:3px 8px;box-shadow:0 2px 8px -3px rgba(201,169,97,.7);white-space:nowrap;}
+.poster-slogan{position:relative;font-size:26px;font-weight:800;line-height:1.35;margin:22px 0 18px;letter-spacing:-.5px;color:#F7F5F1;}
+.poster-benefits{position:relative;display:flex;flex-wrap:wrap;gap:8px;}
+.pb-item{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--primary-strong);border:1px solid rgba(201,169,97,.3);background:rgba(201,169,97,.06);border-radius:999px;padding:4px 10px;}
+.pb-item svg{width:11px;height:11px;}
+.poster-qr{position:relative;margin-top:22px;background:rgba(201,169,97,.08);border:1px solid rgba(201,169,97,.18);border-radius:16px;padding:16px;text-align:center;}
+.qr-box{display:flex;flex-direction:column;align-items:center;gap:9px;}
+.qr-wrap{position:relative;padding:10px;background:#F7F5F1;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+.qr-fake{width:92px;height:92px;background:repeating-conic-gradient(#1A1F26 0 25%,transparent 0 50%) 50%/15px 15px;border-radius:4px;}
+.qr-corner{position:absolute;width:12px;height:12px;border:3px solid #C9A961;}
+.qr-c1{left:2px;top:2px;border-right:none;border-bottom:none;border-radius:4px 0 0 0;}
+.qr-c2{right:2px;top:2px;border-left:none;border-bottom:none;border-radius:0 4px 0 0;}
+.qr-c3{left:2px;bottom:2px;border-right:none;border-top:none;border-radius:0 0 0 4px;}
+.qr-c4{right:2px;bottom:2px;border-left:none;border-top:none;border-radius:0 0 4px 0;}
+.qr-code{font-size:12.5px;color:rgba(244,242,238,.72);display:flex;align-items:center;gap:6px;}
+.qr-code b{color:var(--primary-strong);letter-spacing:1.5px;font-size:15px;}
+.qr-copy{font-size:10px;font-weight:600;color:var(--primary-strong);border:1px solid rgba(201,169,97,.4);border-radius:6px;padding:2px 8px;background:rgba(201,169,97,.08);cursor:pointer;}
+.qr-copy:active{transform:scale(.94);}
+.qr-hint{font-size:10px;color:rgba(244,242,238,.42);}
+.poster-foot{position:relative;text-align:center;font-size:11px;color:rgba(244,242,238,.42);margin-top:16px;letter-spacing:.06em;}
+
+/* ===== 操作条 ===== */
+.poster-actions{display:flex;gap:10px;margin-top:14px;}
+.pa-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:13px 6px;font-size:12px;font-weight:600;color:var(--text-1);cursor:pointer;transition:transform var(--d-fast),border-color var(--d-fast);}
+.pa-btn:active{transform:scale(.95);border-color:var(--accent-line);}
+.pa-ic{width:34px;height:34px;border-radius:11px;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;}
+.pa-ic svg{width:16px;height:16px;stroke-width:1.8;}
+.pa-gold{background:var(--primary-soft);color:var(--primary-dim);}
+.pa-green{background:rgba(43,107,79,.09);color:var(--success);}
+.poster-tip{text-align:center;font-size:10.5px;color:var(--text-3);margin:12px 0 4px;}
+
+/* ===== 分享弹层 ===== */
+.share-row{display:flex;justify-content:center;gap:26px;}
+.share-cell{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11.5px;color:var(--text-2);cursor:pointer;}
+.share-ic{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.share-ic svg{width:21px;height:21px;stroke-width:1.8;}
+.sh-wechat{background:rgba(43,107,79,.12);color:var(--success);}
+.sh-copy{background:var(--primary-soft);color:var(--primary-dim);}
+.sh-code{background:rgba(37,99,235,.10);color:var(--blue);}
+.share-cell:active .share-ic{transform:scale(.92);}
+
+@media (prefers-reduced-motion: reduce){.poster-card{animation:none;}.pg-sheen{animation:none;}}
+</style>
+</body>
+</html>

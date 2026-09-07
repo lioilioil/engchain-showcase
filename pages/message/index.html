@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/message/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>消息 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body data-tab="message">
+<div class="phone">
+  <div class="page-header" style="padding-top:10px;">
+    <div class="topbar">
+      <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
+      <div class="topbar-title">消息</div>
+      <div class="topbar-right"><span style="color:var(--text-3);font-size:12px;">共 <span class="green" id="total-unread">0</span> 条未读</span></div>
+    </div>
+  </div>
+
+  <div class="scroll" style="padding-top:6px;">
+    <a class="sys-entry" href="system.html">
+      <div class="se-ic accent"><svg class="ic"><use href="#i-bell"/></svg></div>
+      <div class="se-body">
+        <div class="se-top"><span class="se-name">系统消息</span><span class="se-time" id="sys-last-time">今天</span></div>
+        <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span></div>
+      </div>
+    </a>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var TYPE_STYLE = { '公告': 'gold', '系统': 'info', '风控': 'danger', '活动': 'warn' };
+  function fmtTs(ts) {
+    if (!ts) return '';
+    var d = new Date(String(ts).indexOf('-') === 0 ? ts : (String(ts).length === 10 ? ts + 'T00:00:00' : ts));
+    if (isNaN(d)) return String(ts);
+    var m = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][d.getMonth()];
+    return m + d.getDate() + '日';
+  }
+
+  /* ---- 运营消息（同源 engchain-messages：后台消息中心发布 → App 实时可见） ---- */
+  var MSG_READ_KEY = 'engchain-msg-read';
+  function readMsgIds() { try { return JSON.parse(localStorage.getItem(MSG_READ_KEY) || '[]'); } catch (e) { return []; } }
+  function writeMsgIds(ids) { try { localStorage.setItem(MSG_READ_KEY, JSON.stringify(ids)); } catch (e) {} }
+  function isMsgRead(id) { return readMsgIds().indexOf(id) >= 0; }
+  function markMsgRead(id) { var ids = readMsgIds(); if (ids.indexOf(id) < 0) { ids.push(id); writeMsgIds(ids); } }
+  function markAllMsgRead() { var ids = readMsgs().map(function(m){return m.id;}); writeMsgIds(ids); }
+  function readMsgs() {
+    try { return (window.DataBus && DataBus.messages()) || []; } catch (e) { return []; }
+  }
+  function sysUnreadCount() {
+    var list = readMsgs();
+    var readIds = readMsgIds();
+    return list.filter(function (m) { return readIds.indexOf(m.id) < 0; }).length;
+  }
+  function renderOps() {
+    var list = readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
+    var latest = list[0] || {};
+    document.getElementById('sys-last').textContent = latest.title ? (latest.title + '：' + (latest.body || '').slice(0, 32)) : '';
+    document.getElementById('sys-last-time').textContent = fmtTs(latest.ts) || '';
+    var su = document.getElementById('sys-unread');
+    var unread = sysUnreadCount();
+    su.textContent = unread;
+    su.style.display = unread ? '' : 'none';
+    document.getElementById('total-unread').textContent =
+      MOCK.conversations.reduce(function (a, c) { return a + (c.unread || 0); }, 0) + unread;
+    /* 运营公告区（前 3 条） */
+    var ops = document.getElementById('ops-list');
+    if (!ops) return;
+    ops.innerHTML = list.slice(0, 3).map(function (m) {
+      var st = TYPE_STYLE[m.type] || 'info';
+      var stc = st === 'gold' ? 'var(--primary)' : st === 'danger' ? '#dc2626' : st === 'warn' ? '#d97706' : 'var(--primary)';
+      var stbg = st === 'gold' ? 'rgba(201,169,97,.15)' : st === 'danger' ? 'rgba(220,38,38,.1)' : st === 'warn' ? 'rgba(217,119,6,.1)' : 'rgba(46,102,255,.08)';
+      return '<div style="padding:14px 4px;border-bottom:1px solid var(--line);">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+        '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:' + stc + ';background:' + stbg + ';">' + (m.type || '系统') + '</span>' +
+        '<span class="fw-600 fs-13 elip" style="flex:1;">' + (m.title || '') + '</span>' +
+        '<span class="text-3" style="font-size:10px;">' + fmtTs(m.ts) + '</span></div>' +
+        '<div class="text-2 fs-12" style="line-height:1.6;">' + (m.body || '') + '</div>' +
+        '<div class="text-3" style="font-size:10px;margin-top:4px;">发送对象：' + (m.target || '全部用户') + '</div></div>';
+    }).join('') || '<div class="text-3" style="font-size:12px;padding:14px 4px;">暂无运营消息，后台发布后将实时同步至 App</div>';
+  }
+
+  document.getElementById('list').insertAdjacentHTML('beforebegin', '<div id="ops-list"></div>');
+  renderOps();
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages') renderOps(); });
+  window.addEventListener('engchain:messages', function () { renderOps(); });
+
+  document.getElementById('list').innerHTML = MOCK.conversations.map(function (c) {
+    return '<a href="chat.html?id=' + c.id + '" style="display:flex;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line);">' +
+      '<div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,rgba(201,169,97,.2),rgba(201,169,97,.05));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--primary);">' + c.avatar + '</div>' +
+      '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;justify-content:space-between;"><span class="fw-600 fs-14 elip">' + c.name + '</span><span class="text-3 fs-11">' + c.time + '</span></div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;"><span class="text-2 fs-12 elip" style="flex:1;">' + c.last + '</span>' +
+      (c.unread ? '<span class="badge" style="margin-left:8px;">' + c.unread + '</span>' : '') + '</div>' +
+      '<div class="text-3" style="font-size:10px;margin-top:4px;">' + c.role + '</div></div></a>';
+  }).join('');
+
+  /* 总未读 = 会话未读 + 系统消息未读 */
+  var convUnread = MOCK.conversations.reduce(function (a, c) { return a + (c.unread || 0); }, 0);
+  var sysUnread = sysUnreadCount();
+  document.getElementById('total-unread').textContent = convUnread + sysUnread;
+})();
+</script>
+<style>
+  /* 本页为普通 .scroll（已提供 16px 页面边距），清零 .sys-entry 自带的水平外边距，避免双重缩进，与下方会话行对齐 */
+  .sys-entry { margin-left: 0; margin-right: 0; }
+</style>
+</body>
+</html>

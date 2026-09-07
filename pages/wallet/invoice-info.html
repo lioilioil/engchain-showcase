@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>开票信息管理 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">开票信息管理</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <div id="title-list"></div>
+    <div id="title-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-3);font-size:13px;">
+      暂无发票抬头<br><span style="font-size:11px;">点击下方按钮新增抬头</span>
+    </div>
+
+    <div style="padding:14px;">
+      <button class="btn btn-primary btn-block" onclick="location.href='invoice-title-new.html'">＋ 新增抬头</button>
+    </div>
+
+    <div class="card" style="margin:0 14px 16px;background:var(--bg-card-2);">
+      <div class="text-3 fs-12" style="line-height:1.7;">开票信息将用于开具电子发票，请确保抬头名称与纳税人识别号真实有效；已保存的抬头可在「申请开票」时直接选用，发票将开具至接收邮箱。</div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var TITLE_KEY = 'engchain-invoice-titles';
+
+  function loadTitles() {
+    try { return JSON.parse(localStorage.getItem(TITLE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveTitles(arr) {
+    try { localStorage.setItem(TITLE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+  function render() {
+    var titles = loadTitles();
+    var list = document.getElementById('title-list');
+    var empty = document.getElementById('title-empty');
+    if (!titles.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = titles.map(function (t, i) {
+      var defTag = t.isDefault ? '<span class="tag tag-primary" style="margin-left:6px;font-size:10px;">默认</span>' : '';
+      return '<div class="card" style="margin:0 14px 10px;">' +
+        '<div class="fb-between" style="margin-bottom:6px;">' +
+          '<div class="fw-600 fs-15">' + esc(t.name) + defTag + '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            (t.isDefault ? '' : '<span class="link-green fs-12" style="cursor:pointer;" onclick="setDefault(' + i + ')">设为默认</span>') +
+            '<span class="text-3 fs-12" style="cursor:pointer;" onclick="delTitle(' + i + ')">删除</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="iv-row"><span class="iv-k">抬头类型</span><span class="iv-v">' + (t.titleType === 'personal' ? '个人' : '企业') + '</span></div>' +
+        (t.tax ? '<div class="iv-row"><span class="iv-k">纳税人识别号</span><span class="iv-v">' + esc(t.tax) + '</span></div>' : '') +
+        (t.address ? '<div class="iv-row"><span class="iv-k">注册地址</span><span class="iv-v">' + esc(t.address) + '</span></div>' : '') +
+        (t.phone ? '<div class="iv-row"><span class="iv-k">联系电话</span><span class="iv-v">' + esc(t.phone) + '</span></div>' : '') +
+        (t.bank ? '<div class="iv-row"><span class="iv-k">开户银行</span><span class="iv-v">' + esc(t.bank) + '</span></div>' : '') +
+        (t.bankAccount ? '<div class="iv-row"><span class="iv-k">银行账号</span><span class="iv-v">' + esc(t.bankAccount) + '</span></div>' : '') +
+        (t.email ? '<div class="iv-row"><span class="iv-k">接收邮箱</span><span class="iv-v">' + esc(t.email) + '</span></div>' : '') +
+        '<div style="margin-top:10px;"><button class="btn btn-ghost" style="height:34px;padding:0 14px;font-size:12px;border-color:var(--accent-soft);color:var(--primary);" onclick="location.href=\'invoice-info-edit.html?idx=' + i + '\'">编辑</button></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  window.setDefault = function (idx) {
+    var titles = loadTitles();
+    titles.forEach(function (t, i) { t.isDefault = (i === idx); });
+    saveTitles(titles);
+    UI.toast('已设为默认抬头', 'ok');
+    render();
+  };
+
+  window.delTitle = function (idx) {
+    UI.confirm ? UI.confirm({ title: '删除抬头', body: '确认删除该发票抬头？', ok: '删除', danger: true, onYes: doDel }) : doDel();
+    function doDel() {
+      var titles = loadTitles();
+      titles.splice(idx, 1);
+      saveTitles(titles);
+      UI.toast('已删除', 'ok');
+      render();
+    }
+  };
+
+  window.addEventListener('engchain:store-change', render);
+  render();
+})();
+</script>
+</body>
+</html>

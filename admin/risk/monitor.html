@@ -1,0 +1,336 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业监控 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="risk/monitor.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>企业监控</h1>
+        <div class="sub">风控合规中心 · 企业经营动态监控（风险雷达 feed · 风险等级 · 异常预警）· 与 App 监控页 engchain-monitor 同源</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">企业动态 feed</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+
+    <div class="card card-pad mt-16">
+      <div class="card-h">
+        <span class="card-t">关注企业</span>
+        <span class="card-s" id="co-count"></span>
+      </div>
+      <div id="co-list"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var KIND = { warn: { label: '风险预警', cls: 'badge-danger', dot: 'var(--warning)' }, ok: { label: '正常', cls: 'badge-success', dot: 'var(--success)' }, info: { label: '经营动态', cls: 'badge-info', dot: 'var(--info)' } };
+  var DIM = { '风险': '风险事件', '经营': '经营动态', '资金': '资金动态' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { dim: '', kind: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try { return String(ts || '').slice(0, 16); } catch (e) { return '-'; }
+  }
+  function fmtDate(ts) { try { return String(ts || '').slice(0, 10); } catch (e) { return ''; } }
+
+  function getFeed() {
+    try {
+      if (window.DataBus && DataBus.loadMonitorFeed) return DataBus.loadMonitorFeed();
+    } catch (e) {}
+    try {
+      if (window.MonitorStore) { var s = MonitorStore.read(); return s.feed || []; }
+    } catch (e) {}
+    return [];
+  }
+
+  function getFollows() {
+    try { if (window.MonitorStore) { var s = MonitorStore.read(); return s.follows || []; } } catch (e) {}
+    return [];
+  }
+
+  function isFollowed(company) {
+    return getFollows().some(function (f) { return f.companyId === company || f.company === company; });
+  }
+
+  function filteredList() {
+    return getFeed().filter(function (f) {
+      if (filters.dim && f.dim !== filters.dim) return false;
+      if (filters.kind && f.kind !== filters.kind) return false;
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        if ((f.company + f.text + f.dim).toLowerCase().indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKPI() {
+    var st = (window.DataBus && DataBus.monitorStat) ? DataBus.monitorStat() : { follows: 0, feed: 0, warn: 0, ok: 0 };
+    var feed = getFeed();
+    var today = fmtDate(Date.now());
+    var todayN = feed.filter(function (f) { return fmtDate(f.ts) === today; }).length;
+    var cards = [
+      ['监控企业数', st.follows, 'up', '关注企业数量'],
+      ['今日动态', todayN, 'gold', '当日 feed 数'],
+      ['高风险预警', st.warn, 'down', '需关注'],
+      ['已关注', st.follows, 'warn', '持续监控中']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'dim', label: '动态类型', type: 'select', options: [
+          { value: '风险', label: '风险事件' },
+          { value: '经营', label: '经营动态' },
+          { value: '资金', label: '资金动态' }
+        ]},
+        { key: 'kind', label: '风险等级', type: 'select', options: [
+          { value: 'warn', label: '风险预警' },
+          { value: 'ok', label: '正常' },
+          { value: 'info', label: '经营动态' }
+        ]},
+        { key: 'keyword', label: '企业搜索', type: 'text', placeholder: '企业名 / 动态内容' }
+      ],
+      onFilter: function (vals) {
+        filters.dim = vals.dim || ''; filters.kind = vals.kind || '';
+        filters.keyword = vals.keyword || ''; page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 条动态');
+      },
+      onReset: function () {
+        filters = { dim: '', kind: '', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function kindBadge(kind) {
+    var k = KIND[kind] || KIND.info;
+    return '<span class="badge ' + k.cls + '">' + k.label + '</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = '筛选 ' + list.length + ' / 共 ' + getFeed().length + ' 条动态 · 按时间倒序';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'ts', label: '时间', width: '140px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.ts) + '</span>'; } },
+        { key: 'company', label: '企业', width: '180px', render: function (row) {
+          var followed = isFollowed(row.company);
+          return '<div><div class="tx-semibold">' + esc(row.company) + (followed ? '<span class="badge badge-gold ml-6 badge-xs">已关注</span>' : '') + '</div>' +
+            '<div class="tx-muted-xs">' + esc(DIM[row.dim] || row.dim || '-') + '</div></div>';
+        }},
+        { key: 'kind', label: '风险等级', width: '100px', render: function (row) { return kindBadge(row.kind); } },
+        { key: 'text', label: '动态详情', render: function (row) { return '<span class="tx-base">' + esc(row.text) + '</span>'; } },
+        { key: 'ops', label: '操作', width: '200px', render: function (row, idx) {
+          var followed = isFollowed(row.company);
+          var ops = '';
+          if (!followed) {
+            ops += '<button class="btn btn-sm btn-outline" data-act="follow" data-idx="' + idx + '">关注</button>';
+          } else {
+            ops += '<button class="btn btn-sm btn-ghost" data-act="unfollow" data-idx="' + idx + '">取消关注</button>';
+          }
+          if (row.kind === 'warn') {
+            ops += '<button class="btn btn-sm btn-primary" data-perm="ban" data-act="alert" data-idx="' + idx + '">生成预警</button>';
+          }
+          return ops;
+        }}
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '暂无企业动态'
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function renderFollows() {
+    var follows = getFollows();
+    $('#co-count').textContent = follows.length + ' 家 · 升级认证可扩容关注上限';
+    $('#co-list').innerHTML = follows.map(function (f) {
+      return '<div class="review-item">' +
+        '<span class="u-av av-info">企</span>' +
+        '<div class="r-main">' +
+          '<div class="r-t">' + esc(f.companyId || f.company || '未知企业') + '<span class="badge badge-gold">监控中</span></div>' +
+          '<div class="r-sub"><span>关注于 ' + (f.ts ? fmtTime(f.ts) : '-') + '</span></div>' +
+        '</div>' +
+        '<div class="r-ops"><button class="btn btn-sm btn-outline" data-unfollow="' + esc(f.companyId || f.company || '') + '">取消关注</button></div>' +
+      '</div>';
+    }).join('') || '<div class="empty"><div class="e-ic"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-4.88 4.88a.5.5 0 0 1-.87-.35V13H2.5a.5.5 0 0 1-.5-.5V11a.5.5 0 0 1 .5-.5h2.75V2.5A.5.5 0 0 1 6.13 2 16 16 0 0 1 8.14 3.7 36 36 0 0 1 10.66 6.5C12.13 8.35 13.3 10.2 14.1 12H22a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-4.65c.8 1.8 1.97 3.65 3.49 5.5a.5.5 0 0 1-.39.82c-1.4 0-2.8-.26-4.18-.78a34 34 0 0 1-4.08-2.12A12 12 0 0 1 11 17Z"/></svg></div><div class="e-title">尚未关注任何企业</div><div class="e-tip">在上方动态 feed 中，发现感兴趣的企业可点击「关注」</div></div>';
+  }
+
+  function openDetail(f) {
+    var followed = isFollowed(f.company);
+    var companyFeeds = getFeed().filter(function (x) { return x.company === f.company; });
+    var historyHtml = companyFeeds.slice(0, 5).map(function (x) {
+      var k = KIND[x.kind] || KIND.info;
+      return '<div class="tl-item"><span class="tl-dot" style="background:' + k.dot + ';"></span><div>' +
+        '<div class="tl-t">' + esc(x.text) + '</div>' +
+        '<div class="tl-s">' + fmtTime(x.ts) + ' · ' + esc(DIM[x.dim] || x.dim || '') + '</div></div></div>';
+    }).join('');
+
+    var body = '<div class="tx-title mb-4">' + esc(f.company) +
+      (followed ? '<span class="badge badge-gold ml-8">已关注</span>' : '') + '</div>' +
+      '<div class="tx-muted-sm mb-16">' + esc(DIM[f.dim] || f.dim || '') + ' · ' + kindBadge(f.kind) + '</div>' +
+
+      '<div class="sec-title-sm">动态详情</div>' +
+      '<div class="detail-box">' + esc(f.text) + '</div>' +
+
+      '<div class="sec-title">企业画像</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">企业名称</div><div class="v">' + esc(f.company) + '</div></div>' +
+      '<div class="dg"><div class="k">动态维度</div><div class="v">' + esc(DIM[f.dim] || f.dim || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">风险等级</div><div class="v">' + kindBadge(f.kind) + '</div></div>' +
+      '<div class="dg"><div class="k">历史动态</div><div class="v">' + companyFeeds.length + ' 条</div></div>' +
+      '</div>' +
+
+      '<div class="sec-title">历史记录</div>' +
+      '<div class="timeline">' + (historyHtml || '<div class="tx-muted-sm">暂无历史记录</div>') + '</div>';
+
+    var footer = '';
+    if (!followed) {
+      footer = '<button class="btn btn-primary" id="d-follow">关注企业</button>';
+    } else {
+      footer = '<button class="btn btn-ghost" id="d-unfollow">取消关注</button>';
+    }
+    if (f.kind === 'warn') {
+      footer += '<button class="btn btn-primary" data-perm="ban" id="d-alert">生成预警</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '企业动态详情 · ' + f.company, content: body, footer: footer, width: '560px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    var fb = drawer.panel.querySelector('.drawer-footer');
+    if (fb) {
+      var flBtn = fb.querySelector('#d-follow');
+      if (flBtn) flBtn.onclick = function () { drawer.close(); followCompany(f.company); };
+      var ufBtn = fb.querySelector('#d-unfollow');
+      if (ufBtn) ufBtn.onclick = function () { drawer.close(); unfollowCompany(f.company); };
+      var alBtn = fb.querySelector('#d-alert');
+      if (alBtn) alBtn.onclick = function () { drawer.close(); generateAlert(f); };
+    }
+  }
+
+  function followCompany(company) {
+    try {
+      if (window.MonitorStore) MonitorStore.follow(company);
+      Admin.toast('已关注：' + company);
+      Admin.log('关注企业', '企业监控', company, '加入监控列表');
+    } catch (e) { Admin.toast('关注失败'); }
+    renderKPI(); renderTable(); renderFollows();
+  }
+
+  function unfollowCompany(company) {
+    try {
+      if (window.MonitorStore) MonitorStore.unfollow(company);
+      Admin.toast('已取消关注：' + company);
+      Admin.log('取消关注', '企业监控', company, '移出监控列表');
+    } catch (e) { Admin.toast('操作失败'); }
+    renderKPI(); renderTable(); renderFollows();
+  }
+
+  function generateAlert(f) {
+    Admin.confirm({
+      title: '生成预警 · ' + f.company,
+      body: '针对「' + esc(f.company) + '」的风险事件生成预警？\n\n' + esc(f.text) + '\n\n预警将通知风控团队并记录在案。',
+      ok: '确认生成预警', danger: true,
+      onYes: function () {
+        Admin.toast('已生成预警：' + f.company);
+        Admin.log('生成风险预警', '企业监控', f.company, f.text);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows = list.map(function (f) {
+      return [fmtTime(f.ts), f.company, DIM[f.dim] || f.dim || '', KIND[f.kind] ? KIND[f.kind].label : f.kind, f.text];
+    });
+    var ok = Admin.exportCSV('企业监控.csv', ['时间', '企业', '动态类型', '风险等级', '动态详情'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '企业监控', '', '企业监控.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () {
+      try { if (window.DataBus && DataBus.loadMonitorFeed) DataBus.loadMonitorFeed(); } catch (e) {}
+      renderKPI(); renderTable(); renderFollows(); Admin.toast('已刷新');
+    };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var idx = parseInt(b.getAttribute('data-idx'), 10);
+      var list = filteredList();
+      var f = list[idx];
+      if (!f) return;
+      var act = b.getAttribute('data-act');
+      if (act === 'follow') followCompany(f.company);
+      else if (act === 'unfollow') unfollowCompany(f.company);
+      else if (act === 'alert') generateAlert(f);
+    });
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-unfollow]');
+      if (!b) return;
+      unfollowCompany(b.getAttribute('data-unfollow'));
+    });
+    window.addEventListener('engchain:monitor', function () { renderKPI(); renderTable(); renderFollows(); });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); renderFollows(); }
+  function init() {
+    try { if (window.DataBus && DataBus.loadMonitorFeed) DataBus.loadMonitorFeed(); } catch (e) {}
+    bind(); render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
