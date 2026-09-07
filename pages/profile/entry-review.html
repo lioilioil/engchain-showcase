@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>入驻审核 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">入驻审核进度</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll er-scroll" id="root"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+function fmtT(t){if(!t)return '';var d=new Date(t),now=new Date();var p=function(n){return ('0'+n).slice(-2);};
+  var md=(d.getMonth()+1)+'月'+d.getDate()+'日 '+p(d.getHours())+':'+p(d.getMinutes());
+  return d.getFullYear()===now.getFullYear()?md:(d.getFullYear()+'年'+md);}
+function money(n){return '¥'+Number(n||0).toLocaleString();}
+
+function render(){
+  var e=EntryStore.read();
+  var type=e.type||new URLSearchParams(location.search).get('type')||'construction';
+  var t=MOCK.entryTypeById(type);
+  var label=t?t.label:'企业入驻';
+  var root=document.getElementById('root');
+
+  /* 无申请记录 */
+  if(!e.status){
+    root.innerHTML='<div class="er-empty"><span class="er-e-ic"><svg class="ic" style="width:26px;height:26px;"><use href="#i-form"/></svg></span>'+
+      '<div class="fw-700 fs-15" style="margin:12px 0 6px;">暂无入驻申请</div>'+
+      '<div class="text-3 fs-12" style="margin-bottom:18px;">选择企业类型并提交资料后，可在此查看两级审核进度。</div>'+
+      '<button class="btn btn-primary" onclick="location.href=\'entry.html\'">去选择企业类型</button></div>';
+    return;
+  }
+
+  /* 终审通过 / 已生效 */
+  if(e.status==='active'&&e.active){
+    /* 入驻积分奖励（claim 防重，后台终审通过后进入本页时补发） */
+    try{var cfg=(MOCK.business.credits&&MOCK.business.credits.rewards)||{};CreditStore.claim('entry',cfg.entry||500,'企业入驻奖励');}catch(err){}
+    root.innerHTML=
+      headCard('done','<svg class="ic" style="width:26px;height:26px;"><use href="#i-check"/></svg>','审核通过 · 入驻生效',label+' 已完成两级审核，专属标识与经营权益已开通')+
+      infoCard([['入驻类型',label+' · '+(t?t.badge:'')],['入驻订单',e.orderId||'—'],['生效时间',fmtT(e.paidAt)],['有效期至',fmtT(e.expireAt)]])+
+      timeline([{k:'提交申请',t:e.submittedAt,state:'done'},{k:'平台初审',t:e.firstAt,state:'done'},{k:'终审通过',t:e.paidAt,state:'done'},{k:'入驻生效',t:e.paidAt,state:'done'}])+
+      '<div class="fixed-cta er-cta"><button class="btn btn-primary btn-block btn-lg" onclick="location.href=\'entry-result.html?type='+type+'\'">查看入驻权益</button></div>';
+    return;
+  }
+
+  /* 驳回 */
+  if(e.status==='rejected'){
+    var lv=e.rejectLevel==='final'?'终审':'初审';
+    root.innerHTML=
+      headCard('reject','!','入驻申请未通过',lv+'驳回 · 可补充资料后重新提交')+
+      '<div class="er-rj"><div class="fw-600 fs-13" style="margin-bottom:5px;">驳回原因</div><div class="fs-13" style="line-height:1.7;color:var(--text-2);">'+(e.note||'资料不齐，请补充后重新提交')+'</div></div>'+
+      infoCard([['入驻类型',label+' · '+(t?t.badge:'')],['联系人',e.contact||'—'],['驳回时间',fmtT(e.rejectedAt)]])+
+      timeline([{k:'提交申请',t:e.submittedAt,state:'done'},{k:'平台'+lv,state:'reject'},{k:'终审通过',state:'todo'},{k:'入驻生效',state:'todo'}])+
+      '<div class="fixed-cta er-cta"><button class="btn btn-primary btn-block btn-lg" onclick="location.href=\'entry.html\'">补充资料重新入驻</button><button class="btn btn-ghost btn-block" style="margin-top:9px;" onclick="location.href=\'auth.html\'">返回认证中心</button></div>';
+    return;
+  }
+
+  /* pending / first_ok 审核中 */
+  var firstOk=e.status==='first_ok';
+  var pct=firstOk?72:38;
+  var steps=[
+    {k:'提交申请',t:e.submittedAt,state:'done'},
+    {k:'平台初审',t:firstOk?e.firstAt:null,state:firstOk?'done':'active'},
+    {k:'平台终审',state:firstOk?'active':'todo'},
+    {k:'入驻生效',state:'todo'}
+  ];
+  root.innerHTML=
+    headCard('review','<svg class="ic" style="width:26px;height:26px;"><use href="#i-clock"/></svg>',firstOk?'初审通过 · 等待终审':'资料已提交 · 等待初审','预计 24 小时内完成，审核结果实时同步本页')+
+    '<div class="er-pbar"><div class="fb-between" style="font-size:12px;margin-bottom:7px;"><span class="text-2">审核进度</span><b style="color:var(--primary);">'+pct+'%</b></div><div class="er-track"><i style="width:'+pct+'%;"></i></div></div>'+
+    infoCard([['入驻类型',label+' · '+(t?t.badge:'')],['入驻费',feeText(e,type)],['联系人',e.contact||'—'],['提交时间',fmtT(e.submittedAt)||'—']])+
+    timeline(steps)+
+    /* 新增：入驻资料详情 */
+    detailSections(e)+
+    '<button class="btn btn-ghost btn-block er-refresh" onclick="location.reload()">↻ 刷新审核状态</button>'+
+    '<div class="er-tip">审核由平台后台完成，本页在后台审批后自动更新，无需重复提交。</div>';
+}
+
+function headCard(kind,ic,title,sub){
+  return '<div class="er-head er-head-'+kind+'"><span class="er-h-ic">'+ic+'</span>'+
+    '<div class="fw-700 fs-17">'+title+'</div>'+
+    '<div class="fs-12" style="margin-top:6px;line-height:1.7;opacity:.85;">'+sub+'</div></div>';
+}
+function infoCard(rows){
+  return '<div class="group ap-group">'+rows.map(function(r){
+    return '<div class="ap-field ap-field-ro"><label>'+r[0]+'</label><b class="fs-13 text-2">'+r[1]+'</b></div>';
+  }).join('')+'</div>';
+}
+function timeline(steps){
+  return '<div class="section-title"><div class="st-left">审核轨迹</div></div><div class="card er-tl">'+
+    steps.map(function(s,i){
+      var icon=s.state==='done'?'<svg class="ic" style="width:12px;height:12px;"><use href="#i-check"/></svg>':(s.state==='active'?'<span class="tl-dot"></span>':(s.state==='reject'?'!':(i+1)));
+      var right=s.t?fmtT(s.t):(s.state==='done'?'已完成':(s.state==='active'?'进行中…':(s.state==='reject'?'未通过':'待处理')));
+      return '<div class="tl-row tl-'+s.state+'">'+
+        '<span class="tl-ic">'+icon+'</span>'+(i<steps.length-1?'<i class="tl-line"></i>':'')+
+        '<span class="tl-k">'+s.k+'</span><span class="tl-t">'+right+'</span></div>';
+    }).join('')+'</div>';
+}
+/* ============ 入驻资料详情分区 ============ */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function detailSections(e){
+  var html='';
+  html+=contactSection(e);
+  html+=qualSection(e);
+  html+=introSection(e);
+  html+=caseSection(e);
+  if(e.attachments&&e.attachments.length)html+=attSection(e);
+  return html;
+}
+function sectionCard(title,content,extra){
+  return '<div class="er-detail-card">'
+    +'<div class="er-detail-head"><span>'+title+'</span>'+(extra||'')+'</div>'
+    +'<div class="er-detail-body">'+content+'</div></div>';
+}
+function kvRow(k,v){
+  return '<div class="er-kv"><span class="er-kv-k">'+k+'</span><span class="er-kv-v">'+(v?esc(v):'—')+'</span></div>';
+}
+function longText(text,maxLen){
+  if(!text)return '<span class="er-kv-v">—</span>';
+  var short=text.length>maxLen;
+  var id='lt-'+Math.random().toString(36).slice(2,8);
+  if(!short)return '<span class="er-kv-v er-longtext">'+esc(text)+'</span>';
+  return '<div class="er-kv-v er-longtext-wrap">'
+    +'<span class="er-longtext" id="'+id+'">'+esc(text.slice(0,maxLen))+'<span class="er-dots">…</span><span class="er-full" style="display:none;">'+esc(text)+'</span></span>'
+    +'<a class="er-toggle" onclick="toggleLong(\''+id+'\',this)">展开全文</a></div>';
+}
+window.toggleLong=function(id,btn){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var dots=el.querySelector('.er-dots');
+  var full=el.querySelector('.er-full');
+  var isExpanded=full.style.display!=='none';
+  if(isExpanded){
+    full.style.display='none';if(dots)dots.style.display='';btn.textContent='展开全文';
+  }else{
+    full.style.display='';if(dots)dots.style.display='none';btn.textContent='收起';
+  }
+};
+
+function contactSection(e){
+  var addr=[e.address&&e.address.province,e.address&&e.address.city,e.address&&e.address.district,e.address&&e.address.detail].filter(Boolean).join('');
+  var content=kvRow('联系人',e.contact)
+    +kvRow('联系电话',e.tel)
+    +'<div class="er-kv er-kv-block"><span class="er-kv-k">经营范围</span>'+longText(e.scope,60)+'</div>'
+    +kvRow('办公地址',addr)
+    +(e.website?kvRow('企业官网',e.website):'');
+  return sectionCard('联系与经营',content);
+}
+function qualSection(e){
+  var qs=e.qualifications||[];
+  if(!qs.length)return '';
+  var content=qs.map(function(q,i){
+    return '<div class="er-qual-item">'
+      +'<div class="er-qual-name">'+esc(q.name||'未命名资质')+'</div>'
+      +'<div class="er-qual-meta">'+(q.level?esc(q.level)+'级':'')+(q.no?' · 编号：'+esc(q.no):'')+(q.expireAt?' · 有效期至 '+esc(q.expireAt):'')+'</div>'
+      +(q.image?'<div class="er-qual-img"><img src="'+q.image+'" alt="证书影像"></div>':'')
+    +'</div>';
+  }).join('');
+  return sectionCard('建筑资质（'+qs.length+'项）',content);
+}
+function introSection(e){
+  var intro=e.intro||{};
+  if(!intro.founded&&!intro.capital&&!intro.staffSize&&!intro.desc)return '';
+  var content=kvRow('成立年份',intro.founded)
+    +kvRow('注册资本',intro.capital?(intro.capital+' 万元'):'')
+    +kvRow('员工规模',intro.staffSize)
+    +'<div class="er-kv er-kv-block"><span class="er-kv-k">企业简介</span>'+longText(intro.desc,80)+'</div>';
+  return sectionCard('企业介绍',content);
+}
+function caseSection(e){
+  var cs=e.cases||[];
+  if(!cs.length)return '';
+  var content=cs.map(function(c,i){
+    var imgs=(c.images||[]).map(function(img){return '<img src="'+img+'" alt="案例图">';}).join('');
+    return '<div class="er-case-item">'
+      +'<div class="er-case-name">'+esc(c.name||'未命名案例')+'</div>'
+      +'<div class="er-case-meta">'+(c.type?esc(c.type):'')+(c.amount?' · '+esc(c.amount)+'万元':'')+(c.startDate&&c.endDate?' · '+esc(c.startDate)+' 至 '+esc(c.endDate):'')+'</div>'
+      +(c.desc?'<div class="er-case-desc">'+longTextInline(c.desc,100)+'</div>':'')
+      +(imgs?'<div class="er-case-imgs">'+imgs+'</div>':'')
+    +'</div>';
+  }).join('');
+  return sectionCard('企业案例（'+cs.length+'个）',content);
+}
+function longTextInline(text,maxLen){
+  if(!text)return '—';
+  if(text.length<=maxLen)return esc(text);
+  var id='lti-'+Math.random().toString(36).slice(2,8);
+  return '<span class="er-longtext" id="'+id+'">'+esc(text.slice(0,maxLen))+'<span class="er-dots">…</span><span class="er-full" style="display:none;">'+esc(text)+'</span></span>'
+    +'<a class="er-toggle" onclick="toggleLong(\''+id+'\',this)">展开</a>';
+}
+function attSection(e){
+  var content=(e.attachments||[]).map(function(a){
+    return '<div class="er-att-item"><svg class="ic" style="width:14px;height:14px;flex:none;color:var(--primary);"><use href="#i-doc"/></svg>'
+      +'<span class="er-att-name">'+esc(a.name||'附件')+'</span></div>';
+  }).join('');
+  return sectionCard('其他附件',content);
+}
+
+function feeText(e,type){
+  if(type==='partner')return '¥0 · 审核制';
+  if(e.fee !== undefined && e.fee !== null){
+    if(e.fee===0 && window.ModeStore && ModeStore.isBreakIn())return '¥0 免费（破冰期价）';
+    return '¥'+Number(e.fee).toLocaleString()+'（已支付）';
+  }
+  var fee = (window.DataBus && DataBus.entryFeeOf) ? DataBus.entryFeeOf(type) : ((MOCK.business.entryTypes&&MOCK.business.entryTypes[type])?MOCK.business.entryTypes[type].fee:0);
+  if(fee===0 && window.ModeStore && ModeStore.isBreakIn())return '¥0 免费（破冰期价）';
+  return '¥'+Number(fee).toLocaleString()+' · 按次';
+}
+
+render();
+/* 后台在另一标签页审批后实时刷新 */
+window.addEventListener('storage',function(ev){if(['engchain-users','engchain-entry'].indexOf(ev.key)>=0)render();});
+window.addEventListener('engchain:entry',render);
+})();
+</script>
+<style>
+.er-scroll{padding-top:12px;padding-bottom:96px;}
+.er-head{border-radius:18px;padding:26px 20px;text-align:center;margin-bottom:14px;}
+.er-h-ic{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+.er-head-review{background:linear-gradient(150deg,#FBF4E4,#F6ECD2);color:#8a6a24;border:1px solid rgba(201,169,97,.35);}
+.er-head-review .er-h-ic{background:var(--bg-card);color:var(--warning);box-shadow:0 4px 14px rgba(214,158,46,.25);animation:er-pulse 1.5s infinite;}
+@keyframes er-pulse{0%{box-shadow:0 0 0 0 rgba(214,158,46,.35);}70%{box-shadow:0 0 0 12px rgba(214,158,46,0);}100%{box-shadow:0 0 0 0 rgba(214,158,46,0);}}
+.er-head-done{background:linear-gradient(150deg,#F3EBD6,#EADFC2);color:#6e5523;border:1px solid rgba(201,169,97,.4);}
+.er-head-done .er-h-ic{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);box-shadow:0 4px 14px rgba(201,169,97,.35);}
+.er-head-reject{background:linear-gradient(150deg,#FBECEB,#F6DEDC);color:#9c3a36;border:1px solid rgba(212,76,71,.28);}
+.er-head-reject .er-h-ic{background:var(--bg-card);color:var(--danger);font-size:24px;font-weight:700;}
+.er-pbar{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:14px;}
+.er-track{height:6px;border-radius:999px;background:var(--bg-card-2);overflow:hidden;}
+.er-track i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary-dim),var(--primary));transition:width .8s var(--e-out);}
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ap-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.ap-field:last-child{border-bottom:none;}
+.ap-field label{flex:none;width:64px;font-size:13px;color:var(--text-2);}
+.ap-field-ro b{flex:1;text-align:right;font-weight:600;min-width:0;}
+.er-rj{border-radius:14px;padding:13px 14px;margin-bottom:14px;background:rgba(212,76,71,.07);border:1px solid rgba(212,76,71,.25);}
+.er-tl{padding:15px 16px 7px;margin-bottom:14px;}
+.tl-row{position:relative;display:flex;align-items:center;gap:11px;padding-bottom:16px;}
+.tl-ic{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;z-index:1;}
+.tl-ic .ic{width:12px;height:12px;}
+.tl-line{position:absolute;left:11px;top:26px;width:2px;height:calc(100% - 22px);background:var(--line);}
+.tl-k{font-size:13px;font-weight:600;}
+.tl-t{margin-left:auto;font-size:11.5px;color:var(--text-3);}
+.tl-done .tl-ic{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);}
+.tl-done .tl-k{color:var(--text-1);}
+.tl-active .tl-ic{background:rgba(214,158,46,.14);color:var(--warning);border:1px solid rgba(214,158,46,.45);}
+.tl-active .tl-k{color:var(--warning);}
+.tl-dot{width:8px;height:8px;border-radius:50%;background:var(--warning);animation:er-pulse 1.3s infinite;}
+.tl-reject .tl-ic{background:rgba(212,76,71,.1);color:var(--danger);border:1px solid rgba(212,76,71,.35);}
+.tl-reject .tl-k{color:var(--danger);}
+.tl-todo .tl-ic{background:var(--bg-card-2);color:var(--text-3);}
+.tl-todo .tl-k{color:var(--text-3);font-weight:400;}
+.er-refresh{margin:2px 0 12px;}
+.er-tip{font-size:11.5px;color:var(--text-3);line-height:1.7;text-align:center;padding:0 14px;}
+.er-cta{left:14px;right:14px;}
+.er-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:0 34px;}
+.er-e-ic{width:64px;height:64px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;}
+
+/* 入驻资料详情分区 */
+.er-detail-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+.er-detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line);}
+.er-detail-head>span{font-size:14px;font-weight:600;color:var(--text-1);}
+.er-detail-body{font-size:13px;}
+.er-kv{display:flex;align-items:flex-start;gap:10px;padding:6px 0;}
+.er-kv-k{flex:none;width:72px;font-size:12px;color:var(--text-3);padding-top:1px;}
+.er-kv-v{flex:1;min-width:0;color:var(--text-1);line-height:1.6;word-break:break-word;text-align:left;}
+.er-kv-block{align-items:flex-start;}
+.er-kv-block .er-kv-v{text-align:left;}
+.er-longtext-wrap{flex:1;min-width:0;}
+.er-longtext{display:inline;line-height:1.6;color:var(--text-1);}
+.er-toggle{display:inline-block;margin-left:6px;font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;}
+.er-qual-item{padding:10px 0;border-bottom:1px dashed var(--line);}
+.er-qual-item:last-child{border-bottom:none;}
+.er-qual-name{font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:4px;}
+.er-qual-meta{font-size:11.5px;color:var(--text-3);line-height:1.5;}
+.er-qual-img{margin-top:8px;}
+.er-qual-img img{width:100%;max-height:180px;object-fit:cover;border-radius:10px;border:1px solid var(--line);}
+.er-case-item{padding:10px 0;border-bottom:1px dashed var(--line);}
+.er-case-item:last-child{border-bottom:none;}
+.er-case-name{font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:4px;}
+.er-case-meta{font-size:11.5px;color:var(--text-3);line-height:1.5;}
+.er-case-desc{font-size:12px;color:var(--text-2);line-height:1.6;margin-top:6px;}
+.er-case-imgs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.er-case-imgs img{width:80px;height:80px;object-fit:cover;border-radius:10px;border:1px solid var(--line);}
+.er-att-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);}
+.er-att-item:last-child{border-bottom:none;}
+.er-att-name{font-size:13px;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+</style>
+</body>
+</html>

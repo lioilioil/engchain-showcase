@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/personnel/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>积分兑换线索包 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* ===== 页面容器 ===== */
+  .cp-page { min-height: 100vh; background: var(--bg-page); padding-bottom: 100px; }
+
+  /* ===== 顶部余额卡 ===== */
+  .cp-balance { background: linear-gradient(135deg, var(--primary-dim) 0%, #8B6914 100%); padding: 20px 18px 24px; color: #fff; position: relative; overflow: hidden; }
+  .cp-balance::before { content: ""; position: absolute; top: -40px; right: -30px; width: 140px; height: 140px; border-radius: 50%; background: rgba(255,255,255,.08); }
+  .cp-balance::after { content: ""; position: absolute; bottom: -50px; left: -20px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.05); }
+  .cp-balance .cb-label { font-size: 12px; opacity: .85; position: relative; z-index: 1; }
+  .cp-balance .cb-num { font-family: var(--font-num); font-size: 36px; font-weight: 700; margin-top: 4px; position: relative; z-index: 1; }
+  .cp-balance .cb-unit { font-size: 13px; opacity: .8; margin-left: 4px; font-weight: 400; }
+  .cp-balance .cb-desc { font-size: 11px; opacity: .7; margin-top: 6px; position: relative; z-index: 1; }
+
+  /* ===== 套餐区 ===== */
+  .cp-section { padding: 16px 14px 0; }
+  .cp-section-title { font-size: 14px; font-weight: 700; color: var(--text-1); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .cp-section-title svg { width: 15px; height: 15px; color: var(--primary); }
+
+  .cp-packs { display: flex; flex-direction: column; gap: 10px; }
+  .cp-pack { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1.5px solid var(--line); border-radius: var(--r-m); background: var(--bg-card); cursor: pointer; transition: all var(--d-fast); position: relative; overflow: hidden; }
+  .cp-pack:active { transform: scale(.99); }
+  .cp-pack.on { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 2px 12px rgba(201,169,97,.15); }
+  .cp-pack .pp-badge { position: absolute; top: 0; right: 0; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; padding: 3px 10px; border-bottom-left-radius: 10px; }
+  .cp-pack .pp-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--primary-soft); display: flex; align-items: center; justify-content: center; flex: none; }
+  .cp-pack .pp-icon svg { width: 22px; height: 22px; color: var(--primary-dim); }
+  .cp-pack .pp-body { flex: 1; min-width: 0; }
+  .cp-pack .pp-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
+  .cp-pack .pp-desc { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .cp-pack .pp-price { text-align: right; flex: none; }
+  .cp-pack .pp-price .p { font-family: var(--font-num); font-size: 20px; font-weight: 700; color: var(--primary-dim); }
+  .cp-pack .pp-price .o { font-size: 11px; color: var(--text-3); text-decoration: line-through; margin-left: 2px; }
+  .cp-pack .pp-price .u { font-size: 10px; color: var(--text-3); }
+  .cp-pack .pp-check { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; transition: all var(--d-fast); }
+  .cp-pack .pp-check svg { width: 11px; height: 11px; display: none; }
+  .cp-pack.on .pp-check { border-color: var(--primary); background: var(--primary); }
+  .cp-pack.on .pp-check svg { display: block; stroke: var(--text-inv); stroke-width: 3; }
+
+  /* ===== 权益说明 ===== */
+  .cp-benefits { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); padding: 14px; margin-top: 14px; }
+  .cp-benefits .cb-title { font-size: 12.5px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+  .cp-benefits .cb-title svg { width: 13px; height: 13px; color: var(--primary); }
+  .cp-benefits ul { list-style: none; padding: 0; margin: 0; }
+  .cp-benefits li { font-size: 11.5px; color: var(--text-2); line-height: 1.7; padding-left: 16px; position: relative; }
+  .cp-benefits li::before { content: ""; position: absolute; left: 0; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+
+  /* ===== 支付方式 ===== */
+  .pay-method-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin: 18px 0 10px; display: flex; align-items: center; gap: 6px; }
+  .pay-method-label svg { width: 15px; height: 15px; color: var(--primary); }
+  .pm-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: var(--r-m); background: var(--bg-card); margin-bottom: 10px; cursor: pointer; transition: border-color var(--d-fast), background var(--d-fast); }
+  .pm-row:active { transform: scale(.99); }
+  .pm-row.on { border-color: var(--primary); background: var(--primary-soft); }
+  .pm-row .pm-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .pm-row .pm-icon svg { width: 19px; height: 19px; }
+  .pm-row .pm-body { flex: 1; min-width: 0; }
+  .pm-row .pm-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .pm-row .pm-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .pm-row .pm-check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; transition: all var(--d-fast); }
+  .pm-check svg { width: 10px; height: 10px; display: none; }
+  .pm-row.on .pm-check { border-color: var(--primary); background: var(--primary); }
+  .pm-row.on .pm-check svg { display: block; stroke: #fff; stroke-width: 3; }
+
+  /* ===== 底部购买栏 ===== */
+  .cp-buy-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-elev); border-top: 1px solid var(--line); padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; z-index: 100; }
+  .cp-buy-bar .bb-total { flex: 1; }
+  .cp-buy-bar .bb-label { font-size: 11px; color: var(--text-3); }
+  .cp-buy-bar .bb-price { font-family: var(--font-num); font-size: 22px; font-weight: 700; color: var(--primary-dim); }
+  .cp-buy-bar .bb-price .u { font-size: 11px; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+  .cp-buy-btn { flex: none; height: 46px; padding: 0 28px; border-radius: 23px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dim) 100%); color: var(--text-inv); font-size: 15px; font-weight: 700; border: none; cursor: pointer; transition: all var(--d-fast); box-shadow: 0 4px 14px rgba(201,169,97,.35); }
+  .cp-buy-btn:active { transform: scale(.97); box-shadow: 0 2px 8px rgba(201,169,97,.3); }
+
+  /* ===== 购买成功弹窗 ===== */
+  .cp-success-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 200; }
+  .cp-success-overlay.show { display: flex; }
+  .cp-success-card { width: 80%; max-width: 300px; background: var(--bg-elev); border-radius: 16px; padding: 28px 20px 20px; text-align: center; animation: cpPop .3s ease; }
+  @keyframes cpPop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .cp-success-icon { width: 60px; height: 60px; border-radius: 50%; background: var(--success-soft); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .cp-success-icon svg { width: 30px; height: 30px; color: var(--success); }
+  .cp-success-title { font-size: 17px; font-weight: 700; color: var(--text-1); margin-bottom: 6px; }
+  .cp-success-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.6; margin-bottom: 18px; }
+  .cp-success-btn { width: 100%; height: 42px; border-radius: 21px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dim) 100%); color: var(--text-inv); font-size: 14px; font-weight: 700; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="cp-page">
+  <!-- 顶部导航 -->
+  <div class="nav-bar" style="background:var(--primary-dim);color:var(--text-inv);">
+    <button class="nav-back" onclick="history.back()" aria-label="返回">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="nav-title">积分兑换线索包</div>
+  </div>
+
+  <!-- 积分余额卡 -->
+  <div class="cp-balance">
+    <div class="cb-label">当前可用积分</div>
+    <div class="cb-num" id="credit-balance">0<span class="cb-unit">积分</span></div>
+    <div class="cb-desc">兑换线索包消耗积分 · 解锁人才联系方式 1 条/次 · <span id="clue-valid-days">7</span>天内有效</div>
+  </div>
+
+  <!-- 套餐选择 -->
+  <div class="cp-section">
+    <div class="cp-section-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
+      选择积分兑换套餐
+    </div>
+    <div class="cp-packs" id="packList">
+      <!-- 套餐由JS渲染 -->
+    </div>
+
+    <!-- 权益说明 -->
+    <div class="cp-benefits">
+      <div class="cb-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        套餐权益
+      </div>
+      <ul>
+        <li>解锁持证人才联系方式，1条/次，<span id="clue-valid-days2">7</span>天内可重复查看</li>
+        <li>优先匹配平台专属顾问，2小时内响应需求</li>
+        <li>支持证书类型、注册状态、到岗时间等多维度精准筛选</li>
+        <li>未使用线索永久有效，不设过期时间</li>
+        <li>企业认证用户专享，开具增值税专用发票</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 积分说明 -->
+  <div class="cp-section">
+    <div class="pay-method-label">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      积分兑换说明
+    </div>
+    <div class="card" style="padding:14px;">
+      <div class="text-2 fs-12" style="line-height:1.8;">
+        · 线索包已纳入 Q3 统一积分体系，使用积分兑换<br>
+        · 兑换后线索即时到账，可在人才详情页解锁联系方式<br>
+        · 积分不足时可前往「钱包-积分中心」充值<br>
+        · 兑换记录自动计入积分流水
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部兑换栏 -->
+  <div class="cp-buy-bar">
+    <div class="bb-total">
+      <div class="bb-label">所需积分</div>
+      <div class="bb-price" id="totalPrice">99<span class="u">积分 / 50条</span></div>
+    </div>
+    <button class="cp-buy-btn" id="buyBtn">积分兑换</button>
+  </div>
+</div>
+
+<!-- 购买成功弹窗 -->
+<div class="cp-success-overlay" id="successOverlay">
+  <div class="cp-success-card">
+    <div class="cp-success-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="cp-success-title">兑换成功</div>
+    <div class="cp-success-desc" id="success-desc">线索已到账，可在人才详情页解锁联系方式使用</div>
+    <button class="cp-success-btn" onclick="document.getElementById('successOverlay').classList.remove('show')">我知道了</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function () {
+  /* 线索有效期走规则中心（clue.validDays），不写死 7 天 */
+  if (window.RULE) { var vd = RULE('clue.validDays', 7); ['clue-valid-days', 'clue-valid-days2'].forEach(function (id) { var e = document.getElementById(id); if (e) e.textContent = vd; }); }
+  /* ===== L8：Q3 统一积分体系 —— 线索包改为积分兑换（1 积分 = ¥1，与 credits.packages.single 同口径） ===== */
+  var packs = [
+    { id: 1, name: '体验包', count: 10, credits: 29, original: 49, desc: '10条线索 · 适合初次体验', badge: null },
+    { id: 2, name: '基础包', count: 50, credits: 99, original: 199, desc: '50条线索 · 平均1.98积分/条', badge: '热销' },
+    { id: 3, name: '专业包', count: 200, credits: 299, original: 599, desc: '200条线索 · 平均1.50积分/条', badge: '超值' },
+    { id: 4, name: '企业包', count: 500, credits: 599, original: 1299, desc: '500条线索 · 平均1.20积分/条', badge: null }
+  ];
+
+  var selectedPack = packs[1]; // 默认选中基础包
+
+  /* 显示当前积分余额 */
+  function refreshCreditBalance() {
+    var bal = window.CreditStore ? CreditStore.read().balance : 0;
+    var el = document.getElementById('credit-balance');
+    if (el) el.innerHTML = bal.toLocaleString() + '<span class="cb-unit">积分</span>';
+  }
+
+  /* ===== 渲染套餐列表 ===== */
+  function renderPacks() {
+    var html = '';
+    packs.forEach(function (p) {
+      var isOn = p.id === selectedPack.id;
+      html += '<div class="cp-pack' + (isOn ? ' on' : '') + '" data-id="' + p.id + '">' +
+        (p.badge ? '<div class="pp-badge">' + p.badge + '</div>' : '') +
+        '<div class="pp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></div>' +
+        '<div class="pp-body">' +
+          '<div class="pp-name">' + p.name + ' · ' + p.count + '条</div>' +
+          '<div class="pp-desc">' + p.desc + '</div>' +
+        '</div>' +
+        '<div class="pp-price">' +
+          '<span class="p">' + p.credits + '</span>' +
+          '<span class="o">' + p.original + '</span>' +
+        '</div>' +
+        '<div class="pp-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+      '</div>';
+    });
+    document.getElementById('packList').innerHTML = html;
+
+    /* 绑定点击事件 */
+    document.querySelectorAll('.cp-pack').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = parseInt(el.dataset.id);
+        selectedPack = packs.find(function (p) { return p.id === id; });
+        renderPacks();
+        updateTotal();
+      });
+    });
+  }
+
+  /* ===== 更新所需积分 ===== */
+  function updateTotal() {
+    document.getElementById('totalPrice').innerHTML = selectedPack.credits + '<span class="u">积分 / ' + selectedPack.count + '条</span>';
+  }
+
+  /* ===== 积分兑换按钮 ===== */
+  document.getElementById('buyBtn').addEventListener('click', function () {
+    var btn = document.getElementById('buyBtn');
+    var cost = selectedPack.credits;
+    var bal = window.CreditStore ? CreditStore.read().balance : 0;
+    if (bal < cost) {
+      UI.dialog({
+        title: '积分不足',
+        text: '当前积分 <b style="color:var(--primary)">' + bal + '</b>，兑换' + selectedPack.name + '需要 <b style="color:var(--primary)">' + cost + '</b> 积分。前往积分中心充值？',
+        ok: '去充值', cancel: '再看看',
+        onOk: function () { location.href = '../wallet/credits.html'; }
+      });
+      return;
+    }
+    btn.textContent = '兑换中...';
+    btn.style.opacity = '.7';
+    setTimeout(function () {
+      var result = CreditStore.consume(cost, '兑换' + selectedPack.name + '(' + selectedPack.count + '条线索)');
+      btn.textContent = '积分兑换';
+      btn.style.opacity = '1';
+      if (result) {
+        refreshCreditBalance();
+        document.getElementById('success-desc').textContent = selectedPack.count + '条线索已到账，消耗' + cost + '积分，可在人才详情页解锁联系方式使用';
+        document.getElementById('successOverlay').classList.add('show');
+      } else {
+        UI.toast('兑换失败，请重试', 'warn');
+      }
+    }, 600);
+  });
+
+  /* ===== 初始化 ===== */
+  refreshCreditBalance();
+  renderPacks();
+  updateTotal();
+})();
+</script>
+</body>
+</html>

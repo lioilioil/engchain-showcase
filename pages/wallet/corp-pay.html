@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>对公转账确认 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* —— 金额展示 —— */
+  .pay-amount { text-align: center; padding: 6px 0 16px; }
+  .pay-amount .pa-label { font-size: 12px; color: var(--text-3); }
+  .pay-amount .pa-num { font-family: var(--font-num); font-size: 30px; font-weight: 700; color: var(--primary-dim); margin-top: 2px; }
+
+  /* —— 对公 4 步进度（步骤3-4 在本页） —— */
+  .flow-steps { display: flex; margin-bottom: 18px; }
+  .flow-step { flex: 1; text-align: center; position: relative; }
+  .flow-step .fs-dot { width: 22px; height: 22px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--font-num); background: var(--bg-card-2); color: var(--text-3); border: 1px solid var(--line); }
+  .flow-step .fs-label { font-size: 9.5px; color: var(--text-3); margin-top: 5px; }
+  .flow-step.done .fs-dot { background: var(--success-soft); color: var(--success); border-color: transparent; }
+  .flow-step.done .fs-label { color: var(--success); }
+  .flow-step.active .fs-dot { background: var(--primary); color: #fff; border-color: transparent; box-shadow: 0 0 0 3px var(--primary-soft); }
+  .flow-step.active .fs-label { color: var(--primary-dim); font-weight: 600; }
+  .flow-step:not(:last-child)::after { content: ""; position: absolute; top: 10px; left: calc(50% + 16px); right: calc(-50% + 16px); height: 1.5px; background: var(--line); }
+  .flow-step.done:not(:last-child)::after { background: var(--success); }
+
+  /* —— 付款信息卡 —— */
+  .corp-card { border: 1px solid var(--line); border-radius: var(--r-m); background: var(--bg-card); padding: 2px 16px; margin-bottom: 14px; }
+  .row-mini { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .row-mini:last-child { border-bottom: none; }
+  .row-mini .k { color: var(--text-2); flex: none; }
+  .row-mini .v { font-weight: 600; text-align: right; word-break: break-all; }
+
+  .corp-note { display: flex; gap: 8px; padding: 11px 13px; border-radius: var(--r-m); background: var(--bg-subtle); font-size: 11.5px; color: var(--text-2); line-height: 1.6; margin-bottom: 14px; }
+  .corp-note svg { width: 14px; height: 14px; flex: none; margin-top: 1px; color: var(--primary); }
+
+  /* —— 上传凭证 —— */
+  .upload-box { padding: 24px 12px; text-align: center; border: 1.5px dashed var(--line); border-radius: var(--r-m); background: var(--bg-card); color: var(--text-2); cursor: pointer; transition: border-color var(--d-fast), background var(--d-fast); }
+  .upload-box:active { transform: scale(.99); }
+  .upload-box.on { border-color: var(--primary); background: var(--primary-soft); }
+  .upload-box svg { width: 26px; height: 26px; color: var(--text-3); }
+  .upload-box .ub-title { font-size: 13px; margin-top: 6px; }
+  .upload-box .ub-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+  .upload-box .ub-file { display: none; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--success); margin-top: 8px; }
+  .upload-box .ub-file svg { width: 13px; height: 13px; color: var(--success); }
+
+  /* —— 等待核验成功态 —— */
+  .corp-done { text-align: center; padding: 28px 8px 10px; }
+  .corp-done .cd-icon { width: 58px; height: 58px; margin: 0 auto; border-radius: 50%; background: var(--success-soft); color: var(--success); display: flex; align-items: center; justify-content: center; }
+  .corp-done .cd-icon svg { width: 28px; height: 28px; stroke-width: 2.4; }
+  .corp-done .cd-title { font-size: 16px; font-weight: 700; margin-top: 14px; }
+  .corp-done .cd-sub { font-size: 12.5px; color: var(--text-2); line-height: 1.7; margin-top: 6px; }
+  .corp-done .cd-tip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); margin-top: 14px; }
+  .corp-done .cd-tip svg { width: 12px; height: 12px; }
+
+  /* —— 空态 —— */
+  .empty { text-align: center; padding: 42px 16px 10px; }
+  .empty .e-ic { width: 58px; height: 58px; margin: 0 auto; border-radius: 50%; background: var(--bg-card-2); color: var(--text-3); display: flex; align-items: center; justify-content: center; }
+  .empty .e-ic svg { width: 26px; height: 26px; }
+  .empty .e-title { font-size: 15px; font-weight: 700; margin-top: 14px; }
+  .empty .e-sub { font-size: 12px; color: var(--text-3); line-height: 1.8; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">对公转账</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:10px;">
+    <div id="pageBody"></div>
+  </div>
+
+  <div class="fixed-cta"><button class="btn btn-primary btn-block btn-lg" id="cta">提交凭证</button></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var id = (location.search.match(/[?&]id=([^&]+)/) || [])[1] || '';
+  var rec = id ? CorpPay.get(id) : null;
+  var receiptAttached = false;
+
+  var pageBody = document.getElementById('pageBody');
+  var cta = document.getElementById('cta');
+
+  /* ---- 无记录：空态引导 ---- */
+  if (!rec) {
+    pageBody.innerHTML =
+      '<div class="empty">' +
+        '<div class="e-ic"><svg class="ic"><use href="#i-bank"/></svg></div>' +
+        '<div class="e-title">暂无待处理的对公转账</div>' +
+        '<div class="e-sub">请前往「账户充值」选择对公转账发起，<br>或在钱包「收支明细」中进入对应记录。</div>' +
+        '<button class="btn btn-primary" style="margin-top:20px;display:inline-flex;" onclick="location.href=\'recharge.html\'">去充值</button>' +
+      '</div>';
+    cta.style.display = 'none';
+    return;
+  }
+
+  /* ---- 4 步进度条 ---- */
+  function flowHtml(cur) {
+    var steps = ['复制信息', '确认支付', '上传凭证', '等待确认'];
+    var h = '<div class="flow-steps">';
+    for (var i = 0; i < 4; i++) {
+      var cls = '';
+      if (i + 1 < cur) cls = ' done';
+      if (i + 1 === cur) cls = ' active';
+      h += '<div class="flow-step' + cls + '"><div class="fs-dot">' + (i + 1) + '</div><div class="fs-label">' + steps[i] + '</div></div>';
+    }
+    return h + '</div>';
+  }
+
+  /* ---- 渲染：金额 + 进度 + 账号信息 + 状态区 ---- */
+  function fmtTs(t) { if (!t) return '—'; var d = new Date(t); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function render() {
+    var acct = rec.account || CorpPay.BANK;
+    var stateHtml;
+    if (rec.status === 'submitted') {
+      stateHtml =
+        '<div class="corp-done">' +
+          '<div class="cd-icon"><svg class="ic"><use href="#i-clock"/></svg></div>' +
+          '<div class="cd-title">凭证已提交 · 等待核验</div>' +
+          '<div class="cd-sub">对公转账凭证已提交审核，财务将在 <b style="color:var(--primary);">24 小时内</b> 完成核验，核验通过后自动计入您的余额。</div>' +
+          '<div class="cd-tip"><svg class="ic"><use href="#i-clock"/></svg>提交时间 ' + fmtTs(rec.submittedAt) + '</div>' +
+        '</div>' +
+        '<div class="glass" style="margin-top:14px;padding:14px;">' +
+          '<div class="text-2 fs-11" style="margin-bottom:10px;">财务核验 · 原型演示操作</div>' +
+          '<div style="display:flex;gap:10px;">' +
+            '<button class="btn btn-primary" style="flex:1;" onclick="approveCorp()">审批通过 · 入账</button>' +
+            '<button class="btn btn-ghost" style="flex:1;" onclick="rejectCorp()">驳回</button>' +
+          '</div>' +
+        '</div>';
+    } else if (rec.status === 'approved') {
+      stateHtml =
+        '<div class="corp-done">' +
+          '<div class="cd-icon"><svg class="ic"><use href="#i-check"/></svg></div>' +
+          '<div class="cd-title">已入账</div>' +
+          '<div class="cd-sub"><b style="color:var(--success);">' + UI.money(rec.amount) + '</b> 已计入您的余额<br>入账时间 ' + fmtTs(rec.approvedAt) + '</div>' +
+        '</div>';
+    } else if (rec.status === 'rejected') {
+      stateHtml =
+        '<div class="corp-done">' +
+          '<div class="cd-icon" style="background:rgba(234,102,104,.12);color:var(--danger);"><svg class="ic"><use href="#i-warn"/></svg></div>' +
+          '<div class="cd-title">已驳回</div>' +
+          '<div class="cd-sub">核验未通过：' + (rec.rejectReason || '凭证信息有误') + '<br>金额未入账，请核对转账回单后重新提交。</div>' +
+        '</div>';
+    } else {
+      stateHtml =
+        '<div class="upload-box" id="uploadBox" onclick="uploadReceipt()">' +
+          '<svg class="ic"><use href="#i-clip"/></svg>' +
+          '<div class="ub-title">点击上传转账回单 / 截图</div>' +
+          '<div class="ub-sub">支持 jpg · png · pdf，确保金额与户名清晰</div>' +
+          '<div class="ub-file" id="ubFile"><svg class="ic"><use href="#i-check"/></svg>转账回单.png 已上传</div>' +
+        '</div>' +
+        '<div class="corp-note" style="margin-top:12px;"><svg class="ic"><use href="#i-shield"/></svg><div>凭证仅用于财务核验，平台将严格保护您的隐私信息。</div></div>';
+    }
+
+    pageBody.innerHTML =
+      '<div class="pay-amount"><div class="pa-label">转账金额</div><div class="pa-num">' + UI.money(rec.amount) + '</div></div>' +
+      flowHtml(rec.status === 'approved' ? 5 : (rec.status === 'submitted' ? 4 : 3)) +
+      '<div class="corp-card">' +
+        '<div class="row-mini"><span class="k">收款户名</span><span class="v">' + acct.name + '</span></div>' +
+        '<div class="row-mini"><span class="k">开户银行</span><span class="v">' + acct.bank + '</span></div>' +
+        '<div class="row-mini"><span class="k">收款账号</span><span class="v mono">' + acct.acct + '</span></div>' +
+        '<div class="row-mini"><span class="k">备注</span><span class="v">' + rec.remark + '</span></div>' +
+      '</div>' +
+      stateHtml;
+    setCta();
+  }
+
+  /* ---- 底部 CTA ---- */
+  function setCta() {
+    cta.onclick = null;
+    if (rec.status === 'submitted' || rec.status === 'approved') {
+      cta.textContent = '返回钱包';
+      cta.onclick = function () { location.href = 'index.html'; };
+    } else if (rec.status === 'rejected') {
+      cta.textContent = '重新提交';
+      cta.onclick = resubmit;
+    } else {
+      cta.textContent = '提交凭证';
+      cta.onclick = submit;
+    }
+  }
+
+  /* ---- 模拟审批：通过（入账） / 驳回 ---- */
+  window.approveCorp = function () {
+    UI.dialog({
+      title: '模拟审批通过',
+      text: '财务核验通过，<b style="color:var(--success)">' + UI.money(rec.amount) + '</b> 将计入您的余额。',
+      ok: '确认入账', cancel: '取消',
+      onOk: function () {
+        rec = CorpPay.update(id, { status: 'approved', approvedAt: Date.now() });
+        BalanceStore.settleCorp(id, rec.amount);
+        render();
+        UI.toast('审批通过 · 已入账', 'ok');
+      }
+    });
+  };
+  window.rejectCorp = function () {
+    UI.dialog({
+      title: '驳回',
+      text: '凭证信息有误，本次入账不通过，余额保持不变。',
+      ok: '确认驳回', cancel: '取消',
+      onOk: function () {
+        rec = CorpPay.update(id, { status: 'rejected', rejectedAt: Date.now(), rejectReason: '凭证信息有误' });
+        render();
+        UI.toast('已驳回', 'warn');
+      }
+    });
+  };
+  /* ---- 驳回后重新提交：回退到待上传凭证 ---- */
+  function resubmit() {
+    rec = CorpPay.update(id, { status: 'pending', submittedAt: 0, rejectReason: '' });
+    render();
+    UI.toast('请重新上传凭证', 'warn');
+  }
+
+  /* ---- 上传凭证（模拟） ---- */
+  window.uploadReceipt = function () {
+    UI.dialog({
+      title: '上传凭证',
+      text: '可从相册选择或拍照上传转账回单，确保金额、收款户名清晰可辨。',
+      ok: '去相册', cancel: '取消',
+      onOk: function () {
+        var box = document.getElementById('uploadBox');
+        box.classList.add('on');
+        document.getElementById('ubFile').style.display = 'inline-flex';
+        receiptAttached = true;
+        UI.toast('已附凭证', 'ok');
+      }
+    });
+  };
+
+  /* ---- 提交凭证 → 更新记录为待确认入账 ---- */
+  function submit() {
+    if (!receiptAttached) { UI.toast('请先上传付款凭证', 'warn'); return; }
+    UI.dialog({
+      title: '提交审核',
+      text: '提交后将由财务核验，预计 <b style="color:var(--primary)">24 小时内</b> 完成入账。',
+      ok: '提交', cancel: '再等等',
+      onOk: function () {
+        rec = CorpPay.update(id, { status: 'submitted', submittedAt: Date.now() });
+        render();
+        UI.toast('已提交，等待入账', 'ok');
+      }
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

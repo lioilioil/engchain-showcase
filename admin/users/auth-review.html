@@ -1,0 +1,352 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>认证审核 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="users/auth-review.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>认证审核</h1>
+        <div class="sub">用户与认证中心 · 四类认证审批（实名 / 企业 / 个人资质 / 资金账户）· 通过写回用户表 + AuthStore 快照，驳回两端同步</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">认证审核列表</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var TYPE = { realname: '实名认证', enterprise: '企业认证', personalQual: '个人资质', payment: '资金账户' };
+  var TYPE_ICON = { realname: '个人', enterprise: '企业', personalQual: '专业', payment: '资金' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { type: 'realname', scope: 'pending', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); } catch (e) { return '-'; }
+  }
+  function fmtDate(ts) { try { return new Date(ts).toISOString().slice(0, 10); } catch (e) { return ''; } }
+
+  function users() { return (window.DataBus && DataBus.users) ? DataBus.users() : []; }
+
+  function authField(type) {
+    if (type === 'personalQual') return 'personalQual';
+    return type;
+  }
+
+  function pendingOf(type) {
+    return users().filter(function (u) {
+      if (u.status === 'guest') return false;
+      var f = authField(type);
+      if (type === 'payment') return !(u.auth && u.auth.payment && u.auth.payment.ok);
+      if (type === 'personalQual') {
+        var pq = (u.auth && u.auth.personalQual) || (u.auth && u.auth.qual) || { ok: false };
+        return !pq.ok;
+      }
+      return !(u.auth && u.auth[f] && u.auth[f].ok);
+    });
+  }
+
+  function approvedOf(type) {
+    return users().filter(function (u) {
+      if (u.status === 'guest') return false;
+      var f = authField(type);
+      if (type === 'payment') return !!(u.auth && u.auth.payment && u.auth.payment.ok);
+      if (type === 'personalQual') {
+        var pq = (u.auth && u.auth.personalQual) || (u.auth && u.auth.qual) || { ok: false };
+        return !!pq.ok;
+      }
+      return !!(u.auth && u.auth[f] && u.auth[f].ok);
+    });
+  }
+
+  function doneList() {
+    var a = [];
+    try { a = JSON.parse(localStorage.getItem('engchain-audit') || '[]'); } catch (e) {}
+    return a.filter(function (x) {
+      return (x.action === '认证通过' || x.action === '认证驳回') && x.module === '认证审核';
+    });
+  }
+
+  function filteredList() {
+    if (filters.scope === 'pending') {
+      var list = pendingOf(filters.type);
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        list = list.filter(function (u) { return (u.name + u.company + u.account).toLowerCase().indexOf(q) >= 0; });
+      }
+      return list;
+    } else {
+      var dl = doneList();
+      if (filters.keyword) {
+        var q2 = filters.keyword.toLowerCase();
+        dl = dl.filter(function (x) { return (x.target + x.extra + x.operator).toLowerCase().indexOf(q2) >= 0; });
+      }
+      return dl;
+    }
+  }
+
+  function renderKPI() {
+    var types = ['realname', 'enterprise', 'personalQual', 'payment'];
+    var pendingTotal = types.reduce(function (s, t) { return s + pendingOf(t).length; }, 0);
+    var approvedTotal = types.reduce(function (s, t) { return s + approvedOf(t).length; }, 0);
+    var allDone = doneList();
+    var rejectedTotal = allDone.filter(function (x) { return x.action === '认证驳回'; }).length;
+    var today = fmtDate(Date.now());
+    var todayNew = allDone.filter(function (x) { return fmtDate(x.ts) === today; }).length;
+    var cards = [
+      ['待审核', pendingTotal, 'warn', '四类认证待审合计'],
+      ['已通过', approvedTotal, 'up', '认证通过用户数'],
+      ['已驳回', rejectedTotal, 'down', '历史驳回记录'],
+      ['今日新增', todayNew, 'gold', '今日处理记录']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'type', label: '认证类型', type: 'select', options: [
+          { value: 'realname', label: '实名认证' },
+          { value: 'enterprise', label: '企业认证' },
+          { value: 'personalQual', label: '个人资质' },
+          { value: 'payment', label: '资金账户' }
+        ]},
+        { key: 'scope', label: '处理范围', type: 'select', options: [
+          { value: 'pending', label: '待审核' },
+          { value: 'done', label: '已处理' }
+        ]},
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '姓名 / 公司 / 账号' }
+      ],
+      onFilter: function (vals) {
+        filters.type = vals.type || 'realname';
+        filters.scope = vals.scope || 'pending';
+        filters.keyword = vals.keyword || '';
+        page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 条待审');
+      },
+      onReset: function () {
+        filters = { type: 'realname', scope: 'pending', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function statusBadge(st) {
+    var m = { pending: ['badge-warning', '待审核'], approved: ['badge-success', '已通过'], rejected: ['badge-danger', '已驳回'] };
+    var v = m[st] || ['badge-outline', st];
+    return '<span class="badge ' + v[0] + '">' + v[1] + '</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = (filters.scope === 'pending' ? '待审核 ' : '已处理 ') + list.length + ' 条 · ' + TYPE[filters.type];
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    if (filters.scope === 'pending') {
+      Admin.TableRenderer.render({
+        container: '#table-wrap',
+        columns: [
+          { key: 'user', label: '用户', width: '180px', render: function (row) {
+            return '<div class="fl-row-sm">' +
+              '<span class="u-av av-md">' + esc(row.avatar || row.name.charAt(0)) + '</span>' +
+              '<div><div class="tx-semibold">' + esc(row.name) + '</div>' +
+              '<div class="tx-muted-xs">' + esc(row.company || row.account || '-') + '</div></div></div>';
+          }},
+          { key: 'type', label: '认证类型', width: '110px', render: function () { return '<span class="badge badge-primary">' + TYPE[filters.type] + '</span>'; } },
+          { key: 'submitTime', label: '提交时间', width: '140px', render: function (row) {
+            var a = row.auth || {};
+            var f = authField(filters.type);
+            var ts = (a[f] && a[f].ts) || row.createdAt || Date.now();
+            return '<span class="tx-muted-sm">' + fmtTime(ts) + '</span>';
+          }},
+          { key: 'status', label: '状态', width: '90px', render: function () { return statusBadge('pending'); } },
+          { key: 'ops', label: '操作', width: '160px', render: function (row) {
+            return '<button class="btn btn-sm btn-primary" data-perm="approve.first" data-act="approve" data-id="' + row.id + '">通过</button>' +
+              '<button class="btn btn-sm btn-ghost" data-perm="approve.first" data-act="reject" data-id="' + row.id + '">驳回</button>';
+          }}
+        ],
+        data: seg,
+        options: {
+          rowClick: function (row) { openDetail(row); },
+          emptyText: '暂无该类型待审项'
+        }
+      });
+    } else {
+      Admin.TableRenderer.render({
+        container: '#table-wrap',
+        columns: [
+          { key: 'target', label: '用户', width: '150px', render: function (row) { return esc(row.target || '-'); } },
+          { key: 'action', label: '处理结果', width: '100px', render: function (row) {
+            return row.action === '认证通过' ? '<span class="badge badge-success">已通过</span>' : '<span class="badge badge-danger">已驳回</span>';
+          }},
+          { key: 'extra', label: '认证类型 / 说明', render: function (row) { return '<span class="tx-muted-sm">' + esc(row.extra || '-') + '</span>'; } },
+          { key: 'operator', label: '操作人', width: '100px', render: function (row) { return esc(row.operator || '-'); } },
+          { key: 'ts', label: '处理时间', width: '140px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.ts) + '</span>'; } }
+        ],
+        data: seg,
+        options: { emptyText: '暂无处理记录' }
+      });
+    }
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function openDetail(u) {
+    var a = u.auth || {};
+    var f = authField(filters.type);
+    var authData = a[f] || {};
+    var qualList = '-';
+    if (filters.type === 'personalQual') {
+      var pq = a.personalQual || a.qual || { list: [] };
+      qualList = (pq.list && pq.list.length) ? pq.list.join('、') : '未提交资质清单';
+    }
+    var body = '<div class="profile-head">' +
+      '<span class="u-av av-lg">' + esc(u.avatar || u.name.charAt(0)) + '</span>' +
+      '<div><div class="tx-title">' + esc(u.name) + statusBadge('pending') + '</div>' +
+      '<div class="tx-sub">' + esc(u.account) + (u.company ? ' · ' + esc(u.company) : '') + '</div></div></div>' +
+
+      '<div class="sec-title-sm">认证信息 · ' + TYPE[filters.type] + '</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">认证类型</div><div class="v">' + TYPE[filters.type] + '（' + TYPE_ICON[filters.type] + '）</div></div>' +
+      '<div class="dg"><div class="k">提交时间</div><div class="v">' + fmtTime(authData.ts || u.createdAt || Date.now()) + '</div></div>' +
+      (filters.type === 'enterprise' ? '<div class="dg"><div class="k">企业名称</div><div class="v">' + esc(u.company || '-') + '</div></div>' : '') +
+      (filters.type === 'enterprise' ? '<div class="dg"><div class="k">统一社会信用代码</div><div class="v">' + esc(authData.license || '待核验') + '</div></div>' : '') +
+      (filters.type === 'personalQual' ? '<div class="dg"><div class="k">资质清单</div><div class="v tx-regular">' + esc(qualList) + '</div></div>' : '') +
+      (filters.type === 'payment' ? '<div class="dg"><div class="k">钱包余额</div><div class="v">¥' + (u.balance ? u.balance.balance : 0) + '</div></div>' : '') +
+      (filters.type === 'realname' ? '<div class="dg"><div class="k">实名状态</div><div class="v">' + (a.realname && a.realname.ok ? '已认证' : '待审核') + '</div></div>' : '') +
+      '</div>' +
+
+      '<div class="sec-title">关联认证进度</div>' +
+      '<div class="chain-grid">' +
+      '<div class="cg ' + (a.realname && a.realname.ok ? 'ok' : 'no') + '"><div class="ck">实名</div><div class="cv">' + (a.realname && a.realname.ok ? '✓ 已认证' : '待认证') + '</div></div>' +
+      '<div class="cg ' + (a.enterprise && a.enterprise.ok ? 'ok' : 'no') + '"><div class="ck">企业</div><div class="cv">' + (a.enterprise && a.enterprise.ok ? '✓ 已认证' : '待认证') + '</div></div>' +
+      '<div class="cg ' + ((a.personalQual && a.personalQual.ok) || (a.qual && a.qual.ok) ? 'ok' : 'no') + '"><div class="ck">资质</div><div class="cv">' + (((a.personalQual && a.personalQual.ok) || (a.qual && a.qual.ok)) ? '✓ 已认证' : '待认证') + '</div></div>' +
+      '<div class="cg ' + (a.payment && a.payment.ok ? 'ok' : 'no') + '"><div class="ck">资金</div><div class="cv">' + (a.payment && a.payment.ok ? '✓ 已核验' : '待核验') + '</div></div>' +
+      '</div>';
+
+    var footer = '<button class="btn btn-primary" data-perm="approve.first" id="d-approve">通过</button><button class="btn btn-ghost" data-perm="approve.first" id="d-reject">驳回</button>';
+    var drawer = Admin.Drawer.open({ title: '认证详情 · ' + u.name, content: body, footer: footer, width: '520px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    var fb = drawer.panel.querySelector('.drawer-footer');
+    if (fb) {
+      fb.querySelector('#d-approve').onclick = function () { drawer.close(); approveDialog(u); };
+      fb.querySelector('#d-reject').onclick = function () { drawer.close(); rejectDialog(u); };
+    }
+  }
+
+  function approveDialog(u) {
+    Admin.confirm({
+      title: '通过' + TYPE[filters.type] + ' · ' + u.name,
+      body: '<div class="ud-grid">' +
+        '<div class="dg"><div class="k">用户</div><div class="v">' + esc(u.name) + (u.company ? ' · ' + esc(u.company) : '') + '</div></div>' +
+        '<div class="dg"><div class="k">认证类型</div><div class="v">' + TYPE[filters.type] + '</div></div>' +
+        '</div><div class="calc-tip mt-10">通过后将写回用户表 auth 字段 + AuthStore 快照同步；App 端认证状态即时更新，对应权益（入驻/分销/中介）自动开放。</div>',
+      ok: '确认通过',
+      onYes: function () {
+        var r = DataBus.authApprove(u.id, filters.type);
+        if (!r) { Admin.toast('操作失败'); return; }
+        Admin.toast('[' + TYPE[filters.type] + '] 已通过：' + r.name);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function rejectDialog(u) {
+    Admin.confirm({
+      title: '驳回' + TYPE[filters.type] + ' · ' + u.name,
+      body: '<div class="form-item"><label>驳回原因</label><input class="input" id="reject-note" placeholder="请输入驳回原因（将同步至 App 认证结果页）…" maxlength="100"></div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = '';
+        try { note = document.getElementById('reject-note').value.trim(); } catch (e) {}
+        if (!note) { Admin.toast('请填写驳回原因'); return; }
+        var r = DataBus.authReject(u.id, filters.type, note);
+        if (!r) { Admin.toast('操作失败'); return; }
+        Admin.toast('已驳回：' + r.name);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows;
+    if (filters.scope === 'pending') {
+      rows = list.map(function (u) {
+        return [u.name, u.company || '', u.account || '', TYPE[filters.type], '待审核', fmtTime((u.auth && u.auth[authField(filters.type)] && u.auth[authField(filters.type)].ts) || '')];
+      });
+    } else {
+      rows = list.map(function (x) { return [x.target || '', x.action || '', x.extra || '', x.operator || '', fmtTime(x.ts)]; });
+    }
+    var headers = filters.scope === 'pending'
+      ? ['姓名', '公司', '账号', '认证类型', '状态', '提交时间']
+      : ['用户', '处理结果', '说明', '操作人', '处理时间'];
+    var ok = Admin.exportCSV('认证审核.csv', headers, rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '认证审核', '', '认证审核.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var id = b.getAttribute('data-id');
+      var u = null;
+      users().forEach(function (x) { if (x.id === id) u = x; });
+      if (!u) return;
+      if (b.getAttribute('data-act') === 'approve') approveDialog(u);
+      else if (b.getAttribute('data-act') === 'reject') rejectDialog(u);
+    });
+    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

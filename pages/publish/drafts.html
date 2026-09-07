@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>草稿箱 · 工程链</title><link rel="stylesheet" href="../../css/app.css">
+<style>
+  .draft-scroll{padding:10px 16px 30px}.draft-head{padding:8px 0 15px}.draft-title{font-size:22px;font-weight:700}.draft-sub{margin-top:4px;color:var(--text-3);font-size:11px}.draft{padding:14px;margin-bottom:10px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--bg-card)}.draft-top{display:flex;justify-content:space-between;gap:10px}.draft-name{font-size:14px;font-weight:600}.draft-time{color:var(--text-3);font-size:10px;white-space:nowrap}.draft-meta{margin-top:7px;color:var(--text-3);font-size:11px}.draft-progress{height:5px;margin-top:12px;border-radius:var(--r-full);background:var(--bg-subtle);overflow:hidden}.draft-progress i{display:block;height:100%;border-radius:inherit;background:var(--primary)}.draft-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:9px;color:var(--text-3);font-size:11px}.draft-bottom a{color:var(--primary-dim);text-decoration:none;font-weight:600}.draft-bottom button{min-width:44px;min-height:34px;border:0;background:none;color:var(--error);font-size:11px;cursor:pointer}
+</style>
+</head>
+<body><div class="phone">
+  <div id="pub-gate-login" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">登录后查看草稿</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">登录后可管理草稿箱，继续编辑未完成的发布信息。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">立即登录</a>
+  </div>
+  <div id="pub-gate-realname" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-shield"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">实名认证后可管理草稿</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成实名认证后，即可保存草稿并发布供需信息。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往实名认证</a>
+  </div>
+  <div id="pub-content">
+  <div class="navbar" style="height:50px"><button class="nav-back" onclick="history.back()">‹</button><div class="nav-title">草稿箱</div><div class="nav-right"></div></div><main class="scroll draft-scroll"><header class="draft-head"><h1 class="draft-title">草稿箱</h1><div class="draft-sub">未完成的信息会自动保留在这里</div></header><div id="draft-list"></div></main></div></div>
+<script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-workbench.js"></script><script>
+(function(){
+  /* ---- 身份门控 ---- */
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateLogin = document.getElementById('pub-gate-login');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (st.loggedIn === false) { if (content) content.style.display='none'; if (gateLogin) gateLogin.style.display=''; return false; }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) { if (content) content.style.display='none'; if (gateReal) gateReal.style.display=''; return false; }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+  var list=document.getElementById('draft-list');
+  function esc(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function render(){
+    var rows=PublishStore.get().drafts;
+    list.innerHTML=rows.length?rows.map(function(d){
+      var completion=Math.max(0,Math.min(100,Number(d.completion)||0));
+      return '<article class="draft"><div class="draft-top"><div class="draft-name">'+esc(d.title||'未命名草稿')+'</div><div class="draft-time">'+esc(d.updatedAt)+'</div></div><div class="draft-meta">'+(d.role==='supply'?'供应':'需求')+' · '+esc(d.category||'未分类')+' · '+esc(d.missing||'待完善')+'</div><div class="draft-progress"><i style="width:'+completion+'%"></i></div><div class="draft-bottom"><span>已完成 '+completion+'%</span><span><a href="editor.html?draft='+encodeURIComponent(d.id)+'">继续编辑</a> <button data-id="'+esc(d.id)+'">删除</button></span></div></article>';
+    }).join(''):'<div class="wb-empty">草稿箱为空<br><a href="editor.html?role=demand" style="display:inline-block;margin-top:10px;color:var(--primary-dim)">开始发布信息</a></div>';
+  }
+  list.onclick=function(event){var button=event.target.closest('button');if(!button)return;var state=PublishStore.get();state.drafts=state.drafts.filter(function(d){return d.id!==button.dataset.id;});if(PublishStore.save(state)){render();UI.toast('草稿已删除','ok');}else UI.toast('删除失败，请重试','err');};
+  render();
+})();
+</script>
+</body></html>

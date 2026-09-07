@@ -1,0 +1,311 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合规管理 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="risk/compliance.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>合规管理</h1>
+        <div class="sub">风控合规中心 · 企业合规资质管理 · 资质有效期监控（正常 / 即将过期 / 已过期）· 提醒续期与标记过期</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">企业资质列表</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var QUAL_TYPE = { construction: '建筑业企业资质', agency: '中介服务资质', partner: '合伙人资质', general: '通用企业资质' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { qualType: '', expiryStatus: '', enterpriseType: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); } catch (e) { return '-'; }
+  }
+
+  function users() { return (window.DataBus && DataBus.users) ? DataBus.users() : []; }
+
+  function buildQualList() {
+    var list = [];
+    var now = Date.now();
+    var DAY = 86400000;
+
+    try {
+      var quals = (window.DataBus && DataBus.qualifications) ? DataBus.qualifications() : [];
+      quals.forEach(function (q) {
+        var user = null;
+        users().forEach(function (u) { if (u.id === q.uid) user = u; });
+        var expireAt = (user && user.auth && user.auth.enterprise && user.auth.enterprise.expireAt) || (now + 365 * DAY);
+        var daysLeft = Math.ceil((expireAt - now) / DAY);
+        var expiryStatus = daysLeft < 0 ? 'expired' : (daysLeft <= 30 ? 'expiring' : 'normal');
+        var qualType = 'general';
+        if (q.quals && q.quals.length) {
+          if (q.quals[0].indexOf('建筑') >= 0) qualType = 'construction';
+          else if (q.quals[0].indexOf('中介') >= 0 || q.quals[0].indexOf('经纪') >= 0) qualType = 'agency';
+        }
+        list.push({
+          id: q.id,
+          uid: q.uid,
+          company: q.company,
+          license: q.license,
+          quals: q.quals || [],
+          geo: q.geo,
+          source: q.source,
+          ts: q.ts,
+          expireAt: expireAt,
+          daysLeft: daysLeft,
+          expiryStatus: expiryStatus,
+          qualType: qualType,
+          qualTypeLabel: QUAL_TYPE[qualType] || qualType,
+          enterpriseType: (user && user.entry && user.entry.type) || '',
+          user: user
+        });
+      });
+    } catch (e) {}
+
+    list.sort(function (a, b) { return a.daysLeft - b.daysLeft; });
+    return list;
+  }
+
+  function filteredList() {
+    return buildQualList().filter(function (q) {
+      if (filters.qualType && q.qualType !== filters.qualType) return false;
+      if (filters.expiryStatus && q.expiryStatus !== filters.expiryStatus) return false;
+      if (filters.enterpriseType && q.enterpriseType !== filters.enterpriseType) return false;
+      if (filters.keyword) {
+        var q2 = filters.keyword.toLowerCase();
+        if ((q.company + q.license + q.quals.join('')).toLowerCase().indexOf(q2) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKPI() {
+    var all = buildQualList();
+    var normal = all.filter(function (q) { return q.expiryStatus === 'normal'; }).length;
+    var expiring = all.filter(function (q) { return q.expiryStatus === 'expiring'; }).length;
+    var expired = all.filter(function (q) { return q.expiryStatus === 'expired'; }).length;
+    var cards = [
+      ['正常', normal, 'up', '有效期 > 30 天'],
+      ['即将过期', expiring, 'warn', '30 天内到期'],
+      ['已过期', expired, 'down', '需立即续期'],
+      ['总资质数', all.length, 'gold', '已核验企业']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'qualType', label: '资质类型', type: 'select', options: [
+          { value: 'construction', label: '建筑业企业资质' },
+          { value: 'agency', label: '中介服务资质' },
+          { value: 'general', label: '通用企业资质' }
+        ]},
+        { key: 'expiryStatus', label: '有效期状态', type: 'select', options: [
+          { value: 'normal', label: '正常' },
+          { value: 'expiring', label: '即将过期（30天内）' },
+          { value: 'expired', label: '已过期' }
+        ]},
+        { key: 'enterpriseType', label: '企业类型', type: 'select', options: [
+          { value: 'construction', label: '建筑企业' },
+          { value: 'agency', label: '中介服务企业' },
+          { value: 'partner', label: '合伙人企业' }
+        ]},
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '企业名 / 信用代码 / 资质' }
+      ],
+      onFilter: function (vals) {
+        filters.qualType = vals.qualType || ''; filters.expiryStatus = vals.expiryStatus || '';
+        filters.enterpriseType = vals.enterpriseType || ''; filters.keyword = vals.keyword || '';
+        page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 项资质');
+      },
+      onReset: function () {
+        filters = { qualType: '', expiryStatus: '', enterpriseType: '', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function expiryBadge(q) {
+    if (q.expiryStatus === 'expired') return '<span class="badge badge-danger">已过期</span>';
+    if (q.expiryStatus === 'expiring') return '<span class="badge badge-warning">剩 ' + q.daysLeft + ' 天</span>';
+    return '<span class="badge badge-success">正常</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = '筛选 ' + list.length + ' / 共 ' + buildQualList().length + ' 项资质';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'company', label: '企业', width: '180px', render: function (row) {
+          return '<div><div class="tx-semibold">' + esc(row.company) + '</div>' +
+            '<div class="tx-muted-xs">GEO ' + row.geo + ' 分</div></div>';
+        }},
+        { key: 'qualType', label: '资质类型', width: '130px', render: function (row) { return '<span class="badge badge-primary">' + esc(row.qualTypeLabel) + '</span>'; } },
+        { key: 'license', label: '证书编号', width: '160px', render: function (row) { return '<span class="tx-mono">' + esc(row.license) + '</span>'; } },
+        { key: 'expireAt', label: '有效期至', width: '110px', render: function (row) { return '<span class="tx-sm">' + fmtTime(row.expireAt) + '</span>'; } },
+        { key: 'status', label: '状态', width: '100px', render: function (row) { return expiryBadge(row); } },
+        { key: 'ops', label: '操作', width: '180px', render: function (row) {
+          var ops = '<button class="btn btn-sm btn-outline" data-perm="approve.final" data-act="remind" data-id="' + row.id + '">提醒续期</button>';
+          if (row.expiryStatus !== 'expired') {
+            ops += '<button class="btn btn-sm btn-ghost" data-perm="ban" data-act="expire" data-id="' + row.id + '">标记过期</button>';
+          }
+          return ops;
+        }}
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '暂无企业资质记录'
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function openDetail(q) {
+    var user = q.user || {};
+    var qualsHtml = q.quals.map(function (x) { return '<span class="badge badge-primary badge-gap">' + esc(x) + '</span>'; }).join('');
+    var body = '<div class="tx-title mb-12">' + esc(q.company) + expiryBadge(q) + '</div>' +
+
+      '<div class="sec-title-sm">资质详情</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">资质类型</div><div class="v">' + esc(q.qualTypeLabel) + '</div></div>' +
+      '<div class="dg"><div class="k">统一社会信用代码</div><div class="v">' + esc(q.license) + '</div></div>' +
+      '<div class="dg"><div class="k">GEO 评分</div><div class="v">' + q.geo + ' 分</div></div>' +
+      '<div class="dg"><div class="k">核验来源</div><div class="v tx-sm">' + esc(q.source) + '</div></div>' +
+      '<div class="dg"><div class="k">有效期至</div><div class="v">' + fmtTime(q.expireAt) + '（剩 ' + q.daysLeft + ' 天）</div></div>' +
+      '<div class="dg"><div class="k">核验时间</div><div class="v">' + fmtTime(q.ts ? new Date(q.ts).getTime() : Date.now()) + '</div></div>' +
+      '</div>' +
+
+      '<div class="sec-title">资质清单</div>' +
+      '<div class="badge-wrap">' + (qualsHtml || '<span class="tx-muted">无</span>') + '</div>' +
+
+      '<div class="sec-title">企业信息</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">联系人</div><div class="v">' + esc(user.name || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">账号</div><div class="v">' + esc(user.account || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">入驻类型</div><div class="v">' + (user.entry && user.entry.type ? (user.entry.type === 'construction' ? '建筑企业' : user.entry.type === 'agency' ? '中介服务企业' : '合伙人企业') : '未入驻') + '</div></div>' +
+      '<div class="dg"><div class="k">入驻状态</div><div class="v">' + (user.entry && user.entry.active ? '已入驻' : '未入驻') + '</div></div>' +
+      '</div>';
+
+    var footer = '<button class="btn btn-primary" data-perm="approve.final" id="d-remind">提醒续期</button>';
+    if (q.expiryStatus !== 'expired') {
+      footer += '<button class="btn btn-ghost" data-perm="ban" id="d-expire">标记过期</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '资质详情 · ' + q.company, content: body, footer: footer, width: '560px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    var fb = drawer.panel.querySelector('.drawer-footer');
+    if (fb) {
+      var rBtn = fb.querySelector('#d-remind');
+      if (rBtn) rBtn.onclick = function () { drawer.close(); remindRenewal(q); };
+      var eBtn = fb.querySelector('#d-expire');
+      if (eBtn) eBtn.onclick = function () { drawer.close(); markExpired(q); };
+    }
+  }
+
+  function remindRenewal(q) {
+    Admin.confirm({
+      title: '提醒续期 · ' + q.company,
+      body: '向「' + esc(q.company) + '」发送资质续期提醒？\n\n当前资质有效期至 ' + fmtTime(q.expireAt) + '（剩 ' + q.daysLeft + ' 天）。\n提醒将通过 App 站内消息发送给企业联系人。',
+      ok: '确认发送提醒',
+      onYes: function () {
+        Admin.toast('已发送续期提醒：' + q.company);
+        Admin.log('资质续期提醒', '合规管理', q.company, '有效期至 ' + fmtTime(q.expireAt) + '，剩 ' + q.daysLeft + ' 天');
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function markExpired(q) {
+    Admin.confirm({
+      title: '标记过期 · ' + q.company,
+      body: '将「' + esc(q.company) + '」的资质标记为已过期？\n\n标记后企业相关权益（入驻/分销/中介）将受限，需重新提交资质核验。',
+      ok: '确认标记过期', danger: true,
+      onYes: function () {
+        Admin.toast('已标记为过期：' + q.company);
+        Admin.log('资质标记过期', '合规管理', q.company, '原有效期至 ' + fmtTime(q.expireAt));
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows = list.map(function (q) {
+      return [q.company, q.qualTypeLabel, q.license, q.quals.join('、'), fmtTime(q.expireAt),
+        q.expiryStatus === 'normal' ? '正常' : q.expiryStatus === 'expiring' ? '即将过期' : '已过期', q.geo];
+    });
+    var ok = Admin.exportCSV('合规管理.csv', ['企业', '资质类型', '证书编号', '资质清单', '有效期至', '状态', 'GEO评分'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '合规管理', '', '合规管理.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var id = b.getAttribute('data-id');
+      var q = null;
+      buildQualList().forEach(function (x) { if (x.id === id) q = x; });
+      if (!q) return;
+      if (b.getAttribute('data-act') === 'remind') remindRenewal(q);
+      else if (b.getAttribute('data-act') === 'expire') markExpired(q);
+    });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

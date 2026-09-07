@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>发布成功 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>body{background:var(--bg)} .succ-stat{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:12px}.succ-stat:first-of-type{border-top:0}.succ-stat span:first-child{color:var(--text-3)}</style>
+</head>
+<body>
+<div class="phone">
+  <div id="pub-gate-login" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">登录后查看发布结果</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">登录后可查看发布信息的审核状态与对接进展。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">立即登录</a>
+  </div>
+  <div id="pub-gate-realname" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-shield"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">实名认证后可发布信息</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成实名认证后，即可发布供需信息并参与平台对接。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往实名认证</a>
+  </div>
+  <div id="pub-content">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center;">
+    <div style="width:92px;height:92px;border-radius:50%;background:var(--primary-soft-2);display:flex;align-items:center;justify-content:center;">
+      <div style="width:58px;height:58px;border-radius:50%;background:var(--primary);color:var(--text-inv);display:flex;align-items:center;justify-content:center;font-size:28px;">✓</div>
+    </div>
+    <div class="fs-xl fw-700" style="margin-top:22px;">信息已提交</div>
+    <div class="text-2 fs-14" style="margin-top:8px;line-height:1.7;max-width:26ch;" id="succ-sub">信息已进入审核与匹配流程。你可以在信息工作台继续查看状态和对接反馈。</div>
+    <div class="glass" style="width:100%;margin-top:26px;padding:14px;text-align:left;font-size:12px;color:var(--text-2);">
+      <div class="fb-between" style="margin-bottom:10px;"><span class="text-2 fs-12" id="succ-title">信息标题</span><span class="tag tag-primary" id="succ-status">审核中</span></div>
+      <div style="height:6px;border-radius:999px;background:var(--bg-card-2);overflow:hidden;"><div id="succ-bar" style="width:40%;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--primary-dim));"></div></div>
+      <div class="text-3 fs-12" style="margin-top:10px;">有新的匹配或咨询时，消息会推送至你的会话。</div>
+      <div style="margin-top:10px;" id="succ-stats"></div>
+    </div>
+  </div>
+  <div class="fixed-cta">
+    <a id="succ-detail" href="records.html" class="btn btn-secondary btn-block btn-lg" style="margin-bottom:10px;">查看信息详情</a>
+    <a href="records.html" class="btn btn-primary btn-block btn-lg">查看我的发布</a>
+    <a href="index.html" class="btn btn-ghost btn-block" style="margin-top:10px;">返回信息工作台</a>
+  </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/publish-workbench.js"></script>
+<script>
+(function () {
+  /* ---- 身份门控 ---- */
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateLogin = document.getElementById('pub-gate-login');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (st.loggedIn === false) { if (content) content.style.display='none'; if (gateLogin) gateLogin.style.display=''; return false; }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) { if (content) content.style.display='none'; if (gateReal) gateReal.style.display=''; return false; }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+  window.__ROOT__ = '../../';
+  var id = new URLSearchParams(location.search).get('id');
+  var rec = id && window.PublishStore ? PublishStore.getRecordById(id) : null;
+  var sub = document.getElementById('succ-sub'), title = document.getElementById('succ-title'), status = document.getElementById('succ-status'), bar = document.getElementById('succ-bar'), stats = document.getElementById('succ-stats');
+  var statusTxt = rec ? (PublishStore.STATUS[rec.status] || rec.status) : '审核中';
+  if (rec) {
+    title.textContent = rec.title || '已发布信息';
+    status.textContent = statusTxt;
+    if (rec.category) title.textContent = rec.title + '（' + rec.category + (rec.subType ? '·' + rec.subType : '') + '）';
+    var pct = rec.completion != null ? Math.round(rec.completion * 0.7 + 20) : (rec.matches ? Math.min(90, 30 + rec.matches * 10) : 50);
+    pct = Math.max(20, Math.min(90, pct));
+    bar.style.width = pct + '%';
+    sub.textContent = (rec.role === 'supply' ? '供应信息已进入匹配流程' : '需求信息已进入匹配流程');
+    stats.innerHTML =
+      '<div class="succ-stat"><span>浏览</span><span style="font-weight:600">' + (rec.views || 0) + '</span></div>' +
+      '<div class="succ-stat"><span>匹配</span><span style="font-weight:600">' + (rec.matches || 0) + '</span></div>' +
+      '<div class="succ-stat"><span>咨询</span><span style="font-weight:600">' + (rec.inquiries || 0) + '</span></div>';
+    document.getElementById('succ-detail').href = '../supply/detail.html?id=' + encodeURIComponent(rec.id || id);
+  } else {
+    bar.style.width = '40%';
+    stats.innerHTML = '<div class="succ-stat"><span>状态</span><span style="font-weight:600">待生成</span></div>';
+  }
+})();
+</script>
+</body>
+</html>

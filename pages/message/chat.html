@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/message/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>聊天 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title"><span id="c-name">李工</span><div style="font-size:10px;color:var(--text-3);font-weight:400;" id="c-role">四川中建××建设</div></div>
+    <div class="nav-right"><button class="icon-btn" onclick="UI.toast('更多操作','ok')">⋯</button></div>
+  </div>
+
+  <div class="scroll no-pad">
+    <div style="display:flex;justify-content:center;padding:14px 0;"><span class="tag tag-gray">今天 09:12</span></div>
+    <div id="bubbles" style="padding:0 14px 8px;display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <!-- 输入区：智能快捷回复 + 输入栏 -->
+  <div class="chat-input">
+    <div class="chat-quick" id="quick">
+      <span class="cq-label"><svg class="ic"><use href="#i-sparkle"/></svg>智能建议</span>
+      <span class="cq-chip" onclick="send('可以的，请发详细报价')">可以的，请发详细报价</span>
+      <span class="cq-chip" onclick="send('请发一下您的报价单')">请发一下您的报价单</span>
+      <span class="cq-chip" onclick="send('感谢，我的电话是13x')">感谢，我的电话是13x</span>
+    </div>
+    <div class="chat-composer">
+      <button type="button" class="cc-attach" onclick="UI.toast('暂不支持发送附件','ok')" aria-label="附件"><svg class="ic"><use href="#i-clip"/></svg></button>
+      <div class="cc-field">
+        <input id="msg" placeholder="输入消息…" onkeydown="if(event.key==='Enter')send()">
+        <button type="button" class="cc-send" onclick="send()" aria-label="发送"><svg class="ic"><use href="#i-upload"/></svg></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var id = new URLSearchParams(location.search).get('id') || 'c1';
+  var conv = MOCK.conversations.find(function (c) { return c.id === id; }) || MOCK.conversations[0];
+  document.getElementById('c-name').textContent = conv.name;
+  document.getElementById('c-role').textContent = conv.role;
+
+  var bubbles = MOCK.chats[conv.id] || [];
+  var scroller = document.querySelector('.scroll');
+  function scrollBottom() { scroller.scrollTop = scroller.scrollHeight; }
+  function render() {
+    document.getElementById('bubbles').innerHTML = bubbles.map(function (m) {
+      return '<div style="align-self:' + (m.me ? 'flex-end' : 'flex-start') + ';max-width:76%;">' +
+        '<div class="chat-bubble ' + (m.me ? 'green' : 'gray') + '">' + m.text + '</div>' +
+        '<div class="text-3" style="font-size:9px;margin-top:3px;text-align:' + (m.me ? 'right' : 'left') + ';">' + m.t + (m.me ? ' · 已读' : '') + '</div></div>';
+    }).join('');
+    scrollBottom();
+  }
+  render();
+
+  window.send = function (text) {
+    var v = (text || document.getElementById('msg').value).trim();
+    if (!v) return;
+    var now = new Date().getHours() + ':' + new Date().getMinutes().toString().padStart(2, '0');
+    bubbles.push({ me: true, text: v, t: now });
+    document.getElementById('msg').value = '';
+    render();
+    // 模拟对方回复
+    setTimeout(function () {
+      bubbles.push({ me: false, text: '收到，我这边核实一下尽快回复您。', t: '刚刚' });
+      render();
+    }, 1200);
+  };
+})();
+</script>
+</body>
+</html>

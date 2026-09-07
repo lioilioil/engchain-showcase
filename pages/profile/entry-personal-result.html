@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>个人入驻 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">个人入驻</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll pr-scroll" id="root"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+function esc(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function val(v){return (v===undefined||v===null||v==='')?'—':esc(v);}
+/* 长文本折叠 */
+function clamp(text,id){
+  if(!text){return '<div class="pr-empty"><svg class="ic" style="width:28px;height:28px;opacity:.35;"><use href="#i-doc"/></svg><span>暂无内容</span></div>';}
+  return '<div class="clamp-box"><div class="clamp-text" id="'+id+'">'+esc(text)+'</div>'+
+    '<span class="clamp-toggle" onclick="var el=document.getElementById(\''+id+'\');el.classList.toggle(\'open\');this.textContent=el.classList.contains(\'open\')?\'收起\':\'展开全文\';">展开全文</span></div>';
+}
+function emptyState(msg){
+  return '<div class="pr-empty"><svg class="ic" style="width:30px;height:30px;opacity:.35;"><use href="#i-doc"/></svg><span>'+msg+'</span></div>';
+}
+function row(k,v,mono){return '<div class="ap-field ap-field-ro"><label>'+k+'</label><b class="fs-13 text-2 '+(mono?'mono':'')+'">'+v+'</b></div>';}
+/* 基本信息 */
+function renderBasic(pe,rn){
+  var b=(pe&&pe.profile&&pe.profile.basic)||{};
+  var mobile=b.mobile||(rn&&rn.mobile)||'';
+  var js=b.jobStatus;
+  var jsBadge=js?'<span class="tag tag-gold" style="margin-left:6px;">'+esc(js)+'</span>':'';
+  return '<div class="section-title"><div class="st-left">基本信息</div></div>'+
+    '<div class="group ap-group">'+
+      row('姓名',val(rn&&rn.name))+
+      row('性别',val(b.gender))+
+      row('出生年月',val(b.birth))+
+      row('手机号',val(mobile),true)+
+      row('现居地',val(b.location))+
+      '<div class="ap-field ap-field-ro" style="border:none;"><label>求职状态</label><b class="fs-13 text-2">'+(js?esc(js):'—')+jsBadge+'</b></div>'+
+    '</div>';
+}
+/* 专业资质 */
+function renderCerts(pe){
+  var html='<div class="section-title"><div class="st-left">专业资质</div></div>';
+  var list=(pe&&pe.list&&pe.list.length)?pe.list:((pe&&pe.certs&&pe.certs.length)?pe.certs:[]);
+  if(!list.length){return html+emptyState('暂无资质证书');}
+  html+='<div class="pr-card-list">';
+  list.forEach(function(c){
+    var name=c.name||c.title||c;
+    var no=c.no||c.number||c.certNo||'';
+    var img=c.image||c.certImage||c.img||'';
+    html+='<div class="pr-card">'+
+      '<div class="pr-card-head">'+
+        '<span class="pr-card-title">'+esc(name)+'</span>'+
+        (c.level?'<span class="tag tag-gold">'+esc(c.level)+'</span>':'')+
+      '</div>'+
+      (no?'<div class="pr-card-meta"><span>证书编号：<b class="mono">'+esc(no)+'</b></span></div>':'')+
+      (img?'<div class="pr-thumb"><img src="'+esc(img)+'" alt="证书影像"></div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 教育经历 */
+function renderEducation(pe){
+  var html='<div class="section-title"><div class="st-left">教育经历</div></div>';
+  var list=(pe&&pe.profile&&pe.profile.education)||[];
+  if(!list.length){return html+emptyState('暂无教育经历');}
+  html+='<div class="pr-card-list">';
+  list.forEach(function(ed){
+    html+='<div class="pr-card">'+
+      '<div class="pr-card-head">'+
+        '<span class="pr-card-title">'+esc(ed.school||'未填写学校')+'</span>'+
+        (ed.degree?'<span class="tag tag-gold">'+esc(ed.degree)+'</span>':'')+
+      '</div>'+
+      '<div class="pr-card-meta">'+
+        (ed.major?'<span>专业：'+esc(ed.major)+'</span>':'')+
+        ((ed.start||ed.end)?'<span>时间：'+esc(ed.start||'—')+' ~ '+esc(ed.end||'—')+'</span>':'')+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 工作经历 */
+function renderWork(pe){
+  var html='<div class="section-title"><div class="st-left">工作经历</div></div>';
+  var list=(pe&&pe.profile&&pe.profile.work)||[];
+  if(!list.length){return html+emptyState('暂无工作经历');}
+  html+='<div class="pr-card-list">';
+  list.forEach(function(w,i){
+    html+='<div class="pr-card">'+
+      '<div class="pr-card-head">'+
+        '<span class="pr-card-title">'+esc(w.company||'未填写公司')+'</span>'+
+        (w.position?'<span class="tag tag-gold">'+esc(w.position)+'</span>':'')+
+      '</div>'+
+      '<div class="pr-card-meta">'+
+        ((w.start||w.end)?'<span>时间：'+esc(w.start||'—')+' ~ '+esc(w.end||'—')+'</span>':'')+
+      '</div>'+
+      (w.desc?'<div class="pr-card-desc">'+clamp(w.desc,'pr-work-'+i)+'</div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 项目经历 */
+function renderProject(pe){
+  var html='<div class="section-title"><div class="st-left">项目经历</div></div>';
+  var list=(pe&&pe.profile&&pe.profile.project)||[];
+  if(!list.length){return html+emptyState('暂无项目经历');}
+  html+='<div class="pr-card-list">';
+  list.forEach(function(p,i){
+    html+='<div class="pr-card">'+
+      '<div class="pr-card-head">'+
+        '<span class="pr-card-title">'+esc(p.name||'未填写项目')+'</span>'+
+        (p.role?'<span class="tag tag-gold">'+esc(p.role)+'</span>':'')+
+      '</div>'+
+      '<div class="pr-card-meta">'+
+        (p.time?'<span>时间：'+esc(p.time)+'</span>':'')+
+      '</div>'+
+      (p.desc?'<div class="pr-card-desc">'+clamp(p.desc,'pr-proj-'+i)+'</div>':'')+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+/* 技能特长 */
+function renderSkills(pe){
+  var html='<div class="section-title"><div class="st-left">技能特长</div></div>';
+  var list=(pe&&pe.profile&&pe.profile.skills)||[];
+  if(!list.length){return html+emptyState('暂无技能标签');}
+  return html+'<div class="pr-skills">'+list.map(function(s){
+    return '<span class="pr-skill">'+esc(s)+'</span>';
+  }).join('')+'</div>';
+}
+/* 求职意向 */
+function renderJobIntent(pe){
+  var ji=(pe&&pe.profile&&pe.profile.jobIntent)||{};
+  return '<div class="section-title"><div class="st-left">求职意向</div></div>'+
+    '<div class="group ap-group">'+
+      row('期望职位',val(ji.position))+
+      row('期望薪资',val(ji.salary))+
+      row('期望地点',val(ji.location))+
+      '<div class="ap-field ap-field-ro" style="border:none;"><label>工作性质</label><b class="fs-13 text-2">'+(ji.workType?'<span class="tag tag-gold">'+esc(ji.workType)+'</span>':'—')+'</b></div>'+
+    '</div>';
+}
+/* 自我介绍 */
+function renderIntro(pe){
+  var html='<div class="section-title"><div class="st-left">自我介绍</div></div>';
+  var intro=pe&&pe.profile&&pe.profile.intro;
+  if(!intro){return html+emptyState('暂无自我介绍');}
+  return html+'<div class="pr-card">'+clamp(intro,'pr-intro')+'</div>';
+}
+/* 简历附件 */
+function renderResume(pe){
+  var file=pe&&pe.profile&&pe.profile.resumeFile;
+  if(!file)return '';
+  return '<div class="section-title"><div class="st-left">简历附件</div></div>'+
+    '<div class="pr-card pr-resume">'+
+      '<svg class="ic" style="width:20px;height:20px;color:var(--primary);flex:none;"><use href="#i-doc"/></svg>'+
+      '<span class="pr-resume-name">'+esc(file)+'</span>'+
+      '<a href="javascript:void(0)" class="pr-resume-btn" onclick="UI.toast(\'简历预览功能开发中\',\'info\')">查看简历</a>'+
+    '</div>';
+}
+function render(){
+  var a=AuthStore.read();
+  var pe=a.personalEntry||{ok:false,profile:{basic:{},education:[],work:[],project:[],skills:[],jobIntent:{},intro:'',resumeFile:''},list:[],certs:[]};
+  var rn=a.realname||{};
+  var root=document.getElementById('root');
+  /* 未入驻 → 跳转认证页 */
+  if(!pe.ok){
+    root.innerHTML='<div class="pr-empty" style="margin-top:40px;"><svg class="ic" style="width:40px;height:40px;opacity:.4;"><use href="#i-doc"/></svg><span>尚未完成个人入驻</span></div>'+
+      '<div class="fixed-cta pr-cta"><a href="auth-qualification.html" class="btn btn-primary btn-block btn-lg">去入驻</a></div>';
+    return;
+  }
+  var name=rn.name||(UI.state&&UI.state.get&&UI.state.get().user)||'个人用户';
+  var statusText=pe.status==='approved'?'已通过审核':(pe.status||'审核中');
+  /* v3.1: 用户类型与简历完整度 */
+  var ut=pe.userType||'jobseeker';
+  var rc=!!pe.resumeComplete;
+  var utLabel=ut==='jobseeker'?'投递型':'标准型';
+  var utCls=ut==='jobseeker'?'pr-ut-job':'pr-ut-std';
+  var pf=pe.profile||{};
+  var tf=0,ff=0;
+  if(pf.basic){tf+=5;if(pf.basic.gender)ff++;if(pf.basic.birth)ff++;if(pf.basic.location)ff++;if(pf.basic.jobStatus)ff++;if(pf.basic.mobile)ff++;}
+  tf+=1;if(pf.education&&pf.education.length)ff++;
+  tf+=1;if(pf.work&&pf.work.length)ff++;
+  tf+=1;if(pf.project&&pf.project.length)ff++;
+  tf+=1;if(pf.skills&&pf.skills.length)ff++;
+  if(pf.jobIntent){tf+=4;if(pf.jobIntent.position)ff++;if(pf.jobIntent.salary)ff++;if(pf.jobIntent.location)ff++;if(pf.jobIntent.workType)ff++;}
+  tf+=1;if(pf.intro&&pf.intro.trim())ff++;
+  var pct=tf?Math.round(ff/tf*100):0;
+  root.innerHTML=
+    '<div class="pr-hero"><span class="pr-glow"></span>'+
+    '<span class="pr-h-ic"><svg class="ic" style="width:26px;height:26px;"><use href="#i-user"/></svg></span>'+
+    '<div class="fw-700 fs-19" style="color:#fff;margin-top:13px;">个人入驻</div>'+
+    '<div class="fs-12" style="color:rgba(255,255,255,.72);margin-top:6px;">资质与简历详情</div>'+
+    '<div class="pr-hero-user"><span class="pr-hero-name">'+esc(name)+'</span><span class="tag tag-gold" style="background:rgba(201,169,97,.25);color:#EED697;">'+esc(statusText)+'</span><span class="pr-ut-tag '+utCls+'">'+utLabel+'</span></div>'+
+    '</div>'+
+    (ut==='standard' ? '<div class="pr-guide-card"><div class="pr-guide-ic"><svg class="ic" style="width:20px;height:20px;"><use href="#i-doc"/></svg></div><div class="pr-guide-body"><div class="pr-guide-title">完善简历解锁投递权益</div><div class="pr-guide-desc">完成简历详情编辑后升级为投递型用户，享受岗位投递和人才推荐权益</div></div><a href="auth-qualification.html?mode=edit" class="pr-guide-btn">去完善</a></div>' : '')+
+    '<div class="pr-resume-completeness"><div class="pr-rc-label">简历完整度 <b class="pr-rc-pct">'+pct+'%</b>'+(ut==='jobseeker'?'<span class="pr-rc-status '+(rc?'pr-rc-ok':'pr-rc-no')+'">'+(rc?'已完成':'未完成')+'</span>':'')+'</div><div class="pr-rc-track"><div class="pr-rc-fill" style="width:'+pct+'%"></div></div>'+(ut==='jobseeker'&&!rc?'<div class="pr-rc-hint">完善核心字段后可投递简历</div>':'')+'</div>'+
+    renderBasic(pe,rn)+
+    renderCerts(pe)+
+    renderEducation(pe)+
+    renderWork(pe)+
+    renderProject(pe)+
+    renderSkills(pe)+
+    renderJobIntent(pe)+
+    renderIntro(pe)+
+    renderResume(pe)+
+    '<div class="fixed-cta pr-cta">'+
+      (ut==='jobseeker'?'<a href="../../pages/personnel/index.html" class="btn btn-primary btn-block btn-lg">投递简历</a>':'<a href="auth-qualification.html?mode=edit" class="btn btn-primary btn-block btn-lg">完善简历解锁投递</a>')+
+      '<a href="auth-qualification.html?mode=edit" class="btn btn-ghost btn-block" style="margin-top:9px;">编辑资料</a>'+
+      '<a href="auth.html" class="pr-back-link">返回认证中心</a>'+
+    '</div>';
+}
+render();
+window.addEventListener('storage',function(ev){if(['engchain-users','engchain-auth'].indexOf(ev.key)>=0)render();});
+window.addEventListener('engchain:auth',render);
+window.addEventListener('engchain:state',render);
+})();
+</script>
+<style>
+.pr-scroll{padding-top:12px;padding-bottom:170px;}
+/* Hero */
+.pr-hero{position:relative;overflow:hidden;border-radius:20px;padding:28px 22px 24px;text-align:center;margin-bottom:14px;
+  background:radial-gradient(130% 120% at 85% -10%,rgba(238,214,151,.25),transparent 55%),linear-gradient(150deg,#252C35,#151A22 50%,#0B0E13);
+  box-shadow:0 10px 28px rgba(22,22,22,.14);}
+.pr-glow{position:absolute;right:-36px;top:-36px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,.3),transparent 70%);}
+.pr-h-ic{position:relative;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(201,169,97,.4);}
+.pr-hero-user{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;position:relative;}
+.pr-hero-name{color:#fff;font-size:15px;font-weight:600;}
+/* 分组 */
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ap-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.ap-field:last-child{border-bottom:none;}
+.ap-field label{flex:none;width:80px;font-size:13px;color:var(--text-2);}
+.ap-field-ro b{flex:1;text-align:right;font-weight:600;min-width:0;}
+/* 卡片列表 */
+.pr-card-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.pr-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+.pr-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.pr-card-title{font-size:14px;font-weight:600;color:var(--text-1);flex:1;min-width:0;word-break:break-all;}
+.pr-card-meta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-2);}
+.pr-card-meta b{color:var(--text-1);font-weight:500;}
+.pr-card-desc{font-size:13px;color:var(--text-2);line-height:1.7;margin-top:6px;}
+.pr-thumb{margin-top:8px;}
+.pr-thumb img{width:100%;max-height:160px;object-fit:cover;border-radius:8px;display:block;}
+/* 技能标签 */
+.pr-skills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.pr-skill{background:rgba(201,169,97,.12);color:var(--primary-dim);font-size:12.5px;padding:6px 14px;border-radius:20px;font-weight:500;}
+/* 简历附件 */
+.pr-resume{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.pr-resume-name{flex:1;font-size:13px;color:var(--text-1);min-width:0;word-break:break-all;}
+.pr-resume-btn{flex:none;color:var(--primary);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;padding:6px 12px;border:1px solid var(--primary);border-radius:8px;}
+/* 空态 */
+.pr-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 16px;color:var(--text-3);font-size:13px;background:var(--bg-card);border:1px dashed var(--line);border-radius:14px;margin-bottom:14px;}
+/* 长文本折叠 */
+.clamp-box{position:relative;}
+.clamp-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;color:var(--text-2);line-height:1.7;transition:all .3s ease;}
+.clamp-text.open{-webkit-line-clamp:unset;}
+.clamp-toggle{display:inline-block;color:var(--primary);font-size:12px;cursor:pointer;margin-top:6px;font-weight:500;}
+/* CTA */
+.pr-cta{left:14px;right:14px;}
+.pr-back-link{display:block;text-align:center;color:var(--text-3);font-size:13px;margin-top:12px;cursor:pointer;text-decoration:none;}
+.mono{font-family:var(--font-mono);}
+/* ============================================================
+   v3.1: 用户类型标签
+   ============================================================ */
+.pr-ut-tag{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:999px;}
+.pr-ut-job{background:rgba(201,169,97,.3);color:#EED697;border:1px solid rgba(201,169,97,.4);}
+.pr-ut-std{background:rgba(255,255,255,.1);color:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.2);}
+.pr-guide-card{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(201,169,97,.1),rgba(201,169,97,.03));border:1px solid rgba(201,169,97,.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;}
+.pr-guide-ic{width:36px;height:36px;border-radius:10px;background:rgba(201,169,97,.15);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;flex:none;}
+.pr-guide-body{flex:1;min-width:0;}
+.pr-guide-title{font-size:13px;font-weight:600;color:var(--text-1);line-height:1.4;}
+.pr-guide-desc{font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.5;}
+.pr-guide-btn{flex:none;padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;white-space:nowrap;}
+.pr-resume-completeness{background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
+.pr-rc-label{font-size:12px;color:var(--text-2);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.pr-rc-pct{color:var(--primary-dim);font-weight:700;font-family:var(--font-num);}
+.pr-rc-status{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:auto;}
+.pr-rc-ok{background:rgba(76,175,80,.1);color:#4caf50;border:1px solid rgba(76,175,80,.2);}
+.pr-rc-no{background:rgba(212,76,71,.08);color:var(--danger);border:1px solid rgba(212,76,71,.2);}
+.pr-rc-track{height:6px;border-radius:999px;background:var(--bg-card-2,rgba(0,0,0,.06));overflow:hidden;}
+.pr-rc-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary-dim),var(--primary));transition:width .4s ease;}
+.pr-rc-hint{font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5;}
+</style>
+</body>
+</html>

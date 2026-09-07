@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设计系统 · 工程链管理后台</title>
+<link rel="stylesheet" href="css/admin.css">
+<style>
+  /* 设计系统页专用：锚点导航 + 章节布局（仅本页，不污染全局） */
+  .ds-layout { display: flex; gap: 24px; align-items: flex-start; }
+  .ds-toc {
+    position: sticky; top: calc(var(--topbar-h) + 16px);
+    width: 200px; flex: none;
+    max-height: calc(100vh - var(--topbar-h) - 32px);
+    overflow-y: auto;
+  }
+  .ds-toc h4 { font-size: 12px; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px; }
+  .ds-toc a {
+    display: block; padding: 5px 10px; border-radius: var(--radius-sm);
+    font-size: 13px; color: var(--muted-foreground); font-weight: 400;
+    transition: background var(--duration-fast), color var(--duration-fast);
+  }
+  .ds-toc a:hover { background: var(--accent); color: var(--foreground); }
+  .ds-content { flex: 1; min-width: 0; }
+  .ds-section { margin-bottom: 40px; scroll-margin-top: calc(var(--topbar-h) + 16px); }
+  .ds-section h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+    padding-bottom: 10px; margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ds-section h3 { font-size: 15px; font-weight: 600; margin: 18px 0 10px; color: var(--foreground); }
+  .ds-demo {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 20px; margin-bottom: 12px;
+  }
+  .ds-demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .ds-desc { font-size: 12.5px; color: var(--muted-foreground); margin-top: 6px; line-height: 1.6; }
+  /* 色板 */
+  .ds-swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .ds-swatch { border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+  .ds-swatch .sw-color { height: 56px; }
+  .ds-swatch .sw-info { padding: 8px 10px; background: var(--card); }
+  .ds-swatch .sw-name { font-size: 12px; font-weight: 600; }
+  .ds-swatch .sw-val { font-size: 10.5px; color: var(--muted-foreground); margin-top: 2px; word-break: break-all; font-family: monospace; }
+  /* 间距可视化 */
+  .ds-space-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .ds-space-label { width: 70px; font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .ds-space-bar { background: var(--primary); border-radius: 3px; height: 20px; }
+  /* 圆角可视化 */
+  .ds-radius-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .ds-radius-item { text-align: center; }
+  .ds-radius-box { width: 64px; height: 64px; background: var(--muted); border: 1px solid var(--border); margin-bottom: 6px; }
+  .ds-radius-label { font-size: 11px; color: var(--muted-foreground); }
+  /* 阴影可视化 */
+  .ds-shadow-row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .ds-shadow-item { text-align: center; }
+  .ds-shadow-box { width: 80px; height: 64px; background: var(--card); border-radius: var(--radius-md); margin-bottom: 6px; }
+  .ds-shadow-label { font-size: 11px; color: var(--muted-foreground); }
+  /* 排版演示 */
+  .ds-type-spec { font-size: 11px; color: var(--muted-foreground); margin-top: 2px; }
+</style>
+</head>
+<body data-page="design-system.html">
+
+<!-- 顶栏（admin.js 注入） -->
+<div class="topbar"></div>
+
+<div class="layout">
+  <!-- 侧栏（admin.js 注入） -->
+  <nav class="sidenav"></nav>
+
+  <!-- 主内容区 -->
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>设计系统</h1>
+        <div class="sub">工程链管理后台 · Phase 0 设计系统基建。基于 shadcn/ui 视觉语言，中性 slate 色调、8px 网格、极克制动效、tabular-nums 数字。本页展示全部令牌与组件，可交互组件均真实可运行。</div>
+      </div>
+    </div>
+
+    <div class="ds-layout">
+      <!-- 左侧锚点导航 -->
+      <aside class="ds-toc">
+        <h4>目录</h4>
+        <a href="#sec-principles">设计原则</a>
+        <a href="#sec-colors">色彩令牌</a>
+        <a href="#sec-typography">排版</a>
+        <a href="#sec-spacing">间距 / 圆角 / 阴影</a>
+        <a href="#sec-button">Button</a>
+        <a href="#sec-badge">Badge</a>
+        <a href="#sec-card">Card</a>
+        <a href="#sec-table">Table</a>
+        <a href="#sec-form">Form</a>
+        <a href="#sec-filterbar">FilterBar</a>
+        <a href="#sec-pagination">Pagination</a>
+        <a href="#sec-tabs">Tabs</a>
+        <a href="#sec-drawer">Drawer</a>
+        <a href="#sec-modal">Modal / Dialog</a>
+        <a href="#sec-toast">Toast</a>
+        <a href="#sec-alert">Alert</a>
+        <a href="#sec-dropdown">Dropdown</a>
+        <a href="#sec-tooltip">Tooltip</a>
+        <a href="#sec-avatar">Avatar / Status Dot</a>
+        <a href="#sec-skeleton">Skeleton / Loading</a>
+        <a href="#sec-empty">Empty State</a>
+        <a href="#sec-charts">图表</a>
+      </aside>
+
+      <!-- 内容 -->
+      <div class="ds-content">
+
+        <!-- 1. 设计原则 -->
+        <section class="ds-section" id="sec-principles">
+          <h2>1. 设计原则</h2>
+          <div class="ds-demo">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;margin-bottom:6px;">shadcn 中性风</div>
+                <div style="font-size:13px;color:var(--muted-foreground);line-height:1.6;">中性 slate 色调，无品牌彩色。唯一彩色 = destructive 红 + 图表五色。功能语义色去饱和，仅用于状态标识。</div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:600;margin-bottom:6px;">8px 网格</div>
+                <div style="font-size:13px;color:var(--muted-foreground);line-height:1.6;">所有间距、尺寸基于 4/8px 倍数。space-1=4px 至 space-8=32px，组件高度 32/36/40px 三档。</div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:600;margin-bottom:6px;">极克制动效</div>
+                <div style="font-size:13px;color:var(--muted-foreground);line-height:1.6;">仅 hover/fade/translate，时长 150-200ms，ease-out 缓动。全局尊重 prefers-reduced-motion。</div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:600;margin-bottom:6px;">tabular-nums</div>
+                <div style="font-size:13px;color:var(--muted-foreground);line-height:1.6;">所有数字使用等宽表格数字，金额、数量、页码对齐不跳动。.num / .an / .amt 类自动启用。</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. 色彩令牌 -->
+        <section class="ds-section" id="sec-colors">
+          <h2>2. 色彩令牌</h2>
+          <h3>基础色板（亮色主题）</h3>
+          <div class="ds-demo">
+            <div class="ds-swatch-grid" id="swatch-base"></div>
+          </div>
+          <h3>功能语义色</h3>
+          <div class="ds-demo">
+            <div class="ds-swatch-grid" id="swatch-semantic"></div>
+          </div>
+          <div class="ds-desc">所有颜色使用 oklch 色彩空间定义，暗色主题在 .dark / [data-theme=dark] 下自动切换。点击顶栏主题按钮可实时预览暗色色板。</div>
+        </section>
+
+        <!-- 3. 排版 -->
+        <section class="ds-section" id="sec-typography">
+          <h2>3. 排版</h2>
+          <div class="ds-demo">
+            <div style="font-size:13px;color:var(--muted-foreground);margin-bottom:12px;">字体栈：Barlow（英文/数字）+ PingFang SC（中文）</div>
+            <h1 style="font-size:30px;font-weight:700;letter-spacing:-0.025em;">H1 · 页面大标题 30px / 700</h1>
+            <div class="ds-type-spec">letter-spacing: -0.025em</div>
+            <h2 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;margin-top:14px;">H2 · 区块标题 24px / 700</h2>
+            <div class="ds-type-spec">letter-spacing: -0.02em</div>
+            <h3 style="font-size:18px;font-weight:600;letter-spacing:-0.01em;margin-top:14px;">H3 · 小节标题 18px / 600</h3>
+            <div class="ds-type-spec">letter-spacing: -0.01em</div>
+            <h4 style="font-size:15px;font-weight:600;margin-top:14px;">H4 · 卡片标题 15px / 600</h4>
+            <div style="font-size:14px;line-height:1.6;margin-top:14px;">正文 Body 14px / 400 · 行高 1.5。工程链管理后台采用中性、高效的信息密度，正文 14px 兼顾可读性与屏幕利用率。</div>
+            <div style="font-size:12.5px;color:var(--muted-foreground);margin-top:8px;">辅助文字 Caption 12.5px / 400 · muted-foreground。用于次要信息、元数据、描述文本。</div>
+            <div style="margin-top:14px;font-size:13px;color:var(--muted-foreground);">数字 tabular-nums 演示（等宽对齐）：</div>
+            <div class="num" style="font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;">¥ 1,234,567.89 → ¥ 9,876,543.21</div>
+          </div>
+          <h3>字重体系</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <span style="font-weight:300;font-size:16px;">Light 300</span>
+              <span style="font-weight:400;font-size:16px;">Regular 400</span>
+              <span style="font-weight:500;font-size:16px;">Medium 500</span>
+              <span style="font-weight:600;font-size:16px;">Semibold 600</span>
+              <span style="font-weight:700;font-size:16px;">Bold 700</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. 间距/圆角/阴影 -->
+        <section class="ds-section" id="sec-spacing">
+          <h2>4. 间距 / 圆角 / 阴影</h2>
+          <h3>间距 Space</h3>
+          <div class="ds-demo">
+            <div class="ds-space-row"><span class="ds-space-label">space-1 · 4px</span><div class="ds-space-bar" style="width:16px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-2 · 8px</span><div class="ds-space-bar" style="width:32px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-3 · 12px</span><div class="ds-space-bar" style="width:48px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-4 · 16px</span><div class="ds-space-bar" style="width:64px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-5 · 20px</span><div class="ds-space-bar" style="width:80px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-6 · 24px</span><div class="ds-space-bar" style="width:96px;"></div></div>
+            <div class="ds-space-row"><span class="ds-space-label">space-8 · 32px</span><div class="ds-space-bar" style="width:128px;"></div></div>
+          </div>
+          <h3>圆角 Radius</h3>
+          <div class="ds-demo">
+            <div class="ds-radius-row">
+              <div class="ds-radius-item"><div class="ds-radius-box" style="border-radius:var(--radius-sm);"></div><div class="ds-radius-label">sm · 4px</div></div>
+              <div class="ds-radius-item"><div class="ds-radius-box" style="border-radius:var(--radius-md);"></div><div class="ds-radius-label">md · 6px</div></div>
+              <div class="ds-radius-item"><div class="ds-radius-box" style="border-radius:var(--radius-lg);"></div><div class="ds-radius-label">lg · 10px</div></div>
+              <div class="ds-radius-item"><div class="ds-radius-box" style="border-radius:var(--radius-xl);"></div><div class="ds-radius-label">xl · 14px</div></div>
+            </div>
+          </div>
+          <h3>阴影 Shadow</h3>
+          <div class="ds-demo">
+            <div class="ds-shadow-row">
+              <div class="ds-shadow-item"><div class="ds-shadow-box" style="box-shadow:var(--shadow-xs);"></div><div class="ds-shadow-label">xs</div></div>
+              <div class="ds-shadow-item"><div class="ds-shadow-box" style="box-shadow:var(--shadow-sm);"></div><div class="ds-shadow-label">sm</div></div>
+              <div class="ds-shadow-item"><div class="ds-shadow-box" style="box-shadow:var(--shadow-md);"></div><div class="ds-shadow-label">md</div></div>
+              <div class="ds-shadow-item"><div class="ds-shadow-box" style="box-shadow:var(--shadow-lg);"></div><div class="ds-shadow-label">lg</div></div>
+              <div class="ds-shadow-item"><div class="ds-shadow-box" style="box-shadow:var(--shadow-xl);"></div><div class="ds-shadow-label">xl</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Button -->
+        <section class="ds-section" id="sec-button">
+          <h2>5. Button</h2>
+          <h3>变体</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary">Primary</button>
+              <button class="btn btn-outline">Outline</button>
+              <button class="btn btn-secondary">Secondary</button>
+              <button class="btn btn-ghost">Ghost</button>
+              <button class="btn btn-destructive">Destructive</button>
+            </div>
+          </div>
+          <h3>尺寸</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary btn-sm">Small</button>
+              <button class="btn btn-primary">Default</button>
+              <button class="btn btn-primary btn-lg">Large</button>
+            </div>
+          </div>
+          <h3>禁用 + 图标按钮</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary" disabled>Disabled</button>
+              <button class="btn btn-outline">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                下载
+              </button>
+              <button class="btn btn-ghost" style="width:36px;padding:0;" title="图标按钮">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Badge -->
+        <section class="ds-section" id="sec-badge">
+          <h2>6. Badge</h2>
+          <h3>变体</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <span class="badge badge-primary">Primary</span>
+              <span class="badge badge-secondary">Secondary</span>
+              <span class="badge badge-destructive">Destructive</span>
+              <span class="badge badge-outline">Outline</span>
+            </div>
+          </div>
+          <h3>状态徽章（badgeHtml）</h3>
+          <div class="ds-demo" id="demo-badges"></div>
+          <h3>状态点徽章（badgeWithDot）</h3>
+          <div class="ds-demo" id="demo-badges-dot"></div>
+        </section>
+
+        <!-- 7. Card -->
+        <section class="ds-section" id="sec-card">
+          <h2>7. Card</h2>
+          <div class="ds-demo">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+              <div class="card">
+                <div class="card-h"><span class="card-t">默认 Card</span><span class="card-s">card-h 标题区</span></div>
+                <div class="card-pad">card-pad 内容区，带 20px/24px 内边距。Card 组件使用 rounded-xl + border + shadow-sm。</div>
+              </div>
+              <div class="card card-pad">
+                <div style="font-size:15px;font-weight:600;margin-bottom:6px;">card-pad 简写</div>
+                <div style="font-size:13px;color:var(--muted-foreground);">card + card-pad 一步到位，适用于无标题的简单卡片。</div>
+              </div>
+              <div class="kpi">
+                <div class="k"><span>今日交易额</span><span class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span></div>
+                <div class="v num">¥ 128,450.00</div>
+                <div class="d">较昨日 +12.5%</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. Table -->
+        <section class="ds-section" id="sec-table">
+          <h2>8. Table</h2>
+          <h3>基础表格 + 可点击行 + 选择</h3>
+          <div class="ds-demo" id="demo-table"></div>
+          <h3>空态</h3>
+          <div class="ds-demo">
+            <div class="table-wrap">
+              <table><thead><tr><th>ID</th><th>名称</th><th>状态</th></tr></thead>
+              <tbody><tr><td colspan="3" style="text-align:center;padding:32px;color:var(--muted-foreground);font-size:13px;">暂无数据</td></tr></tbody></table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. Form -->
+        <section class="ds-section" id="sec-form">
+          <h2>9. Form</h2>
+          <div class="ds-demo">
+            <div class="form-grid">
+              <div class="form-item">
+                <label class="lbl">文本输入</label>
+                <input type="text" class="input" placeholder="请输入内容">
+              </div>
+              <div class="form-item">
+                <label class="lbl">下拉选择</label>
+                <select class="select"><option>选项一</option><option>选项二</option><option>选项三</option></select>
+              </div>
+              <div class="form-item">
+                <label class="lbl">日期</label>
+                <input type="date" class="input">
+              </div>
+              <div class="form-item" style="grid-column:1/-1;">
+                <label class="lbl">多行文本</label>
+                <textarea class="input" rows="3" placeholder="请输入详细描述..."></textarea>
+              </div>
+            </div>
+            <div style="display:flex;gap:20px;align-items:center;margin-top:16px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" class="checkbox" checked> 同意服务条款
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" class="radio" name="ds-radio" checked> 选项 A
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="radio" class="radio" name="ds-radio"> 选项 B
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" class="switch" checked style="width:44px;height:24px;"> 启用通知
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 10. FilterBar -->
+        <section class="ds-section" id="sec-filterbar">
+          <h2>10. FilterBar</h2>
+          <div class="ds-demo" id="demo-filterbar"></div>
+          <div class="ds-desc" id="filterbar-result" style="margin-top:8px;">点击「查询」查看筛选值</div>
+        </section>
+
+        <!-- 11. Pagination -->
+        <section class="ds-section" id="sec-pagination">
+          <h2>11. Pagination</h2>
+          <div class="ds-demo" id="demo-pagination"></div>
+          <h3>0 条数据时自动隐藏</h3>
+          <div class="ds-demo">
+            <div id="demo-pagination-empty" style="min-height:32px;"></div>
+            <div class="ds-desc" style="margin-top:8px;">总条数为 0 时分页器容器自动清空隐藏。当前页按钮含 aria-current="page"，页码按钮支持键盘 Enter/Space 触发。</div>
+          </div>
+        </section>
+
+        <!-- 12. Tabs -->
+        <section class="ds-section" id="sec-tabs">
+          <h2>12. Tabs</h2>
+          <div class="ds-demo">
+            <div id="demo-tabs">
+              <div class="tabs">
+                <button class="tab active" data-tab="tab1">概览</button>
+                <button class="tab" data-tab="tab2">详情</button>
+                <button class="tab" data-tab="tab3">设置</button>
+              </div>
+              <div class="tab-panel active" data-panel="tab1">
+                <div style="font-size:14px;">这是「概览」标签页内容。Tabs 组件使用底部 2px 指示条，active 时 primary 色，区别于 .seg 分段控件。</div>
+              </div>
+              <div class="tab-panel" data-panel="tab2">
+                <div style="font-size:14px;">这是「详情」标签页内容。点击不同标签切换显示对应 .tab-panel，带 fade-in 动画。</div>
+              </div>
+              <div class="tab-panel" data-panel="tab3">
+                <div style="font-size:14px;">这是「设置」标签页内容。Admin.Tabs.init(container) 自动绑定所有 .tab 按钮与 .tab-panel。支持键盘 ← → 切换、Home/End 跳转，含 role="tablist"/aria-selected 等 ARIA 属性。</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 13. Drawer -->
+        <section class="ds-section" id="sec-drawer">
+          <h2>13. Drawer</h2>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary" id="btn-drawer-right">打开右侧抽屉</button>
+              <button class="btn btn-outline" id="btn-drawer-left">打开左侧抽屉</button>
+            </div>
+            <div class="ds-desc">Drawer 支持右侧（默认）/ 左侧变体，宽度默认 480px 最大 90vw。ESC / 遮罩点击 / 关闭按钮均可关闭。已补齐焦点陷阱（Tab 循环）、背景滚动锁定、ARIA role="dialog"、z-index 堆叠管理，CSS 类驱动 slide 动画。</div>
+          </div>
+        </section>
+
+        <!-- 14. Modal/Dialog -->
+        <section class="ds-section" id="sec-modal">
+          <h2>14. Modal / Dialog</h2>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary" id="btn-modal">打开 Modal</button>
+              <button class="btn btn-outline" id="btn-confirm">confirmDialog 演示</button>
+              <button class="btn btn-secondary" id="btn-confirm-loading">confirm loading 测试</button>
+            </div>
+            <div class="ds-desc">Admin.Modal 用于复杂表单/自定义内容场景（独立 .modal-overlay/.modal-dialog 类名，含焦点陷阱/动效/ARIA/滚动锁定/z-index）；confirmDialog 用于简单确认操作（API 向后兼容，新增 Escape/Enter/焦点陷阱/loading 防重复/动效）。</div>
+          </div>
+        </section>
+
+        <!-- 15. Toast -->
+        <section class="ds-section" id="sec-toast">
+          <h2>15. Toast</h2>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <button class="btn btn-primary" id="btn-toast-ok">Success Toast</button>
+              <button class="btn btn-destructive" id="btn-toast-err">Error Toast</button>
+              <button class="btn btn-outline" id="btn-toast-info">Info Toast</button>
+            </div>
+            <div class="ds-desc" style="margin-top:8px;">Toast 支持 ok/err/info 类型样式，多条垂直堆叠，3 秒自动消失，可点击 × 手动关闭。</div>
+          </div>
+        </section>
+
+        <!-- 16. Alert -->
+        <section class="ds-section" id="sec-alert">
+          <h2>16. Alert</h2>
+          <div class="ds-demo" style="display:flex;flex-direction:column;gap:10px;">
+            <div class="alert alert-default">
+              <span class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></span>
+              <div class="alert-body"><div class="alert-title">提示</div><div class="alert-desc">这是一条默认提示信息，用于一般性通知。</div></div>
+            </div>
+            <div class="alert alert-success">
+              <span class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>
+              <div class="alert-body"><div class="alert-title">操作成功</div><div class="alert-desc">数据已保存，更改将在所有终端同步生效。</div></div>
+            </div>
+            <div class="alert alert-warning">
+              <span class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+              <div class="alert-body"><div class="alert-title">注意</div><div class="alert-desc">当前操作可能影响线上数据，请确认后再执行。</div></div>
+            </div>
+            <div class="alert alert-destructive">
+              <span class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
+              <div class="alert-body"><div class="alert-title">错误</div><div class="alert-desc">操作失败：网络连接中断，请检查网络后重试。</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 17. Dropdown -->
+        <section class="ds-section" id="sec-dropdown">
+          <h2>17. Dropdown</h2>
+          <div class="ds-demo">
+            <div class="ds-demo-row">
+              <div class="dropdown">
+                <button class="btn btn-outline" id="dropdown-trigger">
+                  操作菜单
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="ds-desc">点击外部自动关闭，支持 Escape 键关闭、下方空间不足时自动向上展开防溢出、danger 样式项、分隔线、图标。</div>
+          </div>
+        </section>
+
+        <!-- 18. Tooltip -->
+        <section class="ds-section" id="sec-tooltip">
+          <h2>18. Tooltip</h2>
+          <div class="ds-demo">
+            <div class="ds-demo-row" style="gap:24px;">
+              <span class="tooltip">
+                <button class="btn btn-outline">悬停我（上方）</button>
+                <span class="tooltip-content">这是一条工具提示信息</span>
+              </span>
+              <span class="tooltip tooltip-bottom">
+                <button class="btn btn-outline">悬停我（下方）</button>
+                <span class="tooltip-content">底部方向的工具提示</span>
+              </span>
+              <span class="tooltip">
+                <span class="badge badge-outline">带问号</span>
+                <span class="tooltip-content">Tooltip 支持任意触发元素</span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 19. Avatar / Status Dot -->
+        <section class="ds-section" id="sec-avatar">
+          <h2>19. Avatar / Status Dot</h2>
+          <h3>Avatar Group</h3>
+          <div class="ds-demo">
+            <div class="avatar-group">
+              <span class="avatar">张</span>
+              <span class="avatar">李</span>
+              <span class="avatar">王</span>
+              <span class="avatar">赵</span>
+              <span class="avatar avatar-count">+8</span>
+            </div>
+          </div>
+          <h3>Status Dot</h3>
+          <div class="ds-demo">
+            <div class="ds-demo-row" style="gap:18px;">
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot ok"></span>正常</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot warn"></span>待处理</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot danger"></span>异常</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot info"></span>进行中</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot muted"></span>已停用</span>
+              <span style="display:flex;align-items:center;gap:6px;font-size:13px;"><span class="status-dot ok pulse"></span>实时（pulse）</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 20. Skeleton / Loading -->
+        <section class="ds-section" id="sec-skeleton">
+          <h2>20. Skeleton / Loading</h2>
+          <h3>骨架屏</h3>
+          <div class="ds-demo">
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div class="skeleton" style="height:20px;width:40%;"></div>
+              <div class="skeleton" style="height:14px;width:80%;"></div>
+              <div class="skeleton" style="height:14px;width:60%;"></div>
+              <div style="display:flex;gap:10px;margin-top:6px;">
+                <div class="skeleton" style="width:80px;height:32px;border-radius:var(--radius-md);"></div>
+                <div class="skeleton" style="width:80px;height:32px;border-radius:var(--radius-md);"></div>
+              </div>
+            </div>
+          </div>
+          <h3>加载遮罩</h3>
+          <div class="ds-demo">
+            <div class="loading-wrap" id="demo-loading" style="min-height:120px;border:1px solid var(--border);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:13px;color:var(--muted-foreground);">内容区域</span>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" id="btn-loading-show">显示加载</button>
+              <button class="btn btn-outline btn-sm" id="btn-loading-hide">隐藏加载</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 21. Empty State -->
+        <section class="ds-section" id="sec-empty">
+          <h2>21. Empty State</h2>
+          <div class="ds-demo" id="demo-empty"></div>
+        </section>
+
+        <!-- 22. 图表 -->
+        <section class="ds-section" id="sec-charts">
+          <h2>22. 图表</h2>
+          <h3>柱状图（.bars）</h3>
+          <div class="ds-demo">
+            <div class="bars">
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:65%;"></div></div><span class="l">一月</span><span class="tip">65%</span></div>
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:80%;"></div></div><span class="l">二月</span><span class="tip">80%</span></div>
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:45%;"></div></div><span class="l">三月</span><span class="tip">45%</span></div>
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:90%;"></div></div><span class="l">四月</span><span class="tip">90%</span></div>
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:70%;"></div></div><span class="l">五月</span><span class="tip">70%</span></div>
+              <div class="b"><div class="col-bar-wrap"><div class="col" style="height:55%;"></div></div><span class="l">六月</span><span class="tip">55%</span></div>
+            </div>
+          </div>
+          <h3>分布条（.dist）</h3>
+          <div class="ds-demo">
+            <div class="dist">
+              <div class="d-row"><span class="d-lbl">直接访问</span><div class="d-track"><div class="d-fill" style="width:45%;"></div></div><span class="d-pct">45%</span></div>
+              <div class="d-row"><span class="d-lbl">搜索引擎</span><div class="d-track"><div class="d-fill" style="width:30%;"></div></div><span class="d-pct">30%</span></div>
+              <div class="d-row"><span class="d-lbl">社交媒体</span><div class="d-track"><div class="d-fill" style="width:15%;"></div></div><span class="d-pct">15%</span></div>
+              <div class="d-row"><span class="d-lbl">其他渠道</span><div class="d-track"><div class="d-fill" style="width:10%;"></div></div><span class="d-pct">10%</span></div>
+            </div>
+          </div>
+          <h3>漏斗（.funnel）</h3>
+          <div class="ds-demo">
+            <div class="funnel">
+              <div class="f-row"><span class="n">浏览</span><div class="f-bar" style="position:relative;"><div style="position:absolute;inset:0;width:100%;background:var(--primary);border-radius:6px;"></div></div><span class="v num">10,000</span></div>
+              <div class="f-row"><span class="n">注册</span><div class="f-bar" style="position:relative;"><div style="position:absolute;inset:0;width:65%;background:var(--primary);border-radius:6px;"></div></div><span class="v num">6,500</span></div>
+              <div class="f-row"><span class="n">下单</span><div class="f-bar" style="position:relative;"><div style="position:absolute;inset:0;width:35%;background:var(--primary);border-radius:6px;"></div></div><span class="v num">3,500</span></div>
+              <div class="f-row"><span class="n">完成</span><div class="f-bar" style="position:relative;"><div style="position:absolute;inset:0;width:20%;background:var(--primary);border-radius:6px;"></div></div><span class="v num">2,000</span></div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /.ds-content -->
+    </div><!-- /.ds-layout -->
+  </main>
+</div>
+
+<script src="js/admin.js"></script>
+<script>
+/* 设计系统页交互演示初始化（在 admin:ready 后执行） */
+document.addEventListener('DOMContentLoaded', function () {
+  var A = window.Admin;
+
+  /* ---- 色板渲染 ---- */
+  var baseColors = [
+    { name: 'background', var: '--background', val: 'oklch(1 0 0)' },
+    { name: 'foreground', var: '--foreground', val: 'oklch(0.129 0.042 264.695)' },
+    { name: 'card', var: '--card', val: 'oklch(1 0 0)' },
+    { name: 'popover', var: '--popover', val: 'oklch(1 0 0)' },
+    { name: 'primary', var: '--primary', val: 'oklch(0.208 0.042 265.755)' },
+    { name: 'secondary', var: '--secondary', val: 'oklch(0.968 0.007 247.896)' },
+    { name: 'muted', var: '--muted', val: 'oklch(0.968 0.007 247.896)' },
+    { name: 'accent', var: '--accent', val: 'oklch(0.968 0.007 247.896)' },
+    { name: 'destructive', var: '--destructive', val: 'oklch(0.577 0.245 27.325)' },
+    { name: 'border', var: '--border', val: 'oklch(0.929 0.013 255.508)' }
+  ];
+  var semanticColors = [
+    { name: 'success', var: '--success', val: 'oklch(0.55 0.13 150)' },
+    { name: 'warning', var: '--warning', val: 'oklch(0.62 0.12 75)' },
+    { name: 'info', var: '--info', val: 'oklch(0.55 0.10 240)' },
+    { name: 'danger', var: '--danger', val: 'oklch(0.55 0.20 25)' },
+    { name: 'gold', var: '--gold', val: 'oklch(0.55 0.09 80)' }
+  ];
+  function renderSwatches(containerId, colors) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var html = '';
+    for (var i = 0; i < colors.length; i++) {
+      var c = colors[i];
+      html += '<div class="ds-swatch"><div class="sw-color" style="background:var(' + c.var + ');"></div>' +
+        '<div class="sw-info"><div class="sw-name">' + c.name + '</div>' +
+        '<div class="sw-val">' + c.val + '</div></div></div>';
+    }
+    el.innerHTML = html;
+  }
+  renderSwatches('swatch-base', baseColors);
+  renderSwatches('swatch-semantic', semanticColors);
+
+  /* ---- 状态徽章演示 ---- */
+  var badgeStatuses = ['active', 'pending', 'approved', 'rejected', 'processing', 'cancelled', 'published', 'risk'];
+  var badgeHtml = '';
+  var badgeDotHtml = '';
+  for (var bi = 0; bi < badgeStatuses.length; bi++) {
+    badgeHtml += '<span style="margin:3px;">' + A.badge(badgeStatuses[bi]) + '</span>';
+    badgeDotHtml += '<span style="margin:3px;">' + A.badgeWithDot(badgeStatuses[bi]) + '</span>';
+  }
+  document.getElementById('demo-badges').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + badgeHtml + '</div>';
+  document.getElementById('demo-badges-dot').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + badgeDotHtml + '</div>';
+
+  /* ---- TableRenderer 演示 ---- */
+  var tableData = [
+    { id: 1, name: '张三', role: '运营专员', status: 'active', amount: 12500 },
+    { id: 2, name: '李四', role: '财务主管', status: 'pending', amount: 8900 },
+    { id: 3, name: '王五', role: '风控分析师', status: 'active', amount: 15600 },
+    { id: 4, name: '赵六', role: '系统管理员', status: 'rejected', amount: 0 }
+  ];
+  A.TableRenderer.render({
+    container: '#demo-table',
+    columns: [
+      { key: 'id', label: 'ID', width: '60px', sortable: true },
+      { key: 'name', label: '姓名', sortable: true, render: function(row) {
+          return '<div class="td-main">' + row.name + '</div><div class="td-sub">' + row.role + '</div>';
+        }
+      },
+      { key: 'status', label: '状态', render: function(row) { return A.badge(row.status); } },
+      { key: 'amount', label: '金额', width: '120px', sortable: true, render: function(row) {
+          return '<span class="amt num">' + A.fmt(row.amount) + '</span>';
+        }
+      }
+    ],
+    data: tableData,
+    options: {
+      selectable: true,
+      rowClick: function(row) { A.toast('点击了行：' + row.name, 'ok'); },
+      onSort: function(key, dir) { A.toast('排序：' + key + ' ' + dir, 'info'); }
+    }
+  });
+
+  /* ---- FilterBar 演示 ---- */
+  A.FilterBar.render({
+    container: '#demo-filterbar',
+    fields: [
+      { key: 'status', label: '状态', type: 'select', options: [
+        { value: 'active', label: '生效中' },
+        { value: 'pending', label: '待审核' },
+        { value: 'rejected', label: '已驳回' }
+      ]},
+      { key: 'keyword', label: '关键词', type: 'text', placeholder: '输入名称搜索' },
+      { key: 'date', label: '日期', type: 'date' },
+      { key: 'range', label: '日期范围', type: 'daterange' }
+    ],
+    onFilter: function(vals) {
+      document.getElementById('filterbar-result').textContent = '筛选值：' + JSON.stringify(vals);
+      A.toast('筛选已应用', 'ok');
+    },
+    onReset: function() {
+      document.getElementById('filterbar-result').textContent = '已重置筛选条件';
+    }
+  });
+
+  /* ---- Pagination 演示 ---- */
+  new A.Paginator({
+    container: '#demo-pagination',
+    total: 156,
+    pageSize: 10,
+    onChange: function(page, pageSize) {
+      A.toast('切换到第 ' + page + ' 页（' + pageSize + ' 条/页）', 'info');
+    }
+  });
+  /* 0 条数据演示：自动隐藏 */
+  new A.Paginator({
+    container: '#demo-pagination-empty',
+    total: 0,
+    pageSize: 10,
+    onChange: function() {}
+  });
+
+  /* ---- Tabs 初始化 ---- */
+  A.Tabs.init('#demo-tabs');
+
+  /* ---- Drawer 演示 ---- */
+  document.getElementById('btn-drawer-right').onclick = function() {
+    A.Drawer.open({
+      title: '右侧抽屉详情',
+      content: '<div style="font-size:14px;line-height:1.8;">这是一个从右侧滑入的抽屉面板。<br><br>支持 HTML 字符串或 DOM 元素作为内容。<br>宽度默认 480px，最大 90vw。<br><br>ESC 键、点击遮罩、关闭按钮均可关闭。</div>',
+      footer: '<button class="btn btn-outline" onclick="this.closest(\'.drawer\').querySelector(\'.dh-close\').click()">取消</button><button class="btn btn-primary">保存</button>',
+      onClose: function() { A.toast('抽屉已关闭', 'info'); }
+    });
+  };
+  document.getElementById('btn-drawer-left').onclick = function() {
+    A.Drawer.open({
+      title: '左侧抽屉',
+      side: 'left',
+      width: '360px',
+      content: '<div style="font-size:14px;line-height:1.8;">这是从左侧滑入的抽屉变体（.drawer-left）。<br><br>适用于导航菜单、筛选面板等场景。</div>'
+    });
+  };
+
+  /* ---- Modal 演示 — 使用 instance.close() API（独立类名 .modal-overlay/.modal-dialog） ---- */
+  document.getElementById('btn-modal').onclick = function() {
+    var inst = A.Modal.open({
+      title: '编辑用户信息',
+      content: '<div class="form-grid" style="gap:14px;">' +
+        '<div class="form-item"><label class="lbl">用户名</label><input type="text" class="input" value="张三"></div>' +
+        '<div class="form-item"><label class="lbl">邮箱</label><input type="email" class="input" value="zhangsan@example.com"></div>' +
+        '<div class="form-item"><label class="lbl">角色</label><select class="select"><option>运营专员</option><option>财务主管</option><option>管理员</option></select></div>' +
+        '</div>',
+      footer: '<button class="btn btn-outline" data-modal-close>取消</button><button class="btn btn-primary" data-modal-save>保存修改</button>',
+      onClose: function() { A.toast('Modal 已关闭', 'info'); }
+    });
+    setTimeout(function() {
+      var dlg = inst.dialog;
+      var closeBtn = dlg.querySelector('[data-modal-close]');
+      if (closeBtn) closeBtn.addEventListener('click', function() { inst.close(); });
+      var saveBtn = dlg.querySelector('[data-modal-save]');
+      if (saveBtn) saveBtn.addEventListener('click', function() {
+        A.toast('保存成功', 'ok');
+        inst.close();
+      });
+    }, 50);
+  };
+
+  /* ---- confirmDialog 演示 — 标准确认 + loading/async 测试 ---- */
+  document.getElementById('btn-confirm').onclick = function() {
+    A.confirm({
+      title: '确认删除',
+      body: '此操作将永久删除该条记录，删除后不可恢复。是否继续？<br><br>测试：ESC 关闭 / 遮罩点击关闭 / Enter 确认 / Tab 焦点循环 / danger 时焦点在取消按钮。',
+      ok: '确认删除',
+      danger: true,
+      onYes: function() { A.toast('已删除', 'ok'); },
+      onNo: function() { A.toast('已取消', 'info'); }
+    });
+  };
+  /* loading 态测试：onYes 返回 Promise，确认按钮显示 spinner + "处理中…"，期间禁止重复点击 */
+  var btnConfirmLoading = document.getElementById('btn-confirm-loading');
+  if (btnConfirmLoading) btnConfirmLoading.onclick = function() {
+    A.confirm({
+      title: '批量审批',
+      body: '将批量审批 12 条待审核记录，模拟异步操作（2 秒）。确认按钮进入 loading 态，禁止重复提交。',
+      ok: '开始审批',
+      onYes: function() {
+        return new Promise(function(resolve) {
+          setTimeout(function() {
+            A.toast('12 条记录已审批完成', 'ok');
+            resolve();
+          }, 2000);
+        });
+      },
+      onNo: function() { A.toast('已取消批量审批', 'info'); }
+    });
+  };
+
+  /* ---- Toast 演示 ---- */
+  document.getElementById('btn-toast-ok').onclick = function() { A.toast('操作成功完成', 'ok'); };
+  document.getElementById('btn-toast-err').onclick = function() { A.toast('操作失败，请重试', 'err'); };
+  document.getElementById('btn-toast-info').onclick = function() { A.toast('这是一条提示信息', 'info'); };
+
+  /* ---- Dropdown 演示 ---- */
+  A.Dropdown.create({
+    trigger: '#dropdown-trigger',
+    items: [
+      { label: '查看详情', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>', onClick: function() { A.toast('查看详情', 'info'); } },
+      { label: '编辑', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>', onClick: function() { A.toast('编辑', 'info'); } },
+      { label: '导出数据', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>', onClick: function() { A.toast('导出中...', 'ok'); } },
+      { sep: true },
+      { label: '删除', danger: true, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>', onClick: function() { A.toast('已删除', 'err'); } }
+    ]
+  });
+
+  /* ---- LoadingState 演示 ---- */
+  document.getElementById('btn-loading-show').onclick = function() {
+    A.LoadingState.show('#demo-loading');
+  };
+  document.getElementById('btn-loading-hide').onclick = function() {
+    A.LoadingState.hide('#demo-loading');
+  };
+
+  /* ---- EmptyState 演示 ---- */
+  document.getElementById('demo-empty').innerHTML = A.EmptyState.html({
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>',
+    title: '暂无数据',
+    desc: '当前筛选条件下没有匹配的记录。尝试调整筛选条件，或点击下方按钮创建新记录。',
+    action: '<button class="btn btn-primary btn-sm">新建记录</button>'
+  });
+
+  console.log('[design-system] 所有组件演示初始化完成');
+});
+</script>
+</body>
+</html>

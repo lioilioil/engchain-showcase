@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>浏览历史 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   浏览历史 V1.0
+   与个人中心一致的设计语言，明/暗双模式自动适配
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --vh-gold: #C9A961;
+  --vh-gold-deep: #A98A47;
+  --vh-bg: #F2EFE8;
+  --vh-card: rgba(255,255,255,0.78);
+  --vh-border: rgba(201,169,97,0.16);
+  --vh-text: #2A2722;
+  --vh-text-2: #6B6358;
+  --vh-text-3: #9A9185;
+  --vh-shadow: 0 1px 2px rgba(42,39,34,0.04), 0 2px 8px rgba(42,39,34,0.03);
+}
+[data-theme="dark"] {
+  --vh-gold: #D4B876;
+  --vh-gold-deep: #B89A5A;
+  --vh-bg: #0E0D0B;
+  --vh-card: rgba(32,30,27,0.72);
+  --vh-border: rgba(201,169,97,0.12);
+  --vh-text: #F0EBE0;
+  --vh-text-2: #B0A898;
+  --vh-text-3: #7A7265;
+  --vh-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+body, .phone { background: var(--vh-bg); }
+.phone::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 240px;
+  background: radial-gradient(ellipse at center, rgba(201,169,97,0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 导航栏 */
+.vh-navbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 8px 0 4px;
+  flex: 0 0 auto;
+}
+.vh-nav-back {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: var(--vh-text);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+.vh-nav-back:active { background: rgba(201,169,97,0.12); }
+.vh-nav-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--vh-text);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.vh-nav-clear {
+  font-size: 13px;
+  color: var(--vh-gold-deep);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+.vh-nav-clear:active { background: rgba(201,169,97,0.12); }
+.vh-nav-clear:disabled { color: var(--vh-text-4); cursor: default; }
+
+/* 内容区 */
+.vh-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 100px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 日期分组标题 */
+.vh-date-group {
+  font-size: 12px;
+  color: var(--vh-text-3);
+  font-weight: 600;
+  margin: 16px 0 8px;
+  padding-left: 2px;
+  letter-spacing: 0.3px;
+}
+.vh-date-group:first-child { margin-top: 8px; }
+
+/* 历史记录卡片 */
+.vh-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--vh-card);
+  border: 1px solid var(--vh-border);
+  box-shadow: var(--vh-shadow);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+}
+.vh-card:active { transform: scale(0.98); }
+.vh-card-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(201,169,97,0.15), rgba(201,169,97,0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vh-gold-deep);
+}
+.vh-card-icon svg { width: 22px; height: 22px; }
+.vh-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.vh-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--vh-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.vh-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--vh-text-3);
+}
+.vh-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--vh-text-4); }
+.vh-card-price {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--vh-gold-deep);
+}
+.vh-card-price .unit { font-size: 10px; font-weight: 500; color: var(--vh-text-3); }
+
+/* 空状态 */
+.vh-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+.vh-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(201,169,97,0.12), rgba(201,169,97,0.04));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vh-gold-deep);
+  margin-bottom: 16px;
+}
+.vh-empty-icon svg { width: 32px; height: 32px; opacity: 0.6; }
+.vh-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--vh-text);
+  margin-bottom: 6px;
+}
+.vh-empty-desc {
+  font-size: 12.5px;
+  color: var(--vh-text-3);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.vh-empty-btn {
+  padding: 11px 36px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--vh-gold), var(--vh-gold-deep));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(201,169,97,0.3);
+}
+.vh-empty-btn:active { transform: scale(0.97); }
+
+/* 确认弹窗 */
+.vh-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.vh-confirm-overlay.show { opacity: 1; }
+.vh-confirm-box {
+  width: 280px;
+  border-radius: 16px;
+  background: var(--vh-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--vh-border);
+  padding: 24px 20px 16px;
+  text-align: center;
+  transform: scale(0.9);
+  transition: transform 0.2s;
+}
+.vh-confirm-overlay.show .vh-confirm-box { transform: scale(1); }
+.vh-confirm-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--vh-text);
+  margin-bottom: 8px;
+}
+.vh-confirm-desc {
+  font-size: 13px;
+  color: var(--vh-text-2);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.vh-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+.vh-confirm-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+}
+.vh-confirm-btn:active { opacity: 0.8; }
+.vh-confirm-cancel {
+  background: var(--vh-bg);
+  color: var(--vh-text-2);
+  border: 1px solid var(--vh-border);
+}
+.vh-confirm-ok {
+  background: linear-gradient(135deg, var(--vh-gold), var(--vh-gold-deep));
+  color: #fff;
+}
+</style>
+</head>
+<body data-tab="me">
+<div class="phone">
+  <!-- 导航栏 -->
+  <div class="vh-navbar">
+    <button class="vh-nav-back" onclick="history.back()">‹</button>
+    <div class="vh-nav-title">浏览历史</div>
+    <button class="vh-nav-clear" id="clear-btn" onclick="confirmClear()">清除历史</button>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="vh-content" id="vh-content"></div>
+</div>
+
+<!-- 确认清除弹窗 -->
+<div class="vh-confirm-overlay" id="confirm-overlay">
+  <div class="vh-confirm-box">
+    <div class="vh-confirm-title">清除浏览历史</div>
+    <div class="vh-confirm-desc">确定要清除全部浏览历史吗？<br>此操作不可撤销。</div>
+    <div class="vh-confirm-btns">
+      <button class="vh-confirm-btn vh-confirm-cancel" onclick="hideConfirm()">取消</button>
+      <button class="vh-confirm-btn vh-confirm-ok" onclick="doClear()">确定清除</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var content = document.getElementById('vh-content');
+  var clearBtn = document.getElementById('clear-btn');
+
+  /* 分类图标映射 */
+  var CAT_ICONS = {
+    cooperation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    material: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+    equipment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+    labor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+    agency: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    default: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>'
+  };
+
+  /* 格式化时间为分组标签 */
+  function formatDateGroup(ts) {
+    var d = new Date(ts);
+    var now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var itemDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var diffDays = Math.floor((today - itemDay) / (24 * 60 * 60 * 1000));
+    if (diffDays === 0) return '今天';
+    if (diffDays === 1) return '昨天';
+    if (diffDays <= 7) return diffDays + '天前';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
+  /* 格式化具体时间 */
+  function formatTime(ts) {
+    var d = new Date(ts);
+    var h = d.getHours();
+    var m = d.getMinutes();
+    return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+  }
+
+  /* 渲染历史列表 */
+  function render() {
+    var items = [];
+    try { items = window.ViewHistory ? ViewHistory.list() : []; } catch (e) { items = []; }
+
+    /* 清除按钮状态 */
+    clearBtn.disabled = items.length === 0;
+    clearBtn.style.opacity = items.length === 0 ? '0.4' : '1';
+
+    if (items.length === 0) {
+      content.innerHTML =
+        '<div class="vh-empty">' +
+          '<div class="vh-empty-icon">' + CAT_ICONS.default + '</div>' +
+          '<div class="vh-empty-title">暂无浏览记录</div>' +
+          '<div class="vh-empty-desc">去发现页看看，找到你需要的<br>建筑供需信息</div>' +
+          '<button class="vh-empty-btn" onclick="location.href=\'../supply/list.html\'">去发现</button>' +
+        '</div>';
+      return;
+    }
+
+    /* 按日期分组 */
+    var groups = {};
+    items.forEach(function (it) {
+      var g = formatDateGroup(it.viewedAt);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(it);
+    });
+
+    var html = '';
+    Object.keys(groups).forEach(function (g) {
+      html += '<div class="vh-date-group">' + g + '</div>';
+      groups[g].forEach(function (it) {
+        var icon = CAT_ICONS[it.bizKey] || CAT_ICONS.default;
+        var price = it.price ? it.price : '面议';
+        var priceUnit = it.price && it.price.indexOf('/') > -1 ? '' : '';
+        var metaParts = [];
+        if (it.city) metaParts.push(it.city);
+        if (it.cat) metaParts.push(it.cat);
+        metaParts.push(formatTime(it.viewedAt));
+        var meta = metaParts.join(' <span class="dot"></span> ');
+        html +=
+          '<a class="vh-card" href="../supply/detail.html?id=' + encodeURIComponent(it.id) + '">' +
+            '<div class="vh-card-icon">' + icon + '</div>' +
+            '<div class="vh-card-body">' +
+              '<div class="vh-card-title">' + (it.title || '未命名条目') + '</div>' +
+              '<div class="vh-card-meta">' + meta + '</div>' +
+            '</div>' +
+            '<div class="vh-card-price">' + price + '</div>' +
+          '</a>';
+      });
+    });
+
+    content.innerHTML = html;
+  }
+
+  /* 确认清除 */
+  window.confirmClear = function () {
+    document.getElementById('confirm-overlay').classList.add('show');
+  };
+  window.hideConfirm = function () {
+    document.getElementById('confirm-overlay').classList.remove('show');
+  };
+  window.doClear = function () {
+    try { if (window.ViewHistory) ViewHistory.clear(); } catch (e) {}
+    hideConfirm();
+    render();
+  };
+
+  /* 监听跨标签页历史变更 */
+  window.addEventListener('engchain:view-history', function () { render(); });
+  window.addEventListener('engchain:view-history-clear', function () { render(); });
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'engchain-view-history') render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

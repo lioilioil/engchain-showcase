@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/refund/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>申请退款 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">申请退款</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:100px;">
+
+    <!-- 退款模式 -->
+    <div class="section-title" style="margin-top:2px;"><div class="st-left">退款模式</div></div>
+    <div class="seg" id="mode">
+      <div class="seg-item active is-on" data-m="order">订单退款</div>
+      <div class="seg-item" data-m="balance">余额退款</div>
+    </div>
+
+    <!-- 订单列表（订单模式） -->
+    <div id="order-block">
+      <div class="section-title" style="margin-top:16px;"><div class="st-left">选择订单</div></div>
+      <div class="group" id="order-list"></div>
+    </div>
+
+    <!-- 退款原因 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">退款原因</div></div>
+    <div class="group">
+      <div id="reason-list" style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <!-- 退款金额 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">退款金额</div></div>
+    <div class="card">
+      <div class="fb-between"><span class="text-2 fs-13">可退金额</span><span class="mono fw-700" id="r-amount">¥0.00</span></div>
+      <div class="fb-between" style="margin-top:8px;"><span class="text-2 fs-13">退回方式</span><span class="fw-600 fs-13" id="r-back">原路退回</span></div>
+      <div class="text-3 fs-12" style="margin-top:10px;line-height:1.7;">退款将在审核通过后 <b>T+1</b> 退回原支付账户；已解锁、已对接、已产生交易的订单不支持退款。</div>
+    </div>
+
+    <!-- 凭证上传 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">凭证（选填）</div></div>
+    <div class="upload-box" id="upload" onclick="pick()" role="button" tabindex="0">
+      <svg class="ic"><use href="#i-upload"/></svg>
+      <div class="text-3 fs-12">点击上传订单截图 / 沟通记录</div>
+    </div>
+  </div>
+
+  <div class="fixed-cta"><button class="btn btn-primary btn-block btn-lg" onclick="submit()">提交退款申请</button></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var r = MOCK.business.refund;         /* 7 天无理由 */
+  var w = MOCK.business.withdraw;
+
+  /* 演示订单（内容非业务常量，M3 对齐积分/入驻费口径） */
+  var ORDERS = [
+    { id: 'EC202608300042', desc: '商品混凝土 C30 · 98 积分解锁', amt: 98,  date: '2026-08-30', ok: true },
+    { id: 'EC202608270088', desc: '充值 ¥580 · 1000 积分',        amt: 580, date: '2026-08-27', ok: true },
+    { id: 'EC202608280121', desc: '建筑企业入驻费 · 按次',          amt: 3999, date: '2026-08-28', ok: false }
+  ];
+  var BALANCE = { amount: 1086.50, back: '退回余额卡' };
+
+  var mode = 'order';
+  var selOrder = null;
+  var selReason = null;
+  var uploaded = false;
+
+  function money(n) { return '¥' + (n || 0).toLocaleString(); }
+
+  /* ---- 退款模式切换 ---- */
+  document.querySelectorAll('#mode .seg-item').forEach(function (el) {
+    el.onclick = function () {
+      document.querySelectorAll('#mode .seg-item').forEach(function (x) { x.classList.remove('active', 'is-on'); });
+      el.classList.add('active', 'is-on');
+      mode = el.dataset.m;
+      document.getElementById('order-block').style.display = mode === 'order' ? '' : 'none';
+      document.getElementById('r-back').textContent = mode === 'order' ? '原路退回' : BALANCE.back;
+      renderAmount();
+    };
+  });
+
+  /* ---- 订单列表 ---- */
+  document.getElementById('order-list').innerHTML = ORDERS.map(function (o, i) {
+    return '<div class="row" data-i="' + i + '" onclick="pickOrder(' + i + ')" style="cursor:pointer;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div class="fw-600 fs-14 elip">' + o.desc + '</div>' +
+        '<div class="text-3 fs-11 mt-1">' + o.id + ' · ' + o.date + (o.ok ? '' : ' · <span style="color:var(--text-2)">已使用</span>') + '</div>' +
+      '</div>' +
+      (o.ok ? '<span class="mono fw-600 fs-13" style="margin-left:10px;">' + money(o.amt) + '</span>' : '<span class="tag tag-gray">不可退</span>') +
+      '<span class="arrow">›</span>' +
+    '</div>';
+  }).join('');
+
+  window.pickOrder = function (i) {
+    var o = ORDERS[i];
+    if (!o.ok) { UI.toast('该订单已使用，暂不可退款', 'warn'); return; }
+    selOrder = o;
+    document.querySelectorAll('#order-list .row').forEach(function (rd, x) { rd.style.background = x === i ? 'var(--bg-card-2)' : ''; });
+    renderAmount();
+  };
+
+  /* ---- 退款原因 ---- */
+  var reasons = ['未解锁使用', '解锁后无帮助', '重复扣款', '信息不实', '服务未达预期', '其他'];
+  document.getElementById('reason-list').innerHTML = reasons.map(function (t, i) {
+    return '<span class="reason-chip" data-i="' + i + '" onclick="pickReason(' + i + ')">' + t + '</span>';
+  }).join('');
+
+  window.pickReason = function (i) {
+    document.querySelectorAll('.reason-chip').forEach(function (c, x) { c.classList.toggle('active', x === i); });
+    selReason = reasons[i];
+  };
+
+  /* ---- 金额 ---- */
+  function renderAmount() {
+    var amt = mode === 'order' ? (selOrder ? selOrder.amt : 0) : BALANCE.amount;
+    document.getElementById('r-amount').textContent = money(amt);
+  }
+
+  /* ---- 凭证 ---- */
+  window.pick = function () {
+    uploaded = !uploaded;
+    var u = document.getElementById('upload');
+    u.classList.toggle('done', uploaded);
+    u.querySelector('.fs-12').textContent = uploaded ? '已上传 1 张凭证（模拟）' : '点击上传订单截图 / 沟通记录';
+  };
+
+  /* ---- 提交 ---- */
+  window.submit = function () {
+    if (mode === 'order' && !selOrder) { UI.toast('请选择要退款的订单', 'warn'); return; }
+    if (!selReason) { UI.toast('请选择退款原因', 'warn'); return; }
+    var amt = mode === 'order' ? (selOrder ? selOrder.amt : 0) : BALANCE.amount;
+    var who = mode === 'order' ? (selOrder ? selOrder.desc : '') : '余额';
+    UI.dialog({
+      title: '提交退款申请', ok: '确认提交', cancel: '取消',
+      text: '将就「<b style="color:var(--text-1)">' + who + '</b>」申请退款 <b style="color:var(--primary)">' + money(amt) + '</b>，原因：' + selReason + '。' + r.days + ' 天未使用可保障退回余额，是否提交？',
+      onOk: function () { UI.toast('退款申请已提交', 'ok'); setTimeout(function () { history.back(); }, 900); }
+    });
+  };
+
+  renderAmount();
+})();
+</script>
+<style>
+  .reason-chip { padding:8px 14px; border-radius:999px; border:1px solid var(--line); font-size:12px; color:var(--text-2); background:var(--bg-card); cursor:pointer; transition:background var(--d-fast), color var(--d-fast), border-color var(--d-fast); }
+  .reason-chip.active { color:var(--primary); border-color:var(--primary); background:var(--primary-soft); }
+  .upload-box { border:1.5px dashed var(--line-strong); border-radius:14px; padding:26px 16px; display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--text-3); cursor:pointer; transition:border-color var(--d-fast), color var(--d-fast); }
+  .upload-box svg { width:24px; height:24px; }
+  .upload-box.done { border-color:var(--primary); color:var(--primary); }
+</style>
+</body>
+</html>

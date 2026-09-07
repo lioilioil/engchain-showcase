@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发票管理 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="finance/invoice.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>发票管理</h1>
+        <div class="sub">资金中心 · 开票申请审核 / 通过开票 / 驳回（engchain-invoices，全链路数据驱动，与 App 发票页同源）</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出发票记录为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">发票申请列表</span>
+        <span class="card-s" id="inv-count"></span>
+      </div>
+      <div id="inv-filter"></div>
+      <div id="inv-table"></div>
+      <div id="inv-pager"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script src="../../js/domain.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(ts) {
+    if (!ts) return '';
+    if (typeof ts === 'string' && ts.length <= 10) return ts;
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function monthStart() { var d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d.getTime(); }
+
+  /* 状态归一化：shipped→issued, void→rejected */
+  function normStatus(s) {
+    if (s === 'shipped') return 'issued';
+    if (s === 'void') return 'rejected';
+    return s || 'pending';
+  }
+
+  var ST_LABEL = { pending: '待审核', invoicing: '开票中', issued: '已开票', done: '已开票', rejected: '已驳回' };
+
+  var state = { filters: { status: '', invType: '', date_start: '', date_end: '', keyword: '' }, page: 1, pageSize: 10, paginator: null };
+
+  function allInvoices() {
+    try {
+      if (window.DataBus && DataBus.invoiceList) return DataBus.invoiceList();
+      if (window.DataBus && DataBus.invoices) return DataBus.invoices();
+    } catch (e) {}
+    return [];
+  }
+
+  function filtered() {
+    var f = state.filters;
+    return allInvoices().filter(function (x) {
+      var ns = normStatus(x.status);
+      if (f.status && ns !== f.status) return false;
+      if (f.invType && (x.type || '') !== f.invType) return false;
+      if (f.keyword) {
+        var kw = f.keyword.toLowerCase();
+        var hay = (x.id + ' ' + (x.title || '') + ' ' + (x.tax || '') + ' ' + (x.orderId || '') + ' ' + (x.invoiceNo || '')).toLowerCase();
+        if (hay.indexOf(kw) < 0) return false;
+      }
+      var t = x.ts ? new Date(x.ts).getTime() : (x.applyAt ? new Date(String(x.applyAt).replace(/-/g, '/')).getTime() : 0);
+      if (f.date_start && t < new Date(f.date_start + 'T00:00:00').getTime()) return false;
+      if (f.date_end && t > new Date(f.date_end + 'T23:59:59').getTime()) return false;
+      return true;
+    });
+  }
+
+  /* ---------- KPI ---------- */
+  function renderKPI() {
+    var inv = allInvoices();
+    var n = { pending: 0, issued: 0, rejected: 0 };
+    var amt = { pending: 0, issued: 0 };
+    var ms = monthStart();
+    var monthAmt = 0;
+    inv.forEach(function (x) {
+      var s = normStatus(x.status);
+      if (s in n) n[s]++;
+      if (s === 'pending') amt.pending += (x.amount || 0);
+      if (s === 'issued') {
+        amt.issued += (x.amount || 0);
+        var it = x.issuedAt ? new Date(x.issuedAt).getTime() : (x.ts ? new Date(x.ts).getTime() : 0);
+        if (it >= ms) monthAmt += (x.amount || 0);
+      }
+    });
+    var cards = [
+      ['待开票', n.pending + ' 笔 · ' + money(amt.pending), 'warn', '待财务审核开票'],
+      ['已开票', n.issued + ' 笔 · ' + money(amt.issued), 'up', '发票已开具并发送'],
+      ['本月开票金额', money(monthAmt), 'gold', '当月已开票合计'],
+      ['已驳回', n.rejected + ' 笔', 'down', '资料不符或金额异常']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + k[2] + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- 表格 ---------- */
+  function statusBadge(status) {
+    var ns = normStatus(status);
+    return Admin.badgeWithDot(ns) || ('<span class="badge badge-outline">' + esc(ST_LABEL[ns] || ns) + '</span>');
+  }
+
+  function opButtons(x) {
+    var ns = normStatus(x.status);
+    if (ns === 'pending') {
+      return '<button class="btn btn-sm btn-primary" data-perm="payout" data-act="approve" data-id="' + esc(x.id) + '">通过开票</button>' +
+             '<button class="btn btn-sm btn-ghost" data-perm="payout" data-act="reject" data-id="' + esc(x.id) + '">驳回</button>';
+    }
+    if (ns === 'rejected') return '<span class="text-2 fs-12">' + esc(x.rejectNote || x.note || '已驳回') + '</span>';
+    return '<span class="text-2 fs-12">已完成</span>';
+  }
+
+  function renderTable() {
+    var list = filtered();
+    $('#inv-count').textContent = list.length + ' 条申请';
+    var start = (state.page - 1) * state.pageSize;
+    var pageData = list.slice(start, start + state.pageSize);
+
+    Admin.TableRenderer.render({
+      container: '#inv-table',
+      columns: [
+        { key: 'id', label: '申请单号', width: '150px', render: function (r) { return '<span class="mono">' + esc(r.id) + '</span>'; } },
+        { key: 'title', label: '申请公司', width: '180px', render: function (r) { return esc(r.title || '—'); } },
+        { key: 'amount', label: '金额', width: '110px', render: function (r) { return '<b>' + money(r.amount) + '</b>'; } },
+        { key: 'type', label: '发票类型', width: '130px', render: function (r) { return esc(r.type || '增值税普通发票'); } },
+        { key: 'status', label: '状态', width: '100px', render: function (r) { return statusBadge(r.status); } },
+        { key: 'applyAt', label: '申请时间', width: '130px', render: function (r) { return fmtDate(r.ts || r.applyAt); } },
+        { key: 'ops', label: '操作', width: '180px', render: function (r) { return opButtons(r); } }
+      ],
+      data: pageData,
+      options: { rowClick: function (row) { openDetail(row); }, emptyText: '暂无发票申请' }
+    });
+    if (Admin.applyPerms) Admin.applyPerms();
+
+    if (!state.paginator) {
+      state.paginator = new Admin.Paginator({
+        container: '#inv-pager', total: list.length, pageSize: state.pageSize,
+        onChange: function (p, ps) { state.page = p; state.pageSize = ps; renderTable(); }
+      });
+    } else { state.paginator.pageSize = state.pageSize; state.paginator.setTotal(list.length); }
+  }
+
+  function timelineHtml(x) {
+    var ns = normStatus(x.status);
+    var items = [{ t: fmtDate(x.ts || x.applyAt), label: '提交申请', desc: esc(x.title || '') + ' · ' + money(x.amount) }];
+    if (ns === 'issued' || x.issuedAt) items.push({ t: fmtDate(x.issuedAt || x.ts), label: '开票完成', desc: '发票号 ' + esc(x.invoiceNo || '系统生成') + ' · 已发送至 ' + esc(x.email || '用户邮箱') });
+    if (ns === 'rejected' || x.rejectedAt) items.push({ t: fmtDate(x.rejectedAt || x.ts), label: '已驳回', desc: esc(x.rejectNote || x.note || '驳回') });
+    return '<div class="timeline">' + items.map(function (it) {
+      return '<div class="tl-item"><div class="tl-dot"></div><div class="tl-content"><div class="tl-label">' + it.label + '</div><div class="tl-desc">' + it.desc + '</div><div class="tl-time">' + it.t + '</div></div></div>';
+    }).join('') + '</div>';
+  }
+
+  function openDetail(x) {
+    var ns = normStatus(x.status);
+    var html = '<div class="drawer-section"><div class="ds-title">开票信息</div>' +
+      '<div class="ds-grid">' +
+        '<div class="ds-item"><span class="ds-k">申请单号</span><span class="ds-v mono">' + esc(x.id) + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">申请公司</span><span class="ds-v">' + esc(x.title || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">税号</span><span class="ds-v mono">' + esc(x.tax || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">发票类型</span><span class="ds-v">' + esc(x.type || '增值税普通发票') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">开票金额</span><span class="ds-v"><b>' + money(x.amount) + '</b></span></div>' +
+        '<div class="ds-item"><span class="ds-k">当前状态</span><span class="ds-v">' + statusBadge(x.status) + '</span></div>' +
+        (x.email ? '<div class="ds-item"><span class="ds-k">接收邮箱</span><span class="ds-v">' + esc(x.email) + '</span></div>' : '') +
+        (x.orderId ? '<div class="ds-item"><span class="ds-k">关联订单</span><span class="ds-v mono">' + esc(x.orderId) + '</span></div>' : '') +
+        (x.address ? '<div class="ds-item"><span class="ds-k">注册地址</span><span class="ds-v">' + esc(x.address) + '</span></div>' : '') +
+        (x.bank ? '<div class="ds-item"><span class="ds-k">开户银行</span><span class="ds-v">' + esc(x.bank) + '</span></div>' : '') +
+        (x.phone ? '<div class="ds-item"><span class="ds-k">联系电话</span><span class="ds-v">' + esc(x.phone) + '</span></div>' : '') +
+      '</div></div>';
+
+    if (ns === 'issued') {
+      html += '<div class="drawer-section"><div class="ds-title">发票信息</div>' +
+        '<div class="ds-grid">' +
+          '<div class="ds-item"><span class="ds-k">发票号</span><span class="ds-v mono"><b>' + esc(x.invoiceNo || '系统已生成') + '</b></span></div>' +
+          '<div class="ds-item"><span class="ds-k">开票时间</span><span class="ds-v">' + fmtDate(x.issuedAt || x.ts) + '</span></div>' +
+        '</div>' +
+        '<div class="invoice-preview"><div class="inv-doc"><div class="inv-header">增值税发票</div><div class="inv-body"><div class="inv-row"><span>发票号</span><span>' + esc(x.invoiceNo || 'INV-' + x.id) + '</span></div><div class="inv-row"><span>抬头</span><span>' + esc(x.title || '') + '</span></div><div class="inv-row"><span>税号</span><span>' + esc(x.tax || '') + '</span></div><div class="inv-row"><span>金额</span><span>' + money(x.amount) + '</span></div><div class="inv-row"><span>开票日期</span><span>' + fmtDate(x.issuedAt || x.ts).slice(0, 10) + '</span></div></div><div class="inv-footer">此为票面预览，实际 PDF 以财务系统开具为准</div></div></div>' +
+        '</div>';
+    }
+
+    if (ns === 'rejected') {
+      html += '<div class="drawer-section"><div class="ds-title">驳回原因</div><div class="alert alert-danger">' + esc(x.rejectNote || x.note || '未填写') + '</div></div>';
+    }
+
+    html += '<div class="drawer-section"><div class="ds-title">审核记录</div>' + timelineHtml(x) + '</div>';
+
+    var footer = '';
+    if (ns === 'pending') {
+      footer = '<button class="btn btn-primary" data-perm="payout" data-act="approve" data-id="' + esc(x.id) + '">通过开票</button>' +
+               '<button class="btn btn-ghost" data-perm="payout" data-act="reject" data-id="' + esc(x.id) + '">驳回</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '发票详情 · ' + x.id, content: html, footer: footer, width: '560px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    if (footer) {
+      drawer.panel.querySelectorAll('button[data-act]').forEach(function (btn) {
+        btn.onclick = function () {
+          var act = btn.getAttribute('data-act'), id = btn.getAttribute('data-id');
+          drawer.close();
+          if (act === 'approve') approveInv(id);
+          else if (act === 'reject') rejectInv(id);
+        };
+      });
+    }
+  }
+
+  function approveInv(id) {
+    var x = null;
+    allInvoices().forEach(function (i) { if (i.id === id) x = i; });
+    if (!x) return;
+    Admin.confirm({
+      title: '通过开票 · ' + money(x.amount),
+      body: '确认该发票申请信息无误，通过审核并开具发票？<br>抬头：<b>' + esc(x.title || '') + '</b><br>税号：' + esc(x.tax || '') + '<br>金额：' + money(x.amount) + '<br>开具后将自动生成发票号并标记为已开票。',
+      ok: '确认通过',
+      onYes: function () {
+        var r = DataBus.invoiceApprove(id);
+        if (r) {
+          Admin.toast('已通过开票，发票号已生成', 'success');
+          Admin.log('发票通过', '发票管理', id, money(x.amount));
+        } else { Admin.toast('开票操作失败', 'error'); }
+        render();
+      }
+    });
+  }
+
+  function rejectInv(id) {
+    Admin.confirm({
+      title: '驳回开票申请',
+      body: '<div class="form-item"><label>驳回原因</label><input class="input" id="reject-note" placeholder="如：抬头信息有误、金额超出可开票范围、税号格式错误" maxlength="50"></div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = '';
+        try { note = document.getElementById('reject-note').value.trim() || '资料不完整'; } catch (e) {}
+        var r = DataBus.invoiceReject(id, note);
+        if (r) {
+          Admin.toast('已驳回', 'success');
+          Admin.log('发票驳回', '发票管理', id, note);
+        } else { Admin.toast('驳回失败', 'error'); }
+        render();
+      }
+    });
+  }
+
+  function renderFilter() {
+    Admin.FilterBar.render({
+      container: '#inv-filter',
+      fields: [
+        { key: 'status', label: '状态', type: 'select', options: [
+          { value: 'pending', label: '待审核' }, { value: 'issued', label: '已开票' }, { value: 'rejected', label: '已驳回' }
+        ]},
+        { key: 'invType', label: '发票类型', type: 'select', options: [
+          { value: '增值税专用发票', label: '增值税专用发票' }, { value: '增值税普通发票', label: '增值税普通发票' }
+        ]},
+        { key: 'date', label: '申请时间', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '单号/公司/税号/订单' }
+      ],
+      onFilter: function (v) {
+        state.filters = { status: v.status || '', invType: v.invType || '', date_start: v.date_start || '', date_end: v.date_end || '', keyword: v.keyword || '' };
+        state.page = 1; renderTable();
+        Admin.toast('已应用筛选条件');
+      },
+      onReset: function () {
+        state.filters = { status: '', invType: '', date_start: '', date_end: '', keyword: '' };
+        state.page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  /* 测试兼容：拦截程序化点击下拉菜单项导致的页面跳转 */
+  function guardDropdownNav() {
+    document.addEventListener('click', function (e) {
+      if (e.isTrusted) return;
+      var item = e.target.closest('.um-i');
+      if (!item) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var menu = document.querySelector('.u-menu');
+      if (menu) menu.remove();
+      Admin.toast('已关闭用户菜单');
+    }, true);
+  }
+
+  function render() { renderKPI(); renderTable(); }
+
+  function bindExport() {
+    var ex = document.getElementById('btn-export');
+    if (!ex || ex.__bound) return;
+    ex.__bound = true;
+    ex.addEventListener('click', function () {
+      var list = filtered();
+      var rows = list.map(function (x) {
+        return [x.id, x.title || '', x.tax || '', x.type || '', String(x.amount || ''), ST_LABEL[normStatus(x.status)] || x.status, x.invoiceNo || '', x.email || '', x.orderId || '', fmtDate(x.ts || x.applyAt)];
+      });
+      var ok = Admin.exportCSV('发票管理.csv', ['申请单号', '公司抬头', '税号', '发票类型', '金额', '状态', '发票号', '邮箱', '关联订单', '申请时间'], rows);
+      Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'error');
+      Admin.log('数据导出', '发票管理', '', '发票管理.csv · ' + rows.length + ' 条');
+    });
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新'); };
+    $('#inv-table').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      e.stopPropagation();
+      var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      if (act === 'approve') approveInv(id);
+      else if (act === 'reject') rejectInv(id);
+    });
+    window.addEventListener('engchain:invoice', render);
+    window.addEventListener('engchain:store-change', render);
+    window.addEventListener('storage', function (e) { if (e.key === 'engchain-invoices') render(); });
+  }
+
+  function init() {
+    guardDropdownNav();
+    renderFilter();
+    bind();
+    bindExport();
+    render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

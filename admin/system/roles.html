@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>角色权限 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="system/roles.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>角色权限</h1>
+        <div class="sub">角色权限矩阵管理 · 权限点从 admin.js PERMS 动态读取 · 修改经 Modal 确认后写入 localStorage 并留痕</div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+        <button class="btn btn-primary" id="btn-edit-perms" data-perm="settings">编辑权限</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">角色列表</span><span class="card-s">4 个系统角色 · 切换后左侧导航即时过滤</span></div>
+      <div class="money-grid grid-4" id="role-grid"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">权限矩阵</span><span class="card-s">行=权限点 · 列=角色 · 数据来自 Admin.perms 动态读取</span></div>
+      <div class="table-wrap mt-14">
+        <table class="table" id="perm-matrix">
+          <thead><tr><th class="w-30">权限项</th><th>超级管理员</th><th>运营专员</th><th>财务专员</th><th>风控专员</th></tr></thead>
+          <tbody id="perm-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">权限点说明</span><span class="card-s">各权限点的业务含义与影响范围</span></div>
+      <div id="perm-desc-list"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">角色操作日志</span><span class="card-s">谁在什么时候修改了哪个角色的权限</span></div>
+      <div id="log-table"></div>
+      <div id="log-pager"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+  var OVERRIDE_KEY = 'engchain-role-perms';
+  var LOG_KEY = 'engchain-role-logs';
+  var state = { logPage: 1, logPageSize: 10 };
+
+  /* ---- 角色元数据（与 admin.js ROLES 保持一致） ---- */
+  var ROLE_META = [
+    { id: 'super', name: '超级管理员', desc: '全部模块 · 全量权限', modules: '总览 / 运营 / 用户 / 资金 / 分销 / 中介 / 风控 / 设置', color: 'var(--primary)' },
+    { id: 'ops', name: '运营专员', desc: '内容与交易运营', modules: '总览 / 运营中心 / 分销中心 / 中介服务 / 系统设置', color: 'var(--info)' },
+    { id: 'finance', name: '财务专员', desc: '资金与结算管理', modules: '总览 / 资金中心 / 分销中心 / 中介服务 / 系统设置', color: 'var(--success)' },
+    { id: 'risk', name: '风控专员', desc: '合规与风险治理', modules: '总览 / 风控合规 / 系统设置', color: 'var(--warning)' }
+  ];
+  var ROLE_IDS = ['super', 'ops', 'finance', 'risk'];
+
+  /* ---- 模块可见性（与 admin.js ROLES.secs 一致） ---- */
+  var MODULES = [
+    { key: 'mod_overview', label: '模块 · 数据总览' },
+    { key: 'mod_operations', label: '模块 · 运营中心' },
+    { key: 'mod_users', label: '模块 · 用户与认证' },
+    { key: 'mod_finance', label: '模块 · 资金中心' },
+    { key: 'mod_distribution', label: '模块 · 分销中心' },
+    { key: 'mod_mediation', label: '模块 · 中介服务' },
+    { key: 'mod_risk', label: '模块 · 风控合规' },
+    { key: 'mod_system', label: '模块 · 系统设置' }
+  ];
+  var MODULE_ACCESS = {
+    super: { mod_overview: true, mod_operations: true, mod_users: true, mod_finance: true, mod_distribution: true, mod_mediation: true, mod_risk: true, mod_system: true },
+    ops: { mod_overview: true, mod_operations: true, mod_users: false, mod_finance: false, mod_distribution: true, mod_mediation: true, mod_risk: false, mod_system: true },
+    finance: { mod_overview: true, mod_operations: false, mod_users: false, mod_finance: true, mod_distribution: true, mod_mediation: true, mod_risk: false, mod_system: true },
+    risk: { mod_overview: true, mod_operations: false, mod_users: false, mod_finance: false, mod_distribution: false, mod_mediation: false, mod_risk: true, mod_system: true }
+  };
+
+  /* ---- 权限点说明 ---- */
+  var PERM_DESC = {
+    'approve.first': { label: '入驻/提现初审', desc: '运营专员可执行入驻申请和提现申请的初审通过/驳回' },
+    'approve.final': { label: '入驻终审', desc: '风控专员可执行入驻申请的终审，终审通过后企业正式入驻' },
+    'payout': { label: '提现打款', desc: '财务专员可执行提现终审打款操作，涉及资金流出' },
+    'ban': { label: '用户封禁', desc: '风控专员可封禁/解封违规用户账号' },
+    'settings': { label: '系统设置修改', desc: '仅超级管理员可修改系统配置（定价/周期/角色权限等）' },
+    'export': { label: '数据导出', desc: '所有登录角色均可导出当前页面数据为 CSV' }
+  };
+
+  /* ---- 权限读取：base（Admin.perms）+ override（localStorage） ---- */
+  function getBasePerms() {
+    return (window.Admin && Admin.perms) ? Admin.perms : {};
+  }
+  function getOverride() {
+    try {
+      var raw = localStorage.getItem(OVERRIDE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function saveOverride(ov) {
+    try { localStorage.setItem(OVERRIDE_KEY, JSON.stringify(ov)); } catch (e) {}
+  }
+  function getMergedPerms() {
+    var base = getBasePerms();
+    var ov = getOverride();
+    var merged = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) {
+        merged[k] = ov[k] !== undefined ? ov[k] : base[k];
+      }
+    }
+    for (var k2 in ov) {
+      if (Object.prototype.hasOwnProperty.call(ov, k2) && merged[k2] === undefined) {
+        merged[k2] = ov[k2];
+      }
+    }
+    return merged;
+  }
+  function hasPerm(permPoint, roleId) {
+    if (roleId === 'super') return true;
+    var perms = getMergedPerms();
+    var allow = perms[permPoint];
+    if (allow === null || allow === undefined) return true;
+    return allow.indexOf(roleId) >= 0;
+  }
+
+  /* ---- 操作日志 ---- */
+  function loadLogs() {
+    try {
+      var raw = localStorage.getItem(LOG_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function addLog(action, roleName, detail) {
+    var logs = loadLogs();
+    logs.unshift({
+      id: 'log_' + Date.now(),
+      action: action,
+      role: roleName,
+      detail: detail,
+      operator: '管理员',
+      time: new Date().toLocaleString('zh-CN'),
+      ts: Date.now()
+    });
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(logs.slice(0, 100))); } catch (e) {}
+  }
+
+  /* ---- 当前角色 ---- */
+  function currentRole() {
+    try { return localStorage.getItem('engchain-role') || 'super'; } catch (e) { return 'super'; }
+  }
+
+  /* ---- KPI ---- */
+  function renderKPI() {
+    var cur = currentRole();
+    var curMeta = ROLE_META.filter(function (r) { return r.id === cur; })[0];
+    var perms = getMergedPerms();
+    var permCount = Object.keys(perms).length;
+    var logs = loadLogs();
+    var now = new Date();
+    var monthCount = logs.filter(function (l) {
+      var d = new Date(l.ts);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    var cards = [
+      ['当前角色', curMeta ? esc(curMeta.name) : '超级管理员', 'engchain-role'],
+      ['角色数', ROLE_META.length + ' 个', '部门级权限'],
+      ['权限点数', permCount + ' 个', 'Admin.perms 动态读取'],
+      ['本月权限变更', monthCount + ' 次', '操作日志留痕']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d">' + k[2] + '</div></div>';
+    }).join('');
+  }
+
+  /* ---- 角色卡片 ---- */
+  function renderRoles() {
+    var cur = currentRole();
+    var perms = getMergedPerms();
+    $('#role-grid').innerHTML = ROLE_META.map(function (r) {
+      var on = r.id === cur;
+      var permCount = r.id === 'super' ? Object.keys(perms).length :
+        Object.keys(perms).filter(function (p) { return hasPerm(p, r.id); }).length;
+      return '<div class="money-card" style="border:2px solid ' + (on ? r.color : 'var(--border)') + ';">' +
+        '<span class="mc-tag" style="background:' + r.color + '22;color:' + r.color + ';">' + esc(r.name) + '</span>' +
+        '<div class="mc-k mt-10">' + esc(r.desc) + '</div>' +
+        '<div class="mc-d min-h-32">' + esc(r.modules) + '</div>' +
+        '<div class="mc-d">权限点数：' + permCount + ' / ' + Object.keys(perms).length + '</div>' +
+        '<button class="btn ' + (on ? 'btn-primary' : 'btn-outline') + ' btn-sm mt-8" data-role="' + r.id + '"' + (on ? ' disabled' : '') + '>' + (on ? '当前角色' : '切换至此角色') + '</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---- 权限矩阵 ---- */
+  function renderMatrix() {
+    var html = '';
+    /* 模块可见性行 */
+    MODULES.forEach(function (mod) {
+      var cells = ROLE_IDS.map(function (rid) {
+        var allowed = MODULE_ACCESS[rid] && MODULE_ACCESS[rid][mod.key];
+        return '<td class="text-center">' + (allowed
+          ? '<span class="badge badge-success">✓</span>'
+          : '<span class="tx-muted">✗</span>') + '</td>';
+      }).join('');
+      html += '<tr><td class="tx-medium">' + esc(mod.label) + '</td>' + cells + '</tr>';
+    });
+    /* 分隔行 */
+    html += '<tr><td colspan="5" class="table-group-header">操作权限点（来自 Admin.perms）</td></tr>';
+    /* 操作权限点行 */
+    var perms = getMergedPerms();
+    Object.keys(perms).forEach(function (pkey) {
+      var desc = PERM_DESC[pkey];
+      var label = desc ? desc.label : pkey;
+      var cells = ROLE_IDS.map(function (rid) {
+        var allowed = hasPerm(pkey, rid);
+        var disabled = rid === 'super' ? ' disabled' : '';
+        return '<td class="text-center">' +
+          '<input type="checkbox" class="switch" data-perm-key="' + esc(pkey) + '" data-role="' + rid + '"' + (allowed ? ' checked' : '') + disabled + '>' +
+          '</td>';
+      }).join('');
+      html += '<tr><td class="tx-medium">' + esc(label) + '<div class="td-sub">' + esc(pkey) + '</div></td>' + cells + '</tr>';
+    });
+    $('#perm-body').innerHTML = html;
+  }
+
+  /* ---- 权限点说明列表 ---- */
+  function renderPermDesc() {
+    var html = '<div class="cfg-rows">';
+    Object.keys(PERM_DESC).forEach(function (key) {
+      var d = PERM_DESC[key];
+      html += '<div class="cfg-row"><span class="cfg-k">' + esc(d.label) + '</span>' +
+        '<span class="cfg-v">' + esc(key) + '</span>' +
+        '<span class="cfg-x">' + esc(d.desc) + '</span></div>';
+    });
+    html += '</div>';
+    $('#perm-desc-list').innerHTML = html;
+  }
+
+  /* ---- 操作日志表格 ---- */
+  function renderLogs() {
+    var logs = loadLogs();
+    var start = (state.logPage - 1) * state.logPageSize;
+    var pageData = logs.slice(start, start + state.logPageSize);
+    Admin.TableRenderer.render({
+      container: '#log-table',
+      columns: [
+        { key: 'action', label: '操作', width: '18%' },
+        { key: 'role', label: '目标角色', width: '14%' },
+        { key: 'detail', label: '变更详情', width: '34%' },
+        { key: 'operator', label: '操作人', width: '12%' },
+        { key: 'time', label: '时间', width: '22%' }
+      ],
+      data: pageData,
+      options: { emptyText: '暂无角色权限操作日志' }
+    });
+    if (!window._logPager) {
+      window._logPager = new Admin.Paginator({
+        container: '#log-pager',
+        total: logs.length,
+        pageSize: state.logPageSize,
+        onChange: function (page, size) { state.logPage = page; state.logPageSize = size; renderLogs(); }
+      });
+    } else {
+      window._logPager.setTotal(logs.length);
+      window._logPager.pageSize = state.logPageSize;
+      window._logPager.render();
+    }
+  }
+
+  /* ---- 编辑权限 Modal ---- */
+  function openEditPermsModal() {
+    var perms = getMergedPerms();
+    var permKeys = Object.keys(perms);
+    var content = '<div class="scroll-area-lg">' +
+      '<div class="alert alert-warning mb-14">' +
+      '<div class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>' +
+      '<div class="alert-body"><div class="alert-title">修改角色权限将影响全后台操作权限</div>' +
+      '<div class="alert-desc">超级管理员默认拥有全部权限且不可修改。修改后即时生效并写入 localStorage。</div></div></div>' +
+      '<div class="table-wrap"><table class="table"><thead><tr><th>权限点</th>';
+    ROLE_IDS.forEach(function (rid) {
+      var meta = ROLE_META.filter(function (r) { return r.id === rid; })[0];
+      content += '<th class="text-center">' + esc(meta.name) + '</th>';
+    });
+    content += '</tr></thead><tbody>';
+    permKeys.forEach(function (pkey) {
+      var desc = PERM_DESC[pkey];
+      content += '<tr><td class="tx-medium">' + esc(desc ? desc.label : pkey) + '<div class="td-sub">' + esc(pkey) + '</div></td>';
+      ROLE_IDS.forEach(function (rid) {
+        var allowed = hasPerm(pkey, rid);
+        var disabled = rid === 'super' ? ' disabled' : '';
+        content += '<td class="text-center"><input type="checkbox" class="checkbox edit-perm-cb" data-perm="' + esc(pkey) + '" data-role="' + rid + '"' + (allowed ? ' checked' : '') + disabled + '></td>';
+      });
+      content += '</tr>';
+    });
+    content += '</tbody></table></div></div>';
+    var footer = '<button class="btn btn-outline" id="ep-cancel">取消</button>' +
+      '<button class="btn btn-primary" id="ep-confirm" data-perm="settings">确认保存</button>';
+    var modal = Admin.Modal.open({ title: '编辑角色权限', content: content, footer: footer, width: '680px' });
+    modal.dialog.querySelector('#ep-cancel').onclick = function () { modal.close(); };
+    modal.dialog.querySelector('#ep-confirm').onclick = function () {
+      var newOverride = {};
+      var changes = [];
+      permKeys.forEach(function (pkey) {
+        var allowedRoles = [];
+        ROLE_IDS.forEach(function (rid) {
+          var cb = modal.dialog.querySelector('.edit-perm-cb[data-perm="' + pkey + '"][data-role="' + rid + '"]');
+          if (cb && cb.checked) allowedRoles.push(rid);
+        });
+        var oldVal = perms[pkey];
+        var oldStr = oldVal === null ? '全部' : (oldVal || []).join(',');
+        var newStr = allowedRoles.length === ROLE_IDS.length ? '全部' : allowedRoles.join(',');
+        if (oldStr !== newStr) {
+          changes.push(pkey + ': ' + oldStr + ' → ' + newStr);
+        }
+        newOverride[pkey] = allowedRoles.length === ROLE_IDS.length ? null : allowedRoles;
+      });
+      if (!changes.length) { Admin.toast('未检测到权限变更'); modal.close(); return; }
+      saveOverride(newOverride);
+      addLog('修改角色权限', '全部角色', changes.join('；'));
+      Admin.log('修改角色权限', '系统设置', '角色权限', changes.join('；'));
+      window.dispatchEvent(new CustomEvent('engchain:role-perms', { detail: newOverride }));
+      Admin.toast('角色权限已更新（' + changes.length + ' 项变更），即时生效');
+      modal.close();
+      renderAll();
+    };
+  }
+
+  /* ---- 切换角色 ---- */
+  function switchRole(rid) {
+    var meta = ROLE_META.filter(function (r) { return r.id === rid; })[0];
+    if (!meta) return;
+    Admin.confirm({
+      title: '切换当前角色',
+      body: '<div class="dialog-body-text">确定将当前后台角色切换为 <strong>' + esc(meta.name) + '</strong> 吗？<br>切换后左侧导航将按角色权限过滤，仅显示可访问模块。<br><br><strong>可访问模块：</strong>' + esc(meta.modules) + '</div>',
+      ok: '确认切换',
+      onYes: function () {
+        try { localStorage.setItem('engchain-role', rid); } catch (e) {}
+        addLog('切换角色', meta.name, '当前角色切换为 ' + meta.name);
+        Admin.log('切换角色权限', '系统设置', '角色权限', '切换为 ' + meta.name);
+        if (window.Admin && Admin.refreshNav) Admin.refreshNav();
+        window.dispatchEvent(new CustomEvent('engchain:role', { detail: rid }));
+        Admin.toast('已切换为 ' + esc(meta.name) + '，导航已过滤');
+        renderAll();
+      }
+    });
+  }
+
+  /* ---- 事件绑定 ---- */
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderAll(); Admin.toast('已刷新'); };
+    $('#btn-edit-perms').onclick = function () { openEditPermsModal(); };
+
+    document.addEventListener('click', function (e) {
+      var rb = e.target.closest('[data-role]');
+      if (rb && !rb.disabled && rb.tagName === 'BUTTON') {
+        switchRole(rb.getAttribute('data-role'));
+        return;
+      }
+    });
+
+    /* 矩阵内 Switch 点击直接切换（非 super 角色） */
+    document.addEventListener('change', function (e) {
+      var sw = e.target.closest('.switch[data-perm-key][data-role]');
+      if (!sw || sw.disabled) return;
+      var pkey = sw.getAttribute('data-perm-key');
+      var rid = sw.getAttribute('data-role');
+      var perms = getMergedPerms();
+      var current = perms[pkey];
+      var currentArr = current === null ? ROLE_IDS.slice() : (current || []);
+      var idx = currentArr.indexOf(rid);
+      if (sw.checked) {
+        if (idx < 0) currentArr.push(rid);
+      } else {
+        if (idx >= 0) currentArr.splice(idx, 1);
+      }
+      var ov = getOverride();
+      ov[pkey] = currentArr.length === ROLE_IDS.length ? null : currentArr;
+      saveOverride(ov);
+      var meta = ROLE_META.filter(function (r) { return r.id === rid; })[0];
+      var desc = PERM_DESC[pkey];
+      var detail = (sw.checked ? '授予' : '撤销') + ' ' + (meta ? meta.name : rid) + ' 的 ' + (desc ? desc.label : pkey) + ' 权限';
+      addLog(sw.checked ? '授予权限' : '撤销权限', meta ? meta.name : rid, detail);
+      Admin.log(sw.checked ? '授予权限' : '撤销权限', '系统设置', '角色权限', detail);
+      window.dispatchEvent(new CustomEvent('engchain:role-perms', { detail: ov }));
+      Admin.toast(detail);
+      renderKPI();
+      renderRoles();
+      renderLogs();
+    });
+
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'engchain-role' || e.key === OVERRIDE_KEY || e.key === LOG_KEY) renderAll();
+    });
+    window.addEventListener('engchain:role', function () { renderAll(); });
+  }
+
+  function renderAll() {
+    renderKPI();
+    renderRoles();
+    renderMatrix();
+    renderPermDesc();
+    renderLogs();
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function init() {
+    bind();
+    renderAll();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

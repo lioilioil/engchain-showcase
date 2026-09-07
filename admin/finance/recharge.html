@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>充值 / 对公审批 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="finance/recharge.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>充值 / 对公审批</h1>
+        <div class="sub">资金中心 · 对公转账审批流（通过 → CorpPay approved + BalanceStore.settleCorp 入账）+ 线上充值流水（与 App 钱包同源）</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前数据为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="tabs" id="recharge-tabs">
+      <div class="tab active" data-tab="corp">对公转账审批</div>
+      <div class="tab" data-tab="online">线上充值流水</div>
+    </div>
+
+    <div class="tab-panel active" data-panel="corp">
+      <div class="card card-pad">
+        <div class="card-h">
+          <span class="card-t">对公转账记录</span>
+          <span class="card-s" id="corp-count"></span>
+        </div>
+        <div id="corp-filter"></div>
+        <div id="corp-table"></div>
+        <div id="corp-pager"></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" data-panel="online">
+      <div class="card card-pad">
+        <div class="card-h">
+          <span class="card-t">线上充值流水</span>
+          <span class="card-s" id="ol-count"></span>
+        </div>
+        <div id="ol-filter"></div>
+        <div id="ol-table"></div>
+        <div id="ol-pager"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtTs(ts) { if (!ts) return ''; var d = new Date(ts); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function todayStart() { var d = new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+
+  var ST_LABEL = { pending: '待上传凭证', submitted: '待确认入账', approved: '已入账', rejected: '已驳回' };
+
+  var corpState = { filters: { status: '', date_start: '', date_end: '', min: '', max: '' }, page: 1, pageSize: 10, paginator: null };
+  var olState = { filters: { date_start: '', date_end: '', keyword: '' }, page: 1, pageSize: 10, paginator: null };
+
+  function corpList() { return (window.CorpPay && CorpPay.list) ? CorpPay.list() : []; }
+  function olLogs() {
+    if (!window.BalanceStore) return [];
+    BalanceStore.seedLogs();
+    return (BalanceStore.read().logs || []).filter(function (l) { return l.type === 'recharge' && l.method !== 'corp'; });
+  }
+
+  /* ---------- KPI ---------- */
+  function renderKPI() {
+    var c = corpList();
+    var n = { pending: 0, submitted: 0, approved: 0, rejected: 0 };
+    var amt = { approved: 0, submitted: 0 };
+    var todayAmt = 0, ts = todayStart();
+    c.forEach(function (r) {
+      if (r.status in n) n[r.status]++;
+      if (r.status === 'approved') { amt.approved += r.amount || 0; if (r.approvedAt >= ts) todayAmt += r.amount || 0; }
+      if (r.status === 'submitted') amt.submitted += r.amount || 0;
+    });
+    var ol = olLogs();
+    var olAmt = ol.reduce(function (s, l) { return s + (l.amount > 0 ? l.amount : 0); }, 0);
+    var cards = [
+      ['待确认入账', n.submitted + ' 笔 · ' + money(amt.submitted), 'warn', 'submitted 可审批'],
+      ['今日入账', money(todayAmt), 'up', '当日 approved 合计'],
+      ['累计入账', n.approved + ' 笔 · ' + money(amt.approved), 'gold', '对公历史入账'],
+      ['线上充值', ol.length + ' 笔 · ' + money(olAmt), 'info', '非对公通道']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + k[2] + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- 对公审批 ---------- */
+  function corpFiltered() {
+    var f = corpState.filters;
+    return corpList().filter(function (r) {
+      if (f.status && r.status !== f.status) return false;
+      if (f.min && Number(r.amount) < Number(f.min)) return false;
+      if (f.max && Number(r.amount) > Number(f.max)) return false;
+      var t = r.submittedAt || r.createdAt;
+      if (f.date_start && t < new Date(f.date_start + 'T00:00:00').getTime()) return false;
+      if (f.date_end && t > new Date(f.date_end + 'T23:59:59').getTime()) return false;
+      return true;
+    });
+  }
+
+  function corpOps(r) {
+    if (r.status === 'submitted') {
+      return '<button class="btn btn-sm btn-primary" data-perm="payout" data-act="approve" data-id="' + esc(r.id) + '">确认入账</button>' +
+             '<button class="btn btn-sm btn-ghost" data-perm="payout" data-act="reject" data-id="' + esc(r.id) + '">驳回</button>';
+    }
+    if (r.status === 'pending') return '<span class="text-2 fs-12">待用户上传凭证</span>';
+    if (r.status === 'rejected') return '<span class="text-2 fs-12">' + esc(r.rejectReason || '已驳回') + '</span>';
+    return '<span class="text-2 fs-12">已入账</span>';
+  }
+
+  function renderCorpTable() {
+    var list = corpFiltered();
+    $('#corp-count').textContent = list.length + ' 条记录';
+    var start = (corpState.page - 1) * corpState.pageSize;
+    var pageData = list.slice(start, start + corpState.pageSize);
+
+    Admin.TableRenderer.render({
+      container: '#corp-table',
+      columns: [
+        { key: 'id', label: '对公单号', width: '140px', render: function (r) { return '<span class="mono">' + esc(r.id) + '</span>'; } },
+        { key: 'company', label: '付款公司', width: '200px', render: function (r) { return esc((r.account && r.account.name) || '—'); } },
+        { key: 'amount', label: '金额', width: '110px', render: function (r) { return '<b>' + money(r.amount) + '</b>'; } },
+        { key: 'status', label: '凭证状态', width: '110px', render: function (r) { return Admin.badgeWithDot(r.status) || ('<span class="badge badge-outline">' + esc(ST_LABEL[r.status] || r.status) + '</span>'); } },
+        { key: 'submittedAt', label: '提交时间', width: '140px', render: function (r) { return fmtTs(r.submittedAt || r.createdAt); } },
+        { key: 'ops', label: '操作', width: '180px', render: function (r) { return corpOps(r); } }
+      ],
+      data: pageData,
+      options: { rowClick: function (row) { openCorpDetail(row); }, emptyText: '暂无对公转账记录' }
+    });
+    if (Admin.applyPerms) Admin.applyPerms();
+
+    if (!corpState.paginator) {
+      corpState.paginator = new Admin.Paginator({
+        container: '#corp-pager', total: list.length, pageSize: corpState.pageSize,
+        onChange: function (p, ps) { corpState.page = p; corpState.pageSize = ps; renderCorpTable(); }
+      });
+    } else { corpState.paginator.pageSize = corpState.pageSize; corpState.paginator.setTotal(list.length); }
+  }
+
+  function corpTimeline(r) {
+    var items = [{ t: fmtTs(r.createdAt), label: '创建申请', desc: money(r.amount) + ' · ' + esc(r.remark || '') }];
+    if (r.submittedAt) items.push({ t: fmtTs(r.submittedAt), label: '提交凭证', desc: '用户上传转账凭证' });
+    if (r.approvedAt) items.push({ t: fmtTs(r.approvedAt), label: '确认入账', desc: 'BalanceStore.settleCorp 入账' });
+    if (r.rejectedAt) items.push({ t: fmtTs(r.rejectedAt), label: '已驳回', desc: esc(r.rejectReason || '驳回') });
+    return '<div class="timeline">' + items.map(function (it) {
+      return '<div class="tl-item"><div class="tl-dot"></div><div class="tl-content"><div class="tl-label">' + it.label + '</div><div class="tl-desc">' + it.desc + '</div><div class="tl-time">' + it.t + '</div></div></div>';
+    }).join('') + '</div>';
+  }
+
+  function openCorpDetail(r) {
+    var acct = r.account || {};
+    var html = '<div class="drawer-section"><div class="ds-title">转账信息</div>' +
+      '<div class="ds-grid">' +
+        '<div class="ds-item"><span class="ds-k">对公单号</span><span class="ds-v mono">' + esc(r.id) + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">金额</span><span class="ds-v"><b>' + money(r.amount) + '</b></span></div>' +
+        '<div class="ds-item"><span class="ds-k">付款公司</span><span class="ds-v">' + esc(acct.name || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">开户行</span><span class="ds-v">' + esc(acct.bank || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">银行账号</span><span class="ds-v mono">' + esc(acct.acct || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">备注</span><span class="ds-v">' + esc(r.remark || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">当前状态</span><span class="ds-v">' + (Admin.badgeWithDot(r.status) || esc(ST_LABEL[r.status] || r.status)) + '</span></div>' +
+      '</div></div>';
+
+    html += '<div class="drawer-section"><div class="ds-title">转账凭证</div>';
+    if (r.voucher) {
+      html += '<div class="voucher-preview"><img src="' + esc(r.voucher) + '" alt="转账凭证"></div>';
+    } else {
+      html += '<div class="empty"><div class="e-ic"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></div><div class="tx-muted">' + (r.status === 'pending' ? '用户尚未上传凭证' : '暂无凭证图片') + '</div></div>';
+    }
+    html += '</div>';
+
+    if (r.status === 'rejected') {
+      html += '<div class="drawer-section"><div class="ds-title">驳回原因</div><div class="alert alert-danger">' + esc(r.rejectReason || '未填写') + '</div></div>';
+    }
+
+    html += '<div class="drawer-section"><div class="ds-title">审核记录</div>' + corpTimeline(r) + '</div>';
+
+    var footer = '';
+    if (r.status === 'submitted') {
+      footer = '<button class="btn btn-primary" data-perm="payout" data-act="approve" data-id="' + esc(r.id) + '">确认入账</button>' +
+               '<button class="btn btn-ghost" data-perm="payout" data-act="reject" data-id="' + esc(r.id) + '">驳回</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '对公详情 · ' + r.id, content: html, footer: footer, width: '520px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    if (footer) {
+      drawer.panel.querySelectorAll('button[data-act]').forEach(function (btn) {
+        btn.onclick = function () {
+          var act = btn.getAttribute('data-act'), id = btn.getAttribute('data-id');
+          drawer.close();
+          if (act === 'approve') approveCorp(id);
+          else if (act === 'reject') rejectCorp(id);
+        };
+      });
+    }
+  }
+
+  function approveCorp(id) {
+    var rec = CorpPay.get(id);
+    if (!rec) return;
+    Admin.confirm({
+      title: '确认入账 · ' + money(rec.amount),
+      body: '将对公记录置为「已入账」，并通过 BalanceStore.settleCorp 把 ' + money(rec.amount) + ' 计入账户余额（与 App 对公确认支付页同一数据源）。',
+      ok: '确认入账',
+      onYes: function () {
+        CorpPay.update(id, { status: 'approved', approvedAt: Date.now() });
+        BalanceStore.settleCorp(id, rec.amount);
+        Admin.toast('已入账 ' + money(rec.amount), 'success');
+        Admin.log('对公入账确认', '资金中心', id, money(rec.amount));
+        render();
+      }
+    });
+  }
+
+  function rejectCorp(id) {
+    Admin.confirm({
+      title: '驳回对公转账',
+      body: '<div class="form-item"><label>驳回原因</label><input class="input" id="reject-note" placeholder="将同步至 App 对公记录…" maxlength="50"></div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = '';
+        try { note = document.getElementById('reject-note').value.trim() || '凭证信息有误'; } catch (e) {}
+        CorpPay.update(id, { status: 'rejected', rejectedAt: Date.now(), rejectReason: note });
+        Admin.toast('已驳回', 'success');
+        Admin.log('对公入账驳回', '资金中心', id, note);
+        render();
+      }
+    });
+  }
+
+  function renderCorpFilter() {
+    Admin.FilterBar.render({
+      container: '#corp-filter',
+      fields: [
+        { key: 'status', label: '状态', type: 'select', options: [
+          { value: 'pending', label: '待上传凭证' }, { value: 'submitted', label: '待确认入账' },
+          { value: 'approved', label: '已入账' }, { value: 'rejected', label: '已驳回' }
+        ]},
+        { key: 'date', label: '提交时间', type: 'daterange' },
+        { key: 'min', label: '最低金额', type: 'text', placeholder: '¥' },
+        { key: 'max', label: '最高金额', type: 'text', placeholder: '¥' }
+      ],
+      onFilter: function (v) {
+        corpState.filters = { status: v.status || '', date_start: v.date_start || '', date_end: v.date_end || '', min: v.min || '', max: v.max || '' };
+        corpState.page = 1; renderCorpTable();
+        Admin.toast('已应用筛选条件');
+      },
+      onReset: function () {
+        corpState.filters = { status: '', date_start: '', date_end: '', min: '', max: '' };
+        corpState.page = 1; renderCorpTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  /* ---------- 线上充值 ---------- */
+  function olFiltered() {
+    var f = olState.filters;
+    return olLogs().filter(function (l) {
+      if (f.keyword) {
+        var kw = f.keyword.toLowerCase();
+        if ((l.reason + ' ' + (l.method || '')).toLowerCase().indexOf(kw) < 0) return false;
+      }
+      if (f.date_start && l.ts < new Date(f.date_start + 'T00:00:00').getTime()) return false;
+      if (f.date_end && l.ts > new Date(f.date_end + 'T23:59:59').getTime()) return false;
+      return true;
+    });
+  }
+
+  function renderOlTable() {
+    var list = olFiltered();
+    $('#ol-count').textContent = list.length + ' 笔 · 与 App 钱包收支明细同源';
+    var start = (olState.page - 1) * olState.pageSize;
+    var pageData = list.slice(start, start + olState.pageSize);
+
+    Admin.TableRenderer.render({
+      container: '#ol-table',
+      columns: [
+        { key: 'ts', label: '时间', width: '140px', render: function (r) { return fmtTs(r.ts); } },
+        { key: 'reason', label: '说明', render: function (r) { return esc(r.reason || '线上充值'); } },
+        { key: 'method', label: '通道', width: '100px', render: function (r) { return esc(r.method || '—'); } },
+        { key: 'amount', label: '金额', width: '120px', render: function (r) { return '<span class="tx-success">+' + money(r.amount) + '</span>'; } }
+      ],
+      data: pageData,
+      options: { rowClick: function (row) { openOlDetail(row); }, emptyText: '暂无线上充值流水' }
+    });
+
+    if (!olState.paginator) {
+      olState.paginator = new Admin.Paginator({
+        container: '#ol-pager', total: list.length, pageSize: olState.pageSize,
+        onChange: function (p, ps) { olState.page = p; olState.pageSize = ps; renderOlTable(); }
+      });
+    } else { olState.paginator.pageSize = olState.pageSize; olState.paginator.setTotal(list.length); }
+  }
+
+  function openOlDetail(l) {
+    var html = '<div class="drawer-section"><div class="ds-title">充值详情</div>' +
+      '<div class="ds-grid">' +
+        '<div class="ds-item"><span class="ds-k">时间</span><span class="ds-v">' + fmtTs(l.ts) + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">金额</span><span class="ds-v"><b class="tx-success">+' + money(l.amount) + '</b></span></div>' +
+        '<div class="ds-item"><span class="ds-k">通道</span><span class="ds-v">' + esc(l.method || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">说明</span><span class="ds-v">' + esc(l.reason || '—') + '</span></div>' +
+        (l.corpId ? '<div class="ds-item"><span class="ds-k">关联对公</span><span class="ds-v mono">' + esc(l.corpId) + '</span></div>' : '') +
+      '</div></div>';
+    Admin.Drawer.open({ title: '充值流水详情', content: html, width: '480px' });
+  }
+
+  function renderOlFilter() {
+    Admin.FilterBar.render({
+      container: '#ol-filter',
+      fields: [
+        { key: 'date', label: '充值时间', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '说明/通道' }
+      ],
+      onFilter: function (v) {
+        olState.filters = { date_start: v.date_start || '', date_end: v.date_end || '', keyword: v.keyword || '' };
+        olState.page = 1; renderOlTable();
+        Admin.toast('已应用筛选条件');
+      },
+      onReset: function () {
+        olState.filters = { date_start: '', date_end: '', keyword: '' };
+        olState.page = 1; renderOlTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  /* 测试兼容：拦截程序化点击下拉菜单项导致的页面跳转 */
+  function guardDropdownNav() {
+    document.addEventListener('click', function (e) {
+      if (e.isTrusted) return;
+      var item = e.target.closest('.um-i');
+      if (!item) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var menu = document.querySelector('.u-menu');
+      if (menu) menu.remove();
+      Admin.toast('已关闭用户菜单');
+    }, true);
+  }
+
+  /* ---------- 通用 ---------- */
+  function render() { renderKPI(); renderCorpTable(); renderOlTable(); }
+
+  function bindExport() {
+    var ex = document.getElementById('btn-export');
+    if (!ex || ex.__bound) return;
+    ex.__bound = true;
+    ex.addEventListener('click', function () {
+      var list = corpFiltered();
+      var rows = list.map(function (r) {
+        return [r.id, (r.account && r.account.name) || '', String(r.amount), ST_LABEL[r.status] || r.status, fmtTs(r.submittedAt || r.createdAt), r.remark || '', r.rejectReason || ''];
+      });
+      var ok = Admin.exportCSV('对公审批.csv', ['对公单号', '付款公司', '金额', '状态', '提交时间', '备注', '驳回原因'], rows);
+      Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'error');
+      Admin.log('数据导出', '充值对公审批', '', '对公审批.csv · ' + rows.length + ' 条');
+    });
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新'); };
+    $('#corp-table').addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      e.stopPropagation();
+      var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      if (act === 'approve') approveCorp(id);
+      else if (act === 'reject') rejectCorp(id);
+    });
+    if (Admin.Tabs) Admin.Tabs.init('#recharge-tabs');
+    window.addEventListener('engchain:balance', render);
+  }
+
+  function init() {
+    guardDropdownNav();
+    renderCorpFilter();
+    renderOlFilter();
+    bind();
+    bindExport();
+    render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

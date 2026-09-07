@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>新增抬头 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">新增抬头</div>
+    <div class="nav-right"><button type="button" onclick="save()" style="color:var(--primary);font-size:14px;font-weight:600;">保存</button></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <div class="field">
+      <label class="field-label">抬头类型</label>
+      <div class="seg" id="seg-title-type">
+        <div class="seg-item active is-on" data-t="enterprise">企业抬头</div>
+        <div class="seg-item" data-t="personal">个人抬头</div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" id="label-name">抬头名称 <span class="req">*</span></label>
+      <input class="input" id="in-name" placeholder="请输入抬头名称">
+    </div>
+    <div class="field">
+      <label class="field-label" id="label-tax">纳税人识别号 <span class="req">*</span></label>
+      <input class="input" id="in-tax" placeholder="请输入统一社会信用代码">
+    </div>
+
+    <div id="enterprise-only">
+      <div class="field"><label class="field-label">注册地址</label><input class="input" id="in-addr" placeholder="注册地址（选填）"></div>
+      <div class="field"><label class="field-label">联系电话</label><input class="input" id="in-phone" placeholder="联系电话（选填）"></div>
+      <div class="field"><label class="field-label">开户银行</label><input class="input" id="in-bank" placeholder="开户银行（选填）"></div>
+      <div class="field"><label class="field-label">银行账号</label><input class="input" id="in-acct" placeholder="银行账号（选填，用于专票）"></div>
+    </div>
+
+    <div class="field"><label class="field-label">发票接收邮箱</label><input class="input" id="in-mail" placeholder="电子发票将发送至该邮箱"></div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="in-default" style="width:18px;height:18px;">
+      <label for="in-default" style="font-size:13px;color:var(--text-2);">设为默认抬头</label>
+    </div>
+
+    <div style="margin-top:6px;"><button type="button" class="btn btn-primary btn-block" onclick="save()">保存抬头</button></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var TITLE_KEY = 'engchain-invoice-titles';
+  var titleType = 'enterprise';
+
+  function loadTitles() {
+    try { return JSON.parse(localStorage.getItem(TITLE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveTitles(arr) {
+    try { localStorage.setItem(TITLE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  function setType(t) {
+    titleType = t;
+    document.getElementById('label-name').innerHTML = (t === 'personal' ? '姓名' : '抬头名称') + ' <span class="req">*</span>';
+    document.getElementById('in-name').placeholder = t === 'personal' ? '请输入姓名' : '请输入抬头名称';
+    document.getElementById('label-tax').innerHTML = (t === 'personal' ? '身份证号' : '纳税人识别号') + ' <span class="req">*</span>';
+    document.getElementById('in-tax').placeholder = t === 'personal' ? '请输入身份证号' : '请输入统一社会信用代码';
+    document.getElementById('enterprise-only').style.display = t === 'personal' ? 'none' : '';
+  }
+
+  document.querySelectorAll('#seg-title-type .seg-item').forEach(function (el) {
+    el.onclick = function () {
+      document.querySelectorAll('#seg-title-type .seg-item').forEach(function (x) { x.classList.remove('active', 'is-on'); });
+      el.classList.add('active', 'is-on');
+      setType(el.getAttribute('data-t') === 'personal' ? 'personal' : 'enterprise');
+    };
+  });
+
+  window.save = function () {
+    var name = document.getElementById('in-name').value.trim();
+    if (!name) { UI.toast('请填写抬头名称 / 姓名', 'warn'); document.getElementById('in-name').focus(); return; }
+    var tax = document.getElementById('in-tax').value.trim();
+    if (!tax) { UI.toast(titleType === 'personal' ? '请填写身份证号' : '请填写纳税人识别号', 'warn'); document.getElementById('in-tax').focus(); return; }
+    var titles = loadTitles();
+    var isDef = document.getElementById('in-default').checked;
+    if (isDef || !titles.length) titles.forEach(function (t) { t.isDefault = false; });
+    var item = {
+      name: name,
+      tax: tax,
+      titleType: titleType,
+      invoiceType: titleType === 'personal' ? '增值税普通发票' : '增值税普通发票',
+      address: titleType === 'enterprise' ? document.getElementById('in-addr').value.trim() : '',
+      phone: titleType === 'enterprise' ? document.getElementById('in-phone').value.trim() : '',
+      bank: titleType === 'enterprise' ? document.getElementById('in-bank').value.trim() : '',
+      bankAccount: titleType === 'enterprise' ? document.getElementById('in-acct').value.trim() : '',
+      email: document.getElementById('in-mail').value.trim(),
+      isDefault: isDef || !titles.length
+    };
+    titles.push(item);
+    saveTitles(titles);
+    UI.toast('已新增抬头', 'ok');
+    setTimeout(function () { history.back(); }, 700);
+  };
+})();
+</script>
+</body>
+</html>

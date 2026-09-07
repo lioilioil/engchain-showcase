@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>余额提现 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">余额提现</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:10px;">
+    <!-- 非入驻引导 -->
+    <div id="wd-guide" style="display:none;text-align:center;padding:40px 24px;">
+      <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">
+        <svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-bank"/></svg>
+      </div>
+      <div class="fw-700" style="font-size:17px;margin-top:16px;">入驻企业后可提现</div>
+      <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成企业入驻后，钱包余额可申请提现至银行卡或支付宝，审批通过后打款到账。</div>
+      <a href="../../pages/profile/entry-form.html?type=agency&fin=1" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往企业入驻</a>
+    </div>
+
+    <div id="wd-form">
+    <div style="text-align:center;padding:8px 0;">
+      <div class="text-2 fs-12">可提现余额（元）</div>
+      <div class="mono fw-700" style="font-size:32px;margin-top:4px;" id="w-avail">—</div>
+      <div class="text-3" style="font-size:11px;margin-top:4px;" id="w-limit">—</div>
+    </div>
+
+    <div class="field" style="margin-top:18px;">
+      <label class="field-label">提现金额</label>
+      <div class="unit-input"><input class="input" id="amount" placeholder="0.00" inputmode="decimal"><span class="unit">¥</span></div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">到账账户</label>
+      <div class="group">
+        <div class="row"><span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-bank"/></svg></span><span class="label">招商银行 · 尾号(4638)</span><input type="radio" name="acc" value="bank" checked></div>
+        <div class="row"><span class="row-icon" style="background:rgba(37,99,235,.16)"><svg class="ic"><use href="#i-card"/></svg></span><span class="label">支付宝 · 陈建国</span><input type="radio" name="acc" value="alipay"></div>
+      </div>
+    </div>
+
+    <div class="text-3 fs-12" style="margin-top:4px;">Billing：手续费 ¥0，审批通过后预计 2 小时内到账。</div>
+
+    <div class="section-title" style="margin-top:20px;"><div class="st-left">提现记录</div></div>
+    <div class="group" id="wd-records"></div>
+    </div>
+  </div>
+
+  <div class="fixed-cta" id="wd-cta"><button type="button" class="btn btn-primary btn-block btn-lg" id="withdraw-submit">提交提现申请</button></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var w = MOCK.business.withdraw;
+  document.getElementById('w-limit').textContent = '单笔 ≤' + w.singleMax + '元 · 每日 ≤' + w.dailyMax + '次';
+  try { BalanceStore.seedLogs(); } catch (e) { console.warn('BalanceStore.seedLogs failed:', e); }
+
+  var WD_STATUS = { pending: { label: '待审核', cls: 'tag-warning' }, first_ok: { label: '初审通过', cls: 'tag-primary' }, paid: { label: '已到账', cls: 'tag-success' }, rejected: { label: '已驳回', cls: 'tag-gray' } };
+
+  function currentUser() { try { return (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) { return null; } }
+  function isResident() {
+    var u = currentUser();
+    if (!u) return false;
+    if (u.identity && u.identity.enterprise === 'resident') return true;
+    if (u.entry && u.entry.active && u.entry.status === 'active') return true;
+    return false;
+  }
+  function renderAvail() {
+    document.getElementById('w-avail').textContent = UI.money(BalanceStore.available());
+  }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    if (isNaN(d)) return '';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  function renderRecords() {
+    var box = document.getElementById('wd-records');
+    if (!box) return;
+    var u = currentUser();
+    var uid = u ? u.id : '';
+    var all = [];
+    try { all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : []; } catch (e) {}
+    var mine = all.filter(function (x) { return x.uid === uid; });
+    if (!mine.length) { box.innerHTML = '<div class="text-3 fs-12" style="text-align:center;padding:14px 0;">暂无提现记录</div>'; return; }
+    box.innerHTML = mine.map(function (r) {
+      var st = WD_STATUS[r.status] || { label: r.status, cls: 'tag-gray' };
+      return '<div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;">' +
+        '<div style="display:flex;justify-content:space-between;width:100%;"><span class="mono fw-600">¥' + Number(r.amount).toLocaleString() + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="text-3 fs-11">' + (r.bank || '') + ' · ' + fmtTime(r.appliedAt) + '</div>' +
+        (r.note ? '<div class="text-3 fs-11" style="color:var(--error);">' + r.note + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---- 身份门控：仅入驻企业可提现 ---- */
+  function gate() {
+    var form = document.getElementById('wd-form');
+    var guide = document.getElementById('wd-guide');
+    var cta = document.getElementById('wd-cta');
+    if (isResident()) {
+      if (form) form.style.display = '';
+      if (guide) guide.style.display = 'none';
+      if (cta) cta.style.display = '';
+      renderAvail();
+      renderRecords();
+    } else {
+      if (form) form.style.display = 'none';
+      if (guide) guide.style.display = '';
+      if (cta) cta.style.display = 'none';
+    }
+  }
+
+  window.withdraw = function () {
+    if (!isResident()) { UI.toast('入驻企业后可提现', 'warn'); return; }
+    var amountEl = document.getElementById('amount');
+    var v = parseFloat(amountEl ? amountEl.value : '') || 0;
+    if (v <= 0) { UI.toast('请输入有效提现金额', 'warn'); if (amountEl) amountEl.focus(); return; }
+    if (v > w.singleMax) { UI.toast('单笔提现上限 ¥' + w.singleMax, 'warn'); return; }
+    var avail = BalanceStore.available();
+    if (v > avail) { UI.toast('超过可提现余额（当前可提 ¥' + avail.toLocaleString() + '）', 'warn'); return; }
+    var accEl = document.querySelector('input[name="acc"]:checked');
+    var accName = accEl ? (accEl.closest('.row') ? accEl.closest('.row').querySelector('.label').textContent : '招商银行 · 尾号(4638)') : '招商银行 · 尾号(4638)';
+    var method = accEl && accEl.value === 'alipay' ? 'alipay' : 'bank';
+    UI.dialog({
+      title: '提现确认', text: '本次提现 <b style="color:var(--primary)">¥' + v.toLocaleString() + '</b> 至' + accName + '，提交后进入平台审批流程，审批通过后打款。', ok: '提交申请', cancel: '取消',
+      onOk: function () {
+        try {
+          var u = currentUser();
+          var r = DataBus.withdrawalApply(u ? u.id : '', v, method, { bank: accName });
+          if (!r || r.error) { UI.toast((r && r.error) || '提现申请失败', 'err'); return; }
+          if (amountEl) amountEl.value = '';
+          renderAvail();
+          renderRecords();
+          UI.toast('提现申请已提交，待审核', 'ok');
+        } catch (err) {
+          console.error('withdraw submit error:', err);
+          UI.toast('提现申请失败：' + (err.message || err), 'err');
+        }
+      }
+    });
+  };
+
+  gate();
+  /* 提交提现申请按钮：双重绑定（inline onclick + addEventListener 兜底），确保真实点击必触发 */
+  var _wdBtn = document.getElementById('withdraw-submit') || document.querySelector('#wd-cta button');
+  if (_wdBtn) {
+    _wdBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof window.withdraw === 'function') { window.withdraw(); }
+      else { UI.toast('提现功能初始化中，请稍候重试', 'warn'); }
+    });
+  }
+  window.addEventListener('engchain:balance', renderAvail);
+  window.addEventListener('engchain:withdrawals', renderRecords);
+  window.addEventListener('engchain:auth', gate);
+  window.addEventListener('engchain:entry', gate);
+  window.addEventListener('engchain:store-change', function () { renderAvail(); renderRecords(); gate(); });
+})();
+</script>
+</body>
+</html>

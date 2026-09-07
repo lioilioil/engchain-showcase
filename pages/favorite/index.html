@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/favorite/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的收藏 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* 管理按钮空态灰度 */
+#manage-btn { transition: opacity .2s, color .2s; cursor: pointer; }
+#manage-btn.disabled { opacity: .35; cursor: not-allowed; }
+/* 文字气泡 */
+.manage-tip {
+  position: absolute; top: 42px; right: 14px;
+  background: var(--text-1, #333); color: #fff;
+  font-size: 11px; padding: 6px 10px; border-radius: 8px;
+  white-space: nowrap; z-index: 100; opacity: 0;
+  transform: translateY(-4px); transition: opacity .2s, transform .2s;
+  pointer-events: none;
+}
+.manage-tip.show { opacity: 1; transform: translateY(0); }
+.manage-tip::after {
+  content: ''; position: absolute; top: -5px; right: 16px;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-bottom: 5px solid var(--text-1, #333);
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的收藏</div>
+    <div class="nav-right" style="position:relative;"><button id="manage-btn" onclick="edit()" style="color:var(--text-2);font-size:13px;">管理</button><div class="manage-tip" id="manage-tip">无列项收藏，请前往收藏</div></div>
+  </div>
+
+  <div class="seg" style="margin:10px 14px;">
+    <span class="seg-item is-on">全部</span>
+    <span class="seg-item">需求</span>
+    <span class="seg-item">供应</span>
+  </div>
+
+  <div class="scroll" style="padding-top:4px;">
+    <div id="fav-list"></div>
+    <div class="empty-state" id="fav-empty" style="margin-top:10px;display:none;">
+      <div class="empty-state__icon"><svg class="ic" style="width:44px;height:44px;stroke-width:1.2;color:var(--text-tertiary,var(--text-3));"><use href="#i-star"/></svg></div>
+      <div class="empty-state__title">暂无收藏，去供需列表看看</div>
+      <div class="empty-state__description">把感兴趣的供需信息收藏起来，随时查看对接</div>
+      <a href="../supply/list.html" class="btn btn-primary btn-sm" style="margin-top:6px;">去发现</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){
+  window.__ROOT__='../../';
+  var currentFilter = 'all';
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function fmtTime(ts){
+    if(!ts) return '';
+    var d=new Date(ts); if(isNaN(d)) return '';
+    return (d.getMonth()+1)+'月'+d.getDate()+'日';
+  }
+  function dirLabel(dir){ return dir==='demand'?'需求':(dir==='supply'?'供应':'信息'); }
+  function dirTag(dir){ return dir==='demand'?'tag-demand':'tag-supply'; }
+
+  function render(){
+    var list = (window.FavoriteStore && FavoriteStore.list) ? FavoriteStore.list() : [];
+    var filtered = list.filter(function(it){
+      if(currentFilter==='all') return true;
+      return it.dir === currentFilter;
+    });
+    var box = document.getElementById('fav-list');
+    var empty = document.getElementById('fav-empty');
+    var manageBtn = document.getElementById('manage-btn');
+    if(!filtered.length){
+      box.innerHTML = '';
+      empty.style.display = '';
+      if(manageBtn) manageBtn.classList.add('disabled');
+      return;
+    }
+    empty.style.display = 'none';
+    if(manageBtn) manageBtn.classList.remove('disabled');
+    box.innerHTML = filtered.map(function(it){
+      return '<div class="supply-card" data-id="'+esc(it.id)+'" style="position:relative;">' +
+        '<div class="sc-top"><span class="tag '+dirTag(it.dir)+'">'+dirLabel(it.dir)+'</span>' +
+        (it.type?'<span class="tag tag-gray">'+esc(it.type)+'</span>':'') +
+        '<span style="margin-left:auto;" class="text-3 fs-11">'+fmtTime(it.ts)+'</span></div>' +
+        '<div class="sc-title">'+esc(it.title||'收藏条目')+'</div>' +
+        (it.location?'<div class="sc-meta"><span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>'+esc(it.location)+'</span></div>':'') +
+        '<div class="sc-foot">' +
+        (it.amount?'<span class="sc-price">'+esc(it.amount)+'</span>':'<span></span>') +
+        '<button type="button" class="btn btn-ghost btn-sm" data-fav-remove="'+esc(it.id)+'" style="padding:4px 10px;font-size:11px;">取消收藏</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  /* 取消收藏：事件委托 + 真实调用 FavoriteStore.remove + 即时 DOM 移除 + 跨 tab 同步 */
+  document.getElementById('fav-list').addEventListener('click', function(e){
+    var btn = e.target.closest('[data-fav-remove]');
+    if(!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var id = btn.getAttribute('data-fav-remove');
+    if(window.FavoriteStore && FavoriteStore.remove){
+      var removed = FavoriteStore.remove(id);
+      /* 即时从 DOM 移除该卡片（不等待 re-render） */
+      var card = btn.closest('.supply-card');
+      if(card) card.remove();
+      UI.toast('已取消收藏','ok');
+      /* 触发跨 tab 同步事件（makeStore.write 已派发，此处兜底确保同 tab 其他监听者收到） */
+      try { window.dispatchEvent(new CustomEvent('engchain:favorite', { detail: { action: 'remove', id: id } })); } catch(err) {}
+      /* 重渲染以更新空状态/分类筛选 */
+      render();
+    } else {
+      UI.toast('收藏功能暂不可用','err');
+    }
+  });
+
+  /* 分类切换 */
+  document.querySelectorAll('.seg-item').forEach(function(el){
+    el.onclick=function(){
+      document.querySelectorAll('.seg-item').forEach(function(x){x.classList.remove('is-on')});
+      el.classList.add('is-on');
+      var t = el.textContent.trim();
+      currentFilter = (t==='需求')?'demand':((t==='供应')?'supply':'all');
+      render();
+    };
+  });
+
+  window.edit=function(){
+    var list = (window.FavoriteStore && FavoriteStore.list) ? FavoriteStore.list() : [];
+    var filtered = list.filter(function(it){
+      if(currentFilter==='all') return true;
+      return it.dir === currentFilter;
+    });
+    if(!filtered.length){
+      var tip = document.getElementById('manage-tip');
+      if(tip){
+        tip.classList.add('show');
+        setTimeout(function(){ tip.classList.remove('show'); }, 2000);
+      }
+      return;
+    }
+    UI.toast('管理模式','ok');
+  };
+
+  render();
+  window.addEventListener('engchain:favorite', render);
+  window.addEventListener('storage', function(e){ if(e.key==='engchain-favorites') render(); });
+})();
+</script>
+</body>
+</html>

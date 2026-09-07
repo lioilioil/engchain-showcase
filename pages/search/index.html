@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/search/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>搜索 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">搜索</div>
+    <div class="nav-right" style="width:32px;"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <!-- 可改词重搜的搜索框 -->
+    <div class="sr-search" style="margin-bottom:16px;">
+      <span class="sr-search-ic"><svg class="ic" style="width:15px;height:15px;"><use href="#i-search"/></svg></span>
+      <input id="q" placeholder="试试：成都 商品混凝土 急需" onkeydown="if(event.key==='Enter')go()">
+      <button class="sr-search-btn" onclick="go()">搜索</button>
+    </div>
+    <!-- AI 搜索提示卡 -->
+    <div class="ai-folder" style="margin-bottom:16px;">
+      <div class="af-head">
+        <div class="af-icon"><svg class="ic"><use href="#i-sparkle"/></svg></div>
+        <div><div class="af-title">AI 自然语言搜索</div><div class="af-sub">一句话描述需求，AI 理解意图并智能筛选</div></div>
+      </div>
+      <div style="margin-top:12px;position:relative;">
+        <button class="btn btn-primary btn-block" onclick="aiSearch()" style="background:linear-gradient(135deg,var(--primary),var(--primary-dim));">✦ 让 AI 帮你找</button>
+      </div>
+    </div>
+
+    <div class="section-title"><div class="st-left">大家都在搜</div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span class="tag tag-gray" onclick="setQ('商品混凝土')">商品混凝土</span>
+      <span class="tag tag-gray" onclick="setQ('盘扣脚手架')">盘扣脚手架</span>
+      <span class="tag tag-gray" onclick="setQ('防水分包')">防水分包</span>
+      <span class="tag tag-gray" onclick="setQ('塔吊租赁')">塔吊租赁</span>
+      <span class="tag tag-gray" onclick="setQ('劳务班组')">劳务班组</span>
+      <span class="tag tag-gray" onclick="setQ('外墙保温')">外墙保温</span>
+    </div>
+
+    <!-- AI 历史理解示例 -->
+    <div class="section">
+      <div class="section-title"><div class="st-left">AI 智能建议</div></div>
+      <div class="group">
+        <div class="row" onclick="setAI('成都 急需1000方C30混凝土 下周进场')">
+          <span class="row-icon" style="background:var(--primary-soft);color:var(--primary)"><svg class="ic"><use href="#i-bolt"/></svg></span>
+          <span class="label" style="font-size:13px;">"成都 急需1000方C30混凝土 下周进场"</span><span class="arrow">›</span>
+        </div>
+        <div class="row" onclick="setAI('西南 盘扣脚手架 租赁 200吨 现货')">
+          <span class="row-icon" style="background:rgba(37,99,235,.16);color:var(--blue)"><svg class="ic"><use href="#i-bolt"/></svg></span>
+          <span class="label" style="font-size:13px;">"西南 盘扣脚手架 租赁 200吨 现货"</span><span class="arrow">›</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/common.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  // 轻量意图解析（与 result.html 同口径，用于 AI 理解动画展示）
+  var CITY_WORDS = ['成都','重庆','贵阳','昆明','西安','绵阳','德阳','南充','宜宾','泸州','乐山','西南','四川','云南','贵州'];
+  var CAT_WORDS = [
+    {k:'material', w:['混凝土','水泥','砂石','钢筋','防水','保温','护栏','建材']},
+    {k:'equipment', w:['脚手架','塔吊','挖掘机','装载机','吊车','泵车','钢管','设备','租赁']},
+    {k:'labor', w:['班组','劳务','木工','钢筋工','混凝土工','工人','用工']},
+    {k:'cooperation', w:['分包','合作','联营','总包']},
+    {k:'agency', w:['代办','资质升级','安许','中介']},
+    {k:'franchise', w:['招商','加盟','代理','分公司']},
+    {k:'trade', w:['转让','买卖','收购','过户']},
+    {k:'personnel', w:['招聘','岗位','聘']},
+    {k:'talent', w:['求职','建造师','工程师','人才','持证']}
+  ];
+  var CAT_LABEL = {material:'材料',equipment:'设备',labor:'劳务',cooperation:'项目合作',agency:'中介服务',franchise:'资质招商',trade:'建企买卖',personnel:'企业招聘',talent:'持证人才'};
+  function quickParse(q) {
+    var city = '', cats = [];
+    CITY_WORDS.forEach(function (c) { if (!city && q.indexOf(c) !== -1) city = c; });
+    CAT_WORDS.forEach(function (c) { c.w.forEach(function (w) { if (cats.indexOf(c.k) === -1 && q.indexOf(w) !== -1) cats.push(c.k); }); });
+    return { city: city, cats: cats.map(function (k) { return CAT_LABEL[k]; }) };
+  }
+  // AI 搜索：展示理解动画后跳转 AI 结果页
+  window.aiSearch = function () {
+    var raw = (document.getElementById('q').value || '').trim() || '成都 急需1000方C30混凝土 下周进场';
+    var parsed = quickParse(raw);
+    var sheet = UI.sheet();
+    sheet.setText('AI 帮你找');
+    sheet.body().innerHTML =
+      '<div style="text-align:center;padding:12px 0;">' +
+      '<div class="spinner" style="margin:6px auto 0;"></div>' +
+      '<div class="fw-600" style="margin-top:14px;">AI 正在理解您的意图…</div>' +
+      '<div id="ai-think" style="margin-top:10px;font-size:12px;color:var(--text-3);">识别品类 → 提取地点 → 匹配合适供应/需求方</div>' +
+      '</div>';
+    var understand = [];
+    if (parsed.cats.length) understand.push('类别：<span class="green">' + parsed.cats.join('、') + '</span>');
+    if (parsed.city) understand.push('地区：<span class="green">' + parsed.city + '</span>');
+    understand.push('需求：<span class="green">智能匹配高相关结果</span>');
+    setTimeout(function () {
+      sheet.body().innerHTML =
+        '<div style="text-align:center;padding:8px 0;"><div style="display:flex;align-items:center;justify-content:center;color:var(--primary);"><svg class="ic" style="width:32px;height:32px;stroke-width:1.4;"><use href="#i-sparkle"/></svg></div>' +
+        '<div class="fw-600 fs-17" style="margin-top:8px;">已为您理解</div>' +
+        '<div class="text-2 fs-12" style="margin-top:8px;line-height:1.8;">' + understand.join(' · ') + '</div>' +
+        '<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="this.closest(\'.sheet\').close();location.href=\'result.html?mode=ai&q=\'+encodeURIComponent(\'' + raw.replace(/'/g, "\\'") + '\')">查看智能推荐</button></div>';
+    }, 1400);
+    sheet.show();
+  };
+  window.setQ = function (v) { document.getElementById('q').value = v; };
+  // AI 智能建议句：填入后直接走 AI 搜索
+  window.setAI = function (v) { document.getElementById('q').value = v; aiSearch(); };
+  // 普通关键词搜索：走普通结果页
+  window.go = function () {
+    var v = document.getElementById('q').value.trim();
+    location.href = 'result.html?mode=normal&q=' + encodeURIComponent(v || '混凝土');
+  };
+})();
+</script>
+</body>
+</html>

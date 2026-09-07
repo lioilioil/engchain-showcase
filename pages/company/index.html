@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/company/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业主页 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title" id="nav-title">企业主页</div>
+    <div class="nav-right">
+      <button class="icon-btn" onclick="UI.toast('已分享链接','ok')">↗</button>
+    </div>
+  </div>
+
+  <div class="scroll" style="padding-bottom:100px;">
+    <!-- 企业头图 -->
+    <div id="head"></div>
+    <!-- 认证卡片 (V3.3) -->
+    <div id="cert"></div>
+
+    <!-- 企业数据 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">企业数据</div></div>
+    <div class="card" id="stats" style="padding:16px 0;"></div>
+
+    <!-- 主营与资质 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">主营与资质</div></div>
+    <div class="group" id="info"></div>
+
+    <!-- 该企业发布的供需 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">该企业发布的供需</div></div>
+    <div id="published" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <div class="fixed-cta" style="display:flex;gap:10px;">
+    <button class="btn btn-ghost" style="flex:0 0 80px;" onclick="UI.toast('已收藏企业','ok')">☆ 收藏</button>
+    <button class="btn btn-outline" id="monitor-btn" style="flex:1;" onclick="toggleMonitor()">监控企业</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="UI.toast('已发起联系，等待对方确认','ok')">联系TA</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var id = new URLSearchParams(location.search).get('id') || 'c-znzjs';
+  var c = MOCK.companyById(id);
+  document.getElementById('nav-title').textContent = c.short || '企业主页';
+
+  /* 头图 */
+  function chip(txt, cls) { return '<span class="tag ' + (cls || 'tag-gold') + '">' + txt + '</span>'; }
+  document.getElementById('head').innerHTML =
+    '<div class="card" style="margin-top:2px;padding:18px 16px;">' +
+      '<div style="display:flex;align-items:center;gap:14px;">' +
+        '<div style="width:58px;height:58px;border-radius:16px;flex:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--text-inv);">' + (c.avatar || '企') + '</div>' +
+        '<div style="flex:1;min-width:0;"><div class="fs-title fw-700 elip" style="color:var(--text-1);">' + c.name + '</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + chip('✓ 官方认证', 'tag-gold') + chip(c.industry, 'tag-gray') + chip(c.emphasis || c.status, 'tag-primary') + '</div></div>' +
+      '</div>' +
+      '<div class="fb-between" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);">' +
+        '<span class="text-2 fs-13"><svg class="ic" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><use href="#i-pin"/></svg>' + c.location + '</span>' +
+        '<span class="text-2 fs-13"><svg class="ic" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><use href="#i-card"/></svg>' + (c.mainBusiness || c.industry) + '</span>' +
+      '</div>' +
+    '</div>';
+
+  /* 认证卡片 */
+  document.getElementById('cert').innerHTML = UI.certCard(c);
+
+  /* 企业数据 */
+  var pub = (c.published || []).length;
+  var stats = [
+    { n: pub, l: '发布供需' },
+    { n: (pub * 3), l: '成交订单' },
+    { n: c.reviewCount, l: '企业评价' },
+    { n: 26, l: '在促合作' }
+  ];
+  document.getElementById('stats').innerHTML = '<div style="display:flex;">' + stats.map(function (s, i) {
+    return '<div style="flex:1;text-align:center;' + (i ? 'border-left:1px solid var(--line);' : '') + '"><div class="mono fw-700" style="font-size:19px;color:var(--primary);">' + s.n + '</div><div class="fs-11 text-2" style="margin-top:2px;">' + s.l + '</div></div>';
+  }).join('') + '</div>';
+
+  /* 主营与资质 */
+  var info = [
+    { k: '所属行业', v: c.industry },
+    { k: '经营范围', v: c.mainBusiness },
+    { k: '资质背书', v: c.emphasis },
+    { k: '信用代码', v: c.creditCode, mono: 1 },
+    { k: '法定代表人', v: c.legalRep },
+    { k: '入驻时间', v: c.founded }
+  ];
+  document.getElementById('info').innerHTML = info.map(function (r) {
+    return '<div class="row"><span class="label">' + r.k + '</span><span class="value ' + (r.mono ? 'mono' : '') + '" style="text-align:right;margin-left:auto;max-width:60%;">' + r.v + '</span></div>';
+  }).join('');
+
+  /* 该企业发布的供需 · 统一目录 */
+  var list = (c.published || []).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean);
+  if (!list.length) {
+    document.getElementById('published').innerHTML = '<div class="pub-empty">该企业暂未发布供需信息</div>';
+  } else {
+  document.getElementById('published').innerHTML = list.map(function (s) {
+    var cls = s.dir === 'demand' ? 'tag-blue' : s.dir === 'supply' ? 'tag-primary' : 'tag-gold';
+    var lbl = s.dir === 'demand' ? '需求' : s.dir === 'supply' ? '供应' : '机会';
+    return '<a href="../supply/detail.html?id=' + s.id + '" class="supply-card"><div class="sc-top"><span class="tag ' + cls + '">' + lbl + '</span>' +
+      '<span class="match-pill match-high" style="margin-left:auto;">' + s.match + '%</span></div>' +
+      '<div class="sc-title elip">' + s.title + '</div>' +
+      '<div class="sc-foot"><span class="sc-price" style="font-size:14px;">' + (s.dir === 'demand' ? s.budget : (s.price || s.budget)) + '</span>' +
+      '<span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>' + s.location + '</span></div></a>';
+  }).join('');
+  }
+
+  /* ===== L7：监控企业入口（接通 G1 试用逻辑） ===== */
+  var monitorBtn = document.getElementById('monitor-btn');
+  function monitorLimit() {
+    var st = window.deriveStatus ? deriveStatus() : 'registered';
+    var limits = (MOCK.business && MOCK.business.monitor && MOCK.business.monitor.limits) || {};
+    var limitKey = st === 'resident' ? ((EntryStore.read().type) || 'construction') : st;
+    var limit = limits[limitKey] || limits.realname || 0;
+    if (st === 'registered' || st === 'guest') limit = 0;
+    /* G1：破冰期 registered 用户 7 天免费试用 */
+    if (window.ModeStore && ModeStore.isBreakIn() && st === 'registered') {
+      var TRIAL_KEY = 'engchain-monitor-trial';
+      var trialDays = ((MOCK.business.breakin || {}).monitorTrialDays) || 7;
+      var trial = null;
+      try { trial = JSON.parse(localStorage.getItem(TRIAL_KEY) || 'null'); } catch (e) {}
+      if (!trial) { trial = { start: Date.now(), used: true }; try { localStorage.setItem(TRIAL_KEY, JSON.stringify(trial)); } catch (e) {} }
+      var remainDays = Math.max(0, trialDays - Math.floor((Date.now() - trial.start) / 86400000));
+      if (remainDays > 0) limit = limits.realname || 5;
+    }
+    return { limit: limit, status: st };
+  }
+  function refreshMonitorBtn() {
+    if (!monitorBtn) return;
+    var followed = window.MonitorStore ? MonitorStore.isFollowed(id) : false;
+    if (followed) {
+      monitorBtn.textContent = '已监控';
+      monitorBtn.disabled = true;
+      monitorBtn.style.opacity = '.55';
+      monitorBtn.style.cursor = 'default';
+      return;
+    }
+    var ml = monitorLimit();
+    if (ml.status === 'guest') {
+      monitorBtn.textContent = '监控企业';
+      monitorBtn.disabled = false;
+      monitorBtn.style.opacity = '';
+      monitorBtn.style.cursor = '';
+    } else if (ml.limit <= 0) {
+      monitorBtn.textContent = '入驻解锁监控';
+      monitorBtn.disabled = false;
+      monitorBtn.style.opacity = '';
+      monitorBtn.style.cursor = '';
+    } else {
+      monitorBtn.textContent = '监控企业';
+      monitorBtn.disabled = false;
+      monitorBtn.style.opacity = '';
+      monitorBtn.style.cursor = '';
+    }
+  }
+  window.toggleMonitor = function () {
+    var ml = monitorLimit();
+    if (ml.status === 'guest') {
+      UI.dialog({ title: '登录后监控企业', text: '登录后可关注企业动态，资质到期 / 项目更新 / 司法变更实时推送。', ok: '去登录', cancel: '取消', onOk: function () { location.href = '../auth/login.html'; } });
+      return;
+    }
+    if (window.MonitorStore && MonitorStore.isFollowed(id)) {
+      UI.toast('该企业已在监控列表', 'info');
+      return;
+    }
+    if (ml.limit <= 0) {
+      UI.dialog({ title: '入驻企业解锁监控', text: '完成企业入驻后可监控最多 30~200 家企业动态，破冰期注册用户享 7 天免费试用。', ok: '去入驻', cancel: '取消', onOk: function () { location.href = '../profile/entry.html'; } });
+      return;
+    }
+    var s = MonitorStore.read();
+    if (s.follows.length >= ml.limit) {
+      UI.toast('已达监控上限 ' + ml.limit + ' 家', 'warn');
+      return;
+    }
+    MonitorStore.follow(id);
+    UI.toast('已加入监控列表', 'ok');
+    refreshMonitorBtn();
+    setTimeout(function () { location.href = '../monitor/index.html'; }, 700);
+  };
+  refreshMonitorBtn();
+})();
+</script>
+<style>
+  .cert-card { margin-left:0; margin-right:0; margin-top:6px; }
+  .group .row .value { color: var(--text-1); font-size: 13px; }
+  .pub-empty { padding:24px 16px; text-align:center; font-size:12px; color:var(--text-3); }
+</style>
+</body>
+</html>

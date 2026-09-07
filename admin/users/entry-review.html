@@ -1,0 +1,336 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入驻审核 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="users/entry-review.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>入驻审核</h1>
+        <div class="sub">用户与认证中心 · 三类入驻两级审批（建筑 / 中介 / 合伙人 · 初审→终审）· 通过写用户表 + 入驻费订单，App 端即时同步</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">入驻申请列表</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var TYPE = { construction: '建筑企业', agency: '中介服务企业', partner: '合伙人企业' };
+  var BADGE = { construction: '蓝V', agency: '金V', partner: '专属' };
+  var DEPOSIT = { construction: '¥5,000', agency: '¥20,000', partner: '¥50,000' };
+  var STATUS_LABEL = { pending: '待初审', first_ok: '待终审', active: '已通过', rejected: '已驳回' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { type: '', status: '', date_start: '', date_end: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); } catch (e) { return '-'; }
+  }
+  function fmtDate(ts) { try { return new Date(ts).toISOString().slice(0, 10); } catch (e) { return ''; } }
+
+  function users() { return (window.DataBus && DataBus.users) ? DataBus.users() : []; }
+
+  function allApplications() {
+    return users().filter(function (u) {
+      return u.status !== 'guest' && u.entry && u.entry.type &&
+        (u.entry.status === 'pending' || u.entry.status === 'first_ok' || u.entry.status === 'active' || u.entry.status === 'rejected');
+    });
+  }
+
+  function filteredList() {
+    return allApplications().filter(function (u) {
+      if (filters.type && u.entry.type !== filters.type) return false;
+      if (filters.status && u.entry.status !== filters.status) return false;
+      if (filters.date_start && u.entry.submittedAt && u.entry.submittedAt < new Date(filters.date_start).getTime()) return false;
+      if (filters.date_end && u.entry.submittedAt && u.entry.submittedAt > new Date(filters.date_end).getTime() + 86400000) return false;
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        if ((u.name + u.company + u.account + (u.entry.orderId || '')).toLowerCase().indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function entryFeeOf(type) { return (window.DataBus && DataBus.entryFeeOf) ? DataBus.entryFeeOf(type) : 0; }
+
+  function renderKPI() {
+    var all = allApplications();
+    var pendingFirst = all.filter(function (u) { return u.entry.status === 'pending'; }).length;
+    var pendingFinal = all.filter(function (u) { return u.entry.status === 'first_ok'; }).length;
+    var approved = all.filter(function (u) { return u.entry.status === 'active'; }).length;
+    var rejected = all.filter(function (u) { return u.entry.status === 'rejected'; }).length;
+    var cards = [
+      ['待初审', pendingFirst, 'warn', '运营初审队列'],
+      ['待终审', pendingFinal, 'gold', '风控终审队列'],
+      ['已通过', approved, 'up', '入驻生效'],
+      ['已驳回', rejected, 'down', '申请被驳回']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'type', label: '企业类型', type: 'select', options: [
+          { value: 'construction', label: '建筑企业' },
+          { value: 'agency', label: '中介服务企业' },
+          { value: 'partner', label: '合伙人企业' }
+        ]},
+        { key: 'status', label: '审核状态', type: 'select', options: [
+          { value: 'pending', label: '待初审' },
+          { value: 'first_ok', label: '待终审' },
+          { value: 'active', label: '已通过' },
+          { value: 'rejected', label: '已驳回' }
+        ]},
+        { key: 'date', label: '申请时间', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '企业名 / 申请人 / 申请单号' }
+      ],
+      onFilter: function (vals) {
+        filters.type = vals.type || ''; filters.status = vals.status || '';
+        filters.date_start = vals.date_start || ''; filters.date_end = vals.date_end || '';
+        filters.keyword = vals.keyword || ''; page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 项申请');
+      },
+      onReset: function () {
+        filters = { type: '', status: '', date_start: '', date_end: '', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function statusBadge(st) {
+    var m = {
+      pending: ['badge-warning', '待初审'],
+      first_ok: ['badge-info', '待终审'],
+      active: ['badge-success', '已通过'],
+      rejected: ['badge-danger', '已驳回']
+    };
+    var v = m[st] || ['badge-outline', st];
+    return '<span class="badge ' + v[0] + '">' + v[1] + '</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = '筛选 ' + list.length + ' / 共 ' + allApplications().length + ' 项申请';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'orderId', label: '申请单号', width: '140px', render: function (row) { return '<span class="tx-mono">' + esc(row.entry.orderId || ('—')) + '</span>'; } },
+        { key: 'company', label: '企业 / 申请人', width: '180px', render: function (row) {
+          return '<div><div class="tx-semibold">' + esc(row.name) + '</div>' +
+            '<div class="tx-muted-sm">' + esc(row.company || '-') + '</div></div>';
+        }},
+        { key: 'type', label: '类型', width: '100px', render: function (row) {
+          return '<span class="badge badge-gold">' + BADGE[row.entry.type] + ' · ' + (TYPE[row.entry.type] || row.entry.type) + '</span>';
+        }},
+        { key: 'fee', label: '入驻费', width: '90px', render: function (row) {
+          var fee = entryFeeOf(row.entry.type);
+          return fee === 0 ? '<span class="tx-success">免费</span>' : money(fee);
+        }},
+        { key: 'status', label: '状态', width: '90px', render: function (row) { return statusBadge(row.entry.status); } },
+        { key: 'submittedAt', label: '申请时间', width: '140px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.entry.submittedAt || row.entry.paidAt || Date.now()) + '</span>'; } },
+        { key: 'ops', label: '操作', width: '200px', render: function (row) {
+          if (row.entry.status === 'pending') {
+            return '<button class="btn btn-sm btn-primary" data-perm="approve.first" data-act="first" data-id="' + row.id + '">初审通过</button>' +
+              '<button class="btn btn-sm btn-ghost" data-perm="approve.first" data-act="reject" data-id="' + row.id + '">驳回</button>';
+          } else if (row.entry.status === 'first_ok') {
+            return '<button class="btn btn-sm btn-primary" data-perm="approve.final" data-act="final" data-id="' + row.id + '">终审通过</button>' +
+              '<button class="btn btn-sm btn-ghost" data-perm="approve.final" data-act="reject" data-id="' + row.id + '">驳回</button>';
+          }
+          return '<span class="tx-muted-sm">已完成</span>';
+        }}
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '暂无符合条件的入驻申请'
+      }
+    });
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+  }
+
+  function openDetail(u) {
+    var e = u.entry || {};
+    var a = u.auth || {};
+    var fee = entryFeeOf(e.type);
+    var timeline = '';
+    if (e.submittedAt) timeline += '<div class="tl-item"><span class="tl-dot"></span><div><div class="tl-t">提交申请</div><div class="tl-s">' + fmtTime(e.submittedAt) + '</div></div></div>';
+    if (e.firstAt) timeline += '<div class="tl-item"><span class="tl-dot"></span><div><div class="tl-t">初审通过 · ' + esc(e.firstBy || '运营') + '</div><div class="tl-s">' + fmtTime(e.firstAt) + (e.firstNote ? ' · ' + esc(e.firstNote) : '') + '</div></div></div>';
+    if (e.paidAt && e.status === 'active') timeline += '<div class="tl-item"><span class="tl-dot"></span><div><div class="tl-t">终审通过 · 入驻生效</div><div class="tl-s">' + fmtTime(e.paidAt) + ' · 入驻费 ' + (fee === 0 ? '免费' : money(fee)) + '</div></div></div>';
+    if (e.rejectedAt) timeline += '<div class="tl-item"><span class="tl-dot tl-dot-danger"></span><div><div class="tl-t">已驳回</div><div class="tl-s">' + fmtTime(e.rejectedAt) + (e.note ? ' · ' + esc(e.note) : '') + '</div></div></div>';
+
+    var body = '<div class="profile-head">' +
+      '<span class="u-av av-lg">' + esc(u.avatar || u.name.charAt(0)) + '</span>' +
+      '<div><div class="tx-title">' + esc(u.name) + statusBadge(e.status) + '</div>' +
+      '<div class="tx-sub">' + esc(u.account) + (u.company ? ' · ' + esc(u.company) : '') + '</div></div></div>' +
+
+      '<div class="sec-title-sm">企业信息</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">入驻类型</div><div class="v">' + BADGE[e.type] + ' · ' + (TYPE[e.type] || e.type) + '</div></div>' +
+      '<div class="dg"><div class="k">联系人</div><div class="v">' + esc(e.contact || u.name) + '</div></div>' +
+      '<div class="dg"><div class="k">联系电话</div><div class="v">' + esc(e.tel || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">经营范围</div><div class="v">' + esc(e.scope || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">入驻费</div><div class="v">' + (fee === 0 ? '免费（破冰期）' : money(fee)) + '</div></div>' +
+      '<div class="dg"><div class="k">保证金</div><div class="v">' + DEPOSIT[e.type] + '（' + (e.depositType || 'basic') + '档）</div></div>' +
+      '</div>' +
+
+      '<div class="sec-title">资质材料</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">实名认证</div><div class="v">' + (a.realname && a.realname.ok ? '<span class="tx-success">已认证</span>' : '<span class="tx-warning">未认证</span>') + '</div></div>' +
+      '<div class="dg"><div class="k">企业认证</div><div class="v">' + (a.enterprise && a.enterprise.ok ? '<span class="tx-success">已认证</span>' : '<span class="tx-warning">未认证</span>') + '</div></div>' +
+      '<div class="dg"><div class="k">资质清单</div><div class="v tx-regular">' + esc((a.qual && a.qual.list && a.qual.list.length) ? a.qual.list.join('、') : '—') + '</div></div>' +
+      '<div class="dg"><div class="k">资金账户</div><div class="v">' + (a.payment && a.payment.ok ? '<span class="tx-success">已核验</span>' : '<span class="tx-warning">未核验</span>') + '</div></div>' +
+      '</div>' +
+
+      '<div class="sec-title">审核时间线</div>' +
+      '<div class="timeline">' + (timeline || '<div class="tx-muted-sm">暂无审核记录</div>') + '</div>';
+
+    var footer = '';
+    if (e.status === 'pending') {
+      footer = '<button class="btn btn-primary" data-perm="approve.first" id="d-first">初审通过</button>' +
+        '<button class="btn btn-ghost" data-perm="approve.first" id="d-reject">驳回</button>';
+    } else if (e.status === 'first_ok') {
+      footer = '<button class="btn btn-primary" data-perm="approve.final" id="d-final">终审通过</button>' +
+        '<button class="btn btn-ghost" data-perm="approve.final" id="d-reject">驳回</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '入驻申请详情 · ' + u.name, content: body, footer: footer, width: '560px' });
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+    if (footer) {
+      var fb = drawer.panel.querySelector('.drawer-footer');
+      if (fb) {
+        var fBtn = fb.querySelector('#d-first');
+        if (fBtn) fBtn.onclick = function () { drawer.close(); approveDialog(u, 'first'); };
+        var fiBtn = fb.querySelector('#d-final');
+        if (fiBtn) fiBtn.onclick = function () { drawer.close(); approveDialog(u, 'final'); };
+        var rBtn = fb.querySelector('#d-reject');
+        if (rBtn) rBtn.onclick = function () { drawer.close(); rejectDialog(u); };
+      }
+    }
+  }
+
+  function approveDialog(u, level) {
+    var isFinal = level === 'final';
+    var fee = entryFeeOf(u.entry.type);
+    var body = '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">申请人</div><div class="v">' + esc(u.name) + '</div></div>' +
+      '<div class="dg"><div class="k">企业</div><div class="v">' + esc(u.company || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">入驻类型</div><div class="v">' + BADGE[u.entry.type] + ' · ' + (TYPE[u.entry.type] || u.entry.type) + '</div></div>' +
+      '<div class="dg"><div class="k">审批级</div><div class="v">' + (isFinal ? '终审（风控复核）' : '初审（运营）') + '</div></div>' +
+      '<div class="dg"><div class="k">入驻费</div><div class="v">' + (fee === 0 ? '免费' : money(fee)) + '</div></div>' +
+      '<div class="dg"><div class="k">保证金</div><div class="v">' + DEPOSIT[u.entry.type] + '</div></div>' +
+      '</div>' +
+      '<div class="calc-tip mt-10">' + (isFinal
+        ? '终审通过后：用户表 entry 置为 active + 生成入驻费订单 + App 端身份变为「企业入驻」，分销/中介入口按类型开放。'
+        : '初审通过后状态置为「待终审」，由风控终审岗复核；资金类费用在终审通过后统一落账。') + '</div>';
+    Admin.confirm({
+      title: (isFinal ? '终审通过 · ' : '初审通过 · ') + u.name,
+      body: body, ok: isFinal ? '确认终审通过' : '确认初审通过',
+      onYes: function () {
+        var r = isFinal ? DataBus.entryFinalApprove(u.id, u.entry.type) : DataBus.entryFirstApprove(u.id, u.entry.type);
+        if (!r) { Admin.toast('操作失败，请检查状态'); return; }
+        Admin.toast(isFinal ? ('已终审通过入驻：' + r.name) : ('已初审通过：' + r.name + '（待终审）'));
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function rejectDialog(u) {
+    var isFinal = u.entry.status === 'first_ok';
+    Admin.confirm({
+      title: '驳回入驻申请 · ' + u.name,
+      body: '<div class="form-item"><label>驳回原因</label><input class="input" id="reject-note" placeholder="请输入驳回原因（将同步至 App 入驻结果页）…" maxlength="100"></div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = '';
+        try { note = document.getElementById('reject-note').value.trim(); } catch (e) {}
+        if (!note) { Admin.toast('请填写驳回原因'); return; }
+        var r = DataBus.entryReject(u.id, u.entry.type, note, isFinal ? 'final' : 'first');
+        if (!r) { Admin.toast('操作失败'); return; }
+        Admin.toast('已驳回：' + r.name);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows = list.map(function (u) {
+      return [u.entry.orderId || '', u.name, u.company || '', TYPE[u.entry.type] || u.entry.type,
+        entryFeeOf(u.entry.type), STATUS_LABEL[u.entry.status] || u.entry.status,
+        fmtTime(u.entry.submittedAt || u.entry.paidAt || '')];
+    });
+    var ok = Admin.exportCSV('入驻审核.csv', ['申请单号', '申请人', '企业', '类型', '入驻费', '状态', '申请时间'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '入驻审核', '', '入驻审核.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var id = b.getAttribute('data-id');
+      var u = null;
+      users().forEach(function (x) { if (x.id === id) u = x; });
+      if (!u) return;
+      var act = b.getAttribute('data-act');
+      if (act === 'first') approveDialog(u, 'first');
+      else if (act === 'final') approveDialog(u, 'final');
+      else if (act === 'reject') rejectDialog(u);
+    });
+    window.addEventListener('engchain:entry', function () { renderKPI(); renderTable(); });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

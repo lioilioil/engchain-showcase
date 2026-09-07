@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>我的发布 · 工程链</title><link rel="stylesheet" href="../../css/app.css"><style>
+  .list-scroll{padding:10px 16px 30px}.list-head{padding:8px 0 14px;display:flex;align-items:end;justify-content:space-between}.list-title{font-size:22px;font-weight:700}.list-sub{color:var(--text-3);font-size:11px;margin-top:3px}.record{padding:14px;margin-bottom:10px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--bg-card);box-shadow:var(--shadow-xs)}.record-top,.record-meta,.record-actions{display:flex;align-items:center;gap:8px}.record-top{justify-content:space-between}.record-title{font-size:14px;font-weight:600;line-height:1.45}.record-status{padding:3px 8px;border-radius:var(--r-full);font-size:10px;white-space:nowrap}.status-active{background:var(--success-soft);color:var(--success)}.status-review,.status-pending_review{background:var(--primary-soft);color:var(--primary-dim)}.status-paused,.status-expired,.status-off{background:var(--bg-subtle);color:var(--text-3)}.status-rejected{background:rgba(179,38,30,.10);color:var(--error)}.record-meta{margin-top:8px;color:var(--text-3);font-size:11px;flex-wrap:wrap}.record-price{margin-top:7px;color:var(--primary-dim);font-weight:600;font-size:12px;flex-wrap:wrap}.record-desc{margin-top:7px;color:var(--text-2);font-size:12px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.record-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.record-metric{text-align:center;border-right:1px solid var(--line)}.record-metric:last-child{border:0}.record-metric strong{display:block;font:700 16px var(--font-num)}.record-metric span{display:block;margin-top:2px;color:var(--text-3);font-size:10px}.record-actions{margin-top:12px}.record-actions button{flex:1;min-height:34px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg-card);color:var(--text-2);font-size:11px;cursor:pointer}.record-actions button:hover{border-color:var(--primary);color:var(--primary-dim)}.record-actions button:focus-visible{outline:none;box-shadow:var(--shadow-focus)}
+</style></head><body><div class="phone">
+  <div id="pub-gate-login" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">登录后查看发布记录</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">登录后可管理已发布信息，查看浏览、匹配与咨询数据。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">立即登录</a>
+  </div>
+  <div id="pub-gate-realname" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-shield"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">实名认证后可管理发布</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成实名认证后，即可发布信息并查看对接进展。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往实名认证</a>
+  </div>
+  <div id="pub-content">
+  <div class="navbar" style="height:50px"><button class="nav-back" onclick="history.back()">‹</button><div class="nav-title">我的发布</div><div class="nav-right"><a href="editor.html?role=demand" class="icon-btn" aria-label="新建信息">+</a></div></div><main class="scroll list-scroll"><header class="list-head"><div><h1 class="list-title">我的信息</h1><div class="list-sub">管理发布状态与对接反馈</div></div></header><div class="seg" id="filters"><span class="seg-item is-on" data-filter="all">全部</span><span class="seg-item" data-filter="demand">需求</span><span class="seg-item" data-filter="supply">供应</span></div><div id="record-list" style="margin-top:14px"></div></main></div></div><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-workbench.js"></script><script>
+(function(){
+  /* ---- 身份门控 ---- */
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateLogin = document.getElementById('pub-gate-login');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (st.loggedIn === false) { if (content) content.style.display='none'; if (gateLogin) gateLogin.style.display=''; return false; }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) { if (content) content.style.display='none'; if (gateReal) gateReal.style.display=''; return false; }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+  var list=document.getElementById('record-list'), filter='all';
+  var STATUS_LABEL = { pending_review:'待审核', active:'已上架', rejected:'已驳回', off:'已下架' };
+  function esc(value){return String(value == null ? '' : value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  /* L1：从 SupplyStore 读取当前用户发布的供需（source=user_publish 或 migrated_publish） */
+  function myPublishes() {
+    if (!window.SupplyStore) return [];
+    var cur = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = cur ? cur.id : '';
+    return SupplyStore.read().items.filter(function (x) {
+      return (x.source === 'user_publish' || x.source === 'migrated_publish') && x.publisher === uid;
+    });
+  }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    try { return new Date(ts).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false }); } catch (e) { return ''; }
+  }
+  function render(){
+    var rows=myPublishes().filter(function(r){return filter==='all'||r.dir===filter;});
+    list.innerHTML=rows.length?rows.map(function(r){
+      var status=STATUS_LABEL[r.status]||r.status||'未知';
+      var stClass = r.status || 'pending_review';
+      var amount = r.amount || (r.price ? (r.price + (r.unit ? ' ' + r.unit : '')) : '');
+      return '<article class="record"><div class="record-top"><div class="record-title">'+esc(r.title)+'</div><span class="record-status status-'+esc(stClass)+'">'+esc(status)+'</span></div><div class="record-meta"><span>'+esc(r.cat||r.category||'')+'</span><span>·</span><span>'+esc(r.location||'')+'</span><span>·</span><span>'+esc(fmtTime(r.ts||r.updatedAt))+'</span></div>'+((amount||r.qty)?'<div class="record-price">'+esc(amount||'')+(r.qty?(amount?' · ':'')+esc(r.qty):'')+'</div>':'')+(r.desc||r.description?'<div class="record-desc">'+esc(r.desc||r.description)+'</div>':'')+(r.rejectNote?'<div class="record-desc" style="color:var(--error);">驳回原因：'+esc(r.rejectNote)+'</div>':'')+'<div class="record-actions"><button data-action="edit" data-id="'+esc(r.id)+'">编辑信息</button><button data-action="detail" data-id="'+esc(r.id)+'">查看详情</button></div></article>';
+    }).join(''):'<div class="wb-empty">暂无发布记录<br><a href="editor.html?role=demand" style="display:inline-block;margin-top:10px;color:var(--primary-dim)">发布第一条供需</a></div>';
+  }
+  document.querySelectorAll('#filters .seg-item').forEach(function(el){el.onclick=function(){filter=el.dataset.filter;document.querySelectorAll('#filters .seg-item').forEach(function(x){x.classList.remove('is-on')});el.classList.add('is-on');render();}});
+  list.onclick=function(e){
+    var button=e.target.closest('button');if(!button)return;
+    var id=button.dataset.id, action=button.dataset.action;
+    if(action==='edit')location.href='editor.html?record='+id;
+    else if(action==='detail'&&id&&id!=='undefined')location.href='../supply/detail.html?id='+id;
+  };
+  /* 监听供需变更（后台审核后即时刷新状态） */
+  window.addEventListener('engchain:supply', function(){ render(); });
+  window.addEventListener('storage', function(e){ if(e.key==='engchain-supply') render(); });
+  render();
+})();
+</script></body></html>

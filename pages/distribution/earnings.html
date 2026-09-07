@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/distribution/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>收益明细 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">收益明细</div>
+    <div class="nav-right"><button onclick="openFilter()" style="color:var(--text-2);font-size:13px;">筛选</button></div>
+  </div>
+
+  <!-- 收益总览：玻璃卡 + 数字滚动 -->
+  <div class="earn-summary">
+    <div class="es-item">
+      <span class="es-ic es-gold"><svg class="ic"><use href="#i-sparkle"/></svg></span>
+      <span class="es-label">本月收益</span>
+      <b class="es-val mono" id="sb-month">¥0</b>
+    </div>
+    <span class="es-sep"></span>
+    <div class="es-item">
+      <span class="es-ic es-green"><svg class="ic"><use href="#i-wallet"/></svg></span>
+      <span class="es-label">累计返佣</span>
+      <b class="es-val mono" id="sb-total">¥0</b>
+    </div>
+    <span class="es-sep"></span>
+    <div class="es-item">
+      <span class="es-ic es-blue"><svg class="ic"><use href="#i-card"/></svg></span>
+      <span class="es-label">可提现</span>
+      <b class="es-val mono green" id="sb-avail">¥0</b>
+    </div>
+  </div>
+
+  <!-- 状态快捷筛选 -->
+  <div class="chip-bar" id="chip-bar"></div>
+
+  <div class="scroll" style="padding-top:14px;">
+    <div class="group-label" id="list-label">返佣记录</div>
+    <div class="er-list" id="list"></div>
+    <div id="empty" style="display:none;padding:48px 24px;text-align:center;color:var(--text-3);">
+      <svg class="ic" style="width:40px;height:40px;margin-bottom:10px;color:var(--primary);"><use href="#i-wallet"/></svg>
+      <div class="fs-13">暂无返佣记录，邀请好友消费后自动到账</div>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="location.href='poster.html'">去邀请好友</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmt(ts){var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered'};
+if(!acc.isResident){
+  var ph=document.querySelector('.phone');
+  if(ph){ph.innerHTML='<div style="padding:88px 28px;text-align:center;">'+
+    '<svg class="ic" style="width:42px;height:42px;color:var(--primary);margin-bottom:14px;"><use href="#i-share"/></svg>'+
+    '<div class="fw-700 fs-17" style="margin-bottom:8px;">分销中心 · 入驻企业专享</div>'+
+    '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:26px;">完成企业入驻后开通分销返佣。<br>本页面仅入驻企业可访问。</div>'+
+    '<button class="btn btn-primary btn-block" onclick="location.href=\''+(acc.statusId==='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId==='guest'?'去登录':'去入驻')+'</button>'+
+    '<a href="index.html" style="display:block;margin-top:14px;color:var(--text-3);font-size:13px;">返回分销中心 ›</a>'+
+    '</div>';}
+  return;
+}
+var me=DataBus.current(),uid=me?me.id:'';
+var STATES=RULE('distribution.states',{});
+var SRC={recharge:'充值返佣',order:'订单返佣',entry:'入驻返佣'};
+var SRC_ICON={recharge:'i-wallet',order:'i-doc',entry:'i-shield'};
+var filter={status:'',level:'',source:''};
+var CHIPS=[{k:'',label:'全部'},{k:'frozen',label:'冻结中'},{k:'settled',label:'已结算'},{k:'paid',label:'已发放'},{k:'clawback',label:'已追回'}];
+var ST_TAG={frozen:{t:'冻结中',c:'var(--text-2)',b:'var(--bg-card-2)',bd:'var(--line)'},settled:{t:'已结算',c:'var(--success)',b:'rgba(43,107,79,.08)',bd:'rgba(43,107,79,.22)'},paid:{t:'已发放',c:'var(--primary-dim)',b:'var(--primary-soft)',bd:'var(--accent-line)'},clawback:{t:'已追回',c:'var(--danger)',b:'rgba(190,61,52,.08)',bd:'rgba(190,61,52,.22)'}};
+
+function userName(id){var u=DataBus.byId(id);return u?(u.name||'用户'):id;}
+function renderChips(){
+  document.getElementById('chip-bar').innerHTML=CHIPS.map(function(c){
+    return '<span class="f-chip'+(filter.status===c.k?' on':'')+'" onclick="setChip(\''+c.k+'\')">'+c.label+'</span>';
+  }).join('');
+}
+window.setChip=function(k){filter.status=(filter.status===k?'':k);renderChips();renderList();};
+function countUp(el,target,dur){
+  if(!el||!window.requestAnimationFrame)return;
+  var t0=null;
+  function tick(ts){if(!t0)t0=ts;var p=Math.min(1,(ts-t0)/(dur||800)),e=1-Math.pow(1-p,3);el.textContent='¥'+money(target*e);if(p<1)requestAnimationFrame(tick);}
+  requestAnimationFrame(tick);
+  /* 兜底：后台标签 rAF 可能被节流，1.2s 后强制落定最终值 */
+  setTimeout(function(){el.textContent='¥'+money(target);},1200);
+}
+function renderSummary(){
+  var st=Rebate.stat(uid);
+  var monthStart=new Date();monthStart.setDate(1);monthStart.setHours(0,0,0,0);
+  var month=Rebate.listBy(uid).filter(function(o){return o.createdAt>=monthStart.getTime()&&o.status!=='clawback';}).reduce(function(s,o){return s+o.fee;},0);
+  var elM=document.getElementById('sb-month'),elT=document.getElementById('sb-total'),elA=document.getElementById('sb-avail');
+  /* L5：可提现金额统一口径 = BalanceStore.available()（与提现校验同源） */
+  var _availForSummary = (window.BalanceStore ? BalanceStore.available() : st.available);
+  elM.textContent='¥'+money(month);elT.textContent='¥'+money(st.total);elA.textContent='¥'+money(_availForSummary);
+  countUp(elM,month,900);
+}
+function renderList(){
+  var arr=Rebate.listBy(uid,{status:filter.status||undefined,level:filter.level||undefined,source:filter.source||undefined});
+  var box=document.getElementById('list'),empty=document.getElementById('empty');
+  document.getElementById('list-label').textContent='返佣记录（'+arr.length+'）';
+  if(!arr.length){box.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  box.innerHTML='<div class="er-card">'+arr.map(function(o){
+    var lv=o.level===1?'一级':'二级';
+    var sign=o.fee<0?'':'+';
+    var cls=o.status==='clawback'?'er-amt-dn':(o.status==='paid'?'er-amt-gold':(o.status==='settled'?'er-amt-ok':'er-amt-idle'));
+    var tag=ST_TAG[o.status]||{t:STATES[o.status]||o.status,c:'var(--text-2)',b:'var(--bg-card-2)',bd:'var(--line)'};
+    var ic=(SRC_ICON[o.sourceType]||'i-wallet').replace('i-','#i-');
+    return '<div class="er-row" onclick="showDetail(\''+o.id+'\')">'+
+      '<span class="er-ic" style="background:'+(o.level===1?'var(--primary-soft)':'rgba(43,107,79,.09)')+';color:'+(o.level===1?'var(--primary-dim)':'var(--success)')+';"><svg class="ic"><use href="'+ic+'"/></svg></span>'+
+      '<div class="er-main"><div class="er-title"><b class="er-lv">'+lv+'</b><span class="er-name">'+userName(o.sourceUserId)+'</span><span class="er-src">'+ (SRC[o.sourceType]||o.sourceType)+'</span></div>'+
+      '<div class="er-meta">'+fmt(o.createdAt)+' · 基数 ¥'+money(o.baseAmount)+' × '+o.rate+'%</div></div>'+
+      '<div class="er-right"><div class="er-amt '+cls+'">'+sign+'¥'+money(o.fee)+'</div><span class="er-tag" style="color:'+tag.c+';background:'+tag.b+';border-color:'+tag.bd+';">'+tag.t+'</span></div></div>';
+  }).join('')+'</div>';
+}
+window.showDetail=function(id){
+  var o=Rebate.listBy(uid).filter(function(x){return x.id===id;})[0];if(!o)return;
+  var tag=ST_TAG[o.status]||{t:STATES[o.status]||o.status,c:'var(--text-2)',b:'var(--bg-card-2)',bd:'var(--line)'};
+  var tl=Timeline.list('rebate',id).map(function(t){return '<div class="text-3 fs-12" style="padding:3px 0;">'+fmt(t.ts)+' · '+t.event+'</div>';}).join('')||'<div class="text-3 fs-12">暂无</div>';
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-16" style="margin-bottom:8px;">返佣单详情</div>'+
+    '<div class="od-kv"><span>来源</span><b>'+(SRC[o.sourceType]||o.sourceType)+'（'+(o.sourceOrderId||'—')+'）</b></div>'+
+    '<div class="od-kv"><span>层级 / 档位</span><b>'+(o.level===1?'一级':'二级')+' · '+({full:'完整二级',limited:'受限一级',base:'基础一级'}[o.tier]||o.tier)+'</b></div>'+
+    '<div class="od-kv"><span>计算</span><b>¥'+money(o.baseAmount)+' × '+o.rate+'% = ¥'+money(o.fee)+'</b></div>'+
+    '<div class="od-kv"><span>状态</span><b><span class="er-tag" style="color:'+tag.c+';background:'+tag.b+';border-color:'+tag.bd+';">'+tag.t+'</span></b></div>'+
+    (o.walletTxnId?'<div class="od-kv"><span>钱包流水</span><b>'+o.walletTxnId+'</b></div>':'')+
+    '<div class="group-label" style="margin-top:10px;">记录时间线</div>'+tl+'</div>').show();
+};
+window.openFilter=function(){
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-16" style="margin-bottom:10px;">筛选</div>'+
+    '<div class="text-3 fs-12" style="margin-bottom:6px;">层级</div><div class="chip-bar">'+
+      ['','1','2'].map(function(l){return '<span class="f-chip'+(filter.level===l?' on':'')+'" onclick="setF(\'level\',\''+l+'\')">'+(l===''?'全部':l+'级')+'</span>';}).join('')+'</div>'+
+    '<div class="text-3 fs-12" style="margin:10px 0 6px;">来源</div><div class="chip-bar">'+
+      ['','recharge','order','entry'].map(function(s){return '<span class="f-chip'+(filter.source===s?' on':'')+'" onclick="setF(\'source\',\''+s+'\')">'+({ '':'全部',recharge:'充值',order:'订单',entry:'入驻' }[s])+'</span>';}).join('')+'</div>'+
+    '<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="UI.closeSheet()">完成</button></div>').show();
+};
+window.setF=function(k,v){filter[k]=(filter[k]===v?'':v);openFilter();renderList();};
+renderChips();renderSummary();renderList();
+window.addEventListener('engchain:rebate',function(){renderSummary();renderList();});
+})();
+</script>
+<style>
+/* ===== 收益总览玻璃卡 ===== */
+.earn-summary{display:flex;align-items:stretch;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);margin:10px 16px 0;padding:14px 6px;box-shadow:var(--shadow-card);position:relative;overflow:hidden;}
+.earn-summary::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 100% -20%, rgba(238,214,151,.14) 0%, transparent 55%);}
+.es-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;}
+.es-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:2px;}
+.es-ic svg{width:15px;height:15px;stroke-width:1.8;}
+.es-gold{background:var(--primary-soft);color:var(--primary-dim);}
+.es-green{background:rgba(43,107,79,.09);color:var(--success);}
+.es-blue{background:rgba(37,99,235,.09);color:var(--blue);}
+.es-label{font-size:10.5px;color:var(--text-3);}
+.es-val{font-size:16px;font-weight:800;color:var(--text-1);font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+.es-val.green{color:var(--primary-dim);}
+.es-sep{width:1px;background:var(--line);flex:none;margin:8px 0;}
+
+/* ===== 列表卡片 ===== */
+.er-list{padding:0 16px;}
+.er-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;box-shadow:var(--shadow-xs);}
+.er-row{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background var(--d-fast);animation:er-in .4s var(--e-out) both;}
+.er-row:last-child{border-bottom:none;}
+.er-row:active{background:var(--bg-alp);}
+@keyframes er-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.er-ic{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;}
+.er-ic svg{width:18px;height:18px;stroke-width:1.7;}
+.er-main{flex:1;min-width:0;}
+.er-title{display:flex;align-items:baseline;gap:6px;font-size:13.5px;}
+.er-lv{font-size:10px;font-weight:700;padding:1.5px 6px;border-radius:5px;background:var(--primary-soft);color:var(--primary-dim);flex:none;}
+.er-name{font-weight:600;color:var(--text-1);}
+.er-src{font-size:11px;color:var(--text-3);}
+.er-meta{font-size:10.5px;color:var(--text-3);margin-top:4px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.er-right{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.er-amt{font-size:15.5px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+.er-amt-ok{color:var(--success);}
+.er-amt-gold{color:var(--primary-dim);}
+.er-amt-idle{color:var(--text-2);}
+.er-amt-dn{color:var(--danger);}
+.er-tag{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;border:1px solid;line-height:1.5;}
+
+/* 明细弹层 KV 行 */
+.od-kv{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+.od-kv span{color:var(--text-3);}
+.od-kv b{color:var(--text-1);font-weight:600;}
+
+/* 状态筛选条：吸顶 */
+.chip-bar{position:sticky;top:0;z-index:5;display:flex;gap:8px;overflow-x:auto;padding:10px 16px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);}
+.f-chip{flex:none;font-size:12px;padding:6px 13px;border-radius:99px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);transition:all var(--d-fast);cursor:pointer;}
+.f-chip.on{border-color:var(--primary);color:var(--primary-dim);background:var(--primary-soft);font-weight:600;box-shadow:0 2px 8px rgba(201,169,97,.18);}
+
+@media (prefers-reduced-motion: reduce){.er-row{animation:none;}}
+</style>
+</body>
+</html>

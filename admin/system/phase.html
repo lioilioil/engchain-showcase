@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运营周期 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="system/phase.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>运营周期</h1>
+        <div class="sub">平台运营周期（Phase）配置和切换管理 · 切换周期将全端生效，影响所有用户的周期数据展示 · 高风险操作需二次确认</div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+        <button class="btn btn-primary" id="btn-new-phase" data-perm="settings">+ 新建周期</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad" id="current-alert-card"></div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">快速切换</span><span class="card-s">切换即时生效 · 全端同步（engchain:mode）· 需二次确认</span></div>
+      <div class="money-grid" id="quick-switch"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">运营周期历史</span><span class="card-s">全部周期记录 · 支持切换和查看</span></div>
+      <div id="phase-table"></div>
+      <div id="phase-pager"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">周期配置差异</span><span class="card-s">破冰期 vs 成熟期 · 入驻费 / 佣金 / 免费额度</span></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>配置项</th><th>破冰期</th><th>成熟期</th></tr></thead>
+          <tbody id="cmp-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function yuan(v) { return '¥' + Number(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 }); }
+
+  var REGISTRY_KEY = 'engchain-phase-registry';
+  var state = { page: 1, pageSize: 8 };
+
+  function biz() { return (window.MOCK && MOCK.business) ? MOCK.business : {}; }
+
+  /* ---- 周期注册表（localStorage） ---- */
+  function loadRegistry() {
+    try {
+      var raw = localStorage.getItem(REGISTRY_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return seedRegistry();
+  }
+  function saveRegistry(list) {
+    try { localStorage.setItem(REGISTRY_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  function seedRegistry() {
+    var now = Date.now();
+    var list = [
+      { id: 'p_seed_1', name: '2026 Q1 破冰推广期', type: 'breakin', startDate: '2026-01-01', endDate: '2026-03-31', remark: '平台上线初期拉新补贴，入驻费全免', status: 'completed', createdAt: now - 86400000 * 200 },
+      { id: 'p_seed_2', name: '2026 Q2 标准运营期', type: 'normal', startDate: '2026-04-01', endDate: '2026-06-30', remark: '标准入驻费与阶梯佣金', status: 'completed', createdAt: now - 86400000 * 100 },
+      { id: 'p_current', name: '2026 Q3 破冰二期', type: 'breakin', startDate: '2026-07-01', endDate: '2026-09-30', remark: '三季度拉新活动，佣金统一 5%', status: 'current', createdAt: now - 86400000 * 60 }
+    ];
+    saveRegistry(list);
+    return list;
+  }
+  function currentPhaseType() {
+    var m = ModeStore.read();
+    return m.phase === 'breakin' ? 'breakin' : 'normal';
+  }
+  function syncRegistryStatus(list) {
+    var curType = currentPhaseType();
+    var foundCurrent = false;
+    list.forEach(function (p) {
+      if (p.status === 'current') {
+        if (p.type !== curType) p.status = 'completed';
+        else foundCurrent = true;
+      }
+    });
+    if (!foundCurrent) {
+      var cur = list.filter(function (p) { return p.type === curType; }).sort(function (a, b) { return b.createdAt - a.createdAt; })[0];
+      if (cur) cur.status = 'current';
+    }
+    return list;
+  }
+
+  /* ---- KPI ---- */
+  function renderKPI() {
+    var list = syncRegistryStatus(loadRegistry());
+    var cur = list.filter(function (p) { return p.status === 'current'; })[0];
+    var completed = list.filter(function (p) { return p.status === 'completed'; });
+    var avgDays = '—';
+    if (completed.length) {
+      var total = completed.reduce(function (sum, p) {
+        var s = new Date(p.startDate).getTime(), e = new Date(p.endDate).getTime();
+        return sum + Math.max(0, Math.round((e - s) / 86400000));
+      }, 0);
+      avgDays = Math.round(total / completed.length) + ' 天';
+    }
+    var isB = currentPhaseType() === 'breakin';
+    var cards = [
+      ['当前周期', cur ? esc(cur.name) : (isB ? '破冰期' : '成熟期'), isB ? 'warn' : 'up', cur ? esc(cur.startDate + ' ~ ' + cur.endDate) : ''],
+      ['已完成周期', completed.length + ' 个', 'down', '历史周期数'],
+      ['周期平均时长', avgDays, 'gold', '已完成周期均值'],
+      ['周期类型', isB ? '破冰期（推广补贴）' : '成熟期（标准经营）', isB ? 'warn' : 'up', 'ModeStore 同步']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  /* ---- 当前周期 Alert ---- */
+  function renderCurrentAlert() {
+    var list = syncRegistryStatus(loadRegistry());
+    var cur = list.filter(function (p) { return p.status === 'current'; })[0];
+    var isB = currentPhaseType() === 'breakin';
+    var alertCls = isB ? 'alert-warning' : 'alert-success';
+    var iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+    var remaining = '—';
+    var startDate = '', endDate = '';
+    if (cur) {
+      startDate = cur.startDate;
+      endDate = cur.endDate;
+      var end = new Date(cur.endDate).getTime();
+      var now = Date.now();
+      var days = Math.ceil((end - now) / 86400000);
+      remaining = days > 0 ? days + ' 天' : (days === 0 ? '今天结束' : '已超期 ' + Math.abs(days) + ' 天');
+    }
+    var html = '<div class="alert ' + alertCls + '">' +
+      '<div class="alert-ic">' + iconSvg + '</div>' +
+      '<div class="alert-body">' +
+      '<div class="alert-title">当前运营周期：' + esc(cur ? cur.name : (isB ? '破冰期' : '成熟期')) + '</div>' +
+      '<div class="alert-desc">开始时间：' + esc(startDate || '—') + ' · 结束时间：' + esc(endDate || '—') + ' · 剩余：' + esc(remaining) + '</div>' +
+      (cur && cur.remark ? '<div class="alert-desc mt-4">备注：' + esc(cur.remark) + '</div>' : '') +
+      '</div></div>';
+    $('#current-alert-card').innerHTML = html;
+  }
+
+  /* ---- 快速切换卡片 ---- */
+  function renderQuickSwitch() {
+    var isB = currentPhaseType() === 'breakin';
+    var b = biz();
+    var brk = (b.breakin && b.breakin.entry) || {};
+    var html = '';
+    var phases = [
+      { type: 'breakin', name: '破冰期', desc: '入驻费全免（建筑/中介）· 佣金 ' + (b.breakin && b.breakin.commissionFirstTier !== undefined ? Math.round(b.breakin.commissionFirstTier * 100) : 5) + '% 统一档 · 免费额度翻倍', active: isB },
+      { type: 'normal', name: '成熟期', desc: '标准入驻费（建筑 ' + yuan(b.entryTypes && b.entryTypes.construction ? b.entryTypes.construction.fee : 3999) + ' / 中介 ' + yuan(b.entryTypes && b.entryTypes.agency ? b.entryTypes.agency.fee : 29999) + '）· 佣金阶梯 8%~3% · 标准额度', active: !isB }
+    ];
+    phases.forEach(function (p) {
+      html += '<div class="mode-card" style="border:2px solid ' + (p.active ? 'var(--primary)' : 'var(--border)') + ';">' +
+        '<div class="mc-tag">' + p.name + (p.active ? ' · 当前' : '') + '</div>' +
+        '<div class="mc-v">' + p.desc + '</div>' +
+        '<button class="btn ' + (p.active ? 'btn-primary' : 'btn-outline') + '" data-quick-switch="' + p.type + '"' + (p.active ? ' disabled' : '') + ' data-perm="settings">' + (p.active ? '当前周期' : '切换至此周期') + '</button>' +
+        '</div>';
+    });
+    $('#quick-switch').innerHTML = html;
+  }
+
+  /* ---- 周期历史表格 ---- */
+  function renderPhaseTable() {
+    var list = syncRegistryStatus(loadRegistry());
+    var start = (state.page - 1) * state.pageSize;
+    var pageData = list.slice(start, start + state.pageSize);
+    var statusBadge = function (s) {
+      if (s === 'current') return '<span class="badge badge-primary">进行中</span>';
+      if (s === 'completed') return '<span class="badge badge-secondary">已完成</span>';
+      return '<span class="badge badge-outline">待启动</span>';
+    };
+    Admin.TableRenderer.render({
+      container: '#phase-table',
+      columns: [
+        { key: 'name', label: '周期名称', width: '24%', render: function (row) {
+          return '<div class="td-main">' + esc(row.name) + '</div><div class="td-sub">' + (row.type === 'breakin' ? '破冰期' : '成熟期') + '</div>';
+        }},
+        { key: 'startDate', label: '开始时间', width: '14%' },
+        { key: 'endDate', label: '结束时间', width: '14%' },
+        { key: 'status', label: '状态', width: '10%', render: function (row) { return statusBadge(row.status); } },
+        { key: 'remark', label: '备注', width: '22%', render: function (row) { return esc(row.remark || '—'); } },
+        { key: 'ops', label: '操作', width: '16%', render: function (row) {
+          if (row.status === 'current') return '<span class="tx-muted-sm">当前周期</span>';
+          return '<button class="btn btn-outline btn-sm" data-switch-phase="' + esc(row.id) + '" data-perm="settings">切换至此</button>';
+        }}
+      ],
+      data: pageData,
+      options: { emptyText: '暂无运营周期记录' }
+    });
+    if (!window._phasePager) {
+      window._phasePager = new Admin.Paginator({
+        container: '#phase-pager',
+        total: list.length,
+        pageSize: state.pageSize,
+        onChange: function (page, size) { state.page = page; state.pageSize = size; renderPhaseTable(); }
+      });
+    } else {
+      window._phasePager.setTotal(list.length);
+      window._phasePager.pageSize = state.pageSize;
+      window._phasePager.render();
+    }
+  }
+
+  /* ---- 周期配置差异表 ---- */
+  function renderCmp() {
+    var b = biz();
+    var brk = (b.breakin && b.breakin.entry) || {};
+    var tierRates = (b.commission && b.commission.tier) ? b.commission.tier.map(function (t) { return Math.round(t.rate * 100); }).join('/') + '%' : '—';
+    var rows = [
+      ['建筑入驻费', yuan(brk.construction !== undefined ? brk.construction : 0), yuan(b.entryTypes && b.entryTypes.construction ? b.entryTypes.construction.fee : 3999)],
+      ['中介入驻费', yuan(brk.agency !== undefined ? brk.agency : 0), yuan(b.entryTypes && b.entryTypes.agency ? b.entryTypes.agency.fee : 29999)],
+      ['合伙人入驻费', '¥0', '¥0'],
+      ['佣金', (b.breakin && b.breakin.commissionFirstTier !== undefined ? Math.round(b.breakin.commissionFirstTier * 100) : 5) + '% 统一档', '阶梯 ' + tierRates],
+      ['免费积分额度', ((b.credits && b.credits.freeQuota ? b.credits.freeQuota.monthly : 5) + (b.breakin && b.breakin.registerBonus ? b.breakin.registerBonus : 0)) + ' 条/月', (b.credits && b.credits.freeQuota ? b.credits.freeQuota.monthly : 5) + ' 条/月']
+    ];
+    $('#cmp-body').innerHTML = rows.map(function (r) {
+      return '<tr><td class="tx-medium">' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2]) + '</td></tr>';
+    }).join('');
+  }
+
+  /* ---- 切换周期（高风险 · 必须 confirm） ---- */
+  function switchPhase(targetType, phaseName) {
+    var isB = targetType === 'breakin';
+    var targetName = phaseName || (isB ? '破冰期' : '成熟期');
+    var b = biz();
+    var brk = (b.breakin && b.breakin.entry) || {};
+    var impact = '<div class="fl-col-sm">' +
+      '<div class="alert alert-destructive m-0">' +
+      '<div class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>' +
+      '<div class="alert-body"><div class="alert-title">高风险操作 · 全端生效</div>' +
+      '<div class="alert-desc">切换运营周期将影响所有用户的周期数据展示，包括入驻费、佣金费率、免费额度等配置，preview / App 全链路即时同步。</div></div></div>' +
+      '<div class="dialog-body-text">' +
+      '<div><strong>目标周期：</strong>' + esc(targetName) + '（' + (isB ? '破冰期' : '成熟期') + '）</div>' +
+      '<div><strong>入驻费变化：</strong>建筑 ' + yuan(brk.construction !== undefined ? brk.construction : 0) + ' → ' + yuan(b.entryTypes && b.entryTypes.construction ? b.entryTypes.construction.fee : 3999) + '</div>' +
+      '<div><strong>佣金变化：</strong>' + (isB ? '统一 ' + (b.breakin && b.breakin.commissionFirstTier !== undefined ? Math.round(b.breakin.commissionFirstTier * 100) : 5) + '%' : '阶梯 8/6/5/4/3%') + '</div>' +
+      '<div><strong>影响范围：</strong>全部后台页面 + App 端 + preview 预览</div>' +
+      '</div></div>';
+    Admin.confirm({
+      title: '确认切换运营周期？',
+      body: impact,
+      ok: '确认切换', danger: true,
+      onYes: function () {
+        ModeStore.switch(targetType);
+        var list = loadRegistry();
+        list.forEach(function (p) {
+          if (p.status === 'current') p.status = 'completed';
+          if (p.type === targetType && p.status !== 'current') p.status = 'upcoming';
+        });
+        var target = list.filter(function (p) { return p.type === targetType; }).sort(function (a, b) { return b.createdAt - a.createdAt; })[0];
+        if (target) target.status = 'current';
+        saveRegistry(list);
+        Admin.log('切换运营周期', '系统设置', '运营周期', '切换至 ' + targetName + '（' + (isB ? 'breakin' : 'normal') + '）');
+        window.dispatchEvent(new CustomEvent('engchain:phase', { detail: { phase: targetType } }));
+        Admin.toast('已切换至' + esc(targetName) + '，全端生效');
+        renderAll();
+      }
+    });
+  }
+
+  /* ---- 新建周期 Modal ---- */
+  function openNewPhaseModal() {
+    var content = '<div class="fl-col-md">' +
+      '<div><label class="lbl tx-label">周期名称</label>' +
+      '<input type="text" class="input" w-full id="np-name" placeholder="如：2026 Q4 标准运营期"></div>' +
+      '<div><label class="lbl tx-label">周期类型</label>' +
+      '<select class="select w-full" id="np-type"><option value="breakin">破冰期（推广补贴）</option><option value="normal">成熟期（标准经营）</option></select></div>' +
+      '<div class="fl-row-md">' +
+      '<div class="fl-1"><label class="lbl tx-label">开始时间</label>' +
+      '<input type="date" class="input" w-full id="np-start"></div>' +
+      '<div class="fl-1"><label class="lbl tx-label">结束时间</label>' +
+      '<input type="date" class="input" w-full id="np-end"></div></div>' +
+      '<div><label class="lbl tx-label">备注</label>' +
+      '<textarea class="input" w-full id="np-remark" rows="2" placeholder="周期说明、活动内容等"></textarea></div>' +
+      '</div>';
+    var footer = '<button class="btn btn-outline" id="np-cancel">取消</button>' +
+      '<button class="btn btn-primary" id="np-confirm" data-perm="settings">创建周期</button>';
+    var modal = Admin.Modal.open({ title: '新建运营周期', content: content, footer: footer, width: '520px' });
+    modal.dialog.querySelector('#np-cancel').onclick = function () { modal.close(); };
+    modal.dialog.querySelector('#np-confirm').onclick = function () {
+      var name = modal.dialog.querySelector('#np-name').value.trim();
+      var type = modal.dialog.querySelector('#np-type').value;
+      var startDate = modal.dialog.querySelector('#np-start').value;
+      var endDate = modal.dialog.querySelector('#np-end').value;
+      var remark = modal.dialog.querySelector('#np-remark').value.trim();
+      if (!name) { Admin.toast('请填写周期名称', 'err'); return; }
+      if (!startDate || !endDate) { Admin.toast('请选择开始和结束时间', 'err'); return; }
+      if (new Date(endDate) < new Date(startDate)) { Admin.toast('结束时间不能早于开始时间', 'err'); return; }
+      var list = loadRegistry();
+      var newPhase = {
+        id: 'p_' + Date.now(),
+        name: name, type: type,
+        startDate: startDate, endDate: endDate,
+        remark: remark, status: 'upcoming',
+        createdAt: Date.now()
+      };
+      list.unshift(newPhase);
+      saveRegistry(list);
+      Admin.log('新建运营周期', '系统设置', '运营周期', name + '（' + (type === 'breakin' ? '破冰期' : '成熟期') + '）');
+      Admin.toast('已创建周期：' + name);
+      modal.close();
+      renderAll();
+    };
+  }
+
+  /* ---- 事件绑定 ---- */
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderAll(); Admin.toast('已刷新'); };
+    $('#btn-new-phase').onclick = function () { openNewPhaseModal(); };
+
+    document.addEventListener('click', function (e) {
+      var qs = e.target.closest('[data-quick-switch]');
+      if (qs && !qs.disabled) {
+        switchPhase(qs.getAttribute('data-quick-switch'));
+        return;
+      }
+      var ps = e.target.closest('[data-switch-phase]');
+      if (ps) {
+        var list = loadRegistry();
+        var phase = list.filter(function (p) { return p.id === ps.getAttribute('data-switch-phase'); })[0];
+        if (phase) switchPhase(phase.type, phase.name);
+        return;
+      }
+    });
+
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'engchain-mode' || e.key === REGISTRY_KEY) renderAll();
+    });
+    window.addEventListener('engchain:mode', function () { renderAll(); });
+    window.addEventListener('engchain:phase', function () { renderAll(); });
+  }
+
+  function renderAll() {
+    renderKPI();
+    renderCurrentAlert();
+    renderQuickSwitch();
+    renderPhaseTable();
+    renderCmp();
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function init() {
+    bind();
+    renderAll();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>认证结果 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">认证结果</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll ar-scroll" id="root"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var q=new URLSearchParams(location.search);
+var type=q.get('type')||'realname';
+var state0=q.get('state')||'success';
+var st=UI.state.get();
+function fmtD(t){if(!t)return '—';var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+var META={
+  realname:{name:'个人实名认证',detail:'auth-personal.html'},
+  enterprise:{name:'企业工商认证',detail:'auth-enterprise.html'},
+  qual:{name:'个人专业资质',detail:'auth-qualification.html'}
+};
+function head(kind,ic,title,sub){
+  return '<div class="ar-head ar-head-'+kind+'"><span class="ar-h-ic">'+ic+'</span>'+
+    '<div class="fw-700 fs-19">'+title+'</div><div class="fs-13" style="margin-top:7px;line-height:1.7;opacity:.85;">'+sub+'</div></div>';
+}
+function info(rows){return '<div class="group ap-group">'+rows.map(function(r){
+  return '<div class="ap-field ap-field-ro"><label>'+r[0]+'</label><b class="fs-13 text-2">'+r[1]+'</b></div>';}).join('')+'</div>';}
+
+function render(){
+  var a=AuthStore.read(),root=document.getElementById('root');
+  var meta=META[type]||META.realname;
+  /* 以真实存储状态为准：后台在另一标签审批后，本页自动切换结果 */
+  var live;
+  if(type==='realname')live=a.realname.ok?'success':'reviewing';
+  else if(type==='enterprise'){
+    if(a.enterprise.ok&&a.enterprise.expireAt>Date.now())live='success';
+    else if(a.enterprise.ok&&a.enterprise.expireAt<=Date.now())live='expired';
+    else if(a.enterprise.note)live='reject';
+    else live='reviewing';
+  }else{
+    var pq=(a.personalQual&&(a.personalQual.status||a.personalQual.ok||a.personalQual.note))?a.personalQual:a.qual;
+    if(pq.ok)live='success';else if(pq.note)live='reject';else live='reviewing';
+  }
+  var state=(state0==='reviewing'&&live==='success')?'success':(live==='reject'?'reject':(live==='expired'?'expired':state0));
+
+  if(state==='success'){
+    var rows=[['认证类型',meta.name],['认证时间','今日']];
+    if(type==='realname'){rows.push(['实名信息',a.realname.name||st.user||'—'],['核验方式','二要素 + 活体人脸']);}
+    if(type==='enterprise'){rows.push(['有效期至',fmtD(a.enterprise.expireAt)],['认证费用','¥999 · 年费']);}
+    if(type==='qual'){rows.push(['证书数量',((a.personalQual.list||a.qual.list||[]).length||0)+' 项'],['核验方式','平台人工核验']);}
+    root.innerHTML=head('done','<svg class="ic" style="width:26px;height:26px;"><use href="#i-check"/></svg>','认证成功',
+        type==='realname'?'身份信息已通过平台核验，可信身份全站生效':'审核已通过，对应认证权益已开通')+
+      info(rows)+rewardLine(type)+
+      '<div class="fixed-cta ar-cta"><a href="auth.html" class="btn btn-primary btn-block btn-lg">返回认证中心</a>'+
+      '<a href="../../pages/supply/list.html" class="btn btn-ghost btn-block" style="margin-top:9px;">去逛逛供需大厅</a></div>';
+  }else if(state==='reject'){
+    var note=(type==='enterprise'?a.enterprise.note:((a.personalQual.note||a.qual.note)))||'材料不完整，请补充后重新提交';
+    root.innerHTML=head('reject','!','认证未通过','平台审核未通过，可按原因修改后重新提交')+
+      '<div class="ar-rj"><div class="fw-600 fs-13" style="margin-bottom:5px;">驳回原因</div><div class="fs-13" style="line-height:1.7;color:var(--text-2);">'+note+'</div></div>'+
+      '<div class="fixed-cta ar-cta"><a href="'+meta.detail+'" class="btn btn-primary btn-block btn-lg">修改并重新提交</a>'+
+      '<a href="auth.html" class="btn btn-ghost btn-block" style="margin-top:9px;">返回认证中心</a></div>';
+  }else if(state==='expired'){
+    root.innerHTML=head('review','!','认证已过期','企业工商认证已于 '+fmtD(a.enterprise.expireAt)+' 到期，续费后恢复认证企业权益')+
+      '<div class="fixed-cta ar-cta"><a href="auth-enterprise.html" class="btn btn-primary btn-block btn-lg">立即续费 ¥999</a>'+
+      '<a href="auth.html" class="btn btn-ghost btn-block" style="margin-top:9px;">返回认证中心</a></div>';
+  }else{
+    root.innerHTML=head('review','<svg class="ic" style="width:26px;height:26px;"><use href="#i-clock"/></svg>','已提交 · 审核中',
+        '资料已进入平台审核队列，预计 <b>24 小时内</b> 完成人工核验，结果将在此页与认证中心实时同步')+
+      info([['申请类型',meta.name],['提交时间','今日'],['审核方式','平台人工审核']])+
+      '<div class="ar-steps"><div class="ok">提交资料</div><i></i><div class="on">人工审核</div><i></i><div>认证生效</div></div>'+
+      '<div class="fixed-cta ar-cta"><a href="'+meta.detail+'" class="btn btn-primary btn-block btn-lg">查看申请详情</a>'+
+      '<a href="auth.html" class="btn btn-ghost btn-block" style="margin-top:9px;">返回认证中心</a></div>';
+  }
+}
+function rewardLine(type){
+  if(type!=='realname')return '';
+  var n=(MOCK.business.credits&&MOCK.business.credits.rewards&&MOCK.business.credits.rewards.realname)||100;
+  return '<div class="ar-reward"><svg class="ic" style="width:16px;height:16px;"><use href="#i-wallet"/></svg> 实名奖励 <b>+'+n+' 积分</b> 已发放至账户</div>';
+}
+render();
+window.addEventListener('storage',function(ev){if(['engchain-users','engchain-auth'].indexOf(ev.key)>=0)render();});
+window.addEventListener('engchain:auth',render);
+})();
+</script>
+<style>
+.ar-scroll{padding-top:14px;padding-bottom:96px;}
+.ar-head{border-radius:18px;padding:30px 22px;text-align:center;margin-bottom:14px;}
+.ar-h-ic{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 13px;}
+.ar-head-review{background:linear-gradient(150deg,#FBF4E4,#F6ECD2);color:#8a6a24;border:1px solid rgba(201,169,97,.35);}
+.ar-head-review .ar-h-ic{background:var(--bg-card);color:var(--warning);box-shadow:0 4px 14px rgba(214,158,46,.25);animation:ar-pulse 1.5s infinite;}
+@keyframes ar-pulse{0%{box-shadow:0 0 0 0 rgba(214,158,46,.35);}70%{box-shadow:0 0 0 12px rgba(214,158,46,0);}100%{box-shadow:0 0 0 0 rgba(214,158,46,0);}}
+.ar-head-done{background:linear-gradient(150deg,#F3EBD6,#EADFC2);color:#6e5523;border:1px solid rgba(201,169,97,.4);}
+.ar-head-done .ar-h-ic{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);box-shadow:0 4px 14px rgba(201,169,97,.35);}
+.ar-head-reject{background:linear-gradient(150deg,#FBECEB,#F6DEDC);color:#9c3a36;border:1px solid rgba(212,76,71,.28);}
+.ar-head-reject .ar-h-ic{background:var(--bg-card);color:var(--danger);font-size:26px;font-weight:700;}
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ap-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.ap-field:last-child{border-bottom:none;}
+.ap-field label{flex:none;width:64px;font-size:13px;color:var(--text-2);}
+.ap-field-ro b{flex:1;text-align:right;font-weight:600;min-width:0;}
+.ar-rj{border-radius:14px;padding:13px 14px;margin-bottom:14px;background:rgba(212,76,71,.07);border:1px solid rgba(212,76,71,.25);}
+.ar-steps{display:flex;align-items:center;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:13px 12px;font-size:11.5px;color:var(--text-3);}
+.ar-steps>div{flex:1;text-align:center;}
+.ar-steps .ok{color:var(--primary);font-weight:600;}
+.ar-steps .on{color:var(--warning);font-weight:600;}
+.ar-steps i{flex:0 0 16px;height:2px;background:var(--line);}
+.ar-reward{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12.5px;color:var(--text-2);background:var(--primary-soft);border-radius:12px;padding:11px;margin:0 0 14px;}
+.ar-reward b{color:var(--primary);}
+.ar-cta{left:14px;right:14px;}
+</style>
+</body>
+</html>

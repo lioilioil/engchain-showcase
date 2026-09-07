@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/message/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>系统消息 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  .sys-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 24px; text-align:center; }
+  .sys-empty svg { width:48px; height:48px; color:var(--text-4); margin-bottom:14px; }
+  .sys-empty-title { font-size:14px; font-weight:600; color:var(--text-2); }
+  .sys-empty-sub { font-size:12px; color:var(--text-3); margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">系统消息</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll no-pad" style="padding-bottom:40px;">
+    <div class="sys-hero">
+      <div class="sh-ic"><svg class="ic"><use href="#i-bell"/></svg></div>
+      <div class="sh-body">
+        <div class="sh-title">平台通知中心</div>
+        <div class="sh-sub">公告 · 认证 · 订单 · 资金动态</div>
+      </div>
+      <button type="button" class="sh-read" id="read-all" onclick="readAll()">全部已读</button>
+    </div>
+
+    <div id="sys-list"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var sm = (window.MOCK && MOCK.systemMessages) || [];
+
+  /* 与 message/index.html 共用的已读追踪键 */
+  var MSG_READ_KEY = 'engchain-msg-read';
+  function markAllDataBusRead() {
+    try {
+      var list = (window.DataBus && DataBus.messages) ? DataBus.messages() : [];
+      var ids = list.map(function (m) { return m.id; });
+      localStorage.setItem(MSG_READ_KEY, JSON.stringify(ids));
+    } catch (e) {}
+  }
+
+  /* —— 富文本块 -> HTML —— */
+  function blockHTML(b) {
+    if (b.h) return '<div class="rich-h">' + b.h + '</div>';
+    if (b.p) return '<p class="rich-p">' + b.p + '</p>';
+    if (b.call) return '<div class="rich-call"><span class="rc-badge">提示</span>' + b.call + '</div>';
+    if (b.ul) return '<ul class="rich-ul">' + b.ul.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul>';
+    return '';
+  }
+  /* 头部：图标 + 标题 + 时间 (cls = sf | sr | sc) */
+  var TINT_BADGE = { success: '成功', warning: '警告', accent: '通知', muted: '公告' };
+  function headHTML(m, cls) {
+    var badge = (cls === 'sc' && TINT_BADGE[m.tint]) ? '<span class="sc-badge">' + TINT_BADGE[m.tint] + '</span>' : '';
+    return '<div class="' + cls + '-head"><div class="' + cls + '-ic ' + m.tint + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
+      '<div class="' + cls + '-headbody"><div class="' + cls + '-title">' + badge + m.title + '</div><div class="' + cls + '-time">' + m.time + '</div></div></div>';
+  }
+
+  /* —— 按消息类型渲染 —— */
+  function itemHTML(m) {
+    if (m.type === 'long') { /* 长内容：可展开/收起 */
+      return '<div class="sys-full" onclick="markRead(\'' + m.id + '\')">' + headHTML(m, 'sf') +
+        '<div class="sf-body collapsed" id="body-' + m.id + '">' + m.body + '</div>' +
+        '<div class="sf-foot"><span></span><button type="button" class="sf-more" id="more-' + m.id + '" onclick="event.stopPropagation();toggleLong(\'' + m.id + '\')">展开全文</button></div>' +
+        '</div>';
+    }
+    if (m.type === 'rich') { /* 富文本长内容 */
+      return '<div class="sys-rich" onclick="markRead(\'' + m.id + '\')">' + headHTML(m, 'sr') +
+        '<div class="sr-body">' + (m.blocks || []).map(blockHTML).join('') + '</div></div>';
+    }
+    if (m.type === 'card') { /* 富交互卡片：摘要 + 动作按钮 */
+      var acts = (m.actions || []).map(function (a) {
+        return '<button type="button" class="sc-btn ' + (a.primary ? 'primary' : 'ghost') + '" onclick="event.stopPropagation();markRead(\'' + m.id + '\');location.href=\'' + a.href + '\'">' + a.label + '</button>';
+      }).join('');
+      return '<div class="sys-card tint-' + m.tint + '" onclick="markRead(\'' + m.id + '\')">' + headHTML(m, 'sc') +
+        '<div class="sc-desc">' + m.desc + '</div>' +
+        (m.meta ? '<div class="sc-meta">' + m.meta + '</div>' : '') +
+        (acts ? '<div class="sc-actions">' + acts + '</div>' : '') +
+        '</div>';
+    }
+    /* 默认：短消息行 */
+    return '<div class="sys-item" onclick="markRead(\'' + m.id + '\')">' +
+      '<div class="si-ic ' + m.tint + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
+      '<div class="si-body"><div class="si-title">' + m.title + '</div>' +
+      '<div class="si-text">' + m.text + '</div>' +
+      '<div class="si-time">' + m.time + '</div></div>' +
+      (m.unread ? '<span class="si-unread"></span>' : '') +
+      '</div>';
+  }
+
+  function renderList() {
+    /* 空状态 */
+    if (!sm.length) {
+      document.getElementById('sys-list').innerHTML =
+        '<div class="sys-empty">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>' +
+        '<div class="sys-empty-title">暂无系统消息</div>' +
+        '<div class="sys-empty-sub">公告、认证、订单、资金动态将在这里显示</div>' +
+        '</div>';
+      document.getElementById('read-all').style.display = 'none';
+      return;
+    }
+    /* 按日期分组，保持最新在前 */
+    var groups = [];
+    sm.forEach(function (m) {
+      var g = null;
+      for (var i = 0; i < groups.length; i++) if (groups[i].date === m.date) { g = groups[i]; break; }
+      if (!g) { g = { date: m.date, items: [] }; groups.push(g); }
+      g.items.push(m);
+    });
+    document.getElementById('sys-list').innerHTML = groups.map(function (g) {
+      return '<div class="sys-group"><div class="sys-glabel">' + g.date + '</div>' +
+        g.items.map(itemHTML).join('') + '</div>';
+    }).join('');
+
+    var n = sm.filter(function (m) { return m.unread; }).length;
+    var btn = document.getElementById('read-all');
+    if (n) { btn.style.display = ''; btn.textContent = '全部已读 (' + n + ')'; }
+    else { btn.style.display = 'none'; }
+  }
+
+  window.markRead = function (id) {
+    var m = sm.filter(function (x) { return x.id === id; })[0];
+    if (m && m.unread) { m.unread = false; renderList(); } /* 仅真的从未读变已读时重渲染，避免重置展开状态 */
+  };
+  window.toggleLong = function (id) {
+    var body = document.getElementById('body-' + id);
+    var more = document.getElementById('more-' + id);
+    if (!body || !more) return;
+    var collapsed = body.classList.toggle('collapsed');
+    more.textContent = collapsed ? '展开全文' : '收起';
+  };
+  window.readAll = function () {
+    sm.forEach(function (m) { m.unread = false; });
+    markAllDataBusRead();
+    renderList();
+    UI.toast('已全部标记为已读', 'ok');
+  };
+
+  renderList();
+  /* 跨 tab 自动重渲染：系统消息变更后自动刷新 */
+  var _sysRerender = null;
+  function _sysRefresh() { if (_sysRerender) clearTimeout(_sysRerender); _sysRerender = setTimeout(renderList, 100); }
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages') _sysRefresh(); });
+  window.addEventListener('engchain:messages', _sysRefresh);
+  window.addEventListener('engchain:store-change', function (e) { if (e && e.detail && e.detail.key === 'engchain-messages') _sysRefresh(); });
+})();
+</script>
+</body>
+</html>

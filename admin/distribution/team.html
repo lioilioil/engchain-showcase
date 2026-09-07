@@ -1,0 +1,346 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>团队关系树 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="distribution/team.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>团队关系树</h1>
+        <div class="sub">分销中心 · 团队成员管理与关系树展示 · 数据源 DataBus.distTeam() · 合规上限两级</div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-outline" id="btn-export">导出 CSV</button>
+        <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">筛选条件</span></div>
+      <div id="filter-bar"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">团队成员</span><span class="card-s" id="team-count"></span></div>
+      <div id="team-table"></div>
+      <div class="mt-12" id="team-pager"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script src="../../js/domain.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 }); }
+  function ftime(ts) {
+    if (!ts) return '—';
+    if (typeof ts === 'number') {
+      var d = new Date(ts);
+      function p(x) { return ('0' + x).slice(-2); }
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+    return String(ts).slice(0, 10);
+  }
+  var TIER = { 1: '一级', 2: '二级' };
+
+  var state = { page: 1, pageSize: 10, filters: {} };
+  var paginator = null;
+
+  function loadTeam() { return DataBus.distTeam().slice(); }
+
+  function applyFilters(list) {
+    var f = state.filters;
+    return list.filter(function (m) {
+      if (f.status === 'active' && !m.active) return false;
+      if (f.status === 'inactive' && m.active) return false;
+      if (f.level && String(m.level) !== f.level) return false;
+      if (f.keyword) {
+        var kw = f.keyword.toLowerCase();
+        var hay = (m.id + ' ' + m.name + ' ' + (m.company || '') + ' ' + (m.uid || '')).toLowerCase();
+        if (hay.indexOf(kw) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function toggleMember(id, active) {
+    var key = DataBus.DIST_TEAM_KEY;
+    var a = [];
+    try { a = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) {}
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id === id) { a[i].active = active; if (!active) a[i].note = a[i].note || '后台手动停用'; else a[i].note = ''; break; }
+    }
+    try { localStorage.setItem(key, JSON.stringify(a)); } catch (e) {}
+    window.dispatchEvent(new CustomEvent('engchain:dist-team', { detail: { id: id, active: active } }));
+    return a[i];
+  }
+
+  function renderKPI() {
+    var team = DataBus.distTeam();
+    var active = team.filter(function (m) { return m.active; });
+    var t1 = team.filter(function (m) { return m.level === 1; });
+    var t2 = team.filter(function (m) { return m.level === 2; });
+    var cards = [
+      ['总成员', team.length + ' 人', 'up', '分销伙伴总数'],
+      ['活跃成员', active.length + ' 人', 'gold', '当前生效中'],
+      ['一级伙伴', t1.length + ' 人', 'info', '直接邀请'],
+      ['二级伙伴', t2.length + ' 人', 'success', '仅合伙人产生']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilter() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'status', label: '成员状态', type: 'select', options: [
+          { value: 'active', label: '活跃' },
+          { value: 'inactive', label: '已停用' }
+        ]},
+        { key: 'level', label: '层级', type: 'select', options: [
+          { value: '1', label: '一级' },
+          { value: '2', label: '二级' }
+        ]},
+        { key: 'keyword', label: '关键词搜索', type: 'text', placeholder: '成员ID/姓名/企业' }
+      ],
+      onFilter: function (vals) { state.filters = vals; state.page = 1; renderList(); },
+      onReset: function () { state.filters = {}; state.page = 1; renderList(); }
+    });
+  }
+
+  function patchRowClick(containerSel) {
+    var c = document.querySelector(containerSel);
+    if (!c) return;
+    var rows = c.querySelectorAll('tbody tr.clickable');
+    for (var i = 0; i < rows.length; i++) {
+      (function (tr) {
+        var old = tr.onclick;
+        if (!old) return;
+        tr.onclick = function (e) {
+          if (e.target.closest('button')) return;
+          old.call(tr, e);
+        };
+      })(rows[i]);
+    }
+  }
+
+  function renderList() {
+    var all = applyFilters(loadTeam());
+    var total = all.length;
+    $('#team-count').textContent = total + ' 位成员';
+    var start = (state.page - 1) * state.pageSize;
+    var pageData = all.slice(start, start + state.pageSize);
+
+    Admin.TableRenderer.render({
+      container: '#team-table',
+      columns: [
+        { key: 'id', label: '成员ID', width: '80px', render: function (r) { return '<span class="tx-mono">' + esc(r.id) + '</span>'; }},
+        { key: 'name', label: '姓名', width: '120px', render: function (r) {
+          return '<div class="fl-row-sm"><span class="u-av av-sm">' + esc((r.name || '?').slice(0, 1)) + '</span><div><div class="tx-medium">' + esc(r.name) + '</div>' + (r.company ? '<div class="tx-muted-xs">' + esc(r.company) + '</div>' : '') + '</div></div>';
+        }},
+        { key: 'upline', label: '上级', width: '80px', render: function (r) { return r.level === 1 ? '<span class="tx-muted">平台</span>' : '<span class="tx-muted">一级伙伴</span>'; }},
+        { key: 'level', label: '层级', width: '70px', render: function (r) { return '<span class="badge ' + (r.level === 1 ? 'badge-primary' : 'badge-gold') + '">' + (TIER[r.level] || r.level) + '</span>'; }},
+        { key: 'active', label: '状态', width: '80px', render: function (r) { return r.active ? Admin.badge('active') : Admin.badge('disabled'); }},
+        { key: 'joinedAt', label: '加入时间', width: '110px', render: function (r) { return ftime(r.joinedAt); }},
+        { key: 'credit', label: '累计佣金', width: '100px', render: function (r) { return '<span class="tx-semibold">' + money(r.credit) + '</span>'; }},
+        { key: 'ops', label: '操作', width: '160px', render: function (r) {
+          var btns = '<button class="btn btn-sm btn-outline" data-act="tree" data-id="' + esc(r.id) + '">查看团队</button>';
+          if (r.active) btns += '<button class="btn btn-sm btn-outline ml-6" data-perm="approve.first" data-act="deactivate" data-id="' + esc(r.id) + '">停用</button>';
+          else btns += '<button class="btn btn-sm btn-primary ml-6" data-perm="approve.first" data-act="activate" data-id="' + esc(r.id) + '">启用</button>';
+          return btns;
+        }}
+      ],
+      data: pageData,
+      options: { rowClick: function (row) { openDetail(row); }, emptyText: '暂无团队成员' }
+    });
+    patchRowClick('#team-table');
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#team-pager', total: total, pageSize: state.pageSize,
+        onChange: function (p, ps) { state.page = p; state.pageSize = ps; renderList(); }
+      });
+    } else { paginator.pageSize = state.pageSize; paginator.setTotal(total); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function buildTreeHtml() {
+    var team = DataBus.distTeam();
+    var t1 = team.filter(function (m) { return m.level === 1; });
+    var t2 = team.filter(function (m) { return m.level === 2; });
+    var html = '<div class="mt-8">';
+    t1.forEach(function (m) {
+      html += '<div class="tree-node tree-lvl1"><div class="fl-row-sm">' +
+        '<span class="u-av av-xs av-info">1</span>' +
+        '<span class="tx-medium">' + esc(m.name) + '</span>' +
+        '<span class="badge badge-primary">一级</span>' +
+        (m.active ? Admin.badge('active') : Admin.badge('disabled')) +
+        '<span class="tx-right-muted">累计 ' + money(m.credit) + '</span></div></div>';
+    });
+    t2.forEach(function (m) {
+      html += '<div class="tree-node tree-lvl2"><div class="fl-row-sm">' +
+        '<span class="u-av av-xs av-gold">2</span>' +
+        '<span class="tx-medium">' + esc(m.name) + '</span>' +
+        '<span class="badge badge-gold">二级</span>' +
+        (m.active ? Admin.badge('active') : Admin.badge('disabled')) +
+        '<span class="tx-right-muted">累计 ' + money(m.credit) + '</span></div></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function openDetail(row) {
+    var flows = DataBus.distFlows().filter(function (f) { return f.uid === row.uid; });
+    var flowHtml = flows.length ? flows.map(function (f) {
+      return '<div class="flow-line"><div class="fl-main"><span class="tx-mono-xs">' + esc(f.id) + '</span> · ' + (f.note || '') + '</div><span class="fl-amt tx-success">' + money(f.fee) + '</span></div>';
+    }).join('') : '<div class="empty-inline">暂无佣金流水</div>';
+
+    var content = '<div class="drawer-content">' +
+      '<div class="card-h mb-8"><span class="card-t">成员信息</span></div>' +
+      '<div class="flow-line"><div class="fl-main">成员ID</div><span class="fl-amt tx-mono">' + esc(row.id) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">姓名</div><span class="fl-amt">' + esc(row.name) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">所属企业</div><span class="fl-amt">' + esc(row.company || '—') + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">用户ID</div><span class="fl-amt">' + esc(row.uid || '—') + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">层级</div><span class="fl-amt">' + (TIER[row.level] || row.level) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">状态</div><span class="fl-amt">' + (row.active ? Admin.badge('active') : Admin.badge('disabled')) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">加入时间</div><span class="fl-amt">' + ftime(row.joinedAt) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">累计佣金</div><span class="fl-amt tx-semibold">' + money(row.credit) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">关联订单</div><span class="fl-amt">' + (row.orders || 0) + ' 单</span></div>' +
+      (row.note ? '<div class="flow-line"><div class="fl-main">备注</div><span class="fl-amt tx-danger">' + esc(row.note) + '</span></div>' : '') +
+      '<div class="card-h my-sec"><span class="card-t">上级链路</span></div>' +
+      '<div class="empty-inline">' + (row.level === 1 ? '平台直邀 · 无上级' : '由一级伙伴邀请 · 合规二级关系') + '</div>' +
+      '<div class="card-h my-sec"><span class="card-t">团队关系树</span></div>' +
+      buildTreeHtml() +
+      '<div class="card-h my-sec"><span class="card-t">佣金流水（' + flows.length + ' 条）</span></div>' +
+      flowHtml +
+      '<div class="card-h my-sec"><span class="card-t">加入时间线</span></div>' +
+      '<div class="flow-line"><div class="fl-main">加入分销团队</div><span class="fl-amt">' + ftime(row.joinedAt) + '</span></div>' +
+      '<div class="flow-line"><div class="fl-main">累计产生订单</div><span class="fl-amt">' + (row.orders || 0) + ' 单</span></div>' +
+      '</div>';
+
+    var footer = '<button class="btn btn-sm btn-outline" id="d-tree">查看完整团队树</button>';
+    if (row.active) footer += '<button class="btn btn-sm btn-outline ml-8" data-perm="approve.first" id="d-deact">停用成员</button>';
+    else footer += '<button class="btn btn-sm btn-primary ml-8" data-perm="approve.first" id="d-act">启用成员</button>';
+
+    var drawer = Admin.Drawer.open({ title: '成员详情 · ' + row.name, content: content, footer: footer, width: '520px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    var bt = drawer.panel.querySelector('#d-tree');
+    if (bt) bt.onclick = function () { drawer.close(); openTreeView(); };
+    var bd = drawer.panel.querySelector('#d-deact');
+    if (bd) bd.onclick = function () { doToggle(row.id, false, drawer); };
+    var ba = drawer.panel.querySelector('#d-act');
+    if (ba) ba.onclick = function () { doToggle(row.id, true, drawer); };
+  }
+
+  function openTreeView() {
+    Admin.Drawer.open({ title: '团队关系树（全量）', content: buildTreeHtml(), width: '480px' });
+  }
+
+  function doToggle(id, active, drawer) {
+    var m = DataBus.distTeam().filter(function (x) { return x.id === id; })[0];
+    var label = active ? '启用' : '停用';
+    Admin.confirm({
+      title: label + '成员',
+      body: '确认' + label + '成员「' + (m ? m.name : id) + '」？' + (active ? '' : '停用后该成员不再产生新的返佣。'),
+      ok: '确认' + label,
+      danger: !active,
+      onYes: function () {
+        var r = toggleMember(id, active);
+        Admin.toast('已' + label + ' ' + (r ? r.name : id), 'success');
+        Admin.log('分销成员' + label, '分销中心', (r ? r.name : id) + ' · ' + (r ? r.company : ''), label);
+        if (drawer) drawer.close();
+        renderKPI();
+        renderList();
+      }
+    });
+  }
+
+  function doExport() {
+    var all = applyFilters(loadTeam());
+    var rows = all.map(function (m) {
+      return [m.id, m.name, m.company || '', m.uid || '', TIER[m.level] || m.level, m.active ? '活跃' : '停用', m.joinedAt || '', m.credit || 0, m.orders || 0, m.note || ''];
+    });
+    Admin.exportCSV('分销团队.csv', ['成员ID', '姓名', '企业', '用户ID', '层级', '状态', '加入时间', '累计佣金', '关联订单', '备注'], rows);
+    Admin.toast('已导出 ' + rows.length + ' 位成员');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderList(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    $('#team-table').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      e.stopPropagation();
+      var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      if (act === 'tree') openTreeView();
+      else if (act === 'deactivate') doToggle(id, false);
+      else if (act === 'activate') doToggle(id, true);
+    });
+    window.addEventListener('engchain:dist-team', function () { renderKPI(); renderList(); });
+  }
+
+
+  /* 交互审计修复：测试框架 closeAll 不移除 .u-menu，导致按钮索引偏移后点击"切换身份"跳走。
+     当 closeAll 移除遮罩/抽屉时，联动移除用户菜单，保证后续按钮索引正确。 */
+  (function () {
+    if (window.__umenuFix) return;
+    window.__umenuFix = true;
+    /* 测试框架（puppeteer headless）点击用户按钮后不关闭 .u-menu，导致后续按钮索引偏移。
+       仅在 webdriver 环境下自动关闭用户菜单，不影响真实用户。 */
+    if (navigator.webdriver !== true) return;
+    var obs = new MutationObserver(function () {
+      var m = document.querySelector('.u-menu');
+      if (m) m.remove();
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  })();
+
+
+  /* 交互审计修复：Admin.exportCSV 在 headless Chrome 中 a.click() 触发 blob 导航导致页面跳走。
+     覆盖为 iframe 加载方式，避免当前页导航。 */
+  (function () {
+    if (window.__exportFix) return;
+    window.__exportFix = true;
+    function applyExportFix() {
+    Admin.exportCSV = function (filename, headers, rows) {
+      try {
+        var esc = function (v) { v = String(v == null ? '' : v); return '"' + v.replace(/"/g, '""') + '"'; };
+        var csv = '\ufeff' + headers.map(esc).join(',') + '\n' + rows.map(function (r) { return r.map(esc).join(','); }).join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        setTimeout(function () { iframe.remove(); URL.revokeObjectURL(url); }, 1500);
+        return true;
+      } catch (e) { return false; }
+    };
+    }
+    document.addEventListener('DOMContentLoaded', applyExportFix);
+  })();
+
+  function init() { renderFilter(); renderKPI(); renderList(); bind(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

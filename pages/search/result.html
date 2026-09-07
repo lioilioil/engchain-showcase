@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/search/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>搜索结果 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <!-- 顶部：返回 + 页面名称 -->
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">搜索结果</div>
+    <div class="nav-right" style="width:32px;"></div>
+  </div>
+
+  <div class="scroll" style="padding:0 0 24px;">
+    <!-- 吸顶区：搜索栏 + 方向分段 + 类型标签 + 结果数量/排序（滚动时固定在顶部） -->
+    <div class="sr-sticky" id="sr-sticky">
+      <!-- 可改词重搜的搜索框 -->
+      <div class="sr-search" style="margin:0 16px 10px;">
+        <span class="sr-search-ic"><svg class="ic" style="width:15px;height:15px;"><use href="#i-search"/></svg></span>
+        <input id="q-input" placeholder="搜索材料 / 设备 / 劳务 / 资质 / 人才" onkeydown="if(event.key==='Enter')research()">
+        <button class="sr-search-btn" onclick="research()">搜索</button>
+      </div>
+
+      <!-- ══ 普通模式：方向分段 ══ -->
+      <div class="seg sr-dir" id="dir-seg">
+        <div class="seg-item active" data-d="all">全部</div>
+        <div class="seg-item" data-d="demand">找需求</div>
+        <div class="seg-item" data-d="supply">找供应</div>
+        <div class="seg-item" data-d="opportunity">合作机会</div>
+      </div>
+      <!-- 普通模式：9 类类型横滑 -->
+      <div class="sr-cats" id="cat-row"></div>
+
+      <!-- 结果数量 + 排序行 -->
+      <div class="sr-bar">
+        <span class="text-2 fs-12" id="count"></span>
+        <button id="sort-btn" class="sr-sort"></button>
+      </div>
+    </div>
+
+    <!-- ══ AI 模式：AI 理解横幅（不吸顶，随内容滚动） ══ -->
+    <div class="ai-folder" id="ai-banner" style="display:none;margin:12px 16px 12px;padding:14px;">
+      <div class="af-head">
+        <div class="af-icon" style="width:36px;height:36px;"><svg class="ic" style="width:16px;height:16px;"><use href="#i-sparkle"/></svg></div>
+        <div style="flex:1;min-width:0;">
+          <div class="af-title" style="font-size:14px;">AI 已理解你的需求</div>
+          <div class="af-sub" id="ai-understand"></div>
+        </div>
+      </div>
+      <div class="sr-ai-tags" id="ai-tags"></div>
+      <button class="sr-manual" onclick="switchMode('normal')">
+        <svg class="ic" style="width:12px;height:12px;"><use href="#i-edit"/></svg>
+        理解有误？切换手动筛选
+      </button>
+    </div>
+
+    <div id="list"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* ============ 状态 ============ */
+  var params = new URLSearchParams(location.search);
+  var state = {
+    mode: params.get('mode') === 'ai' ? 'ai' : 'normal',
+    q: params.get('q') || '',
+    dir: 'all',
+    biz: 'all',
+    sort: 'comprehensive',           // comprehensive 综合 / newest 最新 / match 匹配度
+    aiActive: {}                     // AI 意图标签激活状态
+  };
+  document.getElementById('q-input').value = state.q;
+
+  /* ============ 类型口径（与首页二级分类一致，覆盖 9 类业务） ============ */
+  var CATS = [
+    { k: 'all',         label: '全部' },
+    { k: 'material',    label: '材料' },
+    { k: 'equipment',   label: '设备' },
+    { k: 'labor',       label: '劳务' },
+    { k: 'cooperation', label: '项目合作' },
+    { k: 'agency',      label: '中介' },
+    { k: 'franchise',   label: '资质招商' },
+    { k: 'trade',       label: '建企买卖' },
+    { k: 'personnel',   label: '企业招聘' },
+    { k: 'talent',      label: '人才求职' }
+  ];
+
+  /* ============ AI 意图规则解析（原型演示：词典提取，提取不到整句兜底） ============ */
+  var CITY_WORDS = ['成都', '重庆', '贵阳', '昆明', '西安', '绵阳', '德阳', '南充', '宜宾', '泸州', '乐山', '西南', '四川', '云南', '贵州'];
+  var CAT_WORDS = [
+    { k: 'material', label: '材料', w: ['混凝土', '水泥', '砂石', '钢筋', '防水', '保温', '护栏', '建材', '砖', '型材'] },
+    { k: 'equipment', label: '设备', w: ['脚手架', '塔吊', '挖掘机', '装载机', '吊车', '泵车', '钢管', '设备', '租赁', '桩机'] },
+    { k: 'labor', label: '劳务', w: ['班组', '劳务', '木工', '钢筋工', '混凝土工', '工人', '用工', '焊工'] },
+    { k: 'cooperation', label: '项目合作', w: ['分包', '合作', '联营', '总包', '承包'] },
+    { k: 'agency', label: '中介', w: ['代办', '资质升级', '安许', '中介', '财税'] },
+    { k: 'franchise', label: '资质招商', w: ['招商', '加盟', '代理', '分公司', '连锁'] },
+    { k: 'trade', label: '建企买卖', w: ['转让', '买卖', '收购', '过户', '出售公司'] },
+    { k: 'personnel', label: '企业招聘', w: ['招聘', '岗位', '聘用', '招人'] },
+    { k: 'talent', label: '人才求职', w: ['求职', '建造师', '工程师', '人才', '持证', '找工作'] }
+  ];
+  function parseAI(q) {
+    var tokens = [];
+    var hitCities = [], hitCats = [], rest = q;
+    CITY_WORDS.forEach(function (c) { if (q.indexOf(c) !== -1 && hitCities.indexOf(c) === -1) { hitCities.push(c); rest = rest.split(c).join(' '); } });
+    CAT_WORDS.forEach(function (c) {
+      c.w.forEach(function (w) {
+        if (q.indexOf(w) !== -1 && hitCats.filter(function (x) { return x.k === c.k; }).length === 0) {
+          hitCats.push({ k: c.k, label: c.label, word: w });
+          rest = rest.split(w).join(' ');
+        }
+      });
+    });
+    hitCities.forEach(function (c) { tokens.push({ type: 'city', text: c, bizKey: null }); });
+    hitCats.forEach(function (c) { tokens.push({ type: 'cat', text: c.label, bizKey: c.k }); });
+    // 剩余实词（急需/现货/进场等），按空格标点切分后保留 2-6 字片段
+    rest.split(/[\s,，。、;；0-9a-zA-Z\.\/]+/).forEach(function (seg) {
+      seg = seg.replace(/[^\u4e00-\u9fa5]/g, '');
+      if (seg.length >= 2 && seg.length <= 8 && tokens.filter(function (t) { return t.text === seg; }).length === 0) tokens.push({ type: 'intent', text: seg, bizKey: null });
+    });
+    if (!tokens.length) tokens.push({ type: 'raw', text: q.slice(0, 12), bizKey: null });
+    return tokens;
+  }
+
+  /* ============ L1：SupplyStore 已上架用户发布 归一化 + 合并搜索 ============ */
+  var SEARCH_BIZ_MAP = { '材料':'material','设备':'equipment','劳务':'labor','项目合作':'cooperation','合作':'cooperation','中介服务':'agency','中介':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent' };
+  function normSearchItem(x) {
+    var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
+    return Object.assign({}, x, {
+      id: x.id,
+      bizKey: x.bizKey || SEARCH_BIZ_MAP[x.cat] || 'material',
+      dir: x.dir || x.type || 'demand',
+      title: x.title || '',
+      cat: x.cat || x.category || '',
+      sub: x.sub || x.subType || '',
+      city: x.city || x.location || '',
+      location: x.location || x.city || '',
+      price: x.price || x.budget || '',
+      budget: x.budget || x.price || '',
+      unit: x.unit || '',
+      tags: x.tags || [],
+      company: x.company || '',
+      desc: x.desc || x.description || '',
+      match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
+      verified: x.verified !== undefined ? x.verified : !isUser,
+      hot: x.hot || false,
+      _badge: isUser ? '用户发布' : '平台认证'
+    });
+  }
+  function readActiveSearchSupplies() {
+    try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
+  }
+  function mergedCatalog() {
+    var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
+    var active = readActiveSearchSupplies().map(normSearchItem);
+    var seen = {};
+    var out = [];
+    active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    return out;
+  }
+
+  /* ============ 检索：全字段拼接，全部空值保护（根治历史崩溃） ============ */
+  function blobOf(s) {
+    var parts = [s.title, s.name, s.maskedName, s.cat, s.sub, s.location, s.city, s.company, s.desc, s.description,
+      s.qualCategory, s.qualLevel, s.expectedPosition, s.experience, s.transferMethod,
+      (s.tags || []).join(' '),
+      (s.fields || []).map(function (f) { return (f && f.k ? f.k + ' ' + f.v : ''); }).join(' ')];
+    return parts.filter(Boolean).join(' ').toLowerCase();
+  }
+  function splitKw(q) {
+    return (q || '').toLowerCase().split(/[\s,，。、;；]+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= 1; });
+  }
+  function search() {
+    var list = mergedCatalog();
+    // 1) 关键词（普通模式：任一分词命中即通过；空词全量）
+    var kws = splitKw(state.q);
+    if (state.mode === 'normal' && kws.length) {
+      list = list.filter(function (s) {
+        var blob = blobOf(s);
+        return kws.some(function (k) { return blob.indexOf(k) !== -1; });
+      });
+    }
+    // 2) 方向
+    if (state.dir !== 'all') list = list.filter(function (s) { return s.dir === state.dir; });
+    // 3) 业务类型
+    if (state.biz !== 'all') list = list.filter(function (s) { return s.bizKey === state.biz; });
+    // 4) AI 意图标签：城市/品类为硬过滤，描述性意图词仅做排序加权（避免描述词导致结果归零）
+    var softBlobs = [];
+    if (state.mode === 'ai') {
+      var actTokens = aiTokens.filter(function (t) { return state.aiActive[t.text]; });
+      actTokens.filter(function (t) { return t.type === 'city' || t.type === 'cat'; }).forEach(function (t) {
+        list = list.filter(function (s) {
+          if (t.bizKey) return s.bizKey === t.bizKey;
+          return blobOf(s).indexOf(t.text.toLowerCase()) !== -1;
+        });
+      });
+      softBlobs = actTokens.filter(function (t) { return t.type === 'intent' || t.type === 'raw'; }).map(function (t) { return t.text.toLowerCase(); });
+    }
+    // 5) 排序
+    var softScore = function (s) {
+      if (!softBlobs.length) return 0;
+      var blob = blobOf(s), n = 0;
+      softBlobs.forEach(function (w) { if (blob.indexOf(w) !== -1) n += 4; });
+      return n;
+    };
+    if (state.mode === 'ai') {
+      list.sort(function (a, b) {
+        var sa = (a.match || 0) + (a.verified ? 3 : 0) + (a.hot ? 2 : 0) + softScore(a);
+        var sb = (b.match || 0) + (b.verified ? 3 : 0) + (b.hot ? 2 : 0) + softScore(b);
+        return sb - sa;
+      });
+    } else if (state.sort === 'newest') {
+      list.sort(function (a, b) { return String(b.time || '').localeCompare(String(a.time || '')); });
+    } else if (state.sort === 'match') {
+      list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
+    } else {
+      // 综合：匹配度为主，认证/热点加权
+      list.sort(function (a, b) {
+        var sa = (a.match || 0) + (a.verified ? 3 : 0) + (a.hot ? 2 : 0);
+        var sb = (b.match || 0) + (b.verified ? 3 : 0) + (b.hot ? 2 : 0);
+        return sb - sa;
+      });
+    }
+    return list;
+  }
+
+  /* ============ 渲染 ============ */
+  var aiTokens = [];
+  function renderAiBanner() {
+    var banner = document.getElementById('ai-banner');
+    var dirSeg = document.getElementById('dir-seg');
+    var catRow = document.getElementById('cat-row');
+    if (state.mode === 'ai') {
+      banner.style.display = '';
+      dirSeg.style.display = 'none';
+      catRow.style.display = 'none';
+      aiTokens = parseAI(state.q || '工程');
+      var city = aiTokens.filter(function (t) { return t.type === 'city'; }).map(function (t) { return t.text; });
+      var cats = aiTokens.filter(function (t) { return t.type === 'cat'; }).map(function (t) { return t.text; });
+      var desc = [];
+      if (cats.length) desc.push('品类「' + cats.join('、') + '」');
+      if (city.length) desc.push('地区「' + city.join('、') + '」');
+      desc.push('按 AI 匹配度排序');
+      document.getElementById('ai-understand').textContent = desc.join(' · ');
+      aiTokens.forEach(function (t) { if (state.aiActive[t.text] === undefined) state.aiActive[t.text] = true; });
+      document.getElementById('ai-tags').innerHTML = aiTokens.map(function (t) {
+        var on = state.aiActive[t.text];
+        return '<span class="sr-ai-tag ' + (on ? 'on' : '') + '" data-t="' + t.text + '">' +
+          (t.type === 'city' ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--info);vertical-align:-1px;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' : t.type === 'cat' ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);vertical-align:-1px;"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>' : '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" style="color:var(--text-3);vertical-align:-1px;"><circle cx="12" cy="12" r="4"/></svg>') + ' ' + t.text +
+          (on ? ' ×' : ' +') + '</span>';
+      }).join('');
+      document.querySelectorAll('#ai-tags .sr-ai-tag').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var key = el.dataset.t;
+          state.aiActive[key] = !state.aiActive[key];
+          renderList();
+          renderAiBanner();
+        });
+      });
+    } else {
+      banner.style.display = 'none';
+      dirSeg.style.display = '';
+      catRow.style.display = '';
+    }
+  }
+
+  function renderCats() {
+    document.getElementById('cat-row').innerHTML = CATS.map(function (c) {
+      return '<span class="sr-cat ' + (state.biz === c.k ? 'on' : '') + '" data-k="' + c.k + '">' + c.label + '</span>';
+    }).join('');
+    document.querySelectorAll('#cat-row .sr-cat').forEach(function (el) {
+      el.addEventListener('click', function () {
+        state.biz = el.dataset.k;
+        renderCats();
+        // 横滑让选中项可见
+        el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        renderList();
+      });
+    });
+  }
+
+  var SORT_LABEL = { comprehensive: '综合排序', newest: '最新发布', match: '匹配度优先' };
+  var SORT_ORDER = ['comprehensive', 'newest', 'match'];
+  function renderSort() {
+    var btn = document.getElementById('sort-btn');
+    if (state.mode === 'ai') {
+      btn.textContent = 'AI 匹配度 ›';
+      btn.onclick = function () { UI.toast('AI 结果已按匹配度排序', 'ok'); };
+    } else {
+      btn.textContent = SORT_LABEL[state.sort] + ' ›';
+      btn.onclick = function () {
+        var idx = SORT_ORDER.indexOf(state.sort);
+        state.sort = SORT_ORDER[(idx + 1) % SORT_ORDER.length];
+        renderSort();
+        renderList();
+      };
+    }
+  }
+
+  function renderList() {
+    var list = search();
+    document.getElementById('count').textContent = (state.mode === 'ai' ? 'AI 为你找到 ' : '共 ') + list.length + ' 条相关结果';
+    var box = document.getElementById('list');
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-state"><div class="e-icon"><svg class="ic"><use href="#i-search"/></svg></div>' +
+        '<div class="e-title">未找到相关内容</div><div class="e-desc">换个关键词，或' +
+        (state.mode === 'ai' ? '切换手动筛选' : '减少筛选条件') + '试试</div></div>';
+      return;
+    }
+    box.innerHTML = window.Cards.render(list);
+    /* L1：为用户发布条目注入角标 */
+    var cards = document.querySelectorAll('#list .job-card');
+    list.forEach(function (item, idx) {
+      if (item._badge && cards[idx]) {
+        var tag = document.createElement('span');
+        tag.className = 'tag ' + (item._badge === '用户发布' ? 'tag-supply' : 'tag-gold');
+        tag.style.cssText = 'margin-left:6px;font-size:10px;';
+        tag.textContent = item._badge;
+        var tagsRow = cards[idx].querySelector('.jc-tags');
+        if (tagsRow) tagsRow.appendChild(tag);
+      }
+    });
+  }
+
+  /* 改词重搜（不跳页） */
+  window.research = function () {
+    state.q = document.getElementById('q-input').value.trim();
+    state.aiActive = {};
+    history.replaceState({}, '', '?mode=' + state.mode + (state.q ? '&q=' + encodeURIComponent(state.q) : ''));
+    renderAiBanner();
+    renderList();
+  };
+  window.switchMode = function (m) {
+    state.mode = m;
+    history.replaceState({}, '', '?mode=' + m + (state.q ? '&q=' + encodeURIComponent(state.q) : ''));
+    renderAiBanner();
+    renderList();
+  };
+
+  /* 方向分段绑定 */
+  document.querySelectorAll('#dir-seg .seg-item').forEach(function (el) {
+    el.addEventListener('click', function () {
+      document.querySelectorAll('#dir-seg .seg-item').forEach(function (x) { x.classList.remove('active'); });
+      el.classList.add('active');
+      state.dir = el.dataset.d;
+      renderList();
+    });
+  });
+
+  /* 初始化 */
+  renderAiBanner();
+  renderCats();
+  renderSort();
+  renderList();
+  /* L1：监听供需变更（后台审核上架后搜索结果即时包含） */
+  window.addEventListener('engchain:supply', function () { renderList(); });
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-supply') renderList(); });
+})();
+</script>
+</body>
+</html>

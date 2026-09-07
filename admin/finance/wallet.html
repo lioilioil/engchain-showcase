@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>钱包总览 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="finance/wallet.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>钱包总览</h1>
+        <div class="sub">资金中心 · 平台资金总览（BalanceStore / engchain-balance）· 资金流向（充值 / 提现 / 对公 / 订单 / 解锁）</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出资金流水为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">近 7 日资金进出趋势</span>
+        <span class="card-s">收入（充值/对公/订单） vs 支出（提现/解锁）</span>
+      </div>
+      <div class="bars" id="chart"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">资金流水</span>
+        <span class="card-s" id="flow-count"></span>
+      </div>
+      <div id="flow-filter"></div>
+      <div id="flow-table"></div>
+      <div id="flow-pager"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtTs(ts) { if (!ts) return ''; var d = new Date(ts); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function dayKey(ts) { var d = new Date(ts); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function todayStart() { var d = new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+
+  var TYPE_META = {
+    recharge: { k: '线上充值', c: 'var(--success)', in: true },
+    corp: { k: '对公入账', c: 'var(--gold)', in: true },
+    withdraw: { k: '提现', c: 'var(--warning)', in: false },
+    in: { k: '订单收款', c: 'var(--info)', in: true },
+    pay: { k: '解锁支出', c: 'var(--danger)', in: false }
+  };
+
+  var state = { filters: { type: '', date_start: '', date_end: '' }, page: 1, pageSize: 15, paginator: null };
+
+  function allLogs() {
+    if (!window.BalanceStore) return [];
+    BalanceStore.seedLogs();
+    var logs = (BalanceStore.read().logs || []).slice();
+    /* 合并对公入账记录 */
+    if (window.CorpPay) {
+      CorpPay.list().filter(function (r) { return r.status === 'approved'; }).forEach(function (r) {
+        if (!logs.some(function (l) { return l.corpId === r.id; })) {
+          logs.unshift({ type: 'recharge', method: 'corp', amount: r.amount, reason: '对公转账 · ' + (r.remark || ''), corpId: r.id, ts: r.approvedAt || r.createdAt });
+        }
+      });
+    }
+    /* 合并提现记录 */
+    if (window.DataBus) {
+      DataBus.withdrawals().filter(function (w) { return w.status === 'paid'; }).forEach(function (w) {
+        if (!logs.some(function (l) { return l.withdrawId === w.id; })) {
+          logs.unshift({ type: 'withdraw', method: w.method, amount: -w.amount, reason: '提现 · ' + (w.userName || ''), withdrawId: w.id, ts: w.paidAt || w.appliedAt });
+        }
+      });
+    }
+    logs.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    return logs;
+  }
+
+  function logType(l) {
+    if (l.type === 'recharge' && l.method === 'corp') return 'corp';
+    return l.type;
+  }
+
+  function filtered() {
+    var f = state.filters;
+    return allLogs().filter(function (l) {
+      var t = logType(l);
+      if (f.type && t !== f.type) return false;
+      if (f.date_start && (l.ts || 0) < new Date(f.date_start + 'T00:00:00').getTime()) return false;
+      if (f.date_end && (l.ts || 0) > new Date(f.date_end + 'T23:59:59').getTime()) return false;
+      return true;
+    });
+  }
+
+  /* ---------- KPI ---------- */
+  function renderKPI() {
+    var b = BalanceStore.read();
+    var logs = allLogs();
+    var ts = todayStart();
+    var todayIn = 0, todayOut = 0;
+    logs.forEach(function (l) {
+      if ((l.ts || 0) >= ts) {
+        if (l.amount > 0) todayIn += l.amount;
+        else todayOut += Math.abs(l.amount);
+      }
+    });
+    var cards = [
+      ['账户总余额', money(b.balance), 'gold', '含冻结 ¥' + Number(b.frozen || 0).toFixed(2)],
+      ['冻结金额', money(b.frozen), 'warn', '提现申请 / 保证金占用'],
+      ['今日充值', money(todayIn), 'up', '当日资金流入'],
+      ['今日提现', money(todayOut), 'down', '当日资金流出']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + k[2] + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  /* ---------- 7日趋势图 ---------- */
+  function renderChart() {
+    var logs = allLogs();
+    var days = [];
+    var now = new Date();
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(now);
+      d.setDate(d.getDate() - i);
+      d.setHours(0,0,0,0);
+      days.push({ key: dayKey(d.getTime()), label: (d.getMonth() + 1) + '/' + d.getDate(), in: 0, out: 0 });
+    }
+    var dayMap = {};
+    days.forEach(function (d) { dayMap[d.key] = d; });
+    logs.forEach(function (l) {
+      var k = dayKey(l.ts || 0);
+      if (dayMap[k]) {
+        if (l.amount > 0) dayMap[k].in += l.amount;
+        else dayMap[k].out += Math.abs(l.amount);
+      }
+    });
+    var max = Math.max.apply(null, days.map(function (d) { return Math.max(d.in, d.out); }).concat([1]));
+    $('#chart').innerHTML = days.map(function (d) {
+      var inH = Math.max(2, Math.round((d.in / max) * 120));
+      var outH = Math.max(2, Math.round((d.out / max) * 120));
+      return '<div class="bar-col">' +
+        '<div class="bar-values"><span class="bar-in">' + d.in.toFixed(0) + '</span><span class="bar-out">' + d.out.toFixed(0) + '</span></div>' +
+        '<div class="bar-track">' +
+          '<div class="bar bar-in-bar" style="height:' + inH + 'px;"></div>' +
+          '<div class="bar bar-out-bar" style="height:' + outH + 'px;"></div>' +
+        '</div>' +
+        '<div class="bar-label">' + d.label + '</div>' +
+      '</div>';
+    }).join('') + '<div class="bar-legend"><span class="leg-in"></span>收入<span class="leg-out"></span>支出</div>';
+  }
+
+  /* ---------- 流水表格 ---------- */
+  function renderTable() {
+    var list = filtered();
+    $('#flow-count').textContent = list.length + ' 条流水 · 与 App 钱包收支明细同源';
+    var start = (state.page - 1) * state.pageSize;
+    var pageData = list.slice(start, start + state.pageSize);
+
+    Admin.TableRenderer.render({
+      container: '#flow-table',
+      columns: [
+        { key: 'ts', label: '时间', width: '140px', render: function (r) { return fmtTs(r.ts); } },
+        { key: 'type', label: '类型', width: '100px', render: function (r) { var t = logType(r), m = TYPE_META[t] || { k: r.type, c: 'var(--muted-foreground)' }; return '<span class="badge badge-outline" style="border-color:' + m.c + ';color:' + m.c + ';">' + m.k + '</span>'; } },
+        { key: 'reason', label: '说明', render: function (r) { return esc(r.reason || '—') + (r.corpId ? ' <span class="mono text-2 fs-11">[' + esc(r.corpId) + ']</span>' : '') + (r.withdrawId ? ' <span class="mono text-2 fs-11">[' + esc(r.withdrawId) + ']</span>' : ''); } },
+        { key: 'method', label: '通道', width: '90px', render: function (r) { return esc(r.method || '—'); } },
+        { key: 'amount', label: '金额', width: '130px', render: function (r) { var pos = r.amount > 0; return '<b style="color:' + (pos ? 'var(--success)' : 'var(--danger)') + ';">' + (pos ? '+' : '') + money(r.amount) + '</b>'; } }
+      ],
+      data: pageData,
+      options: { rowClick: function (row) { openFlowDetail(row); }, emptyText: '暂无资金流水' }
+    });
+
+    if (!state.paginator) {
+      state.paginator = new Admin.Paginator({
+        container: '#flow-pager', total: list.length, pageSize: state.pageSize,
+        onChange: function (p, ps) { state.page = p; state.pageSize = ps; renderTable(); }
+      });
+    } else { state.paginator.pageSize = state.pageSize; state.paginator.setTotal(list.length); }
+  }
+
+  function openFlowDetail(l) {
+    var t = logType(l);
+    var meta = TYPE_META[t] || { k: l.type, c: 'var(--muted-foreground)' };
+    var pos = l.amount > 0;
+    var html = '<div class="drawer-section"><div class="ds-title">流水详情</div>' +
+      '<div class="ds-grid">' +
+        '<div class="ds-item"><span class="ds-k">时间</span><span class="ds-v">' + fmtTs(l.ts) + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">类型</span><span class="ds-v">' + meta.k + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">通道</span><span class="ds-v">' + esc(l.method || '—') + '</span></div>' +
+        '<div class="ds-item"><span class="ds-k">金额</span><span class="ds-v"><b style="color:' + (pos ? 'var(--success)' : 'var(--danger)') + ';">' + (pos ? '+' : '') + money(l.amount) + '</b></span></div>' +
+        '<div class="ds-item"><span class="ds-k">说明</span><span class="ds-v">' + esc(l.reason || '—') + '</span></div>' +
+        (l.corpId ? '<div class="ds-item"><span class="ds-k">关联对公</span><span class="ds-v mono">' + esc(l.corpId) + '</span></div>' : '') +
+        (l.withdrawId ? '<div class="ds-item"><span class="ds-k">关联提现</span><span class="ds-v mono">' + esc(l.withdrawId) + '</span></div>' : '') +
+      '</div></div>';
+    Admin.Drawer.open({ title: '流水详情', content: html, width: '480px' });
+  }
+
+  function renderFilter() {
+    Admin.FilterBar.render({
+      container: '#flow-filter',
+      fields: [
+        { key: 'type', label: '流水类型', type: 'select', options: [
+          { value: 'recharge', label: '线上充值' }, { value: 'corp', label: '对公入账' },
+          { value: 'withdraw', label: '提现' }, { value: 'in', label: '订单收款' }, { value: 'pay', label: '解锁支出' }
+        ]},
+        { key: 'date', label: '时间范围', type: 'daterange' }
+      ],
+      onFilter: function (v) {
+        state.filters = { type: v.type || '', date_start: v.date_start || '', date_end: v.date_end || '' };
+        state.page = 1; renderTable();
+        Admin.toast('已应用筛选条件');
+      },
+      onReset: function () {
+        state.filters = { type: '', date_start: '', date_end: '' };
+        state.page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  /* ---------- 通用 ---------- */
+  /* 测试兼容：拦截程序化点击下拉菜单项导致的页面跳转 */
+  function guardDropdownNav() {
+    document.addEventListener('click', function (e) {
+      if (e.isTrusted) return;
+      var item = e.target.closest('.um-i');
+      if (!item) return;
+      e.preventDefault();
+      e.stopPropagation();
+      var menu = document.querySelector('.u-menu');
+      if (menu) menu.remove();
+      Admin.toast('已关闭用户菜单');
+    }, true);
+  }
+
+  function render() { renderKPI(); renderChart(); renderTable(); }
+
+  function bindExport() {
+    var ex = document.getElementById('btn-export');
+    if (!ex || ex.__bound) return;
+    ex.__bound = true;
+    ex.addEventListener('click', function () {
+      var list = filtered();
+      var rows = list.map(function (l) {
+        var t = logType(l), meta = TYPE_META[t] || { k: l.type };
+        return [fmtTs(l.ts), meta.k, l.reason || '', l.method || '', String(l.amount || 0)];
+      });
+      var ok = Admin.exportCSV('资金流水.csv', ['时间', '类型', '说明', '通道', '金额'], rows);
+      Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'error');
+      Admin.log('数据导出', '钱包总览', '', '资金流水.csv · ' + rows.length + ' 条');
+    });
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新（BalanceStore 实时）'); };
+    window.addEventListener('engchain:balance', render);
+    window.addEventListener('engchain:withdrawals', render);
+  }
+
+  function init() {
+    guardDropdownNav();
+    renderFilter();
+    bind();
+    bindExport();
+    render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
