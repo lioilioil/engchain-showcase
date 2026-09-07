@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>已解锁线索 · 工程链</title><link rel="stylesheet" href="../../css/app.css"><style>.unlock-scroll{padding:10px 16px 30px}.unlock-head{padding:8px 0 15px}.unlock-title{font-size:22px;font-weight:700}.unlock-sub{margin-top:4px;color:var(--text-3);font-size:11px}.lead{padding:14px;margin-bottom:10px;border:1px solid var(--line);border-radius:var(--r-m);background:var(--bg-card)}.lead-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.lead-name{font-size:14px;font-weight:600;line-height:1.45}.lead-kind{color:var(--primary-dim);font-size:10px;white-space:nowrap}.lead-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;color:var(--text-3);font-size:11px}.lead-actions{display:flex;gap:8px;margin-top:12px}.lead-actions a{flex:1;padding:8px;text-align:center;border:1px solid var(--line);border-radius:var(--r-s);color:var(--text-2);font-size:11px;text-decoration:none}.lead-actions a:first-child{border-color:var(--primary);color:var(--primary-dim);background:var(--primary-soft)}</style></head><body><div class="phone">
+  <div id="pub-gate-login" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">登录后查看已解锁线索</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">登录后可管理已解锁的供需线索，查看联系方式与关联订单。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">立即登录</a>
+  </div>
+  <div id="pub-gate-realname" style="display:none;text-align:center;padding:60px 24px;">
+    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;"><svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-shield"/></svg></div>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;">实名认证后可解锁线索</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成实名认证后，即可解锁供需信息并查看完整联系方式。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往实名认证</a>
+  </div>
+  <div id="pub-content">
+  <div class="navbar" style="height:50px"><button class="nav-back" onclick="history.back()">‹</button><div class="nav-title">已解锁线索</div><div class="nav-right"></div></div><main class="scroll unlock-scroll"><header class="unlock-head"><h1 class="unlock-title">已解锁线索</h1><div class="unlock-sub" id="unlock-sub">这里管理你已经获得查看权限的信息</div></header><div id="lead-list"></div></main></div></div>
+<script src="../../js/data.js"></script><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-workbench.js"></script>
+<script>
+(function(){
+  /* ---- 身份门控 ---- */
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateLogin = document.getElementById('pub-gate-login');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (st.loggedIn === false) { if (content) content.style.display='none'; if (gateLogin) gateLogin.style.display=''; return false; }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) { if (content) content.style.display='none'; if (gateReal) gateReal.style.display=''; return false; }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+  window.__ROOT__='../../';
+  var KINDS = { material:'材料采购', equipment:'设备租赁', labor:'劳务用工', cooperation:'项目合作', franchise:'招商加盟', trade:'企业转让', agency:'中介服务', personnel:'企业招聘', talent:'人才线索', publish:'发布信息' };
+  function esc(value){return String(value == null ? '' : value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function readUnlocks(){ try { return JSON.parse(localStorage.getItem('engchain-unlocked') || '{}'); } catch (e){ return {}; } }
+  function resolve(bizKey, id){
+    if (bizKey === 'publish') { var r = window.PublishStore && PublishStore.getRecordById(id); if (r) return { title: r.title, kind: KINDS.publish + ' · ' + (r.category || ''), link: '../supply/detail.html?id=' + encodeURIComponent(r.id || id) }; return null; }
+    var listing = window.MOCK && MOCK.listingById(id);
+    if (listing) return { title: listing.title || listing.name || '信息 #' + id, kind: KINDS[bizKey] || bizKey, link: '../supply/detail.html?id=' + encodeURIComponent(id) };
+    var person = window.MOCK && MOCK.personById(id);
+    if (person) return { title: person.name || '人才 ' + id, kind: KINDS.personnel || bizKey, link: '../personal/index.html?id=' + encodeURIComponent(id) };
+    return null;
+  }
+  function fmtDate(t){ if (!t) return '已解锁'; var d = new Date(t); if (isNaN(d.getTime())) return '已解锁'; return '解锁于 ' + d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+  var box = document.getElementById('lead-list');
+  var obj = readUnlocks(), keys = Object.keys(obj), leads = [];
+  keys.forEach(function(key){
+    var parts = key.split('_'); var bizKey = parts[0]; var id = parts.slice(1).join('_');
+    var hit = resolve(bizKey, id); if (hit) leads.push({ id: key, bizKey: bizKey, t: (obj[key] && obj[key].t) || 0, title: hit.title, kind: hit.kind, link: hit.link });
+  });
+  leads.sort(function(a,b){ return b.t - a.t; });
+  document.getElementById('unlock-sub').textContent = leads.length ? '共 ' + leads.length + ' 条已解锁线索' : '尚未解锁任何线索';
+  box.innerHTML = leads.length ? leads.map(function(l){
+    return '<div class="lead"><div class="lead-top"><div class="lead-name">'+esc(l.title)+'</div><span class="lead-kind">'+esc(l.kind)+'</span></div>'+
+      '<div class="lead-meta"><span>'+esc(fmtDate(l.t))+'</span><span>有效</span></div>'+
+      '<div class="lead-actions"><a href="'+esc(l.link)+'">查看详情</a><a href="../message/index.html">联系对方</a></div></div>';
+  }).join('') : '<div class="wb-empty" style="padding:34px 17px;">暂无已解锁线索<br><span style="display:inline-block;margin-top:8px;color:var(--text-3);font-size:11px;">前往<b style="color:var(--primary-dim);font-weight:600;">发现</b>页，解锁感兴趣的供需信息后这里会展示</span></div>';
+})();
+</script></body></html>

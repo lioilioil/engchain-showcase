@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>定价配置 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="system/pricing.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>定价配置</h1>
+        <div class="sub">平台各项服务定价配置管理 · 入驻费 / 佣金费率 / 信息解锁费 / 增值服务定价 · 修改经 Modal 确认后写入 ConfigAPI 并全端广播</div>
+      </div>
+      <div class="ph-actions">
+        <button class="btn btn-outline" id="btn-reset" data-perm="settings">↺ 恢复默认</button>
+        <button class="btn btn-outline" id="btn-history" data-perm="settings">变更记录</button>
+      </div>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">定价配置分区</span><span class="card-s">点击卡片 [编辑] 修改单项配置 · 所有操作需 settings 权限</span></div>
+      <div class="tabs" id="pricing-tabs">
+        <button class="tab active" data-tab="entry">入驻费配置</button>
+        <button class="tab" data-tab="commission">佣金费率</button>
+        <button class="tab" data-tab="unlock">信息解锁费</button>
+        <button class="tab" data-tab="valueadded">增值服务定价</button>
+      </div>
+      <div class="tab-panel active" data-panel="entry" id="panel-entry"></div>
+      <div class="tab-panel" data-panel="commission" id="panel-commission"></div>
+      <div class="tab-panel" data-panel="unlock" id="panel-unlock"></div>
+      <div class="tab-panel" data-panel="valueadded" id="panel-valueadded"></div>
+    </div>
+
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">配置变更历史</span><span class="card-s">每次保存留痕 · 支持分页查看</span></div>
+      <div id="history-table"></div>
+      <div id="history-pager"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script src="../../js/domain.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function deepGet(obj, path) {
+    var ks = String(path).split('.'), o = obj;
+    for (var i = 0; i < ks.length; i++) { if (o == null) return undefined; o = o[ks[i]]; }
+    return o;
+  }
+  function setObj(obj, path, val) {
+    var ks = path.split('.'), o = obj;
+    for (var i = 0; i < ks.length - 1; i++) { o[ks[i]] = o[ks[i]] || {}; o = o[ks[i]]; }
+    o[ks[ks.length - 1]] = val;
+  }
+  function getAllKeys(obj, prefix) {
+    var keys = [];
+    prefix = prefix || '';
+    if (obj == null || typeof obj !== 'object') return keys;
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var full = prefix ? prefix + '.' + k : k;
+      if (obj[k] != null && typeof obj[k] === 'object' && !Array.isArray(obj[k])) {
+        keys = keys.concat(getAllKeys(obj[k], full));
+      } else {
+        keys.push(full);
+      }
+    }
+    return keys;
+  }
+  function fmtVal(v) {
+    if (v == null) return '—';
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
+  }
+  function yuan(v) { return '¥' + Number(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 }); }
+
+  /* ---- 配置项 schema ---- */
+  var GROUPS = [
+    {
+      id: 'entry', name: '入驻费配置',
+      items: [
+        { key: 'entryTypes.construction.fee', label: '建筑企业入驻费', unit: '¥', step: 100, hint: '成熟期建筑企业入驻费用', def: 3999 },
+        { key: 'entryTypes.agency.fee', label: '中介企业入驻费', unit: '¥', step: 100, hint: '成熟期中介企业入驻费用', def: 29999 },
+        { key: 'entryTypes.partner.fee', label: '合伙人入驻费', unit: '¥', step: 100, hint: '合伙人审核制，通常为 0', def: 0 },
+        { key: 'entryTypes.construction.deposit', label: '建筑企业保证金', unit: '¥', step: 1000, hint: '可退保证金', def: 5000 },
+        { key: 'entryTypes.agency.deposit', label: '中介企业保证金', unit: '¥', step: 1000, hint: '可退保证金', def: 20000 },
+        { key: 'entryTypes.partner.deposit', label: '合伙人保证金', unit: '¥', step: 1000, hint: '可退保证金', def: 50000 },
+        { key: 'breakin.entry.construction', label: '破冰期·建筑入驻费', unit: '¥', step: 100, hint: '破冰期推广补贴价', def: 0 },
+        { key: 'breakin.entry.agency', label: '破冰期·中介入驻费', unit: '¥', step: 100, hint: '破冰期推广补贴价', def: 0 }
+      ]
+    },
+    {
+      id: 'commission', name: '佣金费率',
+      items: [
+        { key: 'commission.minCommission', label: '百万级保底佣金', unit: '¥', step: 1000, hint: '≥100万单笔保底佣金', def: 5000 },
+        { key: 'commission.milestone.minAmount', label: '里程碑启用门槛', unit: '¥', step: 10000, hint: '≥该金额分期托管', def: 50000 },
+        { key: 'commission.milestone.autoConfirmDays', label: '自动确认天数', unit: '天', step: 1, hint: '交付后 N 天自动验收', def: 7 },
+        { key: 'breakin.commissionFirstTier', label: '破冰期首档费率', unit: '', step: 0.01, hint: '0-1 小数，如 0.05=5%', def: 0.05, pct: true }
+      ],
+      special: 'tier'
+    },
+    {
+      id: 'unlock', name: '信息解锁费',
+      items: [
+        { key: 'clue.unlockFee', label: '供需信息查看费', unit: '¥', step: 1, hint: '单次查看供需联系方式费用', def: 9.9 },
+        { key: 'credits.deduct.pointsToYuan', label: '积分抵现比例', unit: '分/¥', step: 10, hint: '多少积分=¥1，如 100 分=¥1', def: 100 },
+        { key: 'credits.deduct.capRate', label: '单笔抵现上限比例', unit: '', step: 0.05, hint: '0-1，如 0.3=最多抵30%', def: 0.3, pct: true },
+        { key: 'clue.validDays', label: '线索包有效天数', unit: '天', step: 1, hint: '到期失效', def: 30 }
+      ]
+    },
+    {
+      id: 'valueadded', name: '增值服务定价',
+      items: [
+        { key: 'certification.expediteFee', label: '认证加急费', unit: '¥', step: 50, hint: '企业认证加急处理费用', def: 299 },
+        { key: 'promotion.topDailyFee', label: '置顶推广日费', unit: '¥/天', step: 10, hint: '供需信息置顶推广每日费用', def: 29 },
+        { key: 'invoice.taxRate', label: '发票税率', unit: '', step: 0.01, hint: '0-1 小数', def: 0.06, pct: true },
+        { key: 'refund.days', label: '虚拟服务可退款天数', unit: '天', step: 1, hint: '未使用可退', def: 7 }
+      ]
+    }
+  ];
+
+  var state = { historyPage: 1, historyPageSize: 10 };
+
+  /* ---- KPI ---- */
+  function renderKPI() {
+    var tiers = RULE('commission.tier', []) || [];
+    var rates = tiers.map(function (t) { return Math.round((t.rate || 0) * 100); });
+    var rateRange = rates.length ? (Math.min.apply(null, rates) + '% ~ ' + Math.max.apply(null, rates) + '%') : '—';
+    var hist = ConfigAPI.history();
+    var now = new Date();
+    var monthCount = hist.filter(function (h) {
+      var d = new Date(h.ts);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    var cards = [
+      ['建筑入驻费', yuan(RULE('entryTypes.construction.fee', 3999)), '成熟期'],
+      ['中介入驻费', yuan(RULE('entryTypes.agency.fee', 29999)), '成熟期'],
+      ['合伙人入驻费', yuan(RULE('entryTypes.partner.fee', 0)), '审核制'],
+      ['佣金费率区间', rateRange, '按订单金额阶梯'],
+      ['本月配置变更', monthCount + ' 次', 'ConfigAPI 留痕']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + esc(k[1]) + '</div><div class="d">' + esc(k[2]) + '</div></div>';
+    }).join('');
+  }
+
+  /* ---- 配置卡片渲染 ---- */
+  function displayVal(item) {
+    var v = RULE(item.key, item.def);
+    if (item.pct) return (Math.round(Number(v) * 10000) / 100) + '%';
+    if (item.unit === '¥' || item.unit === '¥/天') return yuan(v);
+    return v + (item.unit ? ' ' + item.unit : '');
+  }
+
+  function renderGroup(group) {
+    var panel = $('#panel-' + group.id);
+    var html = '<div class="money-grid">';
+    group.items.forEach(function (item) {
+      html += '<div class="money-card">' +
+        '<span class="mc-tag">' + esc(item.label) + '</span>' +
+        '<div class="mc-v tx-xl">' + displayVal(item) + '</div>' +
+        '<div class="mc-d">' + esc(item.hint) + '</div>' +
+        '<button class="btn btn-outline btn-sm mt-10" data-edit="' + esc(item.key) + '" data-perm="settings">编辑</button>' +
+        '</div>';
+    });
+    html += '</div>';
+    if (group.special === 'tier') {
+      html += renderTierCard();
+    }
+    panel.innerHTML = html;
+  }
+
+  function renderTierCard() {
+    var tiers = RULE('commission.tier', []) || [];
+    var rows = tiers.map(function (t, i) {
+      return '<tr><td>第 ' + (i + 1) + ' 档</td><td>≥ ' + yuan(t.min) + '</td><td>' + Math.round((t.rate || 0) * 100) + '%</td></tr>';
+    }).join('');
+    return '<div class="card card-pad card-mt card-plain">' +
+      '<div class="card-h"><span class="card-t">佣金阶梯费率</span><span class="card-s">按订单金额下限阶梯计费</span>' +
+      '<button class="btn btn-outline btn-sm ml-auto" data-edit-tier="1" data-perm="settings">编辑阶梯</button></div>' +
+      '<div class="table-wrap"><table class="table"><thead><tr><th>档位</th><th>订单金额下限</th><th>费率</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="3" class="td-empty-sm">暂无阶梯配置</td></tr>') + '</tbody></table></div>' +
+      '</div>';
+  }
+
+  function renderAllGroups() {
+    GROUPS.forEach(renderGroup);
+  }
+
+  /* ---- 单项编辑 Modal ---- */
+  function openEditModal(key) {
+    var item = null;
+    for (var g = 0; g < GROUPS.length; g++) {
+      for (var i = 0; i < GROUPS[g].items.length; i++) {
+        if (GROUPS[g].items[i].key === key) { item = GROUPS[g].items[i]; break; }
+      }
+      if (item) break;
+    }
+    if (!item) return;
+    var curVal = RULE(item.key, item.def);
+    var content = '<div class="fl-col-md">' +
+      '<div><label class="lbl tx-label">' + esc(item.label) + '</label>' +
+      '<input type="number" step="' + item.step + '" class="input" w-full id="edit-val" value="' + esc(curVal) + '">' +
+      (item.hint ? '<div class="form-hint">' + esc(item.hint) + '</div>' : '') +
+      '</div>' +
+      '<div class="alert alert-default m-0">' +
+      '<div class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>' +
+      '<div class="alert-body"><div class="alert-title">当前值：' + esc(displayVal(item)) + '</div>' +
+      '<div class="alert-desc">修改后将写入 ConfigAPI 并广播全端（engchain:config），所有页面实时生效。</div></div></div>' +
+      '</div>';
+    var footer = '<button class="btn btn-outline" id="edit-cancel">取消</button>' +
+      '<button class="btn btn-primary" id="edit-confirm" data-perm="settings">确认保存</button>';
+    var modal = Admin.Modal.open({ title: '编辑 · ' + item.label, content: content, footer: footer, width: '480px' });
+    modal.dialog.querySelector('#edit-cancel').onclick = function () { modal.close(); };
+    modal.dialog.querySelector('#edit-confirm').onclick = function () {
+      var input = modal.dialog.querySelector('#edit-val');
+      var v = parseFloat(input.value);
+      if (isNaN(v)) { Admin.toast('请输入有效数字', 'err'); return; }
+      var patch = {};
+      setObj(patch, item.key, v);
+      var r = ConfigAPI.save(patch, '修改定价配置：' + item.label + ' → ' + v);
+      if (!r.ok) { Admin.toast('保存失败：' + (r.error || ''), 'err'); return; }
+      Admin.log('修改定价配置', '系统设置', item.label, '旧值=' + curVal + ' 新值=' + v);
+      window.dispatchEvent(new CustomEvent('engchain:config', { detail: { source: 'save' } }));
+      Admin.toast('已保存：' + item.label + ' → ' + displayVal(item));
+      modal.close();
+      renderKPI();
+      renderAllGroups();
+      renderHistory();
+    };
+  }
+
+  /* ---- 佣金阶梯编辑 Modal ---- */
+  function openTierModal() {
+    var tiers = JSON.parse(JSON.stringify(RULE('commission.tier', []) || []));
+    if (!tiers.length) tiers = [{ min: 0, rate: 0.08 }, { min: 50000, rate: 0.06 }, { min: 200000, rate: 0.05 }, { min: 500000, rate: 0.04 }, { min: 1000000, rate: 0.03 }];
+    var content = '<div class="fl-col fl-col-xs" id="tier-rows"></div>' +
+      '<button class="btn btn-outline btn-sm mt-10" id="tier-add">+ 添加一档</button>' +
+      '<div class="alert alert-default mt-12">' +
+      '<div class="alert-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/><path d="m9 12 2 2 4-4"/></svg></div>' +
+      '<div class="alert-body"><div class="alert-title">阶梯按订单金额下限升序排列</div><div class="alert-desc">费率为 0-1 小数（如 0.08 = 8%），保存后全端生效。</div></div></div>';
+    var footer = '<button class="btn btn-outline" id="tier-cancel">取消</button>' +
+      '<button class="btn btn-primary" id="tier-confirm" data-perm="settings">确认保存</button>';
+    var modal = Admin.Modal.open({ title: '编辑佣金阶梯', content: content, footer: footer, width: '560px' });
+    function renderTierRows() {
+      var box = modal.dialog.querySelector('#tier-rows');
+      box.innerHTML = tiers.map(function (t, i) {
+        return '<div class="fl-row-sm">' +
+          '<span class="tier-label">第' + (i + 1) + '档</span>' +
+          '<input class="input tier-min fl-1" type="number" data-idx="' + i + '" placeholder="金额下限 ¥" value="' + (t.min || 0) + '">' +
+          '<input class="input tier-rate fl-1" type="number" step="0.01" data-idx="' + i + '" placeholder="费率 0-1" value="' + (t.rate || 0) + '">' +
+          '<button class="btn btn-outline btn-sm tier-del" data-idx="' + i + '">删除</button></div>';
+      }).join('');
+      box.querySelectorAll('.tier-min').forEach(function (el) {
+        el.oninput = function () { tiers[parseInt(el.getAttribute('data-idx'), 10)].min = parseFloat(el.value) || 0; };
+      });
+      box.querySelectorAll('.tier-rate').forEach(function (el) {
+        el.oninput = function () { tiers[parseInt(el.getAttribute('data-idx'), 10)].rate = parseFloat(el.value) || 0; };
+      });
+      box.querySelectorAll('.tier-del').forEach(function (el) {
+        el.onclick = function () {
+          var idx = parseInt(el.getAttribute('data-idx'), 10);
+          tiers.splice(idx, 1);
+          renderTierRows();
+        };
+      });
+    }
+    renderTierRows();
+    modal.dialog.querySelector('#tier-add').onclick = function () {
+      var lastMin = tiers.length ? (tiers[tiers.length - 1].min || 0) + 100000 : 0;
+      tiers.push({ min: lastMin, rate: 0.03 });
+      renderTierRows();
+    };
+    modal.dialog.querySelector('#tier-cancel').onclick = function () { modal.close(); };
+    modal.dialog.querySelector('#tier-confirm').onclick = function () {
+      tiers.sort(function (a, b) { return a.min - b.min; });
+      var patch = { commission: { tier: tiers } };
+      var r = ConfigAPI.save(patch, '修改佣金阶梯：' + tiers.length + ' 档');
+      if (!r.ok) { Admin.toast('保存失败：' + (r.error || ''), 'err'); return; }
+      Admin.log('修改佣金阶梯', '系统设置', 'commission.tier', tiers.length + ' 档');
+      window.dispatchEvent(new CustomEvent('engchain:config', { detail: { source: 'save' } }));
+      Admin.toast('佣金阶梯已更新（' + tiers.length + ' 档），全端生效');
+      modal.close();
+      renderKPI();
+      renderAllGroups();
+      renderHistory();
+    };
+  }
+
+  /* ---- 变更历史表格 ---- */
+  function flattenHistory() {
+    var hist = ConfigAPI.history();
+    var rows = [];
+    for (var i = 0; i < hist.length; i++) {
+      var cur = hist[i].snapshot || {};
+      var prev = (i < hist.length - 1) ? (hist[i + 1].snapshot || {}) : {};
+      var keys = getAllKeys(cur);
+      for (var j = 0; j < keys.length; j++) {
+        var k = keys[j];
+        var newVal = deepGet(cur, k);
+        var oldVal = deepGet(prev, k);
+        if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+          rows.push({
+            id: String(hist[i].ts) + '_' + k,
+            item: k,
+            old: fmtVal(oldVal),
+            new: fmtVal(newVal),
+            operator: '管理员',
+            time: new Date(hist[i].ts).toLocaleString('zh-CN'),
+            remark: hist[i].remark || ''
+          });
+        }
+      }
+    }
+    return rows;
+  }
+
+  function renderHistory() {
+    var all = flattenHistory();
+    var start = (state.historyPage - 1) * state.historyPageSize;
+    var pageData = all.slice(start, start + state.historyPageSize);
+    Admin.TableRenderer.render({
+      container: '#history-table',
+      columns: [
+        { key: 'item', label: '变更项', width: '28%' },
+        { key: 'old', label: '旧值', width: '14%' },
+        { key: 'new', label: '新值', width: '14%' },
+        { key: 'operator', label: '操作人', width: '10%' },
+        { key: 'time', label: '时间', width: '20%' },
+        { key: 'remark', label: '备注', width: '14%' }
+      ],
+      data: pageData,
+      options: { emptyText: '暂无配置变更记录' }
+    });
+    if (!window._histPager) {
+      window._histPager = new Admin.Paginator({
+        container: '#history-pager',
+        total: all.length,
+        pageSize: state.historyPageSize,
+        onChange: function (page, size) {
+          state.historyPage = page;
+          state.historyPageSize = size;
+          renderHistory();
+        }
+      });
+    } else {
+      window._histPager.setTotal(all.length);
+      window._histPager.pageSize = state.historyPageSize;
+      window._histPager.render();
+    }
+  }
+
+  /* ---- 事件绑定 ---- */
+  function bind() {
+    var _tabsEl = document.querySelector('#pricing-tabs');
+    if (_tabsEl && _tabsEl.parentElement) Admin.Tabs.init(_tabsEl.parentElement);
+
+    document.addEventListener('click', function (e) {
+      var editBtn = e.target.closest('[data-edit]');
+      if (editBtn) { openEditModal(editBtn.getAttribute('data-edit')); return; }
+      var tierBtn = e.target.closest('[data-edit-tier]');
+      if (tierBtn) { openTierModal(); return; }
+    });
+
+    $('#btn-reset').onclick = function () {
+      Admin.confirm({
+        title: '恢复默认配置',
+        body: '确定要将所有定价配置恢复为 data.js 默认值吗？此操作不可撤销，将全端生效。',
+        ok: '确认恢复', danger: true,
+        onYes: function () {
+          ConfigAPI.reset();
+          Admin.log('恢复默认配置', '系统设置', '定价配置', '重置为默认值');
+          Admin.toast('已恢复默认配置，全端生效');
+          renderKPI();
+          renderAllGroups();
+          renderHistory();
+        }
+      });
+    };
+
+    $('#btn-history').onclick = function () {
+      var hist = ConfigAPI.history();
+      var content = '<div class="scroll-area">';
+      if (!hist.length) {
+        content += Admin.EmptyState.html({ title: '暂无变更记录', desc: '保存配置后将在此显示变更历史' });
+      } else {
+        content += hist.map(function (h) {
+          return '<div class="list-row">' +
+            '<div class="tx-medium">' + esc(h.remark || '未命名变更') + '</div>' +
+            '<div class="tx-meta">' + new Date(h.ts).toLocaleString('zh-CN') + '</div>' +
+            '</div>';
+        }).join('');
+      }
+      content += '</div>';
+      Admin.Modal.open({ title: '配置变更记录（' + hist.length + ' 条）', content: content, width: '520px' });
+    };
+
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'engchain-config-override' || e.key === 'engchain-config-history') {
+        renderKPI();
+        renderAllGroups();
+        renderHistory();
+      }
+    });
+    window.addEventListener('engchain:config', function () {
+      renderKPI();
+      renderAllGroups();
+      renderHistory();
+    });
+  }
+
+  function init() {
+    bind();
+    renderKPI();
+    renderAllGroups();
+    renderHistory();
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

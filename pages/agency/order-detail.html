@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>订单详情 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">中介订单详情</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll" style="padding-top:8px;padding-bottom:104px;" id="root"><div class="card">加载中…</div></div>
+
+  <!-- 吸底操作栏 -->
+  <div class="od-cta" id="cta"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function ftime(ts){if(!ts)return '—';var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return (d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+var id=new URLSearchParams(location.search).get('id');
+var me=DataBus.current(),uid=me?me.id:'';
+var acc=window.entryAccess?entryAccess():{agency:false};
+function uname(x){var u=DataBus.byId(x);return u?(u.name||x):x;}
+
+function render(){
+  var o=Mediation.byId(id);
+  var root=document.getElementById('root');
+  var cta=document.getElementById('cta');
+  if(!o){root.innerHTML='<div class="card">订单不存在或已删除。<br><br><button class="btn btn-primary" onclick="location.href=\'order.html?mine=1\'">返回我的订单</button></div>';cta.innerHTML='';return;}
+  var role=o.buyerId===uid?'buyer':(o.sellerId===uid?'seller':'viewer');
+  var mm=Mediation.money(o);
+  var stCol={escrowed:'var(--primary-strong)',serving:'#F0E2BE',settled:'#7FB59A',refunded:'rgba(244,242,238,.66)',disputed:'#E8B4AE'};
+  var col=stCol[o.state]||'#F0E2BE';
+  var html='';
+  /* 状态头：深色 hero */
+  html+='<div class="od-hero"><span class="od-glow" aria-hidden="true"></span>'+
+    '<div class="od-hero-top"><span class="od-state" style="color:'+col+';"><i style="background:'+col+';"></i>'+Mediation.stateLabel(o.state)+'</span>'+
+    '<span class="od-role">'+(role==='buyer'?'我是买方':role==='seller'?'我是服务商':'旁观')+'</span></div>'+
+    '<div class="od-svc">'+o.svcName+'</div>'+
+    '<div class="od-id">单号 '+o.id+'</div></div>';
+  /* 资金卡 */
+  var released=mm.released-mm.feeReleased, remain=mm.escrowRemain;
+  var relPct=o.amount>0?Math.min(100,Math.round((released/o.amount)*100)):0;
+  html+='<div class="card" style="margin-top:12px;"><div class="fw-600 fs-13" style="margin-bottom:8px;">托管资金</div>'+
+    row('托管总额',fmt(o.amount))+
+    row('平台佣金（'+(o.ruleSnapshot?(o.ruleSnapshot.rate*100).toFixed(1).replace(/\.0$/,''):'—')+'%）',fmt(o.fee))+
+    row('已释放给服务商',fmt(released),'var(--success)')+
+    row('监管账户在途',fmt(remain),'var(--primary-dim)')+
+    '<div class="fund-bar"><div class="fund-fill" style="width:'+relPct+'%;"></div></div>'+
+    '<div class="fund-scale"><span>已释放 '+relPct+'%</span><span>在途 '+(100-relPct)+'%</span></div>'+
+    '<div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">资金由持牌机构托管，按里程碑验收后释放；未成交全额退款，规避二清。</div></div>';
+  /* 双方 */
+  html+='<div class="card" style="margin-top:10px;">'+row('买方',uname(o.buyerId))+row('服务商',uname(o.sellerId)||'待接单')+row('创建时间',ftime(o.createdAt))+'</div>';
+  /* 里程碑：垂直时间线 */
+  var doneN=o.milestones.filter(function(m){return m.status==='done';}).length;
+  html+='<div class="section-title" style="margin-top:14px;"><div class="st-left">履约里程碑（'+doneN+'/'+o.milestones.length+'）</div></div>';
+  html+='<div class="card ms-tl">'+o.milestones.map(function(m,i){
+    var st=m.status;
+    var cls=st==='done'?'ms-done':(st==='submitted'?'ms-sub':'ms-todo');
+    /* 节点操作统一收敛到吸底操作栏，时间线内不再重复出按钮 */
+    var stMap={todo:'待交付',submitted:'待买方验收',done:'已完成'};
+    return '<div class="ms-node '+cls+'">'+
+      '<div class="ms-axis"><span class="ms-dot">'+(st==='done'?'<svg class="ic"><use href="#i-check"/></svg>':'')+'</span>'+(i<o.milestones.length-1?'<span class="ms-line"></span>':'')+'</div>'+
+      '<div class="ms-body"><div class="ms-head"><span class="ms-title">'+(m.idx+1)+'. '+m.label+'</span><span class="ms-amt mono">'+fmt(m.amount)+'</span></div>'+
+      '<div class="ms-tags"><span class="ms-st">'+(m.autoConfirmed?'系统自动确认':stMap[st])+'</span></div>'+
+      (m.deliveryNote?'<div class="ms-note">交付说明：'+m.deliveryNote+'</div>':'')+
+      (m.confirmedAt?'<div class="ms-time">'+(m.autoConfirmed?'自动':'买方')+'确认于 '+ftime(m.confirmedAt)+'</div>':'')+'</div></div>';
+  }).join('')+'</div>';
+  /* 纠纷 */
+  if(o.dispute)html+='<div class="card" style="margin-top:10px;border-color:var(--warning);"><div class="fw-700 fs-13" style="color:var(--warning);">纠纷处理中</div><div class="text-2 fs-12" style="margin-top:6px;">'+o.dispute.reason+'</div><div class="text-3 fs-11" style="margin-top:4px;">发起于 '+ftime(o.dispute.at)+'，平台客服将介入仲裁。</div></div>';
+  /* 时间线 */
+  html+='<div class="section-title" style="margin-top:8px;"><div class="st-left">记录时间线</div></div><div class="card" id="tl"></div>';
+  root.innerHTML=html;
+  var tl=Timeline.list('mediation',o.id);
+  document.getElementById('tl').innerHTML=tl.length?tl.map(function(t){
+    return '<div class="flow-step"><span class="flow-dot'+(t.event?'':' gray')+'"></span><div><div class="fs-12 fw-600">'+t.event+'</div><div class="text-3 fs-11">'+ftime(t.ts)+' · '+(t.actor==='system'?'系统':(uname(t.actor)||t.actor))+'</div></div></div>';
+  }).join(''):'<div class="text-3 fs-12">暂无</div>';
+  /* 吸底操作栏 */
+  var acts=actions(o,role);
+  cta.innerHTML=acts;
+}
+function row(k,v,c){return '<div class="fb-between" style="padding:5px 0;"><span class="text-2 fs-12">'+k+'</span><span class="fs-12 fw-600" style="'+(c?'color:'+c+';':'')+'">'+v+'</span></div>';}
+function actions(o,role){
+  var b=[];
+  if(role==='seller'&&o.state==='escrowed'){b.push(btn('primary','接单开始履约','accept()'));b.push(btn('ghost','拒单并退款','reject()'));}
+  if(role==='buyer'&&o.state==='escrowed'){b.push(btn('primary','撤销并全额退款','refund()'));}
+  if(role==='buyer'&&o.state==='await_confirm'){b.push(btn('primary','终验通过 · 结算','finalSettle()'));b.push(btn('ghost','发起纠纷','dispute()'));}
+  if(role==='buyer'&&o.state==='serving'){
+    var sub=o.milestones.filter(function(m){return m.status==='submitted';});
+    if(sub.length)b.push(btn('primary','确认验收','confirmMs('+sub[0].idx+')'));
+    b.push(btn('ghost','申请退款','refund()'));b.push(btn('ghost','发起纠纷','dispute()'));
+  }
+  if(role==='seller'&&o.state==='serving'){
+    var td=o.milestones.filter(function(m){return m.status==='todo';});
+    if(td.length)b.push(btn('primary','提交交付 · '+td[0].label,'deliver('+td[0].idx+')'));
+    b.push(btn('ghost','发起纠纷','dispute()'));
+  }
+  if(role==='buyer'&&o.state==='settled'&&!o.review){b.push(btn('primary','评价订单','review()'));}
+  if(!b.length)return '<div class="od-cta-idle">当前状态暂无可执行操作</div>';
+  return '<div class="od-cta-row">'+b.join('')+'</div>';
+}
+function btn(style,txt,on){return '<button class="btn btn-'+style+' od-cta-btn" onclick="'+on+'">'+txt+'</button>';}
+function reload(){render();}
+window.accept=function(){var r=Mediation.accept(id,uid);if(r.error)UI.toast(r.error,'warn');else{UI.toast('已接单，开始履约','ok');reload();}};
+window.reject=function(){UI.dialog({title:'拒单退款',text:'拒单后托管资金将全额退回买方，确认？',ok:'确认拒单',onOk:function(){var r=Mediation.reject(id,'服务商无法承接');if(r.error)UI.toast(r.error,'warn');else{UI.toast('已拒单并全额退款','ok');reload();}}});};
+window.refund=function(){UI.dialog({title:'申请退款',text:'将按未履约部分退款，已释放部分不退。确认？',ok:'确认退款',onOk:function(){var r=Mediation.refund(id,'买方申请');if(r.error)UI.toast(r.error,'warn');else{UI.toast('退款已原路返回','ok');reload();}}});};
+window.deliver=function(idx){
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-15" style="margin-bottom:10px;">提交节点交付</div>'+
+    '<textarea class="input" id="del-note" rows="3" placeholder="填写交付说明/成果链接"></textarea>'+
+    '<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="submitDeliver('+idx+')">提交，等待买方验收</button></div>').show();
+};
+window.submitDeliver=function(idx){var note=document.getElementById('del-note').value.trim()||'已提交交付成果';var r=Mediation.deliver(id,idx,note);UI.closeSheet();if(r.error)UI.toast(r.error,'warn');else{UI.toast('已提交，'+RULE('commission.milestone.autoConfirmDays',14)+'天未确认将自动验收','ok');reload();}};
+window.confirmMs=function(idx){var r=Mediation.confirmMilestone(id,idx);if(r.error)UI.toast(r.error,'warn');else{UI.toast('节点已验收，资金按比例释放','ok');reload();}};
+window.finalSettle=function(){var r=Mediation.settle(id);if(r.error)UI.toast(r.error,'warn');else{UI.toast('订单结算完成','ok');reload();}};
+window.dispute=function(){
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-15" style="margin-bottom:10px;">发起纠纷</div>'+
+    '<textarea class="input" id="dp-note" rows="3" placeholder="描述问题，平台将介入仲裁"></textarea>'+
+    '<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="submitDispute()">提交纠纷</button></div>').show();
+};
+window.submitDispute=function(){var t=document.getElementById('dp-note').value.trim();if(!t){UI.toast('请填写纠纷说明','warn');return;}var r=Mediation.dispute(id,uid,t);UI.closeSheet();if(r.error)UI.toast(r.error,'warn');else{UI.toast('已发起，平台介入','ok');reload();}};
+window.review=function(){
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-15" style="margin-bottom:10px;">评价本次服务</div>'+
+    '<textarea class="input" id="rv-txt" rows="2" placeholder="服务评价（选填）"></textarea>'+
+    '<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="submitReview()">提交评价</button></div>').show();
+};
+window.submitReview=function(){var t=document.getElementById('rv-txt').value.trim();Mediation.review(id,5,t);UI.closeSheet();UI.toast('感谢评价','ok');reload();};
+render();
+})();
+</script>
+<style>
+/* ===== 状态 hero ===== */
+.od-hero{position:relative;overflow:hidden;border-radius:20px;padding:18px 18px 16px;background:radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.18) 0%, transparent 55%),linear-gradient(150deg,#252C35 0%,#151A22 46%,#0B0E13 100%);box-shadow:0 10px 26px rgba(22,22,22,.14);animation:od-in .45s var(--e-out) both;}
+@keyframes od-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.od-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 100% at 100% 0%, rgba(238,214,151,.10) 0%, transparent 55%);}
+.od-hero-top{display:flex;align-items:center;justify-content:space-between;position:relative;}
+.od-state{display:inline-flex;align-items:center;gap:6px;font-size:19px;font-weight:800;}
+.od-state i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 18%,transparent);}
+.od-role{font-size:10px;font-weight:700;color:#2A1810;background:linear-gradient(135deg,#F0E2BE,#C9A961);border-radius:6px;padding:3px 9px;box-shadow:0 2px 8px -3px rgba(201,169,97,.7);}
+.od-svc{position:relative;font-size:14.5px;font-weight:700;color:#F4F2EE;margin-top:10px;}
+.od-id{position:relative;font-size:11px;color:rgba(244,242,238,.5);margin-top:3px;letter-spacing:.03em;}
+
+/* ===== 资金卡 ===== */
+.fund-bar{height:6px;border-radius:99px;background:var(--bg-card-2);overflow:hidden;margin-top:10px;}
+.fund-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--success),#7FB59A);transition:width .8s cubic-bezier(.22,1,.36,1);}
+.fund-scale{display:flex;justify-content:space-between;font-size:9.5px;color:var(--text-3);margin-top:5px;}
+
+/* ===== 里程碑时间线 ===== */
+.ms-tl{padding:8px 4px 8px 16px;}
+.ms-node{display:flex;gap:12px;}
+.ms-axis{display:flex;flex-direction:column;align-items:center;flex:none;width:24px;}
+.ms-dot{width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:var(--bg-card-2);border:1.5px solid var(--line);}
+.ms-dot svg{width:12px;height:12px;color:var(--text-inv);stroke-width:2.6;}
+.ms-line{flex:1;width:1.5px;background:var(--line);margin:3px 0;}
+.ms-node.ms-done .ms-dot{background:linear-gradient(135deg,var(--success),#7FB59A);border:none;box-shadow:0 3px 8px rgba(43,107,79,.3);}
+.ms-node.ms-done .ms-line{background:rgba(43,107,79,.35);}
+.ms-node.ms-sub .ms-dot{border-color:var(--primary);background:var(--primary-soft);animation:ms-pulse 1.8s ease-in-out infinite;}
+@keyframes ms-pulse{0%,100%{box-shadow:0 0 0 0 rgba(201,169,97,.35);}50%{box-shadow:0 0 0 6px rgba(201,169,97,0);}}
+.ms-node.ms-sub .ms-line{background:var(--accent-line);}
+.ms-body{flex:1;min-width:0;padding-bottom:16px;}
+.ms-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ms-title{font-size:13.5px;font-weight:700;color:var(--text-1);}
+.ms-amt{font-size:13px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);flex:none;}
+.ms-tags{margin-top:4px;}
+.ms-st{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:6px;border:1px solid;line-height:1.5;}
+.ms-done .ms-st{color:var(--success);background:rgba(43,107,79,.08);border-color:rgba(43,107,79,.22);}
+.ms-sub .ms-st{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);}
+.ms-todo .ms-st{color:var(--text-3);background:var(--bg-card-2);border-color:var(--line);}
+.ms-note{font-size:11.5px;color:var(--text-2);margin-top:6px;background:var(--bg-card-2);border-radius:8px;padding:7px 9px;line-height:1.6;}
+.ms-time{font-size:10.5px;color:var(--text-3);margin-top:5px;}
+.ms-act{margin-top:8px;text-align:right;}
+.btn-sm{padding:5px 14px;font-size:11.5px;border-radius:99px;}
+
+/* ===== 吸底操作栏 ===== */
+.od-cta{position:absolute;left:0;right:0;bottom:0;z-index:20;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);}
+.od-cta-row{display:flex;gap:10px;}
+.od-cta-btn{flex:1;padding:12px 0;font-size:13.5px;border-radius:14px;box-shadow:0 6px 16px rgba(201,169,97,.22);}
+.od-cta-btn.btn-ghost,.od-cta-btn.btn-outline{box-shadow:none;}
+.od-cta-idle{text-align:center;font-size:11.5px;color:var(--text-3);padding:6px 0;}
+
+/* ===== 时间线 ===== */
+.flow-step{display:flex;gap:10px;padding:7px 0;}
+.flow-dot{width:9px;height:9px;border-radius:50%;background:var(--primary);margin-top:6px;flex:none;box-shadow:0 0 0 3px var(--primary-soft);}
+.flow-dot.gray{background:var(--line);box-shadow:none;}
+
+@media (prefers-reduced-motion: reduce){.od-hero{animation:none;}.ms-node.ms-sub .ms-dot{animation:none;}}
+</style>
+</body>
+</html>

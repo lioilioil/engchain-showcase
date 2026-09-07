@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>供需管理 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="operations/supply.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>供需管理</h1>
+        <div class="sub">运营中心 · 9 类供需内容发布审核与上架管理（审核动作写回 DataBus，与 App 供需列表联动）</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="seg mb-12" id="tab-switch">
+      <button data-tab="all" class="on">全部供需</button>
+      <button data-tab="pending">待审核 <span id="pending-badge" class="badge badge-warning ml-6">0</span></button>
+    </div>
+
+    <div class="card card-pad">
+      <div id="filter-bar"></div>
+      <div id="table-container"></div>
+      <div id="pager-container"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var CATS = ['材料','设备','劳务','合作','中介','资质招商','建企买卖','招聘','求职'];
+  var ST_LABEL = { pending_review:'待审核', active:'已上架', off:'已下架', rejected:'已驳回' };
+  var page = 1, pageSize = 10, fCat = '', fDir = '', fSt = '', fQ = '', fDateStart = '', fDateEnd = '', curTab = 'all';
+  var paginator = null, tableInst = null;
+  var $ = function (s) { return document.querySelector(s); };
+
+  function stBadge(st) {
+    if (window.Admin) return Admin.badge(st);
+    var m = { active:'badge-success', off:'badge-outline', pending_review:'badge-warning', rejected:'badge-danger' };
+    return '<span class="badge ' + (m[st] || 'badge-outline') + '">' + (ST_LABEL[st] || st) + '</span>';
+  }
+  function dirChip(d) {
+    return d === 'demand'
+      ? '<span class="badge badge-info">需求</span>'
+      : '<span class="badge badge-secondary">供应</span>';
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtDate(ts) {
+    if (!ts) return '';
+    if (typeof ts === 'number') return new Date(ts).toISOString().slice(0, 10);
+    return String(ts).slice(0, 10);
+  }
+
+  function list() {
+    return (window.DataBus && DataBus.supply) ? DataBus.supply() : [];
+  }
+  function filtered() {
+    var a = list(), q = fQ.trim().toLowerCase();
+    return a.filter(function (x) {
+      if (curTab === 'pending' && x.status !== 'pending_review') return false;
+      if (fCat && x.cat !== fCat) return false;
+      if (fDir && x.dir !== fDir) return false;
+      if (fSt && x.status !== fSt) return false;
+      if (fDateStart && fmtDate(x.ts) < fDateStart) return false;
+      if (fDateEnd && fmtDate(x.ts) > fDateEnd) return false;
+      if (q && (x.title + x.company + x.location).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function renderKPI(all) {
+    var c = { pending_review:0, active:0, off:0, rejected:0 }, weekNew = 0;
+    var now = new Date(), weekAgo = new Date(now.getTime() - 7 * 864e5).toISOString().slice(0, 10);
+    all.forEach(function (x) {
+      if (c[x.status] !== undefined) c[x.status]++;
+      if (fmtDate(x.ts) >= weekAgo) weekNew++;
+    });
+    var cards = [
+      ['待审核', c.pending_review, 'warn', '需运营审核'],
+      ['已上架', c.active, 'up', 'App 正在展示'],
+      ['已驳回', c.rejected, 'dn', '含驳回原因'],
+      ['已下架', c.off, '', '暂不对用户可见'],
+      ['本周新增', weekNew, 'info', '近 7 天发布']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] ? (k[2] === 'up' ? 'up' : k[2] === 'dn' ? 'dn' : 'warn') : '') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function opButtons(x) {
+    var ops = [];
+    if (x.status === 'pending_review' || x.status === 'pending') {
+      ops.push('<button class="btn btn-sm btn-primary" data-act="approve" data-id="' + x.id + '" data-perm="approve.first">通过上架</button>');
+      ops.push('<button class="btn btn-sm btn-destructive" data-act="reject" data-id="' + x.id + '" data-perm="approve.first">驳回</button>');
+    } else if (x.status === 'active' || x.status === 'on') {
+      ops.push('<button class="btn btn-sm btn-outline" data-act="off" data-id="' + x.id + '">下架</button>');
+    } else if (x.status === 'off') {
+      ops.push('<button class="btn btn-sm btn-primary" data-act="on" data-id="' + x.id + '">上架</button>');
+    }
+    ops.push('<button class="btn btn-sm btn-ghost" data-act="detail" data-id="' + x.id + '">查看</button>');
+    return ops.join('');
+  }
+
+  function renderTable() {
+    var all = list(), rows = filtered();
+    renderKPI(all);
+    var pendingCount = all.filter(function (x) { return x.status === 'pending_review'; }).length;
+    var pb = document.getElementById('pending-badge');
+    if (pb) pb.textContent = pendingCount;
+
+    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    if (page > totalPages) page = totalPages;
+    var seg = rows.slice((page - 1) * pageSize, page * pageSize);
+
+    var columns = [
+      { key: 'id', label: 'ID', width: '80px', render: function (r) { return '<span class="num">' + esc(r.id) + '</span>'; } },
+      { key: 'title', label: '内容（发布方 · 地区）', render: function (r) {
+          var noteHtml = r.note ? '<span class="text-warning"> · ' + esc(r.note) + '</span>' : '';
+          return '<div class="cell-main">' + esc(r.title) + '</div><div class="cell-sub">' + esc(r.company) + ' · ' + esc(r.location) + noteHtml + '</div>';
+        } },
+      { key: 'cat', label: '品类', width: '80px', render: function (r) { return esc(r.cat); } },
+      { key: 'dir', label: '方向', width: '70px', render: function (r) { return dirChip(r.dir); } },
+      { key: 'amount', label: '预算/报价', width: '110px', render: function (r) { return '<span class="amt">' + esc(r.amount) + '</span>'; } },
+      { key: 'publisher', label: '发布者', width: '100px', render: function (r) { return esc(r.publisher); } },
+      { key: 'status', label: '状态', width: '80px', render: function (r) { return stBadge(r.status); } },
+      { key: 'ts', label: '发布时间', width: '100px', render: function (r) { return fmtDate(r.ts); } },
+      { key: 'ops', label: '操作', width: '200px', render: function (r) { return '<div class="ops">' + opButtons(r) + '</div>'; } }
+    ];
+
+    tableInst = Admin.TableRenderer.render({
+      container: '#table-container',
+      columns: columns,
+      data: seg,
+      options: {
+        selectable: true,
+        emptyText: '无符合条件的供需内容',
+        loading: false
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-container',
+        total: rows.length,
+        pageSize: pageSize,
+        pageSizeOptions: [10, 20, 50],
+        onChange: function (p, sz) { page = p; pageSize = sz; renderTable(); }
+      });
+    } else {
+      paginator.pageSize = pageSize;
+      paginator.current = page;
+      paginator.setTotal(rows.length);
+    }
+
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function render() { renderTable(); }
+
+  /* ---- 详情抽屉 ---- */
+  function openDetail(id) {
+    var x = null;
+    list().forEach(function (o) { if (o.id === id) x = o; });
+    if (!x) { Admin.toast('未找到该条内容'); return; }
+
+    var html = '<div class="drawer-section">';
+    html += '<div class="ds-title">基本信息</div>';
+    html += '<div class="ds-grid">';
+    html += '<div class="ds-item"><span class="ds-k">ID</span><span class="ds-v">' + esc(x.id) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">品类</span><span class="ds-v">' + esc(x.cat) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">方向</span><span class="ds-v">' + dirChip(x.dir) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">状态</span><span class="ds-v">' + stBadge(x.status) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">发布时间</span><span class="ds-v">' + fmtDate(x.ts) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">预算/报价</span><span class="ds-v num">' + esc(x.amount) + '</span></div>';
+    html += '<div class="ds-item ds-full"><span class="ds-k">标题</span><span class="ds-v">' + esc(x.title) + '</span></div>';
+    html += '</div></div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">发布方信息</div>';
+    html += '<div class="ds-grid">';
+    html += '<div class="ds-item"><span class="ds-k">公司/个人</span><span class="ds-v">' + esc(x.company) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">所在地区</span><span class="ds-v">' + esc(x.location) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">发布者ID</span><span class="ds-v">' + esc(x.publisher) + '</span></div>';
+    html += '</div></div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">详细描述</div>';
+    html += '<div class="ds-desc">' + esc(x.desc || x.title || '暂无详细描述') + '</div>';
+    if (x.requirement) {
+      html += '<div class="ds-title mt-12">资质要求</div>';
+      html += '<div class="ds-desc">' + esc(x.requirement) + '</div>';
+    }
+    if (x.contact) {
+      html += '<div class="ds-title mt-12">联系方式</div>';
+      html += '<div class="ds-desc">' + esc(x.contact) + '</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">审核记录</div>';
+    html += '<div class="ms-timeline">';
+    html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">内容发布</div><div class="ms-tl-meta">' + fmtDate(x.ts) + ' · ' + esc(x.publisher) + '</div></div></div>';
+    if (x.status === 'pending_review') {
+      html += '<div class="ms-tl-item"><div class="ms-tl-dot">2</div><div class="ms-tl-body"><div class="ms-tl-label">待运营审核</div><div class="ms-tl-meta">等待审核通过或驳回</div></div></div>';
+    } else if (x.status === 'active') {
+      html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">审核通过 · 已上架</div><div class="ms-tl-meta">' + (x.auditTs ? fmtDate(x.auditTs) : '运营审核通过') + '</div></div></div>';
+    } else if (x.status === 'rejected') {
+      html += '<div class="ms-tl-item"><div class="ms-tl-dot">✕</div><div class="ms-tl-body"><div class="ms-tl-label">审核驳回</div><div class="ms-tl-meta text-warning">' + esc(x.note || '内容不符合发布规范') + '</div></div></div>';
+    } else if (x.status === 'off') {
+      html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">审核通过 · 已上架</div><div class="ms-tl-meta">运营审核通过</div></div></div>';
+      html += '<div class="ms-tl-item"><div class="ms-tl-dot">✕</div><div class="ms-tl-body"><div class="ms-tl-label">已下架</div><div class="ms-tl-meta text-warning">' + esc(x.note || '主动下架') + '</div></div></div>';
+    }
+    html += '</div></div>';
+
+    var footer = '<div class="drawer-footer-actions">';
+    if (x.status === 'pending_review' || x.status === 'pending') {
+      footer += '<button class="btn btn-primary" id="df-approve" data-perm="approve.first">通过上架</button>';
+      footer += '<button class="btn btn-destructive" id="df-reject" data-perm="approve.first">驳回</button>';
+    } else if (x.status === 'active' || x.status === 'on') {
+      footer += '<button class="btn btn-outline" id="df-off">下架</button>';
+    } else if (x.status === 'off') {
+      footer += '<button class="btn btn-primary" id="df-on">上架</button>';
+    }
+    footer += '<button class="btn btn-outline" id="df-close">关闭</button></div>';
+
+    var drawer = Admin.Drawer.open({ title: '供需详情 · ' + x.id, content: html, footer: footer, width: '520px' });
+
+    setTimeout(function () {
+      var bp = drawer.panel;
+      var cl = function (id, fn) { var b = bp.querySelector('#' + id); if (b) b.onclick = fn; };
+      cl('df-close', function () { drawer.close(); });
+      cl('df-approve', function () { drawer.close(); doAudit(id, 'approve'); });
+      cl('df-reject', function () { drawer.close(); rejectDialog(id); });
+      cl('df-off', function () { drawer.close(); doAudit(id, 'off'); });
+      cl('df-on', function () { drawer.close(); doAudit(id, 'on'); });
+      if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+    }, 50);
+  }
+
+  var _auditLock = false;
+  function doAudit(id, action, note) {
+    /* 防重入：admin.js confirm doYes 对非 Promise onYes 双重调用，加锁屏蔽第二次 */
+    if (_auditLock) return;
+    _auditLock = true;
+    var it = DataBus.supplyAudit(id, action, note);
+    if (!it) { Admin.toast('未找到该条内容'); _auditLock = false; return; }
+    var msg = { approve:'已通过并上架', reject:'已驳回', on:'已上架', off:'已下架' }[action] || '已更新';
+    Admin.toast('[' + it.id + '] ' + msg);
+    Admin.log(action === 'approve' ? '审核通过' : action === 'reject' ? '审核驳回' : action === 'on' ? '内容上架' : '内容下架', '供需管理', it.id, it.title);
+    render();
+    setTimeout(function () { _auditLock = false; }, 300);
+  }
+
+  function rejectDialog(id) {
+    Admin.confirm({
+      title: '驳回供需内容 · ' + id,
+      body: '驳回后内容不再展示，需填写驳回原因。' +
+        '<div class="form-item mt-10"><input class="input" id="rej-note" placeholder="驳回原因（必填）…" maxlength="200"></div>' +
+        '<div class="form-hint" id="rej-count">0/200</div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = document.getElementById('rej-note').value.trim();
+        /* 返回 rejected Promise：admin.js 对 rejected promise 不调用 finish，
+           弹窗保持打开、loading 重置，用户可继续输入原因（原代码 return undefined 会导致弹窗错误关闭） */
+        if (!note) { Admin.toast('请填写驳回原因'); return Promise.reject(); }
+        doAudit(id, 'reject', note);
+      }
+    });
+    setTimeout(function () {
+      var inp = document.getElementById('rej-note');
+      var cnt = document.getElementById('rej-count');
+      if (inp && cnt) inp.oninput = function () { cnt.textContent = inp.value.length + '/200'; };
+    }, 50);
+  }
+
+  /* ---- 筛选栏 ---- */
+  function initFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'cat', label: '品类', type: 'select', options: CATS },
+        { key: 'dir', label: '方向', type: 'select', options: [
+          { value: 'demand', label: '需求' }, { value: 'supply', label: '供应' }
+        ] },
+        { key: 'status', label: '状态', type: 'select', options: [
+          { value: 'pending_review', label: '待审核' }, { value: 'active', label: '已上架' },
+          { value: 'off', label: '已下架' }, { value: 'rejected', label: '已驳回' }
+        ] },
+        { key: 'date', label: '发布时间', type: 'daterange' },
+        { key: 'q', label: '关键词', type: 'text', placeholder: '搜索标题 / 公司 / 地区' }
+      ],
+      onFilter: function (vals) {
+        fCat = vals.cat || ''; fDir = vals.dir || ''; fSt = vals.status || ''; fQ = vals.q || '';
+        fDateStart = vals.date_start || ''; fDateEnd = vals.date_end || '';
+        page = 1; render();
+      },
+      onReset: function () {
+        fCat = ''; fDir = ''; fSt = ''; fQ = ''; fDateStart = ''; fDateEnd = ''; page = 1; render();
+      }
+    });
+  }
+
+  function bind() {
+    /* 行点击打开详情（排除按钮/复选框/输入框） */
+    var tc = $('#table-container');
+    if (tc && !tc.__bound) {
+      tc.__bound = true;
+      tc.addEventListener('click', function (e) {
+        if (e.target.closest('button') || e.target.closest('.checkbox') || e.target.closest('input')) return;
+        var tr = e.target.closest('tr[data-row-id]');
+        if (tr) openDetail(tr.getAttribute('data-row-id'));
+      });
+    }
+
+    /* Tab 切换 */
+    var tabSeg = $('#tab-switch');
+    if (tabSeg) {
+      tabSeg.querySelectorAll('button').forEach(function (b) {
+        b.onclick = function () {
+          tabSeg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+          b.classList.add('on');
+          curTab = b.getAttribute('data-tab');
+          page = 1;
+          if (curTab === 'pending') {
+            fSt = '';
+          }
+          render();
+        };
+      });
+    }
+
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新（实时读取 DataBus）'); };
+
+    /* 表格操作按钮（事件委托） */
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]'); if (!b) return;
+      var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      if (!window.Admin) return;
+      if (act === 'detail') { openDetail(id); }
+      else if (act === 'reject') { rejectDialog(id); }
+      else if (act === 'approve') {
+        Admin.confirm({ title: '审核通过 · ' + id, body: '确认该供需内容合规并上架展示？', ok: '通过并上架', onYes: function () { doAudit(id, 'approve'); } });
+      } else if (act === 'on') {
+        Admin.confirm({ title: '重新上架 · ' + id, body: '确认将该内容重新上架至 App 供需列表？', ok: '上架', onYes: function () { doAudit(id, 'on'); } });
+      } else if (act === 'off') {
+        Admin.confirm({ title: '下架 · ' + id, body: '下架后 App 供需列表不再展示该内容。', ok: '确认下架', onYes: function () { doAudit(id, 'off'); } });
+      }
+    });
+
+    /* 导出 */
+    var ex = $('#btn-export');
+    if (ex && !ex.__bound) {
+      ex.__bound = true;
+      ex.onclick = function () {
+        var rows = filtered().map(function (x) {
+          return [x.id, x.cat || '', x.dir || '', x.title || '', x.company || '', x.location || '',
+                  String(x.amount == null ? '' : x.amount), x.status || '', fmtDate(x.ts)];
+        });
+        var ok = Admin.exportCSV('供需管理.csv', ['ID', '品类', '方向', '标题', '公司', '地区', '金额', '状态', '发布时间'], rows);
+        Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+        Admin.log('数据导出', '供需管理', '', '供需管理.csv · ' + rows.length + ' 条');
+      };
+    }
+
+    /* 事件监听 */
+    window.addEventListener('engchain:supply', function () { render(); });
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'engchain-supply' || e.key === 'engchain-store-change') render();
+    });
+  }
+
+  function init() { initFilterBar(); bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

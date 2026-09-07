@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>入驻资料 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title" id="nav-title">入驻资料</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll ef-scroll">
+    <!-- 类型头卡 -->
+    <div class="ef-head">
+      <span class="ef-head-ic" id="head-ic"><svg class="ic"><use href="#i-company"/></svg></span>
+      <div style="flex:1;min-width:0;">
+        <div class="fb-between">
+          <div class="fw-700 fs-15" id="type-label"></div>
+          <span class="tag tag-primary" id="type-badge"></span>
+        </div>
+        <div class="text-3 fs-11" style="margin-top:3px;" id="type-sub"></div>
+      </div>
+    </div>
+
+    <!-- Step 指示器 -->
+    <div class="ef-steps" id="step-indicator"></div>
+
+    <div class="ef-fill-bar"><button class="ap-fill-btn" onclick="fillExample()"><svg class="ic" style="width:15px;height:15px;flex:none;"><use href="#i-magic"/></svg>一键填充示例</button></div>
+
+    <!-- 步骤内容区 -->
+    <div id="step-content"></div>
+
+    <div style="height:20px;"></div>
+  </div>
+
+  <!-- 底部操作栏 -->
+  <div class="fixed-cta ef-cta" id="cta-bar">
+    <div class="ef-cta-row">
+      <button class="btn btn-ghost ef-btn-prev" id="btn-prev" style="display:none;">上一步</button>
+      <button class="btn btn-primary ef-btn-next" id="btn-next">下一步</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+/* ============ 配置 ============ */
+var DRAFT_KEY='engchain-draft-entry';
+var STEP_NAMES=['联系与经营','建筑资质','企业介绍','企业案例','确认提交'];
+var QUAL_LEVELS=['特级','一级','二级','三级'];
+var CASE_TYPES=['房屋建筑','市政公用','公路工程','水利水电','其他'];
+var STAFF_SIZES=['1-20人','21-50人','51-100人','101-500人','500人以上'];
+
+/* ============ 状态 ============ */
+var type=new URLSearchParams(location.search).get('type')||'construction';
+var t=MOCK.entryTypeById(type);
+var bi=MOCK.business.breakin.entry;
+var fee=0;
+var currentStep=0;
+var form=loadDraft();
+
+/* ============ 草稿 ============ */
+function defaultForm(){
+  return {
+    contact:'',tel:'',scope:'',
+    address:{province:'',city:'',district:'',detail:''},
+    website:'',
+    qualifications:[],
+    intro:{founded:'',capital:'',staffSize:'',desc:''},
+    cases:[],
+    attachments:[]
+  };
+}
+function loadDraft(){
+  try{
+    var d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
+    if(d&&d.type===type){return Object.assign(defaultForm(),d);}
+  }catch(e){}
+  return defaultForm();
+}
+function saveDraft(){
+  form.type=type;
+  try{localStorage.setItem(DRAFT_KEY,JSON.stringify(form));}catch(e){}
+}
+function clearDraft(){try{localStorage.removeItem(DRAFT_KEY);}catch(e){}}
+
+/* ============ 费用 ============ */
+function renderFee(){
+  var breakin=ModeStore.isBreakIn();
+  fee=type==='partner'?0:(breakin?(type==='construction'?bi.construction:bi.agency):t.fee);
+}
+function feeText(){
+  if(fee===0)return '<span class="green">¥0 · 免费审核制</span>';
+  return '¥'+Number(fee).toLocaleString();
+}
+function feeNote(){
+  if(type==='partner')return '合伙人企业由平台人工审核，审核通过后入驻并开通完整分销权益，全程不收取线上入驻费。';
+  var breakin=ModeStore.isBreakIn();
+  if(breakin)return type==='construction'
+    ?'破冰期建筑企业限免入驻（成熟期 ¥3,999/次），提交后进入两级审核。'
+    :'破冰期中介服务企业 5 折（成熟期 ¥29,999/次），提交后进入两级审核。';
+  return '入驻费按次收取，支付成功仅代表提交申请，需经平台初审、终审通过后正式生效。';
+}
+function depositText(){
+  if(type==='partner')return '无保证金要求';
+  if(type==='construction')return '基础履约保证金 ¥5,000（入驻生效后缴纳，可退）';
+  return '工程履约保证金 ¥20,000（入驻生效后缴纳，可退）';
+}
+
+/* ============ 类型头卡 ============ */
+function renderHead(){
+  document.getElementById('nav-title').textContent=(t?t.label:'企业')+' · 入驻资料';
+  document.getElementById('type-label').textContent=t?t.label:'企业入驻';
+  document.getElementById('type-badge').textContent=(t&&t.badge)||'';
+  document.getElementById('type-sub').textContent=type==='partner'
+    ?'后台人工审核制 · 不收取线上入驻费'
+    :'初审 + 终审两级审核 · 审核通过后入驻生效';
+}
+
+/* ============ Step 指示器 ============ */
+function renderIndicator(){
+  var el=document.getElementById('step-indicator');
+  var html='';
+  for(var i=0;i<5;i++){
+    var done=i<currentStep;
+    var active=i===currentStep;
+    var cls='ef-step'+(done?' done':'')+(active?' active':'');
+    var inner=done?'<svg class="ic" style="width:14px;height:14px;"><use href="#i-check"/></svg>':(i+1);
+    html+='<div class="'+cls+'" data-step="'+i+'">'
+      +'<span class="ef-step-dot">'+inner+'</span>'
+      +'<span class="ef-step-label">'+STEP_NAMES[i]+'</span>'
+      +'</div>';
+    if(i<4)html+='<div class="ef-step-line'+(done?' done':'')+'"></div>';
+  }
+  el.innerHTML=html;
+}
+
+/* ============ 工具函数 ============ */
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function val(id){return document.getElementById(id)?document.getElementById(id).value.trim():'';}
+function setVal(id,v){var el=document.getElementById(id);if(el)el.value=v||'';}
+function showErr(id,msg){
+  var el=document.getElementById(id);
+  if(!el)return;
+  var f=el.closest('.ef-field')||el.parentElement;
+  var e=f.querySelector('.ef-err');
+  if(!e){e=document.createElement('div');e.className='ef-err';f.appendChild(e);}
+  e.textContent=msg;
+  el.classList.add('ef-input-err');
+}
+function clearErr(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.classList.remove('ef-input-err');
+  var f=el.closest('.ef-field')||el.parentElement;
+  var e=f.querySelector('.ef-err');
+  if(e)e.textContent='';
+}
+function clearAllErrs(){
+  document.querySelectorAll('.ef-err').forEach(function(e){e.textContent='';});
+  document.querySelectorAll('.ef-input-err').forEach(function(e){e.classList.remove('ef-input-err');});
+}
+function scrollToFirstErr(){
+  var first=document.querySelector('.ef-input-err');
+  if(first)first.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+/* ============ 图片上传（mock + 预览） ============ */
+function mockUploadImage(inputId, previewId, callback){
+  var inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';
+  inp.onchange=function(){
+    var f=inp.files&&inp.files[0];
+    if(!f)return;
+    var reader=new FileReader();
+    reader.onload=function(){
+      var dataUrl=reader.result;
+      if(previewId){
+        var pv=document.getElementById(previewId);
+        if(pv)pv.innerHTML='<img src="'+dataUrl+'" class="ef-up-preview" alt="预览">';
+      }
+      if(callback)callback(dataUrl,f.name);
+    };
+    reader.readAsDataURL(f);
+  };
+  inp.click();
+}
+function mockUploadFile(callback){
+  var inp=document.createElement('input');
+  inp.type='file';inp.multiple=true;
+  inp.onchange=function(){
+    var files=inp.files||[];
+    for(var i=0;i<files.length;i++){
+      (function(f){
+        var reader=new FileReader();
+        reader.onload=function(){
+          if(callback)callback({name:f.name,size:f.size,data:reader.result});
+        };
+        reader.readAsDataURL(f);
+      })(files[i]);
+    }
+  };
+  inp.click();
+}
+
+/* ============ Step1: 联系与经营 ============ */
+function renderStep1(){
+  return '<div class="group-title">联系与经营信息</div>'
+  +'<div class="group ap-group">'
+    +'<div class="ef-field"><label>联系人 <span class="ef-req">*</span></label>'
+      +'<input id="f-contact" class="ap-input ef-input" placeholder="请输入联系人姓名" value="'+esc(form.contact)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field"><label>联系电话 <span class="ef-req">*</span></label>'
+      +'<input id="f-tel" class="ap-input mono ef-input" type="tel" placeholder="用于平台审核对接" maxlength="11" value="'+esc(form.tel)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field ef-field-ta"><label>经营范围 <span class="ef-req">*</span></label>'
+      +'<textarea id="f-scope" class="ap-textarea ef-input" placeholder="主营业务 / 服务范围（至少10字）" rows="3">'+esc(form.scope)+'</textarea>'
+      +'<div class="ef-err"></div></div>'
+  +'</div>'
+  +'<div class="group-title">办公地址</div>'
+  +'<div class="group ap-group">'
+    +'<div class="ef-field"><label>省份 <span class="ef-req">*</span></label>'
+      +'<input id="f-province" class="ap-input ef-input" placeholder="如：四川省" value="'+esc(form.address.province)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field"><label>城市 <span class="ef-req">*</span></label>'
+      +'<input id="f-city" class="ap-input ef-input" placeholder="如：成都市" value="'+esc(form.address.city)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field"><label>区/县 <span class="ef-req">*</span></label>'
+      +'<input id="f-district" class="ap-input ef-input" placeholder="如：武侯区" value="'+esc(form.address.district)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field ef-field-ta"><label>详细地址 <span class="ef-req">*</span></label>'
+      +'<textarea id="f-detail" class="ap-textarea ef-input" placeholder="街道、门牌号等" rows="2">'+esc(form.address.detail)+'</textarea>'
+      +'<div class="ef-err"></div></div>'
+  +'</div>'
+  +'<div class="group-title">企业官网（选填）</div>'
+  +'<div class="group ap-group">'
+    +'<div class="ef-field"><label>官网地址</label>'
+      +'<input id="f-website" class="ap-input ef-input" placeholder="https://example.com" value="'+esc(form.website)+'">'
+      +'<div class="ef-err"></div></div>'
+  +'</div>';
+}
+function bindStep1(){
+  var ids=['f-contact','f-tel','f-scope','f-province','f-city','f-district','f-detail','f-website'];
+  ids.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.addEventListener('input',function(){
+      clearErr(id);
+      collectStep1();
+      saveDraft();
+    });
+  });
+}
+function collectStep1(){
+  form.contact=val('f-contact');
+  form.tel=val('f-tel');
+  form.scope=val('f-scope');
+  form.address.province=val('f-province');
+  form.address.city=val('f-city');
+  form.address.district=val('f-district');
+  form.address.detail=val('f-detail');
+  form.website=val('f-website');
+}
+function validateStep1(){
+  collectStep1();
+  var ok=true;
+  if(!form.contact){showErr('f-contact','请填写联系人');ok=false;}
+  else if(!/^[\u4e00-\u9fa5·]{2,16}$/.test(form.contact)){showErr('f-contact','请填写正确的联系人姓名（2-16个汉字）');ok=false;}
+  if(!form.tel){showErr('f-tel','请填写联系电话');ok=false;}
+  else if(!/^1[3-9]\d{9}$/.test(form.tel)){showErr('f-tel','请填写正确的11位手机号');ok=false;}
+  if(!form.scope){showErr('f-scope','请填写经营范围');ok=false;}
+  else if(form.scope.length<10){showErr('f-scope','经营范围至少10个字');ok=false;}
+  if(!form.address.province){showErr('f-province','请填写省份');ok=false;}
+  if(!form.address.city){showErr('f-city','请填写城市');ok=false;}
+  if(!form.address.district){showErr('f-district','请填写区/县');ok=false;}
+  if(!form.address.detail){showErr('f-detail','请填写详细地址');ok=false;}
+  if(form.website&&!/^https?:\/\/.+\..+/.test(form.website)){showErr('f-website','请填写正确的网址（以 http:// 或 https:// 开头）');ok=false;}
+  if(!ok)scrollToFirstErr();
+  return ok;
+}
+
+/* ============ Step2: 建筑资质 ============ */
+function renderStep2(){
+  var reqNote=type==='construction'
+    ?'<div class="ef-note">建筑企业需至少添加 1 项资质</div>'
+    :'<div class="ef-note">资质为选填，可添加多项企业资质证书</div>';
+  var list=form.qualifications.length?form.qualifications.map(function(q,i){
+    return '<div class="ef-card" data-qidx="'+i+'">'
+      +'<button class="ef-card-del" onclick="window.__delQual('+i+')">×</button>'
+      +'<div class="ef-card-title">资质 '+ (i+1) +'</div>'
+      +'<div class="ef-field"><label>资质名称 <span class="ef-req">*</span></label>'
+        +'<input id="q-name-'+i+'" class="ap-input ef-input" placeholder="如：建筑工程施工总承包" value="'+esc(q.name)+'">'
+        +'<div class="ef-err"></div></div>'
+      +'<div class="ef-field"><label>资质等级</label>'
+        +'<select id="q-level-'+i+'" class="ap-input ef-input ef-select">'
+          +QUAL_LEVELS.map(function(lv){return '<option value="'+lv+'"'+(q.level===lv?' selected':'')+'>'+lv+'</option>';}).join('')
+        +'</select></div>'
+      +'<div class="ef-field"><label>证书编号 <span class="ef-req">*</span></label>'
+        +'<input id="q-no-'+i+'" class="ap-input mono ef-input" placeholder="证书编号" value="'+esc(q.no)+'">'
+        +'<div class="ef-err"></div></div>'
+      +'<div class="ef-field"><label>有效期至</label>'
+        +'<input id="q-exp-'+i+'" class="ap-input ef-input" type="date" value="'+esc(q.expireAt)+'"></div>'
+      +'<div class="ef-field ef-field-up"><label>证书影像</label>'
+        +'<div class="ef-up-box" id="q-up-'+i+'" onclick="window.__upQualImg('+i+')">'
+          +(q.image?'<div class="ef-up-img-wrap"><img src="'+q.image+'" class="ef-up-preview" alt="证书"><button class="up-reupload" onclick="event.stopPropagation();window.__upQualImg('+i+')">重新上传</button></div>':'<div class="ef-up-ph"><svg class="ic" style="width:20px;height:20px;"><use href="#i-upload"/></svg><span>上传证书图片</span></div>')
+        +'</div></div>'
+    +'</div>';
+  }).join(''):'<div class="ef-empty">暂无资质，点击下方添加</div>';
+  return '<div class="group-title">建筑资质</div>'
+    +reqNote+list
+    +'<button class="btn btn-ghost btn-block ef-add-btn" onclick="window.__addQual()">+ 添加资质</button>';
+}
+function bindStep2(){
+  form.qualifications.forEach(function(q,i){
+    ['q-name-'+i,'q-no-'+i,'q-exp-'+i].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.addEventListener('input',function(){collectStep2();saveDraft();clearErr(id);});
+    });
+    var lv=document.getElementById('q-level-'+i);
+    if(lv)lv.addEventListener('change',function(){collectStep2();saveDraft();});
+  });
+}
+function collectStep2(){
+  form.qualifications.forEach(function(q,i){
+    q.name=val('q-name-'+i);
+    q.level=val('q-level-'+i)||QUAL_LEVELS[0];
+    q.no=val('q-no-'+i);
+    q.expireAt=val('q-exp-'+i);
+  });
+}
+function validateStep2(){
+  collectStep2();
+  if(type==='construction'&&form.qualifications.length===0){
+    UI.toast('建筑企业需至少添加1项资质','warn');
+    return false;
+  }
+  var ok=true;
+  form.qualifications.forEach(function(q,i){
+    if(!q.name){showErr('q-name-'+i,'请填写资质名称');ok=false;}
+    if(!q.no){showErr('q-no-'+i,'请填写证书编号');ok=false;}
+  });
+  if(!ok)scrollToFirstErr();
+  return ok;
+}
+window.__addQual=function(){
+  collectStep2();
+  form.qualifications.push({name:'',level:QUAL_LEVELS[0],no:'',expireAt:'',image:''});
+  saveDraft();
+  renderStep();
+};
+window.__delQual=function(i){
+  collectStep2();
+  form.qualifications.splice(i,1);
+  saveDraft();
+  renderStep();
+};
+window.__upQualImg=function(i){
+  var box=document.getElementById('q-up-'+i);
+  if(!box||box.classList.contains('up-loading'))return;
+  box.classList.add('up-loading');
+  box.innerHTML='<div class="up-loading"><svg class="up-spinner" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity=".25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>上传中...</span></div>';
+  setTimeout(function(){
+    form.qualifications[i].image='../../assets/mock-certs/qualification-cert.jpg';
+    saveDraft();
+    renderStep();
+  },800);
+};
+
+/* ============ Step3: 企业介绍 ============ */
+function renderStep3(){
+  var descLen=form.intro.desc.length;
+  return '<div class="group-title">企业介绍</div>'
+  +'<div class="group ap-group">'
+    +'<div class="ef-field"><label>成立年份 <span class="ef-req">*</span></label>'
+      +'<input id="i-founded" class="ap-input mono ef-input" type="number" min="1900" max="2099" placeholder="如：2015" value="'+esc(form.intro.founded)+'">'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field"><label>注册资本 <span class="ef-req">*</span></label>'
+      +'<div class="ef-input-suffix"><input id="i-capital" class="ap-input mono ef-input" type="number" placeholder="如：1000" value="'+esc(form.intro.capital)+'"><span class="ef-suffix">万元</span></div>'
+      +'<div class="ef-err"></div></div>'
+    +'<div class="ef-field"><label>员工规模</label>'
+      +'<select id="i-staff" class="ap-input ef-input ef-select">'
+        +STAFF_SIZES.map(function(s){return '<option value="'+s+'"'+(form.intro.staffSize===s?' selected':'')+'>'+s+'</option>';}).join('')
+      +'</select></div>'
+  +'</div>'
+  +'<div class="group-title">企业简介</div>'
+  +'<div class="group ap-group">'
+    +'<div class="ef-field ef-field-ta"><label>简介 <span class="ef-req">*</span></label>'
+      +'<textarea id="i-desc" class="ap-textarea ef-input" placeholder="企业简介（50-500字）" rows="5" maxlength="500">'+esc(form.intro.desc)+'</textarea>'
+      +'<div class="ef-char-count"><span id="desc-count">'+descLen+'</span>/500</div>'
+      +'<div class="ef-err"></div></div>'
+  +'</div>';
+}
+function bindStep3(){
+  ['i-founded','i-capital'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.addEventListener('input',function(){collectStep3();saveDraft();clearErr(id);});
+  });
+  var staff=document.getElementById('i-staff');
+  if(staff)staff.addEventListener('change',function(){collectStep3();saveDraft();});
+  var desc=document.getElementById('i-desc');
+  if(desc){
+    desc.addEventListener('input',function(){
+      collectStep3();saveDraft();clearErr('i-desc');
+      var c=document.getElementById('desc-count');
+      if(c)c.textContent=desc.value.length;
+    });
+  }
+}
+function collectStep3(){
+  form.intro.founded=val('i-founded');
+  form.intro.capital=val('i-capital');
+  form.intro.staffSize=val('i-staff')||STAFF_SIZES[0];
+  form.intro.desc=val('i-desc');
+}
+function validateStep3(){
+  collectStep3();
+  var ok=true;
+  if(!form.intro.founded){showErr('i-founded','请填写成立年份');ok=false;}
+  else if(!/^\d{4}$/.test(form.intro.founded)){showErr('i-founded','请填写4位年份');ok=false;}
+  if(!form.intro.capital){showErr('i-capital','请填写注册资本');ok=false;}
+  else if(isNaN(Number(form.intro.capital))||Number(form.intro.capital)<=0){showErr('i-capital','请填写正确的注册资本金额');ok=false;}
+  if(!form.intro.desc){showErr('i-desc','请填写企业简介');ok=false;}
+  else if(form.intro.desc.length<50){showErr('i-desc','企业简介至少50个字');ok=false;}
+  if(!ok)scrollToFirstErr();
+  return ok;
+}
+
+/* ============ Step4: 企业案例 ============ */
+function renderStep4(){
+  var list=form.cases.length?form.cases.map(function(c,i){
+    var imgs=(c.images||[]).map(function(img,ji){
+      return '<div class="ef-case-img"><img src="'+img+'" alt="案例图"><button class="ef-case-img-del" onclick="window.__delCaseImg('+i+','+ji+')">×</button></div>';
+    }).join('');
+    var addBtn=(c.images&&c.images.length<3)?'<div class="ef-up-box ef-up-box-sm" onclick="window.__upCaseImg('+i+',this)"><div class="ef-up-ph"><svg class="ic" style="width:16px;height:16px;"><use href="#i-upload"/></svg><span>图片</span></div></div>':'';
+    return '<div class="ef-card" data-cidx="'+i+'">'
+      +'<button class="ef-card-del" onclick="window.__delCase('+i+')">×</button>'
+      +'<div class="ef-card-title">案例 '+ (i+1) +'</div>'
+      +'<div class="ef-field"><label>项目名称 <span class="ef-req">*</span></label>'
+        +'<input id="c-name-'+i+'" class="ap-input ef-input" placeholder="如：××大厦建设项目" value="'+esc(c.name)+'">'
+        +'<div class="ef-err"></div></div>'
+      +'<div class="ef-field"><label>项目类型</label>'
+        +'<select id="c-type-'+i+'" class="ap-input ef-input ef-select">'
+          +CASE_TYPES.map(function(tp){return '<option value="'+tp+'"'+(c.type===tp?' selected':'')+'>'+tp+'</option>';}).join('')
+        +'</select></div>'
+      +'<div class="ef-field"><label>项目金额</label>'
+        +'<div class="ef-input-suffix"><input id="c-amount-'+i+'" class="ap-input mono ef-input" type="number" placeholder="如：500" value="'+esc(c.amount)+'"><span class="ef-suffix">万元</span></div></div>'
+      +'<div class="ef-field"><label>开始时间</label>'
+        +'<input id="c-start-'+i+'" class="ap-input ef-input" type="date" value="'+esc(c.startDate)+'"></div>'
+      +'<div class="ef-field"><label>结束时间</label>'
+        +'<input id="c-end-'+i+'" class="ap-input ef-input" type="date" value="'+esc(c.endDate)+'"></div>'
+      +'<div class="ef-field ef-field-ta"><label>案例描述</label>'
+        +'<textarea id="c-desc-'+i+'" class="ap-textarea ef-input" placeholder="项目概况、亮点等" rows="3">'+esc(c.desc)+'</textarea></div>'
+      +'<div class="ef-field ef-field-up"><label>案例图片</label>'
+        +'<div class="ef-imgs-row">'+imgs+addBtn+'</div></div>'
+    +'</div>';
+  }).join(''):'<div class="ef-empty">暂无案例，点击下方添加</div>';
+
+  var attList=form.attachments.length?form.attachments.map(function(a,i){
+    return '<div class="ef-att-item"><span class="ef-att-ic"><svg class="ic" style="width:14px;height:14px;"><use href="#i-file"/></svg></span>'
+      +'<span class="ef-att-name">'+esc(a.name)+'</span>'
+      +'<button class="ef-att-del" onclick="window.__delAtt('+i+')">×</button></div>';
+  }).join(''):'';
+
+  return '<div class="group-title">企业案例</div>'
+    +'<div class="ef-note">选填，可添加多个代表性项目案例</div>'
+    +list
+    +'<button class="btn btn-ghost btn-block ef-add-btn" onclick="window.__addCase()">+ 添加案例</button>'
+    +'<div class="group-title" style="margin-top:18px;">其他附件（选填）</div>'
+    +'<div class="group ap-group" style="padding:12px 14px;">'
+      +attList
+      +'<button class="ef-att-add" onclick="window.__addAtt()">+ 上传附件（营业执照、授权书等）</button>'
+    +'</div>';
+}
+function bindStep4(){
+  form.cases.forEach(function(c,i){
+    ['c-name-'+i,'c-amount-'+i,'c-start-'+i,'c-end-'+i,'c-desc-'+i].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.addEventListener('input',function(){collectStep4();saveDraft();
+        if(id.indexOf('c-name')===0)clearErr(id);
+      });
+    });
+    var tp=document.getElementById('c-type-'+i);
+    if(tp)tp.addEventListener('change',function(){collectStep4();saveDraft();});
+  });
+}
+function collectStep4(){
+  form.cases.forEach(function(c,i){
+    c.name=val('c-name-'+i);
+    c.type=val('c-type-'+i)||CASE_TYPES[0];
+    c.amount=val('c-amount-'+i);
+    c.startDate=val('c-start-'+i);
+    c.endDate=val('c-end-'+i);
+    c.desc=val('c-desc-'+i);
+  });
+}
+function validateStep4(){
+  collectStep4();
+  var ok=true;
+  form.cases.forEach(function(c,i){
+    if(!c.name){showErr('c-name-'+i,'请填写项目名称');ok=false;}
+  });
+  if(!ok)scrollToFirstErr();
+  return ok;
+}
+window.__addCase=function(){
+  collectStep4();
+  form.cases.push({name:'',type:CASE_TYPES[0],amount:'',startDate:'',endDate:'',desc:'',images:[]});
+  saveDraft();
+  renderStep();
+};
+window.__delCase=function(i){
+  collectStep4();
+  form.cases.splice(i,1);
+  saveDraft();
+  renderStep();
+};
+window.__upCaseImg=function(i,el){
+  if(el&&el.classList.contains('up-loading'))return;
+  if(el){el.classList.add('up-loading');el.innerHTML='<svg class="up-spinner-sm" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity=".25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';}
+  setTimeout(function(){
+    if(!form.cases[i].images)form.cases[i].images=[];
+    if(form.cases[i].images.length>=3){UI.toast('每个案例最多3张图片','warn');return;}
+    form.cases[i].images.push('../../assets/mock-certs/qualification-cert.jpg');
+    saveDraft();
+    renderStep();
+  },800);
+};
+window.__delCaseImg=function(i,ji){
+  form.cases[i].images.splice(ji,1);
+  saveDraft();
+  renderStep();
+};
+window.__addAtt=function(){
+  var mockFiles=[
+    {name:'营业执照副本.pdf',size:1240000},
+    {name:'资质证书扫描件.jpg',size:860000},
+    {name:'授权委托书.pdf',size:520000}
+  ];
+  var f=mockFiles[form.attachments.length%mockFiles.length];
+  form.attachments.push({name:f.name,size:f.size,data:''});
+  saveDraft();
+  renderStep();
+  UI.toast('附件已上传','ok');
+};
+window.__delAtt=function(i){
+  form.attachments.splice(i,1);
+  saveDraft();
+  renderStep();
+};
+
+/* ============ Step5: 确认提交 ============ */
+function renderStep5(){
+  var addr=form.address.province+form.address.city+form.address.district+form.address.detail;
+  var qualHtml=form.qualifications.length?form.qualifications.map(function(q,i){
+    return '<div class="ef-sum-item"><b>'+esc(q.name)+'</b>'
+      +'<span>'+esc(q.level)+(q.no?' · '+esc(q.no):'')+(q.expireAt?' · 至'+esc(q.expireAt):'')+'</span></div>';
+  }).join(''):'<div class="ef-sum-empty">未填写资质</div>';
+
+  var introHtml='<div class="ef-sum-item"><b>成立年份</b><span>'+esc(form.intro.founded||'—')+'</span></div>'
+    +'<div class="ef-sum-item"><b>注册资本</b><span>'+(form.intro.capital?esc(form.intro.capital)+' 万元':'—')+'</span></div>'
+    +'<div class="ef-sum-item"><b>员工规模</b><span>'+esc(form.intro.staffSize||'—')+'</span></div>'
+    +'<div class="ef-sum-item ef-sum-desc"><b>企业简介</b><span>'+esc(form.intro.desc||'—')+'</span></div>';
+
+  var caseHtml=form.cases.length?form.cases.map(function(c,i){
+    return '<div class="ef-sum-case"><b>'+esc(c.name)+'</b>'
+      +'<span>'+esc(c.type)+(c.amount?' · '+esc(c.amount)+'万元':'')+(c.startDate&&c.endDate?' · '+esc(c.startDate)+'至'+esc(c.endDate):'')+'</span>'
+      +(c.desc?'<p>'+esc(c.desc)+'</p>':'')
+    +'</div>';
+  }).join(''):'<div class="ef-sum-empty">未填写案例</div>';
+
+  return '<div class="group-title">确认提交信息</div>'
+  +'<div class="ef-sum-card">'
+    +'<div class="ef-sum-head"><span>联系与经营</span><a class="ef-sum-edit" onclick="window.__goStep(0)">返回修改</a></div>'
+    +'<div class="ef-sum-item"><b>联系人</b><span>'+esc(form.contact)+'</span></div>'
+    +'<div class="ef-sum-item"><b>联系电话</b><span>'+esc(form.tel)+'</span></div>'
+    +'<div class="ef-sum-item ef-sum-desc"><b>经营范围</b><span>'+esc(form.scope)+'</span></div>'
+    +'<div class="ef-sum-item ef-sum-desc"><b>办公地址</b><span>'+esc(addr)+'</span></div>'
+    +(form.website?'<div class="ef-sum-item"><b>企业官网</b><span>'+esc(form.website)+'</span></div>':'')
+  +'</div>'
+  +'<div class="ef-sum-card">'
+    +'<div class="ef-sum-head"><span>建筑资质（'+form.qualifications.length+'项）</span><a class="ef-sum-edit" onclick="window.__goStep(1)">返回修改</a></div>'
+    +qualHtml
+  +'</div>'
+  +'<div class="ef-sum-card">'
+    +'<div class="ef-sum-head"><span>企业介绍</span><a class="ef-sum-edit" onclick="window.__goStep(2)">返回修改</a></div>'
+    +introHtml
+  +'</div>'
+  +'<div class="ef-sum-card">'
+    +'<div class="ef-sum-head"><span>企业案例（'+form.cases.length+'个）</span><a class="ef-sum-edit" onclick="window.__goStep(3)">返回修改</a></div>'
+    +caseHtml
+    +(form.attachments.length?'<div class="ef-sum-item"><b>其他附件</b><span>'+form.attachments.length+'个文件</span></div>':'')
+  +'</div>'
+  +'<div class="card ef-fee">'
+    +'<div class="fb-between" style="margin-bottom:7px;"><span class="fw-600 fs-14">入驻费（按次）</span><span class="fw-700 fs-17" style="color:var(--primary);">'+feeText()+'</span></div>'
+    +'<div class="text-3 fs-12" style="line-height:1.7;">'+feeNote()+'</div>'
+    +'<div class="ef-fee-divider"></div>'
+    +'<div class="fb-between"><span class="fw-600 fs-14">保证金说明</span><span class="text-2 fs-12" style="text-align:right;flex:1;margin-left:12px;">'+depositText()+'</span></div>'
+  +'</div>';
+}
+window.__goStep=function(s){
+  currentStep=s;
+  renderAll();
+  window.scrollTo(0,0);
+};
+
+/* ============ 渲染主流程 ============ */
+function renderStep(){
+  var el=document.getElementById('step-content');
+  var html='';
+  if(currentStep===0)html=renderStep1();
+  else if(currentStep===1)html=renderStep2();
+  else if(currentStep===2)html=renderStep3();
+  else if(currentStep===3)html=renderStep4();
+  else html=renderStep5();
+  el.innerHTML=html;
+  if(currentStep===0)bindStep1();
+  else if(currentStep===1)bindStep2();
+  else if(currentStep===2)bindStep3();
+  else if(currentStep===3)bindStep4();
+  updateCTA();
+}
+function updateCTA(){
+  var prev=document.getElementById('btn-prev');
+  var next=document.getElementById('btn-next');
+  prev.style.display=currentStep===0?'none':'flex';
+  if(currentStep===4){
+    next.textContent=fee===0?'确认提交':'支付并提交';
+    next.className='btn btn-primary ef-btn-next';
+  }else{
+    next.textContent='下一步';
+    next.className='btn btn-primary ef-btn-next';
+  }
+}
+function renderAll(){
+  renderIndicator();
+  renderStep();
+}
+
+/* ============ 门控 & 互斥 ============ */
+function gate(){
+  var curSt=deriveStatus();
+  if(curSt!=='enterprise'&&curSt!=='pro'&&curSt!=='resident'){
+    UI.dialog({title:'暂不具备入驻资格',text:'入驻需先完成<b>企业工商认证</b>或<b>专业资质认证</b>。',ok:'去认证',cancel:'返回',onOk:function(){location.href='auth.html';}});
+    return false;
+  }
+  return true;
+}
+function mutualLock(){
+  var e=EntryStore.read();
+  var opp=type==='construction'?'agency':(type==='agency'?'construction':null);
+  var types=(e.types&&e.types.length)?e.types:(e.type?[e.type]:[]);
+  if(opp&&e.active&&types.indexOf(opp)>=0){
+    UI.dialog({title:'类型互斥',text:'建筑企业与中介服务企业不可同时入驻，您已入驻另一类型。',ok:'我知道了',cancel:null});
+    return false;
+  }
+  if(e.status==='pending'||e.status==='first_ok'){UI.toast('已有入驻申请审核中','warn');setTimeout(function(){location.href='entry-review.html';},800);return false;}
+  return true;
+}
+
+/* ============ 提交 ============ */
+function doApply(){
+  var payload={
+    contact:form.contact,tel:form.tel,scope:form.scope,
+    qualifications:form.qualifications,
+    intro:form.intro,
+    cases:form.cases,
+    address:form.address,
+    website:form.website,
+    attachments:form.attachments
+  };
+  var r=DataBus.entryApply(type,payload,fee);
+  if(r&&r.error){UI.toast(r.error,'warn');return;}
+  clearDraft();
+  UI.toast(fee===0?'申请已提交，等待平台审核':'支付成功，申请已进入审核','ok');
+  setTimeout(function(){location.href='entry-review.html';},900);
+}
+function handleSubmit(){
+  if(!gate()||!mutualLock())return;
+  /* 最终全量校验：逐步骤渲染并校验，失败则停在该步骤 */
+  for(var s=0;s<4;s++){
+    currentStep=s;
+    renderStep();
+    var fn=[validateStep1,validateStep2,validateStep3,validateStep4][s];
+    if(!fn()){
+      renderIndicator();
+      window.scrollTo(0,0);
+      UI.toast('请完善第'+(s+1)+'步信息','warn');
+      return;
+    }
+  }
+  currentStep=4;
+  renderAll();
+  if(fee===0){doApply();return;}
+  var avail=window.BalanceStore?BalanceStore.available():0;
+  UI.sheet().html(
+    '<div style="padding:6px 2px 14px;">'+
+    '<div class="fw-700 fs-16" style="margin-bottom:12px;">'+(t?t.label:'')+' · 入驻支付</div>'+
+    '<div class="fb-between" style="font-size:13px;padding:7px 0;"><span class="text-2">入驻费（按次）</span><b>¥'+Number(fee).toLocaleString()+'</b></div>'+
+    '<div class="fb-between" style="font-size:13px;padding:7px 0;"><span class="text-2">账户余额</span><b style="color:'+(avail>=fee?'var(--success)':'var(--danger)')+';">¥'+avail.toLocaleString()+'</b></div>'+
+    '<div class="fb-between" style="font-size:13px;padding:7px 0 12px;"><span class="text-2">生效方式</span><b>两级审核通过后生效</b></div>'+
+    '<button class="btn btn-primary btn-block" id="ef-cfm">确认支付并提交</button>'+
+    '<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button></div>').show();
+  setTimeout(function(){var b=document.getElementById('ef-cfm');if(b)b.onclick=function(){UI.closeSheet();doApply();};},60);
+}
+
+/* ============ 事件绑定 ============ */
+document.getElementById('btn-prev').onclick=function(){
+  if(currentStep>0){currentStep--;saveDraft();renderAll();window.scrollTo(0,0);}
+};
+document.getElementById('btn-next').onclick=function(){
+  if(currentStep===4){handleSubmit();return;}
+  var fn=[validateStep1,validateStep2,validateStep3,validateStep4][currentStep];
+  if(fn&&!fn())return;
+  saveDraft();
+  currentStep++;
+  renderAll();
+  window.scrollTo(0,0);
+};
+
+/* ============ 预填实名信息 ============ */
+function prefill(){
+  if(!form.contact&&!form.tel){
+    var a=AuthStore.read();
+    form.contact=a.realname.name||(UI.state.get().user)||'';
+    form.tel=a.realname.mobile||'';
+  }
+  if(!form.scope){
+    form.scope=type==='construction'?'房屋建筑工程 · 市政公用工程':(type==='agency'?'工程中介 · 招标代理 · 造价咨询':'');
+  }
+}
+
+window.fillExample=function(){
+  var d=window.mockFormData&&window.mockFormData.enterpriseEntry;
+  if(!d){UI.toast('示例数据未加载','warn');return;}
+  var r=window.mockFormData.realname||{};
+  /* 重置为默认表单 */
+  form=defaultForm();
+  /* Step1: 联系与经营 */
+  form.contact=r.name||'陈建国';
+  form.tel=r.mobile||'13800138000';
+  form.scope='房屋建筑工程 · 市政公用工程 · 公路工程施工总承包';
+  if(d.address){
+    form.address.province=d.address.province||'';
+    form.address.city=d.address.city||'';
+    form.address.district=d.address.district||'';
+    form.address.detail=d.address.detail||'';
+  }
+  form.website=d.website?'https://'+d.website.replace(/^https?:\/\//,''):'';
+  /* Step2: 建筑资质 */
+  if(d.qualifications&&d.qualifications.length){
+    form.qualifications=d.qualifications.map(function(q){
+      return {
+        name:q.name||'建筑工程施工总承包',
+        level:q.level||'一级',
+        no:'D15100'+Math.floor(10000+Math.random()*90000),
+        expireAt:'2027-12-31',
+        image:'../../assets/mock-certs/qualification-cert.jpg'
+      };
+    });
+  }else{
+    form.qualifications=[{name:'建筑工程施工总承包',level:'一级',no:'D1510012345',expireAt:'2027-12-31',image:'../../assets/mock-certs/qualification-cert.jpg'}];
+  }
+  /* Step3: 企业介绍 */
+  if(d.intro){
+    form.intro.founded=d.intro.founded||'2018';
+    form.intro.capital=String(d.intro.capital||'').replace(/万$/,'')||'5000';
+    var sm=d.intro.staffSize||'';
+    var smMap={'1-20人':'1-20人','21-50人':'21-50人','51-100人':'51-100人','101-500人':'101-500人','200-500人':'101-500人','500人以上':'500人以上'};
+    form.intro.staffSize=smMap[sm]||'101-500人';
+    form.intro.desc=d.intro.desc&&d.intro.desc.length>=50?d.intro.desc:'大型建筑施工企业，拥有建筑工程施工总承包一级资质，专注房屋建筑、市政公用、公路工程等领域，累计完成各类工程项目百余项，具备丰富的施工管理经验和技术实力。';
+  }
+  /* Step4: 企业案例 */
+  if(d.cases&&d.cases.length){
+    form.cases=d.cases.map(function(c){
+      return {
+        name:c.name||'成都地铁18号线',
+        type:'市政公用',
+        amount:'8000',
+        startDate:(c.year||'2020')+'-03-01',
+        endDate:(c.year||'2020')+'-12-31',
+        desc:c.desc||'轨道交通工程，线路全长约66公里，设车站12座，包含土建施工、机电安装、装饰装修等全流程工程总承包。',
+        images:['../../assets/mock-certs/qualification-cert.jpg']
+      };
+    });
+  }else{
+    form.cases=[{name:'成都地铁18号线',type:'市政公用',amount:'8000',startDate:'2020-03-01',endDate:'2020-12-31',desc:'轨道交通工程，线路全长约66公里。',images:['../../assets/mock-certs/qualification-cert.jpg']}];
+  }
+  form.attachments=[{name:'营业执照副本.pdf',size:1240000,data:''}];
+  saveDraft();
+  renderAll();
+  UI.toast('已填充示例信息，请核对后提交','ok');
+};
+
+/* ============ 初始化 ============ */
+renderHead();
+renderFee();
+prefill();
+saveDraft();
+renderAll();
+window.addEventListener('engchain:mode', renderFee);
+window.addEventListener('engchain:store-change', renderFee);
+})();
+</script>
+<style>
+.ef-scroll{padding-top:12px;padding-bottom:110px;}
+.group-title{padding:0 4px 7px;font-size:12px;color:var(--text-3);letter-spacing:.05em;}
+.ef-head{display:flex;align-items:center;gap:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow-xs);}
+.ef-head-ic{width:42px;height:42px;border-radius:12px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;flex:none;}
+.ef-head-ic .ic{width:21px;height:21px;}
+
+/* Step 指示器 */
+.ef-steps{display:flex;align-items:flex-start;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px 10px;margin-bottom:14px;}
+.ef-step{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:0;cursor:pointer;}
+.ef-step-dot{width:26px;height:26px;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;transition:all .3s var(--e-out);}
+.ef-step-label{font-size:10px;color:var(--text-3);text-align:center;line-height:1.3;white-space:nowrap;}
+.ef-step.active .ef-step-dot{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);box-shadow:0 3px 10px rgba(201,169,97,.35);}
+.ef-step.active .ef-step-label{color:var(--primary);font-weight:600;}
+.ef-step.done .ef-step-dot{background:var(--primary-soft);color:var(--primary);}
+.ef-step.done .ef-step-label{color:var(--text-2);}
+.ef-step-line{flex:0 0 12px;height:2px;background:var(--line);margin-top:12px;}
+.ef-step-line.done{background:var(--primary);}
+
+/* 表单字段 */
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ef-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);position:relative;flex-wrap:wrap;}
+.ef-field:last-child{border-bottom:none;}
+.ef-field label{flex:none;width:72px;font-size:13px;color:var(--text-2);}
+.ef-req{color:var(--danger);margin-left:2px;}
+.ef-input{flex:1;min-width:0;border:none;outline:none;background:transparent;text-align:right;font-size:14px;color:var(--text-1);}
+.ef-input::placeholder{color:var(--text-3);}
+.ef-input-err{color:var(--danger);}
+.ef-err{width:100%;font-size:12px;color:var(--danger);margin-top:2px;padding-left:84px;line-height:1.4;min-height:0;display:none;}
+.ef-err:not(:empty){display:block;}
+.ef-field-ta{align-items:flex-start;}
+.ef-field-ta label{padding-top:8px;}
+.ap-textarea{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:14px;color:var(--text-1);resize:vertical;line-height:1.6;text-align:left;font-family:inherit;}
+.ap-textarea::placeholder{color:var(--text-3);}
+.ef-select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right center;padding-right:20px;}
+.ef-input-suffix{flex:1;min-width:0;display:flex;align-items:center;justify-content:flex-end;gap:4px;}
+.ef-input-suffix .ef-input{flex:0 1 auto;text-align:right;}
+.ef-suffix{font-size:12px;color:var(--text-3);flex:none;}
+.ef-char-count{width:100%;text-align:right;font-size:11px;color:var(--text-3);margin-top:2px;}
+.ef-note{font-size:11px;color:var(--text-3);line-height:1.6;padding:0 4px 8px;}
+
+/* 多条目卡片 */
+.ef-card{position:relative;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px;margin-bottom:12px;}
+.ef-card-title{font-size:13px;font-weight:600;color:var(--primary);margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--line);}
+.ef-card-del{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;border:none;background:var(--bg-card-2);color:var(--text-3);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;}
+.ef-card-del:active{background:rgba(212,76,71,.12);color:var(--danger);}
+.ef-add-btn{margin-bottom:14px;height:46px;font-size:14px;}
+.ef-empty{text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;background:var(--bg-card);border:1px dashed var(--line);border-radius:14px;margin-bottom:12px;}
+
+/* 上传 */
+.ef-field-up{align-items:flex-start;}
+.ef-field-up label{padding-top:10px;}
+.ef-up-box{position:relative;flex:1;min-width:0;min-height:80px;border:1.5px dashed var(--line);border-radius:10px;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:border-color .2s;}
+.ef-up-box:active{border-color:var(--primary);}
+.ef-up-box-sm{width:72px;height:72px;min-height:0;flex:none;}
+.ef-up-ph{display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--text-3);font-size:11px;}
+.ef-up-preview{width:100%;height:100%;object-fit:cover;display:block;}
+.ef-up-img-wrap{position:absolute;inset:0;width:100%;height:100%;}
+.ef-up-img-wrap .ef-up-preview{position:absolute;inset:0;}
+.up-reupload{position:absolute;top:6px;right:6px;padding:3px 9px;border-radius:20px;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:10px;cursor:pointer;z-index:2;min-height:22px;line-height:1;}
+.up-loading{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--text-3);font-size:11px;}
+.up-spinner{width:26px;height:26px;animation:up-spin .8s linear infinite;color:var(--primary);}
+.up-spinner-sm{width:22px;height:22px;animation:up-spin .8s linear infinite;color:var(--primary);}
+@keyframes up-spin{to{transform:rotate(360deg);}}
+.ef-fill-bar{padding:0 4px 12px;}
+.ap-fill-btn{width:100%;height:42px;border-radius:12px;border:1.5px solid rgba(201,169,97,.5);background:rgba(201,169,97,.06);color:var(--primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all var(--d-fast);}
+.ap-fill-btn:active{background:rgba(201,169,97,.12);transform:scale(.98);}
+.ef-imgs-row{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:0;}
+.ef-case-img{position:relative;width:72px;height:72px;border-radius:10px;overflow:hidden;border:1px solid var(--line);}
+.ef-case-img img{width:100%;height:100%;object-fit:cover;}
+.ef-case-img-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(0,0,0,.5);color:#fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+
+/* 附件 */
+.ef-att-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line);}
+.ef-att-item:last-of-type{border-bottom:none;}
+.ef-att-ic{width:28px;height:28px;border-radius:8px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;flex:none;}
+.ef-att-name{flex:1;min-width:0;font-size:13px;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ef-att-del{width:24px;height:24px;border:none;background:transparent;color:var(--text-3);font-size:16px;cursor:pointer;flex:none;}
+.ef-att-add{width:100%;padding:12px;border:1.5px dashed var(--line);border-radius:10px;background:transparent;color:var(--text-3);font-size:13px;cursor:pointer;margin-top:8px;}
+.ef-att-add:active{border-color:var(--primary);color:var(--primary);}
+
+/* 汇总页 */
+.ef-sum-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+.ef-sum-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--line);}
+.ef-sum-head>span{font-size:14px;font-weight:600;color:var(--text-1);}
+.ef-sum-edit{font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;}
+.ef-sum-item{display:flex;align-items:flex-start;gap:10px;padding:6px 0;font-size:13px;}
+.ef-sum-item b{flex:none;width:72px;font-weight:500;color:var(--text-3);font-size:12px;}
+.ef-sum-item span{flex:1;min-width:0;color:var(--text-1);line-height:1.5;word-break:break-word;}
+.ef-sum-desc span{text-align:left;}
+.ef-sum-empty{font-size:12px;color:var(--text-3);padding:6px 0;}
+.ef-sum-case{padding:8px 0;border-bottom:1px dashed var(--line);}
+.ef-sum-case:last-child{border-bottom:none;}
+.ef-sum-case b{font-size:13px;color:var(--text-1);display:block;margin-bottom:3px;}
+.ef-sum-case>span{font-size:11.5px;color:var(--text-3);display:block;}
+.ef-sum-case p{font-size:12px;color:var(--text-2);line-height:1.6;margin:5px 0 0;}
+
+/* 费用卡 */
+.ef-fee{padding:14px;margin-bottom:12px;}
+.ef-fee-divider{height:1px;background:var(--line);margin:12px 0;}
+
+/* CTA */
+.ef-cta{left:14px;right:14px;}
+.ef-cta-row{display:flex;gap:10px;}
+.ef-cta-row .btn{flex:1;height:50px;font-size:15px;display:flex;align-items:center;justify-content:center;}
+.ef-btn-prev{flex:0 0 38% !important;}
+
+/* 375px 适配 */
+@media(max-width:375px){
+  .ef-step-label{font-size:9px;}
+  .ef-step-line{flex:0 0 8px;}
+  .ef-field label{width:64px;font-size:12px;}
+  .ef-err{padding-left:76px;}
+  .ef-sum-item b{width:64px;}
+}
+</style>
+</body>
+</html>

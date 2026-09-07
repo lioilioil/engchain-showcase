@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>在线下单 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">中介服务 · 在线下单</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:96px;">
+    <div class="section-title"><div class="st-left">选择服务商</div></div>
+    <div id="svc-sel"></div>
+
+    <div class="section-title" style="margin-top:14px;"><div class="st-left">自定义服务金额</div></div>
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span class="fs-13 text-2">¥</span>
+        <input class="input" id="amt-input" type="number" inputmode="decimal" placeholder="输入服务金额" style="flex:1;">
+      </div>
+      <div class="opt" id="amt-opts"></div>
+      <div class="amt-show">
+        <div class="mono fw-700" style="font-size:24px;color:var(--primary-dim);" id="amount-display">¥0</div>
+        <div class="text-3 fs-10.5" style="margin-top:3px;color:rgba(244,242,238,.6);">金额托管至持牌机构监管账户（非平台收入）</div>
+        <svg class="ic amt-shield" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="fw-600 fs-13" style="margin-bottom:8px;">费用与结算试算</div>
+      <div class="cal-row"><span class="text-2 fs-12">服务金额（托管）</span><span class="mono fw-700" id="cal-amount">¥0</span></div>
+      <div class="cal-row"><span class="text-2 fs-12">平台佣金（费率）</span><span class="mono fw-700" style="color:var(--primary);" id="cal-fee">—</span></div>
+      <div class="cal-row cal-row-last"><span class="text-2 fs-12">服务商结算（验收后）</span><span class="mono fw-700" style="color:var(--success);" id="cal-settle">—</span></div>
+      <div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">未成交 / 未使用权益 → 全额退款，不结算、不产生佣金。</div>
+    </div>
+
+    <div class="card" style="margin-top:12px;" id="milestone-card">
+      <div class="fw-600 fs-13" style="margin-bottom:8px;">里程碑托管 <span class="tag tag-primary" style="font-size:9px;" id="milestone-tag">—</span></div>
+      <div id="milestone-list"></div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px;"><div class="st-left">我的中介订单</div><span class="more" id="order-count">0</span></div>
+    <div id="order-list"><div class="card"><div class="text-3 fs-12">暂无订单</div></div></div>
+  </div>
+
+  <!-- 吸底结算栏 -->
+  <div class="order-cta">
+    <div class="oc-total">
+      <span class="oc-label">托管金额</span>
+      <b class="mono" id="cta-amount">¥0</b>
+    </div>
+    <button class="btn btn-primary btn-lg" id="pay-btn" style="flex:1;">确认支付并托管</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var cm=RULE('commission',MOCK.business.commission);
+function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:2});}
+var SVCS=[
+ {id:'s1',sellerId:'u2',name:'蜀安人力 · 劳务派遣',cats:['劳务派遣','班组分包'],score:9.4,dep:20000,icon:'劳'},
+ {id:'s2',sellerId:'u2',name:'天府担保 · 工程担保',cats:['投标保函','履约保函'],score:9.1,dep:50000,icon:'保'},
+ {id:'s3',sellerId:'u2',name:'锦城咨询 · 造价审核',cats:['造价咨询','结算审核'],score:9.0,dep:5000,icon:'咨'}
+];
+var params=new URLSearchParams(location.search);
+var svcIdx=Math.min(parseInt(params.get('svc')||'0',10)||0,SVCS.length-1);
+var svc=SVCS[svcIdx];
+var me=DataBus.current(),uid=me?me.id:'';
+
+document.getElementById('svc-sel').innerHTML=SVCS.map(function(s,i){
+  var on=i===svcIdx;
+  return '<div class="od-card'+(on?' on':'')+'" onclick="pickSvc('+i+')">'+
+    '<div class="od-radio"><svg class="ic"><use href="#i-check"/></svg></div>'+
+    '<div class="od-av">'+s.icon+'<span class="od-v">金V</span></div>'+
+    '<div class="od-main"><div class="fw-600 fs-13 od-name">'+s.name+'</div>'+
+    '<div class="od-meta">'+s.cats.join(' · ')+' · 保证金 '+fmt(s.dep)+'</div></div>'+
+    '<span class="od-score"><svg class="ic"><use href="#i-star"/></svg>'+s.score.toFixed(1)+'</span>'+
+    '</div>';
+}).join('');
+window.pickSvc=function(i){location.href='order.html?svc='+i;};
+
+var AMTS=[30000,60000,250000,600000,1200000];
+/* 回退复用：恢复上次未提交草稿（FormStash） */
+var stash=FormStash.get('agency_order_draft');
+var curAmt=(stash&&stash.data&&stash.data.amount)||60000;
+var amtInput=document.getElementById('amt-input');amtInput.value=curAmt;
+function renderAmtOpts(){
+  document.getElementById('amt-opts').innerHTML=AMTS.map(function(a){
+    var lab=a>=10000?('¥'+Math.round(a/10000)+'万'):fmt(a);
+    return '<div class="amt-opt'+(a===curAmt?' on':'')+'" onclick="setAmt('+a+')">'+lab+'</div>';
+  }).join('');
+}
+window.setAmt=function(a){curAmt=a;amtInput.value=a;FormStash.save('agency_order_draft',{amount:a,svc:svc.id});renderAmtOpts();renderCalc();};
+amtInput.addEventListener('input',function(){var v=parseFloat(this.value)||0;curAmt=v;renderAmtOpts();renderCalc();FormStash.save('agency_order_draft',{amount:v,svc:svc.id});});
+
+function renderCalc(){
+  var r=window.commissionRate(curAmt||0);
+  document.getElementById('amount-display').textContent=fmt(curAmt);
+  document.getElementById('cal-amount').textContent=fmt(curAmt);
+  document.getElementById('cal-fee').textContent=fmt(r.fee)+'（'+(r.rate*100).toFixed(1).replace(/\.0$/,'')+'%）';
+  document.getElementById('cal-settle').textContent=fmt(Domain.round2(curAmt-r.fee));
+  document.getElementById('cta-amount').textContent=fmt(curAmt);
+  var useMile=cm.milestone.enable&&curAmt>=cm.milestone.minAmount;
+  document.getElementById('milestone-tag').textContent=useMile?'已启用 '+cm.milestone.nodes.length+' 节点':'<'+fmt(cm.milestone.minAmount)+' 一次性结算';
+  document.getElementById('milestone-list').innerHTML=useMile
+    ? '<div class="mile-steps">'+cm.milestone.nodes.map(function(n,i){
+        return '<div class="mile-row"><span class="mile-dot'+(i===cm.milestone.nodes.length-1?' mile-last':'')+'">'+(i+1)+'</span>'+
+          '<span class="fs-12 text-2" style="flex:1;">'+cm.milestone.labels[i]+'</span>'+
+          '<span class="mono fw-700 fs-12">'+fmt(Domain.round2(curAmt*n))+'</span></div>';
+      }).join('')+'</div>'
+    : '<div class="text-3 fs-12">金额低于 '+fmt(cm.milestone.minAmount)+'，一次性结算，验收后放款给服务商。</div>';
+  document.getElementById('pay-btn').textContent='确认支付并托管 '+fmt(curAmt);
+}
+renderAmtOpts();renderCalc();
+
+/* 支付：创建统一托管单 → 钱包/托管账户扣款（幂等），成功跳详情 */
+var paying=false;
+document.getElementById('pay-btn').addEventListener('click',function(){
+  if(paying)return;
+  var acc=window.entryAccess?entryAccess():{statusId:'guest'};
+  if(acc.statusId==='guest'){location.href='../auth/login.html';return;}
+  var amt=Domain.round2(curAmt||0);
+  if(!(amt>0)){UI.toast('请输入有效金额','warn');return;}
+  var avail=window.BalanceStore?BalanceStore.available():0;
+  if(avail<amt){
+    UI.dialog({title:'余额不足',text:'托管需 '+fmt(amt)+'，钱包可用 '+fmt(avail)+'，请先充值。',ok:'去充值',onOk:function(){location.href='../wallet/recharge.html';}});
+    return;
+  }
+  paying=true;
+  var r=commissionRate(amt);
+  var o=Mediation.create({buyerId:uid,sellerId:svc.sellerId,svcId:svc.id,svcName:svc.name,category:svc.cats[0],amount:amt});
+  if(o.error){paying=false;UI.toast(o.error,'warn');return;}
+  var paid=Mediation.pay(o.id,'balance');
+  paying=false;
+  if(paid.error){UI.toast('托管失败：'+paid.error,'warn');return;}
+  FormStash.clear('agency_order_draft');
+  UI.toast('已托管 '+fmt(amt)+' 至监管账户，等待服务商接单','ok');
+  renderOrders();
+  setTimeout(function(){location.href='order-detail.html?id='+o.id;},700);
+});
+
+function stTxt(s){return Mediation.stateLabel(s);}
+var ST_COLOR={escrowed:'var(--primary-dim)',serving:'var(--blue)',settled:'var(--success)',refunded:'var(--text-3)',disputed:'var(--danger)'};
+function renderOrders(){
+  var list=Mediation.list({uid:uid,role:'buyer'});
+  document.getElementById('order-count').textContent=list.length+' 单';
+  if(!list.length){document.getElementById('order-list').innerHTML='<div class="card"><div class="text-3 fs-12">暂无订单</div></div>';return;}
+  document.getElementById('order-list').innerHTML=list.map(function(o){
+    var mm=Mediation.money(o);
+    var col=ST_COLOR[o.state]||'var(--text-2)';
+    return '<div class="od-card od-card-row" onclick="location.href=\'order-detail.html?id='+o.id+'\'">'+
+      '<div class="fb-between"><div class="fw-600 fs-13">'+o.svcName+'</div><span class="od-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">'+stTxt(o.state)+'</span></div>'+
+      '<div class="text-3 fs-11" style="margin-top:3px;">单号 '+o.id+' · 托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released)+'</div>'+
+      '<div class="fb-between" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">'+
+      '<span class="text-2 fs-12">佣金 '+fmt(o.fee)+'</span><span class="text-2 fs-12">待结算服务商 <b style="color:var(--success);">'+fmt(mm.escrowRemain)+'</b></span></div></div>';
+  }).join('');
+}
+window.renderOrders=renderOrders;
+renderOrders();
+if(params.get('mine')){setTimeout(function(){var el=document.getElementById('order-list');el&&el.scrollIntoView({behavior:'smooth'});},120);}
+window.addEventListener('engchain:mediation',renderOrders);
+})();
+</script>
+<style>
+/* ===== 服务商选择卡 ===== */
+.od-card{position:relative;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:16px;padding:13px;background:var(--bg-card);margin-bottom:8px;cursor:pointer;box-shadow:var(--shadow-xs);transition:all var(--d-fast);}
+.od-card:active{transform:scale(.985);}
+.od-card.on{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 6px 18px rgba(201,169,97,.16);}
+.od-radio{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;transition:all var(--d-fast);}
+.od-card.on .od-radio{border-color:var(--primary);background:linear-gradient(135deg,var(--primary),var(--primary-dim));}
+.od-radio svg{width:11px;height:11px;color:transparent;stroke-width:2.5;}
+.od-card.on .od-radio svg{color:var(--text-inv);}
+.od-av{position:relative;width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#2A313C,#161B23);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--primary-strong);flex:none;}
+.od-v{position:absolute;right:-4px;top:-4px;font-size:7px;font-weight:800;color:#2A1810;background:linear-gradient(135deg,#F0E2BE,#C9A961);border-radius:3.5px;padding:1px 3.5px;line-height:1.4;}
+.od-main{flex:1;min-width:0;}
+.od-name{font-size:13.5px;font-weight:700;color:var(--text-1);}
+.od-meta{font-size:10.5px;color:var(--text-3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.od-score{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--primary-dim);background:var(--bg-card);border:1px solid var(--accent-line);border-radius:99px;padding:3px 8px;}
+.od-score svg{width:10px;height:10px;fill:var(--primary);color:var(--primary);}
+.od-card.on .od-score{background:var(--bg-card);}
+
+/* ===== 金额快捷项 ===== */
+.opt{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.amt-opt{padding:7px 12px;border:1px solid var(--line);border-radius:10px;font-size:12px;cursor:pointer;background:var(--bg-card);transition:all var(--d-fast);}
+.amt-opt:active{transform:scale(.96);}
+.amt-opt.on{border-color:var(--primary);color:var(--primary-dim);background:var(--primary-soft);font-weight:600;box-shadow:0 2px 8px rgba(201,169,97,.15);}
+.amt-show{position:relative;overflow:hidden;margin-top:12px;border-radius:14px;padding:14px;text-align:center;background:radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.2) 0%, transparent 55%),linear-gradient(150deg,#252C35 0%,#151A22 46%,#0B0E13 100%);}
+.amt-shield{position:absolute;right:12px;top:12px;width:16px;height:16px;color:rgba(201,169,97,.8);}
+
+/* ===== 试算行 ===== */
+.cal-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;}
+.cal-row-last{border-top:1px dashed var(--line);margin-top:4px;padding-top:10px;}
+
+/* ===== 里程碑步骤条 ===== */
+.mile-steps{margin-top:4px;}
+.mile-row{position:relative;display:flex;align-items:center;gap:10px;padding:7px 0;padding-left:2px;}
+.mile-dot{width:22px;height:22px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--primary-dim);background:var(--primary-soft);border:1px solid var(--accent-line);position:relative;}
+.mile-row:not(:last-child) .mile-dot::after{content:"";position:absolute;left:50%;top:100%;width:1.5px;height:14px;background:var(--primary-soft);transform:translateX(-50%);}
+.mile-last{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);border:none;}
+
+/* ===== 吸底结算栏 ===== */
+.order-cta{position:absolute;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);}
+.oc-total{flex:none;display:flex;flex-direction:column;gap:2px;}
+.oc-label{font-size:10px;color:var(--text-3);}
+.oc-total b{font-size:19px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);}
+
+/* ===== 订单行 ===== */
+.od-card-row{display:block;box-shadow:var(--shadow-xs);}
+.od-card-row:active{transform:scale(.985);}
+.od-st{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:6px;border:1px solid;line-height:1.5;}
+</style>
+</body>
+</html>

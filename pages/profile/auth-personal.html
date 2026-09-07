@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>个人认证 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">个人认证</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll ap-scroll">
+    <!-- 说明头卡 -->
+    <div class="ap-banner">
+      <span class="ap-banner-ic"><svg class="ic"><use href="#i-user"/></svg></span>
+      <div>
+        <div class="fw-700 fs-15">实名认证<span id="update-badge" class="ap-update-badge" style="display:none;">更新认证</span></div>
+        <div class="text-3 fs-12" style="margin-top:2px;">免费 · 公安二要素 + 活体人脸比对，信息仅用于核验</div>
+      </div>
+    </div>
+
+    <!-- 表单态 -->
+    <div id="form-box">
+      <div class="ap-fill-bar"><button class="ap-fill-btn" onclick="fillExample()"><svg class="ic" style="width:15px;height:15px;flex:none;"><use href="#i-magic"/></svg>一键填充示例</button></div>
+      <div class="group-title">身份信息</div>
+      <div class="group ap-group">
+        <div class="ap-field">
+          <label>真实姓名</label>
+          <input id="in-name" class="ap-input" placeholder="请输入身份证上的姓名">
+        </div>
+        <div class="ap-field">
+          <label>身份证号</label>
+          <input id="in-id" class="ap-input mono" placeholder="请输入 18 位身份证号" maxlength="18">
+        </div>
+        <div class="ap-field">
+          <label>手机号码</label>
+          <input id="in-mobile" class="ap-input mono" type="tel" placeholder="用于接收核验结果通知" maxlength="11">
+        </div>
+      </div>
+
+      <div class="group-title">上传身份证</div>
+      <div class="ap-idcards">
+        <div class="ap-up" id="up-front" onclick="mockUpload('front')">
+          <div class="ap-up-ic"><svg class="ic"><use href="#i-form"/></svg></div>
+          <div class="ap-up-t1">身份证人像面</div>
+          <div class="ap-up-t2">点击拍照 / 上传</div>
+        </div>
+        <div class="ap-up" id="up-back" onclick="mockUpload('back')">
+          <div class="ap-up-ic"><svg class="ic"><use href="#i-folder"/></svg></div>
+          <div class="ap-up-t1">身份证国徽面</div>
+          <div class="ap-up-t2">点击拍照 / 上传</div>
+        </div>
+      </div>
+
+      <div class="group-title">人脸识别</div>
+      <div class="card ap-face-card">
+        <div class="ap-face-ic"><svg class="ic"><use href="#i-user"/></svg></div>
+        <div class="fw-600 fs-14">活体人脸比对</div>
+        <div class="text-3 fs-12" style="margin:4px 0 12px;line-height:1.6;">提交后启动活体检测：请正对屏幕、免冠、保证光线充足，约 3 秒完成。</div>
+        <button class="btn btn-primary btn-block btn-lg" id="submit-btn" onclick="beforeFace()">免费提交并人脸核验</button>
+      </div>
+      <div class="ap-tip"><svg class="ic" style="width:13px;height:13px;flex:none;margin-top:2px;"><use href="#i-shield"/></svg>实名认证为开通全部业务的基础，认证信息加密存储，不对外展示。</div>
+    </div>
+
+    <!-- 已认证态 -->
+    <div id="done-box" style="display:none;">
+      <div class="ap-done">
+        <span class="ap-done-ic"><svg class="ic"><use href="#i-check"/></svg></span>
+        <div>
+          <div class="fw-700 fs-15">已完成实名认证</div>
+          <div class="text-3 fs-12" style="margin-top:2px;">身份信息已通过平台核验，长期有效</div>
+        </div>
+      </div>
+      <div class="group ap-group">
+        <div class="ap-field ap-field-ro"><label>真实姓名</label><b id="d-name" class="fs-14">—</b></div>
+        <div class="ap-field ap-field-ro"><label>身份证号</label><b id="d-id" class="fs-14 mono">—</b></div>
+        <div class="ap-field ap-field-ro"><label>手机号码</label><b id="d-mobile" class="fs-14 mono">—</b></div>
+        <div class="ap-field ap-field-ro"><label>核验方式</label><b class="fs-13 text-2">二要素 + 活体人脸（自动）</b></div>
+        <div class="ap-field ap-field-ro" style="border:none;"><label>认证时间</label><b id="d-ts" class="fs-13 text-2">—</b></div>
+      </div>
+      <div class="card ap-face-card">
+        <div class="fw-600 fs-14" style="margin-bottom:6px;">人脸信息</div>
+        <div class="text-3 fs-12" style="margin-bottom:12px;">已采集活体人脸并与公安照片比对成功。如身份信息或容貌发生变化，可更新认证。</div>
+        <button class="btn btn-ghost btn-block" onclick="askUpdate()">更新个人认证</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 人脸活体检测浮层 -->
+  <div class="ap-mask" id="face-mask">
+    <div class="ap-face-box">
+      <div class="ap-oval"><span class="ap-scan"></span>
+        <svg class="ic ap-face-lg"><use href="#i-user"/></svg>
+      </div>
+      <div class="fw-700 fs-16" id="face-step">正在启动摄像头…</div>
+      <div class="text-3 fs-12" id="face-sub">请将面部置于圆圈内</div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var a=AuthStore.read(), st=UI.state.get();
+var uploaded={front:false,back:false};
+function fmtTs(t){if(!t)return '—';var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function maskMobile(m){return m?m.replace(/^(\d{3})\d{4}(\d{4})$/,'$1****$2'):'—';}
+
+if(a.realname.ok){showDone();}
+function showDone(){
+  document.getElementById('form-box').style.display='none';
+  document.getElementById('done-box').style.display='block';
+  document.getElementById('d-name').textContent=a.realname.name||st.user||'—';
+  document.getElementById('d-id').textContent=a.realname.idMask||'5101**********1234';
+  document.getElementById('d-mobile').textContent=maskMobile(a.realname.mobile);
+  document.getElementById('d-ts').textContent=fmtTs(a.realname.ts);
+}
+/* 更新个人认证：弹窗提醒 → 确认后预填并进入表单态 */
+window.askUpdate=function(){
+  UI.dialog({
+    title:'更新个人认证',
+    text:'本认证需通过手机号、身份证号、实名三要素验证，如重新认证不满足上述条件，则无需重新认证。',
+    ok:'我知道了，继续更新',
+    cancel:'取消',
+    onOk:function(){enterUpdate();}
+  });
+};
+function enterUpdate(){
+  a=AuthStore.read();
+  var r=a.realname||{};
+  document.getElementById('in-name').value=r.name||'';
+  document.getElementById('in-id').value=r.idNo||'';
+  document.getElementById('in-mobile').value=r.mobile||'';
+  uploaded={front:false,back:false};
+  document.getElementById('done-box').style.display='none';
+  document.getElementById('form-box').style.display='block';
+  document.getElementById('update-badge').style.display='inline-flex';
+  if(window.scrollTo)window.scrollTo(0,0);
+}
+
+/* 身份证 18 位校验位核验（GB11643-1999） */
+function validId(id){
+  if(!/^\d{17}[\dXx]$/.test(id))return false;
+  var w=[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2],c=['1','0','X','9','8','7','6','5','4','3','2'],s=0;
+  for(var i=0;i<17;i++)s+=parseInt(id[i],10)*w[i];
+  return c[s%11]===id[17].toUpperCase();
+}
+var _upInitial={front:'<div class="ap-up-ic"><svg class="ic"><use href="#i-form"/></svg></div><div class="ap-up-t1">身份证人像面</div><div class="ap-up-t2">点击拍照 / 上传</div>',back:'<div class="ap-up-ic"><svg class="ic"><use href="#i-folder"/></svg></div><div class="ap-up-t1">身份证国徽面</div><div class="ap-up-t2">点击拍照 / 上传</div>'};
+window.mockUpload=function(side){
+  var box=document.getElementById('up-'+side);
+  if(box.classList.contains('up-loading'))return;
+  box.classList.add('up-loading');
+  box.innerHTML='<div class="up-loading"><svg class="up-spinner" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-opacity=".25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>上传中...</span></div>';
+  setTimeout(function(){
+    uploaded[side]=true;
+    box.classList.remove('up-loading');
+    box.classList.add('on');
+    var img=side==='front'?'../../assets/mock-certs/id-front.jpg':'../../assets/mock-certs/id-back.jpg';
+    var label=side==='front'?'人像面':'国徽面';
+    box.innerHTML='<img src="'+img+'" class="up-preview" alt="身份证'+label+'"><button class="up-reupload" onclick="event.stopPropagation();resetUpload(\''+side+'\')">重新上传</button>';
+  },800);
+};
+window.resetUpload=function(side){
+  uploaded[side]=false;
+  var box=document.getElementById('up-'+side);
+  box.classList.remove('on');
+  box.innerHTML=_upInitial[side];
+};
+window.fillExample=function(){
+  var d=window.mockFormData&&window.mockFormData.realname;
+  if(!d){UI.toast('示例数据未加载','warn');return;}
+  document.getElementById('in-name').value=d.name||'';
+  document.getElementById('in-id').value=d.idNo||'';
+  document.getElementById('in-mobile').value=d.mobile||'';
+  UI.toast('已填充示例信息，请核对后提交','ok');
+};
+
+window.beforeFace=function(){
+  var name=document.getElementById('in-name').value.trim();
+  var id=document.getElementById('in-id').value.trim();
+  var mobile=document.getElementById('in-mobile').value.trim();
+  if(!/^[\u4e00-\u9fa5·]{2,16}$/.test(name)){UI.toast('请输入正确的中文姓名','warn');return;}
+  if(!validId(id)){UI.toast('身份证号格式或校验位有误','warn');return;}
+  if(!/^1[3-9]\d{9}$/.test(mobile)){UI.toast('请输入正确的 11 位手机号','warn');return;}
+  if(!uploaded.front||!uploaded.back){UI.toast('请先上传身份证正反面','warn');return;}
+  runFace(function(){submitReal(name,id,mobile);});
+};
+
+/* 活体检测动效：三步文案 + 扫描线 */
+function runFace(done){
+  var mask=document.getElementById('face-mask');
+  var step=document.getElementById('face-step'),sub=document.getElementById('face-sub');
+  mask.classList.add('show');
+  var seq=[
+    ['正在活体检测…','请保持面部正对屏幕'],
+    ['眨眼 / 微微转头','检测真实人脸'],
+    ['比对公安照片…','二要素核验中'],
+    ['核验通过','即将完成']
+  ];var i=0;
+  step.textContent=seq[0][0];sub.textContent=seq[0][1];
+  var timer=setInterval(function(){
+    i++;if(i>=seq.length){clearInterval(timer);
+      setTimeout(function(){mask.classList.remove('show');done&&done();},450);return;}
+    step.textContent=seq[i][0];sub.textContent=seq[i][1];
+  },620);
+}
+
+window.submitReal=function(name,id,mobile){
+  var r=DataBus.authApply('realname',{name:name,idNo:id,mobile:mobile});
+  if(r&&r.error){UI.toast(r.error,'warn');return;}
+  /* 实名认证积分奖励（claim 防重） */
+  try{var cfg=(MOCK.business.credits&&MOCK.business.credits.rewards)||{};CreditStore.claim('realname',cfg.realname||100,'实名认证奖励');}catch(e){}
+  UI.toast('实名认证成功 · 免费','ok');
+  setTimeout(function(){location.href='auth-result.html?type=realname&state=success';},850);
+};
+/* 跨 tab 自动重渲染：认证状态变更后自动刷新 */
+function renderAuthPersonal() {
+  try {
+    a = AuthStore.read();
+    if (a.realname.ok) showDone();
+  } catch (e) { console.warn('renderAuthPersonal failed:', e); }
+}
+var _apRerender = null;
+function _apRefresh() { if (_apRerender) clearTimeout(_apRerender); _apRerender = setTimeout(renderAuthPersonal, 100); }
+window.addEventListener('storage', function (e) { if (e.key === 'engchain-auth') _apRefresh(); });
+window.addEventListener('engchain:auth', _apRefresh);
+window.addEventListener('engchain:store-change', function (e) { if (e && e.detail && e.detail.key === 'engchain-auth') _apRefresh(); });
+})();
+</script>
+<style>
+.ap-scroll{padding-top:12px;padding-bottom:28px;}
+.group-title{padding:0 4px 7px;font-size:12px;color:var(--text-3);letter-spacing:.05em;}
+.ap-banner{display:flex;align-items:center;gap:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow-xs);}
+.ap-banner-ic{width:42px;height:42px;border-radius:12px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;flex:none;}
+.ap-banner-ic .ic{width:21px;height:21px;}
+.ap-group{padding:2px 14px;margin-bottom:14px;}
+.ap-field{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);}
+.ap-field:last-child{border-bottom:none;}
+.ap-field label{flex:none;width:64px;font-size:13px;color:var(--text-2);}
+.ap-input{flex:1;min-width:0;border:none;outline:none;background:transparent;text-align:right;font-size:14px;color:var(--text-1);}
+.ap-input::placeholder{color:var(--text-3);}
+.ap-field-ro b{flex:1;text-align:right;font-weight:600;min-width:0;}
+.ap-idcards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+.ap-up{border:1.5px dashed var(--line);border-radius:14px;background:var(--bg-card);padding:18px 8px;text-align:center;cursor:pointer;transition:all var(--d-fast);}
+.ap-up:active{transform:scale(.97);}
+.ap-up.on{border-style:solid;border-color:var(--primary);background:var(--primary-soft);}
+.ap-up-ic{width:36px;height:36px;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;}
+.ap-up-ic .ic{width:18px;height:18px;}
+.ap-up-ic.ok{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);}
+.ap-up-t1{font-size:13px;font-weight:600;}
+.ap-up-t2{font-size:11px;color:var(--text-3);margin-top:2px;}
+.ap-face-card{text-align:center;padding:18px 16px;margin-bottom:12px;}
+.ap-face-ic{width:52px;height:52px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
+.ap-face-ic .ic{width:25px;height:25px;}
+.ap-tip{display:flex;gap:6px;font-size:11.5px;color:var(--text-3);line-height:1.7;padding:0 6px;}
+.ap-done{display:flex;align-items:center;gap:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:var(--shadow-xs);}
+.ap-done-ic{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 4px 12px rgba(201,169,97,.3);}
+.ap-done-ic .ic{width:21px;height:21px;}
+.ap-update-badge{display:inline-flex;align-items:center;margin-left:8px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--primary);background:var(--primary-soft);border:1px solid rgba(201,169,97,.4);vertical-align:middle;line-height:1.4;}
+/* 人脸浮层 */
+.ap-mask{position:absolute;inset:0;z-index:100;background:rgba(11,14,19,.92);display:none;align-items:center;justify-content:center;flex-direction:column;}
+.ap-mask.show{display:flex;}
+.ap-face-box{text-align:center;color:#fff;}
+.ap-oval{position:relative;width:168px;height:168px;border-radius:50%;border:2px solid rgba(201,169,97,.6);margin:0 auto 26px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(255,255,255,.04);}
+.ap-face-lg{width:72px;height:72px;color:rgba(255,255,255,.35);}
+.ap-scan{position:absolute;left:8px;right:8px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--primary),transparent);box-shadow:0 0 12px rgba(238,214,151,.8);animation:ap-scan 1.4s ease-in-out infinite;}
+@keyframes ap-scan{0%,100%{top:14px;}50%{top:148px;}}
+.ap-up{position:relative;overflow:hidden;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ap-up .up-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
+.ap-up .up-reupload{position:absolute;top:6px;right:6px;padding:4px 10px;border-radius:20px;border:none;background:rgba(0,0,0,.55);color:#fff;font-size:11px;cursor:pointer;z-index:2;min-height:24px;line-height:1;}
+.up-loading{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text-3);}
+.up-spinner{width:28px;height:28px;animation:up-spin .8s linear infinite;color:var(--primary);}
+@keyframes up-spin{to{transform:rotate(360deg);}}
+.ap-fill-bar{padding:0 4px 12px;}
+.ap-fill-btn{width:100%;height:42px;border-radius:12px;border:1.5px solid rgba(201,169,97,.5);background:rgba(201,169,97,.06);color:var(--primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all var(--d-fast);}
+.ap-fill-btn:active{background:rgba(201,169,97,.12);transform:scale(.98);}
+#face-step{font-size:17px;margin-bottom:6px;}
+#face-sub{font-size:12.5px;color:rgba(255,255,255,.6);}
+</style>
+</body>
+</html>

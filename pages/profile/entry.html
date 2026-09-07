@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业入驻 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">企业入驻</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll et-scroll">
+    <!-- 审核中横幅 -->
+    <div class="et-rvbar" id="rv-bar" style="display:none;">
+      <span class="et-rv-dot"></span>
+      <div style="flex:1;min-width:0;">
+        <div class="fw-600 fs-13" id="rv-title">入驻申请审核中</div>
+        <div class="text-3 fs-11" id="rv-sub">预计 24 小时内完成审核</div>
+      </div>
+      <button class="et-rv-go" onclick="location.href='entry-review.html'">查看进度 ›</button>
+    </div>
+
+    <!-- 资格门控横幅 -->
+    <div class="et-gate" id="gate-bar" style="display:none;">
+      <svg class="ic" style="width:18px;height:18px;flex:none;"><use href="#i-lock"/></svg>
+      <div style="flex:1;min-width:0;font-size:12px;line-height:1.6;" id="gate-txt"></div>
+      <button class="et-rv-go" id="gate-btn">去认证</button>
+    </div>
+
+    <div class="et-head">
+      <div class="fw-700 fs-16">选择企业类型</div>
+      <div class="text-3 fs-11" id="mode-tag">入驻费按次收取 · 认证费按年收取</div>
+    </div>
+
+    <div id="entry-list"></div>
+
+    <div class="et-note">
+      <svg class="ic" style="width:14px;height:14px;flex:none;margin-top:2px;color:var(--primary);"><use href="#i-shield"/></svg>
+      <span>建筑企业与中介服务企业两类互斥，不可同时入驻；合伙人企业可与上述任一类型并行。入驻费按次收取，合伙人采用后台人工审核制，不涉及线上入驻费。</span>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var entry=MOCK.business.entryTypes;
+var breakin=ModeStore.isBreakIn();
+var descs={construction:'承接工程项目供需 · 招标报价 · 蓝V 标识',agency:'提供中介服务 · 线上订单 · 佣金通道',partner:'深度共建 · 完整分销 · 后台审核'};
+var feats={
+  construction:['供需发布不限','招标报价权限','基础分销（一级）','无佣金通道'],
+  agency:['服务橱窗展示','线上订单 + 佣金通道','分销受限','履约保证金机制'],
+  partner:['专属合伙人标识','完整二级分销','优先撮合与运营支持','后台人工审核入驻']
+};
+var names={construction:'建筑企业',agency:'中介服务企业',partner:'合伙人企业'};
+function money(n){return '¥'+Number(n).toLocaleString();}
+function breakinFee(id){var bi=MOCK.business.breakin.entry;return id==='construction'?bi.construction:(id==='agency'?bi.agency:entry[id].fee);}
+
+function render(){
+  var a=AuthStore.read(),e=EntryStore.read(),idy=deriveIdentity();
+  var activeTypes=(e.types&&e.types.length)?e.types:(e.type?[e.type]:[]);
+  var reviewing=['pending','first_ok'].indexOf(e.status)>=0;
+  var qualified=(idy.enterprise==='verified'||idy.personal==='professional');
+
+  /* 审核中横幅 */
+  if(reviewing){var bar=document.getElementById('rv-bar');bar.style.display='flex';
+    document.getElementById('rv-title').textContent=names[e.type]+'入驻申请审核中';
+    document.getElementById('rv-sub').textContent=e.status==='first_ok'?'初审已通过 · 等待终审':'资料已提交 · 等待平台初审';
+  }
+  /* 门控 */
+  if(!qualified){var g=document.getElementById('gate-bar');g.style.display='flex';
+    document.getElementById('gate-txt').innerHTML='入驻需先完成 <b>企业工商认证</b> 或 <b>个人专业资质</b>，当前身份：'+({guest:'游客',registered:'注册会员',realname:'个人认证'}[idy.primary]||'已认证');
+    document.getElementById('gate-btn').onclick=function(){location.href=idy.personal==='verified'?'auth-qualification.html':'auth-personal.html';};
+  }
+
+  var box=document.getElementById('entry-list');
+  box.innerHTML=['construction','agency','partner'].map(function(id,i){
+    var t=entry[id],fee=breakin?breakinFee(id):t.fee;
+    var active=activeTypes.indexOf(id)>=0&&e.active;
+    var pending=reviewing&&e.type===id;
+    var opp=id==='partner'?null:(id==='construction'?'agency':'construction');
+    var locked=!qualified;
+    var exclusive=!active&&!pending&&activeTypes.indexOf(opp)>=0&&e.active;
+    var discount=(breakin&&id==='construction'&&t.fee!==fee)?'破冰期 · 限免':(breakin&&id==='agency'&&t.fee!==fee?'破冰期 5 折':'');
+    var stateHtml='';
+    if(active)stateHtml='<span class="et-badge et-badge-on">✓ 已入驻</span>';
+    else if(pending)stateHtml='<span class="et-badge et-badge-rv"><i></i>审核中</span>';
+    else stateHtml='<span class="tag tag-primary et-vbadge">'+t.badge+'</span>';
+    var cta;
+    if(active)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\'entry-result.html\'">查看</button>';
+    else if(pending)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\'entry-review.html\'">审核进度</button>';
+    else if(exclusive)cta='<button class="btn btn-ghost et-btn" disabled>类型互斥</button>';
+    else if(locked)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\''+(idy.personal==='verified'?'auth-qualification.html':'auth-personal.html')+'\'">先去认证</button>';
+    else cta='<button class="btn '+(id==='partner'?'btn-ghost':'btn-primary')+' et-btn" onclick="location.href=\'entry-form.html?type='+id+'\'">'+(id==='partner'?'申请入驻':'去入驻')+'</button>';
+    return '<div class="et-card '+(active||pending?'is-on':'')+'" style="animation-delay:'+(i*70)+'ms">'+
+      '<div class="et-rail et-rail-'+id+'"></div>'+
+      '<div class="fb-between" style="margin-bottom:6px;"><div class="fw-700 fs-15">'+t.label+'</div>'+stateHtml+'</div>'+
+      '<div class="text-3 fs-12" style="margin-bottom:10px;line-height:1.6;">'+descs[id]+(exclusive?'<br><span style="color:var(--danger);">与已入驻的'+names[opp]+'互斥，不可重复入驻</span>':'')+'</div>'+
+      '<div class="et-feats">'+feats[id].map(function(f){return '<span class="et-chip"><i>✓</i>'+f+'</span>';}).join('')+'</div>'+
+      '<div class="fb-between" style="align-items:flex-end;margin-top:11px;">'+
+        '<div><div style="font-size:11px;color:var(--text-3);">入驻费 · 按次</div>'+
+        '<div class="fw-700 et-fee">'+(fee===0?'<span class="green">¥0 · 免费</span>':money(fee))+'</div>'+
+        (discount?'<div style="font-size:10px;color:var(--warning);">'+discount+'</div>':'')+'</div>'+cta+
+      '</div></div>';
+  }).join('');
+}
+render();
+window.addEventListener('storage',function(ev){if(['engchain-users','engchain-entry','engchain-auth','engchain-mode'].indexOf(ev.key)>=0)render();});
+window.addEventListener('engchain:entry',render);
+window.addEventListener('engchain:auth',render);
+window.addEventListener('engchain:mode',render);
+window.addEventListener('engchain:store-change',render);
+})();
+</script>
+<style>
+.et-scroll{padding-top:12px;padding-bottom:28px;}
+.et-head{padding:2px 4px 10px;}
+.et-head .text-3{margin-top:3px;}
+.et-rvbar,.et-gate{display:flex;align-items:center;gap:10px;border-radius:14px;padding:11px 13px;margin-bottom:12px;}
+.et-rvbar{background:rgba(214,158,46,.09);border:1px solid rgba(214,158,46,.28);}
+.et-rv-dot{width:8px;height:8px;border-radius:50%;background:var(--warning);flex:none;animation:et-pulse 1.3s infinite;}
+@keyframes et-pulse{0%{box-shadow:0 0 0 0 rgba(214,158,46,.4);}70%{box-shadow:0 0 0 6px rgba(214,158,46,0);}100%{box-shadow:0 0 0 0 rgba(214,158,46,0);}}
+.et-gate{background:var(--bg-card);border:1px solid var(--line);}
+.et-rv-go{flex:none;border:none;background:var(--primary-soft);color:var(--primary);font-size:12px;font-weight:600;border-radius:999px;padding:6px 12px;}
+.et-card{position:relative;overflow:hidden;margin-bottom:12px;padding:14px 14px 13px 17px;opacity:0;animation:et-in .5s var(--e-out) forwards;}
+@keyframes et-in{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+.et-rail{position:absolute;left:0;top:0;bottom:0;width:4px;}
+.et-rail-construction{background:linear-gradient(180deg,#5B8DEF,#3b6fe0);}
+.et-rail-agency{background:linear-gradient(180deg,#E1C178,var(--primary));}
+.et-rail-partner{background:linear-gradient(180deg,#8E7CC3,#6B5B95);}
+.et-card.is-on{border-color:rgba(201,169,97,.45);}
+.et-vbadge{font-size:10.5px;}
+.et-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+.et-badge-on{color:var(--primary);background:var(--primary-soft);}
+.et-badge-rv{color:var(--warning);background:rgba(214,158,46,.1);display:inline-flex;align-items:center;gap:4px;}
+.et-badge-rv i{width:6px;height:6px;border-radius:50%;background:var(--warning);animation:et-pulse 1.3s infinite;}
+.et-feats{display:flex;flex-wrap:wrap;gap:6px;}
+.et-chip{font-size:11px;color:var(--text-2);background:var(--bg-card-2);border-radius:8px;padding:4px 8px;display:inline-flex;align-items:center;gap:4px;}
+.et-chip i{color:var(--primary);font-style:normal;font-size:10px;}
+.et-fee{font-size:18px;color:var(--primary);margin-top:1px;}
+.et-btn{min-width:92px;padding-left:14px;padding-right:14px;}
+.et-note{display:flex;gap:7px;font-size:11.5px;color:var(--text-3);line-height:1.75;padding:2px 4px;}
+</style>
+</body>
+</html>

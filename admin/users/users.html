@@ -1,0 +1,315 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>用户管理 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="users/users.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>用户管理</h1>
+        <div class="sub">用户与认证中心 · 全量用户表（六级身份 × 三类入驻）· 认证链五格 · 封禁 / 解锁 / 详情</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">用户列表</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var STATUS_LABEL = { resident: '企业入驻', enterprise: '企业认证', pro: '个人专业入驻', realname: '个人认证', registered: '注册会员', guest: '游客', banned: '已封禁' };
+  var ENTRY_LABEL = { construction: '建筑企业', agency: '中介服务企业', partner: '合伙人企业' };
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { status: '', entry: '', date_start: '', date_end: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); } catch (e) { return '-'; }
+  }
+
+  function users() { return (window.DataBus && DataBus.users) ? DataBus.users() : []; }
+  function stOf(u) { return (window.DataBus && DataBus.statusOf) ? DataBus.statusOf(u) : (u.status || 'registered'); }
+  function tagOf(u) { return (window.DataBus && DataBus.tagOf) ? DataBus.tagOf(u) : (u.tag || ''); }
+
+  function orderCount(id) {
+    var n = 0;
+    try { if (window.DataBus && DataBus.orders) DataBus.orders().forEach(function (o) { if (o.owner === id) n++; }); } catch (e) {}
+    return n;
+  }
+
+  function filteredList() {
+    return users().filter(function (u) {
+      if (filters.status && stOf(u) !== filters.status) return false;
+      if (filters.entry) {
+        var t = (u.entry && u.entry.type) || 'none';
+        if (t !== filters.entry) return false;
+      }
+      if (filters.date_start && u.createdAt && u.createdAt < new Date(filters.date_start).getTime()) return false;
+      if (filters.date_end && u.createdAt && u.createdAt > new Date(filters.date_end).getTime() + 86400000) return false;
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        if ((u.name + u.company + u.account + u.id).toLowerCase().indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKPI() {
+    var all = users();
+    var c = { resident: 0, enterprise: 0, realname: 0, banned: 0 };
+    all.forEach(function (u) {
+      var s = stOf(u);
+      if (s === 'resident') c.resident++;
+      if (s === 'enterprise') c.enterprise++;
+      if (s === 'realname' || s === 'pro') c.realname++;
+      if (u.banned) c.banned++;
+    });
+    var cards = [
+      ['总用户', Math.max(0, all.length - 1), 'up', '游客不计入'],
+      ['入驻企业', c.resident, 'gold', 'resident 身份'],
+      ['认证用户', c.realname, 'info', '实名/专业认证'],
+      ['封禁用户', c.banned, 'warn', '违规处置']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'warn' ? 'warn' : k[2] === 'info' ? 'down' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'status', label: '用户状态', type: 'select', options: [
+          { value: 'resident', label: '入驻企业' },
+          { value: 'enterprise', label: '认证企业' },
+          { value: 'pro', label: '专业认证' },
+          { value: 'realname', label: '个人认证' },
+          { value: 'registered', label: '注册会员' },
+          { value: 'guest', label: '游客' },
+          { value: 'banned', label: '已封禁' }
+        ]},
+        { key: 'entry', label: '入驻类型', type: 'select', options: [
+          { value: 'construction', label: '建筑企业' },
+          { value: 'agency', label: '中介服务企业' },
+          { value: 'partner', label: '合伙人企业' },
+          { value: 'none', label: '未入驻' }
+        ]},
+        { key: 'date', label: '注册时间', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '姓名 / 公司 / 账号 / ID' }
+      ],
+      onFilter: function (vals) {
+        filters.status = vals.status || ''; filters.entry = vals.entry || '';
+        filters.date_start = vals.date_start || ''; filters.date_end = vals.date_end || '';
+        filters.keyword = vals.keyword || ''; page = 1; renderTable();
+        Admin.toast('查询完成，共 ' + filteredList().length + ' 个用户');
+      },
+      onReset: function () {
+        filters = { status: '', entry: '', date_start: '', date_end: '', keyword: '' };
+        page = 1; renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function stBadge(u) {
+    var s = stOf(u);
+    var m = { resident: ['badge-gold', '企业入驻'], enterprise: ['badge-primary', '企业认证'], pro: ['badge-info', '个人专业入驻'], realname: ['badge-success', '个人认证'], registered: ['badge-secondary', '注册会员'], guest: ['badge-outline', '游客'], banned: ['badge-danger', '已封禁'] };
+    var v = m[s] || ['badge-outline', s];
+    return '<span class="badge ' + v[0] + '">' + v[1] + '</span>';
+  }
+
+  function entryBadge(u) {
+    var e = u.entry || {};
+    if (!e.type) return '<span class="badge badge-outline">未入驻</span>';
+    if (e.status === 'active') return '<span class="badge badge-gold">' + (ENTRY_LABEL[e.type] || e.type) + ' · 已入驻</span>';
+    if (e.status === 'pending') return '<span class="badge badge-warning">' + (ENTRY_LABEL[e.type] || e.type) + ' · 待审</span>';
+    if (e.status === 'first_ok') return '<span class="badge badge-info">' + (ENTRY_LABEL[e.type] || e.type) + ' · 待终审</span>';
+    if (e.status === 'rejected') return '<span class="badge badge-danger">' + (ENTRY_LABEL[e.type] || e.type) + ' · 已驳回</span>';
+    return '<span class="badge badge-outline">' + (ENTRY_LABEL[e.type] || e.type) + '</span>';
+  }
+
+  function renderTable() {
+    var list = filteredList();
+    $('#count').textContent = '筛选 ' + list.length + ' / 共 ' + users().length + ' 个账号';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'id', label: '用户ID', width: '70px', render: function (row) { return '<span class="tx-mono tx-muted-sm">' + esc(row.id) + '</span>'; } },
+        { key: 'name', label: '姓名 / 企业', width: '180px', render: function (row) {
+          return '<div><div class="tx-semibold">' + esc(row.name) + '</div>' +
+            '<div class="tx-muted-xs">' + esc(row.company || row.account || '-') + '</div></div>';
+        }},
+        { key: 'tags', label: '身份标签', width: '160px', render: function (row) { return stBadge(row) + ' ' + entryBadge(row); } },
+        { key: 'status', label: '状态', width: '90px', render: function (row) {
+          return row.banned ? '<span class="badge badge-danger">已封禁</span>' : '<span class="badge badge-success">正常</span>';
+        }},
+        { key: 'createdAt', label: '注册时间', width: '140px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.createdAt || Date.now()) + '</span>'; } },
+        { key: 'ops', label: '操作', width: '160px', render: function (row) {
+          var ops = '<button class="btn btn-sm btn-outline" data-act="detail" data-id="' + row.id + '">详情</button>';
+          if (row.status !== 'guest') {
+            ops += row.banned
+              ? '<button class="btn btn-sm btn-primary" data-perm="ban" data-act="ban" data-id="' + row.id + '">解锁</button>'
+              : '<button class="btn btn-sm btn-ghost" data-perm="ban" data-act="ban" data-id="' + row.id + '">封禁</button>';
+          }
+          return ops;
+        }}
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '无匹配用户'
+      }
+    });
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap', total: list.length, pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else { paginator.setTotal(list.length); }
+  }
+
+  function chainHtml(u) {
+    var a = u.auth || {};
+    function cell(k, v, ok) { return '<div class="cg ' + (ok ? 'ok' : 'no') + '"><div class="ck">' + k + '</div><div class="cv">' + (ok ? '✓ ' + v : '待认证') + '</div></div>'; }
+    return '<div class="chain-grid">' +
+      cell('登录', '已注册', true) +
+      cell('实名', '已认证', !!(a.realname && a.realname.ok)) +
+      cell('企业', '已认证', !!(a.enterprise && a.enterprise.ok)) +
+      cell('资质', '已认证', !!((a.personalQual && a.personalQual.ok) || (a.qual && a.qual.ok))) +
+      cell('资金', '已核验', !!(a.payment && a.payment.ok)) +
+    '</div>';
+  }
+
+  function openDetail(u) {
+    var e = u.entry || {};
+    var qualList = (u.auth && u.auth.qual && u.auth.qual.list && u.auth.qual.list.length) ? u.auth.qual.list.join('、') : '—';
+    var depositTxt = e.active ? (money(e.depositPaid) + '（' + (e.depositType || 'basic') + '档）') : '—';
+    var body = '<div class="profile-head">' +
+      '<span class="u-av av-lg">' + esc(u.avatar || u.name.charAt(0)) + '</span>' +
+      '<div><div class="tx-title">' + esc(u.name) + stBadge(u) + '</div>' +
+      '<div class="tx-sub">' + esc(u.account) + (u.company ? ' · ' + esc(u.company) : '') + '</div></div></div>' +
+
+      '<div class="tx-label-sm">认证链（登录 / 实名 / 企业 / 资质 / 资金）</div>' +
+      chainHtml(u) +
+
+      '<div class="sec-title">账户信息</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">钱包余额</div><div class="v">' + money(u.balance && u.balance.balance) + '</div></div>' +
+      '<div class="dg"><div class="k">冻结金额</div><div class="v">' + money(u.balance && u.balance.frozen) + '</div></div>' +
+      '<div class="dg"><div class="k">累计入账</div><div class="v">' + money(u.balance && u.balance.totalIn) + '</div></div>' +
+      '<div class="dg"><div class="k">积分余额</div><div class="v">' + (u.credits ? u.credits.balance : 0) + '</div></div>' +
+      '<div class="dg"><div class="k">订单数</div><div class="v">' + orderCount(u.id) + ' 笔</div></div>' +
+      '<div class="dg"><div class="k">注册时间</div><div class="v">' + fmtTime(u.createdAt || Date.now()) + '</div></div>' +
+      '</div>' +
+
+      '<div class="sec-title">入驻信息</div>' +
+      '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">入驻状态</div><div class="v">' + (e.active ? '已入驻' : e.status || '未入驻') + '</div></div>' +
+      (e.active ? '<div class="dg"><div class="k">入驻类型</div><div class="v">' + (ENTRY_LABEL[e.type] || e.type) + '</div></div>' : '') +
+      (e.active ? '<div class="dg"><div class="k">保证金</div><div class="v">' + depositTxt + '</div></div>' : '') +
+      (e.active ? '<div class="dg"><div class="k">入驻到期</div><div class="v">' + fmtTime(e.expireAt) + '</div></div>' : '') +
+      '<div class="dg"><div class="k">资质清单</div><div class="v tx-regular">' + esc(qualList) + '</div></div>' +
+      '</div>';
+
+    var footer = '';
+    if (u.status !== 'guest') {
+      footer = u.banned
+        ? '<button class="btn btn-primary" data-perm="ban" id="d-ban">解除封禁</button>'
+        : '<button class="btn btn-ghost" data-perm="ban" id="d-ban">封禁账号</button>';
+    }
+    var drawer = Admin.Drawer.open({ title: '用户详情 · ' + u.name, content: body, footer: footer, width: '560px' });
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+    if (footer) {
+      var fb = drawer.panel.querySelector('.drawer-footer');
+      if (fb) {
+        var banBtn = fb.querySelector('#d-ban');
+        if (banBtn) banBtn.onclick = function () { drawer.close(); doBan(u); };
+      }
+    }
+  }
+
+  function doBan(u) {
+    var banned = !u.banned;
+    Admin.confirm({
+      title: (banned ? '封禁账号 · ' : '解除封禁 · ') + u.name,
+      body: banned ? '封禁后该账号无法正常使用平台服务（用户表标记 banned + 身份态变为「已封禁」）。' : '解除封禁后账号恢复正常身份。',
+      ok: banned ? '确认封禁' : '确认解锁', danger: !!banned,
+      onYes: function () {
+        var r = DataBus.toggleBan(u.id);
+        if (!r) { Admin.toast('操作失败'); return; }
+        Admin.toast((banned ? '已封禁：' : '已解锁：') + u.name);
+        renderKPI(); renderTable();
+      }
+    });
+  }
+
+  function doExport() {
+    var list = filteredList();
+    var rows = list.map(function (u) {
+      return [u.id, u.name || '', u.company || '', u.account || '', STATUS_LABEL[stOf(u)] || stOf(u),
+        (u.entry && u.entry.type) ? ENTRY_LABEL[u.entry.type] : '未入驻',
+        u.banned ? '已封禁' : '正常', fmtTime(u.createdAt || '')];
+    });
+    var ok = Admin.exportCSV('用户管理.csv', ['ID', '姓名', '公司', '账号', '身份状态', '入驻类型', '账号状态', '注册时间'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '用户管理', '', '用户管理.csv · ' + rows.length + ' 条');
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      var id = b.getAttribute('data-id');
+      var u = null;
+      users().forEach(function (x) { if (x.id === id) u = x; });
+      if (!u) return;
+      if (b.getAttribute('data-act') === 'detail') { openDetail(u); return; }
+      if (b.getAttribute('data-act') === 'ban') { doBan(u); }
+    });
+    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); });
+    window.addEventListener('engchain:entry', function () { renderKPI(); renderTable(); });
+  }
+
+  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

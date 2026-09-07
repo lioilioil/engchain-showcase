@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/monitor/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业监控 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+.co-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
+.co-row:last-child{border-bottom:none;}
+.dim{font-size:10px;color:var(--text-3);}
+.feed-item{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);}
+.feed-dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">企业监控</div>
+    <div class="nav-right"><span class="tag tag-primary" id="quota-tag" style="font-size:10px;">免费 N 家</span></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <div class="ai-folder" style="margin-bottom:12px;">
+      <div class="fw-700 fs-14">风险雷达 · 企业动态监控</div>
+      <div class="text-2 fs-12" style="margin-top:4px;">关注企业后，资质到期 / 项目更新 / 中标 / 司法 / 经营异常 / 工商变更将实时推送，别错过关键信号。</div>
+      <div class="text-3 fs-11" style="margin-top:6px;">每日 09:00 推送 · 免费额度按认证等级递增</div>
+    </div>
+
+    <div class="section-title"><div class="st-left">已关注企业</div><span class="more" id="co-count">0</span></div>
+    <div class="card" id="co-list"></div>
+
+    <div class="section-title" style="margin-top:14px;"><div class="st-left">监控动态</div></div>
+    <div class="card" id="feed-list"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+var dims=MOCK.business.monitor.dimensions;
+var limits=MOCK.business.monitor.limits;
+var st=window.deriveStatus?deriveStatus():'registered';
+var limitKey=st==='resident'?((EntryStore.read().type||'construction')):st;
+var limit=limits[limitKey]||limits.realname;
+if(st==='registered'||st==='guest')limit=0;
+
+/* G1：破冰期非入驻注册用户 7 天免费监控试用（monitorTrialDays） */
+var trialInfo=null;
+if(window.ModeStore&&ModeStore.isBreakIn()&&st==='registered'){
+  var TRIAL_KEY='engchain-monitor-trial';
+  var trialDays=((MOCK.business.breakin||{}).monitorTrialDays)||7;
+  var trial=null;
+  try{trial=JSON.parse(localStorage.getItem(TRIAL_KEY)||'null');}catch(e){}
+  if(!trial){trial={start:Date.now(),used:true};try{localStorage.setItem(TRIAL_KEY,JSON.stringify(trial));}catch(e){}}
+  var elapsed=Date.now()-trial.start;
+  var remainDays=Math.max(0,trialDays-Math.floor(elapsed/86400000));
+  if(remainDays>0){limit=limits.realname||5;trialInfo={active:true,remain:remainDays};}
+  else{trialInfo={active:false,remain:0};}
+}
+
+if(trialInfo&&trialInfo.active){
+  document.getElementById('quota-tag').textContent='试用剩 '+trialInfo.remain+' 天 · '+limit+' 家';
+}else{
+  document.getElementById('quota-tag').textContent='可关注 '+limit+' 家';
+}
+
+/* 试用状态横幅 */
+if(trialInfo){
+  var banner=trialInfo.active
+    ? '<div class="card" style="margin-bottom:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.05));border:1px solid rgba(201,169,97,.3);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--primary);">破冰期免费试用中</div><div class="text-2 fs-11" style="margin-top:3px;">剩余 '+trialInfo.remain+' 天，可关注最多 '+(limits.realname||5)+' 家企业。入驻企业后解锁完整监控额度。</div></div>'
+    : '<div class="card" style="margin-bottom:12px;padding:12px 14px;background:rgba(212,76,71,.06);border:1px solid rgba(212,76,71,.2);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--danger);">免费试用已结束</div><div class="text-2 fs-11" style="margin-top:3px;">入驻企业解锁完整监控（建筑 30 家 / 中介 50 家 / 合伙人 200 家）。</div></div>';
+  var sc=document.querySelector('.scroll');
+  var ref=sc.querySelector('.section-title');
+  if(ref){ref.insertAdjacentHTML('beforebegin',banner);}else{sc.insertAdjacentHTML('afterbegin',banner);}
+}else if(limit<=0){
+  /* P1-2：成熟期非入驻用户 limit=0，显示入驻解锁提示 */
+  var matureHint='<div class="card" style="margin-bottom:12px;padding:12px 14px;background:rgba(201,169,97,.06);border:1px solid rgba(201,169,97,.25);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--primary);">入驻企业解锁完整监控</div><div class="text-2 fs-11" style="margin-top:3px;">完成企业入驻后可监控最多 30~200 家企业动态，资质到期 / 项目更新 / 司法变更实时推送。</div><button class="btn btn-primary" style="margin-top:10px;padding:7px 16px;font-size:12px;" onclick="location.href=\'../profile/entry.html\'">去入驻</button></div>';
+  var sc2=document.querySelector('.scroll');
+  var ref2=sc2.querySelector('.section-title');
+  if(ref2){ref2.insertAdjacentHTML('beforebegin',matureHint);}else{sc2.insertAdjacentHTML('afterbegin',matureHint);}
+}
+
+/* 企业数据源（示例企业） */
+var COS=[
+ {id:'c-znzjs',name:'四川中建××建设',tag:'总承包'},
+ {id:'c-scjc',name:'四川建材集团',tag:'供应'},
+ {id:'c-cqjt',name:'重庆建工集团',tag:'总承包'},
+ {id:'c-scrm',name:'蜀安人力',tag:'劳务'},
+ {id:'c-cdbl',name:'成都电力工程',tag:'专业分包'}
+];
+function coName(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.name:id;}
+function coTag(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.tag:'';}
+
+var SAMPLE_DIMS={
+ '资质到期':'「安全生产许可证」将于 2026-12-31 到期，请及时办理延续',
+ '项目更新':'新增中标公示 · 成都 6 号线延伸段土建 3 标段',
+ '中标':'中标公示 · 中标金额 ¥8,600 万',
+ '司法':'新增司法案件 1 起 · 建设工程施工合同纠纷（2026-9）',
+ '经营异常':'经营异常名录提醒 · 年报未按期公示',
+ '工商变更':'法定代表人/注册资本发生变更（+¥2,000 万）'
+};
+
+function renderCo(){
+  var s=MonitorStore.read();
+  var box=document.getElementById('co-list');
+  document.getElementById('co-count').textContent=s.follows.length+' 家';
+  if(!s.follows.length){box.innerHTML='<div class="text-3 fs-12" style="padding:8px 2px;">尚未关注企业，点下方「+ 关注」开始监控</div>';return;}
+  box.innerHTML=s.follows.map(function(f){
+    var isF=MonitorStore.isFollowed(f.companyId);
+    return '<div class="co-row">'+
+      '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:700;flex:none;">'+coName(f.companyId).charAt(0)+'</div>'+
+      '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">'+coName(f.companyId)+' <span class="tag tag-gray" style="font-size:9px;">'+coTag(f.companyId)+'</span></div>'+
+      '<div class="dim">监控维度：资质到期 · 项目 · 司法 · 经营异常</div></div>'+
+      (isF?'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="unfollow(\''+f.companyId+'\')">取消</button>':'')+
+    '</div>';
+  }).join('');
+}
+window.renderCo=renderCo;
+window.unfollow=function(id){MonitorStore.unfollow(id);renderCo();UI.toast('已取消关注','info');};
+
+function renderFeed(){
+  var s=MonitorStore.read();
+  var box=document.getElementById('feed-list');
+  var items=s.feed.slice(0,10);
+  if(!items.length){box.innerHTML='<div class="text-3 fs-12" style="padding:8px 2px;">暂无动态 · 关注企业后自动推送</div>';return;}
+  box.innerHTML=items.map(function(it){
+    var d=new Date(it.ts);var ds=(d.getMonth()+1)+'月'+d.getDate()+'日';
+    var col=it.kind==='warning'?'var(--warning)':(it.kind==='danger'?'var(--danger)':'var(--success)');
+    return '<div class="feed-item"><span class="feed-dot" style="background:'+col+';"></span>'+
+      '<div style="flex:1;min-width:0;"><div class="fs-13" style="line-height:1.5;">'+it.text+'</div>'+
+      '<div class="dim" style="margin-top:2px;">'+coName(it.company)+' · '+it.dim+' · '+ds+'</div></div>'+
+    '</div>';
+  }).join('');
+}
+window.renderFeed=renderFeed;
+
+/* 关注入口（企业列表，点关注写入并推动态） */
+var addBox='<div class="section-title" style="margin-top:14px;"><div class="st-left">添加监控企业</div></div><div class="card">';
+COS.forEach(function(c){
+  addBox+='<div class="co-row"><div style="width:36px;height:36px;border-radius:10px;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:700;flex:none;">'+c.name.charAt(0)+'</div>'+
+    '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">'+c.name+'</div><div class="dim">'+c.tag+' · 平台已核验</div></div>'+
+    '<button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="follow(\''+c.id+'\')">+ 关注</button></div>';
+});
+addBox+='</div>';
+var sc=document.querySelector('.scroll');
+sc.insertAdjacentHTML('beforeend',addBox);
+
+window.follow=function(id){
+  var s=MonitorStore.read();
+  /* P1-2 修复：limit=0 时也必须拦截（原条件 limit>0&& 导致成熟期非入驻用户可无限关注） */
+  if(s.follows.length>=limit){
+    if(limit<=0){UI.toast('入驻企业解锁完整监控（建筑 30 家 / 中介 50 家 / 合伙人 200 家）','warn');}
+    else{UI.toast('已达关注上限 '+limit+' 家，升级认证可扩容','warn');}
+    return;
+  }
+  MonitorStore.follow(id);
+  var dim=dims[Math.floor(Math.random()*dims.length)];
+  var kind=dim==='司法'?'danger':(dim==='经营异常'?'warning':'success');
+  MonitorStore.pushFeed({company:id,dim:dim,kind:kind,text:SAMPLE_DIMS[dim]});
+  UI.toast('已关注 · 推送 '+dim,'ok');
+  renderCo();renderFeed();
+};
+
+renderCo();renderFeed();
+  /* 跨 tab 自动重渲染：监控数据变更后自动刷新 */
+  var _monRerender = null;
+  function _monRefresh() { if (_monRerender) clearTimeout(_monRerender); _monRerender = setTimeout(function() { renderCo(); renderFeed(); }, 100); }
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-state' || e.key === 'engchain-auth') _monRefresh(); });
+  window.addEventListener('engchain:state', _monRefresh);
+  window.addEventListener('engchain:auth', _monRefresh);
+  window.addEventListener('engchain:store-change', _monRefresh);
+})();
+</script>
+</body>
+</html>

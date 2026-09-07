@@ -1,0 +1,224 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>操作日志 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="risk/logs.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>操作日志</h1>
+        <div class="sub">风控合规中心 · 管理员操作全留痕（操作人 / 模块 / 动作 / 对象 / 时间 / 详情），每次后台审批 / 配置 / 处罚自动记录</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">操作日志列表</span>
+        <span class="card-s" id="log-count"></span>
+      </div>
+      <div id="filter-bar"></div>
+      <div id="table-wrap"></div>
+      <div id="pager-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var AUDIT_KEY = 'engchain-audit';
+  var PAGE_SIZE = 10;
+  var page = 1;
+  var filters = { module: '', operator: '', date_start: '', date_end: '', keyword: '' };
+  var paginator = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try {
+      var d = new Date(ts);
+      var p = function (n) { return n < 10 ? '0' + n : n; };
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    } catch (e) { return String(ts || ''); }
+  }
+  function fmtDate(ts) {
+    try { return new Date(ts).toISOString().slice(0, 10); } catch (e) { return ''; }
+  }
+
+  function allLogs() {
+    try { return JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]'); } catch (e) { return []; }
+  }
+
+  function moduleOptions() {
+    var logs = allLogs();
+    var map = {};
+    logs.forEach(function (l) { if (l.module) map[l.module] = 1; });
+    return Object.keys(map).sort().map(function (m) { return { value: m, label: m }; });
+  }
+
+  function filteredLogs() {
+    var logs = allLogs();
+    return logs.filter(function (l) {
+      if (filters.module && l.module !== filters.module) return false;
+      if (filters.operator && (l.operator || '').indexOf(filters.operator) < 0) return false;
+      if (filters.date_start) {
+        try { if (l.ts < new Date(filters.date_start).getTime()) return false; } catch (e) {}
+      }
+      if (filters.date_end) {
+        try { if (l.ts > new Date(filters.date_end).getTime() + 86400000) return false; } catch (e) {}
+      }
+      if (filters.keyword) {
+        var q = filters.keyword.toLowerCase();
+        var hay = (l.action + ' ' + l.target + ' ' + l.extra + ' ' + l.operator).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKPI() {
+    var logs = allLogs();
+    var today = fmtDate(Date.now());
+    var weekAgo = Date.now() - 7 * 86400000;
+    var todayN = 0, weekN = 0, admins = {};
+    logs.forEach(function (l) {
+      if (fmtDate(l.ts) === today) todayN++;
+      if (l.ts >= weekAgo) weekN++;
+      if (l.operator) admins[l.operator] = 1;
+    });
+    var cards = [
+      ['今日操作数', todayN, 'gold', '当日管理员操作'],
+      ['本周操作数', weekN, 'up', '近 7 天累计'],
+      ['活跃管理员', Object.keys(admins).length, 'warn', '有操作记录的管理员'],
+      ['日志总数', logs.length, 'down', '全量留痕（上限 200 条）']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'module', label: '模块', type: 'select', options: moduleOptions() },
+        { key: 'operator', label: '操作人', type: 'text', placeholder: '输入操作人姓名' },
+        { key: 'date', label: '时间范围', type: 'daterange' },
+        { key: 'keyword', label: '关键词', type: 'text', placeholder: '动作 / 对象 / 详情' }
+      ],
+      onFilter: function (vals) {
+        filters.module = vals.module || '';
+        filters.operator = vals.operator || '';
+        filters.date_start = vals.date_start || '';
+        filters.date_end = vals.date_end || '';
+        filters.keyword = vals.keyword || '';
+        page = 1;
+        renderTable();
+        Admin.toast('查询完成，共 ' + filteredLogs().length + ' 条日志');
+      },
+      onReset: function () {
+        filters = { module: '', operator: '', date_start: '', date_end: '', keyword: '' };
+        page = 1;
+        renderTable();
+        Admin.toast('已重置筛选条件');
+      }
+    });
+  }
+
+  function renderTable() {
+    var list = filteredLogs();
+    $('#log-count').textContent = '筛选 ' + list.length + ' / 共 ' + allLogs().length + ' 条 · 按时间倒序';
+    var totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    if (page > totalPages) page = totalPages;
+    var seg = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+    Admin.TableRenderer.render({
+      container: '#table-wrap',
+      columns: [
+        { key: 'ts', label: '时间', width: '170px', render: function (row) { return '<span class="tx-muted-sm">' + fmtTime(row.ts) + '</span>'; } },
+        { key: 'operator', label: '操作人', width: '100px', render: function (row) { return esc(row.operator || '-'); } },
+        { key: 'module', label: '模块', width: '100px', render: function (row) { return row.module ? '<span class="badge badge-primary">' + esc(row.module) + '</span>' : '-'; } },
+        { key: 'action', label: '动作', width: '120px', render: function (row) { return '<span class="tx-semibold">' + esc(row.action || '-') + '</span>'; } },
+        { key: 'target', label: '对象', width: '140px', render: function (row) { return esc(row.target || '-'); } },
+        { key: 'extra', label: '详情', render: function (row) { return '<span class="tx-muted-sm">' + esc(row.extra || '-') + '</span>'; } }
+      ],
+      data: seg,
+      options: {
+        rowClick: function (row) { openDetail(row); },
+        emptyText: '暂无操作日志 · 在后台执行审批 / 配置 / 处罚等操作后将自动留痕'
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-wrap',
+        total: list.length,
+        pageSize: PAGE_SIZE,
+        onChange: function (p, ps) { page = p; PAGE_SIZE = ps; renderTable(); }
+      });
+    } else {
+      paginator.setTotal(list.length);
+    }
+  }
+
+  function openDetail(log) {
+    var body = '<div class="ud-grid">' +
+      '<div class="dg"><div class="k">时间</div><div class="v">' + fmtTime(log.ts) + '</div></div>' +
+      '<div class="dg"><div class="k">操作人</div><div class="v">' + esc(log.operator || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">模块</div><div class="v">' + esc(log.module || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">动作</div><div class="v">' + esc(log.action || '-') + '</div></div>' +
+      '<div class="dg"><div class="k">操作对象</div><div class="v">' + esc(log.target || '-') + '</div></div>' +
+      '</div>' +
+      '<div class="mt-14"><div class="tx-label-sm">详情说明</div>' +
+      '<div class="detail-box break-all">' + esc(log.extra || '无额外说明') + '</div></div>' +
+      '<div class="mt-14 tx-muted-xs">日志来源：engchain-audit（localStorage）· 由 DataBus.audit / Admin.log 自动写入 · 只读不可修改</div>';
+    Admin.Drawer.open({
+      title: '操作日志详情 · ' + (log.action || ''),
+      content: body,
+      width: '520px'
+    });
+  }
+
+  function doExport() {
+    var list = filteredLogs();
+    var rows = list.map(function (l) {
+      return [fmtTime(l.ts), l.operator || '', l.module || '', l.action || '', l.target || '', l.extra || ''];
+    });
+    var ok = Admin.exportCSV('操作日志.csv', ['时间', '操作人', '模块', '动作', '对象', '详情'], rows);
+    Admin.toast(ok ? '已导出 ' + rows.length + ' 条日志' : '导出失败', ok ? 'success' : 'danger');
+    if (ok) Admin.log('数据导出', '操作日志', '', '操作日志.csv · ' + rows.length + ' 条');
+  }
+
+  function render() {
+    renderKPI();
+    renderFilterBar();
+    renderTable();
+  }
+
+  function bind() {
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = doExport;
+    window.addEventListener('engchain:audit', function () { renderKPI(); renderTable(); });
+  }
+
+  function init() { bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

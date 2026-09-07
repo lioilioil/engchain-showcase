@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/supply/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>发现 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body data-tab="discover">
+<div class="phone">
+  <div class="page-header" style="padding-top:10px;">
+    <div class="topbar" style="margin-bottom:12px;">
+      <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
+      <div class="topbar-title">发现</div>
+      <div class="topbar-right">
+        <a href="../search/index.html" class="icon-btn" title="搜索" aria-label="搜索"><svg class="ic"><use href="#i-search"/></svg></a>
+      </div>
+    </div>
+    <!-- 供需方向 tab -->
+    <div class="seg" style="margin-top:10px;">
+      <div class="seg-item" data-t="all">全部</div>
+      <div class="seg-item" data-t="demand">找需求</div>
+      <div class="seg-item" data-t="supply">找供应</div>
+    </div>
+  </div>
+
+  <!-- 业务场景筛选行 -->
+  <div id="filter-row" style="display:flex;gap:8px;padding:0 16px 6px;flex-wrap:wrap;flex:0 0 auto;"></div>
+
+  <div class="scroll no-pad" style="padding-top:8px;padding-bottom:100px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 16px;">
+      <span class="text-2 fs-12" id="count"></span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="filter-btn" style="color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;">筛选 <span id="filter-cnt" style="display:none;min-width:16px;height:16px;border-radius:8px;background:var(--primary);color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 4px;">0</span></button>
+        <button id="sort-btn" style="color:var(--text-2);font-size:12px;">最新 ›</button>
+      </div>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<!-- 筛选面板 -->
+<div id="filter-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);" onclick="if(event.target===this)closeFilter()">
+  <div id="filter-sheet" style="position:absolute;bottom:0;left:0;right:0;background:var(--bg);border-radius:16px 16px 0 0;padding:20px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <span style="font-size:16px;font-weight:700;color:var(--text-1);">筛选</span>
+      <button onclick="closeFilter()" style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;line-height:1;">×</button>
+    </div>
+    <div id="filter-groups"></div>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="resetFilter()" style="flex:1;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:14px;cursor:pointer;">重置</button>
+      <button onclick="applyFilter()" style="flex:2;height:42px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var params = new URLSearchParams(location.search);
+  var type = params.get('type') || 'all';
+
+  /* ---- L1：统一供需列表（MOCK 种子 + SupplyStore 已上架用户发布 混排） ---- */
+  var BIZ_MAP = { '材料':'material','设备':'equipment','劳务':'labor','项目合作':'cooperation','合作':'cooperation','中介服务':'agency','中介':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent' };
+  /* 将 SupplyStore 条目归一化为 Cards.render 所需字段 */
+  function normSupplyItem(x) {
+    var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
+    return Object.assign({}, x, {
+      id: x.id,
+      bizKey: x.bizKey || BIZ_MAP[x.cat] || 'material',
+      dir: x.dir || x.type || 'demand',
+      title: x.title || '',
+      cat: x.cat || x.category || '',
+      sub: x.sub || x.subType || '',
+      city: x.city || x.location || '',
+      price: x.price || x.budget || '',
+      budget: x.budget || x.price || '',
+      unit: x.unit || '',
+      tags: x.tags || [],
+      company: x.company || '',
+      match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
+      verified: x.verified !== undefined ? x.verified : !isUser,
+      hot: x.hot || false,
+      /* 角标标记：用户发布 / 平台认证 */
+      _badge: isUser ? '用户发布' : '平台认证'
+    });
+  }
+  function readActiveSupplies() {
+    try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
+  }
+  function mergedList() {
+    var mock = (window.MOCK && MOCK.byFlow) ? MOCK.byFlow('match').slice() : [];
+    var active = readActiveSupplies().map(normSupplyItem);
+    /* 去重：按 id 合并，SupplyStore 条目优先（用户发布覆盖同名种子） */
+    var seen = {};
+    var out = [];
+    active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    return out;
+  }
+
+  var segs = document.querySelectorAll('.seg-item');
+  function setSeg() {
+    segs.forEach(function (el) {
+      el.classList.toggle('active', el.dataset.t === (type === 'demand' ? 'demand' : type === 'supply' ? 'supply' : 'all'));
+    });
+  }
+  segs.forEach(function (el) {
+    el.addEventListener('click', function () {
+      type = el.dataset.t;
+      setSeg();
+      render();
+      history.replaceState({}, '', '?type=' + type);
+    });
+  });
+
+  // 业务场景 chips（与新口径二级分类一致：项目合作/材料/设备/劳务/中介）
+  var bizMap = { '项目合作': 'cooperation', '材料': 'material', '设备': 'equipment', '劳务': 'labor', '中介': 'agency' };
+  var cats = ['全部'].concat(Object.keys(bizMap));
+  var curCat = '全部';
+  var catP = params.get('cat');
+  if (catP) { for (var _k in bizMap) { if (bizMap[_k] === catP) { curCat = _k; break; } } }
+  var fr = document.getElementById('filter-row');
+  fr.innerHTML = cats.map(function (c) { return '<span class="chip" data-c="' + c + '" style="padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer;border:1px solid var(--line);color:var(--text-2);background:var(--bg-card)">' + c + '</span>'; }).join('');
+  fr.querySelectorAll('.chip').forEach(function (ch) {
+    if (ch.dataset.c === curCat) { ch.style.color = 'var(--primary)'; ch.style.background = 'var(--primary-soft)'; ch.style.borderColor = 'var(--primary)'; }
+    ch.addEventListener('click', function () {
+      curCat = ch.dataset.c;
+      fr.querySelectorAll('.chip').forEach(function (x) {
+        x.style.color = 'var(--text-2)'; x.style.background = 'var(--bg-card)'; x.style.borderColor = 'var(--line)';
+      });
+      if (curCat !== '全部') { ch.style.color = 'var(--primary)'; ch.style.background = 'var(--primary-soft)'; ch.style.borderColor = 'var(--primary)'; }
+      render();
+      history.replaceState({}, '', '?type=' + type + (curCat !== '全部' ? '&cat=' + bizMap[curCat] : ''));
+    });
+  });
+
+  var sortNewest = true;
+  document.getElementById('sort-btn').addEventListener('click', function () {
+    sortNewest = !sortNewest;
+    this.textContent = sortNewest ? '最新 ›' : '匹配度 ›';
+    render();
+  });
+
+  /* ---- 筛选面板：地区 / 预算 / 认证 ---- */
+  var FILTER_GROUPS = [
+    { key: 'city', label: '地区', options: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'] },
+    { key: 'budget', label: '预算', options: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'] },
+    { key: 'verified', label: '认证', options: ['全部', '已认证', '未认证'] }
+  ];
+  var filterState = { city: '全部', budget: '全部', verified: '全部' };
+  var filterDraft = { city: '全部', budget: '全部', verified: '全部' };
+
+  function renderFilterGroups() {
+    var html = FILTER_GROUPS.map(function (g) {
+      var opts = g.options.map(function (o) {
+        var active = filterDraft[g.key] === o;
+        return '<span class="filter-opt" data-g="' + g.key + '" data-v="' + o + '" style="display:inline-block;padding:6px 14px;border-radius:999px;font-size:12px;cursor:pointer;margin:0 8px 8px 0;border:1px solid ' + (active ? 'var(--primary)' : 'var(--line)') + ';color:' + (active ? 'var(--primary)' : 'var(--text-2)') + ';background:' + (active ? 'var(--primary-soft)' : 'var(--bg-card)') + ';">' + o + '</span>';
+      }).join('');
+      return '<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:10px;">' + g.label + '</div><div>' + opts + '</div></div>';
+    }).join('');
+    document.getElementById('filter-groups').innerHTML = html;
+    document.querySelectorAll('.filter-opt').forEach(function (el) {
+      el.addEventListener('click', function () {
+        filterDraft[el.dataset.g] = el.dataset.v;
+        renderFilterGroups();
+      });
+    });
+  }
+
+  window.openFilter = function () {
+    filterDraft = { city: filterState.city, budget: filterState.budget, verified: filterState.verified };
+    renderFilterGroups();
+    var ov = document.getElementById('filter-overlay');
+    ov.style.display = 'block';
+    requestAnimationFrame(function () { document.getElementById('filter-sheet').style.transform = 'translateY(0)'; });
+  };
+  window.closeFilter = function () {
+    document.getElementById('filter-sheet').style.transform = 'translateY(100%)';
+    setTimeout(function () { document.getElementById('filter-overlay').style.display = 'none'; }, 300);
+  };
+  window.resetFilter = function () {
+    filterDraft = { city: '全部', budget: '全部', verified: '全部' };
+    renderFilterGroups();
+  };
+  window.applyFilter = function () {
+    filterState = { city: filterDraft.city, budget: filterDraft.budget, verified: filterDraft.verified };
+    updateFilterBadge();
+    render();
+    closeFilter();
+  };
+  function updateFilterBadge() {
+    var cnt = 0;
+    if (filterState.city !== '全部') cnt++;
+    if (filterState.budget !== '全部') cnt++;
+    if (filterState.verified !== '全部') cnt++;
+    var badge = document.getElementById('filter-cnt');
+    if (cnt > 0) { badge.style.display = 'inline-block'; badge.textContent = cnt; }
+    else badge.style.display = 'none';
+  }
+  document.getElementById('filter-btn').addEventListener('click', openFilter);
+
+  /* 预算范围匹配 */
+  function matchBudget(item, budget) {
+    if (budget === '全部') return true;
+    var val = parseFloat((item.price || item.budget || '').toString().replace(/[^0-9.]/g, ''));
+    if (budget === '面议') return !val || val === 0;
+    if (isNaN(val) || val === 0) return false;
+    if (budget === '1万以下') return val < 1;
+    if (budget === '1-5万') return val >= 1 && val < 5;
+    if (budget === '5-20万') return val >= 5 && val < 20;
+    if (budget === '20-100万') return val >= 20 && val < 100;
+    if (budget === '100万以上') return val >= 100;
+    return true;
+  }
+
+  function render() {
+    var list = mergedList();
+    if (type !== 'all') list = list.filter(function (s) { return s.dir === type; });
+    if (curCat !== '全部') list = list.filter(function (s) { return s.bizKey === bizMap[curCat]; });
+    /* 筛选面板：地区 / 预算 / 认证 */
+    if (filterState.city !== '全部') list = list.filter(function (s) { return (s.city || s.location || '') === filterState.city || (s.city || s.location || '').indexOf(filterState.city) >= 0; });
+    if (filterState.budget !== '全部') list = list.filter(function (s) { return matchBudget(s, filterState.budget); });
+    if (filterState.verified === '已认证') list = list.filter(function (s) { return s.verified; });
+    if (filterState.verified === '未认证') list = list.filter(function (s) { return !s.verified; });
+    if (!sortNewest) list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
+    else list.sort(function (a, b) { return (b.ts || b.time || 0) - (a.ts || a.time || 0); });
+
+    document.getElementById('count').textContent = '共 ' + list.length + ' 条';
+    /* L1：用户发布/平台认证角标 —— 在 Cards.render 后注入角标 span */
+    var html = list.length
+      ? window.Cards.render(list, 'detail.html?id=')
+      : '<div class="empty-state"><div class="e-icon"><svg class="ic"><use href="#i-folder"/></svg></div><div class="e-title">暂无匹配</div><div class="e-desc">换个筛选条件试试吧</div></div>';
+    document.getElementById('list').innerHTML = html;
+    /* 为用户发布条目注入角标 */
+    var cards = document.querySelectorAll('#list .job-card');
+    list.forEach(function (item, idx) {
+      if (item._badge && cards[idx]) {
+        var tag = document.createElement('span');
+        tag.className = 'tag ' + (item._badge === '用户发布' ? 'tag-supply' : 'tag-gold');
+        tag.style.cssText = 'margin-left:6px;font-size:10px;';
+        tag.textContent = item._badge;
+        var tagsRow = cards[idx].querySelector('.jc-tags');
+        if (tagsRow) tagsRow.appendChild(tag);
+      }
+    });
+  }
+  setSeg();
+  render();
+  /* L1：监听供需变更（后台审核上架后即时刷新列表） */
+  window.addEventListener('engchain:supply', function () { render(); });
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-supply') render(); });
+})();
+</script>
+</body>
+</html>

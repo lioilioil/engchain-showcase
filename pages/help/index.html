@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/help/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>帮助中心 · 工程链</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23C9A961'/%3E%3Cpath d='M3 21h18M5 21V7l7-4 7 4v14' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ============================================================
+   帮助中心 · V3.3 设计系统重设计
+   视觉规则：整行卡片统一 16px 边距并铺满一行（与 .job-card 对齐）；
+   全部使用设计令牌，明/暗双主题完整。
+   ============================================================ */
+
+/* ---- 吸顶搜索行（仅搜索框悬浮固定顶部；分类按钮已改为正常流两行网格，不吸顶） ---- */
+.help-sticky-top{position:sticky;top:0;z-index:20;background:var(--bg);}
+
+/* ---- 搜索区（令牌化） ---- */
+.help-search-wrap{padding:10px 16px 6px;}
+.help-search-box{display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--r-m);padding:0 14px;height:44px;box-shadow:var(--shadow-xs);transition:border-color .2s,box-shadow .2s;}
+.help-search-box.focus{border-color:var(--primary);box-shadow:var(--shadow-focus);}
+.help-search-box svg{width:17px;height:17px;color:var(--text-3);flex:none;}
+.help-search-box input{flex:1;border:none;outline:none;background:transparent;font-size:14px;color:var(--text-1);height:100%;}
+.help-search-box input::placeholder{color:var(--text-3);}
+.help-search-clear{display:none;width:20px;height:20px;border-radius:50%;background:var(--text-3);color:var(--bg);align-items:center;justify-content:center;font-size:12px;line-height:1;cursor:pointer;flex:none;border:none;padding:0;}
+.help-search-clear.show{display:flex;}
+.help-search-result{font-size:12px;color:var(--primary-dim);margin-top:4px;padding-left:2px;min-height:0;line-height:1.4;transition:opacity .2s;}
+
+/* ---- 分类网格（两行四列展开，icon在上文字在下，仅icon有背景，整体无包裹背景，不吸顶） ---- */
+.help-cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 4px;padding:4px 16px 14px;}
+.help-cat-grid-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:4px 2px;border-radius:12px;transition:transform .15s;-webkit-tap-highlight-color:transparent;}
+.help-cat-grid-item:active{transform:scale(.94);}
+.help-cat-grid-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary-dim);transition:background .15s,color .15s;}
+.help-cat-grid-icon svg{width:19px;height:19px;}
+.help-cat-grid-name{font-size:11px;color:var(--text-2);font-weight:500;line-height:1.2;text-align:center;}
+.help-cat-grid-item.active .help-cat-grid-icon{background:var(--primary);color:var(--text-inv);}
+.help-cat-grid-item.active .help-cat-grid-name{color:var(--primary-dim);font-weight:700;}
+
+/* ---- 区块标题（金色竖条 + 主副题） ---- */
+.help-section-title{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;}
+.help-section-title .st-text{font-size:var(--fs-md);font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:8px;letter-spacing:.01em;}
+.help-section-title .st-text::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--primary);}
+.help-section-title .st-sub{font-size:var(--fs-xs);color:var(--text-3);}
+
+/* ---- 热门问题：整行满宽卡片（358px，符合历史视觉规则，不再 240px 横滑） ---- */
+.help-hot-list{padding:2px 16px 4px;}
+.help-hot-card{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);padding:12px 14px;cursor:pointer;box-shadow:var(--shadow-xs);transition:transform .15s,box-shadow .15s;margin-bottom:8px;}
+.help-hot-card:active{transform:scale(.985);box-shadow:var(--shadow-sm);}
+.help-hot-body{flex:1;min-width:0;}
+.help-hot-title-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.help-hot-tag{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--error);background:rgba(179,38,30,.08);padding:2px 8px;border-radius:20px;flex:none;}
+.help-hot-tag svg{width:11px;height:11px;}
+.help-hot-q{font-size:13.5px;font-weight:600;color:var(--text-1);line-height:1.4;flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.help-hot-a{font-size:11.5px;color:var(--text-3);line-height:1.6;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.help-hot-arrow{width:16px;height:16px;color:var(--text-3);flex:none;}
+
+/* ---- FAQ 手风琴（令牌化） ---- */
+.help-faq-section{margin:0 16px 8px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--shadow-sm);}
+.help-faq-section.hidden{display:none;}
+.help-faq-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;}
+.help-faq-head-icon{width:32px;height:32px;border-radius:var(--r-m);background:var(--primary-soft);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;flex:none;}
+.help-faq-head-icon svg{width:17px;height:17px;}
+.help-faq-head-text{flex:1;font-size:14.5px;font-weight:600;color:var(--text-1);}
+.help-faq-head-count{font-size:11px;color:var(--text-3);background:var(--bg-card-2);padding:2px 8px;border-radius:20px;}
+.help-faq-head-arrow{width:18px;height:18px;color:var(--text-3);transition:transform .25s;flex:none;}
+.help-faq-section.open .help-faq-head-arrow{transform:rotate(90deg);}
+.help-faq-body{max-height:0;overflow:hidden;transition:max-height .3s ease;}
+.help-faq-section.open .help-faq-body{max-height:5000px;}
+
+.help-faq-item{border-bottom:1px solid var(--line);}
+.help-faq-item:last-child{border-bottom:none;}
+.help-faq-q{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;cursor:pointer;min-height:40px;}
+.help-faq-q:active{background:var(--bg-card-2);}
+.help-faq-q-text{flex:1;font-size:13.5px;color:var(--text-1);line-height:1.5;font-weight:500;}
+.help-faq-q-arrow{width:16px;height:16px;color:var(--text-3);flex:none;margin-top:2px;transition:transform .25s;}
+.help-faq-item.open .help-faq-q-arrow{transform:rotate(180deg);}
+.help-faq-detail{max-height:0;overflow:hidden;transition:max-height .3s ease;padding:0 16px;}
+.help-faq-item.open .help-faq-detail{max-height:3000px;padding:0 16px 16px;}
+.help-faq-detail-inner{background:var(--bg-card-2);border-radius:var(--r-m);padding:14px;}
+.help-faq-steps{margin:0 0 12px;padding:0;list-style:none;}
+.help-faq-steps li{position:relative;padding:4px 0 4px 28px;font-size:13px;color:var(--text-2);line-height:1.7;}
+.help-faq-steps li::before{content:attr(data-n);position:absolute;left:0;top:5px;width:18px;height:18px;border-radius:50%;background:var(--primary);color:var(--text-inv);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.help-faq-desc{font-size:13px;color:var(--text-2);line-height:1.8;margin-bottom:12px;}
+.help-faq-links{display:flex;flex-wrap:wrap;gap:8px;}
+.help-faq-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--primary-dim);background:var(--primary-soft);padding:6px 12px;border-radius:20px;text-decoration:none;font-weight:500;}
+.help-faq-link svg{width:12px;height:12px;}
+.help-faq-tip{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 12px;background:var(--warning-soft);border-radius:var(--r-m);}
+.help-faq-tip svg{width:15px;height:15px;color:var(--warning);flex:none;margin-top:1px;}
+.help-faq-tip span{font-size:12px;color:var(--warning);line-height:1.6;}
+
+/* ---- 底部客服（令牌化） ---- */
+.help-bottom{margin:6px 16px 20px;}
+.help-service-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-xl);padding:16px 14px;text-align:center;box-shadow:var(--shadow-sm);}
+.help-service-icon{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin:0 auto 10px;color:var(--text-inv);}
+.help-service-icon svg{width:22px;height:22px;}
+.help-service-title{font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:2px;}
+.help-service-phone{font-size:18px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);margin:4px 0 2px;letter-spacing:.01em;}
+.help-service-time{font-size:11px;color:var(--text-3);margin-bottom:12px;}
+.help-service-btns{display:flex;gap:8px;}
+.help-service-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:40px;border-radius:var(--r-m);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:transform .15s,opacity .15s;}
+.help-service-btn:active{transform:scale(.98);opacity:.85;}
+.help-service-btn.primary{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);box-shadow:0 4px 14px rgba(201,169,97,.25),inset 0 1px 0 rgba(255,255,255,.18);}
+.help-service-btn.ghost{background:var(--bg-card-2);color:var(--text-1);border:1px solid var(--line);}
+.help-service-btn svg{width:17px;height:17px;}
+
+.help-about-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);margin-top:8px;cursor:pointer;min-height:40px;box-shadow:var(--shadow-xs);transition:background .15s;}
+.help-about-row:active{background:var(--bg-card-2);}
+.help-about-left{display:flex;align-items:center;gap:10px;}
+.help-about-left svg{width:18px;height:18px;color:var(--text-3);}
+.help-about-left span{font-size:13.5px;color:var(--text-1);}
+.help-about-ver{font-size:12px;color:var(--text-3);}
+
+/* ---- 搜索高亮 / 空态 ---- */
+.help-faq-item.search-hit{background:var(--primary-soft);}
+.help-no-result{display:none;text-align:center;padding:40px 20px;color:var(--text-3);font-size:13px;}
+.help-no-result.show{display:block;}
+.help-no-result svg{width:48px;height:48px;color:var(--line-strong);margin-bottom:12px;}
+
+/* 确保无横向滚动 */
+.phone{overflow-x:hidden;}
+.scroll{overflow-x:hidden;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">帮助中心</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll no-pad" id="helpScroll" style="padding-bottom:108px;">
+    <!-- 吸顶搜索行（仅搜索框固定顶部） -->
+    <div class="help-sticky-top">
+      <!-- 搜索区 -->
+      <div class="help-search-wrap">
+        <div class="help-search-box" id="searchBox">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-search"/></svg>
+          <input type="text" id="helpSearchInput" placeholder="搜索问题，如：如何实名认证" autocomplete="off">
+          <button class="help-search-clear" id="searchClear" aria-label="清空">×</button>
+        </div>
+        <div class="help-search-result" id="searchResult"></div>
+      </div>
+    </div>
+
+    <!-- 分类网格：两行四列展开，icon在上文字在下，仅icon有背景，不吸顶 -->
+    <div class="help-cat-grid" id="catGrid"></div>
+
+    <!-- 热门问题（整行满宽卡片） -->
+    <div class="help-section-title">
+      <span class="st-text">热门问题</span>
+      <span class="st-sub">高频咨询</span>
+    </div>
+    <div class="help-hot-list" id="hotScroll"></div>
+
+    <!-- 全部分类FAQ -->
+    <div class="help-section-title">
+      <span class="st-text">全部问题</span>
+      <span style="display:flex;align-items:center;gap:10px;">
+        <span class="st-sub" id="faqCountLabel"></span>
+        <span class="st-sub" id="faqToggleAll" style="cursor:pointer;color:var(--primary-dim);font-weight:600;" onclick="toggleAllFAQ()">展开全部</span>
+      </span>
+    </div>
+    <div id="faqContainer"></div>
+
+    <!-- 无搜索结果 -->
+    <div class="help-no-result" id="noResult">
+      <svg class="ic" viewBox="0 0 24 24"><use href="#i-help"/></svg>
+      <div>未找到相关问题</div>
+      <div style="font-size:11px;margin-top:4px;">试试其他关键词，或联系在线客服</div>
+    </div>
+
+    <!-- 底部客服入口 -->
+    <div class="help-bottom">
+      <div class="help-service-card">
+        <div class="help-service-icon">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-headset"/></svg>
+        </div>
+        <div class="help-service-title">需要更多帮助？</div>
+        <div class="help-service-phone">400-000-0000</div>
+        <div class="help-service-time">工作日 09:00 – 21:00</div>
+        <div class="help-service-btns">
+          <button class="help-service-btn primary" onclick="UI.toast('已接入在线客服','ok')">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-chat"/></svg>在线客服
+          </button>
+          <button class="help-service-btn ghost" id="feedbackBtn">
+            <svg class="ic" viewBox="0 0 24 24"><use href="#i-feedback"/></svg>意见反馈
+          </button>
+        </div>
+      </div>
+      <div class="help-about-row" id="aboutRow">
+        <div class="help-about-left">
+          <svg class="ic" viewBox="0 0 24 24"><use href="#i-info"/></svg>
+          <span>关于工程链</span>
+        </div>
+        <span class="help-about-ver">V3.3.0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/domain.js"></script>
+<script>window.__ROOT__='../../';</script>
+<script>
+(function(){
+  'use strict';
+
+  /* ===== FAQ 数据 ===== */
+  var CATEGORIES = [
+    {
+      id:'account', name:'账号与认证', icon:'user',
+      items:[
+        {q:'如何完成个人实名认证？', steps:['进入「我的」页面，点击「认证中心」','选择「个人实名」认证类型','上传身份证正反面照片','完成人脸识别验证','确认信息无误后提交审核'], links:[{text:'前往认证中心',href:'../profile/auth.html'}]},
+        {q:'个人入驻有哪几种类型？', desc:'个人入驻分为两种类型：', steps:['jobseeker 求职型：完成完整简历，享受职位投递权益，企业可查看联系方式','standard 标准型：仅完成资质认证，可浏览信息但投递简历时会被引导升级'], links:[{text:'了解入驻类型',href:'../profile/auth.html'}]},
+        {q:'如何完成企业认证？', steps:['进入「认证中心」，选择「企业认证」','填写企业工商信息（名称、统一社会信用代码等）','上传营业执照照片','完成法人身份验证','提交审核，通常1-3个工作日完成'], links:[{text:'前往企业认证',href:'../profile/auth-enterprise.html'}]},
+        {q:'企业入驻流程是什么？', steps:['填写企业入驻表单，选择入驻类型','提交企业资质和经营信息','缴纳入驻费用','平台审核企业资质','审核通过后入驻成功，解锁完整功能'], links:[{text:'前往入驻表单',href:'../profile/entry-form.html'}]},
+        {q:'什么是个人合伙人？', desc:'个人合伙人是工程链的分销推广身份，享受专属佣金分成政策。合伙人可通过分享邀请码、推广素材等方式邀请新用户注册并消费，从中获取佣金收益。', steps:['在认证中心选择「个人合伙人」认证','完成身份验证和协议签署','获取专属邀请码和推广素材','邀请好友注册并消费','享受佣金分成'], links:[{text:'了解合伙人',href:'../profile/auth-partner.html'}]},
+        {q:'实名认证失败怎么办？', desc:'实名认证失败通常由以下原因导致，请逐一排查：', steps:['检查身份证照片是否清晰、完整、无反光','确保人脸识别时光线充足，面部无遮挡','核对填写的姓名、身份证号与证件一致','确认身份证未过期且在有效期内','如仍失败，请联系在线客服协助处理'], tip:'每人每天最多尝试5次，失败后请24小时后再试'},
+        {q:'如何修改已认证的企业信息？', desc:'企业认证信息（如企业名称、法人、经营范围等）发生变更时，需要重新提交审核：', steps:['进入「认证中心」-「企业认证」','点击「信息变更」或「重新认证」','修改需要变更的企业信息','上传最新的营业执照等证明文件','提交审核，审核期间原有认证状态保持有效'], links:[{text:'前往企业认证',href:'../profile/auth-enterprise.html'}]}
+      ]
+    },
+    {
+      id:'publish', name:'供需发布与浏览', icon:'box',
+      items:[
+        {q:'如何发布需求/供应？', steps:['点击底部「工作台」按钮','选择发布方向：发布需求或发布供应','填写基本信息（品类、标题、描述等）','可使用AI智能补全功能自动生成信息','确认无误后提交发布'], links:[{text:'前往发布页',href:'../publish/index.html'}]},
+        {q:'AI智能补全怎么用？', desc:'AI智能补全可以帮助您快速生成完整的供需信息，只需输入一句话描述：', steps:['在发布页面找到「AI补全」输入框','用一句话描述您的需求或供应（如：需要成都地区的混凝土供应）','点击「生成」按钮，AI自动补全品类、区域、预算等信息','检查并修改生成的内容','确认后发布'], tip:'AI生成内容仅供参考，请核实关键信息后再发布'},
+        {q:'如何搜索和筛选供需信息？', steps:['在首页顶部搜索框输入关键词','或进入「发现」页面浏览全部分类','使用筛选功能按品类、区域、价格范围过滤','点击搜索结果查看详情','可按匹配度、发布时间排序'], links:[{text:'前往搜索',href:'../search/index.html'}]},
+        {q:'如何收藏感兴趣的信息？', steps:['在供需详情页点击右上角「收藏」按钮','收藏成功后按钮变为已收藏状态','在「我的」-「我的收藏」中查看所有收藏','可在收藏列表中快速取消收藏','收藏的信息更新时会收到通知'], links:[{text:'查看我的收藏',href:'../favorite/index.html'}]},
+        {q:'发布的信息如何修改或下架？', steps:['进入「我的」-「已发布」列表','找到需要修改的信息，点击「编辑」','修改内容后重新提交审核','如需下架，点击「下架」按钮确认','下架后的信息不再对外展示，可重新上架'], links:[{text:'管理已发布',href:'../publish/records.html'}]},
+        {q:'供需信息的匹配度是怎么计算的？', desc:'匹配度是AI根据多个维度综合计算的百分比：', steps:['品类匹配：供需品类的相关程度','区域匹配：地理位置的接近程度','预算匹配：价格区间的吻合度','距离匹配：供需双方实际距离','时间匹配：发布时间和有效期','综合以上维度加权计算，得出0-100%的匹配分数']}
+      ]
+    },
+    {
+      id:'order', name:'订单与交易', icon:'briefcase',
+      items:[
+        {q:'如何查看联系信息？', desc:'供需详情页的联系信息默认隐藏，需要付费解锁后查看：', steps:['在供需详情页找到「查看联系信息」按钮','点击后弹出解锁费用确认弹层','确认费用并完成支付','解锁后联系信息自动显示并复制到剪贴板','可在订单记录中查看解锁历史'], links:[{text:'查看订单',href:'../order/index.html'}]},
+        {q:'信息解锁费用是多少？', desc:'信息解锁费用根据品类、区域、信息价值等因素动态定价：', steps:['不同品类的解锁费用不同（如建材类、劳务类、设备类等）','热门区域和高价值信息费用较高','具体费用在详情页底部弹层中明确显示','解锁前可看到费用明细','部分活动期间可享受折扣或免费解锁'], tip:'解锁费用一经支付，除信息有误外不予退款'},
+        {q:'订单有哪些状态？', desc:'订单在整个生命周期中会经历以下状态：', steps:['待支付：订单已创建但尚未付款','已支付/进行中：付款成功，服务进行中','已完成：交易完成，双方确认','已取消：订单被取消（未支付或退款成功）','退款中：已申请退款，正在处理'], links:[{text:'查看订单',href:'../order/index.html'}]},
+        {q:'如何确认订单完成？', steps:['进入「我的」-「订单」列表','找到对应订单，点击进入订单详情','点击「确认完成」按钮','确认后订单状态变为已完成','可对本次交易进行评价'], links:[{text:'前往订单',href:'../order/index.html'}]},
+        {q:'解锁后联系信息有误怎么办？', desc:'如果解锁后发现联系信息有误（如电话空号、信息不实等），可以申请退款：', steps:['在订单详情页点击「申请退款」','选择退款原因（信息有误、联系不上等）','上传相关证据截图','提交退款申请，平台审核','审核通过后费用原路退回'], tip:'请在解锁后24小时内申请，超时将无法受理'}
+      ]
+    },
+    {
+      id:'wallet', name:'资金与钱包', icon:'wallet',
+      items:[
+        {q:'如何充值？', steps:['进入「我的」-「钱包」','点击「充值」按钮','选择充值金额或自定义金额','选择支付方式（微信支付/支付宝）','完成支付后余额即时到账'], links:[{text:'前往钱包',href:'../wallet/index.html'}]},
+        {q:'如何提现？', steps:['进入「我的」-「钱包」','点击「提现」按钮','输入提现金额（需大于最低提现额）','选择到账账户（银行卡/支付宝）','提交提现申请，等待审核'], links:[{text:'前往钱包',href:'../wallet/withdraw.html'}]},
+        {q:'提现多久到账？', desc:'提现到账时间取决于提现方式和银行处理速度：', steps:['工作日提交的提现申请，T+1个工作日到账','周末或节假日提交的申请，顺延至下一工作日处理','大额提现（≥5万元）可能需要额外审核时间','具体到账时间以银行处理为准','如超过3个工作日未到账，请联系客服'], tip:'首次提现需要先绑定提现账户'},
+        {q:'积分有什么用？', desc:'积分是工程链的虚拟奖励，可用于抵扣信息解锁费用：', steps:['每日签到可获取积分','完成平台任务（如完善资料、发布信息）获取积分','积分可在解锁信息时按比例抵扣费用','100积分=1元，单次最多抵扣50%','积分有效期为1年，过期自动清零'], links:[{text:'查看积分',href:'../wallet/credits.html'}]},
+        {q:'如何查看资金流水？', steps:['进入「我的」-「钱包」','点击「流水明细」','可查看充值、提现、消费等所有记录','支持按时间范围和类型筛选','点击单条流水可查看详细信息'], links:[{text:'前往钱包',href:'../wallet/index.html'}]},
+        {q:'冻结金额是什么？', desc:'冻结金额是指进行中订单的托管资金，暂时不能使用或提现：', steps:['下单付款后，资金先进入托管状态（冻结）','订单进行中，资金保持冻结','订单完成确认后，资金解冻并转给对方','如果订单取消或退款，冻结资金退回余额','冻结金额在钱包页面单独显示']}
+      ]
+    },
+    {
+      id:'distribution', name:'分销与推广', icon:'share',
+      items:[
+        {q:'如何邀请好友？', steps:['进入「分销中心」','点击「邀请好友」','获取专属邀请码或邀请链接','通过微信、朋友圈等方式分享','好友注册时填写邀请码即绑定关系'], links:[{text:'前往分销中心',href:'../distribution/index.html'}]},
+        {q:'分销佣金如何计算？', desc:'分销佣金按被邀请人在平台的消费金额计算：', steps:['被邀请人首次消费后，邀请人获得首单佣金','被邀请人后续消费，邀请人持续获得返佣','佣金比例根据分销等级递增','不同品类的佣金比例可能不同','佣金明细可在分销中心查看'], links:[{text:'查看佣金明细',href:'../distribution/earnings.html'}]},
+        {q:'佣金如何提现？', steps:['进入「分销中心」-「佣金提现」','确认可提现佣金余额（需满最低提现额）','输入提现金额','选择到账账户','提交申请，T+1个工作日到账'], links:[{text:'前往分销中心',href:'../distribution/index.html'}]},
+        {q:'如何查看推广效果？', steps:['进入「分销中心」','查看「推广数据」概览','可查看累计邀请人数、活跃用户数','查看佣金收入明细和趋势','可按时间范围筛选统计数据'], links:[{text:'查看推广数据',href:'../distribution/team.html'}]},
+        {q:'个人合伙人与普通分销有什么区别？', desc:'个人合伙人享有比普通分销更高级的权益：', steps:['专属佣金配置：合伙人享受更高的佣金比例','推广渠道支持：可使用平台提供的推广素材和工具','专属客服：合伙人有专属客服对接','团队管理：可发展下级分销并享受团队奖励','优先参与平台活动和新功能内测'], links:[{text:'了解合伙人',href:'../profile/auth-partner.html'}]}
+      ]
+    },
+    {
+      id:'recruit', name:'招聘与求职', icon:'recruit',
+      items:[
+        {q:'如何发布招聘职位？', steps:['进入「工作台」，选择「发布招聘」','填写职位信息（职位名称、薪资、要求等）','选择工作地点和招聘人数','确认后提交发布','发布后可在「已发布」中管理职位'], links:[{text:'前往招聘',href:'../personnel/index.html'}]},
+        {q:'个人入驻求职型有什么权益？', desc:'选择 jobseeker 求职型入驻的个人用户享受以下权益：', steps:['完整简历展示：可填写并展示完整求职简历','职位投递：可直接向心仪职位投递简历','被企业查看：企业可查看您的联系方式','职位推荐：AI根据简历匹配推荐合适职位','求职进度跟踪：可查看投递记录和面试反馈'], links:[{text:'前往认证',href:'../profile/auth.html'}]},
+        {q:'如何投递简历？', desc:'投递简历需要先完成个人入驻（jobseeker类型）并完善简历：', steps:['在职位详情页点击「投递简历」','如未入驻，先引导完成个人入驻','选择要投递的简历（可维护多份简历）','确认投递信息后提交','可在「我的投递」中查看进度'], links:[{text:'前往招聘',href:'../personnel/index.html'}], tip:'需要个人入驻 jobseeker 类型才能投递简历'},
+        {q:'standard型个人入驻为什么不能投递？', desc:'standard 标准型仅完成资质认证，不包含求职功能：', steps:['standard型定位为资质认证用户，主要用于发布供需','投递简历需要完整的求职简历，standard型不提供简历模块','如需投递简历，请升级为 jobseeker 求职型','升级后需完善简历信息','升级可在认证中心操作，即时生效'], links:[{text:'升级入驻类型',href:'../profile/auth.html'}]}
+      ]
+    },
+    {
+      id:'safety', name:'平台规则与安全', icon:'shield',
+      items:[
+        {q:'哪些行为属于违规？', desc:'以下行为在工程链平台属于违规行为：', steps:['发布虚假信息：虚构供需内容、伪造资质','欺诈行为：骗取他人财物、虚假承诺','恶意骚扰：频繁拨打骚扰电话、发送垃圾信息','刷单行为：虚假交易、刷好评、刷匹配度','发布违禁品：法律法规禁止交易的物品和服务'], tip:'发现违规行为请及时举报，共同维护平台环境'},
+        {q:'违规后会有什么处罚？', desc:'平台根据违规情节轻重采取不同处罚措施：', steps:['警告：首次轻微违规，口头警告并要求整改','信息下架：违规信息强制下架，不得重新发布','账号冻结：暂停账号部分或全部功能','账号封禁：严重违规永久封禁账号','违规费用不退：因违规导致的已支付费用不予退还'], tip:'对处罚有异议可在7天内申诉'},
+        {q:'如何保障交易安全？', desc:'工程链通过多重机制保障用户交易安全：', steps:['资金托管：付款后资金先托管，确认完成后才转给对方','实名认证：所有用户需完成实名认证','企业认证：企业用户需通过工商信息核验','信息审核：发布的供需信息经过AI+人工审核','评价体系：交易后双方互评，建立信用档案'], tip:'建议始终通过平台交易，不要私下转账'},
+        {q:'账号被盗怎么办？', desc:'如发现账号被盗或存在异常操作，请立即采取以下措施：', steps:['立即修改登录密码（使用强密码）','在「设置」-「账号安全」中查看登录设备','下线所有非本人设备','联系在线客服申请临时冻结账号','核查近期操作记录，确认是否有异常交易'], tip:'请定期更换密码，不要在多个平台使用相同密码'},
+        {q:'如何举报违规信息？', steps:['在供需详情页点击右上角「...」更多按钮','选择「举报」选项','选择举报类型（虚假信息、欺诈、骚扰等）','填写举报说明并上传相关证据','提交后平台将在1-3个工作日内处理并反馈结果']}
+      ]
+    },
+    {
+      id:'other', name:'其他', icon:'help',
+      items:[
+        {q:'如何联系在线客服？', desc:'在线客服为您提供实时咨询服务：', steps:['在帮助中心底部点击「在线客服」按钮','进入客服对话页面','描述您遇到的问题，客服将为您解答','客服工作时间：工作日 09:00-21:00','非工作时间可留言，客服将在工作时间回复'], tip:'也可拨打客服热线 400-000-0000'},
+        {q:'如何提交意见反馈？', desc:'您的反馈对我们非常重要：', steps:['在帮助中心底部点击「意见反馈」按钮','选择反馈类型（功能建议、Bug反馈、体验问题等）','详细描述您的意见或问题','可上传截图帮助我们更好理解','提交后我们会认真阅读每一条反馈'], tip:'优质反馈可能获得积分奖励'},
+        {q:'工程链是什么平台？', desc:'工程链 ENGCHAIN 是建筑行业供需一站式匹配平台：', steps:['连接建筑行业的供方与需方','覆盖建材、劳务、设备、运输、模板脚手架等全品类','通过AI智能匹配，快速找到合适的供需信息','提供实名认证、企业认证、资金托管等安全保障','服务全国31个省级行政区，覆盖主要地级市'], tip:'您既是供方也是需方，可随时切换发布方向'},
+        {q:'支持哪些地区？', desc:'工程链目前覆盖全国范围：', steps:['支持全国31个省、自治区、直辖市','覆盖主要地级市和县级市','重点城市提供本地化运营服务','偏远地区信息可能较少，正在持续拓展','可在发布和搜索时选择具体地区']}
+      ]
+    }
+  ];
+
+  /* 热门问题（从FAQ中选取） */
+  var HOT_QUESTIONS = [
+    {catId:'publish', index:0, q:'如何发布供需？', a:'点击底部工作台，选择发布需求或供应，填写信息后提交，也可使用AI智能补全快速生成。'},
+    {catId:'order', index:0, q:'如何查看联系信息？', a:'详情页联系信息默认隐藏，付费解锁后即可查看并自动复制到剪贴板。'},
+    {catId:'publish', index:5, q:'AI匹配怎么工作？', a:'AI解析品类、区域、预算、距离等维度，综合计算匹配百分比并在结果中标注。'},
+    {catId:'account', index:3, q:'如何入驻？', a:'填写入驻表单→选择入驻类型→缴纳费用→审核→入驻成功，解锁完整功能。'},
+    {catId:'account', index:0, q:'实名认证流程？', a:'我的→认证中心→个人实名→上传身份证→人脸识别→提交审核。'},
+    {catId:'distribution', index:2, q:'分销佣金如何提现？', a:'分销中心→佣金提现→满最低提现额→T+1到账，支持银行卡和支付宝。'},
+    {catId:'order', index:4, q:'如何申请退款？', a:'订单详情→申请退款→选择原因→上传证据→平台审核→通过后原路退回。'},
+    {catId:'account', index:6, q:'如何修改企业信息？', a:'企业认证信息变更需重新提交审核，在认证中心点击信息变更即可。'}
+  ];
+
+  /* ===== 渲染分类网格（两行四列，icon+文字） ===== */
+  function renderCatGrid(){
+    var grid = document.getElementById('catGrid');
+    var html = '';
+    CATEGORIES.forEach(function(cat){
+      html += '<div class="help-cat-grid-item" data-cat="'+cat.id+'">' +
+        '<div class="help-cat-grid-icon"><svg class="ic" viewBox="0 0 24 24"><use href="#i-'+cat.icon+'"/></svg></div>' +
+        '<div class="help-cat-grid-name">'+cat.name+'</div>' +
+      '</div>';
+    });
+    grid.innerHTML = html;
+  }
+
+  /* ===== 渲染热门问题（整行满宽卡片） ===== */
+  function renderHotQuestions(){
+    var list = document.getElementById('hotScroll');
+    var html = '';
+    HOT_QUESTIONS.forEach(function(h, i){
+      html += '<div class="help-hot-card" data-cat="'+h.catId+'" data-index="'+h.index+'">' +
+        '<div class="help-hot-body">' +
+          '<div class="help-hot-title-row"><span class="help-hot-tag"><svg class="ic" viewBox="0 0 24 24"><use href="#i-fire"/></svg>热门</span>' +
+          '<div class="help-hot-q">'+h.q+'</div></div>' +
+          '<div class="help-hot-a">'+h.a+'</div>' +
+        '</div>' +
+        '<svg class="ic help-hot-arrow" viewBox="0 0 24 24"><use href="#i-chev-r"/></svg>' +
+      '</div>';
+    });
+    list.innerHTML = html;
+  }
+
+  /* ===== 渲染FAQ ===== */
+  function renderFAQ(){
+    var container = document.getElementById('faqContainer');
+    var html = '';
+    var total = 0;
+    CATEGORIES.forEach(function(cat){
+      total += cat.items.length;
+      html += '<div class="help-faq-section" data-cat="'+cat.id+'">' +
+        '<div class="help-faq-head">' +
+          '<div class="help-faq-head-icon"><svg class="ic" viewBox="0 0 24 24"><use href="#i-'+cat.icon+'"/></svg></div>' +
+          '<span class="help-faq-head-text">'+cat.name+'</span>' +
+          '<span class="help-faq-head-count">'+cat.items.length+'题</span>' +
+          '<svg class="ic help-faq-head-arrow" viewBox="0 0 24 24"><use href="#i-chev-r"/></svg>' +
+        '</div>' +
+        '<div class="help-faq-body">';
+      cat.items.forEach(function(item, idx){
+        html += '<div class="help-faq-item" data-q="'+item.q.replace(/"/g,'&quot;')+'">' +
+          '<div class="help-faq-q">' +
+            '<span class="help-faq-q-text">'+item.q+'</span>' +
+            '<svg class="ic help-faq-q-arrow" viewBox="0 0 24 24"><use href="#i-chev-r"/></svg>' +
+          '</div>' +
+          '<div class="help-faq-detail"><div class="help-faq-detail-inner">';
+        if(item.desc){
+          html += '<div class="help-faq-desc">'+item.desc+'</div>';
+        }
+        if(item.steps){
+          html += '<ol class="help-faq-steps">';
+          item.steps.forEach(function(s, si){
+            html += '<li data-n="'+(si+1)+'">'+s+'</li>';
+          });
+          html += '</ol>';
+        }
+        if(item.links){
+          html += '<div class="help-faq-links">';
+          item.links.forEach(function(l){
+            html += '<a class="help-faq-link" href="'+l.href+'">'+l.text+'<svg class="ic" viewBox="0 0 24 24"><use href="#i-external"/></svg></a>';
+          });
+          html += '</div>';
+        }
+        if(item.tip){
+          html += '<div class="help-faq-tip"><svg class="ic" viewBox="0 0 24 24"><use href="#i-info"/></svg><span>'+item.tip+'</span></div>';
+        }
+        html += '</div></div></div>';
+      });
+      html += '</div></div>';
+    });
+    container.innerHTML = html;
+    document.getElementById('faqCountLabel').textContent = '共'+total+'个问题';
+    return total;
+  }
+
+  /* ===== 搜索过滤 ===== */
+  var searchInput = document.getElementById('helpSearchInput');
+  var searchBox = document.getElementById('searchBox');
+  var searchClear = document.getElementById('searchClear');
+  var searchResult = document.getElementById('searchResult');
+  var noResult = document.getElementById('noResult');
+
+  function doSearch(keyword){
+    keyword = (keyword || '').trim().toLowerCase();
+    var sections = document.querySelectorAll('.help-faq-section');
+    var totalHit = 0;
+
+    if(!keyword){
+      // 恢复全部
+      sections.forEach(function(sec){
+        sec.classList.remove('hidden');
+        sec.classList.remove('open');
+        var items = sec.querySelectorAll('.help-faq-item');
+        items.forEach(function(it){
+          it.classList.remove('open','search-hit');
+          it.style.display = '';
+        });
+      });
+      searchResult.textContent = '';
+      noResult.classList.remove('show');
+      return;
+    }
+
+    sections.forEach(function(sec){
+      var items = sec.querySelectorAll('.help-faq-item');
+      var catHit = 0;
+      var catName = sec.querySelector('.help-faq-head-text').textContent.toLowerCase();
+      items.forEach(function(it){
+        var q = (it.getAttribute('data-q') || '').toLowerCase();
+        var hit = q.indexOf(keyword) > -1 || catName.indexOf(keyword) > -1;
+        if(hit){
+          it.style.display = '';
+          it.classList.add('search-hit');
+          catHit++;
+          totalHit++;
+        } else {
+          it.style.display = 'none';
+          it.classList.remove('open','search-hit');
+        }
+      });
+      if(catHit > 0){
+        sec.classList.remove('hidden');
+        sec.classList.add('open');
+      } else {
+        sec.classList.add('hidden');
+        sec.classList.remove('open');
+      }
+    });
+
+    if(totalHit > 0){
+      searchResult.textContent = '找到 '+totalHit+' 个相关问题';
+      noResult.classList.remove('show');
+    } else {
+      searchResult.textContent = '未找到相关问题';
+      noResult.classList.add('show');
+    }
+  }
+
+  searchInput.addEventListener('focus', function(){ searchBox.classList.add('focus'); });
+  searchInput.addEventListener('blur', function(){ searchBox.classList.remove('focus'); });
+  searchInput.addEventListener('input', function(){
+    var val = this.value;
+    if(val){ searchClear.classList.add('show'); } else { searchClear.classList.remove('show'); }
+    doSearch(val);
+  });
+  searchClear.addEventListener('click', function(){
+    searchInput.value = '';
+    searchClear.classList.remove('show');
+    doSearch('');
+    searchInput.focus();
+  });
+
+  /* ===== 展开/收起全部 ===== */
+  window.toggleAllFAQ = function(){
+    var sections = document.querySelectorAll('.help-faq-section:not(.hidden)');
+    var allOpen = true;
+    sections.forEach(function(s){ if(!s.classList.contains('open')) allOpen = false; });
+    sections.forEach(function(s){
+      if(allOpen){ s.classList.remove('open'); }
+      else { s.classList.add('open'); }
+    });
+    document.getElementById('faqToggleAll').textContent = allOpen ? '展开全部' : '收起全部';
+  };
+
+  /* ===== 手风琴交互 ===== */
+  var faqContainer = document.getElementById('faqContainer');
+
+  // 分类展开/收起
+  faqContainer.addEventListener('click', function(e){
+    var head = e.target.closest('.help-faq-head');
+    if(head){
+      var section = head.parentElement;
+      section.classList.toggle('open');
+      return;
+    }
+    // 问题展开/收起（同一分类下只展开一个）
+    var q = e.target.closest('.help-faq-q');
+    if(q){
+      var item = q.parentElement;
+      var section = item.closest('.help-faq-section');
+      var wasOpen = item.classList.contains('open');
+      // 关闭同分类下所有
+      section.querySelectorAll('.help-faq-item.open').forEach(function(it){
+        it.classList.remove('open');
+      });
+      if(!wasOpen){
+        item.classList.add('open');
+      }
+    }
+  });
+
+  /* ===== 分类点击滚动（滚动偏移随吸顶搜索行高度自适应） ===== */
+  var catGrid = document.getElementById('catGrid');
+  catGrid.addEventListener('click', function(e){
+    var catItem = e.target.closest('.help-cat-grid-item');
+    if(!catItem) return;
+    var catId = catItem.getAttribute('data-cat');
+    var target = document.querySelector('.help-faq-section[data-cat="'+catId+'"]');
+    if(target){
+      // 高亮分类
+      document.querySelectorAll('.help-cat-grid-item').forEach(function(c){ c.classList.remove('active'); });
+      catItem.classList.add('active');
+      // 展开该分类
+      target.classList.add('open');
+      // 平滑滚动（以吸顶搜索行底边为基准，用 rect 差值定位，适配状态栏/导航栏高度）
+      var scrollEl = document.getElementById('helpScroll');
+      var sticky = document.querySelector('.help-sticky-top');
+      var delta = target.getBoundingClientRect().top - sticky.getBoundingClientRect().bottom - 10;
+      scrollEl.scrollTo({top: Math.max(0, scrollEl.scrollTop + delta), behavior: 'smooth'});
+      // 3秒后取消高亮
+      setTimeout(function(){ catItem.classList.remove('active'); }, 3000);
+    }
+  });
+
+  /* ===== 热门问题点击 ===== */
+  document.getElementById('hotScroll').addEventListener('click', function(e){
+    var card = e.target.closest('.help-hot-card');
+    if(!card) return;
+    var catId = card.getAttribute('data-cat');
+    var index = parseInt(card.getAttribute('data-index'), 10);
+    var section = document.querySelector('.help-faq-section[data-cat="'+catId+'"]');
+    if(section){
+      section.classList.add('open');
+      var items = section.querySelectorAll('.help-faq-item');
+      if(items[index]){
+        items[index].classList.add('open');
+        var scrollEl = document.getElementById('helpScroll');
+        var sticky = document.querySelector('.help-sticky-top');
+        var delta = items[index].getBoundingClientRect().top - sticky.getBoundingClientRect().bottom - 20;
+        scrollEl.scrollTo({top: Math.max(0, scrollEl.scrollTop + delta), behavior: 'smooth'});
+      }
+    }
+  });
+
+  /* ===== 意见反馈 ===== */
+  document.getElementById('feedbackBtn').addEventListener('click', function(){
+    var s = UI.sheet();
+    s.setText('意见反馈');
+    s.html(
+      '<div style="padding:6px 0 14px;">' +
+        '<div style="font-size:13px;color:var(--text-2);margin-bottom:10px;">您的反馈是我们进步的动力</div>' +
+        '<textarea id="fbText" placeholder="请描述您的建议或遇到的问题..." style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;min-height:100px;resize:none;outline:none;font-family:inherit;"></textarea>' +
+        '<button class="btn btn-primary btn-block" style="margin-top:14px;height:44px;font-size:14px;font-weight:600;" onclick="UI.toast(\'反馈已提交，感谢您的支持\',\'ok\');this.closest(\'.sheet\').querySelector(\'.sheet-close\').click();">提交反馈</button>' +
+      '</div>'
+    );
+    s.show();
+  });
+
+  /* ===== 关于工程链 ===== */
+  document.getElementById('aboutRow').addEventListener('click', function(){
+    UI.dialog({
+      title:'关于工程链',
+      text:'<div style="text-align:center;padding:6px 0;">' +
+        '<div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));margin:0 auto 12px;display:flex;align-items:center;justify-content:center;color:var(--text-inv);"><svg style="width:30px;height:30px;" viewBox="0 0 24 24"><use href="#i-buil"/></svg></div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:4px;">工程链 ENGCHAIN</div>' +
+        '<div style="font-size:12px;color:var(--text-3);margin-bottom:12px;">版本 V3.3.0</div>' +
+        '<div style="font-size:13px;color:var(--text-2);line-height:1.8;">建筑行业供需一站式匹配平台<br>连接供方与需方，让交易更高效</div>' +
+      '</div>',
+      ok:'知道了',
+      cancel:''
+    });
+  });
+
+  /* ===== 初始化 ===== */
+  renderCatGrid();
+  renderHotQuestions();
+  var total = renderFAQ();
+
+  // 默认展开第一个分类，避免页面空旷
+  var firstSection = document.querySelector('.help-faq-section');
+  if(firstSection) firstSection.classList.add('open');
+
+  // 渲染底部tabbar
+  var phone = document.querySelector('.phone');
+  if(phone && !phone.querySelector('.app-tabbar')){
+    phone.insertAdjacentHTML('beforeend', UI.tabbar('me', window.__ROOT__));
+    UI.ensureThinkingOrb(function () { window.ThinkingOrb.initAll(); });
+  }
+
+  // 暴露总数供验证
+  window.__HELP_FAQ_TOTAL__ = total;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>订单管理 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="operations/orders.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>订单管理</h1>
+        <div class="sub">运营中心 · 订单全生命周期（待支付→服务中→待验收→已结算）+ 里程碑验收 + 佣金试算（规则同源）</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出当前筛选结果为 CSV"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>导出 CSV</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="seg mb-12" id="f-kind">
+      <button data-k="all" class="on">全部订单</button>
+      <button data-k="normal">普通订单</button>
+      <button data-k="mediation">中介托管</button>
+    </div>
+
+    <div class="card card-pad">
+      <div id="filter-bar"></div>
+      <div id="table-container"></div>
+      <div id="pager-container"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script src="../../js/domain.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var TYPE = { supply:'供方承接', need:'需求匹配', agency:'中介撮合', transfer:'建企买卖', qual:'资质招商' };
+  var ST_LABEL = { pending:'待支付', serving:'服务中', await_accept:'待验收', settled:'已结算', cancelled:'已取消',
+                   escrowed:'已托管', await_confirm:'待验收', disputed:'纠纷中', refunded:'已退款', partial_refund:'部分退款', draft:'待支付' };
+  var page = 1, pageSize = 10, fType = '', fSt = '', fQ = '', fDateStart = '', fDateEnd = '', orderKind = 'all';
+  var paginator = null, tableInst = null;
+  var $ = function (s) { return document.querySelector(s); };
+
+  function stBadge(st) {
+    var m = { settled: ['badge-success', '已结算'], serving: ['badge-info', '服务中'], await_accept: ['badge-warning', '待验收'],
+              await_confirm: ['badge-warning', '待验收'], pending: ['badge-warning', '待支付'], draft: ['badge-warning', '待支付'],
+              cancelled: ['badge-outline', '已取消'], escrowed: ['badge-primary', '已托管'],
+              disputed: ['badge-danger', '纠纷中'], refunded: ['badge-outline', '已退款'], partial_refund: ['badge-outline', '部分退款'] };
+    var v = m[st] || ['badge-outline', st];
+    return '<span class="badge ' + v[0] + '">' + v[1] + '</span>';
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(ts) {
+    if (!ts) return '';
+    if (typeof ts === 'number') return new Date(ts).toISOString().slice(0, 10);
+    return String(ts).slice(0, 10);
+  }
+
+  function listNormal() { return (window.DataBus && DataBus.orders) ? DataBus.orders() : []; }
+  function listMediation() {
+    if (!window.Mediation) return [];
+    return Mediation.list().map(function (o) {
+      var sellerName = '';
+      try { var su = DataBus.byId(o.sellerId); if (su) sellerName = su.name || su.company || o.sellerId; } catch (e) {}
+      return {
+        id: o.id, kind: 'mediation', title: o.title || o.svcName || '中介托管订单',
+        type: 'mediation', counterparty: sellerName || o.svcName || '',
+        amount: o.amount, fee: o.fee || 0, status: o.state, milestones: o.milestones || [],
+        ts: o.createdAt || 0, _isMediation: true, _raw: o
+      };
+    });
+  }
+  function list() {
+    var n = listNormal().map(function (o) { return Object.assign({}, o, { kind: 'normal', _isMediation: false }); });
+    var m = listMediation();
+    if (orderKind === 'normal') return n;
+    if (orderKind === 'mediation') return m;
+    return n.concat(m).sort(function (a, b) { return (b.ts || b.createdAt || 0) - (a.ts || a.createdAt || 0); });
+  }
+  function filtered() {
+    var a = list(), q = fQ.trim().toLowerCase();
+    return a.filter(function (x) {
+      if (fType && x.type !== fType) return false;
+      if (fSt && x.status !== fSt) return false;
+      if (fDateStart && fmtDate(x.ts) < fDateStart) return false;
+      if (fDateEnd && fmtDate(x.ts) > fDateEnd) return false;
+      if (q && (x.id + x.title + x.counterparty).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+  }
+
+  function msBar(x) {
+    var ms = (x && Array.isArray(x.milestones)) ? x.milestones : [];
+    var done = 0;
+    ms.forEach(function (m) { if (m.status === 'done') done++; });
+    var html = '<div class="ms-bar">';
+    ms.forEach(function (m, i) {
+      html += '<div class="ms-seg ' + (m.status === 'done' ? 'done' : (m.status === 'todo' && i === done ? 'cur' : '')) + '" title="' + esc(m.label) + '"></div>';
+    });
+    html += '</div><div class="row-sub">' + done + '/' + ms.length + ' 节点达成</div>';
+    return html;
+  }
+
+  function renderKPI(all) {
+    var c = { total: all.length, serving: 0, await_accept: 0, settled: 0, cancelled: 0 }, fee = 0, monthAmount = 0;
+    var now = new Date(), ym = now.toISOString().slice(0, 7);
+    all.forEach(function (x) {
+      if (c[x.status] !== undefined) c[x.status]++;
+      if (x.fee) fee += x.fee;
+      if (x.status === 'settled' && fmtDate(x.ts).slice(0, 7) === ym) monthAmount += Number(x.amount || 0);
+    });
+    var cards = [
+      ['总订单', c.total, 'info', '全部类型合计'],
+      ['进行中', c.serving, 'up', '履约推进中'],
+      ['待验收', c.await_accept, 'warn', '里程碑待确认'],
+      ['已结算', c.settled, 'success', '佣金已计提'],
+      ['本月成交额', '¥' + Math.round(monthAmount).toLocaleString(), 'gold', '已结算订单金额']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + k[2] + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function opButtons(x) {
+    var isMed = !!x._isMediation;
+    var ops = [];
+    if (isMed) {
+      ops.push('<button class="btn btn-sm btn-outline" data-act="detail" data-id="' + x.id + '">查看详情</button>');
+      return ops.join('');
+    }
+    if (x.status === 'pending') {
+      ops.push('<button class="btn btn-sm btn-primary" data-act="pay" data-id="' + x.id + '" data-perm="approve.first">确认支付</button>');
+      ops.push('<button class="btn btn-sm btn-ghost" data-act="cancel" data-id="' + x.id + '">取消订单</button>');
+    } else if (x.status === 'serving') {
+      ops.push('<button class="btn btn-sm btn-primary" data-act="ms" data-id="' + x.id + '">推进里程碑</button>');
+      ops.push('<button class="btn btn-sm btn-ghost" data-act="cancel" data-id="' + x.id + '">取消订单</button>');
+    } else if (x.status === 'await_accept') {
+      ops.push('<button class="btn btn-sm btn-primary" data-act="settle" data-id="' + x.id + '" data-perm="approve.first">确认结算</button>');
+      ops.push('<button class="btn btn-sm btn-ghost" data-act="cancel" data-id="' + x.id + '">取消订单</button>');
+    }
+    ops.push('<button class="btn btn-sm btn-outline" data-act="detail" data-id="' + x.id + '">查看详情</button>');
+    return ops.join('');
+  }
+
+  function renderTable() {
+    var all = list(), rows = filtered();
+    renderKPI(all);
+    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    if (page > totalPages) page = totalPages;
+    var seg = rows.slice((page - 1) * pageSize, page * pageSize);
+
+    var columns = [
+      { key: 'id', label: '订单号', width: '140px', render: function (r) { return '<span class="num">' + esc(r.id) + '</span>'; } },
+      { key: 'title', label: '订单内容', render: function (r) {
+          var medBadge = r._isMediation ? '<span class="badge badge-gold ml-6">托管</span>' : '';
+          return '<div class="cell-main">' + esc(r.title) + medBadge + '</div><div class="cell-sub">对方：' + esc(r.counterparty) + '</div>';
+        } },
+      { key: 'type', label: '类型', width: '90px', render: function (r) { return r._isMediation ? '中介托管' : (TYPE[r.type] || r.type); } },
+      { key: 'amount', label: '金额', width: '110px', render: function (r) { return '<span class="amt">' + money(r.amount) + '</span>'; } },
+      { key: 'fee', label: '佣金', width: '110px', render: function (r) { return r.fee ? '<span class="amt">' + money(r.fee) + '</span>' : '<span class="text-muted">—</span>'; } },
+      { key: 'milestones', label: '里程碑', width: '140px', render: function (r) { return msBar(r); } },
+      { key: 'status', label: '状态', width: '90px', render: function (r) { return stBadge(r.status); } },
+      { key: 'ts', label: '创建时间', width: '100px', render: function (r) { return fmtDate(r.ts); } },
+      { key: 'ops', label: '操作', width: '220px', render: function (r) { return '<div class="ops">' + opButtons(r) + '</div>'; } }
+    ];
+
+    tableInst = Admin.TableRenderer.render({
+      container: '#table-container',
+      columns: columns,
+      data: seg,
+      options: {
+        selectable: true,
+        emptyText: '无符合条件的订单',
+        loading: false
+      }
+    });
+
+    if (!paginator) {
+      paginator = new Admin.Paginator({
+        container: '#pager-container',
+        total: rows.length,
+        pageSize: pageSize,
+        pageSizeOptions: [10, 20, 50],
+        onChange: function (p, sz) { page = p; pageSize = sz; renderTable(); }
+      });
+    } else {
+      paginator.pageSize = pageSize;
+      paginator.current = page;
+      paginator.setTotal(rows.length);
+    }
+
+    if (window.Admin && Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function render() { renderTable(); }
+
+  /* ---- 详情抽屉 ---- */
+  function openDetail(id) {
+    var x = null;
+    list().forEach(function (o) { if (o.id === id) x = o; });
+    if (!x) { Admin.toast('未找到订单'); return; }
+    var isMed = !!x._isMediation;
+    var c = DataBus.orderCalc(x.amount);
+    var ms = (x && Array.isArray(x.milestones)) ? x.milestones : [];
+    var done = 0; ms.forEach(function (m) { if (m.status === 'done') done++; });
+
+    var html = '<div class="drawer-section">';
+    html += '<div class="ds-title">基本信息</div>';
+    html += '<div class="ds-grid">';
+    html += '<div class="ds-item"><span class="ds-k">订单号</span><span class="ds-v">' + esc(x.id) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">订单类型</span><span class="ds-v">' + (isMed ? '中介托管' : (TYPE[x.type] || x.type)) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">订单状态</span><span class="ds-v">' + stBadge(x.status) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">创建时间</span><span class="ds-v">' + fmtDate(x.ts) + '</span></div>';
+    html += '<div class="ds-item ds-full"><span class="ds-k">订单标题</span><span class="ds-v">' + esc(x.title) + '</span></div>';
+    html += '</div></div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">双方信息</div>';
+    html += '<div class="ds-grid">';
+    html += '<div class="ds-item"><span class="ds-k">甲方（发布方）</span><span class="ds-v">' + esc(x.owner || '平台') + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">乙方（承接方）</span><span class="ds-v">' + esc(x.counterparty || '—') + '</span></div>';
+    html += '</div></div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">金额与佣金</div>';
+    html += '<div class="ds-grid">';
+    html += '<div class="ds-item"><span class="ds-k">订单金额</span><span class="ds-v num">' + money(x.amount) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">适用费率</span><span class="ds-v num">' + (c.rate * 100).toFixed(1) + '%</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">应计佣金</span><span class="ds-v num">' + money(c.fee) + '</span></div>';
+    html += '<div class="ds-item"><span class="ds-k">已计提佣金</span><span class="ds-v num">' + (x.fee ? money(x.fee) : '¥0.00') + '</span></div>';
+    html += '</div>';
+    if (c.items && c.items.length) {
+      html += '<div class="calc-detail">';
+      c.items.forEach(function (it) {
+        html += '<div class="calc-row"><span class="ck">' + esc(it.label) + '（' + Math.round(it.pct * 100) + '%）</span><span class="cv num">' + money(it.fee) + '</span></div>';
+      });
+      html += '</div>';
+    }
+    html += '<div class="calc-tip">' + (c.milestone
+      ? '里程碑分账：订单金额 ≥5 万，佣金按 30/30/30/10 四节点分期；结算时按已达成节点比例计提。'
+      : '整单结算：订单金额 <5 万，不启用里程碑分账，结算时一次性计提全额佣金。') + '</div>';
+    html += '</div>';
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">里程碑进度（' + done + '/' + ms.length + '）</div>';
+    if (ms.length) {
+      html += '<div class="ms-timeline">';
+      ms.forEach(function (m, i) {
+        var isDone = m.status === 'done';
+        html += '<div class="ms-tl-item ' + (isDone ? 'done' : '') + '">';
+        html += '<div class="ms-tl-dot">' + (isDone ? '✓' : (i + 1)) + '</div>';
+        html += '<div class="ms-tl-body">';
+        html += '<div class="ms-tl-label">' + esc(m.label) + '</div>';
+        html += '<div class="ms-tl-meta">' + Math.round(m.pct * 100) + '% · 佣金 ' + money(Math.round(c.fee * m.pct * 100) / 100);
+        if (isDone && m.doneAt) html += ' · 达成于 ' + fmtDate(m.doneAt);
+        html += '</div></div></div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="text-muted">无里程碑节点</div>';
+    }
+    html += '</div>';
+
+    if (isMed && x._raw) {
+      html += '<div class="drawer-section">';
+      html += '<div class="ds-title">中介托管信息</div>';
+      html += '<div class="ds-grid">';
+      html += '<div class="ds-item"><span class="ds-k">托管状态</span><span class="ds-v">' + esc(x._raw.state || x.status) + '</span></div>';
+      html += '<div class="ds-item"><span class="ds-k">托管金额</span><span class="ds-v num">' + money(x._raw.escrowAmount || x.amount) + '</span></div>';
+      if (x._raw.disputeReason) html += '<div class="ds-item ds-full"><span class="ds-k">纠纷原因</span><span class="ds-v">' + esc(x._raw.disputeReason) + '</span></div>';
+      html += '</div></div>';
+    }
+
+    html += '<div class="drawer-section">';
+    html += '<div class="ds-title">操作时间线</div>';
+    html += '<div class="ms-timeline">';
+    html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">订单创建</div><div class="ms-tl-meta">' + fmtDate(x.ts) + '</div></div></div>';
+    if (x.status !== 'pending' && x.status !== 'cancelled') {
+      html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">确认支付 · 进入服务中</div><div class="ms-tl-meta">运营确认</div></div></div>';
+    }
+    if (done > 0) {
+      html += '<div class="ms-tl-item done"><div class="ms-tl-dot">✓</div><div class="ms-tl-body"><div class="ms-tl-label">里程碑推进</div><div class="ms-tl-meta">已达成 ' + done + '/' + ms.length + ' 节点</div></div></div>';
+    }
+    if (x.status === 'await_accept' || x.status === 'settled') {
+      html += '<div class="ms-tl-item ' + (x.status === 'settled' ? 'done' : '') + '"><div class="ms-tl-dot">' + (x.status === 'settled' ? '✓' : '4') + '</div><div class="ms-tl-body"><div class="ms-tl-label">' + (x.status === 'settled' ? '已结算 · 佣金计提' : '待验收结算') + '</div><div class="ms-tl-meta">' + (x.status === 'settled' ? '结算完成' : '等待确认') + '</div></div></div>';
+    }
+    if (x.status === 'cancelled') {
+      html += '<div class="ms-tl-item"><div class="ms-tl-dot">✕</div><div class="ms-tl-body"><div class="ms-tl-label">订单已取消</div><div class="ms-tl-meta">订单终止，不产生佣金</div></div></div>';
+    }
+    html += '</div></div>';
+
+    var footer = '<div class="drawer-footer-actions">';
+    if (!isMed) {
+      if (x.status === 'pending') footer += '<button class="btn btn-primary" id="df-pay">确认支付</button><button class="btn btn-ghost" id="df-cancel">取消订单</button>';
+      else if (x.status === 'serving') footer += '<button class="btn btn-primary" id="df-ms">推进里程碑</button><button class="btn btn-ghost" id="df-cancel">取消订单</button>';
+      else if (x.status === 'await_accept') footer += '<button class="btn btn-primary" id="df-settle">确认结算</button><button class="btn btn-ghost" id="df-cancel">取消订单</button>';
+    }
+    footer += '<button class="btn btn-outline" id="df-close">关闭</button></div>';
+
+    var drawer = Admin.Drawer.open({ title: '订单详情 · ' + x.id, content: html, footer: footer, width: '560px' });
+
+    setTimeout(function () {
+      var bp = drawer.panel;
+      var cl = function (id, fn) { var b = bp.querySelector('#' + id); if (b) b.onclick = fn; };
+      cl('df-close', function () { drawer.close(); });
+      cl('df-pay', function () { drawer.close(); doTransition(id, 'serving', '已进入服务中'); });
+      cl('df-ms', function () { drawer.close(); msDialog(id); });
+      cl('df-settle', function () { drawer.close(); doTransition(id, 'settled', '已结算并计提佣金'); });
+      cl('df-cancel', function () {
+        drawer.close();
+        Admin.confirm({ title: '取消订单 · ' + id, body: '取消后订单终止，不产生佣金。', ok: '确认取消', danger: true, onYes: function () { doTransition(id, 'cancelled', '已取消'); } });
+      });
+    }, 50);
+  }
+
+  var _transitionLock = false;
+  function doTransition(id, next, okMsg) {
+    /* 防重入：admin.js confirm 的 doYes 对非 Promise onYes 会双重调用（try 块 + finish），
+       第二次调用时订单状态已变更，DataBus 会返回"非法状态迁移"错误 toast。此处加锁屏蔽第二次调用。 */
+    if (_transitionLock) return;
+    _transitionLock = true;
+    var r = DataBus.orderTransition(id, next);
+    if (!r) { Admin.toast('未找到订单'); _transitionLock = false; return; }
+    if (r.error) { Admin.toast(r.error); _transitionLock = false; return; }
+    Admin.toast('[' + id + '] ' + okMsg);
+    Admin.log('订单流转', '订单管理', id, r.status);
+    render();
+    setTimeout(function () { _transitionLock = false; }, 300);
+  }
+
+  function msDialog(id) {
+    var x = null;
+    list().forEach(function (o) { if (o.id === id) x = o; });
+    if (!x) return;
+    var c = DataBus.orderCalc(x.amount);
+    var ms = (x && Array.isArray(x.milestones)) ? x.milestones : [];
+    var nodes = ms.map(function (m, i) {
+      var done = m.status === 'done';
+      return '<div class="ms-node ' + (done ? 'done' : '') + '">' +
+        '<span class="idx">' + (done ? '✓' : (i + 1)) + '</span>' +
+        '<span class="info"><div class="lbl">' + esc(m.label) + '</div><div class="amt">' + Math.round(m.pct * 100) + '% · 佣金 ' + money(Math.round(c.fee * m.pct * 100) / 100) + '</div></span>' +
+        '<span class="st">' + (done ? '<span class="badge badge-success">已达成</span>' : '<button class="btn btn-sm btn-primary" data-ms="' + i + '" data-id="' + id + '">达成</button>') + '</span>' +
+      '</div>';
+    }).join('');
+    Admin.confirm({
+      title: '里程碑验收 · ' + id,
+      body: '<div class="ms-node ms-node-hd"><span class="info"><div class="lbl">订单进度</div><div class="amt">全部节点达成后自动进入「待验收」</div></span></div>' + nodes,
+      ok: '关闭'
+    });
+    /* 直接给弹窗内的里程碑"达成"按钮绑定点击（原 .ov 选择器与 admin.js 实际类名 .confirm-overlay 不匹配，导致按钮完全无效） */
+    setTimeout(function () {
+      var dialog = document.querySelector('.confirm-dialog:last-of-type');
+      if (!dialog) return;
+      dialog.querySelectorAll('button[data-ms]').forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          var msIdx = parseInt(btn.getAttribute('data-ms'), 10);
+          var r = DataBus.orderAdvanceMilestone(id, msIdx);
+          if (!r) return;
+          if (r.error) { Admin.toast(r.error); return; }
+          Admin.toast('里程碑节点已达成');
+          Admin.log('里程碑验收', '订单管理', id, '节点' + (msIdx + 1));
+          render();
+          /* 先正常关闭当前弹窗（走 doNo 释放焦点/解锁滚动），再重开以展示最新进度 */
+          var overlay = btn.closest('.confirm-overlay');
+          if (overlay) {
+            var noBtn = overlay.querySelector('.cd-actions .btn-outline');
+            if (noBtn) noBtn.click();
+          }
+          setTimeout(function () { msDialog(id); }, 320);
+        };
+      });
+    }, 60);
+  }
+
+  /* ---- 筛选栏 ---- */
+  function initFilterBar() {
+    Admin.FilterBar.render({
+      container: '#filter-bar',
+      fields: [
+        { key: 'type', label: '订单类型', type: 'select', options: [
+          { value: 'supply', label: '供方承接' }, { value: 'need', label: '需求匹配' },
+          { value: 'agency', label: '中介撮合' }, { value: 'transfer', label: '建企买卖' },
+          { value: 'qual', label: '资质招商' }
+        ] },
+        { key: 'status', label: '订单状态', type: 'select', options: [
+          { value: 'pending', label: '待支付' }, { value: 'serving', label: '服务中' },
+          { value: 'await_accept', label: '待验收' }, { value: 'settled', label: '已结算' },
+          { value: 'cancelled', label: '已取消' }
+        ] },
+        { key: 'date', label: '创建时间', type: 'daterange' },
+        { key: 'q', label: '关键词', type: 'text', placeholder: '搜索订单号 / 标题 / 公司名' }
+      ],
+      onFilter: function (vals) {
+        fType = vals.type || ''; fSt = vals.status || ''; fQ = vals.q || '';
+        fDateStart = vals.date_start || ''; fDateEnd = vals.date_end || '';
+        page = 1; render();
+      },
+      onReset: function () {
+        fType = ''; fSt = ''; fQ = ''; fDateStart = ''; fDateEnd = ''; page = 1; render();
+      }
+    });
+  }
+
+  function bind() {
+    /* 行点击打开详情（排除按钮/复选框/输入框） */
+    var tc = $('#table-container');
+    if (tc && !tc.__bound) {
+      tc.__bound = true;
+      tc.addEventListener('click', function (e) {
+        if (e.target.closest('button') || e.target.closest('.checkbox') || e.target.closest('input')) return;
+        var tr = e.target.closest('tr[data-row-id]');
+        if (tr) openDetail(tr.getAttribute('data-row-id'));
+      });
+    }
+
+    /* 订单种类 seg */
+    var segKind = $('#f-kind');
+    segKind.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () {
+        segKind.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+        b.classList.add('on'); orderKind = b.getAttribute('data-k'); page = 1; render();
+      };
+    });
+
+    $('#btn-refresh').onclick = function () { render(); Admin.toast('已刷新（实时读取 DataBus）'); };
+
+    /* 表格操作按钮（事件委托） */
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]'); if (!b || !window.Admin) return;
+      var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+      if (act === 'detail') { openDetail(id); }
+      else if (act === 'pay') {
+        Admin.confirm({ title: '确认支付 · ' + id, body: '确认该订单已收到定金/全款，进入服务中？', ok: '确认支付', onYes: function () { doTransition(id, 'serving', '已进入服务中'); } });
+      } else if (act === 'ms') {
+        msDialog(id);
+      } else if (act === 'settle') {
+        Admin.confirm({ title: '确认结算 · ' + id, body: '结算后按已达成里程碑比例计提佣金并进入已结算，不可撤销。', ok: '确认结算', onYes: function () { doTransition(id, 'settled', '已结算并计提佣金'); } });
+      } else if (act === 'cancel') {
+        Admin.confirm({ title: '取消订单 · ' + id, body: '取消后订单终止，不产生佣金。', ok: '确认取消', danger: true, onYes: function () { doTransition(id, 'cancelled', '已取消'); } });
+      }
+    });
+
+    /* 导出当前筛选结果 */
+    var ex = $('#btn-export');
+    if (ex && !ex.__bound) {
+      ex.__bound = true;
+      ex.onclick = function () {
+        var rows = filtered().map(function (o) {
+          return [o.id, o._isMediation ? '中介托管' : (TYPE[o.type] || o.type), o.title || '',
+                  String(o.amount == null ? '' : o.amount), o.status || '', fmtDate(o.ts), o.counterparty || ''];
+        });
+        var ok = Admin.exportCSV('订单列表.csv', ['订单号', '类型', '标题', '金额', '状态', '创建时间', '对方'], rows);
+        Admin.toast(ok ? '已导出 ' + rows.length + ' 条记录' : '导出失败', ok ? 'success' : 'danger');
+        Admin.log('数据导出', '订单管理', '', '订单列表.csv · ' + rows.length + ' 条');
+      };
+    }
+
+    /* 事件监听 */
+    window.addEventListener('engchain:orders', function () { render(); });
+    window.addEventListener('engchain:mediation', function () { render(); });
+    var _rerender = null;
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'engchain-orders' || e.key === 'engchain-users' || e.key === 'engchain-mediation-orders') {
+        if (_rerender) clearTimeout(_rerender);
+        _rerender = setTimeout(render, 100);
+      }
+    });
+    window.addEventListener('engchain:store-change', function (e) {
+      if (e && e.detail && (e.detail.key === 'engchain-orders' || e.detail.key === 'engchain-users')) {
+        if (_rerender) clearTimeout(_rerender);
+        _rerender = setTimeout(render, 100);
+      }
+    });
+  }
+
+  function init() { initFilterBar(); bind(); render(); }
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>

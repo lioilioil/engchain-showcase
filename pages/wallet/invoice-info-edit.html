@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>编辑开票信息 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">编辑开票信息</div>
+    <div class="nav-right"><button type="button" onclick="save()" style="color:var(--primary);font-size:14px;font-weight:600;">保存</button></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;">
+    <div class="field">
+      <label class="field-label">发票类型</label>
+      <div class="seg" id="seg-type">
+        <div class="seg-item" data-t="增值税专用发票">增值税专用发票</div>
+        <div class="seg-item" data-t="增值税普通发票">增值税普通发票</div>
+      </div>
+    </div>
+    <div class="field"><label class="field-label">抬头名称 <span class="req">*</span></label><input class="input" id="in-name"></div>
+    <div class="field"><label class="field-label">纳税人识别号 <span class="req">*</span></label><input class="input" id="in-tax"></div>
+    <div class="field"><label class="field-label">注册地址</label><input class="input" id="in-addr"></div>
+    <div class="field"><label class="field-label">联系电话</label><input class="input" id="in-phone"></div>
+    <div class="field"><label class="field-label">开户银行</label><input class="input" id="in-bank"></div>
+    <div class="field"><label class="field-label">银行账号</label><input class="input" id="in-acct"></div>
+    <div class="field"><label class="field-label">发票接收邮箱</label><input class="input" id="in-mail" placeholder="电子发票将发送至该邮箱"></div>
+    <div class="field" style="display:flex;align-items:center;gap:8px;">
+      <input type="checkbox" id="in-default" style="width:18px;height:18px;">
+      <label for="in-default" style="font-size:13px;color:var(--text-2);">设为默认抬头</label>
+    </div>
+
+    <div style="margin-top:6px;"><button type="button" class="btn btn-primary btn-block" onclick="save()">保存开票信息</button></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var TITLE_KEY = 'engchain-invoice-titles';
+  var idx = parseInt(new URLSearchParams(location.search).get('idx') || '-1', 10);
+
+  function loadTitles() {
+    try { return JSON.parse(localStorage.getItem(TITLE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveTitles(arr) {
+    try { localStorage.setItem(TITLE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+
+  var invType = '增值税普通发票';
+
+  function init() {
+    var titles = loadTitles();
+    var t = titles[idx];
+    if (!t) {
+      UI.toast('抬头不存在', 'warn');
+      setTimeout(function () { history.back(); }, 700);
+      return;
+    }
+    document.getElementById('in-name').value = t.name || '';
+    document.getElementById('in-tax').value = t.tax || '';
+    document.getElementById('in-addr').value = t.address || '';
+    document.getElementById('in-phone').value = t.phone || '';
+    document.getElementById('in-bank').value = t.bank || '';
+    document.getElementById('in-acct').value = t.bankAccount || '';
+    document.getElementById('in-mail').value = t.email || '';
+    document.getElementById('in-default').checked = !!t.isDefault;
+    invType = t.invoiceType || '增值税普通发票';
+    document.querySelectorAll('#seg-type .seg-item').forEach(function (el) {
+      if (el.getAttribute('data-t') === invType) { el.classList.add('active', 'is-on'); }
+    });
+  }
+
+  document.querySelectorAll('#seg-type .seg-item').forEach(function (el) {
+    el.onclick = function () {
+      document.querySelectorAll('#seg-type .seg-item').forEach(function (x) { x.classList.remove('active', 'is-on'); });
+      el.classList.add('active', 'is-on');
+      invType = el.getAttribute('data-t');
+    };
+  });
+
+  window.save = function () {
+    var name = document.getElementById('in-name').value.trim();
+    if (!name) { UI.toast('请填写抬头名称', 'warn'); document.getElementById('in-name').focus(); return; }
+    var tax = document.getElementById('in-tax').value.trim();
+    if (!tax) { UI.toast('请填写纳税人识别号', 'warn'); document.getElementById('in-tax').focus(); return; }
+    var titles = loadTitles();
+    if (!titles[idx]) { UI.toast('抬头不存在', 'warn'); return; }
+    var isDef = document.getElementById('in-default').checked;
+    if (isDef) titles.forEach(function (t) { t.isDefault = false; });
+    titles[idx] = {
+      name: name,
+      tax: tax,
+      address: document.getElementById('in-addr').value.trim(),
+      phone: document.getElementById('in-phone').value.trim(),
+      bank: document.getElementById('in-bank').value.trim(),
+      bankAccount: document.getElementById('in-acct').value.trim(),
+      email: document.getElementById('in-mail').value.trim(),
+      invoiceType: invType,
+      titleType: titles[idx].titleType || 'enterprise',
+      isDefault: isDef
+    };
+    saveTitles(titles);
+    UI.toast('开票信息已保存', 'ok');
+    setTimeout(function () { history.back(); }, 700);
+  };
+
+  init();
+})();
+</script>
+</body>
+</html>
