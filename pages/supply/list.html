@@ -12,6 +12,39 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>发现 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<style>
+/* 发现页一级分类：横向滚动 seg */
+.discover-seg { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 0; padding: 0 16px; }
+.discover-seg::-webkit-scrollbar { display: none; }
+.discover-seg .seg-item { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; font-weight: 500; color: var(--text-2); border-bottom: 2px solid transparent; cursor: pointer; transition: color .2s, border-color .2s; white-space: nowrap; }
+.discover-seg .seg-item.active { color: var(--primary-dim); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* 排序气泡弹窗 */
+.sort-popover { position: absolute; top: calc(100% + 6px); right: 0; background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 100; overflow: hidden; min-width: 100px; animation: sort-pop-in .18s ease; }
+@keyframes sort-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.sort-popover .sort-opt { display: block; width: 100%; padding: 10px 16px; font-size: 13px; color: var(--text-2); background: none; border: none; cursor: pointer; text-align: left; transition: background .15s; }
+.sort-popover .sort-opt:hover { background: var(--bg-card-2); }
+.sort-popover .sort-opt.active { color: var(--primary-dim); font-weight: 600; }
+.sort-popover .sort-opt.active::after { content: '✓'; float: right; }
+
+/* 筛选弹窗：顶部底部固定，内容滚动，最大80% */
+.filter-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.4); }
+.filter-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: var(--bg); border-radius: 16px 16px 0 0; max-height: 80vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .3s ease; }
+.filter-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+.filter-header-title { font-size: 16px; font-weight: 700; color: var(--text-1); }
+.filter-header-close { background: none; border: none; font-size: 22px; color: var(--text-3); cursor: pointer; line-height: 1; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.filter-header-close:active { background: var(--bg-card-2); }
+.filter-body { flex: 1 1 auto; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+.filter-footer { flex: 0 0 auto; display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--bg); }
+.filter-footer .btn-reset { flex: 1; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); font-size: 14px; cursor: pointer; }
+.filter-footer .btn-apply { flex: 2; height: 44px; border-radius: 12px; border: none; background: linear-gradient(135deg,var(--primary),var(--primary-dim)); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* 筛选选项 */
+.filter-group { margin-bottom: 18px; }
+.filter-group-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 10px; }
+.filter-opt { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 12px; cursor: pointer; margin: 0 8px 8px 0; border: 1px solid var(--line); color: var(--text-2); background: var(--bg-card); transition: all .15s; }
+.filter-opt.active { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+</style>
 </head>
 <body data-tab="discover">
 <div class="phone">
@@ -23,37 +56,46 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <a href="../search/index.html" class="icon-btn" title="搜索" aria-label="搜索"><svg class="ic"><use href="#i-search"/></svg></a>
       </div>
     </div>
-    <!-- 供需方向 tab -->
-    <div class="seg" style="margin-top:10px;">
-      <div class="seg-item" data-t="all">全部</div>
+    <!-- 一级分类：全部 / 找需求 / 找供应 / 找招商 / 找转让 / 找人才 -->
+    <div class="discover-seg" id="discover-seg">
+      <div class="seg-item active" data-t="all">全部</div>
       <div class="seg-item" data-t="demand">找需求</div>
       <div class="seg-item" data-t="supply">找供应</div>
+      <div class="seg-item" data-t="franchise">找招商</div>
+      <div class="seg-item" data-t="trade">找转让</div>
+      <div class="seg-item" data-t="talent">找人才</div>
     </div>
   </div>
 
   <div class="scroll no-pad" style="padding-top:8px;padding-bottom:100px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 16px;position:relative;">
       <span class="text-2 fs-12" id="count"></span>
-      <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:14px;">
         <button id="filter-btn" style="color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;">筛选 <span id="filter-cnt" style="display:none;min-width:16px;height:16px;border-radius:8px;background:var(--primary);color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 4px;">0</span></button>
-        <button id="sort-btn" style="color:var(--text-2);font-size:12px;">最新 ›</button>
+        <div style="position:relative;">
+          <button id="sort-btn" style="color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;">排序 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:11px;height:11px;"><path d="m6 9 6 6 6-6"/></svg></button>
+          <div class="sort-popover" id="sort-popover" style="display:none;">
+            <button class="sort-opt active" data-sort="newest">最新</button>
+            <button class="sort-opt" data-sort="match">匹配度</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="list"></div>
   </div>
 </div>
 
-<!-- 筛选面板 -->
-<div id="filter-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);" onclick="if(event.target===this)closeFilter()">
-  <div id="filter-sheet" style="position:absolute;bottom:0;left:0;right:0;background:var(--bg);border-radius:16px 16px 0 0;padding:20px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s ease;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <span style="font-size:16px;font-weight:700;color:var(--text-1);">筛选</span>
-      <button onclick="closeFilter()" style="background:none;border:none;font-size:20px;color:var(--text-3);cursor:pointer;line-height:1;">×</button>
+<!-- 筛选弹窗：顶部固定 + 内容滚动 + 底部固定 -->
+<div class="filter-overlay" id="filter-overlay" onclick="if(event.target===this)closeFilter()">
+  <div class="filter-sheet" id="filter-sheet">
+    <div class="filter-header">
+      <span class="filter-header-title">筛选</span>
+      <button class="filter-header-close" onclick="closeFilter()">×</button>
     </div>
-    <div id="filter-groups"></div>
-    <div style="display:flex;gap:10px;margin-top:20px;">
-      <button onclick="resetFilter()" style="flex:1;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:14px;cursor:pointer;">重置</button>
-      <button onclick="applyFilter()" style="flex:2;height:42px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:600;cursor:pointer;">确定</button>
+    <div class="filter-body" id="filter-groups"></div>
+    <div class="filter-footer">
+      <button class="btn-reset" onclick="resetFilter()">重置</button>
+      <button class="btn-apply" onclick="applyFilter()">确定</button>
     </div>
   </div>
 </div>
@@ -68,28 +110,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var params = new URLSearchParams(location.search);
   var type = params.get('type') || 'all';
 
-  /* ---- L1：统一供需列表（MOCK 种子 + SupplyStore 已上架用户发布 混排） ---- */
+  /* ---- 供需方向 + 资源分类 统一映射 ---- */
   var BIZ_MAP = { '材料':'material','设备':'equipment','劳务':'labor','项目合作':'cooperation','合作':'cooperation','中介服务':'agency','中介':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent' };
-  /* 将 SupplyStore 条目归一化为 Cards.render 所需字段 */
+
+  /* 资源类分类对应的 bizKey */
+  var RESOURCE_BIZ = { franchise: 'franchise', trade: 'trade', talent: 'talent' };
+  /* 资源类筛选条件 */
+  var RESOURCE_FILTERS = {
+    franchise: { category: ['全部', '施工总承包', '专业承包', '劳务分包', '设计资质', '监理资质', '造价咨询'], city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '10万以下', '10-50万', '50万以上'], verified: ['全部', '已认证', '未认证'] },
+    trade: { category: ['全部', '建筑公司', '装饰公司', '劳务公司', '设计公司', '监理公司', '其他'], city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '50万以下', '50-200万', '200-500万', '500万以上'], verified: ['全部', '已认证', '未认证'] },
+    talent: { category: ['全部', '一级建造师', '二级建造师', '注册工程师', '技术工人', '项目经理', '其他'], city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '5千以下', '5千-1万', '1-2万', '2万以上'], verified: ['全部', '已认证', '未认证'] }
+  };
+  /* 供需类通用筛选 */
+  var MATCH_FILTERS = { category: ['全部'].concat(Object.keys(BIZ_MAP)), city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'], verified: ['全部', '已认证', '未认证'] };
+
   function normSupplyItem(x) {
     var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
     return Object.assign({}, x, {
-      id: x.id,
-      bizKey: x.bizKey || BIZ_MAP[x.cat] || 'material',
-      dir: x.dir || x.type || 'demand',
-      title: x.title || '',
-      cat: x.cat || x.category || '',
-      sub: x.sub || x.subType || '',
-      city: x.city || x.location || '',
-      price: x.price || x.budget || '',
-      budget: x.budget || x.price || '',
-      unit: x.unit || '',
-      tags: x.tags || [],
-      company: x.company || '',
+      id: x.id, bizKey: x.bizKey || BIZ_MAP[x.cat] || 'material',
+      dir: x.dir || x.type || 'demand', title: x.title || '', cat: x.cat || x.category || '',
+      sub: x.sub || x.subType || '', city: x.city || x.location || '',
+      price: x.price || x.budget || '', budget: x.budget || x.price || '', unit: x.unit || '',
+      tags: x.tags || [], company: x.company || '',
       match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
-      verified: x.verified !== undefined ? x.verified : !isUser,
-      hot: x.hot || false,
-      /* 角标标记：用户发布 / 平台认证 */
+      verified: x.verified !== undefined ? x.verified : !isUser, hot: x.hot || false,
       _badge: isUser ? '用户发布' : '平台认证'
     });
   }
@@ -99,59 +143,77 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function mergedList() {
     var mock = (window.MOCK && MOCK.byFlow) ? MOCK.byFlow('match').slice() : [];
     var active = readActiveSupplies().map(normSupplyItem);
-    /* 去重：按 id 合并，SupplyStore 条目优先（用户发布覆盖同名种子） */
-    var seen = {};
-    var out = [];
+    var seen = {}, out = [];
     active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
     mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
     return out;
   }
 
-  var segs = document.querySelectorAll('.seg-item');
+  /* ---- 一级分类切换 ---- */
+  var segs = document.querySelectorAll('.discover-seg .seg-item');
   function setSeg() {
-    segs.forEach(function (el) {
-      el.classList.toggle('active', el.dataset.t === (type === 'demand' ? 'demand' : type === 'supply' ? 'supply' : 'all'));
-    });
+    segs.forEach(function (el) { el.classList.toggle('active', el.dataset.t === type); });
   }
   segs.forEach(function (el) {
     el.addEventListener('click', function () {
       type = el.dataset.t;
       setSeg();
+      /* 切换分类时重置筛选 */
+      filterState = getDefaultFilter();
+      filterDraft = getDefaultFilter();
+      updateFilterBadge();
       render();
       history.replaceState({}, '', '?type=' + type);
     });
   });
 
-  // 业务分类（完整9类，与 BIZ_MAP 归一化口径一致）
-  var bizMap = { '项目合作': 'cooperation', '材料': 'material', '设备': 'equipment', '劳务': 'labor', '中介': 'agency', '资质招商': 'franchise', '建企买卖': 'trade', '企业招聘': 'personnel', '人才求职': 'talent' };
-  var catP = params.get('cat');
-  var initCat = '全部';
-  if (catP) { for (var _k in bizMap) { if (bizMap[_k] === catP) { initCat = _k; break; } } }
-
-  var sortNewest = true;
-  document.getElementById('sort-btn').addEventListener('click', function () {
-    sortNewest = !sortNewest;
-    this.textContent = sortNewest ? '最新 ›' : '匹配度 ›';
-    render();
+  /* ---- 排序：气泡弹窗 ---- */
+  var sortBy = 'newest';
+  var sortBtn = document.getElementById('sort-btn');
+  var sortPopover = document.getElementById('sort-popover');
+  sortBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var isOpen = sortPopover.style.display !== 'none';
+    sortPopover.style.display = isOpen ? 'none' : 'block';
+  });
+  document.addEventListener('click', function (e) {
+    if (!sortPopover.contains(e.target) && e.target !== sortBtn) {
+      sortPopover.style.display = 'none';
+    }
+  });
+  document.querySelectorAll('.sort-opt').forEach(function (opt) {
+    opt.addEventListener('click', function () {
+      sortBy = opt.dataset.sort;
+      document.querySelectorAll('.sort-opt').forEach(function (o) { o.classList.toggle('active', o === opt); });
+      sortPopover.style.display = 'none';
+      render();
+    });
   });
 
-  /* ---- 筛选面板：分类 / 地区 / 预算 / 认证 ---- */
-  var FILTER_GROUPS = [
-    { key: 'category', label: '分类', options: ['全部'].concat(Object.keys(bizMap)) },
-    { key: 'city', label: '地区', options: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'] },
-    { key: 'budget', label: '预算', options: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'] },
-    { key: 'verified', label: '认证', options: ['全部', '已认证', '未认证'] }
-  ];
-  var filterState = { category: initCat, city: '全部', budget: '全部', verified: '全部' };
-  var filterDraft = { category: initCat, city: '全部', budget: '全部', verified: '全部' };
+  /* ---- 筛选面板：根据当前分类动态生成 ---- */
+  function getDefaultFilter() {
+    return { category: '全部', city: '全部', budget: '全部', verified: '全部' };
+  }
+  var filterState = getDefaultFilter();
+  var filterDraft = getDefaultFilter();
 
+  function getFilterConfig() {
+    return RESOURCE_FILTERS[type] || MATCH_FILTERS;
+  }
   function renderFilterGroups() {
-    var html = FILTER_GROUPS.map(function (g) {
+    var cfg = getFilterConfig();
+    var groups = [
+      { key: 'category', label: '分类', options: cfg.category },
+      { key: 'city', label: '地区', options: cfg.city },
+      { key: 'budget', label: type === 'talent' ? '薪资' : '预算', options: cfg.budget },
+      { key: 'verified', label: '认证', options: cfg.verified }
+    ];
+    var html = groups.map(function (g) {
       var opts = g.options.map(function (o) {
         var active = filterDraft[g.key] === o;
-        return '<span class="filter-opt" data-g="' + g.key + '" data-v="' + o + '" style="display:inline-block;padding:6px 14px;border-radius:999px;font-size:12px;cursor:pointer;margin:0 8px 8px 0;border:1px solid ' + (active ? 'var(--primary)' : 'var(--line)') + ';color:' + (active ? 'var(--primary)' : 'var(--text-2)') + ';background:' + (active ? 'var(--primary-soft)' : 'var(--bg-card)') + ';">' + o + '</span>';
+        return '<span class="filter-opt' + (active ? ' active' : '') + '" data-g="' + g.key + '" data-v="' + o + '">' + o + '</span>';
       }).join('');
-      return '<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:10px;">' + g.label + '</div><div>' + opts + '</div></div>';
+      return '<div class="filter-group"><div class="filter-group-label">' + g.label + '</div><div>' + opts + '</div></div>';
     }).join('');
     document.getElementById('filter-groups').innerHTML = html;
     document.querySelectorAll('.filter-opt').forEach(function (el) {
@@ -174,14 +236,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     setTimeout(function () { document.getElementById('filter-overlay').style.display = 'none'; }, 300);
   };
   window.resetFilter = function () {
-    filterDraft = { category: '全部', city: '全部', budget: '全部', verified: '全部' };
+    filterDraft = getDefaultFilter();
     renderFilterGroups();
   };
   window.applyFilter = function () {
     filterState = { category: filterDraft.category, city: filterDraft.city, budget: filterDraft.budget, verified: filterDraft.verified };
     updateFilterBadge();
     render();
-    history.replaceState({}, '', '?type=' + type + (filterState.category !== '全部' ? '&cat=' + bizMap[filterState.category] : ''));
     closeFilter();
   };
   function updateFilterBadge() {
@@ -196,38 +257,57 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   document.getElementById('filter-btn').addEventListener('click', openFilter);
 
-  /* 预算范围匹配 */
+  /* ---- 预算/薪资范围匹配 ---- */
   function matchBudget(item, budget) {
     if (budget === '全部') return true;
     var val = parseFloat((item.price || item.budget || '').toString().replace(/[^0-9.]/g, ''));
     if (budget === '面议') return !val || val === 0;
     if (isNaN(val) || val === 0) return false;
-    if (budget === '1万以下') return val < 1;
-    if (budget === '1-5万') return val >= 1 && val < 5;
-    if (budget === '5-20万') return val >= 5 && val < 20;
-    if (budget === '20-100万') return val >= 20 && val < 100;
-    if (budget === '100万以上') return val >= 100;
-    return true;
+    /* 通用万级区间 */
+    var ranges = {
+      '1万以下': [0, 1], '1-5万': [1, 5], '5-20万': [5, 20], '20-100万': [20, 100], '100万以上': [100, Infinity],
+      '10万以下': [0, 10], '10-50万': [10, 50], '50万以上': [50, Infinity],
+      '50万以下': [0, 50], '50-200万': [50, 200], '200-500万': [200, 500], '500万以上': [500, Infinity],
+      '5千以下': [0, 0.5], '5千-1万': [0.5, 1], '1-2万': [1, 2], '2万以上': [2, Infinity]
+    };
+    var r = ranges[budget];
+    if (!r) return true;
+    return val >= r[0] && val < r[1];
   }
 
+  /* ---- 主渲染 ---- */
   function render() {
     var list = mergedList();
-    if (type !== 'all') list = list.filter(function (s) { return s.dir === type; });
-    if (filterState.category !== '全部') list = list.filter(function (s) { return s.bizKey === bizMap[filterState.category]; });
-    /* 筛选面板：地区 / 预算 / 认证 */
+
+    /* 按一级分类筛选 */
+    if (type === 'demand' || type === 'supply') {
+      list = list.filter(function (s) { return s.dir === type; });
+    } else if (RESOURCE_BIZ[type]) {
+      /* 资源类：按 bizKey 筛选 */
+      list = list.filter(function (s) { return s.bizKey === RESOURCE_BIZ[type]; });
+    }
+    /* type === 'all' 不筛选 */
+
+    /* 筛选条件 */
+    if (filterState.category !== '全部') {
+      var bizKey = BIZ_MAP[filterState.category] || filterState.category;
+      list = list.filter(function (s) { return s.bizKey === bizKey; });
+    }
     if (filterState.city !== '全部') list = list.filter(function (s) { return (s.city || s.location || '') === filterState.city || (s.city || s.location || '').indexOf(filterState.city) >= 0; });
     if (filterState.budget !== '全部') list = list.filter(function (s) { return matchBudget(s, filterState.budget); });
     if (filterState.verified === '已认证') list = list.filter(function (s) { return s.verified; });
     if (filterState.verified === '未认证') list = list.filter(function (s) { return !s.verified; });
-    if (!sortNewest) list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
+
+    /* 排序 */
+    if (sortBy === 'match') list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
     else list.sort(function (a, b) { return (b.ts || b.time || 0) - (a.ts || a.time || 0); });
 
     document.getElementById('count').textContent = '共 ' + list.length + ' 条';
-    /* L1：用户发布/平台认证角标 —— 在 Cards.render 后注入角标 span */
     var html = list.length
       ? window.Cards.render(list, 'detail.html?id=')
       : '<div class="empty-state"><div class="e-icon"><svg class="ic"><use href="#i-folder"/></svg></div><div class="e-title">暂无匹配</div><div class="e-desc">换个筛选条件试试吧</div></div>';
     document.getElementById('list').innerHTML = html;
+
     /* 为用户发布条目注入角标 */
     var cards = document.querySelectorAll('#list .job-card');
     list.forEach(function (item, idx) {
@@ -241,9 +321,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     });
   }
+
   setSeg();
   render();
-  /* L1：监听供需变更（后台审核上架后即时刷新列表） */
   window.addEventListener('engchain:supply', function () { render(); });
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-supply') render(); });
 })();

@@ -646,12 +646,12 @@ window.DETAIL = (function () {
     ];
     basicHtml += dList(detailInfo);
     h += sec('企业基本信息', basicHtml);
-    var qp = franchQualPack(fc, r.qualPack);
-    if (qp) {
-      var qpExtra = '';
-      if (fc.safety) qpExtra += '<div class="qpc-extra"><span class="qpe-k">安全生产许可 / 管理体系</span><span class="qpe-v">' + cfgText(fc.safety.no) + ' · 有效期至 ' + cfgText(fc.safety.expiry) + '</span></div>';
-      if (fc.safety && fc.safety.note) qpExtra += '<div class="qpc-note">' + cfgText(fc.safety.note) + '</div>';
-      h += sec('资质与有效期（共 ' + ((fc.qualPack && fc.qualPack.length) || (r.qualPack ? r.qualPack.length : 0)) + ' 项）', qp + qpExtra);
+    var qualList = (fc && fc.qualPack) || r.qualPack || [];
+    if (qualList.length) {
+      var qualRows = [];
+      if (fc.safety) qualRows.push({ k: '安全生产许可 / 管理体系', v: cfgText(fc.safety.no) + ' · 有效期至 ' + cfgText(fc.safety.expiry) });
+      if (fc.safety && fc.safety.note) qualRows.push({ k: '备注说明', v: cfgText(fc.safety.note) });
+      h += sec('资质与证照', tradeQualPack(qualList) + (qualRows.length ? '<div class="qual-extra-table">' + dList(qualRows) + '</div>' : ''));
     }
     if (r.qual) h += sec('核验状态', '<div class="ds-text" style="color:var(--success);">' + r.qual + '</div>');
     /* 资质证照图（带水印） */
@@ -722,16 +722,16 @@ window.DETAIL = (function () {
       var introHtml = r.descMd ? '<div class="md-content">' + renderMarkdown(r.descMd) + '</div>' : '<div class="ds-text">' + r.desc + '</div>';
       h += sec('企业介绍', introHtml);
     }
-    /* 企业宣传文件（PDF 上传/浏览/下载） */
+    /* 企业宣传文件（PDF 上传/浏览/下载）— 内侧环形进度 */
     if (r.pdfFiles && r.pdfFiles.length) {
-      var pdfHtml = '<div class="pdf-list">';
-      r.pdfFiles.forEach(function (p) {
-        var pname = p.name.replace(/'/g, "\\'");
-        pdfHtml += '<div class="pdf-item" onclick="DETAIL.viewPdf(\'' + pname + '\')">';
-        pdfHtml += '<div class="pi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
-        pdfHtml += '<div class="pi-body"><div class="pi-name">' + p.name + '</div><div class="pi-meta"><span>' + p.size + '</span><span>' + p.pages + '页</span><span>' + p.uploadTime + '</span></div></div>';
-        pdfHtml += '<div class="pi-actions"><button class="pi-btn view" onclick="event.stopPropagation();DETAIL.viewPdf(\'' + pname + '\')">浏览</button><button class="pi-btn download" onclick="event.stopPropagation();DETAIL.downloadPdf(\'' + pname + '\')">下载</button></div>';
-        pdfHtml += '</div>';
+      var pdfHtml = '<div class="fd-list">';
+      r.pdfFiles.forEach(function (p, idx) {
+        var fid = 'pdf_' + (r.id || 'rec') + '_' + idx;
+        var fsize = p.sizeKb || (2048 + idx * 1024);
+        pdfHtml += window.FileDownload.renderInnerRing({
+          id: fid, name: p.name, size: fsize,
+          sub: (p.pages || '12') + '页 · ' + (p.uploadTime || '2026-09')
+        });
       });
       pdfHtml += '</div>';
       pdfHtml += '<div class="pdf-upload" onclick="DETAIL.uploadPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>上传企业宣传文件</span></div>';
@@ -1261,7 +1261,7 @@ window.DETAIL = (function () {
       if (r.safetyLicense) qualRows.push({ k: '安全生产许可证', v: r.safetyLicense.no + ' · 有效期至 ' + r.safetyLicense.expiry });
       if (r.qualExpiry) qualRows.push({ k: '主资质有效期', v: r.qualExpiry });
       if (r.businessAbnormal) qualRows.push({ k: '经营合规', v: r.businessAbnormal });
-      h += sec('资质与证照', tradeQualPack(r.qualPack) + (qualRows.length ? dList(qualRows) : ''));
+      h += sec('资质与证照', tradeQualPack(r.qualPack) + (qualRows.length ? '<div class="qual-extra-table">' + dList(qualRows) + '</div>' : ''));
     }
     /* 交易 · 结算 · 交付 */
     var dealRows = [];
@@ -2367,10 +2367,79 @@ window.DETAIL = (function () {
       });
       sheet.show();
     }
-    /* v3.1: 简历投递门控 */
-    function openDeliverBlocked(reason) {
-      var desc = document.getElementById('deliverModalDesc');
-      if (desc) desc.textContent = reason || '请先完成个人入驻并完善简历信息';
+    /* v3.1: 简历投递门控（动态文案+按钮+跳转） */
+    /* 根据 canDeliverResume 返回的 reason 判断拦截类型，返回完整的弹窗配置 */
+    function resolveDeliverBlocked(reason, userType) {
+      var r = (reason || '').toString();
+      /* 类型1：未完成个人入驻 */
+      if (r.indexOf('个人入驻') >= 0 || r.indexOf('入驻') >= 0 && r.indexOf('标准') < 0 && r.indexOf('简历') < 0) {
+        return {
+          type: 'entry',
+          title: '需要个人入驻',
+          desc: '完成求职者个人入驻后，即可向企业投递简历。入驻流程约2分钟，认证后享受优先推荐。',
+          btnText: '去入驻',
+          btnHref: '../profile/auth.html?tab=personal',
+          iconColor: 'var(--primary)'
+        };
+      }
+      /* 类型2：标准入驻用户（不支持投递） */
+      if (r.indexOf('标准') >= 0 || userType === 'standard') {
+        return {
+          type: 'standard',
+          title: '升级为求职者入驻',
+          desc: '您当前为标准入驻用户，暂不支持简历投递。升级为求职者入驻后，可完善简历并向企业投递。',
+          btnText: '了解升级',
+          btnHref: '../profile/auth.html?tab=personal&upgrade=1',
+          iconColor: 'var(--warning)'
+        };
+      }
+      /* 类型3：求职者但简历未完成 */
+      if (r.indexOf('简历') >= 0) {
+        return {
+          type: 'resume',
+          title: '完善简历信息',
+          desc: '请先完成简历详情编辑（基本信息、工作经历、持有证书等），完善后即可向企业投递。',
+          btnText: '去完善简历',
+          btnHref: '../profile/auth-qualification.html?mode=edit',
+          iconColor: 'var(--primary)'
+        };
+      }
+      /* 兜底：未知原因 */
+      return {
+        type: 'unknown',
+        title: '暂不支持简历投递',
+        desc: r || '请先完成个人入驻并完善简历信息',
+        btnText: '去完善',
+        btnHref: '../profile/auth-qualification.html?mode=edit',
+        iconColor: 'var(--danger)'
+      };
+    }
+    /* 当前弹窗配置（用于按钮跳转） */
+    var _currentDeliverConfig = null;
+    function openDeliverBlocked(reason, userType) {
+      var cfg = resolveDeliverBlocked(reason, userType);
+      _currentDeliverConfig = cfg;
+      /* 动态设置标题 */
+      var titleEl = document.getElementById('deliverModalTitle');
+      if (titleEl) titleEl.textContent = cfg.title;
+      /* 动态设置描述 */
+      var descEl = document.getElementById('deliverModalDesc');
+      if (descEl) descEl.textContent = cfg.desc;
+      /* 动态设置按钮文案 */
+      var goBtn = document.getElementById('deliverGoEdit');
+      if (goBtn) goBtn.textContent = cfg.btnText;
+      /* 动态设置图标颜色 */
+      var iconEl = document.getElementById('deliverModalIcon');
+      if (iconEl) {
+        iconEl.style.color = cfg.iconColor;
+        if (cfg.type === 'entry' || cfg.type === 'resume') {
+          iconEl.style.background = 'linear-gradient(135deg,rgba(43,107,79,.15),rgba(43,107,79,.05))';
+        } else if (cfg.type === 'standard') {
+          iconEl.style.background = 'linear-gradient(135deg,rgba(214,158,46,.15),rgba(214,158,46,.05))';
+        } else {
+          iconEl.style.background = 'linear-gradient(135deg,rgba(212,76,71,.15),rgba(212,76,71,.05))';
+        }
+      }
       var mask = document.getElementById('deliverMask');
       var modal = document.getElementById('deliverModal');
       if (mask) mask.classList.add('show');
@@ -2393,7 +2462,7 @@ window.DETAIL = (function () {
       if (can) {
         openApply(rec, c);
       } else {
-        openDeliverBlocked(reason);
+        openDeliverBlocked(reason, userType);
       }
     }
     /* 绑定弹窗关闭事件（只绑定一次） */
@@ -2407,8 +2476,13 @@ window.DETAIL = (function () {
       if (mask) mask.addEventListener('click', closeDeliverBlocked);
       if (cancelBtn) cancelBtn.addEventListener('click', closeDeliverBlocked);
       if (goBtn) goBtn.addEventListener('click', function () {
+        var cfg = _currentDeliverConfig;
         closeDeliverBlocked();
-        location.href = '../profile/auth-qualification.html?mode=edit';
+        if (cfg && cfg.btnHref) {
+          location.href = cfg.btnHref;
+        } else {
+          location.href = '../profile/auth-qualification.html?mode=edit';
+        }
       });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' || e.keyCode === 27) {
@@ -2685,6 +2759,20 @@ window.DETAIL = (function () {
   }
   /* ---- PDF 浏览 ---- */
   function viewPdf(name) {
+    var fid = 'pdf_' + name.replace(/[^a-zA-Z0-9]/g, '_');
+    if (window.FileDownload) {
+      var rec = window.FileDownload.get(fid);
+      if (rec && rec.status === 'completed') {
+        /* 已缓存：直接打开预览 */
+      } else if (rec && rec.status === 'downloading') {
+        UI.toast('文件下载中，请稍候', 'info');
+        return;
+      } else {
+        /* 未下载：先开始下载再预览 */
+        window.FileDownload.start(fid, name, 2048);
+      }
+    }
+
     var html = '<div style="padding:16px;">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
       '<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#e74c3c,#c0392b);display:flex;align-items:center;justify-content:center;color:#fff;flex:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:20px;height:20px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
@@ -2702,7 +2790,20 @@ window.DETAIL = (function () {
     UI.sheet({ title: '文件预览', body: html });
   }
   /* ---- PDF 下载 / 上传 ---- */
-  function downloadPdf(name) { UI.toast('正在下载：' + name, 'ok'); }
+  function downloadPdf(name) {
+    var id = 'pdf_' + name.replace(/[^a-zA-Z0-9]/g, '_');
+    if (window.FileDownload) {
+      var rec = window.FileDownload.get(id);
+      if (rec && rec.status === 'completed') {
+        UI.toast('文件已缓存，直接查看', 'ok');
+        return;
+      }
+      window.FileDownload.start(id, name, 2048);
+      UI.toast('开始下载：' + name, 'ok');
+    } else {
+      UI.toast('正在下载：' + name, 'ok');
+    }
+  }
   function uploadPdf() {
     UI.dialog({
       title: '上传企业宣传文件',
