@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/search/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>搜索 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   通用业务搜索页 V1.0
+   通过 ?type=franchise/trade/personnel 切换业务类型
+   ═══════════════════════════════════════════════════════════════ */
+body { background: var(--bg); }
+
+/* 顶部搜索栏 */
+.bs-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  padding-top: calc(10px + env(safe-area-inset-top));
+  position: sticky; top: 0; z-index: 10;
+}
+.bs-back {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--bg-card);
+  border: none; cursor: pointer; flex: none;
+  color: var(--text-2); font-size: 20px; line-height: 1;
+}
+.bs-back:active { background: var(--bg-card-2); }
+.bs-search-box {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 8px 14px;
+  transition: border-color .2s;
+}
+.bs-search-box.focus { border-color: var(--primary); }
+.bs-search-box svg { width: 15px; height: 15px; color: var(--text-3); flex: none; }
+.bs-search-box input {
+  flex: 1; min-width: 0; border: none; outline: none;
+  background: transparent; font-size: 13.5px; color: var(--text-1);
+}
+.bs-search-box input::placeholder { color: var(--text-3); }
+.bs-clear {
+  width: 18px; height: 18px;
+  display: none; align-items: center; justify-content: center;
+  border: none; background: var(--text-3); border-radius: 50%;
+  cursor: pointer; color: #fff; flex: none; padding: 0;
+  font-size: 11px; line-height: 1;
+}
+.bs-clear.show { display: flex; }
+.bs-search-btn {
+  padding: 7px 14px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+  color: var(--text-inv); border: none; border-radius: var(--r-full);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; flex: none;
+}
+.bs-search-btn:active { opacity: .85; }
+
+/* 内容区 */
+.bs-body { padding: 14px 16px 100px; }
+
+/* 区块标题 */
+.bs-section { margin-bottom: 20px; }
+.bs-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.bs-section-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.bs-section-clear {
+  font-size: 11.5px; color: var(--text-3);
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 3px;
+}
+.bs-section-clear:active { color: var(--text-2); }
+.bs-section-clear svg { width: 12px; height: 12px; }
+
+/* 历史标签 */
+.bs-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.bs-tag {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font-size: 12px; color: var(--text-2);
+  cursor: pointer; transition: all .15s;
+}
+.bs-tag:active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-dim); }
+
+/* 热门搜索 - 带序号 */
+.bs-hot-list { display: flex; flex-direction: column; gap: 0; }
+.bs-hot-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer; transition: background .15s;
+}
+.bs-hot-item:last-child { border-bottom: none; }
+.bs-hot-item:active { background: var(--bg-card); }
+.bs-hot-rank {
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; font-family: var(--font-num);
+  flex: none;
+}
+.bs-hot-rank.top1 { color: #E53935; }
+.bs-hot-rank.top2 { color: #FB8C00; }
+.bs-hot-rank.top3 { color: #FDD835; }
+.bs-hot-rank.normal { color: var(--text-3); }
+.bs-hot-text {
+  flex: 1; min-width: 0;
+  font-size: 13px; color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bs-hot-tag {
+  flex: none; font-size: 10px; padding: 2px 6px;
+  border-radius: 4px; font-weight: 600;
+}
+.bs-hot-tag.hot { background: rgba(229,57,53,.1); color: #E53935; }
+.bs-hot-tag.new { background: rgba(67,160,71,.1); color: #43A047; }
+
+/* 搜索结果 */
+.bs-result-count {
+  font-size: 12px; color: var(--text-3);
+  margin-bottom: 10px; padding-left: 2px;
+}
+.bs-result-count b { color: var(--primary-dim); font-weight: 600; }
+
+/* 空状态 */
+.bs-empty {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 20px; text-align: center;
+}
+.bs-empty-icon {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-3); margin-bottom: 14px;
+}
+.bs-empty-icon svg { width: 28px; height: 28px; }
+.bs-empty-title { font-size: 14px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
+.bs-empty-desc { font-size: 12px; color: var(--text-3); line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 顶部搜索栏 -->
+  <div class="bs-header">
+    <button class="bs-back" id="bs-back">‹</button>
+    <div class="bs-search-box" id="searchBox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input type="text" id="searchInput" placeholder="" autocomplete="off">
+      <button class="bs-clear" id="searchClear" aria-label="清空">×</button>
+    </div>
+    <button class="bs-search-btn" id="searchBtn">搜索</button>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="bs-body" id="bs-body">
+    <!-- 搜索前：历史 + 热门 -->
+    <div id="beforeSearch">
+      <!-- 搜索历史 -->
+      <div class="bs-section" id="historySection" style="display:none;">
+        <div class="bs-section-head">
+          <span class="bs-section-title">搜索历史</span>
+          <button class="bs-section-clear" id="clearHistory">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            清空
+          </button>
+        </div>
+        <div class="bs-tags" id="historyTags"></div>
+      </div>
+
+      <!-- 热门搜索 -->
+      <div class="bs-section">
+        <div class="bs-section-head">
+          <span class="bs-section-title">热门搜索</span>
+        </div>
+        <div class="bs-hot-list" id="hotList"></div>
+      </div>
+    </div>
+
+    <!-- 搜索结果 -->
+    <div id="afterSearch" style="display:none;">
+      <div class="bs-result-count" id="resultCount"></div>
+      <div id="resultList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* ===== 业务类型配置：通过 ?type= 参数切换 ===== */
+  var TYPE_CONFIG = {
+    franchise: {
+      title: '资质招商',
+      placeholder: '搜索资质类型、地区、企业名称',
+      bizKey: 'franchise',
+      historyKey: 'engchain_franchise_search_history',
+      hot: [
+        { text: '成都 施工总承包一级', tag: 'hot' },
+        { text: '北京 市政公用工程', tag: 'hot' },
+        { text: '上海 建筑工程二级', tag: '' },
+        { text: '深圳 机电安装资质', tag: 'new' },
+        { text: '重庆 公路工程三级', tag: '' },
+        { text: '广州 水利水电资质', tag: '' },
+        { text: '杭州 装饰装修一级', tag: 'new' },
+        { text: '南京 钢结构专业承包', tag: '' }
+      ]
+    },
+    trade: {
+      title: '建企买卖',
+      placeholder: '搜索企业类型、资质、地区',
+      bizKey: 'trade',
+      historyKey: 'engchain_trade_search_history',
+      hot: [
+        { text: '成都 建筑公司转让', tag: 'hot' },
+        { text: '北京 带资质建筑公司', tag: 'hot' },
+        { text: '上海 一级资质公司', tag: '' },
+        { text: '深圳 装饰公司转让', tag: 'new' },
+        { text: '重庆 劳务公司买卖', tag: '' },
+        { text: '广州 市政公司转让', tag: '' },
+        { text: '杭州 设计公司收购', tag: 'new' },
+        { text: '南京 监理公司转让', tag: '' }
+      ]
+    },
+    personnel: {
+      title: '人员招聘',
+      placeholder: '搜索职位、证书、地区、企业',
+      bizKey: 'personnel',
+      historyKey: 'engchain_personnel_search_history',
+      hot: [
+        { text: '一级建造师 房建', tag: 'hot' },
+        { text: '二级建造师 市政', tag: 'hot' },
+        { text: '成都 项目经理招聘', tag: '' },
+        { text: '北京 技术负责人', tag: 'new' },
+        { text: '上海 安全员C证', tag: '' },
+        { text: '深圳 造价工程师', tag: '' },
+        { text: '重庆 施工员招聘', tag: 'new' },
+        { text: '广州 监理工程师', tag: '' }
+      ]
+    }
+  };
+
+  /* 读取 type 参数，默认 franchise */
+  var type = new URLSearchParams(location.search).get('type') || 'franchise';
+  if (!TYPE_CONFIG[type]) type = 'franchise';
+  var cfg = TYPE_CONFIG[type];
+
+  /* 更新页面标题和占位符 */
+  document.title = cfg.title + '搜索 · 工程链';
+  document.getElementById('searchInput').placeholder = cfg.placeholder;
+
+  /* ===== DOM 元素 ===== */
+  var searchInput = document.getElementById('searchInput');
+  var searchBox = document.getElementById('searchBox');
+  var searchClear = document.getElementById('searchClear');
+  var searchBtn = document.getElementById('searchBtn');
+  var backBtn = document.getElementById('bs-back');
+  var beforeSearch = document.getElementById('beforeSearch');
+  var afterSearch = document.getElementById('afterSearch');
+  var historySection = document.getElementById('historySection');
+  var historyTags = document.getElementById('historyTags');
+  var hotList = document.getElementById('hotList');
+  var resultCount = document.getElementById('resultCount');
+  var resultList = document.getElementById('resultList');
+  var clearHistoryBtn = document.getElementById('clearHistory');
+
+  /* ===== 搜索历史 ===== */
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem(cfg.historyKey) || '[]'); } catch (e) { return []; }
+  }
+  function saveHistory(kw) {
+    var list = getHistory().filter(function (k) { return k !== kw; });
+    list.unshift(kw);
+    if (list.length > 10) list = list.slice(0, 10);
+    try { localStorage.setItem(cfg.historyKey, JSON.stringify(list)); } catch (e) {}
+  }
+  function clearHistory() {
+    try { localStorage.removeItem(cfg.historyKey); } catch (e) {}
+    renderHistory();
+  }
+  function renderHistory() {
+    var list = getHistory();
+    if (list.length === 0) {
+      historySection.style.display = 'none';
+      return;
+    }
+    historySection.style.display = '';
+    historyTags.innerHTML = list.map(function (kw) {
+      return '<span class="bs-tag" data-kw="' + kw.replace(/"/g, '&quot;') + '">' + kw + '</span>';
+    }).join('');
+    historyTags.querySelectorAll('.bs-tag').forEach(function (el) {
+      el.addEventListener('click', function () {
+        doSearch(el.dataset.kw);
+      });
+    });
+  }
+
+  /* ===== 热门搜索 ===== */
+  function renderHot() {
+    hotList.innerHTML = cfg.hot.map(function (item, i) {
+      var rankCls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : 'normal';
+      var tagHtml = item.tag ? '<span class="bs-hot-tag ' + item.tag + '">' + (item.tag === 'hot' ? '热' : '新') + '</span>' : '';
+      return '<div class="bs-hot-item" data-kw="' + item.text.replace(/"/g, '&quot;') + '">' +
+        '<span class="bs-hot-rank ' + rankCls + '">' + (i + 1) + '</span>' +
+        '<span class="bs-hot-text">' + item.text + '</span>' +
+        tagHtml +
+        '</div>';
+    }).join('');
+    hotList.querySelectorAll('.bs-hot-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        doSearch(el.dataset.kw);
+      });
+    });
+  }
+
+  /* ===== 搜索结果 ===== */
+  function searchData(kw) {
+    /* 从 MOCK 数据中按 bizKey 过滤，再按关键词搜索 */
+    var all = [];
+    try {
+      if (window.MOCK && MOCK.byFlow) {
+        all = MOCK.byFlow('match').slice();
+      }
+    } catch (e) {}
+    /* 按业务类型过滤 */
+    var filtered = all.filter(function (item) {
+      return item.bizKey === cfg.bizKey;
+    });
+    /* 按关键词搜索（标题、分类、地区、企业名称） */
+    if (kw) {
+      var lower = kw.toLowerCase();
+      filtered = filtered.filter(function (item) {
+        var text = [
+          item.title || '',
+          item.cat || '',
+          item.sub || '',
+          item.city || '',
+          item.location || '',
+          item.company || '',
+          (item.tags || []).join(' ')
+        ].join(' ').toLowerCase();
+        return text.indexOf(lower) >= 0;
+      });
+    }
+    return filtered;
+  }
+
+  function renderResults(kw, list) {
+    resultCount.innerHTML = '找到 <b>' + list.length + '</b> 条与「' + kw + '」相关的' + cfg.title + '信息';
+    if (list.length === 0) {
+      resultList.innerHTML =
+        '<div class="bs-empty">' +
+          '<div class="bs-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>' +
+          '<div class="bs-empty-title">未找到相关结果</div>' +
+          '<div class="bs-empty-desc">换个关键词试试，或浏览热门搜索</div>' +
+        '</div>';
+      return;
+    }
+    /* 使用 Cards.render 渲染 */
+    if (window.Cards) {
+      resultList.innerHTML = Cards.render(list, '../supply/detail.html?id=');
+    } else {
+      resultList.innerHTML = list.map(function (item) {
+        return '<a class="job-card" href="../supply/detail.html?id=' + item.id + '">' +
+          '<div class="jc-title">' + (item.title || '') + '</div>' +
+          '</a>';
+      }).join('');
+    }
+  }
+
+  /* ===== 搜索动作 ===== */
+  function doSearch(kw) {
+    kw = (kw || searchInput.value || '').trim();
+    if (!kw) {
+      searchInput.focus();
+      return;
+    }
+    searchInput.value = kw;
+    saveHistory(kw);
+    /* 切换到结果视图 */
+    beforeSearch.style.display = 'none';
+    afterSearch.style.display = '';
+    /* 搜索并渲染 */
+    var results = searchData(kw);
+    renderResults(kw, results);
+    /* 滚动到顶部 */
+    document.querySelector('.phone').scrollTop = 0;
+  }
+
+  function backToHome() {
+    if (afterSearch.style.display !== 'none') {
+      /* 如果在结果页，返回搜索首页 */
+      afterSearch.style.display = 'none';
+      beforeSearch.style.display = '';
+      searchInput.value = '';
+      searchClear.classList.remove('show');
+      renderHistory();
+    } else {
+      /* 如果在搜索首页，返回上一页 */
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        location.href = '../index.html';
+      }
+    }
+  }
+
+  /* ===== 事件绑定 ===== */
+  backBtn.addEventListener('click', backToHome);
+  searchInput.addEventListener('focus', function () { searchBox.classList.add('focus'); });
+  searchInput.addEventListener('blur', function () { searchBox.classList.remove('focus'); });
+  searchInput.addEventListener('input', function () {
+    if (this.value) searchClear.classList.add('show');
+    else searchClear.classList.remove('show');
+  });
+  searchInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') doSearch();
+  });
+  searchClear.addEventListener('click', function () {
+    searchInput.value = '';
+    searchClear.classList.remove('show');
+    searchInput.focus();
+  });
+  searchBtn.addEventListener('click', function () { doSearch(); });
+  clearHistoryBtn.addEventListener('click', function () {
+    if (confirm('确定清空搜索历史吗？')) clearHistory();
+  });
+
+  /* ===== 初始化 ===== */
+  renderHistory();
+  renderHot();
+
+  /* 如果URL带 ?kw= 参数，自动搜索 */
+  var initKw = new URLSearchParams(location.search).get('kw');
+  if (initKw) {
+    setTimeout(function () { doSearch(initKw); }, 100);
+  }
+})();
+</script>
+</body>
+</html>

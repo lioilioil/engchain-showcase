@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>编辑资料 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+.edit-profile-page {
+  min-height: 100%;
+  background: var(--bg, #F5F3EE);
+  padding-bottom: 100px;
+}
+
+/* 头像区域 */
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 24px;
+  background: linear-gradient(180deg, rgba(201,169,97,0.08) 0%, transparent 100%);
+}
+
+.avatar-large-wrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.avatar-large {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E8D9B5, #C9A961);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+  box-shadow: 0 6px 20px rgba(201,169,97,0.3), inset 0 1px 0 rgba(255,255,255,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.avatar-large::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 50%);
+}
+.avatar-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-edit-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(201,169,97,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  z-index: 2;
+}
+.avatar-edit-btn svg { width: 13px; height: 13px; color: #A98A47; }
+
+.avatar-change-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #A98A47;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.avatar-change-text svg { width: 14px; height: 14px; }
+.avatar-change-text:active { opacity: 0.7; }
+
+.avatar-hint {
+  font-size: 11px;
+  color: var(--text-3, #999);
+  margin-top: 6px;
+}
+
+/* 表单区域 */
+.form-section {
+  padding: 16px;
+}
+
+.form-group {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--line, #E8E4DC);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line, #F0ECE4);
+}
+.form-row:last-child { border-bottom: none; }
+
+.form-row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1, #333);
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.form-row-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-1, #333);
+  text-align: right;
+  padding: 0;
+}
+.form-row-input::placeholder { color: var(--text-4, #ccc); }
+
+.form-row-arrow {
+  color: var(--text-4, #ccc);
+  margin-left: 8px;
+  font-size: 16px;
+}
+
+.form-row-value {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-2, #666);
+}
+
+/* 性别选择 */
+.gender-options {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+}
+.gender-opt {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3, #999);
+  background: var(--bg-card-2, #F5F3EE);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gender-opt.active {
+  background: rgba(201,169,97,0.12);
+  color: #A98A47;
+  border-color: rgba(201,169,97,0.3);
+  font-weight: 600;
+}
+
+/* 简介 */
+.bio-textarea {
+  width: 100%;
+  min-height: 80px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-1, #333);
+  resize: none;
+  line-height: 1.6;
+  padding: 0;
+}
+.bio-textarea::placeholder { color: var(--text-4, #ccc); }
+.bio-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-4, #ccc);
+  margin-top: 4px;
+}
+
+/* 保存按钮 */
+.save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98));
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--line, #E8E4DC);
+  z-index: 50;
+}
+.save-btn {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #C9A961, #A98A47);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -3px rgba(169,138,71,0.4);
+  transition: all 0.2s;
+}
+.save-btn:active { transform: scale(0.98); opacity: 0.9; }
+
+/* 头像选择弹窗 */
+.avatar-sheet-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.avatar-sheet-mask.show { opacity: 1; pointer-events: auto; }
+
+.avatar-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg, #F5F3EE);
+  border-radius: 18px 18px 0 0;
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.avatar-sheet.show { transform: translateY(0); }
+
+.avatar-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line, #E8E4DC);
+}
+.avatar-sheet-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1, #333);
+}
+.avatar-sheet-cancel {
+  font-size: 13px;
+  color: var(--text-3, #999);
+  cursor: pointer;
+}
+
+.avatar-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+.avatar-preset {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 3px solid transparent;
+}
+.avatar-preset:active { transform: scale(0.92); }
+.avatar-preset.selected { border-color: #C9A961; box-shadow: 0 0 0 3px rgba(201,169,97,0.2); }
+
+.avatar-sheet-action {
+  padding: 0 16px 16px;
+}
+.avatar-upload-btn {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px dashed var(--line, #D8D4CC);
+  border-radius: 12px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2, #666);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.avatar-upload-btn svg { width: 16px; height: 16px; }
+.avatar-upload-btn:active { background: rgba(201,169,97,0.06); }
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="phone">
+<div class="edit-profile-page">
+  <!-- 导航栏 -->
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">编辑资料</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <!-- 头像区域 -->
+  <div class="avatar-section">
+    <div class="avatar-large-wrap">
+      <div class="avatar-large" id="ep-avatar">游</div>
+      <div class="avatar-edit-btn" onclick="openAvatarSheet()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>
+    </div>
+    <div class="avatar-change-text" onclick="openAvatarSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      更换头像
+    </div>
+    <div class="avatar-hint">支持 JPG/PNG 格式，建议尺寸 400×400</div>
+  </div>
+
+  <!-- 表单区域 -->
+  <div class="form-section">
+    <div class="form-group">
+      <div class="form-row">
+        <span class="form-row-label">昵称</span>
+        <input class="form-row-input" id="ep-nickname" placeholder="请输入昵称" maxlength="20">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">性别</span>
+        <div class="gender-options" id="ep-gender">
+          <span class="gender-opt" data-val="male">男</span>
+          <span class="gender-opt" data-val="female">女</span>
+          <span class="gender-opt" data-val="secret">保密</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">所在城市</span>
+        <input class="form-row-input" id="ep-city" placeholder="请输入城市" readonly style="cursor:pointer;" onclick="showToast('演示环境：城市选择暂未开放')">
+        <span class="form-row-arrow">›</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <span class="form-row-label" style="width:auto;">个人简介</span>
+        <textarea class="bio-textarea" id="ep-bio" placeholder="介绍一下自己，让更多人认识你" maxlength="100"></textarea>
+        <div class="bio-count"><span id="ep-bio-count">0</span>/100</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-row" onclick="showToast('演示环境：手机号修改暂未开放')">
+        <span class="form-row-label">手机号</span>
+        <span class="form-row-value">138****8866</span>
+        <span class="form-row-arrow">›</span>
+      </div>
+      <div class="form-row" onclick="showToast('演示环境：微信号修改暂未开放')">
+        <span class="form-row-label">微信号</span>
+        <span class="form-row-value">未绑定</span>
+        <span class="form-row-arrow">›</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 保存按钮 -->
+  <div class="save-bar">
+    <button class="save-btn" onclick="saveProfile()">保存</button>
+  </div>
+</div>
+
+<!-- 头像选择弹窗 -->
+<div class="avatar-sheet-mask" id="avatar-mask" onclick="closeAvatarSheet()"></div>
+<div class="avatar-sheet" id="avatar-sheet">
+  <div class="avatar-sheet-head">
+    <span class="avatar-sheet-title">选择头像</span>
+    <span class="avatar-sheet-cancel" onclick="closeAvatarSheet()">取消</span>
+  </div>
+  <div class="avatar-presets" id="avatar-presets"></div>
+  <div class="avatar-sheet-action">
+    <button class="avatar-upload-btn" onclick="showToast('演示环境：上传头像暂未开放')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      从相册上传
+    </button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+</div>
+
+<script src="../../js/common.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* 预设头像颜色 */
+  var AVATAR_PRESETS = [
+    { bg: 'linear-gradient(135deg,#E8D9B5,#C9A961)', text: '游' },
+    { bg: 'linear-gradient(135deg,#A8D5BA,#5B9A6F)', text: '工' },
+    { bg: 'linear-gradient(135deg,#B8D4E8,#5B8AB5)', text: '程' },
+    { bg: 'linear-gradient(135deg,#F0C8C0,#D4655A)', text: '建' },
+    { bg: 'linear-gradient(135deg,#F0E0C0,#D4945A)', text: '材' },
+    { bg: 'linear-gradient(135deg,#D0C8E8,#8B7BB5)', text: '设' },
+    { bg: 'linear-gradient(135deg,#C8E0E8,#5BA5B5)', text: '机' },
+    { bg: 'linear-gradient(135deg,#E8D0C0,#B5805A)', text: '劳' }
+  ];
+
+  var selectedAvatar = null;
+  var selectedGender = 'secret';
+
+  /* 加载已保存的资料 */
+  function loadProfile() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('engchain-user-profile') || '{}');
+      if (saved.nickname) document.getElementById('ep-nickname').value = saved.nickname;
+      if (saved.gender) {
+        selectedGender = saved.gender;
+        updateGenderUI();
+      }
+      if (saved.city) document.getElementById('ep-city').value = saved.city;
+      if (saved.bio) {
+        document.getElementById('ep-bio').value = saved.bio;
+        document.getElementById('ep-bio-count').textContent = saved.bio.length;
+      }
+      if (saved.avatar != null) {
+        selectedAvatar = saved.avatar;
+        applyAvatar(selectedAvatar);
+      } else {
+        /* 从UI.state读取用户名 */
+        try {
+          var st = UI.state.get();
+          var name = st.user || (st.loggedIn ? '工程用户' : '游客');
+          document.getElementById('ep-avatar').textContent = name.charAt(0) || '游';
+          document.getElementById('ep-nickname').value = name;
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  /* 更新性别UI */
+  function updateGenderUI() {
+    var opts = document.querySelectorAll('#ep-gender .gender-opt');
+    opts.forEach(function (opt) {
+      opt.classList.toggle('active', opt.dataset.val === selectedGender);
+    });
+  }
+
+  /* 应用头像 */
+  function applyAvatar(index) {
+    var preset = AVATAR_PRESETS[index];
+    var el = document.getElementById('ep-avatar');
+    el.style.background = preset.bg;
+    el.textContent = preset.text;
+  }
+
+  /* 渲染预设头像 */
+  function renderPresets() {
+    var box = document.getElementById('avatar-presets');
+    box.innerHTML = AVATAR_PRESETS.map(function (p, i) {
+      return '<div class="avatar-preset' + (selectedAvatar === i ? ' selected' : '') +
+        '" style="background:' + p.bg + ';" onclick="selectAvatar(' + i + ')">' + p.text + '</div>';
+    }).join('');
+  }
+
+  window.selectAvatar = function (index) {
+    selectedAvatar = index;
+    applyAvatar(index);
+    renderPresets();
+  };
+
+  /* 打开/关闭头像选择弹窗 */
+  window.openAvatarSheet = function () {
+    renderPresets();
+    document.getElementById('avatar-mask').classList.add('show');
+    document.getElementById('avatar-sheet').classList.add('show');
+  };
+
+  window.closeAvatarSheet = function () {
+    document.getElementById('avatar-mask').classList.remove('show');
+    document.getElementById('avatar-sheet').classList.remove('show');
+  };
+
+  /* 性别选择 */
+  document.getElementById('ep-gender').addEventListener('click', function (e) {
+    var opt = e.target.closest('.gender-opt');
+    if (!opt) return;
+    selectedGender = opt.dataset.val;
+    updateGenderUI();
+  });
+
+  /* 简介字数统计 */
+  document.getElementById('ep-bio').addEventListener('input', function () {
+    document.getElementById('ep-bio-count').textContent = this.value.length;
+  });
+
+  /* Toast */
+  window.showToast = function (msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1800);
+  };
+
+  /* 保存资料 */
+  window.saveProfile = function () {
+    var nickname = document.getElementById('ep-nickname').value.trim();
+    if (!nickname) {
+      showToast('请输入昵称');
+      return;
+    }
+    var data = {
+      nickname: nickname,
+      gender: selectedGender,
+      city: document.getElementById('ep-city').value.trim(),
+      bio: document.getElementById('ep-bio').value.trim(),
+      avatar: selectedAvatar,
+      updatedAt: Date.now()
+    };
+    try {
+      localStorage.setItem('engchain-user-profile', JSON.stringify(data));
+      /* 同步更新UI.state */
+      try {
+        var st = UI.state.get();
+        st.user = nickname;
+        UI.state.set(st);
+      } catch (e) {}
+    } catch (e) {}
+    showToast('保存成功');
+    setTimeout(function () { history.back(); }, 800);
+  };
+
+  /* 初始化 */
+  loadProfile();
+})();
+</script>
+</body>
+</html>

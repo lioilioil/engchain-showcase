@@ -357,21 +357,75 @@ window.payEnterprise=function(){
   }
   if(resubmit){doSubmit();return;}
   var avail=window.BalanceStore?BalanceStore.available():0;
-  UI.sheet().html(
-    '<div style="padding:6px 2px 14px;">'+
-    '<div class="fw-700 fs-16" style="margin-bottom:12px;">企业认证 · 支付确认</div>'+
-    '<div class="fb-between" style="font-size:13px;padding:7px 0;"><span class="text-2">认证费（年费）</span><b>¥'+fee+'</b></div>'+
-    '<div class="fb-between" style="font-size:13px;padding:7px 0;"><span class="text-2">账户余额</span><b style="color:'+(avail>=fee?'var(--success)':'var(--danger)')+';">¥'+avail.toLocaleString()+'</b></div>'+
-    '<div class="fb-between" style="font-size:13px;padding:7px 0 12px;"><span class="text-2">审核时效</span><b>24 小时内人工复核</b></div>'+
-    '<button class="btn btn-primary btn-block" id="cfm-pay">确认支付并提交</button>'+
-    '<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button></div>').show();
-  setTimeout(function(){var b=document.getElementById('cfm-pay');if(b)b.onclick=function(){
-    UI.closeSheet();
-    var r=DataBus.authApply('enterprise',payload,fee);
-    if(r&&r.error){UI.toast(r.error,'warn');return;}
-    UI.toast('支付成功，已进入平台审核','ok');
-    setTimeout(function(){location.href='auth-result.html?type=enterprise&state=reviewing';},800);
-  };},60);
+  var payMethod='balance';
+  function paySheetHtml(){
+    var balanceOk=avail>=fee;
+    var methods=[
+      {key:'balance',name:'余额支付',desc:'账户余额 ¥'+avail.toLocaleString()+(balanceOk?'':'（余额不足）'),icon:'💳',disabled:!balanceOk},
+      {key:'wechat',name:'微信支付',desc:'推荐使用微信扫码支付',icon:'💚',disabled:false},
+      {key:'alipay',name:'支付宝',desc:'支持支付宝快捷支付',icon:'💙',disabled:false},
+      {key:'corp',name:'对公转账',desc:'企业对公账户转账，1-3工作日到账',icon:'🏦',disabled:false}
+    ];
+    var html='<div style="padding:6px 2px 14px;">';
+    html+='<div class="fw-700 fs-16" style="margin-bottom:14px;">企业认证 · 支付确认</div>';
+    /* 订单信息 */
+    html+='<div style="background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;">';
+    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">认证服务费（年费）</span><b style="font-family:var(--font-num);">¥'+fee+'</b></div>';
+    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">审核时效</span><b>24 小时内人工复核</b></div>';
+    html+='<div class="fb-between" style="font-size:13px;padding:5px 0 0;"><span class="text-2">服务内容</span><b>企业认证标识 + 详情页优先展示</b></div>';
+    html+='</div>';
+    /* 支付方式选择 */
+    html+='<div style="font-size:13px;font-weight:600;color:var(--text-1);margin-bottom:10px;">选择支付方式</div>';
+    methods.forEach(function(m){
+      var active=payMethod===m.key;
+      html+='<div class="pay-method-item'+(active?' active':'')+(m.disabled?' disabled':'')+'" data-method="'+m.key+'" style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid '+(active?'var(--primary)':'var(--line)')+';border-radius:10px;margin-bottom:8px;cursor:'+(m.disabled?'not-allowed':'pointer')+';opacity:'+(m.disabled?'.5':'1')+';background:'+(active?'var(--primary-soft)':'var(--bg-card)')+';transition:all .15s;">';
+      html+='<span style="font-size:18px;flex:none;">'+m.icon+'</span>';
+      html+='<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:var(--text-1);">'+m.name+'</div><div style="font-size:10.5px;color:var(--text-3);margin-top:1px;">'+m.desc+'</div></div>';
+      html+='<span style="width:18px;height:18px;border-radius:50%;border:2px solid '+(active?'var(--primary)':'var(--line)')+';display:flex;align-items:center;justify-content:center;flex:none;">'+(active?'<span style="width:8px;height:8px;border-radius:50%;background:var(--primary);"></span>':'')+'</span>';
+      html+='</div>';
+    });
+    /* 对公转账提示 */
+    if(payMethod==='corp'){
+      html+='<div style="background:rgba(201,169,97,.08);border:1px solid rgba(201,169,97,.2);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text-2);line-height:1.6;">';
+      html+='<b style="color:var(--primary-dim);">转账信息：</b>开户名：工程链科技有限公司<br>开户行：中国工商银行成都分行<br>账号：6222 **** **** 8888<br>转账时请备注：企业认证+企业名称';
+      html+='</div>';
+    }
+    /* 支付按钮 */
+    var btnText=payMethod==='balance'?'确认支付 ¥'+fee:payMethod==='corp'?'提交审核（转账后上传凭证）':'立即支付 ¥'+fee;
+    html+='<button class="btn btn-primary btn-block" id="cfm-pay" style="margin-top:6px;">'+btnText+'</button>';
+    html+='<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button>';
+    html+='</div>';
+    return html;
+  }
+  function refreshPaySheet(){
+    var sheet=document.querySelector('.ui-sheet-body, [class*="sheet"]');
+    var container=document.querySelector('.ui-sheet-body') || document.querySelector('[class*="sheet-body"]');
+    if(container){container.innerHTML=paySheetHtml();bindPayEvents();}
+  }
+  function bindPayEvents(){
+    document.querySelectorAll('.pay-method-item').forEach(function(el){
+      if(el.classList.contains('disabled'))return;
+      el.addEventListener('click',function(){
+        payMethod=el.dataset.method;
+        refreshPaySheet();
+      });
+    });
+    var payBtn=document.getElementById('cfm-pay');
+    if(payBtn)payBtn.onclick=function(){
+      UI.closeSheet();
+      if(payMethod==='corp'){
+        UI.toast('已提交审核，请转账后上传凭证','ok');
+        setTimeout(function(){location.href='auth-result.html?type=enterprise&state=reviewing';},800);
+        return;
+      }
+      var r=DataBus.authApply('enterprise',payload,fee);
+      if(r&&r.error){UI.toast(r.error,'warn');return;}
+      UI.toast(payMethod==='wechat'?'微信支付成功，已进入平台审核':payMethod==='alipay'?'支付宝支付成功，已进入平台审核':'支付成功，已进入平台审核','ok');
+      setTimeout(function(){location.href='auth-result.html?type=enterprise&state=reviewing';},800);
+    };
+  }
+  UI.sheet().html(paySheetHtml()).show();
+  setTimeout(bindPayEvents,60);
 };
 document.addEventListener('click',function(e){if(e.target&&e.target.id==='pay-btn')payEnterprise();});
 document.getElementById('in-short').addEventListener('input',function(){

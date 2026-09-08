@@ -191,17 +191,206 @@ window.UI = (function () {
       { key: 'message',  label: '消息', href: root + 'pages/message/index.html',             icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>', badge: 3 },
       { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',             icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' },
     ];
-    var tabs = '<nav class="app-tabbar" aria-label="主导航">' + TABS.map(function (t) {
-      return '<a href="' + t.href + '" class="app-tab' + (active === t.key ? ' active' : '') + '">' +
+    var tabs = '<nav class="app-tabbar" aria-label="主导航">' +
+      '<div class="tab-glass" aria-hidden="true"></div>' +
+      TABS.map(function (t) {
+      return '<a href="' + t.href + '" class="app-tab' + (active === t.key ? ' active' : '') + '" data-key="' + t.key + '">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + t.icon + '</svg>' +
-        t.label +
+        '<span class="tab-label">' + t.label + '</span>' +
         (t.badge ? '<span class="badge">' + t.badge + '</span>' : '') +
         '</a>';
     }).join('') + '</nav>';
     var orbActive = active === 'workbench';
     var orb = '<a class="ai-orb-entry' + (orbActive ? ' active' : '') + '" href="' + root + 'pages/publish/index.html" aria-label="AI 信息工作台" title="信息工作台">' +
-      '<span data-thinking-orb data-orb-size="60" aria-hidden="true"></span></a>';
+      '<span class="glass-orb" aria-hidden="true">' +
+        '<svg class="glass-orb-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>' +
+      '</span></a>';
     return '<div class="app-nav-shell">' + tabs + orb + '</div>';
+  }
+
+  /* ---- 页面过渡管理器（Tab 切换淡出/淡入 + 预加载 + 进度条）---- */
+  var pageTransition = {
+    _progressEl: null,
+
+    // 开始跳转过渡：当前页面淡出 + 显示进度条 + 延迟跳转
+    start: function (href) {
+      // 防止重复触发
+      if (document.body.classList.contains('page-leaving')) return;
+      document.body.classList.add('page-leaving');
+      this._showProgress();
+      // 等待淡出动画完成（300ms）后跳转
+      setTimeout(function () {
+        window.location.href = href;
+      }, 300);
+    },
+
+    // 显示顶部加载进度条
+    _showProgress: function () {
+      if (!this._progressEl) {
+        this._progressEl = document.createElement('div');
+        this._progressEl.className = 'page-progress';
+        document.body.appendChild(this._progressEl);
+      }
+      this._progressEl.classList.add('active');
+    },
+
+    // 预加载其他 Tab 页面（浏览器空闲时预取 HTML，加速后续跳转）
+    prefetch: function () {
+      var root = window.__ROOT__ || '';
+      var pages = [
+        'home.html',
+        'pages/supply/list.html',
+        'pages/message/index.html',
+        'pages/profile/index.html'
+      ];
+      pages.forEach(function (url) {
+        // 跳过当前页
+        if (location.href.indexOf(url) !== -1) return;
+        try {
+          var link = document.createElement('link');
+          link.rel = 'prefetch';
+          link.href = root + url;
+          link.as = 'document';
+          document.head.appendChild(link);
+        } catch (e) {}
+      });
+    }
+  };
+
+  /* ---- 底部 Tabbar 玻璃块滑动交互 ----
+     独立 .tab-glass 元素通过 transform: translateX() 平滑滑动；
+     支持点击滑动后跳转、触摸左右滑动切换、鼠标拖拽切换、resize 重算位置。 */
+  function initTabbarGlass() {
+    var tabbar = document.querySelector('.app-tabbar');
+    if (!tabbar) return;
+    var glass = tabbar.querySelector('.tab-glass');
+    var tabs = tabbar.querySelectorAll('.app-tab');
+    if (!glass || tabs.length === 0) return;
+
+    var activeIndex = 0;
+    tabs.forEach(function (t, i) { if (t.classList.contains('active')) activeIndex = i; });
+
+    // 计算每个 tab 相对 tabbar 的位置和宽度
+    function measure() {
+      var parentRect = tabbar.getBoundingClientRect();
+      var arr = [];
+      tabs.forEach(function (t) {
+        var r = t.getBoundingClientRect();
+        arr.push({ left: r.left - parentRect.left, width: r.width });
+      });
+      return arr;
+    }
+    var positions = measure();
+
+    // 移动玻璃块到指定 index
+    function moveTo(index, animate) {
+      if (index < 0) index = 0;
+      if (index >= positions.length) index = positions.length - 1;
+      var p = positions[index];
+      glass.style.transition = animate
+        ? 'transform .42s cubic-bezier(.34,1.4,.64,1), width .3s ease'
+        : 'none';
+      glass.style.transform = 'translateX(' + p.left + 'px)';
+      glass.style.width = p.width + 'px';
+      glass.classList.toggle('is-first', index === 0);
+      glass.classList.toggle('is-last', index === positions.length - 1);
+    }
+
+    // 初始化位置（无动画）
+    requestAnimationFrame(function () { moveTo(activeIndex, false); });
+
+    // 点击 tab：先滑动玻璃块，再延迟跳转
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function (e) {
+        e.preventDefault();
+        var href = t.getAttribute('href');
+        tabs.forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        activeIndex = i;
+        moveTo(i, true);
+        UI.pageTransition.start(href);
+      });
+    });
+
+    // ===== 触摸滑动（移动端）=====
+    var touchStartX = 0, touchStartY = 0, isTouching = false;
+    var dragStartIndex = 0, currentOffset = 0;
+
+    tabbar.addEventListener('touchstart', function (e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isTouching = true;
+      dragStartIndex = activeIndex;
+      currentOffset = 0;
+      glass.style.transition = 'none';
+    }, { passive: true });
+
+    tabbar.addEventListener('touchmove', function (e) {
+      if (!isTouching) return;
+      var dx = e.touches[0].clientX - touchStartX;
+      var dy = e.touches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 4) {
+        e.preventDefault();
+        currentOffset = dx;
+        var targetLeft = positions[dragStartIndex].left + dx;
+        var minL = positions[0].left, maxL = positions[positions.length - 1].left;
+        if (targetLeft < minL) targetLeft = minL + (targetLeft - minL) * 0.3;
+        if (targetLeft > maxL) targetLeft = maxL + (targetLeft - maxL) * 0.3;
+        glass.style.transform = 'translateX(' + targetLeft + 'px)';
+      }
+    }, { passive: false });
+
+    function endDrag() {
+      if (!isTouching && !isMouseDragging) return;
+      isTouching = false;
+      isMouseDragging = false;
+      var threshold = positions[0].width * 0.28;
+      var newIndex = dragStartIndex;
+      if (currentOffset < -threshold && dragStartIndex < positions.length - 1) newIndex = dragStartIndex + 1;
+      else if (currentOffset > threshold && dragStartIndex > 0) newIndex = dragStartIndex - 1;
+      activeIndex = newIndex;
+      tabs.forEach(function (x, i) { x.classList.toggle('active', i === newIndex); });
+      moveTo(newIndex, true);
+      if (newIndex !== dragStartIndex) {
+        var href = tabs[newIndex].getAttribute('href');
+        UI.pageTransition.start(href);
+      }
+    }
+    tabbar.addEventListener('touchend', endDrag);
+    tabbar.addEventListener('touchcancel', endDrag);
+
+    // ===== 鼠标拖拽（桌面端）=====
+    var mouseStartX = 0, isMouseDragging = false;
+    tabbar.addEventListener('mousedown', function (e) {
+      if (e.target.closest && e.target.closest('.app-tab')) return; // 点击链接走点击逻辑
+      mouseStartX = e.clientX;
+      isMouseDragging = true;
+      dragStartIndex = activeIndex;
+      currentOffset = 0;
+      glass.style.transition = 'none';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!isMouseDragging) return;
+      var dx = e.clientX - mouseStartX;
+      currentOffset = dx;
+      var targetLeft = positions[dragStartIndex].left + dx;
+      var minL = positions[0].left, maxL = positions[positions.length - 1].left;
+      if (targetLeft < minL) targetLeft = minL + (targetLeft - minL) * 0.3;
+      if (targetLeft > maxL) targetLeft = maxL + (targetLeft - maxL) * 0.3;
+      glass.style.transform = 'translateX(' + targetLeft + 'px)';
+    });
+    document.addEventListener('mouseup', endDrag);
+
+    // ===== 窗口 resize：重新计算位置 =====
+    var resizeTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        positions = measure();
+        moveTo(activeIndex, false);
+      }, 120);
+    });
   }
 
   /* ---- 图标：全局 SVG sprite（只允许 SVG，禁用 emoji/字符图标）----
@@ -470,7 +659,7 @@ window.UI = (function () {
     return sh;
   }
 
-  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, ensureThinkingOrb, icon, catIcon, certCard, certModal, cityPicker };
+  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, initTabbarGlass, pageTransition, ensureThinkingOrb, icon, catIcon, certCard, certModal, cityPicker };
 })();
 
 /* ============================================================================
@@ -561,6 +750,14 @@ window.ViewHistory = ViewHistory;
 
 /* ---- 自动引导：注入状态栏 + 灵动岛，补齐 __ROOT__ ---- */
 (function autoBootstrap() {
+  // 页面过渡：判断是否为同域 Tab 切换跳转，若是则先隐藏内容等待淡入
+  try {
+    var _ref = document.referrer;
+    var _isInternalNav = _ref && _ref.indexOf(location.origin) === 0 && _ref !== location.href;
+    if (_isInternalNav && document.body) {
+      document.body.classList.add('page-loading');
+    }
+  } catch (e) {}
   if (!window.__ROOT__) {
     // 计算页面距仓库根的深度：pages/profile/index.html → 2 → ../../（autoBootstrap 兜底，供 back() 回退使用）
     window.__ROOT__ = location.pathname.includes('/pages/') ? '../'.repeat(location.pathname.split('/pages/')[1].split('/').length) : '';
@@ -600,6 +797,7 @@ window.ViewHistory = ViewHistory;
     if (tab && phone && !phone.querySelector('.app-tabbar')) {
       phone.insertAdjacentHTML('beforeend', UI.tabbar(tab, window.__ROOT__));
       UI.ensureThinkingOrb(function () { window.ThinkingOrb.initAll(); });
+      UI.initTabbarGlass();
     }
     // 付费墙字段（contact-grid 内由详情页自行唤起付费墙，避免与全局提示重复）
     document.querySelectorAll('.obscured').forEach(function (el) {
@@ -621,6 +819,24 @@ window.ViewHistory = ViewHistory;
       var lbl = t.querySelector('span');
       if (lbl) lbl.textContent = next === 0 ? '查看资质评分' : (next === 1 ? '查看完整认证详情' : '收起');
     });
+
+    // 页面过渡：内容就绪后触发淡入动画
+    if (document.body.classList.contains('page-loading')) {
+      // 延迟一帧，确保 DOM 渲染完成后再淡入
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          document.body.classList.remove('page-loading');
+          document.body.classList.add('page-ready');
+          setTimeout(function () { document.body.classList.remove('page-ready'); }, 600);
+        });
+      });
+    }
+    // 预加载其他 Tab 页面资源（空闲时执行，加速后续切换）
+    if (window.requestIdleCallback) {
+      requestIdleCallback(function () { UI.pageTransition.prefetch(); });
+    } else {
+      setTimeout(function () { UI.pageTransition.prefetch(); }, 800);
+    }
   });
 })();
 
@@ -789,7 +1005,11 @@ window.Cards = (function () {
     href = href || (window.__ROOT__ || '') + 'pages/supply/detail.html?id=';
     return list.map(function (s) {
       var fn = BUILDERS[s.bizKey] || supplyLike;
-      return '<a href="' + href + s.id + '" class="job-card">' + fn(s) + '</a>';
+      /* 供应/需求类卡片附加方向类名，用于左上角弥散渐变标识（仅明亮模式） */
+      var dirCls = '';
+      if (s.dir === 'demand') dirCls = ' is-demand';
+      else if (s.dir === 'supply') dirCls = ' is-supply';
+      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + fn(s) + '</a>';
     }).join('');
   }
 

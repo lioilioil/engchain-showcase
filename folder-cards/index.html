@@ -1,0 +1,1986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liquid Glass Folder Cards</title>
+<style>
+/* ============ Design Tokens ============ */
+:root {
+  --bg-deep: #0a0a0f;
+  --bg-elevated: #14141c;
+  --glass-bg: rgba(22, 22, 28, 0.72);
+  --glass-bg-solid: rgba(16, 16, 22, 0.92);
+  --glass-back-inner: rgba(40, 40, 52, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.35);
+  --control-bg: rgba(255,255,255,.06);
+  --control-border: rgba(255,255,255,.1);
+  --accent: #4a9eff;
+  --radius-lg: 28px;
+  --radius-sm: 14px;
+  --radius-paper: 12px;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --folder-scale: 1;
+}
+
+[data-theme="light"] {
+  --bg-deep: #e8e8ed;
+  --bg-elevated: #f5f5f7;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-bg-solid: rgba(245, 245, 250, 0.9);
+  --glass-back-inner: rgba(225, 225, 235, 0.95);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.8);
+  --text-primary: rgba(0, 0, 0, 0.9);
+  --text-secondary: rgba(0, 0, 0, 0.5);
+  --text-tertiary: rgba(0, 0, 0, 0.3);
+  --control-bg: rgba(0,0,0,.05);
+  --control-border: rgba(0,0,0,.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  position: relative;
+  transition: background .4s var(--ease-spring), color .4s var(--ease-spring);
+}
+
+/* ============ Ambient Background ============ */
+.ambient-bg {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(74, 158, 255, 0.12), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(191, 90, 242, 0.1), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 159, 10, 0.05), transparent 70%),
+    var(--bg-deep);
+  transition: background .4s var(--ease-spring);
+}
+[data-theme="light"] .ambient-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(74, 158, 255, 0.15), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 100%, rgba(191, 90, 242, 0.12), transparent 60%),
+    var(--bg-deep);
+}
+.ambient-bg::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: .4; pointer-events: none;
+}
+
+/* ============ Header ============ */
+.header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px 48px; max-width: 1200px; margin: 0 auto;
+}
+.brand { display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.brand-mark {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255,255,255,.15), rgba(255,255,255,.05));
+  border: 1px solid rgba(255,255,255,.15); backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+}
+[data-theme="light"] .brand-mark {
+  background: linear-gradient(135deg, rgba(0,0,0,.08), rgba(0,0,0,.03));
+  border: 1px solid rgba(0,0,0,.1);
+}
+.brand-mark svg { width: 16px; height: 16px; color: var(--text-primary); }
+
+.header-controls { display: flex; align-items: center; gap: 10px; }
+
+/* Theme toggle */
+.theme-toggle {
+  width: 38px; height: 38px; border-radius: 12px;
+  background: var(--control-bg); border: 1px solid var(--control-border);
+  color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .3s var(--ease-spring); backdrop-filter: blur(10px);
+}
+.theme-toggle:hover { color: var(--text-primary); transform: scale(1.05); }
+.theme-toggle svg { width: 17px; height: 17px; }
+
+/* Language toggle */
+.lang-toggle {
+  height: 38px; padding: 0 14px; border-radius: 12px;
+  background: var(--control-bg); border: 1px solid var(--control-border);
+  color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  transition: all .3s var(--ease-spring); backdrop-filter: blur(10px);
+}
+.lang-toggle:hover { color: var(--text-primary); background: rgba(255,255,255,.08); }
+[data-theme="light"] .lang-toggle:hover { background: rgba(0,0,0,.06); }
+.lang-toggle .lang-active { color: var(--text-primary); }
+.lang-toggle .lang-sep { opacity: .3; }
+
+/* Zoom controls */
+.zoom-group {
+  display: flex; align-items: center; gap: 0;
+  background: var(--control-bg); border: 1px solid var(--control-border);
+  border-radius: 12px; backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+.zoom-btn {
+  width: 38px; height: 38px; border: none; background: transparent;
+  color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; font-size: 18px; font-weight: 500;
+}
+.zoom-btn:hover { color: var(--text-primary); background: rgba(255,255,255,.06); }
+[data-theme="light"] .zoom-btn:hover { background: rgba(0,0,0,.05); }
+.zoom-btn:active { transform: scale(.92); }
+.zoom-value {
+  min-width: 48px; text-align: center;
+  font-size: 12.5px; font-weight: 600; color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--control-border);
+  border-right: 1px solid var(--control-border);
+  padding: 0 4px;
+}
+
+/* ============ Sticker Upload Panel ============ */
+.sticker-panel {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(.9);
+  z-index: 100;
+  background: var(--glass-bg-solid);
+  backdrop-filter: blur(40px) saturate(1.8);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none;
+  transition: all .35s var(--ease-spring);
+  width: 320px;
+}
+.sticker-panel.show {
+  opacity: 1; pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+.sticker-panel-overlay {
+  position: fixed; inset: 0; z-index: 99;
+  background: rgba(0,0,0,.4);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s;
+}
+.sticker-panel-overlay.show { opacity: 1; pointer-events: auto; }
+.sticker-panel-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 16px;
+  color: var(--text-primary);
+}
+.sticker-preview {
+  width: 100%; height: 160px;
+  background: var(--control-bg);
+  border: 1px dashed var(--control-border);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.sticker-preview img {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.sticker-preview-placeholder {
+  font-size: 12px; color: var(--text-tertiary);
+  text-align: center; line-height: 1.5;
+}
+.sticker-panel-info {
+  font-size: 11.5px; color: var(--text-tertiary);
+  margin-bottom: 14px; line-height: 1.5;
+}
+.sticker-panel-actions {
+  display: flex; gap: 10px;
+}
+.sticker-panel-actions button {
+  flex: 1; padding: 10px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+  font-family: inherit;
+}
+.btn-cancel {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--text-secondary);
+}
+.btn-cancel:hover { color: var(--text-primary); }
+.btn-apply {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+}
+.btn-apply:hover { filter: brightness(1.1); }
+.btn-apply:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ============ Hero ============ */
+.hero {
+  position: relative; z-index: 10; text-align: center;
+  padding: 28px 20px 36px; max-width: 640px; margin: 0 auto;
+}
+.hero-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 16px; border-radius: 100px;
+  background: var(--control-bg); border: 1px solid var(--control-border);
+  backdrop-filter: blur(20px); font-size: 12.5px; font-weight: 500;
+  color: var(--text-secondary); margin-bottom: 18px;
+}
+.hero-label .pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: #30d158;
+  box-shadow: 0 0 10px rgba(48,209,88,.7); animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+.hero h1 { font-size: 38px; font-weight: 700; letter-spacing: -.035em; line-height: 1.1; margin-bottom: 12px; }
+.hero h1 .grad {
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero p { font-size: 15px; color: var(--text-secondary); line-height: 1.55; max-width: 520px; margin: 0 auto; }
+
+/* ============ State Tabs ============ */
+.state-tabs { position: relative; z-index: 10; display: flex; justify-content: center; gap: 8px; margin-bottom: 48px; }
+.state-tab {
+  padding: 8px 18px; border-radius: 100px;
+  background: var(--control-bg); border: 1px solid var(--control-border);
+  color: var(--text-secondary); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .3s var(--ease-spring); font-family: inherit;
+  backdrop-filter: blur(10px);
+}
+.state-tab:hover { color: var(--text-primary); }
+.state-tab.active { background: rgba(255,255,255,.12); border-color: var(--glass-border); color: var(--text-primary); }
+[data-theme="light"] .state-tab.active { background: rgba(0,0,0,.08); }
+
+/* ============ Folder Rows (folder + side controls) ============ */
+.folder-rows {
+  position: relative; z-index: 10;
+  max-width: 900px; margin: 0 auto;
+  padding: 0 40px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 70px;
+}
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  justify-content: center;
+}
+.folder-row .folder {
+  flex-shrink: 0;
+}
+
+/* Per-folder side control panel */
+.folder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 320px;
+  max-width: 320px;
+}
+/* Layout rule: label fixed-width left-aligned, control left-aligned,
+   flexible controls (select/button) fill remaining space right-aligned,
+   stepper controls fixed-width right-aligned */
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.control-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+.control-row .layout-group { flex: 1; min-width: 0; width: auto; }
+.control-row .font-group { flex: 0 0 auto; width: auto; }
+.control-row .font-group .stepper { margin-left: 0; }
+.control-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  width: 56px;
+  flex-shrink: 0;
+  text-align: left;
+}
+.control-select {
+  height: 32px;
+  padding: 0 8px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .2s;
+  backdrop-filter: blur(10px);
+  flex: 1;
+  min-width: 0;
+}
+.control-select:hover { border-color: rgba(74,158,255,.4); }
+.control-select:focus { border-color: var(--accent); }
+.control-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Stepper: minus + input + plus — unified border wrapper, right-aligned */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--control-bg);
+  transition: border-color .2s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.stepper:focus-within {
+  border-color: var(--accent);
+}
+.stepper-btn {
+  width: 28px;
+  height: 30px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s;
+  user-select: none;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.stepper-btn:hover { background: var(--control-border); color: var(--text-primary); }
+.stepper-btn:active { background: rgba(74,158,255,.15); }
+.stepper-input {
+  width: 44px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--control-border);
+  border-right: 1px solid var(--control-border);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.control-btn {
+  height: 32px;
+  padding: 0 12px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all .2s;
+  backdrop-filter: blur(10px);
+  flex: 1;
+  min-width: 0;
+}
+.control-btn:hover {
+  color: var(--accent);
+  border-color: rgba(74,158,255,.4);
+  background: rgba(74,158,255,.08);
+}
+.control-btn svg { width: 15px; height: 15px; }
+.control-divider {
+  height: 1px;
+  background: var(--control-border);
+  margin: 2px 0;
+}
+
+/* ============ Folder Component ============ */
+.folder {
+  position: relative; width: 220px; height: 340px;
+  cursor: pointer; perspective: 1400px; user-select: none;
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  transition: transform .4s var(--ease-spring);
+}
+
+/* 三态整体前倾：打开程度越大，rotateX 越大，露出后盖顶部与书脊厚度 */
+.folder[data-state="closed"]  { transform: scale(var(--folder-scale)) rotateX(0deg); }
+.folder[data-state="preview"] { transform: scale(var(--folder-scale)) rotateX(10deg); }
+.folder[data-state="open"]    { transform: scale(var(--folder-scale)) rotateX(18deg); }
+
+/* ---- Paper Stack (middle layer) ---- */
+.paper-stack {
+  position: absolute; top: 50%; left: 10px;
+  width: 175px; height: 250px;
+  transform: translateY(-50%) translateZ(2px);
+  transform-style: preserve-3d;
+  transition: transform .7s var(--ease-spring);
+}
+
+.paper {
+  position: absolute; top: 0; left: 0;
+  width: 175px; height: 250px;
+  border-radius: var(--radius-paper);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  transition: transform .7s var(--ease-spring), box-shadow .4s, filter .4s;
+  transform-origin: var(--origin-x, 50%) 50%;
+}
+.paper::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  opacity: .07; mix-blend-mode: overlay; pointer-events: none; border-radius: inherit;
+}
+.paper::before {
+  content: ''; position: absolute; inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -1px 0 rgba(0,0,0,.1);
+  pointer-events: none; z-index: 2;
+}
+
+.paper-cover { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
+.paper-cover::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,.3) 100%);
+}
+.paper-text { position: absolute; left: 16px; bottom: 18px; z-index: 2; }
+.paper-title { font-size: 19px; font-weight: 700; letter-spacing: -.02em; color: #fff; line-height: 1.15; text-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.paper-sub { font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: rgba(255,255,255,.7); margin-top: 5px; }
+.paper-art {
+  position: absolute; right: 14px; top: 18px;
+  display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,.25)); z-index: 1;
+}
+
+.cover-music { background: linear-gradient(160deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%); }
+.cover-music .paper-art { color: #e94560; }
+.cover-video { background: linear-gradient(160deg, #2d1b69 0%, #11998e 100%); }
+.cover-video .paper-art { color: rgba(255,255,255,.9); }
+.cover-photo { background: linear-gradient(160deg, #f857a6 0%, #ff5858 100%); }
+.cover-photo .paper-art { color: rgba(255,255,255,.9); }
+.cover-doc { background: linear-gradient(160deg, #0f2027 0%, #203a43 50%, #2c5364 100%); }
+.cover-doc .paper-art { color: #4a9eff; }
+
+/* ---- Folder Shell ---- */
+.folder-shell {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+}
+
+/* Back cover — shared hinge axis at X=0, translateZ first then rotateY */
+.back-cover {
+  position: absolute; top: 30px; left: 0;
+  width: 100%; height: 280px;
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  background: var(--glass-bg-solid);
+  border: 1px solid rgba(255,255,255,.08);
+  transform-origin: 0 center;
+  box-shadow:
+    0 30px 70px rgba(0,0,0,.5),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset -2px 0 8px rgba(0,0,0,.2);
+  transition: transform .7s var(--ease-spring);
+}
+[data-theme="light"] .back-cover {
+  border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 20px 50px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.back-cover::before {
+  content: ''; position: absolute; inset: 10px 10px 10px 14px;
+  border-radius: 8px 20px 20px 8px;
+  background: var(--glass-back-inner);
+  box-shadow:
+    inset 0 2px 8px rgba(0,0,0,.3),
+    inset 0 0 0 1px rgba(255,255,255,.04);
+  pointer-events: none;
+}
+[data-theme="light"] .back-cover::before {
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.1), inset 0 0 0 1px rgba(0,0,0,.04);
+}
+.back-cover::after {
+  content: ''; position: absolute; top: 12px; bottom: 12px; right: 0; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.15) 30%, rgba(255,255,255,.2) 50%, rgba(255,255,255,.15) 70%, transparent);
+  pointer-events: none;
+}
+
+/* Spine — sits at the shared hinge axis */
+.folder-spine {
+  position: absolute; top: 36px; bottom: 36px; left: -6px;
+  width: 18px;
+  background: linear-gradient(90deg,
+    rgba(0,0,0,.6) 0%,
+    rgba(0,0,0,.35) 30%,
+    rgba(255,255,255,.06) 60%,
+    rgba(255,255,255,.03) 100%);
+  border-radius: 9px 0 0 9px;
+  z-index: 1;
+  box-shadow:
+    -3px 0 8px rgba(0,0,0,.25),
+    inset 1px 0 0 rgba(255,255,255,.05);
+}
+[data-theme="light"] .folder-spine {
+  background: linear-gradient(90deg,
+    rgba(0,0,0,.2) 0%,
+    rgba(0,0,0,.1) 30%,
+    rgba(255,255,255,.4) 60%,
+    rgba(255,255,255,.2) 100%);
+}
+.folder-spine::before {
+  content: '';
+  position: absolute;
+  top: 14px; bottom: 14px; left: 6px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255,255,255,.15) 0px,
+    rgba(255,255,255,.15) 3px,
+    transparent 3px,
+    transparent 8px
+  );
+  border-radius: 1px;
+}
+[data-theme="light"] .folder-spine::before {
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(0,0,0,.2) 0px,
+    rgba(0,0,0,.2) 3px,
+    transparent 3px,
+    transparent 8px
+  );
+}
+.folder-spine::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  width: 1px;
+  background: linear-gradient(180deg,
+    transparent,
+    rgba(255,255,255,.12) 20%,
+    rgba(255,255,255,.18) 50%,
+    rgba(255,255,255,.12) 80%,
+    transparent);
+}
+
+/* Front cover — shared hinge axis at X=0, translateZ first then rotateY */
+.front-cover {
+  position: absolute; top: 30px; left: 0;
+  width: 100%; height: 280px;
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+  background: var(--cover-bg, var(--glass-bg));
+  backdrop-filter: blur(32px) saturate(1.9);
+  -webkit-backdrop-filter: blur(32px) saturate(1.9);
+  border: 1px solid var(--cover-border, var(--glass-border));
+  box-shadow: 0 24px 60px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);
+  transform-origin: 0 center;
+  transition: transform .7s var(--ease-spring), box-shadow .4s, background .4s;
+  overflow: visible;
+}
+[data-theme="light"] .front-cover {
+  box-shadow: 0 16px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
+}
+
+/* Spine-to-cover micro gradient */
+.front-cover .spine-gradient {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 22px;
+  background: linear-gradient(90deg,
+    rgba(0,0,0,.35) 0%,
+    rgba(0,0,0,.18) 35%,
+    rgba(0,0,0,.06) 65%,
+    transparent 100%);
+  pointer-events: none;
+  z-index: 3;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+[data-theme="light"] .front-cover .spine-gradient {
+  background: linear-gradient(90deg,
+    rgba(0,0,0,.15) 0%,
+    rgba(0,0,0,.08) 35%,
+    rgba(0,0,0,.03) 65%,
+    transparent 100%);
+}
+
+/* Integrated tab — label paper style */
+.front-cover .cover-tab {
+  position: absolute; top: -16px; right: 28px;
+  width: 66px; height: 22px;
+  background: linear-gradient(90deg,
+    var(--tab-accent, #e94560) 0%,
+    var(--tab-accent, #e94560) 25%,
+    var(--cover-bg, var(--glass-bg)) 25%,
+    var(--cover-bg, var(--glass-bg)) 100%);
+  opacity: .9;
+  backdrop-filter: blur(32px) saturate(1.9);
+  -webkit-backdrop-filter: blur(32px) saturate(1.9);
+  border: 1px solid var(--cover-border, var(--glass-border));
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  z-index: 4;
+  box-shadow: 0 -2px 8px rgba(0,0,0,.15);
+}
+.front-cover .cover-tab::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg,
+    rgba(255,255,255,.3),
+    rgba(255,255,255,.1) 25%,
+    transparent 25%);
+}
+
+.front-cover .edge-highlight {
+  position: absolute; top: 8px; bottom: 8px; right: 0; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--glass-highlight) 20%, rgba(255,255,255,.25) 50%, var(--glass-highlight) 80%, transparent);
+  z-index: 4;
+}
+
+/* Stickers container */
+.stickers-container {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  overflow: visible;
+}
+.sticker {
+  position: absolute;
+  left: var(--sticker-x, 50%);
+  top: var(--sticker-y, 50%);
+  transform: translate(-50%, -50%) rotate(var(--sticker-rotate, 0deg)) scale(var(--sticker-scale, 1));
+  opacity: var(--sticker-opacity, .95);
+  filter: drop-shadow(2px 4px 6px rgba(0,0,0,.35));
+  animation: stickerIn .5s var(--ease-spring);
+}
+@keyframes stickerIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--sticker-rotate, 0deg)) scale(calc(var(--sticker-scale, 1) * 0.3)); }
+  60% { opacity: 1; transform: translate(-50%, -50%) rotate(calc(var(--sticker-rotate, 0deg) + 3deg)) scale(calc(var(--sticker-scale, 1) * 1.08)); }
+  100% { opacity: var(--sticker-opacity, .95); transform: translate(-50%, -50%) rotate(var(--sticker-rotate, 0deg)) scale(var(--sticker-scale, 1)); }
+}
+.sticker img {
+  display: block;
+  max-width: 110px;
+  max-height: 110px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+.sticker-fold {
+  position: absolute;
+  width: 14px; height: 14px;
+  pointer-events: none;
+}
+.sticker-fold.bottom-right {
+  bottom: 0; right: 0;
+  background: linear-gradient(135deg, transparent 50%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.2) 100%);
+  border-radius: 0 0 2px 0;
+}
+.sticker-fold.bottom-left {
+  bottom: 0; left: 0;
+  background: linear-gradient(225deg, transparent 50%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.2) 100%);
+  border-radius: 0 0 0 2px;
+}
+.sticker-fold.top-right {
+  top: 0; right: 0;
+  background: linear-gradient(45deg, transparent 50%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.2) 100%);
+  border-radius: 0 2px 0 0;
+}
+.sticker-fold.top-left {
+  top: 0; left: 0;
+  background: linear-gradient(315deg, transparent 50%, rgba(0,0,0,.12) 50%, rgba(0,0,0,.2) 100%);
+  border-radius: 2px 0 0 0;
+}
+
+/* Shell content */
+.shell-content {
+  position: relative; z-index: 4;
+  padding: 24px 20px 20px 28px; height: 100%;
+  display: flex; flex-direction: column;
+  color: var(--cover-color, var(--text-primary));
+  transition: color .4s;
+}
+.shell-title {
+  font-size: 18px; font-weight: 600; letter-spacing: -.02em;
+  color: var(--cover-color, var(--text-primary));
+  margin-bottom: 8px;
+  transition: color .4s;
+}
+.shell-meta {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: var(--cover-color-secondary, var(--text-secondary));
+  margin-bottom: auto;
+  transition: color .4s;
+}
+.shell-meta svg { width: 13px; height: 13px; opacity: .7; }
+.shell-stats { display: flex; align-items: center; gap: 18px; padding-top: 14px; }
+.stat { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 500; color: var(--cover-color-secondary, var(--text-secondary)); font-variant-numeric: tabular-nums; transition: color .4s; }
+.stat svg { width: 16px; height: 16px; opacity: .8; }
+
+.drag-dot {
+  position: absolute; bottom: 18px; right: 18px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: rgba(255,255,255,.85); box-shadow: 0 0 10px rgba(255,255,255,.5);
+  opacity: 0; transform: scale(0); transition: all .4s var(--ease-spring); z-index: 6;
+}
+[data-theme="light"] .drag-dot { background: rgba(0,0,0,.5); box-shadow: 0 0 8px rgba(0,0,0,.2); }
+
+/* ============ 10 Cover Presets ============ */
+.front-cover[data-cover="classic-dark"] {
+  --cover-bg: linear-gradient(160deg, rgba(26,26,46,.88), rgba(15,52,96,.88));
+  --cover-color: rgba(255,255,255,.95);
+  --cover-color-secondary: rgba(255,255,255,.55);
+  --tab-accent: #e94560;
+  --cover-border: rgba(255,255,255,.12);
+}
+.front-cover[data-cover="leather-brown"] {
+  --cover-bg: linear-gradient(160deg, rgba(74,44,28,.92), rgba(48,28,18,.92));
+  --cover-color: rgba(245,230,200,.95);
+  --cover-color-secondary: rgba(245,230,200,.6);
+  --tab-accent: #c9a84c;
+  --cover-border: rgba(201,168,76,.3);
+}
+.front-cover[data-cover="leather-brown"] .shell-content {
+  justify-content: center; align-items: center; text-align: center; padding: 24px;
+}
+.front-cover[data-cover="leather-brown"] .shell-title {
+  font-family: Georgia, "Times New Roman", serif; font-size: 20px; letter-spacing: .02em; margin-bottom: 4px;
+}
+.front-cover[data-cover="leather-brown"] .shell-meta { margin-bottom: 0; margin-top: 8px; }
+.front-cover[data-cover="leather-brown"] .shell-stats { justify-content: center; }
+
+.front-cover[data-cover="cloth-navy"] {
+  --cover-bg: linear-gradient(160deg, rgba(28,42,78,.9), rgba(18,28,56,.92));
+  --cover-color: rgba(255,255,255,.92);
+  --cover-color-secondary: rgba(255,255,255,.5);
+  --tab-accent: #b8c4d4;
+  --cover-border: rgba(255,255,255,.1);
+}
+.front-cover[data-cover="cloth-navy"] .shell-content { justify-content: flex-end; }
+.front-cover[data-cover="cloth-navy"] .shell-title { margin-bottom: 8px; }
+.front-cover[data-cover="cloth-navy"] .shell-meta { margin-bottom: 0; }
+
+.front-cover[data-cover="hardcover-wine"] {
+  --cover-bg: linear-gradient(160deg, rgba(96,20,38,.92), rgba(64,12,28,.94));
+  --cover-color: rgba(240,200,120,.95);
+  --cover-color-secondary: rgba(240,200,120,.6);
+  --tab-accent: #d4a843;
+  --cover-border: rgba(212,168,67,.35);
+}
+.front-cover[data-cover="hardcover-wine"] .shell-content {
+  justify-content: center; align-items: center; text-align: center;
+}
+.front-cover[data-cover="hardcover-wine"] .shell-title {
+  font-family: Georgia, serif; font-size: 21px; letter-spacing: .04em;
+}
+
+.front-cover[data-cover="vintage-green"] {
+  --cover-bg: linear-gradient(160deg, rgba(28,58,48,.92), rgba(18,42,34,.94));
+  --cover-color: rgba(230,220,190,.95);
+  --cover-color-secondary: rgba(230,220,190,.55);
+  --tab-accent: #8b6f47;
+  --cover-border: rgba(139,111,71,.4);
+}
+.front-cover[data-cover="vintage-green"] .shell-title {
+  font-family: Georgia, serif; font-size: 19px;
+}
+
+.front-cover[data-cover="minimal-gray"] {
+  --cover-bg: linear-gradient(160deg, rgba(48,48,54,.85), rgba(32,32,38,.9));
+  --cover-color: rgba(255,255,255,.92);
+  --cover-color-secondary: rgba(255,255,255,.45);
+  --tab-accent: #ff8c42;
+  --cover-border: rgba(255,255,255,.08);
+}
+.front-cover[data-cover="minimal-gray"] .shell-title {
+  font-weight: 700; font-size: 20px; letter-spacing: -.03em;
+}
+
+.front-cover[data-cover="paper-cream"] {
+  --cover-bg: linear-gradient(160deg, rgba(248,244,232,.92), rgba(240,235,220,.94));
+  --cover-color: rgba(40,38,32,.92);
+  --cover-color-secondary: rgba(40,38,32,.5);
+  --tab-accent: #3b6ea5;
+  --cover-border: rgba(40,38,32,.12);
+}
+.front-cover[data-cover="paper-cream"] {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+.front-cover[data-cover="paper-cream"] .shell-title {
+  font-family: Georgia, serif;
+}
+
+.front-cover[data-cover="luxury-purple"] {
+  --cover-bg: linear-gradient(160deg, rgba(58,28,88,.92), rgba(38,18,62,.94));
+  --cover-color: rgba(240,200,120,.95);
+  --cover-color-secondary: rgba(240,200,120,.55);
+  --tab-accent: #d4a843;
+  --cover-border: rgba(212,168,67,.3);
+}
+.front-cover[data-cover="luxury-purple"] .shell-content {
+  justify-content: center; align-items: center; text-align: center;
+}
+.front-cover[data-cover="luxury-purple"] .shell-title {
+  font-family: Georgia, serif; font-size: 20px; letter-spacing: .05em;
+}
+
+.front-cover[data-cover="vibrant-orange"] {
+  --cover-bg: linear-gradient(160deg, rgba(240,100,40,.88), rgba(200,60,20,.92));
+  --cover-color: rgba(255,255,255,.97);
+  --cover-color-secondary: rgba(255,255,255,.7);
+  --tab-accent: #1a2a4a;
+  --cover-border: rgba(255,255,255,.18);
+}
+.front-cover[data-cover="vibrant-orange"] .shell-title {
+  font-weight: 800; font-size: 21px; letter-spacing: -.02em;
+}
+
+.front-cover[data-cover="fresh-teal"] {
+  --cover-bg: linear-gradient(160deg, rgba(20,120,110,.88), rgba(12,90,82,.92));
+  --cover-color: rgba(255,255,255,.95);
+  --cover-color-secondary: rgba(255,255,255,.6);
+  --tab-accent: #ff6b9d;
+  --cover-border: rgba(255,255,255,.14);
+}
+.front-cover[data-cover="fresh-teal"] .shell-title {
+  font-weight: 600;
+}
+
+/* ============ Content Layout Modes ============ */
+.shell-content[data-layout="center"] { text-align: center; align-items: center; }
+.shell-content[data-layout="center"] .shell-stats { justify-content: center; }
+
+.shell-content[data-layout="minimal"] .shell-meta,
+.shell-content[data-layout="minimal"] .shell-stats { display: none; }
+.shell-content[data-layout="minimal"] .shell-title {
+  font-size: 26px; text-align: center; margin-top: auto; margin-bottom: auto;
+}
+.shell-content[data-layout="minimal"] { justify-content: center; }
+
+.shell-content[data-layout="magazine"] .shell-meta {
+  position: absolute; top: 20px; right: 20px; margin: 0;
+}
+.shell-content[data-layout="magazine"] .shell-title {
+  font-size: 24px; line-height: 1.15; margin-top: auto;
+}
+.shell-content[data-layout="magazine"] .shell-stats { padding-top: 10px; }
+
+.shell-content[data-layout="split"] {
+  flex-direction: row; align-items: flex-end; justify-content: space-between;
+}
+.shell-content[data-layout="split"] .shell-title { margin-bottom: 0; }
+.shell-content[data-layout="split"] .shell-meta { display: none; }
+.shell-content[data-layout="split"] .shell-stats {
+  flex-direction: column; gap: 8px; padding-top: 0; align-items: flex-end;
+}
+
+/* ============ States — hinge-aligned transforms ============ */
+
+/* Closed */
+.folder[data-state="closed"] .paper-stack { transform: translateY(-50%) translateZ(2px) translateX(0); }
+.folder[data-state="closed"] .paper:nth-child(1) { transform: rotate(calc(-3.5deg + var(--r1, 0deg))) translateX(5px); z-index: 1; filter: brightness(.72); }
+.folder[data-state="closed"] .paper:nth-child(2) { transform: rotate(calc(2deg + var(--r2, 0deg))) translateX(3px); z-index: 2; filter: brightness(.8); }
+.folder[data-state="closed"] .paper:nth-child(3) { transform: rotate(calc(-1.2deg + var(--r3, 0deg))) translateX(1px); z-index: 3; filter: brightness(.88); }
+.folder[data-state="closed"] .paper:nth-child(4) { transform: rotate(calc(2.8deg + var(--r4, 0deg))) translateX(-2px); z-index: 4; }
+.folder[data-state="closed"] .front-cover { transform: translateZ(18px) rotateY(-6deg); }
+.folder[data-state="closed"] .back-cover { transform: translateZ(-24px) rotateY(18deg); }
+
+/* Preview */
+.folder[data-state="preview"] .paper-stack { transform: translateY(-50%) translateZ(2px) translateX(calc(45px * var(--spread, 1))); }
+.folder[data-state="preview"] .paper:nth-child(1) { transform: rotate(calc(-9deg + var(--r1, 0deg))) translateX(calc(14px * var(--spread, 1))) translateY(10px); z-index: 1; filter: brightness(.78); }
+.folder[data-state="preview"] .paper:nth-child(2) { transform: rotate(calc(-3.5deg + var(--r2, 0deg))) translateX(calc(8px * var(--spread, 1))) translateY(5px); z-index: 2; filter: brightness(.86); }
+.folder[data-state="preview"] .paper:nth-child(3) { transform: rotate(calc(3.5deg + var(--r3, 0deg))) translateX(calc(-6px * var(--spread, 1))) translateY(-3px); z-index: 3; filter: brightness(.92); }
+.folder[data-state="preview"] .paper:nth-child(4) { transform: rotate(calc(9deg + var(--r4, 0deg))) translateX(calc(-12px * var(--spread, 1))) translateY(-8px); z-index: 4; }
+.folder[data-state="preview"] .front-cover { transform: translateZ(18px) rotateY(-20deg); }
+.folder[data-state="preview"] .back-cover { transform: translateZ(-24px) rotateY(34deg); }
+
+/* Open */
+.folder[data-state="open"] .paper-stack { transform: translateY(-50%) translateZ(2px) translateX(calc(85px * var(--spread, 1))); }
+.folder[data-state="open"] .paper:nth-child(1) { transform: rotate(calc(-15deg + var(--r1, 0deg))) translateX(calc(24px * var(--spread, 1))) translateY(30px); z-index: 1; filter: brightness(.82); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.folder[data-state="open"] .paper:nth-child(2) { transform: rotate(calc(-6deg + var(--r2, 0deg))) translateX(calc(52px * var(--spread, 1))) translateY(14px); z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.folder[data-state="open"] .paper:nth-child(3) { transform: rotate(calc(6deg + var(--r3, 0deg))) translateX(calc(62px * var(--spread, 1))) translateY(-10px); z-index: 3; box-shadow: 0 12px 34px rgba(0,0,0,.5); }
+.folder[data-state="open"] .paper:nth-child(4) { transform: rotate(calc(15deg + var(--r4, 0deg))) translateX(calc(38px * var(--spread, 1))) translateY(-28px); z-index: 4; box-shadow: 0 14px 38px rgba(0,0,0,.5); }
+.folder[data-state="open"] .front-cover { transform: translateZ(18px) rotateY(-38deg); }
+.folder[data-state="open"] .back-cover { transform: translateZ(-24px) rotateY(52deg); }
+.folder[data-state="open"] .drag-dot { opacity: 1; transform: scale(1); }
+
+.folder:hover .front-cover { box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 6px 16px rgba(0,0,0,.35); }
+[data-theme="light"] .folder:hover .front-cover { box-shadow: 0 20px 50px rgba(0,0,0,.18), 0 4px 12px rgba(0,0,0,.08); }
+
+.folder-label {
+  position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: var(--text-tertiary); white-space: nowrap;
+  opacity: 0; transition: opacity .3s; letter-spacing: .02em;
+}
+.folder:hover .folder-label { opacity: 1; }
+
+/* ============ Footer ============ */
+.footer {
+  position: relative; z-index: 10; text-align: center;
+  padding: 20px 20px 50px; font-size: 12.5px; color: var(--text-tertiary);
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+}
+.footer-tagline { opacity: .7; }
+.footer-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.footer-sep { opacity: .4; }
+.footer-contact { color: var(--text-secondary); text-decoration: none; transition: color .2s; }
+.footer-contact:hover { color: var(--accent, #6ea8fe); }
+
+/* ============ Responsive ============ */
+@media (max-width: 720px) {
+  .header { padding: 16px 20px; }
+  .hero { padding: 20px 16px 28px; }
+  .hero h1 { font-size: 28px; }
+  .hero p { font-size: 14px; }
+  .folder-rows { padding: 0 20px 80px; gap: 50px; }
+  .folder-row {
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+  }
+  .folder-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    min-width: 0;
+    width: 100%;
+    max-width: 360px;
+    flex: 1;
+    gap: 10px;
+  }
+  .control-group { flex: 1; min-width: 140px; }
+  .control-row { width: 100%; flex-wrap: wrap; }
+  .control-row .layout-group { flex: 1; min-width: 140px; }
+  .control-row .font-group { flex: 0 0 auto; }
+  .folder[data-state="closed"]  { transform: scale(calc(var(--folder-scale) * 0.85)) rotateX(0deg); }
+  .folder[data-state="preview"] { transform: scale(calc(var(--folder-scale) * 0.85)) rotateX(10deg); }
+  .folder[data-state="open"]    { transform: scale(calc(var(--folder-scale) * 0.85)) rotateX(18deg); }
+  .state-tabs { flex-wrap: wrap; padding: 0 20px; }
+  .zoom-value { min-width: 40px; font-size: 11.5px; }
+  .sticker-panel { width: 280px; padding: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="ambient-bg"></div>
+
+<header class="header">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    Liquid Glass Folders
+  </div>
+  <div class="header-controls">
+    <button class="lang-toggle" id="langToggle" aria-label="切换语言">
+      <span class="lang-active" data-lang-display="zh">中</span>
+      <span class="lang-sep">/</span>
+      <span data-lang-display="en">EN</span>
+    </button>
+    <div class="zoom-group">
+      <button class="zoom-btn" id="zoomOut" aria-label="缩小">−</button>
+      <span class="zoom-value" id="zoomValue">100%</span>
+      <button class="zoom-btn" id="zoomIn" aria-label="放大">+</button>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+      <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Hidden file input for sticker upload -->
+<input type="file" id="stickerInput" accept="image/*" hidden>
+
+<!-- Sticker upload panel overlay -->
+<div class="sticker-panel-overlay" id="stickerOverlay"></div>
+
+<!-- Sticker upload panel -->
+<div class="sticker-panel" id="stickerPanel">
+  <div class="sticker-panel-title" data-i18n="sticker.title">贴贴纸</div>
+  <div class="sticker-preview" id="stickerPreview">
+    <div class="sticker-preview-placeholder" data-i18n="sticker.placeholder">选择图片后<br>将自动分析尺寸并粘贴</div>
+  </div>
+  <div class="sticker-panel-info" id="stickerInfo" data-i18n="sticker.info">点击下方按钮选择图片，系统将根据图片宽高比自动决定粘贴位置、大小和倾斜角度。</div>
+  <div class="sticker-panel-actions">
+    <button class="btn-cancel" id="stickerCancel" data-i18n="sticker.cancel">取消</button>
+    <button class="btn-apply" id="stickerApply" disabled data-i18n="sticker.apply">贴上</button>
+  </div>
+</div>
+
+<section class="hero">
+  <div class="hero-label"><span class="pulse"></span><span data-i18n="hero.label">Vertical 3D Folder · 10 Cover Presets · Independent Controls</span></div>
+  <h1><span class="grad" data-i18n="hero.title">液态玻璃文件夹</span></h1>
+  <p data-i18n="hero.desc">每个文件夹右侧独立控制面板，精确铰接轴模拟真实书籍开合，10种封面预设与独立贴纸系统。</p>
+</section>
+
+<div class="state-tabs" id="stateTabs">
+  <button class="state-tab active" data-state="closed"><span data-i18n="state.closed">关闭态</span></button>
+  <button class="state-tab" data-state="preview"><span data-i18n="state.preview">内容态</span></button>
+  <button class="state-tab" data-state="open"><span data-i18n="state.open">打开态</span></button>
+</div>
+
+<main class="folder-rows" id="folderRows">
+
+  <!-- Folder Row 1: Music -->
+  <div class="folder-row">
+    <div class="folder" data-state="closed" data-folder="music">
+      <div class="paper-stack">
+        <div class="paper"><div class="paper-cover cover-doc"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-video"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-photo"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div></div></div>
+        <div class="paper">
+          <div class="paper-cover cover-music">
+            <div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="42" height="42"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>
+            <div class="paper-text">
+              <div class="paper-title">RICK<br>ASTLEY</div>
+              <div class="paper-sub">Never Gonna Give You Up</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="folder-shell">
+        <div class="back-cover"></div>
+        <div class="folder-spine"></div>
+        <div class="front-cover" data-cover="classic-dark">
+          <div class="spine-gradient"></div>
+          <div class="cover-tab"></div>
+          <div class="stickers-container"></div>
+          <div class="edge-highlight"></div>
+          <div class="shell-content" data-layout="standard">
+            <div class="shell-title">Demo Flask</div>
+            <div class="shell-meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              15d ago
+            </div>
+            <div class="shell-stats">
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                4
+              </div>
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                6
+              </div>
+            </div>
+          </div>
+          <div class="drag-dot"></div>
+        </div>
+      </div>
+      <div class="folder-label" data-i18n="folder.music">音乐收藏</div>
+    </div>
+      <div class="folder-controls">
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.cover">封面风格</label>
+        <select class="control-select cover-select" data-target="music">
+          <option value="classic-dark" data-i18n="cover.classic-dark">经典深色</option>
+          <option value="leather-brown" data-i18n="cover.leather-brown">暖棕皮革</option>
+          <option value="cloth-navy" data-i18n="cover.cloth-navy">深蓝布面</option>
+          <option value="hardcover-wine" data-i18n="cover.hardcover-wine">酒红精装</option>
+          <option value="vintage-green" data-i18n="cover.vintage-green">墨绿复古</option>
+          <option value="minimal-gray" data-i18n="cover.minimal-gray">炭灰极简</option>
+          <option value="paper-cream" data-i18n="cover.paper-cream">米白纸质</option>
+          <option value="luxury-purple" data-i18n="cover.luxury-purple">紫色奢华</option>
+          <option value="vibrant-orange" data-i18n="cover.vibrant-orange">橙色活力</option>
+          <option value="fresh-teal" data-i18n="cover.fresh-teal">青色清新</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <div class="control-group layout-group">
+          <label class="control-label" data-i18n="control.layout">内容排版</label>
+          <select class="control-select layout-select" data-target="music">
+            <option value="standard" data-i18n="layout.standard">标准</option>
+            <option value="center" data-i18n="layout.center">居中</option>
+            <option value="minimal" data-i18n="layout.minimal">极简</option>
+            <option value="magazine" data-i18n="layout.magazine">杂志</option>
+            <option value="split" data-i18n="layout.split">分栏</option>
+          </select>
+        </div>
+        <div class="control-group font-group">
+          <label class="control-label" data-i18n="control.fontSize">字号</label>
+          <div class="stepper">
+            <button class="stepper-btn" data-stepper="font" data-target="music" data-action="minus">−</button>
+            <input type="number" class="stepper-input font-size-input" data-target="music" value="18" min="8" max="60" step="1">
+            <button class="stepper-btn" data-stepper="font" data-target="music" data-action="plus">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.opacity">透明度</label>
+        <div class="stepper">
+          <button class="stepper-btn" data-stepper="opacity" data-target="music" data-action="minus">−</button>
+          <input type="number" class="stepper-input opacity-input" data-target="music" value="100" min="10" max="100" step="5">
+          <button class="stepper-btn" data-stepper="opacity" data-target="music" data-action="plus">+</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.sticker">贴纸</label>
+        <button class="control-btn sticker-upload-btn" data-target="music">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span data-i18n="control.upload">上传贴纸</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Row 2: Video -->
+  <div class="folder-row">
+    <div class="folder" data-state="closed" data-folder="video">
+      <div class="paper-stack">
+        <div class="paper"><div class="paper-cover cover-music"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-doc"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-photo"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div></div></div>
+        <div class="paper">
+          <div class="paper-cover cover-video">
+            <div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="40" height="40"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+            <div class="paper-text">
+              <div class="paper-title">October<br>Video #1</div>
+              <div class="paper-sub">4K · 24fps · HDR</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="folder-shell">
+        <div class="back-cover"></div>
+        <div class="folder-spine"></div>
+        <div class="front-cover" data-cover="leather-brown">
+          <div class="spine-gradient"></div>
+          <div class="cover-tab"></div>
+          <div class="stickers-container"></div>
+          <div class="edge-highlight"></div>
+          <div class="shell-content" data-layout="standard">
+            <div class="shell-title">October Video #1</div>
+            <div class="shell-meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              1m ago
+            </div>
+            <div class="shell-stats">
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                2
+              </div>
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                1
+              </div>
+            </div>
+          </div>
+          <div class="drag-dot"></div>
+        </div>
+      </div>
+      <div class="folder-label" data-i18n="folder.video">视频项目</div>
+    </div>
+    <div class="folder-controls">
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.cover">封面风格</label>
+        <select class="control-select cover-select" data-target="video">
+          <option value="classic-dark" data-i18n="cover.classic-dark">经典深色</option>
+          <option value="leather-brown" data-i18n="cover.leather-brown">暖棕皮革</option>
+          <option value="cloth-navy" data-i18n="cover.cloth-navy">深蓝布面</option>
+          <option value="hardcover-wine" data-i18n="cover.hardcover-wine">酒红精装</option>
+          <option value="vintage-green" data-i18n="cover.vintage-green">墨绿复古</option>
+          <option value="minimal-gray" data-i18n="cover.minimal-gray">炭灰极简</option>
+          <option value="paper-cream" data-i18n="cover.paper-cream">米白纸质</option>
+          <option value="luxury-purple" data-i18n="cover.luxury-purple">紫色奢华</option>
+          <option value="vibrant-orange" data-i18n="cover.vibrant-orange">橙色活力</option>
+          <option value="fresh-teal" data-i18n="cover.fresh-teal">青色清新</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <div class="control-group layout-group">
+          <label class="control-label" data-i18n="control.layout">内容排版</label>
+          <select class="control-select layout-select" data-target="video">
+            <option value="standard" data-i18n="layout.standard">标准</option>
+            <option value="center" data-i18n="layout.center">居中</option>
+            <option value="minimal" data-i18n="layout.minimal">极简</option>
+            <option value="magazine" data-i18n="layout.magazine">杂志</option>
+            <option value="split" data-i18n="layout.split">分栏</option>
+          </select>
+        </div>
+        <div class="control-group font-group">
+          <label class="control-label" data-i18n="control.fontSize">字号</label>
+          <div class="stepper">
+            <button class="stepper-btn" data-stepper="font" data-target="video" data-action="minus">−</button>
+            <input type="number" class="stepper-input font-size-input" data-target="video" value="18" min="8" max="60" step="1">
+            <button class="stepper-btn" data-stepper="font" data-target="video" data-action="plus">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.opacity">透明度</label>
+        <div class="stepper">
+          <button class="stepper-btn" data-stepper="opacity" data-target="video" data-action="minus">−</button>
+          <input type="number" class="stepper-input opacity-input" data-target="video" value="100" min="10" max="100" step="5">
+          <button class="stepper-btn" data-stepper="opacity" data-target="video" data-action="plus">+</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.sticker">贴纸</label>
+        <button class="control-btn sticker-upload-btn" data-target="video">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span data-i18n="control.upload">上传贴纸</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Row 3: Photo -->
+  <div class="folder-row">
+    <div class="folder" data-state="closed" data-folder="photo">
+      <div class="paper-stack">
+        <div class="paper"><div class="paper-cover cover-video"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-music"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-doc"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></div></div>
+        <div class="paper">
+          <div class="paper-cover cover-photo">
+            <div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="40" height="40"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            <div class="paper-text">
+              <div class="paper-title">Summer<br>2025</div>
+              <div class="paper-sub">248 Photos · 12 Videos</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="folder-shell">
+        <div class="back-cover"></div>
+        <div class="folder-spine"></div>
+        <div class="front-cover" data-cover="hardcover-wine">
+          <div class="spine-gradient"></div>
+          <div class="cover-tab"></div>
+          <div class="stickers-container"></div>
+          <div class="edge-highlight"></div>
+          <div class="shell-content" data-layout="standard">
+            <div class="shell-title">Summer Memories</div>
+            <div class="shell-meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              3h ago
+            </div>
+            <div class="shell-stats">
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                5
+              </div>
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                12
+              </div>
+            </div>
+          </div>
+          <div class="drag-dot"></div>
+        </div>
+      </div>
+      <div class="folder-label" data-i18n="folder.photo">照片图库</div>
+    </div>
+    <div class="folder-controls">
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.cover">封面风格</label>
+        <select class="control-select cover-select" data-target="photo">
+          <option value="classic-dark" data-i18n="cover.classic-dark">经典深色</option>
+          <option value="leather-brown" data-i18n="cover.leather-brown">暖棕皮革</option>
+          <option value="cloth-navy" data-i18n="cover.cloth-navy">深蓝布面</option>
+          <option value="hardcover-wine" data-i18n="cover.hardcover-wine">酒红精装</option>
+          <option value="vintage-green" data-i18n="cover.vintage-green">墨绿复古</option>
+          <option value="minimal-gray" data-i18n="cover.minimal-gray">炭灰极简</option>
+          <option value="paper-cream" data-i18n="cover.paper-cream">米白纸质</option>
+          <option value="luxury-purple" data-i18n="cover.luxury-purple">紫色奢华</option>
+          <option value="vibrant-orange" data-i18n="cover.vibrant-orange">橙色活力</option>
+          <option value="fresh-teal" data-i18n="cover.fresh-teal">青色清新</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <div class="control-group layout-group">
+          <label class="control-label" data-i18n="control.layout">内容排版</label>
+          <select class="control-select layout-select" data-target="photo">
+            <option value="standard" data-i18n="layout.standard">标准</option>
+            <option value="center" data-i18n="layout.center">居中</option>
+            <option value="minimal" data-i18n="layout.minimal">极简</option>
+            <option value="magazine" data-i18n="layout.magazine">杂志</option>
+            <option value="split" data-i18n="layout.split">分栏</option>
+          </select>
+        </div>
+        <div class="control-group font-group">
+          <label class="control-label" data-i18n="control.fontSize">字号</label>
+          <div class="stepper">
+            <button class="stepper-btn" data-stepper="font" data-target="photo" data-action="minus">−</button>
+            <input type="number" class="stepper-input font-size-input" data-target="photo" value="18" min="8" max="60" step="1">
+            <button class="stepper-btn" data-stepper="font" data-target="photo" data-action="plus">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.opacity">透明度</label>
+        <div class="stepper">
+          <button class="stepper-btn" data-stepper="opacity" data-target="photo" data-action="minus">−</button>
+          <input type="number" class="stepper-input opacity-input" data-target="photo" value="100" min="10" max="100" step="5">
+          <button class="stepper-btn" data-stepper="opacity" data-target="photo" data-action="plus">+</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.sticker">贴纸</label>
+        <button class="control-btn sticker-upload-btn" data-target="photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span data-i18n="control.upload">上传贴纸</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folder Row 4: Document -->
+  <div class="folder-row">
+    <div class="folder" data-state="closed" data-folder="doc">
+      <div class="paper-stack">
+        <div class="paper"><div class="paper-cover cover-photo"><div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="36" height="36"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-video"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="5 3 19 12 5 21 5 3"/></svg></div></div></div>
+        <div class="paper"><div class="paper-cover cover-music"><div class="paper-art"><svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div></div></div>
+        <div class="paper">
+          <div class="paper-cover cover-doc">
+            <div class="paper-art"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="40" height="40"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+            <div class="paper-text">
+              <div class="paper-title">Q3<br>Report</div>
+              <div class="paper-sub">Financial Summary</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="folder-shell">
+        <div class="back-cover"></div>
+        <div class="folder-spine"></div>
+        <div class="front-cover" data-cover="paper-cream">
+          <div class="spine-gradient"></div>
+          <div class="cover-tab"></div>
+          <div class="stickers-container"></div>
+          <div class="edge-highlight"></div>
+          <div class="shell-content" data-layout="standard">
+            <div class="shell-title">Q3 Financial Report</div>
+            <div class="shell-meta">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              2d ago
+            </div>
+            <div class="shell-stats">
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                3
+              </div>
+              <div class="stat">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                4
+              </div>
+            </div>
+          </div>
+          <div class="drag-dot"></div>
+        </div>
+      </div>
+      <div class="folder-label" data-i18n="folder.doc">文档工作区</div>
+    </div>
+    <div class="folder-controls">
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.cover">封面风格</label>
+        <select class="control-select cover-select" data-target="doc">
+          <option value="classic-dark" data-i18n="cover.classic-dark">经典深色</option>
+          <option value="leather-brown" data-i18n="cover.leather-brown">暖棕皮革</option>
+          <option value="cloth-navy" data-i18n="cover.cloth-navy">深蓝布面</option>
+          <option value="hardcover-wine" data-i18n="cover.hardcover-wine">酒红精装</option>
+          <option value="vintage-green" data-i18n="cover.vintage-green">墨绿复古</option>
+          <option value="minimal-gray" data-i18n="cover.minimal-gray">炭灰极简</option>
+          <option value="paper-cream" data-i18n="cover.paper-cream">米白纸质</option>
+          <option value="luxury-purple" data-i18n="cover.luxury-purple">紫色奢华</option>
+          <option value="vibrant-orange" data-i18n="cover.vibrant-orange">橙色活力</option>
+          <option value="fresh-teal" data-i18n="cover.fresh-teal">青色清新</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <div class="control-group layout-group">
+          <label class="control-label" data-i18n="control.layout">内容排版</label>
+          <select class="control-select layout-select" data-target="doc">
+            <option value="standard" data-i18n="layout.standard">标准</option>
+            <option value="center" data-i18n="layout.center">居中</option>
+            <option value="minimal" data-i18n="layout.minimal">极简</option>
+            <option value="magazine" data-i18n="layout.magazine">杂志</option>
+            <option value="split" data-i18n="layout.split">分栏</option>
+          </select>
+        </div>
+        <div class="control-group font-group">
+          <label class="control-label" data-i18n="control.fontSize">字号</label>
+          <div class="stepper">
+            <button class="stepper-btn" data-stepper="font" data-target="doc" data-action="minus">−</button>
+            <input type="number" class="stepper-input font-size-input" data-target="doc" value="18" min="8" max="60" step="1">
+            <button class="stepper-btn" data-stepper="font" data-target="doc" data-action="plus">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.opacity">透明度</label>
+        <div class="stepper">
+          <button class="stepper-btn" data-stepper="opacity" data-target="doc" data-action="minus">−</button>
+          <input type="number" class="stepper-input opacity-input" data-target="doc" value="100" min="10" max="100" step="5">
+          <button class="stepper-btn" data-stepper="opacity" data-target="doc" data-action="plus">+</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label class="control-label" data-i18n="control.sticker">贴纸</label>
+        <button class="control-btn sticker-upload-btn" data-target="doc">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span data-i18n="control.upload">上传贴纸</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-tagline" data-i18n="footer">液态玻璃文件夹卡片 · 精确铰接轴 · 10种封面预设 · 独立控制面板 · 贴纸系统</div>
+  <div class="footer-meta">
+    <span data-i18n="footer.copyright">© 2026 Lio. 保留所有权利。</span>
+    <span class="footer-sep">·</span>
+    <a href="mailto:20.lioilioil.08@gmail.com" class="footer-contact">20.lioilioil.08@gmail.com</a>
+  </div>
+</footer>
+
+<script>
+(function() {
+  /* ===== i18n 中英文词典 ===== */
+  const I18N = {
+    zh: {
+      'hero.label': '竖向3D文件夹 · 10种封面预设 · 独立控制面板',
+      'hero.title': '液态玻璃文件夹',
+      'hero.desc': '每个文件夹右侧独立控制面板，精确铰接轴模拟真实书籍开合，10种封面预设与独立贴纸系统。',
+      'state.closed': '关闭态',
+      'state.preview': '内容态',
+      'state.open': '打开态',
+      'folder.music': '音乐收藏',
+      'folder.video': '视频项目',
+      'folder.photo': '照片图库',
+      'folder.doc': '文档工作区',
+      'control.cover': '封面风格',
+      'control.layout': '内容排版',
+      'control.fontSize': '字号',
+      'control.opacity': '透明度',
+      'control.sticker': '贴纸',
+      'control.upload': '上传贴纸',
+      'layout.standard': '标准',
+      'layout.center': '居中',
+      'layout.minimal': '极简',
+      'layout.magazine': '杂志',
+      'layout.split': '分栏',
+      'cover.classic-dark': '经典深色',
+      'cover.leather-brown': '暖棕皮革',
+      'cover.cloth-navy': '深蓝布面',
+      'cover.hardcover-wine': '酒红精装',
+      'cover.vintage-green': '墨绿复古',
+      'cover.minimal-gray': '炭灰极简',
+      'cover.paper-cream': '米白纸质',
+      'cover.luxury-purple': '紫色奢华',
+      'cover.vibrant-orange': '橙色活力',
+      'cover.fresh-teal': '青色清新',
+      'sticker.title': '贴贴纸',
+      'sticker.placeholder': '选择图片后\n将自动分析尺寸并粘贴',
+      'sticker.info': '点击下方按钮选择图片，系统将根据图片宽高比自动决定粘贴位置、大小和倾斜角度。',
+      'sticker.cancel': '取消',
+      'sticker.apply': '贴上',
+      'sticker.invalid': '请选择图片文件。',
+      'sticker.dim': '图片尺寸：{w}×{h}（宽高比 {r}）\n将贴到当前文件夹封面。',
+      'footer': '液态玻璃文件夹卡片 · 精确铰接轴 · 10种封面预设 · 独立控制面板 · 贴纸系统',
+      'footer.copyright': '© 2026 Lio. 保留所有权利。'
+    },
+    en: {
+      'hero.label': 'Vertical 3D Folder · 10 Cover Presets · Independent Controls',
+      'hero.title': 'Liquid Glass Folders',
+      'hero.desc': 'Each folder has an independent control panel on the right, precise hinge axis simulating real book opening, 10 cover presets and independent sticker system.',
+      'state.closed': 'Closed',
+      'state.preview': 'Preview',
+      'state.open': 'Open',
+      'folder.music': 'Music',
+      'folder.video': 'Videos',
+      'folder.photo': 'Photos',
+      'folder.doc': 'Documents',
+      'control.cover': 'Cover Style',
+      'control.layout': 'Layout',
+      'control.fontSize': 'Size',
+      'control.opacity': 'Opacity',
+      'control.sticker': 'Sticker',
+      'control.upload': 'Upload Sticker',
+      'layout.standard': 'Standard',
+      'layout.center': 'Centered',
+      'layout.minimal': 'Minimal',
+      'layout.magazine': 'Magazine',
+      'layout.split': 'Split',
+      'cover.classic-dark': 'Classic Dark',
+      'cover.leather-brown': 'Leather Brown',
+      'cover.cloth-navy': 'Cloth Navy',
+      'cover.hardcover-wine': 'Hardcover Wine',
+      'cover.vintage-green': 'Vintage Green',
+      'cover.minimal-gray': 'Minimal Gray',
+      'cover.paper-cream': 'Paper Cream',
+      'cover.luxury-purple': 'Luxury Purple',
+      'cover.vibrant-orange': 'Vibrant Orange',
+      'cover.fresh-teal': 'Fresh Teal',
+      'sticker.title': 'Add Sticker',
+      'sticker.placeholder': 'Select an image\nAuto size analysis & paste',
+      'sticker.info': 'Click the button below to select an image. The system will automatically determine position, size and rotation based on aspect ratio.',
+      'sticker.cancel': 'Cancel',
+      'sticker.apply': 'Apply',
+      'sticker.invalid': 'Please select an image file.',
+      'sticker.dim': 'Image size: {w}×{h} (aspect ratio {r})\nWill be pasted to current folder cover.',
+      'footer': 'Liquid Glass Folder Cards · Precision Hinge · 10 Cover Presets · Independent Controls · Sticker System',
+      'footer.copyright': '© 2026 Lio. All rights reserved.'
+    }
+  };
+
+  let currentLang = localStorage.getItem('folder-lang') || 'zh';
+
+  function applyLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('folder-lang', lang);
+    const dict = I18N[lang];
+    document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en');
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (dict[key]) {
+        if (el.tagName === 'OPTION') {
+          el.textContent = dict[key];
+        } else {
+          el.innerHTML = dict[key].replace(/\n/g, '<br>');
+        }
+      }
+    });
+
+    // 更新语言按钮高亮
+    document.querySelectorAll('[data-lang-display]').forEach(el => {
+      el.classList.toggle('lang-active', el.getAttribute('data-lang-display') === lang);
+    });
+  }
+
+  document.getElementById('langToggle').addEventListener('click', () => {
+    applyLang(currentLang === 'zh' ? 'en' : 'zh');
+  });
+
+  applyLang(currentLang);
+
+  const folders = document.querySelectorAll('.folder');
+  const tabs = document.querySelectorAll('.state-tab');
+  const states = ['closed', 'preview', 'open'];
+
+  /* ===== Randomized paper angles per folder ===== */
+  folders.forEach(folder => {
+    const r1 = (Math.random() * 5 - 2.5).toFixed(2);
+    const r2 = (Math.random() * 5 - 2.5).toFixed(2);
+    const r3 = (Math.random() * 5 - 2.5).toFixed(2);
+    const r4 = (Math.random() * 5 - 2.5).toFixed(2);
+    const spread = (0.85 + Math.random() * 0.3).toFixed(3);
+    const ox = (42 + Math.random() * 16).toFixed(1);
+
+    folder.style.setProperty('--r1', r1 + 'deg');
+    folder.style.setProperty('--r2', r2 + 'deg');
+    folder.style.setProperty('--r3', r3 + 'deg');
+    folder.style.setProperty('--r4', r4 + 'deg');
+    folder.style.setProperty('--spread', spread);
+    folder.style.setProperty('--origin-x', ox + '%');
+  });
+
+  /* ===== Folder state cycling ===== */
+  folders.forEach(folder => {
+    folder.addEventListener('click', () => {
+      const current = folder.getAttribute('data-state');
+      const idx = states.indexOf(current);
+      const next = states[(idx + 1) % states.length];
+      folder.setAttribute('data-state', next);
+      updateTabs(next);
+    });
+    folder.setAttribute('tabindex', '0');
+    folder.setAttribute('role', 'button');
+    folder.setAttribute('aria-label', '文件夹卡片，按回车切换状态');
+    folder.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); folder.click(); }
+    });
+  });
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const state = tab.getAttribute('data-state');
+      folders.forEach(f => f.setAttribute('data-state', state));
+      updateTabs(state);
+    });
+  });
+
+  function updateTabs(state) {
+    tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-state') === state));
+  }
+
+  /* ===== Per-folder cover preset selector ===== */
+  const DEFAULT_COVERS = { music: 'classic-dark', video: 'leather-brown', photo: 'hardcover-wine', doc: 'paper-cream' };
+  document.querySelectorAll('.cover-select').forEach(select => {
+    const target = select.getAttribute('data-target');
+    if (DEFAULT_COVERS[target]) select.value = DEFAULT_COVERS[target];
+    select.addEventListener('change', (e) => {
+      const target = e.target.getAttribute('data-target');
+      const folder = document.querySelector('.folder[data-folder="' + target + '"]');
+      if (folder) {
+        folder.querySelector('.front-cover').setAttribute('data-cover', e.target.value);
+      }
+    });
+    // Prevent click from bubbling to folder
+    select.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  /* ===== Per-folder content layout selector ===== */
+  const DEFAULT_LAYOUTS = { music: 'standard', video: 'center', photo: 'magazine', doc: 'split' };
+  document.querySelectorAll('.layout-select').forEach(select => {
+    const target = select.getAttribute('data-target');
+    if (DEFAULT_LAYOUTS[target]) select.value = DEFAULT_LAYOUTS[target];
+    // Apply default layout
+    const folder = document.querySelector('.folder[data-folder="' + target + '"]');
+    if (folder && DEFAULT_LAYOUTS[target]) {
+      folder.querySelector('.shell-content').setAttribute('data-layout', DEFAULT_LAYOUTS[target]);
+    }
+    select.addEventListener('change', (e) => {
+      const target = e.target.getAttribute('data-target');
+      const folder = document.querySelector('.folder[data-folder="' + target + '"]');
+      if (folder) {
+        folder.querySelector('.shell-content').setAttribute('data-layout', e.target.value);
+      }
+    });
+    select.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  /* ===== Zoom control ===== */
+  const zoomValue = document.getElementById('zoomValue');
+  const zoomIn = document.getElementById('zoomIn');
+  const zoomOut = document.getElementById('zoomOut');
+  let scale = 1;
+  const minScale = 0.3, maxScale = 1.6, step = 0.1;
+  const BASE_FONT_SIZE = 18;
+  const fontMultipliers = { music: 1, video: 1, photo: 1, doc: 1 };
+
+  function updateFontInputs() {
+    document.querySelectorAll('.font-size-input').forEach(input => {
+      const target = input.getAttribute('data-target');
+      const mult = fontMultipliers[target] || 1;
+      input.value = Math.round(BASE_FONT_SIZE * mult * scale);
+    });
+  }
+
+  function applyScale() {
+    document.documentElement.style.setProperty('--folder-scale', scale);
+    zoomValue.textContent = Math.round(scale * 100) + '%';
+    updateFontInputs();
+  }
+
+  zoomIn.addEventListener('click', () => {
+    scale = Math.min(maxScale, Math.round((scale + step) * 10) / 10);
+    applyScale();
+  });
+  zoomOut.addEventListener('click', () => {
+    scale = Math.max(minScale, Math.round((scale - step) * 10) / 10);
+    applyScale();
+  });
+
+  /* ===== Per-folder font size & opacity control ===== */
+  function applyFontSize(target, visualVal) {
+    let val = parseFloat(visualVal);
+    if (isNaN(val)) val = BASE_FONT_SIZE;
+    val = Math.max(8, Math.min(60, val));
+    const mult = val / (BASE_FONT_SIZE * scale);
+    fontMultipliers[target] = mult;
+    const folder = document.querySelector('.folder[data-folder="' + target + '"]');
+    if (folder) {
+      const title = folder.querySelector('.shell-title');
+      const meta = folder.querySelector('.shell-meta');
+      const stats = folder.querySelector('.shell-stats');
+      if (title) title.style.fontSize = (BASE_FONT_SIZE * mult) + 'px';
+      if (meta) meta.style.fontSize = (12 * mult) + 'px';
+      if (stats) stats.style.fontSize = (13 * mult) + 'px';
+    }
+    // Update input display
+    const input = document.querySelector('.font-size-input[data-target="' + target + '"]');
+    if (input) input.value = Math.round(val);
+  }
+
+  function applyOpacity(target, val) {
+    let v = parseFloat(val);
+    if (isNaN(v)) v = 100;
+    v = Math.max(10, Math.min(100, v));
+    // Snap to step of 5
+    v = Math.round(v / 5) * 5;
+    const folder = document.querySelector('.folder[data-folder="' + target + '"]');
+    if (folder) {
+      const cover = folder.querySelector('.front-cover');
+      if (cover) cover.style.opacity = (v / 100).toFixed(2);
+    }
+    const input = document.querySelector('.opacity-input[data-target="' + target + '"]');
+    if (input) input.value = v;
+  }
+
+  // Font size inputs
+  document.querySelectorAll('.font-size-input').forEach(input => {
+    const target = input.getAttribute('data-target');
+    input.value = Math.round(BASE_FONT_SIZE * (fontMultipliers[target] || 1) * scale);
+    input.addEventListener('change', (e) => applyFontSize(target, e.target.value));
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('keydown', (e) => e.stopPropagation());
+  });
+
+  // Opacity inputs
+  document.querySelectorAll('.opacity-input').forEach(input => {
+    input.addEventListener('change', (e) => applyOpacity(e.target.getAttribute('data-target'), e.target.value));
+    input.addEventListener('click', (e) => e.stopPropagation());
+    input.addEventListener('keydown', (e) => e.stopPropagation());
+  });
+
+  // Stepper buttons (font + opacity)
+  document.querySelectorAll('.stepper-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const type = btn.getAttribute('data-stepper');
+      const target = btn.getAttribute('data-target');
+      const action = btn.getAttribute('data-action');
+      const inputClass = type === 'font' ? 'font-size-input' : type + '-input';
+      const input = document.querySelector('.' + inputClass + '[data-target="' + target + '"]');
+      if (!input) return;
+      const step = parseFloat(input.step) || 1;
+      let val = parseFloat(input.value) || 0;
+      if (action === 'plus') val += step;
+      else val -= step;
+      if (type === 'font') applyFontSize(target, val);
+      else if (type === 'opacity') applyOpacity(target, val);
+    });
+  });
+
+  /* ===== Theme toggle ===== */
+  const themeToggle = document.getElementById('themeToggle');
+  const iconSun = document.getElementById('iconSun');
+  const iconMoon = document.getElementById('iconMoon');
+  const savedTheme = localStorage.getItem('folder-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcon(savedTheme);
+
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('folder-theme', next);
+    updateThemeIcon(next);
+  });
+
+  function updateThemeIcon(theme) {
+    if (theme === 'light') {
+      iconSun.style.display = 'block';
+      iconMoon.style.display = 'none';
+    } else {
+      iconSun.style.display = 'none';
+      iconMoon.style.display = 'block';
+    }
+  }
+
+  /* ===== Per-folder Sticker System ===== */
+  const stickerInput = document.getElementById('stickerInput');
+  const stickerPanel = document.getElementById('stickerPanel');
+  const stickerOverlay = document.getElementById('stickerOverlay');
+  const stickerPreview = document.getElementById('stickerPreview');
+  const stickerInfo = document.getElementById('stickerInfo');
+  const stickerCancel = document.getElementById('stickerCancel');
+  const stickerApply = document.getElementById('stickerApply');
+
+  let stickerTargetFolder = null;
+  let pendingImageData = null;
+  let pendingImageDim = null;
+
+  // Each folder's sticker button opens upload for that specific folder
+  document.querySelectorAll('.sticker-upload-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const target = btn.getAttribute('data-target');
+      stickerTargetFolder = document.querySelector('.folder[data-folder="' + target + '"]');
+      stickerInput.click();
+    });
+  });
+
+  stickerInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      stickerInfo.textContent = I18N[currentLang]['sticker.invalid'];
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      pendingImageData = ev.target.result;
+      const img = new Image();
+      img.onload = () => {
+        pendingImageDim = { w: img.naturalWidth, h: img.naturalHeight };
+        stickerPreview.innerHTML = '<img src="' + pendingImageData + '" alt="preview">';
+        const ratio = (pendingImageDim.w / pendingImageDim.h).toFixed(2);
+        stickerInfo.innerHTML = I18N[currentLang]['sticker.dim']
+          .replace('{w}', pendingImageDim.w)
+          .replace('{h}', pendingImageDim.h)
+          .replace('{r}', ratio);
+        stickerApply.disabled = false;
+      };
+      img.src = pendingImageData;
+      showPanel();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function showPanel() {
+    stickerPanel.classList.add('show');
+    stickerOverlay.classList.add('show');
+  }
+  function hidePanel() {
+    stickerPanel.classList.remove('show');
+    stickerOverlay.classList.remove('show');
+  }
+
+  stickerCancel.addEventListener('click', resetSticker);
+  stickerOverlay.addEventListener('click', resetSticker);
+
+  function resetSticker() {
+    hidePanel();
+    pendingImageData = null;
+    pendingImageDim = null;
+    stickerTargetFolder = null;
+    stickerInput.value = '';
+    stickerPreview.innerHTML = '<div class="sticker-preview-placeholder">' + I18N[currentLang]['sticker.placeholder'].replace(/\n/g, '<br>') + '</div>';
+    stickerInfo.textContent = I18N[currentLang]['sticker.info'];
+    stickerApply.disabled = true;
+  }
+
+  stickerApply.addEventListener('click', () => {
+    if (!pendingImageData || !pendingImageDim || !stickerTargetFolder) return;
+    const params = calculateStickerParams(pendingImageDim.w, pendingImageDim.h);
+    createSticker(pendingImageData, params, stickerTargetFolder);
+    resetSticker();
+  });
+
+  function calculateStickerParams(imgW, imgH) {
+    const ratio = imgW / imgH;
+    const folderW = 220;
+    const folderH = 280;
+    let x, y, maxDim;
+
+    if (ratio > 1.3) {
+      x = 48 + (Math.random() * 16 - 8);
+      y = 58 + (Math.random() * 14 - 7);
+      maxDim = folderW * 0.52;
+    } else if (ratio < 0.7) {
+      x = 66 + (Math.random() * 14 - 7);
+      y = 46 + (Math.random() * 18 - 9);
+      maxDim = folderH * 0.42;
+    } else {
+      const corners = [
+        { x: 26, y: 28 },
+        { x: 74, y: 30 },
+        { x: 28, y: 68 },
+        { x: 72, y: 64 },
+      ];
+      const c = corners[Math.floor(Math.random() * corners.length)];
+      x = c.x + (Math.random() * 8 - 4);
+      y = c.y + (Math.random() * 8 - 4);
+      maxDim = folderW * 0.34;
+    }
+
+    const scaleByW = maxDim / imgW;
+    const scaleByH = maxDim / imgH;
+    let scale = Math.min(scaleByW, scaleByH);
+    scale = Math.min(scale, 1.2);
+    scale = Math.max(scale, 0.15);
+
+    const rotate = (Math.random() * 24 - 12).toFixed(1);
+
+    let foldCorner = null;
+    if (Math.random() < 0.35) {
+      const corners = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+      foldCorner = corners[Math.floor(Math.random() * corners.length)];
+    }
+
+    const opacity = (0.92 + Math.random() * 0.05).toFixed(2);
+
+    return { x: x.toFixed(1), y: y.toFixed(1), scale: scale.toFixed(3), rotate, foldCorner, opacity };
+  }
+
+  function createSticker(src, params, folder) {
+    const sticker = document.createElement('div');
+    sticker.className = 'sticker';
+    sticker.style.setProperty('--sticker-x', params.x + '%');
+    sticker.style.setProperty('--sticker-y', params.y + '%');
+    sticker.style.setProperty('--sticker-rotate', params.rotate + 'deg');
+    sticker.style.setProperty('--sticker-scale', params.scale);
+    sticker.style.setProperty('--sticker-opacity', params.opacity);
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = 'sticker';
+    sticker.appendChild(img);
+
+    if (params.foldCorner) {
+      const fold = document.createElement('div');
+      fold.className = 'sticker-fold ' + params.foldCorner;
+      sticker.appendChild(fold);
+    }
+
+    const container = folder.querySelector('.stickers-container');
+    if (container) {
+      container.appendChild(sticker);
+    }
+  }
+
+  /* ===== Entrance animation ===== */
+  folders.forEach((folder, i) => {
+    folder.style.opacity = '0';
+    folder.style.transform = 'translateY(24px) scale(var(--folder-scale))';
+    folder.style.transition = 'opacity .6s ease, transform .6s var(--ease-spring)';
+    setTimeout(() => {
+      folder.style.opacity = '1';
+      folder.style.transform = 'translateY(0) scale(var(--folder-scale))';
+      // 入场动画结束后清除内联 transform/transition，让CSS三态 rotateX 规则生效
+      setTimeout(() => {
+        folder.style.removeProperty('transform');
+        folder.style.removeProperty('transition');
+      }, 700);
+    }, 120 + i * 100);
+  });
+})();
+</script>
+
+</body>
+</html>
