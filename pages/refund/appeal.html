@@ -97,24 +97,69 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
 
   /* ---- 订单列表 ---- */
-  document.getElementById('order-list').innerHTML = ORDERS.map(function (o, i) {
-    return '<div class="row" data-i="' + i + '" onclick="pickOrder(' + i + ')" style="cursor:pointer;">' +
-      '<div style="flex:1;min-width:0;">' +
-        '<div class="fw-600 fs-14 elip">' + o.desc + '</div>' +
-        '<div class="text-3 fs-11 mt-1">' + o.id + ' · ' + o.date + (o.ok ? '' : ' · <span style="color:var(--text-2)">已使用</span>') + '</div>' +
-      '</div>' +
-      (o.ok ? '<span class="mono fw-600 fs-13" style="margin-left:10px;">' + money(o.amt) + '</span>' : '<span class="tag tag-gray">不可退</span>') +
-      '<span class="arrow">›</span>' +
-    '</div>';
-  }).join('');
+  /* 检查URL是否带orderId参数（从订单详情页跳转过来） */
+  var urlOrderId = new URLSearchParams(location.search).get('orderId');
+  var lockedOrder = null;
+
+  /* 如果带orderId，从真实订单数据中获取并添加到列表顶部 */
+  if (urlOrderId) {
+    try {
+      var rawOrders = JSON.parse(localStorage.getItem('engchain-orders') || '[]');
+      var found = rawOrders.find(function (ro) { return ro.id === urlOrderId; });
+      if (found) {
+        lockedOrder = {
+          id: found.id,
+          desc: (found.title || found.item || '订单') + ' · ' + (found.amount ? '¥' + found.amount : ''),
+          amt: parseFloat(found.amount) || 0,
+          date: found.createdAt ? new Date(found.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+          ok: true,
+          locked: true
+        };
+        /* 将锁定订单插入到列表顶部 */
+        ORDERS.unshift(lockedOrder);
+      }
+    } catch (e) { console.warn('读取订单数据失败', e); }
+  }
+
+  function renderOrderList() {
+    document.getElementById('order-list').innerHTML = ORDERS.map(function (o, i) {
+      var isLocked = o.locked;
+      var cursor = isLocked ? 'default' : 'pointer';
+      var lockIcon = isLocked ? '<span style="display:inline-flex;align-items:center;gap:4px;margin-right:6px;color:var(--text-3);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span style="font-size:10px;">已锁定</span></span>' : '';
+      return '<div class="row" data-i="' + i + '" ' + (isLocked ? '' : 'onclick="pickOrder(' + i + ')"') + ' style="cursor:' + cursor + ';' + (isLocked ? 'background:var(--bg-card-2);border:1px solid var(--primary);' : '') + '">' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="fw-600 fs-14 elip">' + lockIcon + o.desc + '</div>' +
+          '<div class="text-3 fs-11 mt-1">' + o.id + ' · ' + o.date + (o.ok ? '' : ' · <span style="color:var(--text-2)">已使用</span>') + '</div>' +
+        '</div>' +
+        (o.ok ? '<span class="mono fw-600 fs-13" style="margin-left:10px;">' + money(o.amt) + '</span>' : '<span class="tag tag-gray">不可退</span>') +
+        (isLocked ? '' : '<span class="arrow">›</span>') +
+      '</div>';
+    }).join('');
+  }
+  renderOrderList();
 
   window.pickOrder = function (i) {
     var o = ORDERS[i];
     if (!o.ok) { UI.toast('该订单已使用，暂不可退款', 'warn'); return; }
+    if (o.locked) { UI.toast('该订单已从订单详情带入，不可更改', 'info'); return; }
     selOrder = o;
-    document.querySelectorAll('#order-list .row').forEach(function (rd, x) { rd.style.background = x === i ? 'var(--bg-card-2)' : ''; });
+    document.querySelectorAll('#order-list .row').forEach(function (rd, x) {
+      var isLocked = ORDERS[x] && ORDERS[x].locked;
+      rd.style.background = (x === i || isLocked) ? 'var(--bg-card-2)' : '';
+      if (isLocked) rd.style.border = '1px solid var(--primary)';
+      else rd.style.border = '';
+    });
     renderAmount();
   };
+
+  /* 如果有锁定订单，自动选中 */
+  if (lockedOrder) {
+    selOrder = lockedOrder;
+    renderAmount();
+    /* 锁定订单模式下隐藏退款模式切换（只能订单退款） */
+    var modeSeg = document.getElementById('mode');
+    if (modeSeg) modeSeg.style.display = 'none';
+  }
 
   /* ---- 退款原因 ---- */
   var reasons = ['未解锁使用', '解锁后无帮助', '重复扣款', '信息不实', '服务未达预期', '其他'];

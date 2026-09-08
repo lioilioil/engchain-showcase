@@ -14,8 +14,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="../../css/app.css">
 <style>
 /* ═══════════════════════════════════════════════════════════════
-   浏览历史 V1.0
-   与个人中心一致的设计语言，明/暗双模式自动适配
+   浏览历史 V1.1
+   修复：返回/清除/去发现按钮事件 + 移除底部主bar
    ═══════════════════════════════════════════════════════════════ */
 :root {
   --vh-gold: #C9A961;
@@ -100,7 +100,7 @@ body, .phone { background: var(--vh-bg); }
   font-weight: 500;
 }
 .vh-nav-clear:active { background: rgba(201,169,97,0.12); }
-.vh-nav-clear:disabled { color: var(--vh-text-4); cursor: default; }
+.vh-nav-clear:disabled { color: var(--vh-text-3); cursor: default; opacity: 0.4; }
 
 /* 内容区 */
 .vh-content {
@@ -108,7 +108,7 @@ body, .phone { background: var(--vh-bg); }
   z-index: 1;
   flex: 1;
   overflow-y: auto;
-  padding: 4px 16px 100px;
+  padding: 4px 16px 40px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -171,14 +171,13 @@ body, .phone { background: var(--vh-bg); }
   font-size: 11px;
   color: var(--vh-text-3);
 }
-.vh-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--vh-text-4); }
+.vh-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--vh-text-3); }
 .vh-card-price {
   flex-shrink: 0;
   font-size: 14px;
   font-weight: 700;
   color: var(--vh-gold-deep);
 }
-.vh-card-price .unit { font-size: 10px; font-weight: 500; color: var(--vh-text-3); }
 
 /* 空状态 */
 .vh-empty {
@@ -237,9 +236,10 @@ body, .phone { background: var(--vh-bg); }
   align-items: center;
   justify-content: center;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.2s;
 }
-.vh-confirm-overlay.show { opacity: 1; }
+.vh-confirm-overlay.show { opacity: 1; pointer-events: auto; }
 .vh-confirm-box {
   width: 280px;
   border-radius: 16px;
@@ -291,13 +291,13 @@ body, .phone { background: var(--vh-bg); }
 }
 </style>
 </head>
-<body data-tab="me">
+<body>
 <div class="phone">
   <!-- 导航栏 -->
   <div class="vh-navbar">
-    <button class="vh-nav-back" onclick="history.back()">‹</button>
+    <button class="vh-nav-back" id="vh-back">‹</button>
     <div class="vh-nav-title">浏览历史</div>
-    <button class="vh-nav-clear" id="clear-btn" onclick="confirmClear()">清除历史</button>
+    <button class="vh-nav-clear" id="clear-btn">清除历史</button>
   </div>
 
   <!-- 内容区 -->
@@ -310,8 +310,8 @@ body, .phone { background: var(--vh-bg); }
     <div class="vh-confirm-title">清除浏览历史</div>
     <div class="vh-confirm-desc">确定要清除全部浏览历史吗？<br>此操作不可撤销。</div>
     <div class="vh-confirm-btns">
-      <button class="vh-confirm-btn vh-confirm-cancel" onclick="hideConfirm()">取消</button>
-      <button class="vh-confirm-btn vh-confirm-ok" onclick="doClear()">确定清除</button>
+      <button class="vh-confirm-btn vh-confirm-cancel" id="confirm-cancel">取消</button>
+      <button class="vh-confirm-btn vh-confirm-ok" id="confirm-ok">确定清除</button>
     </div>
   </div>
 </div>
@@ -325,6 +325,10 @@ body, .phone { background: var(--vh-bg); }
 
   var content = document.getElementById('vh-content');
   var clearBtn = document.getElementById('clear-btn');
+  var backBtn = document.getElementById('vh-back');
+  var confirmOverlay = document.getElementById('confirm-overlay');
+  var confirmCancel = document.getElementById('confirm-cancel');
+  var confirmOk = document.getElementById('confirm-ok');
 
   /* 分类图标映射 */
   var CAT_ICONS = {
@@ -333,6 +337,9 @@ body, .phone { background: var(--vh-bg); }
     equipment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
     labor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
     agency: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    franchise: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>',
+    trade: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>',
+    personnel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
     default: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>'
   };
 
@@ -364,7 +371,6 @@ body, .phone { background: var(--vh-bg); }
 
     /* 清除按钮状态 */
     clearBtn.disabled = items.length === 0;
-    clearBtn.style.opacity = items.length === 0 ? '0.4' : '1';
 
     if (items.length === 0) {
       content.innerHTML =
@@ -372,8 +378,12 @@ body, .phone { background: var(--vh-bg); }
           '<div class="vh-empty-icon">' + CAT_ICONS.default + '</div>' +
           '<div class="vh-empty-title">暂无浏览记录</div>' +
           '<div class="vh-empty-desc">去发现页看看，找到你需要的<br>建筑供需信息</div>' +
-          '<button class="vh-empty-btn" onclick="location.href=\'../supply/list.html\'">去发现</button>' +
+          '<button class="vh-empty-btn" id="go-discover">去发现</button>' +
         '</div>';
+      var goBtn = document.getElementById('go-discover');
+      if (goBtn) goBtn.addEventListener('click', function () {
+        location.href = '../supply/list.html';
+      });
       return;
     }
 
@@ -391,7 +401,6 @@ body, .phone { background: var(--vh-bg); }
       groups[g].forEach(function (it) {
         var icon = CAT_ICONS[it.bizKey] || CAT_ICONS.default;
         var price = it.price ? it.price : '面议';
-        var priceUnit = it.price && it.price.indexOf('/') > -1 ? '' : '';
         var metaParts = [];
         if (it.city) metaParts.push(it.city);
         if (it.cat) metaParts.push(it.cat);
@@ -412,18 +421,31 @@ body, .phone { background: var(--vh-bg); }
     content.innerHTML = html;
   }
 
-  /* 确认清除 */
-  window.confirmClear = function () {
-    document.getElementById('confirm-overlay').classList.add('show');
-  };
-  window.hideConfirm = function () {
-    document.getElementById('confirm-overlay').classList.remove('show');
-  };
-  window.doClear = function () {
+  /* 返回按钮 */
+  backBtn.addEventListener('click', function () {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      location.href = 'index.html';
+    }
+  });
+
+  /* 清除历史 - 确认弹窗 */
+  clearBtn.addEventListener('click', function () {
+    if (clearBtn.disabled) return;
+    confirmOverlay.classList.add('show');
+  });
+  confirmCancel.addEventListener('click', function () {
+    confirmOverlay.classList.remove('show');
+  });
+  confirmOk.addEventListener('click', function () {
     try { if (window.ViewHistory) ViewHistory.clear(); } catch (e) {}
-    hideConfirm();
+    confirmOverlay.classList.remove('show');
     render();
-  };
+  });
+  confirmOverlay.addEventListener('click', function (e) {
+    if (e.target === confirmOverlay) confirmOverlay.classList.remove('show');
+  });
 
   /* 监听跨标签页历史变更 */
   window.addEventListener('engchain:view-history', function () { render(); });
