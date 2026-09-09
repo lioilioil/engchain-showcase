@@ -646,7 +646,7 @@
       emit('engchain:mediation', { id: o.id, state: o.state }); return o;
     },
     refund: function (id, reason) { var o = this.byId(id); if (!o) return { error: '订单不存在' }; if (!this._can(o, 'refunded')) return { error: '当前状态不可退款' }; return this._fullRefund(o, '买方申请退款', reason, o.buyerId); },
-    review: function (id, score, text) { var o = this.byId(id); if (!o || o.state !== 'settled') return { error: '仅已结算订单可评价' }; o.review = { score: score, text: text, at: Date.now() }; this._write(o); return o; },
+    review: function (id, score, text) { var o = this.byId(id); if (!o || o.state !== 'settled') return { error: '仅已结算订单可评价' }; o.review = { score: score, text: text, at: Date.now() }; this._write(o); /* C3 评价回流：聚合到服务卡片口碑（svcId 维度） */ try { if (o.svcId && window.SvcRatingStore) SvcRatingStore.add(String(o.svcId), score); } catch (e) {} return o; },
     /* 资金概览（订单维度） */
     money: function (o) {
       var released = 0, fee = 0;

@@ -884,6 +884,8 @@ window.DETAIL = (function () {
     ]));
     if (r.cases && r.cases.length) h += sec('真实成功案例（' + r.cases.length + '）', agencyCaseCard(r.cases));
     if (r.qual) h += sec('机构资质', '<div class="ds-text">' + r.qual + '</div>');
+    if (r.refundPolicy) h += sec('退款保障', '<div class="ds-text">' + r.refundPolicy + '</div>');
+    if (r.overdueClause) h += sec('超期赔付', '<div class="ds-text">' + r.overdueClause + '</div>');
     h += sec('机构联系方式', agencyContact(r, c, locked));
     return h;
   }
@@ -1548,6 +1550,21 @@ window.DETAIL = (function () {
     lockRows: function (r, c) { return tradeLock(r, c); },
     unlockItems: function () { return ['完整公司名称', '统一社会信用代码', '详细注册地址', '法定代表人', '股东身份信息', '银行账户（开户行/账号）', '精确可谈底价', '风险案件明细', '注册人员名册', '尽调报告 PDF', '隐性债务承诺条款', '转让方联系人']; }
   };
+  /* 服务广场来源（from=market）：从报价解析可下单金额（一价全包/预算），供 CTA 文本与跳转 */
+  function agencyOrderAmount(rec) {
+    var q = rec && rec.quote && rec.quote.total;
+    var m = q ? /([\d.]+)\s*(万)?/.exec(String(q)) : null;
+    if (m) return Math.round(parseFloat(m[1]) * (m[2] ? 10000 : 1));
+    var p = rec ? (rec.price || rec.budget) : null;
+    var m2 = p ? /([\d.]+)\s*(万)?/.exec(String(p)) : null;
+    if (m2) return Math.round(parseFloat(m2[1]) * (m2[2] ? 10000 : 1));
+    return 0;
+  }
+  function agencyOrderAmountText(rec) {
+    var v = agencyOrderAmount(rec);
+    if (v <= 0) return '';
+    return v >= 10000 ? (' ¥' + (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万') : (' ¥' + v.toLocaleString());
+  }
   byType.agency = {
     label: '中介服务', cta: '立即咨询', ctaLocked: '立即咨询', consultMode: true, inlineLock: true, verified: '机构已认证',
     hero: function (r, c) {
@@ -1561,7 +1578,7 @@ window.DETAIL = (function () {
         chips.map(function (x) { return '<span class="tag tag-gold">' + x + '</span>'; }).join('') + '</div></div>';
     },
     sections: function (r, c) { return agencyBody(r, c); },
-    ctaText: function (r, unlocked) { return unlocked ? '电话咨询服务顾问' : '立即咨询'; },
+    ctaText: function (r, unlocked) { if (window.__AGENCY_MARKET__) return '在线下单' + agencyOrderAmountText(r); return unlocked ? '电话咨询服务顾问' : '立即咨询'; },
     unlockItems: function () { return ['服务顾问完整电话与微信', '机构详细地址', '一对一办理方案与报价单', '材料模板与合同范本']; },
     lockRows: function () { return []; }
   };
@@ -2189,13 +2206,15 @@ window.DETAIL = (function () {
     /* P1-3：personnel 始终走动态 CTA（isFree已解锁不等于可投递，需单独检查投递权限） */
     var ctaText = (rec.bizKey === 'personnel')
       ? personnelCta()
-      : (unlocked
+      : (window.__AGENCY_MARKET__ && rec.bizKey === 'agency'
+          ? ('在线下单' + agencyOrderAmountText(rec))
+          : (unlocked
           ? (t.ctaText ? t.ctaText(rec, true) : (t.cta || '联系TA'))
           : (guestFreeAvail
               ? '免费查看（游客福利 ' + (gs.used + 1) + '/' + gs.total + '）'
               : ((needGate && !gate.pass)
                   ? gate.label
-                  : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta))));
+                  : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta)))));
     if ($('actionbar')) $('actionbar').innerHTML = actionbarHtml(ctaText);
     var origLine = up.tiered ? '<span style="font-size:13px;color:var(--text-3);text-decoration:line-through;margin-left:8px;">¥' + up.original + '</span>' : '';
     function openPay() {
@@ -2594,11 +2613,32 @@ window.DETAIL = (function () {
           });
         }
         agBind('ag-serve'); agBind('ag-urge');
+        /* 读取选中 chips（选中项以 primary-soft 背景标记） */
+        function agSel(gid) {
+          var out = [];
+          var nodes = sheet.body().querySelectorAll('#' + gid + ' .cs-tag');
+          for (var i = 0; i < nodes.length; i++) if (nodes[i].style.background) out.push(nodes[i].getAttribute('data-val'));
+          return out.join(' / ');
+        }
         sheet.body().querySelector('#ag-submit').addEventListener('click', function () {
           var name = sheet.body().querySelector('#ag-name').value.trim();
           var phone = sheet.body().querySelector('#ag-phone').value.trim();
           if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
           if (!phone || !/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
+          /* 生成询盘线索：服务商工作台可见（v3.2） */
+          try {
+            if (window.LeadStore) {
+              var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+              LeadStore.create({
+                svcId: String(rec.id || ''),
+                svcName: String(rec.title || rec.name || '中介服务'),
+                sellerId: rec.sellerId || rec.publisher || (rec.companyId ? 'u2' : 'u2'),
+                buyerId: me ? me.id : '',
+                name: name, phone: phone,
+                serve: agSel('ag-serve'), urge: agSel('ag-urge')
+              });
+            }
+          } catch (e) {}
           sheet.close();
           unlock('咨询需求已提交，联系方式已开放');
         });
@@ -2671,6 +2711,10 @@ window.DETAIL = (function () {
       });
     }
     function tryUnlock() {
+      if (window.__AGENCY_MARKET__ && rec.bizKey === 'agency') {
+        location.href = '../agency/order.html?svcId=' + encodeURIComponent(rec.id) + '&amount=' + (agencyOrderAmount(rec) || 0);
+        return;
+      }
       if (unlocked) { UI.toast(t.consultMode ? '已提交意向，可直接联系招商顾问' : '信息已解锁，可直接对接', 'ok'); return; }
       if (t.consultMode) { openConsult(rec, c); return; }
       /* G2：破冰期游客免费示例 —— 直接解锁当前条，计数 +1，不进入登录引导 */
@@ -2722,6 +2766,9 @@ window.DETAIL = (function () {
     }
     if ($('cta')) $('cta').addEventListener('click', function () {
       if (rec.bizKey === 'personnel') { bindDeliverModalEvents(); checkDeliverPermission(rec, c); }
+      else if (window.__AGENCY_MARKET__ && rec.bizKey === 'agency') {
+        location.href = '../agency/order.html?svcId=' + encodeURIComponent(rec.id) + '&amount=' + (agencyOrderAmount(rec) || 0);
+      }
       else if (t.consultMode) { if (!unlocked) openConsult(rec, c); else UI.toast('联系方式已开放，可直接拨打招商顾问电话', 'ok'); }
       else if (!unlocked) { tryUnlock(); }
     });
@@ -2934,9 +2981,19 @@ window.DETAIL = (function () {
     if (r.subType) params.push({ k: '子类 / 品名', v: r.subType });
     if (r.qty) params.push({ k: '数量 / 规模', v: r.qty });
     if (r.spec) params.push({ k: '规格 / 参数', v: r.spec });
-    if (r.price) params.push({ k: r.role === 'supply' ? '报价单价' : '预算区间', v: r.price + (r.unit ? ' ' + r.unit : '') });
+    var _pl = { '招聘': '薪资范围', '求职': '期望薪资', '建企买卖': '意向预算', '资质招商': '意向费用' }[r.category];
+    if (r.price) params.push({ k: _pl || (r.role === 'supply' ? '报价单价' : '预算区间'), v: r.price + (r.unit ? ' ' + r.unit : '') });
     if (r.delivery) params.push({ k: '交付 / 工期', v: r.delivery });
     if (r.qualification) params.push({ k: '资质要求', v: r.qualification });
+    /* 建企买卖收购需求：标的四要素（标的/负债/人员/税务） */
+    if (r.tradeInfo) {
+      var _ti = r.tradeInfo;
+      if (_ti.qualCat) params.push({ k: '目标资质', v: _ti.qualCat + (_ti.level ? ' · ' + _ti.level : '') + (_ti.anxu ? ' · ' + _ti.anxu : '') });
+      if (_ti.region) params.push({ k: '目标区域', v: _ti.region });
+      if (_ti.debt) params.push({ k: '负债要求', v: _ti.debt });
+      if (_ti.staff) params.push({ k: '人员要求', v: _ti.staff });
+      if (_ti.tax) params.push({ k: '税务要求', v: _ti.tax });
+    }
     if (r.tags && r.tags.length) params.push({ k: '标签', v: r.tags.join(' · ') });
     if (params.length) h += sec('关键参数', dList(params));
     if (r.description) h += sec('详细描述', '<div class="ds-text">' + renderMarkdown(r.description) + '</div>');
