@@ -2995,6 +2995,186 @@ window.MOCK = (function () {
       ],
       qual: '入驻机构持专业执照与银行对公验证，办理流程合规透明。',
       contact: { name: '孙顾问（重组部）', phone: '13688017788', wechat: 'sun-fenli-cd', addr: '成都·武侯区·商务总部基地' }
+    },
+    {
+      id: 'a5', bizType: '中介服务', cat: '中介', sub: '工程担保', verified: true, hot: true, dir: 'supply',
+      title: '工程担保代办（投标/履约/预付款保函 全国出函）',
+      budget: '¥0.8', unit: '万元/笔起 · 按担保额', location: '成都·武侯', city: '成都', distance: '—',
+      tags: ['投标保函', '履约保函', '预付款担保', '电子保函'], time: ago(28), views: 186, match: 84, companyId: 'c-znzx',
+      desc: '面向施工企业提供投标保函、履约保函、预付款担保、工程质量担保等全品类工程担保服务，银行/担保公司双通道出函，支持电子保函，最快当日出函。',
+      serveType: '投标/履约/预付款/质量担保（银行保函 + 担保公司保函）',
+      targetQualLevel: '不限（按招标文件与合同要求出具对应保函）',
+      targetQualMajor: '房建/市政/公路/水利/电力等全资质序列',
+      priceInclude: '含担保费率核价、出函材料组卷、电子保函推送；银行开函费按机构政策另行结算',
+      paymentTerms: '分 2 期：签约 50% · 出函交付 50%',
+      handleCycle: '投标保函最快当日出函；履约/预付款保函 2–5 个工作日',
+      personnelReq: '无需企业配置人员；需提供营业执照、资质证书、近年业绩与财务报表用于授信核额',
+      policyBasis: '依据《招标投标法》及银行/担保公司保函业务规则办理，费率与额度按企业资质与授信核定',
+      refundPolicy: '因机构原因未能出函的，全额退还已收费用；已出函后企业撤标的按担保公司规则扣减费用',
+      overdueClause: '承诺时限内未出函的，每逾期 1 天减免服务费 2%，上限 20%',
+      govFeeNote: '银行开函费/担保费按金融机构票据由企业承担，机构不代收、不赚差价',
+      invoiceType: '增值税专用发票（6%），对公结算',
+      successRate: 97,
+      rating: 4.8,
+      quote: {
+        total: '¥0.8 万/笔起', range: '按担保额费率计（投标保函通常 0.5‰–1‰/笔，履约保函按担保额 1%–3%/年）',
+        items: [
+          { k: '投标保函（电子）', v: '¥0.1–0.5 万/笔', note: '银行/担保公司双通道，当日可出' },
+          { k: '履约保函', v: '担保额 1%–3%/年', note: '按合同履约担保额与期限核定' },
+          { k: '预付款担保', v: '担保额 1.5%–3%/年', note: '需授信核额，支持分批释放' },
+          { k: '材料组卷与推送', v: '¥0.05–0.2 万', note: '保函文本、盖章、电子推送' }
+        ],
+        govFee: '开函费按金融机构票据实付，机构明码标价',
+        payStages: [
+          { stage: '签约启动', pct: '50%', when: '确定保函类型与额度、签约' },
+          { stage: '出函交付', pct: '50%', when: '保函出具并推送后支付' }
+        ],
+        include: ['保函类型与额度方案', '出函材料组卷', '电子保函推送', '未出函全额退'],
+        exclude: ['金融机构开函费（凭票另付）', '企业授信资料公证等杂费']
+      },
+      cases: [
+        { caseCompany: '四川某路桥工程公司', caseQual: '投标保函', caseLevel: '市政项目', caseCycle: '当日出函', caseResult: '电子保函当日推送、顺利投标', caseDate: '2026-04', verifyUrl: '可提供保函编号核验' },
+        { caseCompany: '成都某装饰工程公司', caseQual: '履约保函', caseLevel: '房建精装', caseCycle: '3 个工作日', caseResult: '按合同担保额顺利出函', caseDate: '2026-05', verifyUrl: '可提供保函编号核验' }
+      ],
+      requiredMaterials: [
+        { name: '营业执照与资质证书', required: '必须', who: '企业提供', note: '彩色扫描件' },
+        { name: '近年业绩与财务报表', required: '必须', who: '企业提供', note: '用于授信核额' },
+        { name: '招标文件/合同（含担保条款）', required: '必须', who: '企业提供', note: '确定保函类型与额度' },
+        { name: '法人及授权材料', required: '必须', who: '企业提供', note: '盖章授权书、法人身份证明' }
+      ],
+      serveProcess: [
+        { step: 1, title: '需求核额', desc: '确认保函类型/金额/期限，核定额度与费率', duration: '0.5 天', customerAction: '提供招标文件或合同' },
+        { step: 2, title: '材料组卷', desc: '收集授信材料，提交银行/担保公司审批', duration: '1–2 天', customerAction: '配合盖章与授权' },
+        { step: 3, title: '出函推送', desc: '保函出具、验真、电子推送至项目方', duration: '当日/1 天', customerAction: '接收保函并核验' }
+      ],
+      fields: [
+        { k: '办理范围', v: '全国 · 支持电子保函' },
+        { k: '周期', v: '最快当日出函' },
+        { k: '费用构成', v: '按担保额费率计' }
+      ],
+      qual: '入驻机构与多家银行/担保公司建立直连通道，出函效率与费率有保障。',
+      contact: { name: '赵顾问（担保部）', phone: '13785002233', wechat: 'zhao-danbao-cd', addr: '成都·武侯区·金融城' }
+    },
+    {
+      id: 'a6', bizType: '中介服务', cat: '中介', sub: '造价咨询', verified: true, hot: false, dir: 'supply',
+      title: '造价咨询/结算审核/全过程咨询 按项目计价',
+      budget: '¥2.0', unit: '万元/项目起 · 按送审额', location: '成都·高新', city: '成都', distance: '—',
+      tags: ['造价咨询', '结算审核', '全过程咨询', '审计'], time: ago(52), views: 143, match: 81, companyId: 'c-znzx',
+      desc: '面向建设单位与施工企业提供工程预算编制、结算审核、全过程造价咨询、竣工决算审计服务，一级注册造价师带队，按送审额或包干计价。',
+      serveType: '预算编制 / 结算审核 / 全过程造价咨询 / 竣工决算审计',
+      targetQualLevel: '不限（按项目规模与送审额计价）',
+      targetQualMajor: '房建/市政/公路/安装/园林等专业',
+      priceInclude: '含现场踏勘、算量计价、对审答疑、成果文件交付；结算审核含核减额提成方案',
+      paymentTerms: '分 3 期：签约 30% · 初稿交付 40% · 审定交付 30%',
+      handleCycle: '预算编制 7–15 天；结算审核 15–30 天（按送审额与资料完整度浮动）',
+      personnelReq: '无需企业配置人员；企业需提供图纸、合同、签证变更与结算资料',
+      policyBasis: '依据《建设工程工程量清单计价规范》GB50500 及四川省现行计价定额与政策文件执行',
+      refundPolicy: '因机构原因未按期交付初稿的，按日减免服务费；成果经双方复核确认后视为交付完成',
+      overdueClause: '超期交付每逾期 1 天减免服务费 1%，上限 15%',
+      govFeeNote: '无行政规费；差旅费按实报销（外地项目）',
+      invoiceType: '增值税专用发票（6%），对公结算',
+      successRate: 96,
+      rating: 4.7,
+      quote: {
+        total: '¥2.0 万/项目起', range: '按送审额/建筑面积包干，或按核减额提成（结算审核）',
+        items: [
+          { k: '预算编制', v: '¥0.8–2 万', note: '按建筑面积与专业复杂程度' },
+          { k: '结算审核', v: '送审额 1.5‰–3‰', note: '或核减额 5%–8% 提成' },
+          { k: '全过程咨询', v: '¥3–8 万/年', note: '驻场或定期到场' },
+          { k: '决算审计', v: '按送审额 2‰–4‰', note: '含竣工资料梳理' }
+        ],
+        govFee: '无行政规费，外地项目差旅另计',
+        payStages: [
+          { stage: '签约启动', pct: '30%', when: '确定计价方式、签约' },
+          { stage: '初稿交付', pct: '40%', when: '成果初稿交付并答疑' },
+          { stage: '审定交付', pct: '30%', when: '双方确认成果后支付' }
+        ],
+        include: ['算量计价', '对审答疑', '成果文件交付', '结算审核含核减提成方案'],
+        exclude: ['外部图纸审查费', '异地差旅费']
+      },
+      cases: [
+        { caseCompany: '成都某商业综合体', caseQual: '结算审核', caseLevel: '总造价 2.1 亿', caseCycle: '28 天', caseResult: '核减率 6.3%，双方认可审定结果', caseDate: '2026-02', verifyUrl: '可提供审定报告（脱敏）' },
+        { caseCompany: '四川某市政道路项目', caseQual: '预算编制', caseLevel: '投资 8600 万', caseCycle: '12 天', caseResult: '按图完成工程量清单编制', caseDate: '2026-04', verifyUrl: '可提供成果文件（脱敏）' }
+      ],
+      requiredMaterials: [
+        { name: '施工图纸与电子版', required: '必须', who: '企业提供', note: '全套图纸及设计变更' },
+        { name: '合同与补充协议', required: '必须', who: '企业提供', note: '计价条款与取费依据' },
+        { name: '签证变更与结算资料', required: '结算审核时', who: '企业提供', note: '现场签证、材料认价单等' },
+        { name: '工程量清单（如有）', required: '可选', who: '企业提供', note: '无清单则按图算量' }
+      ],
+      serveProcess: [
+        { step: 1, title: '资料交接', desc: '明确服务范围与计价方式，收集图纸合同', duration: '1–2 天', customerAction: '提供全套图纸与合同' },
+        { step: 2, title: '算量计价', desc: '工程量计算、组价、编制成果初稿', duration: '7–20 天', customerAction: '补充签证与认价资料' },
+        { step: 3, title: '对审答疑', desc: '与甲方/审计对审，修正争议项', duration: '3–7 天', customerAction: '参与对审会议' },
+        { step: 4, title: '成果交付', desc: '审定版成果文件交付，结算审核含核减确认', duration: '1–2 天', customerAction: '确认成果并支付尾款' }
+      ],
+      fields: [
+        { k: '办理范围', v: '四川省 · 可驻场' },
+        { k: '周期', v: '7–30 天按项目' },
+        { k: '费用构成', v: '包干或核减提成' }
+      ],
+      qual: '入驻机构由一级注册造价师带队，成果文件可对接审计复核。',
+      contact: { name: '李顾问（造价部）', phone: '13980991144', wechat: 'li-zaojia-cd', addr: '成都·高新区·天府软件园' }
+    },
+    {
+      id: 'a7', bizType: '中介服务', cat: '中介', sub: '劳务派遣', verified: true, hot: false, dir: 'supply',
+      title: '建筑劳务派遣/班组分包 全国进场 用工合规',
+      budget: '¥0.2', unit: '万元/人·月起 · 按工种', location: '成都·青羊', city: '成都', distance: '—',
+      tags: ['劳务派遣', '班组分包', '用工合规', '持证上岗'], time: ago(61), views: 158, match: 80, companyId: 'c-znzx',
+      desc: '提供钢筋工、木工、混凝土工、水电安装、架子工等建筑劳务班组派遣与分包服务，人员持证上岗、社保规范，支持整建制班组进场。',
+      serveType: '劳务派遣 / 班组分包（钢筋/木工/混凝土/水电/架子工）',
+      targetQualLevel: '按项目工种需求配置（特种作业持证上岗）',
+      targetQualMajor: '房建/市政/公路/工业厂房等现场劳务',
+      priceInclude: '含人员工资代发、社保缴纳、入场培训与现场管理；按人/月或按班组工程量计价',
+      paymentTerms: '分 2 期：进场 50% · 月结 50%（按月结算，次月对账）',
+      handleCycle: '常备班组 3–7 天进场；整建制班组按项目排期 7–15 天',
+      personnelReq: '按项目配置班组长、持证特种作业人员与普工，全员实名制录入',
+      policyBasis: '依据《劳动合同法》《保障农民工工资支付条例》及实名制管理要求规范用工',
+      refundPolicy: '进场 7 天内人员不合格的免费调换；因机构原因无法进场的退还预付款',
+      overdueClause: '承诺进场时限每逾期 1 天减免当日服务费，上限 10 天',
+      govFeeNote: '社保按实缴纳、工资代发零手续费；无行政规费',
+      invoiceType: '增值税专用发票（3% 劳务），对公结算',
+      successRate: 95,
+      rating: 4.6,
+      quote: {
+        total: '¥0.2 万/人·月起', range: '按工种与技能等级计价（普工/技工/特种作业分档）',
+        items: [
+          { k: '普工', v: '¥0.15–0.2 万/人·月', note: '含社保与工资代发' },
+          { k: '技工（钢筋/木工等）', v: '¥0.25–0.35 万/人·月', note: '按技能等级与工种' },
+          { k: '特种作业（电工/焊工等）', v: '¥0.35–0.5 万/人·月', note: '持证上岗' },
+          { k: '班组整建制分包', v: '按工程量报价', note: '含班组长与现场管理' }
+        ],
+        govFee: '社保实缴、无行政规费',
+        payStages: [
+          { stage: '进场', pct: '50%', when: '班组进场、人员核验后支付' },
+          { stage: '月结', pct: '50%', when: '次月对账后按月结算' }
+        ],
+        include: ['人员实名制与社保', '工资代发', '入场安全培训', '不合格免费调换'],
+        exclude: ['食宿（可协调）', '重大工伤商业险（可按需加购）']
+      },
+      cases: [
+        { caseCompany: '成都某住宅项目', caseQual: '劳务派遣', caseLevel: '房建 · 120 人', caseCycle: '3 天进场', caseResult: '木工/钢筋班组按期进场，实名制合规', caseDate: '2026-01', verifyUrl: '可提供进场核验记录' },
+        { caseCompany: '绵阳某厂房项目', caseQual: '班组分包', caseLevel: '钢结构 · 60 人', caseCycle: '10 天排期', caseResult: '整建制班组按节点完成', caseDate: '2026-03', verifyUrl: '可提供分包合同（脱敏）' }
+      ],
+      requiredMaterials: [
+        { name: '项目用工需求表', required: '必须', who: '企业提供', note: '工种、人数、进场时间' },
+        { name: '企业营业执照与安全许可', required: '必须', who: '企业提供', note: '劳务分包合同签署用' },
+        { name: '现场安全交底资料', required: '必须', who: '双方配合', note: '进场前安全培训' },
+        { name: '实名制录入信息', required: '必须', who: '机构提供', note: '人员身份证、特种作业证' }
+      ],
+      serveProcess: [
+        { step: 1, title: '需求确认', desc: '确认工种、人数、进场时间与计价方式', duration: '1 天', customerAction: '提供用工需求表' },
+        { step: 2, title: '人员配置', desc: '按需求筛选班组，核验证书与健康状态', duration: '2–5 天', customerAction: '确认人员名单' },
+        { step: 3, title: '进场履约', desc: '实名制录入、安全培训后进场作业', duration: '按工期', customerAction: '现场管理与验收' },
+        { step: 4, title: '月度结算', desc: '考勤核对、工资代发、月度结算', duration: '次月', customerAction: '对账确认' }
+      ],
+      fields: [
+        { k: '办理范围', v: '全国 · 常备成都' },
+        { k: '周期', v: '3–15 天进场' },
+        { k: '费用构成', v: '按人/月或工程量' }
+      ],
+      qual: '入驻机构具备劳务派遣经营资质，人员实名制与社保规范。',
+      contact: { name: '周顾问（劳务部）', phone: '13551006677', wechat: 'zhou-lw-cd', addr: '成都·青羊区·人力资源产业园' }
     }
   ];
 

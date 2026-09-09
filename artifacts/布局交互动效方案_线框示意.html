@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布编辑器 · 布局/交互/动效重构方案（线框示意）</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;background:#F2F3F2;color:#1D2A26;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1060px;margin:0 auto;padding:40px 30px 64px;}
+  .hero{margin-bottom:32px;}
+  .hero h1{font-size:26px;font-weight:800;letter-spacing:-.4px;}
+  .hero .sub{font-size:12px;color:#5C6B66;margin-top:6px;line-height:1.7;}
+  .hero .note{display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid #D8DDDA;border-radius:999px;padding:6px 14px;font-size:12px;color:#46564F;margin-top:12px;}
+  section{margin-bottom:40px;}
+  .sec-h{display:flex;align-items:baseline;gap:10px;margin-bottom:16px;}
+  .sec-h .no{font-size:12px;font-weight:800;color:#fff;background:#2B2F2D;width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex:none;transform:translateY(4px);}
+  .sec-h h2{font-size:18px;font-weight:800;}
+  .sec-h .d{font-size:11.5px;color:#5C6B66;}
+
+  /* 双栏对比 */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+  @media(max-width:800px){.vs{grid-template-columns:1fr;}}
+  .col{border:1px solid #D8DDDA;border-radius:14px;background:#fff;overflow:hidden;}
+  .col-h{padding:9px 14px;font-size:11px;font-weight:800;letter-spacing:1px;border-bottom:1px solid #E4E7E5;}
+  .before .col-h{background:#F4F5F4;color:#5C6B66;}
+  .after .col-h{background:#2B2F2D;color:#fff;}
+  .col-b{padding:14px;}
+
+  /* 手机线框 */
+  .phone{width:290px;margin:0 auto;background:#fff;border:1px solid #C9D1CD;border-radius:22px;padding:9px;box-shadow:0 14px 34px -18px rgba(29,42,38,.25);}
+  .p-in{background:#F6F7F6;border-radius:16px;overflow:hidden;padding-bottom:54px;position:relative;}
+  .p-nav{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-bottom:1px solid #E4E7E5;}
+  .p-nav .b{width:22px;height:22px;border-radius:50%;background:#EDEFEE;border:1px solid #D8DDDA;display:flex;align-items:center;justify-content:center;font-size:10px;color:#46564F;}
+  .p-nav .t{font-size:13px;font-weight:700;flex:1;text-align:center;}
+  .p-nav .s{font-size:9px;color:#2C6B46;background:#E8F3EC;padding:2px 7px;border-radius:999px;font-weight:600;}
+  .p-body{padding:10px;}
+  .p-bar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;padding:9px 12px;background:#fff;border-top:1px solid #E4E7E5;}
+  .p-bar .bt{height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:#EDEFEE;border:1px solid #D8DDDA;color:#46564F;}
+  .p-bar .bt.pri{background:#2B2F2D;color:#fff;border:none;}
+
+  /* 元素 */
+  .el{background:#fff;border:1px solid #D8DDDA;border-radius:10px;margin-bottom:8px;}
+  .el .in{height:30px;border:1px solid #E0E4E1;border-radius:7px;margin:8px;background:#FAFBFA;}
+  .el .lbl{font-size:9.5px;color:#7A8781;padding:8px 8px 0;}
+  .el.sec{display:flex;align-items:center;gap:7px;padding:8px;}
+  .el.sec .num{width:17px;height:17px;border-radius:5px;background:#2B2F2D;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;}
+  .el.sec .nm{font-size:11px;font-weight:700;flex:1;}
+  .el.sec .meta{font-size:8.5px;color:#7A8781;}
+  .group{background:#F3F5F4;border:1px dashed #C9D1CD;border-radius:9px;padding:7px;margin:8px;}
+  .group .g-t{font-size:9px;color:#5C6B66;font-weight:700;margin-bottom:5px;display:flex;gap:5px;align-items:center;}
+  .group .g-t .b{width:11px;height:11px;border-radius:3.5px;background:#2B2F2D;color:#fff;font-size:7px;display:flex;align-items:center;justify-content:center;}
+  .group .row{height:24px;border:1px solid #E0E4E1;border-radius:6px;background:#fff;margin-bottom:5px;}
+  .group .row:last-child{margin-bottom:0;}
+
+  .steps{display:flex;align-items:center;margin:8px 8px 6px;}
+  .st{display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .st .d{width:20px;height:20px;border-radius:50%;border:1px solid #B8C1BC;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;color:#5C6B66;font-weight:700;}
+  .st.on .d{background:#2B2F2D;color:#fff;border-color:#2B2F2D;}
+  .st.done .d{background:#DCE5E0;border-color:#B9CCC2;color:#1F4F3A;}
+  .st .l{font-size:8px;color:#7A8781;}
+  .ln{flex:1;height:1.5px;background:#E0E4E1;margin:0 5px;margin-bottom:14px;}
+  .ln.on{background:#2B2F2D;}
+  .track{height:4px;border-radius:2px;background:#E4E7E5;margin:8px;overflow:hidden;}
+  .track .f{height:100%;width:60%;background:#2B2F2D;border-radius:2px;}
+
+  .ai-chip{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #D8DDDA;border-radius:999px;padding:8px 12px;margin:8px;font-size:10px;color:#46564F;}
+  .ai-chip .bd{width:15px;height:15px;border-radius:5px;background:#2B2F2D;color:#fff;font-size:7.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+
+  /* 动效分镜 */
+  .frames{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+  .frame{border:1px solid #D8DDDA;border-radius:14px;background:#fff;overflow:hidden;}
+  .frame .fh{padding:8px 12px;font-size:11px;font-weight:800;border-bottom:1px solid #E4E7E5;display:flex;align-items:center;gap:7px;}
+  .frame .fh .tag{font-size:8.5px;color:#5C6B66;background:#F4F5F4;border:1px solid #E0E4E1;border-radius:999px;padding:2px 7px;font-weight:600;}
+  .frame .fb{padding:13px;font-size:11px;color:#46564F;line-height:1.7;}
+  .frame .fb b{color:#1D2A26;}
+  .frame .fb .anim{display:block;margin-top:8px;font-size:10px;color:#7A8781;}
+  .seq{display:flex;align-items:center;gap:5px;margin:10px 0;}
+  .seq .q{width:26px;height:26px;border-radius:8px;border:1px solid #D8DDDA;background:#FAFBFA;display:flex;align-items:center;justify-content:center;font-size:9px;color:#5C6B66;}
+  .seq .q.fill{background:#2B2F2D;color:#fff;border-color:#2B2F2D;}
+  .seq .ar{color:#A8B1AC;font-size:10px;}
+
+  /* 交互要点 */
+  .ix{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;}
+  .ix-item{border:1px solid #D8DDDA;border-radius:12px;background:#fff;padding:14px 16px;}
+  .ix-item .n{font-size:12px;font-weight:800;margin-bottom:5px;display:flex;align-items:center;gap:8px;}
+  .ix-item .n .k{font-size:8.5px;background:#EDEFEE;border:1px solid #D8DDDA;color:#5C6B66;border-radius:5px;padding:2px 6px;font-weight:700;letter-spacing:.5px;}
+  .ix-item p{font-size:11px;color:#46564F;line-height:1.7;}
+
+  footer{margin-top:26px;padding-top:16px;border-top:1px solid #D8DDDA;font-size:11px;color:#5C6B66;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .ft{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #D8DDDA;border-radius:999px;padding:5px 11px;font-size:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>发布编辑器 · 布局 / 交互 / 动效 重构方案</h1>
+    <div class="sub">重点：布局骨架 · 交互摩擦 · 动效体系。线框仅为结构与关系示意，不代表最终视觉。</div>
+    <div class="note">■ 色彩：全部沿用 App 现有 CSS 变量（--primary / --accent / --success / --warn / --danger 等），不再自造独立色彩规则</div>
+  </div>
+
+  <!-- 1 布局 -->
+  <section>
+    <div class="sec-h"><span class="no">1</span><h2>布局 · 让"发布流程"有骨架</h2><span class="d">头部碎片 → 单一进度头；等宽卡片 → 章节面板；操作栏固定三槽</span></div>
+    <div class="vs">
+      <div class="col before">
+        <div class="col-h">现状 · 碎片堆叠</div>
+        <div class="col-b">
+          <div class="phone"><div class="p-in">
+            <div class="p-nav"><div class="b">‹</div><div class="t">发布需求</div><div class="s">已保存</div></div>
+            <div class="p-body">
+              <div class="el"><div class="steps">
+                <div class="st done"><div class="d">✓</div><div class="l">基础信息</div></div><div class="ln on"></div>
+                <div class="st on"><div class="d">2</div><div class="l">交易要求</div></div><div class="ln"></div>
+                <div class="st"><div class="d">3</div><div class="l">联系发布</div></div>
+              </div><div class="track"><div class="f"></div></div></div>
+              <div class="el" style="margin-top:0;"><div class="lbl">AI 智能补全 · 占一整个卡片</div><div class="in" style="height:34px;"></div><div style="padding:0 8px 8px;font-size:8.5px;color:#7A8781;">展开 ▾</div></div>
+              <div class="el"><div class="lbl">价格与数量</div><div class="in"></div></div>
+              <div class="el"><div class="lbl">规格与交付</div><div class="in"></div></div>
+              <div class="el"><div class="lbl">资质与标签</div><div class="in"></div></div>
+              <div class="el"><div class="lbl">建企买卖四要素（7 字段平铺）</div><div class="in"></div><div class="in"></div></div>
+              <div class="el"><div class="lbl">图片附件</div><div class="in" style="height:24px;"></div></div>
+            </div>
+            <div class="p-bar"><div class="bt" style="flex:1.1;">存草稿</div><div class="bt" style="flex:1;">上一步</div><div class="bt pri" style="flex:1.4;">下一步</div></div>
+          </div></div>
+          <div style="font-size:10.5px;color:#7A8781;line-height:1.7;margin-top:12px;padding:0 4px;">
+            ✗ 头部 4 块碎片（导航/步骤/完成度/AI）各占一层<br>
+            ✗ 表单 6 张等宽卡平铺，读不出主次<br>
+            ✗ AI 卡占首屏大块，是可选项却最显眼<br>
+            ✗ 按钮宽度随步骤变化
+          </div>
+        </div>
+      </div>
+      <div class="col after">
+        <div class="col-h">设计后 · 骨架清晰</div>
+        <div class="col-b">
+          <div class="phone"><div class="p-in">
+            <div class="p-nav"><div class="b">‹</div><div class="t">发布需求</div><div class="s">已保存</div></div>
+            <div class="p-body">
+              <!-- 合成进度头 -->
+              <div class="el" style="background:#2B2F2D;border:none;border-radius:11px;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px 2px;"><span style="font-size:11px;font-weight:800;color:#fff;">发布进度</span><span style="font-size:9px;color:#C9D1CD;">62%</span></div>
+                <div class="steps" style="margin:7px 9px 4px;">
+                  <div class="st done"><div class="d" style="background:#fff;color:#2B2F2D;border:none;">✓</div><div class="l" style="color:#C9D1CD;">基础信息</div></div><div class="ln on" style="background:#fff;height:2px;"></div>
+                  <div class="st on"><div class="d" style="background:#fff;color:#2B2F2D;border:none;">2</div><div class="l" style="color:#fff;">交易要求</div></div><div class="ln" style="background:rgba(255,255,255,.3);"></div>
+                  <div class="st"><div class="d" style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.4);color:#fff;">3</div><div class="l" style="color:#C9D1CD;">联系发布</div></div>
+                </div>
+                <div class="track" style="margin:0 9px 9px;background:rgba(255,255,255,.2);"><div class="f" style="background:#fff;width:62%;"></div></div>
+              </div>
+              <!-- AI 胶囊 -->
+              <div class="ai-chip" style="margin:0 0 8px;"><div class="bd">AI</div><span style="flex:1;">用一句话描述，自动整理</span><span style="font-weight:700;">去填写 →</span></div>
+              <!-- 章节面板 -->
+              <div class="el sec"><div class="num">02</div><div class="nm">交易要求</div><div class="meta">价格 · 规格 · 交付</div></div>
+              <div class="el"><div class="lbl">价格与数量</div><div class="in"></div></div>
+              <div class="group"><div class="g-t"><span class="b">①</span>标的</div><div class="row"></div><div class="row"></div></div>
+              <div class="group"><div class="g-t"><span class="b">②</span>负债</div><div class="row"></div></div>
+              <div class="group"><div class="g-t"><span class="b">③</span>人员</div><div class="row"></div></div>
+              <div class="group"><div class="g-t"><span class="b">④</span>税务</div><div class="row"></div></div>
+              <div class="el"><div class="lbl">图片附件（封面可切换）</div><div class="in" style="height:24px;"></div></div>
+            </div>
+            <div class="p-bar"><div class="bt" style="flex:0 0 74px;">存草稿</div><div class="bt" style="flex:1;">上一步</div><div class="bt pri" style="flex:1.5;">下一步</div></div>
+          </div></div>
+          <div style="font-size:10.5px;color:#7A8781;line-height:1.7;margin-top:12px;padding:0 4px;">
+            ✓ 进度头合成一体（滚动可置顶，始终知道在第几步）<br>
+            ✓ AI 降级为一行胶囊，首屏还给表单<br>
+            ✓ 章节面板（02 交易要求）+ 四要素 ①②③④ 分组<br>
+            ✓ 操作栏三槽恒定：存草稿固定宽，下一步恒定
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 交互 -->
+  <section>
+    <div class="sec-h"><span class="no">2</span><h2>交互 · 降低填写摩擦</h2><span class="d">切品类有反馈 · 格式即时校验 · AI 可撤销 · 图片有闭环 · 隐私锁有引导</span></div>
+    <div class="ix">
+      <div class="ix-item"><div class="n">品类切换反馈 <span class="k">I1</span></div><p>切品类时，受影响的字段组高亮 600ms，提示"该品类新增 2 项必填 / 隐藏 3 项"；建企买卖四要素卡滑入，不再无声变化。</p></div>
+      <div class="ix-item"><div class="n">失焦即时校验 <span class="k">I2</span></div><p>手机号等格式字段 blur 即提示格式错误；空值不提前红字（保持现有静默校验，提交时才渲染）。</p></div>
+      <div class="ix-item"><div class="n">AI 填充可撤销 <span class="k">I3</span></div><p>AI 填入后显示"撤销本次填充"（3 秒内有效），一键恢复原值——AI 填错不靠手动清。</p></div>
+      <div class="ix-item"><div class="n">图片管理闭环 <span class="k">I4</span></div><p>缩略图 + 删除 + "设为封面"角标，首图即封面，可切换；附件同理（文件名 + 大小 + 移除）。</p></div>
+      <div class="ix-item"><div class="n">隐私锁引导 <span class="k">I5</span></div><p>联系方式锁定态旁注"完成实名认证后可解锁"，点击跳认证（沿用现有 entry 逻辑），不出现无解释的锁。</p></div>
+      <div class="ix-item"><div class="n">草稿离开保护 <span class="k">I6</span></div><p>表单有未保存改动时，返回/关闭前二次确认（自绘弹窗：保存草稿 / 放弃 / 取消）。</p></div>
+    </div>
+  </section>
+
+  <!-- 3 动效 -->
+  <section>
+    <div class="sec-h"><span class="no">3</span><h2>动效 · 推进感与完成感</h2><span class="d">全部 ≤300ms，尊重 reduced-motion</span></div>
+    <div class="frames">
+      <div class="frame"><div class="fh">入场编排 <span class="tag">M1 · 300ms</span></div><div class="fb">进度头 → 当前面板 → AI 胶囊，错峰浮现（<b>180 / 120 / 100ms</b>），首屏有主次，不齐现。</div></div>
+      <div class="frame"><div class="fh">步骤切换方向感 <span class="tag">M2 · 260ms</span></div><div class="fb">前进：面板右滑入 + 进度线填充 + 步骤点亮；后退：左滑入 + 进度线回缩。方向可感知。</div></div>
+      <div class="frame"><div class="fh">完成度满格 <span class="tag">M3 · 400ms</span></div><div class="fb">到达 100% 时进度条弹跳一次 + 转成功色（沿用现有 success 变量），给"填完了"的正反馈。</div></div>
+      <div class="frame"><div class="fh">提交成功里程碑 <span class="tag">M4 · 700ms</span></div><div class="fb">对勾描边动画（SVG draw）+ 冻结金额数字滚动 + 成功卡错峰浮现——发布完成是节点，值得庆祝。</div></div>
+    </div>
+    <div style="margin-top:14px;border:1px solid #D8DDDA;border-radius:14px;background:#fff;padding:14px 18px;font-size:11px;color:#46564F;line-height:1.8;">
+      <b>动效纪律</b>：① 所有新动效 200–350ms，唯独成功对勾允许 700ms（里程碑时刻）；② 全部纳入现有 <code>@media (prefers-reduced-motion)</code> 禁用范围；③ 动效只服务于"位置/状态/方向"，不引入装饰性动画。
+    </div>
+  </section>
+
+  <footer>
+    <span>发布编辑器 · 布局/交互/动效重构方案 v2 · 待确认</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="ft">P1 布局骨架</span><span class="ft">P2 交互摩擦</span><span class="ft">P3 动效体系</span><span class="ft">色彩沿用现有变量</span>
+    </span>
+  </footer>
+
+</div>
+</body>
+</html>

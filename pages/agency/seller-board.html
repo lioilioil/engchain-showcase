@@ -26,10 +26,38 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="kpi">
       <div class="kpi-tile kp-gold"><span class="kp-ic"><svg class="ic"><use href="#i-bell"/></svg></span><span class="kp-label">待处理</span><b class="mono" id="k-todo">0</b></div>
       <div class="kpi-tile kp-blue"><span class="kp-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span><span class="kp-label">履约中</span><b class="mono" id="k-doing">0</b></div>
-      <div class="kpi-tile kp-green"><span class="kp-ic"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="kp-label">累计净收入</span><b class="mono green" id="k-income">¥0</b></div>
+      <div class="kpi-tile kp-green" id="k-income-tile" style="cursor:pointer;"><span class="kp-ic"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="kp-label">累计净收入 · 点开明细</span><b class="mono green" id="k-income">¥0</b></div>
     </div>
+
+    <!-- B1 询盘线索：买家从服务详情"免费咨询"留资后汇聚于此 -->
+    <div class="card lead-card" style="margin-bottom:12px;">
+      <div class="lead-head">
+        <span class="lead-ic"><svg class="ic"><use href="#i-chat"/></svg></span>
+        <div class="lead-t"><b>询盘线索</b><span id="lead-sub">买家咨询将实时汇聚</span></div>
+        <span class="lead-count" id="lead-count">0</span>
+      </div>
+      <div id="lead-list"><div class="text-3 fs-12" style="padding:12px 0;text-align:center;">加载中…</div></div>
+    </div>
+
     <!-- 保证金 -->
     <div class="card" id="deposit-card" style="margin-bottom:12px;"></div>
+    <!-- 我的服务（合作方经营橱窗） -->
+    <div class="ms-head">
+      <span class="fw-600 fs-13">我的服务</span>
+      <span class="text-3 fs-11" id="ms-count">0 项</span>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto;" onclick="location.href='../publish/editor.html?role=supply'">+ 发布服务</button>
+    </div>
+    <div id="ms-list"></div>
+    <div id="ms-empty" style="display:none;padding:20px 18px;text-align:center;color:var(--text-3);background:var(--bg-card);border:1px dashed var(--line);border-radius:16px;margin-bottom:12px;">
+      <!-- B4 入驻经营引导：第一步做什么 -->
+      <div class="fw-700 fs-13" style="color:var(--text-1);margin-bottom:10px;">三步开始经营</div>
+      <div class="onb-steps">
+        <div class="onb-step"><span class="onb-n">1</span><span class="onb-t"><b>发布服务</b><em>选「中介服务」品类，填写服务范围与参考报价</em></span></div>
+        <div class="onb-step"><span class="onb-n">2</span><span class="onb-t"><b>平台审核</b><em>1 个工作日内完成上架审核</em></span></div>
+        <div class="onb-step"><span class="onb-n">3</span><span class="onb-t"><b>接单经营</b><em>买家在线下单 / 咨询，托管资金按里程碑结算</em></span></div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px;" onclick="location.href='../publish/editor.html?role=supply'">+ 发布第一个服务</button>
+    </div>
     <!-- 状态筛选 -->
     <div class="tab-bar" id="tabs"></div>
     <div id="list"></div>
@@ -61,6 +89,90 @@ var TABS=[{k:'',label:'全部'},{k:'escrowed',label:'待接单'},{k:'serving',la
 var cur='';
 function bname(x){var u=DataBus.byId(x);return u?(u.name||x):x;}
 var ST_COLOR={escrowed:'var(--primary-dim)',serving:'var(--blue)',await_confirm:'var(--warning)',settled:'var(--success)',refunded:'var(--text-3)',disputed:'var(--danger)'};
+function fmtTime(ts){
+  if(!ts)return'';
+  var d=new Date(ts),n=new Date();
+  var pad=function(x){return x<10?'0'+x:''+x;};
+  var sameDay=d.toDateString()===n.toDateString();
+  return (sameDay?'今天 ':(d.getMonth()+1)+'月'+d.getDate()+'日 ')+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+function fmtPhone(p){return p?String(p).replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'):'—';}
+
+/* ---- B1 询盘线索：LeadStore 同源 ---- */
+var LEAD_STATUS=[{k:'new',label:'新线索',c:'var(--primary-dim)'},{k:'contacted',label:'已联系',c:'var(--blue)'},{k:'dealt',label:'已成交',c:'var(--success)'},{k:'invalid',label:'无效',c:'var(--text-3)'}];
+function leadStatusLabel(k){for(var i=0;i<LEAD_STATUS.length;i++)if(LEAD_STATUS[i].k===k)return LEAD_STATUS[i].label;return k;}
+function leadStatusColor(k){for(var i=0;i<LEAD_STATUS.length;i++)if(LEAD_STATUS[i].k===k)return LEAD_STATUS[i].c;return 'var(--text-3)';}
+function renderLeads(){
+  if(!window.LeadStore)return;
+  var all=LeadStore.list({sellerId:uid});
+  var fresh=all.filter(function(l){return l.status==='new';}).length;
+  var box=document.getElementById('lead-list'),cnt=document.getElementById('lead-count'),sub=document.getElementById('lead-sub');
+  if(cnt)cnt.textContent=all.length?all.length+' 条':'';
+  if(sub)sub.textContent=fresh?('待跟进 '+fresh+' 条'):'买家咨询将实时汇聚';
+  if(!box)return;
+  if(!all.length){
+    box.innerHTML='<div style="padding:14px 0 10px;text-align:center;"><div class="text-3 fs-12">暂无询盘</div>'+
+      '<div class="text-3 fs-11" style="margin-top:4px;line-height:1.6;">买家在服务详情页提交「免费咨询」后，线索会实时出现在这里，请及时跟进</div></div>';
+    return;
+  }
+  box.innerHTML=all.slice(0,12).map(function(l){
+    var col=leadStatusColor(l.status);
+    return '<div class="lead-item">'+
+      '<div class="li-top"><div class="li-svc">'+l.svcName+'</div>'+
+        '<span class="lead-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">'+leadStatusLabel(l.status)+'</span></div>'+
+      '<div class="li-row"><span class="li-k">咨询人</span><span class="li-v">'+l.name+' · '+fmtPhone(l.phone)+'</span></div>'+
+      (l.serve?'<div class="li-row"><span class="li-k">办理事项</span><span class="li-v">'+l.serve+'</span></div>':'')+
+      (l.urge?'<div class="li-row"><span class="li-k">紧急程度</span><span class="li-v">'+l.urge+'</span></div>':'')+
+      '<div class="li-foot"><span class="text-3 fs-10">'+fmtTime(l.createdAt)+'</span>'+
+        '<span class="li-ops">'+LEAD_STATUS.map(function(s){
+          var on=s.k===l.status;
+          return '<span class="li-op'+(on?' on':'')+'" style="'+(on?'color:'+s.c+';border-color:color-mix(in srgb,'+s.c+' 40%,transparent);background:color-mix(in srgb,'+s.c+' 8%,transparent);':'')+'" onclick="window.setLeadStatus(\''+l.id+'\',\''+s.k+'\')">'+s.label+'</span>';
+        }).join('')+'</span></div>'+
+    '</div>';
+  }).join('')+(all.length>12?'<div class="text-3 fs-10" style="text-align:center;padding-top:8px;">仅显示最近 12 条</div>':'');
+}
+window.setLeadStatus=function(id,k){
+  if(!window.LeadStore)return;
+  LeadStore.setStatus(id,k);
+  renderLeads();
+  if(window.UI)UI.toast(k==='dealt'?'已标记成交，可跟进收款':'线索状态已更新','ok');
+};
+
+/* ---- B3 收入明细：订单级净额 + 佣金（合作方侧透明） ---- */
+function renderIncomeSheet(){
+  if(!window.Mediation||!window.UI)return;
+  var all=Mediation.list({uid:uid,role:'seller'});
+  var rows=all.filter(function(o){var mm=Mediation.money(o);return mm.released>0;});
+  var sheet=UI.sheet();
+  sheet.setText('收入明细 · 已释放订单');
+  var totalNet=0,totalFee=0;
+  var html='<div style="padding:2px 0 6px;">';
+  if(!rows.length){
+    html+='<div class="text-3 fs-12" style="padding:20px 0;text-align:center;">暂无已释放收入，完成里程碑结算后展示明细</div>';
+  }else{
+    html+='<div class="inc-note">佣金为平台撮合服务费，仅您可见；用户侧不展示任何扣减。</div>';
+    rows.forEach(function(o){
+      var mm=Mediation.money(o);
+      var net=Domain.round2(mm.released-mm.feeReleased);
+      totalNet=Domain.round2(totalNet+net);totalFee=Domain.round2(totalFee+mm.feeReleased);
+      html+='<div class="inc-row"><div class="ir-top"><span class="fw-600 fs-12.5">'+o.svcName+'</span><b class="mono fs-13" style="color:var(--success);">+'+fmt(net)+'</b></div>'+
+        '<div class="ir-meta"><span>托管 '+fmt(o.amount)+'</span><span>已释放 '+fmt(mm.released)+'</span><span class="ir-fee">佣金 −'+fmt(mm.feeReleased)+'</span></div>'+
+        '<div class="text-3 fs-10" style="margin-top:3px;">'+Mediation.stateLabel(o.state)+' · '+fmtTime(o.updatedAt||o.createdAt)+'</div></div>';
+    });
+    html+='<div class="inc-total"><span>合计到账</span><b class="mono" style="color:var(--success);">'+fmt(totalNet)+'</b><span class="text-3 fs-11" style="margin-left:auto;">累计佣金 '+fmt(totalFee)+'</span></div>';
+  }
+  html+='</div>';
+  sheet.body().innerHTML=html;
+  sheet.show();
+}
+
+/* ---- B2 我的服务经营数据 ---- */
+function svcBiz(sid){
+  var leads=window.LeadStore?LeadStore.countBySvc(String(sid)):0;
+  var orders=0;
+  try{if(window.Mediation)orders=Mediation.list({uid:uid,role:'seller'}).filter(function(o){return String(o.svcId)===String(sid);}).length;}catch(e){}
+  return {leads:leads,orders:orders};
+}
 function renderTabs(){document.getElementById('tabs').innerHTML=TABS.map(function(t){return '<span class="f-chip'+(cur===t.k?' on':'')+'" onclick="setTab(\''+t.k+'\')">'+t.label+'</span>';}).join('');}
 window.setTab=function(k){cur=cur===k?'':k;renderTabs();renderList();};
 function renderList(){
@@ -77,6 +189,39 @@ function renderList(){
       '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span class="text-2 fs-12">已结净额</span><b class="green fs-12 mono">'+fmt(net)+'</b></div></div>';
   }).join('');
 }
+/* ---- 我的服务：该中介企业发布的供应（服务广场同源） ---- */
+var _BIZ_MAP={'材料':'material','设备':'equipment','劳务':'labor','项目合作':'cooperation','合作':'cooperation','中介服务':'agency','中介':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent'};
+function myServices(){
+  var items=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items:[];
+  return items.filter(function(s){return s.publisher===uid&&((s.bizKey||_BIZ_MAP[s.cat]||'')==='agency');});
+}
+function renderMyServices(){
+  var list=myServices();
+  var c=document.getElementById('ms-count');if(c)c.textContent=list.length+' 项';
+  var box=document.getElementById('ms-list'),emp=document.getElementById('ms-empty');
+  if(!list.length){if(box)box.innerHTML='';if(emp)emp.style.display='block';return;}
+  if(emp)emp.style.display='none';
+  if(!box)return;
+  box.innerHTML=list.map(function(s){
+    var stTxt=s.status==='pending_review'?'审核中':(s.status==='active'?'已上架':'已下架');
+    var stCol=s.status==='active'?'var(--success)':(s.status==='pending_review'?'var(--warning)':'var(--text-3)');
+    var biz=svcBiz(s.id);
+    return '<div class="od ms-item">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="fw-600 fs-13 od-name">'+(s.title||'未命名服务')+'</div>'+
+      '<span class="od-st" style="color:'+stCol+';background:color-mix(in srgb,'+stCol+' 10%,transparent);border-color:color-mix(in srgb,'+stCol+' 26%,transparent);">'+stTxt+'</span></div>'+
+      '<div class="text-3 fs-11" style="margin-top:4px;">'+(s.sub||s.subType||s.category||'中介服务')+' · '+(s.price?(s.price+(s.unit?' '+s.unit:'')):'按需报价')+'</div>'+
+      /* B2 经营数据：咨询 / 订单漏斗 */
+      '<div class="ms-biz"><span class="mb-cell"><b>'+biz.leads+'</b><em>咨询</em></span><span class="mb-cell"><b>'+biz.orders+'</b><em>订单</em></span>'+
+        '<span class="mb-tip">'+(biz.leads||biz.orders?'从服务广场带来的转化':'尚未有转化，可优化服务描述或报价')+'</span></div>'+
+      '<div style="display:flex;gap:8px;margin-top:10px;">'+
+        '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();location.href=\'../publish/editor.html?role=supply&record='+s.id+'\'">编辑</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();window.takeDown(\''+s.id+'\')">下架</button>'+
+      '</div></div>';
+  }).join('');
+}
+window.takeDown=function(id){
+  UI.dialog({title:'下架服务',text:'下架后将从服务广场移除，编辑后可重新发布。',ok:'下架',cancel:'取消',onOk:function(){SupplyStore.remove(id);UI.toast('已下架','ok');renderMyServices();}});
+};
 function renderKpi(){
   var all=Mediation.list({uid:uid,role:'seller'});
   var todo=all.filter(function(o){return o.state==='escrowed';}).length;
@@ -97,8 +242,12 @@ function renderKpi(){
     '</div>'+
     '<div class="dep-note">保证金独立托管，无违规解约时原路退还；私下跳单将按防跳单规则扣罚。</div>';
 }
-renderTabs();renderList();renderKpi();
-window.addEventListener('engchain:mediation',function(){renderList();renderKpi();});
+renderTabs();renderList();renderKpi();renderMyServices();renderLeads();
+var kt=document.getElementById('k-income-tile');
+if(kt)kt.addEventListener('click',renderIncomeSheet);
+window.addEventListener('engchain:mediation',function(){renderList();renderKpi();renderMyServices();});
+window.addEventListener('engchain:supply',function(){renderMyServices();});
+window.addEventListener('engchain:lead',function(){renderLeads();});
 })();
 </script>
 <style>
@@ -127,6 +276,11 @@ window.addEventListener('engchain:mediation',function(){renderList();renderKpi()
 .dep-high .dt-amt{color:var(--danger);}
 .dep-note{font-size:10.5px;color:var(--text-3);line-height:1.7;margin-top:10px;}
 
+/* ===== 我的服务 ===== */
+.ms-head{display:flex;align-items:center;gap:8px;margin:2px 0 10px;}
+.btn-sm{padding:5px 12px;font-size:11.5px;border-radius:8px;}
+.ms-item{margin-bottom:8px;}
+
 /* ===== 状态筛选（吸顶） ===== */
 .tab-bar{position:sticky;top:0;z-index:5;display:flex;gap:6px;overflow-x:auto;padding:8px 18px 10px 0;margin-right:-16px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);scrollbar-width:none;}
 .tab-bar::-webkit-scrollbar{display:none;}
@@ -143,6 +297,51 @@ window.addEventListener('engchain:mediation',function(){renderList();renderKpi()
 .od-st i{width:5px;height:5px;border-radius:50%;display:inline-block;}
 
 @media (prefers-reduced-motion: reduce){.od{animation:none;}}
+
+/* ===== B1 询盘线索 ===== */
+.lead-card{padding:13px 14px 8px;}
+.lead-head{display:flex;align-items:center;gap:9px;margin-bottom:4px;}
+.lead-ic{width:30px;height:30px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary-dim);}
+.lead-ic svg{width:14px;height:14px;stroke-width:1.8;}
+.lead-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.lead-t b{font-size:13px;font-weight:700;color:var(--text-1);}
+.lead-t span{font-size:10px;color:var(--text-3);}
+.lead-count{flex:none;font-size:11px;font-weight:700;color:var(--primary-dim);background:var(--primary-soft);border-radius:99px;padding:3px 10px;}
+.lead-item{border-top:1px dashed var(--line);padding:11px 0 9px;}
+.li-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;}
+.li-svc{font-size:12.5px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lead-st{flex:none;font-size:9px;font-weight:600;padding:2px 7px;border-radius:6px;border:1px solid;line-height:1.5;white-space:nowrap;}
+.li-row{display:flex;gap:8px;font-size:11px;padding:2.5px 0;}
+.li-k{flex:none;width:52px;color:var(--text-3);}
+.li-v{flex:1;color:var(--text-2);word-break:break-all;}
+.li-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;}
+.li-ops{display:inline-flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+.li-op{font-size:9.5px;color:var(--text-3);border:1px solid var(--line);border-radius:99px;padding:2.5px 8px;cursor:pointer;transition:all var(--d-fast);}
+.li-op:active{transform:scale(.94);}
+.li-op.on{font-weight:600;}
+
+/* ===== B3 收入明细 sheet ===== */
+.inc-note{font-size:10px;color:var(--text-3);background:var(--bg-card-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;line-height:1.6;margin-bottom:10px;}
+.inc-row{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}
+.ir-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
+.ir-meta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:10px;color:var(--text-3);}
+.ir-fee{color:var(--danger);}
+.inc-total{display:flex;align-items:center;gap:8px;padding:11px 12px;background:var(--primary-soft);border-radius:12px;font-size:12px;font-weight:700;color:var(--text-1);}
+
+/* ===== B2 服务经营数据 ===== */
+.ms-biz{display:flex;align-items:center;gap:10px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);}
+.mb-cell{display:inline-flex;align-items:baseline;gap:3px;}
+.mb-cell b{font-size:13px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);}
+.mb-cell em{font-style:normal;font-size:10px;color:var(--text-3);}
+.mb-tip{font-size:9.5px;color:var(--text-3);margin-left:auto;text-align:right;line-height:1.5;}
+
+/* ===== B4 入驻经营引导 ===== */
+.onb-steps{display:flex;flex-direction:column;gap:8px;text-align:left;}
+.onb-step{display:flex;gap:9px;align-items:flex-start;}
+.onb-n{flex:none;width:20px;height:20px;border-radius:50%;background:var(--primary-soft);color:var(--primary-dim);font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;}
+.onb-t{display:flex;flex-direction:column;gap:1px;}
+.onb-t b{font-size:11.5px;font-weight:600;color:var(--text-1);}
+.onb-t em{font-style:normal;font-size:10px;color:var(--text-3);line-height:1.5;}
 </style>
 </body>
 </html>

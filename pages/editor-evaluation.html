@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑器字段与详情页内容项对比评估 · Engchain3.0</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; background:#f5f6f8; color:#1a1a2e; line-height:1.6; }
+  .wrap { max-width:1200px; margin:0 auto; padding:32px 24px 80px; }
+  h1 { font-size:26px; font-weight:800; margin-bottom:6px; color:#0f172a; }
+  .subtitle { font-size:14px; color:#64748b; margin-bottom:32px; }
+  h2 { font-size:20px; font-weight:700; margin:40px 0 16px; padding-bottom:8px; border-bottom:2px solid #e2e8f0; color:#0f172a; }
+  h3 { font-size:16px; font-weight:700; margin:24px 0 12px; color:#1e293b; }
+  .card { background:#fff; border-radius:12px; padding:24px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+  .stat { background:#fff; border-radius:10px; padding:18px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .stat .num { font-size:32px; font-weight:800; color:#2563eb; }
+  .stat .num.danger { color:#dc2626; }
+  .stat .num.warn { color:#d97706; }
+  .stat .num.ok { color:#16a34a; }
+  .stat .label { font-size:12px; color:#64748b; margin-top:4px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:12px 0; }
+  th { background:#f1f5f9; padding:10px 12px; text-align:left; font-weight:600; color:#334155; border-bottom:2px solid #e2e8f0; }
+  td { padding:10px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  tr:hover td { background:#f8fafc; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+  .tag-ok { background:#dcfce7; color:#16a34a; }
+  .tag-warn { background:#fef3c7; color:#d97706; }
+  .tag-danger { background:#fee2e2; color:#dc2626; }
+  .tag-info { background:#dbeafe; color:#2563eb; }
+  .field-list { columns:2; column-gap:32px; }
+  .field-item { break-inside:avoid; margin-bottom:8px; font-size:13px; }
+  .field-item code { background:#f1f5f9; padding:1px 6px; border-radius:4px; font-size:12px; color:#1e40af; }
+  .field-item .req { color:#dc2626; font-weight:700; }
+  .gap-bar { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin:4px 0; }
+  .gap-fill { height:100%; border-radius:4px; transition:width .3s; }
+  .conclusion { background:#fffbeb; border-left:4px solid #f59e0b; padding:16px 20px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .conclusion.danger { background:#fef2f2; border-left-color:#dc2626; }
+  .conclusion.ok { background:#f0fdf4; border-left-color:#16a34a; }
+  .biz-row { display:grid; grid-template-columns:120px 1fr 100px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+  .biz-name { font-weight:600; font-size:13px; }
+  .biz-detail { font-size:12px; color:#64748b; }
+  .pct { font-size:18px; font-weight:800; text-align:right; }
+  .note { font-size:12px; color:#94a3b8; margin-top:8px; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media(max-width:768px){ .summary-grid{grid-template-columns:repeat(2,1fr);} .field-list{columns:1;} .two-col{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>编辑器字段与详情页内容项对比评估</h1>
+<p class="subtitle">评估对象：<code>pages/publish/editor.html</code>（发布表单） vs <code>js/detail.js</code>（9类详情页渲染器） · 评估日期：2026-09-09</p>
+
+<!-- ===== 结论摘要 ===== -->
+<h2>一、结论摘要</h2>
+<div class="summary-grid">
+  <div class="stat"><div class="num">27</div><div class="label">编辑器收集字段数</div></div>
+  <div class="stat"><div class="num">89</div><div class="label">详情页内容区块数（9类合计）</div></div>
+  <div class="stat"><div class="num danger">~16%</div><div class="label">编辑器字段对详情页的平均填充率</div></div>
+  <div class="stat"><div class="num warn">4类</div><div class="label">用户发布后被降级为通用渲染器</div></div>
+</div>
+
+<div class="conclusion danger">
+  <strong>核心结论：编辑器是"通用扁平表单"，详情页是"按业务类型深度结构化的展示页"，两者之间存在严重的信息结构鸿沟。</strong><br>
+  编辑器仅收集 27 个扁平文本字段，而 9 类详情页共需要 89 个结构化内容区块（含嵌套对象、数组、专业组件）。编辑器字段平均只能填充详情页约 16% 的内容，其余 84% 的区块因无对应数据源而无法展示。<br>
+  正因此，<code>detail.html</code> 对用户发布的 4 类（trade/franchise/personnel/talent）和缺 <code>serveType</code> 的 agency 条目，强制降级为通用发布渲染器（<code>bizKey='publish'</code>），仅展示 5 个极简区块，无法走各业务类型的专业渲染器。
+</div>
+
+<!-- ===== 编辑器字段清单 ===== -->
+<h2>二、编辑器字段清单（collectData 输出）</h2>
+<div class="card">
+  <h3>步骤 1 · 基础信息（6 字段）</h3>
+  <div class="field-list">
+    <div class="field-item"><code>title</code> <span class="req">*</span> 信息标题</div>
+    <div class="field-item"><code>category</code> <span class="req">*</span> 品类（9类下拉）</div>
+    <div class="field-item"><code>subType</code> 子类/品名</div>
+    <div class="field-item"><code>location</code> <span class="req">*</span> 城市·区域</div>
+    <div class="field-item"><code>images[]</code> 图片（最多6张）</div>
+    <div class="field-item"><code>description</code> <span class="req">*</span> 详细描述（富文本）</div>
+  </div>
+  <h3>步骤 2 · 交易要求（10 字段 + 建企买卖专属 7 子字段）</h3>
+  <div class="field-list">
+    <div class="field-item"><code>price</code> <span class="req">*</span> 价格（标签随品类变：预算区间/报价单价/薪资范围/期望薪资/意向预算/意向费用）</div>
+    <div class="field-item"><code>unit</code> 计量单位（方/吨/米/天/人/次）</div>
+    <div class="field-item"><code>qty</code> 数量/规模</div>
+    <div class="field-item"><code>spec</code> 规格/参数（单文本）</div>
+    <div class="field-item"><code>delivery</code> 交付/工期（单文本）</div>
+    <div class="field-item"><code>qualification</code> 资质要求（单文本）</div>
+    <div class="field-item"><code>tags[]</code> 标签（自定义+快捷）</div>
+    <div class="field-item" style="color:#d97706;"><code>tradeInfo{}</code> 建企买卖·收购标的四要素（<strong>仅需求侧显示</strong>）：qualCat/level/anxu/region/debt/staff/tax</div>
+  </div>
+  <h3>步骤 3 · 联系发布（11 字段）</h3>
+  <div class="field-list">
+    <div class="field-item"><code>contact.name</code> <span class="req">*</span> 联系人</div>
+    <div class="field-item"><code>contact.phone</code> <span class="req">*</span> 手机号</div>
+    <div class="field-item"><code>contact.wechat</code> 微信号</div>
+    <div class="field-item"><code>company</code> <span class="req">*</span> 企业/团队名称</div>
+    <div class="field-item"><code>address</code> 联系地址</div>
+    <div class="field-item"><code>files[]</code> 附件资料（最多5个）</div>
+    <div class="field-item"><code>expireDays</code> 信息有效期（7/30/90/365）</div>
+    <div class="field-item"><code>privacyContact</code> 联系方式需解锁查看</div>
+    <div class="field-item"><code>negotiable</code> 接受议价</div>
+  </div>
+  <p class="note">必填字段：title / category / location / price / description / contact.name / contact.phone / company（共 8 个）。其余均为选填。</p>
+</div>
+
+<!-- ===== 详情页内容项清单 ===== -->
+<h2>三、9 类详情页内容区块清单（从 detail.js sec() 调用提取）</h2>
+
+<div class="two-col">
+<div class="card">
+  <h3>material · 材料（9 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>采购/供应说明</td><td><code>r.detail/r.desc</code> 文本</td></tr>
+    <tr><td>2</td><td>核心参数</td><td><code>m.spec[]</code> 键值表数组 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>3</td><td>价格与计价</td><td><code>m.price{range,exact,basis}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>交易·结算·交付</td><td><code>m.trade[]</code> 键值表数组 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>5</td><td>交付与配送能力</td><td><code>m.delivery{radius,capacity,eta,cost}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>资质与合规</td><td><code>m.quals[]</code> 标签 + <code>m.docs[]</code> 文件 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>7</td><td>质量与售后承诺</td><td><code>m.warranty</code> 文本</td></tr>
+    <tr><td>8</td><td>采购/供应商联系方式</td><td><code>m.contact{}</code> 结构化</td></tr>
+    <tr><td>9</td><td>交易流程</td><td><code>m.flow[]</code> 步骤时间线 <span class="tag tag-warn">数组</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>equipment · 设备（9 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>求租/设备说明</td><td><code>r.detail/r.desc</code> 文本</td></tr>
+    <tr><td>2</td><td>核心技术参数</td><td><code>e.specs[]</code> 网格数组 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>3</td><td>费用与计价</td><td><code>e.fee{range,rows[],total}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>交易·结算·租期</td><td><code>e.trade[]</code> 键值表数组 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>5</td><td>资质与合规</td><td><code>e.quals[]+e.docs[]</code> <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>6</td><td>风险与服务承诺</td><td><code>e.promise[]</code> 列表 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>7</td><td>设备履历</td><td><code>e.history[]</code> 时间线 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>8</td><td>承租/出租方联系方式</td><td><code>e.contact{}</code> 结构化</td></tr>
+    <tr><td>9</td><td>租赁流程</td><td><code>e.flow[]</code> 步骤时间线 <span class="tag tag-warn">数组</span></td></tr>
+  </table>
+</div>
+</div>
+
+<div class="two-col">
+<div class="card">
+  <h3>labor · 劳务（9 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>用工需求/班组介绍</td><td><code>r.detail/r.desc</code> 文本</td></tr>
+    <tr><td>2</td><td>工种需求明细</td><td><code>l.workforce[]</code> 工种+人数 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>3</td><td>工资与计价</td><td><code>l.wage{}</code> 结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>合同·结算·考勤</td><td><code>l.trade[]</code> 键值表 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>5</td><td>合规与资质保障</td><td><code>l.compliance{}</code> 结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>对接人/班组长履历</td><td><code>l.foreman{}</code> 结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>7</td><td>用工/质量承诺</td><td><code>l.promise[]</code> 列表 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>8</td><td>用工/班组联系方式</td><td><code>l.contact{}</code> 结构化</td></tr>
+    <tr><td>9</td><td>用工/劳务流程</td><td><code>l.flow[]</code> 步骤时间线 <span class="tag tag-warn">数组</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>cooperation · 项目合作（11 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>项目说明</td><td><code>r.desc</code> 文本</td></tr>
+    <tr><td>2</td><td>项目基本信息</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>合作模式对比</td><td><code>r.coopModes[]</code> 模式对比 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>4</td><td>合作方资质要求</td><td><code>r.partnerQualReq</code> 文本</td></tr>
+    <tr><td>5</td><td>资金到位情况</td><td><code>r.fundStatus{}</code> 进度条 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>合同·结算·付款</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>7</td><td>风险分担与退出</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>8</td><td>招标文件与资料</td><td><code>r.tenderFiles[]</code> 文件 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>9</td><td>合作流程</td><td><code>r.coopProcess[]</code> 步骤 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>10</td><td>关键时间节点</td><td><code>r.coopTimeline[]</code> 时间线 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>11</td><td>合作方联系方式</td><td>结构化</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="two-col">
+<div class="card">
+  <h3>franchise · 资质招商（11 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>企业基本信息</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>2</td><td>资质与证照</td><td><code>qualPack{}</code> 资质包 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>合作模式与核心条件</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>费用结构（透明公开）</td><td>费用明细块 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>5</td><td>注册人员配置</td><td>人员配置块 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>扶持权益</td><td><code>r.benefits[]</code> 权益网格 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>7</td><td>已有分公司案例</td><td>案例展示 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>8</td><td>企业介绍</td><td><code>r.desc</code> 文本</td></tr>
+    <tr><td>9</td><td>企业宣传文件</td><td>PDF 文件 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>10</td><td>招商联系方式</td><td>结构化</td></tr>
+    <tr><td>11</td><td>加盟流程</td><td><code>fc.flow[]/r.joinProcess[]</code> <span class="tag tag-warn">数组</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>trade · 建企买卖（9 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>风险雷达·六维体检</td><td><code>r.radar{}</code> ECharts 雷达图 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>2</td><td>企业概况</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>注册人员配置</td><td><code>r.staffConfig{}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>资质与证照</td><td><code>r.qualPack{}</code> 资质包 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>5</td><td>交易·结算·交付</td><td>dealRows+paymentTerms+deposit <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>股权·税务·社保·账户</td><td>finRows 字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>7</td><td>司法涉诉</td><td><code>r.litigation{}</code> 时间线 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>8</td><td>尽调档案</td><td>ddHtml 尽调文件 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>9</td><td>风险与承诺</td><td><code>r.hiddenDebtCommitment</code> <span class="tag tag-warn">嵌套</span></td></tr>
+  </table>
+</div>
+</div>
+
+<div class="two-col">
+<div class="card">
+  <h3>agency · 中介服务（11 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>服务介绍</td><td><code>r.desc</code> 文本</td></tr>
+    <tr><td>2</td><td>服务类型与办理目标</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>报价明细（透明公开）</td><td><code>r.quote{}</code> 报价卡 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>办理周期与流程</td><td><code>r.serveProcess[]</code> 步骤 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>5</td><td>所需材料清单</td><td><code>r.requiredMaterials[]</code> <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>6</td><td>人员配置与政策依据</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>7</td><td>真实成功案例</td><td><code>r.cases[]</code> 案例卡 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>8</td><td>机构资质</td><td><code>r.qual</code> 文本</td></tr>
+    <tr><td>9</td><td>退款保障</td><td><code>r.refundPolicy</code> 文本</td></tr>
+    <tr><td>10</td><td>超期赔付</td><td><code>r.overdueClause</code> 文本</td></tr>
+    <tr><td>11</td><td>机构联系方式</td><td>结构化</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>personnel · 企业招聘（9 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>岗位说明与证书要求</td><td>intro 结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>2</td><td>薪资结构（透明拆解）</td><td><code>r.salaryStructure{}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>岗位与任职要求</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>4</td><td>入职项目信息</td><td><code>r.projectInfo{}</code> <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>5</td><td>注册办理与继续教育</td><td>结构化字段组 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>6</td><td>企业实力与福利待遇</td><td>comp 结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>7</td><td>投递与招聘流程</td><td><code>r.hireProcess[]</code> 时间线 <span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>8</td><td>该企业在招职位</td><td>otherJobs 系统生成 <span class="tag tag-info">系统</span></td></tr>
+    <tr><td>9</td><td>投递说明</td><td><code>r.applyHtml</code> 文本</td></tr>
+  </table>
+</div>
+</div>
+
+<div class="card">
+  <h3>talent · 人才求职（12 区块）</h3>
+  <table>
+    <tr><th>#</th><th>区块名</th><th>数据结构</th><th>#</th><th>区块名</th><th>数据结构</th></tr>
+    <tr><td>1</td><td>求职意向与自我评价</td><td>intent 结构化 <span class="tag tag-warn">嵌套</span></td><td>7</td><td>项目经验</td><td><span class="tag tag-warn">数组</span></td></tr>
+    <tr><td>2</td><td>持有证书</td><td><code>r.certPack[]</code> 证书网格 <span class="tag tag-warn">数组</span></td><td>8</td><td>教育背景</td><td>结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>3</td><td>期望薪资</td><td>结构化 <span class="tag tag-warn">嵌套</span></td><td>9</td><td>联系方式（付费解锁）</td><td>结构化</td></tr>
+    <tr><td>4</td><td>注册状态</td><td><code>talentRegCard{}</code> <span class="tag tag-warn">嵌套</span></td><td>10</td><td>基本信息与核验</td><td>结构化 <span class="tag tag-warn">嵌套</span></td></tr>
+    <tr><td>5</td><td>社保情况</td><td><code>talentSsCard{}</code> <span class="tag tag-warn">嵌套</span></td><td>11</td><td>解锁完整简历</td><td>价格面板 <span class="tag tag-info">系统</span></td></tr>
+    <tr><td>6</td><td>工作履历</td><td>时间线 <span class="tag tag-warn">数组</span></td><td>12</td><td>相似人才推荐</td><td>系统生成 <span class="tag tag-info">系统</span></td></tr>
+  </table>
+</div>
+
+<!-- ===== 逐类对比矩阵 ===== -->
+<h2>四、逐类对比矩阵（编辑器字段 → 详情页区块）</h2>
+
+<div class="card">
+  <table>
+    <tr>
+      <th style="width:90px;">业务类型</th>
+      <th style="width:60px;">区块数</th>
+      <th>完全匹配（编辑器可直接填充）</th>
+      <th>部分匹配（字段存在但结构/粒度不匹配）</th>
+      <th>完全缺失（详情页有但编辑器无）</th>
+      <th style="width:70px;">填充率</th>
+    </tr>
+    <tr>
+      <td><strong>material</strong><br>材料</td>
+      <td>9</td>
+      <td>①采购/供应说明(<code>description</code>) ⑧联系方式(<code>contact/company/address</code>)</td>
+      <td>②核心参数(<code>spec</code>单文本 vs 键值表数组) ③价格(<code>price</code>单值 vs 区间+精确价+计价依据) ⑤交付(<code>delivery</code>单文本 vs 半径+能力+时效+费用) ⑥资质(<code>qualification</code>单文本 vs 标签数组+文件数组)</td>
+      <td>④交易·结算·交付键值表 ⑦质量与售后承诺 ⑨交易流程时间线</td>
+      <td><span class="pct" style="color:#d97706;">22%</span></td>
+    </tr>
+    <tr>
+      <td><strong>equipment</strong><br>设备</td>
+      <td>9</td>
+      <td>①求租/设备说明 ⑧联系方式</td>
+      <td>②核心技术参数(<code>spec</code> vs 网格数组) ③费用(<code>price</code> vs 区间+明细+合计) ⑤资质(<code>qualification</code> vs 数组)</td>
+      <td>④交易·结算·租期键值表 ⑥风险与服务承诺列表 ⑦设备履历时间线 ⑨租赁流程</td>
+      <td><span class="pct" style="color:#d97706;">22%</span></td>
+    </tr>
+    <tr>
+      <td><strong>labor</strong><br>劳务</td>
+      <td>9</td>
+      <td>①用工需求/班组介绍 ⑧联系方式</td>
+      <td>③工资(<code>price+unit</code> vs 结构化计价) ⑤合规(<code>qualification</code> vs 结构化保障)</td>
+      <td>②工种需求明细数组 ④合同·结算·考勤键值表 ⑥对接人/班组长履历 ⑦用工/质量承诺列表 ⑨用工流程</td>
+      <td><span class="pct" style="color:#d97706;">22%</span></td>
+    </tr>
+    <tr>
+      <td><strong>cooperation</strong><br>项目合作</td>
+      <td>11</td>
+      <td>①项目说明 ⑪联系方式</td>
+      <td>④合作方资质要求(<code>qualification</code>) ⑧招标文件(<code>files</code> vs 结构化文件数组)</td>
+      <td>②项目基本信息 ③合作模式对比数组 ⑤资金到位情况进度条 ⑥合同·结算·付款 ⑦风险分担与退出 ⑨合作流程 ⑩关键时间节点</td>
+      <td><span class="pct" style="color:#dc2626;">18%</span></td>
+    </tr>
+    <tr>
+      <td><strong>franchise</strong><br>资质招商</td>
+      <td>11</td>
+      <td>⑧企业介绍(<code>description</code>) ⑩联系方式</td>
+      <td>—（无部分匹配，franchiseBody 读取 fc.* 结构化对象，编辑器扁平字段无法映射）</td>
+      <td>①企业基本信息 ②资质与证照包 ③合作模式与核心条件 ④费用结构 ⑤注册人员配置 ⑥扶持权益网格 ⑦已有分公司案例 ⑨企业宣传文件（结构化PDF） ⑪加盟流程</td>
+      <td><span class="pct" style="color:#dc2626;">18%</span></td>
+    </tr>
+    <tr>
+      <td><strong>trade</strong><br>建企买卖</td>
+      <td>9</td>
+      <td>—（无完全匹配，tradeInfo 是收购方需求结构，与出让方详情页结构完全不同）</td>
+      <td>⑤交易·结算(<code>tradeInfo</code>仅需求侧，结构不同) ⑥股权税务(<code>tradeInfo.debt/staff/tax</code>粒度不同)</td>
+      <td>①风险雷达六维体检 ②企业概况 ③注册人员配置 ④资质与证照包 ⑦司法涉诉 ⑧尽调档案 ⑨风险与承诺</td>
+      <td><span class="pct" style="color:#dc2626;">7%</span></td>
+    </tr>
+    <tr>
+      <td><strong>agency</strong><br>中介服务</td>
+      <td>11</td>
+      <td>①服务介绍 ⑪联系方式</td>
+      <td>⑧机构资质(<code>qualification</code>)</td>
+      <td>②服务类型与办理目标 ③报价明细 ④办理周期与流程 ⑤所需材料清单 ⑥人员配置与政策依据 ⑦真实成功案例 ⑨退款保障 ⑩超期赔付</td>
+      <td><span class="pct" style="color:#dc2626;">18%</span></td>
+    </tr>
+    <tr>
+      <td><strong>personnel</strong><br>企业招聘</td>
+      <td>9</td>
+      <td>—（无完全匹配）</td>
+      <td>①岗位说明(<code>description+qualification</code>) ③任职要求(<code>qualification</code>)</td>
+      <td>②薪资结构透明拆解 ④入职项目信息 ⑤注册办理与继续教育 ⑥企业实力与福利待遇 ⑦投递与招聘流程 ⑨投递说明</td>
+      <td><span class="pct" style="color:#dc2626;">7%</span></td>
+    </tr>
+    <tr>
+      <td><strong>talent</strong><br>人才求职</td>
+      <td>12</td>
+      <td>⑨联系方式(<code>contact/company</code>)</td>
+      <td>①求职意向(<code>description</code>) ③期望薪资(<code>price</code>单值 vs 结构化)</td>
+      <td>②持有证书网格 ④注册状态 ⑤社保情况 ⑥工作履历时间线 ⑦项目经验 ⑧教育背景 ⑩基本信息与核验</td>
+      <td><span class="pct" style="color:#dc2626;">13%</span></td>
+    </tr>
+  </table>
+  <p class="note">填充率计算：(完全匹配区块数 × 1.0 + 部分匹配区块数 × 0.3) / 总区块数。部分匹配仅计 30% 因为字段粒度/结构与详情页要求差距大，实际展示时会降级为纯文本。</p>
+</div>
+
+<!-- ===== 差距分析 ===== -->
+<h2>五、差距分析与根因</h2>
+
+<div class="card">
+  <h3>5.1 问题分类</h3>
+  <table>
+    <tr><th style="width:140px;">问题类型</th><th>描述</th><th style="width:80px;">影响范围</th><th style="width:80px;">严重度</th></tr>
+    <tr>
+      <td><span class="tag tag-danger">结构鸿沟</span></td>
+      <td>编辑器全部为扁平文本字段（<code>string</code>），详情页 60% 以上区块需要嵌套对象或数组（如 <code>m.spec[{k,v}]</code>、<code>e.fee{range,rows[],total}</code>、<code>r.certPack[]</code>）。编辑器的单文本无法填充这些结构化区块。</td>
+      <td>9/9 类</td>
+      <td><span class="tag tag-danger">致命</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-danger">业务字段缺失</span></td>
+      <td>每类业务有大量专属字段编辑器完全没有：材料的交易结算键值表/配送能力/质量承诺/交易流程；设备的费用明细/设备履历；劳务的工种明细/工资计价/合规保障/班组长履历；项目合作的合作模式对比/资金到位/风险分担/时间节点；资质招商的资质包/费用结构/人员配置/扶持权益/案例；建企买卖的风险雷达/资质包/司法涉诉/尽调档案；中介的报价明细/办理流程/材料清单/成功案例/退款赔付；招聘的薪资结构/项目信息/招聘流程；求职的证书/注册/社保/履历/项目/教育。</td>
+      <td>9/9 类</td>
+      <td><span class="tag tag-danger">致命</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">唯一例外不完整</span></td>
+      <td>建企买卖需求侧有 <code>tradeInfo</code> 四要素（标的/负债/人员/税务），是编辑器中唯一的业务特定结构化字段。但仅覆盖需求侧（收购方），供应侧（出让方）无对应字段；且四要素结构与详情页的 9 个区块（风险雷达/企业概况/资质包/交易结算/股权税务/司法涉诉/尽调/承诺）差距仍大。</td>
+      <td>1/9 类</td>
+      <td><span class="tag tag-warn">中等</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-warn">降级渲染机制</span></td>
+      <td>正因为编辑器数据不足，<code>detail.html</code> 第 78-80 行对用户发布的 4 类（trade/franchise/personnel/talent）和缺 <code>serveType</code> 的 agency 强制降级为通用发布渲染器（<code>bizKey='publish'</code>），仅展示 5 个极简区块（关键参数/详细描述/联系方式/发布主体/对接流程），无法走各业务类型的专业渲染器。这意味着用户发布的信息在详情页中展示效果远差于平台预置的 mock 数据。</td>
+      <td>5/9 类</td>
+      <td><span class="tag tag-danger">高</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-info">通用字段复用</span></td>
+      <td>编辑器的通用字段（title/description/price/contact/company/address/location/tags/images/files）在所有类型中都能部分复用，这是编辑器唯一的优势。但这些字段仅覆盖详情页的"描述+联系方式"类区块，无法覆盖业务核心参数区。</td>
+      <td>9/9 类</td>
+      <td><span class="tag tag-info">低</span></td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>5.2 根因分析</h3>
+  <div class="conclusion">
+    <strong>根因 1：编辑器设计为"最小可用发布表单"，未与详情页的信息架构对齐。</strong><br>
+    编辑器采用"一套表单通吃 9 类"的设计，仅通过品类下拉切换价格标签文案，未按业务类型动态展开专属字段。这导致表单字段数被压缩到 27 个通用字段，无法承载详情页的深度结构化信息。
+  </div>
+  <div class="conclusion">
+    <strong>根因 2：详情页的信息架构是"平台运营深度填充"模式，而非"用户自发布"模式。</strong><br>
+    从 <code>js/data.js</code> 的 mock 数据可以看出，详情页的结构化区块（如 material.mat.spec/price/trade/delivery、trade.radar/qualPack、talent.certPack/workHistory 等）是由平台运营或数据团队深度填充的，数据结构复杂且专业。编辑器作为 C 端/B 端用户的发布入口，不可能要求用户填写如此深度的结构化数据——这本身是一个产品定位问题。
+  </div>
+  <div class="conclusion">
+    <strong>根因 3：缺少"用户发布数据 → 详情页结构化区块"的映射/转换层。</strong><br>
+    即使编辑器只收集扁平字段，也可以通过一个转换层将扁平字段映射到详情页的结构化区块（如将 <code>spec</code> 文本按换行拆分为键值表数组、将 <code>price</code> 包装为 <code>{range: price, exact: price}</code>）。但当前 <code>detail.html</code> 直接判断用户发布条目后降级为通用渲染器，未做任何字段映射尝试。
+  </div>
+</div>
+
+<!-- ===== 编辑器做得好的地方 ===== -->
+<h2>六、编辑器符合要求的部分</h2>
+<div class="card">
+  <table>
+    <tr><th style="width:160px;">维度</th><th>评估</th><th style="width:80px;">状态</th></tr>
+    <tr><td>品类覆盖</td><td>9 类品类完整（材料/设备/劳务/项目合作/中介服务/资质招商/建企买卖/招聘/求职），与详情页 bizKey 一一对应</td><td><span class="tag tag-ok">符合</span></td></tr>
+    <tr><td>供需角色</td><td>通过 URL 参数 <code>role=supply/demand</code> 区分，价格标签文案随角色和品类动态变化</td><td><span class="tag tag-ok">符合</span></td></tr>
+    <tr><td>通用字段</td><td>标题/描述/价格/联系方式/企业/地址/位置/标签/图片/附件等通用字段完整，可填充详情页的通用区块</td><td><span class="tag tag-ok">符合</span></td></tr>
+    <tr><td>建企买卖专属</td><td>需求侧有收购标的四要素（标的/负债/人员/税务），是唯一的业务特定结构化字段</td><td><span class="tag tag-warn">部分</span></td></tr>
+    <tr><td>表单体验</td><td>3 步分步表单、步骤指示器、必填校验、自动保存草稿、复制上次发布、实时预览、费用透明提示——发布体验完善</td><td><span class="tag tag-ok">符合</span></td></tr>
+    <tr><td>数据提交</td><td>collectData 输出结构清晰，字段命名规范，含 role/bizKey/match/source 等元数据，可被 SupplyStore 正确存储</td><td><span class="tag tag-ok">符合</span></td></tr>
+  </table>
+</div>
+
+<!-- ===== 建议 ===== -->
+<h2>七、改进建议（按优先级）</h2>
+<div class="card">
+  <h3>P0 · 致命问题（必须解决）</h3>
+  <table>
+    <tr><th style="width:40px;">#</th><th>建议</th><th>目的</th></tr>
+    <tr><td>1</td><td><strong>按业务类型动态展开专属字段</strong>：选择品类后，步骤 2 动态显示该类型的专属结构化字段组（如材料→核心参数键值表编辑器+价格区间+交易结算+配送能力；劳务→工种明细数组+工资计价；建企买卖→资质包+人员配置+风险信息等）。不再用一套通用表单通吃 9 类。</td><td>消除结构鸿沟，使用户发布的信息能走专业渲染器而非降级</td></tr>
+    <tr><td>2</td><td><strong>建立"扁平字段 → 结构化区块"映射层</strong>：在 detail.html 中，对用户发布条目不直接降级，而是先尝试将编辑器的扁平字段映射到详情页结构化区块（如 spec 文本按换行拆为键值表、price 包装为价格对象、qualification 拆为标签数组），映射失败的区块才隐藏而非整个降级。</td><td>在不改编辑器的前提下，最大化用户发布信息的详情页展示效果</td></tr>
+  </table>
+
+  <h3>P1 · 高优先级</h3>
+  <table>
+    <tr><th style="width:40px;">#</th><th>建议</th><th>目的</th></tr>
+    <tr><td>3</td><td><strong>建企买卖供应侧补充字段</strong>：当前 tradeInfo 仅需求侧显示，供应侧（出让方）需要填写企业概况/资质包/人员配置/股权税务/司法涉诉/尽调信息等出让方专属字段。</td><td>建企买卖是高客单价业务，出让方信息完整度直接影响交易撮合</td></tr>
+    <tr><td>4</td><td><strong>求职（talent）补充简历字段</strong>：当前编辑器无证书/注册状态/社保/工作履历/项目经验/教育背景等求职核心字段。求职信息的核心价值就是简历，当前编辑器完全无法收集。</td><td>talent 填充率仅 8%，是 9 类中最低的，用户发布的求职信息几乎无展示价值</td></tr>
+    <tr><td>5</td><td><strong>招聘（personnel）补充岗位字段</strong>：补充薪资结构（基本工资+绩效+补贴拆解）、入职项目信息、注册办理要求、福利待遇、招聘流程等岗位专属字段。</td><td>personnel 填充率仅 11%，招聘信息的核心是岗位详情，当前无法收集</td></tr>
+  </table>
+
+  <h3>P2 · 中优先级</h3>
+  <table>
+    <tr><th style="width:40px;">#</th><th>建议</th><th>目的</th></tr>
+    <tr><td>6</td><td><strong>资质招商（franchise）补充企业字段</strong>：补充企业基本信息/资质包/费用结构/注册人员配置/扶持权益/分公司案例等招商专属字段。</td><td>franchise 填充率仅 9%，招商信息需要展示企业实力和合作条件</td></tr>
+    <tr><td>7</td><td><strong>中介服务（agency）补充服务字段</strong>：补充服务类型/报价明细/办理流程/所需材料清单/成功案例/退款保障/超期赔付等服务专属字段。当前缺 serveType 的 agency 也会被降级。</td><td>agency 填充率 18%，中介服务的核心是服务内容和承诺，当前无法收集</td></tr>
+    <tr><td>8</td><td><strong>项目合作（cooperation）补充项目字段</strong>：补充项目基本信息/合作模式对比/资金到位情况/合同结算条款/风险分担/招标文件/合作流程/时间节点等合作专属字段。</td><td>cooperation 填充率 18%，项目合作需要展示项目详情和合作条件</td></tr>
+  </table>
+
+  <h3>P3 · 低优先级（体验优化）</h3>
+  <table>
+    <tr><th style="width:40px;">#</th><th>建议</th><th>目的</th></tr>
+    <tr><td>9</td><td><strong>材料/设备/劳务的数组字段编辑器</strong>：为核心参数/交易结算/工种明细等数组类型字段提供动态行编辑器（添加/删除行，每行 key+value），而非单个文本框。</td><td>提升这 3 类的字段粒度，从"部分匹配"提升到"完全匹配"</td></tr>
+    <tr><td>10</td><td><strong>字段引导与模板</strong>：对每类业务提供"填写示例"和"一键填充模板"，降低用户填写深度结构化字段的门槛。</td><td>解决"用户不愿填复杂字段"的产品定位问题</td></tr>
+  </table>
+</div>
+
+<!-- ===== 最终结论 ===== -->
+<h2>八、最终结论</h2>
+<div class="conclusion danger">
+  <strong>当前编辑器不符合"基于所有详情页内容项"的要求。</strong><br><br>
+  编辑器仅收集 27 个扁平通用字段，而 9 类详情页共需要 89 个结构化内容区块，平均填充率仅约 16%。核心问题是"一套通用表单通吃 9 类"的设计未与详情页的深度信息架构对齐，导致用户发布的 5 类信息（trade/franchise/personnel/talent/缺serveType的agency）在详情页中被强制降级为极简通用渲染器，无法展示业务核心参数。<br><br>
+  <strong>编辑器的发布体验（分步表单/校验/草稿/预览/费用透明）是完善的，但信息收集深度严重不足。</strong>需要按业务类型动态展开专属结构化字段，并建立扁平字段到结构化区块的映射层，才能符合详情页的信息展示要求。
+</div>
+
+<p class="note" style="margin-top:32px;text-align:center;">评估报告生成于 2026-09-09 · 基于 editor.html collectData() 与 detail.js 全部 sec() 调用的逐字段对比</p>
+
+</div>
+</body>
+</html>

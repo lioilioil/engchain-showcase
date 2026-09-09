@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编辑器深度检查报告 · Engchain3.0</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:#f5f6f8;color:#1a1a2e;line-height:1.7}
+.container{max-width:1100px;margin:0 auto;padding:32px 24px}
+h1{font-size:28px;font-weight:700;margin-bottom:8px;color:#1a1a2e}
+.subtitle{color:#666;font-size:14px;margin-bottom:32px}
+h2{font-size:20px;font-weight:600;margin:40px 0 16px;padding-bottom:8px;border-bottom:2px solid #e8e8e8}
+h3{font-size:16px;font-weight:600;margin:24px 0 12px}
+.card{background:#fff;border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border-radius:12px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.stat-num{font-size:36px;font-weight:700;line-height:1.2}
+.stat-label{font-size:13px;color:#666;margin-top:4px}
+.p0 .stat-num{color:#dc3545}
+.p1 .stat-num{color:#fd7e14}
+.p2 .stat-num{color:#ffc107}
+.p3 .stat-num{color:#20c997}
+.issue{border-left:4px solid;padding:16px 20px;margin-bottom:12px;background:#fff;border-radius:0 8px 8px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+.issue.p0{border-color:#dc3545;background:#fff5f5}
+.issue.p1{border-color:#fd7e14;background:#fff8f0}
+.issue.p2{border-color:#ffc107;background:#fffdf0}
+.issue.p3{border-color:#20c997;background:#f0fff9}
+.issue-title{font-weight:600;font-size:15px;margin-bottom:6px}
+.issue-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-right:8px;vertical-align:middle}
+.tag-p0{background:#dc3545;color:#fff}
+.tag-p1{background:#fd7e14;color:#fff}
+.tag-p2{background:#ffc107;color:#333}
+.tag-p3{background:#20c997;color:#fff}
+.issue-desc{font-size:14px;color:#444;margin-bottom:8px}
+.issue-impact{font-size:13px;color:#666;margin-bottom:6px}
+.issue-fix{font-size:13px;color:#2b6cb0;background:#ebf8ff;padding:8px 12px;border-radius:6px;margin-top:8px}
+.issue-fix strong{color:#2b6cb0}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:16px 0}
+th{background:#f0f2f5;padding:10px 12px;text-align:left;font-weight:600;border-bottom:2px solid #ddd}
+td{padding:10px 12px;border-bottom:1px solid #eee}
+tr:hover{background:#fafbfc}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-pass{background:#d4edda;color:#155724}
+.badge-miss{background:#f8d7da;color:#721c24}
+.badge-partial{background:#fff3cd;color:#856404}
+.badge-ok{background:#d1ecf1;color:#0c5460}
+.method-list{list-style:none;padding:0}
+.method-list li{padding:8px 0;border-bottom:1px solid #eee;font-size:14px}
+.method-list li:last-child{border-bottom:none}
+.method-list li::before{content:'✓ ';color:#28a745;font-weight:700;margin-right:6px}
+.summary-box{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:12px;padding:24px;margin-bottom:24px}
+.summary-box h3{color:#fff;margin-top:0}
+.summary-box p{font-size:14px;opacity:0.95}
+@media(max-width:768px){.stat-grid{grid-template-columns:repeat(2,1fr)}.container{padding:16px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>编辑器深度检查报告</h1>
+<p class="subtitle">Engchain3.0 · pages/publish/editor.html · 检查时间：2026-09-09 · 检查维度：15 项 · 覆盖 9 类业务</p>
+
+<div class="summary-box">
+<h3>核心结论</h3>
+<p>编辑器动态字段引擎已实现 9 类业务的专属字段渲染，快速填写演示功能正常。但存在 <strong>2 个 P0 阻断问题</strong>（编辑已有条目时动态字段无法回填、认证信息未自动填充）和 <strong>11 个详情页区块缺少对应编辑字段</strong>，需优先修复。整体功能可用，但数据闭环和用户体验存在明显缺口。</p>
+</div>
+
+<h2>一、问题总览</h2>
+<div class="stat-grid">
+<div class="stat-card p0"><div class="stat-num">2</div><div class="stat-label">P0 阻断问题</div></div>
+<div class="stat-card p1"><div class="stat-num">5</div><div class="stat-label">P1 严重问题</div></div>
+<div class="stat-card p2"><div class="stat-num">4</div><div class="stat-label">P2 一般问题</div></div>
+<div class="stat-card p3"><div class="stat-num">6</div><div class="stat-label">P3 优化建议</div></div>
+</div>
+
+<h2>二、P0 阻断问题（必须立即修复）</h2>
+
+<div class="issue p0">
+<div class="issue-title"><span class="issue-tag tag-p0">P0</span>fillDynamicData 仅实现 material/equipment 嵌套对象提取，其他 7 类未实现</div>
+<div class="issue-desc"><strong>位置：</strong>editor.html 第 2432-2462 行 fillDynamicData 函数</div>
+<div class="issue-desc"><strong>问题：</strong>fillDynamicData 函数中，仅对 material（data.mat）和 equipment（data.equip）做了嵌套对象字段提取，其他 7 类（labor/cooperation/franchise/trade/agency/personnel/talent）的嵌套对象提取完全缺失。注释写"从 dynamic 字段读取已覆盖大部分场景"，但如果数据是通过 collectDynamicData 组装的嵌套对象格式（如 coop/tradeDetail/agencyDetail 等）存储的，编辑时 fillDynamicData 无法从嵌套对象中提取字段到 dynamicData，导致动态字段全部为空。</div>
+<div class="issue-impact"><strong>影响：</strong>用户发布包含动态字段的条目后，从"我的发布"进入编辑时，所有动态字段（核心参数、价格明细、交易条款等）全部丢失，用户必须重新填写。这是数据闭环的严重断裂。</div>
+<div class="issue-fix"><strong>修复方案：</strong>为 labor/cooperation/franchise/trade/agency/personnel/talent 各添加嵌套对象提取逻辑，与 collectDynamicData 的组装逻辑一一对应。例如 cooperation 需从 data.coop 提取 projectInfo/coopModes/partnerQualReq/fundStatus/fundAmount/payment/riskExit/coopProcess/coopTimeline 到 dynamicData。</div>
+</div>
+
+<div class="issue p0">
+<div class="issue-title"><span class="issue-tag tag-p0">P0</span>认证信息未自动填充（联系人/电话/企业名称/地址全部为空）</div>
+<div class="issue-desc"><strong>位置：</strong>editor.html 初始化逻辑（IIFE 内字段赋值部分）</div>
+<div class="issue-desc"><strong>问题：</strong>编辑器初始化时，未从 window.UI.state（用户信息）和 window.AuthStore.read()（实名认证/企业认证信息）中自动填充联系人姓名、联系电话、微信号、企业名称、企业地址、所在地区等字段。所有联系信息字段均为空，用户需手动重复填写。</div>
+<div class="issue-impact"><strong>影响：</strong>用户每次发布信息都需手动填写已在认证时提交过的联系信息，操作冗余，且容易填写不一致。这是基础用户体验的明显缺失。</div>
+<div class="issue-fix"><strong>修复方案：</strong>在 IIFE 初始化时（checkAuth 通过后），添加认证信息自动填充逻辑：<br>① 从 UI.state.get().user 提取 name/phone/wechat 填充到 f-contactName/f-contactPhone/f-contactWechat<br>② 从 AuthStore.read().enterprise 提取 name/address 填充到 f-company/f-address<br>③ 从 AuthStore.read().realname 提取 location 填充到 f-location<br>④ 已自动填充的字段添加"已认证"标识，支持用户修改</div>
+</div>
+
+<h2>三、P1 严重问题（需优先修复）</h2>
+
+<div class="issue p1">
+<div class="issue-title"><span class="issue-tag tag-p1">P1</span>9 类共 11 个详情页区块缺少对应编辑字段</div>
+<div class="issue-desc"><strong>问题：</strong>逐类对比编辑器 FIELD_CONFIG 与详情页渲染器读取的字段，发现以下详情页展示区块在编辑器中没有对应的动态编辑字段：</div>
+<table>
+<tr><th>业务类型</th><th>缺失字段</th><th>详情页区块</th><th>影响</th></tr>
+<tr><td>材料 material</td><td>docs</td><td>资质与合规-文件列表（含编号可打码、文件预览）</td><td>详情页 docs 为空数组，资质文件无法展示</td></tr>
+<tr><td>设备 equipment</td><td>docs</td><td>资质与合规-文件列表（设备合格证、年检报告）</td><td>同上</td></tr>
+<tr><td>项目合作 cooperation</td><td>tenderFiles</td><td>招标文件与资料（可下载附件）</td><td>详情页无法展示招标文件</td></tr>
+<tr><td>资质招商 franchise</td><td>cases</td><td>已有分公司案例（案例卡片）</td><td>详情页无法展示分公司案例</td></tr>
+<tr><td>资质招商 franchise</td><td>pdfFiles</td><td>企业宣传文件（PDF 预览）</td><td>详情页无法展示宣传 PDF</td></tr>
+<tr><td>建企买卖 trade</td><td>radar</td><td>风险雷达·六维体检（雷达图）</td><td>详情页风险雷达无数据，核心卖点缺失</td></tr>
+<tr><td>建企买卖 trade</td><td>ddHtml</td><td>尽调档案（富文本展示）</td><td>详情页尽调档案为空</td></tr>
+<tr><td>企业招聘 personnel</td><td>applyHtml</td><td>投递说明（富文本展示）</td><td>详情页投递说明为空</td></tr>
+<tr><td>人才求职 talent</td><td>basicInfo</td><td>基本信息与核验（性别/年龄/出生年月/工作年限）</td><td>详情页基本信息为空，简历不完整</td></tr>
+</table>
+<div class="issue-fix"><strong>修复方案：</strong>在 FIELD_CONFIG 中为上述类型添加缺失字段。文件类字段（docs/tenderFiles/pdfFiles）可新增"文件列表"编辑器类型（支持上传+名称+编号打码）；雷达图字段（radar）新增"六维评分"编辑器；富文本字段（ddHtml/applyHtml）新增"富文本"编辑器或多行文本；基本信息（basicInfo）新增键值对编辑器。</div>
+</div>
+
+<div class="issue p1">
+<div class="issue-title"><span class="issue-tag tag-p1">P1</span>空提交表单校验未触发</div>
+<div class="issue-desc"><strong>问题：</strong>清空所有必填字段（标题/价格/联系人/电话/描述）后点击提交，页面未显示任何校验错误提示，校验错误元素数为 0。</div>
+<div class="issue-impact"><strong>影响：</strong>用户可能提交不完整的信息，导致详情页展示内容缺失。需确认是校验逻辑未绑定、提交按钮事件未触发，还是校验通过后静默提交。</div>
+<div class="issue-fix"><strong>修复方案：</strong>检查提交按钮的事件绑定和 validateForm 函数的调用时机，确保空提交时显示具体的字段错误提示（如"请填写标题""请填写联系电话"），并滚动到第一个错误字段。</div>
+</div>
+
+<div class="issue p1">
+<div class="issue-title"><span class="issue-tag tag-p1">P1</span>字段名不一致：trade.commitment vs 详情页 hiddenDebtCommitment</div>
+<div class="issue-desc"><strong>问题：</strong>collectDynamicData 中建企买卖的风险承诺字段输出为 tradeDetail.commitment，但详情页渲染器读取的是 r.hiddenDebtCommitment。虽然 detail.html 映射层可能做了转换，但字段名不一致增加了维护成本和出错风险。</div>
+<div class="issue-fix"><strong>修复方案：</strong>统一字段名为 hiddenDebtCommitment，或在 detail.html 映射层明确添加 commitment → hiddenDebtCommitment 的转换并注释说明。</div>
+</div>
+
+<div class="issue p1">
+<div class="issue-title"><span class="issue-tag tag-p1">P1</span>字段名不一致：franchise.joinProcess vs 详情页 flow</div>
+<div class="issue-desc"><strong>问题：</strong>资质招商的加盟流程字段在编辑器中为 joinProcess，collectDynamicData 输出为 fc.joinProcess，但详情页 franchiseBody 渲染器读取的是 fc.flow 或 r.joinProcess。需确认映射层是否正确处理。</div>
+<div class="issue-fix"><strong>修复方案：</strong>统一字段名，或在 detail.html 映射层添加 joinProcess → flow 的转换。</div>
+</div>
+
+<div class="issue p1">
+<div class="issue-title"><span class="issue-tag tag-p1">P1</span>建企买卖交易条款结构不精细（paymentTerms/deposit 缺失）</div>
+<div class="issue-desc"><strong>问题：</strong>详情页建企买卖的交易·结算·交付区块包含三个子部分：dealRows（交易条款行）、paymentTerms（付款条款）、deposit（保证金）。但编辑器只有一个 dealTerms 键值对字段，将付款条款和保证金混在一起，结构不精细。</div>
+<div class="issue-impact"><strong>影响：</strong>详情页的付款条款和保证金可能无法正确展示，或展示格式不符合设计。</div>
+<div class="issue-fix"><strong>修复方案：</strong>将 dealTerms 拆分为三个字段：dealTerms（交易条款）、paymentTerms（付款条款）、deposit（保证金），或在 collectDynamicData 中从 dealTerms 数组中按 key 分类提取。</div>
+</div>
+
+<h2>四、P2 一般问题（建议修复）</h2>
+
+<div class="issue p2">
+<div class="issue-title"><span class="issue-tag tag-p2">P2</span>trade.litigation 为纯文本，但详情页用时间线组件渲染</div>
+<div class="issue-desc"><strong>问题：</strong>编辑器中建企买卖的司法涉诉是单行文本字段（placeholder："如 无诉讼、无被执行、无失信记录"），但详情页的司法涉诉区块使用的是时间线组件（litigationTimeline），需要结构化的时间线数据。纯文本无法正确渲染为时间线。</div>
+<div class="issue-fix"><strong>修复方案：</strong>将 litigation 字段类型改为步骤编辑器（steplist），每行一条司法记录（时间+事件），与详情页时间线组件对齐。</div>
+</div>
+
+<div class="issue p2">
+<div class="issue-title"><span class="issue-tag tag-p2">P2</span>agency.quote/cases 结构可能不够精细</div>
+<div class="issue-desc"><strong>问题：</strong>中介服务的报价明细（quote）和成功案例（cases）在编辑器中是通用键值对字段，但详情页使用的是专门的 agencyQuoteCard 和 agencyCaseCard 组件，可能需要更结构化的数据（如案例包含标题/描述/用时/结果等字段）。</div>
+<div class="issue-fix"><strong>修复方案：</strong>检查详情页 agencyQuoteCard 和 agencyCaseCard 的数据结构，如需要更精细的结构，则将 quote/cases 改为嵌套对象数组或专门的编辑器类型。</div>
+</div>
+
+<div class="issue p2">
+<div class="issue-title"><span class="issue-tag tag-p2">P2</span>cooperation.fundStatus 为纯文本，但详情页用资金进度条渲染</div>
+<div class="issue-desc"><strong>问题：</strong>项目合作的资金到位情况在编辑器中是单行文本（placeholder："如 已到位80%，剩余按节点拨付"），但详情页使用的是 fundStatusBar 资金进度条组件，需要结构化的百分比和节点数据。</div>
+<div class="issue-fix"><strong>修复方案：</strong>将 fundStatus 改为键值对编辑器，包含"已到位比例""总预算""已拨付金额""剩余拨付节点"等字段，与详情页进度条组件对齐。</div>
+</div>
+
+<div class="issue p2">
+<div class="issue-title"><span class="issue-tag tag-p2">P2</span>建议值/占位符未按供应/需求角色区分</div>
+<div class="issue-desc"><strong>问题：</strong>当前 FIELD_CONFIG 中所有字段的 placeholder 和 hint 都是通用的，未按供应/需求角色区分。例如材料的"价格区间"placeholder 是"如 300-350元/方"，但需求方应是"采购预算"，供应方应是"供应单价"，两者的占位符应有差异。</div>
+<div class="issue-fix"><strong>修复方案：</strong>在 FIELD_CONFIG 中为关键字段添加 supplyPlaceholder/demandPlaceholder，渲染时根据当前角色选择对应的占位符。</div>
+</div>
+
+<h2>五、P3 优化建议（体验提升）</h2>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>快速填写区域缺少"清空"按钮</div>
+<div class="issue-desc"><strong>问题：</strong>步骤1品类选择下方有 9 个快速填写按钮，但点击后没有"清空所有字段"的按钮，用户如需重新填写需手动逐个清空。</div>
+<div class="issue-fix"><strong>建议：</strong>在快速填写按钮旁添加"清空"按钮，一键清空所有静态和动态字段。</div>
+</div>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>动态字段组缺少折叠/展开功能</div>
+<div class="issue-desc"><strong>问题：</strong>9 类业务平均 6-8 个动态字段组，全部展开时页面很长（建企买卖 63 个编辑项），用户需频繁滚动。</div>
+<div class="issue-fix"><strong>建议：</strong>为每个动态字段组添加折叠/展开按钮，默认展开前 2 组，其余折叠，减少页面长度。</div>
+</div>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>数组编辑器缺少拖拽排序功能</div>
+<div class="issue-desc"><strong>问题：</strong>键值对编辑器、步骤编辑器的行只能添加/删除，不能调整顺序。但交易流程步骤、工作履历等字段的顺序很重要。</div>
+<div class="issue-fix"><strong>建议：</strong>为数组编辑器添加上移/下移按钮或拖拽排序功能。</div>
+</div>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>已自动填充字段缺少"已认证"标识和一键修改入口</div>
+<div class="issue-desc"><strong>问题：</strong>即使实现了认证信息自动填充，用户也无法区分哪些字段是自动填充的、哪些是手动填写的。修改自动填充字段时也没有提示。</div>
+<div class="issue-fix"><strong>建议：</strong>已自动填充的字段添加"已认证"标签，点击标签可跳转到认证页面修改，修改字段时提示"将覆盖认证信息"。</div>
+</div>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>动态字段容器位置可优化</div>
+<div class="issue-desc"><strong>问题：</strong>当前动态字段容器（#dyn-fields-card）插入在步骤2价格与数量卡片之后，但动态字段包含核心参数、交易条款等重要信息，位置应更靠前或与静态字段更好地融合。</div>
+<div class="issue-fix"><strong>建议：</strong>评估动态字段容器的最佳位置，可考虑将核心参数字段组移到价格字段之前，符合用户填写的心智顺序。</div>
+</div>
+
+<div class="issue p3">
+<div class="issue-title"><span class="issue-tag tag-p3">P3</span>数组编辑器添加行后无焦点自动定位</div>
+<div class="issue-desc"><strong>问题：</strong>点击键值对编辑器的"添加行"按钮后，新行的输入框没有自动获取焦点，用户需手动点击才能输入，操作不流畅。</div>
+<div class="issue-fix"><strong>建议：</strong>添加行后自动 focus 到新行的第一个输入框。</div>
+</div>
+
+<h2>六、9 类字段对比矩阵</h2>
+<div class="card">
+<table>
+<tr><th>业务类型</th><th>编辑器字段组数</th><th>总编辑项</th><th>详情页区块数</th><th>缺失区块</th><th>完整度</th></tr>
+<tr><td>材料 material</td><td>6</td><td>31</td><td>9</td><td>docs（资质文件）</td><td><span class="badge badge-partial">89%</span></td></tr>
+<tr><td>设备 equipment</td><td>7</td><td>53</td><td>9</td><td>docs（资质文件）</td><td><span class="badge badge-partial">89%</span></td></tr>
+<tr><td>劳务 labor</td><td>7</td><td>47</td><td>9</td><td>无</td><td><span class="badge badge-pass">100%</span></td></tr>
+<tr><td>项目合作 cooperation</td><td>8</td><td>59</td><td>11</td><td>tenderFiles（招标文件）</td><td><span class="badge badge-partial">91%</span></td></tr>
+<tr><td>资质招商 franchise</td><td>7</td><td>60</td><td>11</td><td>cases（分公司案例）、pdfFiles（宣传PDF）</td><td><span class="badge badge-partial">82%</span></td></tr>
+<tr><td>建企买卖 trade</td><td>7</td><td>63</td><td>9</td><td>radar（风险雷达）、ddHtml（尽调档案）</td><td><span class="badge badge-partial">78%</span></td></tr>
+<tr><td>中介服务 agency</td><td>8</td><td>43</td><td>11</td><td>无</td><td><span class="badge badge-pass">100%</span></td></tr>
+<tr><td>企业招聘 personnel</td><td>7</td><td>66</td><td>9</td><td>applyHtml（投递说明）</td><td><span class="badge badge-partial">89%</span></td></tr>
+<tr><td>人才求职 talent</td><td>8</td><td>57</td><td>12</td><td>basicInfo（基本信息）</td><td><span class="badge badge-partial">92%</span></td></tr>
+</table>
+<p style="font-size:13px;color:#666;margin-top:12px">注：完整度 = (详情页区块数 - 缺失区块数) / 详情页区块数。劳务和中介服务字段完整度为 100%，但仍需确认嵌套结构精细度。</p>
+</div>
+
+<h2>七、已验证通过的功能</h2>
+<div class="card">
+<ul class="method-list">
+<li>9 类业务快速填写演示数据全部正常填充（标题/价格/描述/动态字段）</li>
+<li>9 类动态字段组正确渲染（材料6组/设备7组/劳务7组/合作8组/招商7组/买卖7组/中介8组/招聘7组/求职8组）</li>
+<li>三种数组编辑器正常渲染（键值对 kvlist/标签 taglist/步骤 steplist）</li>
+<li>品类切换后动态字段正确清理，无残留不匹配字段</li>
+<li>价格标签随品类+角色动态更新（如需求方显示"预算区间"）</li>
+<li>collectDynamicData 嵌套对象组装逻辑正确（material/equipment/labor/cooperation 等 9 类）</li>
+<li>编辑器页面 0 JS 语法错误（IIFE 作用域问题已修复）</li>
+<li>详情页映射层无代码语法错误，页面正常渲染</li>
+</ul>
+</div>
+
+<h2>八、检查方法与覆盖范围</h2>
+<div class="card">
+<h3>静态代码审查</h3>
+<ul class="method-list">
+<li>逐行审查 FIELD_CONFIG（9类×平均7组×平均3字段=约160个字段定义）</li>
+<li>审查 collectDynamicData 的 9 类嵌套对象组装逻辑</li>
+<li>审查 fillDynamicData 的回填逻辑（发现 7 类缺失）</li>
+<li>审查 detail.html 映射层的 50+ 字段转换逻辑</li>
+</ul>
+<h3 style="margin-top:20px">无头浏览器动态验证（puppeteer-core + Chrome）</h3>
+<ul class="method-list">
+<li>9 类逐一快速填写，验证静态字段+动态字段填充</li>
+<li>品类切换字段清理验证（材料→建企买卖，无残留）</li>
+<li>价格标签 5 种组合切换验证</li>
+<li>认证信息自动填充检查（发现全部未填充）</li>
+<li>空提交表单校验触发检查（发现未触发）</li>
+<li>数组编辑器渲染数量验证</li>
+</ul>
+<h3 style="margin-top:20px">字段对比自动化</h3>
+<ul class="method-list">
+<li>Python 脚本自动提取编辑器动态字段 key，与详情页渲染器字段逐类对比</li>
+<li>输出缺失字段清单和完整度矩阵</li>
+</ul>
+</div>
+
+<h2>九、修复优先级建议</h2>
+<div class="card">
+<table>
+<tr><th>优先级</th><th>修复项</th><th>预计工作量</th><th>依赖</th></tr>
+<tr><td><span class="badge badge-miss">P0</span></td><td>fillDynamicData 补全 7 类嵌套对象提取</td><td>2-3 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-miss">P0</span></td><td>认证信息自动填充（联系人/企业/地址）</td><td>1-2 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-miss">P1</span></td><td>补充 11 个缺失详情页区块的编辑字段</td><td>4-6 小时</td><td>需新增文件列表/雷达图/富文本编辑器类型</td></tr>
+<tr><td><span class="badge badge-miss">P1</span></td><td>空提交表单校验修复</td><td>1 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-miss">P1</span></td><td>字段名统一（commitment/hiddenDebtCommitment、joinProcess/flow）</td><td>0.5 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-miss">P1</span></td><td>建企买卖交易条款拆分（dealTerms/paymentTerms/deposit）</td><td>1-2 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-partial">P2</span></td><td>litigation 改为步骤编辑器、fundStatus 改为键值对</td><td>1 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-partial">P2</span></td><td>建议值按供应/需求角色区分</td><td>2 小时</td><td>无</td></tr>
+<tr><td><span class="badge badge-ok">P3</span></td><td>清空按钮、字段组折叠、拖拽排序、已认证标识等体验优化</td><td>3-4 小时</td><td>无</td></tr>
+</table>
+</div>
+
+<div style="text-align:center;padding:32px 0;color:#999;font-size:13px">
+<p>编辑器深度检查报告 · Engchain3.0 · 2026-09-09</p>
+<p>检查维度：15 项 · 覆盖 9 类业务 · 发现 17 个问题 · 6 项优化建议</p>
+</div>
+
+</div>
+</body>
+</html>

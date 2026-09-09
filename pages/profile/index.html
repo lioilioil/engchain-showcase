@@ -1501,6 +1501,7 @@ html, body { margin: 0; padding: 0; background: var(--me-bg); }
       { href:'../order/index.html', ic:'i-box', cls:'ic-gold', title:'我的订单', badge:orderCount > 0 ? String(orderCount) : '' },
       { href:'../wallet/index.html', ic:'i-wallet', cls:'ic-green', title:'我的钱包' },
       { href:'../distribution/index.html', ic:'i-share', cls:'ic-gold', title:'分销中心', lock:true, unlockKey:'dist' },
+      { href:'../agency/seller-board.html', ic:'i-briefcase', cls:'ic-purple', title:'服务经营', lock:true, unlockKey:'agency' },
       { href:'../publish/records.html', ic:'i-form', cls:'ic-blue', title:'发布管理' },
       { href:'../favorite/index.html', ic:'i-fav', cls:'ic-red', title:'我的收藏' },
       { href:'../wallet/invoice.html', ic:'i-doc', cls:'ic-orange', title:'发票管理' },
@@ -1511,17 +1512,18 @@ html, body { margin: 0; padding: 0; background: var(--me-bg); }
       { href:'../personnel/index.html', ic:'i-user', cls:'ic-green', title:'人才市场' }
     ];
 
-    /* 权限解锁条件 */
+    /* 权限解锁条件（单一来源 entryAccess：分销=入驻/个人合伙人；服务经营=中介入驻） */
+    var acc = window.entryAccess ? entryAccess() : { dist: false, agency: false };
     var idy = currentIdentity();
     /* 简历投递：pro及以上解锁 */
     var resumeUnlocked = idy.primary === 'pro' || idy.primary === 'partner' || idy.primary === 'enterprise' || idy.primary === 'resident';
-    /* 分销中心：入驻企业 / 个人合伙人专享 */
-    var distUnlocked = idy.primary === 'partner' || idy.primary === 'resident';
+    var distUnlocked = acc.dist;
+    var agencyUnlocked = acc.agency;
 
     q.innerHTML = items.map(function (it) {
-      var unlocked = it.unlockKey === 'dist' ? distUnlocked : resumeUnlocked;
+      var unlocked = it.unlockKey === 'dist' ? distUnlocked : (it.unlockKey === 'agency' ? agencyUnlocked : resumeUnlocked);
       var isLocked = it.lock && !unlocked;
-      var click = (guest || isLocked) ? '' : 'onclick="location.href=\'' + it.href + '\'"';
+      var click = guest ? '' : (isLocked ? 'onclick="quickLocked(\'' + it.unlockKey + '\')"' : 'onclick="location.href=\'' + it.href + '\'"');
       var iconSvg = it.ic === 'i-rotate'
         ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l2.5 2.5"/></svg>'
         : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#' + it.ic + '"/></svg>';
@@ -1534,6 +1536,18 @@ html, body { margin: 0; padding: 0; background: var(--me-bg); }
       '</div>';
     }).join('');
   }
+
+  /* ---------- 锁定入口点击引导（分销/服务经营/简历投递） ---------- */
+  window.quickLocked = function (key) {
+    var cfg = {
+      dist: { title: '分销中心 · 未开通', text: '完成<b>企业入驻</b>（建筑/中介/合伙人三选一）或申请<b>个人合伙人</b>后开通分销返佣。', href: 'auth-prep.html?type=center' },
+      agency: { title: '服务经营 · 未开通', text: '完成「<b>中介服务企业</b>」入驻后开通服务经营工作台：<br>服务橱窗、在线接单、托管结算、履约保证金。', href: 'entry.html' },
+      resume: { title: '简历投递 · 未开通', text: '完成<b>个人入驻</b>（专业资质认证）后开通简历投递与人才展示。', href: 'auth-prep.html?type=center' }
+    };
+    var c = cfg[key] || { title: '功能未开通', text: '前往认证中心查看开通条件', href: 'auth-prep.html?type=center' };
+    if (window.UI && UI.dialog) UI.dialog({ title: c.title, text: c.text, ok: '去开通', cancel: '取消', onOk: function () { location.href = c.href; } });
+    else location.href = c.href;
+  };
 
   /* ---------- 渲染：最近浏览 ---------- */
   function renderHistory() {
