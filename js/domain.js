@@ -64,11 +64,11 @@
       states: { pending: '待生成', frozen: '冻结中', settled: '已结算', paid: '已发放', clawback: '已追回', failed: '发放失败' }
     },
     orderStates: {
-      draft: '草稿', escrowed: '已托管', serving: '履约中', await_confirm: '待验收',
+      draft: '草稿', intent: '意向金已付', escrowed: '已托管', serving: '履约中', await_confirm: '待验收',
       settled: '已结算', refunded: '已退款', partial_refund: '部分退款', disputed: '平台介入中', cancelled: '已取消'
     },
     accountTypes: {
-      available: '可用余额', withdraw_frozen: '提现冻结', escrow: '交易托管',
+      available: '可用余额', withdraw_frozen: '提现冻结', escrow: '交易托管', intent: '意向金',
       deposit: '履约保证金', rebate_frozen: '返佣冻结', platform_income: '平台收入'
     },
     credits: { deduct: { pointsToYuan: 100, capRate: 0.1 } },
@@ -77,6 +77,7 @@
     commission: {
       settleCycle: 'T+1',
       deposit: { basic: 5000, engineering: 20000, high: 50000, note: '服务商履约保证金分级，后台可配' },
+      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], note: '买方意向金：成交价×20% 就近取档（100/500/800/5000），锁定需求+保障平台佣金，服务启动前可退，启动后抵扣服务费' },
       actions: [
         { id: 'warn', label: '警告' }, { id: 'ban7', label: '禁聊 7 天' }, { id: 'ban30', label: '二次禁聊 30 天' },
         { id: 'fine', label: '罚款 ¥5,000' }, { id: 'freeze15', label: '停号 15 天' }, { id: 'remove', label: '二次清退' }
@@ -476,13 +477,25 @@
      ========================================================================== */
   var MED_KEY = 'engchain-mediation-orders';
   var LEGAL = {
-    draft: ['escrowed', 'cancelled'],
+    draft: ['intent', 'cancelled'],
+    intent: ['escrowed', 'refunded', 'cancelled'],
     escrowed: ['serving', 'refunded'],
     serving: ['await_confirm', 'disputed', 'refunded'],
     await_confirm: ['settled', 'disputed'],
     disputed: ['serving', 'settled', 'refunded', 'partial_refund'],
     settled: [], refunded: [], partial_refund: [], cancelled: []
   };
+  /* 意向金档位：成交价 × rate（后台按业务类型可配），就近取档 [100,500,800,5000] */
+  function intentAmountOf(amount, bizType) {
+    var cfg = RULE('commission.intent', { rate: 0.2, tiers: [100, 500, 800, 5000] });
+    var rate = cfg.rate || 0.2;
+    if (bizType && cfg.bTypes && cfg.bTypes[bizType] && cfg.bTypes[bizType].rate) rate = cfg.bTypes[bizType].rate;
+    var target = Math.round(r2(amount) * rate);
+    var tiers = (cfg.tiers || [100, 500, 800, 5000]).slice().sort(function (a, b) { return a - b; });
+    var best = tiers[0];
+    for (var i = 1; i < tiers.length; i++) if (Math.abs(tiers[i] - target) < Math.abs(best - target)) best = tiers[i];
+    return best;
+  }
   function medRead() { var s = parse(MED_KEY, null); if (!s) { s = { list: [], migrated: false }; save(MED_KEY, s); } return s; }
   function buildMilestones(amount) {
     var cm = RULE('commission', {});
@@ -536,17 +549,64 @@
       var o = {
         id: uid('MD'), buyerId: input.buyerId || me, sellerId: input.sellerId || '', svcId: input.svcId || '', svcName: input.svcName || '',
         category: input.category || '', title: input.title || input.svcName || '中介服务订单', amount: amt, fee: r2(calc.fee),
-        settle: r2(amt - calc.fee), state: 'draft', payMethod: '', payTxnId: '', idemKey: '',
+        settle: r2(amt - calc.fee), intentAmount: intentAmountOf(amt, input.bizType || input.category), intentPaid: false, intentTxnId: '', intentTransferred: false,
+        state: 'draft', payMethod: '', payTxnId: '', idemKey: '',
         milestones: buildMilestones(amt), refund: null, dispute: null, review: null, timeline: [], version: 1,
-        ruleSnapshot: { rate: calc.rate, fee: calc.fee, at: Date.now() }, createdAt: Date.now(), updatedAt: Date.now()
+        ruleSnapshot: { rate: calc.rate, fee: calc.fee, intent: intentAmountOf(amt, input.bizType || input.category), at: Date.now() }, createdAt: Date.now(), updatedAt: Date.now()
       };
       this._tl(o, '创建订单草稿', o.buyerId);
       this._write(o); emit('engchain:mediation', { id: o.id, state: o.state }); return o;
     },
     _can: function (o, next) { return (LEGAL[o.state] || []).indexOf(next) >= 0; },
-    /* 支付托管：买方 available → 平台 escrow（幂等） */
+    /* 支付意向金：draft → intent（买方付意向金入平台意向金账户，启动前可退；金额=成交价×20%就近取档） */
+    payIntent: function (id, method, idemKey) {
+      var o = this.byId(id); if (!o) return { error: '订单不存在' };
+      if (!this._can(o, 'intent')) return { error: '当前状态不可支付意向金' };
+      var key = idemKey || ('int_' + o.id);
+      var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'intent', amount: o.intentAmount, bizType: 'mediation_intent', bizId: o.id, idemKey: key, remark: '中介服务意向金' });
+      if (tx.error) return tx;
+      safeMoneyMinus(o.buyerId, o.intentAmount, '中介服务意向金');
+      o.state = 'intent'; o.intentPaid = true; o.intentTxnId = tx.txn ? tx.txn.id : ''; o.payMethod = method || 'balance'; o.idemKey = key; o.version++; o.updatedAt = Date.now();
+      this._tl(o, '支付意向金，确认合作意向', o.buyerId, { amount: o.intentAmount });
+      this._write(o); emit('engchain:mediation', { id: id, state: o.state }); return o;
+    },
+    /* 启动服务：intent → escrowed（意向金转入托管抵扣，买方补足剩余合同款） */
+    startService: function (id, method, idemKey) {
+      var o = this.byId(id); if (!o) return { error: '订单不存在' };
+      if (!this._can(o, 'escrowed')) return { error: '当前状态不可启动托管' };
+      var remain = r2(o.amount - (o.intentAmount || 0));
+      var key = idemKey || ('pay_' + o.id);
+      if (remain > 0) {
+        var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: remain, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '中介订单服务费托管' });
+        if (tx.error) return tx;
+        safeMoneyMinus(o.buyerId, remain, '中介订单服务费托管');
+        o.payTxnId = tx.txn ? tx.txn.id : '';
+      }
+      if (o.intentPaid && !o.intentTransferred) {
+        Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'intent', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: o.intentAmount, bizType: 'mediation_intent_transfer', bizId: o.id, idemKey: 'itr_' + o.id, remark: '意向金转入托管（抵扣服务费）' });
+        o.intentTransferred = true;
+      }
+      o.state = 'escrowed'; o.payMethod = method || 'balance'; o.version++; o.updatedAt = Date.now();
+      this._tl(o, '服务启动，意向金抵扣并托管全款', o.buyerId, { remain: remain, intent: o.intentAmount });
+      this._write(o); emit('engchain:mediation', { id: id, state: o.state }); return o;
+    },
+    /* 启动前取消：intent → refunded（意向金全额原路退还） */
+    cancelIntent: function (id, reason) {
+      var o = this.byId(id); if (!o) return { error: '订单不存在' };
+      if (!this._can(o, 'refunded')) return { error: '当前状态不可取消退意向金' };
+      if (o.intentPaid && !o.intentTransferred) {
+        Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'intent', toUid: o.buyerId, toAcct: 'available', amount: o.intentAmount, bizType: 'mediation_intent_refund', bizId: o.id, idemKey: 'irf_' + o.id, remark: '启动前取消·退意向金' });
+        safeMoneyAdd(o.buyerId, o.intentAmount, '意向金退还');
+      }
+      o.state = 'refunded'; o.refund = { amount: o.intentAmount || 0, reason: reason || '启动前取消', at: Date.now(), released: 0, intent: true }; o.version++; o.updatedAt = Date.now();
+      this._tl(o, '启动前取消，意向金全额退还', o.buyerId, { amount: o.intentAmount });
+      this._write(o); emit('engchain:mediation', { id: id, state: o.state }); return o;
+    },
+    /* 支付托管：draft → 支付意向金；intent → 启动托管；旧单 escrowed 兼容直付 */
     pay: function (id, method, idemKey) {
       var o = this.byId(id); if (!o) return { error: '订单不存在' };
+      if (o.state === 'draft') return this.payIntent(id, method, idemKey);
+      if (o.state === 'intent') return this.startService(id, method, idemKey);
       if (!this._can(o, 'escrowed')) return { error: '当前状态不可支付托管' };
       var key = idemKey || ('pay_' + o.id);
       var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: o.amount, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '中介订单资金托管' });
@@ -645,19 +705,57 @@
       try { Rebate.clawback(o.id, remain / o.amount); } catch (e) {}
       emit('engchain:mediation', { id: o.id, state: o.state }); return o;
     },
-    refund: function (id, reason) { var o = this.byId(id); if (!o) return { error: '订单不存在' }; if (!this._can(o, 'refunded')) return { error: '当前状态不可退款' }; return this._fullRefund(o, '买方申请退款', reason, o.buyerId); },
+    refund: function (id, reason) { var o = this.byId(id); if (!o) return { error: '订单不存在' }; if (o.state === 'intent') return this.cancelIntent(id, reason); if (!this._can(o, 'refunded')) return { error: '当前状态不可退款' }; return this._fullRefund(o, '买方申请退款', reason, o.buyerId); },
     review: function (id, score, text) { var o = this.byId(id); if (!o || o.state !== 'settled') return { error: '仅已结算订单可评价' }; o.review = { score: score, text: text, at: Date.now() }; this._write(o); /* C3 评价回流：聚合到服务卡片口碑（svcId 维度） */ try { if (o.svcId && window.SvcRatingStore) SvcRatingStore.add(String(o.svcId), score); } catch (e) {} return o; },
-    /* 资金概览（订单维度） */
+    /* 资金概览（订单维度）：intent 单资金在平台意向金账户，未进托管 */
     money: function (o) {
+      if (o.state === 'intent') return { escrowRemain: 0, released: 0, feeReleased: 0, refundable: o.intentAmount || 0, intent: o.intentAmount || 0 };
       var released = 0, fee = 0;
       o.milestones.forEach(function (m) { if (m.status === 'done') { var rel = r2(o.amount * m.pct); released += rel; fee += r2(rel * (o.ruleSnapshot ? o.ruleSnapshot.rate : 0.08)); } });
-      return { escrowRemain: r2(o.amount - released), released: r2(released), feeReleased: r2(fee), refundable: r2(o.amount - released) };
+      return { escrowRemain: r2(o.amount - released), released: r2(released), feeReleased: r2(fee), refundable: r2(o.amount - released), intent: 0 };
     },
     /* 平台托管汇总：在途订单未释放额之和（守恒用） */
     escrowInFlight: function () {
       var sum = 0;
       this.list().forEach(function (o) { if (['escrowed', 'serving', 'await_confirm', 'disputed'].indexOf(o.state) >= 0) sum += r2(o.amount) - o.milestones.reduce(function (s, m) { return m.status === 'done' ? s + r2(o.amount * m.pct) : s; }, 0); });
       return r2(sum);
+    },
+    /* WP7 意向金超时检查：超过 remindDays 标记提醒，超过 autoCancelDays 自动退意向金 */
+    checkIntentTimeout: function () {
+      var cfg = RULE('commission.intent', { remindDays: 7, autoCancelDays: 30 });
+      var remindDays = cfg.remindDays || 7, autoCancelDays = cfg.autoCancelDays || 30;
+      var now = Date.now(), DAY = 86400000;
+      var reminded = [], autoCancelled = [];
+      this.list().forEach(function (o) {
+        if (o.state !== 'intent') return;
+        var days = Math.floor((now - o.createdAt) / DAY);
+        if (days >= autoCancelDays && !o._autoCancelled) {
+          try {
+            var r = Mediation.cancelIntent(o.id, '意向金超期' + autoCancelDays + '天未启动，系统自动退还');
+            if (!r.error) { o._autoCancelled = true; autoCancelled.push(o.id); }
+          } catch (e) {}
+        } else if (days >= remindDays && !o._reminded) {
+          o._reminded = true; o._remindedAt = now; o.updatedAt = now;
+          Mediation._write(o);
+          reminded.push({ id: o.id, days: days, buyerId: o.buyerId, sellerId: o.sellerId });
+        }
+      });
+      return { reminded: reminded, autoCancelled: autoCancelled };
+    },
+    /* WP7 意向金状态查询：返回超时天数与提醒状态 */
+    intentStatus: function (id) {
+      var o = this.byId(id);
+      if (!o || o.state !== 'intent') return null;
+      var cfg = RULE('commission.intent', { remindDays: 7, autoCancelDays: 30 });
+      var days = Math.floor((Date.now() - o.createdAt) / 86400000);
+      return {
+        days: days,
+        remindDays: cfg.remindDays || 7,
+        autoCancelDays: cfg.autoCancelDays || 30,
+        isReminded: !!o._reminded,
+        nearAutoCancel: days >= (cfg.autoCancelDays || 30) - 3,
+        willAutoCancel: days >= (cfg.autoCancelDays || 30)
+      };
     }
   };
   function safeMoneyMinus(uidStr, amount, reason) {
@@ -788,6 +886,7 @@
   window.Referral = Referral;
   window.Rebate = Rebate;
   window.Mediation = Mediation;
+  window.intentAmountOf = intentAmountOf;
   window.Outbox = Outbox;
   window.Sync = Sync;
   window.FormStash = FormStash;

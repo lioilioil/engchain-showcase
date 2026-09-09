@@ -42,13 +42,15 @@ var acc=window.entryAccess?entryAccess():{agency:false};
 function uname(x){var u=DataBus.byId(x);return u?(u.name||x):x;}
 
 function render(){
+  /* WP7 页面加载时检查意向金超时 */
+  try{ if(window.Mediation&&Mediation.checkIntentTimeout)Mediation.checkIntentTimeout(); }catch(e){}
   var o=Mediation.byId(id);
   var root=document.getElementById('root');
   var cta=document.getElementById('cta');
-  if(!o){root.innerHTML='<div class="card">订单不存在或已删除。<br><br><button class="btn btn-primary" onclick="location.href=\'order.html?mine=1\'">返回我的订单</button></div>';cta.innerHTML='';return;}
+  if(!o){root.innerHTML='<div class="card">订单不存在或已删除。<br><br><button class="btn btn-primary" onclick="location.href=\'my-orders.html\'">返回我的订单</button></div>';cta.innerHTML='';return;}
   var role=o.buyerId===uid?'buyer':(o.sellerId===uid?'seller':'viewer');
   var mm=Mediation.money(o);
-  var stCol={escrowed:'var(--primary-strong)',serving:'#F0E2BE',settled:'#7FB59A',refunded:'rgba(244,242,238,.66)',disputed:'#E8B4AE'};
+  var stCol={intent:'var(--primary-strong)',escrowed:'var(--primary-strong)',serving:'#F0E2BE',settled:'#7FB59A',refunded:'rgba(244,242,238,.66)',disputed:'#E8B4AE'};
   var col=stCol[o.state]||'#F0E2BE';
   var html='';
   /* 状态头：深色 hero */
@@ -57,16 +59,48 @@ function render(){
     '<span class="od-role">'+(role==='buyer'?'我是买方':role==='seller'?'我是服务商':'旁观')+'</span></div>'+
     '<div class="od-svc">'+o.svcName+'</div>'+
     '<div class="od-id">单号 '+o.id+'</div></div>';
-  /* 资金卡 */
+  /* 资金卡：intent 单展示意向金，托管单展示托管进度 */
   var released=mm.released-mm.feeReleased, remain=mm.escrowRemain;
   var relPct=o.amount>0?Math.min(100,Math.round((released/o.amount)*100)):0;
-  html+='<div class="card" style="margin-top:12px;"><div class="fw-600 fs-13" style="margin-bottom:8px;">托管资金</div>'+
-    row('托管总额',fmt(o.amount))+
-    row('已释放给服务商',fmt(released),'var(--success)')+
-    row('监管账户在途',fmt(remain),'var(--primary-dim)')+
-    '<div class="fund-bar"><div class="fund-fill" style="width:'+relPct+'%;"></div></div>'+
-    '<div class="fund-scale"><span>已释放 '+relPct+'%</span><span>在途 '+(100-relPct)+'%</span></div>'+
-    '<div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">资金由持牌机构托管，按里程碑验收后释放；未成交全额退款，规避二清。</div></div>';
+  if(o.state==='intent'){
+    /* WP7 意向金解锁流程条 + 超时提醒 */
+    var intentSt=null;
+    try{ if(window.Mediation&&Mediation.intentStatus) intentSt=Mediation.intentStatus(o.id); }catch(e){}
+    var flowHtml='<div class="intent-flow">'+
+      '<div class="if-step if-done"><span class="if-dot">1</span><span class="if-label">已付意向金</span></div>'+
+      '<div class="if-line if-todo"></div>'+
+      '<div class="if-step if-todo"><span class="if-dot">2</span><span class="if-label">启动转托管</span></div>'+
+      '<div class="if-line if-todo"></div>'+
+      '<div class="if-step if-todo"><span class="if-dot">3</span><span class="if-label">履约验收</span></div>'+
+      '<div class="if-line if-todo"></div>'+
+      '<div class="if-step if-todo"><span class="if-dot">4</span><span class="if-label">结算完成</span></div>'+
+      '</div>';
+    var timeoutHtml='';
+    if(intentSt){
+      if(intentSt.willAutoCancel){
+        timeoutHtml='<div class="intent-warn intent-warn-danger">意向金已超期 '+intentSt.days+' 天，系统将自动退还意向金并关闭订单</div>';
+      }else if(intentSt.nearAutoCancel){
+        timeoutHtml='<div class="intent-warn intent-warn-warn">意向金已付 '+intentSt.days+' 天，距自动退还还有 '+(intentSt.autoCancelDays-intentSt.days)+' 天，请尽快启动服务</div>';
+      }else if(intentSt.isReminded){
+        timeoutHtml='<div class="intent-warn">意向金已付 '+intentSt.days+' 天，启动前可全额退还，启动后自动抵扣服务费</div>';
+      }
+    }
+    html+='<div class="card" style="margin-top:12px;border-color:color-mix(in srgb,var(--primary) 45%,transparent);"><div class="fw-600 fs-13" style="margin-bottom:8px;">意向金 · 确认合作</div>'+
+      flowHtml+
+      row('意向金（已付 · 可退）',fmt(o.intentAmount),'var(--primary-dim)')+
+      row('合同金额',fmt(o.amount))+
+      row('服务启动后',fmt(Domain.round2(o.amount-o.intentAmount))+' 托管至监管账户')+
+      timeoutHtml+
+      '<div class="text-3 fs-11" style="margin-top:8px;color:var(--text-3);line-height:1.7;">意向金已锁定合作意向与机构档期；服务启动前可全额退还，启动后自动抵扣服务费并托管全款。超期未启动系统将自动退还。</div></div>';
+  }else{
+    html+='<div class="card" style="margin-top:12px;"><div class="fw-600 fs-13" style="margin-bottom:8px;">托管资金</div>'+
+      row('托管总额',fmt(o.amount))+
+      row('已释放给服务商',fmt(released),'var(--success)')+
+      row('监管账户在途',fmt(remain),'var(--primary-dim)')+
+      '<div class="fund-bar"><div class="fund-fill" style="width:'+relPct+'%;"></div></div>'+
+      '<div class="fund-scale"><span>已释放 '+relPct+'%</span><span>在途 '+(100-relPct)+'%</span></div>'+
+      '<div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">资金由持牌机构托管，按里程碑验收后释放；未成交全额退款，规避二清。</div></div>';
+  }
   /* 双方 */
   html+='<div class="card" style="margin-top:10px;">'+row('买方',uname(o.buyerId))+row('服务商',uname(o.sellerId)||'待接单')+row('创建时间',ftime(o.createdAt))+'</div>';
   /* 里程碑：垂直时间线 */
@@ -100,6 +134,8 @@ function render(){
 function row(k,v,c){return '<div class="fb-between" style="padding:5px 0;"><span class="text-2 fs-12">'+k+'</span><span class="fs-12 fw-600" style="'+(c?'color:'+c+';':'')+'">'+v+'</span></div>';}
 function actions(o,role){
   var b=[];
+  if(role==='buyer'&&o.state==='intent'){b.push(btn('primary','启动服务 · 托管全款','startSvc()'));b.push(btn('ghost','取消并退意向金','cancelIntent()'));}
+  if(role==='seller'&&o.state==='intent'){b.push(btn('primary','提醒买方启动','remindBuyer()'));b.push(btn('ghost','联系买方','contactBuyer()'));}
   if(role==='seller'&&o.state==='escrowed'){b.push(btn('primary','接单开始履约','accept()'));b.push(btn('ghost','拒单并退款','reject()'));}
   if(role==='buyer'&&o.state==='escrowed'){b.push(btn('primary','撤销并全额退款','refund()'));}
   if(role==='buyer'&&o.state==='await_confirm'){b.push(btn('primary','终验通过 · 结算','finalSettle()'));b.push(btn('ghost','发起纠纷','dispute()'));}
@@ -120,6 +156,26 @@ function actions(o,role){
 function btn(style,txt,on){return '<button class="btn btn-'+style+' od-cta-btn" onclick="'+on+'">'+txt+'</button>';}
 function reload(){render();}
 window.accept=function(){var r=Mediation.accept(id,uid);if(r.error)UI.toast(r.error,'warn');else{UI.toast('已接单，开始履约','ok');reload();}};
+window.startSvc=function(){
+  var o=Mediation.byId(id);if(!o)return;
+  var remain=Domain.round2(o.amount-o.intentAmount);
+  var avail=window.BalanceStore?BalanceStore.available():0;
+  if(avail<remain){UI.dialog({title:'余额不足',text:'启动服务需补足托管 '+fmt(remain)+'，钱包可用 '+fmt(avail)+'，请先充值。',ok:'去充值',onOk:function(){location.href='../wallet/recharge.html';}});return;}
+  UI.dialog({title:'启动服务 · 托管全款',text:'意向金 '+fmt(o.intentAmount)+' 将自动抵扣并转入托管，需再支付 '+fmt(remain)+' 完成全款托管。确认启动？',ok:'确认启动',onOk:function(){var r=Mediation.startService(id,'balance');if(r.error)UI.toast(r.error,'warn');else{UI.toast('服务已启动，全款已托管','ok');reload();}}});
+};
+window.cancelIntent=function(){UI.dialog({title:'取消并退意向金',text:'服务启动前取消，意向金 '+fmt(Mediation.byId(id).intentAmount)+' 将全额原路退还。确认？',ok:'确认取消',onOk:function(){var r=Mediation.cancelIntent(id,'启动前取消');if(r.error)UI.toast(r.error,'warn');else{UI.toast('已取消，意向金全额退还','ok');reload();}}});};
+/* WP7 服务商提醒买方启动服务 */
+window.remindBuyer=function(){
+  var o=Mediation.byId(id);
+  if(!o)return;
+  o._reminded=true;o._remindedAt=Date.now();o.updatedAt=Date.now();
+  Mediation._write(o);
+  UI.toast('已提醒买方启动服务，买方将收到通知','ok');
+  reload();
+};
+window.contactBuyer=function(){
+  UI.dialog({title:'联系买方',text:'买方联系方式将在服务启动后完整展示。当前可通过平台站内消息沟通，避免私下跳单风险。',ok:'我知道了'});
+};
 window.reject=function(){UI.dialog({title:'拒单退款',text:'拒单后托管资金将全额退回买方，确认？',ok:'确认拒单',onOk:function(){var r=Mediation.reject(id,'服务商无法承接');if(r.error)UI.toast(r.error,'warn');else{UI.toast('已拒单并全额退款','ok');reload();}}});};
 window.refund=function(){UI.dialog({title:'申请退款',text:'将按未履约部分退款，已释放部分不退。确认？',ok:'确认退款',onOk:function(){var r=Mediation.refund(id,'买方申请');if(r.error)UI.toast(r.error,'warn');else{UI.toast('退款已原路返回','ok');reload();}}});};
 window.deliver=function(idx){
@@ -201,6 +257,22 @@ render();
 .flow-dot.gray{background:var(--line);box-shadow:none;}
 
 @media (prefers-reduced-motion: reduce){.od-hero{animation:none;}.ms-node.ms-sub .ms-dot{animation:none;}}
+
+/* WP7 意向金解锁流程条 */
+.intent-flow{display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:8px;}
+.if-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;}
+.if-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.if-done .if-dot{background:var(--primary);color:#fff;}
+.if-todo .if-dot{background:var(--bg-card-2);color:var(--text-4);border:1px solid var(--line);}
+.if-label{font-size:10px;color:var(--text-3);white-space:nowrap;}
+.if-done .if-label{color:var(--primary-dim);font-weight:600;}
+.if-line{flex:1;height:2px;margin:0 4px;border-radius:1px;}
+.if-line.if-done{background:var(--primary);}
+.if-line.if-todo{background:var(--line);}
+.intent-warn{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:11px;line-height:1.6;}
+.intent-warn:not(.intent-warn-danger):not(.intent-warn-warn){background:var(--primary-soft);color:var(--primary-dim);}
+.intent-warn-warn{background:rgba(255,159,10,.1);color:#b86b00;border:1px solid rgba(255,159,10,.2);}
+.intent-warn-danger{background:rgba(255,69,58,.1);color:#d70015;border:1px solid rgba(255,69,58,.2);}
 </style>
 </body>
 </html>

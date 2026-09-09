@@ -19,22 +19,33 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="navbar" style="height:50px;">
     <button class="nav-back" onclick="history.back()">‹</button>
     <div class="nav-title">中介服务 · 在线下单</div>
-    <div class="nav-right"></div>
+    <div class="nav-right"><span class="mo-link" onclick="location.href='my-orders.html'">我的单</span></div>
   </div>
 
   <div class="scroll" style="padding-top:8px;padding-bottom:96px;">
-    <!-- A4 履约保障前置：下单页第一步先建立信任 -->
+    <!-- 下单流程指引：选服务商 → 确认金额 → 付意向金 -->
+    <div class="order-flow">
+      <div class="of-step of-on"><span class="of-dot">1</span><span class="of-t">选服务商</span></div>
+      <span class="of-line"></span>
+      <div class="of-step"><span class="of-dot">2</span><span class="of-t">确认金额</span></div>
+      <span class="of-line"></span>
+      <div class="of-step"><span class="of-dot">3</span><span class="of-t">付意向金</span></div>
+    </div>
+
+    <!-- A4 履约保障前置：下单页第一步先建立信任（意向金 + 托管两段） -->
     <div class="order-guard">
       <svg class="ic"><use href="#i-shield"/></svg>
-      <div class="og-meta"><b>持牌机构资金托管</b><span>未成交全额退款 · 验收后按里程碑释放给服务商</span></div>
+      <div class="og-meta"><b>意向金锁定合作 · 资金全程托管</b><span>意向金启动前可退 · 服务启动后托管全款，按里程碑释放给服务商</span></div>
     </div>
 
     <div class="section-title"><div class="st-left">选择服务商</div></div>
+    <div class="svc-summary" id="svc-summary" style="display:none;"></div>
     <div id="svc-sel"></div>
 
-    <div class="section-title" style="margin-top:14px;"><div class="st-left">托管金额</div><span class="more" id="quote-hint" style="display:none;"></span></div>
+    <div class="section-title" style="margin-top:14px;"><div class="st-left">意向金与托管</div><span class="more" id="quote-hint" style="display:none;"></span></div>
     <div class="card">
       <div class="quote-line" id="quote-line" style="display:none;"></div>
+      <div class="intent-line" id="intent-line" style="display:none;"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <span class="fs-13 text-2">¥</span>
         <input class="input" id="amt-input" type="number" inputmode="decimal" placeholder="输入服务金额" style="flex:1;">
@@ -42,16 +53,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="opt" id="amt-opts"></div>
       <div class="amt-show">
         <div class="mono fw-700" style="font-size:24px;color:var(--primary-dim);" id="amount-display">¥0</div>
-        <div class="text-3 fs-10.5" style="margin-top:3px;color:rgba(244,242,238,.6);">金额托管至持牌机构监管账户（非平台收入），可按实际工作量与方案协商</div>
+        <div class="text-3 fs-10.5" style="margin-top:3px;color:rgba(244,242,238,.6);">意向金用于锁定合作与机构档期（启动前可退）；服务启动后托管全款，按里程碑释放</div>
         <svg class="ic amt-shield" viewBox="0 0 24 24"><use href="#i-shield"/></svg>
       </div>
     </div>
 
     <div class="card" style="margin-top:12px;">
-      <div class="fw-600 fs-13" style="margin-bottom:8px;">托管金额</div>
-      <div class="cal-row"><span class="text-2 fs-12">服务金额（托管至监管账户）</span><span class="mono fw-700" id="cal-amount">¥0</span></div>
-      <div class="cal-row cal-row-last"><span class="text-2 fs-12">未成交 / 未使用权益</span><span class="mono fw-700" style="color:var(--success);">全额退款</span></div>
-      <div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">金额托管至持牌机构监管账户（非平台收入）；验收后按里程碑释放给服务商。</div>
+      <div class="fw-600 fs-13" style="margin-bottom:8px;">费用说明</div>
+      <div class="cal-row"><span class="text-2 fs-12">意向金（现付 · 启动前可退）</span><span class="mono fw-700" style="color:var(--primary-dim);" id="cal-intent">¥0</span></div>
+      <div class="cal-row"><span class="text-2 fs-12">服务金额（启动后托管至监管账户）</span><span class="mono fw-700" id="cal-amount">¥0</span></div>
+      <div class="cal-row cal-row-last"><span class="text-2 fs-12">服务启动前取消</span><span class="mono fw-700" style="color:var(--success);">意向金全额退还</span></div>
+      <div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">意向金金额按成交价约 20% 就近取档（¥100 / ¥500 / ¥800 / ¥5000），后台按业务类型可配；服务启动后全款托管至持牌机构监管账户（非平台收入），验收后按里程碑释放。</div>
     </div>
 
     <div class="card" style="margin-top:12px;" id="milestone-card">
@@ -59,17 +71,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div id="milestone-list"></div>
     </div>
 
-    <div class="section-title" style="margin-top:20px;"><div class="st-left">我的中介订单</div><span class="more" id="order-count">0</span></div>
-    <div id="order-list"><div class="card"><div class="text-3 fs-12">暂无订单</div></div></div>
   </div>
 
   <!-- 吸底结算栏 -->
   <div class="order-cta">
     <div class="oc-total">
-      <span class="oc-label">托管金额</span>
+      <span class="oc-label">意向金</span>
       <b class="mono" id="cta-amount">¥0</b>
     </div>
-    <button class="btn btn-primary btn-lg" id="pay-btn" style="flex:1;">确认支付并托管</button>
+    <button class="btn btn-primary btn-lg" id="pay-btn" style="flex:1;">支付意向金并确认合作</button>
   </div>
 </div>
 
@@ -123,6 +133,12 @@ if(svcId){
 if(!svc){svcIdx=Math.min(parseInt(params.get('svc')||'0',10)||0,SVCS.length-1);svc=SVCS[svcIdx];}
 var me=DataBus.current(),uid=me?me.id:'';
 
+var sumEl=document.getElementById('svc-summary');
+if(sumEl&&svc){
+  sumEl.style.display='flex';
+  sumEl.innerHTML='<span class="ss-ic"><svg class="ic"><use href="#i-check"/></svg></span>'+
+    '<span class="ss-meta"><b>为「'+svc.name+'」在线下单</b><span>'+svc.cats.join(' · ')+' · 金V 已核验 · 资金托管</span></span>';
+}else if(sumEl){sumEl.style.display='none';}
 document.getElementById('svc-sel').innerHTML=SVCS.map(function(s,i){
   var on=i===svcIdx;
   return '<div class="od-card'+(on?' on':'')+'" onclick="pickSvc('+i+')">'+
@@ -133,6 +149,9 @@ document.getElementById('svc-sel').innerHTML=SVCS.map(function(s,i){
     '<span class="od-score"><svg class="ic"><use href="#i-star"/></svg>'+s.score.toFixed(1)+'</span>'+
     '</div>';
 }).join('');
+if(!SVCS.length){
+  document.getElementById('svc-sel').innerHTML='<div class="card"><div class="text-3 fs-12">暂无可下单的服务，请稍后再试或返回服务广场挑选。</div><div style="margin-top:10px;"><a class="btn btn-primary btn-sm" href="index.html">返回服务广场</a></div></div>';
+}
 window.pickSvc=function(i){location.href='order.html?svc='+i;};
 
 var AMTS=[30000,60000,250000,600000,1200000];
@@ -172,9 +191,14 @@ amtInput.addEventListener('input',function(){var v=parseFloat(this.value)||0;cur
 
 function renderCalc(){
   var r=window.commissionRate(curAmt||0);
+  var intAmt=window.intentAmountOf?intentAmountOf(curAmt,svc&&svc.cats?svc.cats[0]:''):0;
   document.getElementById('amount-display').textContent=fmt(curAmt);
+  document.getElementById('cal-intent').textContent=fmt(intAmt);
   document.getElementById('cal-amount').textContent=fmt(curAmt);
-  document.getElementById('cta-amount').textContent=fmt(curAmt);
+  document.getElementById('cta-amount').textContent=fmt(intAmt);
+  var il=document.getElementById('intent-line');
+  if(il){il.style.display='flex';il.innerHTML='<span class="ql-k">意向金</span><span class="mono fw-700 ql-v" style="color:var(--primary-dim);">'+fmt(intAmt)+'</span>'+
+    '<span class="ql-note">约成交价 20% 就近取档（100/500/800/5000）· 启动前可退</span>';}
   var useMile=cm.milestone.enable&&curAmt>=cm.milestone.minAmount;
   document.getElementById('milestone-tag').textContent=useMile?'已启用 '+cm.milestone.nodes.length+' 节点':'<'+fmt(cm.milestone.minAmount)+' 一次性结算';
   document.getElementById('milestone-list').innerHTML=useMile
@@ -184,11 +208,11 @@ function renderCalc(){
           '<span class="mono fw-700 fs-12">'+fmt(Domain.round2(curAmt*n))+'</span></div>';
       }).join('')+'</div>'
     : '<div class="text-3 fs-12">金额低于 '+fmt(cm.milestone.minAmount)+'，一次性结算，验收后放款给服务商。</div>';
-  document.getElementById('pay-btn').textContent='确认支付并托管 '+fmt(curAmt);
+  document.getElementById('pay-btn').textContent='支付意向金 '+fmt(intAmt)+' 并确认合作';
 }
 renderAmtOpts();renderCalc();
 
-/* 支付：创建统一托管单 → 钱包/托管账户扣款（幂等），成功跳详情 */
+/* 支付：创建统一托管单 → 支付意向金（幂等），成功跳详情；服务启动后再补足托管 */
 var paying=false;
 document.getElementById('pay-btn').addEventListener('click',function(){
   if(paying)return;
@@ -196,44 +220,35 @@ document.getElementById('pay-btn').addEventListener('click',function(){
   if(acc.statusId==='guest'){location.href='../auth/login.html';return;}
   var amt=Domain.round2(curAmt||0);
   if(!(amt>0)){UI.toast('请输入有效金额','warn');return;}
+  /* WP5 毛利保护：下单金额不低于平台最低售价（配置为0时不启用） */
+  try {
+    var minFeeCfg=(window.MOCK&&MOCK.business&&MOCK.business.commission&&MOCK.business.commission.minServiceFee)||{};
+    var svcCat=svc&&svc.cats&&svc.cats[0]?svc.cats[0]:'';
+    var minFee=minFeeCfg[svcCat]!=null?Number(minFeeCfg[svcCat]):Number(minFeeCfg._default||0);
+    if(minFee>0&&amt<minFee){
+      UI.toast('服务金额不低于平台保护价 '+fmt(minFee),'warn');
+      return;
+    }
+  } catch(e) {}
+  var intAmt=window.intentAmountOf?intentAmountOf(amt,svc&&svc.cats?svc.cats[0]:''):0;
   var avail=window.BalanceStore?BalanceStore.available():0;
-  if(avail<amt){
-    UI.dialog({title:'余额不足',text:'托管需 '+fmt(amt)+'，钱包可用 '+fmt(avail)+'，请先充值。',ok:'去充值',onOk:function(){location.href='../wallet/recharge.html';}});
+  if(avail<intAmt){
+    UI.dialog({title:'余额不足',text:'支付意向金需 '+fmt(intAmt)+'，钱包可用 '+fmt(avail)+'，请先充值。',ok:'去充值',onOk:function(){location.href='../wallet/recharge.html';}});
     return;
   }
   paying=true;
   var r=commissionRate(amt);
   var o=Mediation.create({buyerId:uid,sellerId:svc.sellerId,svcId:svc.id,svcName:svc.name,category:svc.cats[0],amount:amt});
   if(o.error){paying=false;UI.toast(o.error,'warn');return;}
-  var paid=Mediation.pay(o.id,'balance');
+  var paid=Mediation.payIntent(o.id,'balance');
   paying=false;
-  if(paid.error){UI.toast('托管失败：'+paid.error,'warn');return;}
+  if(paid.error){UI.toast('意向金支付失败：'+paid.error,'warn');return;}
   FormStash.clear('agency_order_draft');
-  UI.toast('已托管 '+fmt(amt)+' 至监管账户，等待服务商接单','ok');
-  renderOrders();
+  UI.toast('意向金已付 '+fmt(intAmt)+'，服务启动前可全额退款','ok');
   setTimeout(function(){location.href='order-detail.html?id='+o.id;},700);
 });
 
-function stTxt(s){return Mediation.stateLabel(s);}
-var ST_COLOR={escrowed:'var(--primary-dim)',serving:'var(--blue)',settled:'var(--success)',refunded:'var(--text-3)',disputed:'var(--danger)'};
-function renderOrders(){
-  var list=Mediation.list({uid:uid,role:'buyer'});
-  document.getElementById('order-count').textContent=list.length+' 单';
-  if(!list.length){document.getElementById('order-list').innerHTML='<div class="card"><div class="text-3 fs-12">暂无订单</div></div>';return;}
-  document.getElementById('order-list').innerHTML=list.map(function(o){
-    var mm=Mediation.money(o);
-    var col=ST_COLOR[o.state]||'var(--text-2)';
-    return '<div class="od-card od-card-row" onclick="location.href=\'order-detail.html?id='+o.id+'\'">'+
-      '<div class="fb-between"><div class="fw-600 fs-13">'+o.svcName+'</div><span class="od-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">'+stTxt(o.state)+'</span></div>'+
-      '<div class="text-3 fs-11" style="margin-top:3px;">单号 '+o.id+' · 托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released)+'</div>'+
-      '<div class="fb-between" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);">'+
-      '<span class="text-2 fs-12">未结算 <b style="color:var(--primary-dim);">'+fmt(mm.escrowRemain)+'</b></span><span class="text-2 fs-12">验收通过后结算</span></div></div>';
-  }).join('');
-}
-window.renderOrders=renderOrders;
-renderOrders();
-if(params.get('mine')){setTimeout(function(){var el=document.getElementById('order-list');el&&el.scrollIntoView({behavior:'smooth'});},120);}
-window.addEventListener('engchain:mediation',renderOrders);
+/* 我的单已独立为 my-orders.html；本页仅承担「在线下单」，不再内嵌订单列表 */
 })();
 </script>
 <style>
@@ -279,6 +294,24 @@ window.addEventListener('engchain:mediation',renderOrders);
 .oc-label{font-size:10px;color:var(--text-3);}
 .oc-total b{font-size:19px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);}
 
+/* ===== 服务摘要条 ===== */
+.svc-summary{display:flex;align-items:center;gap:9px;border:1px solid color-mix(in srgb,var(--primary) 42%,transparent);background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 9%,var(--bg-card)),var(--bg-card));border-radius:14px;padding:10px 12px;margin-bottom:10px;}
+.ss-ic{width:28px;height:28px;border-radius:9px;background:var(--primary-soft);color:var(--primary-dim);flex:none;display:flex;align-items:center;justify-content:center;}
+.ss-ic svg{width:14px;height:14px;stroke-width:2;}
+.ss-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.ss-meta b{font-size:12.5px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ss-meta span{font-size:10.5px;color:var(--text-3);}
+
+/* ===== 下单流程指引 ===== */
+.order-flow{display:flex;align-items:flex-start;margin-bottom:14px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;}
+.of-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;}
+.of-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-3);background:var(--bg-card-2);border:1px solid var(--line);}
+.of-step.of-on .of-dot{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);border:none;box-shadow:0 3px 8px rgba(201,169,97,.35);}
+.of-t{font-size:9.5px;color:var(--text-3);white-space:nowrap;}
+.of-step.of-on .of-t{color:var(--primary-dim);font-weight:700;}
+.of-line{flex:1;height:1.5px;background:var(--line);margin:10px 6px 0;border-radius:2px;}
+.mo-link{font-size:12px;font-weight:600;color:var(--primary-dim);cursor:pointer;}
+
 /* ===== A4 履约保障前置条 ===== */
 .order-guard{display:flex;align-items:center;gap:10px;border:1px solid rgba(43,107,79,.22);background:linear-gradient(135deg,rgba(43,107,79,.08),rgba(43,107,79,.03));border-radius:14px;padding:11px 13px;margin-bottom:14px;}
 .order-guard .ic{width:20px;height:20px;flex:none;color:var(--success);stroke-width:1.8;}
@@ -287,7 +320,8 @@ window.addEventListener('engchain:mediation',renderOrders);
 .og-meta span{font-size:10.5px;color:var(--text-3);line-height:1.5;}
 
 /* ===== A3 报价来源行 ===== */
-.quote-line{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:11px;margin-bottom:10px;flex-wrap:wrap;}
+.quote-line,.intent-line{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:11px;margin-bottom:10px;flex-wrap:wrap;}
+.intent-line{border-color:color-mix(in srgb,var(--primary) 40%,transparent);background:color-mix(in srgb,var(--primary) 8%,var(--bg-card-2));}
 .ql-k{font-size:10.5px;color:var(--text-3);}
 .ql-v{font-size:14px;color:var(--primary-dim);}
 .ql-note{font-size:9.5px;color:var(--text-3);margin-left:auto;}

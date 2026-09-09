@@ -526,7 +526,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <option value="设备">设备</option>
                 <option value="劳务">劳务</option>
                 <option value="项目合作">项目合作</option>
-                <option value="中介服务">中介服务</option>
+                <option value="中介服务" data-side="supply" data-agency="1">中介服务</option>
                 <option value="资质招商" data-side="both">资质招商</option>
                 <option value="建企买卖" data-side="both">建企买卖</option>
                 <option value="招聘" data-side="demand">招聘</option>
@@ -988,21 +988,32 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   /* ===== 品类 × 角色联动：招聘仅需求侧、求职仅供应侧 ===== */
   function applyCategorySide() {
+    var isAgency = false;
+    try { isAgency = !!(window.entryAccess && entryAccess().agency); } catch (e) { isAgency = false; }
     var opts = fields.category.options;
     for (var i = 0; i < opts.length; i++) {
       var ds = opts[i].getAttribute('data-side');
-      opts[i].style.display = (ds && ds !== 'both' && ds !== role) ? 'none' : '';
+      var needAgency = opts[i].getAttribute('data-agency');
+      var hidden = (ds && ds !== 'both' && ds !== role);
+      if (needAgency && !isAgency) hidden = true;
+      opts[i].style.display = hidden ? 'none' : '';
     }
     document.querySelectorAll('#chips-category .chip').forEach(function (c) {
       var ds = c.getAttribute('data-side');
       c.style.display = (ds && ds !== 'both' && ds !== role) ? 'none' : '';
     });
-    // 若当前选中项在当前角色下不可用，回退到材料
+    var qfAgency = document.querySelector('.quick-fill-btn[data-demo="agency"]');
+    if (qfAgency) qfAgency.style.display = isAgency ? '' : 'none';
     var cur = fields.category.value, ok = false;
     for (var j = 0; j < opts.length; j++) {
       if (opts[j].value === cur && opts[j].style.display !== 'none') { ok = true; break; }
     }
-    if (!ok) { fields.category.value = '材料'; fields.category.dispatchEvent(new Event('change')); }
+    if (!ok) {
+      if (cur === '中介服务' && !isAgency) {
+        UI.toast('「中介服务」仅入驻中介服务企业可发布，已为您切换品类', 'warn');
+      }
+      fields.category.value = '材料'; fields.category.dispatchEvent(new Event('change'));
+    }
   }
 
   /* ===== 步骤切换 ===== */
@@ -1085,6 +1096,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       } else {
         if (!quiet && tq) { tq.classList.remove('error'); $('err-trade-qual-cat').classList.remove('show'); }
       }
+    }
+    // WP5 毛利保护：中介服务供应报价不低于平台最低售价（配置为0时不启用）
+    if (step === 2 && role === 'supply' && fields.category.value === '中介服务' && fields.price.value.trim()) {
+      try {
+        var minFeeCfg = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.minServiceFee) || {};
+        var subType = fields.sub.value.trim();
+        var minFee = minFeeCfg[subType] != null ? Number(minFeeCfg[subType]) : Number(minFeeCfg._default || 0);
+        var priceVal = parseFloat(fields.price.value);
+        if (minFee > 0 && !isNaN(priceVal) && priceVal < minFee) {
+          errors.push('price');
+          if (!quiet) {
+            fields.price.classList.add('error');
+            var pe = $('err-price');
+            if (pe) { pe.textContent = '中介服务报价不低于平台保护价 ¥' + minFee; pe.classList.add('show'); }
+            UI.toast('报价低于平台保护价 ¥' + minFee + '，请调整', 'warn');
+          }
+        }
+      } catch (e) {}
     }
     return errors;
   }
