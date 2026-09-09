@@ -432,6 +432,75 @@
     } catch (e) {}
   })();
 
+  /* ---- 服务广场·询盘线索（v3.2）：用户"免费咨询"留资即生成线索，服务商工作台可见 ----
+     字段：id / svcId / svcName / sellerId / buyerId / name / phone / serve(办理事项) / urge(紧急度)
+           note / status(new=新线索|contacted=已联系|dealt=已成交|invalid=无效) / createdAt ---- */
+  var LeadStore = makeStore('engchain-agency-leads', { items: [] }, 'engchain:lead');
+  LeadStore.create = function (input) {
+    var s = this.read();
+    var lead = Object.assign({
+      id: 'LD' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      svcId: input.svcId || '', svcName: input.svcName || '中介服务', sellerId: input.sellerId || 'u2',
+      buyerId: input.buyerId || '', name: input.name || '', phone: input.phone || '',
+      serve: input.serve || '', urge: input.urge || '', note: input.note || '',
+      status: 'new', createdAt: Date.now()
+    }, input);
+    s.items.unshift(lead);
+    this.write(s);
+    return lead;
+  };
+  LeadStore.list = function (opt) {
+    opt = opt || {};
+    var a = this.read().items.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
+    if (opt.sellerId) a = a.filter(function (l) { return l.sellerId === opt.sellerId; });
+    if (opt.svcId) a = a.filter(function (l) { return l.svcId === opt.svcId; });
+    if (opt.status) a = a.filter(function (l) { return l.status === opt.status; });
+    return a;
+  };
+  LeadStore.byId = function (id) {
+    var items = this.read().items, i;
+    for (i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  };
+  LeadStore.setStatus = function (id, status) {
+    var s = this.read();
+    var hit = null;
+    s.items.forEach(function (l) { if (l.id === id) { l.status = status; l.updatedAt = Date.now(); hit = l; } });
+    this.write(s);
+    return hit;
+  };
+  LeadStore.countBySvc = function (svcId) {
+    return this.list({ svcId: svcId }).length;
+  };
+  LeadStore.stats = function (sellerId) {
+    var all = this.list({ sellerId: sellerId });
+    return {
+      total: all.length,
+      fresh: all.filter(function (l) { return l.status === 'new'; }).length,
+      bySvc: (function () {
+        var m = {};
+        all.forEach(function (l) { m[l.svcId] = (m[l.svcId] || 0) + 1; });
+        return m;
+      })()
+    };
+  };
+
+  /* ---- 服务评价聚合（v3.2）：订单评价回流到服务卡片，形成口碑资产 ---- */
+  var SvcRatingStore = makeStore('engchain-svc-ratings', { items: {} }, 'engchain:svc-rating');
+  SvcRatingStore.add = function (svcId, score) {
+    var s = this.read();
+    var r = s.items[svcId] || { count: 0, sum: 0 };
+    r.count += 1; r.sum += (Number(score) || 0);
+    s.items[svcId] = r;
+    this.write(s);
+    return r;
+  };
+  SvcRatingStore.get = function (svcId) {
+    var r = this.read().items[svcId];
+    if (!r || !r.count) return null;
+    return { count: r.count, avg: Math.round((r.sum / r.count) * 10) / 10 };
+  };
+
   /* ---- 破冰期/成熟期模式（v1.2 §10.4；phase: breakin=破冰期 / normal=成熟期） ---- */
   var ModeStore = makeStore('engchain-mode', { phase: 'breakin' }, 'engchain:mode');
   ModeStore.isBreakIn = function () {
@@ -582,6 +651,8 @@
   window.MonitorStore = MonitorStore;
   window.FavoriteStore = FavoriteStore;
   window.SupplyStore = SupplyStore;
+  window.LeadStore = LeadStore;
+  window.SvcRatingStore = SvcRatingStore;
   window.ModeStore = ModeStore;
   /* 派生规则暴露给后台复用（规则同源：后台佣金试算/身份派生与 App 同一函数） */
   window.commissionRate = commissionRate;

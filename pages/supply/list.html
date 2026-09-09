@@ -19,6 +19,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .discover-seg .seg-item { flex: 0 0 auto; padding: 8px 14px; font-size: 13px; font-weight: 500; color: var(--text-2); border-bottom: 2px solid transparent; cursor: pointer; transition: color .2s, border-color .2s; white-space: nowrap; }
 .discover-seg .seg-item.active { color: var(--primary-dim); border-bottom-color: var(--primary); font-weight: 600; }
 
+/* 二级分类栏：横向滚动 chips */
+.discover-sub { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; gap: 6px; padding: 0 16px 10px; }
+.discover-sub::-webkit-scrollbar { display: none; }
+.sub-chip { flex: 0 0 auto; padding: 5px 13px; font-size: 11.5px; font-weight: 500; color: var(--text-2); background: var(--bg-card); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.sub-chip.on { color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-dim)); border-color: transparent; font-weight: 600; }
+
 /* 排序气泡弹窗 */
 .sort-popover { position: absolute; top: calc(100% + 6px); right: 0; background: var(--bg-card); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 100; overflow: hidden; min-width: 100px; animation: sort-pop-in .18s ease; }
 @keyframes sort-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
@@ -59,12 +65,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <!-- 一级分类：全部 / 找需求 / 找供应 / 找招商 / 找转让 / 找人才 -->
     <div class="discover-seg" id="discover-seg">
       <div class="seg-item active" data-t="all">全部</div>
-      <div class="seg-item" data-t="demand">找需求</div>
-      <div class="seg-item" data-t="supply">找供应</div>
-      <div class="seg-item" data-t="franchise">找招商</div>
-      <div class="seg-item" data-t="trade">找转让</div>
-      <div class="seg-item" data-t="talent">找人才</div>
+      <div class="seg-item" data-t="resource">资源</div>
+      <div class="seg-item" data-t="supply">供应</div>
+      <div class="seg-item" data-t="demand">需求</div>
+      <div class="seg-item" data-t="service">服务</div>
     </div>
+    <!-- 二级分类：资源/供应/需求/服务 各自的分项（全部+子类） -->
+    <div class="discover-sub" id="discover-sub" style="display:none;"></div>
   </div>
 
   <div class="scroll no-pad" style="padding-top:8px;padding-bottom:100px;">
@@ -123,6 +130,27 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
   /* 供需类通用筛选 */
   var MATCH_FILTERS = { category: ['全部'].concat(Object.keys(BIZ_MAP)), city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'], verified: ['全部', '已认证', '未认证'] };
+  /* 一级 tab 的二级分类（资源/供应/需求/服务） */
+  var SUBTABS = {
+    resource: [{ key: 'all', label: '全部' }, { key: 'franchise', label: '资质招商' }, { key: 'trade', label: '建企买卖' }, { key: 'personnel', label: '企业招聘' }, { key: 'talent', label: '人才求职' }],
+    supply: [{ key: 'all', label: '全部' }, { key: 'material', label: '材料' }, { key: 'equipment', label: '设备' }, { key: 'labor', label: '劳务' }, { key: 'cooperation', label: '项目合作' }, { key: 'agency', label: '中介服务' }],
+    demand: [{ key: 'all', label: '全部' }, { key: 'material', label: '材料' }, { key: 'equipment', label: '设备' }, { key: 'labor', label: '劳务' }, { key: 'cooperation', label: '项目合作' }, { key: 'agency', label: '中介服务' }],
+    service: [{ key: 'all', label: '全部' }, { key: '资质代办', label: '资质代办' }, { key: '工程担保', label: '工程担保' }, { key: '造价咨询', label: '造价咨询' }, { key: '企业服务', label: '企业服务' }]
+  };
+  /* 服务子类关键词匹配 */
+  var SERVICE_KEYS = {
+    '资质代办': ['资质', '代办', '升级', '安许', '新办', '延期', '分立'],
+    '工程担保': ['担保', '保函', '履约', '投标'],
+    '造价咨询': ['造价', '咨询', '结算', '审核', '审计'],
+    '企业服务': ['工商', '注册', '劳务', '招标', '代理', '服务']
+  };
+  function matchService(item, key) {
+    if (key === 'all') return true;
+    var hay = (item.sub || '') + ' ' + (item.title || '') + ' ' + (item.serveType || '');
+    var keys = SERVICE_KEYS[key] || [key];
+    for (var i = 0; i < keys.length; i++) if (hay.indexOf(keys[i]) >= 0) return true;
+    return false;
+  }
 
   function normSupplyItem(x) {
     var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
@@ -149,15 +177,37 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return out;
   }
 
-  /* ---- 一级分类切换 ---- */
+  /* ---- 一级分类切换 + 二级分类栏 ---- */
   var segs = document.querySelectorAll('.discover-seg .seg-item');
+  var subBar = document.getElementById('discover-sub');
+  var sub = 'all';
   function setSeg() {
     segs.forEach(function (el) { el.classList.toggle('active', el.dataset.t === type); });
   }
+  function renderSubs() {
+    var defs = SUBTABS[type];
+    if (!defs) { subBar.style.display = 'none'; sub = 'all'; return; }
+    subBar.style.display = '';
+    subBar.innerHTML = defs.map(function (d) {
+      return '<span class="sub-chip' + (sub === d.key ? ' on' : '') + '" data-k="' + d.key + '">' + d.label + '</span>';
+    }).join('');
+  }
+  subBar.addEventListener('click', function (e) {
+    var chip = e.target.closest ? e.target.closest('.sub-chip') : null;
+    if (!chip) return;
+    sub = chip.getAttribute('data-k');
+    renderSubs();
+    filterState = getDefaultFilter();
+    filterDraft = getDefaultFilter();
+    updateFilterBadge();
+    render();
+  });
   segs.forEach(function (el) {
     el.addEventListener('click', function () {
       type = el.dataset.t;
+      sub = 'all';
       setSeg();
+      renderSubs();
       /* 切换分类时重置筛选 */
       filterState = getDefaultFilter();
       filterDraft = getDefaultFilter();
@@ -198,7 +248,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var filterDraft = getDefaultFilter();
 
   function getFilterConfig() {
-    return RESOURCE_FILTERS[type] || MATCH_FILTERS;
+    if (type === 'resource' && sub !== 'all' && RESOURCE_FILTERS[sub]) return RESOURCE_FILTERS[sub];
+    if (type === 'service') return MATCH_FILTERS;
+    return MATCH_FILTERS;
   }
   function renderFilterGroups() {
     var cfg = getFilterConfig();
@@ -279,12 +331,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function render() {
     var list = mergedList();
 
-    /* 按一级分类筛选 */
-    if (type === 'demand' || type === 'supply') {
+    /* 按一级分类 + 二级分类筛选 */
+    if (type === 'resource') {
+      var RES_KEYS = ['franchise', 'trade', 'personnel', 'talent'];
+      list = list.filter(function (s) { return RES_KEYS.indexOf(s.bizKey) >= 0; });
+      if (sub !== 'all') list = list.filter(function (s) { return s.bizKey === sub; });
+    } else if (type === 'supply' || type === 'demand') {
       list = list.filter(function (s) { return s.dir === type; });
-    } else if (RESOURCE_BIZ[type]) {
-      /* 资源类：按 bizKey 筛选 */
-      list = list.filter(function (s) { return s.bizKey === RESOURCE_BIZ[type]; });
+      if (sub !== 'all') list = list.filter(function (s) { return s.bizKey === sub; });
+    } else if (type === 'service') {
+      list = list.filter(function (s) { return s.bizKey === 'agency'; });
+      list = list.filter(function (s) { return matchService(s, sub); });
     }
     /* type === 'all' 不筛选 */
 
@@ -323,6 +380,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   setSeg();
+  renderSubs();
   render();
   window.addEventListener('engchain:supply', function () { render(); });
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-supply') render(); });

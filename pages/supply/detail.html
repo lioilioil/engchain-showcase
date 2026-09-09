@@ -62,6 +62,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function () {
   window.__ROOT__ = '../../';
   var id = new URLSearchParams(location.search).get('id') || '1001';
+  /* from=market：服务广场来源 → CTA 变为「在线下单」（金额从报价带入） */
+  window.__AGENCY_MARKET__ = new URLSearchParams(location.search).get('from') === 'market';
   var rec = MOCK.listingById(id);
 
   /* P1.5：id 不在 catalog 但存在于 SupplyStore（用户发布/后台审核已上架条目）
@@ -72,8 +74,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var sup = SupplyStore.byId(id);
     if (sup) {
       var _isUser = (sup.source === 'user_publish' || sup.source === 'migrated_publish');
+      /* 重组件渲染器不兼容的四类用户条目 → 通用发布渲染器；其余保持原业务渲染器（行为不变） */
+      var _bk0 = sup.bizKey || _BIZ_MAP[sup.cat] || 'material';
+      /* 动态字段映射层：判断用户发布条目是否包含编辑器提交的业务结构化数据 */
+      var _hasRich = !!(sup.mat || sup.equip || sup.labor || sup.fc || sup.tradeDetail || sup.agencyDetail || sup.personnelDetail || sup.talentDetail || sup.coop);
+      /* 含结构化数据的用户条目走专业渲染器；无结构化数据的四类+缺serveType的中介仍降级为通用渲染器 */
+      var _bk = ((_isUser && (_bk0 === 'trade' || _bk0 === 'franchise' || _bk0 === 'personnel' || _bk0 === 'talent') && !_hasRich) || (_bk0 === 'agency' && !sup.serveType && !_hasRich)) ? 'publish' : _bk0;
       rec = Object.assign({}, sup, {
-        bizKey: sup.bizKey || _BIZ_MAP[sup.cat] || 'material',
+        bizKey: _bk,
         dir: sup.dir || sup.type || 'demand',
         title: sup.title || '',
         cat: sup.cat || sup.category || '',
@@ -106,7 +114,63 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         qualification: sup.qualification || '',
         requirement: sup.requirement || '',
         publisher: sup.publisher || '',
-        source: sup.source || ''
+        source: sup.source || '',
+        /* ===== 动态业务字段映射层 ===== */
+        /* 嵌套对象透传：material/equipment/labor/franchise 专业渲染器读取嵌套对象 */
+        mat: sup.mat || null,
+        equip: sup.equip || null,
+        labor: sup.labor || null,
+        fc: sup.fc || null,
+        /* 嵌套对象展开为扁平字段：cooperation/trade/agency/personnel/talent 专业渲染器读取扁平字段 */
+        coopModes: (sup.coop && sup.coop.coopModes) || sup.coopModes || [],
+        partnerQualReq: (sup.coop && sup.coop.partnerQualReq) || sup.partnerQualReq || '',
+        fundStatus: (sup.coop && sup.coop.fundStatus) || sup.fundStatus || '',
+        fundAmount: (sup.coop && sup.coop.fundAmount) || sup.fundAmount || '',
+        payment: (sup.coop && sup.coop.payment) || sup.payment || [],
+        riskExit: (sup.coop && sup.coop.riskExit) || sup.riskExit || [],
+        coopProcess: (sup.coop && sup.coop.coopProcess) || sup.coopProcess || [],
+        coopTimeline: (sup.coop && sup.coop.coopTimeline) || sup.coopTimeline || [],
+        projectInfo: (sup.coop && sup.coop.projectInfo) || (sup.personnelDetail && sup.personnelDetail.projectInfo) || sup.projectInfo || [],
+        /* trade 展开 */
+        staffConfig: (sup.tradeDetail && sup.tradeDetail.staffConfig) || (sup.fc && sup.fc.staffConfig) || sup.staffConfig || [],
+        qualPack: (sup.tradeDetail && sup.tradeDetail.qualPack) || (sup.fc && sup.fc.qualPack) || sup.qualPack || [],
+        dealTerms: (sup.tradeDetail && sup.tradeDetail.dealTerms) || sup.dealTerms || [],
+        finInfo: (sup.tradeDetail && sup.tradeDetail.finInfo) || sup.finInfo || [],
+        litigation: (sup.tradeDetail && sup.tradeDetail.litigation) || sup.litigation || '',
+        hiddenDebtCommitment: (sup.tradeDetail && sup.tradeDetail.commitment) || sup.hiddenDebtCommitment || '',
+        companyProfile: (sup.tradeDetail && sup.tradeDetail.companyProfile) || sup.companyProfile || [],
+        /* agency 展开 */
+        serveType: (sup.agencyDetail && sup.agencyDetail.serveType) || sup.serveType || [],
+        quote: (sup.agencyDetail && sup.agencyDetail.quote) || sup.quote || null,
+        serveProcess: (sup.agencyDetail && sup.agencyDetail.serveProcess) || sup.serveProcess || [],
+        requiredMaterials: (sup.agencyDetail && sup.agencyDetail.requiredMaterials) || sup.requiredMaterials || [],
+        staffPolicy: (sup.agencyDetail && sup.agencyDetail.staffPolicy) || sup.staffPolicy || [],
+        cases: (sup.agencyDetail && sup.agencyDetail.cases) || sup.cases || [],
+        refundPolicy: (sup.agencyDetail && sup.agencyDetail.refundPolicy) || sup.refundPolicy || '',
+        overdueClause: (sup.agencyDetail && sup.agencyDetail.overdueClause) || sup.overdueClause || '',
+        /* personnel 展开 */
+        jobDesc: (sup.personnelDetail && sup.personnelDetail.jobDesc) || sup.jobDesc || '',
+        salaryStructure: (sup.personnelDetail && sup.personnelDetail.salaryStructure) || sup.salaryStructure || [],
+        requirements: (sup.personnelDetail && sup.personnelDetail.requirements) || sup.requirements || [],
+        regContinuing: (sup.personnelDetail && sup.personnelDetail.regContinuing) || sup.regContinuing || [],
+        benefits: (sup.personnelDetail && sup.personnelDetail.benefits) || (sup.fc && sup.fc.benefits) || sup.benefits || [],
+        hireProcess: (sup.personnelDetail && sup.personnelDetail.hireProcess) || sup.hireProcess || [],
+        /* talent 展开 */
+        intent: (sup.talentDetail && sup.talentDetail.intent) || sup.intent || [],
+        certPack: (sup.talentDetail && sup.talentDetail.certPack) || sup.certPack || [],
+        expectedSalary: (sup.talentDetail && sup.talentDetail.expectedSalary) || sup.expectedSalary || '',
+        regStatus: (sup.talentDetail && sup.talentDetail.regStatus) || sup.regStatus || [],
+        socialSecurity: (sup.talentDetail && sup.talentDetail.socialSecurity) || sup.socialSecurity || [],
+        workHistory: (sup.talentDetail && sup.talentDetail.workHistory) || sup.workHistory || [],
+        projectExp: (sup.talentDetail && sup.talentDetail.projectExp) || sup.projectExp || [],
+        education: (sup.talentDetail && sup.talentDetail.education) || sup.education || [],
+        /* franchise 扁平字段兼容 */
+        companyInfo: (sup.fc && sup.fc.companyInfo) || sup.companyInfo || [],
+        coopTerms: (sup.fc && sup.fc.coopTerms) || sup.coopTerms || [],
+        feeStructure: (sup.fc && sup.fc.feeStructure) || sup.feeStructure || [],
+        joinProcess: (sup.fc && sup.fc.joinProcess) || sup.joinProcess || [],
+        /* 动态字段原始数据保留（用于调试和后续扩展） */
+        dynamic: sup.dynamic || null
       });
     }
   }
