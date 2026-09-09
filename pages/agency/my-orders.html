@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的单 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的单</div>
+    <div class="nav-right"><span class="mo-link" onclick="location.href='index.html'">去下单</span></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:40px;">
+    <!-- 状态筛选 -->
+    <div class="mo-filters" id="mo-filters">
+      <span class="chip on" data-f="all">全部</span>
+      <span class="chip" data-f="intent">待启动</span>
+      <span class="chip" data-f="active">进行中</span>
+      <span class="chip" data-f="settled">已完成</span>
+      <span class="chip" data-f="refunded">已退款</span>
+    </div>
+
+    <!-- 订单列表 -->
+    <div id="mo-list"><div class="card"><div class="text-3 fs-12">加载中…</div></div></div>
+
+    <!-- 说明条 -->
+    <div class="mo-note">在线下单的资金由持牌机构托管，按里程碑验收后释放给服务商；未成交全额退款。</div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:2});}
+function ftime(ts){if(!ts)return '—';var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+var me=DataBus.current(),uid=me?me.id:'';
+var ST_COLOR={draft:'var(--text-3)',intent:'var(--primary-dim)',escrowed:'var(--blue)',serving:'var(--blue)',await_confirm:'var(--primary-dim)',settled:'var(--success)',partial_refund:'var(--text-3)',refunded:'var(--text-3)',disputed:'var(--danger)',cancelled:'var(--text-3)'};
+var GROUPS=[
+  {f:'all',label:'全部',test:function(){return true;}},
+  {f:'intent',label:'待启动',test:function(o){return o.state==='intent';}},
+  {f:'active',label:'进行中',test:function(o){return ['draft','escrowed','serving','await_confirm','disputed'].indexOf(o.state)>=0;}},
+  {f:'settled',label:'已完成',test:function(o){return o.state==='settled';}},
+  {f:'refunded',label:'已退款',test:function(o){return ['refunded','partial_refund','cancelled'].indexOf(o.state)>=0;}}
+];
+var curF='all';
+function renderFilters(){
+  var el=document.getElementById('mo-filters');if(!el)return;
+  el.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.getAttribute('data-f')===curF);});
+}
+function subOf(o,mm){
+  if(o.state==='draft')return '草稿 · 未支付';
+  if(o.state==='intent'){
+    var s='意向金 '+fmt(o.intentAmount)+' · 待启动服务';
+    try{
+      var ist=Mediation.intentStatus(o.id);
+      if(ist){if(ist.willAutoCancel)s+=' · 即将自动退款';else if(ist.nearAutoCancel)s+=' · 超期'+ist.days+'天';}
+    }catch(e){}
+    return s;
+  }
+  if(o.state==='settled')return '已结算 · 合同额 '+fmt(o.amount);
+  if(o.state==='refunded'||o.state==='partial_refund'||o.state==='cancelled')return '退款 '+fmt((o.refund&&o.refund.amount)||o.intentAmount||0);
+  if(o.state==='disputed')return '平台介入中 · 合同额 '+fmt(o.amount);
+  return '托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released);
+}
+function render(){
+  try{ if(window.Mediation&&Mediation.checkIntentTimeout)Mediation.checkIntentTimeout(); }catch(e){}
+  var all=Mediation.list({uid:uid,role:'buyer'});
+  var g=GROUPS.filter(function(x){return x.f===curF;})[0]||GROUPS[0];
+  var list=all.filter(g.test);
+  var el=document.getElementById('mo-list');if(!el)return;
+  if(!all.length){el.innerHTML=emptyHtml(false);return;}
+  if(!list.length){el.innerHTML=emptyHtml(true);return;}
+  el.innerHTML=list.map(function(o){
+    var mm=Mediation.money(o);
+    var col=ST_COLOR[o.state]||'var(--text-2)';
+    return '<div class="mo-card" onclick="location.href=\'order-detail.html?id='+o.id+'\'">'+
+      '<div class="mo-top"><div class="mo-name">'+o.svcName+'</div>'+
+      '<span class="mo-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">'+Mediation.stateLabel(o.state)+'</span></div>'+
+      '<div class="mo-sub">'+subOf(o,mm)+'</div>'+
+      '<div class="mo-foot"><span class="mo-time">'+ftime(o.createdAt)+'</span><span class="mo-id">单号 '+o.id+'</span><span class="mo-go">›</span></div>'+
+      '</div>';
+  }).join('');
+}
+function emptyHtml(filtered){
+  return '<div class="mo-empty">'+
+    '<div class="me-ic2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>'+
+    '<div class="fw-700 fs-14" style="color:var(--text-1);">'+(filtered?'该状态下暂无订单':'还没有订单')+'</div>'+
+    '<div class="text-3 fs-12" style="margin-top:5px;line-height:1.7;">'+(filtered?'切换其他状态查看':'去服务广场挑选服务，在线下单后订单会出现在这里')+'</div>'+
+    '<a class="mo-cta" href="index.html">去服务广场逛逛 ›</a>'+
+    '</div>';
+}
+var filtersEl=document.getElementById('mo-filters');
+if(filtersEl)filtersEl.addEventListener('click',function(e){
+  var c=e.target&&e.target.closest?e.target.closest('.chip'):null;
+  if(!c)return;
+  curF=c.getAttribute('data-f');
+  renderFilters();render();
+});
+render();
+window.addEventListener('engchain:mediation',function(){render();});
+})();
+</script>
+<style>
+/* ===== 状态筛选 ===== */
+.mo-filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.mo-filters::-webkit-scrollbar{display:none;}
+.mo-filters .chip{flex:none;padding:6px 13px;border-radius:99px;font-size:11.5px;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:all var(--d-fast);}
+.mo-filters .chip:active{transform:scale(.95);}
+.mo-filters .chip.on{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);font-weight:600;}
+
+/* ===== 订单卡 ===== */
+.mo-card{display:block;border:1px solid var(--line);border-radius:16px;padding:13px 14px;background:var(--bg-card);margin-bottom:10px;cursor:pointer;box-shadow:var(--shadow-xs);transition:all var(--d-fast);animation:mo-in .4s var(--e-out) both;}
+@keyframes mo-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.mo-card:active{transform:scale(.985);border-color:var(--accent-line);}
+.mo-top{display:flex;align-items:center;gap:8px;}
+.mo-name{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mo-st{flex:none;font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:6px;border:1px solid;line-height:1.5;white-space:nowrap;}
+.mo-sub{font-size:11.5px;color:var(--text-2);margin-top:6px;line-height:1.5;}
+.mo-foot{display:flex;align-items:center;gap:10px;margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);}
+.mo-time{font-size:10.5px;color:var(--text-3);}
+.mo-id{flex:1;min-width:0;font-size:10px;color:var(--text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-num);}
+.mo-go{flex:none;font-size:13px;color:var(--primary-dim);}
+
+/* ===== 空态 ===== */
+.mo-empty{text-align:center;padding:32px 18px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-xs);}
+.me-ic2{width:46px;height:46px;margin:0 auto 10px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--bg-card-2);color:var(--text-3);}
+.me-ic2 svg{width:22px;height:22px;}
+.mo-cta{display:inline-block;margin-top:14px;font-size:12px;font-weight:600;color:var(--primary-dim);background:var(--primary-soft);border-radius:99px;padding:8px 16px;text-decoration:none;}
+
+/* ===== 说明条 ===== */
+.mo-note{font-size:10.5px;color:var(--text-3);line-height:1.7;text-align:center;margin-top:16px;padding:0 10px;}
+
+.mo-link{font-size:12px;font-weight:600;color:var(--primary-dim);cursor:pointer;}
+@media (prefers-reduced-motion: reduce){.mo-card{animation:none;}}
+</style>
+</body>
+</html>

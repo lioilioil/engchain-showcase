@@ -1044,7 +1044,13 @@ window.MOCK = (function () {
       deposit: { basic: 5000, engineering: 20000, high: 50000 },
       jumpContract: { warn: true, chatBlockDays: 7, secondChatBlockDays: 30, firstPenalty: 5000, firstSuspendDays: 15, secondClear: true },
       settleNote: '成交后 T+1 结算',
-      refundNote: '未成交全额退款'
+      refundNote: '未成交全额退款',
+      /* WP5 毛利保护/最低售价：按服务品类配置最低可售服务费，0=不启用（首期默认不启用） */
+      minServiceFee: { '资质代办': 0, '工商注册': 0, '税务筹划': 0, '工程担保': 0, '造价咨询': 0, '企业服务': 0, '_default': 0 },
+      /* WP7 意向金解锁深度对接：超时提醒与自动退款配置 */
+      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30 },
+      /* WP8 服务商增值付费：架构预留，首期不激活 */
+      vendorUpgrades: { topListing: { enabled: false, price: 0, label: '服务置顶' }, leadPack: { enabled: false, price: 0, label: '线索包' }, saasTools: { enabled: false, price: 0, label: '经营工具' } }
     },
     /* 企业关注/监控（P0-7.1） */
     monitor: {

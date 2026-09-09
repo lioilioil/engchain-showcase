@@ -501,6 +501,54 @@
     return { count: r.count, avg: Math.round((r.sum / r.count) * 10) / 10 };
   };
 
+  /* ---- 服务商信用分（v3.3 WP4）：评价均分 + 履约率，首期只展示不计权 ----
+     公式：基础分60 + 评价分(avg/5*20) + 履约率分(履约订单/总订单*20)，上限100
+     无订单/无评价时返回默认分80（新服务商起步分） */
+  function svcCreditOf(sellerId, svcId) {
+    var base = 60, ratingMax = 20, fulfillMax = 20, defaultScore = 80;
+    var ratingScore = 0, ratingInfo = null;
+    if (svcId) {
+      /* 单服务维度：直接查该服务的评价 */
+      var r = SvcRatingStore.get(svcId);
+      if (r && r.count > 0) { ratingScore = Math.min(ratingMax, (r.avg / 5) * ratingMax); ratingInfo = r; }
+    } else if (sellerId) {
+      /* 服务商综合维度：遍历该服务商所有订单关联的服务，聚合评价 */
+      try {
+        if (window.Mediation) {
+          var allOrders = Mediation.list({ uid: sellerId, role: 'seller' });
+          var svcIds = {};
+          allOrders.forEach(function (o) { if (o.svcId) svcIds[o.svcId] = true; });
+          var totalCount = 0, totalSum = 0;
+          Object.keys(svcIds).forEach(function (sid) {
+            var sr = SvcRatingStore.get(sid);
+            if (sr && sr.count > 0) { totalCount += sr.count; totalSum += sr.sum; }
+          });
+          if (totalCount > 0) {
+            var avg = Math.round((totalSum / totalCount) * 10) / 10;
+            ratingScore = Math.min(ratingMax, (avg / 5) * ratingMax);
+            ratingInfo = { count: totalCount, avg: avg };
+          }
+        }
+      } catch (e) {}
+    }
+    var fulfillScore = 0, totalOrders = 0, fulfillRate = null;
+    try {
+      if (window.Mediation && sellerId) {
+        var orders = Mediation.list({ uid: sellerId, role: 'seller' });
+        totalOrders = orders.length;
+        if (totalOrders > 0) {
+          var bad = orders.filter(function (o) { return o.state === 'disputed' || o.state === 'refunded' || o.state === 'partial_refund'; }).length;
+          fulfillRate = Math.round(((totalOrders - bad) / totalOrders) * 100);
+          fulfillScore = Math.min(fulfillMax, ((totalOrders - bad) / totalOrders) * fulfillMax);
+        }
+      }
+    } catch (e) {}
+    if (ratingScore === 0 && totalOrders === 0) return { score: defaultScore, rating: null, fulfillRate: null, totalOrders: 0, level: '新入驻' };
+    var score = Math.round(Math.min(100, base + ratingScore + fulfillScore));
+    var level = score >= 95 ? '金牌' : (score >= 85 ? '银牌' : (score >= 70 ? '铜牌' : '观察'));
+    return { score: score, rating: ratingInfo, fulfillRate: fulfillRate, totalOrders: totalOrders, level: level };
+  }
+
   /* ---- 破冰期/成熟期模式（v1.2 §10.4；phase: breakin=破冰期 / normal=成熟期） ---- */
   var ModeStore = makeStore('engchain-mode', { phase: 'breakin' }, 'engchain:mode');
   ModeStore.isBreakIn = function () {
@@ -660,4 +708,5 @@
   window.deriveIdentity = deriveIdentity;
   window.creditDiscount = creditDiscount;
   window.entryAccess = entryAccess;
+  window.svcCreditOf = svcCreditOf;
 })();

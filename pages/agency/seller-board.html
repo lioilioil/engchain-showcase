@@ -29,6 +29,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="kpi-tile kp-green" id="k-income-tile" style="cursor:pointer;"><span class="kp-ic"><svg class="ic"><use href="#i-wallet"/></svg></span><span class="kp-label">累计净收入 · 点开明细</span><b class="mono green" id="k-income">¥0</b></div>
     </div>
 
+    <!-- WP4 服务商信用分卡片：首期只展示不计权 -->
+    <div class="card credit-card" id="credit-card" style="margin-bottom:12px;display:none;">
+      <div class="credit-head">
+        <span class="credit-ic"><svg class="ic"><use href="#i-star"/></svg></span>
+        <div class="credit-info">
+          <div class="credit-title">服务商信用 <span class="credit-level" id="cr-level">—</span></div>
+          <div class="credit-sub" id="cr-sub">基于评价与履约数据计算</div>
+        </div>
+        <div class="credit-score mono" id="cr-score">—</div>
+      </div>
+      <div class="credit-meta">
+        <span id="cr-rating">暂无评价</span>
+        <span class="dot-sep"></span>
+        <span id="cr-fulfill">履约率 —</span>
+        <span class="dot-sep"></span>
+        <span id="cr-orders">0 单</span>
+      </div>
+    </div>
+
     <!-- B1 询盘线索：买家从服务详情"免费咨询"留资后汇聚于此 -->
     <div class="card lead-card" style="margin-bottom:12px;">
       <div class="lead-head">
@@ -41,6 +60,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <!-- 保证金 -->
     <div class="card" id="deposit-card" style="margin-bottom:12px;"></div>
+    <!-- WP8 增值付费入口位（架构预留，首期敬请期待） -->
+    <div class="card upgrade-card" onclick="showUpgradeSoon()" style="margin-bottom:12px;cursor:pointer;">
+      <div class="up-head">
+        <span class="up-ic"><svg class="ic"><use href="#i-star"/></svg></span>
+        <div class="up-info">
+          <div class="up-title">推广增值 <span class="up-badge">敬请期待</span></div>
+          <div class="up-sub">服务置顶 / 线索包 / 经营工具，助力获客增长</div>
+        </div>
+        <span class="up-arrow">›</span>
+      </div>
+    </div>
     <!-- 我的服务（合作方经营橱窗） -->
     <div class="ms-head">
       <span class="fw-600 fs-13">我的服务</span>
@@ -85,10 +115,10 @@ if(!acc.agency){
   return;
 }
 var me=DataBus.current(),uid=me?me.id:'';
-var TABS=[{k:'',label:'全部'},{k:'escrowed',label:'待接单'},{k:'serving',label:'履约中'},{k:'await_confirm',label:'待验收'},{k:'settled',label:'已结算'},{k:'refunded',label:'已退款'},{k:'disputed',label:'纠纷中'}];
+var TABS=[{k:'',label:'全部'},{k:'intent',label:'意向金'},{k:'escrowed',label:'待接单'},{k:'serving',label:'履约中'},{k:'await_confirm',label:'待验收'},{k:'settled',label:'已结算'},{k:'refunded',label:'已退款'},{k:'disputed',label:'纠纷中'}];
 var cur='';
 function bname(x){var u=DataBus.byId(x);return u?(u.name||x):x;}
-var ST_COLOR={escrowed:'var(--primary-dim)',serving:'var(--blue)',await_confirm:'var(--warning)',settled:'var(--success)',refunded:'var(--text-3)',disputed:'var(--danger)'};
+var ST_COLOR={intent:'var(--primary-dim)',escrowed:'var(--primary-dim)',serving:'var(--blue)',await_confirm:'var(--warning)',settled:'var(--success)',refunded:'var(--text-3)',disputed:'var(--danger)'};
 function fmtTime(ts){
   if(!ts)return'';
   var d=new Date(ts),n=new Date();
@@ -182,11 +212,26 @@ function renderList(){
   document.getElementById('list').innerHTML=a.map(function(o){
     var mm=Mediation.money(o),net=Domain.round2(mm.released-mm.feeReleased);
     var col=ST_COLOR[o.state]||'var(--text-2)';
+    /* WP7 intent 订单超时标识 */
+    var intentTag='';
+    if(o.state==='intent'){
+      try{
+        var ist=window.Mediation&&Mediation.intentStatus?Mediation.intentStatus(o.id):null;
+        if(ist){
+          if(ist.willAutoCancel) intentTag='<span style="color:#d70015;font-size:10px;font-weight:700;">· 即将自动退款</span>';
+          else if(ist.nearAutoCancel) intentTag='<span style="color:#b86b00;font-size:10px;font-weight:700;">· 超期'+ist.days+'天</span>';
+          else if(ist.isReminded) intentTag='<span style="color:var(--primary-dim);font-size:10px;">· 已提醒</span>';
+        }
+      }catch(e){}
+    }
+    var foot=o.state==='intent'
+      ? '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span class="text-2 fs-12">意向金已付 · 待买方启动'+intentTag+'</span><b class="green fs-12 mono">'+fmt(o.intentAmount)+'</b></div>'
+      : '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span class="text-2 fs-12">已结净额</span><b class="green fs-12 mono">'+fmt(net)+'</b></div>';
     return '<div class="od" onclick="location.href=\'order-detail.html?id='+o.id+'\'">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div class="fw-600 fs-13 od-name">'+o.svcName+'</div>'+
       '<span class="od-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);"><i style="background:'+col+';"></i>'+Mediation.stateLabel(o.state)+'</span></div>'+
-      '<div class="text-3 fs-11" style="margin-top:4px;">买方 '+bname(o.buyerId)+' · 托管 '+fmt(o.amount)+'</div>'+
-      '<div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span class="text-2 fs-12">已结净额</span><b class="green fs-12 mono">'+fmt(net)+'</b></div></div>';
+      '<div class="text-3 fs-11" style="margin-top:4px;">买方 '+bname(o.buyerId)+' · '+(o.state==='intent'?'意向金 '+fmt(o.intentAmount)+' · 合同额 '+fmt(o.amount):'托管 '+fmt(o.amount))+'</div>'+
+      foot+'</div>';
   }).join('');
 }
 /* ---- 我的服务：该中介企业发布的供应（服务广场同源） ---- */
@@ -222,7 +267,13 @@ function renderMyServices(){
 window.takeDown=function(id){
   UI.dialog({title:'下架服务',text:'下架后将从服务广场移除，编辑后可重新发布。',ok:'下架',cancel:'取消',onOk:function(){SupplyStore.remove(id);UI.toast('已下架','ok');renderMyServices();}});
 };
+/* WP8 增值付费：首期敬请期待 */
+window.showUpgradeSoon=function(){
+  if(window.UI&&UI.dialog)UI.dialog({title:'推广增值 · 即将上线',text:'服务置顶、精准线索包、经营数据分析工具等增值能力正在建设中，上线后将第一时间通知您。',ok:'我知道了'});
+};
 function renderKpi(){
+  /* WP7 页面加载时检查意向金超时 */
+  try{ if(window.Mediation&&Mediation.checkIntentTimeout)Mediation.checkIntentTimeout(); }catch(e){}
   var all=Mediation.list({uid:uid,role:'seller'});
   var todo=all.filter(function(o){return o.state==='escrowed';}).length;
   var doing=all.filter(function(o){return ['serving','await_confirm'].indexOf(o.state)>=0;}).length;
@@ -241,6 +292,21 @@ function renderKpi(){
       '<div class="dep-tier dep-high"><span class="dt-name">高风险</span><span class="dt-amt mono">'+fmt(dep.high)+'</span></div>'+
     '</div>'+
     '<div class="dep-note">保证金独立托管，无违规解约时原路退还；私下跳单将按防跳单规则扣罚。</div>';
+  /* WP4 服务商信用分：基于当前用户的评价与履约数据 */
+  try {
+    if (window.svcCreditOf) {
+      var cr = svcCreditOf(uid, null);
+      var cc = document.getElementById('credit-card');
+      if (cc && cr) {
+        cc.style.display = '';
+        document.getElementById('cr-score').textContent = cr.score;
+        document.getElementById('cr-level').textContent = cr.level;
+        document.getElementById('cr-rating').textContent = cr.rating ? ('好评 ' + cr.rating.count + ' · ' + cr.rating.avg + '分') : '暂无评价';
+        document.getElementById('cr-fulfill').textContent = cr.fulfillRate != null ? ('履约率 ' + cr.fulfillRate + '%') : '履约率 —';
+        document.getElementById('cr-orders').textContent = cr.totalOrders + ' 单';
+      }
+    }
+  } catch (e) {}
 }
 renderTabs();renderList();renderKpi();renderMyServices();renderLeads();
 var kt=document.getElementById('k-income-tile');
@@ -342,6 +408,29 @@ window.addEventListener('engchain:lead',function(){renderLeads();});
 .onb-t{display:flex;flex-direction:column;gap:1px;}
 .onb-t b{font-size:11.5px;font-weight:600;color:var(--text-1);}
 .onb-t em{font-style:normal;font-size:10px;color:var(--text-3);line-height:1.5;}
+
+.credit-card{padding:14px 16px;}
+.credit-head{display:flex;align-items:center;gap:12px;}
+.credit-ic{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft));display:flex;align-items:center;justify-content:center;flex:none;}
+.credit-ic svg{width:20px;height:20px;color:var(--primary-dim);}
+.credit-info{flex:1;min-width:0;}
+.credit-title{font-size:14px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:8px;}
+.credit-level{font-size:10px;font-weight:700;color:var(--primary-strong);background:rgba(201,169,97,.1);border:1px solid rgba(201,169,97,.3);border-radius:99px;padding:2px 8px;}
+.credit-sub{font-size:11px;color:var(--text-3);margin-top:2px;}
+.credit-score{font-size:28px;font-weight:800;color:var(--primary);line-height:1;}
+.credit-meta{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--text-3);}
+.credit-meta .dot-sep{width:3px;height:3px;border-radius:50%;background:var(--text-4);}
+
+.upgrade-card{padding:14px 16px;transition:transform .2s,border-color .2s;}
+.upgrade-card:active{transform:scale(.98);}
+.up-head{display:flex;align-items:center;gap:12px;}
+.up-ic{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,rgba(201,169,97,.15),rgba(201,169,97,.05));display:flex;align-items:center;justify-content:center;flex:none;}
+.up-ic svg{width:20px;height:20px;color:var(--primary-dim);}
+.up-info{flex:1;min-width:0;}
+.up-title{font-size:14px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:8px;}
+.up-badge{font-size:9px;font-weight:700;color:var(--primary-strong);background:rgba(201,169,97,.1);border:1px solid rgba(201,169,97,.3);border-radius:99px;padding:2px 7px;}
+.up-sub{font-size:11px;color:var(--text-3);margin-top:2px;}
+.up-arrow{font-size:20px;color:var(--text-4);flex:none;}
 </style>
 </body>
 </html>

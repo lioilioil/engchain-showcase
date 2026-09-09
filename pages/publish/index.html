@@ -107,7 +107,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <p class="workbench-sub">管理发布、草稿与正在发生的对接机会</p>
       <div class="wb-actions">
         <a class="wb-action" href="editor.html?role=demand"><div class="wb-action-ic"><svg class="ic"><use href="#i-search"/></svg></div><div><strong>发布需求</strong><span>寻找供应与服务</span></div></a>
-        <a class="wb-action" href="editor.html?role=supply"><div class="wb-action-ic"><svg class="ic"><use href="#i-upload"/></svg></div><div><strong>发布供应</strong><span>展示资源与能力</span></div></a>
+        <a class="wb-action" id="wb-supply" href="editor.html?role=supply"><div class="wb-action-ic"><svg class="ic"><use href="#i-upload"/></svg></div><div><strong>发布供应</strong><span>展示资源与能力</span></div></a>
       </div>
     </section>
     <section class="wb-section" aria-labelledby="wb-overview-title">
@@ -157,6 +157,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return true;
   }
   if (!checkPublishAuth()) return;
+
+  /* 发布供应防呆：非入驻中介企业提示「中介服务需入驻」 */
+  (function () {
+    var isAgency = false;
+    try { isAgency = !!(window.entryAccess && entryAccess().agency); } catch (e) {}
+    if (isAgency) return;
+    var btn = document.getElementById('wb-supply');
+    if (!btn) return;
+    var sub = btn.querySelector('span');
+    if (sub) sub.innerHTML = '展示资源与能力 <em style="font-style:normal;color:var(--warning);font-size:9.5px;display:block;margin-top:1px;">中介服务需入驻中介企业</em>';
+  })();
 
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function unlockCount() { try { return Object.keys(JSON.parse(localStorage.getItem('engchain-unlocked') || '{}')).length; } catch (e) { return 0; } }
