@@ -290,6 +290,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .es-btn-primary:active { transform:scale(.97); }
   .es-btn-outline { background:transparent; color:var(--primary-dim); border:1px solid var(--primary); }
   .es-btn-outline:active { background:var(--primary-soft); }
+
+  /* 交叉导流卡片 */
+  .cross-sell-card { display:flex; align-items:center; gap:12px; margin:12px 16px 0; padding:14px 16px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(135deg,var(--bg-card),var(--bg-card-2)); cursor:pointer; transition:transform .2s,border-color .2s; }
+  .cross-sell-card:active { transform:scale(.98); }
+  .cross-sell-card:hover { border-color:var(--primary); }
+  .cs-icon { flex:none; width:40px; height:40px; border-radius:11px; background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft)); display:flex; align-items:center; justify-content:center; }
+  .cs-icon svg { width:20px; height:20px; color:var(--primary-dim); }
+  .cs-body { flex:1; min-width:0; }
+  .cs-title { font-size:13.5px; font-weight:700; color:var(--text-1); line-height:1.4; }
+  .cs-sub { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.5; }
+  .cs-arrow { flex:none; color:var(--text-4); }
+  .cs-arrow svg { width:18px; height:18px; }
 </style>
 </head>
 <body>
@@ -349,6 +361,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <!-- 加载更多 -->
     <button type="button" class="load-more" id="loadMore" style="display:none;">加载更多 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg></button>
+
+    <!-- 交叉导流：人员招聘 -> 服务广场（劳务派遣/猎头/人员配置） -->
+    <div class="cross-sell-card" onclick="location.href='../agency/index.html?scene=personnel'">
+      <div class="cs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="cs-body">
+        <div class="cs-title">需要劳务派遣 / 猎头 / 人员配置？</div>
+        <div class="cs-sub">入驻中介服务商一对一服务，资金托管 / 未成交退款</div>
+      </div>
+      <div class="cs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></div>
+    </div>
 
     <!-- 最小高度占位 -->
     <div id="listSpacer"></div>
@@ -445,6 +467,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/delegates.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -1035,14 +1058,43 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   document.getElementById('exclusiveCancel').addEventListener('click', closeExclusiveConfirm);
   document.getElementById('exclusiveOk').addEventListener('click', function () {
     closeExclusiveConfirm();
+    try {
+      var ac = Delegates.authContact();
+      Delegates.add({
+        biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
+        type: '专享委托', qualLevel: '', mode: '', budget: '',
+        region: { province: '', city: '', text: '全国' },
+        contact: ac.name, phone: ac.phone, backup: '', note: '',
+        status: '等待承接'
+      });
+    } catch (e) {}
     UI.toast('已提交专享委托，顾问将在2小时内联系您', 'ok');
   });
+  /* 暴露给页面内联入口（空态/页脚按钮使用） */
+  window.openDelegate = openDelegate;
+  window.openExclusiveConfirm = openExclusiveConfirm;
   document.getElementById('dmSubmit').addEventListener('click', function () {
     var name = document.getElementById('dmName').value.trim();
     var phone = document.getElementById('dmPhone').value.trim();
     if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
     if (!phone) { UI.toast('请输入您的手机号', 'warn'); return; }
     if (!/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
+    /* 归属统一委托库：记录本次委托（招聘需求 / 委托顾问） */
+    try {
+      var certs = Array.prototype.map.call(document.querySelectorAll('#dmCertTags .dm-tag.selected'), function (t) { return t.dataset.val; });
+      var salaryEl = document.querySelector('#dmSalaryTags .dm-tag.selected');
+      var remark = document.getElementById('dmRemark') ? document.getElementById('dmRemark').value.trim() : '';
+      Delegates.add({
+        biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
+        type: currentTab === 'enterprise' ? '招聘需求' : '委托顾问',
+        qualLevel: '', mode: '', budget: '',
+        region: { province: '', city: '', text: '全国' },
+        contact: name, phone: phone, backup: '',
+        certTypes: certs, salary: salaryEl ? salaryEl.dataset.val : '',
+        note: remark || (certs.length ? '证书/资质：' + certs.join('、') : ''),
+        status: '等待承接'
+      });
+    } catch (e) {}
     /* 提交成功动画 */
     var modal = document.getElementById('delegateModal');
     var form = document.getElementById('dmForm');

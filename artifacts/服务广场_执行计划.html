@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务广场 · 系统内多业务线并行 · 执行计划 · Engchain 3.0</title>
+<style>
+  :root{
+    --bg:#F5F2EA; --card:#FFFFFF; --card2:#FBF7EE; --line:#E7E0D0; --line2:#D8CEB8;
+    --ink:#1F2429; --ink2:#5B6159; --ink3:#8B8F86;
+    --gold:#8A6A2E; --gold2:#C9A961; --gold3:#E8D5A3; --gold-soft:#F6EDD8;
+    --dark:#252C35; --dark2:#151A22; --dark-ink:#F4F2EE; --dark-ink2:rgba(244,242,238,.62);
+    --green:#2B6B4F; --green-soft:#E9F2EC;
+    --blue:#2563EB; --blue-soft:#EAF0F8;
+    --red:#B33A2E; --red-soft:#F8ECEA;
+    --purple:#7A5C9E; --purple-soft:#F0EBF6;
+    --shadow:0 10px 28px -14px rgba(40,36,28,.25);
+    --r:16px;
+    --font:-apple-system,'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+    --mono:'SF Mono','Cascadia Code',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;font-size:15px;}
+  .wrap{max-width:1020px;margin:0 auto;padding:34px 20px 80px;}
+
+  .cover{background:linear-gradient(150deg,#252C35 0%,#151A22 55%,#0B0E13 100%);border-radius:24px;padding:36px 32px 30px;color:var(--dark-ink);position:relative;overflow:hidden;margin-bottom:18px;}
+  .cover::before{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,.20),transparent 66%);}
+  .cover::after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);}
+  .cover-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.18em;color:var(--gold2);text-transform:uppercase;}
+  .cover-tag::before{content:"";width:22px;height:1px;background:var(--gold2);opacity:.7;}
+  .cover h1{font-size:29px;font-weight:800;line-height:1.28;margin:14px 0 10px;letter-spacing:-.01em;}
+  .cover h1 em{font-style:normal;color:var(--gold2);}
+  .cover-sub{font-size:14px;color:var(--dark-ink2);max-width:680px;line-height:1.8;}
+  .cover-sub b{color:var(--dark-ink);}
+  .cover-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;}
+  .cm{font-size:11.5px;color:var(--dark-ink2);border:1px solid rgba(244,242,238,.16);border-radius:99px;padding:5px 13px;background:rgba(244,242,238,.04);}
+  .cm b{color:var(--dark-ink);font-weight:700;}
+
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px 28px;margin-bottom:18px;box-shadow:var(--shadow);}
+  .sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;}
+  .sec-no{flex:none;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#2A1810;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;font-family:var(--mono);box-shadow:0 6px 16px -8px rgba(201,169,97,.8);}
+  .sec-title{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.3;}
+  .sec-title small{display:block;font-size:12.5px;font-weight:500;color:var(--ink3);margin-top:3px;letter-spacing:0;}
+  .sec h4{font-size:15px;font-weight:800;margin:22px 0 10px;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .sec h4::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--gold2);flex:none;}
+  .sec p{color:var(--ink2);font-size:14px;margin-bottom:10px;}
+  .sec p b{color:var(--ink);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;}
+  th{background:var(--dark);color:var(--dark-ink);font-weight:700;text-align:left;padding:10px 12px;font-size:12.5px;white-space:nowrap;}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--card2);}
+  td b{color:var(--ink);}
+  .t-gold th{background:linear-gradient(135deg,#8A6A2E,#6B5326);}
+  .t-dark th{background:var(--dark2);}
+
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:3px 10px;margin:2px 3px 2px 0;white-space:nowrap;}
+  .tag-ok{background:var(--green-soft);color:var(--green);border:1px solid #C9E0D2;}
+  .tag-fix{background:var(--red-soft);color:var(--red);border:1px solid #EBC9C4;}
+  .tag-new{background:var(--blue-soft);color:var(--blue);border:1px solid #C9D9F2;}
+  .tag-wait{background:#F1F0EC;color:var(--ink3);border:1px solid var(--line);}
+  .tag-gold{background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold3);}
+
+  .grid{display:grid;gap:12px;}
+  .g2{grid-template-columns:repeat(2,1fr);}
+  .box{border:1px solid var(--line);border-radius:14px;padding:14px 15px;background:var(--card);}
+  .box.b-dark{background:linear-gradient(150deg,#252C35,#151A22);border-color:transparent;color:var(--dark-ink);}
+  .box.b-dark .bt{color:var(--gold2);}
+  .box.b-dark .bd{color:var(--dark-ink2);}
+  .box.b-dark .bd b{color:var(--dark-ink);}
+  .bt{font-size:13px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+  .bd{font-size:12.5px;color:var(--ink2);line-height:1.75;}
+
+  .note{background:var(--gold-soft);border:1px solid var(--gold3);border-radius:12px;padding:12px 15px;font-size:12.5px;color:#5C4A22;line-height:1.75;margin:12px 0;}
+  .note b{color:#4A3A16;}
+  .note.n-red{background:var(--red-soft);border-color:#EBC9C4;color:#7A2E25;}
+  .note.n-green{background:var(--green-soft);border-color:#C9E0D2;color:#24543D;}
+  .note.n-blue{background:var(--blue-soft);border-color:#C9D9F2;color:#24406F;}
+
+  /* 工作包卡片 */
+  .wp{border:1px solid var(--line);border-radius:16px;margin:14px 0;overflow:hidden;background:var(--card);}
+  .wp-head{display:flex;align-items:center;gap:12px;padding:15px 18px;background:linear-gradient(150deg,var(--dark),var(--dark2));color:var(--dark-ink);}
+  .wp-no{flex:none;font-family:var(--mono);font-weight:800;font-size:14px;color:var(--gold2);}
+  .wp-title{font-size:15px;font-weight:800;flex:1;}
+  .wp-head .tag{margin:0;}
+  .wp-body{padding:16px 18px;}
+  .wp-sec{margin:10px 0;}
+  .wp-sec-t{font-size:12px;font-weight:800;color:var(--gold);letter-spacing:.04em;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .wp-sec-t::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--gold2);}
+  .wp-sec p{font-size:13px;color:var(--ink2);line-height:1.8;margin-bottom:6px;}
+  .wp-sec p b{color:var(--ink);}
+  .wp-sec p .mono{font-family:var(--mono);font-weight:600;color:var(--gold);font-size:12px;background:var(--gold-soft);padding:1px 6px;border-radius:6px;}
+  .wp-sec ul{list-style:none;margin:4px 0;}
+  .wp-sec li{font-size:13px;color:var(--ink2);padding:3px 0 3px 18px;position:relative;line-height:1.7;}
+  .wp-sec li::before{content:"";position:absolute;left:2px;top:11px;width:5px;height:5px;border-radius:50%;background:var(--gold2);}
+  .wp-sec li b{color:var(--ink);}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+  .kpi{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;text-align:center;}
+  .kpi .k-num{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--gold);}
+  .kpi .k-lab{font-size:11px;color:var(--ink3);margin-top:2px;}
+
+  /* 依赖图 */
+  .deps{display:flex;align-items:stretch;gap:0;margin:16px 0;flex-wrap:wrap;}
+  .dep{flex:1;min-width:150px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;position:relative;margin-right:20px;}
+  .dep:last-child{margin-right:0;}
+  .dep::after{content:"";position:absolute;right:-18px;top:50%;width:15px;height:1.5px;background:var(--gold2);}
+  .dep:last-child::after{display:none;}
+  .dep .d-n{font-family:var(--mono);font-size:11px;font-weight:800;color:var(--gold);}
+  .dep .d-t{font-size:12.5px;font-weight:700;color:var(--ink);margin-top:2px;}
+  .dep .d-s{font-size:11px;color:var(--ink3);margin-top:3px;line-height:1.5;}
+
+  @media (max-width:720px){
+    .wrap{padding:16px 12px 60px;}
+    .sec{padding:20px 16px;}
+    .cover{padding:26px 20px;}
+    .cover h1{font-size:22px;}
+    .g2,.kpis{grid-template-columns:1fr;}
+    .deps{flex-direction:column;gap:10px;}
+    .dep{margin-right:0;}
+    .dep::after{display:none;}
+    table{font-size:12px;}
+    th,td{padding:8px 9px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= 封面 ================= -->
+  <div class="cover">
+    <div class="cover-tag">Engchain 3.0 · 执行计划 · V1.0</div>
+    <h1>服务广场 · <em>系统内多业务线并行</em> · 执行计划</h1>
+    <div class="cover-sub">基于对 <b>D:/Engchain3.0 全部核心页面与数据层的逐文件核读</b>（js/data.js · stores.js · domain.js · detail.js · publish/editor.html · agency×3 · franchise · trade · personnel · supply/list · all-listings · profile · distribution · publish/index），将业务模式方案落为<b>文件级、可验证、可回滚</b>的执行计划：先修偏差，再建协同，后置增值。</div>
+    <div class="cover-meta">
+      <span class="cm">编制日期 <b>2026-09-09</b></span>
+      <span class="cm">核读范围 <b>16 个文件</b></span>
+      <span class="cm">状态 <b>待你确认后执行</b></span>
+      <span class="cm">A 类修正 <b>2 项</b> · B 类新增 <b>6 项</b> · C 类待定 <b>5 项</b></span>
+    </div>
+  </div>
+
+  <!-- ================= 00 执行总览 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">00</div><div class="sec-title">执行总览：三类工作，一个原则
+        <small>已拍板决策的落地状态已逐项核实——大多数已实现，本计划聚焦「偏差修正 + 协同新增 + 待确认项」</small></div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-num">11</div><div class="k-lab">已拍板决策</div></div>
+      <div class="kpi"><div class="k-num">9</div><div class="k-lab">已落地（可复核）</div></div>
+      <div class="kpi"><div class="k-num">2</div><div class="k-lab">偏差/缺口（需修正）</div></div>
+      <div class="kpi"><div class="k-num">8</div><div class="k-lab">工作包（WP1-WP8）</div></div>
+    </div>
+    <table>
+      <tr><th>类别</th><th>内容</th><th>性质</th><th>是否需再确认</th></tr>
+      <tr><td><b>A · 偏差修正</b></td><td>WP1 发布编辑器「中介服务」品类门控 · WP2 服务商经营入口一致性收口</td><td>修复已拍板决策与代码现状的冲突</td><td><span class="tag tag-fix">不需确认 · 必须修</span></td></tr>
+      <tr><td><b>B · 协同新增</b></td><td>WP3 交叉导流六路径 · WP4 服务商信用分 · WP5 毛利保护 · WP6 高频入口 · WP7 意向金解锁深度对接 · WP8 增值付费占位</td><td>业务模式方案的落地执行</td><td><span class="tag tag-gold">需确认范围与顺序</span></td></tr>
+      <tr><td><b>C · 待定决策</b></td><td>C1-C5（信用分计权时机 / 毛利保护首期值 / 顺手办轻量版 / 深度对接后置 / 增值占位）</td><td>方案遗留的 5 个拍板点</td><td><span class="tag tag-wait">需拍板</span></td></tr>
+    </table>
+    <div class="note n-green"><b>执行原则（贯穿全部工作包）：</b>① 单一数据源——金额/费率/档位只改 <b>js/data.js</b>，页面一律引用，禁止硬编码；② 门控单一来源——入口显隐一律走 <b>entryAccess()</b>（stores.js 已统一），页面不写重复判断；③ 状态机不破坏——订单流转只走 <b>Mediation 既有状态机</b>（draft→intent→escrowed→serving→await_confirm→settled）；④ 增量小步——每包独立可验收，改动前备份 <b>_backup/</b>；⑤ 语义隔离——积分/诚意金/意向金/托管/保证金文案互不借用；⑥ 入口物理分离——用户侧页面永不出现服务商经营操作。</div>
+  </div>
+
+  <!-- ================= 01 现状核对表 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">01</div><div class="sec-title">已拍板决策 · 落地现状核对（逐项可复核）
+        <small>完整性检查：确认「说过要做的」与「代码里实际存在的」一致；发现两处偏差</small></div></div>
+    <table>
+      <tr><th>#</th><th>已拍板决策</th><th>落地状态</th><th>证据（文件·位置）</th></tr>
+      <tr><td>1</td><td>金刚区按「招商/转让/人才/服务/综合」</td><td><span class="tag tag-ok">已落地</span></td><td>home.html 文件夹金刚区 L287-403</td></tr>
+      <tr><td>2</td><td>发现页一级 Tab「全部/资源/供应/需求/服务」+ 二级 tabbar 分项</td><td><span class="tag tag-ok">已落地</span></td><td>pages/supply/list.html 一级 Tab + SUBTABS 二级分项</td></tr>
+      <tr><td>3</td><td>建企买卖单独重表单（标的/负债/人员/税务四要素）</td><td><span class="tag tag-ok">已落地</span></td><td>publish/editor.html L663-727（需求侧四要素卡）+ L2211-2221（供给侧六维体检/尽调/承诺）</td></tr>
+      <tr><td>4</td><td>建企买卖押金 tradeDeposit 5000（发布时收）</td><td><span class="tag tag-ok">已落地</span></td><td>js/data.js credits.tradeDeposit · editor.html 多处引用</td></tr>
+      <tr><td>5</td><td>三类需求接入 AI 匹配</td><td><span class="tag tag-ok">已落地</span></td><td>agency/index.html 场景卡 + doMatch；publish 匹配逻辑</td></tr>
+      <tr><td>6</td><td>意向金四档 100/500/800/5000 ≈ 成交价 20%</td><td><span class="tag tag-ok">已落地</span></td><td>js/domain.js L489-498 intentAmountOf · order.html 两段式</td></tr>
+      <tr><td>7</td><td>下单金额 = 意向金 + 托管结合</td><td><span class="tag tag-ok">已落地</span></td><td>domain.js Mediation：draft→intent（付意向金）→escrowed（补足托管）</td></tr>
+      <tr><td>8</td><td>服务详情页列项化（范围/周期/退款/超期等）</td><td><span class="tag tag-ok">已落地</span></td><td>js/detail.js L867-888：服务类型/报价/流程/材料/案例/退款保障/超期赔付</td></tr>
+      <tr><td>9</td><td>用户侧隐藏佣金（服务商侧可见）</td><td><span class="tag tag-ok">已落地</span></td><td>seller-board.html 收入明细 inc-note「用户侧不展示任何扣减」</td></tr>
+      <tr><td>10</td><td>服务广场页 = 用户侧；工作台 = 个人中心「服务经营」</td><td><span class="tag tag-ok">已落地</span></td><td>profile/index.html L1504 宫格锁 agency · seller-board 未入驻整页拦截</td></tr>
+      <tr><td>11</td><td>「中介服务」发布权限 = 仅入驻中介企业</td><td><span class="tag tag-fix">偏差！未门控</span></td><td>editor.html L529 硬编码「中介服务」option，无 entryAccess().agency 判断 —— 普通用户也可发布供应</td></tr>
+      <tr><td>12</td><td>用户获取服务流程：需求→选单位→详情→下单/咨询→意向金</td><td><span class="tag tag-ok">已落地</span></td><td>agency/index.html 需求先行→市场→详情→下单；order.html</td></tr>
+      <tr><td>13</td><td>交易卡（服务广场）vs 浏览卡（发现页）口径统一</td><td><span class="tag tag-ok">已落地</span></td><td>agency/index.html 卡片含「在线下单/资金托管」；all-listings.html 浏览型卡片</td></tr>
+      <tr><td>14</td><td>防跳单规则 / 履约保证金三档 / 佣金阶梯</td><td><span class="tag tag-ok">已落地</span></td><td>js/data.js commission + jumpContract；stores.js commissionRate L590-601</td></tr>
+      <tr><td>15</td><td>分销定位不强化（维持现状）</td><td><span class="tag tag-ok">已落地</span></td><td>distribution 现状保留；entryAccess dist 逻辑已统一</td></tr>
+      <tr><td>16</td><td>交叉导流六路径（业务模式方案 04 章）</td><td><span class="tag tag-fix">缺口！未实现</span></td><td>franchise / trade / personnel 均无服务广场导流挂点（grep 零命中）</td></tr>
+    </table>
+    <div class="note n-red"><b>两处偏差必须修正：</b>① 发布编辑器「中介服务」品类未按入驻类型门控——任何实名用户都能选该品类发布供应，与拍板决策 11 冲突；② 交叉导流矩阵整体未落地——业务模式方案第 04 章六条路径全部待建。</div>
+  </div>
+
+  <!-- ================= 02 工作包拆解 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">02</div><div class="sec-title">工作包拆解：WP1-WP8（文件级 · 可验收 · 可回滚）
+        <small>A 类先修偏差 → B 类建协同 → B 类增值后置；每个工作包给出改动文件、具体改动点、验收标准</small></div></div>
+
+    <!-- WP1 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP1</span><span class="wp-title">发布编辑器「中介服务」品类门控</span><span class="tag tag-fix">A · 修正偏差</span></div>
+      <div class="wp-body">
+        <div class="wp-sec">
+          <div class="wp-sec-t">改动文件</div>
+          <p><span class="mono">pages/publish/editor.html</span> · <span class="mono">js/stores.js</span>（引用既有 entryAccess，不改逻辑）</p>
+        </div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>页面初始化时取 <span class="mono">entryAccess().agency</span>；为 <b>false</b> 时：隐藏 f-category 中「中介服务」option；若 draft/record 已选该品类则回退为空并提示</li>
+            <li>为 <b>true</b>（入驻中介企业）：正常可选，与 seller-board「+ 发布服务」路径一致</li>
+            <li>需求侧（role=demand）一律不显示「中介服务」——用户找服务走服务广场「需求先行」，不走发布编辑器</li>
+          </ul>
+        </div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">验收标准</div>
+          <ul>
+            <li>普通用户进入 editor.html：品类下拉无「中介服务」，选中提示不可用</li>
+            <li>入驻中介企业（entryAccess().agency=true）从工作台进入：可见可选、可正常发布</li>
+            <li>历史草稿若含「中介服务」且非中介身份：发布时被拦截并引导去入驻</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>无。可最先执行。</p></div>
+      </div>
+    </div>
+
+    <!-- WP2 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP2</span><span class="wp-title">服务商经营入口一致性收口</span><span class="tag tag-fix">A · 修正偏差</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">背景</div><p>业务模式方案 03 章红线：用户侧页面永不出现服务商经营操作。现状「服务广场」页面对未入驻用户已有 role-hint 引导，但需做一次全站一致性核验。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">pages/agency/index.html</span> · <span class="mono">pages/profile/index.html</span> · <span class="mono">pages/publish/index.html</span>（核验 + 文案收口，不新增逻辑）</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>服务广场页：确认顶部/底部不存在「发布服务」「去入驻」等经营侧 CTA；用户侧仅保留「找服务/发布需求」</li>
+            <li>个人中心「服务经营」宫格：锁定弹窗文案与 entry.html 入驻路径一致（已有，核验）</li>
+            <li>发布中心 publish/index.html「发布供应」按钮：加轻提示「发布中介服务需入驻中介企业」防呆（不拦截，仅提示）</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>以普通用户身份走查 agency/index.html + profile + publish/index：全程无任何服务商经营入口；以中介身份走查：工作台可从个人中心唯一进入。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>无。可与 WP1 并行。</p></div>
+      </div>
+    </div>
+
+    <!-- WP3 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP3</span><span class="wp-title">交叉导流六路径</span><span class="tag tag-new">B · 协同新增</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">统一规则</div><p>所有导流一律走「需求先行」：从源页面跳转至服务广场对应场景（带业务上下文参数），不做硬弹窗、不打断主流程；每个源页面<b>最多 1 个推荐位</b>，克制呈现。</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">六条路径 · 改动文件</div>
+          <ul>
+            <li><b>3.1 资质招商→服务广场</b>：<span class="mono">pages/franchise/index.html</span> 详情/底部加「资质代办 / 安许 / 人员配置」推荐卡 → 服务广场对应场景</li>
+            <li><b>3.2 建企买卖→服务广场</b>：<span class="mono">pages/trade/index.html</span> 转让流程「成交后事项」节点挂「资质变更 / 人员过户 / 税务筹划」入口</li>
+            <li><b>3.3 人员招聘→服务广场</b>：<span class="mono">pages/personnel/index.html</span> 空态/底部加「劳务派遣 / 猎头」入口</li>
+            <li><b>3.4 企业监控→服务广场</b>：<span class="mono">js/databus.js</span> MonitorStore 事件（资质到期/中标/工商变更）→ 对应代办场景；首期做<b>静态挂点</b>，事件联动二期</li>
+            <li><b>3.5 服务广场→资源线</b>：<span class="mono">pages/agency/index.html</span> 底部「关联服务」反向推荐招商/转让信息</li>
+            <li><b>3.6 综合发现→服务广场</b>：<span class="mono">pages/all-listings.html</span>「中介」Tab 已指向详情页——核验兜底，确认链路完整</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>六条路径均从源页面可进入服务广场并完成一次需求提交（冒烟）；推荐位不挤压主内容；移动端无溢出。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>建议在 WP1 之后执行（门控已收敛，导流不会把普通用户带进经营路径）。</p></div>
+      </div>
+    </div>
+
+    <!-- WP4 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP4</span><span class="wp-title">服务商信用分体系（D1）</span><span class="tag tag-new">B · 协同新增</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">js/stores.js</span>（新增 SvcCredit 计算）· <span class="mono">js/data.js</span>（信用分规则配置）· <span class="mono">pages/agency/index.html</span> · <span class="mono">js/detail.js</span> · <span class="mono">pages/agency/seller-board.html</span></p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>基于 <span class="mono">SvcRatingStore</span>（评价）+ <span class="mono">Mediation</span> 履约数据（disputed / refunded 占比）计算信用分，公式写入 data.js 规则（首期：评价均分×权重 + 履约率×权重）</li>
+            <li>服务卡片新增「信用分」展示位（与金V 并排）；服务商工作台新增「信用分」KPI 卡</li>
+            <li><b>首期只展示不计权</b>（见 C1），二期再挂入匹配/排序权重</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>新订单评价后信用分即时变化；卡片/详情/工作台三处展示一致；未产生任何订单的服务商有默认分。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>无强依赖；与 WP3 可并行。</p></div>
+      </div>
+    </div>
+
+    <!-- WP5 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP5</span><span class="wp-title">毛利保护 / 最低售价（D2）</span><span class="tag tag-new">B · 协同新增</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">js/data.js</span>（新增 business.agency.minServiceFee 按品类配置）· <span class="mono">pages/publish/editor.html</span>（发布校验）· <span class="mono">pages/agency/order.html</span>（下单校验）· <span class="mono">js/detail.js</span>（展示）</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>按服务品类配置最低可售服务费（后台可调，首期默认 0=不启用，见 C2）</li>
+            <li>发布时：报价低于最低价 → 校验拦截并提示；下单时：同校验</li>
+            <li>详情页展示「平台保护价」标识（若启用）</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>配置启用后，低于最低价的发布/下单被拦截；未启用时零影响（回归通过）。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>无。可并行。</p></div>
+      </div>
+    </div>
+
+    <!-- WP6 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP6</span><span class="wp-title">高频入口「顺手办」（D3）</span><span class="tag tag-new">B · 协同新增</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">pages/agency/index.html</span>（顶部入口）· 轻量工具实现（优先复用现有能力：资质年检/材料核验/政策查询）</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>服务广场顶部新增「顺手办」横向入口（3 个轻工具：资质年检提醒 / 材料清单核验 / 政策速查）</li>
+            <li>轻工具优先以现有页面能力实现（如监控配置/详情字段），不做重开发（见 C3）</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>三个入口可点击、可完成一次查询/提醒设置；不挤占需求先行主流程。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>无。可后置。</p></div>
+      </div>
+    </div>
+
+    <!-- WP7 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP7</span><span class="wp-title">意向金解锁深度对接（D4）</span><span class="tag tag-new">B · 协同新增</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">pages/agency/index.html</span> · <span class="mono">js/detail.js</span> · <span class="mono">pages/agency/seller-board.html</span>（线索质量）</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>保留「免费咨询」（无门槛留资）；新增「深度对接」：查看完整服务方案 / 直达联系方式，需按意向金档位支付</li>
+            <li>工作台线索增加「深度意向」标记，区分普通咨询与已付意向金线索</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>未付意向金看不到深度信息；支付后解锁；工作台线索标记正确。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>建议观察询盘质量后再定（见 C4），可后置。</p></div>
+      </div>
+    </div>
+
+    <!-- WP8 -->
+    <div class="wp">
+      <div class="wp-head"><span class="wp-no">WP8</span><span class="wp-title">服务商增值付费占位（D5）</span><span class="tag tag-new">B · 架构预留</span></div>
+      <div class="wp-body">
+        <div class="wp-sec"><div class="wp-sec-t">改动文件</div><p><span class="mono">pages/agency/seller-board.html</span> · <span class="mono">js/data.js</span>（增值位配置）</p></div>
+        <div class="wp-sec">
+          <div class="wp-sec-t">具体改动</div>
+          <ul>
+            <li>工作台预留「推广增值」入口位（置顶 / 线索包 / 经营工具），首期点击进入「敬请期待」说明</li>
+            <li>data.js 预留 business.agency.vendorUpgrades 配置结构（不激活）</li>
+          </ul>
+        </div>
+        <div class="wp-sec"><div class="wp-sec-t">验收标准</div><p>占位可见、点击有明确说明；不激活任何收费逻辑。</p></div>
+        <div class="wp-sec"><div class="wp-sec-t">依赖</div><p>最后执行。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 03 执行顺序 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">03</div><div class="sec-title">执行顺序与依赖：两个阶段，六条并行
+        <small>关键路径：先修偏差（A）→ 再建协同（B）→ 增值后置；每包独立验收后再进入下一包</small></div></div>
+    <div class="deps">
+      <div class="dep"><div class="d-n">PHASE A</div><div class="d-t">修正偏差</div><div class="d-s">WP1 门控 + WP2 入口收口（并行）</div></div>
+      <div class="dep"><div class="d-n">PHASE B</div><div class="d-t">协同新增</div><div class="d-s">WP3 导流 + WP4 信用分 + WP5 毛利保护（并行）</div></div>
+      <div class="dep"><div class="d-n">PHASE C</div><div class="d-t">增值后置</div><div class="d-s">WP6 高频 + WP7 深度对接 + WP8 占位（按 C3-C5 拍板）</div></div>
+    </div>
+    <table>
+      <tr><th>阶段</th><th>工作包</th><th>并行性</th><th>前置依赖</th><th>产出验证</th></tr>
+      <tr><td><b>A</b></td><td>WP1 · WP2</td><td>两包可并行</td><td>无</td><td>角色走查（普通/中介）</td></tr>
+      <tr><td><b>B</b></td><td>WP3 · WP4 · WP5</td><td>三包可并行</td><td>依赖 A 收敛（导流不指向经营路径）</td><td>六路径冒烟 + 信用分联动 + 毛利校验</td></tr>
+      <tr><td><b>C</b></td><td>WP6 · WP7 · WP8</td><td>三包可并行</td><td>依赖 C1-C5 拍板</td><td>工具可用 + 解锁验证 + 占位展示</td></tr>
+    </table>
+    <div class="note"><b>并行原则：</b>同阶段内各包改动文件不重叠（WP1=editor · WP2=agency/profile/publish · WP3=franchise/trade/personnel/databus/all-listings · WP4=stores/data/卡片 · WP5=data/editor/order · WP6=agency 顶部 · WP7=agency/detail · WP8=seller-board），可安全并行；若你希望串行小步，按 A→B→C 顺序逐包执行亦可。</div>
+  </div>
+
+  <!-- ================= 04 验证方案 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">04</div><div class="sec-title">验证方案：每包独立验证 + 全链路回归
+        <small>每个工作包交付前都必须通过「可能失败」的验证，不是文件存在即通过</small></div></div>
+    <div class="grid g2">
+      <div class="box">
+        <div class="bt">单包验证（每包必做）</div>
+        <div class="bd">
+          · 修改后页面脚本 console 无错误<br>
+          · 关键路径手动冒烟（发布/下单/导流/解锁）<br>
+          · 视觉自检：桌面 + 移动双视口截图核对<br>
+          · 角色切换验证（普通用户 / 中介企业 / 合伙人）入口显隐正确
+        </div>
+      </div>
+      <div class="box">
+        <div class="bt">回归验证（A+B 完成后）</div>
+        <div class="bd">
+          · 既有供应发布不回归（材料/设备/劳务/项目合作）<br>
+          · 建企买卖四要素重表单不回归<br>
+          · 意向金两段式（draft→intent→escrowed）状态机完整<br>
+          · 佣金计算与防跳单规则不回归（stores.js/domain.js 单测式断言）
+        </div>
+      </div>
+    </div>
+    <div class="note n-blue"><b>集成冒烟（全链路）：</b>资质招商详情 → 推荐卡 → 服务广场「资质代办」场景 → 匹配 → 详情决策 → 下单 → 意向金 → 托管 → 里程碑 —— 一条完整路径走通，作为 A+B 阶段结束的验收门槛。</div>
+  </div>
+
+  <!-- ================= 05 风险与回滚 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">05</div><div class="sec-title">风险与回滚
+        <small>每项风险都有对策；每包改动前备份，数据层改动提供旧值还原</small></div></div>
+    <table>
+      <tr><th>风险</th><th>影响</th><th>对策</th><th>回滚</th></tr>
+      <tr><td>WP1 门控误伤中介企业发布路径</td><td>中介无法上架服务</td><td>验收覆盖「已入驻中介从工作台 + 发布服务」用例；门控只读 entryAccess() 不另写判断</td><td>备份 editor.html，还原 option</td></tr>
+      <tr><td>WP3 导流挂点造成页面拥挤</td><td>主流程被挤压</td><td>每源页最多 1 个推荐位；克制设计；移动端溢出检查</td><td>删除推荐位区块</td></tr>
+      <tr><td>WP4 信用分计算影响排序公正</td><td>服务商体验受损</td><td>首期只展示不计权；公式可配置；异常订单风控标记</td><td>关闭展示位</td></tr>
+      <tr><td>WP5 毛利保护误拦截真实低价服务</td><td>正常发布被拒</td><td>首期默认 0（不启用）；配置项后台可调</td><td>置 0 即还原</td></tr>
+      <tr><td>资金语义混用（历史缺陷复发）</td><td>用户认知混乱</td><td>所有新文案走「积分=看 / 意向金=办 / 托管=履约 / 保证金=约束」口径；代码评审时逐词核对</td><td>文案级回退</td></tr>
+    </table>
+  </div>
+
+  <!-- ================= 06 待拍板 ================= -->
+  <div class="sec">
+    <div class="sec-head"><div class="sec-no">06</div><div class="sec-title">待你拍板：C1-C5
+        <small>A 类（WP1/WP2）不需确认即可执行；B 类范围与顺序请确认</small></div></div>
+    <table>
+      <tr><th>编号</th><th>决策点</th><th>建议默认</th><th>影响</th></tr>
+      <tr><td><b>C1</b></td><td>信用分是否首期只展示、二期再计权</td><td><span class="tag tag-gold">只展示不计权</span></td><td>决定 WP4 排序逻辑是否纳入</td></tr>
+      <tr><td><b>C2</b></td><td>毛利保护首期默认值（0=不启用 或 具体金额）</td><td><span class="tag tag-gold">首期 0（不启用）</span></td><td>决定 WP5 是否立即生效</td></tr>
+      <tr><td><b>C3</b></td><td>「顺手办」做轻量版（复用现有能力）还是完整版</td><td><span class="tag tag-gold">轻量版</span></td><td>决定 WP6 工作量</td></tr>
+      <tr><td><b>C4</b></td><td>意向金解锁深度对接是否本轮执行还是观察询盘质量后定</td><td><span class="tag tag-gold">观察后置</span></td><td>决定 WP7 是否列入本轮</td></tr>
+      <tr><td><b>C5</b></td><td>增值付费占位（WP8）是否本轮加入</td><td><span class="tag tag-gold">加入占位</span></td><td>决定 WP8 是否执行</td></tr>
+    </table>
+    <div class="note"><b>确认方式：</b>回复如「A 执行，B 执行 WP3/WP4/WP5，C1 同意 / C2 置0 / C3 轻量 / C4 后置 / C5 占位」；或直接说「全部按建议默认执行」。确认后我按 Phase A → B → C 逐包落地，每包完成即向你汇报验证结果。</div>
+  </div>
+
+  <div style="text-align:center;font-size:12px;color:var(--ink3);padding:10px 0 0;">Engchain 3.0 · 服务广场系统内多业务线并行 · 执行计划 V1.0 · 2026-09-09</div>
+</div>
+</body>
+</html>

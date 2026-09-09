@@ -1571,6 +1571,13 @@ window.DETAIL = (function () {
       var d = dirTag(r.dir);
       var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '机构已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: oppMeta(r) });
       var chips = [];
+      /* WP4 服务商信用分：详情页服务速览展示 */
+      try {
+        if (window.svcCreditOf && (r.uid || r.sellerId)) {
+          var cr = svcCreditOf(r.uid || r.sellerId, r.id);
+          if (cr) chips.push('信用 ' + cr.score + ' · ' + cr.level);
+        }
+      } catch (e) {}
       if (r.successRate != null) chips.push('成功率 ' + r.successRate + '%');
       if (r.rating != null) chips.push('评分 ' + Number(r.rating).toFixed(1));
       chips.push('不过退款');

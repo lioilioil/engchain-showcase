@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的委托 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/delegates.css">
+<style>
+  body { background: var(--bg); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" id="navBack" aria-label="返回">‹</button>
+    <div class="nav-title">我的委托</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll no-pad" style="padding-bottom:96px;">
+    <div class="dl-stats" id="dlStats"></div>
+    <div class="dl-filters" id="dlFilters"></div>
+    <div class="dl-list" id="dlList"></div>
+  </div>
+
+  <div class="dl-add-bar">
+    <button type="button" id="dlAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>新增委托</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/delegates.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  document.getElementById('navBack').addEventListener('click', function () {
+    if (history.length > 1) history.back();
+    else location.href = 'index.html';
+  });
+
+  var FILTERS = [
+    { key: 'all', label: '全部' },
+    { key: 'pending', label: '等待承接' },
+    { key: 'accepted', label: '已承接' },
+    { key: 'rejected', label: '已驳回' }
+  ];
+  var current = 'all';
+
+  function statusOf(d) { return Delegates.normStatus(d.status); }
+
+  /* 统计条 */
+  function renderStats() {
+    var c = Delegates.counts();
+    var box = document.getElementById('dlStats');
+    var rows = [
+      { n: c.all, l: '全部委托', hl: true },
+      { n: c.pending, l: '等待承接' },
+      { n: c.accepted, l: '已承接' },
+      { n: c.rejected, l: '已驳回' }
+    ];
+    box.innerHTML = rows.map(function (r) {
+      return '<div class="dl-stat' + (r.hl ? ' hl' : '') + '"><div class="n">' + r.n + '</div><div class="l">' + r.l + '</div></div>';
+    }).join('');
+  }
+
+  /* 状态筛选 chips */
+  function renderFilters() {
+    var box = document.getElementById('dlFilters');
+    box.innerHTML = FILTERS.map(function (f) {
+      return '<button type="button" class="dl-fchip' + (f.key === current ? ' active' : '') + '" data-key="' + f.key + '">' + f.label + '</button>';
+    }).join('');
+    box.querySelectorAll('.dl-fchip').forEach(function (b) {
+      b.addEventListener('click', function () { current = b.dataset.key; renderFilters(); renderList(); });
+    });
+  }
+
+  /* 列表卡片 */
+  function card(d) {
+    var st = statusOf(d);
+    var meta = Delegates.statusMeta(st);
+    var title = d.type || '委托需求';
+    if (d.qualLevel && d.qualLevel !== '不限') title += ' · ' + d.qualLevel;
+    if (d.mode) title += ' · ' + d.mode;
+    var region = Delegates.regionText(d.region);
+    var note = d.note || '';
+    var time = (d.submitTime || '').slice(0, 16);
+    return '<div class="dl-card" data-id="' + UI.esc(d.id) + '">' +
+      '<div class="dl-top">' +
+        '<span class="dl-biz">' + UI.esc(d.bizLabel || (d.biz === 'franchise' ? '资质招商' : '委托')) + '</span>' +
+        '<span class="dl-title">' + UI.esc(title) + '</span>' +
+        '<span class="dd-status ' + meta.cls + '"><span class="dot"></span>' + meta.label + '</span>' +
+      '</div>' +
+      '<div class="dl-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><b>' + UI.esc(region) + '</b></div>' +
+      (note ? '<div class="dl-note">' + UI.esc(note) + '</div>' : '') +
+      '<div class="dl-foot"><span class="dl-time">' + UI.esc(time) + ' 提交</span><span class="dl-meta" style="margin:0;color:var(--primary-dim);font-weight:600;">查看详情 ›</span></div>' +
+    '</div>';
+  }
+
+  function emptyHtml(t, d, btnLabel, btnId) {
+    return '<div class="dl-empty">' +
+      '<div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>' +
+      '<div class="e-t">' + t + '</div>' +
+      '<div class="e-d">' + d + '</div>' +
+      '<button type="button" id="' + btnId + '">' + btnLabel + '</button>' +
+    '</div>';
+  }
+
+  function renderList() {
+    var list = Delegates.list();
+    if (current !== 'all') {
+      list = list.filter(function (x) {
+        var s = statusOf(x);
+        return (current === 'accepted' ? s === '已承接' : (current === 'rejected' ? s === '已驳回' : s === '等待承接'));
+      });
+    }
+    var box = document.getElementById('dlList');
+
+    var st; try { st = UI.state.get(); } catch (e) { st = {}; }
+    var total = Delegates.counts().all;
+
+    if (!st.loggedIn && total === 0) {
+      box.innerHTML = emptyHtml('委托需要登录后使用', '登录后可提交委托并查看全部委托进度，平台顾问将在 2 小时内响应。', '去登录', 'dlEmptyLogin');
+      document.getElementById('dlEmptyLogin').addEventListener('click', function () { location.href = '../auth/login.html'; });
+      return;
+    }
+    if (total === 0) {
+      box.innerHTML = emptyHtml('暂无委托记录', '还没有提交过委托，可新增委托，平台专属顾问将在 2 小时内与您联系。', '立即新增委托', 'dlEmptyAdd');
+      document.getElementById('dlEmptyAdd').addEventListener('click', function () { location.href = 'delegate-new.html'; });
+      return;
+    }
+    if (list.length === 0) {
+      box.innerHTML = emptyHtml('当前筛选下暂无委托', '试试切换其他状态，或查看全部委托。', '查看全部', 'dlEmptyAll');
+      document.getElementById('dlEmptyAll').addEventListener('click', function () { current = 'all'; renderFilters(); renderList(); });
+      return;
+    }
+    box.innerHTML = list.map(card).join('');
+    box.querySelectorAll('.dl-card').forEach(function (el) {
+      el.addEventListener('click', function () {
+        location.href = 'delegate-detail.html?id=' + encodeURIComponent(el.dataset.id);
+      });
+    });
+  }
+
+  document.getElementById('dlAddBtn').addEventListener('click', function () {
+    location.href = 'delegate-new.html';
+  });
+
+  renderStats();
+  renderFilters();
+  renderList();
+})();
+</script>
+</body>
+</html>

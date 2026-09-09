@@ -147,7 +147,7 @@ window.UI = (function () {
      注意：用户是「供需综合体」——一个用户/企业可同时是供方与需方，因此不设身份切换。 */
   const stateStore = (function () {
     const KEY = 'engchain-state';
-    const def = { user: '陈建国', company: '四川省××建设有限公司', member: false, account: 'demo@engchain.cn' };
+    const def = { user: '陈建国', company: '四川省××建设有限公司', member: false, account: 'demo@engchain.cn', mobile: '13800138000' };
     function load() { let s = {}; try { s = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {} return Object.assign({}, def, s); }
     function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} window.dispatchEvent(new CustomEvent('engchain:state', { detail: s })); return s; }
     return {
@@ -659,7 +659,7 @@ window.UI = (function () {
     return sh;
   }
 
-  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, initTabbarGlass, pageTransition, ensureThinkingOrb, icon, catIcon, certCard, certModal, cityPicker };
+  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, initTabbarGlass, pageTransition, ensureThinkingOrb, icon, catIcon, certCard, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES };
 })();
 
 /* ============================================================================

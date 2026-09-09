@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据播种 · 中介服务历史订单与评价</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f7;margin:0;padding:40px 20px;}
+  .wrap{max-width:640px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+  h1{font-size:20px;margin:0 0 8px;color:#1d1d1f;}
+  .sub{font-size:13px;color:#86868b;margin-bottom:24px;}
+  .progress{height:8px;background:#e8e8ed;border-radius:99px;overflow:hidden;margin:16px 0;}
+  .bar{height:100%;background:linear-gradient(90deg,#c9a961,#d4b87a);width:0%;transition:width .3s;border-radius:99px;}
+  .log{background:#1d1d1f;color:#e8e8ed;border-radius:10px;padding:16px;font-family:monospace;font-size:12px;line-height:1.7;max-height:320px;overflow-y:auto;margin-top:16px;}
+  .log .ok{color:#30d158;}
+  .log .warn{color:#ff9f0a;}
+  .log .err{color:#ff453a;}
+  .btn{display:inline-block;margin-top:20px;padding:12px 28px;background:#c9a961;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;}
+  .btn:active{transform:scale(.97);}
+  .btn.secondary{background:#e8e8ed;color:#1d1d1f;margin-left:10px;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px;}
+  .stat{background:#f5f5f7;border-radius:10px;padding:14px;text-align:center;}
+  .stat b{display:block;font-size:22px;color:#1d1d1f;}
+  .stat span{font-size:11px;color:#86868b;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>数据播种 · 中介服务历史订单与评价</h1>
+  <p class="sub">为服务商 u2 生成 28 单历史订单（含评价、履约、争议、退款），用于信用分体系验证与 WP7 意向金解锁深度对接。</p>
+  <div class="progress"><div class="bar" id="bar"></div></div>
+  <div id="status" style="font-size:13px;color:#86868b;">准备中...</div>
+  <div class="stats" id="stats" style="display:none;">
+    <div class="stat"><b id="s-total">0</b><span>总订单</span></div>
+    <div class="stat"><b id="s-settled">0</b><span>已结算</span></div>
+    <div class="stat"><b id="s-rated">0</b><span>已评价</span></div>
+    <div class="stat"><b id="s-credit">0</b><span>信用分</span></div>
+  </div>
+  <div class="log" id="log"></div>
+  <div id="actions" style="display:none;">
+    <a class="btn" href="index.html">前往服务广场验证</a>
+    <a class="btn secondary" href="seller-board.html">前往服务商工作台</a>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){
+  var logEl = document.getElementById('log');
+  var barEl = document.getElementById('bar');
+  var statusEl = document.getElementById('status');
+
+  function log(msg, type){
+    var line = document.createElement('div');
+    line.className = type || '';
+    line.textContent = msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setProgress(pct, text){
+    barEl.style.width = pct + '%';
+    statusEl.textContent = text;
+  }
+
+  // 模拟买家
+  var BUYERS = ['u-buyer-001','u-buyer-002','u-buyer-003','u-buyer-004','u-buyer-005','u-buyer-006'];
+  // 服务与金额映射
+  var SVCS = [
+    {id:'a1', name:'建筑资质升级代办', cat:'资质升级', amount:180000},
+    {id:'a2', name:'工商注册代办', cat:'工商注册', amount:8000},
+    {id:'a3', name:'安许新办延期', cat:'安许代办', amount:35000},
+    {id:'a4', name:'资质分立重组', cat:'资质分立', amount:120000},
+    {id:'a5', name:'工程保函担保', cat:'工程担保', amount:25000},
+    {id:'a6', name:'造价咨询服务', cat:'造价咨询', amount:15000},
+    {id:'a7', name:'劳务派遣服务', cat:'劳务派遣', amount:45000}
+  ];
+
+  var SELLER = 'u2';
+  var now = Date.now();
+  var DAY = 86400000;
+
+  // 订单模板生成
+  function makeOrder(idx, svc, buyer, state, daysAgo, rating){
+    var amount = svc.amount * (0.85 + Math.random() * 0.3);
+    amount = Math.round(amount / 100) * 100;
+    var createdAt = now - daysAgo * DAY - Math.floor(Math.random() * DAY);
+    var o = {
+      id: 'seed-' + String(idx).padStart(3,'0'),
+      buyerId: buyer,
+      sellerId: SELLER,
+      svcId: svc.id,
+      svcName: svc.name,
+      category: svc.cat,
+      title: svc.name,
+      amount: Math.round(amount * 100) / 100,
+      fee: 0,
+      settle: 0,
+      state: state,
+      payMethod: 'balance',
+      milestones: [],
+      refund: null,
+      dispute: null,
+      review: null,
+      timeline: [],
+      version: 1,
+      ruleSnapshot: null,
+      createdAt: createdAt,
+      updatedAt: createdAt
+    };
+    // 已结算订单加评价
+    if(state === 'settled' && rating){
+      o.review = { score: rating, text: '', at: createdAt + 5 * DAY };
+      o.settledAt = createdAt + 20 * DAY;
+    }
+    // 进行中订单
+    if(state === 'serving'){
+      o.timeline = [{at: createdAt, action: '服务启动'}];
+    }
+    if(state === 'escrowed'){
+      o.timeline = [{at: createdAt, action: '资金托管'}];
+    }
+    // 争议订单
+    if(state === 'disputed'){
+      o.dispute = { reason: '服务进度争议', at: createdAt + 30 * DAY };
+    }
+    // 退款订单
+    if(state === 'refunded'){
+      o.refund = { amount: o.amount, reason: '企业自身原因取消', at: createdAt + 10 * DAY };
+    }
+    return o;
+  }
+
+  async function seed(){
+    log('=== 开始数据播种 ===', 'ok');
+    setProgress(5, '清理旧播种数据...');
+
+    // 清理旧的 seed 订单（不影响真实订单）
+    try{
+      var existing = Mediation.list({uid: SELLER, role: 'seller'});
+      var seedIds = existing.filter(function(o){ return o.id && o.id.indexOf('seed-') === 0; }).map(function(o){ return o.id; });
+      if(seedIds.length){
+        log('清理旧播种订单 ' + seedIds.length + ' 条', 'warn');
+        // 直接从 localStorage 移除
+        var key = 'engchain-mediation-orders';
+        var raw = JSON.parse(localStorage.getItem(key) || '{"list":[]}');
+        raw.list = raw.list.filter(function(o){ return o.id.indexOf('seed-') !== 0; });
+        localStorage.setItem(key, JSON.stringify(raw));
+      }
+    }catch(e){ log('清理失败: ' + e.message, 'err'); }
+
+    await new Promise(function(r){ setTimeout(r, 200); });
+
+    setProgress(15, '生成历史订单...');
+
+    // 订单分布：28 单
+    // settled: 20 单（18 单有评价，2 单未评价）
+    // serving: 3 单
+    // escrowed: 2 单
+    // disputed: 1 单
+    // refunded: 1 单
+    // partial_refund: 1 单
+    var orders = [];
+    var idx = 1;
+
+    // 20 单已结算
+    var settledSvcs = ['a1','a1','a2','a2','a3','a3','a3','a4','a5','a5','a6','a6','a7','a1','a2','a3','a4','a5','a6','a7'];
+    var ratings = [5,5,4,5,5,4,5,5,4,5,5,5,4,5,4,5,5,4,5,5]; // 18 个有评价，后2个null
+    for(var i=0;i<20;i++){
+      var svc = SVCS.find(function(s){return s.id===settledSvcs[i];});
+      var buyer = BUYERS[i % BUYERS.length];
+      var daysAgo = 30 + Math.floor(Math.random() * 150); // 30-180天前
+      var rating = i < 18 ? ratings[i] : null;
+      orders.push(makeOrder(idx++, svc, buyer, 'settled', daysAgo, rating));
+    }
+
+    // 3 单进行中
+    var servingSvcs = ['a1','a3','a5'];
+    for(var j=0;j<3;j++){
+      var svc2 = SVCS.find(function(s){return s.id===servingSvcs[j];});
+      orders.push(makeOrder(idx++, svc2, BUYERS[j], 'serving', 5 + j*3, null));
+    }
+
+    // 2 单已托管待启动
+    var escrowSvcs = ['a2','a6'];
+    for(var k=0;k<2;k++){
+      var svc3 = SVCS.find(function(s){return s.id===escrowSvcs[k];});
+      orders.push(makeOrder(idx++, svc3, BUYERS[k+1], 'escrowed', 1 + k, null));
+    }
+
+    // 1 单争议
+    orders.push(makeOrder(idx++, SVCS[3], BUYERS[4], 'disputed', 45, null));
+
+    // 1 单退款
+    orders.push(makeOrder(idx++, SVCS[1], BUYERS[5], 'refunded', 60, null));
+
+    // 1 单部分退款
+    orders.push(makeOrder(idx++, SVCS[5], BUYERS[2], 'partial_refund', 90, null));
+
+    log('生成订单 ' + orders.length + ' 条', 'ok');
+    setProgress(40, '写入订单数据...');
+
+    // 直接写入 localStorage（绕过 Mediation.create 的状态机校验）
+    try{
+      var key2 = 'engchain-mediation-orders';
+      var raw2 = JSON.parse(localStorage.getItem(key2) || '{"list":[],"migrated":true}');
+      raw2.migrated = true;
+      orders.forEach(function(o){ raw2.list.push(o); });
+      localStorage.setItem(key2, JSON.stringify(raw2));
+      log('订单写入成功', 'ok');
+    }catch(e){ log('订单写入失败: ' + e.message, 'err'); }
+
+    await new Promise(function(r){ setTimeout(r, 300); });
+    setProgress(60, '写入评价数据...');
+
+    // 写入评价到 SvcRatingStore
+    try{
+      var ratingKey = 'engchain-svc-ratings';
+      var ratingRaw = JSON.parse(localStorage.getItem(ratingKey) || '{"items":{}}');
+      // 清理旧 seed 评价（通过重新计算）
+      orders.forEach(function(o){
+        if(o.state === 'settled' && o.review && o.review.score){
+          var r = ratingRaw.items[o.svcId] || {count:0, sum:0};
+          r.count += 1;
+          r.sum += o.review.score;
+          ratingRaw.items[o.svcId] = r;
+        }
+      });
+      localStorage.setItem(ratingKey, JSON.stringify(ratingRaw));
+      log('评价写入成功', 'ok');
+
+      // 输出各服务评价统计
+      Object.keys(ratingRaw.items).forEach(function(sid){
+        var r = ratingRaw.items[sid];
+        var avg = (r.sum / r.count).toFixed(1);
+        log('  服务 ' + sid + ': ' + r.count + ' 条评价, 均分 ' + avg, '');
+      });
+    }catch(e){ log('评价写入失败: ' + e.message, 'err'); }
+
+    await new Promise(function(r){ setTimeout(r, 300); });
+    setProgress(80, '验证信用分计算...');
+
+    // 验证信用分
+    try{
+      var credit = svcCreditOf(SELLER, null);
+      log('=== 信用分验证 ===', 'ok');
+      log('服务商 u2 信用分: ' + credit.score + ' (' + credit.level + ')', 'ok');
+      log('总订单: ' + credit.totalOrders + ', 履约率: ' + credit.fulfillRate + '%', '');
+      if(credit.rating){
+        log('评价: ' + credit.rating.count + ' 条, 均分 ' + credit.rating.avg, '');
+      }
+
+      // 各服务单独信用分
+      SVCS.forEach(function(s){
+        var c = svcCreditOf(SELLER, s.id);
+        log('  服务 ' + s.id + ' 信用分: ' + c.score + ' (' + c.level + ')', '');
+      });
+
+      document.getElementById('s-total').textContent = credit.totalOrders;
+      document.getElementById('s-settled').textContent = orders.filter(function(o){return o.state==='settled';}).length;
+      document.getElementById('s-rated').textContent = orders.filter(function(o){return o.review;}).length;
+      document.getElementById('s-credit').textContent = credit.score;
+      document.getElementById('stats').style.display = 'grid';
+    }catch(e){ log('信用分验证失败: ' + e.message, 'err'); }
+
+    setProgress(100, '播种完成！');
+    log('=== 数据播种完成 ===', 'ok');
+    log('共生成 ' + orders.length + ' 条订单，' + orders.filter(function(o){return o.review;}).length + ' 条评价', 'ok');
+    document.getElementById('actions').style.display = 'block';
+  }
+
+  // 等待依赖加载
+  function waitAndRun(){
+    if(typeof Mediation !== 'undefined' && typeof svcCreditOf !== 'undefined' && typeof SvcRatingStore !== 'undefined'){
+      seed();
+    }else{
+      setTimeout(waitAndRun, 100);
+    }
+  }
+  waitAndRun();
+})();
+</script>
+</body>
+</html>

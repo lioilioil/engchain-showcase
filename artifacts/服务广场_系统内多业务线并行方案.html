@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务广场 · 系统内多业务线并行方案 · Engchain 3.0</title>
+<style>
+  :root{
+    --bg:#F5F2EA; --card:#FFFFFF; --card2:#FBF7EE; --line:#E7E0D0; --line2:#D8CEB8;
+    --ink:#1F2429; --ink2:#5B6159; --ink3:#8B8F86;
+    --gold:#8A6A2E; --gold2:#C9A961; --gold3:#E8D5A3; --gold-soft:#F6EDD8;
+    --dark:#252C35; --dark2:#151A22; --dark-ink:#F4F2EE; --dark-ink2:rgba(244,242,238,.62);
+    --green:#2B6B4F; --green-soft:#E9F2EC;
+    --blue:#2563EB; --blue-soft:#EAF0F8;
+    --red:#B33A2E; --red-soft:#F8ECEA;
+    --purple:#7A5C9E; --purple-soft:#F0EBF6;
+    --shadow:0 10px 28px -14px rgba(40,36,28,.25);
+    --r:16px;
+    --font:-apple-system,'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+    --mono:'SF Mono','Cascadia Code',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;font-size:15px;}
+  .wrap{max-width:980px;margin:0 auto;padding:34px 20px 80px;}
+
+  /* ===== 封面 ===== */
+  .cover{background:linear-gradient(150deg,#252C35 0%,#151A22 55%,#0B0E13 100%);border-radius:24px;padding:36px 32px 30px;color:var(--dark-ink);position:relative;overflow:hidden;margin-bottom:18px;}
+  .cover::before{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,.20),transparent 66%);}
+  .cover::after{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);}
+  .cover-tag{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.18em;color:var(--gold2);text-transform:uppercase;}
+  .cover-tag::before{content:"";width:22px;height:1px;background:var(--gold2);opacity:.7;}
+  .cover h1{font-size:30px;font-weight:800;line-height:1.25;margin:14px 0 10px;letter-spacing:-.01em;}
+  .cover h1 em{font-style:normal;color:var(--gold2);}
+  .cover-sub{font-size:14px;color:var(--dark-ink2);max-width:640px;line-height:1.8;}
+  .cover-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;}
+  .cm{font-size:11.5px;color:var(--dark-ink2);border:1px solid rgba(244,242,238,.16);border-radius:99px;padding:5px 13px;background:rgba(244,242,238,.04);}
+  .cm b{color:var(--dark-ink);font-weight:700;}
+
+  /* ===== 章节 ===== */
+  .sec{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px 28px;margin-bottom:18px;box-shadow:var(--shadow);}
+  .sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px;}
+  .sec-no{flex:none;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#2A1810;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;font-family:var(--mono);box-shadow:0 6px 16px -8px rgba(201,169,97,.8);}
+  .sec-title{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.3;}
+  .sec-title small{display:block;font-size:12.5px;font-weight:500;color:var(--ink3);margin-top:3px;letter-spacing:0;}
+  .sec h4{font-size:15px;font-weight:800;margin:22px 0 10px;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .sec h4::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--gold2);flex:none;}
+  .sec p{color:var(--ink2);font-size:14px;margin-bottom:10px;}
+  .sec p b{color:var(--ink);}
+  .hl{color:var(--gold);font-weight:700;}
+  .hl-g{color:var(--green);font-weight:700;}
+  .hl-r{color:var(--red);font-weight:700;}
+  .hl-b{color:var(--blue);font-weight:700;}
+
+  /* ===== 表格 ===== */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0;}
+  th{background:var(--dark);color:var(--dark-ink);font-weight:700;text-align:left;padding:10px 12px;font-size:12.5px;white-space:nowrap;}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--ink2);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--card2);}
+  td b{color:var(--ink);}
+  .t-gold th{background:linear-gradient(135deg,#8A6A2E,#6B5326);}
+  .t-dark th{background:var(--dark2);}
+
+  /* ===== 标签 ===== */
+  .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:3px 10px;margin:2px 3px 2px 0;white-space:nowrap;}
+  .tag-gold{background:var(--gold-soft);color:var(--gold);border:1px solid var(--gold3);}
+  .tag-green{background:var(--green-soft);color:var(--green);border:1px solid #C9E0D2;}
+  .tag-blue{background:var(--blue-soft);color:var(--blue);border:1px solid #C9D9F2;}
+  .tag-red{background:var(--red-soft);color:var(--red);border:1px solid #EBC9C4;}
+  .tag-purple{background:var(--purple-soft);color:var(--purple);border:1px solid #DCCFEA;}
+  .tag-gray{background:#F1F0EC;color:var(--ink3);border:1px solid var(--line);}
+
+  /* ===== 卡片网格 ===== */
+  .grid{display:grid;gap:12px;}
+  .g2{grid-template-columns:repeat(2,1fr);}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .box{border:1px solid var(--line);border-radius:14px;padding:14px 15px;background:var(--card);}
+  .box.b-gold{background:linear-gradient(160deg,var(--gold-soft),#FFFDF6);border-color:var(--gold3);}
+  .box.b-dark{background:linear-gradient(150deg,#252C35,#151A22);border-color:transparent;color:var(--dark-ink);}
+  .box.b-dark .bt{color:var(--gold2);}
+  .box.b-green{background:var(--green-soft);border-color:#C9E0D2;}
+  .box.b-blue{background:var(--blue-soft);border-color:#C9D9F2;}
+  .box.b-red{background:var(--red-soft);border-color:#EBC9C4;}
+  .box.b-purple{background:var(--purple-soft);border-color:#DCCFEA;}
+  .bt{font-size:13px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:7px;}
+  .bt svg{width:15px;height:15px;flex:none;}
+  .bd{font-size:12.5px;color:var(--ink2);line-height:1.75;}
+  .box.b-dark .bd{color:var(--dark-ink2);}
+  .bd b{color:var(--ink);}
+  .box.b-dark .bd b{color:var(--dark-ink);}
+  .bd .num{font-family:var(--mono);font-weight:800;color:var(--gold);font-size:16px;}
+
+  /* ===== 流程 ===== */
+  .flow{display:flex;align-items:stretch;gap:0;margin:14px 0;flex-wrap:wrap;}
+  .f-step{flex:1;min-width:104px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;position:relative;margin-right:18px;}
+  .f-step:last-child{margin-right:0;}
+  .f-step::after{content:"";position:absolute;right:-16px;top:50%;width:13px;height:1.5px;background:var(--gold2);}
+  .f-step:last-child::after{display:none;}
+  .f-n{display:inline-flex;width:20px;height:20px;border-radius:7px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#2A1810;font-size:11px;font-weight:800;align-items:center;justify-content:center;font-family:var(--mono);margin-bottom:6px;}
+  .f-t{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.4;}
+  .f-d{font-size:11px;color:var(--ink3);margin-top:3px;line-height:1.5;}
+  .f-step.on{background:linear-gradient(160deg,var(--gold-soft),#FFFDF6);border-color:var(--gold3);}
+
+  /* ===== 角色矩阵 ===== */
+  .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0;}
+  .role{border:1px solid var(--line);border-radius:14px;padding:15px;position:relative;overflow:hidden;}
+  .role.r-user{background:linear-gradient(160deg,#FFFDF6,var(--card));border-color:var(--gold3);}
+  .role.r-agent{background:linear-gradient(160deg,var(--green-soft),var(--card));border-color:#C9E0D2;}
+  .role.r-plat{background:linear-gradient(160deg,#EEF2F8,var(--card));border-color:#C9D9F2;}
+  .role-tag{font-size:10.5px;font-weight:800;letter-spacing:.12em;margin-bottom:8px;display:inline-block;border-radius:99px;padding:3px 10px;}
+  .r-user .role-tag{background:var(--gold-soft);color:var(--gold);}
+  .r-agent .role-tag{background:var(--green-soft);color:var(--green);}
+  .r-plat .role-tag{background:var(--blue-soft);color:var(--blue);}
+  .role h3{font-size:15px;font-weight:800;margin-bottom:4px;}
+  .role p{font-size:12.5px;color:var(--ink2);line-height:1.7;}
+  .role ul{list-style:none;margin-top:9px;}
+  .role li{font-size:12px;color:var(--ink2);padding:4px 0 4px 18px;position:relative;line-height:1.55;}
+  .role li::before{content:"";position:absolute;left:2px;top:11px;width:5px;height:5px;border-radius:50%;background:var(--gold2);}
+
+  /* ===== 导流矩阵 ===== */
+  .cross{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:14px 0;}
+  .cross-item{border:1px solid var(--line);border-radius:14px;padding:14px 15px;background:var(--card);}
+  .ci-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .ci-from{font-size:12.5px;font-weight:800;color:var(--ink);}
+  .ci-arrow{color:var(--gold2);font-weight:800;font-size:13px;}
+  .ci-to{font-size:12.5px;font-weight:800;color:var(--gold);}
+  .ci-body{font-size:12px;color:var(--ink2);line-height:1.7;}
+  .ci-body .tag{margin-top:2px;}
+
+  /* ===== 资金流转 ===== */
+  .fund{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0;}
+  .fund-item{border-radius:14px;padding:13px 12px;border:1px solid var(--line);background:var(--card2);}
+  .fund-item .fi-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;font-size:14px;font-weight:800;font-family:var(--mono);color:#fff;}
+  .fi-1{background:linear-gradient(135deg,#8A6A2E,#6B5326);}
+  .fi-2{background:linear-gradient(135deg,#B33A2E,#8E2E24);}
+  .fi-3{background:linear-gradient(135deg,#2B6B4F,#1E4D38);}
+  .fi-4{background:linear-gradient(135deg,#2563EB,#1B4FC2);}
+  .fi-5{background:linear-gradient(135deg,#7A5C9E,#5E4480);}
+  .fund-item h4{font-size:13px;font-weight:800;margin-bottom:3px;}
+  .fund-item .amt{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--gold);margin-bottom:2px;}
+  .fund-item p{font-size:11px;color:var(--ink3);line-height:1.55;}
+
+  /* ===== 时间轴 ===== */
+  .timeline{display:flex;flex-direction:column;gap:0;margin:16px 0;}
+  .tl-row{display:grid;grid-template-columns:92px 34px 1fr;gap:0;position:relative;}
+  .tl-time{font-family:var(--mono);font-size:12.5px;font-weight:800;color:var(--gold);padding:6px 0 22px;text-align:right;padding-right:14px;}
+  .tl-axis{display:flex;flex-direction:column;align-items:center;}
+  .tl-dot{width:13px;height:13px;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));border:3px solid var(--card);box-shadow:0 0 0 1px var(--gold3);margin-top:9px;z-index:1;}
+  .tl-line{flex:1;width:2px;background:var(--line2);}
+  .tl-body{padding:0 0 22px 16px;}
+  .tl-body h4{font-size:14px;font-weight:800;margin-bottom:4px;}
+  .tl-body p{font-size:12.5px;color:var(--ink2);line-height:1.7;margin-bottom:4px;}
+  .tl-body p b{color:var(--ink);}
+  .tl-row:last-child .tl-body{padding-bottom:0;}
+  .tl-row:last-child .tl-line{display:none;}
+  .tl-body .tag{margin-top:2px;}
+
+  /* ===== 漏斗/泳道 ===== */
+  .lane{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:12px 0;}
+  .lane-head{padding:11px 15px;font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;}
+  .lane-user{background:linear-gradient(160deg,var(--gold-soft),#FFFDF6);color:var(--gold);border-bottom:1px solid var(--gold3);}
+  .lane-agent{background:linear-gradient(160deg,var(--green-soft),#F6FBF8);color:var(--green);border-bottom:1px solid #C9E0D2;}
+  .lane-plat{background:linear-gradient(160deg,#EEF2F8,#F7FAFD);color:var(--blue);border-bottom:1px solid #C9D9F2;}
+  .lane-body{display:flex;flex-wrap:wrap;gap:8px;padding:13px 15px;}
+  .l-step{flex:1;min-width:118px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 11px;position:relative;}
+  .l-step .ls-n{font-size:10px;font-weight:800;color:var(--gold);font-family:var(--mono);}
+  .l-step .ls-t{font-size:12px;font-weight:700;color:var(--ink);margin-top:2px;line-height:1.4;}
+  .l-step .ls-d{font-size:10.5px;color:var(--ink3);margin-top:2px;line-height:1.5;}
+
+  /* ===== 提示 ===== */
+  .note{background:var(--gold-soft);border:1px solid var(--gold3);border-radius:12px;padding:12px 15px;font-size:12.5px;color:#5C4A22;line-height:1.75;margin:12px 0;}
+  .note b{color:#4A3A16;}
+  .note.n-red{background:var(--red-soft);border-color:#EBC9C4;color:#7A2E25;}
+  .note.n-green{background:var(--green-soft);border-color:#C9E0D2;color:#24543D;}
+  .note.n-blue{background:var(--blue-soft);border-color:#C9D9F2;color:#24406F;}
+
+  /* ===== 决策清单 ===== */
+  .decide{border:1px solid var(--line);border-radius:14px;margin:10px 0;overflow:hidden;}
+  .decide-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--dark);color:var(--dark-ink);font-size:14px;font-weight:800;}
+  .decide-head .d-no{font-family:var(--mono);color:var(--gold2);}
+  .decide-body{padding:13px 16px;background:var(--card);}
+  .decide-body p{font-size:13px;color:var(--ink2);line-height:1.75;margin-bottom:6px;}
+  .decide-body p:last-child{margin-bottom:0;}
+  .decide-body .tag{vertical-align:middle;}
+
+  /* ===== 数字高亮 ===== */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+  .kpi{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;text-align:center;}
+  .kpi .k-num{font-family:var(--mono);font-size:21px;font-weight:800;color:var(--gold);}
+  .kpi .k-lab{font-size:11px;color:var(--ink3);margin-top:2px;}
+
+  @media (max-width:720px){
+    .wrap{padding:16px 12px 60px;}
+    .sec{padding:20px 16px;}
+    .cover{padding:26px 20px;}
+    .cover h1{font-size:23px;}
+    .g2,.g3,.g4,.roles,.cross,.fund,.kpis{grid-template-columns:1fr;}
+    .tl-row{grid-template-columns:70px 26px 1fr;}
+    .flow{flex-direction:column;gap:10px;}
+    .f-step{margin-right:0;margin-bottom:0;}
+    .f-step::after{display:none;}
+    .fund{grid-template-columns:repeat(2,1fr);}
+    table{font-size:12px;}
+    th,td{padding:8px 9px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= 封面 ================= -->
+  <div class="cover">
+    <div class="cover-tag">Engchain 3.0 · 业务模式方案 · V1.0</div>
+    <h1>服务广场 · <em>系统内多业务线并行方案</em></h1>
+    <div class="cover-sub">把「服务广场」放进全系统并行视角：与资质招商、建企买卖、人员招聘、综合发现、分销体系六线同台运作时，它的定位、角色边界、资金体系、交叉导流、数据资产与收入模型应如何设计。本方案基于对 D:/Engchain3.0 现有代码与数据层的完整核读，所有金额、比例、档位均取自 <b>js/data.js 单一数据源</b>。</div>
+    <div class="cover-meta">
+      <span class="cm">编制日期 <b>2026-09-09</b></span>
+      <span class="cm">依据 <b>js/data.js · 六页面实读</b></span>
+      <span class="cm">性质 <b>方案稿 · 待确认后执行</b></span>
+      <span class="cm">交付 <b>HTML 方案文档</b></span>
+    </div>
+  </div>
+
+  <!-- ================= 01 系统业务全景 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">01</div>
+      <div class="sec-title">系统业务全景：六线并行，谁是信息撮合、谁是交易闭环
+        <small>金刚区五入口 + 分销/钱包支撑体系 · 每一线的交易形态、资金机制、供需角色已逐页核读</small>
+      </div>
+    </div>
+    <table class="t-gold">
+      <tr><th>业务线</th><th>页面</th><th>交易形态</th><th>资金机制</th><th>供给方 → 需求方</th><th>信任机制</th></tr>
+      <tr><td><b>资质招商</b></td><td>pages/franchise</td><td>信息撮合 + 加盟流程（6步）</td><td>积分解锁 29 / 39 / 49 分档</td><td>招商建企 → 意向加盟者</td><td>四库一平台可验 · 平台核验</td></tr>
+      <tr><td><b>建企买卖</b></td><td>pages/trade</td><td>资产撮合（重表单）</td><td>诚意保证金 <span class="hl">¥5000</span>（发布时冻结）</td><td>转让方 → 收购方</td><td>无债务/无涉诉声明 · 保证金</td></tr>
+      <tr><td><b>人员招聘</b></td><td>pages/personnel</td><td>双向信息（招聘/求职双 Tab）</td><td>免费配额 5 次/月 · 积分解锁 29</td><td>企业 ↔ 持证人才</td><td>实名认证 · 持证核验</td></tr>
+      <tr><td><b>服务广场</b></td><td>pages/agency</td><td><span class="hl">交易闭环</span>（需求→匹配→下单→托管→验收）</td><td>意向金四档 + 资金托管 + 佣金阶梯</td><td>中介服务企业 → 用户</td><td>金V 认证 · 履约保证金 · 评价回流</td></tr>
+      <tr><td><b>综合发现</b></td><td>pages/supply/list</td><td>聚合浏览（资源/供需双流）</td><td>积分解锁 98</td><td>全类型混合</td><td>企业认证 · 双端认证</td></tr>
+      <tr><td><b>分销体系</b></td><td>pages/distribution</td><td>二级分销（拉新返佣）</td><td>企业 12%/3% · 个人 8%/2%</td><td>合伙人 → 平台</td><td>入驻资质门槛</td></tr>
+    </table>
+    <div class="note n-green"><b>关键洞察：</b>四条资源线（招商/转让/人才）都是<b>信息撮合</b>——平台收信息费（积分），不介入交易资金；服务广场是系统内<b>唯一真正闭合交易资金</b>的业务线（意向金→托管→里程碑→佣金）。它既是独立业务线，也是其余各线深度需求的<b>承接落地层</b>。</div>
+  </div>
+
+  <!-- ================= 02 并行架构 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">02</div>
+      <div class="sec-title">并行架构：一条「交易闭环」承载四条「信息撮合」的深度需求
+        <small>金刚区入口 = 市场端分流；服务广场 = 深度服务的落地端；个人中心 = 合作方经营端</small>
+      </div>
+    </div>
+    <div class="grid g4">
+      <div class="box b-gold"><div class="bt">资质招商</div><div class="bd">加盟意向产生后 → <b>资质代办 / 安许 / 人员配置</b> 承接</div></div>
+      <div class="box b-gold"><div class="bt">建企买卖</div><div class="bd">收购完成后 → <b>资质变更 / 人员过户 / 税务</b> 承接</div></div>
+      <div class="box b-gold"><div class="bt">人员招聘</div><div class="bd">招聘困难 → <b>劳务派遣 / 猎头服务</b> 承接</div></div>
+      <div class="box b-gold"><div class="bt">综合发现</div><div class="bd">聚合浏览 → 深度需求 → <b>服务广场</b> 承接</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:12px;">
+      <div class="box b-dark">
+        <div class="bt">市场端（用户可见）</div>
+        <div class="bd">
+          金刚区五入口：<b>招商 / 转让 / 人才 / 服务 / 综合</b>（已实现）<br>
+          发现页一级 Tab：<b>全部 / 资源 / 供应 / 需求 / 服务</b>，除「全部」外各 Tab 下挂二级分项（已拍板）<br>
+          服务广场页 = <b>纯用户侧</b>：找服务、匹配、下单、验收
+        </div>
+      </div>
+      <div class="box b-dark">
+        <div class="bt">经营端（合作方可见）</div>
+        <div class="bd">
+          入口唯一：<b>个人中心 → 服务经营</b>（已实现锁定逻辑）<br>
+          中介服务企业入驻金V 后解锁 <b>服务商工作台</b><br>
+          工作台 = 询盘线索 / 订单 / 服务橱窗 / 保证金 / 收入明细<br>
+          用户与经营两端<b>彻底分离，互不混淆</b>
+        </div>
+      </div>
+    </div>
+    <div class="note"><b>设计原则：</b>同一业务线下「浏览入口」与「经营入口」物理分离——服务广场页只服务买方，服务商经营只从个人中心进入。此原则已在代码层落实（role-hint 仅买方引导；seller-board 未入驻时整页拦截）。</div>
+  </div>
+
+  <!-- ================= 03 角色矩阵 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">03</div>
+      <div class="sec-title">角色边界：用户 = 买方，中介 = 合作方，平台 = 规则与资金方
+        <small>三种身份的价值主张、入口、权限必须各自独立，任何一处混淆都会破坏商业模式</small>
+      </div>
+    </div>
+    <div class="roles">
+      <div class="role r-user">
+        <span class="role-tag">用户 · 买方</span>
+        <h3>一次办成，不被骗</h3>
+        <p>有资质/担保/造价等需求的企业或个人</p>
+        <ul>
+          <li>先明确需求 → AI 匹配 → 详情决策</li>
+          <li>金V 核验信号 + 口碑 + 案例参考</li>
+          <li>意向金锁定诚意（可退）</li>
+          <li>资金托管 · 里程碑验收 · 未成交退款</li>
+          <li><b>全程看不到佣金</b>（已拍板）</li>
+        </ul>
+      </div>
+      <div class="role r-agent">
+        <span class="role-tag">合作方 · 中介服务企业</span>
+        <h3>低成本获客，合规经营</h3>
+        <p>资质代办/担保/造价/派遣等持证机构</p>
+        <ul>
+          <li>入驻金V（¥29999 · 破冰期 ¥14999）</li>
+          <li>工作台上架服务，普通用户不可代发（已拍板）</li>
+          <li>询盘实时汇聚，意向金锁定成交</li>
+          <li>里程碑回款 + 佣金透明（仅服务商侧可见）</li>
+          <li>履约保证金分级（5000/2万/5万）</li>
+        </ul>
+      </div>
+      <div class="role r-plat">
+        <span class="role-tag">平台 · 规则与资金方</span>
+        <h3>控制交易闭环，而非信息展示</h3>
+        <p>规则制定 · 资金监管 · 信用治理</p>
+        <ul>
+          <li>撮合 + 审核 + 评级 + 仲裁</li>
+          <li>意向金与托管账户独立监管</li>
+          <li>佣金按里程碑释放时扣取（服务商侧）</li>
+          <li>防跳单规则（聊天封禁/罚款/清退）</li>
+          <li>数据沉淀 → 远期钻井</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note n-red"><b>红线：</b>「中介服务代表开通了中介服务企业认证」≠ 用户在服务广场替中介发供应。发布「中介服务」品类的权限<b>仅归入驻中介企业</b>；用户侧永远只有「找服务/买服务」的角色。任何让用户进入服务商经营路径的设计都视为错误。</div>
+  </div>
+
+  <!-- ================= 04 交叉导流 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">04</div>
+      <div class="sec-title">交叉导流矩阵：五条业务线如何互相喂养
+        <small>导流一律走「需求先行」，不做硬导流；每条导流路径都有明确触发场景</small>
+      </div>
+    </div>
+    <div class="cross">
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">资质招商</span><span class="ci-arrow">→</span><span class="ci-to">服务广场</span></div>
+        <div class="ci-body">意向加盟者考察后，需<b>资质代办 / 安许代办 / 建造师配置</b>。在招商详情页「下一步需要什么」处，推荐已核验的资质代办服务。<span class="tag tag-gold">需求先行</span></div>
+      </div>
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">建企买卖</span><span class="ci-arrow">→</span><span class="ci-to">服务广场</span></div>
+        <div class="ci-body">收购方成交后需<b>资质变更 / 人员过户 / 税务筹划 / 银行开户</b>。转让流程「成交后事项」节点挂接企业服务入口。<span class="tag tag-gold">成交后承接</span></div>
+      </div>
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">人员招聘</span><span class="ci-arrow">→</span><span class="ci-to">服务广场</span></div>
+        <div class="ci-body">长期招不到持证人员的企业，可转向<b>劳务派遣 / 猎头 / 证书挂靠合规咨询</b>服务。招聘空态兜底位给出服务入口。<span class="tag tag-gold">空态导流</span></div>
+      </div>
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">企业监控</span><span class="ci-arrow">→</span><span class="ci-to">服务广场</span></div>
+        <div class="ci-body">监控到<b>资质到期 / 中标 / 工商变更</b>事件时，按事件类型推荐对应代办服务（如资质延期、安许年检）。<span class="tag tag-gold">事件驱动</span></div>
+      </div>
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">服务广场</span><span class="ci-arrow">→</span><span class="ci-to">资质招商 / 建企买卖</span></div>
+        <div class="ci-body">代办过程中发现客户有<b>加盟 / 收购 / 转让</b>需求，反向推荐资源线信息。<span class="tag tag-gray">反向导流</span></div>
+      </div>
+      <div class="cross-item">
+        <div class="ci-top"><span class="ci-from">综合发现</span><span class="ci-arrow">→</span><span class="ci-to">服务广场</span></div>
+        <div class="ci-body">供需流中的<b>「中介」二级 Tab</b>与聚合浏览卡片，全部指向服务广场/详情页；浏览型卡片不承担下单动作。<span class="tag tag-gold">入口统一</span></div>
+      </div>
+    </div>
+    <div class="note n-blue"><b>口径统一（已确认）：</b>服务广场卡片 = <b>引导交易</b>（含「在线下单」「资金托管·未成交退款」）；发现页卡片 = <b>聚合浏览展示</b>。两者是<b>同一条完整信息的不同入口</b>，不是两套卡片体系。</div>
+  </div>
+
+  <!-- ================= 05 资金体系 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">05</div>
+      <div class="sec-title">资金体系：五类资金并行，各有归属、互不混淆
+        <small>全部金额取自 js/data.js 单一数据源 · 每一类资金的时点、用途、去向都已定义</small>
+      </div>
+    </div>
+    <div class="fund">
+      <div class="fund-item"><div class="fi-ic fi-1">¥</div><h4>积分解锁</h4><div class="amt">98 / 580 / 1280</div><p>浏览付费：材料/设备/劳务/合作 98，招商 29-49，人才 29。平台信息费收入。</p></div>
+      <div class="fund-item"><div class="fi-ic fi-2">¥</div><h4>诚意保证金</h4><div class="amt">¥5000</div><p>建企买卖<b>发布时</b>冻结（tradeDeposit）。挡垃圾信息；审核不过原路解冻。</p></div>
+      <div class="fund-item"><div class="fi-ic fi-3">¥</div><h4>意向金</h4><div class="amt">100/500/800/5000</div><p>服务下单时按成交价约 20% 就近取档。启动前可退，启动后抵扣托管。</p></div>
+      <div class="fund-item"><div class="fi-ic fi-4">¥</div><h4>资金托管</h4><div class="amt">成交额</div><p>服务履约资金，持牌机构监管（非平台收入）；里程碑 30/30/30/10 释放。</p></div>
+      <div class="fund-item"><div class="fi-ic fi-5">¥</div><h4>履约保证金</h4><div class="amt">5000/2万/5万</div><p>中介企业入驻缴纳，普通/工程/高风险三档；无违规原路退还。</p></div>
+    </div>
+    <table class="t-dark">
+      <tr><th>资金流</th><th>业务线</th><th>发生时点</th><th>金额/比例</th><th>性质</th><th>去向</th></tr>
+      <tr><td><b>入驻费</b></td><td>全系统</td><td>企业入驻时</td><td>建筑企业 3999 · 中介 29999（破冰期 14999）· 合伙人 0</td><td>平台收入</td><td>平台</td></tr>
+      <tr><td><b>佣金</b></td><td>服务广场</td><td>里程碑释放时扣取</td><td>8% → 6% → 5% → 4% → 3% 阶梯，最低佣金 1 万</td><td>平台收入（<span class="hl">仅服务商侧可见</span>）</td><td>平台</td></tr>
+      <tr><td><b>分销返佣</b></td><td>分销体系</td><td>成交后 T+1</td><td>企业 12%/3% · 个人 8%/2%</td><td>拉新成本</td><td>合伙人</td></tr>
+      <tr><td><b>提现</b></td><td>钱包</td><td>随时</td><td>单笔 ≤1000 · 日 ≤2 次 · 2 小时到账</td><td>资金流出</td><td>用户</td></tr>
+      <tr><td><b>意向金沉淀</b></td><td>服务广场</td><td>下单 → 启动/退款</td><td>20% 就近取档</td><td><span class="hl">资金时间价值 + 违约罚没</span></td><td>托管账户</td></tr>
+    </table>
+    <div class="note"><b>并行要点：</b>① 积分管「看信息」，意向金/托管管「办事情」，保证金管「服务商约束」，三者语义完全不同，<b>页面展示不得互相借用文案</b>；② 佣金只在服务商收入明细出现（inc-note 已注明"用户侧不展示任何扣减"）；③ 意向金是服务广场独有的「信任+资金」双杠杆，其他业务线不复制该机制。</div>
+  </div>
+
+  <!-- ================= 06 交易闭环 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">06</div>
+      <div class="sec-title">交易闭环：用户侧与服务商侧的完整泳道
+        <small>先明确服务需求 → 再选合作单位 → 详情决策 → 下单或咨询 → 支付意向金（用户已确认的获取流程）</small>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-head lane-user">用户侧（买方） · 服务广场页</div>
+      <div class="lane-body">
+        <div class="l-step"><div class="ls-n">STEP 1</div><div class="ls-t">明确服务需求</div><div class="ls-d">场景卡 / 澄清表单：目标+状态+时限+预算</div></div>
+        <div class="l-step"><div class="ls-n">STEP 2</div><div class="ls-t">AI 匹配</div><div class="ls-d">按目标与条件推荐已核验机构</div></div>
+        <div class="l-step"><div class="ls-n">STEP 3</div><div class="ls-t">选合作单位</div><div class="ls-d">对比金V/口碑/成功率/案例/报价</div></div>
+        <div class="l-step"><div class="ls-n">STEP 4</div><div class="ls-t">详情决策</div><div class="ls-d">服务范围/周期/退款/超期条款（列项化）</div></div>
+        <div class="l-step"><div class="ls-n">STEP 5</div><div class="ls-t">下单或咨询</div><div class="ls-d">在线下单 / 免费咨询留资</div></div>
+        <div class="l-step"><div class="ls-n">STEP 6</div><div class="ls-t">支付意向金</div><div class="ls-d">约成交价 20% 就近取档 · 可退</div></div>
+        <div class="l-step"><div class="ls-n">STEP 7</div><div class="ls-t">托管履约</div><div class="ls-d">里程碑验收 30/30/30/10 · 未成交退款</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-head lane-agent">合作方侧（中介企业） · 个人中心 → 服务经营 → 工作台</div>
+      <div class="lane-body">
+        <div class="l-step"><div class="ls-n">STEP 1</div><div class="ls-t">入驻金V</div><div class="ls-d">¥29999（破冰期 14999）· 缴纳履约保证金</div></div>
+        <div class="l-step"><div class="ls-n">STEP 2</div><div class="ls-t">上架服务</div><div class="ls-d">工作台发布「中介服务」品类 · 平台审核 1 个工作日</div></div>
+        <div class="l-step"><div class="ls-n">STEP 3</div><div class="ls-t">接单</div><div class="ls-d">询盘实时汇聚 · 在线订单待接</div></div>
+        <div class="l-step"><div class="ls-n">STEP 4</div><div class="ls-t">履约交付</div><div class="ls-d">按里程碑交付 · 进度可查</div></div>
+        <div class="l-step"><div class="ls-n">STEP 5</div><div class="ls-t">里程碑收款</div><div class="ls-d">托管资金按节点释放 · 佣金同步扣取</div></div>
+        <div class="l-step"><div class="ls-n">STEP 6</div><div class="ls-t">评价回流</div><div class="ls-d">订单评价聚合为口碑 → 影响后续匹配权重</div></div>
+      </div>
+    </div>
+    <div class="lane">
+      <div class="lane-head lane-plat">平台侧（规则与资金）</div>
+      <div class="lane-body">
+        <div class="l-step"><div class="ls-n">规则</div><div class="ls-t">佣金阶梯 + 防跳单</div><div class="ls-d">首罚 ¥5000 · 聊天封禁 7/30 天 · 二次清退</div></div>
+        <div class="l-step"><div class="ls-n">资金</div><div class="ls-t">意向金 + 托管账户</div><div class="ls-d">持牌机构监管 · 未成交全额退款</div></div>
+        <div class="l-step"><div class="ls-n">信用</div><div class="ls-t">金V + 评价回流</div><div class="ls-d">履约率/响应/纠纷沉淀为信用分</div></div>
+        <div class="l-step"><div class="ls-n">仲裁</div><div class="ls-t">纠纷处理</div><div class="ls-d">证据链 + 平台调解 + 保证金罚扣</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 07 数据字典 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">07</div>
+      <div class="sec-title">数据资产：一套 Store，多线共用，服务广场专属字段独立
+        <small>供应/订单/询盘/评价全部同源，保证「发现页看到的信息 = 服务广场可下单的信息」</small>
+      </div>
+    </div>
+    <table>
+      <tr><th>数据实体</th><th>Store / 来源</th><th>服务广场角色</th><th>并行业务线共用</th></tr>
+      <tr><td><b>供应信息</b></td><td>SupplyStore</td><td>服务源（SVCS = MOCK 机构 + 中介企业发布）</td><td>发现页 / 综合发现 / 服务广场 同源渲染</td></tr>
+      <tr><td><b>订单</b></td><td>Mediation</td><td>意向金→托管→里程碑→结算全状态</td><td>仅服务广场（其余线无交易订单）</td></tr>
+      <tr><td><b>询盘线索</b></td><td>LeadStore</td><td>「免费咨询」留资 → 工作台线索</td><td>服务广场专用</td></tr>
+      <tr><td><b>评价</b></td><td>SvcRatingStore</td><td>订单评价聚合 → 卡片口碑行</td><td>服务广场专用</td></tr>
+      <tr><td><b>企业档案</b></td><td>MOCK.companies</td><td>金V 机构归属与背书</td><td>资质招商 / 建企买卖 / 发现页</td></tr>
+      <tr><td><b>企业监控</b></td><td>monitor 配置</td><td>事件驱动导流（资质到期→代办）</td><td>全系统企业服务</td></tr>
+    </table>
+    <h4>服务广场专属字段（发布编辑器 agencyDetail 动态字段引擎）</h4>
+    <div class="grid g4">
+      <div class="box"><div class="bt">serveType</div><div class="bd">服务类型（资质/担保/造价/派遣）</div></div>
+      <div class="box"><div class="bt">quote</div><div class="bd">报价方式（全包/分项/按进度）</div></div>
+      <div class="box"><div class="bt">serveProcess</div><div class="bd">服务流程（分步说明）</div></div>
+      <div class="box"><div class="bt">requiredMaterials</div><div class="bd">所需材料清单</div></div>
+      <div class="box"><div class="bt">staffPolicy</div><div class="bd">人员配置承诺</div></div>
+      <div class="box"><div class="bt">cases</div><div class="bd">案例库（成功案例）</div></div>
+      <div class="box"><div class="bt">refundPolicy</div><div class="bd">退款政策（不过退款等）</div></div>
+      <div class="box"><div class="bt">overdueClause</div><div class="bd">超期赔付条款</div></div>
+    </div>
+    <h4>建企买卖重表单：四要素结构（已拍板）</h4>
+    <div class="grid g4">
+      <div class="box b-gold"><div class="bt">标的</div><div class="bd">资质等级/类别/注册地/注册资本</div></div>
+      <div class="box b-gold"><div class="bt">负债</div><div class="bd">债务/担保/诉讼/异常经营</div></div>
+      <div class="box b-gold"><div class="bt">人员</div><div class="bd">建造师/职称人员/社保情况</div></div>
+      <div class="box b-gold"><div class="bt">税务</div><div class="bd">纳税信用/欠税/发票状态</div></div>
+    </div>
+    <div class="note n-blue"><b>数据钻井（远期）：</b>服务广场的需求画像字段（目标/状态/时限/预算）从第一笔订单开始沉淀——这是未来「工程行情指数、服务商信用分、供应链金融」的数据底座。现在留存，避免将来重建。</div>
+  </div>
+
+  <!-- ================= 08 收入模型 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">08</div>
+      <div class="sec-title">系统级收入模型：佣金不是唯一，五层递进
+        <small>对照猪八戒「佣金有毒」教训：服务广场用资金闭环对抗跳单，佣金收在里程碑放款处</small>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-num">8%→3%</div><div class="k-lab">佣金阶梯（服务商侧）</div></div>
+      <div class="kpi"><div class="k-num">¥1万</div><div class="k-lab">最低佣金门槛</div></div>
+      <div class="kpi"><div class="k-num">29999</div><div class="k-lab">中介入驻费（破冰期 14999）</div></div>
+      <div class="kpi"><div class="k-num">¥5000</div><div class="k-lab">履约保证金基础档</div></div>
+    </div>
+    <table>
+      <tr><th>收入层</th><th>对应机制</th><th>现状</th><th>性质</th></tr>
+      <tr><td><b>交易佣金</b></td><td>里程碑释放时按阶梯扣取（用户侧隐藏）</td><td><span class="tag tag-green">已实现</span></td><td>核心收入</td></tr>
+      <tr><td><b>意向金/保证金沉淀</b></td><td>资金时间价值 + 违约罚没</td><td><span class="tag tag-green">已实现</span></td><td>资金杠杆</td></tr>
+      <tr><td><b>入驻费</b></td><td>建筑企业 3999 / 中介 29999 / 合伙人 0</td><td><span class="tag tag-green">已实现</span></td><td>准入收入</td></tr>
+      <tr><td><b>积分解锁</b></td><td>浏览付费 98 / 29-49（全系统信息费）</td><td><span class="tag tag-green">已实现</span></td><td>信息收入</td></tr>
+      <tr><td><b>服务商增值</b>（置顶/线索包/SaaS 工具）</td><td>工作台 + 排名加权</td><td><span class="tag tag-gray">未实现 · 规划中</span></td><td>增长收入</td></tr>
+      <tr><td><b>自营严选 + 数据产品</b></td><td>平台官方代办频道 / 行情报告 / 供应链金融</td><td><span class="tag tag-gray">远期</span></td><td>生态收入</td></tr>
+    </table>
+    <div class="note"><b>并行协同的收入逻辑：</b>资源线（招商/转让/人才）负责<b>聚流量</b>（信息费保底），服务广场负责<b>做深单</b>（佣金+沉淀），分销负责<b>拉新</b>（返佣成本换增长）。四条线不抢同一笔钱：信息费永远在「看」环节，佣金永远在「成交」环节。</div>
+  </div>
+
+  <!-- ================= 09 风险与治理 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">09</div>
+      <div class="sec-title">风险与治理：并行体系下的五条防线
+        <small>每条风险都有已落地或待落地的具体机制，防止「多线并行」变成「多线混乱」</small>
+      </div>
+    </div>
+    <div class="grid g2">
+      <div class="box b-red">
+        <div class="bt">跳单（结构性风险）</div>
+        <div class="bd">已有 <b>jumpContract</b> 全规则：警告 → 聊天封禁 7/30 天 → 首罚 ¥5000 → 停业 15 天 → 二次清退。<b>需补充：</b>跳单规则制度条款落到用户协议与保证金规则层。</div>
+      </div>
+      <div class="box b-red">
+        <div class="bt">服务非标 → 客诉</div>
+        <div class="bd">资质代办失败/延期是高频纠纷。已有「超期赔付 / 不过退款」兜底。<b>需补充：</b>平台调解 + 证据链机制（订单消息/进度留痕）。</div>
+      </div>
+      <div class="box b-red">
+        <div class="bt">低频 → 获客贵</div>
+        <div class="bd">一个买方一年仅 1-2 次需求。<b>解法：</b>需求澄清后 AI 长期跟踪 + 服务商主动跟进线索（LeadStore 已支持线索状态流转），拉高 LTV。</div>
+      </div>
+      <div class="box b-red">
+        <div class="bt">身份混淆（已发生的程序缺陷）</div>
+        <div class="bd">历史版本中「中介服务代表」与「入驻中介企业」混淆，导致服务广场无经营入口。已通过<b>入口物理分离</b>（用户侧页 / 个人中心工作台）解决。<b>守则：</b>后续任何页面不得让用户角色代行服务商操作。</div>
+      </div>
+      <div class="box b-purple">
+        <div class="bt">刷单 / 虚假供给</div>
+        <div class="bd"><b>需补充：</b>服务商信用分（履约率/响应/纠纷/评价）挂钩流量分配与费率；异常订单风控标记。</div>
+      </div>
+      <div class="box b-purple">
+        <div class="bt">资金语义混用</div>
+        <div class="bd">积分 / 诚意金 / 意向金 / 托管 / 保证金文案不得互相借用。<b>守则：</b>每个资金名词在全局唯一、页面口径一致（数据层已是单一数据源）。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 10 落地路径 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">10</div>
+      <div class="sec-title">落地路径：四阶段演进（对标猪八戒但压缩周期）
+        <small>当前处于阶段 0 与阶段 1 交界：信任基建已齐，闭环验证进行中</small>
+      </div>
+    </div>
+    <div class="timeline">
+      <div class="tl-row">
+        <div class="tl-time">阶段 0 · 现在</div>
+        <div class="tl-axis"><div class="tl-dot"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <h4>信任基建 + 双边冷启动</h4>
+          <p>金V 严选 + 需求先行 + AI 匹配 + 意向金闭环 + 资金托管 + 防跳单规则，已全部落地。<b>重点：</b>先攻服务商供给（中介入驻），再引买方流量。</p>
+          <span class="tag tag-green">已建成</span><span class="tag tag-gold">核心指标：撮合成功率 / 意向金→托管转化率 / 跳单率</span>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">阶段 1 · 3 个月内</div>
+        <div class="tl-axis"><div class="tl-dot"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <h4>闭环验证 + 交叉导流上线</h4>
+          <p>打通 04 章六条导流路径；服务详情页列项化完整落地；建企买卖四要素重表单验收。<b>核心：</b>验证「资源线导流 → 服务广场成交」的单客闭环是否成立。</p>
+          <span class="tag tag-gold">核心指标：导流点击率 / 详情页→下单转化率 / 首单满意度</span>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">阶段 2 · 3-6 个月</div>
+        <div class="tl-axis"><div class="tl-dot"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <h4>服务商分级 + 增值变现</h4>
+          <p>服务商信用分（履约/响应/纠纷/评价）挂钩流量与费率；置顶/线索包/SaaS 工具上线。<b>对标：</b>猪八戒店铺化 + 服务商分层。</p>
+          <span class="tag tag-gold">核心指标：在线下单占比 / 服务商续费率 / 增值收入占比</span>
+        </div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-time">阶段 3 · 12 个月+</div>
+        <div class="tl-axis"><div class="tl-dot"></div><div class="tl-line"></div></div>
+        <div class="tl-body">
+          <h4>数据驱动 + 生态化</h4>
+          <p>需求画像数据钻井：工程行情指数 / 服务商信用报告 / 供应链金融（订单贷/履约保险）。<b>远期：</b>自营严选频道（平台官方代办，毛利保护）。</p>
+          <span class="tag tag-gray">核心指标：GMV / 复购率（同一企业多次资产业务）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 11 待确认决策 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">11</div>
+      <div class="sec-title">待你拍板的五个决策点
+        <small>本方案已纳入全部历史确认项；以下五项为本次新增或需明确范围的决策</small>
+      </div>
+    </div>
+    <div class="decide">
+      <div class="decide-head"><span class="d-no">D1</span>服务商信用分体系</div>
+      <div class="decide-body">
+        <p>把「金V 认证」从静态标签升级为<b>动态信用分</b>（履约率 / 响应 / 纠纷 / 评价），直接挂钩流量分配与费率阶梯。这是双边平台治理的核心，也是猪八戒验证过的路径。</p>
+        <span class="tag tag-gold">建议：列入阶段 2</span><span class="tag tag-gray">影响面：工作台 + 卡片 + 匹配排序</span>
+      </div>
+    </div>
+    <div class="decide">
+      <div class="decide-head"><span class="d-no">D2</span>毛利保护 / 最低售价</div>
+      <div class="decide-body">
+        <p>对资质代办等核心品类设<b>最低可售服务费</b>（后台可调），防止服务商低价内卷导致服务质量崩塌。</p>
+        <span class="tag tag-gold">建议：阶段 1 配置化上线</span><span class="tag tag-gray">影响面：发布编辑器 + 详情页</span>
+      </div>
+    </div>
+    <div class="decide">
+      <div class="decide-head"><span class="d-no">D3</span>高频入口（顺手办式）</div>
+      <div class="decide-body">
+        <p>服务是低频刚需，需要标准化小服务（如<b>资质年检提醒 / 材料核验 / 政策查询</b>）拉回访频率，养流量池。</p>
+        <span class="tag tag-gray">建议：远期评估</span><span class="tag tag-gray">影响面：服务广场顶部 + 消息推送</span>
+      </div>
+    </div>
+    <div class="decide">
+      <div class="decide-head"><span class="d-no">D4</span>意向金解锁深度对接</div>
+      <div class="decide-body">
+        <p>对标猪八戒「付担保金可见联系方式」：当前「免费咨询」无门槛，可评估升级为<b>「咨询免费、成交价级意向金解锁深度对接」</b>，防无效询盘。</p>
+        <span class="tag tag-gray">建议：观察询盘质量后再定</span><span class="tag tag-gray">影响面：详情页 + 工作台线索</span>
+      </div>
+    </div>
+    <div class="decide">
+      <div class="decide-head"><span class="d-no">D5</span>服务商增值付费（置顶/线索包/SaaS）</div>
+      <div class="decide-body">
+        <p>是否现在就列入规划？直接影响服务商工作台的后续设计（增值位 / 工具模块预留）。</p>
+        <span class="tag tag-gold">建议：架构预留，功能后置</span><span class="tag tag-gray">影响面：工作台布局</span>
+      </div>
+    </div>
+    <div class="note"><b>执行前提：</b>以上五项确认后，按「先方案、后执行」原则逐项落地；本方案本身不修改任何代码。确认方式：回复各决策点编号 + 结论（如「D1 同意 / D2 暂缓」）。</div>
+  </div>
+
+  <!-- ================= 附录 ================= -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-no">附</div>
+      <div class="sec-title">附录：本方案的事实来源与口径
+        <small>所有数字可追溯，未做任何估算</small>
+      </div>
+    </div>
+    <table>
+      <tr><th>事实项</th><th>来源</th></tr>
+      <tr><td>佣金阶梯 8/6/5/4/3% · 最低佣金 1 万 · 里程碑 30/30/30/10 · 自动确认 14 天</td><td>js/data.js L1040-1048 commission</td></tr>
+      <tr><td>履约保证金 5000/20000/50000 三档</td><td>js/data.js L1044 commission.deposit</td></tr>
+      <tr><td>建企买卖诚意保证金 5000（tradeDeposit）</td><td>js/data.js L1011 · editor.html 多处引用</td></tr>
+      <tr><td>入驻费：建筑 3999 / 中介 29999 / 合伙人 0（破冰期 14999）</td><td>js/data.js L1026-1030, L1056-1063</td></tr>
+      <tr><td>意向金四档 100/500/800/5000 · 约成交价 20%</td><td>对话已拍板决策（用户确认）</td></tr>
+      <tr><td>防跳单规则（聊天封禁/罚款/清退）</td><td>js/data.js L1045 jumpContract</td></tr>
+      <tr><td>分销返佣 企业 12/3% · 个人 8/2%</td><td>js/data.js L968-969 distribution</td></tr>
+      <tr><td>积分解锁 98/580/1280 · 招商 29-49 · 人才 29</td><td>js/data.js L996-1010 credits</td></tr>
+      <tr><td>金刚区五入口（招商/转让/人才/服务/综合）</td><td>home.html L287-403 文件夹金刚区</td></tr>
+      <tr><td>服务广场用户侧流程（需求先行→匹配→详情→下单→意向金→托管）</td><td>pages/agency/index.html 全页 + 对话已拍板</td></tr>
+      <tr><td>服务商工作台（KPI/询盘/订单/服务/保证金/收入）</td><td>pages/agency/seller-board.html 全页</td></tr>
+      <tr><td>个人中心「服务经营」入口锁定于中介入驻</td><td>pages/profile/index.html L1504-1544</td></tr>
+      <tr><td>发布编辑器含「中介服务」品类 + agencyDetail 动态字段</td><td>pages/publish/editor.html L524-529, L2224-2298</td></tr>
+      <tr><td>发现页「中介服务」板块（聚合浏览入口）</td><td>pages/all-listings.html L228, L301-312</td></tr>
+    </table>
+  </div>
+
+  <div style="text-align:center;font-size:12px;color:var(--ink3);padding:10px 0 0;">Engchain 3.0 · 服务广场系统内多业务线并行方案 · V1.0 · 2026-09-09</div>
+</div>
+</body>
+</html>

@@ -206,7 +206,7 @@ function ok(name, cond, extra) {
       Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: 'u1', toAcct: 'available', amount: 200000, allowNegative: true, idemKey: 'seed_u1_' + Date.now(), remark: '测试注资' });
       Mediation.create({ buyerId: 'u1', sellerId: 'u2', svcId: 'a1', svcName: '测试订单', amount: 60000 });
       const o = Mediation.list({ uid: 'u2', role: 'seller' })[0];
-      Mediation.pay(o.id, 'balance'); Mediation.accept(o.id, 'u2');
+      Mediation.payIntent(o.id, 'balance'); Mediation.startService(o.id, 'balance'); Mediation.accept(o.id, 'u2');
       Mediation.confirmMilestone(o.id, 0, false);
     });
     await p.evaluate(() => { const t = document.getElementById('k-income-tile'); t && t.click(); });
@@ -236,7 +236,7 @@ function ok(name, cond, extra) {
       localStorage.removeItem('engchain-svc-ratings');
       Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: 'u1', toAcct: 'available', amount: 200000, allowNegative: true, idemKey: 'seed_u1_2_' + Date.now(), remark: '测试注资' });
       const o = Mediation.create({ buyerId: 'u1', sellerId: 'u2', svcId: 'a3', svcName: '安许代办', amount: 68000 });
-      Mediation.pay(o.id, 'balance'); Mediation.accept(o.id, 'u2');
+      Mediation.payIntent(o.id, 'balance'); Mediation.startService(o.id, 'balance'); Mediation.accept(o.id, 'u2');
       o.milestones.forEach((m, i) => { Mediation.confirmMilestone(o.id, i, false); });
       Mediation.settle(o.id);
       Mediation.review(o.id, 5, '很好');
@@ -244,6 +244,80 @@ function ok(name, cond, extra) {
       return g ? g.count + '/' + g.avg : null;
     });
     ok('订单评价聚合到服务卡片（a3: 1条/5分）', r === '1/5', r);
+    await p.close();
+  }
+
+  /* ========== 8. 意向金两段式（需求锁定 + 佣金保障） ========== */
+  console.log('\n[8] 意向金两段式（draft→intent→escrowed）');
+  {
+    const p = await page(); await seed(p, 'u1');
+    await goto(p, 'pages/agency/order.html?svc=0');
+    await new Promise(r => setTimeout(r, 600));
+    const r = await p.evaluate(() => {
+      localStorage.removeItem('engchain-mediation-orders');
+      localStorage.removeItem('engchain-ledger');
+      const out = {};
+      /* 档位计算：成交价×20% 就近取档 [100,500,800,5000] */
+      out.tier = [intentAmountOf(180000), intentAmountOf(60000), intentAmountOf(38000), intentAmountOf(2500), intentAmountOf(1000), intentAmountOf(4000)].join(',');
+      /* 两段式链路：create → payIntent → startService → accept */
+      Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: 'u1', toAcct: 'available', amount: 200000, allowNegative: true, idemKey: 'seed_u1_8_' + Date.now(), remark: '测试注资' });
+      const o = Mediation.create({ buyerId: 'u1', sellerId: 'u2', svcId: 'a1', svcName: '资质升级', category: 'agency', amount: 180000 });
+      out.intentAmt = o.intentAmount;
+      const p1 = Mediation.payIntent(o.id, 'balance');
+      out.afterIntent = p1.state + '/' + p1.intentPaid;
+      const c1 = Mediation.cancelIntent(o.id, '测试取消');
+      out.afterCancel = c1.state + '/' + c1.refund.amount + '/' + c1.refund.intent;
+      /* 再走一单完整启动：意向金转入托管 + 补足剩余 */
+      const o2 = Mediation.create({ buyerId: 'u1', sellerId: 'u2', svcId: 'a1', svcName: '资质升级', category: 'agency', amount: 180000 });
+      Mediation.payIntent(o2.id, 'balance');
+      const s2 = Mediation.startService(o2.id, 'balance');
+      out.afterStart = s2.state + '/' + s2.intentTransferred + '/' + s2.payMethod;
+      const m2 = Mediation.money(o2);
+      out.money = m2.escrowRemain;
+      /* 佣金保障：意向金在平台账户，未释放不计佣金；结算才入平台收入 */
+      const lg = Ledger.txns().filter(x => x.bizType === 'mediation_intent' || x.bizType === 'mediation_intent_transfer' || x.bizType === 'mediation_intent_refund');
+      out.ledger = lg.map(x => x.bizType + ':' + x.amount).join('|');
+      return out;
+    });
+    ok('意向金档位（18万→5000 / 6万→5000 / 3.8万→5000 / 2500→500 / 1000→100 / 4000→800）', r.tier === '5000,5000,5000,500,100,800', r.tier);
+    ok('下单支付意向金 → intent 状态', r.afterIntent === 'intent/true', r.afterIntent);
+    ok('启动前取消 → 意向金全额退还', r.afterCancel === 'refunded/5000/true', r.afterCancel);
+    ok('启动服务 → escrowed + 意向金转入托管', r.afterStart === 'escrowed/true/balance', r.afterStart);
+    ok('启动后托管资金=合同金额', r.money === 180000, String(r.money));
+    ok('意向金台账链路（付→转→退）', (r.ledger || '').indexOf('mediation_intent:5000') >= 0 && (r.ledger || '').indexOf('mediation_intent_transfer:5000') >= 0 && (r.ledger || '').indexOf('mediation_intent_refund:5000') >= 0, r.ledger);
+    await p.close();
+  }
+
+  /* ========== 9. 需求先行入口（场景卡 + AI 匹配） ========== */
+  console.log('\n[9] 需求先行入口（服务广场）');
+  {
+    const p = await page(); await seed(p, 'u1');
+    await goto(p, 'pages/agency/index.html');
+    await new Promise(r => setTimeout(r, 600));
+    ok('需求入口卡片渲染', (await count(p, '#need-card')) === 1);
+    ok('场景卡 5 个（办资质/新办企业/担保/造价/派遣）', (await count(p, '.ns-chip')) === 5, String(await count(p, '.ns-chip')));
+    ok('头部含「先说说你的需求」', (await txt(p, '#need-card')) !== null && (await txt(p, '#need-card')).indexOf('先说说你的需求') >= 0);
+    /* AI 匹配：填表单 → 出推荐 */
+    const r = await p.evaluate(() => {
+      const goal = document.getElementById('nf-goal'); goal.value = '资质升级';
+      const st = document.getElementById('nf-state'); st.value = '现有三级资质';
+      const bd = document.getElementById('nf-budget'); bd.value = '30';
+      window.doMatch();
+      const b = document.getElementById('match-banner');
+      return b ? { text: b.textContent.slice(0, 80), items: b.querySelectorAll('.mb-item').length } : null;
+    });
+    ok('AI 匹配推荐区渲染', !!r && r.items > 0, JSON.stringify(r));
+    ok('匹配含机构与预算提示', !!r && r.text.indexOf('合作机构') >= 0 && r.text.indexOf('预算内') >= 0, r && r.text);
+    /* 展开表单交互 */
+    const open = await p.evaluate(() => {
+      const f = document.getElementById('need-form');
+      const before = f.style.display;
+      window.toggleNeed();
+      const after = f.style.display;
+      window.toggleNeed();
+      return before + '→' + after;
+    });
+    ok('需求表单展开/收起', open === 'none→block', open);
     await p.close();
   }
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/franchise/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>修改委托 · 资质招商</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/delegates.css">
+<style>
+  /* ===== 修改委托页脚手架（表单/状态/注意事项样式来自 delegates.css） ===== */
+  .de-info { margin: 16px 16px 12px; padding: 13px 16px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); font-size: 12.5px; color: var(--text-2); line-height: 1.8; }
+  .de-info b { color: var(--text-1); font-weight: 600; }
+  .de-info .di-status { margin-right: 6px; }
+  .de-form { margin: 0 16px; padding: 16px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-xs); }
+  .de-title { display: flex; align-items: center; gap: 6px; font-size: 14.5px; font-weight: 700; color: var(--text-1); margin-bottom: 14px; }
+  .de-title svg { width: 16px; height: 16px; color: var(--primary-dim); }
+
+  /* ===== 底部保存栏 ===== */
+  .de-save-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: rgba(244,242,238,.92); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top: 1px solid var(--line); z-index: 20; }
+  .de-save-bar button { width: 100%; height: 48px; border: none; border-radius: var(--r-full); background: linear-gradient(135deg, var(--primary), var(--primary-dim)); color: var(--text-inv); font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px -3px var(--primary-dim); transition: transform var(--d-fast); }
+  .de-save-bar button:active { transform: scale(.98); }
+
+  /* ===== 空状态 ===== */
+  .de-empty { display: flex; flex-direction: column; align-items: center; padding: 90px 24px; text-align: center; }
+  .de-empty .de-ic { width: 64px; height: 64px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dim); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .de-empty .de-ic svg { width: 30px; height: 30px; }
+  .de-empty .de-et { font-size: 15px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; font-family: var(--font-display); }
+  .de-empty .de-ed { font-size: 12.5px; color: var(--text-3); line-height: 1.6; margin-bottom: 20px; }
+  .de-empty button { padding: 11px 32px; border-radius: var(--r-full); border: none; background: linear-gradient(135deg, var(--primary), var(--primary-dim)); color: var(--text-inv); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" id="navBack" aria-label="返回">‹</button>
+    <div class="nav-title">修改委托</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll no-pad" style="padding-bottom:110px;">
+    <div id="editRoot"></div>
+  </div>
+
+  <div class="de-save-bar" id="saveBar" style="display:none;">
+    <button type="button" id="deSaveBtn">保存修改</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/delegates.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  document.getElementById('navBack').addEventListener('click', function () {
+    if (history.length > 1) history.back();
+    else location.href = 'index.html';
+  });
+
+  /* 读取目标委托：优先 ?id=，缺省取最新一条资质招商委托 */
+  var q = {};
+  try { (location.search.slice(1).split('&') || []).forEach(function (s) { var kv = s.split('='); q[kv[0]] = decodeURIComponent(kv[1] || ''); }); } catch (e) {}
+  var d = (q.id ? Delegates.get(q.id) : null) || Delegates.franchiseCurrent();
+
+  var root = document.getElementById('editRoot');
+
+  if (!d) {
+    document.getElementById('saveBar').style.display = 'none';
+    root.innerHTML =
+      '<div class="de-empty">' +
+        '<div class="de-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>' +
+        '<div class="de-et">未找到委托信息</div>' +
+        '<div class="de-ed">您还没有提交委托，或委托数据已被清除。<br>可返回首页重新提交委托需求。</div>' +
+        '<button type="button" id="deEmptyBack">返回首页</button>' +
+      '</div>';
+    document.getElementById('deEmptyBack').addEventListener('click', function () { location.href = 'index.html'; });
+    return;
+  }
+
+  var status = Delegates.normStatus(d.status);
+  if (status === '已承接') {
+    /* 已承接不可修改（防御：正常流程不会进入本页） */
+    document.getElementById('saveBar').style.display = 'none';
+    root.innerHTML =
+      '<div class="de-empty">' +
+        '<div class="de-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg></div>' +
+        '<div class="de-et">委托已被承接</div>' +
+        '<div class="de-ed">您的委托已被顾问承接，正在服务中，详情不可修改。<br>如需调整请联系平台客服。</div>' +
+        '<button type="button" id="deAcceptedBack">返回</button>' +
+      '</div>';
+    document.getElementById('deAcceptedBack').addEventListener('click', function () { history.back(); });
+    return;
+  }
+
+  var st = Delegates.statusMeta(status);
+  root.innerHTML =
+    '<div class="de-info">' +
+      '<div>委托编号：<b>' + UI.esc(d.id || '—') + '</b></div>' +
+      '<div>提交时间：<b>' + UI.esc(d.submitTime || '—') + '</b></div>' +
+      '<div>当前状态：<span class="dd-status ' + st.cls + '"><span class="dot"></span>' + status + '</span></div>' +
+    '</div>' +
+    '<div class="de-form">' +
+      '<div class="de-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>修改委托信息</div>' +
+      '<div id="deFormRoot" class="df-form"></div>' +
+    '</div>' +
+    '<div class="dfm-notes" style="margin:12px 16px 0;">' +
+      '<div class="dfm-notes-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>提交注意事项</div>' +
+      '<ul>' +
+        '<li>修改提交后，专属顾问将在 <b>2小时内</b> 与您联系，请保持电话畅通；</li>' +
+        '<li>本服务免费，平台不会以委托名义向您收取任何费用；</li>' +
+        '<li>您的需求信息仅用于资质匹配，平台将严格保密；</li>' +
+        '<li>修改后的委托将重新进入「等待承接」状态，<b>已承接后不可更改详情</b>。</li>' +
+      '</ul>' +
+    '</div>';
+
+  var formRoot = document.getElementById('deFormRoot');
+  formRoot.innerHTML = Delegates.formHtml({ mode: 'franchise' });
+  Delegates.bindForm(formRoot);
+  Delegates.fillForm(formRoot, d);
+
+  document.getElementById('saveBar').style.display = 'block';
+
+  document.getElementById('deSaveBtn').addEventListener('click', function () {
+    var data = Delegates.collectForm(formRoot);
+    if (!data) return;
+    Delegates.upsert({
+      id: d.id,
+      biz: 'franchise', bizLabel: '资质招商', source: d.source || 'franchise',
+      type: data.type, qualLevel: data.qualLevel, mode: data.mode, budget: data.budget,
+      region: data.region, contact: data.contact, phone: data.phone,
+      backup: data.backup, note: data.note,
+      status: '等待承接'
+    });
+    UI.toast('委托已更新，顾问将尽快处理', 'ok');
+    setTimeout(function () {
+      if (history.length > 1) history.back();
+      else location.href = 'index.html';
+    }, 600);
+  });
+})();
+</script>
+</body>
+</html>
