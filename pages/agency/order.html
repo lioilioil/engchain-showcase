@@ -139,9 +139,23 @@ if(sumEl&&svc){
   sumEl.innerHTML='<span class="ss-ic"><svg class="ic"><use href="#i-check"/></svg></span>'+
     '<span class="ss-meta"><b>为「'+svc.name+'」在线下单</b><span>'+svc.cats.join(' · ')+' · 金V 已核验 · 资金托管</span></span>';
 }else if(sumEl){sumEl.style.display='none';}
-document.getElementById('svc-sel').innerHTML=SVCS.map(function(s,i){
-  var on=i===svcIdx;
-  return '<div class="od-card'+(on?' on':'')+'" onclick="pickSvc('+i+')">'+
+/* P1 fix: filter service list by category when svc param present */
+var _showSVCs=SVCS,_svcCatLabel='';
+if(!svcId&&svc&&svc.cats&&svc.cats[0]){
+  var _cat=svc.cats[0];
+  var _filtered=SVCS.filter(function(s){return s.cats.some(function(c){return c.indexOf(_cat)>=0||_cat.indexOf(c)>=0;});});
+  if(_filtered.length<3){
+    var _catMap={'劳务':/劳务|派遣|人力|班组/,'造价':/造价|审核|咨询|审计|结算/,'资质':/资质|升级|增项|分立|合并|新办|延续/,'担保':/担保|保函/,'工商':/工商|注册|安许|税务|记账/};
+    var _re=null;
+    for(var k in _catMap){if(_cat.indexOf(k)>=0){_re=_catMap[k];break;}}
+    if(_re){_filtered=SVCS.filter(function(s){return s.cats.some(function(c){return _re.test(c)||_re.test(s.name);});});}
+  }
+  if(_filtered.length>=2){_showSVCs=_filtered;_svcCatLabel=_cat;}
+}
+var _displayIdx=_showSVCs.indexOf(svc);if(_displayIdx<0)_displayIdx=0;
+document.getElementById('svc-sel').innerHTML=_showSVCs.map(function(s,i){
+  var on=i===_displayIdx;
+  return '<div class="od-card'+(on?' on':'')+'" onclick="pickSvc(\''+s.id+'\')">'+
     '<div class="od-radio"><svg class="ic"><use href="#i-check"/></svg></div>'+
     '<div class="od-av">'+s.icon+'<span class="od-v">金V</span></div>'+
     '<div class="od-main"><div class="fw-600 fs-13 od-name">'+s.name+'</div>'+
@@ -151,8 +165,10 @@ document.getElementById('svc-sel').innerHTML=SVCS.map(function(s,i){
 }).join('');
 if(!SVCS.length){
   document.getElementById('svc-sel').innerHTML='<div class="card"><div class="text-3 fs-12">暂无可下单的服务，请稍后再试或返回服务广场挑选。</div><div style="margin-top:10px;"><a class="btn btn-primary btn-sm" href="index.html">返回服务广场</a></div></div>';
+} else if(_svcCatLabel){
+  document.getElementById('svc-sel').insertAdjacentHTML('afterbegin','<div style="font-size:11px;color:var(--text-3);padding:2px 0 10px;">已按「'+_svcCatLabel+'」筛选 · 仅展示同类服务商</div>');
 }
-window.pickSvc=function(i){location.href='order.html?svc='+i;};
+window.pickSvc=function(sid){location.href='order.html?svcId='+sid;};
 
 var AMTS=[30000,60000,250000,600000,1200000];
 /* 金额预填优先级：URL amount（报价带入）> 未提交草稿 > 服务报价 > 默认 6 万（均可改） */
@@ -307,7 +323,7 @@ document.getElementById('pay-btn').addEventListener('click',function(){
 .of-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;}
 .of-dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--text-3);background:var(--bg-card-2);border:1px solid var(--line);}
 .of-step.of-on .of-dot{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);border:none;box-shadow:0 3px 8px rgba(201,169,97,.35);}
-.of-t{font-size:9.5px;color:var(--text-3);white-space:nowrap;}
+.of-t{font-size:11px;color:var(--text-3);white-space:nowrap;}
 .of-step.of-on .of-t{color:var(--primary-dim);font-weight:700;}
 .of-line{flex:1;height:1.5px;background:var(--line);margin:10px 6px 0;border-radius:2px;}
 .mo-link{font-size:12px;font-weight:600;color:var(--primary-dim);cursor:pointer;}

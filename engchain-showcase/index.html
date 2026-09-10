@@ -3,24 +3,33 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工程链 ENGCHAIN · 全屏展示</title>
+<title>工程链 ENGCHAIN · 全局展示</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #F4F2EE; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
   [data-theme="dark"] body, body.dark { background: #1A1816; }
 
-  .showcase-wrap { width: 100%; height: 100%; display: flex; justify-content: center; align-items: stretch; position: relative; }
+  .showcase-wrap { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; position: relative; }
 
-  /* iframe 容器：最大手机宽度，居中，窗口小时自适应 */
+  /* iframe 容器：默认 iPhone 16 Pro 比例 390×844，居中 */
   .showcase-frame {
-    width: min(100%, 430px);
-    height: 100%;
+    width: 390px;
+    height: 844px;
+    max-width: 100%;
+    max-height: 100vh;
     border: none;
     display: block;
     background: #F4F2EE;
     box-shadow: 0 0 40px rgba(0,0,0,.08);
   }
   [data-theme="dark"] .showcase-frame, body.dark .showcase-frame { background: #1A1816; box-shadow: 0 0 40px rgba(0,0,0,.3); }
+
+  /* Pura X View 比例：390×655 */
+  body.model-pura .showcase-frame { height: 655px; }
+
+  /* 手机浏览器全屏模式 */
+  body.model-fullscreen .showcase-wrap { align-items: stretch; }
+  body.model-fullscreen .showcase-frame { width: 100%; height: 100%; max-width: 100%; max-height: 100%; box-shadow: none; }
 
   /* 返回 preview 模式的浮动按钮 */
   .back-to-preview {
@@ -43,44 +52,151 @@
     opacity: .5;
   }
   .back-to-preview:hover { opacity: 1; transform: translateY(-1px); }
+
+  /* 浮动机型切换器 */
+  .model-switcher {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(28,26,20,.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.15);
+    transition: opacity .3s;
+  }
+  .model-switcher button {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,.6);
+    background: transparent;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .model-switcher button.active {
+    background: rgba(255,255,255,.18);
+    color: #fff;
+  }
+  .model-switcher button:hover { color: #fff; }
+  .model-switcher.hidden { opacity: 0; pointer-events: none; }
+
+  /* 全屏模式下隐藏切换器 */
+  body.model-fullscreen .model-switcher { display: none; }
 </style>
 </head>
 <body>
-  <a href="../preview.html" class="back-to-preview" title="返回带 iPhone 模型的预览模式">← 预览模式</a>
+  <a href="../preview.html" class="back-to-preview" title="返回带手机模型的预览模式">← 预览模式</a>
   <div class="showcase-wrap">
     <iframe id="app-frame" class="showcase-frame" src="../home.html" title="工程链 ENGCHAIN" allow="clipboard-read; clipboard-write"></iframe>
   </div>
+  <div class="model-switcher" id="model-switcher">
+    <button type="button" data-model="iphone" class="active">iPhone</button>
+    <button type="button" data-model="pura">Pura</button>
+  </div>
 <script>
-  // 同步主题：读取 localStorage 中的主题设置，应用到 body
-  (function() {
-    try {
-      var state = JSON.parse(localStorage.getItem('engchain-state') || '{}');
-      if (state.theme === 'dark' || document.documentElement.getAttribute('data-theme') === 'dark') {
-        document.body.classList.add('dark');
-      }
-    } catch(e) {}
-  })();
+(function() {
+  // 同步主题
+  try {
+    var state = JSON.parse(localStorage.getItem('engchain-state') || '{}');
+    if (state.theme === 'dark' || document.documentElement.getAttribute('data-theme') === 'dark') {
+      document.body.classList.add('dark');
+    }
+  } catch(e) {}
 
-  // 监听 iframe 内的主题切换，同步到外层 body
+  // 监听 iframe 内主题切换
   document.getElementById('app-frame').addEventListener('load', function() {
     try {
       var innerDoc = this.contentDocument;
       if (innerDoc) {
         var syncTheme = function() {
           var innerTheme = innerDoc.documentElement.getAttribute('data-theme');
-          if (innerTheme === 'dark') {
-            document.body.classList.add('dark');
-          } else {
-            document.body.classList.remove('dark');
-          }
+          if (innerTheme === 'dark') document.body.classList.add('dark');
+          else document.body.classList.remove('dark');
         };
         syncTheme();
-        // 监听 iframe 内的主题变化
         var observer = new MutationObserver(syncTheme);
         observer.observe(innerDoc.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
       }
     } catch(e) {}
   });
+
+  // 机型管理
+  function getModelFromUrl() {
+    try {
+      var p = new URLSearchParams(location.search);
+      return p.get('model') || 'auto';
+    } catch(e) { return 'auto'; }
+  }
+
+  function applyModel(model) {
+    document.body.classList.remove('model-iphone', 'model-pura', 'model-fullscreen');
+    if (model === 'pura') {
+      document.body.classList.add('model-pura');
+    } else if (model === 'fullscreen') {
+      document.body.classList.add('model-fullscreen');
+    } else {
+      document.body.classList.add('model-iphone');
+    }
+    // 更新切换器状态
+    document.querySelectorAll('.model-switcher button').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-model') === model);
+    });
+    try { localStorage.setItem('engchain-showcase-model', model); } catch(e) {}
+  }
+
+  // 自动判断：窄窗口（手机浏览器）→ fullscreen；宽窗口 → 上次选择或 iphone
+  var urlModel = getModelFromUrl();
+  var initModel;
+  if (urlModel === 'auto' || !urlModel) {
+    if (window.innerWidth < 500) {
+      initModel = 'fullscreen';
+    } else {
+      try { initModel = localStorage.getItem('engchain-showcase-model') || 'iphone'; } catch(e) { initModel = 'iphone'; }
+      if (initModel === 'fullscreen') initModel = 'iphone'; // 电脑端不默认全屏
+    }
+  } else {
+    initModel = urlModel;
+  }
+  applyModel(initModel);
+
+  // 切换器点击
+  document.querySelectorAll('.model-switcher button').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      applyModel(this.getAttribute('data-model'));
+    });
+  });
+
+  // 窗口尺寸变化时自动判断（仅 auto 模式）
+  var resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (urlModel === 'auto') {
+        if (window.innerWidth < 500) applyModel('fullscreen');
+        else if (document.body.classList.contains('model-fullscreen')) applyModel('iphone');
+      }
+    }, 200);
+  });
+
+  // 切换器自动隐藏（3秒无操作）
+  var switcher = document.getElementById('model-switcher');
+  var hideTimer;
+  function showSwitcher() {
+    switcher.classList.remove('hidden');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function() { switcher.classList.add('hidden'); }, 3000);
+  }
+  showSwitcher();
+  document.addEventListener('mousemove', showSwitcher);
+  document.addEventListener('touchstart', showSwitcher);
+})();
 </script>
 </body>
 </html>

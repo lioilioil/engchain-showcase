@@ -236,6 +236,8 @@ window.UI = (function () {
 
     // 预加载其他 Tab 页面（浏览器空闲时预取 HTML，加速后续跳转）
     prefetch: function () {
+      // UX-FIX：后台（/admin/）页面不引入 App 端 Tab 导航，预取 App 路由会解析成 /admin/... 全部 404，直接跳过。
+      try { if (location.pathname.indexOf('/admin/') !== -1) return; } catch (e) {}
       var root = window.__ROOT__ || '';
       var pages = [
         'home.html',
@@ -799,6 +801,128 @@ window.ViewHistory = ViewHistory;
       UI.ensureThinkingOrb(function () { window.ThinkingOrb.initAll(); });
       UI.initTabbarGlass();
     }
+    /* ---- Pura X View 侧边栏布局（仅短屏触发，不影响 iPhone） ---- */
+    if (phone && window.innerHeight <= 720 && !phone.querySelector('.pura-sidebar')) {
+      (function initPuraSidebar() {
+        var root = window.__ROOT__ || '';
+        var activeTab = document.body.dataset.tab || 'home';
+        var SIDEBAR_TABS = [
+          { key: 'home',     label: '首页', href: root + 'home.html',                    icon: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z"/>' },
+          { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',       icon: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>' },
+          { key: 'message',  label: '消息', href: root + 'pages/message/index.html',     icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>', badge: 3 },
+          { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',     icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' }
+        ];
+
+        /* 读取持久化状态：默认展开 */
+        var collapsed = false;
+        try { collapsed = localStorage.getItem('engchain-pura-sidebar') === 'collapsed'; } catch(e) {}
+
+        /* 构建侧边栏 HTML（含收起按钮） */
+        var sidebarHTML = '<nav class="pura-sidebar active" aria-label="主导航">' +
+          '<div class="ps-user" id="ps-user" title="个人中心">我</div>' +
+          '<div class="ps-tabs">' +
+          SIDEBAR_TABS.map(function(t) {
+            return '<button class="ps-tab' + (activeTab === t.key ? ' active' : '') + '" data-href="' + t.href + '" data-key="' + t.key + '" title="' + t.label + '">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + t.icon + '</svg>' +
+              (t.badge ? '<span class="ps-badge">' + t.badge + '</span>' : '') +
+            '</button>';
+          }).join('') +
+          '<button class="ps-fab" data-href="' + root + 'pages/publish/index.html' + '" title="发布">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>' +
+          '</button>' +
+          '</div>' +
+          '<div class="ps-bottom">' +
+            '<button class="ps-theme" id="ps-theme" title="切换主题">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>' +
+            '</button>' +
+            '<button class="ps-collapse" id="ps-collapse" title="收起侧边栏">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>' +
+            '</button>' +
+          '</div>' +
+        '</nav>';
+
+        /* 展开把手（收起态显示在屏幕左侧边缘） */
+        var expandHandleHTML = '<button class="ps-expand-handle" id="ps-expand-handle" title="展开侧边栏" style="display:none;">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg>' +
+        '</button>';
+
+        /* 创建内容区包裹层，将 phone 原有子元素移入 */
+        var content = document.createElement('div');
+        content.className = 'pura-content';
+        while (phone.firstChild) {
+          content.appendChild(phone.firstChild);
+        }
+
+        /* 插入侧边栏、展开把手和内容区 */
+        phone.insertAdjacentHTML('afterbegin', sidebarHTML + expandHandleHTML);
+        phone.appendChild(content);
+        phone.classList.add('has-pura-sidebar');
+
+        /* 状态栏/灵动岛移到 phone 直接子元素，确保全宽绝对定位相对于 phone（而非 content） */
+        var sb = content.querySelector('.status-bar');
+        if (sb) phone.insertBefore(sb, phone.firstChild);
+        var di = content.querySelector('.dynamic-island');
+        if (di) phone.insertBefore(di, phone.firstChild);
+
+        /* 切换函数 */
+        function setSidebarCollapsed(collapse) {
+          collapsed = collapse;
+          try { localStorage.setItem('engchain-pura-sidebar', collapse ? 'collapsed' : 'expanded'); } catch(e) {}
+          phone.classList.toggle('sidebar-collapsed', collapse);
+          var handle = document.getElementById('ps-expand-handle');
+          if (handle) handle.style.display = collapse ? 'flex' : 'none';
+        }
+
+        /* 绑定 Tab 点击 */
+        phone.querySelectorAll('.ps-tab, .ps-fab').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var href = this.getAttribute('data-href');
+            if (href) {
+              if (window.UI && UI.pageTransition) {
+                UI.pageTransition.start(href);
+              } else {
+                window.location.href = href;
+              }
+            }
+          });
+        });
+
+        /* 头像点击进个人中心 */
+        var psUser = document.getElementById('ps-user');
+        if (psUser) {
+          psUser.addEventListener('click', function() {
+            window.location.href = root + 'pages/profile/index.html';
+          });
+        }
+
+        /* 主题切换 */
+        var psTheme = document.getElementById('ps-theme');
+        if (psTheme) {
+          psTheme.addEventListener('click', function() {
+            var cur = document.documentElement.getAttribute('data-theme') || 'light';
+            var next = cur === 'dark' ? 'light' : 'dark';
+            if (window.UI && UI.theme) UI.theme.set(next);
+          });
+        }
+
+        /* 收起按钮 */
+        var psCollapse = document.getElementById('ps-collapse');
+        if (psCollapse) {
+          psCollapse.addEventListener('click', function() { setSidebarCollapsed(true); });
+        }
+
+        /* 展开把手 */
+        var psExpand = document.getElementById('ps-expand-handle');
+        if (psExpand) {
+          psExpand.addEventListener('click', function() { setSidebarCollapsed(false); });
+        }
+
+        /* 初始化状态 */
+        setSidebarCollapsed(collapsed);
+      })();
+    }
+
     // 付费墙字段（contact-grid 内由详情页自行唤起付费墙，避免与全局提示重复）
     document.querySelectorAll('.obscured').forEach(function (el) {
       if (el.closest('.contact-grid')) return;

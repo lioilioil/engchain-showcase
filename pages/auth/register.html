@@ -12,6 +12,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>注册 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<style>
+  .field-err{min-height:0;font-size:12px;color:var(--danger,#e8564f);margin-top:4px;line-height:1.4;display:none;}
+  .field.has-error .input{border-color:var(--danger,#e8564f);}
+  .pwd-wrap{position:relative;}
+  .pwd-wrap .input{padding-right:56px;}
+  .pwd-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:none;background:transparent;color:var(--text-3);font-size:12px;cursor:pointer;padding:8px 4px;line-height:1;}
+</style>
 </head>
 <body>
 <div class="phone">
@@ -27,11 +34,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="text-3 fs-12" style="margin-top:4px;">一分钟注册，开启供需匹配</div>
     </div>
 
-    <div class="field"><label class="field-label">手机号</label><input class="input" id="phone" placeholder="请输入手机号" maxlength="11" value="13800008866"></div>
+    <div class="field"><label class="field-label">手机号</label><input class="input" id="phone" inputmode="numeric" placeholder="请输入手机号" maxlength="11" value="13800008866"><div class="field-err" id="err-phone"></div></div>
     <div class="field"><label class="field-label">验证码</label>
-      <div class="f-flex" style="gap:10px;"><input class="input" placeholder="请输入验证码" maxlength="6" value="123456"><button class="btn btn-ghost" style="white-space:nowrap;flex:none;" onclick="UI.toast('验证码已发送','ok')">获取验证码</button></div>
+      <div class="f-flex" style="gap:10px;"><input class="input" id="sms" inputmode="numeric" placeholder="请输入验证码" maxlength="6" value="123456"><button class="btn btn-ghost" type="button" style="white-space:nowrap;flex:none;" onclick="sendSms(this)">获取验证码</button></div>
+      <div class="field-err" id="err-sms"></div>
     </div>
-    <div class="field"><label class="field-label">设置密码</label><input class="input" type="password" placeholder="6-20位，含字母和数字" value="abc123456"></div>
+    <div class="field"><label class="field-label">设置密码</label>
+      <div class="pwd-wrap"><input class="input" id="pwd" type="password" placeholder="6-20位，含字母和数字" value="abc123456"><button type="button" class="pwd-toggle" id="pwdToggle" aria-label="显示密码">显示</button></div>
+      <div class="field-err" id="err-pwd"></div>
+    </div>
     <div class="field"><label class="field-label">邀请码（选填）</label><input class="input" id="invite" placeholder="填写好友邀请码，双方各得积分"></div>
     <div class="field"><label class="field-label">你的身份</label>
       <div style="font-size:12px;color:var(--text-2);line-height:1.7;margin-top:2px;">供需一体账号：注册后既是需方也是供方，可随时发布需求或供应，无需切换身份。</div>
@@ -56,8 +67,56 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function(){window.__ROOT__='../../';
 /* 海报/链接带来的邀请码自动回填 */
 try{var qs=new URLSearchParams(location.search);var ic=qs.get('invite');if(ic){var inp=document.getElementById('invite');inp.value=ic.toUpperCase();}}catch(e){}
-window.reg=function(){if(!document.getElementById('agree').checked){UI.toast('请先同意用户协议','warn');return;}
-  var phone=document.getElementById('phone').value.trim();var st=UI.state.get();
+
+/* ---- P0 表单校验：字段级错误提示 ---- */
+function setErr(field,msg){
+  var box=document.getElementById('err-'+field);
+  var input=document.getElementById(field);
+  if(box){box.textContent=msg||'';box.style.display=msg?'block':'none';}
+  if(input&&input.closest('.field'))input.closest('.field').classList.toggle('has-error',!!msg);
+}
+function valPhone(){var v=document.getElementById('phone').value.trim();
+  if(!v){setErr('phone','请输入手机号');return null;}
+  if(!/^1[3-9]\d{9}$/.test(v)){setErr('phone','手机号格式不正确，需11位大陆手机号');return null;}
+  setErr('phone','');return v;}
+function valSms(){var v=document.getElementById('sms').value.trim();
+  if(!v){setErr('sms','请输入短信验证码');return null;}
+  if(!/^\d{6}$/.test(v)){setErr('sms','验证码为6位数字');return null;}
+  setErr('sms','');return v;}
+function valPwd(){var v=document.getElementById('pwd').value;
+  if(!v){setErr('pwd','请设置密码');return null;}
+  if(v.length<6||v.length>20){setErr('pwd','密码长度需为6-20位');return null;}
+  if(!(/[A-Za-z]/.test(v)&&/\d/.test(v))){setErr('pwd','密码需同时包含字母和数字');return null;}
+  setErr('pwd','');return v;}
+
+/* 输入时即时清除该字段错误 */
+[['phone',valPhone],['sms',valSms],['pwd',valPwd]].forEach(function(p){
+  var el=document.getElementById(p[0]);
+  if(el)el.addEventListener('input',function(){p[1]();});
+});
+
+/* 密码显隐切换（UX-150） */
+(function(){
+  var pwd=document.getElementById('pwd'),tg=document.getElementById('pwdToggle');
+  if(tg)tg.addEventListener('click',function(){
+    var show=pwd.type==='password';pwd.type=show?'text':'password';tg.textContent=show?'隐藏':'显示';
+  });
+})();
+
+/* 获取验证码：倒计时（仅前端演示，不发请求） */
+window.sendSms=function(btn){
+  var v=valPhone();if(!v)return;
+  var s=60;btn.disabled=true;var old=btn.textContent;
+  var t=setInterval(function(){btn.textContent=s+'s 后重发';if(--s<0){clearInterval(t);btn.disabled=false;btn.textContent=old;}},1000);
+  UI.toast('验证码已发送至 '+v,'ok');
+};
+
+window.reg=function(){
+  var phone=valPhone();var sms=valSms();var pwd=valPwd();
+  var agree=document.getElementById('agree');
+  if(!agree.checked){UI.toast('请先阅读并同意用户协议与隐私政策','warn');return;}
+  if(!phone||!sms||!pwd)return;   /* 任一字段不通过：不弹成功 toast，聚焦首个错误 */
+  var st=UI.state.get();
   /* 新账号落用户表并登录，保证后续邀请关系/返佣挂到稳定 uid */
   var nu=null;
   try{nu=Domain.provisionUser(phone||st.account||('demo'+Date.now()));DataBus.login(nu.id);}catch(e){}

@@ -83,7 +83,7 @@ window.DataBus = (function () {
         identity:{ personal:'partner', partner:true, enterprise:'none', identities:['realname','partner'], entryTypes:[] },
         auth:{ realname:{ok:true,ts:now-DAY*15,name:'孙小美',idNo:'',mobile:'138****6789',idMask:''},
           enterprise:{ok:false,expireAt:0}, personalQual:{ok:false,list:[]},
-          personalEntry:{ok:false,status:'',list:[],certs:[],profile:{basic:{},education:[],work:[],project:[],skills:[],jobIntent:{},intro:'',resumeFile:''}},
+          personalEntry:{ok:false,status:'',list:[],certs:[],profile:{basic:{},education:[],work:[],project:[],skills:[],jobIntent:{},intro:'',resumeFile:'',regStatus:null,socialSecurity:null}},
           enterpriseQual:{ok:false,list:[]},
           partner:{ok:true,status:'approved',note:'',submittedAt:now-DAY*10,approvedAt:now-DAY*8,
             channel:['朋友圈','社群','短视频'], intent:'两者兼有',
@@ -379,9 +379,22 @@ window.DataBus = (function () {
         u.auth.personalQual = JSON.parse(JSON.stringify(u.auth.qual));
         /* v3.0：同步 personalEntry */
         if (!u.auth.personalEntry) u.auth.personalEntry = { ok: true, status: 'approved', note: '', submittedAt: t, list: u.auth.qual.list, certs: u.auth.qual.certs || [],
-          profile: { basic: {}, education: [], work: [], project: [], skills: [], jobIntent: {}, intro: '', resumeFile: '' } };
+          profile: { basic: {}, education: [], work: [], project: [], skills: [], jobIntent: {}, intro: '', resumeFile: '', regStatus: null, socialSecurity: null } };
         u.auth.personalEntry.ok = true; u.auth.personalEntry.status = 'approved';
         u.auth.personalEntry.list = u.auth.qual.list; u.auth.personalEntry.certs = u.auth.qual.certs || [];
+        /* 阶段一：qual 审核通过 → 激活对应用户的人才条目（pending_review → active） */
+        try {
+          if (window.SupplyStore && u.auth.personalEntry.userType === 'jobseeker' && u.auth.personalEntry.resumeComplete) {
+            var tid = 'talent-u' + (u.account || u.id || '');
+            var item = SupplyStore.byId(tid);
+            if (item) {
+              item.status = 'active';
+              item.verified = true;
+              SupplyStore.remove(tid);
+              SupplyStore.add(item);
+            }
+          }
+        } catch (eTalent) { console.warn('activate talent item error', eTalent); }
       }
     } else return null;
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);

@@ -207,36 +207,45 @@
     }).join('');
   }
 
-  /* ---- 权限矩阵 ---- */
+  /* ---- 权限矩阵（分批渲染优化） ---- */
+  var _matrixBuilt = false;
   function renderMatrix() {
-    var html = '';
-    /* 模块可见性行 */
+    var tbody = $("#perm-body");
+    if (!_matrixBuilt) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted);">权限矩阵加载中…</td></tr>';
+      requestAnimationFrame(function(){ setTimeout(function(){ _buildMatrix(); _matrixBuilt = true; }, 0); });
+    } else { _buildMatrix(); }
+  }
+  function _buildMatrix() {
+    var tbody = $("#perm-body");
+    var html = "";
     MODULES.forEach(function (mod) {
       var cells = ROLE_IDS.map(function (rid) {
         var allowed = MODULE_ACCESS[rid] && MODULE_ACCESS[rid][mod.key];
-        return '<td class="text-center">' + (allowed
-          ? '<span class="badge badge-success">✓</span>'
-          : '<span class="tx-muted">✗</span>') + '</td>';
-      }).join('');
-      html += '<tr><td class="tx-medium">' + esc(mod.label) + '</td>' + cells + '</tr>';
+        return '<td class="text-center">' + (allowed ? '<span class="badge badge-success">✓</span>' : '<span class="tx-muted">✗</span>') + '</td>';
+      }).join("");
+      html += "<tr><td class=\"tx-medium\">" + esc(mod.label) + "</td>" + cells + "</tr>";
     });
-    /* 分隔行 */
     html += '<tr><td colspan="5" class="table-group-header">操作权限点（来自 Admin.perms）</td></tr>';
-    /* 操作权限点行 */
     var perms = getMergedPerms();
-    Object.keys(perms).forEach(function (pkey) {
-      var desc = PERM_DESC[pkey];
-      var label = desc ? desc.label : pkey;
-      var cells = ROLE_IDS.map(function (rid) {
-        var allowed = hasPerm(pkey, rid);
-        var disabled = rid === 'super' ? ' disabled' : '';
-        return '<td class="text-center">' +
-          '<input type="checkbox" class="switch" data-perm-key="' + esc(pkey) + '" data-role="' + rid + '"' + (allowed ? ' checked' : '') + disabled + '>' +
-          '</td>';
-      }).join('');
-      html += '<tr><td class="tx-medium">' + esc(label) + '<div class="td-sub">' + esc(pkey) + '</div></td>' + cells + '</tr>';
-    });
-    $('#perm-body').innerHTML = html;
+    var pkeys = Object.keys(perms);
+    var chunkSize = 8;
+    function buildChunk(start) {
+      for (var i = start; i < Math.min(start + chunkSize, pkeys.length); i++) {
+        var pkey = pkeys[i];
+        var desc = PERM_DESC[pkey];
+        var label = desc ? desc.label : pkey;
+        var cells = ROLE_IDS.map(function (rid) {
+          var allowed = hasPerm(pkey, rid);
+          var disabled = rid === "super" ? " disabled" : "";
+          return '<td class="text-center"><input type="checkbox" class="switch" data-perm-key="' + esc(pkey) + '" data-role="' + rid + '"' + (allowed ? " checked" : "") + disabled + '></td>';
+        }).join("");
+        html += "<tr><td class=\"tx-medium\">" + esc(label) + '<div class="td-sub">' + esc(pkey) + "</div></td>" + cells + "</tr>";
+      }
+      if (start + chunkSize < pkeys.length) { tbody.innerHTML = html; requestAnimationFrame(function(){ buildChunk(start + chunkSize); }); }
+      else { tbody.innerHTML = html; }
+    }
+    buildChunk(0);
   }
 
   /* ---- 权限点说明列表 ---- */
@@ -414,9 +423,11 @@
     renderKPI();
     renderRoles();
     renderMatrix();
-    renderPermDesc();
-    renderLogs();
-    if (Admin.applyPerms) Admin.applyPerms();
+    requestAnimationFrame(function(){
+      renderPermDesc();
+      renderLogs();
+      if (Admin.applyPerms) Admin.applyPerms();
+    });
   }
 
   function init() {
