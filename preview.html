@@ -13,6 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <title>工程链 ENGCHAIN · 高保真交互原型(总览)</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/iphone-frame.css">
+<link rel="stylesheet" href="css/pura-frame.css">
 <script type="module" src="vendor/browser-window.js"></script>
 <style>
   * { box-sizing: border-box; }
@@ -28,10 +29,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .pv-showcase-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; text-decoration: none; color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-dim)); box-shadow: 0 2px 8px rgba(201,169,97,.3); transition: transform .15s, box-shadow .15s; }
 .pv-showcase-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(201,169,97,.4); }
 
+  /* 手机模型名称标签：下移10px，居中 */
+  .ip-label {
+    text-align: center;
+    margin-top: 30px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-3);
+    letter-spacing: .02em;
+  }
+
   /* 演示状态控制台 */
   .pv-state { margin: 14px 16px 6px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-card); padding: 12px 12px 6px; }
   .pv-state .ss-title { font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
   .pv-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; }
+
+  .color-swatches { display: flex; gap: 8px; align-items: center; }
+  .swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; transition: all .15s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--primary,#C9A961), 0 1px 4px rgba(0,0,0,.3); }
+
   .pv-row .k { font-size: 12.5px; color: var(--text-2); }
   .seg { display: inline-flex; background: var(--bg-card-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
   .seg button { border: 0; background: transparent; color: var(--text-2); font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; transition: background var(--d-fast), color var(--d-fast); }
@@ -160,6 +177,140 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   #bw-admin { width: 100%; height: 660px; display: flex; flex-direction: column; }
   .stage-label { font-size: 12px; font-weight: 700; color: var(--text-2); letter-spacing: .04em; }
   .stage-label em { font-style: normal; color: var(--gold, #C9A961); }
+
+  /* ---- 全屏展示 · 设备选择弹窗（浏览器窗口居中，自适应尺寸） ---- */
+  .fs-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    background: rgba(16, 15, 12, .50);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0; visibility: hidden;
+    transition: opacity var(--d-norm) ease, visibility var(--d-norm) ease;
+  }
+  .fs-overlay.open { opacity: 1; visibility: visible; }
+  .fs-dialog {
+    width: min(680px, 100%);
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-xl);
+    transform: translateY(14px) scale(.98);
+    transition: transform var(--d-norm) var(--e-out);
+  }
+  .fs-overlay.open .fs-dialog { transform: translateY(0) scale(1); }
+  .fs-dialog-hd {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--line);
+  }
+  .fs-dialog-hd .fs-title { font-size: 16px; font-weight: 800; letter-spacing: .01em; }
+  .fs-dialog-hd .fs-title em { font-style: normal; color: var(--primary); }
+  .fs-dialog-hd .fs-sub { font-size: 11.5px; color: var(--text-3); margin-top: 4px; line-height: 1.6; }
+  .fs-close {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; margin-top: 2px;
+    border: 1px solid var(--line); border-radius: var(--r-full);
+    background: var(--bg-card-2); color: var(--text-2); cursor: pointer;
+    transition: background var(--d-fast), color var(--d-fast), border-color var(--d-fast), transform var(--d-fast);
+  }
+  .fs-close:hover { background: var(--primary-soft); color: var(--primary-dim); border-color: var(--primary-dim); }
+  .fs-close:active { transform: scale(.9); }
+  .fs-body { padding: 18px 20px 22px; }
+  .fs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .fs-card {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 11px;
+    padding: 18px 12px 16px;
+    border: 1.5px solid var(--line); border-radius: var(--r-l);
+    background: var(--bg-card-2); cursor: pointer; outline: none;
+    transition: border-color var(--d-fast), transform var(--d-fast), box-shadow var(--d-fast), background var(--d-fast);
+  }
+  .fs-card:hover, .fs-card:focus-visible {
+    border-color: var(--primary); background: var(--bg-card); box-shadow: var(--shadow-card);
+    transform: translateY(-3px);
+  }
+  .fs-card:focus-visible { box-shadow: var(--shadow-card), var(--shadow-focus); }
+  .fs-card.disabled { cursor: not-allowed; filter: grayscale(1); opacity: .52; }
+  .fs-card.disabled:hover, .fs-card.disabled:focus-visible {
+    transform: none; border-color: var(--line); background: var(--bg-card-2); box-shadow: none;
+  }
+  .fs-badge {
+    position: absolute; top: 10px; right: 10px;
+    font-size: 10px; font-weight: 700; letter-spacing: .02em;
+    padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .fs-badge.ok { background: var(--primary-soft); color: var(--primary-dim); }
+  .fs-badge.na { background: rgba(154, 123, 31, .12); color: var(--text-3); }
+  [data-theme="dark"] .fs-badge.na { background: rgba(255, 255, 255, .07); color: var(--text-3); }
+
+  /* 手机轮廓（纯 CSS 绘制，轻量无图） */
+  .fs-phone { position: relative; flex: none; }
+  .fs-phone .scr {
+    position: absolute; overflow: hidden; border-radius: 9px;
+    background:
+      linear-gradient(165deg, rgba(201, 169, 97, .30), rgba(201, 169, 97, .05) 58%, rgba(201, 169, 97, .12) 100%),
+      var(--bg-inset);
+    box-shadow: inset 0 0 0 1px rgba(22, 22, 22, .06);
+  }
+  [data-theme="dark"] .fs-phone .scr { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+  .fs-phone .bar {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    height: 2.5px; border-radius: 2px; background: var(--text-4); opacity: .55;
+  }
+  .fs-phone.iphone {
+    width: 58px; height: 120px; border-radius: 13px;
+    background: linear-gradient(160deg, #E9E6E0, #CFCBC0);
+    box-shadow: inset 0 0 0 2px rgba(22, 22, 22, .10), 0 12px 20px rgba(22, 22, 22, .18);
+  }
+  .fs-phone.iphone .scr { left: 5px; top: 5px; right: 5px; bottom: 5px; }
+  .fs-phone.iphone .island {
+    position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+    width: 27px; height: 7px; border-radius: 999px; background: #141414; z-index: 2;
+  }
+  .fs-phone.iphone .bar.b1 { bottom: 26px; width: 26px; }
+  .fs-phone.iphone .bar.b2 { bottom: 18px; width: 16px; }
+  .fs-phone.duo {
+    width: 96px; height: 112px; border-radius: 13px;
+    background: linear-gradient(90deg, #E9E6E0 0 46%, #BFBAB0 46% 54%, #E9E6E0 54% 100%);
+    box-shadow: inset 0 0 0 2px rgba(22, 22, 22, .10), 0 12px 20px rgba(22, 22, 22, .18);
+  }
+  .fs-phone.duo .scr.a { left: 5px; top: 5px; width: 40px; bottom: 5px; }
+  .fs-phone.duo .scr.b { right: 5px; top: 5px; width: 40px; bottom: 5px; }
+  .fs-phone.duo .bar.b1 { bottom: 24px; width: 22px; }
+  .fs-phone.pura {
+    width: 90px; height: 108px; border-radius: 12px;
+    background: linear-gradient(160deg, #E9E6E0, #CFCBC0);
+    box-shadow: inset 0 0 0 2px rgba(22, 22, 22, .10), 0 12px 20px rgba(22, 22, 22, .18);
+  }
+  .fs-phone.pura .scr { left: 5px; top: 5px; right: 5px; bottom: 5px; border-radius: 8px; }
+  .fs-phone.pura .hole {
+    position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+    width: 8px; height: 8px; border-radius: 50%; background: #141414; z-index: 2;
+  }
+  .fs-phone.pura .bar.b1 { bottom: 26px; width: 26px; }
+  .fs-phone.pura .bar.b2 { bottom: 18px; width: 16px; }
+  [data-theme="dark"] .fs-phone.iphone, [data-theme="dark"] .fs-phone.pura {
+    background: linear-gradient(160deg, #3A3A3C, #262628);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .08), 0 12px 20px rgba(0, 0, 0, .45);
+  }
+  [data-theme="dark"] .fs-phone.duo {
+    background: linear-gradient(90deg, #3A3A3C 0 46%, #202022 46% 54%, #3A3A3C 54% 100%);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .08), 0 12px 20px rgba(0, 0, 0, .45);
+  }
+  .fs-name { font-size: 13.5px; font-weight: 700; color: var(--text-1); letter-spacing: .01em; }
+  .fs-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; text-align: center; }
+  .fs-note {
+    margin-top: 14px; padding: 9px 12px; font-size: 11px; color: var(--text-3); line-height: 1.6;
+    background: var(--bg-subtle); border-radius: var(--r-s);
+  }
+  .fs-note b { color: var(--text-1); font-weight: 600; }
+  @media (max-width: 640px) {
+    .fs-grid { grid-template-columns: 1fr; }
+    .fs-dialog-hd { padding: 16px 16px 12px; }
+    .fs-body { padding: 14px 16px 18px; }
+  }
 </style>
 </head>
 <body>
@@ -168,7 +319,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="pv-side-hd">
       <div class="brand">工程链 <span>ENGCHAIN</span></div>
       <div class="sub">建筑供需匹配 · AI 全链路 · 高保真交互原型</div>
-      <a href="engchain-showcase/index.html" class="pv-showcase-btn" title="全屏展示模式">全屏展示</a>
+      <div style="display:flex;gap:8px;">
+        <button type="button" id="btn-showcase" class="pv-showcase-btn" title="无外壳纯应用展示，根据窗口自动适配">全局展示</button>
+        <button type="button" id="btn-model" class="pv-showcase-btn" style="background:var(--bg-card);border:1px solid var(--line);color:var(--text-2);" title="切换手机外壳模型">模型展示</button>
+      </div>
     </div>
 
     <!-- 可滚动区：演示状态控制台 + 走查提示 + 目录树整体上下滚动，为目录树让出纵向空间 -->
@@ -182,6 +336,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <span class="zn" id="zoom-num">82%</span>
             <button id="zoom-in" title="放大">＋</button>
             <button id="zoom-reset" class="zr" title="重置">重置</button>
+          </span>
+        </div>
+        <div class="pv-row"><span class="k">机身配色</span>
+          <span class="color-swatches" id="color-swatches">
+            <button class="swatch" data-color="natural" style="background:linear-gradient(150deg,#48484A,#1E1E20);" title="原色钛"></button>
+            <button class="swatch" data-color="blue" style="background:linear-gradient(150deg,#5B6F8A,#2A3A4A);" title="蓝色钛"></button>
+            <button class="swatch" data-color="white" style="background:linear-gradient(150deg,#F5F5F7,#D8D8DC);" title="白色钛"></button>
+            <button class="swatch" data-color="black" style="background:linear-gradient(150deg,#3A3A3C,#1A1A1C);" title="黑色钛"></button>
           </span>
         </div>
         <div class="pv-row"><span class="k">主题</span>
@@ -236,9 +398,33 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <main class="pv-stage">
     <div class="device">
-      <div class="iphone"><div class="ip-btn mute"></div><div class="ip-btn action"></div><div class="ip-btn vol-up"></div><div class="ip-btn vol-down"></div><div class="ip-btn power"></div><div class="ip-btn camera"></div>
-        <div class="ip-screen"><iframe id="frame" src="home.html" title="工程链"></iframe></div>
-        <div class="ip-label" id="device-label">iPhone 16 Pro · 全流程</div>
+      <!-- iPhone 16 Pro 外壳 -->
+      <div class="shell shell-iphone" id="shell-iphone">
+        <div class="iphone" id="iphone-device" data-color="natural">
+          <div class="ip-btn mute"></div><div class="ip-btn action"></div><div class="ip-btn vol-up"></div><div class="ip-btn vol-down"></div><div class="ip-btn power"></div><div class="ip-btn camera"></div>
+          <div class="ip-screen"><iframe id="frame" src="home.html" title="工程链"></iframe></div>
+        </div>
+        <div class="ip-label" id="label-iphone">iPhone 16 Pro · 全流程</div>
+      </div>
+      <!-- HUAWEI Pura X View 外壳 -->
+      <div class="shell shell-pura" id="shell-pura" hidden>
+        <div class="pura" id="pura-device" data-color="white">
+          <div class="face front">
+            <div class="pura-screen">
+              <div class="pura-cam"></div>
+              <div class="screen-gloss"></div>
+            </div>
+          </div>
+          <div class="face back">
+            <div class="lattice"><div class="cell v"></div><div class="cell h"></div></div>
+            <div class="deco"><div class="deco-inner">
+              <div class="lens big"></div><div class="lens periscope"></div><div class="lens red"></div><div class="flash"></div><div class="lens wide"></div>
+            </div></div>
+            <div class="logo-hw">HUAWEI</div>
+          </div>
+          <div class="pura-keys"><i class="k1"></i><i class="k2"></i><i class="k3"></i></div>
+        </div>
+        <div class="ip-label" id="label-pura">HUAWEI Pura X View · 全流程</div>
       </div>
     </div>
     <div class="browser-stage" id="browser-stage" hidden>
@@ -256,6 +442,71 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </main>
 </div>
 
+  <!-- 全屏展示 · 设备选择弹窗（浏览器窗口居中，自适应尺寸） -->
+  <div class="fs-overlay" id="fs-overlay" aria-hidden="true">
+    <div class="fs-dialog" role="dialog" aria-modal="true" aria-labelledby="fs-title">
+      <div class="fs-dialog-hd">
+        <div>
+          <div class="fs-title" id="fs-title">全局展示 · <em>无外壳纯应用</em></div>
+          <div class="fs-sub">无外壳纯应用展示，根据浏览器窗口自动适配尺寸。电脑端默认 iPhone 16 Pro 比例，可浮动切换 Pura X View 比例。</div>
+        </div>
+        <button type="button" class="fs-close" id="fs-close" aria-label="关闭弹窗">✕</button>
+      </div>
+      <div class="fs-body">
+        <div class="fs-grid">
+          <div class="fs-card" id="fs-card-iphone" role="button" tabindex="0" data-href="engchain-showcase/index.html">
+            <span class="fs-badge ok">可体验</span>
+            <div class="fs-phone iphone"><span class="scr"><i class="island"></i><i class="bar b1"></i><i class="bar b2"></i></span></div>
+            <div class="fs-name">iPhone 16 Pro</div>
+            <div class="fs-desc">6.3″ · 全流程演示<br>已接入全部演示数据</div>
+          </div>
+          <div class="fs-card disabled" role="button" tabindex="-1" aria-disabled="true">
+            <span class="fs-badge na">暂无数据</span>
+            <div class="fs-phone duo"><span class="scr a"><i class="bar b1"></i></span><span class="scr b"><i class="bar b1"></i></span></div>
+            <div class="fs-name">iPhone Duo</div>
+            <div class="fs-desc">双屏折叠 · 灰度中<br>暂无演示数据</div>
+          </div>
+          <div class="fs-card disabled" role="button" tabindex="-1" aria-disabled="true">
+            <span class="fs-badge na">暂无数据</span>
+            <div class="fs-phone pura"><span class="scr"><i class="hole"></i><i class="bar b1"></i><i class="bar b2"></i></span></div>
+            <div class="fs-name">华为 Pura X View</div>
+            <div class="fs-desc">折叠宽屏 · 灰度中<br>暂无演示数据</div>
+          </div>
+        </div>
+        <div class="fs-note"><b>说明</b> · 全局展示为无外壳模式，进入后可通过右下角浮动切换器在 iPhone / Pura 比例间切换；手机浏览器自动全屏。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模型展示 · 手机外壳选择弹窗 -->
+  <div class="fs-overlay" id="model-overlay" aria-hidden="true">
+    <div class="fs-dialog" role="dialog" aria-modal="true" aria-labelledby="model-title">
+      <div class="fs-dialog-hd">
+        <div>
+          <div class="fs-title" id="model-title">模型展示 · <em>选择外壳</em></div>
+          <div class="fs-sub">选择手机外壳模型，右侧舞台切换对应外壳，当前浏览页面保持不变。</div>
+        </div>
+        <button type="button" class="fs-close" id="model-close" aria-label="关闭弹窗">✕</button>
+      </div>
+      <div class="fs-body">
+        <div class="fs-grid" style="grid-template-columns:repeat(2,1fr);">
+          <div class="fs-card model-card" id="model-iphone" role="button" tabindex="0" data-model="iphone">
+            <span class="fs-badge ok">当前</span>
+            <div class="fs-phone iphone"><span class="scr"><i class="island"></i><i class="bar b1"></i><i class="bar b2"></i></span></div>
+            <div class="fs-name">iPhone 16 Pro</div>
+            <div class="fs-desc">6.3″ · 19.5:9 · 灵动岛<br>钛金属中框</div>
+          </div>
+          <div class="fs-card model-card" id="model-pura" role="button" tabindex="0" data-model="pura">
+            <span class="fs-badge na">可切换</span>
+            <div class="fs-phone pura"><span class="scr"><i class="hole"></i><i class="bar b1"></i><i class="bar b2"></i></span></div>
+            <div class="fs-name">HUAWEI Pura X View</div>
+            <div class="fs-desc">6.39″ · 16:9.5 阔直板 · 单孔<br>Deco 四摄 · 光栅背板</div>
+          </div>
+        </div>
+        <div class="fs-note"><b>说明</b> · 切换外壳后 app 内容不刷新，保持当前浏览页面；点击 Pura 外壳非屏幕区域可翻转查看背面。</div>
+      </div>
+    </div>
+  </div>
 <script src="js/data.js"></script>
 <script src="js/common.js"></script>
 <script src="js/stores.js"></script>
@@ -730,7 +981,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var bst = document.getElementById('browser-stage');
     if (dev) {
       dev.style.transform = 'scale(' + scale + ')';
-      dev.style.marginBottom = Math.round(-117 * scale) + 'px';
+      var mb = (currentShell === 'pura') ? -80 : -117;
+      dev.style.marginBottom = Math.round(mb * scale) + 'px';
     }
     if (bst) bst.style.transform = 'scale(' + scale + ')';
     document.getElementById('zoom-num').textContent = Math.round(scale * 100) + '%';
@@ -921,6 +1173,141 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.addEventListener('engchain:state', refreshAll);
   window.addEventListener('engchain:auth', refreshAll);
   window.addEventListener('engchain:entry', refreshAll);
+  /* ---- 全屏展示 · 设备选择弹窗（浏览器窗口居中 / 自适应；仅已配置机型可点击） ---- */
+  var btnShow = document.getElementById('btn-showcase');
+  var fsOverlay = document.getElementById('fs-overlay');
+  var fsClose = document.getElementById('fs-close');
+  var fsReturnFocus = null;
+  function openFs() {
+    fsReturnFocus = document.activeElement;
+    fsOverlay.classList.add('open');
+    fsOverlay.setAttribute('aria-hidden', 'false');
+    if (fsClose) { try { fsClose.focus(); } catch (e) {} }
+  }
+  function closeFs() {
+    fsOverlay.classList.remove('open');
+    fsOverlay.setAttribute('aria-hidden', 'true');
+    if (fsReturnFocus && fsReturnFocus.focus) { try { fsReturnFocus.focus(); } catch (e) {} }
+  }
+  if (btnShow && fsOverlay) {
+    btnShow.addEventListener('click', function (e) { e.preventDefault(); openFs(); });
+    if (fsClose) fsClose.addEventListener('click', closeFs);
+    /* 点击遮罩空白处关闭 */
+    fsOverlay.addEventListener('click', function (e) { if (e.target === fsOverlay) closeFs(); });
+    /* Esc 关闭 */
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && fsOverlay.classList.contains('open')) closeFs(); });
+    fsOverlay.querySelectorAll('.fs-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        if (card.classList.contains('disabled')) return;   /* 灰度机型：点击无效 */
+        var href = card.getAttribute('data-href');
+        if (href) window.location.href = href;
+      });
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+      });
+    });
+  }
+  /* ---- 妯″瀷灞曠ず 路 鎵嬫満澶栧３鍒囨崲 ---- */
+  var currentShell = 'iphone';
+  try { currentShell = localStorage.getItem('engchain-shell') || 'iphone'; } catch(e) {}
+  var btnModel = document.getElementById('btn-model');
+  var modelOverlay = document.getElementById('model-overlay');
+  var modelClose = document.getElementById('model-close');
+  var shellIphone = document.getElementById('shell-iphone');
+  var shellPura = document.getElementById('shell-pura');
+  var puraDevice = document.getElementById('pura-device');
+
+  function switchShell(model) {
+    currentShell = model;
+    try { localStorage.setItem('engchain-shell', model); } catch(e) {}
+    var frame = document.getElementById('frame');
+    if (model === 'pura') {
+      shellIphone.setAttribute('hidden', '');
+      shellPura.removeAttribute('hidden');
+      var ps = shellPura.querySelector('.pura-screen');
+      if (frame && ps) ps.appendChild(frame);
+    } else {
+      shellPura.setAttribute('hidden', '');
+      shellIphone.removeAttribute('hidden');
+      var ips = shellIphone.querySelector('.ip-screen');
+      if (frame && ips) ips.appendChild(frame);
+    }
+    applyScale();
+  }
+
+  function openModel() { modelOverlay.classList.add('open'); modelOverlay.setAttribute('aria-hidden','false'); }
+  function closeModel() { modelOverlay.classList.remove('open'); modelOverlay.setAttribute('aria-hidden','true'); }
+
+  if (btnModel && modelOverlay) {
+    btnModel.addEventListener('click', function(e) { e.preventDefault(); openModel(); });
+    if (modelClose) modelClose.addEventListener('click', closeModel);
+    modelOverlay.addEventListener('click', function(e) { if (e.target === modelOverlay) closeModel(); });
+    document.addEventListener('keydown', function(e) { if (e.key==='Escape' && modelOverlay.classList.contains('open')) closeModel(); });
+    modelOverlay.querySelectorAll('.model-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        var m = card.getAttribute('data-model');
+        if (m) { switchShell(m); closeModel(); }
+      });
+    });
+  }
+  if (puraDevice) {
+    puraDevice.addEventListener('click', function(e) {
+      if (!e.target.closest('.pura-screen')) puraDevice.classList.toggle('flipped');
+    });
+  }
+
+  /* ---- 机身配色切换 ---- */
+  var SHELL_COLORS = {
+    iphone: [
+      { id:'natural', name:'原色钛', css:'linear-gradient(150deg,#48484A,#1E1E20)' },
+      { id:'blue', name:'蓝色钛', css:'linear-gradient(150deg,#5B6F8A,#2A3A4A)' },
+      { id:'white', name:'白色钛', css:'linear-gradient(150deg,#F5F5F7,#D8D8DC)' },
+      { id:'black', name:'黑色钛', css:'linear-gradient(150deg,#3A3A3C,#1A1A1C)' }
+    ],
+    pura: [
+      { id:'white', name:'零度白', css:'linear-gradient(150deg,#fdfefe,#cfd4de)' },
+      { id:'red', name:'跃影红', css:'linear-gradient(150deg,#e04b6a,#8f0e31)' },
+      { id:'flax', name:'亚麻灰', css:'linear-gradient(150deg,#d6d2c8,#8e8a7c)' },
+      { id:'black', name:'幻夜黑', css:'linear-gradient(150deg,#5a5d65,#15171c)' }
+    ]
+  };
+  var shellColors = { iphone:'natural', pura:'white' };
+  try { var sc = JSON.parse(localStorage.getItem('engchain-shell-color') || '{}'); if (sc.iphone) shellColors.iphone = sc.iphone; if (sc.pura) shellColors.pura = sc.pura; } catch(e) {}
+
+  function renderSwatches() {
+    var box = document.getElementById('color-swatches');
+    if (!box) return;
+    var colors = SHELL_COLORS[currentShell] || SHELL_COLORS.iphone;
+    box.innerHTML = colors.map(function(co) {
+      return '<button class="swatch' + (shellColors[currentShell] === co.id ? ' active' : '') + '" data-color="' + co.id + '" style="background:' + co.css + ';" title="' + co.name + '"></button>';
+    }).join('');
+    box.querySelectorAll('.swatch').forEach(function(btn) {
+      btn.addEventListener('click', function() { applyShellColor(this.getAttribute('data-color')); });
+    });
+  }
+
+  function applyShellColor(color) {
+    shellColors[currentShell] = color;
+    try { localStorage.setItem('engchain-shell-color', JSON.stringify(shellColors)); } catch(e) {}
+    var dev = (currentShell === 'pura') ? document.getElementById('pura-device') : document.getElementById('iphone-device');
+    if (dev) dev.setAttribute('data-color', color);
+    renderSwatches();
+  }
+
+  // 在 switchShell 中调用 renderSwatches
+  var origSwitchShell = switchShell;
+  switchShell = function(model) {
+    origSwitchShell(model);
+    renderSwatches();
+    applyShellColor(shellColors[model]);
+  };
+
+  // 初始化配色
+  renderSwatches();
+  applyShellColor(shellColors[currentShell]);
+
+  if (currentShell === 'pura') switchShell('pura');
+
   renderMode(); renderEntry(); renderKPI();
 })();
 </script>

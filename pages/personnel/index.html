@@ -62,6 +62,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ===== 证书分类栏 ===== */
   .cat-bar { display:flex; gap:8px; overflow-x:auto; padding:10px 16px 14px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   .cat-bar::-webkit-scrollbar { display:none; }
+  .cat-bar-zone { position:relative; }
+  .cat-bar-zone .cat-bar { padding-right:40px; }
+  .cat-bar-fade { position:absolute; top:10px; bottom:14px; right:0; width:28px; background:linear-gradient(90deg,transparent,var(--bg) 92%); pointer-events:none; }
+  /* 卡片标题过长时两行截断，避免括号孤悬换行 */
+  .job-card .jc-title, .jc-head .jc-title { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; word-break:break-word; }
   .cat-item { flex:none; display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; min-width:58px; padding:4px 2px; border-radius:var(--r-m); transition:background var(--d-fast); }
   .cat-item:active { background:var(--bg-card-2); }
   .cat-item .cat-icon { width:44px; height:44px; border-radius:13px; background:var(--bg-card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--text-2); transition:all var(--d-fast); }
@@ -322,8 +327,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="tab-item" data-tab="talent">持证人才</div>
     </div>
 
-    <!-- 证书分类 icon 栏（与筛选弹窗 certType 维度联动） -->
-    <div class="cat-bar" id="catBar"></div>
+    <!-- 证书分类 icon 栏（与筛选弹窗 certType 维度联动）右侧渐变遮罩提示可横滑 -->
+    <div class="cat-bar-zone">
+      <div class="cat-bar" id="catBar"></div>
+      <span class="cat-bar-fade" aria-hidden="true"></span>
+    </div>
 
     <!-- 核验提示条 -->
     <div class="verify-notice">
@@ -472,6 +480,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function () {
   window.__ROOT__ = '../../';
 
+  /* 确定性匹配度兜底：无 match 字段时按 id 哈希在 62-96 取值，避免出现 "-%" 占位符 */
+  function varyMatch(r) {
+    if (typeof r.match === 'number' && r.match > 0) return r.match;
+    var h = 0, s = String(r.id || r.title || r.name || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return 62 + (h % 35);
+  }
+
   /* ===== 数据预处理 ===== */
   var entData = (MOCK.personnels || []).map(function (r) {
     return Object.assign({}, r, {
@@ -481,7 +497,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       socialSecurity: r.socialSecurity || '可配合',
       urgent: !!r.urgent,
       salaryNum: r.salaryNum || 0,
-      salaryRange: r.salaryRange || '面议'
+      salaryRange: r.salaryRange || '面议',
+      match: varyMatch(r)
     });
   });
 
@@ -498,7 +515,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       experienceNum: r.experienceNum || 0,
       salaryNum: r.salaryNum || 0,
       salaryRange: r.salaryRange || ((r.expectedSalary || {}).salaryRange || '面议'),
-      jobStatus: r.currentStatus || r.jobStatus || statuses[idx % statuses.length]
+      jobStatus: r.currentStatus || r.jobStatus || statuses[idx % statuses.length],
+      match: varyMatch(r)
     });
   });
 
@@ -1239,6 +1257,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var pendingDeliverId = null;
   window.checkAndDeliver = function(jobId){
     pendingDeliverId = jobId;
+    /* 已投递：直接提示 */
+    if(window.ApplyStore && ApplyStore.hasApplied(jobId)){
+      UI.toast('您已投递该岗位，可在「我的投递」中查看状态','info');
+      return;
+    }
     var result = {can:false, reason:'请先完成个人入驻', userType:''};
     try{
       if(window.DataBus && DataBus.canDeliverResume){
@@ -1246,16 +1269,74 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     }catch(e){ console.warn('canDeliverResume error', e); }
     if(result.can){
-      /* 有权限：正常投递（跳转详情页） */
-      UI.toast('正在投递简历...','ok');
-      setTimeout(function(){
-        location.href = '../supply/detail.html?id=' + jobId;
-      }, 400);
+      /* 有权限：弹出投递表单 */
+      openApplySheet(jobId);
     } else {
       /* 无权限：弹出引导弹窗 */
       document.getElementById('deliverModalDesc').textContent = result.reason || '请先完成个人入驻并完善简历信息';
       openDeliverModal();
     }
+  };
+
+  /* 阶段三：列表页投递表单 */
+  function openApplySheet(jobId){
+    var jobData = null;
+    try{
+      var all = (window.MOCK && MOCK.personnel) ? MOCK.personnel : [];
+      for(var i=0;i<all.length;i++){ if(String(all[i].id)===String(jobId)){ jobData=all[i]; break; } }
+    }catch(e){}
+    var jobTitle = jobData ? (jobData.title || jobData.name || '') : '';
+    var company = jobData ? (jobData.company || '') : '';
+    /* 预填姓名和电话 */
+    var preName = '', prePhone = '';
+    try{
+      var auth = window.AuthStore ? AuthStore.read() : {};
+      if(auth.realname && auth.realname.name) preName = auth.realname.name;
+      if(auth.realname && auth.realname.mobile) prePhone = auth.realname.mobile;
+      if(auth.personalEntry && auth.personalEntry.profile && auth.personalEntry.profile.basic){
+        if(auth.personalEntry.profile.basic.mobile) prePhone = auth.personalEntry.profile.basic.mobile;
+      }
+    }catch(e){}
+    var sh = UI.sheet();
+    sh.setText('投递简历 · ' + (jobTitle||'').substring(0,20));
+    sh.html('<div style="padding:6px 2px 14px;">'+
+      '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">投递后企业将在24小时内查看，感兴趣后平台为您对接联系方式</div>'+
+      '<input id="lp-name" placeholder="姓名 *" class="sheet-input" value="'+escHtml(preName)+'">'+
+      '<input id="lp-phone" placeholder="联系电话 *" class="sheet-input" style="margin-top:10px;" value="'+escHtml(prePhone)+'">'+
+      '<textarea id="lp-msg" rows="3" placeholder="自我介绍（选填）" class="sheet-textarea" style="margin-top:10px;"></textarea>'+
+      '<div style="padding:8px 10px;background:rgba(43,107,79,.06);border:1px solid rgba(43,107,79,.15);border-radius:8px;margin-top:10px;"><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">隐私保护：</b>您的联系方式仅在企业确认感兴趣后由平台对接</div></div>'+
+      '<button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="confirmListApply(\''+jobId+'\',\''+escHtml(jobTitle)+'\',\''+escHtml(company)+'\')">提交投递</button>'+
+      '<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button></div>');
+    sh.show();
+  }
+  function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  window.confirmListApply = function(jobId, jobTitle, company){
+    var name = (document.getElementById('lp-name')||{}).value.trim();
+    var phone = (document.getElementById('lp-phone')||{}).value.trim();
+    var msg = (document.getElementById('lp-msg')||{}).value.trim();
+    if(!name){ UI.toast('请输入姓名','warn'); return; }
+    if(!phone || !/^1\d{10}$/.test(phone)){ UI.toast('请输入正确的手机号','warn'); return; }
+    try{
+      if(window.ApplyStore){
+        ApplyStore.add({
+          jobId: jobId, jobTitle: jobTitle, company: company,
+          resumeSnapshot: { name: name, phone: phone },
+          applyMsg: msg, status: 'pending'
+        });
+      }
+    }catch(e){ console.warn('apply error', e); }
+    UI.closeSheet();
+    UI.toast('投递成功，企业将尽快与您联系','ok');
+    /* 更新当前卡片按钮状态 */
+    var cards = document.querySelectorAll('#fullList .job-card');
+    cards.forEach(function(card){
+      var href = card.getAttribute('href') || '';
+      var id = href.indexOf('id=') > -1 ? href.split('id=')[1] : '';
+      if(id === jobId){
+        var btn = card.querySelector('.card-deliver-btn');
+        if(btn){ btn.textContent = '已投递'; btn.style.opacity = '0.6'; btn.style.cursor = 'default'; btn.onclick = null; }
+      }
+    });
   };
   function openDeliverModal(){
     document.getElementById('deliverMask').classList.add('show');
@@ -1290,13 +1371,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var id = href.indexOf('id=') > -1 ? href.split('id=')[1] : '';
       var btn = document.createElement('button');
       btn.className = 'card-deliver-btn';
-      btn.textContent = '投递简历';
-      btn.setAttribute('data-id', id);
-      btn.onclick = function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        checkAndDeliver(id);
-      };
+      /* 阶段三：已投递的岗位显示已投递状态 */
+      var applied = window.ApplyStore && ApplyStore.hasApplied(id);
+      if(applied){
+        btn.textContent = '已投递';
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'default';
+      } else {
+        btn.textContent = '投递简历';
+        btn.setAttribute('data-id', id);
+        btn.onclick = function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          checkAndDeliver(id);
+        };
+      }
       card.appendChild(btn);
     });
   }

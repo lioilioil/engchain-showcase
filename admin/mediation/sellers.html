@@ -77,7 +77,9 @@
     });
   }
 
+  var _statCache = {};
   function sellerStat(uid) {
+    if (_statCache[uid]) return _statCache[uid];
     var orders = Mediation.list({ uid: uid, role: 'seller' });
     var done = orders.filter(function (o) { return o.state === 'settled'; });
     var income = done.reduce(function (s, o) {
@@ -87,10 +89,14 @@
     var disp = orders.filter(function (o) { return o.state === 'disputed'; }).length;
     var reviews = orders.filter(function (o) { return o.review && o.review.score; });
     var avgScore = reviews.length ? reviews.reduce(function (s, o) { return s + o.review.score; }, 0) / reviews.length : 0;
-    return { total: orders.length, done: done.length, income: income, disp: disp, reviews: reviews.length, avgScore: Math.round(avgScore * 10) / 10, orders: orders };
+    var _r = { total: orders.length, done: done.length, income: income, disp: disp, reviews: reviews.length, avgScore: Math.round(avgScore * 10) / 10, orders: orders };
+    _statCache[uid] = _r;
+    return _r;
   }
 
+  var _catCache = {};
   function sellerCategory(u) {
+    if (_catCache[u.id]) return _catCache[u.id];
     var orders = Mediation.list({ uid: u.id, role: 'seller' });
     var cats = {};
     orders.forEach(function (o) { if (o.category) cats[o.category] = true; });
@@ -350,7 +356,7 @@
   }
 
   function bind() {
-    $('#btn-refresh').onclick = function () { renderKPI(); renderList(); Admin.toast('已刷新'); };
+    $('#btn-refresh').onclick = function () { _statCache = {}; _catCache = {}; renderKPI(); renderList(); Admin.toast('已刷新'); };
     $('#btn-export').onclick = doExport;
     $('#seller-table').addEventListener('click', function (e) {
       var b = e.target.closest('button');

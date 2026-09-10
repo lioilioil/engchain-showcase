@@ -44,10 +44,10 @@
       personalQual: { ok: false, list: [], certs: [], status: '', note: '', submittedAt: 0 },
       personalEntry: { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [],
         userType: 'jobseeker', resumeComplete: false, /* v3.1：个人入驻两类用户区分（jobseeker求职/standard标准）+ 简历完成标记 */
-        profile: { basic: { gender: '', birth: '', location: '', jobStatus: '', mobile: '' },
+        profile: { basic: { gender: '', birth: '', location: '', jobStatus: '', mobile: '', wechat: '', address: '' },
           education: [], work: [], project: [], skills: [],
-          jobIntent: { position: '', salary: '', location: '', workType: '' },
-          intro: '', resumeFile: '' } },
+          jobIntent: { position: '', salary: '', salaryRange: '', minAcceptable: '', certSubsidy: '', arrivalTime: '', location: '', workType: '' },
+          intro: '', resumeFile: '', regStatus: null, socialSecurity: null } },
       enterpriseQual: { ok: false, list: [] },
       partner: { ok: false, status: '', note: '', submittedAt: 0, approvedAt: 0,
         channel: [], intent: '', intro: '', experience: '', profitConfig: {} },
@@ -407,6 +407,45 @@
     this.write(s);
   };
 
+  /* ---- 投递记录（v3.1：个人向企业岗位投递简历的持久化存储） ---- */
+  var ApplyStore = makeStore('engchain-applies', { items: [] }, 'engchain:apply');
+  ApplyStore.add = function (record) {
+    var s = this.read();
+    var id = record.id || ('AP' + Date.now());
+    var item = Object.assign({
+      id: id, jobId: '', jobTitle: '', company: '', resumeSnapshot: {},
+      applyMsg: '', certsSelected: [], expSelected: '', status: 'pending',
+      ts: Date.now(), updatedAt: Date.now()
+    }, record);
+    var existIdx = s.items.findIndex(function (i) { return i.jobId === item.jobId; });
+    if (existIdx >= 0) {
+      item.id = s.items[existIdx].id;
+      item.ts = s.items[existIdx].ts;
+      s.items[existIdx] = item;
+    } else {
+      s.items.unshift(item);
+    }
+    this.write(s);
+    return item;
+  };
+  ApplyStore.list = function () { return this.read().items; };
+  ApplyStore.byJob = function (jobId) {
+    return this.read().items.find(function (i) { return i.jobId === jobId; }) || null;
+  };
+  ApplyStore.hasApplied = function (jobId) {
+    return !!this.byJob(jobId);
+  };
+  ApplyStore.updateStatus = function (id, status) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) { i.status = status; i.updatedAt = Date.now(); } });
+    this.write(s);
+  };
+  ApplyStore.remove = function (id) {
+    var s = this.read();
+    s.items = s.items.filter(function (i) { return i.id !== id; });
+    this.write(s);
+  };
+
   /* 迁移旧 engchain-publish 孤岛键中的发布记录 → SupplyStore（Step 6，幂等） */
   (function migrateOldPublishRecords() {
     try {
@@ -699,6 +738,7 @@
   window.MonitorStore = MonitorStore;
   window.FavoriteStore = FavoriteStore;
   window.SupplyStore = SupplyStore;
+  window.ApplyStore = ApplyStore;
   window.LeadStore = LeadStore;
   window.SvcRatingStore = SvcRatingStore;
   window.ModeStore = ModeStore;

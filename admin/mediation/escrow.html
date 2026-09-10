@@ -62,7 +62,7 @@
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
   function uname(id) { if (id === 'PLATFORM') return '平台/托管机构'; var u = DataBus.byId(id); return u ? (u.name || id) : id; }
-  var ACCT = RULE('accountTypes', {});
+  var ACCT = {};  /* RULE() 依赖 defer 的 domain.js，须在 DOMContentLoaded 后初始化（见 init） */
   var BIZ = { mediation_pay: '资金托管', mediation_release: '节点释放', mediation_fee: '平台佣金', mediation_refund: '订单退款', rebate: '返佣冻结', rebate_pay: '返佣发放' };
 
   var state = { page: 1, pageSize: 10, filters: {} };
@@ -420,7 +420,23 @@
     try { localStorage.setItem('engchain-mediation-orders', JSON.stringify({ list: orders, migrated: true })); } catch (e) {}
   }
 
-  function init() { seedMediationIfEmpty(); renderFilter(); renderKPI(); renderList(); renderAccounts(); check(); bind(); }
+  function renderErrorState(msg) {
+    var html = '<div style="padding:48px 20px;text-align:center;">' +
+      '<div style="width:56px;height:56px;margin:0 auto 14px;border-radius:50%;background:rgba(229,83,75,.12);display:flex;align-items:center;justify-content:center;color:#e5534b;font-size:26px;font-weight:700;">!</div>' +
+      '<div style="font-size:16px;font-weight:700;color:#1f2329;">台账加载失败</div>' +
+      '<div style="font-size:13px;color:#646a73;margin:8px 0 18px;line-height:1.6;">' + (msg || '页面脚本初始化异常，部分数据未能渲染') + '</div>' +
+      '<button class="btn btn-primary" onclick="location.reload()">重新加载</button></div>';
+    ['#filter-bar', '#accounts'].forEach(function (s) { var el = document.querySelector(s); if (el) el.innerHTML = ''; });
+    var main = document.querySelector('#escrow-table'); if (main) main.innerHTML = html;
+  }
+  function init() {
+    try {
+      ACCT = (window.RULE ? RULE('accountTypes', {}) : {}) || {};
+      seedMediationIfEmpty(); renderFilter(); renderKPI(); renderList(); renderAccounts(); check(); bind();
+    } catch (e) {
+      renderErrorState('错误：' + (e && e.message ? e.message : e));
+    }
+  }
   document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
