@@ -23,6 +23,17 @@
 
     <div class="kpis" id="kpi"></div>
 
+    <div class="card" id="batch-bar" style="margin-bottom:12px;display:none;">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:600;">批量操作</span>
+        <span id="batch-count" style="font-size:12px;color:var(--text-muted);">已选 0 项</span>
+        <button class="btn btn-sm btn-primary" id="btn-batch-approve" data-perm="approve.first">批量通过</button>
+        <button class="btn btn-sm btn-ghost" id="btn-batch-reject" data-perm="approve.first">批量驳回</button>
+        <span style="flex:1;"></span>
+        <span id="queue-progress" style="font-size:11px;color:var(--text-muted);"></span>
+      </div>
+    </div>
+
     <div class="card card-pad">
       <div class="card-h">
         <span class="card-t">认证审核列表</span>
@@ -340,10 +351,45 @@
       if (b.getAttribute('data-act') === 'approve') approveDialog(u);
       else if (b.getAttribute('data-act') === 'reject') rejectDialog(u);
     });
-    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); });
+    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); updateQueueProgress(); });
+    var ba=document.getElementById('btn-batch-approve');
+    if(ba)ba.onclick=function(){
+      var ids=[];document.querySelectorAll('.row-chk:checked').forEach(function(c){ids.push(c.getAttribute('data-id'));});
+      if(!ids.length){Admin.toast('请先选择待审核项');return;}
+      Admin.confirm({title:'批量通过',body:'确认通过选中的 '+ids.length+' 项认证申请？',ok:'确认通过',onYes:function(){
+        ids.forEach(function(id){var u=null;users().forEach(function(x){if(x.id===id)u=x;});if(u)DataBus.authApprove(u.id,filters.type);});
+        Admin.toast('已批量通过 '+ids.length+' 项');renderKPI();renderTable();updateQueueProgress();
+      }});
+    };
+    var br=document.getElementById('btn-batch-reject');
+    if(br)br.onclick=function(){
+      var ids=[];document.querySelectorAll('.row-chk:checked').forEach(function(c){ids.push(c.getAttribute('data-id'));});
+      if(!ids.length){Admin.toast('请先选择待审核项');return;}
+      Admin.confirm({title:'批量驳回',body:'确认驳回选中的 '+ids.length+' 项认证申请？',ok:'确认驳回',danger:true,onYes:function(){
+        ids.forEach(function(id){var u=null;users().forEach(function(x){if(x.id===id)u=x;});if(u)DataBus.authReject(u.id,filters.type,'批量驳回');});
+        Admin.toast('已批量驳回 '+ids.length+' 项');renderKPI();renderTable();updateQueueProgress();
+      }});
+    };
   }
 
-  function render() { renderKPI(); renderFilterBar(); renderTable(); }
+  window.toggleAll=function(cb){document.querySelectorAll('.row-chk').forEach(function(c){c.checked=cb.checked;});updateBatchBar();};
+  window.updateBatchBar=function(){
+    var checked=document.querySelectorAll('.row-chk:checked');
+    var bar=document.getElementById('batch-bar');
+    var cnt=document.getElementById('batch-count');
+    if(bar)bar.style.display=checked.length?'':'none';
+    if(cnt)cnt.textContent='已选 '+checked.length+' 项';
+  };
+  function updateQueueProgress(){
+    var types=['realname','enterprise','personalQual','payment'];
+    var pending=types.reduce(function(s,t){return s+pendingOf(t).length;},0);
+    var done=doneList();
+    var today=new Date().toISOString().slice(0,10);
+    var todayDone=done.filter(function(x){return fmtDate(x.ts)===today;}).length;
+    var el=document.getElementById('queue-progress');
+    if(el)el.textContent='待审 '+pending+' · 今日已审 '+todayDone;
+  }
+  function render() { renderKPI(); renderFilterBar(); renderTable(); updateQueueProgress(); }
   function init() { bind(); render(); }
   document.addEventListener('DOMContentLoaded', init);
 })();

@@ -152,6 +152,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return false;
   }
 
+  /* 确定性匹配度：按 id 哈希在 62-96 间取值，避免所有卡片统一显示 70% 失去区分度 */
+  function varyMatch(x) {
+    if (typeof x.match === 'number' && x.match > 0) return x.match;
+    var h = 0, s = String(x.id || x.title || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return 62 + (h % 35);
+  }
   function normSupplyItem(x) {
     var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
     return Object.assign({}, x, {
@@ -160,7 +167,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       sub: x.sub || x.subType || '', city: x.city || x.location || '',
       price: x.price || x.budget || '', budget: x.budget || x.price || '', unit: x.unit || '',
       tags: x.tags || [], company: x.company || '',
-      match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
+      match: typeof x.match === 'number' ? x.match : (isUser ? 55 : varyMatch(x)),
       verified: x.verified !== undefined ? x.verified : !isUser, hot: x.hot || false,
       _badge: isUser ? '用户发布' : '平台认证'
     });
@@ -173,7 +180,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var active = readActiveSupplies().map(normSupplyItem);
     var seen = {}, out = [];
     active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
-    mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    mock.forEach(function (x) {
+      if (seen[x.id]) return;
+      seen[x.id] = true;
+      out.push(Object.assign({}, x, { match: varyMatch(x) }));
+    });
     return out;
   }
 

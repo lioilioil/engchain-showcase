@@ -2093,6 +2093,29 @@ window.DETAIL = (function () {
       '</div>';
   }
   /* ---- 组装 + 交互 ---- */
+  /* UX-FIX：企业认证卡按本条发布方解析，避免张冠李戴到示例企业 c-znzjs。
+     - franchise(资质招商)/trade(建企买卖)：本条即标的企业本体，用本条自报企业名覆盖代发机构；
+     - talent(个人求职)：由 talentCertHtml 渲染个人卡，不复用企业 GEO 模板。 */
+  function resolveCertCompany(rec) {
+    var base = MOCK.companyById(rec.companyId) || {};
+    if (rec.bizKey === 'franchise' && rec.name) {
+      return Object.assign({}, base, { name: rec.name, short: rec.short || rec.name, industry: rec.qualCategory || rec.qualType || '建筑施工', regCapital: rec.capital || base.regCapital, founded: rec.founded || base.founded });
+    }
+    if (rec.bizKey === 'trade' && (rec.maskedName || rec.title)) {
+      var nm = rec.maskedName || rec.title;
+      return Object.assign({}, base, { name: nm, short: nm.slice(0, 6), industry: rec.sub || '股权转让' });
+    }
+    return base;
+  }
+  function talentCertHtml(rec) {
+    var nm = rec.nameMasked || rec.name || '持证人才';
+    var meta = [rec.certLevel, rec.certMajor].filter(Boolean).join(' · ');
+    return '<div class="cert-card cert-card--compact"><div class="cert-header">' +
+      '<div class="cert-badge-wrap"><div class="cert-seal">' + UI.icon('award', '') + '</div>' +
+      '<div class="cert-badge-text"><div class="cert-badge-title">' + UI.esc(nm) + '</div>' +
+      '<div class="cert-badge-sub">个人持证人才 · 简历信息已核验</div>' +
+      '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div></div>';
+  }
   function attach(rec) {
     var t = byType[rec.bizKey];
     if (!t) {
@@ -2108,7 +2131,7 @@ window.DETAIL = (function () {
       var statuses = ['在职·考虑机会', '离职·立即到岗', '在职·考虑机会', '在职·暂不考虑', '离职·立即到岗', '在职·考虑机会'];
       rec.jobStatus = talentIdx >= 0 ? statuses[talentIdx % statuses.length] : '在职·考虑机会';
     }
-    var c = MOCK.companyById(rec.companyId);
+    var c = resolveCertCompany(rec);
     var $ = function (id) { return document.getElementById(id); };
     DETAIL._currentRec = rec;
     /* P0：从持久化恢复解锁态，并由 .phone.is-unlocked 驱动全页就近打码去码 */
@@ -2118,10 +2141,10 @@ window.DETAIL = (function () {
     if ($('nav-title')) $('nav-title').textContent = t.label;
     if ($('hero')) $('hero').innerHTML = t.hero(rec, c);
     if ($('cert')) {
-      var home = '../company/index.html?id=' + c.id;
-      $('cert').innerHTML = UI.certCard(c, { home: home, compact: true });
+      var home = (rec.bizKey === 'talent' || rec.bizKey === 'franchise' || rec.bizKey === 'trade') ? null : ('../company/index.html?id=' + c.id);
+      $('cert').innerHTML = rec.bizKey === 'talent' ? talentCertHtml(rec) : UI.certCard(c, { home: home, compact: true });
       var cc = $('cert').querySelector('.cert-card--compact');
-      if (cc) {
+      if (cc && rec.bizKey !== 'talent') {
         var openCert = function () { UI.certModal(c, { home: home }); };
         cc.addEventListener('click', function (e) { if (e.target.closest('.cert-home')) return; openCert(); });
         cc.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCert(); } });
@@ -2415,7 +2438,7 @@ window.DETAIL = (function () {
           title: '升级为求职者入驻',
           desc: '您当前为标准入驻用户，暂不支持简历投递。升级为求职者入驻后，可完善简历并向企业投递。',
           btnText: '了解升级',
-          btnHref: '../profile/auth.html?tab=personal&upgrade=1',
+          btnHref: '../profile/auth-qualification.html?mode=edit&upgrade=1',
           iconColor: 'var(--warning)'
         };
       }
@@ -2570,7 +2593,20 @@ window.DETAIL = (function () {
         var phone = sheet.body().querySelector('#ap-phone').value.trim();
         if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
         if (!phone || !/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
+        var _apCerts = [];
+        sheet.body().querySelectorAll('#ap-certs .ap-tag.selected').forEach(function(t) { _apCerts.push(t.getAttribute('data-val')); });
+        var _apExp = '';
+        var _apExpTag = sheet.body().querySelector('#ap-exps .ap-tag-single[style*="background"]');
+        if (_apExpTag) _apExp = _apExpTag.getAttribute('data-val');
+        var _apMsg = sheet.body().querySelector('#ap-msg').value.trim();
         sheet.close();
+        try {
+          if (window.ApplyStore) {
+            ApplyStore.add({ jobId: rec.id, jobTitle: rec.title || '', company: rec.company || '',
+              resumeSnapshot: { name: name, phone: phone, certs: _apCerts, experience: _apExp },
+              applyMsg: _apMsg, certsSelected: _apCerts, expSelected: _apExp, status: 'pending' });
+          }
+        } catch (eApply) { console.warn('apply store error', eApply); }
         /* 更新投递状态 */
         var applyArea = document.getElementById('apply-area');
         if (applyArea) {
@@ -2771,8 +2807,15 @@ window.DETAIL = (function () {
         if (hit) { e.preventDefault(); tryUnlock(); }
       });
     }
+    /* 阶段三：personnel 回显投递状态 */
+    if (rec.bizKey === 'personnel' && window.ApplyStore && ApplyStore.hasApplied(rec.id)) {
+      var _aa = document.getElementById('apply-area');
+      if (_aa) _aa.innerHTML = '<div class="aa-applied"><div class="aa-applied-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="aa-applied-text"><div class="aa-applied-title">投递成功，等待企业回复</div><div class="aa-applied-desc">企业将在24小时内查看您的投递</div></div><div class="aa-applied-status"><span class="aas-dot"></span>待回复</div></div>';
+      var _cb = $('cta');
+      if (_cb) _cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>查看投递状态';
+    }
     if ($('cta')) $('cta').addEventListener('click', function () {
-      if (rec.bizKey === 'personnel') { bindDeliverModalEvents(); checkDeliverPermission(rec, c); }
+      if (rec.bizKey === 'personnel') { if (window.ApplyStore && ApplyStore.hasApplied(rec.id)) { location.href = '../profile/my-applies.html'; return; } bindDeliverModalEvents(); checkDeliverPermission(rec, c); }
       else if (window.__AGENCY_MARKET__ && rec.bizKey === 'agency') {
         location.href = '../agency/order.html?svcId=' + encodeURIComponent(rec.id) + '&amount=' + (agencyOrderAmount(rec) || 0);
       }
