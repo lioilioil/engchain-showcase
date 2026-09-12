@@ -13,35 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <title>我的订单 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <style>
-/* 订单筛选子bar — 与状态chips统一简洁样式 */
-.order-filter-bar {
-  display: none;
-  margin: 0 14px 12px;
-}
-.order-filter-bar.show { display: block; }
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-.filter-row + .filter-row { margin-top: 2px; }
-.filter-label {
-  font-size: 11px;
-  color: var(--text-3, #999);
-  flex-shrink: 0;
-  width: 48px;
-  font-weight: 500;
-}
-.filter-chips {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  flex: 1;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.filter-chips::-webkit-scrollbar { display: none; }
+/* 状态chips样式 */
 .filter-chip {
   flex-shrink: 0;
   padding: 4px 10px;
@@ -62,14 +34,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   border-color: rgba(201,169,97,0.3);
   font-weight: 600;
 }
-.filter-reset {
-  font-size: 10px;
-  color: var(--text-3, #999);
-  cursor: pointer;
-  flex-shrink: 0;
-  padding: 2px 6px;
-}
-.filter-reset:active { opacity: 0.6; }
 /* [FIX] 订单骨架屏（首次加载脉冲） */
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
 .skeleton-card { background: var(--bg-card, #fff); border: 1px solid var(--line, #e8e4dc); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
@@ -93,38 +57,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
 
   <!-- 状态筛选 chips（E3-15） -->
-  <div class="status-chips" style="display:flex;gap:6px;overflow-x:auto;margin:0 14px 8px;padding:0 2px;">
+  <div class="status-chips" style="display:flex;gap:6px;overflow-x:auto;margin:0 14px 12px;padding:0 2px;">
     <span class="filter-chip active" data-sf="all">全部</span>
     <span class="filter-chip" data-sf="pending">待支付</span>
     <span class="filter-chip" data-sf="serving">进行中</span>
     <span class="filter-chip" data-sf="await">待验收</span>
     <span class="filter-chip" data-sf="settled">已完成</span>
     <span class="filter-chip" data-sf="refunded">已退款</span>
-  </div>
-
-  <!-- 筛选子bar：仅普通订单/中介托管时显示 -->
-  <div class="order-filter-bar" id="filterBar">
-    <div class="filter-row">
-      <span class="filter-label">产品类型</span>
-      <div class="filter-chips" data-filter="type">
-        <span class="filter-chip active" data-val="all">全部</span>
-        <span class="filter-chip" data-val="supply">供方承接</span>
-        <span class="filter-chip" data-val="need">需求匹配</span>
-        <span class="filter-chip" data-val="agency">中介撮合</span>
-        <span class="filter-chip" data-val="transfer">建企买卖</span>
-        <span class="filter-chip" data-val="qual">资质招商</span>
-      </div>
-    </div>
-    <div class="filter-row">
-      <span class="filter-label">付款</span>
-      <div class="filter-chips" data-filter="pay">
-        <span class="filter-chip active" data-val="all">全部</span>
-        <span class="filter-chip" data-val="paid">已付</span>
-        <span class="filter-chip" data-val="unpaid">未付</span>
-        <span class="filter-chip" data-val="free">免费</span>
-      </div>
-      <span class="filter-reset" id="filterReset">重置</span>
-    </div>
   </div>
 
   <div class="scroll" style="padding-top:4px; display:flex; flex-direction:column; min-height:calc(100vh - 230px); padding-bottom:20px;">
@@ -167,9 +106,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
   var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
   var currentTab = 'all';
-  /* 筛选状态 */
-  var filters = { type: 'all', pay: 'all' };
-  /* 状态 chips 分组（E3-15） */
+/* 状态 chips 分组（E3-15） */
   var STATUS_GROUPS = {
     pending:   ['pending', 'draft'],
     serving:   ['serving', 'escrowed'],
@@ -178,9 +115,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     refunded:  ['refunded', 'partial_refund', 'cancelled']
   };
   var statusFilter = 'all';
-  var PAID_STATUSES = { serving:1, await_accept:1, await_confirm:1, settled:1, escrowed:1 };
-
-  function currentUser() {
+function currentUser() {
     try { return (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) { return null; }
   }
 
@@ -226,9 +161,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     });
   }
 
+  /* [PERF] 防抖工具 */
+  function debounce(fn, wait) {
+    var t;
+    return function () {
+      var ctx = this, args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, wait);
+    };
+  }
+
+  /* [PERF] 订单数据缓存 */
+  var _orderCache = null;
+  function invalidateCache() { _orderCache = null; }
+
   function render() {
     var list = document.getElementById('order-list');
     var empty = document.getElementById('order-empty');
+    try {
     var acct = currentUser();
     if (!acct) {
       list.innerHTML = '';
@@ -236,31 +186,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       empty.innerHTML = emptyIcon() + '请先登录查看订单<br><a href="../auth/login.html" style="color:var(--primary);font-size:12px;">去登录</a>';
       return;
     }
-    var all = [];
-    if (currentTab === 'all' || currentTab === 'normal') all = all.concat(getNormalOrders());
-    if (currentTab === 'all' || currentTab === 'mediation') all = all.concat(getMediationOrders());
+    /* [PERF] 使用缓存：首次读取后缓存，事件触发时清除缓存重新读取 */
+    if (!_orderCache) {
+      var _all = [];
+      try {
+        if (currentTab === 'all' || currentTab === 'normal') _all = _all.concat(getNormalOrders());
+        if (currentTab === 'all' || currentTab === 'mediation') _all = _all.concat(getMediationOrders());
+      } catch (e) { console.warn('订单数据读取失败:', e); }
+      _orderCache = _all;
+    }
+    var all = (_orderCache || []).slice();
     /* 按时间倒序 */
     all.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
-    /* 应用筛选 */
-    if (currentTab !== 'all') {
-      all = all.filter(function (o) {
-        /* 产品类型 */
-        if (filters.type !== 'all') {
-          var oType = o.rawType || o.type;
-          if (oType !== filters.type) return false;
-        }
-        /* 付款类型 */
-        if (filters.pay !== 'all') {
-          var isFree = !o.amount || Number(o.amount) === 0;
-          var isPaid = PAID_STATUSES[o.status] ? true : false;
-          if (filters.pay === 'free' && !isFree) return false;
-          if (filters.pay === 'paid' && (!isPaid || isFree)) return false;
-          if (filters.pay === 'unpaid' && (isPaid || isFree)) return false;
-        }
-        return true;
-      });
-    }
-    /* 状态 chips 筛选（E3-15，跨 tab 生效） */
+/* 状态 chips 筛选（E3-15，跨 tab 生效） */
     if (statusFilter !== 'all') {
       var grp = STATUS_GROUPS[statusFilter] || [];
       all = all.filter(function (o) { return grp.indexOf(o.status) > -1; });
@@ -290,17 +228,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<span class="link-green fs-12">查看 ›</span></div>' +
         '</div>';
     }).join('');
+    } catch (e) {
+      console.error('order render error:', e);
+      if (list) list.innerHTML = '<div class=text-3 style=padding:20px;text-align:center;font-size:12px>加载失败，请刷新</div>';
+      if (empty) empty.style.display = 'none';
+    }
   }
+
+  /* [PERF] 防抖版render（在render函数定义之后声明） */
+  var scheduleRender = debounce(render, 100);
 
   document.querySelectorAll('.seg-item').forEach(function(el){
     el.onclick = function(){
       document.querySelectorAll('.seg-item').forEach(function(x){x.classList.remove('is-on')});
       el.classList.add('is-on');
       currentTab = el.getAttribute('data-tab');
-      /* 筛选栏仅在非"全部"tab时显示 */
-      var bar = document.getElementById('filterBar');
-      if (bar) bar.classList.toggle('show', currentTab !== 'all');
-      render();
+      invalidateCache();
+      scheduleRender();
     };
   });
 
@@ -310,36 +254,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       document.querySelectorAll('.status-chips .filter-chip').forEach(function (x) { x.classList.remove('active'); });
       el.classList.add('active');
       statusFilter = el.getAttribute('data-sf');
-      render();
+      scheduleRender();
     };
   });
-
-  /* 筛选chip点击 */
-  document.querySelectorAll('.filter-chips').forEach(function(chipGroup){
-    var ftype = chipGroup.getAttribute('data-filter');
-    chipGroup.addEventListener('click', function(e){
-      var chip = e.target.closest('.filter-chip');
-      if (!chip) return;
-      chipGroup.querySelectorAll('.filter-chip').forEach(function(c){ c.classList.remove('active'); });
-      chip.classList.add('active');
-      filters[ftype] = chip.getAttribute('data-val');
-      render();
-    });
-  });
-
-  /* 重置筛选 */
-  var resetBtn = document.getElementById('filterReset');
-  if (resetBtn) {
-    resetBtn.onclick = function(){
-      filters = { type: 'all', pay: 'all' };
-      document.querySelectorAll('.filter-chips').forEach(function(g){
-        g.querySelectorAll('.filter-chip').forEach(function(c){
-          c.classList.toggle('active', c.getAttribute('data-val') === 'all');
-        });
-      });
-      render();
-    };
-  }
 
   /* [FIX] 首次加载骨架屏：数据未就绪时显示 3-4 行灰色脉冲卡片 */
   function showSkeleton() {
@@ -355,14 +272,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     list.innerHTML = sk;
   }
-  window.addEventListener('engchain:orders', render);
-  window.addEventListener('engchain:mediation', render);
-  window.addEventListener('engchain:store-change', render);
-  window.addEventListener('engchain:state', render);
-  window.addEventListener('engchain:auth', render);
-  window.addEventListener('engchain:entry', render);
+  /* [PERF] 只监听订单相关事件 */
+  window.addEventListener('engchain:orders', function () { invalidateCache(); scheduleRender(); });
+  window.addEventListener('engchain:mediation', function () { invalidateCache(); scheduleRender(); });
+  /* [PERF] 立即渲染：不等待350ms */
   showSkeleton();
-  setTimeout(render, 350);
+  scheduleRender();
 })();
 </script>
 </body>

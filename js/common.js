@@ -163,13 +163,17 @@ window.UI = (function () {
 
   /* ---- 动态加载 thinking-orb.js（AI 球 Canvas 动画引擎） ---- */
   let _orbLoading = false;
+    var _orbLoadFailed = false;
+  var _orbPollTimers = [];
   function ensureThinkingOrb(cb) {
     if (window.ThinkingOrb) { if (cb) cb(); return; }
+    if (_orbLoadFailed) { return; }
     if (_orbLoading) {
-      // 已在加载中，轮询等待
       var check = setInterval(function () {
-        if (window.ThinkingOrb) { clearInterval(check); if (cb) cb(); }
+        if (window.ThinkingOrb) { clearInterval(check); var idx = _orbPollTimers.indexOf(check); if (idx > -1) _orbPollTimers.splice(idx, 1); if (cb) cb(); }
+        else if (_orbLoadFailed) { clearInterval(check); var idx = _orbPollTimers.indexOf(check); if (idx > -1) _orbPollTimers.splice(idx, 1); }
       }, 50);
+      _orbPollTimers.push(check);
       return;
     }
     _orbLoading = true;
@@ -177,7 +181,7 @@ window.UI = (function () {
     var s = document.createElement('script');
     s.src = root + 'js/thinking-orb.js';
     s.onload = function () { _orbLoading = false; if (cb) cb(); };
-    s.onerror = function () { _orbLoading = false; };
+    s.onerror = function () { _orbLoading = false; _orbLoadFailed = true; _orbPollTimers.forEach(function (t) { clearInterval(t); }); _orbPollTimers = []; };
     document.head.appendChild(s);
   }
 
@@ -1254,6 +1258,9 @@ window.ListFooter = (function () {
   var debounceTimers = {};
   window.addEventListener('storage', function (e) {
     if (!e.key) return;
+    /* 跨页面缓存失效：其他页面修改 localStorage 后，清除当前页面的内存缓存 */
+    try { if (typeof window.invalidateAllStoreCaches === 'function') window.invalidateAllStoreCaches(); } catch (err) {}
+    try { if (window.DataBus && typeof window.DataBus.invalidateCache === 'function') window.DataBus.invalidateCache(); } catch (err) {}
     var evtName = KEY_TO_EVENT[e.key];
     if (!evtName) return;
     /* 派发通用变更事件 */
