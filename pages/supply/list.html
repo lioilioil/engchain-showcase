@@ -34,7 +34,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .sort-popover .sort-opt.active::after { content: '✓'; float: right; }
 
 /* 筛选弹窗：顶部底部固定，内容滚动，最大80% */
-.filter-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.4); }
+.filter-overlay { display: none; position: fixed; top: 0; bottom: 0; left: 50%; right: auto; width: var(--phone-w, 420px); max-width: 100%; transform: translateX(-50%); z-index: 9999; background: rgba(0,0,0,.4); }
 .filter-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: var(--bg); border-radius: 16px 16px 0 0; max-height: 80vh; display: flex; flex-direction: column; transform: translateY(100%); transition: transform .3s ease; }
 .filter-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
 .filter-header-title { font-size: 16px; font-weight: 700; color: var(--text-1); }
@@ -87,6 +87,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           </div>
         </div>
       </div>
+    </div>
+    <!-- [FEAT 9.2-4] 每日免费浏览额度提示 -->
+    <div id="dq-banner" style="margin:0 0 10px;padding:8px 12px;border-radius:10px;background:var(--bg-card);border:1px solid var(--line);font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;">
+      <svg class="ic" style="width:14px;height:14px;color:var(--primary-dim);"><use href="#i-eye"/></svg>
+      今日免费浏览摘要剩余 <b id="dq-remain" style="color:var(--primary-dim);">–</b> 条 · 查看详情自动扣减
     </div>
     <div id="list"></div>
   </div>
@@ -176,7 +181,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
   }
   function mergedList() {
-    var mock = (window.MOCK && MOCK.byFlow) ? MOCK.byFlow('match').slice() : [];
+    var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
     var active = readActiveSupplies().map(normSupplyItem);
     var seen = {}, out = [];
     active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
@@ -302,6 +307,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     filterDraft = getDefaultFilter();
     renderFilterGroups();
   };
+  /* E2-08：空态"重置筛选"——直接重置已生效筛选并刷新列表 */
+  window.resetEmptyFilter = function () {
+    filterState = getDefaultFilter();
+    filterDraft = getDefaultFilter();
+    renderFilterGroups();
+    updateFilterBadge();
+    render();
+  };
   window.applyFilter = function () {
     filterState = { category: filterDraft.category, city: filterDraft.city, budget: filterDraft.budget, verified: filterDraft.verified };
     updateFilterBadge();
@@ -369,11 +382,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     /* 排序 */
     if (sortBy === 'match') list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
     else list.sort(function (a, b) { return (b.ts || b.time || 0) - (a.ts || a.time || 0); });
+    /* [FEAT 9.2-1] 置顶道具：置顶信息排最前 */
+    try {
+      if (window.UpgradeStore) {
+        list.sort(function (a, b) {
+          var ta = UpgradeStore.isActive('topListing', a.id) ? 1 : 0;
+          var tb = UpgradeStore.isActive('topListing', b.id) ? 1 : 0;
+          return tb - ta;
+        });
+      }
+    } catch (e) {}
 
     document.getElementById('count').textContent = '共 ' + list.length + ' 条';
     var html = list.length
       ? window.Cards.render(list, 'detail.html?id=')
-      : '<div class="empty-state"><div class="e-icon"><svg class="ic"><use href="#i-folder"/></svg></div><div class="e-title">暂无匹配</div><div class="e-desc">换个筛选条件试试吧</div></div>';
+      : '<div class="empty-state"><div class="e-icon"><svg class="ic"><use href="#i-folder"/></svg></div><div class="e-title">暂无匹配</div><div class="e-desc">换个筛选条件试试吧</div>' +
+        '<div style="margin-top:18px;"><button class="btn btn-primary" onclick="window.resetEmptyFilter()">重置筛选</button></div></div>';
     document.getElementById('list').innerHTML = html;
 
     /* 为用户发布条目注入角标 */
@@ -388,6 +412,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (tagsRow) tagsRow.appendChild(tag);
       }
     });
+    /* [FEAT 9.2-1] 置顶标签注入 */
+    try {
+      if (window.UpgradeStore) {
+        list.forEach(function (item, idx) {
+          if (UpgradeStore.isActive('topListing', item.id) && cards[idx]) {
+            var topTag = document.createElement('span');
+            topTag.className = 'tag tag-gold';
+            topTag.style.cssText = 'margin-left:6px;font-size:10px;background:linear-gradient(135deg,#C9A961,#A98A47);color:#fff;';
+            topTag.textContent = '置顶';
+            var tagsRow2 = cards[idx].querySelector('.jc-tags');
+            if (tagsRow2) tagsRow2.insertBefore(topTag, tagsRow2.firstChild);
+          }
+        });
+      }
+    } catch (e) {}
   }
 
   setSeg();
@@ -395,6 +434,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   render();
   window.addEventListener('engchain:supply', function () { render(); });
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-supply') render(); });
+  /* [FEAT 9.2-4] 每日免费浏览摘要额度横幅 */
+  (function(){
+    function render(){
+      if (!window.FreeQuotaStore) return;
+      var el = document.getElementById("dq-remain");
+      if (el) el.textContent = FreeQuotaStore.remaining();
+    }
+    render();
+    window.addEventListener("engchain:free-quota", render);
+  })();
 })();
 </script>
 </body>

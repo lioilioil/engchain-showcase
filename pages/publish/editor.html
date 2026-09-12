@@ -1891,6 +1891,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     }
     if (!$('agree').checked) { UI.toast('请先同意用户协议', 'warn'); return; }
+    /* [FEAT 9.2-2] credit score threshold check for publishing */
+    try {
+      var csCfg = (MOCK.business.creditScore) || { thresholds: { publish: 60 } };
+      var pubThreshold = (csCfg.thresholds && csCfg.thresholds.publish) || 60;
+      var curU = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var curUid = curU ? curU.id : '';
+      var csInfo = window.svcCreditOf ? svcCreditOf(curUid) : { score: 80 };
+      if ((csInfo.score || 80) < pubThreshold) {
+        UI.toast('诚信分不足（当前' + (csInfo.score || 80) + '分，需' + pubThreshold + '分），无法发布', 'err');
+        return;
+      }
+    } catch (e) {}
+
     var data = collectData();
     var curUser = (window.DataBus && DataBus.current) ? DataBus.current() : null;
     var amount = data.price ? (data.price + (data.unit ? ' ' + data.unit : '')) : '';

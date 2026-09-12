@@ -234,6 +234,19 @@ document.getElementById('pay-btn').addEventListener('click',function(){
   if(paying)return;
   var acc=window.entryAccess?entryAccess():{statusId:'guest'};
   if(acc.statusId==='guest'){location.href='../auth/login.html';return;}
+  /* [FIX BM-033] 风控封禁用户前台拦截：被封禁则禁止下单 */
+  try {
+    var _curU=(window.DataBus&&DataBus.current)?DataBus.current():null;
+    if(_curU&&_curU.banned){UI.toast('账号已被封禁，无法执行此操作','warn');return;}
+  } catch(e){}
+  /* [FIX BM-026] 下单前必须实名认证：注册未实名不得下托管单 */
+  var _idy=window.deriveIdentity?deriveIdentity():null;
+  var _authRn=(window.AuthStore&&AuthStore.read())?AuthStore.read().realname:null;
+  var _realnameOk=(_idy&&_idy.personal==='verified')||(_idy&&_idy.identities&&_idy.identities.indexOf('realname')>=0)||(_authRn&&_authRn.ok);
+  if(!_realnameOk){
+    UI.dialog({title:'请先完成实名认证',text:'托管交易需先完成实名认证以保障双方权益。',ok:'去认证',onOk:function(){location.href='../profile/auth-personal.html';}});
+    return;
+  }
   var amt=Domain.round2(curAmt||0);
   if(!(amt>0)){UI.toast('请输入有效金额','warn');return;}
   /* WP5 毛利保护：下单金额不低于平台最低售价（配置为0时不启用） */
@@ -252,6 +265,17 @@ document.getElementById('pay-btn').addEventListener('click',function(){
     UI.dialog({title:'余额不足',text:'支付意向金需 '+fmt(intAmt)+'，钱包可用 '+fmt(avail)+'，请先充值。',ok:'去充值',onOk:function(){location.href='../wallet/recharge.html';}});
     return;
   }
+  /* [FEAT 9.2-2] credit score threshold check for ordering */
+  try {
+    var csCfg2 = (MOCK.business.creditScore) || { thresholds: { order: 50 } };
+    var orderThreshold = (csCfg2.thresholds && csCfg2.thresholds.order) || 50;
+    var csInfo2 = window.svcCreditOf ? svcCreditOf(uid) : { score: 80 };
+    if ((csInfo2.score || 80) < orderThreshold) {
+      UI.toast('诚信分不足（当前' + (csInfo2.score || 80) + '分，需' + orderThreshold + '分），无法下单', 'err');
+      return;
+    }
+  } catch (e) {}
+
   paying=true;
   var r=commissionRate(amt);
   var o=Mediation.create({buyerId:uid,sellerId:svc.sellerId,svcId:svc.id,svcName:svc.name,category:svc.cats[0],amount:amt});

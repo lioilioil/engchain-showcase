@@ -45,10 +45,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
 
     <div class="field">
-      <label class="field-label">到账账户</label>
-      <div class="group">
-        <div class="row"><span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-bank"/></svg></span><span class="label">招商银行 · 尾号(4638)</span><input type="radio" name="acc" value="bank" checked></div>
-        <div class="row"><span class="row-icon" style="background:rgba(37,99,235,.16)"><svg class="ic"><use href="#i-card"/></svg></span><span class="label">支付宝 · 陈建国</span><input type="radio" name="acc" value="alipay"></div>
+      <label class="field-label">到账银行卡</label>
+      <div class="group" id="wd-cards"></div>
+      <div class="row" onclick="location.href='bank-cards.html'" style="margin-top:8px;">
+        <span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-card"/></svg></span>
+        <span class="label" style="color:var(--primary-dim);">管理银行卡</span><span class="arrow">›</span>
       </div>
     </div>
 
@@ -79,15 +80,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   document.getElementById('w-limit').textContent = '单笔 ≤' + w.singleMax + '元 · 每日 ≤' + w.dailyMax + '次';
   try { BalanceStore.seedLogs(); } catch (e) { console.warn('BalanceStore.seedLogs failed:', e); }
 
-  var WD_STATUS = { pending: { label: '待审核', cls: 'tag-warning' }, first_ok: { label: '初审通过', cls: 'tag-primary' }, paid: { label: '已到账', cls: 'tag-success' }, rejected: { label: '已驳回', cls: 'tag-gray' } };
+  var WD_STATUS = { pending: { label: '待审核', cls: 'tag-warning' }, first_ok: { label: '初审通过', cls: 'tag-primary' }, paid: { label: '已到账', cls: 'tag-success' }, rejected: { label: '已驳回', cls: 'tag-gray' }, cancelled: { label: '已撤销', cls: 'tag-gray' } };
 
   function currentUser() { try { return (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) { return null; } }
+  /* [FIX BM-046] 删除自定义 isResident()，改用全局 entryAccess() 单一来源（与其他页面门控一致） */
   function isResident() {
-    var u = currentUser();
-    if (!u) return false;
-    if (u.identity && u.identity.enterprise === 'resident') return true;
-    if (u.entry && u.entry.active && u.entry.status === 'active') return true;
-    return false;
+    try { return !!(window.entryAccess && entryAccess().isResident); } catch (e) { return false; }
+  }
+  /* [FIX BM-035] 统计当日已提现次数（本 uid），用于每日 ≤dailyMax 校验与展示 */
+  function todayWithdrawCount() {
+    var u = currentUser(); if (!u) return 0;
+    var all = [];
+    try { all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : []; } catch (e) {}
+    var now = new Date(), y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    return all.filter(function (x) {
+      if (!x || x.uid !== u.id) return false;
+      var t = new Date(x.appliedAt || 0);
+      return t.getFullYear() === y && t.getMonth() === mo && t.getDate() === d;
+    }).length;
+  }
+  function renderLimit() {
+    var el = document.getElementById('w-limit');
+    if (!el) return;
+    var used = todayWithdrawCount();
+    el.textContent = '单笔 ≤¥' + w.singleMax + ' · 每日 ≤' + w.dailyMax + '次（今日已 ' + used + '/' + w.dailyMax + '）';
   }
   function renderAvail() {
     document.getElementById('w-avail').textContent = UI.money(BalanceStore.available());
@@ -98,6 +114,83 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (isNaN(d)) return '';
     return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
   }
+  /* ---- E1-10 已绑银行卡：localStorage engchain-bank-cards ---- */
+  function loadBankCards() {
+    try { var a = JSON.parse(localStorage.getItem('engchain-bank-cards') || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function maskCard(no) { var s = String(no || ''); return s.length > 4 ? '尾号 ' + s.slice(-4) : s; }
+  function renderCards() {
+    var box = document.getElementById('wd-cards');
+    if (!box) return;
+    var cards = loadBankCards();
+    if (!cards.length) {
+      box.innerHTML = '<div class="row" onclick="location.href=\'bank-cards.html\'" style="cursor:pointer;">' +
+        '<span class="row-icon" style="background:rgba(234,102,104,.14)"><svg class="ic"><use href="#i-bank"/></svg></span>' +
+        '<span class="label text-3">暂未绑定银行卡，点击去绑定</span><span class="arrow">›</span></div>';
+      return;
+    }
+    var defIdx = cards.findIndex ? cards.findIndex(function (c) { return c.isDefault; }) : -1;
+    if (defIdx < 0) defIdx = 0;
+    box.innerHTML = cards.map(function (c, i) {
+      var checked = i === defIdx ? 'checked' : '';
+      var label = (c.bank || '银行卡') + ' · ' + maskCard(c.cardNo) + (c.isDefault ? '（默认）' : '');
+      return '<div class="row" style="cursor:pointer;" onclick="var r=this.querySelector(\'input\');if(r)r.checked=true;">' +
+        '<span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-bank"/></svg></span>' +
+        '<span class="label">' + label + '</span>' +
+        '<input type="radio" name="acc" value="bank" ' + checked + ' data-card="' + (c.bank || '') + ' ' + maskCard(c.cardNo) + '"></div>';
+    }).join('');
+  }
+
+  /* ---- E2-22 提现进度时间线：已申请→审核中→打款中→已到账 ---- */
+  var WD_STEPS = ['已申请', '审核中', '打款中', '已到账'];
+  function stepIndex(status) {
+    if (status === 'pending') return 1;
+    if (status === 'first_ok') return 2;
+    if (status === 'paid') return 4;
+    return 0;
+  }
+  function timelineHtml(status) {
+    var cur = stepIndex(status);
+    var dots = '';
+    for (var i = 0; i < 4; i++) {
+      var done = i < cur;
+      var active = (i + 1) === cur;
+      var color = done ? 'var(--success)' : (active ? 'var(--primary-dim)' : 'var(--line)');
+      var labColor = done ? 'var(--success)' : (active ? 'var(--primary-dim)' : 'var(--text-3)');
+      dots += '<div style="flex:1;text-align:center;">' +
+        '<div style="width:8px;height:8px;border-radius:50%;background:' + color + ';margin:0 auto;"></div>' +
+        '<div style="font-size:9px;margin-top:3px;color:' + labColor + ';">' + WD_STEPS[i] + '</div></div>';
+    }
+    return '<div style="display:flex;align-items:flex-end;margin:6px 0 2px;">' + dots + '</div>';
+  }
+  /* E2-22 撤销申请：优先 DataBus.withdrawCancel，否则直接改 localStorage 状态为 cancelled 并解冻 */
+  window.cancelWithdraw = function (id) {
+    UI.dialog({
+      title: '撤销提现申请', text: '确定撤销该笔提现申请吗？撤销后资金将解冻回可用余额。', ok: '撤销申请', cancel: '再想想', danger: true,
+      onOk: function () {
+        try {
+          if (window.DataBus && typeof DataBus.withdrawCancel === 'function') {
+            DataBus.withdrawCancel(id);
+          } else {
+            var all = JSON.parse(localStorage.getItem('engchain-withdrawals') || '[]');
+            var w = null;
+            for (var i = 0; i < all.length; i++) if (all[i].id === id) { w = all[i]; break; }
+            if (w && (w.status === 'pending' || w.status === 'first_ok')) {
+              w.status = 'cancelled'; w.cancelledAt = Date.now(); w.note = '用户主动撤销';
+              var bs = BalanceStore.read();
+              bs.frozen = Math.max(0, Math.round((bs.frozen - w.amount) * 100) / 100);
+              BalanceStore.write(bs);
+              localStorage.setItem('engchain-withdrawals', JSON.stringify(all));
+              window.dispatchEvent(new CustomEvent('engchain:withdrawals'));
+            }
+          }
+          UI.toast('已撤销，资金已解冻', 'ok');
+          renderAvail(); renderRecords(); renderLimit();
+        } catch (e) { UI.toast('撤销失败：' + (e.message || e), 'err'); }
+      }
+    });
+  };
   function renderRecords() {
     var box = document.getElementById('wd-records');
     if (!box) return;
@@ -109,10 +202,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!mine.length) { box.innerHTML = '<div class="text-3 fs-12" style="text-align:center;padding:14px 0;">暂无提现记录</div>'; return; }
     box.innerHTML = mine.map(function (r) {
       var st = WD_STATUS[r.status] || { label: r.status, cls: 'tag-gray' };
-      return '<div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;">' +
+      var tl = (r.status === 'pending' || r.status === 'first_ok' || r.status === 'paid') ? timelineHtml(r.status) : '';
+      var cancelBtn = (r.status === 'pending') ? '<button class="tx-btn" style="margin-top:6px;" onclick="cancelWithdraw(\'' + r.id + '\')">撤销申请</button>' : '';
+      return '<div class="row" style="flex-direction:column;align-items:flex-start;gap:4px;padding:12px 14px;">' +
         '<div style="display:flex;justify-content:space-between;width:100%;"><span class="mono fw-600">¥' + Number(r.amount).toLocaleString() + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
         '<div class="text-3 fs-11">' + (r.bank || '') + ' · ' + fmtTime(r.appliedAt) + '</div>' +
+        tl +
         (r.note ? '<div class="text-3 fs-11" style="color:var(--error);">' + r.note + '</div>' : '') +
+        cancelBtn +
         '</div>';
     }).join('');
   }
@@ -126,8 +223,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (form) form.style.display = '';
       if (guide) guide.style.display = 'none';
       if (cta) cta.style.display = '';
+      renderCards();
       renderAvail();
       renderRecords();
+      renderLimit(); /* [FIX BM-035] 展示当日已提现次数 */
     } else {
       if (form) form.style.display = 'none';
       if (guide) guide.style.display = '';
@@ -137,15 +236,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   window.withdraw = function () {
     if (!isResident()) { UI.toast('入驻企业后可提现', 'warn'); return; }
+    /* [FIX BM-033] 风控封禁用户前台拦截：被封禁则禁止提现 */
+    var _u0 = currentUser();
+    if (_u0 && _u0.banned) { UI.toast('账号已被封禁，无法执行此操作', 'warn'); return; }
     var amountEl = document.getElementById('amount');
     var v = parseFloat(amountEl ? amountEl.value : '') || 0;
-    if (v <= 0) { UI.toast('请输入有效提现金额', 'warn'); if (amountEl) amountEl.focus(); return; }
+    /* [FIX BM-044] 最低提现 ¥10：提交校验由 v<=0 收紧为 v<10 */
+    if (v < 10) { UI.toast('最低提现金额为 ¥10', 'warn'); if (amountEl) amountEl.focus(); return; }
     if (v > w.singleMax) { UI.toast('单笔提现上限 ¥' + w.singleMax, 'warn'); return; }
+    /* [FIX BM-035] 每日提现 ≤dailyMax 次校验（核心层 withdrawalApply 已兜底，前台二次拦截并展示） */
+    var used = todayWithdrawCount();
+    if (used >= w.dailyMax) { UI.toast('今日提现次数已达上限（每日 ' + w.dailyMax + ' 次），请明日再试', 'warn'); return; }
     var avail = BalanceStore.available();
     if (v > avail) { UI.toast('超过可提现余额（当前可提 ¥' + avail.toLocaleString() + '）', 'warn'); return; }
     var accEl = document.querySelector('input[name="acc"]:checked');
-    var accName = accEl ? (accEl.closest('.row') ? accEl.closest('.row').querySelector('.label').textContent : '招商银行 · 尾号(4638)') : '招商银行 · 尾号(4638)';
-    var method = accEl && accEl.value === 'alipay' ? 'alipay' : 'bank';
+    if (!accEl) { UI.toast('请先绑定或选择到账银行卡', 'warn'); return; }
+    var accName = accEl.getAttribute('data-card') || (accEl.closest('.row') ? accEl.closest('.row').querySelector('.label').textContent : '银行卡');
+    var method = 'bank';
     UI.dialog({
       title: '提现确认', text: '本次提现 <b style="color:var(--primary)">¥' + v.toLocaleString() + '</b> 至' + accName + '，提交后进入平台审批流程，审批通过后打款。', ok: '提交申请', cancel: '取消',
       onOk: function () {
@@ -156,7 +263,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           if (amountEl) amountEl.value = '';
           renderAvail();
           renderRecords();
-          UI.toast('提现申请已提交，待审核', 'ok');
+          var sh = UI.sheet();
+          sh.setClosable(false);
+          sh.html(
+            '<div style="text-align:center;padding:14px 0;">' +
+              '<div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2E7D50,#4CAF7D);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+              '<svg viewBox="0 0 24 24" style="width:28px;height:28px;stroke:#fff;stroke-width:2.5;fill:none;"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+              '<div style="font-size:17px;font-weight:700;">提现申请已提交</div>' +
+              '<div style="font-size:12px;color:var(--text-2);margin-top:6px;">单号 <span class="mono">' + (r.id || '') + '</span></div>' +
+              '<div style="font-size:12px;color:var(--text-2);margin-top:4px;">审批通过后预计 <b style="color:var(--primary-dim);">2 小时内</b> 到账</div>' +
+              '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="UI.closeSheet()">完成</button>' +
+            '</div>'
+          ).show();
         } catch (err) {
           console.error('withdraw submit error:', err);
           UI.toast('提现申请失败：' + (err.message || err), 'err');
@@ -185,32 +303,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     document.getElementById('rt-amount').textContent='¥'+fmtMoney(v);
     document.getElementById('rt-fee').textContent='¥'+fmtMoney(fee);
     document.getElementById('rt-arrive').textContent='¥'+fmtMoney(arrive);
-    var w='';
-    if(v<MIN_WD)w='最低提现金额 ¥'+MIN_WD+' 元';
-    else if(v>w.singleMax)w='单笔上限 ¥'+w.singleMax+' 元';
-    else if(v>avail)w='超过可提现余额（当前 ¥'+avail.toLocaleString()+'）';
-    if(warn)warn.textContent=w;
+    /* [FIX BM-044] 修复局部 var w 阴影外层 MOCK withdraw 配置的 bug：改用 localWarn 变量 */
+    var localWarn='';
+    if(v<MIN_WD)localWarn='最低提现金额 ¥'+MIN_WD+' 元';
+    else if(v>w.singleMax)localWarn='单笔上限 ¥'+w.singleMax+' 元';
+    else if(v>avail)localWarn='超过可提现余额（当前 ¥'+avail.toLocaleString()+'）';
+    if(warn)warn.textContent=localWarn;
   }
   var amtEl=document.getElementById('amount');
   if(amtEl){
     amtEl.addEventListener('input',updateRealtime);
     amtEl.addEventListener('blur',updateRealtime);
   }
-  /* 提交提现申请按钮：双重绑定（inline onclick + addEventListener 兜底），确保真实点击必触发 */
-  var _wdBtn = document.getElementById('withdraw-submit') || document.querySelector('#wd-cta button');
-  if (_wdBtn) {
-    _wdBtn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (typeof window.withdraw === 'function') { window.withdraw(); }
-      else { UI.toast('提现功能初始化中，请稍候重试', 'warn'); }
-    });
-  }
-  window.addEventListener('engchain:balance', renderAvail);
-  window.addEventListener('engchain:withdrawals', renderRecords);
+  /* E3-17 提交提现申请按钮：单一绑定（addEventListener），移除原重复绑定 */
+  var _wdBtn = document.getElementById('withdraw-submit');
+  if (_wdBtn) _wdBtn.addEventListener('click', function () { window.withdraw(); });
+  window.addEventListener('engchain:balance', function(){ renderAvail(); renderLimit(); });
+  window.addEventListener('engchain:withdrawals', function(){ renderRecords(); renderLimit(); });
   window.addEventListener('engchain:auth', gate);
   window.addEventListener('engchain:entry', gate);
-  window.addEventListener('engchain:store-change', function () { renderAvail(); renderRecords(); gate(); });
+  window.addEventListener('engchain:store-change', function () { renderCards(); renderAvail(); renderRecords(); renderLimit(); gate(); });
 })();
 </script>
 </body>

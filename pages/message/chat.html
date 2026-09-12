@@ -70,9 +70,41 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   render();
 
+  /* [FIX BM-039] 聊天内容正则扫描：发送前检测手机号/微信/QQ 等站外联系方式。
+     优先调用领域层 JumpContract.scanMessage（如已就绪）；否则用本地正则兜底。
+     命中时警告"检测到疑似联系方式，为保障交易安全，请通过平台沟通"，不强制拦截，但记录风控日志。 */
+  function scanContact(text) {
+    if (window.JumpContract && typeof JumpContract.scanMessage === 'function') {
+      try { return JumpContract.scanMessage(text); } catch (e) {}
+    }
+    /* 本地正则兜底：手机号 / 微信号 / QQ号 */
+    var hits = [];
+    if (/(?:1[3-9]\d{9})/.test(text)) hits.push('手机号');
+    if (/(?:微信|vx|VX|vX|wx|WX|weixin|WeChat|加微)/.test(text)) hits.push('微信号');
+    if (/(?:QQ|qq|ＱＱ)/.test(text)) hits.push('QQ号');
+    return hits.length ? { hit: true, types: hits } : { hit: false };
+  }
+  function riskLog(text, types) {
+    try {
+      var key = 'engchain-risk-logs';
+      var arr = [];
+      try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) {}
+      arr.unshift({ ts: Date.now(), text: text.slice(0, 80), types: types, scene: 'chat' });
+      if (arr.length > 100) arr.length = 100;
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch (e) {}
+  }
+
   window.send = function (text) {
     var v = (text || document.getElementById('msg').value).trim();
     if (!v) return;
+    /* [FIX BM-039] 发送前扫描站外联系方式 */
+    var scan = scanContact(v);
+    if (scan && scan.hit) {
+      var types = (scan.types || []).join('/') || '联系方式';
+      UI.toast('检测到疑似' + types + '，为保障交易安全，请通过平台沟通', 'warn');
+      riskLog(v, scan.types || []);
+    }
     var now = new Date().getHours() + ':' + new Date().getMinutes().toString().padStart(2, '0');
     bubbles.push({ me: true, text: v, t: now });
     document.getElementById('msg').value = '';

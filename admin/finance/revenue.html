@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>收入看板 · 工程链管理后台</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  .rev-total{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;border-radius:14px;padding:20px;margin:12px;}
+  .rev-total-label{font-size:13px;opacity:0.9;}
+  .rev-total-val{font-size:36px;font-weight:800;margin:6px 0;}
+  .stream-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px;}
+  .stream-card{background:var(--bg-card);border-radius:12px;padding:14px;}
+  .stream-label{font-size:12px;color:var(--text-3);}
+  .stream-amt{font-size:20px;font-weight:800;color:var(--primary-dim);margin:4px 0;}
+  .stream-pct{font-size:11px;color:var(--text-2);}
+  .chart-card{background:var(--bg-card);border-radius:12px;margin:12px;padding:16px;}
+  .chart-title{font-size:14px;font-weight:700;margin-bottom:14px;}
+  .pie-wrap{display:flex;align-items:center;gap:16px;}
+  .pie-legend{flex:1;}
+  .pie-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;}
+  .pie-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+  .bar-row{display:flex;align-items:gap:8px;padding:6px 0;}
+  .bar-label{width:50px;font-size:12px;color:var(--text-2);}
+  .bar-track{flex:1;height:20px;background:var(--bg-card-2);border-radius:4px;overflow:hidden;}
+  .bar-val{height:100%;border-radius:4px;}
+  .bar-num{width:80px;text-align:right;font-size:12px;font-weight:600;}
+  .roadmap-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .roadmap-table th{background:var(--bg-card-2);padding:8px;text-align:left;font-weight:700;}
+  .roadmap-table td{padding:8px;border-bottom:1px solid var(--line);}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="location.href='../index.html'">‹</button>
+    <div class="nav-title">收入看板</div>
+    <div class="nav-right" style="width:32px;"></div>
+  </div>
+  <div class="scroll" style="padding-bottom:24px;">
+    <!-- [FEAT 9.2-7] 总收入 -->
+    <div class="rev-total">
+      <div class="rev-total-label">平台累计总收入</div>
+      <div class="rev-total-val" id="rev-total">¥0</div>
+      <div style="font-size:12px;opacity:0.9;">含 R1认证 / R2入驻 / R3解锁 / R4积分 / R5佣金 / R6增值 / R7API</div>
+    </div>
+    <!-- 各收入流卡片 -->
+    <div class="stream-grid" id="stream-grid"></div>
+    <!-- 收入结构饼图（纯CSS） -->
+    <div class="chart-card">
+      <div class="chart-title">收入结构占比</div>
+      <div id="pie-chart"></div>
+    </div>
+    <!-- 月度趋势柱状图 -->
+    <div class="chart-card">
+      <div class="chart-title">近6个月收入趋势</div>
+      <div id="trend-chart"></div>
+    </div>
+    <!-- 路线图 -->
+    <div class="chart-card">
+      <div class="chart-title">收入结构规划路线图</div>
+      <table class="roadmap-table">
+        <thead><tr><th>阶段</th><th>时间</th><th>重点收入流</th><th>目标占比</th></tr></thead>
+        <tbody>
+          <tr><td>P1 短期</td><td>1-3月</td><td>R1认证费 R2入驻费</td><td>60%+</td></tr>
+          <tr><td>P2 中期</td><td>3-6月</td><td>R3解锁 R4积分 R5佣金</td><td>50%+</td></tr>
+          <tr><td>P3 长期</td><td>6-12月</td><td>R6增值 R7API</td><td>30%+</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){
+  /* [FEAT 9.2-7] 生成收入数据 */
+  var data = RevenueStore.generate();
+  var streams = RevenueStore.byStream();
+  var colors = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00897b','#3949ab','#757575'];
+  /* 总收入 */
+  document.getElementById('rev-total').textContent = '¥' + Number(data.total||0).toLocaleString();
+  /* 各收入流卡片 */
+  document.getElementById('stream-grid').innerHTML = streams.map(function(s,i){
+    return '<div class="stream-card"><div class="stream-label">'+s.label+'</div>'+
+      '<div class="stream-amt">¥'+Number(s.amount||0).toLocaleString()+'</div>'+
+      '<div class="stream-pct">占比 '+s.pct+'%</div></div>';
+  }).join('');
+  /* 收入结构（纯CSS条形占比） */
+  document.getElementById('pie-chart').innerHTML = streams.map(function(s,i){
+    var color = colors[i % colors.length];
+    return '<div class="bar-row">'+
+      '<div class="bar-label">'+s.label+'</div>'+
+      '<div class="bar-track"><div class="bar-val" style="width:'+Math.max(s.pct,1)+'%;background:'+color+';"></div></div>'+
+      '<div class="bar-num">'+s.pct+'%</div></div>';
+  }).join('');
+  /* 月度趋势 */
+  var trend = RevenueStore.trend();
+  var maxAmt = trend.length ? Math.max.apply(null, trend.map(function(t){return t.total;})) : 1;
+  document.getElementById('trend-chart').innerHTML = trend.map(function(t){
+    var h = Math.round((t.total/maxAmt)*120);
+    return '<div style="display:flex;flex-direction:column;align-items:center;flex:1;">'+
+      '<div style="font-size:11px;font-weight:600;color:var(--primary-dim);">'+(t.total/10000).toFixed(1)+'万</div>'+
+      '<div style="width:100%;max-width:30px;height:120px;display:flex;align-items:flex-end;">'+
+      '<div style="width:100%;height:'+h+'px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--primary),var(--primary-dim));"></div></div>'+
+      '<div style="font-size:10px;color:var(--text-3);margin-top:4px;">'+t.month+'</div></div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

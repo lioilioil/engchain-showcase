@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/vendor/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>经营数据看板 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:12px;}
+  .stat-card{background:var(--bg-card);border-radius:12px;padding:14px 12px;text-align:center;}
+  .stat-val{font-size:22px;font-weight:800;color:var(--primary-dim);font-family:var(--font-num);}
+  .stat-label{font-size:11px;color:var(--text-3);margin-top:4px;}
+  .chart-card{background:var(--bg-card);border-radius:12px;margin:12px;padding:14px;}
+  .chart-title{font-size:14px;font-weight:700;margin-bottom:12px;}
+  .bar-chart{display:flex;align-items:flex-end;gap:3px;height:140px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+  .bar-fill{width:100%;max-width:18px;border-radius:3px 3px 0 0;background:linear-gradient(180deg,var(--primary),var(--primary-dim));min-height:2px;}
+  .bar-label{font-size:9px;color:var(--text-3);margin-top:4px;white-space:nowrap;overflow:hidden;}
+  .cat-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);}
+  .cat-row:last-child{border-bottom:none;}
+  .cat-name{flex:1;font-size:13px;}
+  .cat-bar{flex:2;height:8px;border-radius:4px;background:var(--bg-card-2);overflow:hidden;}
+  .cat-bar-fill{height:100%;border-radius:4px;background:var(--primary-dim);}
+  .cat-count{font-size:13px;font-weight:700;color:var(--primary-dim);width:36px;text-align:right;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">经营数据看板</div>
+    <div class="nav-right" style="width:32px;"></div>
+  </div>
+  <div class="scroll" style="padding-bottom:24px;">
+    <!-- [FEAT 9.2-4] 核心指标卡片 -->
+    <div class="stat-grid" id="stat-grid"></div>
+    <!-- 趋势图：近30天成交金额 -->
+    <div class="chart-card">
+      <div class="chart-title">近30天成交金额趋势</div>
+      <div class="bar-chart" id="amount-chart"></div>
+    </div>
+    <!-- 趋势图：询盘量 -->
+    <div class="chart-card">
+      <div class="chart-title">近30天询盘量趋势</div>
+      <div class="bar-chart" id="inquiry-chart"></div>
+    </div>
+    <!-- 品类分布 -->
+    <div class="chart-card">
+      <div class="chart-title">品类分布（按发布量）</div>
+      <div id="cat-list"></div>
+    </div>
+    <!-- 热门信息 -->
+    <div class="chart-card">
+      <div class="chart-title">热门信息排行</div>
+      <div id="top-list"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){
+  window.__ROOT__='../../';
+  /* [FEAT 9.2-4] 进入页面自动生成数据 */
+  var data = DashboardStore.generate();
+  var s = data.stats;
+  /* 渲染核心指标 */
+  var stats = [
+    {label:'发布信息数', val:s.publishCount},
+    {label:'浏览量', val:s.viewCount},
+    {label:'询盘数', val:s.inquiryCount},
+    {label:'成交订单', val:s.orderCount},
+    {label:'成交金额', val:'¥'+Number(s.totalAmount).toLocaleString()},
+    {label:'客单价', val:'¥'+Number(s.avgAmount).toLocaleString()}
+  ];
+  document.getElementById('stat-grid').innerHTML = stats.map(function(st){
+    return '<div class="stat-card"><div class="stat-val">'+st.val+'</div><div class="stat-label">'+st.label+'</div></div>';
+  }).join('');
+  /* 渲染柱状图 */
+  function renderBarChart(elId, items, valKey, labelKey){
+    var max = Math.max.apply(null, items.map(function(i){return i[valKey];}).concat([1]));
+    document.getElementById(elId).innerHTML = items.map(function(it){
+      var h = Math.round((it[valKey]/max)*100);
+      return '<div class="bar-col"><div class="bar-fill" style="height:'+h+'%;" title="'+it[valKey]+'"></div><div class="bar-label">'+it[labelKey]+'</div></div>';
+    }).join('');
+  }
+  var daily = data.trends.daily || [];
+  renderBarChart('amount-chart', daily, 'amount', 'date');
+  renderBarChart('inquiry-chart', daily, 'inquiries', 'date');
+  /* 品类分布 */
+  var cats = data.topCategories || [];
+  var maxCat = cats.length ? Math.max.apply(null, cats.map(function(c){return c.count;})) : 1;
+  document.getElementById('cat-list').innerHTML = cats.length ? cats.map(function(c){
+    var w = Math.round((c.count/maxCat)*100);
+    return '<div class="cat-row"><span class="cat-name">'+c.name+'</span><div class="cat-bar"><div class="cat-bar-fill" style="width:'+w+'%;"></div></div><span class="cat-count">'+c.count+'</span></div>';
+  }).join('') : '<div style="text-align:center;color:var(--text-3);padding:20px 0;font-size:13px;">暂无品类数据</div>';
+  /* 热门信息排行 */
+  var topItems = (window.SupplyStore ? SupplyStore.listActive() : []).slice(0,5);
+  document.getElementById('top-list').innerHTML = topItems.length ? topItems.map(function(it,idx){
+    return '<div class="cat-row"><span style="font-weight:800;color:var(--primary-dim);width:20px;">'+(idx+1)+'</span><span class="cat-name">'+(it.title||'未命名')+'</span><span class="cat-count">'+(it.viewCount||(idx+5)*23)+'次</span></div>';
+  }).join('') : '<div style="text-align:center;color:var(--text-3);padding:20px 0;font-size:13px;">暂无发布信息</div>';
+})();
+</script>
+</body>
+</html>

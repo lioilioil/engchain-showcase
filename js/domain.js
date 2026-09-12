@@ -52,9 +52,13 @@
     distribution: {
       maxLevel: 2, freezeDays: 1, bindWindowHours: 72,
       tiers: {
-        base: { label: '基础一级（建筑企业）', t1: 8, t2: 0 },
+        /* [FIX BM-028/BM-030] 档位：base/limited/full 企业三档 + individualPartner 个人合伙人档（8%/2%）。
+           费率不硬编码死值：applyConfig 时以 MOCK.business.distribution.tier1/tier2 覆盖 base.t1/t2，
+           以 MOCK.business.distribution.individualPartner 覆盖个人合伙人档；后台 ConfigAPI.save 改价即时生效。 */
+        base: { label: '基础一级（建筑企业）', t1: 12, t2: 3 },
         limited: { label: '受限一级（中介企业）', t1: 6, t2: 0 },
-        full: { label: '完整二级（合伙人企业）', t1: 12, t2: 3 }
+        full: { label: '完整二级（合伙人企业）', t1: 12, t2: 3 },
+        individualPartner: { label: '个人合伙人', t1: 8, t2: 2 }
       },
       levelRules: [
         { level: 1, name: '见习推广员', minActive: 0, minConsume: 0 },
@@ -92,6 +96,16 @@
   }
   function applyConfig() {
     deepMerge(B(), CONFIG_PATCH);
+    /* [FIX BM-030] 分销费率双轨收敛：以 data.js MOCK.business.distribution 为唯一来源，
+       运行时覆盖 CONFIG_PATCH.tiers.base 与 tiers.individualPartner；后台 ConfigAPI.save 改价后再次 applyConfig 仍生效 */
+    var dist = B().distribution || {};
+    if (dist.tiers) {
+      if (dist.tier1 !== undefined) dist.tiers.base.t1 = dist.tier1;
+      if (dist.tier2 !== undefined) dist.tiers.base.t2 = dist.tier2;
+      if (dist.individualPartner && dist.individualPartner.tier1 !== undefined) {
+        dist.tiers.individualPartner = { label: '个人合伙人', t1: dist.individualPartner.tier1, t2: dist.individualPartner.tier2 };
+      }
+    }
     applyOverride();
   }
   applyConfig();
@@ -131,6 +145,9 @@
       num('distribution.tiers.limited.t1', 0, 100);
       num('distribution.tiers.full.t1', 0, 100);
       num('distribution.tiers.full.t2', 0, 100);
+      /* [FIX BM-028] 个人合伙人档（8%/2%）校验 */
+      num('distribution.tiers.individualPartner.t1', 0, 100);
+      num('distribution.tiers.individualPartner.t2', 0, 100);
       /* 合规锁：分销层级最多二级 */
       var ml = deepGet(snapshot, 'distribution.maxLevel');
       if (ml !== undefined && ml > 2) errs.push('分销层级合规上限为 2 级');
@@ -321,15 +338,20 @@
   function safeDistTier(uidStr) {
     var u = window.DataBus && DataBus.byId(uidStr);
     if (!u) return 'base';
+    /* [FIX BM-028] 个人合伙人档：u.auth.partner.ok===true 且非企业 resident → individualPartner（8%/2%），
+       修复原仅企业入驻可分销导致个人合伙人分销返佣资金断链 */
+    if (u.auth && u.auth.partner && u.auth.partner.ok && (!u.identity || u.identity.enterprise !== 'resident')) return 'individualPartner';
     var types = (u.identity && u.identity.entryTypes) || (u.entry && u.entry.types) || (u.entry && u.entry.type ? [u.entry.type] : []);
     if (types.indexOf('partner') >= 0) return 'full';
     if (types.indexOf('agency') >= 0) return 'limited';
     return 'base';
   }
-  /* 是否为有效分销员：企业入驻生效（resident）才有分销/获佣资格 */
+  /* 是否为有效分销员：企业入驻生效（resident）或个人合伙人（auth.partner.ok）才有分销/获佣资格 */
   function isDistributor(uidStr) {
     var u = window.DataBus && DataBus.byId(uidStr);
     if (!u) return false;
+    /* [FIX BM-028] 放行个人合伙人：u.auth.partner.ok===true 即具备分销/获佣资格 */
+    if (u.auth && u.auth.partner && u.auth.partner.ok) return true;
     if (u.identity) return u.identity.enterprise === 'resident';
     return !!(u.entry && u.entry.active && u.entry.status === 'active');
   }
@@ -462,14 +484,23 @@
   };
   function safeMoneyAdd(uidStr, amount, reason) {
     var users = DataBus.users();
+    /* [FIX BM-050] 返佣类入账计入 totalRebate 而非 totalIn，避免充值口径被返佣污染 */
+    var isRebate = /返佣|rebate/i.test(reason || '');
     for (var i = 0; i < users.length; i++) if (users[i].id === uidStr) {
       users[i].balance = users[i].balance || { balance: 0, frozen: 0, totalIn: 0 };
       users[i].balance.balance = r2((users[i].balance.balance || 0) + amount);
-      users[i].balance.totalIn = r2((users[i].balance.totalIn || 0) + amount); break;
+      if (isRebate) users[i].balance.totalRebate = r2((users[i].balance.totalRebate || 0) + amount);
+      else users[i].balance.totalIn = r2((users[i].balance.totalIn || 0) + amount);
+      break;
     }
     try { LS.setItem(DataBus.USERS_KEY, JSON.stringify(users)); } catch (e) {}
     var cur = currentUid();
-    if (cur === uidStr && window.BalanceStore) BalanceStore.recharge(amount, 'rebate', { remark: reason || '分销返佣' });
+    if (cur === uidStr && window.BalanceStore) {
+      /* [FIX BM-050] 优先调用核心层 BalanceStore.rebate()（totalRebate+=amount，不污染 totalIn、不重复触发充值返佣）；
+         核心层未升级时回退 recharge(method='rebate')——既有 recharge 挂接已对该 method 内部豁免，不会递归虚增 */
+      if (typeof BalanceStore.rebate === 'function') BalanceStore.rebate(amount, reason || '分销返佣');
+      else BalanceStore.recharge(amount, 'rebate', { remark: reason || '分销返佣' });
+    }
   }
 
   /* ==========================================================================
@@ -639,12 +670,25 @@
       if (['serving', 'await_confirm'].indexOf(o.state) < 0) return { error: '当前状态不可确认节点' };
       var m = o.milestones[idx]; if (!m) return { error: '节点不存在' };
       if (m.status === 'done') return { error: '该节点已确认' };
+      /* [FIX BM-024] 佣金口径=按里程碑比例（release × rate）计提，非整单全额；与 databus commissionSettle 同源 */
       var release = r2(o.amount * m.pct), fee = r2(release * (o.ruleSnapshot ? o.ruleSnapshot.rate : 0.08)), net = r2(release - fee);
-      var k1 = Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: o.sellerId, toAcct: 'available', amount: net, bizType: 'mediation_release', bizId: o.id + '_m' + idx, idemKey: 'rel_' + o.id + '_' + idx, remark: '节点释放·服务商尾款' });
+      /* [FEAT 9.2-5] warranty reserve */
+      var warCfg = RULE('commission.warranty', { rate: 0.05, releaseDays: 30 });
+      var warrantyAmt = r2(release * (warCfg.rate || 0.05));
+      var sellerNet = r2(net - warrantyAmt);
+      var k1 = Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: o.sellerId, toAcct: 'available', amount: sellerNet, bizType: 'mediation_release', bizId: o.id + '_m' + idx, idemKey: 'rel_' + o.id + '_' + idx, remark: 'milestone release net' });
       if (k1.error) return k1;
-      var k2 = Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: Ledger.PLATFORM, toAcct: 'platform_income', amount: fee, bizType: 'mediation_fee', bizId: o.id + '_m' + idx, idemKey: 'fee_' + o.id + '_' + idx, remark: '节点释放·平台佣金' });
-      safeMoneyAdd(o.sellerId, net, '中介订单节点结算');
+      var k2 = Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: Ledger.PLATFORM, toAcct: 'platform_income', amount: fee, bizType: 'mediation_fee', bizId: o.id + '_m' + idx, idemKey: 'fee_' + o.id + '_' + idx, remark: 'platform commission' });
+      if (warrantyAmt > 0) Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: Ledger.PLATFORM, toAcct: 'warranty', amount: warrantyAmt, bizType: 'mediation_warranty_reserve', bizId: o.id + '_w' + idx, idemKey: 'war_' + o.id + '_' + idx, remark: 'warranty reserve' });
+      safeMoneyAdd(o.sellerId, sellerNet, 'milestone settlement');
+      /* [FEAT 9.2-5] record warranty */
+      o.warranty = o.warranty || { amount: 0, reservedAt: 0, releaseAt: 0, status: 'reserved' };
+      o.warranty.amount = r2((o.warranty.amount || 0) + warrantyAmt);
+      o.warranty.reservedAt = Date.now();
+      o.warranty.status = 'reserved';
       m.status = 'done'; m.confirmedAt = Date.now(); m.autoConfirmed = !!auto;
+      /* [FIX BM-022] 累计本单已释放佣金，settle 时一次性写入 CommissionStore.addFlow */
+      o._commissionAccumulated = r2((o._commissionAccumulated || 0) + fee);
       var allDone = o.milestones.every(function (x) { return x.status === 'done'; });
       if (allDone && o.state === 'serving') o.state = 'await_confirm';
       o.version++; o.updatedAt = Date.now();
@@ -663,6 +707,10 @@
           if (m.status === 'submitted' && m.dueAt && m.dueAt <= nowTs) { self.confirmMilestone(o.id, idx, true); changed = true; }
         });
       });
+        /* [FEAT 9.2-5] lazy warranty release check */
+        if (o.warranty && o.warranty.status === 'reserved' && o.warranty.releaseAt && o.warranty.releaseAt <= nowTs) {
+          self.releaseWarranty(o.id); changed = true;
+        }
       return changed;
     },
     /* 终验结算：await_confirm → settled，并触发分销订单返佣（基数=实际结算额） */
@@ -678,8 +726,27 @@
       o.milestones.forEach(function (m, idx) { if (m.status !== 'done') self.confirmMilestone(o.id, idx, false); });
       o = this.byId(id);
       o.state = 'settled'; o.settledAt = Date.now(); o.version++; o.updatedAt = Date.now();
+      /* [FEAT 9.2-5] set warranty releaseAt = settledAt + releaseDays */
+      if (o.warranty && o.warranty.amount > 0) {
+        var _wrd = (RULE('commission.warranty', {releaseDays: 30}).releaseDays || 30) * 86400000;
+        o.warranty.releaseAt = (o.warranty.releaseAt || 0) || (o.settledAt + _wrd);
+      }
       this._tl(o, '终验通过，订单结算完成', o.buyerId, { fee: o.fee, settle: o.settle });
       this._write(o);
+      /* [FIX BM-022] 新 Mediation 订单佣金回写 CommissionStore.addFlow，后台佣金报表不再断链：
+         金额=里程碑累计释放佣金 o._commissionAccumulated（无里程碑累计时回退整单 o.fee） */
+      try {
+        var commFee = r2(o._commissionAccumulated || o.fee || 0);
+        if (commFee > 0 && window.CommissionStore && typeof CommissionStore.addFlow === 'function') {
+          var _sel = window.DataBus && DataBus.byId(o.sellerId);
+          CommissionStore.addFlow({
+            id: uid('CF'), orderId: o.id, buyerId: o.buyerId, sellerId: o.sellerId,
+            uid: o.buyerId, userName: _sel ? _sel.name : (o.sellerId || ''), title: o.title || o.svcName || '',
+            amount: r2(o.amount), fee: commFee, rate: (o.ruleSnapshot ? o.ruleSnapshot.rate : 0.08),
+            milestones: 'mediation', status: 'pending', ts: Date.now(), settleAt: Date.now()
+          });
+        }
+      } catch (e) {}
       /* 触发分销订单返佣（消费者=买方，基数=订单成交额；返佣引擎沿买方邀请关系上溯） */
       try { Rebate.createFromEvent({ sourceType: 'order', sourceUserId: o.buyerId, baseAmount: o.amount, sourceOrderId: o.id }); } catch (e) {}
       emit('engchain:mediation', { id: id, state: 'settled' }); return o;
@@ -757,6 +824,27 @@
         willAutoCancel: days >= (cfg.autoCancelDays || 30)
       };
     }
+    ,
+    /* [FEAT 9.2-5] releaseWarranty: release reserved warranty to seller after releaseDays */
+    releaseWarranty: function (id) {
+      var o = this.byId(id); if (!o || !o.warranty) return { error: 'no warranty on this order' };
+      if (o.warranty.status !== 'reserved') return { error: 'warranty already released' };
+      if (o.warranty.releaseAt && o.warranty.releaseAt > Date.now()) return { error: 'warranty not yet due' };
+      var amt = o.warranty.amount || 0;
+      if (amt > 0) {
+        Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'warranty', toUid: o.sellerId, toAcct: 'available', amount: amt, bizType: 'mediation_warranty_release', bizId: o.id, idemKey: 'wrel_' + o.id, remark: 'warranty released' });
+        safeMoneyAdd(o.sellerId, amt, 'warranty released');
+        /* write BalanceStore log */
+        try { if (window.BalanceStore) { var bs = BalanceStore.read(); bs.logs.unshift({ type: 'warranty_released', amount: amt, method: 'balance', reason: 'order warranty released ' + o.id, ts: Date.now() }); BalanceStore.write(bs); } } catch (e) {}
+      }
+      o.warranty.status = 'released';
+      o.warranty.releasedAt = Date.now();
+      o.version++; o.updatedAt = Date.now();
+      this._tl(o, 'warranty released to seller', o.sellerId, { amount: amt });
+      this._write(o);
+      emit('engchain:mediation', { id: id, warranty: 'released' });
+      return o;
+    }
   };
   function safeMoneyMinus(uidStr, amount, reason) {
     var users = DataBus.users();
@@ -802,7 +890,10 @@
      7. 分佣引擎挂接三类消费事件（无侵入包装既有方法）
      ========================================================================== */
   function hookRebate() {
-    /* 7.1 充值成功 → 充值返佣 */
+    /* 7.1 充值成功 → 充值返佣
+       [FIX BM-050] 本挂钩保留两个合法职责：①真实充值时 Ledger 台账双账对齐（否则 Mediation.pay 扣 Ledger.available 会失败）；
+       ②真实充值触发充值返佣事件。返佣发放侧已不再依赖本挂钩的 method=rebate 隐式抑制——
+       safeMoneyAdd 已显式调用核心层 BalanceStore.rebate()（totalRebate 口径），本挂钩对该 method 的豁免仅作向后兼容保留。 */
     if (window.BalanceStore && !BalanceStore.__rebateHooked) {
       var origRecharge = BalanceStore.recharge;
       BalanceStore.recharge = function (amount, method, extra) {
@@ -878,6 +969,128 @@
     return nu;
   }
 
+  /* ==========================================================================
+     7.5 防跳单检测 JumpContract（BM-039）
+         聊天内容正则扫描手机号/微信号/QQ，命中即记录 CommissionStore.violations
+     ========================================================================== */
+  var JumpContract = {
+    /* [FIX BM-039] 防跳单：手机号 1[3-9]xxxxxxxxx / 微信号 wx|weixin|微信 / QQ号 */
+    PHONE_RE: /(?:(?:\+?86[\s-]?)?1[3-9]\d{9})/,
+    WX_RE: /(?:wx|weixin|微信)[\s:：]*[A-Za-z][-_A-Za-z0-9]{5,19}/i,
+    QQ_RE: /(?:qq|腾讯QQ)[\s:：]*\d{5,12}/i,
+    /* 扫描文本：命中返回 {hit:true,type,matched}，否则 {hit:false} */
+    scanMessage: function (text) {
+      if (!text) return { hit: false };
+      var s = String(text), m;
+      if ((m = s.match(this.PHONE_RE))) return { hit: true, type: 'phone', matched: m[0] };
+      if ((m = s.match(this.WX_RE))) return { hit: true, type: 'wechat', matched: m[0] };
+      if ((m = s.match(this.QQ_RE))) return { hit: true, type: 'qq', matched: m[0] };
+      return { hit: false };
+    },
+    /* 记录违规到 CommissionStore.violations（结构与 databus seedViolations 对齐） */
+    recordViolation: function (uidStr, type, content) {
+      var hit = this.scanMessage(content);
+      var u = window.DataBus && DataBus.byId(uidStr);
+      var v = {
+        id: uid('VIO'), uid: uidStr, userName: u ? u.name : (uidStr || ''),
+        company: (u && u.company) || '', level: 'warn',
+        type: type || (hit.hit ? hit.type : 'unknown'),
+        desc: '聊天中疑似跳单引流：命中' + (hit.hit ? hit.type : (type || '未知')) + '「' + (hit.matched || content || '') + '」',
+        ts: Date.now(), status: 'open', note: ''
+      };
+      if (window.CommissionStore && typeof CommissionStore.addViolation === 'function') CommissionStore.addViolation(v);
+      Timeline.add('jumpcontract', v.id, '防跳单命中', uidStr, { type: v.type, matched: hit.matched || '' });
+      emit('engchain:violations', v);
+      return v;
+    },
+    /* 聊天落库前调用：命中才记违规，返回扫描结果 */
+    scanAndRecord: function (uidStr, text) {
+      var hit = this.scanMessage(text);
+      if (hit.hit) { hit.violation = this.recordViolation(uidStr, hit.type, text); }
+      return hit;
+    }
+  };
+  window.JumpContract = JumpContract;
+
+  /* ==========================================================================
+     7.6 加盟 Franchise（BM-048）
+         applyFranchise 扣加盟费 → 加盟关系（engchain-franchise-relations）→ settleFranchiseProfit 分润
+     ========================================================================== */
+  var FRAN_KEY = 'engchain-franchise-relations';
+  var Franchise = {
+    KEY: FRAN_KEY,
+    all: function () { return parse(FRAN_KEY, []); },
+    _write: function (a) { return save(FRAN_KEY, a); },
+    /* 按 id 取招商信息（data.js MOCK.franchises） */
+    _listing: function (franchiseId) {
+      var list = (window.MOCK && MOCK.franchises) || [];
+      for (var i = 0; i < list.length; i++) if (list[i].id === franchiseId) return list[i];
+      return null;
+    },
+    /* 演示原型加盟费：优先 payload.fee；否则按资质分级读 unlock.franchise / credits.consume.franchise 档价（元）。
+       真实区间价见招商信息 fc.fee.join（文本），以后台 ConfigAPI 配置为准。 */
+    _feeOf: function (fr) {
+      var cfg = RULE('credits.consume.franchise', null) || RULE('unlock.franchise', null);
+      if (!cfg) return 0;
+      var qual = (fr.qualLevel || '') + ' ' + (fr.qualCategory || '');
+      var tier = /一级|特级/.test(qual) ? cfg.t1 : (/二级|甲级|乙级/.test(qual) ? cfg.t2 : cfg.t3);
+      return r2(tier && tier.price ? tier.price : 0);
+    },
+    /* 申请加盟：扣加盟费（平台收入科目 + 用户表）并建立加盟关系 */
+    apply: function (franchiseId, payload) {
+      payload = payload || {};
+      var me = payload.uid || currentUid();
+      if (!me) return { error: '登录态缺失' };
+      var fr = this._listing(franchiseId);
+      if (!fr) return { error: '招商信息不存在' };
+      var u = window.DataBus && DataBus.byId(me);
+      var fee = r2(payload.fee != null ? payload.fee : this._feeOf(fr));
+      if (!(fee >= 0)) return { error: '加盟费计算失败' };
+      if (fee > 0) {
+        var tx = Ledger.transfer({ fromUid: me, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'platform_income',
+          amount: fee, bizType: 'franchise_join', bizId: franchiseId, idemKey: 'fr_' + me + '_' + franchiseId,
+          remark: '加盟费：' + (fr.name || fr.title || '') });
+        if (tx.error) return tx;
+        safeMoneyMinus(me, fee, '加盟费：' + (fr.name || fr.title || ''));
+      }
+      var now = Date.now();
+      var rel = {
+        id: uid('FR'), franchiseId: franchiseId, franchiseName: fr.name || fr.title || '',
+        uid: me, userName: u ? u.name : (payload.userName || me), fee: fee, status: 'active',
+        joinedAt: now, expireAt: now + (payload.years || 1) * 365 * 864e5,
+        profitShare: { rate: payload.profitRate || 0.01, totalEarned: 0 }
+      };
+      var a = this.all(); a.push(rel); this._write(a);
+      Timeline.add('franchise', rel.id, '提交加盟申请并缴费', me, { fee: fee });
+      emit('engchain:franchise', { relation: rel });
+      return { ok: true, relation: rel };
+    },
+    list: function (uidStr) {
+      var a = this.all();
+      if (uidStr) a = a.filter(function (r) { return r.uid === uidStr; });
+      return a;
+    },
+    /* 分润记账：平台收入 → 加盟商可用；累计 profitShare.totalEarned */
+    settleProfit: function (relationId, amount) {
+      var a = this.all(), rel = null;
+      a.forEach(function (r) { if (r.id === relationId) rel = r; });
+      if (!rel) return { error: '加盟关系不存在' };
+      var amt = r2(amount);
+      if (!(amt > 0)) return { error: '分润金额需大于 0' };
+      var tx = Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'platform_income', toUid: rel.uid, toAcct: 'available',
+        amount: amt, bizType: 'franchise_profit', bizId: relationId,
+        idemKey: 'fp_' + relationId + '_' + amt + '_' + Date.now(), remark: '加盟分润', allowNegative: true });
+      if (tx.error) return tx;
+      rel.profitShare.totalEarned = r2((rel.profitShare.totalEarned || 0) + amt);
+      this._write(a);
+      if (currentUid() === rel.uid) safeMoneyAdd(rel.uid, amt, '加盟分润');
+      Timeline.add('franchise', relationId, '分润入账', rel.uid, { amount: amt });
+      emit('engchain:franchise', { relationId: relationId, amount: amt });
+      return { ok: true, relation: rel };
+    }
+  };
+  window.Franchise = Franchise;
+
   /* ---- 导出 ---- */
   window.RULE = RULE;
   window.ConfigAPI = ConfigAPI;
@@ -894,6 +1107,7 @@
     RULE: RULE, ConfigAPI: ConfigAPI, Timeline: Timeline, Ledger: Ledger, Referral: Referral, Rebate: Rebate,
     Mediation: Mediation, Outbox: Outbox, Sync: Sync, FormStash: FormStash, distLevel: distLevel,
     provisionUser: provisionUser,
-    safeDistTier: safeDistTier, round2: r2
+    safeDistTier: safeDistTier, round2: r2,
+    JumpContract: JumpContract, Franchise: Franchise
   };
 })();

@@ -66,16 +66,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function(){window.__ROOT__='../../';
 function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmt(ts){var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
-var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered'};
-if(!acc.isResident){
+var acc=window.entryAccess?entryAccess():{isResident:false,dist:false,statusId:'registered'};
+/* [FIX BM-028/BM-029] 门控统一为 entryAccess().dist（企业入驻 或 个人合伙人），个人合伙人须可访问收益页 */
+if(!acc.dist){
   var ph=document.querySelector('.phone');
-  if(ph){ph.innerHTML='<div style="padding:88px 28px;text-align:center;">'+
-    '<svg class="ic" style="width:42px;height:42px;color:var(--primary);margin-bottom:14px;"><use href="#i-share"/></svg>'+
-    '<div class="fw-700 fs-17" style="margin-bottom:8px;">分销中心 · 入驻企业专享</div>'+
-    '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:26px;">完成企业入驻后开通分销返佣。<br>本页面仅入驻企业可访问。</div>'+
-    '<button class="btn btn-primary btn-block" onclick="location.href=\''+(acc.statusId==='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId==='guest'?'去登录':'去入驻')+'</button>'+
-    '<a href="index.html" style="display:block;margin-top:14px;color:var(--text-3);font-size:13px;">返回分销中心 ›</a>'+
-    '</div>';}
+  if(ph){ph.innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
+  '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 160px;">'+
+    '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
+      '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</div>'+
+    '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">分销收益</div>'+
+    '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">入驻企业 / 个人合伙人专享 · 完成入驻后查看分销返佣明细</div>'+
+  '</div>'+
+  '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
+    '<div style="padding:0 24px;">'+
+      '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+(acc.statusId=='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId=='guest'?'去登录':'去入驻')+'</button>'+
+      '<a href="index.html" style="display:block;margin-top:12px;color:var(--text-3);font-size:12.5px;text-align:center;">返回分销中心 ›</a>'+
+    '</div>'+
+  '</div>'+
+'</div>';}
   return;
 }
 var me=DataBus.current(),uid=me?me.id:'';
@@ -118,7 +127,7 @@ function renderList(){
   if(!arr.length){box.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   box.innerHTML='<div class="er-card">'+arr.map(function(o){
-    var lv=o.level===1?'一级':'二级';
+    var lv=(o.level===1?'一级':(o.level===2?'二级':'未知'));
     var sign=o.fee<0?'':'+';
     var cls=o.status==='clawback'?'er-amt-dn':(o.status==='paid'?'er-amt-gold':(o.status==='settled'?'er-amt-ok':'er-amt-idle'));
     var tag=ST_TAG[o.status]||{t:STATES[o.status]||o.status,c:'var(--text-2)',b:'var(--bg-card-2)',bd:'var(--line)'};
@@ -126,7 +135,7 @@ function renderList(){
     return '<div class="er-row" onclick="showDetail(\''+o.id+'\')">'+
       '<span class="er-ic" style="background:'+(o.level===1?'var(--primary-soft)':'rgba(43,107,79,.09)')+';color:'+(o.level===1?'var(--primary-dim)':'var(--success)')+';"><svg class="ic"><use href="'+ic+'"/></svg></span>'+
       '<div class="er-main"><div class="er-title"><b class="er-lv">'+lv+'</b><span class="er-name">'+userName(o.sourceUserId)+'</span><span class="er-src">'+ (SRC[o.sourceType]||o.sourceType)+'</span></div>'+
-      '<div class="er-meta">'+fmt(o.createdAt)+' · 基数 ¥'+money(o.baseAmount)+' × '+o.rate+'%</div></div>'+
+      '<div class="er-meta">来源：'+lv+' · '+fmt(o.createdAt)+' · 基数 ¥'+money(o.baseAmount)+' × '+o.rate+'%</div></div>'+
       '<div class="er-right"><div class="er-amt '+cls+'">'+sign+'¥'+money(o.fee)+'</div><span class="er-tag" style="color:'+tag.c+';background:'+tag.b+';border-color:'+tag.bd+';">'+tag.t+'</span></div></div>';
   }).join('')+'</div>';
 }

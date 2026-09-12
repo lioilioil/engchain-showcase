@@ -347,7 +347,18 @@ window.DataBus = (function () {
       AuthStore.write(snapAuth);
     }
     if (window.EntryStore) EntryStore.write(JSON.parse(JSON.stringify(u.entry || {})));
-    if (window.BalanceStore && u.balance) BalanceStore.write(JSON.parse(JSON.stringify(u.balance)));
+    /* [FIX BM-004] 修复：原 BalanceStore.write(整个 u.balance 快照) 会用用户表快照覆盖 logs，
+       导致充值后钱包历史流水被清空。改为增量 merge：只同步 balance/frozen/totalIn/totalRebate，
+       保留 BalanceStore 自身 logs 数组不被覆盖。 */
+    if (window.BalanceStore && u.balance) {
+      var bsNow = BalanceStore.read();
+      bsNow.balance = Math.round((u.balance.balance || 0) * 100) / 100;
+      bsNow.frozen = Math.round((u.balance.frozen || 0) * 100) / 100;
+      bsNow.totalIn = Math.round((u.balance.totalIn || 0) * 100) / 100;
+      if (typeof u.balance.totalRebate === 'number') bsNow.totalRebate = Math.round(u.balance.totalRebate * 100) / 100;
+      if (!bsNow.logs || !Array.isArray(bsNow.logs)) bsNow.logs = [];
+      BalanceStore.write(bsNow);
+    }
     if (window.UI && UI.state) {
       var st2 = statusOf(u);
       UI.state.set({ status: st2, member: (st2 === 'resident' || st2 === 'enterprise' || st2 === 'pro') });
@@ -410,6 +421,21 @@ window.DataBus = (function () {
       if (type === 'qual') u.auth.personalQual = JSON.parse(JSON.stringify(u.auth.qual));
     }
     else return null;
+    /* [FIX BM-003] 修复：原企业认证驳回不退费（提交即扣，驳回仅置状态）。
+       企业认证且费用>0 且尚未退款时，退回 BalanceStore 并写退款流水。 */
+    if (type === 'enterprise' && u.auth.enterprise && u.auth.enterprise.fee > 0 && !u.auth.enterprise.feeRefunded) {
+      var refundFee = Math.round(u.auth.enterprise.fee * 100) / 100;
+      try {
+        if (window.BalanceStore) {
+          BalanceStore.refund(refundFee, '企业认证驳回退款', { method: u.auth.enterprise.payMethod || 'balance' });
+          var bs2 = BalanceStore.read();
+          if (u.balance) { u.balance.balance = bs2.balance; u.balance.frozen = bs2.frozen; u.balance.totalIn = bs2.totalIn; }
+        } else if (u.balance) {
+          u.balance.balance = Math.round((u.balance.balance + refundFee) * 100) / 100;
+        }
+      } catch (eRefund) { console.warn('authReject refund error', eRefund); }
+      u.auth.enterprise.feeRefunded = true;
+    }
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
@@ -441,7 +467,12 @@ window.DataBus = (function () {
     var prevE = u.entry || {};
     var prevTypes = (prevE.types && prevE.types.length) ? prevE.types : (prevE.type ? [prevE.type] : []);
     if (prevTypes.indexOf(type) < 0) prevTypes.push(type);
-    u.entry = { type: type, types: prevTypes, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: DEPOSIT_TYPE[type] || 'basic', depositPaid: dep[DEPOSIT_TYPE[type]] || 0, auditPass: type === 'partner', firstBy: prevE.firstBy || '', firstAt: prevE.firstAt || 0, submittedAt: prevE.submittedAt || 0, contact: prevE.contact || '', tel: prevE.tel || '', scope: prevE.scope || '', fee: prevE.fee || fee };
+    /* [FIX BM-007] 修复：原终审凭空写 depositPaid=5000/20000/50000（未真实缴纳）。
+       现取 entryApply 时记录的 depositAmount（已冻结），终审时从 BalanceStore.frozen 划转至实缴。 */
+    var depTypeFinal = prevE.depositType || DEPOSIT_TYPE[type] || 'basic';
+    var depAmountFinal = Math.round(((typeof prevE.depositAmount === 'number') ? prevE.depositAmount : (dep[depTypeFinal] || 0)) * 100) / 100;
+    try { if (window.BalanceStore && depAmountFinal > 0 && current() && current().id === u.id) BalanceStore.commitDeposit(depAmountFinal, '入驻保证金转正 · ' + entryLabel(type)); } catch (eCommit) { console.warn('commitDeposit error', eCommit); }
+    u.entry = { type: type, types: prevTypes, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: depTypeFinal, depositAmount: depAmountFinal, depositPaid: depAmountFinal, auditPass: type === 'partner', firstBy: prevE.firstBy || '', firstAt: prevE.firstAt || 0, submittedAt: prevE.submittedAt || 0, contact: prevE.contact || '', tel: prevE.tel || '', scope: prevE.scope || '', fee: prevE.fee || fee };
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     var fees = [];
@@ -463,7 +494,11 @@ window.DataBus = (function () {
     var prevE2 = u.entry || {};
     var prevTypes2 = (prevE2.types && prevE2.types.length) ? prevE2.types : (prevE2.type ? [prevE2.type] : []);
     if (prevTypes2.indexOf(type) < 0) prevTypes2.push(type);
-    u.entry = { type: type, types: prevTypes2, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: DEPOSIT_TYPE[type] || 'basic', depositPaid: dep[DEPOSIT_TYPE[type]] || 0, auditPass: type === 'partner', submittedAt: prevE2.submittedAt || 0, contact: prevE2.contact || '', tel: prevE2.tel || '', scope: prevE2.scope || '', fee: prevE2.fee || fee };
+    /* [FIX BM-007] 同上：单级直通审批也从已冻结保证金划转，不凭空写 depositPaid。 */
+    var depTypeAppr = prevE2.depositType || DEPOSIT_TYPE[type] || 'basic';
+    var depAmountAppr = Math.round(((typeof prevE2.depositAmount === 'number') ? prevE2.depositAmount : (dep[depTypeAppr] || 0)) * 100) / 100;
+    try { if (window.BalanceStore && depAmountAppr > 0 && current() && current().id === u.id) BalanceStore.commitDeposit(depAmountAppr, '入驻保证金转正 · ' + entryLabel(type)); } catch (eCommit2) { console.warn('commitDeposit error', eCommit2); }
+    u.entry = { type: type, types: prevTypes2, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: depTypeAppr, depositAmount: depAmountAppr, depositPaid: depAmountAppr, auditPass: type === 'partner', submittedAt: prevE2.submittedAt || 0, contact: prevE2.contact || '', tel: prevE2.tel || '', scope: prevE2.scope || '', fee: prevE2.fee || fee };
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     var fees = [];
@@ -482,6 +517,29 @@ window.DataBus = (function () {
     u.entry.status = 'rejected'; u.entry.note = note || '资料不齐，请补充后重新提交'; u.entry.active = false;
     u.entry.rejectLevel = level || (prevStatus === 'first_ok' ? 'final' : 'first');
     u.entry.rejectedAt = Date.now();
+    /* [FIX BM-006] 修复：原入驻驳回不退费。已支付入驻费且未退款时退回 BalanceStore；
+       已冻结保证金一并解冻。 */
+    if (!u.entry.feeRefunded) {
+      var entryFee = Math.round((u.entry.fee || 0) * 100) / 100;
+      if (entryFee > 0) {
+        try {
+          if (window.BalanceStore) {
+            BalanceStore.refund(entryFee, '入驻驳回退款', { method: 'balance' });
+            var bsE = BalanceStore.read();
+            if (u.balance) { u.balance.balance = bsE.balance; u.balance.frozen = bsE.frozen; }
+          } else if (u.balance) {
+            u.balance.balance = Math.round((u.balance.balance + entryFee) * 100) / 100;
+          }
+        } catch (eEntryRef) { console.warn('entryReject fee refund error', eEntryRef); }
+        u.entry.feeRefunded = true;
+      }
+      var depAmt = Math.round((u.entry.depositAmount || 0) * 100) / 100;
+      if (depAmt > 0) {
+        try { if (window.BalanceStore) BalanceStore.unfreezeDeposit(depAmt, '入驻驳回 · 保证金解冻'); } catch (eDep) { console.warn('entryReject unfreeze error', eDep); }
+        u.entry.depositAmount = 0;
+        u.entry.depositPaid = 0;
+      }
+    }
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
@@ -492,7 +550,10 @@ window.DataBus = (function () {
   /* ===== App 端 → 后台：认证申请（app↔后台连通） =====
      realname：二要素+活体自动核验即时通过；enterprise/qual：入后台认证审核队列（pending，由后台通过/驳回）
      权威写用户表并同步当前账号快照；fee 非 0 时从用户余额扣减 */
-  function authApply(type, payload, fee) {
+  /* [FIX BM-001/BM-002/BM-005/BM-009] authApply 新增第 4 参 payMethod：
+     'balance'|'wechat'|'alipay'|'corp'。企业认证收费统一经 BalanceStore.consume 扣减并写 logs，
+     logs.method 记录所选方式；非余额通道标注"模拟支付"。选对公转账(corp)不扣款，生成 CorpPay 待审记录。 */
+  function authApply(type, payload, fee, payMethod) {
     payload = payload || {};
     var u = current();
     if (!u) return { error: '未登录' };
@@ -506,14 +567,46 @@ window.DataBus = (function () {
     } else if (type === 'enterprise') {
       if (u.auth.enterprise && u.auth.enterprise.ok) return { error: '已通过企业认证，无需重复提交' };
       /* 驳回后重新提交不重复收取认证费（审核通过前仅收一次） */
-      var paidBefore = u.auth.enterprise && u.auth.enterprise.fee && !u.auth.enterprise.ok;
+      var paidBefore = u.auth.enterprise && u.auth.enterprise.fee && !u.auth.enterprise.ok && !u.auth.enterprise.feeRefunded;
       var charge = paidBefore ? 0 : (fee || 0);
-      if (charge && !(u.balance && u.balance.balance >= charge)) return { error: '余额不足，请先充值后再支付认证费' };
+      payMethod = payMethod || (payload.payMethod || 'balance');
+      /* [FIX BM-009] 余额判断统一用 BalanceStore.available()（=balance-frozen），排除冻结资金 */
+      if (charge && payMethod !== 'corp' && window.BalanceStore && BalanceStore.available() < charge) {
+        return { error: '余额不足，请先充值后再支付认证费' };
+      }
       u.auth.enterprise = { ok: false, expireAt: 0, status: 'pending', submittedAt: t,
         co: payload.co || '', code: payload.code || '', legal: payload.legal || '',
         shortName: payload.shortName || '', nameBasis: payload.nameBasis || '', nameProof: payload.nameProof || [],
-        fee: (u.auth.enterprise && u.auth.enterprise.fee) || fee || 0, note: '', resubmit: !!paidBefore };
-      if (charge && u.balance) u.balance.balance -= charge;
+        fee: (u.auth.enterprise && u.auth.enterprise.fee) || fee || 0, note: '', resubmit: !!paidBefore,
+        payMethod: payMethod };
+      if (charge) {
+        if (payMethod === 'corp') {
+          /* [FIX BM-002] 对公转账：不扣款，生成待审 CorpPay 记录，后台审批通过后入账/扣费 */
+          try {
+            if (window.CorpPay) {
+              var corpRec = CorpPay.create({
+                amount: charge, status: 'pending', bizType: 'enterprise_cert', uid: u.id,
+                remark: '企业认证服务费 · ' + (payload.co || u.name),
+                appliedAt: t
+              });
+              u.auth.enterprise.corpPayId = corpRec.id;
+            }
+          } catch (eCorp) { console.warn('enterprise corp pay create error', eCorp); }
+          u.auth.enterprise.awaitingCorp = true;
+        } else {
+          /* [FIX BM-001/BM-005] 统一走 BalanceStore.consume 扣减并写 logs；非余额通道标注模拟支付 */
+          var simMark = (payMethod === 'wechat' || payMethod === 'alipay') ? '(模拟支付)' : '';
+          var r = null;
+          if (window.BalanceStore) {
+            r = BalanceStore.consume(charge, 'certification', { method: payMethod, remark: '企业认证服务费' + simMark });
+          } else if (u.balance) {
+            u.balance.balance = Math.round((u.balance.balance - charge) * 100) / 100;
+          }
+          if (!r && window.BalanceStore) return { error: '余额不足，请先充值后再支付认证费' };
+          /* 回写用户表 u.balance */
+          try { if (window.BalanceStore) { var bs3 = BalanceStore.read(); u.balance = u.balance || {}; u.balance.balance = bs3.balance; u.balance.frozen = bs3.frozen; u.balance.totalIn = bs3.totalIn; } } catch (eSyncB) {}
+        }
+      }
     } else if (type === 'qual') {
       var certs = (payload.list || []).map(function (x) {
         return (typeof x === 'string') ? { name: x, no: '' } : x;
@@ -559,39 +652,99 @@ window.DataBus = (function () {
     return { ok: true, expireAt: u.auth.enterprise.expireAt };
   }
   /* App 端 → 后台：入驻申请（三类统一进入后台两级审核队列；partner 免费审核制） */
+  /* [FEAT 9.2-2] 增加 cycle 参数：once=一次性 / yearly=年度订阅 */
   function entryApply(type, payload, fee) {
     payload = payload || {};
     var u = current();
     if (!u) return { error: '未登录' };
     if (u.entry && (u.entry.status === 'pending' || u.entry.status === 'first_ok')) return { error: '已有入驻申请正在审核中' };
-    if (fee && !(u.balance && u.balance.balance >= fee)) return { error: '余额不足，请先充值后再支付入驻费' };
+    /* [FIX BM-009] 余额判断统一用 BalanceStore.available()（=balance-frozen），排除冻结资金 */
+    if (fee && window.BalanceStore && BalanceStore.available() < fee) return { error: '余额不足，请先充值后再支付入驻费' };
     var t = Date.now();
+    /* [FIX BM-007] 保证金项选择：payload.depositType 决定保证金档位，提交时真实冻结 */
+    var depCfg = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.deposit) ? MOCK.business.commission.deposit : { basic: 5000, engineering: 20000, high: 50000 };
+    var depTypeChosen = payload.depositType || DEPOSIT_TYPE[type] || 'basic';
+    var depAmountChosen = Math.round((depCfg[depTypeChosen] || 0) * 100) / 100;
+    if (fee && window.BalanceStore) {
+      /* [FIX BM-008] 入驻费经 BalanceStore.consume 扣减并写 logs type='entry' */
+      var consumeR = BalanceStore.consume(fee, 'entry', { method: 'balance', remark: '入驻费 · ' + entryLabel(type) });
+      if (!consumeR) return { error: '余额不足，请先充值后再支付入驻费' };
+      var bsE2 = BalanceStore.read();
+      u.balance = u.balance || {}; u.balance.balance = bsE2.balance; u.balance.frozen = bsE2.frozen; u.balance.totalIn = bsE2.totalIn;
+    } else if (fee && u.balance) {
+      u.balance.balance = Math.round((u.balance.balance - fee) * 100) / 100;
+    }
+    /* [FIX BM-007] 冻结保证金（partner 免费审核制不收保证金） */
+    if (type !== 'partner' && depAmountChosen > 0 && window.BalanceStore) {
+      var fr = BalanceStore.freezeDeposit(depAmountChosen, '入驻保证金冻结 · ' + entryLabel(type));
+      if (!fr) {
+        /* 保证金不足：回滚已扣入驻费 */
+        if (fee && window.BalanceStore) BalanceStore.refund(fee, '保证金不足 · 入驻费回滚', { method: 'balance' });
+        return { error: '保证金可用余额不足，请先充值' };
+      }
+      var bsF = BalanceStore.read();
+      u.balance = u.balance || {}; u.balance.balance = bsF.balance; u.balance.frozen = bsF.frozen;
+    }
     /* 保留历史已申请/已入驻类型（含并行类型与驳回重提场景） */
     var prevTypes = (u.entry && u.entry.types && u.entry.types.length) ? u.entry.types.slice() : (u.entry && u.entry.type ? [u.entry.type] : []);
     var types = prevTypes.indexOf(type) < 0 ? prevTypes.concat(type) : prevTypes;
     u.entry = { type: type, types: types, orderId: null, status: 'pending', active: false,
       paidAt: (type === 'partner') ? 0 : t, fee: fee || 0,
+      depositType: depTypeChosen, depositAmount: depAmountChosen, depositPaid: 0,
       contact: payload.contact || '', tel: payload.tel || '', scope: payload.scope || '',
       qualifications: payload.qualifications || [],
       intro: payload.intro || { founded: '', capital: '', staffSize: '', desc: '' },
       cases: payload.cases || [],
       address: payload.address || { province: '', city: '', district: '', detail: '' },
       website: payload.website || '', attachments: payload.attachments || [],
+      /* [FEAT 9.2-2] 付费模式 */
+      cycle: payload.cycle || 'once',
       submittedAt: t, note: '' };
-    if (fee && u.balance) u.balance.balance -= fee;
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
-    audit('提交入驻申请', '入驻审核', u.name, entryLabel(type) + (fee ? ' · 入驻费 ¥' + fee : ' · 后台审核制'));
+    audit('提交入驻申请', '入驻审核', u.name, entryLabel(type) + (fee ? ' · 入驻费 ¥' + fee : ' · 后台审核制') + (depAmountChosen ? ' · 保证金冻结 ¥' + depAmountChosen : ''));
     return { ok: true, entry: u.entry };
+  }
+  /* [FIX BM-033] 封禁时冻结全部可用余额并写 logs，解封时恢复；
+     isBanned(uid) 供前台数据层门控查询。 */
+  function isBanned(uid) {
+    var u = byId(uid);
+    return !!(u && u.banned);
   }
   function toggleBan(id) {
     var u = byId(id); if (!u || u.status === 'guest') return null;
     u.banned = !u.banned;
+    try {
+      if (window.BalanceStore) {
+        if (u.banned) {
+          var availNow = BalanceStore.available();
+          if (availNow > 0) {
+            var bsB = BalanceStore.read();
+            bsB.frozen = Math.round((bsB.frozen + availNow) * 100) / 100;
+            bsB.logs.unshift({ type: 'freeze', amount: -availNow, method: 'ban', reason: '风控封禁 · 全额冻结', ts: Date.now() });
+            BalanceStore.write(bsB);
+          }
+        } else {
+          /* 解封：将封禁期间冻结的可用部分解冻（保守地解冻当前 frozen 中非提现占用的部分，
+             原型单钱包：直接将全部 frozen 释放回可用） */
+          var bsU = BalanceStore.read();
+          if (bsU.frozen > 0) {
+            bsU.logs.unshift({ type: 'unfreeze', amount: bsU.frozen, method: 'ban', reason: '解除封禁 · 解冻冻结资金', ts: Date.now() });
+            bsU.frozen = 0;
+            BalanceStore.write(bsU);
+          }
+        }
+        if (current() && current().id === u.id) {
+          var bsSync = BalanceStore.read();
+          u.balance = u.balance || {}; u.balance.balance = bsSync.balance; u.balance.frozen = bsSync.frozen; u.balance.totalIn = bsSync.totalIn;
+        }
+      }
+    } catch (eBan) { console.warn('toggleBan balance error', eBan); }
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
-    audit(u.banned ? '封禁账号' : '解除封禁', '用户管理', u.name, u.banned ? '已封禁' : '已解锁');
+    audit(u.banned ? '封禁账号' : '解除封禁', '用户管理', u.name, u.banned ? '已封禁 · 资金冻结' : '已解锁 · 资金解冻');
     return u;
   }
   function loadEntryFees() { var a = []; try { a = JSON.parse(LS.getItem(ENTRYFEE_KEY) || '[]'); } catch (e) {} return Array.isArray(a) ? a : []; }
@@ -931,20 +1084,47 @@ window.DataBus = (function () {
       if (changed) saveUsers(a);
     } catch (e) {}
   }
+  /* [FIX BM-035] 修复：原"每日2次"仅展示文案，提交不校验次数。
+     现增加 dailyMax 次数校验（localStorage 记录当日次数），校验在冻结资金之前执行。 */
+  var WDL_DAILY_KEY = 'engchain-withdraw-daily-count';
+  function wdlTodayKey() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function wdlDailyCount() {
+    var dailyMax = (MOCK.business.withdraw && MOCK.business.withdraw.dailyMax) || 2;
+    var rec = { date: wdlTodayKey(), count: 0 };
+    try {
+      var raw = JSON.parse(LS.getItem(WDL_DAILY_KEY) || 'null');
+      if (raw && raw.date === rec.date) rec.count = raw.count || 0;
+    } catch (e) {}
+    return { count: rec.count, dailyMax: dailyMax };
+  }
+  function wdlDailyIncr() {
+    var rec = { date: wdlTodayKey(), count: 0 };
+    try {
+      var raw = JSON.parse(LS.getItem(WDL_DAILY_KEY) || 'null');
+      if (raw && raw.date === rec.date) rec.count = raw.count || 0;
+    } catch (e) {}
+    rec.count += 1;
+    try { LS.setItem(WDL_DAILY_KEY, JSON.stringify(rec)); } catch (e) {}
+    return rec.count;
+  }
   function withdrawalApply(uid, amount, method, extra) {
     var amt = Math.round(amount * 100) / 100;
     if (amt <= 0 || !window.BalanceStore) return null;
+    /* [FIX BM-035] 先校验当日提现次数，再冻结资金 */
+    var dc = wdlDailyCount();
+    if (dc.count >= dc.dailyMax) return { error: '今日提现次数已达上限（每日' + dc.dailyMax + '次）' };
     if (BalanceStore.available() < amt) return { error: '可用余额不足' };
     var s = BalanceStore.read();
     s.frozen = Math.round((s.frozen + amt) * 100) / 100;
     BalanceStore.write(s);
     syncBalanceToUser(uid);
+    wdlDailyIncr();
     var u = byId(uid);
     var w = { id: 'WD' + String(Date.now()).slice(-9), uid: uid, userName: u ? u.name : uid,
               amount: amt, method: method || 'bank', bank: (extra && extra.bank) || '银行 · 尾号 ****',
               status: 'pending', appliedAt: Date.now(), note: '' };
     var a = loadWithdrawals(); a.unshift(w); saveWithdrawals(a);
-    audit('提现申请', '提现审批', w.userName, '¥' + amt + ' 已冻结');
+    audit('提现申请', '提现审批', w.userName, '¥' + amt + ' 已冻结（今日第 ' + (dc.count + 1) + ' 次）');
     return w;
   }
   /* ===== 提现两级审批（任务 2-3）：pending(待初审) → first_ok(初审通过·待终审) → paid(终审通过·打款) ===== */
@@ -1365,7 +1545,7 @@ window.DataBus = (function () {
     entryApply: entryApply,
     entryApprove: entryApprove, entryReject: entryReject,
     entryFirstApprove: entryFirstApprove, entryFinalApprove: entryFinalApprove,
-    toggleBan: toggleBan, entryFees: loadEntryFees, ENTRYFEE_KEY: ENTRYFEE_KEY,
+    toggleBan: toggleBan, isBanned: isBanned, entryFees: loadEntryFees, ENTRYFEE_KEY: ENTRYFEE_KEY,
     /* Phase 4 资金中心 */
     WDL_KEY: WDL_KEY, INV_KEY: INV_KEY,
     withdrawals: loadWithdrawals, withdrawalFrozen: withdrawalFrozen,

@@ -31,7 +31,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="scroll" style="padding-top:8px;">
     <div class="ai-folder" style="margin-bottom:12px;">
       <div class="fw-700 fs-14">风险雷达 · 企业动态监控</div>
-      <div class="text-2 fs-12" style="margin-top:4px;">关注企业后，资质到期 / 项目更新 / 中标 / 司法 / 经营异常 / 工商变更将实时推送，别错过关键信号。</div>
+      <div class="text-2 fs-12" style="margin-top:4px;">关注企业后，资质到期 / 项目更新 / 中标 / 司法 / 经营异常 / 工商变更 / 价格行情预警将实时推送，别错过关键信号。</div>
       <div class="text-3 fs-11" style="margin-top:6px;">每日 09:00 推送 · 免费额度按认证等级递增</div>
     </div>
 
@@ -48,11 +48,28 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
-var dims=MOCK.business.monitor.dimensions;
+var dims=(MOCK.business.monitor.dimensions||[]).slice();
+/* [FIX] 本地追加"价格行情预警"维度（data.js 不可改，页面级补充） */
+if(dims.indexOf('价格行情预警')<0) dims.push('价格行情预警');
 var limits=MOCK.business.monitor.limits;
-var st=window.deriveStatus?deriveStatus():'registered';
-var limitKey=st==='resident'?((EntryStore.read().type||'construction')):st;
-var limit=limits[limitKey]||limits.realname;
+/* [FIX BM-047] 改用 deriveIdentity().entryTypes 数组判断，多类型并行时取最高权限档（partner>agency>construction），
+   不再用旧单值 EntryStore.read().type / deriveStatus() 取错档。监控限额从 MOCK.business.monitor.limits 读取。 */
+var idy=window.deriveIdentity?deriveIdentity():{personal:'none',enterprise:'none',entryTypes:[]};
+var st=idy.primary||'registered';
+var limit=limits.realname||5;
+/* 档位优先级：partner(200) > agency(50) > construction(30) > pro(10) > realname(5) */
+var tierRank=['realname','pro','construction','agency','partner'];
+var achieved=[];
+if(idy.enterprise==='resident' && idy.entryTypes && idy.entryTypes.length){
+  achieved=achieved.concat(idy.entryTypes); /* 入驻类型数组 */
+}
+if(idy.partner) achieved.push('partner');       /* 个人合伙人（与企业入驻 partner 类型分离） */
+if(idy.personal==='professional'||idy.personal==='full') achieved.push('pro');
+if(idy.personal==='verified'||idy.personal==='professional'||idy.personal==='partner'||idy.personal==='full') achieved.push('realname');
+/* 取 achieved 中权限最高的档 */
+var bestIdx=-1;
+achieved.forEach(function(t){ var i=tierRank.indexOf(t); if(i>bestIdx)bestIdx=i; });
+if(bestIdx>=0){ limit=limits[tierRank[bestIdx]]||limit; }
 if(st==='registered'||st==='guest')limit=0;
 
 /* G1：破冰期非入驻注册用户 7 天免费监控试用（monitorTrialDays） */
@@ -108,7 +125,8 @@ var SAMPLE_DIMS={
  '中标':'中标公示 · 中标金额 ¥8,600 万',
  '司法':'新增司法案件 1 起 · 建设工程施工合同纠纷（2026-9）',
  '经营异常':'经营异常名录提醒 · 年报未按期公示',
- '工商变更':'法定代表人/注册资本发生变更（+¥2,000 万）'
+ '工商变更':'法定代表人/注册资本发生变更（+¥2,000 万）',
+ '价格行情预警':'商品混凝土 C30 成都周环比 +2.4%，建议关注走势'
 };
 
 function renderCo(){
@@ -154,7 +172,20 @@ COS.forEach(function(c){
 });
 addBox+='</div>';
 var sc=document.querySelector('.scroll');
-sc.insertAdjacentHTML('beforeend',addBox);
+/* [FIX] 监控专业版升级 CTA（破冰期特惠） */
+var isBreakIn = !!(window.ModeStore && ModeStore.isBreakIn());
+var prosPrice = isBreakIn ? '破冰期特惠 ¥99/年' : '¥199/年';
+var subCard = '<div class="card" style="margin-top:14px;padding:14px;background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.3);border-radius:14px;">'+
+  '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'+
+    '<span style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:flex;align-items:center;justify-content:center;flex:none;"><svg class="ic" style="width:17px;height:17px;"><use href="#i-shield"/></svg></span>'+
+    '<div style="flex:1;"><div style="font-size:13.5px;font-weight:700;color:var(--text-1);">升级监控专业版</div>'+
+    '<div style="font-size:11px;color:var(--text-3);margin-top:2px;">不限关注数 + 价格预警 + 实时推送</div></div>'+
+    '<span style="font-size:13px;font-weight:800;color:var(--primary-dim);">'+prosPrice+'</span>'+
+  '</div>'+
+  '<button class="btn btn-primary btn-block" style="margin-top:8px;padding:9px;font-size:12.5px;" onclick="location.href=\'../wallet/membership.html\'">立即升级</button>'+
+'</div>';
+sc.insertAdjacentHTML('beforeend', subCard);
+sc.insertAdjacentHTML('beforeend', addBox);
 
 window.follow=function(id){
   var s=MonitorStore.read();
@@ -166,7 +197,7 @@ window.follow=function(id){
   }
   MonitorStore.follow(id);
   var dim=dims[Math.floor(Math.random()*dims.length)];
-  var kind=dim==='司法'?'danger':(dim==='经营异常'?'warning':'success');
+  var kind=dim==='司法'?'danger':(dim==='经营异常'||dim==='价格行情预警'?'warning':'success');
   MonitorStore.pushFeed({company:id,dim:dim,kind:kind,text:SAMPLE_DIMS[dim]});
   UI.toast('已关注 · 推送 '+dim,'ok');
   renderCo();renderFeed();

@@ -100,6 +100,9 @@
      ② 内侧进度环（参考图形态2）
      左侧文件信息，右侧 SVG 环形进度 + 百分比 + 速度
      ============================================================ */
+  /* 浏览 / 下载 icon（内联 SVG，不依赖页面 sprite） */
+  var FD_ICON_VIEW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var FD_ICON_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
   function renderInnerRing(opts) {
     var id = opts.id, name = opts.name, size = opts.size || 2048, sub = opts.sub || '';
     var rec = getRecord(id);
@@ -122,16 +125,11 @@
         (status === 'downloading' ? '<span class="fd-speed">' + fmtSpeed(speed) + '</span>' : '<span class="fd-speed">已暂停</span>') +
         '</div></div>';
     } else if (status === 'completed') {
-      rightHtml = '<div class="fd-ring-wrap">' +
-        '<svg class="fd-ring" viewBox="0 0 44 44">' +
-        '<circle class="fd-ring-bg" cx="22" cy="22" r="' + R + '" fill="none" stroke="var(--success-soft, #d5f5e3)" stroke-width="3.5"/>' +
-        '<circle class="fd-ring-fg" cx="22" cy="22" r="' + R + '" fill="none" stroke="var(--success)" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="' + C + '" stroke-dashoffset="0" transform="rotate(-90 22 22)"/>' +
-        '</svg>' +
-        '<div class="fd-ring-text"><span class="fd-pct fd-cached-pct">已缓存</span></div></div>';
+      rightHtml = '<div class="fd-acts"><button class="fd-ibtn" data-fd-action="view" data-fd-id="' + id + '" title="浏览">' + FD_ICON_VIEW + '</button><span class="fd-ok">已缓存</span></div>';
     } else if (status === 'failed') {
       rightHtml = '<div class="fd-ring-wrap"><div class="fd-failed-text">失败</div></div>';
     } else {
-      rightHtml = '<button class="fd-btn download" data-fd-action="download" data-fd-id="' + id + '">下载</button>';
+      rightHtml = '<div class="fd-acts"><button class="fd-ibtn" data-fd-action="view" data-fd-id="' + id + '" title="浏览">' + FD_ICON_VIEW + '</button><button class="fd-ibtn accent" data-fd-action="download" data-fd-id="' + id + '" title="下载">' + FD_ICON_DOWN + '</button></div>';
     }
 
     return '<div class="fd-inner-ring" data-fd-id="' + id + '" data-fd-name="' + name.replace(/"/g, '&quot;') + '" data-fd-size="' + size + '">' +
@@ -150,6 +148,12 @@
   var timers = {};
 
   function startDownload(id, name, size) {
+    /* [FIX BM-016] 下载前校验解锁态：detail.js 会注入 checkUnlock/onUnlockRequired；未解锁的打码文件不允许直接下载，唤起付费 Sheet */
+    if (typeof window.FileDownload.checkUnlock === 'function' && !window.FileDownload.checkUnlock(id, name)) {
+      if (typeof window.FileDownload.onUnlockRequired === 'function') { window.FileDownload.onUnlockRequired(id, name); }
+      else if (window.UI && UI.toast) { UI.toast('请先解锁与对方沟通权限后再下载', 'warn'); }
+      return;
+    }
     var rec = getRecord(id) || { id: id, name: name, size: size, progress: 0, status: 'downloading', speed: 0, createdAt: Date.now() };
     rec.status = 'downloading';
     rec.speed = SPEED_BASE * (0.6 + Math.random() * 0.8);
@@ -257,6 +261,11 @@
           } else {
             UI.toast('打开已缓存文件：' + rec.name, 'ok');
           }
+        } else if (rec && rec.status === 'downloading') {
+          UI.toast('文件下载中，请稍候', 'info');
+        } else {
+          startDownload(id, name, size);
+          UI.toast('开始下载，完成后可浏览', 'ok');
         }
         break;
     }
@@ -291,6 +300,9 @@
     get: getRecord,
     getAll: loadAll,
     clearAll: function () { saveAll({}); },
-    onView: null // 外部可注入查看回调
+    onView: null, // 外部可注入查看回调
+    /* [FIX BM-016] 由 detail.js 注入：checkUnlock(id,name) 返回 true 才允许下载；onUnlockRequired 唤起付费 Sheet */
+    checkUnlock: null,
+    onUnlockRequired: null
   };
 })();

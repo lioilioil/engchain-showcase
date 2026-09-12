@@ -316,14 +316,16 @@
       },
       address: basic.address || basic.location || '',
       addressDetail: '',
-      /* 价格 */
+      /* 价格
+         [FIX BM-041] 清除硬编码旧"线索包"定价 29/59/79/229，统一改读 MOCK.business：
+         单价 = credits.consume.talent；原价 = credits.consume.franchise.t3.original 同源演示价；
+         条数包 packOptions 由 commission.vendorUpgrades.leadPack.enabled 控制（首期 false → 空数组不展示）。 */
       unlockPrice: {
-        singlePrice: 29,
-        originalPrice: 59,
-        packOptions: [
-          { count: 3, price: 79, unit: 26.33 },
-          { count: 10, price: 229, unit: 22.90 }
-        ],
+        singlePrice: (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.talent) || 29,
+        originalPrice: (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.franchise && MOCK.business.credits.consume.franchise.t3 && MOCK.business.credits.consume.franchise.t3.original) || 58,
+        packOptions: (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades.leadPack && MOCK.business.commission.vendorUpgrades.leadPack.enabled)
+          ? (MOCK.business.commission.vendorUpgrades.leadPack.packs || [])
+          : [],
         unlockContent: ['真实姓名与联系方式', '完整工作履历与项目详情', '证书编号与注册状态', '社保缴纳情况', '期望薪资与到岗时间', '详细自我介绍', '在线沟通对接']
       },
       /* 列表卡片用 */

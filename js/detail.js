@@ -1,4 +1,4 @@
-﻿/* 工程链 · 单一供需详情引擎 (按业务场景分发，复用统一 shell) */
+/* 工程链 · 单一供需详情引擎 (按业务场景分发，复用统一 shell) */
 window.DETAIL = (function () {
   function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + name + '"/></svg>'; }
   function mt(iconName, txt) { return icon(iconName) + txt; }
@@ -56,7 +56,11 @@ window.DETAIL = (function () {
   var UnlockStore = {
     KEY: 'engchain-unlocked',
     _read: function () { try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { return {}; } },
-    _write: function (o) { try { localStorage.setItem(this.KEY, JSON.stringify(o)); } catch (e) { } },
+    /* [FIX BM-014] _write 后派发 engchain-unlock-changed 事件，其他监听页面/组件可实时联动刷新解锁态 */
+    _write: function (o) {
+      try { localStorage.setItem(this.KEY, JSON.stringify(o)); } catch (e) { }
+      try { window.dispatchEvent(new CustomEvent('engchain-unlock-changed', { detail: o })); } catch (e) { }
+    },
     _key: function (rec) { return (rec.bizKey || 'unknown') + '_' + rec.id; },
     /* 有效期（天）：普通供需/合作永久；人才单条 7 天；建企转让保证金 30 天；-1 表示永久 */
     _ttlDays: function (bizKey) {
@@ -76,9 +80,18 @@ window.DETAIL = (function () {
       return (Date.now() - (rec0.t || 0)) < days * 864e5;
     },
     mark: function (rec) { var o = this._read(); o[this._key(rec)] = { t: Date.now() }; this._write(o); },
-    clear: function (rec) { var o = this._read(); delete o[this._key(rec)]; this._write(o); }
+    clear: function (rec) { var o = this._read(); delete o[this._key(rec)]; this._write(o); },
+    /* [FIX BM-014] reset：清除全部解锁记录并恢复默认空状态，同时派发事件通知监听方 */
+    reset: function () {
+      try { localStorage.removeItem(this.KEY); } catch (e) { }
+      try { window.dispatchEvent(new CustomEvent('engchain-unlock-changed', { detail: {} })); } catch (e) { }
+    }
   };
   /* ---- 就近打码 helper（P0）：locked 时按粒度输出打码 HTML，解锁后输出明文；配合 app.css .pw-* 组件 ---- */
+  /* [E3-9] 付费墙类名与设计文档对应关系（仅注释对齐，不修改 CSS 类名）：
+     .pw-blur   -> Lock.full()   整值模糊（文案/描述段落整段遮罩）
+     .pwp/.pw-val/.pwp-mask/.pwp-real -> Lock.partial()/Lock.price()  部分掩码（手机号/价格，明文同帧渲染原地解锁）
+     .pw-file/.pw-file-veil -> Lock.file()  文件卡磨砂锁层 */
   var Lock = {
     lockIc: '<span class="pw-lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></span>',
     partialPhone: function (s) { s = String(s == null ? '' : s); if (s.length < 7) return '****'; return s.slice(0, 3) + '****' + s.slice(-4); },
@@ -113,6 +126,32 @@ window.DETAIL = (function () {
         (priceText ? '<div class="pw-inline-price">' + cfgText(priceText) + '</div>' : '') + '</div>';
     }
   };
+  /* [FIX BM-010] trade 保证金台账（localStorage）：记录冻结/释放状态，30 天 TTL 到期自动解冻退还 */
+  var TRADE_DEP_KEY = 'engchain-trade-deposits';
+  function _tradeDepositRead() { try { return JSON.parse(localStorage.getItem(TRADE_DEP_KEY) || '[]'); } catch (e) { return []; } }
+  function _tradeDepositWrite(arr) { try { localStorage.setItem(TRADE_DEP_KEY, JSON.stringify(arr)); } catch (e) { } }
+  function sweepTradeDeposits() {
+    if (!window.BalanceStore) return;
+    var arr = _tradeDepositRead(); var now = Date.now(); var changed = false;
+    arr.forEach(function (d) {
+      if (d.status !== 'frozen' || !d.releaseAt || d.releaseAt > now) return;
+      var s = BalanceStore.read();
+      s.frozen = Math.max(0, Math.round((s.frozen - d.amount) * 100) / 100);
+      s.logs.unshift({ type: 'trade_deposit_released', amount: d.amount, method: 'refund', reason: '保证金 30 天到期解冻退还', ts: now, ref: d.ref });
+      BalanceStore.write(s);
+      d.status = 'released'; d.releasedAt = now; changed = true;
+    });
+    if (changed) _tradeDepositWrite(arr);
+  }
+  /* [FIX BM-012] 锁区价签统一从 MOCK.business.credits.consume 读取，文案为「N 积分 / 次」；trade 保证金保留人民币；免费类显示「免费咨询」 */
+  function unlockCreditText(rec) {
+    try {
+      var up = unlockPriceOf(rec);
+      if (up.mode === 'deposit') return '¥' + Number(up.price).toLocaleString() + ' 可退保证金';
+      if (up.mode === 'free') return '免费咨询';
+      return up.price + ' 积分 / 次';
+    } catch (e) { return '98 积分 / 次'; }
+  }
   /* 键值信息表（方案B）：与 matKVTable 同构，统一为 spec-table 卡片样式（标签固定列宽 + 值左对齐自适应） */
   function dList(fields) {
     return '<div class="spec-table">' + fields.map(function (f) { return '<div class="spt-row"><span class="spt-k">' + cfgText(f.k) + '</span><span class="spt-v">' + cfgText(f.v) + '</span></div>'; }).join('') + '</div>';
@@ -149,19 +188,17 @@ window.DETAIL = (function () {
           '</div>';
       }).join('') + '</div>';
   }
-  /* ---- 通用：竖向步骤时间线 ---- */
+  /* ---- 通用：Zigzag之字形时间线（中间竖线+左右交替，经典流畅蛇形布局） ---- */
   function stepTimeline(steps) {
-    var html = '<div style="display:flex;flex-direction:column;gap:0;">';
+    var html = '<div class="zz-flow">';
     steps.forEach(function (p, i) {
-      var isLast = i === steps.length - 1;
-      html += '<div style="display:flex;gap:10px;align-items:flex-start;">' +
-        '<div style="display:flex;flex-direction:column;align-items:center;">' +
-          '<div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;font-family:var(--font-num);box-shadow:0 2px 8px -2px var(--primary-dim);">' + p.step + '</div>' +
-          (!isLast ? '<div style="width:1.5px;flex:1;background:var(--line);min-height:14px;margin:3px 0;"></div>' : '') +
-        '</div>' +
-        '<div style="flex:1;padding-bottom:' + (isLast ? '0' : '10px') + ';">' +
-          '<div style="font-size:12.5px;font-weight:600;color:var(--text-1);line-height:1.3;">' + p.title + '</div>' +
-          '<div style="font-size:11px;color:var(--text-3);line-height:1.4;margin-top:2px;">' + p.desc + '</div>' +
+      var isLeft = (i % 2 === 0);
+      var side = isLeft ? 'left' : 'right';
+      html += '<div class="zz-step zz-' + side + '">' +
+        '<div class="zz-dot">' + p.step + '</div>' +
+        '<div class="zz-content">' +
+          '<div class="zz-title">' + p.title + '</div>' +
+          (p.desc ? '<div class="zz-desc">' + p.desc + '</div>' : '') +
         '</div></div>';
     });
     return html + '</div>';
@@ -194,17 +231,34 @@ window.DETAIL = (function () {
       var tierText = tiers.map(function(t) { return (t.min / 10000) + '万以上 ' + (t.rate * 100) + '%'; }).join(' / ');
       commHtml = '<div style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border:1px solid var(--accent-line);border-radius:8px;"><div style="font-size:11px;font-weight:600;color:var(--primary-dim);margin-bottom:3px;">平台服务费（成交后收取）</div><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;">阶梯费率：' + tierText + '%，最低 ' + (cm.minCommission || 10000).toLocaleString() + ' 元' + (isBreakin ? '；<b style="color:var(--accent);">破冰期首档优惠至 ' + (firstRate * 100) + '%（5万以下成交）</b>' : '') + '</div></div>';
     }
-    var rows = items.map(function (x) {
-      return '<div style="display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" style="width:13px;height:13px;flex:none;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' + x + '</div>';
+    var gtIcons = ['shield', 'wallet', 'doc', 'check'];
+    var rows = items.map(function (x, i) {
+      return '<div class="gt-card"><div class="gt-ic">' + icon(gtIcons[i % gtIcons.length]) + '</div><div class="gt-tx">' + x + '</div></div>';
     }).join('');
-    return sec(GUARANTEE_TITLE[rec.bizKey] || '平台保障', '<div class="ds-text"><div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--text-2);line-height:1.6;">' + rows + '</div>' + commHtml + '</div>');
+    var gtTitle = GUARANTEE_TITLE[rec.bizKey] || '平台保障';
+    return sec(gtTitle, '<div class="gt-wrap">' +
+      '<div class="gt-head">' + icon('shield') + '<div><div class="gt-head-t">' + gtTitle + ' · 交易全流程安心护航</div><div class="gt-head-s">工程链平台为每笔交易提供全链路保障</div></div></div>' +
+      '<div class="gt-grid">' + rows + '</div>' +
+      (commHtml ? '<div class="gt-comm">' + commHtml + '</div>' : '') +
+      '</div>');
   }
   /* ---- 通用：相关推荐（同业务类型，同子类/同城优先，人才/招聘各自有推荐则跳过） ---- */
-  var RELATED_LABEL = { material: '材料', equipment: '设备', labor: '劳务', cooperation: '合作', franchise: '招商', trade: '转让', agency: '服务' };
+  var RELATED_LABEL = { material: '材料', equipment: '设备', labor: '劳务', cooperation: '合作', franchise: '招商', trade: '转让', agency: '服务', personnel: '招聘' };
   function relatedSec(rec) {
     if (!MOCK.byBizType) return '';
-    if (rec.bizKey === 'personnel' || rec.bizKey === 'talent') return '';
-    var pool = MOCK.byBizType(rec.bizKey).filter(function (x) { return String(x.id) !== String(rec.id); });
+    if (rec.bizKey === 'talent') return '';
+    var mockPool = MOCK.byBizType(rec.bizKey).filter(function (x) { return String(x.id) !== String(rec.id); });
+    var pool = mockPool.slice();
+    /* mergedList 同源：混入 SupplyStore 中同 bizKey 的用户发布条目 */
+    try {
+      if (window.SupplyStore) {
+        SupplyStore.listActive().forEach(function (x) {
+          if (x.bizKey === rec.bizKey && String(x.id) !== String(rec.id) && !pool.some(function (y) { return String(y.id) === String(x.id); })) {
+            pool.push(x);
+          }
+        });
+      }
+    } catch (e) {}
     if (!pool.length) return '';
     pool.sort(function (a, b) {
       var sa = (a.sub === rec.sub ? 2 : 0) + (a.city === rec.city ? 1 : 0) + ((a.match || 0) / 100);
@@ -298,7 +352,7 @@ window.DETAIL = (function () {
         row('微信号', Lock.full(wechatFull, locked)) +
         row(demand ? '项目/交货地址' : '发货/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确门牌付费可见')) +
       '</div>' +
-      Lock.inline(locked, '解锁查看联系方式与完整报价', '电话 · 微信 · 精确单价 · 资质文件', '¥98 单次解锁') +
+      Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 精确单价 · 资质文件', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
   }
   function materialBody(r, c) {
@@ -382,7 +436,7 @@ window.DETAIL = (function () {
         row('微信号', Lock.full(wechatFull, locked)) +
         row(demand ? '项目/工地地址' : '设备/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确场地付费可见')) +
       '</div>' +
-      Lock.inline(locked, '解锁查看联系方式与完整报价', '电话 · 微信 · 费用明细 · 资质文件', '¥98 单次解锁') +
+      Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 费用明细 · 资质文件', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
   }
   function equipHero(r, c) {
@@ -500,7 +554,7 @@ window.DETAIL = (function () {
         (wechat ? row('微信号', Lock.full(wechat, locked)) : '') +
         row(demand ? '项目部地址' : '班组驻地', Lock.partial(addr, locked, cfgText(r.location) + ' · 精确地址付费可见')) +
       '</div>' +
-      Lock.inline(locked, '解锁查看联系方式与精确工资', '电话 · 微信 · 精确工资 · 证书业绩', '¥98 单次解锁') +
+      Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 精确工资 · 证书业绩', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
   }
   function laborHero(r, c) {
@@ -632,12 +686,11 @@ window.DETAIL = (function () {
       { label: '年中标项目', value: r.annualProjects ? r.annualProjects + '个' : '—', sub: '近3年平均' },
       { label: '已加盟分公司', value: r.branchCount ? r.branchCount + '家' : '—', sub: '全国分布' }
     ];
-    var basicHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+    var basicHtml = '<div class="fbi-grid">' +
       keyStats.map(function (s) {
-        return '<div style="padding:10px 12px;border-radius:10px;background:linear-gradient(135deg,var(--primary-soft),rgba(201,169,97,.04));border:1px solid var(--accent-line);">' +
-          '<div style="font-size:10.5px;color:var(--text-3);margin-bottom:3px;">' + s.label + '</div>' +
-          '<div style="font-size:16px;font-weight:700;color:var(--primary-dim);font-family:var(--font-num);line-height:1.2;">' + s.value + '</div>' +
-          (s.sub ? '<div style="font-size:9.5px;color:var(--text-4);margin-top:2px;">' + s.sub + '</div>' : '') +
+        return '<div class="fbi-card">' +
+          '<div class="fbi-l"><div class="fbi-label">' + s.label + '</div>' + (s.sub ? '<div class="fbi-sub">' + s.sub + '</div>' : '') + '</div>' +
+          '<div class="fbi-value">' + s.value + '</div>' +
           '</div>';
       }).join('') + '</div>';
     var detailInfo = [
@@ -653,7 +706,7 @@ window.DETAIL = (function () {
       if (fc.safety && fc.safety.note) qualRows.push({ k: '备注说明', v: cfgText(fc.safety.note) });
       h += sec('资质与证照', tradeQualPack(qualList) + (qualRows.length ? '<div class="qual-extra-table">' + dList(qualRows) + '</div>' : ''));
     }
-    if (r.qual) h += sec('核验状态', '<div class="ds-text" style="color:var(--success);">' + r.qual + '</div>');
+    if (r.qual) h += sec('核验状态', '<div class="cert-verify-bar"><div class="cvb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="cvb-body"><div class="cvb-title">资质与证照已核验</div><div class="cvb-desc">' + r.qual + '</div></div><span class="cvb-badge">✓ 平台核验</span></div>');
     /* 资质证照图（带水印） */
     if (r.certImages && r.certImages.length) {
       var certHtml = '<div class="cert-gallery">';
@@ -734,7 +787,7 @@ window.DETAIL = (function () {
         });
       });
       pdfHtml += '</div>';
-      pdfHtml += '<div class="pdf-upload" onclick="DETAIL.uploadPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>上传企业宣传文件</span></div>';
+      /* 上传入口已移除（信息浏览页不提供上传） */
       h += sec('企业宣传文件', pdfHtml);
     }
     /* 招商联系方式（免费留资后开放）+ 加盟流程 */
@@ -1403,7 +1456,7 @@ window.DETAIL = (function () {
         row('微信号', Lock.full(cc.wechat || '', locked)) +
         row('项目/办公地址', Lock.partial(cc.addr || r.location || '', locked, cfgText(r.location) + ' · 精确地址付费可见')) +
       '</div>' +
-      Lock.inline(locked, '解锁联系方式 · 查看招标文件', '电话 · 微信 · 精确地址 · 全套招标资料', '¥98 单次解锁') +
+      Lock.inline(locked, '解锁沟通权限 · 查看招标文件', '电话 · 微信 · 精确地址 · 全套招标资料', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
   }
   function coopHero(r, c) {
@@ -1910,7 +1963,7 @@ window.DETAIL = (function () {
         { k: '微信号', v: tPair(ct.wechat, locked, ct.wechatMasked) },
         { k: '居住区域', v: cfgText(r.address) },
         { k: '详细地址', v: Lock.price(r.addressDetail, locked, '解锁查看详细地址') }
-      ]) + Lock.inline(locked, '解锁查看姓名 / 手机 / 微信等完整联系方式', '单条 ¥29 · 7天有效 · 未对接可退', '¥29') + '</div>');
+      ]) + Lock.inline(locked, '解锁与对方沟通权限', '单条 29 积分 · 7天有效 · 未对接可退', '29 积分') + '</div>'); /* [FIX BM-012/BM-013] ¥29 改 29 积分，清除「查看姓名/手机/微信」表述 */
     /* 基本信息 */
     h += sec('基本信息与核验', dList([
       { k: '工作年限', v: r.workYears }, { k: '年龄范围', v: r.ageRange }, { k: '性别', v: r.gender },
@@ -1941,7 +1994,7 @@ window.DETAIL = (function () {
   }
   byType.talent = {
     label: '人才简历详情', cta: '立即解锁', verified: '证书已核验', inlineLock: true,
-    ctaText: function (r, unlocked) { return unlocked ? '查看联系方式' : payGoLabel(unlockPriceOf(r)); },
+    ctaText: function (r, unlocked) { return unlocked ? '沟通权限已开通' : payGoLabel(unlockPriceOf(r)); }, /* [FIX BM-013] 已解锁 CTA 不再说「查看联系方式」 */
     hero: talentHero,
     sections: function (r, c) { return talentBody(r, c); },
     unlockItems: function () { return ['真实姓名', '手机号', '微信号', '注册单位全称', '完整工作履历', '项目详情', '学历院校']; },
@@ -2003,6 +2056,11 @@ window.DETAIL = (function () {
     return true;
   }
   function creditDiscountRate() { return window.creditDiscount ? creditDiscount() : 1; }
+  /* [FIX BM-015] 积分↔人民币溢价系数，收敛到 MOCK.business.credits.cnyToCreditRate；data.js 未配置时默认 1.28 */
+  function creditToCnyRate() {
+    var r = (MOCK.business.credits || {}).cnyToCreditRate;
+    return (typeof r === 'number' && r > 0) ? r : 1.28;
+  }
   /* 转化漏斗前置门（手册§8.2）：游客→登录/注册；注册未实名→免费实名认证；实名及以上直接放行 */
   function identityGate() {
     var st = window.deriveStatus ? deriveStatus() : 'registered';
@@ -2036,6 +2094,11 @@ window.DETAIL = (function () {
   function payGoLabel(up) {
     if (up.mode === 'free') return '免费解锁';
     if (up.mode === 'deposit') return '支付保证金 ¥' + Number(up.price).toLocaleString();
+    /* [FEAT 9.2-1] 年度会员：详情免费解锁，不消耗积分 */
+    if (window.MemberStore && MemberStore.isActive() && up.mode === 'credit') return '年度会员免费解锁';
+    /* [FEAT 9.2-4] 每日免费浏览摘要额度提示 */
+    var dqRemain = (window.FreeQuotaStore) ? FreeQuotaStore.remaining() : 0;
+    if (dqRemain > 0 && up.mode === 'credit') return '今日免费解锁（剩 ' + dqRemain + ' 条）';
     var fq = freeQuotaInfo();
     if (fq.allow && fq.remain > 0) return '免费解锁（本月剩 ' + fq.remain + ' 条）';
     var bal = window.CreditStore ? CreditStore.read().balance : 0;
@@ -2044,21 +2107,32 @@ window.DETAIL = (function () {
     return '积分不足 · 去充值';
   }
   function lockHtml(rows, rec) {
-    var cur = MOCK.business.unlock.currency;
+    var cur = (MOCK.business.credits && MOCK.business.credits.currency) || '积分'; /* [FIX BM-012] 不再读 unlock.currency(¥)，统一用 credits.currency=积分 */
     var up = unlockPriceOf(rec);
     var price = up.price.toLocaleString();
     var badge = '<span class="la-badge">' + rows.length + ' 项</span>';
     var label = '<div class="la-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg>核心信息<span class="unlocked-badge">· 已解锁</span></div>';
     var rowsHtml = rows.map(function (x) { return '<div class="la-row"><span class="k">' + x.k + '</span><span class="v masked">' + x.v + '</span></div>'; }).join('');
-    var origHtml = up.tiered ? '<span style="font-size:12px;color:var(--text-3);text-decoration:line-through;margin-left:6px;">¥' + up.original + '</span>' : '';
+    var origHtml = up.tiered ? '<span style="font-size:12px;color:var(--text-3);text-decoration:line-through;margin-left:6px;">' + up.original + ' 积分</span>' : ''; /* [FIX BM-012] 划线原价与现价同为积分单位 */
+    /* [FIX E1-16/E2-20/E3-8] 锁区价格体现入驻折扣/年度会员/破冰恢复原价；[FIX E2-07] 取消伪造人数 */
+    var _disc = creditDiscountRate();
+    var _discNum = Math.round(_disc * 100) / 10;
+    var _isAnnualLock = !!(window.MemberStore && MemberStore.isActive() && up.mode === 'credit');
+    var _priceShow = Math.round(up.price * (_disc < 1 ? _disc : 1));
+    var price = _priceShow.toLocaleString();
+    var priceBadge = _isAnnualLock ? '<span style="font-size:11px;color:var(--success);font-weight:600;margin-left:6px;">会员免费解锁</span>' : (_disc < 1 ? '<span style="font-size:11px;color:var(--primary-dim);font-weight:600;margin-left:6px;">入驻' + _discNum + '折</span>' : '');
+    var calcLine = (_disc < 1 && up.price) ? '<div style="font-size:10px;color:var(--text-3);margin-top:2px;">原价 ' + up.price + ' 积分 × ' + _disc + ' = ' + _priceShow + ' 积分</div>' : '';
+    var breakNote = (window.ModeStore && ModeStore.isBreakIn() && (up.original || up.price)) ? '<div style="font-size:10px;color:var(--accent);margin-top:2px;">限时优惠 · 正式期恢复原价 ' + (up.original || up.price) + ' 积分</div>' : '';
+    var _uc = 0; try { _uc = Object.keys(UnlockStore._read()).length; } catch (e) {}
+    var socialText = _uc > 0 ? ('已有 ' + _uc + ' 位同行解锁') : '已有多位同行解锁';
     return '<div class="lock-area" id="lock-area">' +
       '<div class="la-head">' + label + badge + '</div>' +
       '<div class="la-body">' + rowsHtml + '</div>' +
       '<div class="la-paywall" id="paywall">' +
         '<div class="lp-head"><div class="lp-head-left"><div class="lp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></div><div class="lp-text"><div class="lp-title">解锁查看全部核心信息</div><div class="lp-subtitle">已隐藏 ' + rows.length + ' 项核心信息 · 解锁后完全公开</div></div></div>' +
-        '<div class="lp-price"><span class="lp-currency">' + cur + '</span><span class="lp-amount">' + price + '</span>' + origHtml + '</div></div>' +
+        '<div class="lp-price"><span class="lp-currency">' + cur + '</span><span class="lp-amount">' + price + '</span>' + origHtml + priceBadge + '</div>' + calcLine + breakNote + '</div></div>' +
         '<div class="lp-benefits"><span class="lp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-check"/></svg>即时解锁</span><span class="lp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-check"/></svg>安全支付</span><span class="lp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-check"/></svg>未对接可退</span></div>' +
-        '<div class="lp-foot"><div class="lp-social">已有 ' + (rows.length * 214 + 236).toLocaleString() + ' 人解锁</div><div class="lp-trust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-shield"/></svg>安全加密</div></div>' +
+        '<div class="lp-foot"><div class="lp-social">' + socialText + '</div><div class="lp-trust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-shield"/></svg>安全加密</div></div>' +
       '</div></div>';
   }
   /* ---- 投递引导区 (企业招聘详情 · 替代付费墙) ---- */
@@ -2117,6 +2191,7 @@ window.DETAIL = (function () {
       '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div></div>';
   }
   function attach(rec) {
+    sweepTradeDeposits(); /* [FIX BM-010] 每次进入详情页清扫已过 30 天 TTL 的保证金并解冻退还 */
     var t = byType[rec.bizKey];
     if (!t) {
       /* P0：bizKey 异常时不张冠李戴到其他类别（历史上会错误回退到材料详情），直接空状态 */
@@ -2153,7 +2228,9 @@ window.DETAIL = (function () {
     var __bodyHtml = t.sections(rec, c) + guaranteeSec(rec) + relatedSec(rec);
     if ($('body')) $('body').innerHTML = __bodyHtml;
     if ($('lock')) {
-      if (rec.bizKey === 'personnel') {
+      /* [FIX E1-06] applyHtml 仅招聘类(personnel/talent)渲染，其余 7 类不渲染，避免遮挡解锁 CTA */
+      var _RECRUIT_BIZ = { personnel: 1, talent: 1 };
+      if (_RECRUIT_BIZ[rec.bizKey]) {
         $('lock').innerHTML = applyHtml(rec);
       } else if (t.inlineLock) {
         /* 就近打码类：联系方式已嵌入信息卡，页面不再出现底部集中锁定区 */
@@ -2174,7 +2251,7 @@ window.DETAIL = (function () {
     var payw = MOCK.business.unlock;
     var up = unlockPriceOf(rec);
     var price = up.price.toLocaleString();
-    var cur = payw.currency;
+    var cur = (MOCK.business.credits && MOCK.business.credits.currency) || '积分'; /* [FIX BM-012] 不再读 unlock.currency(¥)，统一积分 */
     /* 底部主按钮文案：付费/积分类对游客与未实名用户先做登录/实名引导；就近打码类未解锁显示「立即解锁 ¥XX」，解锁后切换为对接动作；免费留资/投递类沿用原 CTA */
     var gate = identityGate();
     var needGate = !unlocked && rec.bizKey !== 'personnel' && rec.bizKey !== 'agency' && rec.bizKey !== 'franchise';
@@ -2246,7 +2323,18 @@ window.DETAIL = (function () {
                   ? gate.label
                   : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta)))));
     if ($('actionbar')) $('actionbar').innerHTML = actionbarHtml(ctaText);
-    var origLine = up.tiered ? '<span style="font-size:13px;color:var(--text-3);text-decoration:line-through;margin-left:8px;">¥' + up.original + '</span>' : '';
+    /* [FIX BM-043] 已解锁（含刷新恢复）时 CTA 立即变绿；并监听解锁事件实时切换底色 */
+    var __ctaEl = $('cta'); if (__ctaEl && unlocked) __ctaEl.classList.add('is-unlocked');
+    window.addEventListener('engchain-unlock-changed', function () {
+      var c = $('cta'); if (c) c.classList.toggle('is-unlocked', UnlockStore.isUnlocked(rec));
+    });
+    /* [FIX BM-016] 向 FileDownload 注入解锁态校验：未解锁的打码文件禁止直接下载，唤起付费 Sheet */
+    if (window.FileDownload) {
+      window.FileDownload.checkUnlock = function () { return UnlockStore.isFree(rec.bizKey) || UnlockStore.isUnlocked(rec); };
+      window.FileDownload.onUnlockRequired = function () { tryUnlock(); };
+      window.FileDownload.onView = function (rec) { if (rec && rec.name) DETAIL.viewPdf(rec.name); };
+    }
+    var origLine = up.tiered ? '<span style="font-size:13px;color:var(--text-3);text-decoration:line-through;margin-left:8px;">' + up.original + ' 积分</span>' : ''; /* [FIX BM-012] 划线原价改积分单位 */
     function openPay() {
       var lockRows = t.lockRows(rec, c);
       /* 就近打码类 lockRows 为空，改用该类声明的「将解锁内容」清单；其余类沿用集中锁定行 */
@@ -2318,7 +2406,7 @@ window.DETAIL = (function () {
         '</div>';
       }
       var sheet = UI.sheet();
-      sheet.setText(rec.bizKey === 'trade' ? '支付保证金 · 查看完整信息' : '解锁联系方式');
+      sheet.setText(rec.bizKey === 'trade' ? '支付保证金 · 查看完整信息' : '解锁与对方沟通权限'); /* [FIX BM-013] 付费 Sheet 标题统一为「沟通权限」 */
       var fqM3 = freeQuotaInfo();
       var discM3 = creditDiscountRate();
       var costM3 = Math.round(up.price * (up.mode === 'credit' ? discM3 : 1));
@@ -2333,10 +2421,29 @@ window.DETAIL = (function () {
       } else if (isFree) {
         priceHtml = '<div class="unlock-price free"><span class="up-amt">免费</span><div class="up-sub">免费咨询 · 留资即开放联系方式</div></div>';
       } else {
+        /* [FIX E1-16/E2-20] 解锁 Sheet 价格区：折扣价 + 计算过程 + 年度会员标识 + 免费额度期入驻折扣提示 */
+        var _isAnnual = !!(window.MemberStore && MemberStore.isActive() && up.mode === 'credit');
+        var _discNum = Math.round(discM3 * 100) / 10; /* 0.8 -> 8 折 */
+        var _origShow = up.original || (discM3 < 1 ? up.price : null);
+        var _discBadge = _isAnnual ? '<span class="up-disc">会员免费解锁</span>' : (discM3 < 1 ? '<span class="up-disc">入驻' + _discNum + ' 折</span>' : '');
+        var _calcLine = (discM3 < 1 && up.price) ? '<div style="font-size:10px;color:var(--text-3);margin-top:2px;">' + up.price + ' 积分 × ' + discM3 + ' = ' + costM3 + ' 积分</div>' : '';
+        var _todayRemain = (window.FreeQuotaStore) ? FreeQuotaStore.remaining() : 0;
+        var _freeHint = '';
+        if (_todayRemain > 0) {
+          _freeHint = '今日免费解锁剩 ' + _todayRemain + ' 条';
+          if (discM3 < 1) _freeHint += '（入驻后解锁享' + _discNum + ' 折）';
+        } else if (fqM3.allow && fqM3.remain > 0) {
+          _freeHint = '本月免费额度剩 ' + fqM3.remain + ' 条，可先免费解锁';
+          if (discM3 < 1) _freeHint += '（入驻后解锁享' + _discNum + ' 折）';
+        } else {
+          _freeHint = '账户余额 ' + balM3 + ' 积分' + (creditEnough ? '' : '，积分不足');
+        }
+        /* [FIX E3-8] 破冰/限时价旁标注正式期恢复原价 */
+        var _breakNote = (window.ModeStore && ModeStore.isBreakIn() && _origShow) ? '<div style="font-size:10px;color:var(--accent);margin-top:2px;">限时优惠 · 正式期恢复原价 ' + _origShow + ' 积分</div>' : '';
         priceHtml = '<div class="unlock-price credit"><span class="up-amt">' + costM3 + '</span><span class="up-unit">积分</span>' +
-          (up.original ? '<span class="up-orig">' + up.original + '</span>' : '') +
-          (discM3 < 1 ? '<span class="up-disc">会员 ' + Math.round(discM3 * 10) + ' 折</span>' : '') +
-          '<div class="up-sub">' + (fqM3.allow && fqM3.remain > 0 ? '本月免费额度剩 ' + fqM3.remain + ' 条，可先免费解锁' : '账户余额 ' + balM3 + ' 积分' + (creditEnough ? '' : '，积分不足')) + '</div></div>';
+          (_origShow ? '<span class="up-orig">' + _origShow + '</span>' : '') +
+          _discBadge +
+          '<div class="up-sub">' + _freeHint + '</div>' + _calcLine + _breakNote + '</div>';
       }
       /* 积分套餐引导（积分不足时展示） */
       var pkgs = (MOCK.business.credits && MOCK.business.credits.packages) || [];
@@ -2358,7 +2465,7 @@ window.DETAIL = (function () {
       if (!isFree) {
         var methods = isDeposit
           ? [{ id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160' }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF' }]
-          : [{ id:'credit', name:'积分支付', icon:'i-star', color:'#D4AF37', desc:'余额 ' + balM3 + ' 积分' }, { id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160', desc:'单次 ¥' + Math.round(costM3 * 1.28) }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF', desc:'单次 ¥' + Math.round(costM3 * 1.28) }];
+          : [{ id:'credit', name:'积分支付', icon:'i-star', color:'#D4AF37', desc:'余额 ' + balM3 + ' 积分' }, { id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }];
         payMethodHtml = '<div class="unlock-paymethods"><div class="pm-label">选择支付方式</div>' +
           methods.map(function (pm, i) {
             return '<div class="pm-item' + (i === 0 ? ' selected' : '') + '" data-pay="' + pm.id + '">' +
@@ -2391,8 +2498,8 @@ window.DETAIL = (function () {
           currentPay = item.dataset.pay;
           var btn = sheet.body().querySelector('#pay-go');
           if (currentPay === 'credit') btn.textContent = '确认解锁 · ' + costM3 + '积分';
-          else if (currentPay === 'wechat') btn.textContent = isDeposit ? '微信支付 ¥' + Number(up.price).toLocaleString() : '微信支付 ¥' + Math.round(costM3 * 1.28);
-          else if (currentPay === 'alipay') btn.textContent = isDeposit ? '支付宝 ¥' + Number(up.price).toLocaleString() : '支付宝 ¥' + Math.round(costM3 * 1.28);
+          else if (currentPay === 'wechat') btn.textContent = isDeposit ? '微信支付 ¥' + Number(up.price).toLocaleString() : '微信支付 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */;
+          else if (currentPay === 'alipay') btn.textContent = isDeposit ? '支付宝 ¥' + Number(up.price).toLocaleString() : '支付宝 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */;
         });
       });
       /* 积分套餐选择 */
@@ -2403,16 +2510,26 @@ window.DETAIL = (function () {
         });
       });
       /* 确认支付 */
-      sheet.body().querySelector('#pay-go').addEventListener('click', function () {
-        sheet.close();
-        if (currentPay === 'credit' || currentPay === 'free') {
-          payGo(rec, up);
-        } else {
-          var payName = currentPay === 'wechat' ? '微信支付' : '支付宝';
-          UI.toast(payName + '成功，已解锁', 'ok');
-          UnlockStore.mark(rec);
-          unlock();
-        }
+      var payBtn = sheet.body().querySelector('#pay-go');
+      /* [FIX BM-051] 点击后置灰「支付中...」防重复提交；[FIX BM-010/BM-011] 微信/支付宝/保证金走真实资金动作，不再仅 toast+mark */
+      payBtn.addEventListener('click', function () {
+        if (payBtn.disabled) return;
+        var _origBtnText = payBtn.textContent;
+        payBtn.disabled = true;
+        payBtn.textContent = '支付中...';
+        var method = currentPay;
+        setTimeout(function () {
+          payBtn.disabled = false;
+          payBtn.textContent = _origBtnText;
+          sheet.close();
+          if (method === 'credit' || method === 'free') {
+            payGo(rec, up);
+          } else if (isDeposit) {
+            payGoDeposit(rec, up, method);
+          } else {
+            simulatePayUnlock(rec, up, method);
+          }
+        }, 600);
       });
       sheet.show();
     }
@@ -2646,7 +2763,7 @@ window.DETAIL = (function () {
             '<div style="margin-bottom:12px;"><label style="font-size:11.5px;font-weight:600;color:var(--text-1);display:block;margin-bottom:6px;">联系电话 <span style="color:var(--accent);">*</span></label><input type="tel" id="ag-phone" placeholder="请输入您的手机号" value="13800008866" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-m);font-size:13px;background:var(--bg-card);box-sizing:border-box;outline:none;"></div>' +
             '<div style="padding:8px 10px;background:var(--success-soft);border-radius:8px;margin-bottom:12px;"><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">免费咨询保障：</b>报价、材料与案例已全部公开，留资仅用于顾问对接；服务不过按约退款，平台不代收代办费，款项均对公签约。</div></div>' +
           '</div>' +
-          '<button class="btn btn-primary btn-block btn-lg" id="ag-submit">免费提交并查看联系方式</button>';
+          '<button class="btn btn-primary btn-block btn-lg" id="ag-submit">免费提交并解锁沟通权限</button>'; /* [FIX BM-013] 清除「查看联系方式」表述 */
         function agBind(gid) {
           sheet.body().querySelectorAll('#' + gid + ' .cs-tag').forEach(function (tag) {
             tag.addEventListener('click', function () {
@@ -2728,15 +2845,28 @@ window.DETAIL = (function () {
         if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
         if (!phone || !/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
         sheet.close();
-        UI.toast('咨询意向已提交，请付费查看联系方式', 'ok');
-        setTimeout(function () { openPay(); }, 300);
+        UI.toast('咨询意向已提交，请付费解锁沟通权限', 'ok'); /* [FIX BM-013] 清除「查看联系方式」表述 */
+        setTimeout(function () {
+          /* [FIX] franchise 付费分支身份门控：留资后、openPay 前补 gateAct，与普通类一致（游客→登录，未实名→实名） */
+          var _g2 = identityGate();
+          if (!gateAct(_g2)) return;
+          openPay();
+        }, 300);
       });
       sheet.show();
     }
     /* M3：积分/免费额度/保证金 三种解锁执行（免费额度优先 → 扣积分 → 不足去充值） */
     function payGo(rec, up) {
-      if (up.mode === 'free') { unlock('已开放联系方式'); return; }
-      if (up.mode === 'deposit') { UI.toast('模拟支付保证金 ¥' + Number(up.price).toLocaleString(), 'ok'); UnlockStore.mark(rec); unlock('保证金已付 · 信息已解锁'); return; }
+      if (up.mode === 'free') { unlock('已开放沟通权限'); return; } /* [FIX BM-013] 文案统一沟通权限 */
+      /* [FIX BM-010] trade 保证金不再在此空壳 toast+mark，统一走 payGoDeposit 真实冻结/解冻 */
+      /* [FEAT 9.2-1] 年度会员：积分类详情免费解锁，不消耗月度免费额度与积分；保证金类仍走保证金流程 */
+      if (window.MemberStore && MemberStore.isActive() && up.mode === 'credit') {
+        UI.toast('年度会员免费解锁 · 已开放完整信息', 'ok'); unlock(); return;
+      }
+      /* [FEAT 9.2-4] 每日免费浏览摘要额度（游客3/注册5/实名10，跨天重置），优先于月度免费额度 */
+      if (window.FreeQuotaStore && up.mode === 'credit' && FreeQuotaStore.use(1)) {
+        UI.toast('已使用今日免费浏览额度 1 条 · 今日剩 ' + FreeQuotaStore.remaining() + ' 条', 'ok'); unlock(); return;
+      }
       var fqG = freeQuotaInfo();
       if (fqG.allow && fqG.remain > 0) { CreditStore.freeSpend(1); UI.toast('已使用免费解锁额度 1 条 · 本月剩 ' + (fqG.remain - 1), 'ok'); unlock(); return; }
       var costG = Math.round(up.price * creditDiscountRate());
@@ -2752,6 +2882,58 @@ window.DETAIL = (function () {
         ok: '去充值', cancel: '再看看',
         onOk: function () { location.href = '../../pages/wallet/credits.html'; }
       });
+    }
+    /* [FIX BM-010] trade 保证金：校验可用余额 → 真实冻结 BalanceStore.frozen → 30 天 TTL 台账到期解冻退还（写 trade_deposit_frozen / trade_deposit_released 流水） */
+    function payGoDeposit(rec, up, method) {
+      var deposit = Math.round(((MOCK.business.credits || {}).tradeDeposit || 5000) * 100) / 100;
+      if (!window.BalanceStore) { UI.toast('余额账本不可用', 'err'); return; }
+      if (BalanceStore.available() < deposit) {
+        UI.dialog({
+          title: '保证金余额不足',
+          text: '支付保证金需 <b>¥' + deposit.toLocaleString() + '</b>，当前可用余额 <b>¥' + BalanceStore.available().toLocaleString() + '</b>。充值后可继续支付。',
+          ok: '去充值', cancel: '再看看',
+          onOk: function () { location.href = '../../pages/wallet/credits.html'; }
+        });
+        return;
+      }
+      var s = BalanceStore.read();
+      s.frozen = Math.round((s.frozen + deposit) * 100) / 100;
+      s.logs.unshift({ type: 'trade_deposit_frozen', amount: -deposit, method: method || 'wechat', reason: '建企买卖保证金冻结 · ' + ((rec.title || rec.name || '') + '').slice(0, 16), ts: Date.now(), ref: rec.id });
+      BalanceStore.write(s);
+      /* 解锁台账：30 天 TTL 到期自动解冻退还（见模块级 sweepTradeDeposits） */
+      var arr = _tradeDepositRead();
+      arr.push({ ref: rec.id, amount: deposit, status: 'frozen', ts: Date.now(), releaseAt: Date.now() + 30 * 864e5 });
+      _tradeDepositWrite(arr);
+      UnlockStore.mark(rec);
+      unlock('保证金 ¥' + deposit.toLocaleString() + ' 已冻结 · 信息已解锁（30 天未成交可全额退还）');
+    }
+    /* [FIX BM-011 / E1-09] 单次解锁：微信/支付宝只走人民币流水(unlock_sim_pay/unlock_cny_pay)→平台收入台账，不再双扣积分；积分支付走上面 credit 分支只扣积分 */
+    function simulatePayUnlock(rec, up, method) {
+      var rate = creditToCnyRate();
+      var costCredit = Math.round(up.price * (up.mode === 'credit' ? creditDiscountRate() : 1));
+      var rmb = Math.round(costCredit * rate);
+      var payName = method === 'alipay' ? '支付宝' : (method === 'credit' ? '积分支付' : '微信支付');
+      /* [FIX E1-09] 支付方式二选一，严禁双扣费：微信/支付宝只扣人民币余额，绝不调 CreditStore.consume；积分支付只扣积分，绝不碰 BalanceStore */
+      if (method === 'credit') {
+        if (window.CreditStore) CreditStore.consume(costCredit, '解锁沟通权限 · ' + ((rec.title || rec.name || '') + '').slice(0, 12), { method: method });
+        UnlockStore.mark(rec);
+        UI.toast('已扣 ' + costCredit + ' 积分', 'ok');
+        unlock();
+        return;
+      }
+      if (window.BalanceStore) {
+        var s = BalanceStore.read();
+        s.logs.unshift({ type: 'unlock_sim_pay', amount: -rmb, method: method, reason: payName + ' · 单次解锁模拟支付', ts: Date.now(), ref: rec.id });
+        if (BalanceStore.available() >= rmb) {
+          s.balance = Math.round((s.balance - rmb) * 100) / 100;
+          s.logs.unshift({ type: 'unlock_cny_pay', amount: -rmb, method: method, reason: payName + '扣款 · 单次解锁', ts: Date.now(), ref: rec.id });
+        }
+        s.logs.unshift({ type: 'platform_income', amount: rmb, method: method, reason: '单次解锁平台收入（模拟）', ts: Date.now(), ref: rec.id });
+        BalanceStore.write(s);
+      }
+      UnlockStore.mark(rec);
+      UI.toast(payName + '成功，已扣 ¥' + rmb, 'ok');
+      unlock();
     }
     function tryUnlock() {
       if (window.__AGENCY_MARKET__ && rec.bizKey === 'agency') {
@@ -2791,7 +2973,7 @@ window.DETAIL = (function () {
           });
         }
       }
-      if ($('cta')) $('cta').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + (t.ctaText ? t.ctaText(rec, true) : '联系TA');
+      if ($('cta')) { $('cta').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + (t.ctaText ? t.ctaText(rec, true) : '联系TA'); $('cta').classList.add('is-unlocked'); } /* [FIX BM-043] 解锁后 CTA 由橙变绿 */
       unlocked = true;
       UnlockStore.mark(rec);
       if (phoneEl) phoneEl.classList.add('is-unlocked');
@@ -2831,7 +3013,23 @@ window.DETAIL = (function () {
         el.classList.toggle('active', isFav);
         UI.toast(isFav ? '已收藏' : '已取消收藏', 'ok');
       }
-      else if (el.dataset.act === 'share') UI.toast('已复制链接', 'ok');
+      else if (el.dataset.act === 'share') {
+        /* [FIX E2-07] 真实写入剪贴板，不再假复制；降级用 execCommand 兜底 */
+        var shareUrl = location.href;
+        var fallbackCopy = function (txt) {
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            var okCopy = document.execCommand('copy');
+            document.body.removeChild(ta);
+            UI.toast(okCopy ? '链接已复制' : '复制失败，请手动复制地址', okCopy ? 'ok' : 'warn');
+          } catch (e) { UI.toast('复制失败，请手动复制地址', 'warn'); }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(shareUrl).then(function () { UI.toast('链接已复制', 'ok'); }).catch(function () { fallbackCopy(shareUrl); });
+        } else { fallbackCopy(shareUrl); }
+      }
     });
     /* 初始化收藏按钮状态：从 FavoriteStore 读取当前条是否已收藏 */
     if ($('actionbar') && window.FavoriteStore) {
@@ -2901,30 +3099,10 @@ window.DETAIL = (function () {
       UI.toast('正在下载：' + name, 'ok');
     }
   }
-  function uploadPdf() {
-    UI.dialog({
-      title: '上传企业宣传文件',
-      body: '<div style="padding:4px 0 8px;"><div style="width:100%;padding:24px;border:2px dashed var(--accent-line);border-radius:10px;text-align:center;cursor:pointer;" onclick="UI.toast(\'已选择文件\',\'ok\')"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" style="width:32px;height:32px;margin:0 auto 8px;display:block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div style="font-size:13px;font-weight:600;color:var(--primary-dim);">点击选择 PDF 文件</div><div style="font-size:10.5px;color:var(--text-3);margin-top:4px;">支持 PDF 格式 · 单个文件不超过 20MB</div></div>' +
-      '<div style="margin-top:12px;font-size:11px;color:var(--text-3);line-height:1.6;">上传的文件将在详情页中展示，供潜在合作伙伴浏览下载。平台会对文件进行审核，审核通过后自动展示。</div></div>',
-      cta: '确认上传',
-      onCta: function () { UI.toast('上传成功，审核通过后展示', 'ok'); }
-    });
-  }
+  /* uploadPdf 已移除（信息浏览页不提供上传入口） */
   /* ---- 全国招商区域地图弹窗 ---- */
-  var _mapChart = null, _mapRec = null;
-  var _cityCoords = {
-    '北京':[116.4,39.9],'天津':[117.2,39.1],'石家庄':[114.5,38.0],'唐山':[118.2,39.6],'保定':[115.5,38.9],
-    '太原':[112.5,37.9],'大同':[113.3,40.1],'呼和浩特':[111.7,40.8],'沈阳':[123.4,41.8],'大连':[121.6,38.9],
-    '长春':[125.3,43.9],'哈尔滨':[126.5,45.8],'上海':[121.5,31.2],'南京':[118.8,32.1],'苏州':[120.6,31.3],
-    '无锡':[120.3,31.6],'常州':[119.9,31.8],'杭州':[120.2,30.3],'宁波':[121.5,29.9],'温州':[120.7,28.0],
-    '合肥':[117.3,31.8],'芜湖':[118.4,31.3],'蚌埠':[117.4,32.9],'福州':[119.3,26.1],'厦门':[118.1,24.5],
-    '南昌':[115.9,28.7],'济南':[117.0,36.7],'青岛':[120.4,36.1],'烟台':[121.4,37.5],'郑州':[113.6,34.8],
-    '洛阳':[112.4,34.6],'武汉':[114.3,30.6],'宜昌':[111.3,30.7],'长沙':[113.0,28.2],'广州':[113.3,23.1],
-    '深圳':[114.1,22.5],'东莞':[113.7,23.0],'佛山':[113.1,23.0],'南宁':[108.4,22.8],'海口':[110.3,20.0],
-    '三亚':[109.5,18.3],'重庆':[106.5,29.6],'成都':[104.1,30.7],'绵阳':[104.7,31.5],'贵阳':[106.6,26.6],
-    '昆明':[102.7,25.0],'拉萨':[91.1,29.6],'西安':[108.9,34.3],'兰州':[103.8,36.1],'西宁':[101.8,36.6],
-    '银川':[106.3,38.5],'乌鲁木齐':[87.6,43.8]
-  };
+  var _mapRec = null;
+  /* 原全国地图城市坐标已移除（弹窗改为区域明细列表） */
   function openRegionMap() {
     _mapRec = DETAIL._currentRec;
     if (!_mapRec || !_mapRec.nationalRegions) { UI.toast('暂无全国区域数据', 'err'); return; }
@@ -2937,77 +3115,95 @@ window.DETAIL = (function () {
     var modal = document.createElement('div');
     modal.id = modalId;
     modal.className = 'map-modal';
+    function badge(r) {
+      if (r.status === 'full') return '<span class="rm-badge is-full">已满</span>';
+      if (r.status === 'limited') return '<span class="rm-badge is-limited">仅剩' + (r.count || 1) + '席</span>';
+      return '<span class="rm-badge is-vacant">空缺</span>';
+    }
+    function cityStatus(c) {
+      if (c.status === 'full') return 'is-full';
+      if (c.status === 'limited') return 'is-limited';
+      return 'is-vacant';
+    }
+    function cityLabel(c) {
+      if (c.status === 'full') return '已满';
+      if (c.status === 'limited') return '仅剩' + (c.seats || 1) + '席';
+      return '空缺';
+    }
+    /* 城市明细列表行（关键样式内联，规避样式表缓存错配导致文字不可见） */
+    function cityRows(r) {
+      if (!r.cities || !r.cities.length) {
+        return '<div class="rm-city-empty" style="padding:8px 10px;font-size:10.5px;color:var(--text-3);text-align:center;">暂无城市明细，可直接咨询总部</div>';
+      }
+      return r.cities.map(function (c) {
+        var s = cityStatus(c);
+        var dotC = s === 'is-vacant' ? '#2b6b4f' : (s === 'is-limited' ? '#d48806' : '#c4cad4');
+        var stC = s === 'is-vacant' ? '#0f7b55' : (s === 'is-limited' ? '#c07c10' : 'var(--text-3)');
+        return '<div class="rm-city-row" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--bg-card-2);">' +
+          '<span class="rc-dot ' + s + '" style="width:6px;height:6px;border-radius:50%;flex:none;background:' + dotC + ';"></span>' +
+          '<span class="rc-name" style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--text-1);">' + c.name + '</span>' +
+          '<span class="rc-status ' + s + '" style="flex:none;font-size:11px;font-weight:600;color:' + stC + ';">' + cityLabel(c) + '</span>' +
+          '</div>';
+      }).join('');
+    }
+    /* 搜索关键词：省份名 + 全部城市名 */
+    function provKey(r) {
+      var keys = [r.province].concat((r.cities || []).map(function (c) { return c.name; }));
+      return keys.join(' ');
+    }
     modal.innerHTML = '<div class="mm-panel">' +
-      '<div class="mm-head"><div class="mm-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px;color:var(--primary-dim);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>全国招商区域分布</div>' +
+      '<div class="mm-head"><div class="mm-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px;color:var(--primary-dim);"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>全国招商区域明细</div>' +
       '<button class="mm-close" onclick="DETAIL.closeRegionMap()">×</button></div>' +
       '<div class="mm-stats">' +
       '<div class="ms-item"><div class="ms-num">' + nr.length + '</div><div class="ms-label">覆盖省份</div></div>' +
       '<div class="ms-item"><div class="ms-num green">' + vacant + '</div><div class="ms-label">空缺可加盟</div></div>' +
       '<div class="ms-item"><div class="ms-num orange">' + limited + '</div><div class="ms-label">仅剩席位</div></div>' +
       '</div>' +
-      '<div class="mm-map"><div id="mapChartInner" style="width:100%;height:100%;"></div>' +
-      '<div class="mm-zoom"><button onclick="DETAIL._mapZoom(1.2)">+</button><button onclick="DETAIL._mapZoom(0.8)">−</button></div>' +
-      '<div class="mm-province-info" id="mapProvinceInfo" style="display:none;"><div class="pi-name" id="mpiName"></div><div class="pi-row"><span>招商状态</span><b id="mpiStatus"></b></div><div class="pi-row"><span>可加盟城市</span><b id="mpiCities"></b></div></div>' +
+      '<div class="rm-search">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+      '<input class="rm-search-input" type="text" placeholder="搜索省份 / 城市" autocomplete="off" />' +
+      '<button class="rm-search-clear" type="button">×</button>' +
       '</div>' +
-      '<div class="mm-legend">' +
-      '<div class="lg-item"><div class="lg-dot" style="background:#2b6b4f;"></div>空缺可加盟</div>' +
-      '<div class="lg-item"><div class="lg-dot" style="background:#d48806;"></div>仅剩席位</div>' +
-      '<div class="lg-item"><div class="lg-dot" style="background:#bfbfbf;"></div>已满/未开放</div>' +
-      '</div></div>';
+      '<div class="rm-list" id="rmList">' + nr.map(function (r) {
+        return '<div class="rm-group" data-k="' + provKey(r).replace(/"/g, '&quot;') + '">' +
+          '<div class="rm-group-head">' +
+          '<span class="rm-prov-name">' + r.province + '</span>' +
+          (r.count ? '<span class="rm-count">可开放 ' + r.count + ' 席</span>' : '') +
+          badge(r) + '</div>' +
+          '<div class="rm-group-city">' + cityRows(r) + '</div>' +
+          '</div>';
+      }).join('') +
+      '<div class="rm-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><b>未找到匹配的区域</b><span>换个省份或城市关键词试试</span></div>' +
+      '</div>' +
+      '<div class="rm-foot">区域数据由总部招商中心维护 · 实时更新</div></div>';
     document.body.appendChild(modal);
     requestAnimationFrame(function () { modal.classList.add('open'); });
     modal.addEventListener('click', function (e) { if (e.target === modal) DETAIL.closeRegionMap(); });
-    setTimeout(function () {
-      if (typeof echarts === 'undefined') { document.getElementById('mapChartInner').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-3);font-size:12px;">地图加载中...</div>'; return; }
-      _mapChart = echarts.init(document.getElementById('mapChartInner'));
-      var provNameMap = { '北京':'北京市','天津':'天津市','河北':'河北省','山西':'山西省','内蒙古':'内蒙古自治区','辽宁':'辽宁省','吉林':'吉林省','黑龙江':'黑龙江省','上海':'上海市','江苏':'江苏省','浙江':'浙江省','安徽':'安徽省','福建':'福建省','江西':'江西省','山东':'山东省','河南':'河南省','湖北':'湖北省','湖南':'湖南省','广东':'广东省','广西':'广西壮族自治区','海南':'海南省','重庆':'重庆市','四川':'四川省','贵州':'贵州省','云南':'云南省','西藏':'西藏自治区','陕西':'陕西省','甘肃':'甘肃省','青海':'青海省','宁夏':'宁夏回族自治区','新疆':'新疆维吾尔自治区' };
-      var mapData = nr.map(function (r) {
-        return { name: provNameMap[r.province] || r.province, value: r.status === 'full' ? 0 : (r.status === 'limited' ? 1 : 2), raw: r };
+    /* 搜索：模糊匹配省份/城市，输入即过滤，空结果显示占位 */
+    var input = modal.querySelector('.rm-search-input');
+    var clearBtn = modal.querySelector('.rm-search-clear');
+    var emptyEl = modal.querySelector('.rm-empty');
+    var groupEls = modal.querySelectorAll('.rm-group');
+    function applyFilter() {
+      var q = (input.value || '').trim().toLowerCase();
+      var hit = 0;
+      groupEls.forEach(function (el) {
+        var ok = !q || (el.getAttribute('data-k') || '').toLowerCase().indexOf(q) !== -1;
+        el.style.display = ok ? '' : 'none';
+        if (ok) hit++;
       });
-      var scatterData = [];
-      nr.forEach(function (r) {
-        if (r.cities) r.cities.forEach(function (c) {
-          if (_cityCoords[c.name] && c.status !== 'full') {
-            scatterData.push({ name: c.name, value: _cityCoords[c.name].concat([c.status === 'limited' ? 1 : 2]), status: c.status, seats: c.seats });
-          }
-        });
-      });
-      _mapChart.setOption({
-        backgroundColor: 'transparent',
-        geo: { map: 'china', roam: true, zoom: 1.15, center: [105, 36], label: { show: false }, itemStyle: { areaColor: '#f5f3ef', borderColor: '#e0ddd5', borderWidth: 0.6 }, emphasis: { itemStyle: { areaColor: '#ede8df' }, label: { show: true, color: '#333', fontSize: 10 } } },
-        visualMap: { show: false, min: 0, max: 2, inRange: { color: ['#d9d9d9', '#f0c36d', '#67b08a'] } },
-        series: [
-          { type: 'map', map: 'china', geoIndex: 0, data: mapData },
-          { type: 'scatter', coordinateSystem: 'geo', data: scatterData, symbolSize: function (val) { return val[2] === 1 ? 7 : 5; }, itemStyle: { color: function (p) { return p.data.value[2] === 1 ? '#d48806' : '#2b6b4f'; }, borderColor: '#fff', borderWidth: 1 }, emphasis: { label: { show: true, formatter: '{b}', fontSize: 10, color: '#333' } } }
-        ]
-      });
-      _mapChart.on('click', function (params) {
-        if (params.componentType === 'series' && params.seriesType === 'map' && params.data && params.data.raw) {
-          var r = params.data.raw;
-          var info = document.getElementById('mapProvinceInfo');
-          document.getElementById('mpiName').textContent = r.province;
-          var st = r.status === 'full' ? '已满' : (r.status === 'limited' ? '仅剩' + (r.count || 1) + '席' : '空缺');
-          var stColor = r.status === 'full' ? '#bfbfbf' : (r.status === 'limited' ? '#d48806' : '#2b6b4f');
-          document.getElementById('mpiStatus').textContent = st;
-          document.getElementById('mpiStatus').style.color = stColor;
-          document.getElementById('mpiCities').textContent = (r.cities ? r.cities.length : 0) + '个城市';
-          info.style.display = 'block';
-        }
-      });
-    }, 100);
+      clearBtn.classList.toggle('show', !!q);
+      emptyEl.classList.toggle('show', !!q && hit === 0);
+    }
+    input.addEventListener('input', applyFilter);
+    clearBtn.addEventListener('click', function () { input.value = ''; applyFilter(); input.focus(); });
   }
+
   function closeRegionMap() {
     var modal = document.getElementById('regionMapModal');
     if (modal) { modal.classList.remove('open'); setTimeout(function () { if (modal.parentNode) modal.remove(); }, 300); }
-    if (_mapChart) { _mapChart.dispose(); _mapChart = null; }
   }
-  function _mapZoom(factor) {
-    if (_mapChart) {
-      var opt = _mapChart.getOption();
-      var curZoom = opt.geo[0].zoom || 1;
-      _mapChart.setOption({ geo: { zoom: Math.max(0.8, Math.min(4, curZoom * factor)) } });
-    }
-  }
+  /* _mapZoom 已随地图组件移除 */
   /* ================= 发布信息（publish）：信息工作台发布项的通用详情渲染器 ================= */
   /* 发布者自持信息（isFree 已放行），完整结构化字段 → 关键参数/描述/联系/发布主体/流程/保障 */
   function publishMeta(r) {
@@ -3098,5 +3294,5 @@ window.DETAIL = (function () {
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-favorites') _detailRefresh(); });
   window.addEventListener('engchain:favorite', _detailRefresh);
   window.addEventListener('engchain:store-change', function (e) { if (e && e.detail && e.detail.key === 'engchain-favorites') _detailRefresh(); });
-  return { byType: byType, attach: attach, viewCert: viewCert, viewPdf: viewPdf, downloadPdf: downloadPdf, uploadPdf: uploadPdf, openRegionMap: openRegionMap, closeRegionMap: closeRegionMap, _mapZoom: _mapZoom, _currentRec: null, syncFavBtn: syncFavBtn };
+  return { byType: byType, attach: attach, viewCert: viewCert, viewPdf: viewPdf, downloadPdf: downloadPdf, openRegionMap: openRegionMap, closeRegionMap: closeRegionMap, _currentRec: null, syncFavBtn: syncFavBtn, UnlockStore: UnlockStore }; /* [FIX BM-014/BM-016] 对外暴露 UnlockStore 供跨页/跨脚本访问 */
 })();
