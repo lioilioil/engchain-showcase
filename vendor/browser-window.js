@@ -1868,6 +1868,3 @@ class E extends HTMLElement {
   }
 }
 customElements.get("browser-window") || customElements.define("browser-window", E);
-export {
-  E as BrowserWindow
-};

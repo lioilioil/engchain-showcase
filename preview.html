@@ -14,7 +14,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/iphone-frame.css">
 <link rel="stylesheet" href="css/pura-frame.css">
-<script type="module" src="vendor/browser-window.js"></script>
+<script src="vendor/browser-window.js"></script>
 <style>
   * { box-sizing: border-box; }
   body { background: var(--bg); color: var(--text-1); }
@@ -510,7 +510,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var STATE_KEY = 'engchain-state';
   var THEME_KEY = 'engchain-theme';
 
-  /* ---- 页面分组（共 79 条目 / 71 个去重页面；支持父子二级，父节点可折叠） ---- */
+  /* ---- 页面分组（支持父子二级，父节点可折叠；页数由 countPages() 动态统计） ---- */
   var MODULES = [
     { name:'工作台', pages:[
       ['home.html','App首页'],
@@ -731,7 +731,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   /* ---- 统计目录树页面总数（App / 后台分类） ---- */
-  (function countPages() {
+  function countPages() {
     var appCount = 0, adminCount = 0;
     function countItem(it) {
       if (Array.isArray(it)) {
@@ -744,7 +744,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (it.children) it.children.forEach(countItem);
       }
     }
-    MODULES.forEach(function (m) { m.pages.forEach(countItem); });
+    try { MODULES.forEach(function (m) { if (m.pages) m.pages.forEach(countItem); }); } catch (e) { console.warn('countPages error:', e); }
     var total = appCount + adminCount;
     var elTotal = document.getElementById('nh-total');
     var elApp = document.getElementById('nh-app');
@@ -752,7 +752,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (elTotal) elTotal.textContent = '共 ' + total + ' 页';
     if (elApp) elApp.textContent = 'App ' + appCount;
     if (elAdmin) elAdmin.textContent = '后台 ' + adminCount;
-  })();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', countPages);
+  else countPages();
 
   nav.innerHTML = MODULES.map(function (m) {
     var links = m.pages.map(itemHtml).join('');

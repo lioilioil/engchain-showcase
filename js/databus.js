@@ -17,6 +17,12 @@ window.DataBus = (function () {
   var now = Date.now();
   var DAY = 864e5, YEAR = 365 * DAY;
 
+  /* ---- 内存缓存（v2.0：减少 JSON.parse） ---- */
+  var _dbCache = {};
+  function _cacheGet(key) { return _dbCache.hasOwnProperty(key) ? _dbCache[key] : undefined; }
+  function _cacheSet(key, val) { _dbCache[key] = val; }
+  function _cacheClear(key) { if (key) delete _dbCache[key]; else _dbCache = {}; }
+
   /* ---- 预置 8 类用户画像（v2.0 双线并行身份模型） ----
      identity = { personal: 'none'|'verified'|'professional', enterprise: 'none'|'verified'|'resident', entryTypes: [] }
      auth.qual 已拆分为 auth.personalQual（个人资质）+ auth.enterpriseQual（企业资质），旧 auth.qual 保留兼容
@@ -122,6 +128,7 @@ window.DataBus = (function () {
   }
 
   function loadUsers() {
+    var _c = _cacheGet('users'); if (_c !== undefined) return _c;
     var a = [];
     try {
       if (LS.getItem(USERS_KEY) === null) {
@@ -132,9 +139,9 @@ window.DataBus = (function () {
       a = JSON.parse(LS.getItem(USERS_KEY) || '[]');
     } catch (e) { a = []; }
     migrateSeedIfNeeded();
-    return Array.isArray(a) && a.length ? a : seedUsers();
+    var _r = Array.isArray(a) && a.length ? a : seedUsers(); _cacheSet('users', _r); return _r;
   }
-  function saveUsers(a) { try { LS.setItem(USERS_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveUsers(a) { try { LS.setItem(USERS_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('users', a); return a; }
   function byId(id) {
     var a = loadUsers(), i;
     for (i = 0; i < a.length; i++) if (a[i].id === id) return a[i];
@@ -143,7 +150,7 @@ window.DataBus = (function () {
 
   /* ---- 登录历史 ---- */
   function history() { var h = []; try { h = JSON.parse(LS.getItem(HIST_KEY) || '[]'); } catch (e) {} return Array.isArray(h) ? h : []; }
-  function saveHistory(h) { try { LS.setItem(HIST_KEY, JSON.stringify(h)); } catch (e) {} return h; }
+  function saveHistory(h) { try { LS.setItem(HIST_KEY, JSON.stringify(h)); } catch (e) {} _cacheSet('history', h); return h; }
 
   /* ---- 当前登录用户：engchain-state.account 匹配用户表；显式登出 → 游客；无匹配回退默认 u1 ---- */
   function current() {
@@ -747,7 +754,7 @@ window.DataBus = (function () {
     audit(u.banned ? '封禁账号' : '解除封禁', '用户管理', u.name, u.banned ? '已封禁 · 资金冻结' : '已解锁 · 资金解冻');
     return u;
   }
-  function loadEntryFees() { var a = []; try { a = JSON.parse(LS.getItem(ENTRYFEE_KEY) || '[]'); } catch (e) {} return Array.isArray(a) ? a : []; }
+  function loadEntryFees() { var c = _cacheGet('entryFees'); if (c !== undefined) return c; var a = []; try { a = JSON.parse(LS.getItem(ENTRYFEE_KEY) || '[]'); } catch (e) {} var r = Array.isArray(a) ? a : []; _cacheSet('entryFees', r); return r; }
 
 
   function stats() {
@@ -940,14 +947,15 @@ window.DataBus = (function () {
     ];
   }
   function loadOrders() {
+    var _c = _cacheGet('orders'); if (_c !== undefined) return _c;
     var a = [];
     try {
       if (LS.getItem(ORDERS_KEY) === null) { a = seedOrders(); saveOrders(a); return a; }
       a = JSON.parse(LS.getItem(ORDERS_KEY) || '[]');
     } catch (e) { a = []; }
-    return Array.isArray(a) && a.length ? a : seedOrders();
+    var _r = Array.isArray(a) && a.length ? a : seedOrders(); _cacheSet('orders', _r); return _r;
   }
-  function saveOrders(a) { try { LS.setItem(ORDERS_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveOrders(a) { try { LS.setItem(ORDERS_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('orders', a); return a; }
   function orderCalc(amount) {
     /* 规则同源：调用 stores.js 暴露的 commissionRate（同 data.js 阶梯 + 破冰期首档） */
     var r = { rate: 0.08, fee: 0 };
@@ -1011,6 +1019,7 @@ window.DataBus = (function () {
     ];
   }
   function loadMessages() {
+    var _c = _cacheGet('messages'); if (_c !== undefined) return _c;
     var a = [];
     try {
       if (LS.getItem(MSG_KEY) === null) { a = seedMessages(); saveMessages(a); }
@@ -1023,7 +1032,7 @@ window.DataBus = (function () {
     }
     return a;
   }
-  function saveMessages(a) { try { LS.setItem(MSG_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveMessages(a) { try { LS.setItem(MSG_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('messages', a); return a; }
   function publishMessage(m) {
     var a = loadMessages();
     a.unshift({ id: 'MSG' + String(Date.now()).slice(-5), type: m.type || '公告', title: m.title || '', body: m.body || '', target: m.target || '全部用户', ts: new Date().toISOString().slice(0, 10), admin: true });
@@ -1050,8 +1059,9 @@ window.DataBus = (function () {
       { id: 'WD20260902018', uid: 'u6', userName: '刘洋', amount: 600, method: 'bank', bank: '工商银行 · 尾号 8899', status: 'rejected', appliedAt: now - 3 * 864e5, note: '到账信息不完整' }
     ];
   }
-  function saveWithdrawals(a) { try { LS.setItem(WDL_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveWithdrawals(a) { try { LS.setItem(WDL_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('withdrawals', a); return a; }
   function loadWithdrawals() {
+    var _c = _cacheGet('withdrawals'); if (_c !== undefined) return _c;
     var a = [];
     try { a = JSON.parse(LS.getItem(WDL_KEY) || '[]'); } catch (e) {}
     if (!Array.isArray(a) || !a.length) {
@@ -1363,8 +1373,9 @@ window.DataBus = (function () {
       { id: 'QUA003', uid: 'u8', company: '四川××建设工程（集团）有限公司', license: '91510100MA6×××66K', quals: ['建筑业企业资质 · 市政公用工程施工总承包壹级'], geo: 95, source: 'AI 评估引擎 · 企业资质核验报告', status: 'verified', ts: t(15) }
     ];
   }
-  function saveQualifications(a) { try { LS.setItem(QUAL_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveQualifications(a) { try { LS.setItem(QUAL_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('qualifications', a); return a; }
   function loadQualifications() {
+    var _c = _cacheGet('qualifications'); if (_c !== undefined) return _c;
     var a = [];
     try { a = JSON.parse(LS.getItem(QUAL_KEY) || '[]'); } catch (e) {}
     if (!Array.isArray(a) || !a.length) { a = seedQualifications(); saveQualifications(a); }
@@ -1425,8 +1436,9 @@ window.DataBus = (function () {
       { id: 'T6', uid: 'u7', name: '赵磊', company: '××机械租赁有限公司', level: 2, active: true, joinedAt: t(8), orders: 1, credit: 1800, note: '' }
     ];
   }
-  function saveDistTeam(a) { try { LS.setItem(DIST_TEAM_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveDistTeam(a) { try { LS.setItem(DIST_TEAM_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('distTeam', a); return a; }
   function loadDistTeam() {
+    var _c = _cacheGet('distTeam'); if (_c !== undefined) return _c;
     var a = [];
     try { a = JSON.parse(LS.getItem(DIST_TEAM_KEY) || '[]'); } catch (e) {}
     if (!Array.isArray(a) || !a.length) { a = seedDistTeam(); saveDistTeam(a); }
@@ -1444,12 +1456,13 @@ window.DataBus = (function () {
       { id: 'DF005', tier: 't2', source: 'order', member: '张敏', uid: 'u4', amount: 2200, fee: 66, rate: 0.03, status: 'pending', ts: t(11, '09:15'), note: '二级分销 | 订单返佣' }
     ];
   }
-  function saveDistFlows(a) { try { LS.setItem(DIST_FLOW_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function saveDistFlows(a) { try { LS.setItem(DIST_FLOW_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('distFlows', a); return a; }
   function loadDistFlows() {
+    var _c = _cacheGet('distFlows'); if (_c !== undefined) return _c;
     var a = [];
     try { a = JSON.parse(LS.getItem(DIST_FLOW_KEY) || '[]'); } catch (e) {}
     if (!Array.isArray(a) || !a.length) { a = seedDistFlows(); saveDistFlows(a); }
-    return a;
+    _cacheSet('messages', a); _cacheSet('withdrawals', a); _cacheSet('qualifications', a); _cacheSet('distTeam', a); _cacheSet('distFlows', a); return a;
   }
   /* 分销统计：团队规模 / 有效伙伴 / 一级·二级返佣合计 */
   function distStat() {
@@ -1564,6 +1577,8 @@ window.DataBus = (function () {
     loadMonitorFeed: loadMonitorFeed, monitorStat: monitorStat,
     PUNISH_STEPS: PUNISH_STEPS,
     /* v3.1：简历投递门控 */
-    canDeliverResume: canDeliverResume
+    canDeliverResume: canDeliverResume,
+    /* v2.0：内存缓存管理 */
+    invalidateCache: function (key) { _cacheClear(key); }
   };
 })();

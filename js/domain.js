@@ -527,7 +527,36 @@
     for (var i = 1; i < tiers.length; i++) if (Math.abs(tiers[i] - target) < Math.abs(best - target)) best = tiers[i];
     return best;
   }
-  function medRead() { var s = parse(MED_KEY, null); if (!s) { s = { list: [], migrated: false }; save(MED_KEY, s); } return s; }
+  /* [SEED] 中介托管订单演示数据 */
+  function seedMediationOrders() {
+    var now = Date.now();
+    var day = 86400000;
+    function mk(id, buyerId, sellerId, svcName, title, amount, state, daysAgo, category) {
+      var ms = buildMilestones(amount);
+      if (state === 'serving') { ms[0].status = 'done'; ms[0].confirmedAt = now - daysAgo * day + day; if (ms[1]) ms[1].status = 'doing'; }
+      if (state === 'await_confirm') { ms.forEach(function(m){ m.status = 'done'; m.confirmedAt = now - daysAgo * day + 2*day; }); }
+      if (state === 'settled') { ms.forEach(function(m){ m.status = 'done'; m.confirmedAt = now - daysAgo * day + 3*day; }); }
+      return {
+        id: id, buyerId: buyerId, sellerId: sellerId, svcId: '', svcName: svcName,
+        category: category || '中介服务', title: title, amount: r2(amount), fee: r2(amount * 0.08), settle: r2(amount * 0.92),
+        state: state, payMethod: 'balance', milestones: ms,
+        refund: null, dispute: null, review: null, timeline: [],
+        version: 1, ruleSnapshot: null, createdAt: now - daysAgo * day, updatedAt: now - daysAgo * day + day
+      };
+    }
+    return [
+      mk('MED2026091001', 'u1', 'u2', '建筑资质代办 · 三级总包', '建筑工程施工总承包三级资质代办服务', 38000, 'serving', 2, '资质代办'),
+      mk('MED2026090802', 'u1', 'u3', '安全生产许可证新办', '安全生产许可证新办全程代办', 12000, 'escrowed', 4, '安许代办'),
+      mk('MED2026090503', 'u2', 'u1', '工商注册加急 · 建筑公司', '建筑工程有限公司注册加急办理', 3500, 'settled', 7, '工商注册'),
+      mk('MED2026090104', 'u1', 'u4', '财税代理记账 · 年度', '建筑企业年度财税代理记账服务', 6000, 'await_confirm', 11, '财税服务'),
+      mk('MED2026082805', 'u3', 'u2', '资质升级咨询 · 二级升一级', '市政公用工程施工总承包二级升一级咨询服务', 88000, 'serving', 15, '资质升级'),
+      mk('MED2026082006', 'u1', 'u5', '人才猎头 · 一级建造师', '一级建造师（建筑工程）人才猎聘服务', 15000, 'settled', 23, '人才服务'),
+      mk('MED2026081507', 'u2', 'u3', '法律咨询 · 合同审查', '建筑工程合同审查与法律咨询服务', 5000, 'refunded', 28, '法律咨询'),
+      mk('MED2026081008', 'u4', 'u1', 'ISO体系认证 · 三体系', 'ISO9001/ISO14001/ISO45001三体系认证代办', 22000, 'settled', 33, '认证服务')
+    ];
+  }
+
+  function medRead() { var s = parse(MED_KEY, null); var SEED_VER = 2; if (!s || s.seedVer !== SEED_VER || !s.list || !s.list.length) { s = { list: seedMediationOrders(), migrated: true, seedVer: SEED_VER }; save(MED_KEY, s); } return s; }
   function buildMilestones(amount) {
     var cm = RULE('commission', {});
     var ms = cm.milestone || { enable: true, minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], labels: ['合同签订', '服务进度50%', '验收', '质保期满'], autoConfirmDays: 14 };

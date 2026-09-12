@@ -439,4 +439,15 @@
   } else {
     autoInjectFlags();
   }
+
+  /* 页面可见性变化时暂停/恢复轮播（减少后台CPU消耗） */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      carousel.stopAuto();
+    } else {
+      if (carousel.el && carousel.el.style.display !== 'none' && carousel.cards && carousel.cards.length) {
+        carousel.startAuto();
+      }
+    }
+  });
 })();

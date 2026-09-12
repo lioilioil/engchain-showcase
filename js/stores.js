@@ -13,23 +13,46 @@
 
   function jsonSafe(v) { try { return JSON.parse(v); } catch (e) { return null; } }
 
-  /* 通用 Store 工厂 */
+  /* 所有 Store 实例注册表（用于批量失效缓存） */
+  var _allStores = [];
+
+  /* 通用 Store 工厂（v2.0：添加内存缓存，减少 JSON.parse） */
   function makeStore(KEY, def, evtName) {
-    function load() { return Object.assign({}, def, jsonSafe(LS.getItem(KEY)) || {}); }
+    var _cached = false;
+    var _cacheVal = null;
+    var _savePending = false;
+
+    function load() {
+      if (_cached) return Object.assign({}, _cacheVal);
+      var val = Object.assign({}, def, jsonSafe(LS.getItem(KEY)) || {});
+      _cacheVal = val;
+      _cached = true;
+      return Object.assign({}, val);
+    }
     function save(s) {
+      _cacheVal = s;
+      _cached = true;
       try { LS.setItem(KEY, JSON.stringify(s)); } catch (e) {}
       window.dispatchEvent(new CustomEvent(evtName, { detail: s }));
       return s;
     }
-    return {
+    var store = {
       KEY: KEY,
       read: load,
       get: load,
       write: save,
       set: function (part) { return save(Object.assign(load(), part)); },
-      reset: function () { try { LS.removeItem(KEY); } catch (e) {} return save(def); }
+      reset: function () { _cached = false; _cacheVal = null; try { LS.removeItem(KEY); } catch (e) {} return save(def); },
+      invalidateCache: function () { _cached = false; _cacheVal = null; }
     };
+    _allStores.push(store);
+    return store;
   }
+
+  /* 批量失效所有 Store 的内存缓存（跨页面同步时调用） */
+  window.invalidateAllStoreCaches = function () {
+    _allStores.forEach(function (s) { s.invalidateCache(); });
+  };
 
   /* ---- 认证记录（R1，v3.0 五身份叠加） ----
      personalQual = 个人建筑类专业资质（建造师等）；enterpriseQual = 企业资质（建筑业企业资质等）
@@ -148,8 +171,12 @@
   };
   /* [FEAT 9.2-2] 惰性过期清理：扫描 logs 中 expireAt<=now 的入账流水，批量扣减 balance 并写 credits_expired 汇总流水。
      内部直接读写 LS（_rawLoad/write），避免 read() 递归调用。 */
+  var _creditExpireLastRun = 0;
   CreditStore.expireDue = function () {
     var now = Date.now();
+    /* 节流：每60秒最多执行一次，避免每次 read() 都扫描 logs */
+    if (now - _creditExpireLastRun < 60000) return 0;
+    _creditExpireLastRun = now;
     var s = this._rawLoad();
     var expiredTotal = 0;
     (s.logs || []).forEach(function (rec) {
