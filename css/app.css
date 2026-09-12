@@ -1,4 +1,4 @@
-﻿/* ============================================================================
+/* ============================================================================
    工程链 ENGCHAIN — 全局设计系统 (app.css)
    视觉权威：V3.3 设计系统  (Editorial × Industrial | 明色默认 + 暗色主题)
    参考：design-system-demo-fixed.html  ·  5 套高保真原型屏
@@ -256,6 +256,8 @@ img { max-width: 100%; display: block; }
   flex-direction: column;
   overflow: hidden;
   box-shadow: var(--shadow-xl);
+  /* 阔屏视口等比缩放（Pura X View 侧边栏场景，由全局 viewport-fit 逻辑写入 --fit-scale） */
+  transform: scale(var(--fit-scale, 1));
   /* 页面过渡：淡出/淡入动画 */
   transition: opacity .3s cubic-bezier(.4,0,.2,1), transform .3s cubic-bezier(.4,0,.2,1);
   will-change: opacity, transform;
@@ -263,10 +265,10 @@ img { max-width: 100%; display: block; }
 @media (max-height: 900px) { .phone { height: 100dvh; } }
 
 /* ===== 页面过渡动画（Tab 切换淡出/淡入）===== */
-/* 跳转前：当前页面淡出 + 轻微缩小 */
+/* 跳转前：当前页面淡出 + 轻微缩小（在适配缩放基础上叠加） */
 body.page-leaving .phone {
   opacity: 0;
-  transform: scale(0.985);
+  transform: scale(calc(var(--fit-scale, 1) * 0.985));
   pointer-events: none;
 }
 /* 跳转后新页面初始：隐藏（仅内部跳转时生效） */
@@ -278,8 +280,8 @@ body.page-ready .phone {
   animation: page-fade-in .38s cubic-bezier(.22,1,.36,1) forwards;
 }
 @keyframes page-fade-in {
-  from { opacity: 0; transform: scale(0.985); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(calc(var(--fit-scale, 1) * 0.985)); }
+  to { opacity: 1; transform: scale(var(--fit-scale, 1)); }
 }
 /* 顶部加载进度条（跳转时显示） */
 .page-progress {
@@ -309,9 +311,14 @@ body.page-ready .phone {
 /* reduced motion 适配 */
 @media (prefers-reduced-motion: reduce) {
   .phone { transition: none; }
-  body.page-leaving .phone, body.page-loading .phone { opacity: 1; transform: none; }
+  body.page-leaving .phone, body.page-loading .phone { opacity: 1; transform: scale(var(--fit-scale, 1)); }
   body.page-ready .phone { animation: none; }
   .page-progress.active { animation: none; display: none; }
+  /* [E3 FIX] 入场动画兜底：.anim-in 在 reduced-motion 下直接显示 */
+  .anim-in, .anim-in.d1, .anim-in.d2, .anim-in.d3, .anim-in.d4, .anim-in.d5 {
+    animation: none !important; opacity: 1 !important; transform: none !important;
+  }
+  .skeleton { animation: none; }
 }
 
 /* 桌面衬底 */
@@ -898,7 +905,7 @@ body.page-ready .phone {
 .job-card .jc-meta { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); margin: 8px 0 10px; }
 .job-card .jc-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); }
 .job-card .jc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.job-card .jc-tag { font-family: var(--font-display); font-size: 10px; font-weight: 500; letter-spacing: .04em; padding: 4px 9px; border-radius: var(--r-xs); background: var(--bg-card-2); color: var(--text-2); }
+.job-card .jc-tag { display: inline-flex; align-items: center; line-height: 1; font-family: var(--font-display); font-size: 10px; font-weight: 500; letter-spacing: .04em; padding: 4px 9px; border-radius: var(--r-xs); background: var(--bg-card-2); color: var(--text-2); }
 .job-card .jc-tag.ok { background: rgba(43, 107, 79, .10); color: var(--success); }
 .job-card .jc-tag.hot { background: var(--primary-soft); color: var(--primary-dim); }
 .job-card .jc-company { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); }
@@ -1679,7 +1686,7 @@ body.page-ready .phone {
 .cert-tag{padding:4px 9px;border-radius:6px;
   background:linear-gradient(135deg,rgba(201,169,97,0.18),rgba(201,169,97,0.06));
   border:0.5px solid rgba(255,232,176,0.34);color:var(--accent-light);font-size:10px;font-weight:500;letter-spacing:0.02em;
-  display:flex;align-items:center;gap:3px;}
+  display:flex;align-items:center;gap:3px;line-height:1;}
 .cert-tag svg{width:9px;height:9px;color:rgba(255,232,176,0.8);stroke-width:2;}
 .cert-tag.review{background:transparent;border:none;color:rgba(255,232,176,0.55);padding:3px 4px;font-size:9px;}
 .cert-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;
@@ -1891,6 +1898,9 @@ body.page-ready .phone {
 .dab-cta:active { transform: scale(0.98); background: var(--accent-pressed); box-shadow: 0 0 20px rgba(201,169,97,0.30), 0 2px 8px rgba(201,169,97,0.20); }
 .dab-cta .price { font-family: var(--font-num); font-size: 16px; font-weight: 500; font-feature-settings: "tnum" 1; }
 .dab-cta svg { width: 15px; height: 15px; stroke-width: 2; }
+/* [FIX BM-043] 解锁成功后 CTA 按钮由橙变绿（成功色），文字保持白色 */
+.dab-cta.is-unlocked { background: var(--success); box-shadow: 0 0 32px rgba(43,107,79,0.42), 0 4px 14px rgba(43,107,79,0.30), 0 1px 0 rgba(255,255,255,0.18) inset; }
+.dab-cta.is-unlocked:active { background: #1f5a41; box-shadow: 0 0 20px rgba(43,107,79,0.30), 0 2px 8px rgba(43,107,79,0.20); }
 
 /* ══════════ 付费墙 P0 · 就近打码组件 ══════════
    付费字段在其所在信息卡内就地打码（不再集中到底部锁定区），由 .phone.is-unlocked 统一驱动全页去码。
@@ -2823,6 +2833,58 @@ body[data-tab="me"] .profile-header { padding-top: 10px; }
   font-family: var(--font-num);
 }
 .fd-inner-right { flex: none; display: flex; align-items: center; }
+.fd-acts {
+  display: flex; align-items: center; gap: 6px;
+}
+.fd-ibtn {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--bg-card-2);
+  color: var(--text-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .15s;
+}
+.fd-ibtn svg { width: 14px; height: 14px; }
+.fd-ibtn.accent { background: var(--primary-soft); border-color: var(--accent-line); color: var(--primary-dim); }
+.fd-ibtn:active { transform: scale(.92); }
+.fd-ok {
+  font-size: 10px; font-weight: 700;
+  color: var(--success);
+  background: var(--success-soft, rgba(39,174,96,.12));
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+/* ===== 通用竖向步骤时间线 v2（浅金编号 · 统一节奏） ===== */
+.st-timeline { display: flex; flex-direction: column; }
+.st-step { display: flex; gap: 10px; align-items: stretch; }
+.st-rail { display: flex; flex-direction: column; align-items: center; flex: none; width: 22px; }
+.st-num { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dim); border: 1px solid rgba(201, 169, 97, .32); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-family: var(--font-num); flex: none; box-sizing: border-box; }
+.st-line { width: 1.5px; flex: 1; background: rgba(201, 169, 97, .26); margin: 5px 0; min-height: 12px; border-radius: 1px; }
+.st-body { flex: 1; min-width: 0; padding-bottom: 16px; }
+.st-step:last-child .st-body { padding-bottom: 0; }
+.st-title { font-size: 12.5px; font-weight: 600; color: var(--text-1); line-height: 1.3; padding-top: 4px; }
+.st-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; margin-top: 3px; min-height: 33px; }
+.st-step:last-child .st-desc { min-height: 0; }
+
+
+
+
+/* ===== Zigzag之字形时间线（中间竖线+左右交替，经典流畅蛇形布局） ===== */
+.zz-flow { position: relative; padding: 8px 0 4px; }
+/* 中间竖线 */
+.zz-flow::before { content: ''; position: absolute; left: 50%; top: 12px; bottom: 12px; width: 2px; background: linear-gradient(180deg, rgba(201,169,97,.42), rgba(201,169,97,.14)); transform: translateX(-50%); border-radius: 1px; }
+.zz-step { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; position: relative; width: 50%; box-sizing: border-box; }
+.zz-left { left: 0; flex-direction: row-reverse; text-align: right; padding-right: 20px; }
+.zz-right { left: 50%; flex-direction: row; text-align: left; padding-left: 20px; }
+.zz-dot { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, var(--primary, #1f4e99), var(--primary-dim, #163a73)); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-family: var(--font-num); flex: none; position: absolute; top: 4px; z-index: 2; box-shadow: 0 2px 6px rgba(31,78,153,.28); }
+.zz-left .zz-dot { right: -11px; }
+.zz-right .zz-dot { left: -11px; }
+.zz-step:last-child .zz-dot { background: linear-gradient(135deg, #c9a961, #a88a45); box-shadow: 0 2px 8px rgba(201,169,97,.38); }
+.zz-content { flex: 1; min-width: 0; padding-top: 1px; }
+.zz-title { font-size: 12.5px; font-weight: 600; color: var(--text-1); line-height: 1.35; }
+.zz-desc { font-size: 10.5px; color: var(--text-3); line-height: 1.45; margin-top: 2px; }
 .fd-ring-wrap {
   position: relative;
   width: 44px; height: 44px;
@@ -2883,8 +2945,8 @@ body[data-tab="me"] .profile-header { padding-top: 10px; }
 /* ---- 触控目标：可点击元素热区 ≥44×44 / chips ≥36（扩展热区，不放大视觉图标）---- */
 /* 顶栏返回 / 右上图标按钮 32~34px → 44px（UX-131） */
 .nav-back, .icon-btn { width: 44px; height: 44px; }
-/* 次级分类 chip / 标签 / 城市格：上下 padding 撑开命中区（UX-008/UX-049） */
-.tag, .jc-tag, .chip, .sub-chip, .cs-cell, .cs-prov, .cert-tag { min-height: 36px; padding-top: 8px; padding-bottom: 8px; }
+/* 可点击 chip / 次级分类 / 城市格：上下 padding 撑开命中区（UX-008/UX-049）；纯展示标签 .tag/.jc-tag/.cert-tag 不适用 */
+.chip, .sub-chip, .cs-cell, .cs-prov { min-height: 36px; padding-top: 8px; padding-bottom: 8px; }
 /* 主按钮触控高度（不改变视觉内边距节奏，仅保证命中） */
 .btn { min-height: 44px; }
 /* 底部 tab 与行内小链接/按钮命中区（UX-134/UX-140/UX-153/UX-154/UX-170） */
@@ -2929,13 +2991,11 @@ input[type="checkbox"] { accent-color: var(--primary); }
   .hero-card .h-price { font-size: 21px; }
   .hero-card .h-cta { padding: 6px 13px; font-size: 11px; }
 
-  /* 5. 金刚区：folder 60×102 → 54×90 */
-  .home-folders { margin-bottom: 14px; }
-  .hf-folder { width: 54px; height: 90px; }
-  .hf-papers { width: 48px; height: 68px; }
-  .hf-paper { width: 48px; height: 68px; }
-  .hf-label { font-size: 10px; }
-  .hf-label span { font-size: 10px; }
+  /* 5. 金刚区：图标 46 → 42 */
+  .home-kk { margin-bottom: 14px; }
+  .kk-ic { width: 42px; height: 42px; }
+  .kk-ic .ic { width: 21px; height: 21px; }
+  .kk-label { font-size: 11px; }
 
   /* 6. 滚动内容区底部预留 */
   .scroll { padding-bottom: calc(var(--sp-5) + 16px); }
@@ -2976,9 +3036,13 @@ input[type="checkbox"] { accent-color: var(--primary); }
 
 /* ============================================================================
    Pura X View 侧边栏布局范式（16:9.5 宽短屏专属）
-   原则：不缩放、不拉伸，内容区固定 334px 居右，左侧 56px 侧边栏
+   原则：不缩放、不拉伸，内容区固定 390px 居右，左侧 56px 侧边栏
    仅短屏触发，iPhone 844px 不受影响
    ============================================================================ */
+/* 防御性兜底：高视口下即使 JS 渲染了 .pura-sidebar 元素也隐藏，避免无样式 nav(block) 显示 */
+.pura-sidebar { display: none; }
+/* Pura 侧边栏模式：隐藏底部 tabbar（导航功能由侧边栏承担，避免重复） */
+.phone.has-pura-sidebar .app-nav-shell { display: none; }
 @media (max-height: 720px) {
   /* ---- 侧边栏（默认隐藏，JS 注入后显示） ---- */
   .pura-sidebar {
@@ -3040,11 +3104,13 @@ input[type="checkbox"] { accent-color: var(--primary); }
     background: var(--primary);
   }
   .pura-sidebar .ps-tab .ps-badge {
-    position: absolute; top: 6px; right: 6px;
-    min-width: 16px; height: 16px; padding: 0 4px;
-    background: var(--error); color: #fff;
-    font-size: 9px; font-weight: 700;
+    position: absolute; top: 4px; right: 4px;
+    min-width: 15px; height: 15px; padding: 0 4px;
+    background: var(--primary); color: #fff;
+    font-size: 9.5px; font-weight: 700; font-family: var(--font-num);
     border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(201,169,97,.3);
+    z-index: 6;
   }
 
   /* 发布 FAB */
@@ -3081,6 +3147,16 @@ input[type="checkbox"] { accent-color: var(--primary); }
   .pura-sidebar .ps-collapse:hover { color: var(--text-2); background: var(--bg-card-2); }
   .pura-sidebar .ps-collapse svg { width: 16px; height: 16px; }
 
+  /* 左右切换按钮 */
+  .pura-sidebar .ps-switch {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--text-3); display: flex; align-items: center; justify-content: center;
+    transition: all .15s ease; margin-top: 4px;
+  }
+  .pura-sidebar .ps-switch:hover { color: var(--primary-dim); background: var(--primary-soft); }
+  .pura-sidebar .ps-switch svg { width: 16px; height: 16px; }
+
   /* 展开把手（收起态显示在屏幕左侧边缘） */
   .ps-expand-handle {
     position: absolute;
@@ -3106,7 +3182,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
   /* ---- 内容区包裹层 ---- */
   .pura-content {
     position: relative;
-    width: 334px;
+    width: 390px;
     flex: none;
     display: flex;
     flex-direction: column;
@@ -3139,7 +3215,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
     top: 40px;
   }
 
-  /* ---- 底部 Tab Bar 居右 ---- */
+  /* ---- 底部 Tab Bar 居右（tabbar 不被 scale，宽度基于内容区视觉宽 334px） ---- */
   .phone.has-pura-sidebar .app-nav-shell {
     position: absolute;
     bottom: 10px;
@@ -3160,35 +3236,27 @@ input[type="checkbox"] { accent-color: var(--primary); }
   .phone.has-pura-sidebar .fixed-cta {
     left: auto;
     right: 12px;
-    width: calc(334px - 32px);
+    width: calc(390px - 32px);
   }
 
   /* ---- 详情操作栏居右 ---- */
   .phone.has-pura-sidebar .detail-actionbar {
     left: auto;
     right: 12px;
-    width: calc(334px - 24px);
+    width: calc(390px - 24px);
   }
 
   /* ---- 底部 Sheet 居右 ---- */
   .phone.has-pura-sidebar .sheet {
     left: auto;
     right: 0;
-    width: 334px;
+    width: 390px;
     transform: translateX(0) translateY(100%);
   }
   .phone.has-pura-sidebar .sheet.open {
     transform: translateX(0) translateY(0);
   }
 
-  /* ---- 首页金刚区 5→4 列 ---- */
-  .phone.has-pura-sidebar .home-folders {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px 6px;
-  }
-  .phone.has-pura-sidebar .hf-folder { width: 52px; height: 86px; }
-  .phone.has-pura-sidebar .hf-papers { width: 46px; height: 64px; }
-  .phone.has-pura-sidebar .hf-paper { width: 46px; height: 64px; }
 
   /* ---- 个人中心头像区左右布局 ---- */
   .phone.has-pura-sidebar .profile-header {
@@ -3239,33 +3307,19 @@ input[type="checkbox"] { accent-color: var(--primary); }
     right: 12px;
     left: auto;
     transform: none;
-    width: calc(334px - 24px);
+    width: calc(390px - 24px);
     z-index: 30;
-  }
-  .phone.has-pura-sidebar.sidebar-collapsed .app-tabbar {
-    height: 32px;
-    margin: 0;
-    border-radius: 12px;
-  }
-  .phone.has-pura-sidebar.sidebar-collapsed .app-tab .tab-label {
-    display: none;  /* 迷你态仅图标 */
-  }
-  .phone.has-pura-sidebar.sidebar-collapsed .app-tab svg {
-    width: 18px; height: 18px;
   }
   .phone.has-pura-sidebar.sidebar-collapsed .ai-orb-entry {
     display: none;  /* 收起态隐藏发布 orb，用侧边栏 FAB 替代（但侧边栏已收起，发布入口暂隐藏） */
   }
-  .phone.has-pura-sidebar.sidebar-collapsed .tab-glass {
-    display: none;  /* 迷你态隐藏玻璃滑块 */
-  }
 
-  /* 收起态：内容区底部预留迷你 Tab Bar 空间 */
+  /* 收起态：内容区底部预留 Tab Bar 空间（与展开态一致） */
   .phone.has-pura-sidebar.sidebar-collapsed .scroll {
-    padding-bottom: calc(var(--sp-6) + 10px);
+    padding-bottom: calc(var(--sp-6) + 20px);
   }
   .phone.has-pura-sidebar.sidebar-collapsed .scroll.no-pad {
-    padding-bottom: 52px;
+    padding-bottom: 70px;
   }
 
   /* 收起态：固定 CTA 和操作栏全宽居中 */
@@ -3280,14 +3334,6 @@ input[type="checkbox"] { accent-color: var(--primary); }
     width: auto;
   }
 
-  /* 收起态：首页金刚区恢复 5 列（全宽） */
-  .phone.has-pura-sidebar.sidebar-collapsed .home-folders {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px 4px;
-  }
-  .phone.has-pura-sidebar.sidebar-collapsed .hf-folder { width: 60px; height: 102px; }
-  .phone.has-pura-sidebar.sidebar-collapsed .hf-papers { width: 53px; height: 77px; }
-  .phone.has-pura-sidebar.sidebar-collapsed .hf-paper { width: 53px; height: 77px; }
 
   /* 收起态：个人中心头像区恢复上下布局 */
   .phone.has-pura-sidebar.sidebar-collapsed .profile-header {
@@ -3295,11 +3341,190 @@ input[type="checkbox"] { accent-color: var(--primary); }
     text-align: center;
   }
 
-  /* 展开/收起过渡动画 */
+  /* 展开/收起/左右切换过渡动画 */
   .pura-sidebar {
-    transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .2s ease;
+    transition: transform .28s cubic-bezier(.4,0,.2,1), opacity .2s ease, left .28s cubic-bezier(.4,0,.2,1), right .28s cubic-bezier(.4,0,.2,1);
   }
   .pura-content {
-    transition: margin-left .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1);
+    transition: margin-left .28s cubic-bezier(.4,0,.2,1), margin-right .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ========================================================================
+     右侧态：侧边栏在窗口右侧，内容区居左
+     ======================================================================== */
+  .phone.has-pura-sidebar.sidebar-right .pura-sidebar {
+    left: auto;
+    right: 0;
+  }
+  /* 右侧态：渐变边框线改到左侧 */
+  .phone.has-pura-sidebar.sidebar-right .pura-sidebar::after {
+    right: auto;
+    left: 0;
+  }
+  /* 右侧态：内容区居左 */
+  .phone.has-pura-sidebar.sidebar-right .pura-content {
+    margin-left: 0;
+    margin-right: 56px;
+  }
+  /* 右侧态：底部 Tab Bar 居左 */
+  .phone.has-pura-sidebar.sidebar-right .app-nav-shell {
+    right: auto;
+    left: 12px;
+  }
+  /* 右侧态：固定 CTA 和操作栏居左 */
+  .phone.has-pura-sidebar.sidebar-right .fixed-cta {
+    left: 16px;
+    right: auto;
+    width: calc(390px - 32px);
+  }
+  .phone.has-pura-sidebar.sidebar-right .detail-actionbar {
+    left: 14px;
+    right: auto;
+    width: calc(390px - 28px);
+  }
+  /* 右侧态：展开把手显示在屏幕右侧边缘 */
+  .phone.has-pura-sidebar.sidebar-right .ps-expand-handle {
+    left: auto;
+    right: 0;
+    border-radius: 8px 0 0 8px;
+    border-right: none;
+    border-left: 1px solid var(--line);
+    box-shadow: -2px 0 8px rgba(0,0,0,.1);
+  }
+  /* 右侧态：收缩按钮和展开把手图标水平翻转（左侧< → 右侧>） */
+  .phone.has-pura-sidebar.sidebar-right .ps-collapse svg,
+  .phone.has-pura-sidebar.sidebar-right .ps-expand-handle svg {
+    transform: scaleX(-1);
   }
 }
+
+/* ============================================================================
+   身份视觉徽章系统 (Identity Badge System)
+   蓝V(建筑企业) / 金V(中介服务) / 专属(合伙人) / 个人合伙人
+   ============================================================================ */
+.id-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  height:20px;padding:0 8px 0 6px;border-radius:999px;
+  font-size:11px;font-weight:700;letter-spacing:.3px;line-height:1;
+  white-space:nowrap;vertical-align:middle;
+  transition:transform .15s ease,box-shadow .15s ease;
+}
+.id-badge:active{transform:scale(.95);}
+.id-badge-icon{width:12px;height:12px;flex:none;display:inline-flex;align-items:center;justify-content:center;}
+.id-badge-icon svg{width:100%;height:100%;display:block;}
+.id-badge-text{line-height:1;}
+
+/* ---- 尺寸变体 ---- */
+.id-badge-lg{height:24px;padding:0 10px 0 7px;font-size:12px;gap:5px;}
+.id-badge-lg .id-badge-icon{width:14px;height:14px;}
+.id-badge-sm{height:16px;padding:0 6px 0 5px;font-size:10px;gap:3px;}
+.id-badge-sm .id-badge-icon{width:10px;height:10px;}
+
+/* ---- 蓝V：建筑企业 ---- */
+.id-badge-bluev{
+  background:linear-gradient(135deg,#4A90D9 0%,#2563EB 50%,#1D4ED8 100%);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(37,99,235,.35),inset 0 1px 0 rgba(255,255,255,.25);
+  border:1px solid rgba(255,255,255,.15);
+}
+.id-badge-bluev .id-badge-icon{color:#fff;}
+
+/* ---- 金V：中介服务企业 ---- */
+.id-badge-goldv{
+  background:linear-gradient(135deg,#E8C878 0%,#C9A961 45%,#A8894F 100%);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(201,169,97,.4),inset 0 1px 0 rgba(255,255,255,.3);
+  border:1px solid rgba(255,255,255,.18);
+}
+.id-badge-goldv .id-badge-icon{color:#fff;}
+
+/* ---- 专属：合伙人 ---- */
+.id-badge-exclusive{
+  background:linear-gradient(135deg,#A78BFA 0%,#8B5CF6 50%,#6D28D9 100%);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(139,92,246,.35),inset 0 1px 0 rgba(255,255,255,.25);
+  border:1px solid rgba(255,255,255,.15);
+}
+.id-badge-exclusive .id-badge-icon{color:#fff;}
+
+/* ---- 个人合伙人 ---- */
+.id-badge-individual{
+  background:linear-gradient(135deg,#34D399 0%,#10B981 50%,#059669 100%);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(16,185,129,.35),inset 0 1px 0 rgba(255,255,255,.25);
+  border:1px solid rgba(255,255,255,.15);
+}
+.id-badge-individual .id-badge-icon{color:#fff;}
+
+/* ---- 暗色主题适配 ---- */
+[data-theme="dark"] .id-badge-bluev{box-shadow:0 2px 10px rgba(37,99,235,.5),inset 0 1px 0 rgba(255,255,255,.2);}
+[data-theme="dark"] .id-badge-goldv{box-shadow:0 2px 10px rgba(201,169,97,.5),inset 0 1px 0 rgba(255,255,255,.25);}
+[data-theme="dark"] .id-badge-exclusive{box-shadow:0 2px 10px rgba(139,92,246,.5),inset 0 1px 0 rgba(255,255,255,.2);}
+[data-theme="dark"] .id-badge-individual{box-shadow:0 2px 10px rgba(16,185,129,.5),inset 0 1px 0 rgba(255,255,255,.2);}
+/* ============================================================================
+   入驻等级徽章系统 EntryTier Badge
+   系统自动判定等级，非用户选择
+   ============================================================================ */
+.et-tier-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  height:22px;padding:0 9px 0 7px;border-radius:999px;
+  font-size:11px;font-weight:700;letter-spacing:.3px;line-height:1;
+  white-space:nowrap;vertical-align:middle;
+  background:var(--bg-card-2);color:var(--text-2);
+  border:1px solid var(--line);
+  transition:transform .15s ease;
+}
+.et-tier-badge:active{transform:scale(.95);}
+.et-tier-lv{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:16px;padding:0 4px;border-radius:5px;
+  font-size:9.5px;font-weight:800;letter-spacing:.2px;
+  background:rgba(0,0,0,.12);color:#fff;
+}
+.et-tier-name{line-height:1;}
+
+/* 等级颜色 — 建筑企业（蓝色系） */
+.et-tier-badge[data-type="construction"].et-tier-l1{background:linear-gradient(135deg,#e8f1fb,#d4e4f7);color:#2d6fc4;border-color:rgba(91,155,213,.4);}
+.et-tier-badge[data-type="construction"].et-tier-l1 .et-tier-lv{background:#5b9bd5;}
+.et-tier-badge[data-type="construction"].et-tier-l2{background:linear-gradient(135deg,#d4e4f7,#b8d4f0);color:#1f66b8;border-color:rgba(58,130,204,.45);}
+.et-tier-badge[data-type="construction"].et-tier-l2 .et-tier-lv{background:#3a82cc;}
+.et-tier-badge[data-type="construction"].et-tier-l3{background:linear-gradient(135deg,#b8d4f0,#8bb8e8);color:#0d4a96;border-color:rgba(31,102,184,.5);}
+.et-tier-badge[data-type="construction"].et-tier-l3 .et-tier-lv{background:#1f66b8;}
+.et-tier-badge[data-type="construction"].et-tier-l4{background:linear-gradient(135deg,#1f66b8,#0d4a96);color:#fff;border-color:rgba(13,74,150,.6);box-shadow:0 2px 10px rgba(13,74,150,.3);}
+.et-tier-badge[data-type="construction"].et-tier-l4 .et-tier-lv{background:rgba(255,255,255,.25);}
+
+/* 等级颜色 — 中介服务（金色系） */
+.et-tier-badge[data-type="agency"].et-tier-l1{background:linear-gradient(135deg,#faf3e3,#f0e4c8);color:#8a6d2f;border-color:rgba(212,184,118,.4);}
+.et-tier-badge[data-type="agency"].et-tier-l1 .et-tier-lv{background:#d4b876;}
+.et-tier-badge[data-type="agency"].et-tier-l2{background:linear-gradient(135deg,#f0e4c8,#e4d0a0);color:#7a5f25;border-color:rgba(196,164,92,.45);}
+.et-tier-badge[data-type="agency"].et-tier-l2 .et-tier-lv{background:#c4a45c;}
+.et-tier-badge[data-type="agency"].et-tier-l3{background:linear-gradient(135deg,#e4d0a0,#d4b876);color:#6b521e;border-color:rgba(168,137,79,.5);}
+.et-tier-badge[data-type="agency"].et-tier-l3 .et-tier-lv{background:#a8894f;}
+.et-tier-badge[data-type="agency"].et-tier-l4{background:linear-gradient(135deg,#a8894f,#8a6d2f);color:#fff;border-color:rgba(138,109,47,.6);box-shadow:0 2px 10px rgba(138,109,47,.3);}
+.et-tier-badge[data-type="agency"].et-tier-l4 .et-tier-lv{background:rgba(255,255,255,.25);}
+
+/* 等级颜色 — 合伙人（紫色系） */
+.et-tier-badge[data-type="partner"].et-tier-l1{background:linear-gradient(135deg,#f3efff,#e8dfff);color:#6d28d9;border-color:rgba(167,139,250,.4);}
+.et-tier-badge[data-type="partner"].et-tier-l1 .et-tier-lv{background:#a78bfa;}
+.et-tier-badge[data-type="partner"].et-tier-l2{background:linear-gradient(135deg,#e8dfff,#d4c4ff);color:#5b21b6;border-color:rgba(139,92,246,.45);}
+.et-tier-badge[data-type="partner"].et-tier-l2 .et-tier-lv{background:#8b5cf6;}
+.et-tier-badge[data-type="partner"].et-tier-l3{background:linear-gradient(135deg,#d4c4ff,#b89eff);color:#4c1d95;border-color:rgba(124,58,237,.5);}
+.et-tier-badge[data-type="partner"].et-tier-l3 .et-tier-lv{background:#7c3aed;}
+.et-tier-badge[data-type="partner"].et-tier-l4{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-color:rgba(91,33,182,.6);box-shadow:0 2px 10px rgba(91,33,182,.3);}
+.et-tier-badge[data-type="partner"].et-tier-l4 .et-tier-lv{background:rgba(255,255,255,.25);}
+
+/* 等级进度条 */
+.et-tier-progress{margin-top:10px;padding:10px 12px;background:var(--bg-card-2);border-radius:10px;border:1px solid var(--line);}
+.etp-track{position:relative;height:6px;background:var(--bg);border-radius:3px;overflow:visible;margin-bottom:8px;}
+.etp-fill{height:100%;border-radius:3px;transition:width .5s ease;}
+.etp-labels{position:absolute;top:-2px;left:0;right:0;display:flex;justify-content:space-between;pointer-events:none;}
+.etp-labels span{font-size:8px;font-weight:700;color:var(--text-3);width:16px;text-align:center;}
+.etp-info{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.etp-cur{font-size:11px;font-weight:700;}
+.etp-hint{font-size:10px;color:var(--text-3);text-align:right;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* 暗色主题适配 */
+[data-theme="dark"] .et-tier-badge[data-type="construction"].et-tier-l1{background:linear-gradient(135deg,rgba(91,155,213,.18),rgba(91,155,213,.08));color:#7ab0e0;border-color:rgba(91,155,213,.3);}
+[data-theme="dark"] .et-tier-badge[data-type="agency"].et-tier-l1{background:linear-gradient(135deg,rgba(212,184,118,.18),rgba(212,184,118,.08));color:#d4b876;border-color:rgba(212,184,118,.3);}
+[data-theme="dark"] .et-tier-badge[data-type="partner"].et-tier-l1{background:linear-gradient(135deg,rgba(167,139,250,.18),rgba(167,139,250,.08));color:#a78bfa;border-color:rgba(167,139,250,.3);}
+[data-theme="dark"] .et-tier-progress{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);}

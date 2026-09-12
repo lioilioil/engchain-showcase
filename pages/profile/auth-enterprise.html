@@ -133,6 +133,35 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
         <div class="text-3 fs-12" style="line-height:1.7;">包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。</div>
       </div>
+
+      <!-- [FEAT 9.2-3] 多维资质核验：可选维度 -->
+      <div class="group-title" style="margin-top:16px;">多维资质核验（可选）</div>
+      <div class="text-3 fs-12" style="padding:0 2px 10px;line-height:1.6;">完成营业执照+法人身份即可基础认证；提交更多维度可提升认证等级（高级/完整）。</div>
+      <div id="dim-progress" style="margin-bottom:12px;"></div>
+      <div class="group ap-group">
+        <div class="ap-field">
+          <label>企业资质证书（可选）</label>
+          <div class="ae-license" onclick="submitDim('qualification')" style="margin-top:6px;">
+            <div class="ap-up-ic"><svg class="ic" style="width:18px;height:18px;"><use href="#i-upload"/></svg></div>
+            <div><div class="fw-600 fs-13">上传企业资质证书</div><div class="text-3 fs-11" style="margin-top:2px;">施工总承包/专业承包资质等</div></div>
+          </div>
+        </div>
+        <div class="ap-field">
+          <label>对公账户信息（可选）</label>
+          <div class="ae-license" onclick="submitDim('bank')" style="margin-top:6px;">
+            <div class="ap-up-ic"><svg class="ic" style="width:18px;height:18px;"><use href="#i-upload"/></svg></div>
+            <div><div class="fw-600 fs-13">上传对公账户开户许可证</div><div class="text-3 fs-11" style="margin-top:2px;">提升认证等级至高级</div></div>
+          </div>
+        </div>
+        <div class="ap-field" style="border:none;">
+          <label>办公场地证明（可选）</label>
+          <div class="ae-license" onclick="submitDim('office')" style="margin-top:6px;">
+            <div class="ap-up-ic"><svg class="ic" style="width:18px;height:18px;"><use href="#i-upload"/></svg></div>
+            <div><div class="fw-600 fs-13">上传办公场地照片/租赁合同</div><div class="text-3 fs-11" style="margin-top:2px;">完成全部5项=完整认证</div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="fixed-cta ae-cta"><button class="btn btn-primary btn-block btn-lg" id="pay-btn">支付 ¥999 提交审核</button></div>
     </div>
 
@@ -141,14 +170,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="ae-review">
         <span class="ae-r-ic pulse"><svg class="ic" style="width:24px;height:24px;"><use href="#i-clock"/></svg></span>
         <div class="fw-700 fs-17">企业认证审核中</div>
-        <div class="text-2 fs-13" style="margin-top:6px;line-height:1.7;">资料已提交平台，预计 <b>24 小时内</b> 完成人工复核，结果将在此页与消息中心同步。</div>
+        <div class="text-2 fs-13" style="margin-top:6px;line-height:1.7;">资料已提交平台，预计 <b>3 个工作日内</b> 完成人工复核，结果将在此页与消息中心同步。</div>
         <div class="ae-progress"><i id="rv-bar"></i></div>
         <div class="ae-rv-steps">
           <div class="ok">提交资料</div><div class="on" id="rv-s2">人工审核</div><div>认证生效</div>
         </div>
       </div>
+      <!-- E1-18 各认证维度审核进度 -->
+      <div class="group ap-group" id="rv-dims" style="display:none;"></div>
       <div class="group ap-group" id="rv-info"></div>
-      <button class="btn btn-ghost btn-block" onclick="location.reload()">刷新审核状态</button>
+      <button class="btn btn-block" disabled style="background:var(--line);color:var(--text-3);cursor:not-allowed;opacity:.7;">审核中，请勿重复提交</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="location.reload()">刷新审核状态</button>
     </div>
 
     <!-- 驳回态 -->
@@ -179,6 +211,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div class="ap-field ap-field-ro"><label>信用代码</label><b class="fs-13 mono" id="d-code">—</b></div>
         <div class="ap-field ap-field-ro"><label>法定代表人</label><b class="fs-13" id="d-legal">—</b></div>
         <div class="ap-field ap-field-ro" style="border:none;"><label>有效期至</label><b class="fs-13" id="d-expire">—</b></div>
+      </div>
+      <!-- [FEAT 9.2-3] 认证等级与多维核验进度 -->
+      <div class="card" style="padding:14px;margin-bottom:12px;">
+        <div class="fb-between" style="margin-bottom:8px;">
+          <span class="fw-600 fs-14">认证等级</span>
+          <span id="dim-level-badge" style="font-size:12px;padding:3px 10px;border-radius:999px;background:var(--primary-pale);color:var(--primary-dim);font-weight:600;">--</span>
+        </div>
+        <div id="dim-progress-done"></div>
+        <div class="text-3 fs-11" style="margin-top:8px;line-height:1.6;">完成必选项=基础认证，完成3项以上=高级认证，完成全部5项=完整认证</div>
       </div>
       <div class="card ae-fee" id="renew-card">
         <div class="fw-600 fs-14" style="margin-bottom:6px;">认证有效期</div>
@@ -288,7 +329,8 @@ function render(){
   var a=cur(),now=Date.now(),box;
   document.querySelectorAll('#real-gate,#form-box,#review-box,#reject-box,#done-box').forEach(function(el){el.style.display='none';});
   if(a.enterprise.ok&&a.enterprise.expireAt>now){box='done-box';fillDone(a);}
-  else if(a.enterprise.status==='pending'){box='review-box';fillReview(a);}
+  /* E1-18：审核中态统一识别 submitted/review/pending，避免落到空白表单+支付按钮 */
+  else if(a.enterprise.status==='pending'||a.enterprise.status==='submitted'||a.enterprise.status==='review'){box='review-box';fillReview(a);}
   else if(!a.enterprise.ok&&a.enterprise.note){box='reject-box';document.getElementById('rj-note').textContent=a.enterprise.note;fillReject(a);}
   else if(!a.realname.ok){box='real-gate';}
   else{box='form-box';initForm(a);}
@@ -310,7 +352,28 @@ function fillReview(a){
   document.getElementById('rv-info').innerHTML=
     rvRow('企业名称',a.enterprise.co||'—')+rvRow('企业简称',a.enterprise.shortName||'—')+
     rvRow('命名依据',basisLabel(a.enterprise.nameBasis))+rvRow('信用代码',a.enterprise.code||'—')+
-    rvRow('提交时间',fmtD(a.enterprise.submittedAt))+rvRow('认证费','¥'+(a.enterprise.fee||fee));
+    rvRow('提交时间',fmtD(a.enterprise.submittedAt))+rvRow('预计完成','3 个工作日内')+
+    rvRow('认证费','¥'+(a.enterprise.fee||fee));
+  /* E1-18：渲染各认证维度审核状态（已提交/审核中/已通过） */
+  try{
+    var dd=AuthStore.dimensionStatus(), box=document.getElementById('rv-dims');
+    if(box&&dd&&dd.list&&dd.list.length){
+      box.style.display='';
+      box.innerHTML='<div class="group-title">认证维度进度</div>'+dd.list.map(function(d){
+        /* 法人身份维度：隐式依赖个人实名，只读展示 */
+        if(d.id==='legal'){
+          var rn=(a.realname)||{};
+          if(rn.ok){
+            return '<div class="ap-field ap-field-ro"><label>法人身份</label><b class="fs-13" style="color:var(--success);">已随个人实名核验 ✓</b></div>';
+          }
+          return '<div class="ap-field ap-field-ro"><label>法人身份</label><b class="fs-13" style="color:var(--warning);"><a href="auth-personal.html" style="text-decoration:underline;color:var(--warning);">需先完成个人实名认证 ›</a></b></div>';
+        }
+        var st=d.done?'已通过':(d.status==='pending_review'||d.status==='submitted'?'审核中':'已提交');
+        var col=d.done?'var(--success)':'var(--warning)';
+        return '<div class="ap-field ap-field-ro"><label>'+d.label+'</label><b class="fs-13" style="color:'+col+';">'+st+'</b></div>';
+      }).join('');
+    }
+  }catch(e){}
 }
 function rvRow(k,v){return '<div class="ap-field ap-field-ro"><label>'+k+'</label><b class="fs-13 text-2">'+v+'</b></div>';}
 function fillReject(a){
@@ -327,6 +390,8 @@ function fillDone(a){
   document.getElementById('d-expire').textContent=fmtD(a.enterprise.expireAt);
   var days=Math.ceil((a.enterprise.expireAt-Date.now())/864e5);
   document.getElementById('expire-note').textContent='当前认证有效期至 '+fmtD(a.enterprise.expireAt)+'（剩余 '+days+' 天），到期后续费即可保持认证企业权益。';
+  /* E2-13：已认证用户进入页面需渲染维度进度条与等级徽标 */
+  renderDimProgress();
 }
 window.toForm=function(){var a=cur();a.enterprise.note='';AuthStore.write(a);render();};
 function validUscc(c){return /^[0-9A-HJ-NPQRTUWXY]{18}$/.test(c.toUpperCase());}
@@ -440,6 +505,44 @@ window.renew=function(){
     UI.toast('续费成功，有效期已延长','ok');render();
   }});
 };
+  /* [FEAT 9.2-3] 提交某一维核验材料 */
+  window.submitDim = function(type) {
+    AuthStore.submitDimension(type, { files: ['mock_' + type + '.jpg'] });
+    var labels = { qualification: '企业资质', bank: '对公账户', office: '办公场地' };
+    UI.toast(labels[type] + '已提交，等待审核', 'ok');
+    renderDimProgress();
+  };
+  function renderDimProgress() {
+    try {
+      var ds = AuthStore.dimensionStatus();
+      var el = document.getElementById('dim-progress');
+      if (el) {
+        el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+          '<div style="flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden;">' +
+          '<div style="height:100%;width:' + Math.round(ds.doneCount/ds.total*100) + '%;background:var(--primary);border-radius:3px;"></div></div>' +
+          '<span style="font-size:12px;font-weight:600;color:var(--primary-dim);">' + ds.doneCount + '/' + ds.total + '</span></div>';
+      }
+      var lv = document.getElementById('dim-level-badge');
+      if (lv) lv.textContent = ds.levelLabel;
+      var el2 = document.getElementById('dim-progress-done');
+      if (el2) {
+        el2.innerHTML = ds.list.map(function(d) {
+          /* 法人身份维度：隐式依赖个人实名，只读展示 */
+          if(d.id==='legal'){
+            var ra=AuthStore.read();var rnOk=!!(ra.realname&&ra.realname.ok);
+            return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;">' +
+              (rnOk ? '<svg class="ic" style="width:14px;height:14px;color:var(--success);"><use href="#i-check"/></svg>' : '<span style="width:14px;height:14px;border:1.5px solid var(--line);border-radius:50%;display:inline-block;"></span>') +
+              '<span>' + d.label + ' <span style="color:var(--danger);font-size:10px;">必选</span></span>' +
+              '<span style="margin-left:auto;font-size:11px;color:' + (rnOk ? 'var(--success)' : 'var(--warning)') + ';">' + (rnOk ? '已随个人实名核验 ✓' : '<a href="auth-personal.html" style="text-decoration:underline;color:var(--warning);">需先实名认证 ›</a>') + '</span></div>';
+          }
+          return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px;">' +
+            (d.done ? '<svg class="ic" style="width:14px;height:14px;color:var(--success);"><use href="#i-check"/></svg>' : '<span style="width:14px;height:14px;border:1.5px solid var(--line);border-radius:50%;display:inline-block;"></span>') +
+            '<span>' + d.label + (d.required ? ' <span style="color:var(--danger);font-size:10px;">必选</span>' : ' <span style="color:var(--text-3);font-size:10px;">可选</span>') + '</span>' +
+            '<span style="margin-left:auto;font-size:11px;color:' + (d.done ? 'var(--success)' : 'var(--text-3)') + ';">' + (d.done ? '已完成' : d.status === 'pending_review' ? '审核中' : '待提交') + '</span></div>';
+        }).join('');
+      }
+    } catch(e) {}
+  }
 render();
 window.addEventListener('storage',function(ev){if(['engchain-users','engchain-auth'].indexOf(ev.key)>=0)render();});
 window.addEventListener('engchain:auth',render);

@@ -859,8 +859,10 @@ window.MOCK = (function () {
 
   /* ---- 钱包 / 明细 ---- */
   const wallet = { balance: 1286.50, frozen: 200.00, total: 13486.50 };
+  /* [FIX BM-052] 以下为历史遗留展示流水（legacy）：信息解锁已改走 CreditStore 积分扣费（credits.consume.*=98 积分）。
+     首行 ¥-98 仅用于演示旧余额账流水样式，BalanceStore.seedLogs 映射时保留，不代表现行人民币扣款。 */
   const transactions = [
-    { t: '金额 | 订单解锁', date: '2026-08-28 10:23', amount: -98, type: 'pay' },
+    { t: '金额 | 订单解锁·积分扣费', date: '2026-08-28 10:23', amount: -98, type: 'pay', legacy: true },
     { t: '收款 | 供方订单', date: '2026-08-27 16:40', amount: 3200, type: 'in' },
     { t: '充值 | 余额预存', date: '2026-08-26 09:11', amount: 5000, type: 'recharge' },
     { t: '提现 | 余额提现', date: '2026-08-25 14:02', amount: -1000, type: 'withdraw' }
@@ -938,10 +940,13 @@ window.MOCK = (function () {
   /* ---- 业务常量 (单一数据源：解锁定价/分销比例/入驻费/提现限制/退款/合规) ----
      所有页面统一从此处读取数字，避免跨页漂移。 */
   const business = {
-    /* 信息解锁付费墙 */
+    /* 信息解锁付费墙
+       [FIX BM-042] @deprecated legacy 旧结构：货币符号由 '¥' 改为 '积分'（对齐 credits.currency），
+       修复锁区价签 ¥98 与 CTA「98 积分」不一致（BM-012）；价格 items 已全库 0 引用（由 credits.packages 取代）。
+       本对象仅为兼容旧页面（detail.js 读 currency/process）保留，勿新增引用。 */
     unlock: {
       label: '解锁联系信息',
-      currency: '¥',
+      currency: '积分',
       default: 'single',
       items: [
         { id: 'single', count: 1,  price: 98 },
@@ -967,7 +972,9 @@ window.MOCK = (function () {
     /* 二级分销 */
     distribution: { rule: '二级分销', tier1: 12, tier2: 3, minWithdraw: 100, settleNote: '工作日 T+1 到账',
       individualPartner: { rule: '二级分销', tier1: 8, tier2: 2, minWithdraw: 50, settleNote: '工作日 T+1 到账', badge: '个人合伙人' } },
-    /* 专业版入驻 */
+    /* 专业版入驻
+       [FIX BM-042] @deprecated legacy 旧结构（¥2000 专业版已无任何页面引用）；
+       入驻费唯一权威来源为下方 entryTypes（construction/agency/partner 分类定价），勿新增对本对象的引用。 */
     entry: { audit: 300, seat: 1700, days: 30, total: 2000, trial: 7,
       benefits: ['完整查看联系信息', '不限次发布供需信息', 'AI 智能匹配优先权重', '企业专属标识与主页', '7 天无理由退款保障'] },
     /* 提现限制 */
@@ -991,7 +998,23 @@ window.MOCK = (function () {
        全部金额/比例/额度收敛于此单一数据源；旧 unlock/entry 结构保留为 legacy，
        待 M3/M5 页面迁移后收敛删除，避免阶段0破坏现有页面。 */
     /* 认证费（R1，按年） */
-    certification: { personal: 0, enterprise: 999, qual: 0, enterpriseCycle: 'year' },
+    /* [FEAT 9.2-3] 企业认证多维度资质核验：5项逐项提交/审核 */
+    certification: { personal: 0, enterprise: 999, qual: 0, enterpriseCycle: 'year',
+      dimensions: [
+        { id: 'business', label: '营业执照', required: true },
+        { id: 'legal', label: '法人身份', required: true },
+        { id: 'qualification', label: '企业资质', required: false },
+        { id: 'bank', label: '对公账户', required: false },
+        { id: 'office', label: '办公场地', required: false }
+      ],
+      multiDim: { enabled: true, label: '多维资质核验' },
+      /* [FEAT 9.2-3] 认证等级：完成必选项=基础认证，完成3项以上=高级认证，完成全部5项=完整认证 */
+      levels: {
+        basic: { min: 2, label: '基础认证', desc: '完成营业执照+法人身份核验' },
+        advanced: { min: 3, label: '高级认证', desc: '完成3项以上核验' },
+        full: { min: 5, label: '完整认证', desc: '完成全部5项核验' }
+      }
+    },
     /* 解锁积分体系（R3+R4，Q3 统一积分；取代旧 unlock.items 条数包） */
     credits: {
       currency: '积分',
@@ -1019,22 +1042,50 @@ window.MOCK = (function () {
         checkinStreakDays: 7,
         realname: 100,           /* 实名认证 */
         entry: 500,              /* 企业入驻 */
-        invite: 50               /* 邀请好友（双方各得；原型以被邀注册填码发放） */
+        invite: 50,              /* 邀请好友（双方各得；原型以被邀注册填码发放） */
+        /* [FIX BM-049] guide 弹窗福利奖励（与 popup.js 硬编码 ¥30/¥20 同源口径，后台可配） */
+        guideFirst: 30,          /* 首次发布供需（guide 弹窗展示 ¥30 积分） */
+        guideShare: 20           /* guide 弹窗分享/邀请好友（展示 ¥20 积分/人） */
+      },
+      /* [FEAT 9.2-2] 积分有效期：自获取之日起 ttlDays 天后过期，到期自动清零（CreditStore.expireDue 惰性清理） */
+      ttlDays: 365,
+      /* [FEAT 9.2-3] 积分批量充值折扣梯度：自定义充值数量达到档位后按对应折扣计价 */
+      batchDiscount: {
+        enabled: true,
+        minAmount: 1000,
+        tiers: [
+          { min: 1000,  discount: 0.95, label: '95折' },
+          { min: 5000,  discount: 0.90, label: '9折' },
+          { min: 10000, discount: 0.85, label: '85折' }
+        ]
       }
     },
     /* 入驻费（R2，按次；取代旧 entry ¥2000 专业版） */
     entryTypes: {
-      construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V' },
-      agency: { fee: 29999, cycle: 'once', label: '中介服务企业', badge: '金V' },
-      partner: { fee: 0, cycle: 'once', label: '合伙人企业', badge: '专属', audit: true }
+      construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V',
+        yearly: { price: 3599, cycle: 'yearly', discount: 0.9 } },
+      agency: { fee: 29999, cycle: 'once', label: '中介服务企业', badge: '金V',
+        yearly: { price: 26999, cycle: 'yearly', discount: 0.9 } },
+      partner: { fee: 0, cycle: 'once', label: '合伙人企业', badge: '专属', audit: true,
+        yearly: { price: 0, cycle: 'yearly', discount: 0.9 } }
     },
+    /* [FEAT 9.2-2] 入驻年度订阅全局配置 */
+    subscription: { enabled: true, remindDays: 30, label: '年度订阅' },
     /* 会员权益（P0-3.1 积分折扣 / P0-7.1 监控额度） */
     membership: {
       types: [
         { id: 'construction', name: '建筑企业', creditDiscount: 0.8, badge: '蓝V' },
         { id: 'agency',       name: '中介服务企业', creditDiscount: 0.7, badge: '金V' },
         { id: 'partner',      name: '合伙人企业', creditDiscount: 0.5, badge: '专属' }
-      ]
+      ],
+      /* [FEAT 9.2-1] 年度解锁会员（P1）：年费订阅，全部详情免费解锁 + 积分折扣提升至 0.5x */
+      membershipAnnual: {
+        price: 999,
+        cycle: 'year',
+        label: '年度解锁会员',
+        creditDiscount: 0.5,
+        benefits: ['全部详情免费解锁', '积分折扣提升至0.5x', '专属标识', '优先客服']
+      }
     },
     /* 中介佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
     commission: {
@@ -1049,14 +1100,32 @@ window.MOCK = (function () {
       minServiceFee: { '资质代办': 0, '工商注册': 0, '税务筹划': 0, '工程担保': 0, '造价咨询': 0, '企业服务': 0, '_default': 0 },
       /* WP7 意向金解锁深度对接：超时提醒与自动退款配置 */
       intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30 },
-      /* WP8 服务商增值付费：架构预留，首期不激活 */
-      vendorUpgrades: { topListing: { enabled: false, price: 0, label: '服务置顶' }, leadPack: { enabled: false, price: 0, label: '线索包' }, saasTools: { enabled: false, price: 0, label: '经营工具' } }
+      /* [FEAT 9.2-1] R6 B端增值道具：激活架构预留（topListing/leadPack/saasTools） */
+      /* [FEAT 9.2-4] 入驻类型差异：entryTypes 限制不同入驻类型可购买的道具 */
+      vendorUpgrades: {
+        topListing: { enabled: true, price: 99, durationDays: 7, label: '服务置顶', desc: '供需信息置顶展示7天', entryTypes: ['construction', 'agency', 'partner'] },
+        leadPack: { enabled: true, price: 299, count: 50, label: '线索包', desc: '获取50条精准询盘线索', entryTypes: ['agency'] },
+        saasTools: { enabled: true, price: 199, durationDays: 30, label: '经营工具', desc: '数据看板+经营分析工具30天', entryTypes: ['construction', 'agency'] }
+      },
+      /* [FEAT 9.2-5] 质保金预留机制：交易金额5%预留，验收30天后释放 */
+      warranty: { rate: 0.05, releaseDays: 30, label: '质保金', desc: '交易金额5%预留，验收30天后释放' }
     },
     /* 企业关注/监控（P0-7.1） */
     monitor: {
       dimensions: ['资质到期', '项目更新', '中标', '司法', '经营异常', '工商变更'],
       pushDaily: '09:00',
       limits: { realname: 5, pro: 10, construction: 30, agency: 50, partner: 200 }
+    },
+    /* [FEAT 9.2-2] 诚信分体系：阈值与等级配置 */
+    creditScore: {
+      label: '诚信分',
+      thresholds: { publish: 60, order: 50, withdraw: 40 },
+      levels: [
+        { min: 85, label: '金牌', color: 'gold' },
+        { min: 70, label: '银牌', color: 'silver' },
+        { min: 60, label: '铜牌', color: 'bronze' },
+        { min: 0, label: '观察', color: 'gray' }
+      ]
     },
     /* 破冰期模式（v1.2 §10.4；preview 开关读写 engchain-mode） */
     breakin: {
@@ -1066,6 +1135,31 @@ window.MOCK = (function () {
       registerBonus: 3,
       monitorTrialDays: 7,
       guestSample: 1
+    },
+    /* [FEAT 9.2-4] 游客/注册/实名 每日免费浏览摘要额度，跨天重置（FreeQuotaStore 单一来源） */
+    freeDailyQuota: {
+      guest: 3,
+      registered: 5,
+      realname: 10,
+      resetHour: 0,
+      label: '每日免费浏览'
+    },
+    /* [FEAT 9.2-5] 行业资讯/数据报告订阅（P2） */
+    industryReport: {
+      label: '行业资讯',
+      categories: ['建筑材料','工程机械','劳务用工','政策法规','市场分析'],
+      subscription: { monthly: 29, yearly: 299, label: '数据报告订阅' },
+      freePreview: 3
+    },
+    /* [FEAT 9.2-6] R7 B端数据服务/API（P3） */
+    dataApi: {
+      label: '数据服务API',
+      products: [
+        { id: 'enterprise_info', name: '企业信息查询', price: 0.1, unit: '次', desc: '查询企业工商注册信息、股东、年报等' },
+        { id: 'qualification_verify', name: '资质核验', price: 1, unit: '次', desc: '核验建筑企业资质等级、有效期、安全生产许可' },
+        { id: 'market_data', name: '市场数据批量导出', price: 99, unit: '次', desc: '按地区/品类批量导出供需行情数据(CSV)' },
+        { id: 'realtime_price', name: '建材实时价格', price: 299, unit: '月', desc: '建材品类实时价格订阅，按日更新' }
+      ]
     }
   };
 
@@ -4850,4 +4944,65 @@ window.MOCK.personnelsByCompany = function (companyId) {
 /* 按证书类型取持证人才 */
 window.MOCK.talentsByCertType = function (certType) {
   return (this.talents || []).filter(function (x) { return x.certType === certType; });
+};
+
+/* [FEAT 9.2-5] 行业资讯 Mock 数据（15条） */
+window.MOCK.reports = [
+  { id: 'r001', title: '2026年9月建筑钢材价格走势分析', category: '建筑材料', date: '2026-09-08', isFree: true, price: 0, summary: '受钢厂减产预期影响，螺纹钢价格连续三周上涨，成都地区HRB400E报价较上月上涨3.2%。', content: '受钢厂减产预期影响，螺纹钢价格连续三周上涨。成都地区HRB400E 12-25mm报价较上月上涨3.2%至3850元/吨。线材价格同步走高，预计四季度维持震荡上行趋势。建议施工企业适度备货，关注10月钢厂排产计划。' },
+  { id: 'r002', title: '工程机械租赁市场三季度行情报告', category: '工程机械', date: '2026-09-05', isFree: true, price: 0, summary: '挖掘机租赁需求环比增长12%，成都主城区挖机月租价格维持在2.8-3.5万元区间。', content: '三季度工程机械租赁市场回暖明显。挖掘机租赁需求环比增长12%，成都主城区20吨级挖机月租价格维持在2.8-3.5万元区间。装载机、压路机租赁价格平稳。预计四季度基建项目集中开工将进一步带动租赁需求。' },
+  { id: 'r003', title: '2026年劳务用工成本调查报告', category: '劳务用工', date: '2026-09-03', isFree: false, price: 29, summary: '四川地区建筑木工日薪同比上涨8%，钢筋工日薪达380-420元，招工难持续。', content: '四川地区建筑劳务用工成本持续上涨。木工日薪同比上涨8%至350-400元，钢筋工日薪380-420元，焊工日薪450-500元。招工难现象持续，建议企业通过智能化工具提升人效，或与劳务公司签订长期合作协议锁定成本。' },
+  { id: 'r004', title: '住建部发布工程总承包新规解读', category: '政策法规', date: '2026-09-01', isFree: true, price: 0, summary: '新规明确工程总承包单位对工程质量负总责，强化设计施工一体化要求。', content: '住建部近日发布《关于完善工程总承包管理的若干意见》，明确工程总承包单位对工程质量、安全、工期负总责。新规强化设计施工一体化要求，鼓励采用全过程工程咨询模式。自2027年1月1日起施行。' },
+  { id: 'r005', title: '西南地区基建投资同比增长9.8%', category: '市场分析', date: '2026-08-28', isFree: false, price: 29, summary: '1-8月西南五省基建投资同比增长9.8%，交通水利项目占比超60%。', content: '1-8月西南五省基建投资同比增长9.8%，高于全国平均水平3.2个百分点。其中交通项目占比42%，水利项目占比19%。四川天府新区、重庆两江新区重点项目集中开工，预计带动建材需求增长约15%。' },
+  { id: 'r006', title: '水泥价格触底反弹，企业补库窗口已至', category: '建筑材料', date: '2026-08-25', isFree: false, price: 29, summary: '西南地区P.O42.5散装水泥价格结束5周下跌，环比上涨2.1%至385元/吨。', content: '西南地区P.O42.5散装水泥价格结束5周下跌，环比上涨2.1%至385元/吨。主要企业执行错峰生产计划，供给收缩带动价格企稳。分析认为四季度基建旺季叠加冬储需求，水泥价格有望继续上行。' },
+  { id: 'r007', title: '塔机租赁行业集中度提升趋势分析', category: '工程机械', date: '2026-08-22', isFree: false, price: 29, summary: '头部塔机租赁企业市场份额从15%提升至28%，中小租赁商面临转型压力。', content: '塔机租赁行业集中度持续提升，头部企业市场份额从15%提升至28%。设备更新加速，6015以上大机型占比从30%提升至45%。中小租赁商面临资金和规模压力，建议向服务型租赁转型，提供安装、维修一体化服务。' },
+  { id: 'r008', title: '建筑业农民工工资支付保障新规要点', category: '政策法规', date: '2026-08-20', isFree: true, price: 0, summary: '新规要求施工总承包单位开设农民工工资专用账户，按月足额代发工资。', content: '人社部发布《工程建设领域农民工工资支付保障规定》，要求施工总承包单位开设农民工工资专用账户，按月足额代发工资。建设单位须在项目开工前拨付人工费用，占工程款比例不低于25%。新规自2026年10月1日起施行。' },
+  { id: 'r009', title: '防水卷材市场季度报告：需求企稳回升', category: '建筑材料', date: '2026-08-18', isFree: false, price: 29, summary: 'SBS改性沥青防水卷材出货量环比增长6%，房地产竣工端回暖带动需求。', content: 'SBS改性沥青防水卷材出货量环比增长6%，主要受房地产竣工端回暖带动。成都地区价格稳定在28-32元/平方米。预计四季度随保障房建设加快，防水材料需求将进一步增长。' },
+  { id: 'r010', title: '架子工班组转型：从纯劳务到模块化施工', category: '劳务用工', date: '2026-08-15', isFree: false, price: 29, summary: '模块化脚手架施工趋势明显，掌握盘扣式脚手架的班组日薪高出15%。', content: '模块化脚手架施工趋势明显，掌握盘扣式脚手架的班组日薪高出传统钢管架子工15%。成都地区盘扣式架子工日薪400-450元，传统架子工350-380元。建议劳务班组加快技能升级，参与企业装配式施工培训。' },
+  { id: 'r011', title: 'BIM技术在工程造价中的应用深度分析', category: '市场分析', date: '2026-08-12', isFree: false, price: 29, summary: '应用BIM算量可降低造价误差率至3%以下，结算周期缩短40%。', content: 'BIM技术在工程造价中的应用持续深化。应用BIM算量可降低造价误差率至3%以下，结算周期缩短40%。成都地区已有23%的甲级造价咨询企业全面应用BIM，相关BIM工程师月薪达1.5-2.5万元。' },
+  { id: 'r012', title: '商品混凝土价格指数周报', category: '建筑材料', date: '2026-09-10', isFree: false, price: 29, summary: '成都C30商品混凝土均价485元/方，周环比上涨1.2%，砂石成本传导明显。', content: '成都C30商品混凝土均价485元/方，周环比上涨1.2%。砂石价格持续高位运行，机制砂均价115元/吨，碎石95元/吨。预计短期混凝土价格仍有上行压力，建议施工方锁定长期供货协议。' },
+  { id: 'r013', title: '2026年工程担保行业发展白皮书', category: '市场分析', date: '2026-08-08', isFree: false, price: 29, summary: '银行保函占比首次超过60%，担保公司电子化保函渗透率达45%。', content: '2026年工程担保行业持续数字化转型。银行保函占比首次超过60%，担保公司电子化保函渗透率达45%。投标保函平均费率从0.8%降至0.5%，履约保函费率维持在1.0-1.5%。建议企业优先使用电子保函降低成本。' },
+  { id: 'r014', title: '建筑废料资源化利用政策解读', category: '政策法规', date: '2026-08-05', isFree: true, price: 0, summary: '住建部要求2027年新建建筑施工现场建筑垃圾排放量不低于30%的减排目标。', content: '住建部发布《关于推进建筑垃圾资源化利用的实施意见》，要求2027年新建建筑施工现场建筑垃圾排放量较2023年减排30%。鼓励采用装配式建筑、可周转材料。成都已获批国家级建筑垃圾资源化利用试点城市。' },
+  { id: 'r015', title: '叉车与高空作业设备租赁价格月报', category: '工程机械', date: '2026-09-09', isFree: false, price: 29, summary: '12米高空作业车月租7500-9000元，叉车月租3500-4500元，需求旺季价格坚挺。', content: '9月高空作业设备租赁需求进入旺季。12米高空作业车月租7500-9000元，20米以上直臂车月租12000-15000元。3吨叉车月租3500-4500元。随国庆前赶工需求，预计价格将上浮5-8%。' }
+];
+
+/* [FEAT 9.2-6] Mock API 返回结果定义 */
+window.MOCK.apiResults = {
+  enterprise_info: function (params) {
+    return { code: 0, message: 'success', data: {
+      name: params.name || '四川示例建筑工程有限公司', creditCode: '91510100MA6CXXXXXX',
+      legalRep: '张某某', regCapital: '5000万元', established: '2015-06-18',
+      status: '存续', address: '四川省成都市高新区天府大道123号',
+      scope: '房屋建筑工程施工总承包；市政公用工程；装饰装修工程',
+      shareholders: [{ name: '张三', ratio: '60%' }, { name: '李四', ratio: '40%' }],
+      annualReport: '2024年已公示', riskLevel: '低风险'
+    }};
+  },
+  qualification_verify: function (params) {
+    return { code: 0, message: 'success', data: {
+      company: params.company || '四川示例建筑工程有限公司',
+      qualifications: [
+        { name: '建筑工程施工总承包', level: '一级', validUntil: '2028-06-30', status: '有效' },
+        { name: '市政公用工程施工总承包', level: '二级', validUntil: '2027-12-31', status: '有效' }
+      ],
+      safetyLicense: { valid: true, validUntil: '2027-03-15' },
+      verifiedAt: new Date().toISOString()
+    }};
+  },
+  market_data: function (params) {
+    var rows = [];
+    var cats = ['螺纹钢', '水泥', '混凝土', '砂石', '防水材料'];
+    for (var i = 0; i < cats.length; i++) {
+      rows.push({ category: cats[i], region: params.region || '成都', price: (3000 + i * 500) + '元/吨', change: (i % 2 ? '+' : '-') + (1.5 + i * 0.3) + '%', date: '2026-09-10' });
+    }
+    return { code: 0, message: 'success', format: 'csv', rows: rows, total: rows.length, downloadUrl: 'mock://market-data.csv' };
+  },
+  realtime_price: function (params) {
+    return { code: 0, message: 'success', updateTime: new Date().toISOString(), prices: [
+      { name: 'HRB400E螺纹钢12-25mm', price: 3850, unit: '元/吨', change: '+3.2%' },
+      { name: 'P.O42.5散装水泥', price: 385, unit: '元/吨', change: '+2.1%' },
+      { name: 'C30商品混凝土', price: 485, unit: '元/方', change: '+1.2%' },
+      { name: '机制砂', price: 115, unit: '元/吨', change: '-0.5%' },
+      { name: 'SBS防水卷材', price: 30, unit: '元/㎡', change: '0.0%' }
+    ]};
+  }
 };

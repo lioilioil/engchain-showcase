@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/match/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>匹配偏好 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+.pref-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.pref-label { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; }
+.pref-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pref-chip { padding: 7px 16px; border-radius: 999px; font-size: 12px; cursor: pointer; border: 1px solid var(--line); color: var(--text-2); background: var(--bg); transition: all .15s; }
+.pref-chip.on { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); font-weight: 600; }
+.pref-save { position: fixed; bottom: 20px; left: 16px; right: 16px; height: 46px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-dim)); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">&#8249;</button>
+    <div class="nav-title">匹配偏好</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll" style="padding:12px 16px 100px;">
+
+    <div style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:16px;">
+      设置您关注的品类、方向和地区，系统将为您智能推送最匹配的供需信息。
+    </div>
+
+    <div class="pref-card">
+      <div class="pref-label">关注品类</div>
+      <div class="pref-chips" id="cat-chips"></div>
+    </div>
+
+    <div class="pref-card">
+      <div class="pref-label">关注方向</div>
+      <div class="pref-chips" id="dir-chips">
+        <span class="pref-chip" data-v="">不限</span>
+        <span class="pref-chip" data-v="supply">供应</span>
+        <span class="pref-chip" data-v="demand">需求</span>
+      </div>
+    </div>
+
+    <div class="pref-card">
+      <div class="pref-label">关注地区</div>
+      <div class="pref-chips" id="loc-chips">
+        <span class="pref-chip" data-v="">不限</span>
+        <span class="pref-chip" data-v="成都">成都</span>
+        <span class="pref-chip" data-v="北京">北京</span>
+        <span class="pref-chip" data-v="上海">上海</span>
+        <span class="pref-chip" data-v="广州">广州</span>
+        <span class="pref-chip" data-v="深圳">深圳</span>
+        <span class="pref-chip" data-v="重庆">重庆</span>
+      </div>
+    </div>
+
+  </div>
+  <button class="pref-save" onclick="savePrefs()">保存并生成推荐</button>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var CATS = ['材料', '设备', '劳务', '项目合作', '合作', '中介服务', '资质招商'];
+  var prefs = MatchStore.read().preferences || { cats: [], dir: '', location: '' };
+
+  /* render cat chips */
+  var catBox = document.getElementById('cat-chips');
+  catBox.innerHTML = CATS.map(function (c) {
+    var on = prefs.cats.indexOf(c) >= 0;
+    return '<span class="pref-chip' + (on ? ' on' : '') + '" data-cat="' + c + '">' + c + '</span>';
+  }).join('');
+  catBox.addEventListener('click', function (e) {
+    var chip = e.target.closest('.pref-chip');
+    if (!chip) return;
+    chip.classList.toggle('on');
+  });
+
+  /* dir chips */
+  document.getElementById('dir-chips').addEventListener('click', function (e) {
+    var chip = e.target.closest('.pref-chip');
+    if (!chip) return;
+    this.querySelectorAll('.pref-chip').forEach(function (c) { c.classList.remove('on'); });
+    chip.classList.add('on');
+  });
+  /* set initial dir */
+  document.querySelectorAll('#dir-chips .pref-chip').forEach(function (c) {
+    if (c.dataset.v === (prefs.dir || '')) c.classList.add('on');
+  });
+
+  /* loc chips */
+  document.getElementById('loc-chips').addEventListener('click', function (e) {
+    var chip = e.target.closest('.pref-chip');
+    if (!chip) return;
+    this.querySelectorAll('.pref-chip').forEach(function (c) { c.classList.remove('on'); });
+    chip.classList.add('on');
+  });
+  document.querySelectorAll('#loc-chips .pref-chip').forEach(function (c) {
+    if (c.dataset.v === (prefs.location || '')) c.classList.add('on');
+  });
+
+  window.savePrefs = function () {
+    var cats = [];
+    document.querySelectorAll('#cat-chips .pref-chip.on').forEach(function (c) { cats.push(c.dataset.cat); });
+    var dirEl = document.querySelector('#dir-chips .pref-chip.on');
+    var locEl = document.querySelector('#loc-chips .pref-chip.on');
+    var newPrefs = {
+      cats: cats,
+      dir: dirEl ? dirEl.dataset.v : '',
+      location: locEl ? locEl.dataset.v : ''
+    };
+    MatchStore.setPreferences(newPrefs);
+    MatchStore.generate();
+    if (window.UI && UI.toast) UI.toast('偏好已保存，推荐已更新', 'ok');
+    else alert('偏好已保存');
+    setTimeout(function () { history.back(); }, 800);
+  };
+})();
+</script>
+</body>
+</html>

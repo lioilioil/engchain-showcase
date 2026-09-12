@@ -42,6 +42,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <!-- 步骤内容区 -->
     <div id="step-content"></div>
 
+    <!-- 提交成功·审核中结果态 -->
+    <div id="result-box" style="display:none;"></div>
+
     <div style="height:20px;"></div>
   </div>
 
@@ -72,6 +75,8 @@ var type=new URLSearchParams(location.search).get('type')||'construction';
 var t=MOCK.entryTypeById(type);
 var bi=MOCK.business.breakin.entry;
 var fee=0;
+/* [FEAT 9.2-2] 付费模式：once=一次性入驻 / yearly=年度订阅 */
+var cycle='once';
 var currentStep=0;
 var form=loadDraft();
 
@@ -103,7 +108,12 @@ function clearDraft(){try{localStorage.removeItem(DRAFT_KEY);}catch(e){}}
 /* ============ 费用 ============ */
 function renderFee(){
   var breakin=ModeStore.isBreakIn();
-  fee=type==='partner'?0:(breakin?(type==='construction'?bi.construction:bi.agency):t.fee);
+  /* [FEAT 9.2-2] 年度订阅模式：年费=入驻费*0.9 */
+  if(cycle==='yearly' && t && t.yearly){
+    fee=type==='partner'?0:t.yearly.price;
+  } else {
+    fee=type==='partner'?0:(breakin?(type==='construction'?bi.construction:bi.agency):t.fee);
+  }
 }
 function feeText(){
   if(fee===0)return '<span class="green">¥0 · 免费审核制</span>';
@@ -607,12 +617,29 @@ function renderStep5(){
     +(form.attachments.length?'<div class="ef-sum-item"><b>其他附件</b><span>'+form.attachments.length+'个文件</span></div>':'')
   +'</div>'
   +'<div class="card ef-fee">'
-    +'<div class="fb-between" style="margin-bottom:7px;"><span class="fw-600 fs-14">入驻费（按次）</span><span class="fw-700 fs-17" style="color:var(--primary);">'+feeText()+'</span></div>'
+    +'<div class="fw-600 fs-14" style="margin-bottom:8px;">付费模式</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px;">'
+    +'<label style="flex:1;border:2px solid '+(cycle==='once'?'var(--primary)':'var(--line)')+';border-radius:10px;padding:10px;cursor:pointer;" onclick="window.__setCycle(\'once\')">'
+    +'<div style="font-size:13px;font-weight:600;">一次性入驻</div>'
+    +'<div style="font-size:12px;color:var(--text-3);margin-top:2px;">'+(t?'¥'+Number(t.fee||0).toLocaleString():'')+' · 永久有效</div>'
+    +'</label>'
+    +'<label style="flex:1;border:2px solid '+(cycle==='yearly'?'var(--primary)':'var(--line)')+';border-radius:10px;padding:10px;cursor:pointer;" onclick="window.__setCycle(\'yearly\')">'
+    +'<div style="font-size:13px;font-weight:600;">年度订阅 <span style="font-size:10px;color:var(--danger);background:#fff0f0;padding:1px 4px;border-radius:3px;">省10%</span></div>'
+    +'<div style="font-size:12px;color:var(--text-3);margin-top:2px;">'+(t&&t.yearly?'¥'+Number(t.yearly.price||0).toLocaleString():'')+' / 年 · 到期续费提醒</div>'
+    +'</label></div>'
+    +'<div class="fb-between" style="margin-bottom:7px;"><span class="fw-600 fs-14">'+(cycle==='yearly'?'年度订阅费':'入驻费（按次）')+'</span><span class="fw-700 fs-17" style="color:var(--primary);">'+feeText()+'</span></div>'
     +'<div class="text-3 fs-12" style="line-height:1.7;">'+feeNote()+'</div>'
     +'<div class="ef-fee-divider"></div>'
     +'<div class="fb-between"><span class="fw-600 fs-14">保证金说明</span><span class="text-2 fs-12" style="text-align:right;flex:1;margin-left:12px;">'+depositText()+'</span></div>'
   +'</div>';
 }
+/* [FEAT 9.2-2] 切换付费模式 */
+window.__setCycle=function(c){
+  cycle=c;
+  renderFee();
+  renderStep();
+  updateCTA();
+};
 window.__goStep=function(s){
   currentStep=s;
   renderAll();
@@ -674,6 +701,43 @@ function mutualLock(){
 }
 
 /* ============ 提交 ============ */
+function pad2(n){return ('0'+n).slice(-2);}
+function showResult(e){
+  var name=(t&&t.label)||'企业入驻';
+  var feeVal=(e&&(e.fee||e.fee===0))?e.fee:fee;
+  var dep=depositText();
+  var submitted=(e&&e.submittedAt)?new Date(e.submittedAt):new Date();
+  var sTime=submitted.getFullYear()+'-'+pad2(submitted.getMonth()+1)+'-'+pad2(submitted.getDate())+' '+pad2(submitted.getHours())+':'+pad2(submitted.getMinutes());
+  /* 隐藏表单各区块与底部 CTA */
+  document.querySelector('.ef-head').style.display='none';
+  document.getElementById('step-indicator').style.display='none';
+  document.querySelector('.ef-fill-bar').style.display='none';
+  document.getElementById('step-content').style.display='none';
+  document.getElementById('cta-bar').style.display='none';
+  var rb=document.getElementById('result-box');
+  rb.style.display='block';
+  rb.innerHTML=
+    '<div class="ef-result">'+
+      '<span class="ef-r-ic"><svg class="ic" style="width:26px;height:26px;"><use href="#i-check"/></svg></span>'+
+      '<div class="fw-700 fs-17">入驻申请已提交 · 审核中</div>'+
+      '<div class="text-3 fs-12" style="margin-top:6px;line-height:1.7;">资料已提交平台，预计 <b style="color:var(--warning);">3-5 个工作日</b> 内完成初审与终审，审核结果将在消息中心同步通知。</div>'+
+    '</div>'+
+    '<div class="card" style="padding:14px;margin-bottom:12px;">'+
+      '<div class="ef-sum-item"><b>入驻类型</b><span>'+name+'</span></div>'+
+      '<div class="ef-sum-item"><b>入驻费</b><span>'+(Number(feeVal)>0?'¥'+Number(feeVal).toLocaleString():'¥0 · 免费审核制')+'</span></div>'+
+      '<div class="ef-sum-item"><b>保证金</b><span>'+dep+'</span></div>'+
+      '<div class="ef-sum-item"><b>提交时间</b><span>'+sTime+'</span></div>'+
+      '<div class="ef-sum-item" style="border:none;margin-bottom:0;"><b>预计审核</b><span>3-5 个工作日</span></div>'+
+    '</div>'+
+    '<button class="btn btn-primary btn-block btn-lg" onclick="location.href=\'index.html\'">返回个人中心</button>';
+  document.querySelector('.ef-scroll').style.paddingBottom='28px';
+}
+/* 已有 pending 入驻记录 → 进入页直接展示审核中结果态 */
+function checkPending(){
+  var e=EntryStore.read();
+  if(e.status==='pending'||e.status==='first_ok'){showResult(e);return true;}
+  return false;
+}
 function doApply(){
   var payload={
     contact:form.contact,tel:form.tel,scope:form.scope,
@@ -682,13 +746,17 @@ function doApply(){
     cases:form.cases,
     address:form.address,
     website:form.website,
-    attachments:form.attachments
+    attachments:form.attachments,
+    /* [FEAT 9.2-2] 付费模式 */
+    cycle:cycle
   };
   var r=DataBus.entryApply(type,payload,fee);
   if(r&&r.error){UI.toast(r.error,'warn');return;}
   clearDraft();
   UI.toast(fee===0?'申请已提交，等待平台审核':'支付成功，申请已进入审核','ok');
-  setTimeout(function(){location.href='entry-review.html';},900);
+  /* 提交成功后不立即跳转，当前页展示审核中结果态 */
+  showResult(EntryStore.read());
+  window.scrollTo(0,0);
 }
 function handleSubmit(){
   if(!gate()||!mutualLock())return;
@@ -812,7 +880,8 @@ renderHead();
 renderFee();
 prefill();
 saveDraft();
-renderAll();
+/* 已有审核中入驻记录 → 直接展示结果态，不渲染空白表单 */
+if(!checkPending()){renderAll();}
 window.addEventListener('engchain:mode', renderFee);
 window.addEventListener('engchain:store-change', renderFee);
 })();
@@ -917,6 +986,10 @@ window.addEventListener('engchain:store-change', renderFee);
 /* 费用卡 */
 .ef-fee{padding:14px;margin-bottom:12px;}
 .ef-fee-divider{height:1px;background:var(--line);margin:12px 0;}
+
+/* 提交成功·审核中结果态 */
+.ef-result{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:26px 20px;text-align:center;margin-bottom:14px;box-shadow:var(--shadow-xs);}
+.ef-r-ic{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 4px 14px rgba(201,169,97,.3);}
 
 /* CTA */
 .ef-cta{left:14px;right:14px;}

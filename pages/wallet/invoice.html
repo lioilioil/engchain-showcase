@@ -42,6 +42,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
       <div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>
         <input class="input" id="f-amount" type="number" placeholder="请输入开票金额" value="">
+        <div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">可开票总额：—</div>
       </div>
       <div class="field"><label class="field-label">关联订单</label>
         <select class="input" id="f-order"><option value="">不关联订单</option></select>
@@ -114,18 +115,65 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (def && def.email) document.getElementById('f-email').value = def.email;
   }
 
-  function renderOrderSelect() {
-    var sel = document.getElementById('f-order');
+  /* [FIX BM-037] 计算可开票总额：当前用户已结算/已完成订单实付累计 − 已开票（非驳回）金额。
+     发票金额不得自由输入任意大额，须 >0 且 ≤ 可开票总额。 */
+  function invoiceableOrders() {
     var orders = [];
     try { orders = (window.DataBus && DataBus.orders) ? DataBus.orders() : []; } catch (e) {}
     var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
     var uid = me ? me.id : '';
     var acct = '';
     try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
+    var settledStates = { settled: 1, paid: 1, completed: 1, finished: 1, done: 1 };
+    return orders.filter(function (o) {
+      if (!(o.owner === uid || o.counterparty === acct)) return false;
+      return settledStates[o.state] || settledStates[o.status];
+    });
+  }
+  function invoiceableTotal() {
+    var orders = invoiceableOrders();
+    var gross = orders.reduce(function (s, o) { return s + (Number(o.amount) || 0); }, 0);
+    /* 减去已开票（非驳回）金额，避免重复开票 */
+    var invoiced = 0;
+    try {
+      var list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []);
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var uid = me ? me.id : '';
+      list.forEach(function (x) {
+        if (x.status === 'rejected') return;
+        if (uid && x.uid && x.uid !== uid) return;
+        invoiced += Number(x.amount) || 0;
+      });
+    } catch (e) {}
+    return Math.max(0, Math.round((gross - invoiced) * 100) / 100);
+  }
+  function refreshAmountHint() {
+    var el = document.getElementById('f-amount-hint');
+    if (!el) return;
+    el.textContent = '可开票总额：¥' + invoiceableTotal().toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '（金额不得超过此数）';
+  }
+
+  function renderOrderSelect() {
+    var sel = document.getElementById('f-order');
+    var orders = invoiceableOrders();
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    var acct = '';
+    try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
     var mine = orders.filter(function (o) { return o.owner === uid || o.counterparty === acct; });
     sel.innerHTML = '<option value="">不关联订单</option>' + mine.slice(0, 20).map(function (o) {
-      return '<option value="' + o.id + '">' + o.id + ' · ' + esc(o.title || '').slice(0, 20) + '</option>';
+      var amt = Number(o.amount) || 0;
+      return '<option value="' + o.id + '" data-amt="' + amt + '">' + o.id + ' · ' + esc(o.title || '').slice(0, 16) + '（¥' + amt.toLocaleString() + '）</option>';
     }).join('');
+    /* [FIX BM-037] 选择订单后自动带入该订单实付金额，避免自由输入任意大额 */
+    sel.onchange = function () {
+      var opt = sel.options[sel.selectedIndex];
+      var amt = opt && opt.getAttribute('data-amt');
+      if (amt && Number(amt) > 0) {
+        document.getElementById('f-amount').value = Number(amt);
+      }
+    };
+    refreshAmountHint();
   }
 
   function renderList() {
@@ -173,14 +221,43 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   };
 
+  /* E1-20 企业认证门控：仅 enterprise/resident 可开专票 */
+  function isEnterpriseCertified() {
+    try { return !!(window.entryAccess && entryAccess().isResident); } catch (e) { return false; }
+  }
+  function isSpecial() { return invType === '增值税专用发票'; }
+  /* E1-20 税号格式：15/17/18/20 位字母数字 */
+  function validTaxNo(no) { return /^[A-Za-z0-9]{15,20}$/.test(String(no || '').trim()); }
+  function renderSpecialGate() {
+    var sp = document.querySelector('#f-type-seg .seg-item[data-t="增值税专用发票"]');
+    if (!sp) return;
+    var ok = isEnterpriseCertified();
+    sp.style.opacity = ok ? '' : '.45';
+    sp.style.pointerEvents = ok ? '' : 'none';
+    var hint = document.getElementById('f-special-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'f-special-hint';
+      hint.style.cssText = 'font-size:11px;color:var(--text-3);margin-top:6px;';
+      sp.parentNode.parentNode.insertBefore(hint, sp.parentNode.nextSibling);
+    }
+    hint.innerHTML = ok ? '' : '完成<b style="color:var(--primary-dim);">企业认证</b>后可开具增值税专用发票；普票无需企业认证。';
+  }
   /* 发票类型切换 */
   document.querySelectorAll('#f-type-seg .seg-item').forEach(function (el) {
     el.onclick = function () {
+      var want = el.getAttribute('data-t');
+      if (want === '增值税专用发票' && !isEnterpriseCertified()) {
+        UI.toast('完成企业认证后可开具增值税专用发票', 'warn');
+        renderSpecialGate();
+        return;
+      }
       document.querySelectorAll('#f-type-seg .seg-item').forEach(function (x) { x.classList.remove('is-on'); });
       el.classList.add('is-on');
-      invType = el.getAttribute('data-t');
+      invType = want;
     };
   });
+  renderSpecialGate();
 
   window.cancelApply = function () {
     document.getElementById('apply-form').style.display = 'none';
@@ -193,8 +270,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!title) { UI.toast('请先添加发票抬头', 'warn'); return; }
     var amount = parseFloat(document.getElementById('f-amount').value);
     if (!amount || amount <= 0) { UI.toast('请输入有效的开票金额', 'warn'); return; }
+    /* [FIX BM-037] 发票金额必须 >0 且 ≤ 可开票总额（已结算订单实付累计 − 已开票），不得自由输入任意大额 */
+    var invTotal = invoiceableTotal();
+    if (amount > invTotal + 0.001) {
+      UI.toast('开票金额超过可开票总额 ¥' + invTotal.toLocaleString(), 'warn');
+      return;
+    }
     var email = document.getElementById('f-email').value.trim();
     if (!email) { UI.toast('请填写接收邮箱', 'warn'); return; }
+    /* E1-20 专票强制校验税号与开户行 */
+    if (invType === '增值税专用发票') {
+      if (!isEnterpriseCertified()) { UI.toast('完成企业认证后可开具增值税专用发票', 'warn'); return; }
+      var taxNo = (title.tax || '').trim();
+      if (!taxNo) { UI.toast('专票需填写纳税人识别号（税号），请在开票信息管理中补全', 'warn'); return; }
+      if (!validTaxNo(taxNo)) { UI.toast('税号格式不正确（应为 15/17/18/20 位字母或数字）', 'warn'); return; }
+      if (!((title.bankAccount || '').trim())) { UI.toast('专票需填写开户行及账号，请在开票信息管理中补全', 'warn'); return; }
+    }
     var orderId = document.getElementById('f-order').value;
     var payload = {
       title: title.name,

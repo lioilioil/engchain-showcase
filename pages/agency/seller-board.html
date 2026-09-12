@@ -60,15 +60,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <!-- 保证金 -->
     <div class="card" id="deposit-card" style="margin-bottom:12px;"></div>
-    <!-- WP8 增值付费入口位（架构预留，首期敬请期待） -->
-    <div class="card upgrade-card" onclick="showUpgradeSoon()" style="margin-bottom:12px;cursor:pointer;">
+    <!-- [FEAT 9.2-1] upgrade entry -->
+    <div class="card upgrade-card" onclick="location.href='../vendor/upgrades.html'" style="margin-bottom:12px;cursor:pointer;">
       <div class="up-head">
         <span class="up-ic"><svg class="ic"><use href="#i-star"/></svg></span>
         <div class="up-info">
-          <div class="up-title">推广增值 <span class="up-badge">敬请期待</span></div>
+          <div class="up-title">增值道具 <span class="up-badge" style="background:var(--primary);color:#fff;">已上线</span></div>
           <div class="up-sub">服务置顶 / 线索包 / 经营工具，助力获客增长</div>
         </div>
         <span class="up-arrow">›</span>
+      </div>
+    </div>
+    <!-- [FEAT 9.2-5] warranty frozen display -->
+    <div class="card" id="warranty-card" style="margin-bottom:12px;display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--text-1);">质保金冻结中</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:3px;">验收后30天自动释放</div>
+        </div>
+        <div class="mono fw-700" id="warranty-amount" style="font-size:18px;color:var(--text-2);">Y0</div>
       </div>
     </div>
     <!-- 我的服务（合作方经营橱窗） -->
@@ -109,11 +119,21 @@ function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFracti
 var acc=window.entryAccess?entryAccess():{agency:false,isResident:false,statusId:'registered'};
 window.previewAsSeller=function(){try{var cur=DataBus.current();if(cur){if(!cur.identity)cur.identity={};if(!cur.identity.entryTypes)cur.identity.entryTypes=[];if(cur.identity.entryTypes.indexOf('agency')<0)cur.identity.entryTypes.push('agency');if(!cur.identity.enterprise)cur.identity.enterprise='verified';DataBus._write(cur);}location.reload();}catch(e){if(window.UI)UI.toast('预览启动失败','err');}};
 if(!acc.agency){
-  document.querySelector('.scroll').innerHTML='<div style="padding:70px 26px;text-align:center;">'+
-    '<div class="fw-700 fs-17" style="margin-bottom:8px;">服务商工作台 · 中介企业专享</div>'+
-    '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:22px;">完成「中介服务企业」入驻并缴纳履约保证金后，可在此接单、交付与结算。</div>'+
-    '<button class="btn btn-primary btn-block" onclick="location.href=\''+(acc.statusId==='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId==='guest'?'去登录':'去入驻中介企业')+'</button>'+
-    '<button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="previewAsSeller()">以服务商视角预览</button></div>';
+  document.querySelector('.scroll').innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
+  '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 180px;">'+
+    '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
+      '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><path d="M3 9l1-5h16l1 5M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9M9 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</div>'+
+    '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">服务商工作台</div>'+
+    '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">中介服务企业专享 · 完成入驻并缴纳履约保证金后接单、交付与结算</div>'+
+  '</div>'+
+  '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
+    '<div style="padding:0 24px;">'+
+      '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+(acc.statusId=='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId=='guest'?'去登录':'去入驻中介企业')+'</button>'+
+      '<button class="btn btn-ghost btn-block" style="margin-top:10px;height:44px;font-size:14px;" onclick="previewAsSeller()">以服务商视角预览</button>'+
+    '</div>'+
+  '</div>'+
+'</div>';
   return;
 }
 var me=DataBus.current(),uid=me?me.id:'';
@@ -309,6 +329,23 @@ function renderKpi(){
       }
     }
   } catch (e) {}
+
+  /* [FEAT 9.2-5] warranty frozen amount display */
+  try {
+    if (window.Mediation) {
+      var myOrders = Mediation.list({ uid: uid, role: 'seller' });
+      var warTotal = 0;
+      myOrders.forEach(function(o) {
+        if (o.warranty && o.warranty.status === 'reserved') warTotal += (o.warranty.amount || 0);
+      });
+      var wc = document.getElementById('warranty-card');
+      if (wc && warTotal > 0) {
+        wc.style.display = '';
+        document.getElementById('warranty-amount').textContent = fmt(warTotal);
+      }
+    }
+  } catch (e) {}
+
 }
 renderTabs();renderList();renderKpi();renderMyServices();renderLeads();
 var kt=document.getElementById('k-income-tile');
