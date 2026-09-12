@@ -136,12 +136,25 @@ if(!resident && !isInd){
   if(body){
     var gBtn=st==='guest'?'../auth/login.html':'../profile/entry.html';
     var gLabel=st==='guest'?'去登录':'去入驻';
-    body.innerHTML='<div style="padding:52px 28px;text-align:center;">'+
-      '<div class="dq-icon" style="color:var(--primary);margin-bottom:14px;"><svg class="ic" style="width:42px;height:42px;"><use href="#i-share"/></svg></div>'+
-      '<div class="fw-700 fs-17" style="margin-bottom:8px;">分销中心 · 入驻企业 / 个人合伙人专享</div>'+
-      '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:26px;">完成企业入驻或申请个人合伙人后开通分销返佣：<br>建筑企业 · 基础一级 8%<br>中介服务企业 · 受限一级 6%<br>合伙人企业 · 完整二级 12% / 3%<br>个人合伙人 · 完整二级 8% / 2%</div>'+
-      '<button class="btn btn-primary btn-block" onclick="location.href=\''+gBtn+'\'">'+gLabel+'</button>'+
-      '</div>';
+        body.innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
+      '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 140px;">'+
+        '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
+          '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="6" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="19" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'+
+        '</div>'+
+        '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">分销中心</div>'+
+        '<div style="font-size:13px;color:var(--text-3);line-height:1.75;margin-bottom:22px;">入驻企业 / 个人合伙人专享<br>完成入驻后开通分销返佣权益</div>'+
+        '<div style="width:100%;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left;">'+
+          '<div style="font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:10px;letter-spacing:.6px;opacity:.7;">返佣比例一览</div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);"><span style="font-size:12.5px;color:var(--text-2);">建筑企业</span><span style="font-size:13px;font-weight:700;color:var(--primary);">一级 8%</span></div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);"><span style="font-size:12.5px;color:var(--text-2);">中介服务企业</span><span style="font-size:13px;font-weight:700;color:var(--primary);">一级 6%</span></div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);"><span style="font-size:12.5px;color:var(--text-2);">合伙人企业</span><span style="font-size:13px;font-weight:700;color:var(--primary);">二级 12%/3%</span></div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0 0;"><span style="font-size:12.5px;color:var(--text-2);">个人合伙人</span><span style="font-size:13px;font-weight:700;color:var(--primary);">二级 8%/2%</span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
+        '<div style="padding:0 24px;"><button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+gBtn+'\'">'+gLabel+'</button></div>'+
+      '</div>'+
+    '</div>';
   }
   window.withdraw=function(){UI.toast('分销为入驻企业 / 个人合伙人专享','warn');};
   return;
@@ -157,6 +170,10 @@ if(!resident && !isInd){
   var me2 = DataBus.current();
   var myUid = me2 ? me2.id : '';
   if (!myUid) return;
+  /* E2-09：演示数据仅 seed 一次，避免每次进入都改写 localStorage */
+  var SEED_KEY = 'engchain-dist-seeded-v1';
+  if (localStorage.getItem(SEED_KEY)) return;
+  try { localStorage.setItem(SEED_KEY, '1'); } catch(e) {}
 
   var DAY = 86400000;
   var now = Date.now();
@@ -269,6 +286,27 @@ document.getElementById('dh-frozen').textContent=money(stat.frozen+stat.settled)
 var _availAmt = (window.BalanceStore ? BalanceStore.available() : stat.available);
 document.getElementById('dh-avail').textContent=money(_availAmt);
 document.getElementById('dq-team').textContent=lv.total+' 位伙伴';
+/* [FIX] 零团队引导卡：无伙伴时提示生成海报邀请首位好友 */
+(function insertZeroTeamGuide(){
+  if(lv.total>0) return;
+  var scroll=document.querySelector('.dist-scroll');
+  if(!scroll) return;
+  if(scroll.querySelector('#zero-team-guide')) return;
+  var card=document.createElement('div');
+  card.id='zero-team-guide';
+  card.style.cssText='margin:4px 2px 16px;padding:16px;border-radius:16px;background:linear-gradient(135deg,rgba(201,169,97,.10),rgba(201,169,97,.03));border:1px solid rgba(201,169,97,.3);display:flex;align-items:center;gap:12px;';
+  card.innerHTML=
+    '<div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:flex;align-items:center;justify-content:center;flex:none;">'+
+      '<svg class="ic" style="width:22px;height:22px;"><use href="#i-share"/></svg></div>'+
+    '<div style="flex:1;min-width:0;">'+
+      '<div style="font-size:13.5px;font-weight:700;color:var(--text-1);">还没有团队伙伴</div>'+
+      '<div style="font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.5;">生成专属海报，邀请首位好友加入，消费后自动返佣</div>'+
+    '</div>'+
+    '<a href="poster.html" style="flex:none;padding:8px 14px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12px;font-weight:700;text-decoration:none;">去生成海报</a>';
+  var quick=document.querySelector('.dist-quick');
+  if(quick && quick.nextSibling){ quick.parentNode.insertBefore(card, quick.nextSibling); }
+  else { scroll.insertBefore(card, scroll.firstChild); }
+})();
 document.getElementById('d-t1').textContent=tr.t1+'%';
 document.getElementById('d-t2').textContent=(tr.t2>0)?tr.t2+'%':'暂未开放';
 document.getElementById('d-active').textContent=lv.active+' 位 / '+money(lv.consume);
@@ -338,13 +376,43 @@ window.withdraw=function(){
 };
 window.doWithdraw=function(method){
   UI.closeSheet&&UI.closeSheet();
+  /* [FIX BM-033] 风控封禁用户前台拦截：被封禁则禁止提现 */
+  try {
+    var _curU=(window.DataBus&&DataBus.current)?DataBus.current():null;
+    if(_curU&&_curU.banned){UI.toast('账号已被封禁，无法执行此操作','warn');return;}
+  } catch(e){}
+  /* [FIX BM-031] 分销提现统一走 DataBus.withdrawalApply，并受单笔¥1000/每日2次限额约束，
+     不得一键提现全部余额。从 MOCK.business.withdraw 读取 singleMax/dailyMax。 */
+  var wdCfg=(window.MOCK&&MOCK.business&&MOCK.business.withdraw)||{singleMax:1000,dailyMax:2};
+  var singleMax=Number(wdCfg.singleMax)||1000;
+  var dailyMax=Number(wdCfg.dailyMax)||2;
+  /* 统计今日已提现次数（本 uid，今日 appliedAt） */
+  var todayCount=0;
+  try {
+    var allWd=DataBus.withdrawals()||[];
+    var now=new Date();var y=now.getFullYear(),mo=now.getMonth(),d=now.getDate();
+    todayCount=allWd.filter(function(w){
+      if(!w||w.uid!==uid)return false;
+      var t=new Date(w.appliedAt||0);
+      return t.getFullYear()===y&&t.getMonth()===mo&&t.getDate()===d;
+    }).length;
+  } catch(e){}
+  if(todayCount>=dailyMax){
+    UI.toast('今日提现次数已达上限（每日 '+dailyMax+' 次），请明日再试','warn');return;
+  }
   var avail=BalanceStore.available();
-  var w=DataBus.withdrawalApply(uid,avail,method,{bank:method==='bank'?'银行卡 · 尾号 ****':'支付宝 · 本人'});
+  /* 单笔封顶：不得超过 singleMax；超出部分需分批提现 */
+  var amt=Math.min(avail,singleMax);
+  amt=Math.round(amt*100)/100;
+  if(!(amt>0)){UI.toast('可提现金额不足','warn');return;}
+  var capped=(avail>singleMax+0.001);
+  var w=DataBus.withdrawalApply(uid,amt,method,{bank:method==='bank'?'银行卡 · 尾号 ****':'支付宝 · 本人'});
   if(!w||w.error){UI.toast((w&&w.error)||'提现失败','warn');return;}
   /* S5 离线写队列：本地已落审批流，同时入 Outbox，联网后由服务端幂等补传（idemKey 防重） */
   if(window.Outbox){Outbox.enqueue('withdrawal.apply',{uid:uid,amount:w.amount,method:method,idemKey:'wd_'+(w.id||(Date.now()))});
     if(navigator.onLine===false)UI.toast('当前离线，提现已暂存，联网后自动提交','warn');}
-  UI.dialog({title:'提现已提交',text:'申请金额 <b>'+money(w.amount)+'</b>，已冻结，进入两级审批，'+RULE('distribution.settleNote','T+1')+'到账。可在「钱包-提现记录」查看进度。',ok:'我知道了',onOk:function(){location.href='earnings.html';}});
+  var remain=capped?('单笔限额 ¥'+singleMax.toLocaleString()+'，剩余 ¥'+(avail-singleMax).toLocaleString()+' 可今日下次提现。'):'';
+  UI.dialog({title:'提现已提交',text:'申请金额 <b>'+money(w.amount)+'</b>，已冻结，进入两级审批，'+RULE('distribution.settleNote','T+1')+'到账。今日已提现 '+(todayCount+1)+'/'+dailyMax+' 次。'+remain+'<br>可在「钱包-提现记录」查看进度。',ok:'我知道了',onOk:function(){location.href='earnings.html';}});
 };
 /* 恢复联网时自动重放离线写队列（原型 runner 直接成功，真实后端替换为接口幂等提交） */
 window.addEventListener('online',function(){if(window.Outbox&&Outbox.pending()){var r=Outbox.flush(function(){return{ok:true};});if(r.done)UI.toast('已补传 '+r.done+' 条离线操作','ok');}});
@@ -382,6 +450,8 @@ window.addEventListener('online',function(){if(window.Outbox&&Outbox.pending()){
   window.addEventListener('engchain:auth', _distRefresh);
   window.addEventListener('engchain:store-change', _distRefresh);
   window.addEventListener('engchain:rebate', _distRefresh);
+  /* E2-08：完成企业入驻后档位文案/门槛需整体重建，刷新页面以重算 distTier */
+  window.addEventListener('engchain:entry', function(){ location.reload(); });
 })();
 </script>
 <style>

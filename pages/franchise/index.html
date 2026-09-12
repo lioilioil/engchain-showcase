@@ -404,6 +404,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
 <script src="../../js/delegates.js"></script>
 <script>
 (function () {
@@ -424,8 +426,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     { key: '市政公用',   label: '市政公用', icon: 'company',  lv: '市政' }
   ];
 
-  /* ---- 数据源：仅资质招商（type === qualification） ---- */
+  /* ---- 数据源：仅资质招商（type === qualification），mergedList 同源混入用户发布 ---- */
   var all = (MOCK.franchises || []).filter(function (f) { return f.type === 'qualification'; });
+  try {
+    if (window.SupplyStore) {
+      SupplyStore.listActive().forEach(function (x) {
+        if (x.bizKey === 'franchise' && !all.some(function (y) { return String(y.id) === String(x.id); })) {
+          all.push(Object.assign({}, x, { type: x.type || 'qualification', _badge: '用户发布' }));
+        }
+      });
+    }
+  } catch (e) {}
 
   function filtered() { return all; }
 
@@ -548,12 +559,62 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '';
   }
 
+  /* ---- [FIX BM-048] 加盟申请：Franchise 模块尚未就绪时，本页实现申请按钮 + 模拟支付扣减逻辑。
+     加盟费从 BalanceStore 扣减（模拟支付流程），成功后写入本地加盟关系并在卡片上显示已加盟状态。 ---- */
+  var JOINED_KEY = 'engchain-franchise-joined';
+  function readJoined() { try { return JSON.parse(localStorage.getItem(JOINED_KEY) || '{}'); } catch (e) { return {}; } }
+  function writeJoined(o) { try { localStorage.setItem(JOINED_KEY, JSON.stringify(o)); } catch (e) {} }
+  function isJoined(fid) { return !!readJoined()[fid]; }
+  /* 提取加盟费（元）：优先 joinFee 数值字段，否则从 fee 文本解析，兜底 29800 */
+  function franchiseFee(f) {
+    if (typeof f.joinFee === 'number' && f.joinFee > 0) return f.joinFee;
+    var s = String(f.fee || '');
+    var m = s.match(/(\d+(?:\.\d+)?)\s*(万|w|W)?/);
+    if (m) { var n = parseFloat(m[1]); return Math.round(m[2] ? n * 10000 : n); }
+    return 29800;
+  }
+  window.franchiseApply = function (fid, ev) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    /* 风控封禁拦截 */
+    try { var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null; if (cu && cu.banned) { UI.toast('账号已被封禁，无法执行此操作', 'warn'); return; } } catch (e) {}
+    var f = all.filter(function (x) { return x.id === fid; })[0];
+    if (!f) return;
+    if (isJoined(fid)) { UI.toast('已提交加盟申请，等待品牌方审核', 'ok'); return; }
+    var fee = franchiseFee(f);
+    var avail = window.BalanceStore ? BalanceStore.available() : 0;
+    UI.dialog({
+      title: '申请加盟',
+      text: '加盟「' + (f.name || '') + '」需加盟费 <b style="color:var(--primary-dim)">¥' + fee.toLocaleString() + '</b>（模拟支付，从余额扣减）。当前可用余额 ¥' + avail.toLocaleString() + '。确认申请？',
+      ok: '确认支付加盟费', cancel: '取消',
+      onOk: function () {
+        if (avail < fee) { UI.toast('模拟支付：余额不足，请先充值', 'warn'); return; }
+        /* 经 BalanceStore 扣减（read→修改→write，Math.round 规整 + logs 记录） */
+        try {
+          var bs = BalanceStore.read();
+          bs.balance = Math.round((bs.balance - fee) * 100) / 100;
+          bs.logs.unshift({ type: 'franchise_join', amount: -fee, method: 'balance', reason: '加盟「' + (f.name || '') + '」加盟费', ts: Date.now(), status: 'success' });
+          BalanceStore.write(bs);
+        } catch (e) { UI.toast('支付失败：' + (e.message || e), 'err'); return; }
+        var j = readJoined();
+        j[fid] = { ts: Date.now(), fee: fee, name: f.name };
+        writeJoined(j);
+        UI.toast('加盟费 ¥' + fee.toLocaleString() + ' 已支付，加盟申请已提交', 'ok');
+        renderList();
+      }
+    });
+  };
+
   function franchiseCard(f) {
     var regionsHtml = (f.regions || []).slice(0, 4).map(regionTag).join('');
     var hotCls = f.hot ? ' hot' : '';
+    var joined = isJoined(f.id);
+    var applyBtn = joined
+      ? '<span class="fc-view" style="background:var(--success-soft);color:var(--success);">已加盟 · 待审核</span>'
+      : '<button class="fc-view" style="border:none;cursor:pointer;font-family:inherit;" onclick="franchiseApply(\'' + f.id + '\',event)">申请加盟</button>';
     return '<a href="../supply/detail.html?id=' + f.id + '" class="franchise-card' + hotCls + '">' +
       '<div class="fc-top">' + verifiedTag(f) + levelTag(f) + urgentTag(f) +
-        '<span class="match-pill match-high" style="margin-left:auto;">' + f.match + '%</span></div>' +
+        (joined ? '<span class="tag tag-success" style="margin-left:auto;">已加盟</span>' : '') +
+        '<span class="match-pill match-high" style="' + (joined ? '' : 'margin-left:auto;') + '">' + f.match + '%</span></div>' +
       '<div class="fc-name">' + f.name + ' · ' + (f.qualCategory || f.qualType || '') + '</div>' +
       '<div class="fc-meta">' +
         '<span>' + iconName('pin') + (f.region || f.location) + '</span>' +
@@ -570,7 +631,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="fc-price"><span class="p">¥' + (f.unlockPrice || 98) + '</span>' +
           (f.originalPrice ? '<span class="o">¥' + f.originalPrice + '</span>' : '') +
           '<span class="u">/ 联系方式</span></div>' +
-        '<span class="fc-view">查看详情 ' + iconName('chev-r') + '</span>' +
+        applyBtn +
       '</div>' +
     '</a>';
   }
@@ -1043,6 +1104,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSortTabs();
   renderList();
   renderDelegateBtn();
+  /* E2-10：认证/入驻变化后，招商委托状态随认证刷新 */
+  window.addEventListener('engchain:auth', function(){ renderDelegateBtn(); var fr=document.getElementById('delegateFormRoot'); if(fr&&window.Delegates)Delegates.prefillAuth(fr); });
+  window.addEventListener('engchain:entry', function(){ renderDelegateBtn(); var fr=document.getElementById('delegateFormRoot'); if(fr&&window.Delegates)Delegates.prefillAuth(fr); });
 })();
 </script>
 </body>

@@ -501,6 +501,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       match: varyMatch(r)
     });
   });
+  /* mergedList 同源：混入 SupplyStore 中用户发布的 personnel 条目 */
+  try {
+    if (window.SupplyStore) {
+      SupplyStore.listActive().forEach(function (r) {
+        if (r.bizKey === 'personnel' && !entData.some(function (y) { return String(y.id) === String(r.id); })) {
+          entData.push(Object.assign({}, r, {
+            certType: r.certType || r.sub, certLevel: r.certLevel || '—',
+            registerStatus: r.registerStatus || '可转注册', socialSecurity: r.socialSecurity || '可配合',
+            urgent: !!r.urgent, salaryNum: r.salaryNum || 0, salaryRange: r.salaryRange || '面议',
+            match: varyMatch(r), _badge: '用户发布'
+          }));
+        }
+      });
+    }
+  } catch (e) {}
 
   var talentData = (MOCK.talents || []).map(function (r, idx) {
     var statuses = ['在职·考虑机会', '离职·立即到岗', '在职·考虑机会', '在职·暂不考虑', '离职·立即到岗', '在职·考虑机会'];
@@ -519,6 +534,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       match: varyMatch(r)
     });
   });
+  /* mergedList 同源：混入 SupplyStore 中用户发布的 talent 条目 */
+  try {
+    if (window.SupplyStore) {
+      SupplyStore.listActive().forEach(function (r) {
+        if (r.bizKey === 'talent' && !talentData.some(function (y) { return String(y.id) === String(r.id); })) {
+          talentData.push(Object.assign({}, r, {
+            certType: r.certType || r.sub, certLevel: r.certLevel || '—',
+            registerStatus: (r.registerStatus && typeof r.registerStatus === 'object') ? r.registerStatus.status : (r.registerStatus || '可转注册'),
+            socialSecurity: (r.socialSecurity && typeof r.socialSecurity === 'object') ? r.socialSecurity.status : (r.socialSecurity || '可配合'),
+            urgent: !!r.urgent, experienceNum: r.experienceNum || 0, salaryNum: r.salaryNum || 0,
+            salaryRange: r.salaryRange || ((r.expectedSalary || {}).salaryRange || '面议'),
+            jobStatus: r.currentStatus || r.jobStatus || '在职·考虑机会',
+            match: varyMatch(r), _badge: '用户发布'
+          }));
+        }
+      });
+    }
+  } catch (e) {}
 
   /* ===== 状态 ===== */
   var currentTab = 'enterprise';
@@ -1272,8 +1305,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       /* 有权限：弹出投递表单 */
       openApplySheet(jobId);
     } else {
-      /* 无权限：弹出引导弹窗 */
+      /* 无权限：弹出引导弹窗，按身份动态切换 CTA */
       document.getElementById('deliverModalDesc').textContent = result.reason || '请先完成个人入驻并完善简历信息';
+      setupDeliverCta(result);
       openDeliverModal();
     }
   };
@@ -1338,6 +1372,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     });
   };
+  /* E2-11：按身份动态切换引导 CTA（未注册→去登录 / 已注册未实名→去实名 / 其余→去完善简历） */
+  var deliverCtaHref = '../profile/auth-qualification.html?mode=edit';
+  function setupDeliverCta(result){
+    var btn = document.getElementById('deliverGoEdit');
+    var loggedIn = false;
+    try { var me = window.DataBus && DataBus.current(); loggedIn = !!(me && me.id); } catch(e){}
+    var rnOk = false;
+    try { var rn = window.AuthStore ? AuthStore.read().realname : null; rnOk = !!(rn && rn.ok); } catch(e){}
+    var label, href;
+    if(!loggedIn){ label='去登录'; href='../auth/login.html'; }
+    else if(!rnOk){ label='去实名'; href='../profile/auth-personal.html'; }
+    else { label='去完善简历'; href='../profile/auth-qualification.html?mode=edit'; }
+    deliverCtaHref = href;
+    if(btn) btn.textContent = label;
+  }
   function openDeliverModal(){
     document.getElementById('deliverMask').classList.add('show');
     document.getElementById('deliverModal').classList.add('show');
@@ -1350,7 +1399,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   document.getElementById('deliverCancel').addEventListener('click', closeDeliverModal);
   document.getElementById('deliverGoEdit').addEventListener('click', function(){
     closeDeliverModal();
-    location.href = '../profile/auth-qualification.html?mode=edit';
+    location.href = deliverCtaHref;
   });
   /* ESC键关闭 */
   document.addEventListener('keydown', function(e){
@@ -1401,6 +1450,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSortTabs();
   renderHot();
   renderList();
+  /* E2-12：完成实名/入驻后，投递按钮状态即时刷新 */
+  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); });
+  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); });
 })();
 </script>
 </body>

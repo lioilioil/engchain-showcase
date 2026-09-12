@@ -149,8 +149,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <!-- ══════════ ① 账户概览数据带（随卡片切换联动） ══════════ -->
     <div class="ov-grid">
       <div class="ov-cell"><div class="ov-label" id="ov-la">可用余额</div><div class="ov-val" id="ov-a">—</div></div>
-      <div class="ov-cell"><div class="ov-label" id="ov-lb">冻结</div><div class="ov-val" id="ov-b">—</div></div>
-      <div class="ov-cell"><div class="ov-label" id="ov-lc">累计消费</div><div class="ov-val" id="ov-c">—</div></div>
+      <div class="ov-cell"><div class="ov-label" id="ov-lb">在途金额</div><div class="ov-val" id="ov-b">—</div></div>
+      <div class="ov-cell"><div class="ov-label" id="ov-lc">冻结</div><div class="ov-val" id="ov-c">—</div></div>
+    </div>
+
+    <div id="banned-banner" style="display:none;margin-top:10px;padding:11px 13px;border-radius:11px;background:rgba(234,102,104,.12);border:1px solid rgba(234,102,104,.32);">
+      <div style="font-size:13px;font-weight:700;color:var(--danger);">账号已封禁 · 资金已冻结</div>
+      <div style="font-size:11px;margin-top:3px;color:var(--text-2);line-height:1.6;">账号因违规被封禁，充值/提现已暂停，余额与在途资金已冻结。如有疑问请联系客服 400-888-6688。</div>
     </div>
 
     <!-- ══════════ ② 主卡轮播：余额卡 ⇄ 积分卡（左右切换） ══════════ -->
@@ -165,7 +170,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <div class="wc-brand">工程链 · 余额账户</div>
                 <div class="wc-tright">
                   <span class="wc-contact" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8.9 15.6a4 4 0 0 0 0-7.2"/><path d="M12 18.1a7.4 7.4 0 0 0 0-12.2"/><path d="M5.8 13.4a1.7 1.7 0 0 0 0-2.8"/></svg></span>
-                  <div class="wc-badge">金 V</div>
+                  <div class="wc-badge" id="entry-badge">—</div>
                 </div>
               </div>
               <div class="wc-amt"><span class="cur">¥</span><span id="balance">—</span></div>
@@ -173,10 +178,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <div class="wc-chip"><svg viewBox="0 0 42 30" fill="none" stroke="rgba(88,62,16,.5)" stroke-width="1"><path d="M13 .5v9M29 .5v9M13 20.5v9M29 20.5v9M.5 15h12M29.5 15h12M21 .5v29M.5 7.5h8M33.5 22.5h8"/></svg></div>
                 <div class="wc-num">**** **** **** 1286</div>
               </div>
-              <div class="wc-sub">
-                <span>冻结 <b id="bal-frozen">—</b></span>
-                <span class="wc-subsep">·</span>
-                <span>累计入账 <b id="bal-total">—</b></span>
+              <div class="wc-sub" style="flex-direction:column;align-items:stretch;gap:5px;padding-top:11px;">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">可用余额</span><b id="bal-available">—</b></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">在途金额<small style="opacity:.6;">（提现中）</small></span><b id="bal-pending">—</b></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">冻结<span id="bal-deposit-tag" style="display:none;font-size:9px;color:#E6A022;margin-left:4px;"></span></span><b id="bal-frozen">—</b></div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;opacity:.7;"><span>累计入账</span><b id="bal-total">—</b></div>
               </div>
             </div>
           </div>
@@ -236,6 +242,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -359,11 +366,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var txTitle = document.getElementById('tx-title');
     var txSub = document.getElementById('tx-subtitle');
     if (i === 0) {
-      fillOv('可用余额', '冻结', '累计消费', cache.b);
+      fillOv('可用余额', '在途金额', '冻结', cache.b);
       main.textContent = '充余额'; main.href = 'recharge.html';
       sub.href = 'withdraw.html';
       sub.innerHTML = '提现<small id="sub-note">' + cache.b.a + '</small>';
-      countUp(document.getElementById('balance'), Math.round(BalanceStore.read().balance * 100) / 100, fmtBal);
+      countUp(document.getElementById('balance'), Math.round(BalanceStore.available() * 100) / 100, fmtBal);
       if (txTitle) txTitle.textContent = '收支明细';
       if (txSub) txSub.textContent = '对公审批 · 余额流水';
       renderTx();
@@ -374,7 +381,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       sub.innerHTML = '去解锁';
       countUp(document.getElementById('bal-credits'), CreditStore.read().balance || 0, fmtCred);
       if (txTitle) txTitle.textContent = '积分明细';
-      if (txSub) txSub.textContent = '获取 · 消费 · 免费解锁';
+      if (txSub) txSub.innerHTML = '<a href="unlock-records.html" style="color:var(--primary);text-decoration:none;">全部积分明细 ›</a>';
       renderCreditTx();
     }
   }
@@ -428,17 +435,73 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     window.addEventListener('resize', function () { applyPos(false); });
   })();
 
-  /* ---- 余额三数值：真账本渲染（含累计消费派生） ---- */
+  /* ---- E2-21 在途金额：当前用户 pending/first_ok 提现占用 ---- */
+  function pendingWithdrawAmount() {
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var uid = me ? me.id : '';
+      var all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : [];
+      return all.filter(function (x) { return x.uid === uid && (x.status === 'pending' || x.status === 'first_ok'); })
+        .reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0);
+    } catch (e) { return 0; }
+  }
+  /* ---- E1-14 钱包徽标：按入驻类型派生（建筑=蓝V/中介=金V/合伙人=专属/个人合伙人=个人合伙人） ---- */
+    function renderBadge() {
+    var el = document.getElementById('entry-badge');
+    if (!el) return;
+    var type = null;
+    try {
+      var acc = (typeof entryAccess === 'function') ? entryAccess() : null;
+      if (acc) {
+        if (acc.isIndividualPartner) type = 'individual';
+        else if (acc.isResident) {
+          var ts = acc.types || [];
+          if (ts.indexOf('partner') >= 0) type = 'partner';
+          else if (ts.indexOf('agency') >= 0) type = 'agency';
+          else type = 'construction';
+        }
+      }
+    } catch (e) {}
+    if (type && window.IdBadge) {
+      el.innerHTML = IdBadge.render(type, 'md');
+    } else {
+      el.textContent = '未入驻';
+    }
+  }
+  /* ---- E3-18 封禁用户资金冻结状态 ---- */
+  function renderBanned() {
+    var banner = document.getElementById('banned-banner');
+    var banned = false;
+    try { var u = (window.DataBus && DataBus.current) ? DataBus.current() : null; banned = !!(u && u.banned); } catch (e) {}
+    if (banner) banner.style.display = banned ? 'block' : 'none';
+    var main = document.getElementById('btn-main');
+    var sub = document.getElementById('btn-sub');
+    [main, sub].forEach(function (btn) {
+      if (!btn) return;
+      btn.style.pointerEvents = banned ? 'none' : '';
+      btn.style.opacity = banned ? '.45' : '';
+    });
+  }
+  /* ---- 余额三数值：真账本渲染（可用/在途/冻结 拆分） ---- */
   function renderBalance() {
     var b = BalanceStore.read();
-    document.getElementById('balance').textContent = UI.money(b.balance);
+    var avail = BalanceStore.available();
+    var pending = Math.round(pendingWithdrawAmount() * 100) / 100;
+    document.getElementById('balance').textContent = UI.money(avail);
+    document.getElementById('bal-available').textContent = UI.money(avail);
+    document.getElementById('bal-pending').textContent = UI.money(pending);
     document.getElementById('bal-frozen').textContent = UI.money(b.frozen);
     document.getElementById('bal-total').textContent = UI.money(b.totalIn);
-    var spend = 0;
-    (b.logs || []).forEach(function (l) { if (l.amount < 0) spend += Math.abs(l.amount); });
-    spend = Math.round(spend * 100) / 100;
-    cache.b = { a: UI.money(BalanceStore.available()), b: UI.money(b.frozen), c: UI.money(spend) };
-    if (tab === 0) { fillOv('可用余额', '冻结', '累计消费', cache.b); var note = document.getElementById('sub-note'); if (note) note.textContent = cache.b.a; }
+    /* E2-23 入驻审核中且有冻结额：标注含入驻保证金 */
+    var tag = document.getElementById('bal-deposit-tag');
+    if (tag) {
+      var showDeposit = false;
+      try { var en = EntryStore.read(); if (en && en.status === 'pending' && (b.frozen || 0) > 0) showDeposit = true; } catch (e) {}
+      if (showDeposit) { tag.style.display = ''; tag.textContent = '含入驻保证金¥' + (b.frozen || 0).toLocaleString(); }
+      else { tag.style.display = 'none'; tag.textContent = ''; }
+    }
+    cache.b = { a: UI.money(avail), b: UI.money(pending), c: UI.money(b.frozen) };
+    if (tab === 0) { fillOv('可用余额', '在途金额', '冻结', cache.b); var note = document.getElementById('sub-note'); if (note) note.textContent = cache.b.a; }
   }
 
   /* ---- 收支明细：对公记录（4 态）+ 余额账流水 ---- */
@@ -477,7 +540,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="tx-amt" style="color:' + (l.amount > 0 ? 'var(--success)' : 'var(--text-1)') + ';">' + sign + '¥' + Math.abs(l.amount).toLocaleString() + '</div></div>';
     });
 
-    list.innerHTML = html || '<div class="text-3 fs-12" style="padding:8px 0;">暂无收支记录</div>';
+    list.innerHTML = html || '<div style="padding:20px 0;text-align:center;"><div class="text-3 fs-12" style="margin-bottom:12px;">暂无收支记录</div><a href="recharge.html" class="btn btn-primary btn-sm" style="display:inline-flex;">去充值</a></div>';
   }
 
 
@@ -487,12 +550,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       { icon: 'bank', name: '对公转账', action: "location.href='corp-pay.html'" },
       { icon: 'card', name: '支付方式', action: "location.href='payment-method.html'" },
       { icon: 'doc', name: '发票', action: "location.href='invoice.html'" },
-      { icon: 'shield', name: '资金托管', action: "UI.toast('资金由中国建设银行第三方托管','ok')" }
+      { icon: 'shield', name: '资金托管', action: "location.href='escrow.html'" },
+      { icon: 'headset', name: '帮助客服', action: "UI.dialog({ title:'帮助与客服', text:'客服热线 400-888-6688（9:00-21:00）', ok:'知道了', cancel:'关闭' })" }
     ],
     1: [
       { icon: 'eye', name: '解锁记录', action: "location.href='unlock-records.html'" },
       { icon: 'sparkle', name: '积分规则', action: "location.href='credits-rules.html'" },
       { icon: 'gift', name: '免费额度', action: "location.href='free-quota.html'" },
+      { icon: 'award', name: '年度会员', action: "location.href='membership.html'" },
       { icon: 'tag', name: '积分商城', action: "location.href='credits-mall.html'" }
     ]
   };
@@ -508,15 +573,28 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }).join('');
   }
 
-  /* ---- 积分收支明细：获取/消费/免费解锁 ---- */
-  var CREDIT_TX = [
-    { type: 'earn', icon: 'sparkle', title: '每日签到奖励', sub: '连续签到第3天 · 2026-09-05 09:12', amount: 20 },
-    { type: 'spend', icon: 'eye', title: '解锁供需详情', sub: '成都地区混凝土供应 · 2026-09-04 14:32', amount: -10 },
-    { type: 'free', icon: 'tag', title: '免费解锁详情', sub: '使用本月免费额度 · 2026-09-03 10:15', amount: 0 },
-    { type: 'earn', icon: 'bolt', title: '完善资料奖励', sub: '完成个人实名认证 · 2026-09-01 16:40', amount: 50 },
-    { type: 'spend', icon: 'eye', title: '解锁供需详情', sub: '劳务班组需求信息 · 2026-08-28 11:20', amount: -10 },
-    { type: 'earn', icon: 'chat', title: '邀请好友奖励', sub: '好友注册并完成实名 · 2026-08-25 09:00', amount: 100 }
-  ];
+  /* ---- 积分收支明细：[FIX BM-021] 读取 CreditStore.read().logs 真实数据，不再用写死假数据。
+     显示积分变动（credits 正=收入/负=支出）、原因（reason）、时间（ts），logs 已 unshift 倒序；无记录显示空状态。 ---- */
+  function loadCreditRows() {
+    var logs = (CreditStore.read().logs) || [];
+    var pad = function(n){ return ('0' + n).slice(-2); };
+    return logs.slice(0, 20).map(function (l) {
+      var amt = Number(l.credits) || 0;
+      var type = amt > 0 ? 'earn' : (amt < 0 ? 'spend' : 'free');
+      var d = new Date(l.ts || Date.now());
+      var dateStr = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      var icon = (type === 'earn') ? 'sparkle' : (type === 'free' ? 'tag' : 'eye');
+      if (l.type === 'recharge') icon = 'gift';
+      else if (l.type === 'unlock') icon = 'eye';
+      else if (l.reason && /奖励|签到|邀请/.test(l.reason)) icon = 'star';
+      return {
+        type: type, icon: icon,
+        title: l.reason || (type === 'earn' ? '积分获取' : '积分消费'),
+        sub: (l.source ? l.source + ' · ' : '') + dateStr,
+        amount: amt
+      };
+    });
+  }
   var CREDIT_TX_META = {
     earn: { label: '获取', cls: 'tx-tag--earn', color: 'var(--success)' },
     spend: { label: '消费', cls: 'tx-tag--spend', color: 'var(--danger)' },
@@ -525,7 +603,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function renderCreditTx() {
     var el = document.getElementById('tx-list');
     if (!el) return;
-    var html = CREDIT_TX.map(function (r) {
+    var rows = loadCreditRows();
+    var html = rows.map(function (r) {
       var meta = CREDIT_TX_META[r.type] || CREDIT_TX_META.spend;
       var sign = r.amount > 0 ? '+' : (r.amount < 0 ? '' : '');
       var amtText = r.amount === 0 ? '免费' : sign + Math.abs(r.amount) + ' 分';
@@ -539,8 +618,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     el.innerHTML = html || '<div class="text-3 fs-12" style="padding:8px 0;">暂无积分记录</div>';
   }
 
+  /* ---- E2-17 新用户零余额：localStorage 无 engchain-balance 即视为全新用户，不注入演示余额/流水 ---- */
+  (function initNewUser(){
+    try { if (localStorage.getItem('engchain-balance') === null) { var z = BalanceStore.read(); z.balance = 0; z.frozen = 0; z.totalIn = 0; z.totalRebate = 0; z.logs = []; BalanceStore.write(z); } } catch (e) {}
+  })();
   ensureGuestGate();
   BalanceStore.seedLogs();
+  renderBadge();
+  renderBanned();
   renderBalance();
   renderTx();
   renderQuickItems(0);
@@ -554,12 +639,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (window.ModeStore && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
       var used = CreditStore.freeUsed();
       var remain = Math.max(monthly - used, 0);
-      document.getElementById('free-txt').textContent = '已用 ' + used + ' / 共 ' + monthly + ' 条 · 剩 ' + remain + ' 条';
+      /* [FEAT 9.2-2] 积分有效期：30 天内即将到期提示 */
+      var expiring = CreditStore.expiringSoon ? CreditStore.expiringSoon(30) : 0;
+      var expiringTxt = expiring > 0 ? (' · <span style="color:var(--warning);">' + expiring.toLocaleString() + ' 分30日内到期</span>') : '';
+      document.getElementById('free-txt').innerHTML = '已用 ' + used + ' / 共 ' + monthly + ' 条 · 剩 ' + remain + ' 条' + expiringTxt;
       document.getElementById('free-bar').style.width = Math.min(used / monthly * 100, 100) + '%';
       var en = EntryStore.read();
       var disc = window.creditDiscount ? creditDiscount() : 1;
       var discEl = document.getElementById('disc-txt');
-      if (en.type && en.active) {
+      /* [FEAT 9.2-1] 年度会员标识优先展示 */
+      if (window.MemberStore && MemberStore.isActive()) {
+        discEl.textContent = '年度会员 · 0.5折';
+      } else if (en.type && en.active) {
         var t = MOCK.entryTypeById ? MOCK.entryTypeById(en.type) : null;
         discEl.textContent = (t ? t.label : '入驻') + ' · 解锁 ' + Math.round(disc * 10) + ' 折';
       } else {
@@ -574,12 +665,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ---- 卡片动效初始化：激活态 + 3D 倾斜 + 首屏数值翻滚 ---- */
   panelStates();
   bindTilt();
-  countUp(document.getElementById('balance'), Math.round(BalanceStore.read().balance * 100) / 100, fmtBal);
+  countUp(document.getElementById('balance'), Math.round(BalanceStore.available() * 100) / 100, fmtBal);
 
   /* ---- 账本事件联动：充值/提现/审批入账/积分变动后即时刷新 ---- */
   window.addEventListener('engchain:balance', function () { renderBalance(); renderTx(); });
   window.addEventListener('engchain:credits', function () { renderCredits(); });
-  window.addEventListener('engchain:store-change', function () { renderBalance(); renderTx(); renderCredits(); });
+  window.addEventListener('engchain:store-change', function () { renderBadge(); renderBanned(); renderBalance(); renderTx(); renderCredits(); });
 })();
 </script>
 </body>

@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程链 · 信息卡展示位与数据源核查报告</title>
+<style>
+/* ===== 基础 ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f5f7;--card:#fff;--line:#e4e7ec;--line2:#d0d5dd;
+  --t1:#1a1d24;--t2:#5a6172;--t3:#9aa1af;
+  --brand:#101418;--brand2:#1c2128;--gold:#c9a961;--gold-bg:#fbf3e4;
+  --ok:#0f7b55;--ok-bg:#e7f6ef;--warn:#c07c10;--warn-bg:#fdf3e3;
+  --bad:#c92a2a;--bad-bg:#fdeeee;--indep:#6a3fb5;--indep-bg:#f2edfb;
+  --radius:12px;--shadow:0 1px 2px rgba(16,20,24,.04),0 4px 16px rgba(16,20,24,.05);
+}
+html{scroll-behavior:smooth}
+body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Noto Sans SC",sans-serif;background:var(--bg);color:var(--t1);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+
+/* ===== 顶栏 ===== */
+.site-top{background:var(--brand);color:#eef0f3}
+.site-top-inner{display:flex;align-items:center;justify-content:space-between;height:56px}
+.brand{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;letter-spacing:.02em}
+.brand .mark{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#e8cd8f,#b8860b);display:flex;align-items:center;justify-content:center;color:#141414;font-weight:800;font-size:12px}
+.brand .sub{font-size:11px;font-weight:400;color:rgba(238,240,243,.55);letter-spacing:.08em;margin-left:2px}
+.top-nav{display:flex;align-items:center;gap:4px}
+.top-nav a{font-size:12px;color:rgba(238,240,243,.75);padding:5px 10px;border-radius:999px;transition:all .15s}
+.top-nav a:hover{background:rgba(255,255,255,.08);color:#fff}
+
+/* ===== Hero ===== */
+.hero{background:linear-gradient(180deg,var(--brand) 0%,var(--brand2) 100%);color:#eef0f3;padding:40px 0 36px}
+.hero .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.18em;color:var(--gold);margin-bottom:12px}
+.hero .kicker::before{content:"";width:24px;height:1px;background:var(--gold);opacity:.7}
+.hero h1{font-size:26px;font-weight:800;letter-spacing:-.01em;line-height:1.3}
+.hero .lead{margin-top:8px;font-size:13px;color:rgba(238,240,243,.6);max-width:780px}
+.hero-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:24px}
+.hero-stats .hs{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px}
+.hero-stats .hs-num{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:#fff}
+.hero-stats .hs-num i{font-style:normal;color:var(--gold)}
+.hero-stats .hs-label{font-size:11px;color:rgba(238,240,243,.55);margin-top:2px}
+
+/* ===== 章节导航 ===== */
+.sec-nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.sec-nav-inner{display:flex;align-items:center;gap:4px;overflow-x:auto;padding:10px 0;scrollbar-width:none}
+.sec-nav-inner::-webkit-scrollbar{display:none}
+.sec-nav a{flex:none;font-size:12.5px;font-weight:500;color:var(--t2);padding:6px 12px;border-radius:999px;border:1px solid transparent;transition:all .15s;white-space:nowrap}
+.sec-nav a:hover{color:var(--t1);background:#f2f4f7}
+.sec-nav a.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+/* ===== 通用区块 ===== */
+.section{padding:28px 0 8px}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.sec-num{flex:none;width:30px;height:30px;border-radius:8px;background:var(--brand);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.sec-title{font-size:19px;font-weight:700}
+.sec-desc{font-size:12.5px;color:var(--t3);margin-top:1px}
+
+/* ===== 标签 ===== */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600;line-height:1.5;letter-spacing:.02em;white-space:nowrap}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.indep{background:var(--indep-bg);color:var(--indep)}
+.tag.static{background:#f2f4f7;color:var(--t3)}
+.tag.gold{background:var(--gold-bg);color:#8a6a2e}
+
+/* ===== 矩阵表 ===== */
+.matrix-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--line);background:var(--card);box-shadow:var(--shadow)}
+.matrix{width:100%;border-collapse:collapse;font-size:12px;min-width:900px}
+.matrix th,.matrix td{padding:9px 10px;text-align:center;border-bottom:1px solid var(--line);vertical-align:middle}
+.matrix thead th{background:var(--brand);color:#eef0f3;font-weight:600;font-size:11.5px;position:sticky;top:0;z-index:2}
+.matrix thead th:first-child{text-align:left;min-width:200px}
+.matrix tbody tr:hover{background:#fafbfc}
+.matrix tbody td:first-child{text-align:left;font-weight:600;color:var(--t1);font-size:12px}
+.matrix .pos-group{background:#f8f9fa;font-weight:700;color:var(--t2);font-size:11.5px;letter-spacing:.03em}
+.matrix .pos-group td{padding:7px 10px;border-bottom:1px solid var(--line2)}
+.cell-yes{color:var(--ok);font-weight:700}
+.cell-no{color:var(--t3)}
+.cell-warn{color:var(--warn);font-weight:600}
+.cell-bad{color:var(--bad);font-weight:700}
+.matrix .biz-label{display:inline-flex;align-items:center;gap:4px}
+.matrix .biz-dot{width:7px;height:7px;border-radius:50%;flex:none}
+
+/* ===== 明细卡片 ===== */
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px}
+.detail-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.detail-card .dc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+.detail-card .dc-title{font-size:14px;font-weight:700;line-height:1.4}
+.detail-card .dc-page{font-size:11px;color:var(--t3);font-family:Consolas,Menlo,monospace;margin-top:2px}
+.detail-card .dc-body{font-size:12px;color:var(--t2);line-height:1.7}
+.detail-card .dc-row{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.detail-card .dc-label{flex:none;font-weight:600;color:var(--t1);min-width:64px}
+.detail-card .dc-val{flex:1;min-width:0}
+.detail-card .dc-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+
+/* ===== 问题清单 ===== */
+.issue-list{display:flex;flex-direction:column;gap:12px}
+.issue{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);border-left:4px solid var(--bad)}
+.issue.p1{border-left-color:var(--bad)}
+.issue.p2{border-left-color:var(--warn)}
+.issue.p3{border-left-color:var(--indep)}
+.issue .iss-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.issue .iss-id{font-size:11px;font-weight:800;font-family:Consolas,Menlo,monospace;color:var(--t3)}
+.issue .iss-title{font-size:14.5px;font-weight:700}
+.issue .iss-body{font-size:12.5px;color:var(--t2);line-height:1.75}
+.issue .iss-body b{color:var(--t1)}
+.issue .iss-code{display:inline-block;background:#f2f4f7;border:1px solid var(--line);border-radius:5px;padding:1px 7px;font-size:11px;font-family:Consolas,Menlo,monospace;color:var(--t2)}
+
+/* ===== 附录表 ===== */
+.ref-table{width:100%;border-collapse:collapse;font-size:12px;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow)}
+.ref-table th,.ref-table td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+.ref-table thead th{background:var(--brand);color:#eef0f3;font-weight:600;font-size:11.5px}
+.ref-table tbody tr:last-child td{border-bottom:none}
+.ref-table tbody tr:hover{background:#fafbfc}
+.ref-table code{background:#f2f4f7;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;font-family:Consolas,Menlo,monospace}
+
+/* ===== Footer ===== */
+.site-foot{border-top:1px solid var(--line);background:#fff;margin-top:32px}
+.site-foot-inner{padding:20px 0 28px;font-size:11.5px;color:var(--t3);line-height:1.8}
+.site-foot b{color:var(--t2);font-weight:600}
+.site-foot code{background:#f2f4f7;border:1px solid var(--line);padding:1px 6px;border-radius:4px;font-size:10.5px;font-family:Consolas,Menlo,monospace}
+
+/* ===== 响应式 ===== */
+@media(max-width:760px){
+  .wrap{padding:0 16px}
+  .hero h1{font-size:21px}
+  .hero-stats{grid-template-columns:repeat(2,1fr)}
+  .detail-grid{grid-template-columns:1fr}
+  .top-nav a.hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶栏 ===== -->
+<header class="site-top">
+  <div class="wrap site-top-inner">
+    <div class="brand"><span class="mark">链</span>工程链 ENGCHAIN<span class="sub">信息卡盘点报告</span></div>
+    <nav class="top-nav">
+      <a href="#matrix">类型×位置矩阵</a>
+      <a href="#details">展示位明细</a>
+      <a href="#issues">数据断连问题</a>
+      <a href="#reference">数据源附录</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">CODE AUDIT · 信息卡展示位 × 数据源连通性</div>
+    <h1>用户端信息卡展示位与数据源核查报告</h1>
+    <p class="lead">覆盖 home.html + pages/ 全部用户端页面，盘点 9 类信息卡（材料/设备/劳务/项目合作/中介服务/资质招商/建企买卖/企业招聘/人才求职）在所有展示位的数据源、卡片数量与过滤逻辑，重点核查二级展示位是否与 catalog/mergedList 同源。</p>
+    <div class="hero-stats">
+      <div class="hs"><div class="hs-num">9<i>类</i></div><div class="hs-label">信息卡类型</div></div>
+      <div class="hs"><div class="hs-num">30<i>处</i></div><div class="hs-label">信息卡展示位</div></div>
+      <div class="hs"><div class="hs-num">23<i>个</i></div><div class="hs-label">涉及页面文件</div></div>
+      <div class="hs"><div class="hs-num">8<i>处</i></div><div class="hs-label">数据源连通</div></div>
+      <div class="hs"><div class="hs-num" style="color:#f0a0a0">12<i>项</i></div><div class="hs-label">数据断连/不一致问题</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 章节导航 ===== -->
+<nav class="sec-nav">
+  <div class="wrap sec-nav-inner">
+    <a href="#overview" class="active">总览结论</a>
+    <a href="#matrix">类型×位置矩阵</a>
+    <a href="#details">展示位明细</a>
+    <a href="#issues">断连问题清单</a>
+    <a href="#reference">数据源附录</a>
+  </div>
+</nav>
+
+<!-- ===== 1. 总览结论 ===== -->
+<section class="section" id="overview">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-num">1</div><div><div class="sec-title">总览结论</div><div class="sec-desc">数据源连通性判定口径与核心发现</div></div></div>
+
+    <div class="detail-grid">
+      <div class="detail-card">
+        <div class="dc-head"><div class="dc-title">连通性判定口径</div></div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">连通</span><span class="dc-val">数据源合并了 <code>MOCK.catalog</code> 对应子数组 <b>且</b> <code>localStorage['engchain-supply']</code>（SupplyStore active）中用户发布条目，与标准 <code>mergedList()</code> 同源</span></div>
+          <div class="dc-row"><span class="dc-label">不连通</span><span class="dc-val">只读 <code>MOCK.xxx</code> 子数组、未合并用户发布数据；或 mock 池与目标 bizKey 无交集导致结果恒空</span></div>
+          <div class="dc-row"><span class="dc-label">独立数据</span><span class="dc-val">localStorage 快照直渲（收藏/历史/积分日志），不回查 catalog，数据可能与源不同步</span></div>
+          <div class="dc-row"><span class="dc-label">静态HTML</span><span class="dc-val">卡片内容直接写死在 HTML 中，非数据驱动</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head"><div class="dc-title">核心发现（按严重度）</div></div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="tag bad">P0</span><span class="dc-val" style="flex:1"><b>发现页「资源」Tab mock 数据恒空</b>：mergedList mock 基准池误用 <code>byFlow('match')</code>（5类供需），再被 franchise/trade/personnel/talent 过滤，4 类资源卡 mock 层查无数据</span></div>
+          <div class="dc-row"><span class="tag bad">P0</span><span class="dc-val" style="flex:1"><b>分业务搜索页结果恒空</b>：<code>search/business.html</code> 同样以 <code>byFlow('match')</code> 为池却按 franchise/trade/personnel 过滤，三类业务查无数据且不接 SupplyStore</span></div>
+          <div class="dc-row"><span class="tag warn">P1</span><span class="dc-val" style="flex:1"><b>首页主信息流不合并用户发布</b>：<code>home.html #tab-list</code> 只走 MOCK.byFlow，用户发布上架后首页不出现</span></div>
+          <div class="dc-row"><span class="tag warn">P1</span><span class="dc-val" style="flex:1"><b>3 个业务专页不合并用户发布</b>：franchise / trade / personnel 主列表均直读 MOCK 子数组，用户发布的对应类型条目不在专页显示</span></div>
+          <div class="dc-row"><span class="tag indep">P2</span><span class="dc-val" style="flex:1"><b>收藏/浏览历史为快照直渲</b>：不回查 catalog，源数据改名改价后不同步；personnel 详情页无相关推荐模块</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 2. 类型×位置矩阵 ===== -->
+<section class="section" id="matrix">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-num">2</div><div><div class="sec-title">类型 × 展示位置 映射矩阵</div><div class="sec-desc">行=展示位，列=9类信息卡；标记该位置是否渲染此类型卡片及数据源状态</div></div></div>
+
+    <div class="matrix-wrap">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>展示位（页面 / 模块）</th>
+            <th>材料</th><th>设备</th><th>劳务</th><th>项目合作</th><th>中介服务</th><th>资质招商</th><th>建企买卖</th><th>企业招聘</th><th>人才求职</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- 首页 -->
+          <tr class="pos-group"><td colspan="10">▎首页 home.html</td></tr>
+          <tr>
+            <td>Hero 轮播（静态）</td>
+            <td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>主信息流 #tab-list <span class="tag bad" style="margin-left:4px">不连通</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <!-- 发现/列表 -->
+          <tr class="pos-group"><td colspan="10">▎发现页与总览页</td></tr>
+          <tr>
+            <td>all-listings 分组卡片 <span class="tag ok">连通</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>发现页 supply/list 主列表 <span class="tag warn">连通但有bug</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-warn">⚠空</td><td class="cell-warn">⚠空</td><td class="cell-warn">⚠空</td><td class="cell-warn">⚠空</td>
+          </tr>
+          <tr>
+            <td>cards/index 样式总览（每类×3）<span class="tag static">纯catalog</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <!-- 详情页 -->
+          <tr class="pos-group"><td colspan="10">▎详情页 supply/detail.html（js/detail.js）</td></tr>
+          <tr>
+            <td>同类相关推荐（前3条）<span class="tag bad">不连通</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-bad">✕跳过</td><td class="cell-bad">✕跳过</td>
+          </tr>
+          <tr>
+            <td>相似人才推荐（前2条）<span class="tag bad">不连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td>
+          </tr>
+          <!-- 搜索 -->
+          <tr class="pos-group"><td colspan="10">▎搜索页</td></tr>
+          <tr>
+            <td>search/result 搜索结果 <span class="tag ok">连通</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>search/business 分业务搜索 <span class="tag bad">不连通·恒空</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-warn">⚠空</td><td class="cell-warn">⚠空</td><td class="cell-warn">⚠空</td><td class="cell-no">—</td>
+          </tr>
+          <!-- 垂直业务专页 -->
+          <tr class="pos-group"><td colspan="10">▎垂直业务专页</td></tr>
+          <tr>
+            <td>franchise/index 热门+全列表 <span class="tag bad">不连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>trade/index 热门+全列表 <span class="tag bad">不连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>personnel/index 招聘tab <span class="tag bad">不连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>personnel/index 人才tab <span class="tag bad">不连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>agency/index 服务列表+匹配+空态 <span class="tag ok">连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>agency/order 服务商选择 <span class="tag ok">连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>agency/seller-board 我的服务 <span class="tag ok">连通</span></td>
+            <td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <!-- 二级展示位 -->
+          <tr class="pos-group"><td colspan="10">▎二级展示位（用户中心 / 收藏 / 历史 / 发布等）</td></tr>
+          <tr>
+            <td>favorite/index 收藏列表 <span class="tag indep">快照直渲</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>profile/history 浏览历史 <span class="tag indep">快照直渲</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-warn">默认</td>
+          </tr>
+          <tr>
+            <td>profile/index 最近浏览(4条) <span class="tag indep">快照直渲</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>publish/records 我的发布 <span class="tag ok">连通(仅本人)</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>publish/unlocked 已解锁线索 <span class="tag ok">连通(回查)</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td>
+          </tr>
+          <tr>
+            <td>personal/index TA发布的供需 <span class="tag ok">连通(回查)</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>company/index 企业发布的供需 <span class="tag ok">连通(回查)</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+          <tr>
+            <td>wallet/unlock-records 解锁记录 <span class="tag indep">日志快照</span></td>
+            <td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-yes">●</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td><td class="cell-no">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;color:var(--t3);display:flex;gap:16px;flex-wrap:wrap">
+      <span><span class="cell-yes">●</span> 渲染此类型</span>
+      <span><span class="cell-warn">⚠空</span> mock层数据恒空</span>
+      <span><span class="cell-bad">✕跳过</span> 代码显式排除</span>
+      <span><span class="cell-no">—</span> 不涉及</span>
+      <span>标签=该展示位整体数据源连通状态</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 3. 展示位明细 ===== -->
+<section class="section" id="details">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-num">3</div><div><div class="sec-title">展示位明细</div><div class="sec-desc">每个展示位的数据源、卡片数量、过滤逻辑与代码位置</div></div></div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:18px 0 12px;color:var(--t2)">▎首页与发现页</h3>
+    <div class="detail-grid">
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">home.html · 主信息流 #tab-list</div><div class="dc-page">home.html · 行301-315</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（resource=franchise/trade/personnel/talent；match=material/equipment/labor/cooperation/agency）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.byFlow(flow)</code> / <code>MOCK.byBizType(key)</code>，<b>未读取</b> localStorage engchain-supply</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染，无 slice/分页；静态 0</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">按 flow + 二级 bizType 过滤；无排序、无城市/认证筛选</span></div>
+          <div class="dc-row"><span class="dc-label">问题</span><span class="dc-val">用户发布上架后首页不出现；不监听 storage 变更</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">home.html · Hero 轮播 + 信息流内嵌轮播</div><div class="dc-page">home.html · 行92-128 / 186-198</div></div>
+          <span class="tag static">静态HTML</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">Hero轮播</span><span class="dc-val">2张静态卡（1个material锚点 detail.html?id=1001 + 1个共创活动引导），非catalog驱动</span></div>
+          <div class="dc-row"><span class="dc-label">内嵌轮播</span><span class="dc-val">4张运营广告 promo（AI匹配/合规/热点供应/重点需求），页面内写死数组 INFEED_SLIDES</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">Hero 2张静态 + 内嵌 4张静态</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">all-listings.html · 分组卡片区 #groups</div><div class="dc-page">pages/all-listings.html · 行262-539</div></div>
+          <span class="tag ok">连通·标准</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类，9个 section 分组</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><b>标准 mergedList()</b>：<code>MOCK.catalog.slice()</code> + localStorage <code>engchain-supply</code> active 条目（按id去重）</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">每分组全量渲染，无 slice；静态 0</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">按 bizKey 分组；可选 dir 需求/供应拆分；统一按 ts/time 降序；监听 storage 重渲染</span></div>
+          <div class="dc-row"><span class="dc-label">基准数据量</span><span class="dc-val">catalog 共67条：material5/equipment5/labor5/cooperation5/agency7/franchise10/trade6/personnel13/talent11</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">supply/list.html · 发现页主列表 #list</div><div class="dc-page">pages/supply/list.html · 行183-421</div></div>
+          <span class="tag warn">连通但有bug</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（一级seg：全部/资源/供应/需求/服务）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>mergedList()</code> = <code>MOCK.byFlow('match')</code> + <code>SupplyStore.listActive()</code>；监听 engchain:supply</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">过滤后全量渲染，无 slice/分页</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">一级flow + 二级bizType + 分类/城市/预算/认证筛选；排序 newest(默认) 或 match；UpgradeStore topListing 置顶</span></div>
+          <div class="dc-row"><span class="dc-label"><b>Bug</b></span><span class="dc-val" style="color:var(--bad)">mock基准池误用 <code>byFlow('match')</code>（仅5类供需），「资源」Tab 用 RES_KEYS(franchise/trade/personnel/talent) 过滤后 mock 恒空，仅靠用户发布撑数据</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">supply/detail.html · 同类相关推荐</div><div class="dc-page">js/detail.js · 行239-253</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">material/equipment/labor/cooperation/franchise/trade/agency（<b>personnel、talent 显式跳过</b>）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.byBizType(rec.bizKey)</code>，<b>未合并</b>用户发布</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">同 bizKey 排除自身后取 <b>前3条</b>（slice(0,3)）</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">同 sub 子类(+2) → 同 city(+1) → match/100 降序加权</span></div>
+          <div class="dc-row"><span class="dc-label">问题</span><span class="dc-val">personnel 详情页无任何相关推荐模块（代码显式返回空）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">supply/detail.html · 相似人才推荐</div><div class="dc-page">js/detail.js · 行1957-1973</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">仅 talent（人才详情触发）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.byBizType('talent')</code>，未合并用户发布</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">同 certType 优先取前2条；不足退化为任意 talent 前2条</span></div>
+          <div class="dc-row"><span class="dc-label">渲染方式</span><span class="dc-val">自定义 .tsim 卡片 HTML，非 Cards.render 通用组件</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎搜索页</h3>
+    <div class="detail-grid">
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">search/result.html · 搜索结果列表 #list</div><div class="dc-page">pages/search/result.html · 行178-349</div></div>
+          <span class="tag ok">连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（CATS 含全部+9类）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>mergedCatalog()</code> = <code>MOCK.catalog.slice()</code> + <code>SupplyStore.listActive()</code>（去重）；监听 engchain:supply</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">过滤后全量渲染，无 slice/分页</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">关键词blob命中 + dir + bizKey + AI城市/品类硬过滤+意图词软加权；排序 comprehensive(默认)/newest/match</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">search/business.html · 分业务搜索 #resultList</div><div class="dc-page">pages/search/business.html · 行211-388</div></div>
+          <span class="tag bad">不连通·恒空</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">franchise / trade / personnel（TYPE_CONFIG 切换）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.byFlow('match').slice()</code> 再按 cfg.bizKey 过滤；<b>未合并</b> SupplyStore</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">过滤后全量渲染——但 mock 池与目标 bizKey 无交集，<b>结果恒为空</b></span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">bizKey + 关键词命中（标题/cat/sub/city/company/tags）；无排序</span></div>
+          <div class="dc-row"><span class="dc-label"><b>Bug</b></span><span class="dc-val" style="color:var(--bad)">byFlow('match')=material/labor/equipment/cooperation/agency，与 franchise/trade/personnel 互无交集，三类业务搜索从 mock 侧查无任何数据</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">cards/index.html · 9类卡片样式总览 #blocks</div><div class="dc-page">pages/cards/index.html · 行79-245</div></div>
+          <span class="tag static">纯catalog</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（CATS 定义）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.byBizType(cat.key)</code>，未合并用户发布（样式预览用途）</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">每类 <code>slice(0,3)</code>，最多 9×3=27 张示例卡</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">无（仅取每类前3条做样式示例）</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎垂直业务专页</h3>
+    <div class="detail-grid">
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">franchise/index.html · 热门招商 + 全部列表</div><div class="dc-page">pages/franchise/index.html · 行430-795</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">位A 热门</span><span class="dc-val"><code>#hotList</code>：MOCK.franchises filter(type=qualification && hot)，全量渲染无上限</span></div>
+          <div class="dc-row"><span class="dc-label">位B 全列表</span><span class="dc-val"><code>#fullList</code>：5维筛选(qualLevel/qualType/verified/region/mode) + 4排序 + pageSize=6 加载更多</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.franchises</code>，<b>未合并</b> engchain-supply 用户发布</span></div>
+          <div class="dc-row"><span class="dc-label">基准量</span><span class="dc-val">franchises 共10条（f1/f2 + fc1-fc8）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">trade/index.html · 热门急转 + 全部列表</div><div class="dc-page">pages/trade/index.html · 行430-876</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">位A 热门</span><span class="dc-val"><code>#hotScroll</code>：MOCK.trades filter(urgent) <b>slice(0,4)</b>；空则兜底 all.slice(0,4)</span></div>
+          <div class="dc-row"><span class="dc-label">位B 全列表</span><span class="dc-val"><code>#fullList</code>：6维筛选(qualType/level/transferMethod/verified/urgent/priceRange) + 4排序 + pageSize=6</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.trades</code>，未合并用户发布</span></div>
+          <div class="dc-row"><span class="dc-label">基准量</span><span class="dc-val">trades 共6条（t1-t6）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">personnel/index.html · 急聘/急寻 + 双tab列表</div><div class="dc-page">pages/personnel/index.html · 行492-903</div></div>
+          <span class="tag bad">不连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">位A 横滑</span><span class="dc-val"><code>#hotScroll</code>：currentData() filter(urgent) <b>slice(0,4)</b>；标题随tab变「急聘岗位」/「急寻人才」</span></div>
+          <div class="dc-row"><span class="dc-label">位B 招聘tab</span><span class="dc-val"><code>#fullList</code>：entData=MOCK.personnels 预处理；7维筛选 + 4排序 + pageSize=6</span></div>
+          <div class="dc-row"><span class="dc-label">位B' 人才tab</span><span class="dc-val"><code>#fullList</code>：talentData=MOCK.talents 预处理；筛选维度换为急寻/experienceRange</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">仅 <code>MOCK.personnels</code> / <code>MOCK.talents</code>，未合并用户发布</span></div>
+          <div class="dc-row"><span class="dc-label">死代码</span><span class="dc-val">entCard()(行711) / talentCard()(行748) 已定义但 renderList 实际调用全局 <code>window.Cards.render</code>(行846)</span></div>
+          <div class="dc-row"><span class="dc-label">基准量</span><span class="dc-val">personnels 13条（p1-p13）/ talents 11条（talent1-talent11）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">agency/index.html · 服务列表 + AI匹配 + 空态</div><div class="dc-page">pages/agency/index.html · 行208-445</div></div>
+          <span class="tag ok">连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">位A 主列表</span><span class="dc-val"><code>#svc-list</code>：6分类chips(全部/资质代办/工程担保/造价咨询/劳务派遣/企业服务) + 实时搜索；全量渲染</span></div>
+          <div class="dc-row"><span class="dc-label">位B 匹配条</span><span class="dc-val"><code>#match-banner</code>：doMatch 按 goal 正则+预算过滤后 <b>slice(0,3)</b>，动态插入 svc-list 前</span></div>
+          <div class="dc-row"><span class="dc-label">位C 空态</span><span class="dc-val">无搜索结果时 <code>SVCS.slice(0,2)</code> 兜底推荐</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>SVCS</code> = <code>MOCK.byBizType('agency')</code> + <code>SupplyStore.listActive()</code> 中 bizKey=agency && dir!=demand 去重——<b>与 mergedList 的 agency 部分同源</b></span></div>
+          <div class="dc-row"><span class="dc-label">基准量</span><span class="dc-val">agencies 共7条（a1-a7）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">agency/order.html · 服务商选择 #svc-sel</div><div class="dc-page">pages/agency/order.html · 行111-165</div></div>
+          <span class="tag ok">连通</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">仅 agency</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">同 agency/index：<code>MOCK.byBizType('agency')</code> + SupplyStore active agency 去重</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染为单选 .od-card（带radio），无 slice</span></div>
+          <div class="dc-row"><span class="dc-label">过滤</span><span class="dc-val">URL 带 svcId/svc 时按同类目过滤；同类&lt;3 时用关键词正则扩展</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">agency/seller-board.html · 我的服务 #ms-list</div><div class="dc-page">pages/agency/seller-board.html · 行251-278</div></div>
+          <span class="tag ok">连通(仅本人)</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">仅 agency</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>SupplyStore.read().items</code> 过滤 publisher=当前uid && bizKey=agency</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 .ms-item，每张附咨询数/订单数经营漏斗</span></div>
+          <div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">仅展示本人发布的 agency 服务，不含 MOCK 内置数据（经营橱窗场景合理）</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎二级展示位（收藏 / 历史 / 发布 / 主页等）</h3>
+    <div class="detail-grid">
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">favorite/index.html · 我的收藏 #fav-list</div><div class="dc-page">pages/favorite/index.html · 行79-108</div></div>
+          <span class="tag indep">快照直渲</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（快照存 bizKey，但渲染按 dir=需求/供应 走通用 .supply-card，不按 bizKey 分模板）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">localStorage <code>engchain-favorites</code>（FavoriteStore.list()）；<b>快照直渲，不回查 catalog</b></span></div>
+          <div class="dc-row"><span class="dc-label">快照字段</span><span class="dc-val">{id, bizKey, title, type, dir, location, amount}（detail.js:2948 写入）</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 filtered.map；静态 0</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">seg 筛选 全部/需求/供应；无排序（收藏 unshift 倒序）</span></div>
+          <div class="dc-row"><span class="dc-label">问题</span><span class="dc-val">catalog 原数据改名/改价后收藏页不同步；不按 bizKey 分卡片模板</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">profile/history.html · 浏览历史 #vh-content</div><div class="dc-page">pages/profile/history.html · 行334-422</div></div>
+          <span class="tag indep">快照直渲</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（CAT_ICONS 含8类，talent 落 default 图标）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">localStorage <code>engchain-view-history</code>（ViewHistory.list()）；快照直渲不回查</span></div>
+          <div class="dc-row"><span class="dc-label">快照字段</span><span class="dc-val">{id, bizKey, title, price, city, cat, viewedAt}</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染，按日期分组；上限100条/保留1个月（common.js:723-724）</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">无筛选；按 viewedAt 倒序（unshift）</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">profile/index.html · 最近浏览 #pf-history</div><div class="dc-page">pages/profile/index.html · 行1662-1701</div></div>
+          <span class="tag indep">快照直渲</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">仅映射5类图标（cooperation/material/equipment/labor/agency），其余走 default i-doc</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>ViewHistory.recent(4)</code> = localStorage engchain-view-history <b>slice(0,4)</b></span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">固定最多 4 条</span></div>
+          <div class="dc-row"><span class="dc-label">问题</span><span class="dc-val">franchise/trade/personnel/talent 4类无专属图标映射</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">publish/records.html · 我的发布记录 #record-list</div><div class="dc-page">pages/publish/records.html · 行59-79</div></div>
+          <span class="tag ok">连通(仅本人)</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类（用户发布供需；用 cat/category 不直接渲染 bizKey）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">localStorage <code>engchain-supply</code>（SupplyStore.items）过滤 source=user_publish/migrated_publish && publisher=当前uid</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 rows.map；静态 0</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">seg 筛选 全部/需求/供应；无显式排序</span></div>
+          <div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">SupplyStore 即 mergedList 用户发布同源，但只取本人发布、不含 MOCK.catalog 内置</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">publish/unlocked.html · 已解锁线索 #lead-list</div><div class="dc-page">pages/publish/unlocked.html · 行43-65</div></div>
+          <span class="tag ok">连通(回查)</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">全部9类 + publish（KINDS 行41 显式列出全部9类）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val">localStorage <code>engchain-unlocked</code>（键 bizKey_id）→ <code>resolve()</code> 回查 <code>MOCK.listingById</code> / <code>MOCK.personById</code> / PublishStore.getRecordById</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 leads.map；静态 0</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">无筛选；按解锁时间倒序（b.t - a.t）</span></div>
+          <div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">key 仅存 id，resolve 实时回查 catalog 取 title/kind/link——catalog 变动会实时反映</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">personal/index.html · TA发布的供需 #published</div><div class="dc-page">pages/personal/index.html · 行391-400</div></div>
+          <span class="tag ok">连通(回查)</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">supply/demand 方向（经 listingById 回查，可能命中 catalog 各类供需）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>MOCK.personById(id).published</code>（id 数组）→ <code>MOCK.listingById(idStr)</code> 回查 catalog</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 list.map</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">无筛选</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">company/index.html · 企业发布的供需 #published</div><div class="dc-page">pages/company/index.html · 行106-119</div></div>
+          <span class="tag ok">连通(回查)</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">supply/demand 方向</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>MOCK.companyById(id).published</code>（id 数组）→ <code>MOCK.listingById</code> 回查 catalog</span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染；空态提示「该企业暂未发布」</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">无筛选</span></div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="dc-head">
+          <div><div class="dc-title">wallet/unlock-records.html · 解锁记录 #ur-list</div><div class="dc-page">pages/wallet/unlock-records.html · 行82-165</div></div>
+          <span class="tag indep">日志快照</span>
+        </div>
+        <div class="dc-body">
+          <div class="dc-row"><span class="dc-label">覆盖类型</span><span class="dc-val">supply/demand 方向（从积分日志 reason/cat/dir 渲染；含 supplyId 回链 detail）</span></div>
+          <div class="dc-row"><span class="dc-label">数据源</span><span class="dc-val"><code>CreditStore.read().logs</code> 过滤 type='unlock'（localStorage <code>engchain-credits</code>）；<b>日志快照直渲，不回查 catalog</b></span></div>
+          <div class="dc-row"><span class="dc-label">卡片数量</span><span class="dc-val">全量渲染 filtered.map</span></div>
+          <div class="dc-row"><span class="dc-label">过滤排序</span><span class="dc-val">seg 筛选 全部/积分/免费（method）</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎临界/弱卡片（非9类成品信息卡，单列备查）</h3>
+    <div class="detail-grid">
+      <div class="detail-card">
+        <div class="dc-head"><div><div class="dc-title">publish/drafts.html · 草稿箱 #draft-list</div><div class="dc-page">pages/publish/drafts.html · 行48-54</div></div><span class="tag static">PublishStore</span></div>
+        <div class="dc-body"><div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">.draft 草稿卡（title/role/category/进度条），来自 PublishStore.get().drafts（engchain-publish），非成品信息卡</span></div></div>
+      </div>
+      <div class="detail-card">
+        <div class="dc-head"><div><div class="dc-title">publish/index.html · 待处理 #wb-pending</div><div class="dc-page">pages/publish/index.html · 行187-198</div></div><span class="tag static">PublishStore</span></div>
+        <div class="dc-body"><div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">s.pending.slice(0,4) 渲染待处理发布任务行 .wb-task，PublishStore.stats().pending（status=review‖inquiries&gt;0）</span></div></div>
+      </div>
+      <div class="detail-card">
+        <div class="dc-head"><div><div class="dc-title">publish/editor.html · 建企买卖预览 #trade-detail-card</div><div class="dc-page">pages/publish/editor.html · 行1253-1261</div></div><span class="tag static">静态HTML</span></div>
+        <div class="dc-body"><div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">静态HTML 表单预览卡，仅当 cat=建企买卖&&role=demand 显示/隐藏（trade-glow 脉冲），无数据绑定</span></div></div>
+      </div>
+      <div class="detail-card">
+        <div class="dc-head"><div><div class="dc-title">profile/delegates.html · 委托列表 #dlList</div><div class="dc-page">pages/profile/delegates.html · 行88-152</div></div><span class="tag indep">委托store</span></div>
+        <div class="dc-body"><div class="dc-row"><span class="dc-label">说明</span><span class="dc-val">.dl-card 委托记录卡（franchise+general），数据来自 Delegates.list()（js/delegates.js），<b>非 catalog 信息卡</b>；状态筛选 全部/等待承接/已承接/已驳回</span></div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);font-size:12px;color:var(--t2)">
+      <b style="color:var(--t1)">确认无信息卡展示位的页面（共30+个）：</b>
+      search/index.html（仅搜索框+热搜）、franchise/delegate-edit.html（委托表单）、agency/order-detail.html（订单详情）、agency/my-orders.html（买方订单）、agency/_seed-credit-data.html（播种工具）、publish/success.html（单条结果摘要）、monitor/index.html（监控企业非信息卡）、profile/delegate-detail/new/edit.html（委托表单）、match/preferences.html（偏好设置卡）、co-create/index.html、distribution/index/poster.html、industry/index.html（行业报告）、state/index.html、vendor/dashboard/upgrades.html、order/index/detail.html、message/index/chat.html（会话）、wallet/credits-mall.html（积分商城）、profile/all-functions/my-applies/entry-result/entry-personal-result/auth-partner/edit/index(除最近浏览).html、agreement/*、auth/*、help/index.html、guide/index.html、api/index.html、refund/* 等——均不渲染9类信息卡。
+    </div>
+  </div>
+</section>
+
+<!-- ===== 4. 断连问题清单 ===== -->
+<section class="section" id="issues">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-num">4</div><div><div class="sec-title">数据断连 / 不一致问题清单</div><div class="sec-desc">按严重度排序，每项含问题描述、影响范围、代码位置与修复方向</div></div></div>
+
+    <div class="issue-list">
+
+      <div class="issue p1">
+        <div class="iss-head"><span class="iss-id">P0-01</span><span class="tag bad">致命·数据恒空</span><span class="iss-title">发现页「资源」Tab mock 数据恒空</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>supply/list.html</code> 的 <code>mergedList()</code> mock 基准池写成了 <code>MOCK.byFlow('match')</code>（仅 material/labor/equipment/cooperation/agency 5类供需），而一级 Tab=「资源」时用 <code>RES_KEYS=[franchise,trade,personnel,talent]</code> 去过滤——这4类不在 match 池内，因此资源 Tab 的 mock 数据<b>恒为空</b>，只能展示 SupplyStore 里用户发布的资源类条目。<br>
+          <b>影响：</b>资质招商/建企买卖/企业招聘/人才求职 4类卡片在发现页资源 Tab 下无平台内置数据。<br>
+          <b>位置：</b><span class="iss-code">pages/supply/list.html 行183-194 mergedList()</span><br>
+          <b>修复方向：</b>将 mock 基准池从 <code>MOCK.byFlow('match')</code> 改为 <code>MOCK.catalog.slice()</code>（与 all-listings.html / search/result.html 一致）。
+        </div>
+      </div>
+
+      <div class="issue p1">
+        <div class="iss-head"><span class="iss-id">P0-02</span><span class="tag bad">致命·数据恒空</span><span class="iss-title">分业务搜索页 franchise/trade/personnel 结果恒空</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>search/business.html</code> 以 <code>MOCK.byFlow('match')</code>（5类供需）为数据池，却按 <code>cfg.bizKey</code>（franchise/trade/personnel）过滤——三者互无交集，mock 侧查无任何数据；且本页不接 SupplyStore，实际几乎查不到信息。<br>
+          <b>影响：</b>资质招商/建企买卖/企业招聘 三个分业务搜索页结果恒为空。<br>
+          <b>位置：</b><span class="iss-code">pages/search/business.html 行336-365 searchData()</span><br>
+          <b>修复方向：</b>数据池改为 <code>MOCK.catalog.slice()</code> 或 <code>MOCK.byBizType(cfg.bizKey)</code>，并合并 SupplyStore.listActive()。
+        </div>
+      </div>
+
+      <div class="issue p2">
+        <div class="iss-head"><span class="iss-id">P1-01</span><span class="tag warn">严重·用户发布不可见</span><span class="iss-title">首页主信息流不合并用户发布数据</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>home.html #tab-list</code> 只走 <code>MOCK.byFlow(flow)</code> / <code>MOCK.byBizType(key)</code>，完全不读取 localStorage <code>engchain-supply</code>，也不监听其 storage 变更——用户在别处发布并上架后，首页信息流不出现该条目。<br>
+          <b>影响：</b>全部9类用户发布条目在首页不可见。<br>
+          <b>位置：</b><span class="iss-code">home.html 行311 listFor() / 行312-315 renderList()</span><br>
+          <b>修复方向：</b>引入 mergedList() 模式（MOCK.catalog + SupplyStore.listActive() 去重），并监听 engchain:supply 事件重渲染。
+        </div>
+      </div>
+
+      <div class="issue p2">
+        <div class="iss-head"><span class="iss-id">P1-02</span><span class="tag warn">严重·用户发布不可见</span><span class="iss-title">franchise / trade / personnel 三个业务专页不合并用户发布</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>franchise/index.html</code>、<code>trade/index.html</code>、<code>personnel/index.html</code> 的主列表均直读 <code>MOCK.franchises</code> / <code>MOCK.trades</code> / <code>MOCK.personnels+talents</code>，未合并 <code>engchain-supply</code> 用户发布条目——与 agency 线（已合并）形成不一致。<br>
+          <b>影响：</b>用户发布的资质招商/建企买卖/企业招聘/人才求职条目不在对应专页显示。<br>
+          <b>位置：</b><span class="iss-code">franchise/index.html 行430 / trade/index.html 行430 / personnel/index.html 行492,505</span><br>
+          <b>修复方向：</b>参照 agency/index.html 的 <code>agencySource()</code>（行208-221），将 MOCK 子数组与 SupplyStore.listActive() 中对应 bizKey 条目去重合并。
+        </div>
+      </div>
+
+      <div class="issue p2">
+        <div class="iss-head"><span class="iss-id">P1-03</span><span class="tag warn">严重·推荐缺失</span><span class="iss-title">详情页关联推荐不合并用户发布 + personnel 无推荐</span></div>
+        <div class="iss-body">
+          <b>问题A：</b><code>detail.js</code> 的 <code>relatedSec()</code> 只读 <code>MOCK.byBizType(rec.bizKey)</code>，未合并用户发布条目——用户发布的同类型信息不会出现在详情页推荐中。<br>
+          <b>问题B：</b><code>relatedSec()</code> 对 personnel（企业招聘）显式跳过（detail.js:241），且代码中无 personnel 专属推荐块——企业招聘详情页底部无任何相关推荐。<br>
+          <b>位置：</b><span class="iss-code">js/detail.js 行239-253 relatedSec() / 行241 personnel跳过</span><br>
+          <b>修复方向：</b>推荐池改为 mergedList() 同 bizKey 过滤；为 personnel 补充专属推荐逻辑（如同 certType/同 city 的招聘岗位）。
+        </div>
+      </div>
+
+      <div class="issue p3">
+        <div class="iss-head"><span class="iss-id">P2-01</span><span class="tag indep">中等·数据不同步</span><span class="iss-title">收藏 / 浏览历史为 localStorage 快照直渲，不回查 catalog</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>favorite/index.html</code>、<code>profile/history.html</code>、<code>profile/index.html 最近浏览</code> 三处均直接读取 localStorage 快照字段渲染，不通过 <code>MOCK.listingById</code> 回查 catalog 完整数据。后果：catalog 原数据改名/改价/下架后，收藏和历史页仍显示旧快照；且收藏页不按 bizKey 分卡片模板，只用需求/供应通用卡。<br>
+          <b>快照字段：</b>收藏 {id,bizKey,title,type,dir,location,amount}；历史 {id,bizKey,title,price,city,cat,viewedAt}<br>
+          <b>位置：</b><span class="iss-code">favorite/index.html 行79-108 / profile/history.html 行368-422 / detail.js:2948 收藏写入</span><br>
+          <b>修复方向：</b>参照 <code>publish/unlocked.html</code> 的 resolve() 模式，用 id 回查 <code>MOCK.listingById</code> 取最新完整数据；回查失败时兜底用快照。
+        </div>
+      </div>
+
+      <div class="issue p3">
+        <div class="iss-head"><span class="iss-id">P2-02</span><span class="tag indep">中等·双store不一致</span><span class="iss-title">发布记录体系双 Store 分裂：records 读 SupplyStore，workbench 读 PublishStore</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>publish/records.html</code>（我的发布记录）读取 <code>SupplyStore</code>（localStorage <code>engchain-supply</code>）过滤本人；而 <code>publish/drafts.html</code>（草稿箱）、<code>publish/index.html</code>（待处理）、<code>publish/success.html</code>（发布结果）读取 <code>PublishStore</code>（localStorage <code>engchain-publish</code>，含 seed 演示记录）。二者并非同一数据源，可能导致「发布记录」与「工作台待处理/草稿」数据不一致。<br>
+          <b>位置：</b><span class="iss-code">publish/records.html 行59-66 myPublishes() / js/publish-workbench.js 行3 PublishStore / js/stores.js:652 SupplyStore</span>
+        </div>
+      </div>
+
+      <div class="issue p3">
+        <div class="iss-head"><span class="iss-id">P2-03</span><span class="tag indep">中等·图标缺失</span><span class="iss-title">个人中心最近浏览仅映射5类图标，franchise/trade/personnel/talent 落默认</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>profile/index.html</code> 最近浏览模块的 ICONS 仅映射 cooperation/material/equipment/labor/agency 5类，franchise/trade/personnel/talent 4类资源卡均走默认 <code>i-doc</code> 图标，与卡片实际类型不匹配。<br>
+          <b>位置：</b><span class="iss-code">profile/index.html 行1662-1701 renderHistory()</span>
+        </div>
+      </div>
+
+      <div class="issue p3">
+        <div class="iss-head"><span class="iss-id">P2-04</span><span class="tag static">低·死代码</span><span class="iss-title">personnel/index.html 的 entCard() / talentCard() 是死代码</span></div>
+        <div class="iss-body">
+          <b>问题：</b><code>personnel/index.html</code> 定义了 <code>entCard()</code>（行711）和 <code>talentCard()</code>（行748）两个专属卡片模板函数，但 <code>renderList()</code>（行846）实际调用全局 <code>window.Cards.render</code>（common.js:999 的9类通用卡片组件），这两个函数从未被调用。<br>
+          <b>位置：</b><span class="iss-code">personnel/index.html 行711 entCard() / 行748 talentCard() / 行846 实际调用 Cards.render</span>
+        </div>
+      </div>
+
+      <div class="issue p3">
+        <div class="iss-head"><span class="iss-id">P2-05</span><span class="tag static">低·可接受</span><span class="iss-title">cards/index.html 样式总览页不合并用户发布（可接受）</span></div>
+        <div class="iss-body">
+          <b>说明：</b><code>cards/index.html</code> 为开发/设计用的9类卡片样式总览页，每类取 <code>MOCK.byBizType(key).slice(0,3)</code> 做示例，不合并用户发布属于合理设计（样式预览用途），但需明确其非业务数据页。
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== 5. 数据源附录 ===== -->
+<section class="section" id="reference">
+  <div class="wrap">
+    <div class="sec-head"><div class="sec-num">5</div><div><div class="sec-title">数据源附录</div><div class="sec-desc">catalog 结构、localStorage 键、基准数据量与代码位置索引</div></div></div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:18px 0 12px;color:var(--t2)">▎MOCK.catalog 拼接结构（js/data.js 行4858）</h3>
+    <table class="ref-table">
+      <thead><tr><th>bizKey</th><th>类型名</th><th>catalog 子数组来源</th><th>起始行</th><th>数据量</th><th>dir 方向</th></tr></thead>
+      <tbody>
+        <tr><td><code>material</code></td><td>材料</td><td>supplies（supplyBiz 映射：1001/1002/1006/1009/1010）</td><td>10</td><td>5</td><td>demand/supply</td></tr>
+        <tr><td><code>equipment</code></td><td>设备</td><td>supplies（supplyBiz 映射：1003/1005/1008/1011/1012）</td><td>10</td><td>5</td><td>demand/supply</td></tr>
+        <tr><td><code>labor</code></td><td>劳务</td><td>supplies（1004/1013）+ workDemands（w1/w2/w3）</td><td>10 / 1404</td><td>5</td><td>demand</td></tr>
+        <tr><td><code>cooperation</code></td><td>项目合作</td><td>supplies（1007）+ cooperates（cp1-cp4）</td><td>10 / 1631</td><td>5</td><td>demand/supply</td></tr>
+        <tr><td><code>agency</code></td><td>中介服务</td><td>agencies（a1-a7）</td><td>2848</td><td>7</td><td>supply</td></tr>
+        <tr><td><code>franchise</code></td><td>资质招商</td><td>franchises（f1/f2 + fc1-fc8）</td><td>1880</td><td>10</td><td>opportunity</td></tr>
+        <tr><td><code>trade</code></td><td>建企买卖</td><td>trades（t1-t6）</td><td>2293</td><td>6</td><td>opportunity</td></tr>
+        <tr><td><code>personnel</code></td><td>企业招聘</td><td>personnels（p1-p13）</td><td>3282</td><td>13</td><td>demand</td></tr>
+        <tr><td><code>talent</code></td><td>人才求职</td><td>talents（talent1-talent11）</td><td>4157</td><td>11</td><td>supply</td></tr>
+        <tr style="background:#f8f9fa;font-weight:700"><td colspan="4">catalog 总计</td><td>67</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎关键 localStorage 键与 Store</h3>
+    <table class="ref-table">
+      <thead><tr><th>localStorage 键</th><th>Store 对象</th><th>用途</th><th>定义位置</th><th>是否回查 catalog</th></tr></thead>
+      <tbody>
+        <tr><td><code>engchain-supply</code></td><td>SupplyStore</td><td>用户发布条目（mergedList 用户发布部分）</td><td>js/stores.js:652</td><td>本身即数据源</td></tr>
+        <tr><td><code>engchain-favorites</code></td><td>FavoriteStore</td><td>收藏（旧键 engchain-favorite 自动迁移）</td><td>js/stores.js:590</td><td>否（快照直渲）</td></tr>
+        <tr><td><code>engchain-view-history</code></td><td>ViewHistory</td><td>浏览历史（上限100条/保留1个月）</td><td>js/common.js:721</td><td>否（快照直渲）</td></tr>
+        <tr><td><code>engchain-unlocked</code></td><td>—（页面自管）</td><td>已解锁线索（键名 bizKey_id）</td><td>pages/publish/unlocked.html:43</td><td>是（resolve 回查 listingById）</td></tr>
+        <tr><td><code>engchain-monitor</code></td><td>MonitorStore</td><td>监控（follows/feed，监控对象为企业）</td><td>js/stores.js:533</td><td>否（非信息卡）</td></tr>
+        <tr><td><code>engchain-credits</code></td><td>CreditStore</td><td>积分日志（解锁记录从中过滤 type=unlock）</td><td>js/stores.js:133</td><td>否（日志快照）</td></tr>
+        <tr><td><code>engchain-publish</code></td><td>PublishStore</td><td>发布工作台（drafts + records + seed演示）</td><td>js/publish-workbench.js:3</td><td>否（独立store）</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎标准 mergedList() 同源参考实现</h3>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;font-size:12px;font-family:Consolas,Menlo,monospace;color:var(--t2);line-height:1.7;overflow-x:auto">
+<b style="color:var(--t1)">// pages/all-listings.html 行262-269（标准定义）</b><br>
+function mergedList() {<br>
+&nbsp;&nbsp;var mock = (window.MOCK &amp;&amp; MOCK.catalog) ? MOCK.catalog.slice() : [];<br>
+&nbsp;&nbsp;var active = readActiveSupplies().map(normSupplyItem);<br>
+&nbsp;&nbsp;var seen = {}, out = [];<br>
+&nbsp;&nbsp;active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });<br>
+&nbsp;&nbsp;mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });<br>
+&nbsp;&nbsp;return out;<br>
+}<br><br>
+<b style="color:var(--t1)">// 已实现此模式的页面：</b>all-listings.html / supply/list.html(有bug) / search/result.html / agency/index.html / agency/order.html / publish/unlocked.html / personal/index.html / company/index.html
+    </div>
+
+    <h3 style="font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--t2)">▎MOCK 辅助查询函数（js/data.js）</h3>
+    <table class="ref-table">
+      <thead><tr><th>函数</th><th>行号</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td><code>MOCK.listingById(id)</code></td><td>4914-4920</td><td>任一类明细按 id 取（workDemands/cooperates/franchises/trades 共用）</td></tr>
+        <tr><td><code>MOCK.personById(id)</code></td><td>4909</td><td>人才详情按 id 取</td></tr>
+        <tr><td><code>MOCK.byBizType(bizKey, dir?)</code></td><td>4927-4929</td><td>catalog 按 bizKey（可选 dir）过滤</td></tr>
+        <tr><td><code>MOCK.byFlow(flow)</code></td><td>4931-4934</td><td>byFlow('resource')→[franchise,trade,personnel,talent]；byFlow('match')→[material,labor,equipment,cooperation,agency]</td></tr>
+        <tr><td><code>MOCK.byBizTypes(keys)</code></td><td>4933</td><td>catalog 按 bizKey 数组过滤</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="site-foot">
+  <div class="wrap site-foot-inner">
+    <b>报告说明</b>：本报告覆盖 <code>home.html</code> + <code>pages/</code> 全部用户端页面（排除 admin/、artifacts/、docs/），共盘点 30 处信息卡展示位、涉及 23 个页面文件。数据源核查以 <code>js/data.js</code> 的 <code>MOCK.catalog</code>（行4858，共67条）与标准 <code>mergedList()</code>（all-listings.html 行262-269）为同源基准。所有文件路径、行号均取自代码实际内容，可直接核对。<br>
+    <b>扫描范围</b>：home.html / pages/all-listings.html / pages/supply/* / pages/search/* / pages/cards/* / pages/franchise/* / pages/trade/* / pages/personnel/* / pages/agency/* / pages/favorite/* / pages/profile/* / pages/publish/* / pages/personal/* / pages/company/* / pages/monitor/* / pages/wallet/unlock-records.html 等；engchain-showcase/、folder-cards/、visual-system.html、home-blue-concept.html 等根目录其他入口未纳入主盘点（如需要可补充）。
+  </div>
+</footer>
+
+<script>
+// 章节导航高亮
+(function(){
+  var nav = document.querySelector('.sec-nav-inner');
+  if(!nav) return;
+  var links = nav.querySelectorAll('a');
+  var sections = [];
+  links.forEach(function(a){
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if(el) sections.push({el:el,a:a});
+  });
+  function onScroll(){
+    var y = window.scrollY + 120;
+    var active = sections[0];
+    sections.forEach(function(s){ if(s.el.offsetTop <= y) active = s; });
+    links.forEach(function(l){ l.classList.remove('active'); });
+    if(active) active.a.classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+})();
+</script>
+</body>
+</html>

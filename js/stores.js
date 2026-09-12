@@ -40,7 +40,9 @@
   var AuthStore = makeStore('engchain-auth',
     { realname: { ok: false, ts: 0, name: '', idNo: '', mobile: '', idMask: '' },
       enterprise: { ok: false, expireAt: 0, co: '', code: '', legal: '', status: '', note: '', fee: 0, submittedAt: 0,
-        shortName: '', nameBasis: '', nameProof: [] },
+        shortName: '', nameBasis: '', nameProof: [],
+        /* [FEAT 9.2-3] 多维资质核验：5项逐项提交/审核 */
+        dimensions: { business: { status: 'pending', submittedAt: 0, files: [] }, legal: { status: 'pending', submittedAt: 0, files: [] }, qualification: { status: 'pending', submittedAt: 0, files: [] }, bank: { status: 'pending', submittedAt: 0, files: [] }, office: { status: 'pending', submittedAt: 0, files: [] } } },
       personalQual: { ok: false, list: [], certs: [], status: '', note: '', submittedAt: 0 },
       personalEntry: { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [],
         userType: 'jobseeker', resumeComplete: false, /* v3.1：个人入驻两类用户区分（jobseeker求职/standard标准）+ 简历完成标记 */
@@ -53,6 +55,38 @@
         channel: [], intent: '', intro: '', experience: '', profitConfig: {} },
       qual: { ok: false, list: [] } },
     'engchain:auth');
+  /* [FEAT 9.2-3] 提交某一维核验材料 */
+  AuthStore.submitDimension = function (type, payload) {
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.dimensions) s.enterprise.dimensions = {};
+    if (!s.enterprise.dimensions[type]) s.enterprise.dimensions[type] = { status: 'pending', submittedAt: 0, files: [] };
+    s.enterprise.dimensions[type].status = 'pending_review';
+    s.enterprise.dimensions[type].submittedAt = Date.now();
+    s.enterprise.dimensions[type].files = (payload && payload.files) || s.enterprise.dimensions[type].files || [];
+    return this.write(s);
+  };
+  /* [FEAT 9.2-3] 返回各维度审核状态和整体进度，并计算认证等级 */
+  AuthStore.dimensionStatus = function () {
+    var s = this.read();
+    var dims = (s.enterprise && s.enterprise.dimensions) || {};
+    var cfg = (MOCK.business.certification && MOCK.business.certification.dimensions) || [];
+    var list = [];
+    var doneCount = 0;
+    cfg.forEach(function (d) {
+      var cur = dims[d.id] || { status: 'pending', submittedAt: 0, files: [] };
+      var isDone = cur.status === 'approved' || cur.status === 'done';
+      if (isDone) doneCount++;
+      list.push({ id: d.id, label: d.label, required: d.required, status: cur.status, submittedAt: cur.submittedAt, done: isDone });
+    });
+    /* 认证等级：完成必选项=基础认证，完成3项以上=高级认证，完成全部5项=完整认证 */
+    var level = 'none';
+    if (doneCount >= 5) level = 'full';
+    else if (doneCount >= 3) level = 'advanced';
+    else if (doneCount >= 2) level = 'basic';
+    var levelLabelMap = { none: '未认证', basic: '基础认证', advanced: '高级认证', full: '完整认证' };
+    return { list: list, doneCount: doneCount, total: cfg.length, level: level, levelLabel: levelLabelMap[level] || '未认证' };
+  };
 
   /* ---- 入驻记录（R2，v2.0 多类型并行 + v3.0 扩展资料） ----
      types = 入驻类型数组，支持并行（合伙人可与建筑/中介同时存在；建筑⇄中介互斥）
@@ -64,9 +98,34 @@
   var EntryStore = makeStore('engchain-entry',
     { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0,
       depositType: null, depositPaid: 0, fee: 0, contact: '', tel: '', scope: '', submittedAt: 0, note: '',
+      /* [FEAT 9.2-2] 付费模式：once=一次性入驻 / yearly=年度订阅 */
+      cycle: 'once',
       qualifications: [], intro: { founded: '', capital: '', staffSize: '', desc: '' },
       cases: [], address: { province: '', city: '', district: '', detail: '' }, website: '', attachments: [] },
     'engchain:entry');
+  /* [FEAT 9.2-2] 年度订阅续费：cycle==='yearly' 时扣减年费并延长一年 */
+  EntryStore.renew = function (fee) {
+    var s = this.read();
+    if (s.cycle !== 'yearly') return { error: '当前非年度订阅模式' };
+    var price = fee || 0;
+    if (price > 0 && window.BalanceStore) {
+      var r = BalanceStore.consume(price, 'entry_renew', { method: 'balance', remark: '入驻年费续费' });
+      if (!r) return { error: '余额不足，请先充值' };
+    }
+    var base = Math.max(s.expireAt || Date.now(), Date.now());
+    s.expireAt = base + 365 * 864e5;
+    s.paidAt = Date.now();
+    s.renewedAt = Date.now();
+    return this.write(s);
+  };
+  /* [FEAT 9.2-2] 到期提醒：expireAt - now <= remindDays 天 */
+  EntryStore.needRenew = function () {
+    var s = this.read();
+    if (s.cycle !== 'yearly' || !s.active || !s.expireAt) return false;
+    var remindDays = (MOCK.business.subscription && MOCK.business.subscription.remindDays) || 30;
+    var daysLeft = (s.expireAt - Date.now()) / 864e5;
+    return daysLeft <= remindDays && daysLeft > 0;
+  };
   EntryStore.approve = function () { var s = this.read(); s.status = 'active'; s.active = true; return this.write(s); };
   EntryStore.pending = function () { var s = this.read(); s.status = 'pending'; s.active = false; return this.write(s); };
 
@@ -75,19 +134,59 @@
     { balance: 0, logs: [], quota: { month: '', used: 0 } },
     'engchain:credits');
   CreditStore.monthKey = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1); };
+  /* [FEAT 9.2-2] 积分 TTL：入账流水记录 expireAt = ts + ttlDays*86400000；旧历史流水无 expireAt，不参与过期清理（平滑迁移）。 */
+  CreditStore._ttlMs = function () {
+    var days = (MOCK.business.credits && MOCK.business.credits.ttlDays) || 365;
+    return days * 864e5;
+  };
   CreditStore.add = function (credits, reason, meta) {
-    var s = this.read(); s.balance += credits;
-    var rec = Object.assign({ type: 'recharge', credits: credits, reason: reason || '充值到账', ts: Date.now(), status: 'success' }, meta || {});
+    this.expireDue();
+    var s = this._rawLoad(); s.balance += credits;
+    var rec = Object.assign({ type: 'recharge', credits: credits, reason: reason || '充值到账', ts: Date.now(), expireAt: Date.now() + this._ttlMs(), status: 'success' }, meta || {});
     s.logs.unshift(rec);
     return this.write(s);
   };
+  /* [FEAT 9.2-2] 惰性过期清理：扫描 logs 中 expireAt<=now 的入账流水，批量扣减 balance 并写 credits_expired 汇总流水。
+     内部直接读写 LS（_rawLoad/write），避免 read() 递归调用。 */
+  CreditStore.expireDue = function () {
+    var now = Date.now();
+    var s = this._rawLoad();
+    var expiredTotal = 0;
+    (s.logs || []).forEach(function (rec) {
+      if (rec && rec.credits > 0 && rec.expireAt && !rec.expired && rec.expireAt <= now) {
+        rec.expired = true;
+        expiredTotal += rec.credits;
+      }
+    });
+    if (expiredTotal > 0) {
+      s.balance = Math.max(0, (s.balance || 0) - expiredTotal);
+      s.logs.unshift({ type: 'credits_expired', credits: -expiredTotal, reason: '积分到期自动清零', ts: now, status: 'success' });
+      this.write(s);
+    }
+    return expiredTotal;
+  };
+  /* [FEAT 9.2-2] 查询未来 withinDays 天内即将过期的积分数（钱包页"即将过期"提示用） */
+  CreditStore.expiringSoon = function (withinDays) {
+    this.expireDue();
+    var s = this._rawLoad();
+    var horizon = Date.now() + (withinDays || 30) * 864e5;
+    var sum = 0;
+    (s.logs || []).forEach(function (rec) {
+      if (rec && rec.credits > 0 && rec.expireAt && !rec.expired && rec.expireAt <= horizon) sum += rec.credits;
+    });
+    return sum;
+  };
   CreditStore.consume = function (cost, reason, meta) {
-    var s = this.read(); if (s.balance < cost) return null;
+    this.expireDue(); /* [FEAT 9.2-2] 消费前先惰性清理过期积分 */
+    var s = this._rawLoad(); if (s.balance < cost) return null;
     s.balance -= cost;
     var rec = Object.assign({ type: 'unlock', credits: -cost, reason: reason || '信息解锁', ts: Date.now(), status: 'success' }, meta || {});
     s.logs.unshift(rec);
     return this.write(s);
   };
+  /* [FEAT 9.2-2] 包裹 read()：每次读取前惰性过期清理；_rawLoad 为 makeStore 原始 load */
+  CreditStore._rawLoad = CreditStore.read;
+  CreditStore.read = function () { this.expireDue(); return this._rawLoad(); };
   CreditStore.freeUsed = function () {
     var s = this.read(); var mk = this.monthKey();
     if (s.quota.month !== mk) { s.quota = { month: mk, used: 0 }; this.write(s); }
@@ -117,15 +216,41 @@
     this.add(amt, reason || '任务奖励');
     return true;
   };
-  /* 邀请奖励（v1.3）：被邀注册填写邀请码后发放给邀请方（原型：非本人账号即视为有效） */
+  /* 邀请奖励（v1.3）：被邀注册填写邀请码后发放给邀请方
+     [FIX BM-036] 修复：原实现接受任意非空邀请码即发 50 积分，无防重。
+     新规则：(1) 邀请码必须对应用户表中真实存在的用户（account 或 id 匹配）；
+             (2) 同一设备已领取过的邀请码不可重复领取（localStorage 记录）。 */
+  var INVITED_CODES_KEY = 'engchain-credits-invited-codes';
+  CreditStore._invitedCodes = function () {
+    try { var r = JSON.parse(LS.getItem(INVITED_CODES_KEY) || '[]'); if (Array.isArray(r)) return r; } catch (e) {}
+    return [];
+  };
   CreditStore.inviteReward = function (code) {
+    if (!code) return false;
+    code = String(code).trim();
     if (!code) return false;
     var cfg = (MOCK.business.credits && MOCK.business.credits.rewards) || {};
     var amt = cfg.invite || 50;
     var st = (window.UI && UI.state) ? UI.state.get() : {};
     var me = st.account || '';
-    if (!code || code === me) return false;
-    this.add(amt, '邀请好友奖励');
+    if (code === me) return false;
+    /* (1) 邀请码须对应真实用户（account 或 id 匹配用户表） */
+    var exists = false;
+    try {
+      if (window.DataBus && typeof window.DataBus.users === 'function') {
+        var users = window.DataBus.users() || [];
+        for (var i = 0; i < users.length; i++) {
+          if (String(users[i].account) === code || String(users[i].id) === code) { exists = true; break; }
+        }
+      }
+    } catch (e) {}
+    if (!exists) return false;
+    /* (2) 同一设备防重：已领过该邀请码则拒绝 */
+    var claimed = this._invitedCodes();
+    if (claimed.indexOf(code) >= 0) return false;
+    claimed.push(code);
+    try { LS.setItem(INVITED_CODES_KEY, JSON.stringify(claimed)); } catch (e) {}
+    this.add(amt, '邀请好友奖励', { inviteCode: code });
     return true;
   };
 
@@ -151,12 +276,16 @@
     return { ok: true, credits: base + extra, count: count, extra: extra };
   };
 
-  /* ---- 人民币余额账本（v1.3）：充值/提现/对公审批入账 全部落账 ---- */
+  /* ---- 人民币余额账本（v1.3）：充值/提现/对公审批入账 全部落账 ----
+     [FIX BM-045] 注释：当前原型为单用户单钱包，frozen 种子 ¥200 为演示占位数据；
+     多用户切换时余额会随用户表快照同步（见 databus.js login / syncSnapshotIfCurrent）。
+     [FIX BM-038] 新增 totalRebate 字段：分销返佣累计（与 totalIn 累计充值口径分离，不污染充值统计）。 */
   var BalanceStore = makeStore('engchain-balance',
     {
       balance: (MOCK.wallet && typeof MOCK.wallet.balance === 'number') ? MOCK.wallet.balance : 1286.50,
       frozen: (MOCK.wallet && typeof MOCK.wallet.frozen === 'number') ? MOCK.wallet.frozen : 200,
       totalIn: (MOCK.wallet && typeof MOCK.wallet.total === 'number') ? MOCK.wallet.total : 13486.50,
+      totalRebate: 0,
       logs: []
     }, 'engchain:balance');
   /* 首访种子流水：把 MOCK.transactions 静态明细映射为余额账流水（幂等：logs 非空即跳过） */
@@ -173,6 +302,8 @@
     var s = this.read();
     return Math.round((s.balance - s.frozen) * 100) / 100;
   };
+  /* [FIX BM-050] recharge 保持干净：只做充值入账（balance += amt, totalIn += amt），
+     不夹带任何返佣/外部 monkey-patch 钩子。返佣请显式调用下方 rebate()。 */
   BalanceStore.recharge = function (amount, method, extra) {
     var s = this.read(); var amt = Math.round(amount * 100) / 100;
     s.balance += amt; s.totalIn += amt;
@@ -181,6 +312,68 @@
       reason: (extra && extra.remark) || (method === 'corp' ? '对公转账' : '充值到账'),
       ts: Date.now()
     });
+    return this.write(s);
+  };
+  /* [FIX BM-005/BM-008/BM-009] 统一消费入口：校验 available() 后扣减并写 logs。
+     type 建议 'certification'/'entry'/'consume'；meta.method 记录支付方式。 */
+  BalanceStore.consume = function (amount, type, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    if (this.available() < amt) return null;
+    s.balance = Math.round((s.balance - amt) * 100) / 100;
+    s.logs.unshift({
+      type: type || 'consume', amount: -amt, method: meta.method || 'balance',
+      reason: meta.remark || '消费支出', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-003/BM-006] 退款回退：balance += amt，写退款流水。 */
+  BalanceStore.refund = function (amount, reason, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    s.logs.unshift({
+      type: 'refund', amount: amt, method: meta.method || 'balance',
+      reason: reason || '退款', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-038] 分销返佣派发：balance += amt 且 totalRebate += amt（不计入 totalIn 累计充值）。 */
+  BalanceStore.rebate = function (amount, reason, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    s.totalRebate = Math.round(((s.totalRebate || 0) + amt) * 100) / 100;
+    s.logs.unshift({
+      type: 'rebate', amount: amt, method: 'rebate',
+      reason: reason || '分销返佣', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金冻结：available() 校验后 frozen += amt。 */
+  BalanceStore.freezeDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    if (this.available() < amt) return null;
+    s.frozen = Math.round((s.frozen + amt) * 100) / 100;
+    s.logs.unshift({ type: 'freeze', amount: -amt, method: 'deposit', reason: reason || '保证金冻结', ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金解冻（驳回/退出）：frozen -= amt，余额不变。 */
+  BalanceStore.unfreezeDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
+    s.logs.unshift({ type: 'unfreeze', amount: amt, method: 'deposit', reason: reason || '保证金解冻', ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金转正（终审入驻）：frozen 划转至实缴 depositPaid（frozen -= amt 且 balance -= amt）。 */
+  BalanceStore.commitDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
+    s.balance = Math.max(0, Math.round((s.balance - amt) * 100) / 100);
+    s.logs.unshift({ type: 'deposit_paid', amount: -amt, method: 'deposit', reason: reason || '保证金缴纳', ts: Date.now() });
     return this.write(s);
   };
   BalanceStore.withdraw = function (amount, method, extra) {
@@ -220,10 +413,25 @@
     for (i = 0; i < s.list.length; i++) if (s.list[i].id === id) return s.list[i];
     return null;
   };
+  /* [FIX BM-023] 修复：原 transition() 不校验状态机，订单可任意跳变。
+     新增合法迁移表校验，非法迁移返回 null 并 console.warn。 */
+  var AGENCY_ORDER_LEGAL = {
+    pending: ['paid', 'cancelled'],
+    paid: ['serving', 'cancelled', 'refunded'],
+    serving: ['completed', 'refunded'],
+    completed: [],
+    cancelled: [],
+    refunded: []
+  };
   AgencyOrderStore.transition = function (id, next, patch) {
     var s = this.read(); var it = null; var i;
     for (i = 0; i < s.list.length; i++) if (s.list[i].id === id) { it = s.list[i]; break; }
     if (!it) return null;
+    var allowed = AGENCY_ORDER_LEGAL[it.state] || [];
+    if (allowed.indexOf(next) < 0) {
+      console.warn('[AgencyOrder] 非法状态迁移 ' + it.state + ' -> ' + next + ' (order ' + id + ')');
+      return null;
+    }
     it.state = next;
     if (patch) for (var k in patch) if (patch.hasOwnProperty(k)) it[k] = patch[k];
     it.updatedAt = Date.now();
@@ -281,17 +489,85 @@
   };
   InvoiceStore.list = function () { return this.read().items || []; };
 
-  /* ---- 佣金流水 + 防跳单违规（R5 后台跟踪） ---- */
+  /* ---- 佣金流水 + 防跳单违规（R5 后台跟踪） ----
+     [FIX BM-025] 修复：原 flows 无状态细分（仅 done），T+1 为文案。
+     新结构：flow.status = pending(待结算) / settled(已结算) / withdrawable(可提现) / paid(已提现)；
+     frozenUntil = 可结算时间戳（默认创建 +1 天），读取时惰性到期自动 pending->settled。 */
   var CommissionStore = makeStore('engchain-commission', { flows: [], violations: [] }, 'engchain:commission');
-  CommissionStore.addFlow = function (f) { var s = this.read(); s.flows.unshift(f); return this.write(s); };
+  CommissionStore.addFlow = function (f) {
+    var s = this.read();
+    f = Object.assign({ status: 'pending', frozenUntil: Date.now() + 864e5 }, f || {});
+    s.flows.unshift(f);
+    return this.write(s);
+  };
   CommissionStore.addViolation = function (v) { var s = this.read(); s.violations.unshift(v); return this.write(s); };
+  /* 惰性结算：frozenUntil 到期的 pending 流水自动转 settled，返回本次结算条数 */
+  CommissionStore._lazySettle = function (s) {
+    var now = Date.now(), n = 0;
+    (s.flows || []).forEach(function (fl) {
+      if (fl.status === 'pending' && fl.frozenUntil && fl.frozenUntil <= now) { fl.status = 'settled'; n++; }
+    });
+    return n;
+  };
+  CommissionStore.settleFlow = function (id) {
+    var s = this.read(); var hit = false;
+    (s.flows || []).forEach(function (fl) {
+      if (String(fl.id) === String(id) && fl.status === 'pending') { fl.status = 'settled'; hit = true; }
+    });
+    if (hit) this.write(s);
+    return hit;
+  };
+  CommissionStore.markWithdrawable = function (id) {
+    var s = this.read(); var hit = false;
+    (s.flows || []).forEach(function (fl) {
+      if (String(fl.id) === String(id) && fl.status === 'settled') { fl.status = 'withdrawable'; hit = true; }
+    });
+    if (hit) this.write(s);
+    return hit;
+  };
 
-  /* ---- 企业关注/监控（P0-7.1） ---- */
-  var MonitorStore = makeStore('engchain-monitor', { follows: [], feed: [] }, 'engchain:monitor');
+  /* ---- 企业关注/监控（P0-7.1） ----
+     [FIX BM-040] 修复：监控限额原仅页面级校验，未下沉 Store 层。
+     follow() 现按当前身份从 MOCK.business.monitor.limits 取限额；超限返回 {error}。
+     checkDailyPush() 每日首次调用为每个 follow 生成一条 feed 推送。 */
+  var MonitorStore = makeStore('engchain-monitor', { follows: [], feed: [], lastPushDate: '' }, 'engchain:monitor');
+  MonitorStore._limitForIdentity = function () {
+    var limits = (MOCK.business.monitor && MOCK.business.monitor.limits) || { realname: 5, pro: 10, construction: 30, agency: 50, partner: 200 };
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    if (idy.isGuest) return limits.realname;
+    if (idy.primary === 'partner') return limits.partner;
+    if (idy.primary === 'pro') return limits.pro;
+    if (idy.primary === 'realname') return limits.realname;
+    if (idy.primary === 'resident') {
+      var t = (idy.entryTypes && idy.entryTypes[0]) || 'construction';
+      return limits[t] || limits.construction;
+    }
+    return limits.realname;
+  };
   MonitorStore.follow = function (companyId) {
     var s = this.read(); var i;
     for (i = 0; i < s.follows.length; i++) if (s.follows[i].companyId === companyId) return s;
+    var limit = this._limitForIdentity();
+    if (s.follows.length >= limit) return { error: '关注数量已达上限' };
     s.follows.push({ companyId: companyId, ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-040] 每日推送：跨天首次调用时为每个 follow 生成一条 feed */
+  MonitorStore.checkDailyPush = function () {
+    var s = this.read();
+    var d = new Date(); var today = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    if (s.lastPushDate === today) return s;
+    s.lastPushDate = today;
+    var dims = (MOCK.business.monitor && MOCK.business.monitor.dimensions) || ['资质到期', '项目更新'];
+    (s.follows || []).forEach(function (f, idx) {
+      s.feed.unshift({
+        companyId: f.companyId,
+        dim: dims[idx % dims.length],
+        title: '监控日报 · ' + (f.companyId || '企业'),
+        read: false,
+        ts: Date.now()
+      });
+    });
     return this.write(s);
   };
   MonitorStore.unfollow = function (companyId) {
@@ -659,6 +935,11 @@
 
   /* ---- 会员折扣：按入驻类型取积分折扣系数（v2.0 多类型并行取最高折扣） ---- */
   function creditDiscount() {
+    /* [FEAT 9.2-1] 年度解锁会员：积分折扣提升至 0.5x（最高优先级） */
+    if (window.MemberStore && MemberStore.isActive()) {
+      var annualCfg = (MOCK.business.membership && MOCK.business.membership.membershipAnnual) || {};
+      return annualCfg.creditDiscount || 0.5;
+    }
     var idy = deriveIdentity();
     /* P3-7：个人合伙人享有 0.8x 积分折扣（假设：与建筑企业同档，作为推广者激励；产品决策可调整） */
     if (idy.partner && idy.enterprise !== 'resident') return 0.8;
@@ -683,7 +964,9 @@
       rate = MOCK.business.breakin.commissionFirstTier || rate;
     }
     var total = Math.round(amount * rate);
-    if (amount >= 1000000 && total < cm.minCommission) total = cm.minCommission;
+    /* [FIX BM-027] 修复：原保底仅在 amount>=1000000 时检查（3% 档下 1000000*0.03=30000>10000 永不触发），
+       改为所有费率档计算后统一校验保底 minCommission。 */
+    if (amount > 0 && total < cm.minCommission) total = cm.minCommission;
     return { rate: rate, fee: total };
   }
 
@@ -727,6 +1010,442 @@
     };
   }
 
+
+  /* ---- [FEAT 9.2-1] 增值道具 Store（R6 B端增值道具） ----
+     键 engchain-upgrades，结构 { items: [{id, type, targetId, startedAt, expireAt, status}] } */
+  var UpgradeStore = makeStore('engchain-upgrades', { items: [] }, 'engchain:upgrades');
+  UpgradeStore.purchase = function (type, targetId) {
+    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades[type]) || null;
+    if (!cfg || !cfg.enabled) return { error: '该道具未上架' };
+    /* [FEAT 9.2-4] 入驻类型权限检查 */
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    var isIndividualPartner = !!(idy.partner && idy.enterprise !== 'resident');
+    var types = idy.entryTypes || [];
+    var allowed = cfg.entryTypes || [];
+    var canBuy = false;
+    /* 个人合伙人：可购买 topListing 和 saasTools */
+    if (isIndividualPartner && (type === 'topListing' || type === 'saasTools')) canBuy = true;
+    /* 企业入驻：检查 entryTypes 匹配 */
+    if (!canBuy) {
+      for (var i = 0; i < types.length; i++) {
+        if (allowed.indexOf(types[i]) >= 0) { canBuy = true; break; }
+      }
+    }
+    if (!canBuy) return { error: '您的入驻类型暂不支持购买该道具' };
+    /* 扣减费用 */
+    var price = cfg.price || 0;
+    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (cfg.label || type) });
+    if (!consumed) return { error: '余额不足，无法购买' };
+    /* 创建道具记录 */
+    var now = Date.now();
+    var duration = (cfg.durationDays || 0) * 86400000;
+    var item = {
+      id: 'UG' + now + Math.floor(Math.random() * 90 + 10),
+      type: type,
+      targetId: targetId || '',
+      startedAt: now,
+      expireAt: duration ? now + duration : 0,
+      count: cfg.count || 0,
+      status: 'active',
+      purchasedAt: now
+    };
+    var s = this.read();
+    s.items.unshift(item);
+    this.write(s);
+    return item;
+  };
+  UpgradeStore.isActive = function (type, targetId) {
+    var now = Date.now();
+    var items = this.read().items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.type !== type || it.status !== 'active') continue;
+      if (targetId && it.targetId && it.targetId !== targetId) continue;
+      if (it.expireAt && it.expireAt <= now) continue;
+      return true;
+    }
+    return false;
+  };
+  UpgradeStore.listActive = function () {
+    var now = Date.now();
+    return (this.read().items || []).filter(function (it) {
+      if (it.status !== 'active') return false;
+      if (it.expireAt && it.expireAt <= now) return false;
+      return true;
+    });
+  };
+  UpgradeStore.listAvailable = function () {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    var isIndividualPartner = !!(idy.partner && idy.enterprise !== 'resident');
+    var types = idy.entryTypes || [];
+    var out = [];
+    Object.keys(vus).forEach(function (key) {
+      var cfg = vus[key];
+      if (!cfg || !cfg.enabled) return;
+      var allowed = cfg.entryTypes || [];
+      var canBuy = false;
+      if (isIndividualPartner && (key === 'topListing' || key === 'saasTools')) canBuy = true;
+      if (!canBuy) {
+        for (var i = 0; i < types.length; i++) {
+          if (allowed.indexOf(types[i]) >= 0) { canBuy = true; break; }
+        }
+      }
+      out.push(Object.assign({}, cfg, { key: key, available: canBuy }));
+    });
+    return out;
+  };
+  UpgradeStore.countActiveByType = function (type) {
+    return this.listActive().filter(function (it) { return it.type === type; }).length;
+  };
+
+  /* ---- [FEAT 9.2-3] 供需匹配智能推送 Store ----
+     键 engchain-matches，结构 { feed: [...], preferences: {cats, dir, location} } */
+  var MatchStore = makeStore('engchain-matches',
+    { feed: [], preferences: { cats: [], dir: '', location: '' } }, 'engchain:matches');
+  MatchStore.setPreferences = function (prefs) {
+    return this.set({ preferences: Object.assign({}, this.read().preferences, prefs || {}) });
+  };
+  MatchStore.generate = function () {
+    var s = this.read();
+    var prefs = s.preferences || { cats: [], dir: '', location: '' };
+    var list = [];
+    try { list = (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) {}
+    var scored = list.map(function (item) {
+      var score = 0;
+      /* 品类匹配 */
+      if (prefs.cats && prefs.cats.length) {
+        var cat = item.cat || item.category || '';
+        if (prefs.cats.indexOf(cat) >= 0) score += 40;
+      }
+      /* 方向匹配 */
+      if (prefs.dir) {
+        var dir = item.dir || item.type || '';
+        if (dir === prefs.dir) score += 30;
+      }
+      /* 地区匹配 */
+      if (prefs.location) {
+        var loc = item.city || item.location || '';
+        if (loc === prefs.location || loc.indexOf(prefs.location) >= 0) score += 30;
+      }
+      /* 无偏好时给基础分 */
+      if (!prefs.cats.length && !prefs.dir && !prefs.location) score = 50;
+      return { item: item, score: Math.min(100, score) };
+    });
+    scored.sort(function (a, b) { return b.score - a.score; });
+    var top = scored.slice(0, 10);
+    /* 生成 feed（保留已读状态） */
+    var existing = {};
+    (s.feed || []).forEach(function (f) { existing[f.sourceId] = f; });
+    var now = Date.now();
+    var newFeed = top.map(function (x, idx) {
+      var src = x.item;
+      var eid = src.id || ('M' + idx);
+      var old = existing[eid];
+      return {
+        id: eid,
+        type: src.dir === 'supply' ? 'supply' : 'demand',
+        title: src.title || src.cat || '供需信息',
+        desc: src.desc || src.sub || '',
+        matchScore: x.score,
+        sourceId: src.id,
+        cat: src.cat || '',
+        location: src.city || src.location || '',
+        ts: old ? old.ts : now,
+        read: old ? old.read : false
+      };
+    });
+    this.write({ feed: newFeed, preferences: prefs });
+    return newFeed;
+  };
+  MatchStore.markRead = function (id) {
+    var s = this.read();
+    (s.feed || []).forEach(function (f) { if (f.id === id) f.read = true; });
+    this.write(s);
+  };
+  MatchStore.listUnread = function () {
+    return (this.read().feed || []).filter(function (f) { return !f.read; });
+  };
+  /* ---- [FEAT 9.2-1] 年度解锁会员订阅（P1）：年费 ¥999/年，全部详情免费解锁 + 积分折扣 0.5x ----
+     结构：{ active, type, startedAt, expireAt, autoRenew }
+     subscribe()：BalanceStore.consume 扣年费；已在有效期内则续费叠加（expireAt 在原到期日上顺延 365 天） */
+  var MemberStore = makeStore('engchain-member',
+    { active: false, type: 'annual', startedAt: 0, expireAt: 0, autoRenew: false },
+    'engchain:member');
+  MemberStore.isActive = function () {
+    var s = this.read();
+    return !!(s.active && s.expireAt > Date.now());
+  };
+  MemberStore.subscribe = function (type) {
+    var cfg = (MOCK.business.membership && MOCK.business.membership.membershipAnnual) || { price: 999, cycle: 'year', label: '年度解锁会员' };
+    var price = Math.round((cfg.price || 999) * 100) / 100;
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < price) return { ok: false, reason: 'insufficient_balance' };
+      BalanceStore.consume(price, 'membership', { remark: (cfg.label || '年度解锁会员') + '订阅' });
+    }
+    var now = Date.now();
+    var s = this.read();
+    var base = (s.active && s.expireAt > now) ? s.expireAt : now;
+    s.active = true; s.type = type || 'annual';
+    if (!s.startedAt) s.startedAt = now;
+    s.expireAt = base + 365 * 864e5;
+    this.write(s);
+    return { ok: true, expireAt: s.expireAt };
+  };
+  MemberStore.renew = function () { return this.subscribe(this.read().type || 'annual'); };
+
+  /* ---- [FEAT 9.2-4] 每日免费浏览摘要额度（P1）：游客3 / 注册未实名5 / 实名及以上10，跨天 0 点重置 ----
+     remaining() 惰性跨天重置 used；use(n) 原子扣减并返回是否成功。 */
+  var FreeQuotaStore = makeStore('engchain-free-quota', { date: '', used: 0 }, 'engchain:free-quota');
+  FreeQuotaStore._today = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  FreeQuotaStore._limit = function () {
+    var q = (MOCK.business.freeDailyQuota) || { guest: 3, registered: 5, realname: 10 };
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    if (idy.isGuest) return q.guest || 3;
+    var realnameOk = (idy.personal === 'verified' || idy.personal === 'professional' || idy.personal === 'full' ||
+                      idy.enterprise === 'verified' || idy.enterprise === 'resident');
+    return realnameOk ? (q.realname || 10) : (q.registered || 5);
+  };
+  FreeQuotaStore.remaining = function () {
+    var s = this.read(); var today = this._today();
+    if (s.date !== today) { s.date = today; s.used = 0; this.write(s); }
+    return Math.max(this._limit() - (s.used || 0), 0);
+  };
+  FreeQuotaStore.use = function (n) {
+    n = n || 1;
+    if (this.remaining() < n) return false;
+    var s = this.read(); s.used = (s.used || 0) + n; this.write(s);
+    return true;
+  };
+
+  /* ---- [FEAT 9.2-4] 经营数据看板 Store（P2） ----
+     键 engchain-dashboard，结构 { stats, trends, topCategories }
+     generate()：从 SupplyStore/LeadStore 等聚合数据生成统计；trend(period) 返回趋势 */
+  var DashboardStore = makeStore('engchain-dashboard',
+    { stats: { publishCount: 0, viewCount: 0, inquiryCount: 0, orderCount: 0, totalAmount: 0, avgAmount: 0 },
+      trends: { daily: [], weekly: [], monthly: [] }, topCategories: [] },
+    'engchain:dashboard');
+  DashboardStore.generate = function () {
+    var s = this.read();
+    var publishCount = 0, inquiryCount = 0, orderCount = 0, totalAmount = 0;
+    try {
+      var supplies = (window.SupplyStore ? SupplyStore.read().items : []) || [];
+      publishCount = supplies.filter(function (i) { return i.status === 'active'; }).length;
+    } catch (e) {}
+    try {
+      var leads = (window.LeadStore ? LeadStore.list() : []) || [];
+      inquiryCount = leads.length;
+    } catch (e) {}
+    try {
+      var orders = (window.Mediation ? Mediation.list({}) : []) || [];
+      orderCount = orders.filter(function (o) { return o.state === 'completed' || o.state === 'settled'; }).length;
+      totalAmount = orders.reduce(function (sum, o) { return sum + (Number(o.amount) || 0); }, 0);
+    } catch (e) {}
+    /* 模拟浏览量与客单价 */
+    var viewCount = publishCount * 47 + inquiryCount * 12;
+    var avgAmount = orderCount > 0 ? Math.round(totalAmount / orderCount) : 0;
+    s.stats = { publishCount: publishCount, viewCount: viewCount, inquiryCount: inquiryCount, orderCount: orderCount, totalAmount: totalAmount, avgAmount: avgAmount };
+    /* 生成近30天趋势 Mock 数据 */
+    var daily = [];
+    var now = Date.now();
+    for (var i = 29; i >= 0; i--) {
+      var dayTs = now - i * 864e5;
+      var seed = (i * 7 + 13) % 100;
+      daily.push({
+        date: new Date(dayTs).getMonth() + 1 + '/' + new Date(dayTs).getDate(),
+        amount: Math.round(5000 + seed * 300 + (29 - i) * 100),
+        inquiries: 2 + (seed % 8),
+        views: 20 + (seed % 40)
+      });
+    }
+    s.trends.daily = daily;
+    /* 近6个月周/月趋势 */
+    var weekly = [], monthly = [];
+    for (var w = 11; w >= 0; w--) {
+      var wSeed = (w * 13 + 7) % 100;
+      weekly.push({ label: 'W' + (12 - w), amount: Math.round(20000 + wSeed * 800), inquiries: 10 + (wSeed % 20) });
+    }
+    for (var m = 5; m >= 0; m--) {
+      var mSeed = (m * 17 + 3) % 100;
+      monthly.push({ label: (m + 1) + '月', amount: Math.round(80000 + mSeed * 3000), inquiries: 40 + (mSeed % 30) });
+    }
+    s.trends.weekly = weekly;
+    s.trends.monthly = monthly;
+    /* 品类分布 */
+    var catMap = {};
+    supplies.forEach(function (sup) {
+      var c = sup.cat || '其他';
+      catMap[c] = (catMap[c] || 0) + 1;
+    });
+    s.topCategories = Object.keys(catMap).map(function (k) { return { name: k, count: catMap[k] }; }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+    this.write(s);
+    return s;
+  };
+  DashboardStore.trend = function (period) {
+    var s = this.read();
+    return (s.trends && s.trends[period]) || [];
+  };
+
+  /* ---- [FEAT 9.2-5] 行业资讯/数据报告订阅 Store（P2） ----
+     键 engchain-reports，结构 { subscribed, expireAt, readIds, reports } */
+  var ReportStore = makeStore('engchain-reports',
+    { subscribed: false, expireAt: 0, readIds: [], reports: [] },
+    'engchain:reports');
+  ReportStore.subscribe = function (cycle) {
+    var cfg = (MOCK.business.industryReport && MOCK.business.industryReport.subscription) || { monthly: 29, yearly: 299 };
+    var price = cycle === 'yearly' ? (cfg.yearly || 299) : (cfg.monthly || 29);
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < price) return { error: '余额不足，请先充值' };
+      BalanceStore.consume(price, 'report_subscribe', { remark: '行业报告订阅-' + (cycle === 'yearly' ? '年费' : '月费') });
+    }
+    var now = Date.now();
+    var s = this.read();
+    var base = (s.subscribed && s.expireAt > now) ? s.expireAt : now;
+    s.subscribed = true;
+    s.expireAt = cycle === 'yearly' ? base + 365 * 864e5 : base + 30 * 864e5;
+    this.write(s);
+    return { ok: true, expireAt: s.expireAt, price: price };
+  };
+  ReportStore.isSubscribed = function () {
+    var s = this.read();
+    return !!(s.subscribed && s.expireAt > Date.now());
+  };
+  ReportStore.list = function (category) {
+    var reports = (window.MOCK && MOCK.reports) || [];
+    if (category && category !== '全部') reports = reports.filter(function (r) { return r.category === category; });
+    return reports;
+  };
+  ReportStore.read = function (id) {
+    var s = this.read();
+    if (s.readIds.indexOf(id) < 0) { s.readIds.push(id); this.write(s); }
+  };
+  ReportStore.isRead = function (id) {
+    return (this.read().readIds || []).indexOf(id) >= 0;
+  };
+
+  /* ---- [FEAT 9.2-6] R7 B端数据服务/API Store（P3） ----
+     键 engchain-api，结构 { balance, calls, subscriptions } */
+  var ApiStore = makeStore('engchain-api',
+    { balance: 0, calls: [], subscriptions: [] },
+    'engchain:api');
+  ApiStore.recharge = function (amount) {
+    var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return { error: '充值金额必须大于0' };
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < amt) return { error: '余额不足，请先充值' };
+      BalanceStore.consume(amt, 'api_recharge', { remark: 'API余额充值' });
+    }
+    var s = this.read();
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    this.write(s);
+    return { ok: true, balance: s.balance };
+  };
+  ApiStore.call = function (productId, params) {
+    var products = (MOCK.business.dataApi && MOCK.business.dataApi.products) || [];
+    var prod = null;
+    for (var i = 0; i < products.length; i++) { if (products[i].id === productId) { prod = products[i]; break; } }
+    if (!prod) return { error: 'API产品不存在' };
+    var s = this.read();
+    if (s.balance < prod.price) return { error: 'API余额不足，请充值' };
+    s.balance = Math.round((s.balance - prod.price) * 100) / 100;
+    var result = (window.MOCK && MOCK.apiResults && MOCK.apiResults[productId]) ? MOCK.apiResults[productId](params || {}) : { code: 0, message: 'success', data: {} };
+    var callRec = {
+      id: 'API' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      product: productId, productName: prod.name,
+      params: params || {}, result: result,
+      ts: Date.now(), status: 'success', cost: prod.price
+    };
+    s.calls.unshift(callRec);
+    this.write(s);
+    return callRec;
+  };
+  ApiStore.history = function () {
+    return (this.read().calls || []).slice(0, 50);
+  };
+  ApiStore.products = function () {
+    return (MOCK.business.dataApi && MOCK.business.dataApi.products) || [];
+  };
+
+  /* ---- [FEAT 9.2-7] 收入结构规划与路线图 Store（P3） ----
+     键 engchain-revenue，结构 { streams, monthly, total }
+     generate()：从 BalanceStore.logs/CommissionStore 等聚合各收入流数据 */
+  var RevenueStore = makeStore('engchain-revenue',
+    { streams: { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 },
+      monthly: [], total: 0 },
+    'engchain:revenue');
+  RevenueStore.generate = function () {
+    var s = this.read();
+    var streams = { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 };
+    /* R1/R2/R6：从 BalanceStore.logs 聚合 */
+    try {
+      var logs = (window.BalanceStore ? BalanceStore.read().logs : []) || [];
+      logs.forEach(function (log) {
+        var amt = Math.abs(Number(log.amount) || 0);
+        if (log.type === 'certification') streams.R1_cert += amt;
+        else if (log.type === 'entry') streams.R2_entry += amt;
+        else if (log.type === 'entry_renew') streams.R2_entry += amt;
+        else if (log.type === 'membership') streams.R6_upgrade += amt;
+        else if (log.type === 'upgrade') streams.R6_upgrade += amt;
+        else if (log.type === 'report_subscribe') streams.R6_upgrade += amt;
+        else if (log.type === 'api_recharge') streams.R7_api += amt;
+        else if (log.type === 'consume' || log.type === 'recharge') { /* skip */ }
+      });
+    } catch (e) {}
+    /* R3/R4：从 CreditStore.logs 聚合（积分兑换金额） */
+    try {
+      var creditLogs = (window.CreditStore ? CreditStore.read().logs : []) || [];
+      creditLogs.forEach(function (log) {
+        var amt = Math.abs(Number(log.credits) || 0);
+        if (log.type === 'unlock') streams.R3_unlock += Math.round(amt);
+        else if (log.type === 'recharge') streams.R4_credits += Math.round(amt);
+      });
+    } catch (e) {}
+    /* R5：从 CommissionStore.flows 聚合 */
+    try {
+      var flows = (window.CommissionStore ? CommissionStore.read().flows : []) || [];
+      flows.forEach(function (fl) {
+        streams.R5_commission += Math.abs(Number(fl.amount) || Number(fl.fee) || 0);
+      });
+    } catch (e) {}
+    /* R7：从 ApiStore.calls 聚合 API 调用费用 */
+    try {
+      var apiCalls = (window.ApiStore ? ApiStore.read().calls : []) || [];
+      apiCalls.forEach(function (c) { streams.R7_api += Math.abs(Number(c.cost) || 0); });
+    } catch (e) {}
+    /* 生成 Mock 月度趋势（近6个月） */
+    var monthly = [];
+    var now = new Date();
+    for (var m = 5; m >= 0; m--) {
+      var d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      var seed = (m * 13 + 7) % 100;
+      monthly.push({
+        month: (d.getMonth() + 1) + '月',
+        total: Math.round(50000 + seed * 2000 + (5 - m) * 8000),
+        R1_cert: Math.round(streams.R1_cert / 6 + seed * 200),
+        R2_entry: Math.round(streams.R2_entry / 6 + seed * 300),
+        R3_unlock: Math.round(streams.R3_unlock / 6 + seed * 150),
+        R5_commission: Math.round(streams.R5_commission / 6 + seed * 250)
+      });
+    }
+    s.streams = streams;
+    s.monthly = monthly;
+    s.total = Object.keys(streams).reduce(function (sum, k) { return sum + streams[k]; }, 0);
+    this.write(s);
+    return s;
+  };
+  RevenueStore.byStream = function () {
+    var s = this.read();
+    var streams = s.streams || {};
+    var total = s.total || 1;
+    var labels = { R1_cert: 'R1认证费', R2_entry: 'R2入驻费', R3_unlock: 'R3解锁', R4_credits: 'R4积分', R5_commission: 'R5佣金', R6_upgrade: 'R6增值', R7_api: 'R7API', other: '其他' };
+    return Object.keys(streams).map(function (k) {
+      return { key: k, label: labels[k] || k, amount: streams[k] || 0, pct: Math.round((streams[k] / total) * 1000) / 10 };
+    });
+  };
+  RevenueStore.trend = function () {
+    return (this.read().monthly) || [];
+  };
+
   window.AuthStore = AuthStore;
   window.EntryStore = EntryStore;
   window.CreditStore = CreditStore;
@@ -742,6 +1461,14 @@
   window.LeadStore = LeadStore;
   window.SvcRatingStore = SvcRatingStore;
   window.ModeStore = ModeStore;
+  window.MemberStore = MemberStore;
+  window.FreeQuotaStore = FreeQuotaStore;
+  window.UpgradeStore = UpgradeStore;
+  window.MatchStore = MatchStore;
+  window.DashboardStore = DashboardStore;
+  window.ReportStore = ReportStore;
+  window.ApiStore = ApiStore;
+  window.RevenueStore = RevenueStore;
   /* 派生规则暴露给后台复用（规则同源：后台佣金试算/身份派生与 App 同一函数） */
   window.commissionRate = commissionRate;
   window.deriveStatus = deriveStatus;

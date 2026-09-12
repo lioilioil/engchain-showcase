@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-engchain-basefix="2">
@@ -969,28 +969,48 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   function reloadFrame() { frame.src = frame.src; }
 
-  /* 设备比例缩放 */
+  /* ---- 设备比例缩放 ---- */
   var SCALE_KEY = 'engchain-scale';
   var scale = 0.82;
   try { scale = parseFloat(localStorage.getItem(SCALE_KEY) || '0.82'); } catch (e) {}
   function clampScale(v) { return Math.max(0.4, Math.min(1.35, Math.round(v * 20) / 20)); }
   function saveScale() { try { localStorage.setItem(SCALE_KEY, String(scale)); } catch (e) {} }
+
+
+  /* 「后台演示」模式下 .device 被 renderNav 置为 display:none */
+  function deviceHidden() {
+    var dev = document.querySelector('.device');
+    return !!(dev && dev.style.display === 'none');
+  }
+
   function applyScale() {
     scale = clampScale(scale);
+    var phoneShown = !deviceHidden();
+    var shown = scale;
     var dev = document.querySelector('.device');
     var bst = document.getElementById('browser-stage');
     if (dev) {
-      dev.style.transform = 'scale(' + scale + ')';
-      var mb = (currentShell === 'pura') ? -80 : -117;
-      dev.style.marginBottom = Math.round(mb * scale) + 'px';
+      dev.style.transform = 'scale(' + shown + ')';
+      dev.style.marginBottom = Math.round(-117 * shown) + 'px';
     }
     if (bst) bst.style.transform = 'scale(' + scale + ')';
-    document.getElementById('zoom-num').textContent = Math.round(scale * 100) + '%';
-  }
-  document.getElementById('zoom-in').addEventListener('click', function () { scale = clampScale(scale + 0.05); applyScale(); saveScale(); });
+    var zn = document.getElementById('zoom-num');
+    if (zn) {
+      zn.textContent = Math.round(shown * 100) + '%';
+      zn.title = '展示比例 ' + Math.round(shown * 100) + '%';
+    }
+  }  document.getElementById('zoom-in').addEventListener('click', function () { scale = clampScale(scale + 0.05); applyScale(); saveScale(); });
   document.getElementById('zoom-out').addEventListener('click', function () { scale = clampScale(scale - 0.05); applyScale(); saveScale(); });
   document.getElementById('zoom-reset').addEventListener('click', function () { scale = 0.82; applyScale(); saveScale(); });
   applyScale();
+
+  /* 窗口尺寸变化 → 重新计算（防抖） */
+  var fitTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(applyScale, 120);
+  });
+
 
   /* 主题 */
   /* 后台浏览器模型的明暗同步：跟随 preview 主题（engchain-theme） */
@@ -1027,16 +1047,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!window.AuthStore || !window.EntryStore) return;
     var now = Date.now(), Y = now + 365 * 864e5;
     var rn = { ok: false, ts: 0 }, en = { ok: false, expireAt: 0 }, ql = { ok: false, list: [] };
+    var pe = { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [], userType: 'jobseeker', resumeComplete: false };
     var entry = { type: null, orderId: null, status: null, active: false, paidAt: 0, expireAt: 0 };
     if (status === 'realname') { rn = { ok: true, ts: now }; }
-    else if (status === 'pro') { rn = { ok: true, ts: now }; ql = { ok: true, list: ['一级建造师 · 建筑工程'] }; }
+    else if (status === 'pro') { rn = { ok: true, ts: now }; ql = { ok: true, list: ['一级建造师 · 建筑工程'] }; pe = { ok: true, status: 'active', list: ['一级建造师 · 建筑工程'], userType: 'professional', resumeComplete: true }; }
     else if (status === 'enterprise') { rn = { ok: true, ts: now }; en = { ok: true, expireAt: Y }; }
     else if (status === 'resident') {
-      rn = { ok: true, ts: now }; en = { ok: true, expireAt: Y }; ql = { ok: true, list: ['建筑业企业资质'] };
+      rn = { ok: true, ts: now }; en = { ok: true, expireAt: Y }; ql = { ok: true, list: ['建筑业企业资质'] }; pe = { ok: true, status: 'active', list: ['建筑业企业资质'], userType: 'professional', resumeComplete: true };
       var et = (selEntrySync && selEntrySync.value) || 'construction';
       entry = { type: et, orderId: 'DEMO' + now.toString().slice(-6), status: 'active', active: true, paidAt: now, expireAt: Y };
     }
-    AuthStore.write({ realname: rn, enterprise: en, qual: ql });
+    /* [E3 FIX] 必须显式写 personalEntry，否则默认值 {ok:false}（真值对象）会遮蔽 qual，导致 deriveIdentity 推导 pro 失败 */
+    AuthStore.write({ realname: rn, enterprise: en, qual: ql, personalEntry: pe });
     EntryStore.write(entry);
     /* 切换身份后清空旧解锁记录与免费额度计数，付费墙按新身份重新评估 */
     try { localStorage.removeItem('engchain-unlocked'); } catch (e) {}

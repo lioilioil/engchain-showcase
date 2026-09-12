@@ -46,6 +46,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <div id="entry-list"></div>
 
+    <!-- 三类入驻权益并排对比 -->
+    <div class="group-title et-cmp-title">三类入驻权益对比</div>
+    <div id="compare-box"></div>
+
     <div class="et-note">
       <svg class="ic" style="width:14px;height:14px;flex:none;margin-top:2px;color:var(--primary);"><use href="#i-shield"/></svg>
       <span>建筑企业与中介服务企业两类互斥，不可同时入驻；合伙人企业可与上述任一类型并行。入驻费按次收取，合伙人采用后台人工审核制，不涉及线上入驻费。</span>
@@ -96,28 +100,73 @@ function render(){
     var opp=id==='partner'?null:(id==='construction'?'agency':'construction');
     var locked=!qualified;
     var exclusive=!active&&!pending&&activeTypes.indexOf(opp)>=0&&e.active;
-    var discount=(breakin&&id==='construction'&&t.fee!==fee)?'破冰期 · 限免':(breakin&&id==='agency'&&t.fee!==fee?'破冰期 5 折':'');
+    var discount=(breakin&&id==='construction'&&t.fee!==fee)?'体验期 · 限免':(breakin&&id==='agency'&&t.fee!==fee?'体验期 5 折':'');
     var stateHtml='';
-    if(active)stateHtml='<span class="et-badge et-badge-on">✓ 已入驻</span>';
+    if(active){var _tier=window.EntryTier?EntryTier.evaluate(id):1;stateHtml='<span class="et-badge et-badge-on">✓ 已入驻</span> '+(window.EntryTier?EntryTier.render(id,_tier):'');}
     else if(pending)stateHtml='<span class="et-badge et-badge-rv"><i></i>审核中</span>';
-    else stateHtml='<span class="tag tag-primary et-vbadge">'+t.badge+'</span>';
+    else stateHtml=(window.IdBadge?IdBadge.render(id==='agency'?'agency':id==='partner'?'partner':'construction','sm'):'<span class="tag tag-primary et-vbadge">'+t.badge+'</span>');
     var cta;
     if(active)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\'entry-result.html\'">查看</button>';
     else if(pending)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\'entry-review.html\'">审核进度</button>';
     else if(exclusive)cta='<button class="btn btn-ghost et-btn" disabled>类型互斥</button>';
     else if(locked)cta='<button class="btn btn-ghost et-btn" onclick="location.href=\''+(idy.personal==='verified'?'auth-qualification.html':'auth-personal.html')+'\'">先去认证</button>';
     else cta='<button class="btn '+(id==='partner'?'btn-ghost':'btn-primary')+' et-btn" onclick="location.href=\'entry-form.html?type='+id+'\'">'+(id==='partner'?'申请入驻':'去入驻')+'</button>';
-    return '<div class="et-card '+(active||pending?'is-on':'')+'" style="animation-delay:'+(i*70)+'ms">'+
+    return '<div class="et-card '+(id==='construction'?'et-card-core ':'')+(active||pending?'is-on':'')+'" style="animation-delay:'+(i*70)+'ms">'+
       '<div class="et-rail et-rail-'+id+'"></div>'+
       '<div class="fb-between" style="margin-bottom:6px;"><div class="fw-700 fs-15">'+t.label+'</div>'+stateHtml+'</div>'+
       '<div class="text-3 fs-12" style="margin-bottom:10px;line-height:1.6;">'+descs[id]+(exclusive?'<br><span style="color:var(--danger);">与已入驻的'+names[opp]+'互斥，不可重复入驻</span>':'')+'</div>'+
       '<div class="et-feats">'+feats[id].map(function(f){return '<span class="et-chip"><i>✓</i>'+f+'</span>';}).join('')+'</div>'+
       '<div class="fb-between" style="align-items:flex-end;margin-top:11px;">'+
         '<div><div style="font-size:11px;color:var(--text-3);">入驻费 · 按次</div>'+
-        '<div class="fw-700 et-fee">'+(fee===0?'<span class="green">¥0 · 免费</span>':money(fee))+'</div>'+
-        (discount?'<div style="font-size:10px;color:var(--warning);">'+discount+'</div>':'')+'</div>'+cta+
-      '</div></div>';
+        '<div style="display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;">'+
+          '<span class="fw-700 et-fee">'+(fee===0?'<span class="green">¥0 · 免费</span>':money(fee))+'</span>'+
+          (breakin && fee !== t.fee ? '<span class="et-fee-origin">'+money(t.fee)+'</span>' : '')+
+        '</div>'+
+        (discount?'<div style="font-size:10px;color:var(--warning);margin-top:1px;">'+discount+'</div>':'')+'</div>'+cta+
+      '</div>'+
+      (active&&window.EntryTier?EntryTier.renderProgress(id,EntryTier.evaluate(id)):'')+
+    '</div>';
   }).join('');
+
+  /* ---- 三类入驻权益并排对比表 ---- */
+  var cmpBox=document.getElementById('compare-box');
+  var mtypes=(MOCK.business.membership&&MOCK.business.membership.types)||[];
+  var disc={},badgeMap={};
+  mtypes.forEach(function(m){disc[m.id]=m.creditDiscount;badgeMap[m.id]=m.badge;});
+  var mon=(MOCK.business.monitor&&MOCK.business.monitor.limits)||{};
+  function discText(id){var d=disc[id];return d?Math.round(d*10)+'折':'—';}
+  var cmpRows=[
+    {label:'入驻费（正式）',v:['¥'+Number(entry.construction.fee).toLocaleString()+'/次','¥'+Number(entry.agency.fee).toLocaleString()+'/次','¥0 · 人工审核']},
+    {label:'入驻费（体验期）',v:[breakin?money(breakinFee('construction'))+' · 体验':'¥'+Number(entry.construction.fee).toLocaleString()+'/次',breakin?money(breakinFee('agency'))+' · 体验':'¥'+Number(entry.agency.fee).toLocaleString()+'/次','¥0']},
+    {label:'解锁折扣',v:[discText('construction'),discText('agency'),discText('partner')]},
+    {label:'佣金通道',v:['无佣金通道','订单+佣金通道','全渠道分销']},
+    {label:'分销返佣',v:['一级分销','分销受限','完整二级分销']},
+    {label:'专属徽标',v:[window.IdBadge?IdBadge.render('construction','sm'):'蓝V',window.IdBadge?IdBadge.render('agency','sm'):'金V',window.IdBadge?IdBadge.render('partner','sm'):'专属']},
+    {label:'专属后台',v:['供需发布后台','订单管理后台','合伙人专属后台']},
+    {label:'团队管理',v:['不支持','不支持','支持']},
+    {label:'监控额度',v:[(mon.construction||30)+' 家',(mon.agency||50)+' 家',(mon.partner||200)+' 家']}
+  ];
+  var gridHtml='<div class="et-compare">';
+  gridHtml+='<div class="et-cmp-row et-cmp-head">'+
+    '<div class="et-cmp-lab"></div>'+
+    '<div class="et-cmp-v et-cmp-col-construction"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>建筑企业</div>'+
+    '<div class="et-cmp-v et-cmp-col-agency"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.5A8 8 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>中介服务</div>'+
+    '<div class="et-cmp-v et-cmp-col-partner"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6L8 14 2 9.4h7.6L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>合伙人</div>'+
+  '</div>';
+  cmpRows.forEach(function(r, ri){
+    gridHtml+='<div class="et-cmp-row'+(ri%2===1?' et-cmp-row-alt':'')+'"><div class="et-cmp-lab">'+r.label+'</div>'+
+      r.v.map(function(x, ci){return '<div class="et-cmp-v'+(ci===1?' et-cmp-blur':'')+'">'+x+'</div>';}).join('')+'</div>';
+  });
+  gridHtml+='</div>';
+  gridHtml+='<div class="et-agency-contact">'+
+    '<div class="et-agency-contact-icon"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.5A8 8 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+    '<div style="flex:1;min-width:0;">'+
+      '<div class="fw-600 fs-12">中介服务入驻采用定制化方案</div>'+
+      '<div class="text-3 fs-11" style="margin-top:2px;">佣金比例、服务权益、入驻费用一企一议</div>'+
+    '</div>'+
+    '<button class="et-agency-contact-btn" onclick="location.href=\'../../pages/im/index.html\'">联系客服</button>'+
+  '</div>';
+  cmpBox.innerHTML=gridHtml;
 }
 render();
 window.addEventListener('storage',function(ev){if(['engchain-users','engchain-entry','engchain-auth','engchain-mode'].indexOf(ev.key)>=0)render();});
@@ -154,7 +203,146 @@ window.addEventListener('engchain:store-change',render);
 .et-chip i{color:var(--primary);font-style:normal;font-size:10px;}
 .et-fee{font-size:18px;color:var(--primary);margin-top:1px;}
 .et-btn{min-width:92px;padding-left:14px;padding-right:14px;}
+
+/* ========== 建筑企业 — 工业奢华 / 工程蓝图风（项目核心身份，情感差异） ========== */
+/* ---- 明亮模式：浅色高端版 ---- */
+.et-card-core{
+  position:relative;overflow:hidden;
+  background:linear-gradient(150deg,#fdfaf3 0%,#f8f2e4 45%,#f3ecd8 100%)!important;
+  border:1px solid rgba(201,169,97,.5)!important;
+  border-radius:18px!important;
+  padding:18px 18px 16px 20px!important;
+  box-shadow:
+    0 10px 36px rgba(139,109,47,.12),
+    0 3px 10px rgba(201,169,97,.15),
+    inset 0 1px 0 rgba(255,255,255,.8)!important;
+}
+/* 蓝图网格纹理 — 明亮模式用深色金线 */
+.et-card-core::before{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background-image:
+    linear-gradient(rgba(139,109,47,.06) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(139,109,47,.06) 1px,transparent 1px);
+  background-size:22px 22px;
+  pointer-events:none;z-index:0;
+}
+/* 右上角金色光晕 */
+.et-card-core::after{
+  content:'';position:absolute;top:-50px;right:-50px;
+  width:160px;height:160px;
+  background:radial-gradient(circle,rgba(201,169,97,.25),transparent 68%);
+  pointer-events:none;z-index:0;
+}
+.et-card-core>*{position:relative;z-index:1;}
+/* 左侧身份竖条 — 工程感金色 */
+.et-card-core .et-rail-construction{
+  width:4px!important;left:0!important;
+  background:linear-gradient(180deg,#d4b876 0%,#a8894f 45%,#d4b876 100%)!important;
+  box-shadow:0 0 14px rgba(201,169,97,.45);
+  border-radius:0 4px 4px 0;
+}
+/* 标题 — 深金加粗 */
+.et-card-core .fw-700.fs-15{
+  color:#7a5f25!important;font-size:16.5px!important;font-weight:800!important;
+  letter-spacing:.6px;text-shadow:0 1px 2px rgba(255,255,255,.6);
+}
+/* 描述文字 */
+.et-card-core .text-3{color:rgba(90,70,30,.6)!important;}
+/* 功能 chip */
+.et-card-core .et-chip{
+  background:rgba(201,169,97,.12)!important;color:#7a5f25!important;
+  border:1px solid rgba(201,169,97,.25);
+}
+.et-card-core .et-chip i{color:#a8894f!important;}
+/* 价格 */
+.et-card-core .et-fee{
+  color:#7a5f25!important;font-size:23px!important;font-weight:800!important;
+  text-shadow:0 2px 8px rgba(201,169,97,.25);
+}
+.et-card-core .et-fee-origin{color:rgba(90,70,30,.38)!important;text-decoration-color:rgba(90,70,30,.38)!important;}
+/* 入驻费小标签 */
+.et-card-core div[style*="font-size:11px"]{color:rgba(90,70,30,.5)!important;}
+/* CTA 按钮 */
+.et-card-core .btn-primary{
+  background:linear-gradient(135deg,#d4b876,#a8894f)!important;color:#1a2332!important;
+  font-weight:700!important;box-shadow:0 4px 16px rgba(201,169,97,.4);
+}
+.et-card-core .btn-primary:active{transform:scale(.97);}
+/* 先去认证按钮 — 明亮模式下清晰可见 */
+.et-card-core .btn-ghost{
+  color:#7a5f25!important;border:1px solid rgba(201,169,97,.5)!important;
+  background:rgba(201,169,97,.08)!important;font-weight:600!important;
+}
+.et-card-core .btn-ghost:active{background:rgba(201,169,97,.15)!important;}
+
+/* ---- 暗色模式：深色版 ---- */
+[data-theme="dark"] .et-card-core{
+  background:linear-gradient(150deg,#1e2a3a 0%,#141d2b 45%,#0d1420 100%)!important;
+  border:1px solid rgba(201,169,97,.35)!important;
+  box-shadow:
+    0 10px 36px rgba(0,0,0,.4),
+    0 3px 10px rgba(201,169,97,.12),
+    inset 0 1px 0 rgba(255,255,255,.06)!important;
+}
+[data-theme="dark"] .et-card-core::before{
+  background-image:
+    linear-gradient(rgba(201,169,97,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(201,169,97,.035) 1px,transparent 1px);
+}
+[data-theme="dark"] .et-card-core::after{
+  background:radial-gradient(circle,rgba(201,169,97,.2),transparent 68%);
+}
+[data-theme="dark"] .et-card-core .fw-700.fs-15{
+  color:#ecd9ab!important;text-shadow:0 1px 3px rgba(0,0,0,.4);
+}
+[data-theme="dark"] .et-card-core .text-3{color:rgba(236,217,171,.62)!important;}
+[data-theme="dark"] .et-card-core .et-chip{
+  background:rgba(201,169,97,.1)!important;color:#d8c48e!important;
+  border:1px solid rgba(201,169,97,.18);
+}
+[data-theme="dark"] .et-card-core .et-chip i{color:#c9a961!important;}
+[data-theme="dark"] .et-card-core .et-fee{
+  color:#ecd9ab!important;text-shadow:0 2px 10px rgba(201,169,97,.35);
+}
+[data-theme="dark"] .et-card-core .et-fee-origin{color:rgba(236,217,171,.38)!important;text-decoration-color:rgba(236,217,171,.38)!important;}
+[data-theme="dark"] .et-card-core div[style*="font-size:11px"]{color:rgba(236,217,171,.5)!important;}
+[data-theme="dark"] .et-card-core .btn-ghost{
+  color:#d8c48e!important;border:1px solid rgba(201,169,97,.4)!important;
+  background:rgba(201,169,97,.08)!important;
+}
 .et-note{display:flex;gap:7px;font-size:11.5px;color:var(--text-3);line-height:1.75;padding:2px 4px;}
+
+/* ========== 常规价格划线 ========== */
+.et-fee-origin{font-size:12px;color:var(--text-3);text-decoration:line-through;text-decoration-color:var(--text-3);opacity:.65;font-weight:500;}
+
+/* ========== 三类入驻权益并排对比表 ========== */
+.et-cmp-title{padding:6px 4px 10px;font-size:13.5px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;}
+.et-cmp-title::before{content:'';width:3px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--primary),var(--primary-dim));}
+.et-compare{background:var(--bg-card);border:1px solid var(--line);border-radius:16px;padding:0;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.05);margin-bottom:0;}
+.et-cmp-row{display:grid;grid-template-columns:78px 1fr 1fr 1fr;align-items:stretch;}
+.et-cmp-head{background:linear-gradient(135deg,rgba(201,169,97,.08),rgba(201,169,97,.02));}
+.et-cmp-head .et-cmp-v{padding:14px 4px 12px;font-size:12px;font-weight:700;color:var(--text-1);text-align:center;border-bottom:1.5px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;line-height:1.2;}
+.et-cmp-col-icon{font-size:17px;line-height:1;}
+.et-cmp-col-tag{font-size:9px;font-weight:700;padding:1.5px 7px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;letter-spacing:.3px;}
+.et-cmp-col-construction{color:var(--primary-dim)!important;background:linear-gradient(180deg,rgba(201,169,97,.14),rgba(201,169,97,.05))!important;position:relative;}
+.et-cmp-col-construction::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:2.5px;border-radius:2px;background:linear-gradient(180deg,var(--primary),var(--primary-dim));}
+.et-cmp-col-partner{color:#6B5B95;}
+.et-cmp-lab{padding:11px 6px 11px 14px;font-size:11px;color:var(--text-3);display:flex;align-items:center;border-bottom:1px solid var(--line-hairline);line-height:1.4;font-weight:500;}
+.et-cmp-v{padding:11px 4px;font-size:11px;color:var(--text-1);text-align:center;border-bottom:1px solid var(--line-hairline);display:flex;align-items:center;justify-content:center;line-height:1.45;}
+.et-cmp-row-alt{background:rgba(201,169,97,.03);}
+.et-cmp-row:last-child .et-cmp-lab,.et-cmp-row:last-child .et-cmp-v{border-bottom:none;}
+/* 对比表数据行建筑企业列（第2列）高亮 */
+.et-cmp-row:not(.et-cmp-head) .et-cmp-v:nth-child(2){background:rgba(201,169,97,.05);font-weight:600;color:var(--primary-dim);}
+.et-cmp-row-alt:not(.et-cmp-head) .et-cmp-v:nth-child(2){background:rgba(201,169,97,.09);}
+
+/* 中介列模糊覆盖 */
+.et-cmp-blur{filter:blur(3.5px);user-select:none;pointer-events:none;opacity:.5;position:relative;}
+
+/* 中介服务联系客服 */
+.et-agency-contact{display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.3);border-radius:14px;padding:13px 14px;margin-top:11px;margin-bottom:14px;}
+.et-agency-contact-icon{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;box-shadow:0 3px 10px rgba(201,169,97,.35);}
+.et-agency-contact-btn{flex:none;border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:9px 17px;box-shadow:0 2px 10px rgba(201,169,97,.4);cursor:pointer;white-space:nowrap;}
+.et-agency-contact-btn:active{transform:scale(.96);}
 </style>
 </body>
 </html>

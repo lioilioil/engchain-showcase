@@ -227,7 +227,49 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function () {
   var root = window.__ROOT__ || '../../';
 
-  /* ---- 5 步成长路径数据 ---- */
+  /* ---- 5 步成长路径数据 ----
+     E2-10：步骤完成状态接真实业务标志（实名=engchain-auth / 发布=SupplyStore / 首单=engchain-orders / 分销=engchain-entry·partner），
+     同时允许手动点击节点标记完成（写入 engchain-guide-manual），进度条随完成状态实时更新。 */
+  function readManualDone() {
+    try { return JSON.parse(localStorage.getItem('engchain-guide-manual') || '[]'); } catch (e) { return []; }
+  }
+  function setManualDone(arr) {
+    try { localStorage.setItem('engchain-guide-manual', JSON.stringify(arr)); } catch (e) {}
+  }
+  function toggleManual(idx) {
+    var arr = readManualDone();
+    var i = arr.indexOf(idx);
+    if (i >= 0) arr.splice(i, 1); else arr.push(idx);
+    setManualDone(arr);
+  }
+  /* 真实业务标志：是否已发布过供需 */
+  function hasPublished() {
+    try {
+      if (window.SupplyStore && SupplyStore.listActive) return (SupplyStore.listActive() || []).length > 0;
+    } catch (e) {}
+    try { return localStorage.getItem('engchain-published') === '1'; } catch (e) { return false; }
+  }
+  /* 真实业务标志：是否已有成交订单 */
+  function hasDeal() {
+    try {
+      var ord = JSON.parse(localStorage.getItem('engchain-orders') || '[]');
+      return ord.some(function (o) { return o.status === 'settled' || o.status === '已成交'; });
+    } catch (e) { return false; }
+  }
+  /* 真实业务标志：是否已入驻/成为分销（入驻含 partner，或个人合伙人 ok） */
+  function hasPartnerEntry() {
+    try {
+      var e = JSON.parse(localStorage.getItem('engchain-entry') || '{}');
+      var types = (e.types && e.types.length) ? e.types : (e.type ? [e.type] : []);
+      if (types.indexOf('partner') >= 0) return true;
+    } catch (e) {}
+    try {
+      var a = JSON.parse(localStorage.getItem('engchain-auth') || '{}');
+      if (a.partner && a.partner.ok) return true;
+    } catch (e) {}
+    try { return localStorage.getItem('engchain-partner') === '1'; } catch (e) { return false; }
+  }
+
   var STEPS = [
     {
       icon: 'user', title: '注册账号',
@@ -247,19 +289,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       icon: 'doc', title: '发布供需',
       desc: '一句话发布，AI智能补全，让需求被看见',
       href: root + 'pages/publish/index.html',
-      check: function () { return localStorage.getItem('engchain-published') === '1'; }
+      check: function () { return hasPublished(); }
     },
     {
       icon: 'sparkle', title: '对接成交',
       desc: 'AI匹配推荐，付费解锁联系，洽谈成交',
       href: root + 'pages/supply/list.html',
-      check: function () { return localStorage.getItem('engchain-deal') === '1'; }
+      check: function () { return hasDeal(); }
     },
     {
       icon: 'share', title: '分销推广',
       desc: '邀请好友赚佣金，成为合伙人享受更多权益',
       href: root + 'pages/distribution/index.html',
-      check: function () { return localStorage.getItem('engchain-partner') === '1'; }
+      check: function () { return hasPartnerEntry(); }
     },
   ];
 
@@ -273,12 +315,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   function renderTimeline() {
+    var manual = readManualDone();
     var doneCount = 0;
     var html = STEPS.map(function (s, i) {
-      var done = s.check(currentRole);
+      var auto = s.check(currentRole);
+      var done = auto || manual.indexOf(i) >= 0;
       if (done) doneCount++;
+      /* E2-10：节点可点击手动标记/取消完成 */
       return '<div class="gt-step' + (done ? ' done' : '') + '" data-idx="' + i + '">' +
-        '<div class="gt-node">' + (done ? svgIcon('check') : (i + 1)) + '</div>' +
+        '<div class="gt-node" data-node="' + i + '" title="点击标记/取消完成">' + (done ? svgIcon('check') : (i + 1)) + '</div>' +
         '<div class="gt-body">' +
           '<div class="gt-top">' +
             '<div class="gt-title">' + svgIcon(s.icon) + s.title + '</div>' +
@@ -288,7 +333,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           '<div class="gt-action">' +
             (done
               ? '<span class="gt-done-label">' + svgIcon('check') + '已解锁</span>'
-              : '<button type="button" class="gt-btn" data-href="' + s.href + '">去完成' + svgIcon('chev-r') + '</button>') +
+              : '<button type="button" class="gt-btn" data-href="' + s.href + '">去完成' + svgIcon('chev-r') + '</button>' +
+                '<button type="button" class="gt-btn" data-manual="' + i + '" style="margin-left:6px;background:transparent;color:var(--text-3);border:1px solid var(--line);">标记完成</button>') +
           '</div>' +
         '</div>' +
       '</div>';
@@ -296,12 +342,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     timeline.innerHTML = html;
     progressEl.textContent = doneCount + '/5 已完成';
 
-    // 绑定跳转
-    timeline.querySelectorAll('.gt-btn').forEach(function (btn) {
+    /* 绑定跳转 */
+    timeline.querySelectorAll('.gt-btn[data-href]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
+        e.stopPropagation();
         var href = btn.dataset.href;
         if (href) location.href = href;
+      });
+    });
+    /* E2-10 手动标记完成 */
+    timeline.querySelectorAll('[data-manual]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleManual(Number(btn.dataset.manual));
+        renderTimeline();
+      });
+    });
+    /* E2-10 节点点击也可切换完成状态 */
+    timeline.querySelectorAll('[data-node]').forEach(function (nd) {
+      nd.addEventListener('click', function (e) {
+        e.preventDefault();
+        toggleManual(Number(nd.dataset.node));
+        renderTimeline();
       });
     });
   }
@@ -357,6 +421,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   document.getElementById('skipBtn').addEventListener('click', function () {
     if (window.UI && UI.toast) UI.toast('已跳过引导', 'ok');
     setTimeout(function () { location.href = root + 'index.html'; }, 300);
+  });
+
+  /* E2-10 认证/入驻/订单变化后刷新步骤状态 */
+  window.addEventListener('engchain:auth', renderTimeline);
+  window.addEventListener('engchain:entry', renderTimeline);
+  window.addEventListener('engchain:store-change', renderTimeline);
+  window.addEventListener('storage', function (e) {
+    if (e.key && e.key.indexOf('engchain-') === 0) renderTimeline();
   });
 })();
 </script>

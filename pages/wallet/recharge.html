@@ -71,6 +71,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .amt { text-align: center; padding: 12px 0; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line); font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color var(--d-fast), background var(--d-fast), color var(--d-fast); }
   .amt:active { border-color: var(--primary); background: var(--primary-soft); }
   .amt.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dim); }
+
+  /* —— 充值成功弹窗（与 credits.html 同款） —— */
+  .recharge-success { text-align: center; padding: 10px 0; }
+  .rs-icon { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #2E7D50, #4CAF7D); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .rs-icon svg { width: 28px; height: 28px; stroke: #fff; stroke-width: 2.5; fill: none; }
+  .rs-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
+  .rs-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.6; }
+  .rs-amount { font-size: 28px; font-weight: 800; color: var(--primary); font-family: var(--font-num); margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -99,7 +107,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
 
       <!-- 积分抵现（v1.3）：兑换比例与抵扣上限均由规则中心 credits.deduct 配置 -->
-      <div id="deductBox" class="glass" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:14px;opacity:.55;">
+      <div id="deductBox" class="glass" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:14px;">
         <svg class="ic" style="width:18px;height:18px;color:var(--primary);flex:none;"><use href="#i-bolt"/></svg>
         <div style="flex:1;min-width:0;">
           <div class="fw-600 fs-13" style="color:var(--text-1);">积分抵现</div>
@@ -151,6 +159,45 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function () {
   window.__ROOT__ = '../../';
+
+  /* ---- E2-17 新用户零余额 ---- */
+  (function initNewUser(){
+    try { if (localStorage.getItem('engchain-balance') === null) { var z = BalanceStore.read(); z.balance = 0; z.frozen = 0; z.totalIn = 0; z.totalRebate = 0; z.logs = []; BalanceStore.write(z); } } catch (e) {}
+  })();
+
+  /* ---- E2-10 未登录门控（与钱包首页同款覆盖层） ---- */
+  function isLoggedIn() {
+    try { var st = UI.state.get(); return !!(st && st.loggedIn); } catch (e) { return false; }
+  }
+  function ensureGuestGate() {
+    if (isLoggedIn()) return;
+    var phone = document.querySelector('.phone');
+    if (!phone) return;
+    var gate = document.createElement('div');
+    gate.style.cssText = 'position:absolute;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;';
+    gate.innerHTML =
+      '<svg class="ic" viewBox="0 0 24 24" style="width:46px;height:46px;margin-bottom:14px;color:var(--text-2);" aria-hidden="true"><use href="#i-lock"></use></svg>' +
+      '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">登录后充值</div>' +
+      '<div style="font-size:12px;color:var(--text-3);text-align:center;margin-bottom:24px;">充值余额需登录账号后进行</div>' +
+      '<a href="../auth/login.html" style="display:inline-block;padding:12px 40px;background:var(--primary);color:var(--text-inv);border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;">去登录</a>';
+    phone.appendChild(gate);
+  }
+  ensureGuestGate();
+
+  /* ---- E3-16 破冰期新客首充横幅 ---- */
+  (function renderBreakInBanner(){
+    try {
+      if (!(window.ModeStore && ModeStore.isBreakIn())) return;
+      var view = document.getElementById('view-amount');
+      if (!view || document.getElementById('breakin-banner')) return;
+      var b = document.createElement('div');
+      b.id = 'breakin-banner';
+      b.style.cssText = 'margin:10px 0 0;padding:11px 13px;border-radius:11px;background:linear-gradient(135deg,rgba(201,169,97,.16),rgba(238,214,151,.10));border:1px solid rgba(201,169,97,.35);font-size:12px;color:var(--primary-dim);line-height:1.6;';
+      b.innerHTML = '<b>🎁 新客破冰福利</b> · 首充即送积分，多充多送，完成企业入驻还可领专属奖励。';
+      view.insertBefore(b, view.firstChild);
+    } catch (e) {}
+  })();
+
   var v = 0;                    // 充值金额
   var pm = 'wechat';            // 支付方式
   var corpSheet = null;         // 对公底部弹窗
@@ -191,27 +238,36 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.toggleDeduct = function () {
     var p2y = RULE('credits.deduct.pointsToYuan', 100);
     var c = CreditStore.read();
-    if ((c.balance || 0) < p2y) { UI.toast('积分不足 ' + p2y + '，暂不可抵现', 'warn'); return; }
+    if ((c.balance || 0) < p2y) { return; }   // 积分不足时开关已置灰，不响应点击、不再 toast
     deductOn = !deductOn;
     renderDeduct();
   };
   function renderDeduct() {
     var p2y = RULE('credits.deduct.pointsToYuan', 100);
-    var capPct = Math.round(RULE('credits.deduct.capRate', 0.1) * 100);
     var c = CreditStore.read();
     var box = document.getElementById('deductBox');
     var sw = document.getElementById('ded-switch');
     var sub = document.getElementById('ded-sub');
-    if (!box || !sw) return;
-    var can = (c.balance || 0) >= p2y;
+    if (!box || !sw || !sub) return;
+    var bal = c.balance || 0;
+    var can = bal >= p2y;
     var on = deductOn && can;
     box.style.opacity = can ? 1 : 0.55;
     sw.style.background = on ? 'var(--primary)' : 'var(--bg-card-2)';
     sw.firstElementChild.style.left = on ? '20px' : '2px';
+    /* 不可用直接置灰禁用，不依赖点击 toast 提示 */
+    sw.style.pointerEvents = can ? '' : 'none';
+    sw.style.cursor = can ? 'pointer' : 'not-allowed';
     var amt = parseFloat(document.getElementById('amount').value) || 0;
-    var dd = can ? calcDeduct(amt, c.balance) : { d: 0, credit: 0 };
-    sub.textContent = '当前积分 ' + (c.balance || 0).toLocaleString() + ' · ' + p2y + ' 分 = ¥1 · 单笔最多抵 ' + capPct + '%' +
-      (on && dd.d > 0 ? ' · 本单可抵 ¥' + dd.d.toFixed(2) : '');
+    if (can) {
+      var dd = calcDeduct(amt, bal);
+      sub.style.color = '';
+      sub.textContent = '可用积分 ' + bal.toLocaleString() + '，本单最多抵 ¥' + dd.d.toFixed(2);
+    } else {
+      deductOn = false;
+      sub.style.color = 'var(--danger)';
+      sub.textContent = '积分不足 ' + p2y + '，暂不可抵现';
+    }
   }
   renderDeduct();
 
@@ -230,7 +286,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ---- 确认充值（校验通过） ---- */
   cta.onclick = function () {
     v = parseFloat(document.getElementById('amount').value) || 0;
-    if (v <= 0) { UI.toast('请输入有效金额', 'warn'); return; }
+    var minRecharge = (MOCK.business.recharge && MOCK.business.recharge.min) || 10;
+    if (v < minRecharge) { UI.toast('最低充值金额为 ¥' + minRecharge, 'warn'); return; }
     if (!document.getElementById('agree').checked) { UI.toast('请先同意充值协议', 'warn'); return; }
     if (pm === 'corp') {
       // 生成对公转账记录（待上传凭证），并打开对公弹窗
@@ -242,9 +299,31 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var dd = (deductOn && (c.balance || 0) >= RULE('credits.deduct.pointsToYuan', 100)) ? calcDeduct(v, c.balance) : { d: 0, credit: 0 };
       if (dd.credit > 0) CreditStore.consume(dd.credit, '充值抵现');
       BalanceStore.recharge(v, pm, dd.d > 0 ? { remark: '充值到账 · 积分抵现 ¥' + dd.d.toFixed(2) } : null);
-      UI.toast(dd.d > 0 ? ('充值成功 · 积分抵现 ¥' + dd.d.toFixed(2)) : '充值成功', 'ok');
-      setTimeout(function () { location.href = 'index.html'; }, 900);
+      showRechargeSuccess(v, dd.d, BalanceStore.read().balance);
     }
+  };
+
+  /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式） ---- */
+  function showRechargeSuccess(amount, deductYuan, newBalance) {
+    var sh = UI.sheet();
+    sh.setClosable(false);
+    var deductLine = deductYuan > 0
+      ? '<div class="rs-desc" style="color:var(--primary-dim);">积分抵现 ¥' + deductYuan.toFixed(2) + '</div>'
+      : '';
+    sh.html(
+      '<div class="recharge-success">' +
+        '<div class="rs-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '<div class="rs-title">充值成功</div>' +
+        '<div class="rs-amount">+¥' + amount.toFixed(2) + ' 已到账</div>' +
+        '<div class="rs-desc">当前余额 ¥' + newBalance.toFixed(2) + '</div>' +
+        deductLine +
+        '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="rechargeDone()">完成</button>' +
+      '</div>'
+    ).show();
+  }
+  window.rechargeDone = function () {
+    UI.closeSheet();
+    location.href = 'index.html';
   };
 
   /* ---- 复制对公付款信息（全部 4 条 + 金额） ---- */

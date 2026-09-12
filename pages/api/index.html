@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/api/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>数据服务API · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  .balance-card{margin:12px;background:linear-gradient(135deg,#1a237e,#283593);border-radius:14px;padding:18px;color:#fff;}
+  .balance-label{font-size:12px;opacity:0.8;}
+  .balance-val{font-size:32px;font-weight:800;margin:6px 0;}
+  .api-product{margin:10px 12px;padding:14px;background:var(--bg-card);border-radius:12px;}
+  .api-name{font-size:15px;font-weight:700;}
+  .api-price{font-size:14px;color:var(--primary-dim);font-weight:700;}
+  .api-desc{font-size:12px;color:var(--text-2);line-height:1.6;margin-top:4px;}
+  .api-call-btn{margin-top:10px;width:100%;padding:8px;border-radius:8px;border:none;background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .result-box{margin:10px 12px;padding:14px;background:#1e1e2e;border-radius:12px;display:none;}
+  .result-title{font-size:12px;color:#aaa;margin-bottom:8px;}
+  .result-json{font-size:11px;color:#4fc3f7;font-family:monospace;white-space:pre-wrap;line-height:1.5;max-height:200px;overflow-y:auto;}
+  .history-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px;}
+  .history-status{padding:2px 8px;border-radius:4px;font-size:10px;}
+  .history-ok{background:#e8f5e9;color:#2e7d32;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">数据服务API</div>
+    <div class="nav-right" style="width:32px;"></div>
+  </div>
+  <div class="scroll" style="padding-bottom:24px;">
+    <!-- [FEAT 9.2-6] API余额 -->
+    <div class="balance-card">
+      <div class="balance-label">API 余额</div>
+      <div class="balance-val" id="api-balance">¥0.00</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="window.__recharge(100)" style="flex:1;padding:8px;border-radius:8px;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:13px;cursor:pointer;">充值 ¥100</button>
+        <button onclick="window.__recharge(500)" style="flex:1;padding:8px;border-radius:8px;border:none;background:#fff;color:#1a237e;font-size:13px;font-weight:600;cursor:pointer;">充值 ¥500</button>
+      </div>
+    </div>
+    <!-- API产品列表 -->
+    <div style="padding:0 12px;font-size:14px;font-weight:700;margin:16px 0 4px;">API 产品</div>
+    <div id="product-list"></div>
+    <!-- 调用结果 -->
+    <div class="result-box" id="result-box">
+      <div class="result-title">返回结果</div>
+      <div class="result-json" id="result-json"></div>
+    </div>
+    <!-- 调用记录 -->
+    <div style="padding:0 12px;font-size:14px;font-weight:700;margin:16px 0 4px;">调用记录</div>
+    <div id="history-list" style="margin:0 12px;background:var(--bg-card);border-radius:12px;overflow:hidden;"></div>
+  </div>
+</div>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function(){
+  window.__ROOT__='../../';
+  function renderBalance(){
+    var s = ApiStore.read();
+    document.getElementById('api-balance').textContent = '¥' + (s.balance||0).toFixed(2);
+  }
+  function renderProducts(){
+    var products = ApiStore.products();
+    document.getElementById('product-list').innerHTML = products.map(function(p){
+      return '<div class="api-product">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+        '<span class="api-name">'+p.name+'</span>'+
+        '<span class="api-price">¥'+p.price+'<small style="font-size:10px;color:var(--text-3);font-weight:400;"> / '+p.unit+'</small></span>'+
+        '</div>'+
+        '<div class="api-desc">'+p.desc+'</div>'+
+        '<button class="api-call-btn" onclick="window.__callApi(\''+p.id+'\')">调用</button>'+
+      '</div>';
+    }).join('');
+  }
+  function renderHistory(){
+    var calls = ApiStore.history();
+    if(!calls.length){
+      document.getElementById('history-list').innerHTML = '<div style="text-align:center;color:var(--text-3);padding:24px;font-size:13px;">暂无调用记录</div>';
+      return;
+    }
+    document.getElementById('history-list').innerHTML = calls.slice(0,20).map(function(c){
+      var d = new Date(c.ts);
+      var ts = (d.getMonth()+1)+'/'+d.getDate()+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+      return '<div class="history-item">'+
+        '<div><div style="font-weight:600;">'+c.productName+'</div><div style="font-size:10px;color:var(--text-3);">'+ts+'</div></div>'+
+        '<div style="text-align:right;"><span class="history-status history-ok">'+c.status+'</span><div style="font-size:11px;color:var(--primary-dim);margin-top:2px;">¥'+c.cost+'</div></div>'+
+      '</div>';
+    }).join('');
+  }
+  window.__recharge = function(amount){
+    var r = ApiStore.recharge(amount);
+    if(r && r.error){ UI.toast(r.error,'warn'); return; }
+    UI.toast('充值成功，API余额 ¥'+r.balance.toFixed(2),'ok');
+    renderBalance();
+  };
+  window.__callApi = function(productId){
+    var r = ApiStore.call(productId, { sample: true });
+    if(r && r.error){ UI.toast(r.error,'warn'); return; }
+    var box = document.getElementById('result-box');
+    var json = document.getElementById('result-json');
+    box.style.display = '';
+    json.textContent = JSON.stringify(r.result, null, 2);
+    UI.toast('调用成功，费用 ¥'+r.cost,'ok');
+    renderBalance();
+    renderHistory();
+    box.scrollIntoView({behavior:'smooth'});
+  };
+  renderBalance();
+  renderProducts();
+  renderHistory();
+})();
+</script>
+</body>
+</html>

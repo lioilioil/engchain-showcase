@@ -28,10 +28,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="se-ic accent"><svg class="ic"><use href="#i-bell"/></svg></div>
       <div class="se-body">
         <div class="se-top"><span class="se-name">系统消息</span><span class="se-time" id="sys-last-time">今天</span></div>
-        <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span></div>
+        <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span><span style="font-size:10px;color:var(--text-3);margin-left:6px;">演示</span></div>
       </div>
     </a>
     <div id="list"></div>
+    <!-- [FEAT 9.2-3] 智能推荐入口 -->
+    <a class="sys-entry" href="#" onclick="showMatchFeed();return false;">
+      <div class="se-ic" style="background:rgba(139,123,181,.15);color:#8B7BB5;"><svg class="ic"><use href="#i-star"/></svg></div>
+      <div class="se-body">
+        <div class="se-top"><span class="se-name">智能推荐</span><span class="se-time" id="match-time">今日更新</span></div>
+        <div class="se-last"><span class="se-preview" id="match-preview">根据您的偏好推送匹配供需</span><span class="badge" id="match-unread" style="display:none;">0</span></div>
+      </div>
+    </a>
   </div>
 </div>
 
@@ -100,19 +108,68 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages') renderOps(); });
   window.addEventListener('engchain:messages', function () { renderOps(); });
 
-  document.getElementById('list').innerHTML = MOCK.conversations.map(function (c) {
-    return '<a href="chat.html?id=' + c.id + '" style="display:flex;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line);">' +
-      '<div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,rgba(201,169,97,.2),rgba(201,169,97,.05));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--primary);">' + c.avatar + '</div>' +
-      '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;justify-content:space-between;"><span class="fw-600 fs-14 elip">' + c.name + '</span><span class="text-3 fs-11">' + c.time + '</span></div>' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;"><span class="text-2 fs-12 elip" style="flex:1;">' + c.last + '</span>' +
-      (c.unread ? '<span class="badge" style="margin-left:8px;">' + c.unread + '</span>' : '') + '</div>' +
-      '<div class="text-3" style="font-size:10px;margin-top:4px;">' + c.role + '</div></div></a>';
-  }).join('');
-
-  /* 总未读 = 会话未读 + 系统消息未读 */
-  var convUnread = MOCK.conversations.reduce(function (a, c) { return a + (c.unread || 0); }, 0);
-  var sysUnread = sysUnreadCount();
-  document.getElementById('total-unread').textContent = convUnread + sysUnread;
+  /* [FEAT 9.2-3] 进入消息中心时生成/更新智能推荐 */
+  try { MatchStore.generate(); } catch(e) {}
+  function renderMatchUnread() {
+    var unread = 0;
+    try { unread = MatchStore.listUnread().length; } catch(e) {}
+    var badge = document.getElementById("match-unread");
+    if (badge) { badge.textContent = unread; badge.style.display = unread ? "" : "none"; }
+    var totalEl = document.getElementById("total-unread");
+    if (totalEl) totalEl.textContent = (parseInt(totalEl.textContent) || 0) + unread;
+  }
+  renderMatchUnread();
+  window.showMatchFeed = function () {
+    var feed = [];
+    try { feed = MatchStore.read().feed || []; } catch(e) {}
+    if (!feed.length) { UI.toast('暂无推荐，请先设置匹配偏好', 'info'); return; }
+    var rows = feed.slice(0, 5).map(function(f){ return '<div style="padding:10px 2px;border-bottom:1px solid var(--line);"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;"><span class="elip">'+(f.title||'')+'</span><b style="color:var(--primary-dim);flex:none;margin-left:8px;">'+(f.matchScore||0)+'%</b></div><div style="font-size:11.5px;color:var(--text-3);margin-top:3px;">'+(f.cat||'')+' · '+(f.location||'')+'</div></div>'; }).join('');
+    feed.forEach(function(f){ try { MatchStore.markRead(f.id); } catch(e) {} });
+    renderMatchUnread();
+    var sh = UI.sheet(); sh.setText('智能推荐 · 前5条'); sh.html(rows + '<div style="padding:12px 2px 4px;font-size:11.5px;color:var(--text-3);">完整推荐请前往发现页查看</div>'); sh.show();
+  };
+  /* E2-11：会话为空时渲染空态引导卡，不再硬编码假数据。
+     [FIX] 新用户无真实会话时，列表顶部加"演示数据"灰色标注；首次访问种子写入 localStorage，后续可标记已读清零 unread */
+  var CONV_DEMO_KEY = 'engchain-conversations';
+  function readConvs() {
+    try {
+      var raw = localStorage.getItem(CONV_DEMO_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (arr && arr.length) return { list: arr, demo: false };
+      }
+    } catch (e) {}
+    if (!localStorage.getItem(CONV_DEMO_KEY)) {
+      try { localStorage.setItem(CONV_DEMO_KEY, JSON.stringify(MOCK.conversations || [])); } catch (e) {}
+    }
+    return { list: MOCK.conversations || [], demo: true };
+  }
+  function renderConvs() {
+    var data = readConvs();
+    var convs = data.list || [];
+    var list = document.getElementById('list');
+    var demoNote = data.demo
+      ? '<div style="padding:8px 4px 2px;font-size:11px;color:var(--text-3);letter-spacing:.02em;">以下为演示数据</div>'
+      : '';
+    list.innerHTML = demoNote + (convs.length ? convs.map(function (c) {
+      return '<a href="chat.html?id=' + c.id + '" style="display:flex;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line);">' +
+        '<div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,rgba(201,169,97,.2),rgba(201,169,97,.05));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--primary);">' + c.avatar + '</div>' +
+        '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;justify-content:space-between;"><span class="fw-600 fs-14 elip">' + c.name + '</span><span class="text-3 fs-11">' + c.time + '</span></div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;"><span class="text-2 fs-12 elip" style="flex:1;">' + c.last + '</span>' +
+        (c.unread ? '<span class="badge" style="margin-left:8px;">' + c.unread + '</span>' : '') + '</div>' +
+        '<div class="text-3" style="font-size:10px;margin-top:4px;">' + c.role + '</div></div></a>';
+    }).join('') : '<a href="../supply/list.html" style="display:block;text-align:center;padding:48px 20px;"><div style="width:60px;height:60px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><svg class="ic" style="width:28px;height:28px;color:var(--primary);"><use href="#i-chat"/></svg></div><div class="fw-600 fs-14" style="color:var(--text-1);">暂无消息</div><div class="text-2 fs-12" style="margin-top:6px;line-height:1.6;">还没有会话，去供需大厅发布或对接商机<br>开始第一次沟通吧</div><div class="btn btn-primary" style="margin-top:16px;display:inline-block;">去发现页找商机 ›</div></a>');
+    var convUnread = convs.reduce(function (a, c) { return a + (c.unread || 0); }, 0);
+    var sysUnread = sysUnreadCount();
+    document.getElementById('total-unread').textContent = convUnread + sysUnread;
+  }
+  renderConvs();
+  /* [FIX] 登录/退出/入驻后消息列表刷新 */
+  window.addEventListener('engchain:auth', renderConvs);
+  window.addEventListener('engchain:entry', renderConvs);
+  window.addEventListener('storage', function (e) {
+    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages') renderConvs();
+  });
 })();
 </script>
 <style>

@@ -188,9 +188,13 @@ window.UI = (function () {
     const TABS = [
       { key: 'home',     label: '首页', href: root + 'home.html',                          icon: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z"/>' },
       { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',               icon: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>' },
-      { key: 'message',  label: '消息', href: root + 'pages/message/index.html',             icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>', badge: 3 },
+      { key: 'message',  label: '消息', href: root + 'pages/message/index.html',             icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>' },
       { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',             icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' },
     ];
+    /* [E3 FIX] 消息badge动态化：从MOCK.conversations未读数求和，无数据则不显示 */
+    var _msgBadge = 0;
+    try { if (window.MOCK && MOCK.conversations) { for (var _mi=0;_mi<MOCK.conversations.length;_mi++) { _msgBadge += (MOCK.conversations[_mi].unread||0); } } } catch(_e){}
+    if (_msgBadge > 0) TABS[2].badge = _msgBadge > 99 ? '99+' : _msgBadge;
     var tabs = '<nav class="app-tabbar" aria-label="主导航">' +
       '<div class="tab-glass" aria-hidden="true"></div>' +
       TABS.map(function (t) {
@@ -451,7 +455,13 @@ window.UI = (function () {
     'award':    '<circle cx="12" cy="8" r="6"/><path d="M15.5 13.5L17 22l-5-3-5 3 1.5-8.5"/>',
     'upload':   '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
     'file':     '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
-    'box':      '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>'
+    'box':      '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+    /* —— 首页金刚区：五大频道 —— */
+    'badge':    '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76z"/><path d="m9 12 2 2 4-4"/>',
+    'swap':     '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    'users':    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'wrench':   '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    'compass':  '<circle cx="12" cy="12" r="9"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>'
   };
   function injectSprite() {
     if (document.getElementById('engchain-sprite')) return;
@@ -801,17 +811,26 @@ window.ViewHistory = ViewHistory;
       UI.ensureThinkingOrb(function () { window.ThinkingOrb.initAll(); });
       UI.initTabbarGlass();
     }
-    /* ---- Pura X View 侧边栏布局（仅短屏触发，不影响 iPhone） ---- */
-    if (phone && window.innerHeight <= 720 && !phone.querySelector('.pura-sidebar')) {
+    /* ---- Pura X View 侧边栏布局（短屏触发，resize 时也检查，支持运行中切换视口高度） ---- */
+    function ensurePuraSidebar() {
+      if (!phone) return;
+      var _hasSidebar = !!phone.querySelector('.pura-sidebar');
+      if (window.innerHeight <= 720) {
+        if (!_hasSidebar) {
       (function initPuraSidebar() {
         var root = window.__ROOT__ || '';
         var activeTab = document.body.dataset.tab || 'home';
         var SIDEBAR_TABS = [
           { key: 'home',     label: '首页', href: root + 'home.html',                    icon: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z"/>' },
           { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',       icon: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>' },
-          { key: 'message',  label: '消息', href: root + 'pages/message/index.html',     icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>', badge: 3 },
+          { key: 'message',  label: '消息', href: root + 'pages/message/index.html',     icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>' },
           { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',     icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' }
         ];
+
+        /* 消息badge动态化：从MOCK.conversations未读数求和，与底部tabbar展示一致 */
+        var _sidebarMsgBadge = 0;
+        try { if (window.MOCK && MOCK.conversations) { for (var _smi=0;_smi<MOCK.conversations.length;_smi++) { _sidebarMsgBadge += (MOCK.conversations[_smi].unread||0); } } } catch(_se){}
+        if (_sidebarMsgBadge > 0) SIDEBAR_TABS[2].badge = _sidebarMsgBadge > 99 ? '99+' : _sidebarMsgBadge;
 
         /* 读取持久化状态：默认展开 */
         var collapsed = false;
@@ -834,6 +853,9 @@ window.ViewHistory = ViewHistory;
           '<div class="ps-bottom">' +
             '<button class="ps-theme" id="ps-theme" title="切换主题">' +
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>' +
+            '</button>' +
+            '<button class="ps-switch" id="ps-switch" title="切换到另一侧">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>' +
             '</button>' +
             '<button class="ps-collapse" id="ps-collapse" title="收起侧边栏">' +
               '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 18-6-6 6-6"/></svg>' +
@@ -864,13 +886,26 @@ window.ViewHistory = ViewHistory;
         var di = content.querySelector('.dynamic-island');
         if (di) phone.insertBefore(di, phone.firstChild);
 
-        /* 切换函数 */
+        /* 底部 Tab Bar 移到 phone 直接子元素，不被内容区缩放，保持原始大小和相对窗口侧边位置 */
+        var nav = content.querySelector('.app-nav-shell');
+        if (nav) phone.appendChild(nav);
+
+        /* 收起/展开切换函数 */
         function setSidebarCollapsed(collapse) {
           collapsed = collapse;
           try { localStorage.setItem('engchain-pura-sidebar', collapse ? 'collapsed' : 'expanded'); } catch(e) {}
           phone.classList.toggle('sidebar-collapsed', collapse);
           var handle = document.getElementById('ps-expand-handle');
           if (handle) handle.style.display = collapse ? 'flex' : 'none';
+        }
+
+        /* 左右切换函数 */
+        var sidebarSide = 'left';
+        try { sidebarSide = localStorage.getItem('engchain-pura-sidebar-side') || 'left'; } catch(e) {}
+        function setSidebarSide(side) {
+          sidebarSide = side;
+          try { localStorage.setItem('engchain-pura-sidebar-side', side); } catch(e) {}
+          phone.classList.toggle('sidebar-right', side === 'right');
         }
 
         /* 绑定 Tab 点击 */
@@ -912,6 +947,14 @@ window.ViewHistory = ViewHistory;
           psCollapse.addEventListener('click', function() { setSidebarCollapsed(true); });
         }
 
+        /* 左右切换按钮 */
+        var psSwitch = document.getElementById('ps-switch');
+        if (psSwitch) {
+          psSwitch.addEventListener('click', function() {
+            setSidebarSide(sidebarSide === 'left' ? 'right' : 'left');
+          });
+        }
+
         /* 展开把手 */
         var psExpand = document.getElementById('ps-expand-handle');
         if (psExpand) {
@@ -920,8 +963,28 @@ window.ViewHistory = ViewHistory;
 
         /* 初始化状态 */
         setSidebarCollapsed(collapsed);
+        setSidebarSide(sidebarSide);
       })();
+        }
+      } else {
+        if (_hasSidebar) removePuraSidebar();
+      }
     }
+    function removePuraSidebar() {
+      var _content = phone.querySelector('.pura-content');
+      var _sidebar = phone.querySelector('.pura-sidebar');
+      var _handle = document.getElementById('ps-expand-handle');
+      if (_content) { while (_content.firstChild) phone.appendChild(_content.firstChild); _content.remove(); }
+      if (_sidebar) _sidebar.remove();
+      if (_handle) _handle.remove();
+      phone.classList.remove('has-pura-sidebar', 'sidebar-collapsed', 'sidebar-right');
+    }
+    ensurePuraSidebar();
+    var _puraSidebarResizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (_puraSidebarResizeTimer) clearTimeout(_puraSidebarResizeTimer);
+      _puraSidebarResizeTimer = setTimeout(ensurePuraSidebar, 150);
+    });
 
     // 付费墙字段（contact-grid 内由详情页自行唤起付费墙，避免与全局提示重复）
     document.querySelectorAll('.obscured').forEach(function (el) {
@@ -1133,7 +1196,8 @@ window.Cards = (function () {
       var dirCls = '';
       if (s.dir === 'demand') dirCls = ' is-demand';
       else if (s.dir === 'supply') dirCls = ' is-supply';
-      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + fn(s) + '</a>';
+      /* [FEAT 9.2-1] 卡片底部增加查看详情按钮，联系方式/详细描述付费墙后可见 */
+      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + fn(s) +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--text-3);">联系方式查看详情后可见</span><span style="font-size:12px;color:var(--primary);font-weight:600;">查看详情 ›</span></div></a>';
     }).join('');
   }
 
@@ -1200,4 +1264,361 @@ window.ListFooter = (function () {
       window.dispatchEvent(new CustomEvent(evtName, { detail: { source: 'storage', key: e.key } }));
     }, 100);
   });
+})();
+
+/* ============================================================================
+   [E0-02 FIX] 封禁状态全局横幅：检测当前用户 banned 状态，注入顶部封禁横幅
+   登录后自动检测，身份变化时重新检测
+   ============================================================================ */
+(function () {
+  function isCurrentBanned() {
+    try {
+      if (window.DataBus && DataBus.current) {
+        var u = DataBus.current();
+        return !!(u && u.banned);
+      }
+    } catch (e) {}
+    return false;
+  }
+  function injectBannedBanner() {
+    if (!isCurrentBanned()) return;
+    var phone = document.querySelector('.phone');
+    if (!phone) return;
+    if (phone.querySelector('.banned-banner')) return;
+    var banner = document.createElement('div');
+    banner.className = 'banned-banner';
+    banner.style.cssText = 'position:relative;z-index:100;background:linear-gradient(135deg,#dc3545,#c0392b);color:#fff;padding:8px 16px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    banner.innerHTML = '<span style="display:flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>账号已封禁 · 资金已冻结</span><a href="banned.html" style="color:#fff;text-decoration:underline;font-size:11px;flex-shrink:0;">查看详情/申诉 ›</a>';
+    /* 插入到 status-bar 之后、内容之前 */
+    var sb = phone.querySelector('.status-bar');
+    if (sb) sb.insertAdjacentElement('afterend', banner);
+    else phone.insertBefore(banner, phone.firstChild);
+  }
+  function checkAndRedirect() {
+    if (!isCurrentBanned()) return;
+    /* 已在封禁页则不跳转 */
+    if (location.pathname.indexOf('banned.html') >= 0) return;
+    /* 登录页不跳转（让登录流程完成） */
+    if (location.pathname.indexOf('login.html') >= 0 || location.pathname.indexOf('register.html') >= 0) return;
+    injectBannedBanner();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkAndRedirect);
+  } else {
+    checkAndRedirect();
+  }
+  window.addEventListener('engchain:auth', checkAndRedirect);
+  window.addEventListener('engchain:state', checkAndRedirect);
+  window.addEventListener('engchain:store-change', checkAndRedirect);
+})();
+
+/* ================= 窄视口 / Pura 侧边栏自动等比缩放（全局适配） =================
+   两种场景统一处理：
+   1. Pura 侧边栏模式（.phone.has-pura-sidebar）：侧边栏占 56px，内容区 .pura-content
+      布局宽保持 390px（设计稿，内部不换行），transform:scale 视觉缩小到 334px 填满内容区；
+      侧边栏保持原始大小不缩放。
+   2. 无边栏窄视口（innerWidth < 390）：.phone 布局宽保持 390x844，transform:scale 缩小到视口。
+   用 MutationObserver 监听 .phone 的 class 变化（侧边栏收起/展开/左右切换），实时重算。 */
+(function () {
+  var DESIGN_W = 390;
+  var DESIGN_H = 844;
+  var SIDEBAR_W = 56;
+
+  var phone = null;
+  var observer = null;
+  var timer = null;
+
+  function clearPhoneStyles(p) {
+    p.style.maxWidth = '';
+    p.style.maxHeight = '';
+    p.style.width = '';
+    p.style.height = '';
+    p.style.transformOrigin = '';
+    p.style.marginLeft = '';
+    p.style.marginRight = '';
+  }
+
+  function clearContentStyles(c) {
+    c.style.width = '';
+    c.style.flex = '';
+    c.style.transform = '';
+    c.style.transformOrigin = '';
+    c.style.height = '';
+  }
+
+  function apply() {
+    phone = document.querySelector('.phone');
+    var root = document.documentElement;
+    if (!phone || !root) return;
+
+    var content = phone.querySelector('.pura-content');
+    var hasSidebar = phone.classList.contains('has-pura-sidebar');
+    var sidebarCollapsed = phone.classList.contains('sidebar-collapsed');
+    var sidebarRight = phone.classList.contains('sidebar-right');
+
+    if (hasSidebar && content) {
+      /* ---- 侧边栏模式：对 .pura-content 做等比缩放 ---- */
+      clearPhoneStyles(phone);
+      root.style.setProperty('--fit-scale', '1');
+
+      var availableW = sidebarCollapsed ? DESIGN_W : (DESIGN_W - SIDEBAR_W);
+      var scale = availableW / DESIGN_W;
+
+      content.style.width = DESIGN_W + 'px';
+      content.style.flex = 'none';
+      content.style.transform = 'scale(' + scale.toFixed(4) + ')';
+      content.style.transformOrigin = 'left top';
+      /* 高度自适应：布局高 = 视口高 / scale，scale 后视觉高 = 视口高，填满无上下留白 */
+      if (scale < 1) {
+        content.style.height = (window.innerHeight / scale).toFixed(1) + 'px';
+      } else {
+        content.style.height = '';
+      }
+    } else {
+      /* ---- 无边栏模式：对 .phone 做等比缩放 ---- */
+      if (content) clearContentStyles(content);
+
+      var vw = window.innerWidth || 0;
+      var scale = vw ? Math.min(1, vw / DESIGN_W) : 1;
+
+      if (scale < 1) {
+        phone.style.maxWidth = 'none';
+        phone.style.maxHeight = 'none';
+        phone.style.width = DESIGN_W + 'px';
+        phone.style.height = DESIGN_H + 'px';
+        phone.style.transformOrigin = 'top center';
+        phone.style.marginLeft = 'calc((100% - ' + DESIGN_W + 'px) / 2)';
+        phone.style.marginRight = 'calc((100% - ' + DESIGN_W + 'px) / 2)';
+        root.style.setProperty('--fit-scale', scale.toFixed(4));
+      } else {
+        clearPhoneStyles(phone);
+        root.style.setProperty('--fit-scale', '1');
+      }
+    }
+  }
+
+  /* 监听 .phone 的 class 变化（侧边栏收起/展开/左右切换） */
+  function observePhone() {
+    if (observer) observer.disconnect();
+    phone = document.querySelector('.phone');
+    if (!phone) return;
+    observer = new MutationObserver(function () {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(apply, 50);
+    });
+    observer.observe(phone, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  function debounced() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(apply, 100);
+  }
+
+  function init() {
+    apply();
+    observePhone();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+  window.addEventListener('resize', debounced);
+  window.addEventListener('orientationchange', debounced);
+})();
+
+/* 动态加载营销活动卡片模块（所有引入 common.js 的页面通用） */
+(function () {
+  function loadPromoCards() {
+    if (window.PromoCards) return;
+    var root = window.__ROOT__ || '';
+    var s = document.createElement('script');
+    s.src = root + 'js/promo-cards.js';
+    s.async = true;
+    document.head.appendChild(s);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadPromoCards);
+  } else {
+    loadPromoCards();
+  }
+})();
+/* ============================================================================
+   身份视觉徽章系统 IdBadge
+   蓝V(建筑企业) / 金V(中介服务) / 专属(合伙人) / 个人合伙人
+   用法：IdBadge.render('construction', 'md') → HTML字符串
+        IdBadge.html('bluev', '蓝V', 'lg') → 自定义
+   ============================================================================ */
+(function(){
+  var ICONS = {
+    /* V字盾牌 - 蓝V/金V通用 */
+    vshield: '<svg viewBox="0 0 16 16" fill="none"><path d="M8 1.2L2.5 3v4.8c0 3.2 2.3 5.6 5.5 6.5 3.2-.9 5.5-3.3 5.5-6.5V3L8 1.2z" fill="currentColor" opacity="0.28"/><path d="M5.2 6.2l2.3 3.2 2.3-3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    /* 皇冠 - 专属合伙人 */
+    crown: '<svg viewBox="0 0 16 16" fill="none"><path d="M2.5 11.5l1.3-4.2L8 9l4.2-1.7 1.3 4.2h-11z" fill="currentColor"/><path d="M2.5 12.5h11v1a1 1 0 01-1 1h-9a1 1 0 01-1-1v-1z" fill="currentColor" opacity="0.65"/><circle cx="3.5" cy="5.5" r="1" fill="currentColor"/><circle cx="8" cy="4" r="1" fill="currentColor"/><circle cx="12.5" cy="5.5" r="1" fill="currentColor"/></svg>',
+    /* 人物握手 - 个人合伙人 */
+    partner: '<svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="4" r="2" fill="currentColor"/><circle cx="10.5" cy="4" r="2" fill="currentColor" opacity="0.7"/><path d="M2 13c0-2 1.5-3.5 3.5-3.5s3.5 1.5 3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/><path d="M14 13c0-2-1.5-3.5-3.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.7"/></svg>'
+  };
+
+  var TYPE_MAP = {
+    construction: { cls: 'bluev', text: '蓝V', icon: 'vshield' },
+    agency:       { cls: 'goldv', text: '金V', icon: 'vshield' },
+    partner:      { cls: 'exclusive', text: '专属', icon: 'crown' },
+    individual:   { cls: 'individual', text: '个人合伙人', icon: 'partner' }
+  };
+
+  function render(type, size) {
+    var cfg = TYPE_MAP[type];
+    if (!cfg) return '';
+    var sizeCls = size && size !== 'md' ? ' id-badge-' + size : '';
+    return '<span class="id-badge id-badge-' + cfg.cls + sizeCls + '">' +
+      '<span class="id-badge-icon">' + ICONS[cfg.icon] + '</span>' +
+      '<span class="id-badge-text">' + cfg.text + '</span>' +
+    '</span>';
+  }
+
+  /* 自定义：传入class名、文字、图标名 */
+  function html(cls, text, icon, size) {
+    var sizeCls = size && size !== 'md' ? ' id-badge-' + size : '';
+    var iconHtml = icon ? '<span class="id-badge-icon">' + (ICONS[icon] || icon) + '</span>' : '';
+    return '<span class="id-badge id-badge-' + cls + sizeCls + '">' + iconHtml +
+      '<span class="id-badge-text">' + text + '</span></span>';
+  }
+
+  window.IdBadge = { render: render, html: html, ICONS: ICONS, TYPE_MAP: TYPE_MAP };
+})();
+/* ============================================================================
+   入驻等级系统 EntryTier
+   系统根据企业信息自动判断等级，非用户选择
+   建筑企业：标准建企/成长建企/规模建企/龙头建企
+   中介服务：基础服务/专业服务/深度服务/尊享服务
+   合伙人：初级合伙/中级合伙/高级合伙/战略合伙
+   ============================================================================ */
+(function(){
+  var TIERS = {
+    construction: [
+      { level:1, name:'标准建企', desc:'基础入驻，资质齐全', color:'#5b9bd5' },
+      { level:2, name:'成长建企', desc:'稳步发展，项目递增', color:'#3a82cc' },
+      { level:3, name:'规模建企', desc:'规模运营，实力雄厚', color:'#1f66b8' },
+      { level:4, name:'龙头建企', desc:'行业龙头，领军企业', color:'#0d4a96' }
+    ],
+    agency: [
+      { level:1, name:'基础服务', desc:'基础发布，标准服务', color:'#d4b876' },
+      { level:2, name:'专业服务', desc:'专业运营，稳定成交', color:'#c4a45c' },
+      { level:3, name:'深度服务', desc:'深度服务，优先匹配', color:'#a8894f' },
+      { level:4, name:'尊享服务', desc:'专属顾问，定制方案', color:'#8a6d2f' }
+    ],
+    partner: [
+      { level:1, name:'初级合伙', desc:'入门分销，基础权益', color:'#a78bfa' },
+      { level:2, name:'中级合伙', desc:'稳定分销，进阶权益', color:'#8b5cf6' },
+      { level:3, name:'高级合伙', desc:'核心贡献，高级权益', color:'#7c3aed' },
+      { level:4, name:'战略合伙', desc:'战略共建，顶级权益', color:'#5b21b6' }
+    ]
+  };
+
+  /* 获取企业统计数据（系统自动采集） */
+  function getStats(type) {
+    try {
+      var u = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (!u) return null;
+      /* 建筑企业：从企业档案获取资质/项目/分公司数据 */
+      if (type === 'construction') {
+        var cid = u.companyId || u.enterpriseId;
+        if (cid && window.MOCK && MOCK.companies) {
+          var c = null;
+          for (var i=0;i<MOCK.companies.length;i++){if(MOCK.companies[i].id===cid){c=MOCK.companies[i];break;}}
+          if (c) return { qualLevel:c.qualLevel||'', annualProjects:c.annualProjects||0, branchCount:c.branchCount||0, capital:c.capital||'', years:c.years||0 };
+        }
+        /* 降级：从用户扩展字段读取 */
+        if (u.enterprise) return u.enterprise;
+      }
+      /* 中介/合伙人：从用户统计字段读取 */
+      if (u.stats) return u.stats;
+      if (u.agencyStats) return u.agencyStats;
+      if (u.partnerStats) return u.partnerStats;
+    } catch(e) {}
+    return null;
+  }
+
+  /* 系统自动判断等级（非用户选择） */
+  function evaluate(type) {
+    var stats = getStats(type);
+    if (type === 'construction') {
+      if (stats) {
+        if (stats.qualLevel === '特级') return 4;
+        if (stats.qualLevel === '一级' || (stats.annualProjects >= 50 && stats.branchCount >= 10)) return 3;
+        if (stats.qualLevel === '二级' || stats.annualProjects >= 20) return 2;
+      }
+      return 1;
+    }
+    if (type === 'agency') {
+      if (stats) {
+        if (stats.orderCount >= 50 && stats.rating >= 95) return 4;
+        if (stats.orderCount >= 20 || stats.rating >= 90) return 3;
+        if (stats.orderCount >= 10) return 2;
+      }
+      return 1;
+    }
+    if (type === 'partner') {
+      if (stats) {
+        if (stats.commission >= 50000 || stats.teamSize >= 20) return 4;
+        if (stats.commission >= 20000 || stats.teamSize >= 10) return 3;
+        if (stats.commission >= 5000 || stats.inviteCount >= 5) return 2;
+      }
+      return 1;
+    }
+    return 1;
+  }
+
+  /* 获取当前用户入驻类型+等级（系统自动判定） */
+  function current() {
+    try {
+      var acc = (typeof entryAccess === 'function') ? entryAccess() : null;
+      if (!acc || !acc.isResident) return null;
+      var types = acc.types || [];
+      var type = types[0] || 'construction';
+      if (acc.isIndividualPartner) type = 'partner';
+      return { type: type, level: evaluate(type) };
+    } catch(e) {}
+    return null;
+  }
+
+  function getTier(type, level) {
+    var tiers = TIERS[type];
+    if (!tiers) return null;
+    return tiers[Math.max(0, Math.min(3, level - 1))];
+  }
+
+  /* 渲染等级徽章 */
+  function render(type, level) {
+    var t = getTier(type, level);
+    if (!t) return '';
+    return '<span class="et-tier-badge et-tier-l' + t.level + '" data-type="' + type + '">' +
+      '<span class="et-tier-lv">L' + t.level + '</span>' +
+      '<span class="et-tier-name">' + t.name + '</span>' +
+    '</span>';
+  }
+
+  /* 渲染等级进度条（含距下一等级提示） */
+  function renderProgress(type, level) {
+    var t = getTier(type, level);
+    var next = getTier(type, level + 1);
+    if (!t) return '';
+    var pct = Math.round((level / 4) * 100);
+    var hint = next ? getNextHint(type, level) : '已达最高等级';
+    return '<div class="et-tier-progress">' +
+      '<div class="etp-track"><div class="etp-fill" style="width:' + pct + '%;background:' + t.color + '"></div>' +
+      '<span class="etp-labels"><span>L1</span><span>L2</span><span>L3</span><span>L4</span></span></div>' +
+      '<div class="etp-info"><span class="etp-cur" style="color:' + t.color + '">' + t.name + '</span>' +
+      '<span class="etp-hint">' + hint + '</span></div>' +
+    '</div>';
+  }
+
+  function getNextHint(type, level) {
+    var h = {
+      construction: ['年项目≥20 或 二级资质','年项目≥50 或 一级资质','特级资质 或 年项目≥100','已达最高等级'],
+      agency: ['成交订单≥10','成交订单≥20 或 好评率≥90%','成交订单≥50 且 好评率≥95%','已达最高等级'],
+      partner: ['累计佣金≥5000 或 邀请≥5人','累计佣金≥20000 或 团队≥10人','累计佣金≥50000 或 团队≥20人','已达最高等级']
+    };
+    return (h[type] && h[type][level-1]) ? h[type][level-1] : '继续提升';
+  }
+
+  window.EntryTier = { TIERS:TIERS, evaluate:evaluate, current:current, getTier:getTier, render:render, renderProgress:renderProgress };
 })();

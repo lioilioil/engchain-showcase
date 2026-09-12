@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/vendor/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>增值道具 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+.ug-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 12px; }
+.ug-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ug-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ug-icon svg { width: 22px; height: 22px; }
+.ug-title { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.ug-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; margin-bottom: 10px; }
+.ug-price { font-size: 22px; font-weight: 800; color: var(--primary-dim); }
+.ug-price small { font-size: 12px; font-weight: 400; color: var(--text-3); }
+.ug-btn { display: block; width: 100%; height: 42px; border-radius: 10px; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-dim)); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+.ug-btn:disabled { background: var(--bg-card-2); color: var(--text-4); cursor: not-allowed; }
+.ug-btn:active:not(:disabled) { opacity: 0.85; }
+.ug-status { font-size: 11px; color: var(--success); margin-top: 6px; }
+.ug-locked { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+.ug-section { font-size: 13px; font-weight: 700; color: var(--text-1); margin: 18px 0 10px; }
+.ug-tip { font-size: 11px; color: var(--text-3); line-height: 1.6; padding: 12px 14px; background: var(--bg-card); border-radius: 10px; margin-bottom: 12px; }
+.ug-active-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ug-active-item:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">&#8249;</button>
+    <div class="nav-title">增值道具</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll" style="padding:12px 16px 100px;">
+
+    <div class="ug-tip">
+      不同入驻类型享有不同增值道具。购买后即时生效，助力您的供需信息获得更多曝光和询盘。
+    </div>
+
+    <div class="ug-section">可购买道具</div>
+    <div id="shop-list"></div>
+
+    <div class="ug-section">已购道具</div>
+    <div class="card" id="active-list" style="padding:14px 16px;">
+      <div style="text-align:center;color:var(--text-3);font-size:12px;padding:10px 0;">暂无生效中的道具</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 置顶选择弹窗 -->
+<div class="filter-overlay" id="top-pick-overlay" style="display:none;" onclick="if(event.target===this)closeTopPick()">
+  <div class="filter-sheet" style="max-height:70vh;">
+    <div class="filter-header">
+      <span class="filter-header-title">选择要置顶的供需信息</span>
+      <button class="filter-header-close" onclick="closeTopPick()">&#215;</button>
+    </div>
+    <div class="filter-body" id="top-pick-body" style="max-height:50vh;overflow-y:auto;">
+      <div style="text-align:center;color:var(--text-3);font-size:12px;padding:20px;">加载中...</div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + (d.getMinutes()<10?'0':'') + d.getMinutes();
+  }
+
+  /* [FEAT 9.2-1] 渲染道具商城 */
+  function renderShop() {
+    var available = UpgradeStore.listAvailable();
+    var html = available.map(function (cfg) {
+      var iconBg = '', iconColor = '';
+      if (cfg.key === 'topListing') { iconBg = 'linear-gradient(135deg,#F5EDD8,#E8D9B5)'; iconColor = '#A98A47'; }
+      else if (cfg.key === 'leadPack') { iconBg = 'linear-gradient(135deg,#DCE5F0,#C2D4E8)'; iconColor = '#4A7AA5'; }
+      else { iconBg = 'linear-gradient(135deg,#E0EDE4,#C8DFD0)'; iconColor = '#4A8A5E'; }
+      var buyBtn = cfg.available
+        ? '<button class="ug-btn" onclick="buyUpgrade(\'' + cfg.key + '\')">立即购买 &yen;' + cfg.price + '</button>'
+        : '<button class="ug-btn" disabled>仅指定类型可购买</button>';
+      var lockTip = cfg.available ? '' : '<div class="ug-locked">该道具仅：' + (cfg.entryTypes || []).join(' / ') + ' 类型企业可购买</div>';
+      var meta = '';
+      if (cfg.durationDays) meta = '<small>/' + cfg.durationDays + '天</small>';
+      if (cfg.count) meta = '<small>/' + cfg.count + '条</small>';
+      return '<div class="ug-card">' +
+        '<div class="ug-head">' +
+          '<div class="ug-icon" style="background:' + iconBg + ';color:' + iconColor + ';">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>' +
+          '</div>' +
+          '<div><div class="ug-title">' + (cfg.label || cfg.key) + '</div>' +
+          '<div class="ug-price">&yen;' + cfg.price + meta + '</div></div>' +
+        '</div>' +
+        '<div class="ug-desc">' + (cfg.desc || '') + '</div>' +
+        buyBtn + lockTip +
+      '</div>';
+    }).join('');
+    document.getElementById('shop-list').innerHTML = html || '<div style="text-align:center;color:var(--text-3);font-size:12px;padding:20px;">暂无道具</div>';
+  }
+
+  /* [FEAT 9.2-1] 渲染已购道具 */
+  function renderActive() {
+    var items = UpgradeStore.listActive();
+    var box = document.getElementById('active-list');
+    if (!items.length) {
+      box.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:12px;padding:10px 0;">暂无生效中的道具</div>';
+      return;
+    }
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    box.innerHTML = items.map(function (it) {
+      var cfg = vus[it.type] || {};
+      var remain = it.expireAt ? Math.ceil((it.expireAt - Date.now()) / 86400000) : 0;
+      return '<div class="ug-active-item">' +
+        '<div><div style="font-size:13px;font-weight:600;color:var(--text-1);">' + (cfg.label || it.type) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-3);margin-top:2px;">到期：' + fmtDate(it.expireAt) + (it.expireAt ? '（剩' + remain + '天）' : '') + '</div></div>' +
+        '<span class="tag tag-success">生效中</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* [FEAT 9.2-1] 购买道具 */
+  window.buyUpgrade = function (type) {
+    if (type === 'topListing') {
+      openTopPick();
+      return;
+    }
+    var result = UpgradeStore.purchase(type, '');
+    if (result && result.error) {
+      if (window.UI && UI.toast) UI.toast(result.error, 'err');
+      else alert(result.error);
+    } else {
+      if (window.UI && UI.toast) UI.toast('购买成功', 'ok');
+      renderShop();
+      renderActive();
+    }
+  };
+
+  /* [FEAT 9.2-1] 置顶道具：选择要置顶的供需信息 */
+  window.openTopPick = function () {
+    var overlay = document.getElementById('top-pick-overlay');
+    var body = document.getElementById('top-pick-body');
+    var list = [];
+    try { list = SupplyStore.read().items || []; } catch (e) {}
+    /* 只显示当前用户发布的 active 信息 */
+    var myItems = list.filter(function (i) { return i.status === 'active'; });
+    if (!myItems.length) {
+      body.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:12px;padding:20px;">您还没有已发布的供需信息，请先发布</div>';
+    } else {
+      body.innerHTML = myItems.map(function (it) {
+        return '<div style="padding:12px;border-bottom:1px solid var(--line);cursor:pointer;" onclick="confirmTop(\'' + it.id + '\',\'' + (it.title || it.cat || '').replace(/'/g, '') + '\')">' +
+          '<div style="font-size:13px;font-weight:600;color:var(--text-1);">' + (it.title || it.cat || '未命名') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-3);margin-top:3px;">' + (it.cat || '') + ' · ' + (it.city || it.location || '') + '</div></div>';
+      }).join('');
+    }
+    overlay.style.display = 'block';
+  };
+  window.closeTopPick = function () {
+    document.getElementById('top-pick-overlay').style.display = 'none';
+  };
+  window.confirmTop = function (targetId, title) {
+    closeTopPick();
+    var result = UpgradeStore.purchase('topListing', targetId);
+    if (result && result.error) {
+      if (window.UI && UI.toast) UI.toast(result.error, 'err');
+      else alert(result.error);
+    } else {
+      if (window.UI && UI.toast) UI.toast('已置顶：' + title, 'ok');
+      renderShop();
+      renderActive();
+    }
+  };
+
+  renderShop();
+  renderActive();
+  window.addEventListener('engchain:upgrades', function () { renderShop(); renderActive(); });
+})();
+</script>
+</body>
+</html>

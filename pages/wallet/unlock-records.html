@@ -76,19 +76,36 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function(){
   window.__ROOT__='../../';
 
-  /* 模拟解锁记录数据（实际应从CreditStore.unlockLogs读取） */
-  var UNLOCK_LOGS = [
-    { id:'UL001', title:'成都地区C30混凝土供应', cat:'建材', dir:'供应', method:'credit', cost:10, time:'2026-09-04 14:32', contact:'张经理 138****8888', supplyId:'S001' },
-    { id:'UL002', title:'高新区写字楼装修劳务班组', cat:'劳务', dir:'需求', method:'free', cost:0, time:'2026-09-03 10:15', contact:'李工 139****6666', supplyId:'S002' },
-    { id:'UL003', title:'塔吊租赁（6012型）', cat:'设备', dir:'需求', method:'credit', cost:10, time:'2026-08-28 11:20', contact:'王总 137****2222', supplyId:'S003' },
-    { id:'UL004', title:'建筑工程总承包资质转让', cat:'资质', dir:'供应', method:'credit', cost:30, time:'2026-08-25 16:45', contact:'陈经理 136****9999', supplyId:'S004' },
-    { id:'UL005', title:'双流区钢结构加工厂合作', cat:'建材', dir:'需求', method:'free', cost:0, time:'2026-08-20 09:30', contact:'刘厂 135****1111', supplyId:'S005' },
-    { id:'UL006', title:'市政道路工程运输车队', cat:'运输', dir:'供应', method:'credit', cost:10, time:'2026-08-15 14:00', contact:'赵队 133****3333', supplyId:'S006' }
-  ];
+  /* [FIX BM-020] 解锁记录改为从 CreditStore.logs 读取真实 type='unlock' 记录，
+     不再使用写死的 6 条假数据（成本 10/30 分）。真实成本从 logs.credits 绝对值读取（98/29/49/39 等）。
+     免费解锁走 CreditStore.freeSpend（不计积分），这里仅展示积分解锁记录；无记录时显示空状态。 */
+  function loadUnlockLogs() {
+    var logs = (CreditStore.read().logs) || [];
+    return logs.filter(function(l){ return l && l.type === 'unlock'; }).map(function(l, i){
+      var cost = Math.abs(Number(l.credits) || 0);
+      var d = new Date(l.ts || Date.now());
+      var pad = function(n){ return ('0' + n).slice(-2); };
+      var timeStr = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+      return {
+        id: l.id || ('UL' + i),
+        title: l.reason || '解锁供需详情',
+        cat: l.cat || '解锁',
+        dir: l.dir || '供应',
+        method: cost > 0 ? 'credit' : 'free',
+        cost: cost,
+        time: timeStr,
+        ts: l.ts || 0,
+        contact: l.contact || '',
+        supplyId: l.supplyId || l.bizId || ''
+      };
+    });
+  }
 
   var currentFilter = 'all';
+  var UNLOCK_LOGS = [];
 
   function render() {
+    UNLOCK_LOGS = loadUnlockLogs();
     var list = document.getElementById('ur-list');
     var empty = document.getElementById('ur-empty');
     var filtered = UNLOCK_LOGS.filter(function(r){
@@ -96,7 +113,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       return r.method === currentFilter;
     });
 
-    /* 统计 */
+    /* 统计：基于真实积分解锁记录 */
     var total = UNLOCK_LOGS.length;
     var creditCost = UNLOCK_LOGS.reduce(function(s,r){ return s + (r.method==='credit'?r.cost:0); }, 0);
     var freeCount = UNLOCK_LOGS.filter(function(r){ return r.method==='free'; }).length;
@@ -116,16 +133,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         : '<span class="tag tag-gold" style="font-size:10px;">免费</span>';
       var amtClass = r.method==='credit' ? 'credit' : 'free';
       var amtText = r.method==='credit' ? '-'+r.cost+' 分' : '免费';
-      return '<div class="ur-card" onclick="location.href=\'../supply/detail.html?id='+r.supplyId+'\'">' +
+      var contactHtml = r.contact
+        ? '<div class="ur-contact"><svg class="ic"><use href="#i-user"/></svg>'+r.contact+'</div>'
+        : '<div class="ur-contact" style="color:var(--text-3);">信息已解锁</div>';
+      var detailHref = r.supplyId
+        ? ('../supply/detail.html?id=' + r.supplyId)
+        : 'javascript:void(0);';
+      return '<div class="ur-card" onclick="location.href=\''+detailHref+'\'">' +
         '<div class="ur-card-top">' +
-          '<span class="tag '+(r.dir==='供应'?'tag-supply':'tag-demand')+'" style="font-size:10px;">'+r.dir+'</span>' +
+          '<span class="tag '+(r.dir==='需求'?'tag-demand':'tag-supply')+'" style="font-size:10px;">'+r.dir+'</span>' +
           '<span class="tag tag-gray" style="font-size:10px;">'+r.cat+'</span>' +
           methodTag +
         '</div>' +
         '<div class="ur-card-title">'+r.title+'</div>' +
         '<div class="ur-card-meta"><span>'+r.time+'</span></div>' +
         '<div class="ur-card-foot">' +
-          '<div class="ur-contact"><svg class="ic"><use href="#i-user"/></svg>'+r.contact+'</div>' +
+          contactHtml +
           '<span class="ur-amount '+amtClass+'">'+amtText+'</span>' +
         '</div>' +
       '</div>';
@@ -141,6 +164,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     };
   });
 
+  /* 积分账户变化时刷新 */
+  window.addEventListener('engchain:credits', render);
   render();
 })();
 </script>

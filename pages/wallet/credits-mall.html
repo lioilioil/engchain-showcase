@@ -195,13 +195,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       ok: '确认兑换',
       cancel: '取消',
       onOk: function(){
-        /* 模拟扣减积分 */
-        try {
-          var c = CreditStore.read();
-          c.balance = (c.balance || 0) - g.price;
-          localStorage.setItem('engchain-credits', JSON.stringify(c));
-          window.dispatchEvent(new CustomEvent('engchain:credits'));
-        } catch(e) {}
+        /* [FIX BM-019] 积分消耗统一走 CreditStore.consume(cost, reason, meta)，
+           不再裸写 CreditStore.balance 或直写 localStorage；consume 返回 null 表示余额不足 */
+        var res = CreditStore.consume(g.price, '商城兑换 · ' + g.name, {
+          type:'unlock',
+          reason: '商城兑换 · ' + g.name,
+          goodsId: g.id,
+          goodsName: g.name,
+          status: 'success'
+        });
+        if (res === null) {
+          UI.toast('积分不足，兑换失败', 'err');
+          return;
+        }
         /* 添加兑换记录 */
         RECORDS.unshift({ id:'R'+Date.now(), name:g.name, time:new Date().toLocaleString('zh-CN'), cost:g.price, status:'已发放', icon:g.icon, icBg:g.icBg, icColor:g.icColor });
         renderBalance();

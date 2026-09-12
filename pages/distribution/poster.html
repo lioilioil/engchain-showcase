@@ -80,14 +80,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/domain.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
-var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered'};
-if(!acc.isResident){
+var acc=window.entryAccess?entryAccess():{isResident:false,dist:false,statusId:'registered'};
+/* [FIX BM-028/BM-029] 门控统一为 entryAccess().dist（企业入驻 或 个人合伙人），不再仅认 isResident。
+   个人合伙人（u9 孙小美，partner=true 且非企业入驻）享有分销资格，须能访问分销海报。 */
+if(!acc.dist){
   var ph=document.querySelector('.phone');
-  if(ph){ph.innerHTML='<div style="padding:88px 28px;text-align:center;">'+
-    '<svg class="ic" style="width:42px;height:42px;color:var(--primary);margin-bottom:14px;"><use href="#i-share"/></svg>'+
-    '<div class="fw-700 fs-17" style="margin-bottom:8px;">推广海报 · 入驻企业专享</div>'+
-    '<div class="text-3 fs-13" style="line-height:1.9;margin-bottom:26px;">完成企业入驻后生成专属邀请码与海报。</div>'+
-    '<button class="btn btn-primary btn-block" onclick="location.href=\''+(acc.statusId==='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId==='guest'?'去登录':'去入驻')+'</button></div>';}
+  if(ph){ph.innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
+  '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 160px;">'+
+    '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
+      '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</div>'+
+    '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">推广海报</div>'+
+    '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">入驻企业 / 个人合伙人专享 · 完成入驻后生成专属邀请码与海报</div>'+
+  '</div>'+
+  '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
+    '<div style="padding:0 24px;">'+
+      '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+(acc.statusId=='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId=='guest'?'去登录':'去入驻')+'</button>'+
+    '</div>'+
+  '</div>'+
+'</div>';}
   return;
 }
 var me=DataBus.current();
@@ -122,11 +133,77 @@ window.savePoster=function(){
   if(btn&&btn.disabled)return;
   var origHtml=btn?btn.innerHTML:'';
   if(btn){btn.disabled=true;btn.style.opacity='.6';btn.innerHTML='<span class="pa-ic"><svg class="ic" style="width:16px;height:16px;animation:up-spin .8s linear infinite;"><use href="#i-download"/></svg></span><span>生成中...</span>';}
+  /* [FIX] 用 canvas 真实绘制海报并触发下载；失败降级为长按提示 sheet */
   setTimeout(function(){
-    if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=origHtml;}
-    UI.toast('海报已保存到相册（原型演示）','ok');
-  },900);
+    try{
+      var me=DataBus.current()||{};
+      var nick=me.name||me.company||'工程链用户';
+      var cv=document.createElement('canvas');
+      cv.width=750;cv.height=1200;
+      var ctx=cv.getContext('2d');
+      /* 背景渐变 */
+      var bg=ctx.createLinearGradient(0,0,750,1200);
+      bg.addColorStop(0,'#0b0f1a');bg.addColorStop(.6,'#101a2e');bg.addColorStop(1,'#0f2418');
+      ctx.fillStyle=bg;ctx.fillRect(0,0,750,1200);
+      /* 顶部金色光晕 */
+      var glow=ctx.createRadialGradient(650,80,0,650,80,500);
+      glow.addColorStop(0,'rgba(238,214,151,.35)');glow.addColorStop(1,'rgba(238,214,151,0)');
+      ctx.fillStyle=glow;ctx.fillRect(0,0,750,600);
+      /* Logo */
+      ctx.fillStyle='#C9A961';
+      roundRect(ctx,60,80,80,80,20);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='bold 44px sans-serif';ctx.textBaseline='middle';
+      ctx.fillText('链',86,122);
+      /* 品牌名 */
+      ctx.fillStyle='#F4F2EE';ctx.font='bold 28px sans-serif';
+      ctx.fillText('工程链 ENGCHAIN',160,110);
+      ctx.fillStyle='rgba(244,242,238,.6)';ctx.font='16px sans-serif';
+      ctx.fillText('供需匹配 · AI 赋能',160,140);
+      /* 昵称 */
+      ctx.fillStyle='#E8D5A3';ctx.font='bold 30px sans-serif';
+      ctx.fillText(nick+' 邀您加入',60,240);
+      /* Slogan */
+      ctx.fillStyle='#F7F5F1';ctx.font='bold 44px sans-serif';
+      ctx.fillText('把工程需求，',60,340);
+      ctx.fillText('交给 AI 来撮合',60,400);
+      /* 二维码占位块 */
+      ctx.fillStyle='#F7F5F1';
+      roundRect(ctx,225,500,300,300,16);ctx.fill();
+      ctx.strokeStyle='#C9A961';ctx.lineWidth=6;
+      roundRect(ctx,225,500,300,300,16);ctx.stroke();
+      ctx.fillStyle='#333';ctx.font='18px sans-serif';ctx.textAlign='center';
+      ctx.fillText('扫码注册（二维码占位）',375,660);
+      /* 邀请码 */
+      ctx.fillStyle='#C9A961';ctx.font='bold 36px monospace';
+      ctx.fillText('邀请码 '+CODE,375,870);
+      ctx.fillStyle='rgba(244,242,238,.6)';ctx.font='18px sans-serif';
+      ctx.fillText('好友注册填写即绑定 · 消费后自动返佣',375,910);
+      /* 底部 */
+      ctx.fillStyle='rgba(244,242,238,.4)';ctx.font='16px sans-serif';
+      ctx.fillText('扫码 / 填码 · 立即注册绑定',375,1080);
+      ctx.textAlign='left';
+      var url=cv.toDataURL('image/png');
+      var a=document.createElement('a');
+      a.href=url;a.download='engchain-poster.png';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=origHtml;}
+      UI.toast('海报已下载到本地','ok');
+    }catch(e){
+      if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=origHtml;}
+      var sh=UI.sheet();
+      sh.html('<div style="padding:8px 0 14px;text-align:center;">'+
+        '<div class="fw-700 fs-15" style="margin-bottom:10px;">保存海报</div>'+
+        '<div class="text-2 fs-12" style="margin-bottom:14px;line-height:1.7;">请长按上方海报图片<br>选择"保存到相册"</div>'+
+        '<button class="btn btn-primary btn-block" onclick="UI.closeSheet();copy()">复制邀请链接</button>'+
+      '</div>').show();
+    }
+  },500);
 };
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
 window.share=function(){
   UI.sheet().html(
     '<div style="padding:8px 0 14px;text-align:center;">'+

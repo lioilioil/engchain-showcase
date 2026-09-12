@@ -332,15 +332,33 @@ body { background: var(--bg); }
     });
   }
 
-  /* ===== 搜索结果 ===== */
+  /* ===== 搜索结果（mergedList 同源：MOCK.catalog + SupplyStore active） ===== */
+  function readActiveSupplies() {
+    try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
+  }
+  function normSupplyItem(x) {
+    var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
+    return Object.assign({}, x, {
+      id: x.id, bizKey: x.bizKey || '', dir: x.dir || x.type || 'demand',
+      title: x.title || '', cat: x.cat || x.category || '', sub: x.sub || x.subType || '',
+      city: x.city || x.location || '', location: x.location || x.city || '',
+      company: x.company || '', tags: x.tags || [],
+      match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
+      verified: x.verified !== undefined ? x.verified : !isUser, hot: x.hot || false,
+      _badge: isUser ? '用户发布' : '平台认证'
+    });
+  }
+  function mergedList() {
+    var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
+    var active = readActiveSupplies().map(normSupplyItem);
+    var seen = {}, out = [];
+    active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    return out;
+  }
   function searchData(kw) {
-    /* 从 MOCK 数据中按 bizKey 过滤，再按关键词搜索 */
-    var all = [];
-    try {
-      if (window.MOCK && MOCK.byFlow) {
-        all = MOCK.byFlow('match').slice();
-      }
-    } catch (e) {}
+    /* 从 mergedList 中按 bizKey 过滤，再按关键词搜索 */
+    var all = mergedList();
     /* 按业务类型过滤 */
     var filtered = all.filter(function (item) {
       return item.bizKey === cfg.bizKey;
