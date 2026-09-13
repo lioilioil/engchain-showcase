@@ -413,10 +413,20 @@
     /* 列表页：#list 容器，每6条插入1张 */
     var listEl = document.getElementById('list');
     if (listEl) {
-      var doInject = function () { injectIntoList(listEl, '#list > *', 6); };
+      /* [FIX 卡死] 注入期间断开观察器、完成后恢复：
+         injectIntoList 的移除+插入自身会触发 MutationObserver，而观察回调是异步投递的，
+         简单的重入标志无法拦截（回调执行时注入早已结束、标志已复位），会形成
+         "改DOM→观察回调→再改DOM"的无限反馈循环，导致页面打开即卡死。
+         断开观察器可让注入自身的变更不被记录；列表真正重渲染时仍能正常刷新旗帜。 */
+      var listObserver = null;
+      var doInject = function () {
+        if (listObserver) listObserver.disconnect();
+        try { injectIntoList(listEl, '#list > *', 6); }
+        finally { if (listObserver) listObserver.observe(listEl, { childList: true }); }
+      };
       setTimeout(doInject, 600);
       try {
-        var listObserver = new MutationObserver(function () { doInject(); });
+        listObserver = new MutationObserver(function () { doInject(); });
         listObserver.observe(listEl, { childList: true });
       } catch (e) {}
     }

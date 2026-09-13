@@ -1,4 +1,4 @@
-/* ============================================================================
+﻿/* ============================================================================
    工程链 ENGCHAIN — 通用脚本 (common.js)
    Toast / 半屏弹窗 / 居中对话框 / 返回 / iPhone 状态栏 / 支付墙解锁
    ============================================================================ */
@@ -1195,6 +1195,8 @@ window.Cards = (function () {
   function render(list, href) {
     href = href || (window.__ROOT__ || '') + 'pages/supply/detail.html?id=';
     return list.map(function (s) {
+      try {
+        if (!s || typeof s !== 'object') return '';
       var fn = BUILDERS[s.bizKey] || supplyLike;
       /* 供应/需求类卡片附加方向类名，用于左上角弥散渐变标识（仅明亮模式） */
       var dirCls = '';
@@ -1202,6 +1204,10 @@ window.Cards = (function () {
       else if (s.dir === 'supply') dirCls = ' is-supply';
       /* [FEAT 9.2-1] 卡片底部增加查看详情按钮，联系方式/详细描述付费墙后可见 */
       return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + fn(s) +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--text-3);">联系方式查看详情后可见</span><span style="font-size:12px;color:var(--primary);font-weight:600;">查看详情 ›</span></div></a>';
+      } catch (e) {
+        console.error('Cards.render: single card render error, skipped', e, s);
+        return '';
+      }
     }).join('');
   }
 
