@@ -967,17 +967,70 @@ window.DETAIL = (function () {
         return '<div style="padding:8px 10px;border-radius:8px;background:var(--bg-elevated);"><div style="font-size:9px;color:var(--ink-tertiary);margin-bottom:3px;">' + x.k + '</div><div style="font-size:11px;font-weight:600;color:' + (good ? 'var(--success)' : 'var(--warning)') + ';">' + x.v + '</div></div>';
       }).join('') + '</div></div>';
   }
+  /* 近3年营收：平滑曲线图（SVG）—— 渐变面积 + 曲线 + 数据点 + 刻度网格，随主题变量自适应 */
+  var revSeq = 0;
   function revenueSection(revenue) {
     if (!revenue || !revenue.length) return sec('近3年营收', '<div class="ds-text">暂无营收数据。</div>');
-    var max = Math.max.apply(null, revenue.map(function (x) { return x.v; })) || 1;
+    var values = revenue.map(function (x) { return x.v; });
+    var rawMax = Math.max.apply(null, values) || 1;
+    /* 取整齐的坐标上限（1/2/2.5/5/10 × 10ⁿ），让刻度值更干净 */
+    var pow = Math.pow(10, Math.floor(Math.log(rawMax) / Math.LN10));
+    var ratio = rawMax / pow;
+    var axisMax = (ratio <= 1 ? 1 : ratio <= 2 ? 2 : ratio <= 2.5 ? 2.5 : ratio <= 5 ? 5 : 10) * pow;
+
+    var W = 328, H = 130, L = 30, R = 18, T = 18, B = 106; /* 绘图区 [L, W-R] × [T, B] */
+    var plotW = W - L - R;
+    var n = revenue.length;
+    var pts = revenue.map(function (d, i) {
+      var x = L + plotW * (n === 1 ? 0.5 : i / (n - 1));
+      var y = T + (axisMax - d.v) / axisMax * (B - T);
+      return [x, y];
+    });
+    /* Catmull-Rom → 三次贝塞尔平滑曲线 */
+    function smoothD(pts) {
+      if (pts.length < 3) return 'M' + pts.map(function (p) { return p[0] + ' ' + p[1]; }).join(' L');
+      var d = 'M' + pts[0][0] + ' ' + pts[0][1];
+      for (var i = 0; i < pts.length - 1; i++) {
+        var p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+        var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+        var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        d += ' C' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+      }
+      return d;
+    }
+    var lineD = smoothD(pts);
+    var areaD = lineD + ' L' + pts[n - 1][0].toFixed(1) + ' ' + B + ' L' + pts[0][0].toFixed(1) + ' ' + B + ' Z';
+
+    /* 水平网格：0 / ½max / max */
+    var ticks = [0, axisMax / 2, axisMax];
+    var grid = ticks.map(function (t, ti) {
+      var y = T + (axisMax - t) / axisMax * (B - T);
+      return '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) + '" style="stroke:var(--line);' + (ti === 0 ? 'stroke-opacity:.55;' : 'stroke-dasharray:2 3;') + '"/>' +
+        '<text x="' + (L - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" style="font-family:var(--font-num);font-size:8.5px;fill:var(--ink-tertiary);">' + Math.round(t) + '</text>';
+    }).join('');
+
+    /* 数据点：末点高亮（成功绿 + 光晕），其余品牌金；数值在上、年份在下 */
+    var marks = pts.map(function (p, i) {
+      var last = i === n - 1;
+      var stroke = last ? 'var(--success)' : 'var(--accent)';
+      return (last ? '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="7" style="fill:var(--success);fill-opacity:.12;"/>' : '') +
+        '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (last ? 4 : 3.2) + '" style="fill:var(--bg);stroke:' + stroke + ';stroke-width:' + (last ? 2 : 1.6) + ';"/>' +
+        '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 11).toFixed(1) + '" text-anchor="middle" style="font-family:var(--font-num);font-size:9.5px;font-weight:' + (last ? 700 : 600) + ';fill:' + (last ? 'var(--success)' : 'var(--ink-secondary)') + ';">' + revenue[i].v.toLocaleString() + '</text>' +
+        '<text x="' + p[0].toFixed(1) + '" y="' + (B + 15) + '" text-anchor="middle" style="font-size:9px;fill:var(--ink-tertiary);">' + revenue[i].year + '</text>';
+    }).join('');
+
+    var gid = 'rev-area-' + (++revSeq);
     return sec('近3年营收（万元）',
-      '<div style="display:flex;align-items:flex-end;gap:16px;height:100px;padding:0 8px;margin-top:8px;">' + revenue.map(function (b, i) {
-        var h = Math.round(b.v / max * 90);
-        var isLast = i === revenue.length - 1;
-        var col = isLast ? 'var(--success)' : 'var(--accent)';
-        var top = isLast ? '<div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:var(--font-num);font-size:9px;font-weight:600;color:var(--success);">' + b.v.toLocaleString() + '</div>' : '';
-        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><div style="width:100%;height:' + h + 'px;border-radius:4px 4px 0 0;background:' + col + ';position:relative;">' + top + '</div><span style="font-family:var(--font-num);font-size:10px;font-weight:600;color:var(--ink-primary);">' + b.v.toLocaleString() + '</span><span style="font-size:9px;color:var(--ink-tertiary);">' + b.year + '</span></div>';
-      }).join('') + '</div>');
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" style="display:block;width:100%;height:auto;margin-top:6px;" role="img" aria-label="近3年营收曲线图">' +
+        '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" style="stop-color:var(--accent);stop-opacity:.22;"/>' +
+          '<stop offset="1" style="stop-color:var(--accent);stop-opacity:0;"/>' +
+        '</linearGradient></defs>' +
+        grid +
+        '<path d="' + areaD + '" fill="url(#' + gid + ')"/>' +
+        '<path d="' + lineD + '" fill="none" style="stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"/>' +
+        marks +
+      '</svg>');
   }
   function reportCard(exam) {
     return '<div style="margin:0 0 14px;padding:14px;border-radius:12px;background:linear-gradient(135deg,var(--ink-primary),var(--ink-primary));position:relative;overflow:hidden;margin-top:2px;">' +
@@ -2184,11 +2237,82 @@ window.DETAIL = (function () {
   function talentCertHtml(rec) {
     var nm = rec.nameMasked || rec.name || '持证人才';
     var meta = [rec.certLevel, rec.certMajor].filter(Boolean).join(' · ');
-    return '<div class="cert-card cert-card--compact"><div class="cert-header">' +
+    var certPack = rec.certPack || [];
+    var regStatus = rec.registerStatus || {};
+    var ss = rec.socialSecurity || {};
+    // 人才专属维度
+    var dims = [
+      { k: '证书核验', v: rec.verified ? '已核验' : '待核验', s: rec.verified ? 95 : 40 },
+      { k: '注册状态', v: (regStatus.status || '未知').substring(0, 6), s: regStatus.status ? 90 : 50 },
+      { k: '社保唯一', v: ss.uniqueSocial ? '唯一社保' : '非唯一', s: ss.uniqueSocial ? 95 : 60 },
+      { k: '从业年限', v: (rec.experience || rec.workYears || '—'), s: Math.min(100, (rec.experienceNum || 5) * 8) }
+    ];
+    // Tab 栏
+    var tabs = '<div class="cert-tabs">' +
+      '<button class="cert-tab active" data-panel="overview"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>认证概览</button>' +
+      '<button class="cert-tab" data-panel="certs"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>证书清单</button>' +
+      '<button class="cert-tab" data-panel="reg"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>注册社保</button>' +
+    '</div>';
+    // 状态摘要
+    var summary = '<div class="cert-summary">' +
+      '<span class="cert-summary-item cs-highlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>持证 <span class="cs-num">' + certPack.length + '</span> 本</span>' +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + (rec.certType || rec.sub || '执业资格') + '</span>' +
+      '<span class="cert-summary-item' + (ss.uniqueSocial ? ' cs-highlight' : '') + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>' + (ss.uniqueSocial ? '唯一社保' : '社保在缴') + '</span>' +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + (rec.experience || rec.workYears || '—') + '</span>' +
+    '</div>';
+    // 概览维度
+    var overviewDims = '<div class="cert-overview-dims">' +
+      dims.map(function (d) {
+        return '<div class="cert-dim"><div class="cert-dim-top"><span class="cert-dim-name">' + d.k + '</span><span class="cert-dim-val">' + d.v + '</span></div>' +
+          '<div class="cert-dim-bar"><div class="cert-dim-fill" style="width:' + d.s + '%"></div></div></div>';
+      }).join('') + '</div>';
+    // 证书清单
+    var certList = '<div class="cert-cert-list">' +
+      certPack.map(function (ct) {
+        var label = ct.certType + (ct.certLevel && ct.certLevel !== '不分等级' && ct.certLevel !== '—' ? '·' + ct.certLevel : '');
+        return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + label + (ct.certMajor && ct.certMajor !== '—' ? '（' + ct.certMajor + '）' : '') + '</span><span class="cci-date">' + (ct.issueDate || '') + '</span></div>';
+      }).join('') + '</div>';
+    // 注册与社保
+    var regHtml = '<div style="display:flex;flex-direction:column;gap:10px;">' +
+      '<div style="padding:10px 12px;border-radius:8px;background:rgba(201,169,97,0.06);border:0.5px solid rgba(201,169,97,0.12);">' +
+        '<div style="font-size:10px;font-weight:700;color:var(--accent-light);margin-bottom:6px;letter-spacing:0.03em;">注册状态</div>' +
+        '<div style="font-size:10px;color:rgba(255,240,200,0.85);line-height:1.6;">' +
+          '<div>状态：' + (regStatus.status || '—') + '</div>' +
+          '<div>注册单位：' + (regStatus.registerUnitMasked || regStatus.registerUnit || '—') + '</div>' +
+          '<div>注册专业：' + (regStatus.registerMajor || '—') + '</div>' +
+          '<div>有效期至：' + (regStatus.expireDate || '—') + '</div>' +
+        '</div></div>' +
+      '<div style="padding:10px 12px;border-radius:8px;background:rgba(127,212,168,0.06);border:0.5px solid rgba(127,212,168,0.15);">' +
+        '<div style="font-size:10px;font-weight:700;color:var(--success);margin-bottom:6px;letter-spacing:0.03em;">社保状态</div>' +
+        '<div style="font-size:10px;color:rgba(255,240,200,0.85);line-height:1.6;">' +
+          '<div>状态：' + (ss.status || '—') + '</div>' +
+          '<div>缴纳单位：' + (ss.payUnitMasked || ss.payUnit || '—') + '</div>' +
+          '<div>唯一社保：' + (ss.uniqueSocial ? '是 ✓' : '否') + '</div>' +
+          '<div>最近缴纳：' + (ss.lastPayMonth || '—') + '</div>' +
+        '</div></div>' +
+    '</div>';
+    // 头部
+    var header = '<div class="cert-header">' +
       '<div class="cert-badge-wrap"><div class="cert-seal">' + UI.icon('award', '') + '</div>' +
-      '<div class="cert-badge-text"><div class="cert-badge-title">' + UI.esc(nm) + '</div>' +
-      '<div class="cert-badge-sub">个人持证人才 · 简历信息已核验</div>' +
-      '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div></div>';
+        '<div class="cert-badge-text"><div class="cert-badge-title">' + UI.esc(nm) +
+          '<svg class="verified-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
+        '<div class="cert-badge-sub">个人持证人才 · 简历信息已核验</div>' +
+        '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div>' +
+      '<div class="cert-score"><div class="cert-score-row"><span class="cert-score-num">' + (rec.match || '—') + '</span><span class="cert-score-max">%</span></div>' +
+        '<div class="cert-score-label">匹配度</div>' +
+        '<div class="cert-score-grade" style="background:linear-gradient(135deg,rgba(201,169,97,0.15),rgba(201,169,97,0.05));border-color:rgba(201,169,97,0.3);color:var(--accent-light);">✦ ' + (rec.certLevel || '持证') + '</div></div>' +
+    '</div>';
+    // 底部
+    var footer = '<div class="cert-footer">' +
+      '<div class="cert-verify">' + UI.icon('shield', '') + (rec.certVerified ? '四库一平台核验一致' : '平台核验 · 信息真实') + '</div>' +
+      '<div class="cert-id">' + (rec.certNo ? '证书 ' + rec.certNo : '') + '</div>' +
+    '</div>';
+    return '<div class="cert-card cert-card--compact">' + header + tabs +
+      '<div class="cert-panels">' +
+        '<div class="cert-panel active" data-panel="overview">' + summary + overviewDims + '</div>' +
+        '<div class="cert-panel" data-panel="certs">' + certList + '</div>' +
+        '<div class="cert-panel" data-panel="reg">' + regHtml + '</div>' +
+      '</div>' + footer + '</div>';
   }
   function attach(rec) {
     sweepTradeDeposits(); /* [FIX BM-010] 每次进入详情页清扫已过 30 天 TTL 的保证金并解冻退还 */
@@ -2217,13 +2341,9 @@ window.DETAIL = (function () {
     if ($('hero')) $('hero').innerHTML = t.hero(rec, c);
     if ($('cert')) {
       var home = (rec.bizKey === 'talent' || rec.bizKey === 'franchise' || rec.bizKey === 'trade') ? null : ('../company/index.html?id=' + c.id);
-      $('cert').innerHTML = rec.bizKey === 'talent' ? talentCertHtml(rec) : UI.certCard(c, { home: home, compact: true });
-      var cc = $('cert').querySelector('.cert-card--compact');
-      if (cc && rec.bizKey !== 'talent') {
-        var openCert = function () { UI.certModal(c, { home: home }); };
-        cc.addEventListener('click', function (e) { if (e.target.closest('.cert-home')) return; openCert(); });
-        cc.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCert(); } });
-      }
+      var isAgency = rec.bizKey === 'agency';
+      $('cert').innerHTML = rec.bizKey === 'talent' ? talentCertHtml(rec) : UI.certCard(c, { home: home, compact: true, goldV: isAgency });
+      // V4.0: 认证卡已改为页内 Tab 结构，无需弹窗点击事件
     }
     var __bodyHtml = t.sections(rec, c) + guaranteeSec(rec) + relatedSec(rec);
     if ($('body')) $('body').innerHTML = __bodyHtml;
@@ -2335,76 +2455,177 @@ window.DETAIL = (function () {
       window.FileDownload.onView = function (rec) { if (rec && rec.name) DETAIL.viewPdf(rec.name); };
     }
     var origLine = up.tiered ? '<span style="font-size:13px;color:var(--text-3);text-decoration:line-through;margin-left:8px;">' + up.original + ' 积分</span>' : ''; /* [FIX BM-012] 划线原价改积分单位 */
+
+    /* ============================================================================
+       V2.0 付费弹窗辅助函数：价值标签/核心卖点条/统一流程/信任背书/解锁清单
+    ============================================================================ */
+    /* SVG 图标内联（避免依赖 sprite 加载顺序） */
+    var _IC = {
+      doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+      phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+      shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>',
+      clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>',
+      star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+      users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      award: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+      wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>',
+      briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+      fileText: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>',
+      building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>'
+    };
+    /* V2.0: 价值描述标签（按业务类型差异化，带SVG图标和颜色） */
+    function valueChips(rec, t) {
+      var bk = rec.bizKey;
+      var chips = [];
+      function add(text, type, icon) {
+        chips.push('<span class="chip ' + type + '">' + (icon || _IC.check) + text + '</span>');
+      }
+      if (bk === 'trade') {
+        add('完整尽调报告', 'core', _IC.fileText);
+        add('转让方联系方式', 'core', _IC.phone);
+        var qualCount = (rec.qualPack || []).length || 5;
+        add(qualCount + '项资质明细', 'core', _IC.award);
+        add('财务流水与审计', 'core', _IC.doc);
+        add('隐性债务承诺', 'trust', _IC.shield);
+        add('保证金可退', 'trust', _IC.wallet);
+      } else if (bk === 'franchise') {
+        add('一对一加盟方案', 'core', _IC.briefcase);
+        add('加盟手册与合同', 'core', _IC.fileText);
+        add('招商顾问联系方式', 'core', _IC.phone);
+        add('平台担保交易', 'trust', _IC.shield);
+      } else if (bk === 'talent') {
+        add('完整联系方式', 'core', _IC.phone);
+        add('注册单位全称', 'core', _IC.building);
+        add('完整工作履历', 'core', _IC.briefcase);
+        add('证书四库一平台核验', 'trust', _IC.shield);
+      } else if (bk === 'agency') {
+        add('一对一办理方案', 'core', _IC.briefcase);
+        add('材料模板与合同', 'core', _IC.fileText);
+        add('服务顾问联系方式', 'core', _IC.phone);
+        add('平台担保交易', 'trust', _IC.shield);
+      } else if (bk === 'material') {
+        add('完整联系方式', 'core', _IC.phone);
+        add('精确成交价', 'core', _IC.wallet);
+        add('资质检测文件', 'core', _IC.doc);
+      } else if (bk === 'equipment') {
+        add('完整联系方式', 'core', _IC.phone);
+        add('精确租金明细', 'core', _IC.wallet);
+        add('设备资质文件', 'core', _IC.doc);
+      } else if (bk === 'labor') {
+        add('班组长完整信息', 'core', _IC.users);
+        add('精确工资明细', 'core', _IC.wallet);
+        add('资质证书业绩', 'core', _IC.award);
+      } else if (bk === 'cooperation') {
+        add('项目方联系方式', 'core', _IC.phone);
+        add('招标文件正文', 'core', _IC.fileText);
+        add('资金到位证明', 'core', _IC.wallet);
+      } else {
+        add('发布方联系方式', 'core', _IC.phone);
+        add('成交报价明细', 'core', _IC.wallet);
+        add('资质证明文件', 'core', _IC.doc);
+      }
+      return chips.join('');
+    }
+    /* V2.0: 核心卖点条（SVG图标+保障承诺） */
+    function valueBarHtml(rec, up) {
+      var bk = rec.bizKey;
+      var isDeposit = up.mode === 'deposit';
+      var items = [];
+      if (isDeposit) {
+        items.push({ icon: _IC.wallet, text: '可退保证金' });
+        items.push({ icon: _IC.shield, text: '平台担保' });
+        items.push({ icon: _IC.clock, text: '30天未成交全额退还' });
+      } else if (up.mode === 'free') {
+        items.push({ icon: _IC.check, text: '免费咨询' });
+        items.push({ icon: _IC.shield, text: '平台担保' });
+        items.push({ icon: _IC.phone, text: '留资即开放联系方式' });
+      } else {
+        items.push({ icon: _IC.shield, text: '平台担保交易' });
+        items.push({ icon: _IC.wallet, text: '未对接可退' });
+        items.push({ icon: _IC.clock, text: '即时解锁' });
+      }
+      var html = '<div class="us-value-bar">';
+      items.forEach(function (it, i) {
+        if (i > 0) html += '<span class="vb-sep"></span>';
+        html += '<span class="vb-item">' + it.icon + it.text + '</span>';
+      });
+      html += '</div>';
+      return html;
+    }
+    /* V2.0: 统一流程步骤组件（横向步骤条≤3步，垂直时间线>3步） */
+    function unlockSteps(rec) {
+      var bk = rec.bizKey;
+      var steps = [];
+      var title = '';
+      if (bk === 'franchise') {
+        title = '加盟流程';
+        var p = (MOCK.business.unlock && MOCK.business.unlock.process) || [];
+        steps = p.map(function (s) { return { num: s.step, title: s.title, desc: s.desc || '' }; });
+      } else if (bk === 'trade' && rec.transferProcess && rec.transferProcess.length) {
+        title = '转让流程';
+        steps = rec.transferProcess.map(function (s) { return { num: s.step, title: s.title, desc: s.desc || '' }; });
+      } else if (bk === 'talent') {
+        title = '解锁流程';
+        steps = [
+          { num: '1', title: '支付解锁', desc: '积分或微信支付' },
+          { num: '2', title: '查看联系方式', desc: '手机+微信即时可见' },
+          { num: '3', title: '7天有效', desc: '有效期内可反复查看' }
+        ];
+      }
+      if (!steps.length) return '';
+      var isHorizontal = steps.length <= 3;
+      var modeClass = isHorizontal ? 'horizontal' : 'vertical';
+      var html = '<div class="us-steps ' + modeClass + '">';
+      html += '<div class="steps-title">' + _IC.briefcase + title + '（' + steps.length + '步）</div>';
+      html += '<div class="steps-list">';
+      steps.forEach(function (s) {
+        html += '<div class="step">';
+        html += '<div class="step-num">' + s.num + '</div>';
+        html += '<div class="step-body">';
+        html += '<div class="step-title">' + s.title + '</div>';
+        if (s.desc) html += '<div class="step-desc">' + s.desc + '</div>';
+        html += '</div></div>';
+      });
+      html += '</div></div>';
+      return html;
+    }
+    /* V2.0: 信任背书模块（平台资质+成功数据+保障承诺） */
+    function trustBadgeHtml() {
+      return '<div class="us-trust">' +
+        '<div class="trust-title">' + _IC.shield + '平台保障 · 安全交易</div>' +
+        '<div class="trust-grid">' +
+          '<div class="trust-item">' + _IC.award + '<div class="trust-num">10万+</div><div class="trust-label">认证企业用户</div></div>' +
+          '<div class="trust-item">' + _IC.users + '<div class="trust-num">3,200+</div><div class="trust-label">促成交易笔数</div></div>' +
+          '<div class="trust-item">' + _IC.star + '<div class="trust-num">98.6%</div><div class="trust-label">用户好评率</div></div>' +
+        '</div></div>';
+    }
+    /* V2.0: 解锁内容清单（分组展示） */
+    function unlockListHtml(rec, t, lockRows) {
+      var itemNames = (t.inlineLock && t.unlockItems) ? t.unlockItems(rec) : lockRows.map(function (x) { return x.k; });
+      if (!itemNames || !itemNames.length) return '';
+      var html = '<div class="us-section">';
+      html += '<div class="section-title">' + _IC.fileText + '解锁内容清单（' + itemNames.length + '项）</div>';
+      html += '<div class="us-unlock-list"><div class="us-unlock-group">';
+      html += '<div class="us-unlock-items">';
+      itemNames.forEach(function (name) {
+        html += '<span class="us-unlock-item">' + _IC.check + name + '</span>';
+      });
+      html += '</div></div></div></div>';
+      return html;
+    }
     function openPay() {
       var lockRows = t.lockRows(rec, c);
-      /* 就近打码类 lockRows 为空，改用该类声明的「将解锁内容」清单；其余类沿用集中锁定行 */
-      var itemNames = (t.inlineLock && t.unlockItems) ? t.unlockItems(rec) : lockRows.map(function (x) { return x.k; });
-      var chips = itemNames.map(function (x) { return '<span class="chip">' + x + '</span>'; }).join('');
-      /* 仅招商加盟类详情页：解锁弹窗中加入加盟流程 */
-      var processHtml = '';
-      if (rec.bizKey === 'franchise') {
-        var process = (MOCK.business.unlock && MOCK.business.unlock.process) || [];
-        if (process.length) {
-          processHtml = '<div style="margin-top:16px;text-align:left;">' +
-            '<div style="font-size:12px;font-weight:600;color:var(--text-1);margin-bottom:8px;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" style="width:13px;height:13px;"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M9 11V5a3 3 0 0 1 6 0v6"/></svg>加盟流程（' + process.length + '步）</div>' +
-            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">' +
-            process.map(function (p) {
-              return '<div style="background:var(--bg-card-2);border-radius:8px;padding:8px 6px;text-align:center;">' +
-                '<div style="width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 4px;font-family:var(--font-num);box-shadow:0 1px 4px -1px var(--primary-dim);">' + p.step + '</div>' +
-                '<div style="font-size:10.5px;font-weight:600;color:var(--text-1);line-height:1.3;">' + p.title + '</div>' +
-                '<div style="font-size:9px;color:var(--text-3);line-height:1.3;margin-top:2px;">' + (p.desc || '') + '</div>' +
-              '</div>';
-            }).join('') +
-            '</div></div>';
-        }
-      }
-      /* 仅建企买卖类详情页：解锁弹窗中加入转让流程和保证金说明 */
-      var tradeProcessHtml = '';
-      var depositHtml = '';
-      if (rec.bizKey === 'trade') {
-        if (rec.transferProcess && rec.transferProcess.length) {
-          tradeProcessHtml = '<div style="margin-top:16px;text-align:left;">' +
-            '<div style="font-size:12px;font-weight:600;color:var(--text-1);margin-bottom:8px;display:flex;align-items:center;gap:5px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" style="width:13px;height:13px;"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M9 11V5a3 3 0 0 1 6 0v6"/></svg>转让流程（线上' + rec.transferProcess.length + '步）</div>' +
-            '<div style="display:flex;flex-direction:column;gap:0;">' +
-            rec.transferProcess.map(function (p, i) {
-              var isLast = i === rec.transferProcess.length - 1;
-              return '<div style="display:flex;gap:8px;align-items:flex-start;">' +
-                '<div style="display:flex;flex-direction:column;align-items:center;">' +
-                '<div style="width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;font-family:var(--font-num);box-shadow:0 1px 4px -1px var(--primary-dim);">' + p.step + '</div>' +
-                (!isLast ? '<div style="width:1.5px;flex:1;background:var(--line);min-height:12px;margin:2px 0;"></div>' : '') +
-                '</div>' +
-                '<div style="flex:1;padding-bottom:' + (isLast ? '0' : '8px') + ';">' +
-                '<div style="font-size:11px;font-weight:600;color:var(--text-1);line-height:1.3;">' + p.title + '</div>' +
-                '<div style="font-size:9.5px;color:var(--text-3);line-height:1.3;margin-top:2px;">' + p.desc + '</div>' +
-                '</div></div>';
-            }).join('') +
-            '</div></div>';
-        }
-        depositHtml = '<div style="margin-top:12px;padding:8px 10px;background:var(--success-soft);border:1px solid rgba(43,107,79,.15);border-radius:8px;text-align:left;">' +
-          '<div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">可退保证金：</b>支付 ¥5,000 保证金后解锁完整信息并联系出售方；30 天内未达成交易可全额无息退还，达成交易可抵扣交易服务费。</div>' +
-          '</div>';
-      }
-      /* M3：持证人才单条积分解锁（Q3 统一积分体系，去掉旧线索包）；企业招聘免费投递 */
-      var personnelPayHtml = '';
-      if (rec.bizKey === 'talent') {
-        var _discT = creditDiscountRate();
-        var _costT = Math.round((up ? up.price : 29) * _discT);
-        personnelPayHtml = '<div style="margin-top:14px;text-align:left;">' +
-          '<div style="font-size:12px;font-weight:600;color:var(--text-1);margin-bottom:8px;">解锁方式</div>' +
-          '<div style="display:flex;flex-direction:column;gap:8px;">' +
-            '<div style="padding:10px 12px;background:var(--primary-soft);border:1.5px solid var(--primary);border-radius:10px;">' +
-              '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-                '<span style="font-size:12px;font-weight:700;color:var(--primary-dim);">单条解锁</span>' +
-                '<span style="font-family:var(--font-num);font-size:15px;font-weight:700;color:var(--primary-dim);">' + _costT + ' 积分' + (_discT < 1 ? '<span style="font-size:10px;color:var(--text-3);font-weight:400;margin-left:4px;">会员' + Math.round(_discT * 10) + '折</span>' : '') + '</span>' +
-              '</div>' +
-              '<div style="font-size:10px;color:var(--text-3);margin-top:3px;">解锁该人才完整联系方式（手机+微信），7 天内可查看；实名用户本月免费额度可抵扣</div>' +
-            '</div>' +
-            '<div style="padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;">' +
-              '<div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">企业免费发布：</b>企业认证后可免费发布招聘需求，平台精准匹配持证人才，不向求职者收费</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-      }
+      /* V2.0: 价值描述标签（按业务类型差异化，带SVG图标和颜色） */
+      var chips = valueChips(rec, t);
+      /* V2.0: 核心卖点条 */
+      var valueBar = valueBarHtml(rec, up);
+      /* V2.0: 统一流程步骤组件（franchise/trade/talent） */
+      var stepsHtml = unlockSteps(rec);
+      /* V2.0: 信任背书模块 */
+      var trustHtml = trustBadgeHtml();
+      /* V2.0: 解锁内容清单（分组展示） */
+      var unlockList = unlockListHtml(rec, t, lockRows);
       var sheet = UI.sheet();
       sheet.setText(rec.bizKey === 'trade' ? '支付保证金 · 查看完整信息' : '解锁与对方沟通权限'); /* [FIX BM-013] 付费 Sheet 标题统一为「沟通权限」 */
       var fqM3 = freeQuotaInfo();
@@ -2482,7 +2703,10 @@ window.DETAIL = (function () {
             '<div class="us-title">' + payTitle + '</div>' +
             '<div class="us-chips">' + chips + '</div>' +
           '</div>' +
-          processHtml + tradeProcessHtml + depositHtml + personnelPayHtml +
+          valueBar +
+          stepsHtml +
+          unlockList +
+          trustHtml +
           priceHtml + pkgHtml + payMethodHtml +
           '<div class="us-footer">' +
             '<button class="btn btn-primary btn-block btn-lg" id="pay-go">' + (isFree ? '免费解锁' : (isDeposit ? '确认支付 ¥' + Number(up.price).toLocaleString() : '确认解锁')) + '</button>' +

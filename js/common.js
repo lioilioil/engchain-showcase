@@ -1,4 +1,4 @@
-﻿/* ============================================================================
+/* ============================================================================
    工程链 ENGCHAIN — 通用脚本 (common.js)
    Toast / 半屏弹窗 / 居中对话框 / 返回 / iPhone 状态栏 / 支付墙解锁
    ============================================================================ */
@@ -484,12 +484,15 @@ window.UI = (function () {
   const CAT_ICON = { 混凝土: 'box', 材料: 'box', 人工: 'user', 劳务: 'user', 设备: 'tool', 机械: 'gear', 运输: 'truck', 模板: 'form', 脚手架: 'scaffold', default: 'doc' };
   function catIcon(t) { for (const k in CAT_ICON) { if ((t || '').indexOf(k) > -1) return CAT_ICON[k]; } return CAT_ICON.default; }
 
-  // 「企业认证卡片 · 高端视觉」渲染：c = MOCK.companyById(id)
-  // opts.home = 企业主页 href；opts.compact=true 返回压缩卡(点击弹窗)，默认返回折叠卡(全局 .cert-toggle 委托)
+  // 「企业认证卡片 V4.0 · Tab 分段切换」渲染：c = MOCK.companyById(id)
+  // opts.home = 企业主页 href；opts.compact=true 返回详情页完整卡(页内Tab，无弹窗)；默认返回折叠卡(全局 .cert-toggle 委托)
+  // V4.0 变更：移除弹窗、移除与详情页重复的企业基本信息、新增 Tab 分段(认证概览/资质清单/评分明细)、新增状态摘要行
   const DIM_ICON = { 资质: 'shield', 经营: 'buil', 信用: 'star', 服务: 'sparkle' };
   function dimIcon(k) { for (const key in DIM_ICON) { if ((k || '').indexOf(key) > -1) return DIM_ICON[key]; } return 'check'; }
-  // —— 共享片段构建器：供 折叠卡(企业主页默认) / 压缩卡(详情页) / 弹窗完整卡 复用 ——
-  function certHeader(c) {
+  // —— 共享片段构建器 ——
+  function certHeader(c, opts) {
+    opts = opts || {};
+    var goldV = opts.goldV ? '<span class="cert-goldv-badge">金V</span>' : '';
     return '<div class="cert-header">' +
       '<div class="cert-badge-wrap"><div class="cert-seal">' + icon('shield', '') + '</div>' +
         '<div class="cert-badge-text"><div class="cert-badge-title">' + (c.name || '平台认证企业') +
@@ -506,37 +509,55 @@ window.UI = (function () {
     return '<div class="cert-tags">' + tags.map(t => '<span class="cert-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + (t.ic || 'check') + '"/></svg>' + t.t + '</span>').join('') +
       (c.reviewCount ? '<span class="cert-tag review">' + c.reviewCount + '条企业评价</span>' : '') + '</div>';
   }
-  function certDims(c) {
+  // V4.0 状态摘要行：一行传达核心信任信号（已认证项数/最高资质/信用等级）
+  function certSummary(c) {
+    const certs = c.certs || [];
     const dims = c.dims || [];
-    return '<div class="cert-mid"><div class="cert-divider"></div><div class="cert-dimensions">' +
+    const topQual = c.emphasis || (c.tags && c.tags.length ? c.tags[0].t : '资质完备');
+    const creditDim = dims.find(function (d) { return d.k.indexOf('信用') > -1; });
+    return '<div class="cert-summary">' +
+      '<span class="cert-summary-item cs-highlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>已认证 <span class="cs-num">' + certs.length + '</span> 项</span>' +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + topQual + '</span>' +
+      (creditDim ? '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>信用 <span class="cs-num">' + creditDim.v + '</span></span>' : '') +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + (c.status || '存续') + '</span>' +
+    '</div>';
+  }
+  // V4.0 概览维度网格（替代原 .cert-mid）
+  function certOverviewDims(c) {
+    const dims = c.dims || [];
+    return '<div class="cert-overview-dims">' +
       dims.map(function (d) {
         return '<div class="cert-dim"><div class="cert-dim-top"><span class="cert-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-dim-val">' + d.v + '</span></div>' +
           '<div class="cert-dim-bar"><div class="cert-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>';
-      }).join('') + '</div></div>';
+      }).join('') + '</div>';
   }
-  function certDetail(c) {
+  // V4.0 Tab 栏
+  function certTabs() {
+    return '<div class="cert-tabs">' +
+      '<button class="cert-tab active" data-panel="overview"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>认证概览</button>' +
+      '<button class="cert-tab" data-panel="certs"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>资质清单</button>' +
+      '<button class="cert-tab" data-panel="score"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>评分明细</button>' +
+    '</div>';
+  }
+  // V4.0 Tab 面板集合（移除企业基本信息，避免与详情页重复）
+  function certPanels(c) {
     const dims = c.dims || [];
     const certs = c.certs || [];
-    const basic = [
-      { k: '企业名称', v: c.name || '' },
-      { k: '统一社会信用代码', v: c.creditCode || '' },
-      { k: '法定代表人', v: c.legalRep || '' },
-      { k: '注册资本', v: c.regCapital || '' },
-      { k: '成立日期', v: c.founded || '' },
-      { k: '经营状态', v: c.status || '', ok: true }
-    ];
     const gw = (dims.length ? (100 / dims.length) : 25);
     const formula = dims.map(d => d.k + '(' + Math.round(gw) + '%)×' + d.v).join(' + ');
     const avg = dims.length ? (dims.reduce((a, d) => a + parseFloat(d.v), 0) / dims.length) : 0;
-    return '<div class="cert-detail"><div class="cert-detail-inner">' +
-      '<div class="cert-detail-section"><div class="cert-detail-title">企业基本信息</div><div class="cert-detail-grid">' +
-        basic.map(b => '<div class="cert-detail-item"><span class="cdi-label">' + b.k + '</span><span class="cdi-value' + (b.ok ? ' cdi-success' : '') + '">' + b.v + '</span></div>').join('') + '</div></div>' +
-      '<div class="cert-detail-section"><div class="cert-detail-title">认证项目清单</div><div class="cert-cert-list">' +
-        certs.map(ct => '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>').join('') + '</div></div>' +
-      '<div class="cert-detail-section"><div class="cert-detail-title">GEO 评分计算说明</div><div class="cert-score-formula">' +
-        '<p>综合评分 = ' + formula + '</p><p class="cert-score-result">≈ <strong>' + avg.toFixed(1) + '</strong>' + ((c.score && c.score.grade) ? '（' + c.score.grade + '）' : '') + '</p>' +
-        '<p class="cert-score-note">数据来源：国家企业信用信息公示系统、中国执行信息公开网、平台交易数据，每日更新</p></div></div>' +
-    '</div></div>';
+    return '<div class="cert-panels">' +
+      '<div class="cert-panel active" data-panel="overview">' + certSummary(c) + certOverviewDims(c) + '</div>' +
+      '<div class="cert-panel" data-panel="certs"><div class="cert-cert-list">' +
+        certs.map(function (ct) { return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>'; }).join('') +
+      '</div></div>' +
+      '<div class="cert-panel" data-panel="score">' +
+        '<div class="cert-score-formula"><p>综合评分 = ' + formula + '</p><p class="cert-score-result">≈ <strong>' + avg.toFixed(1) + '</strong>' + ((c.score && c.score.grade) ? '（' + c.score.grade + '）' : '') + '</p><p class="cert-score-note">数据来源：国家企业信用信息公示系统、中国执行信息公开网、平台交易数据，每日更新</p></div>' +
+        '<div class="cert-score-dims">' +
+          dims.map(function (d) { return '<div class="cert-score-dim"><div class="cert-score-dim-top"><span class="cert-score-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-score-dim-weight">权重 ' + Math.round(gw) + '%</span><span class="cert-score-dim-val">' + d.v + '</span></div><div class="cert-score-dim-bar"><div class="cert-score-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>'; }).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
   function certFooter(c, opts) {
     return '<div class="cert-footer">' +
@@ -544,28 +565,23 @@ window.UI = (function () {
       (opts && opts.home ? '<a class="cert-home" href="' + opts.home + '">企业主页 ›</a>' : '<div class="cert-id">' + (c.certId || '') + '</div>') +
     '</div>';
   }
-  // opts.compact=true → 详情页压缩卡（仅头部，卡片整体点击弹窗）；默认 → 企业主页折叠卡（全局 .cert-toggle 委托两级展开）
+  // opts.compact=true → 详情页完整卡(页内Tab，无弹窗)；默认 → 企业主页折叠卡
   function certCard(c, opts) {
     opts = opts || {};
     c = c || {};
     if (opts.compact) {
-      return '<div class="cert-card cert-card--compact" role="button" tabindex="0" aria-label="展开企业认证档案">' +
-        certHeader(c) +
-        (opts && opts.home ? '<a class="cert-home" href="' + opts.home + '" onclick="event.stopPropagation();">企业主页 ›</a>' : '') +
-        '<div class="cert-compact-cue"><span>点击查看完整认证档案</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
-      '</div>';
+      return '<div class="cert-card cert-card--compact">' + certHeader(c, opts) + certTabs() + certPanels(c) + certFooter(c, opts) + '</div>';
     }
-    return '<div class="cert-card">' + certHeader(c) + certTags(c) + certDims(c) + certDetail(c) + certFooter(c, opts) +
-      '<div class="cert-toggle"><span>查看资质评分</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
+    return '<div class="cert-card fold-0">' + certHeader(c, opts) + certTags(c) + certTabs() + certPanels(c) + certFooter(c, opts) +
+      '<div class="cert-toggle"><span>展开认证详情</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
     '</div>';
   }
-  // 弹窗完整展开卡：全部区块展开、无 fold/toggle
   function certFull(c, opts) {
     opts = opts || {};
     c = c || {};
-    return '<div class="cert-card cert-card--full">' + certHeader(c) + certTags(c) + certDims(c) + certDetail(c) + certFooter(c, opts) + '</div>';
+    return '<div class="cert-card cert-card--full">' + certHeader(c, opts) + certTags(c) + certTabs() + certPanels(c) + certFooter(c, opts) + '</div>';
   }
-  // 企业认证档案 · 弹窗（蒙版 + 居中展开卡）：详情页压缩卡点击触发
+  // [DEPRECATED V4.0] 企业认证档案 · 弹窗 — 已由页内 Tab 替代，保留仅为向后兼容
   function certModal(c, opts) {
     const o = opts || {};
     const ov = document.createElement('div');
@@ -842,7 +858,6 @@ window.ViewHistory = ViewHistory;
 
         /* 构建侧边栏 HTML（含收起按钮） */
         var sidebarHTML = '<nav class="pura-sidebar active" aria-label="主导航">' +
-          '<div class="ps-user" id="ps-user" title="个人中心">我</div>' +
           '<div class="ps-tabs">' +
           SIDEBAR_TABS.map(function(t) {
             return '<button class="ps-tab' + (activeTab === t.key ? ' active' : '') + '" data-href="' + t.href + '" data-key="' + t.key + '" title="' + t.label + '">' +
@@ -927,13 +942,6 @@ window.ViewHistory = ViewHistory;
           });
         });
 
-        /* 头像点击进个人中心 */
-        var psUser = document.getElementById('ps-user');
-        if (psUser) {
-          psUser.addEventListener('click', function() {
-            window.location.href = root + 'pages/profile/index.html';
-          });
-        }
 
         /* 主题切换 */
         var psTheme = document.getElementById('ps-theme');
@@ -995,20 +1003,31 @@ window.ViewHistory = ViewHistory;
       if (el.closest('.contact-grid')) return;
       el.addEventListener('click', function () { UI.toast('解锁会员后可见', 'warn'); });
     });
-    // 企业认证卡片 · 两级折叠（委托，一处生效）
-    // 第 1 级：展开「资质合规 / 经营稳定」+ 认证标签；第 2 级：展开完整认证档案，共两次点击看全
+    // V4.0 认证卡片 · 折叠展开（折叠态隐藏面板，展开态显示 Tab 面板）
     document.addEventListener('click', function (e) {
       var t = e.target.closest && e.target.closest('.cert-toggle');
       if (!t) return;
       var card = t.closest('.cert-card');
       if (!card) return;
-      var stage = card.classList.contains('fold-2') ? 2 : (card.classList.contains('fold-1') ? 1 : 0);
-      var next = (stage + 1) % 3;
-      card.classList.remove('fold-1', 'fold-2');
-      if (next >= 1) card.classList.add('fold-1');
-      if (next >= 2) card.classList.add('fold-2');
+      var expanded = card.classList.contains('fold-1');
+      card.classList.toggle('fold-1', !expanded);
+      card.classList.remove('fold-2');
       var lbl = t.querySelector('span');
-      if (lbl) lbl.textContent = next === 0 ? '查看资质评分' : (next === 1 ? '查看完整认证详情' : '收起');
+      if (lbl) lbl.textContent = expanded ? '展开认证详情' : '收起认证详情';
+      var arrow = t.querySelector('svg');
+      if (arrow) arrow.style.transform = expanded ? '' : 'rotate(180deg)';
+    });
+    // V4.0 认证卡片 · Tab 分段切换（认证概览 / 资质清单 / 评分明细）
+    document.addEventListener('click', function (e) {
+      var tab = e.target.closest && e.target.closest('.cert-tab');
+      if (!tab) return;
+      var card = tab.closest('.cert-card');
+      if (!card) return;
+      var panelKey = tab.getAttribute('data-panel');
+      card.querySelectorAll('.cert-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
+      card.querySelectorAll('.cert-panel').forEach(function (p) {
+        p.classList.toggle('active', p.getAttribute('data-panel') === panelKey);
+      });
     });
 
     // 页面过渡：内容就绪后触发淡入动画
