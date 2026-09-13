@@ -233,18 +233,44 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var dims = p.dims || [];
     var certs = p.certs || [];
     var tags = p.tags || [];
-    var basic = [
-      { k: '姓名', v: p.name || '' },
-      { k: '性别', v: p.gender || '' },
-      { k: '年龄', v: (p.age ? p.age + ' 岁' : '') },
-      { k: '学历', v: p.education || '' },
-      { k: '从业年限', v: p.experience || '' },
-      { k: '在职状态', v: '在职', ok: true }
-    ];
     var gw = dims.length ? (100 / dims.length) : 25;
     var formula = dims.map(function (d) { return d.k + '(' + Math.round(gw) + '%)×' + d.v; }).join(' + ');
     var avg = dims.length ? (dims.reduce(function (a, d) { return a + parseFloat(d.v); }, 0) / dims.length) : 0;
-    return '<div class="cert-card">' +
+    // Tab 栏
+    var tabs = '<div class="cert-tabs">' +
+      '<button class="cert-tab active" data-panel="overview"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>认证概览</button>' +
+      '<button class="cert-tab" data-panel="certs"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>资质清单</button>' +
+      '<button class="cert-tab" data-panel="score"><svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>评分明细</button>' +
+    '</div>';
+    // 状态摘要（个人专属：实名认证/执业资格/从业年限/信用）
+    var creditDim = dims.find(function (d) { return d.k.indexOf('信用') > -1; });
+    var summary = '<div class="cert-summary">' +
+      '<span class="cert-summary-item cs-highlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>实名认证</span>' +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>执业资格 <span class="cs-num">' + certs.length + '</span> 项</span>' +
+      (creditDim ? '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>信用 <span class="cs-num">' + creditDim.v + '</span></span>' : '') +
+      '<span class="cert-summary-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>从业 ' + (p.experience || '—') + '</span>' +
+    '</div>';
+    // 概览维度
+    var overviewDims = '<div class="cert-overview-dims">' +
+      dims.map(function (d) {
+        return '<div class="cert-dim"><div class="cert-dim-top"><span class="cert-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-dim-val">' + d.v + '</span></div>' +
+          '<div class="cert-dim-bar"><div class="cert-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>';
+      }).join('') + '</div>';
+    // 资质清单
+    var certList = '<div class="cert-cert-list">' +
+      certs.map(function (ct) {
+        return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>';
+      }).join('') + '</div>';
+    // 评分明细
+    var scoreHtml = '<div class="cert-score-formula"><p>综合评分 = ' + formula + '</p>' +
+      '<p class="cert-score-result">≈ <strong>' + avg.toFixed(1) + '</strong>' + ((p.score && p.score.grade) ? '（' + p.score.grade + '）' : '') + '</p>' +
+      '<p class="cert-score-note">数据来源：全国建筑市场监管公共服务平台、个人实名核验系统、平台交易数据，每日更新</p></div>' +
+      '<div class="cert-score-dims">' +
+      dims.map(function (d) {
+        return '<div class="cert-score-dim"><div class="cert-score-dim-top"><span class="cert-score-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-score-dim-weight">权重 ' + Math.round(gw) + '%</span><span class="cert-score-dim-val">' + d.v + '</span></div>' +
+          '<div class="cert-score-dim-bar"><div class="cert-score-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>';
+      }).join('') + '</div>';
+    return '<div class="cert-card fold-0">' +
       '<div class="cert-header">' +
         '<div class="cert-badge-wrap"><div class="cert-seal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg></div>' +
           '<div class="cert-badge-text"><div class="cert-badge-title">' + (p.name || '平台认证用户') +
@@ -259,29 +285,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         return '<span class="cert-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + (t.ic || 'check') + '"/></svg>' + t.t + '</span>';
       }).join('') +
         (p.reviewCount ? '<span class="cert-tag review">' + p.reviewCount + '条个人评价</span>' : '') + '</div>' +
-      '<div class="cert-mid"><div class="cert-divider"></div><div class="cert-dimensions">' +
-        dims.map(function (d) {
-          return '<div class="cert-dim"><div class="cert-dim-top"><span class="cert-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-dim-val">' + d.v + '</span></div>' +
-            '<div class="cert-dim-bar"><div class="cert-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>';
-        }).join('') + '</div></div>' +
-      '<div class="cert-detail"><div class="cert-detail-inner">' +
-        '<div class="cert-detail-section"><div class="cert-detail-title">个人基本信息</div><div class="cert-detail-grid">' +
-          basic.map(function (b) {
-            return '<div class="cert-detail-item"><span class="cdi-label">' + b.k + '</span><span class="cdi-value' + (b.ok ? ' cdi-success' : '') + '">' + b.v + '</span></div>';
-          }).join('') + '</div></div>' +
-        '<div class="cert-detail-section"><div class="cert-detail-title">认证项目清单</div><div class="cert-cert-list">' +
-          certs.map(function (ct) {
-            return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>';
-          }).join('') + '</div></div>' +
-        '<div class="cert-detail-section"><div class="cert-detail-title">GEO 评分计算说明</div><div class="cert-score-formula">' +
-          '<p>综合评分 = ' + formula + '</p><p class="cert-score-result">≈ <strong>' + avg.toFixed(1) + '</strong>' + ((p.score && p.score.grade) ? '（' + p.score.grade + '）' : '') + '</p>' +
-          '<p class="cert-score-note">数据来源：全国建筑市场监管公共服务平台、个人实名核验系统、平台交易数据，每日更新</p></div></div>' +
-      '</div></div>' +
+      tabs +
+      '<div class="cert-panels">' +
+        '<div class="cert-panel active" data-panel="overview">' + summary + overviewDims + '</div>' +
+        '<div class="cert-panel" data-panel="certs">' + certList + '</div>' +
+        '<div class="cert-panel" data-panel="score">' + scoreHtml + '</div>' +
+      '</div>' +
       '<div class="cert-footer">' +
         '<div class="cert-verify"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>区块链存证 · 可在线验证</div>' +
         '<div class="cert-id">' + (p.certId || '') + '</div>' +
       '</div>' +
-      '<div class="cert-toggle"><span>查看资质评分</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
+      '<div class="cert-toggle"><span>展开认证详情</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
     '</div>';
   }
   document.getElementById('cert').innerHTML = personalCert(p);
