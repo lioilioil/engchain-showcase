@@ -1,0 +1,1254 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>编辑简历 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+.resume-edit-page { min-height: 100%; background: var(--bg, #F5F3EE); padding-bottom: 100px; }
+
+/* 完成度提示 */
+.resume-progress-bar { padding: 14px 16px; background: linear-gradient(135deg, rgba(201,169,97,0.1), rgba(201,169,97,0.03)); border-bottom: 1px solid var(--line); }
+.rpb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rpb-label { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.rpb-pct { font-size: 14px; font-weight: 700; color: var(--primary-dim); font-family: var(--font-num); }
+.rpb-track { height: 6px; background: var(--bg-card-2); border-radius: 3px; overflow: hidden; }
+.rpb-fill { height: 100%; background: linear-gradient(90deg, #C9A961, #A98A47); border-radius: 3px; transition: width 0.3s ease; }
+.rpb-hint { font-size: 11px; color: var(--text-3); margin-top: 6px; }
+
+/* 表单区域 */
+.form-section { padding: 12px 16px; }
+.form-group { background: var(--bg-card, #fff); border: 1px solid var(--line, #E8E4DC); border-radius: 14px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+.form-group-title { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line-hairline); font-size: 13px; font-weight: 700; color: var(--text-1); }
+.form-group-title svg { width: 15px; height: 15px; color: var(--primary-dim); }
+.form-group-title .add-btn { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--primary-dim); cursor: pointer; display: flex; align-items: center; gap: 2px; }
+.form-group-title .add-btn svg { width: 13px; height: 13px; }
+
+.form-row { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--line-hairline); }
+.form-row:last-child { border-bottom: none; }
+.form-row-label { font-size: 13px; font-weight: 600; color: var(--text-1); width: 80px; flex-shrink: 0; }
+.form-row-input { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: var(--text-1); text-align: right; padding: 0; }
+.form-row-input::placeholder { color: var(--text-4); }
+.form-row-arrow { color: var(--text-4); margin-left: 8px; font-size: 16px; }
+.form-row-value { flex: 1; text-align: right; font-size: 13px; color: var(--text-2); }
+
+/* 多行文本 */
+.form-row-textarea { flex-direction: column; align-items: stretch; gap: 8px; }
+.form-row-textarea .form-row-label { width: auto; }
+.bio-textarea { width: 100%; min-height: 80px; border: none; outline: none; background: transparent; font-size: 13px; color: var(--text-1); resize: none; line-height: 1.6; padding: 0; font-family: inherit; }
+.bio-textarea::placeholder { color: var(--text-4); }
+.bio-count { text-align: right; font-size: 11px; color: var(--text-4); }
+
+/* 列表项（教育/工作/项目） */
+.list-item { padding: 14px 16px; border-bottom: 1px solid var(--line-hairline); position: relative; }
+.list-item:last-child { border-bottom: none; }
+.list-item-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+.list-item-title { font-size: 13px; font-weight: 600; color: var(--text-1); flex: 1; min-width: 0; }
+.list-item-del { flex: none; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-3); cursor: pointer; margin-left: 8px; }
+.list-item-del:active { background: var(--bg-card-2); }
+.list-item-del svg { width: 14px; height: 14px; }
+.list-item-meta { font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
+.list-item-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.list-empty { padding: 20px 16px; text-align: center; font-size: 12px; color: var(--text-3); }
+
+/* 技能标签 */
+.skill-tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+.skill-tag { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 20px; background: rgba(201,169,97,0.1); color: var(--primary-dim); font-size: 12px; font-weight: 500; }
+.skill-tag .del { cursor: pointer; opacity: 0.6; }
+.skill-tag .del:active { opacity: 1; }
+.skill-add { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 20px; border: 1px dashed var(--line); color: var(--text-3); font-size: 12px; cursor: pointer; }
+.skill-add:active { background: var(--bg-card-2); }
+
+/* 保存按钮 */
+.save-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98)); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-top: 1px solid var(--line); z-index: 50; }
+.save-btn { width: 100%; height: 46px; border: none; border-radius: 12px; background: linear-gradient(135deg, #C9A961, #A98A47); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px -3px rgba(169,138,71,0.4); transition: all 0.2s; }
+.save-btn:active { transform: scale(0.98); opacity: 0.9; }
+
+/* 弹窗 */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-mask.show { display: flex; }
+.modal-box { background: var(--bg-card); border-radius: 16px; width: 100%; max-width: 340px; overflow: hidden; }
+.modal-head { padding: 16px; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 700; color: var(--text-1); text-align: center; }
+.modal-body { padding: 16px; }
+.modal-field { margin-bottom: 12px; }
+.modal-field:last-child { margin-bottom: 0; }
+.modal-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.modal-field input, .modal-field textarea, .modal-field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--text-1); background: var(--bg); outline: none; box-sizing: border-box; font-family: inherit; }
+.modal-field input:focus, .modal-field textarea:focus, .modal-field select:focus { border-color: var(--primary-dim); }
+.modal-field textarea { min-height: 70px; resize: none; }
+.modal-foot { display: flex; gap: 10px; padding: 0 16px 16px; }
+.modal-btn { flex: 1; height: 40px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+.modal-btn.cancel { background: var(--bg-card-2); color: var(--text-2); }
+.modal-btn.confirm { background: linear-gradient(135deg, #C9A961, #A98A47); color: #fff; }
+
+/* 简历附件上传 */
+.resume-upload-area { padding: 16px; }
+.upload-zone { border: 2px dashed var(--line); border-radius: 12px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+.upload-zone:active { background: var(--bg-card-2); border-color: var(--primary-dim); }
+.upload-zone-icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(201,169,97,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.upload-zone-icon svg { width: 22px; height: 22px; color: var(--primary-dim); }
+.upload-zone-title { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+.upload-zone-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; }
+.upload-zone-desc b { color: var(--primary-dim); font-weight: 600; }
+
+.resume-file-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+.resume-file-icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, rgba(201,169,97,0.15), rgba(201,169,97,0.05)); display: flex; align-items: center; justify-content: center; flex: none; }
+.resume-file-icon svg { width: 20px; height: 20px; color: var(--primary-dim); }
+.resume-file-info { flex: 1; min-width: 0; }
+.resume-file-name { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+.resume-file-meta { font-size: 11px; color: var(--text-3); }
+.resume-file-actions { display: flex; gap: 6px; flex: none; }
+.resume-file-btn { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
+.resume-file-btn.preview { background: rgba(43,107,79,0.1); color: var(--success); }
+.resume-file-btn.delete { background: rgba(200,60,60,0.1); color: var(--error); }
+.resume-file-btn:active { transform: scale(0.92); }
+.resume-file-btn svg { width: 15px; height: 15px; }
+.resume-upload-hint { font-size: 11px; color: var(--text-3); margin-top: 10px; text-align: center; line-height: 1.5; }
+
+/* ===== AI 助手 ===== */
+.ai-fab { position: fixed; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #C9A961, #A98A47); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(169,138,71,0.45); cursor: pointer; z-index: 60; transition: transform 0.2s; }
+.ai-fab:active { transform: scale(0.92); }
+.ai-fab svg { width: 26px; height: 26px; color: #fff; }
+.ai-fab .pulse { position: absolute; inset: 0; border-radius: 50%; background: rgba(201,169,97,0.4); animation: aiPulse 2s ease-out infinite; }
+@keyframes aiPulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(1.5); opacity: 0; } }
+
+.ai-panel { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg-card); border-radius: 20px 20px 0 0; z-index: 101; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); max-height: 85vh; display: flex; flex-direction: column; }
+.ai-panel.show { transform: translateY(0); }
+.ai-panel-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; opacity: 0; visibility: hidden; transition: opacity 0.3s; }
+.ai-panel-mask.show { opacity: 1; visibility: visible; }
+
+.ai-panel-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.ai-panel-icon { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #C9A961, #A98A47); display: flex; align-items: center; justify-content: center; flex: none; }
+.ai-panel-icon svg { width: 18px; height: 18px; color: #fff; }
+.ai-panel-title { flex: 1; }
+.ai-panel-title .t1 { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.ai-panel-title .t2 { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.ai-panel-close { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-3); cursor: pointer; flex: none; }
+.ai-panel-close:active { background: var(--bg-card-2); }
+.ai-panel-close svg { width: 16px; height: 16px; }
+
+.ai-tabs { display: flex; gap: 0; padding: 0 16px; border-bottom: 1px solid var(--line); flex: none; }
+.ai-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.ai-tab.active { color: var(--primary-dim); border-bottom-color: var(--primary-dim); }
+
+.ai-panel-body { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+
+/* 语音输入 */
+.voice-area { text-align: center; padding: 20px 0; }
+.voice-btn { width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #C9A961, #A98A47); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 20px rgba(169,138,71,0.4); transition: all 0.2s; position: relative; }
+.voice-btn:active { transform: scale(0.92); }
+.voice-btn.recording { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 6px 20px rgba(231,76,60,0.4); }
+.voice-btn.recording::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid rgba(231,76,60,0.4); animation: voiceRing 1.2s ease-out infinite; }
+@keyframes voiceRing { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+.voice-btn svg { width: 32px; height: 32px; color: #fff; }
+.voice-status { font-size: 13px; color: var(--text-2); margin-top: 14px; min-height: 20px; }
+.voice-result { margin-top: 16px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--text-1); line-height: 1.6; text-align: left; min-height: 60px; }
+.voice-result.empty { color: var(--text-4); text-align: center; display: flex; align-items: center; justify-content: center; }
+.voice-field-select { margin-top: 12px; }
+.voice-field-select label { font-size: 12px; font-weight: 600; color: var(--text-2); display: block; margin-bottom: 6px; }
+.voice-field-select select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--text-1); background: var(--bg-card); outline: none; }
+.voice-apply-btn { margin-top: 12px; width: 100%; padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, #C9A961, #A98A47); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.voice-apply-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.voice-hint { font-size: 11px; color: var(--text-3); margin-top: 10px; text-align: center; line-height: 1.5; }
+
+/* 智能补全 */
+.ai-gen-field { margin-bottom: 14px; }
+.ai-gen-field label { font-size: 12px; font-weight: 600; color: var(--text-2); display: block; margin-bottom: 6px; }
+.ai-gen-field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--text-1); background: var(--bg-card); outline: none; }
+.ai-gen-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, #C9A961, #A98A47); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.ai-gen-btn:active { transform: scale(0.98); }
+.ai-gen-btn svg { width: 16px; height: 16px; }
+.ai-gen-result { margin-top: 14px; padding: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--text-1); line-height: 1.7; min-height: 80px; white-space: pre-wrap; }
+.ai-gen-result.loading { display: flex; align-items: center; justify-content: center; color: var(--text-3); gap: 8px; }
+.ai-gen-result.loading .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary-dim); animation: genDot 1.2s infinite; }
+.ai-gen-result.loading .dot:nth-child(2) { animation-delay: 0.2s; }
+.ai-gen-result.loading .dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes genDot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
+.ai-gen-apply { margin-top: 10px; width: 100%; padding: 11px; border: none; border-radius: 10px; background: var(--success); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ai-gen-apply:active { transform: scale(0.98); }
+
+/* 缺失检查 */
+.ai-check-score { text-align: center; padding: 16px 0; }
+.ai-check-score .num { font-size: 36px; font-weight: 800; color: var(--primary-dim); font-family: var(--font-num); }
+.ai-check-score .label { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.ai-check-list { margin-top: 8px; }
+.ai-check-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+.ai-check-item:active { background: var(--bg-card-2); }
+.ai-check-item .icon { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex: none; }
+.ai-check-item .icon.missing { background: rgba(200,60,60,0.1); color: var(--error); }
+.ai-check-item .icon.done { background: rgba(43,107,79,0.1); color: var(--success); }
+.ai-check-item .icon svg { width: 14px; height: 14px; }
+.ai-check-item .info { flex: 1; min-width: 0; }
+.ai-check-item .info .name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.ai-check-item .info .desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.ai-check-item .chev { color: var(--text-4); flex: none; }
+.ai-check-item .chev svg { width: 14px; height: 14px; }
+.ai-check-refresh { margin-top: 12px; width: 100%; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-card); color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.ai-check-refresh svg { width: 14px; height: 14px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 导航栏 -->
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">编辑简历</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding:0 0 100px;">
+  <!-- 完成度提示 -->
+  <div class="resume-progress-bar">
+    <div class="rpb-top">
+      <span class="rpb-label">简历完整度</span>
+      <span class="rpb-pct" id="rpb-pct">0%</span>
+    </div>
+    <div class="rpb-track"><div class="rpb-fill" id="rpb-fill" style="width:0%"></div></div>
+    <div class="rpb-hint" id="rpb-hint">完善简历可提升投递成功率和企业关注度</div>
+  </div>
+
+  <!-- 表单区域 -->
+  <div class="form-section">
+    <!-- 基本信息 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        基本信息
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">姓名</span>
+        <input class="form-row-input" id="f-name" placeholder="请输入真实姓名" maxlength="20">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">手机号</span>
+        <span class="form-row-value" id="f-phone">138****8866</span>
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">邮箱</span>
+        <input class="form-row-input" id="f-email" placeholder="请输入邮箱" maxlength="50">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">所在地</span>
+        <input class="form-row-input" id="f-location" placeholder="请输入所在城市" maxlength="20">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">求职状态</span>
+        <span class="form-row-value" id="f-jobstatus" style="cursor:pointer;" onclick="openJobStatusSheet()">在职-考虑机会 ›</span>
+      </div>
+    </div>
+
+    <!-- 求职意向 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        求职意向
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">期望岗位</span>
+        <input class="form-row-input" id="f-position" placeholder="如：项目经理/施工员" maxlength="30">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">期望薪资</span>
+        <input class="form-row-input" id="f-salary" placeholder="如：15-25K" maxlength="20">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">期望城市</span>
+        <input class="form-row-input" id="f-city" placeholder="如：成都/重庆" maxlength="20">
+      </div>
+      <div class="form-row">
+        <span class="form-row-label">到岗时间</span>
+        <span class="form-row-value" id="f-arrival" style="cursor:pointer;" onclick="openArrivalSheet()">一个月内 ›</span>
+      </div>
+    </div>
+
+    <!-- 教育背景 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        教育背景
+        <span class="add-btn" onclick="openEduModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加</span>
+      </div>
+      <div id="edu-list"></div>
+    </div>
+
+    <!-- 工作经历 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        工作经历
+        <span class="add-btn" onclick="openWorkModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加</span>
+      </div>
+      <div id="work-list"></div>
+    </div>
+
+    <!-- 项目经验 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        项目经验
+        <span class="add-btn" onclick="openProjectModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加</span>
+      </div>
+      <div id="project-list"></div>
+    </div>
+
+    <!-- 技能证书 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        技能标签
+        <span class="add-btn" onclick="openSkillModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加</span>
+      </div>
+      <div class="skill-tags" id="skill-tags"></div>
+    </div>
+
+    <!-- 个人简介 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        个人简介
+      </div>
+      <div class="form-row form-row-textarea">
+        <span class="form-row-label">自我介绍</span>
+        <textarea class="bio-textarea" id="f-intro" placeholder="介绍一下你的专业背景、核心优势和职业规划" maxlength="300"></textarea>
+        <div class="bio-count"><span id="f-intro-count">0</span>/300</div>
+      </div>
+    </div>
+
+    <!-- 简历附件 -->
+    <div class="form-group">
+      <div class="form-group-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        简历附件
+      </div>
+      <div class="resume-upload-area">
+        <div id="upload-zone" class="upload-zone" onclick="document.getElementById('resume-file-input').click()">
+          <div class="upload-zone-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+          <div class="upload-zone-title">上传个人简历文件</div>
+          <div class="upload-zone-desc">支持 <b>PDF / Word / 图片</b> 格式，最大 10MB</div>
+        </div>
+        <div id="resume-file-card" class="resume-file-card" style="display:none;">
+          <div class="resume-file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div class="resume-file-info">
+            <div class="resume-file-name" id="resume-file-name">resume.pdf</div>
+            <div class="resume-file-meta" id="resume-file-meta">1.2 MB · 已上传</div>
+          </div>
+          <div class="resume-file-actions">
+            <span class="resume-file-btn preview" onclick="previewResumeFile()" title="预览"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+            <span class="resume-file-btn delete" onclick="deleteResumeFile()" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>
+          </div>
+        </div>
+        <input type="file" id="resume-file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none;" onchange="handleResumeFile(this)">
+        <div class="resume-upload-hint">上传完整简历可提升企业关注度，文件仅自己可见</div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /scroll -->
+
+  <!-- AI 助手浮动按钮 -->
+  <div class="ai-fab" onclick="openAIPanel()">
+    <span class="pulse"></span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0-3 3v1a3 3 0 0 0 3 3h1v1a3 3 0 0 0 3 3h1v-1a3 3 0 0 1 3-3h1a3 3 0 0 0 3-3v-1a3 3 0 0 0-3-3h-1V6a3 3 0 0 0-3-3h-1z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></svg>
+  </div>
+
+  <!-- 保存按钮 -->
+  <div class="save-bar">
+    <button class="save-btn" onclick="saveResume()">保存简历</button>
+  </div>
+
+  <!-- AI 助手遮罩 -->
+  <div class="ai-panel-mask" id="ai-mask" onclick="closeAIPanel()"></div>
+
+  <!-- AI 助手面板 -->
+  <div class="ai-panel" id="ai-panel">
+    <div class="ai-panel-head">
+      <div class="ai-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0-3 3v1a3 3 0 0 0 3 3h1v1a3 3 0 0 0 3 3h1v-1a3 3 0 0 1 3-3h1a3 3 0 0 0 3-3v-1a3 3 0 0 0-3-3h-1V6a3 3 0 0 0-3-3h-1z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></svg></div>
+      <div class="ai-panel-title">
+        <div class="t1">AI 简历助手</div>
+        <div class="t2">语音输入 · 智能补全 · 缺失检查</div>
+      </div>
+      <div class="ai-panel-close" onclick="closeAIPanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
+    </div>
+    <div class="ai-tabs">
+      <div class="ai-tab active" data-tab="voice" onclick="switchAITab('voice')">语音输入</div>
+      <div class="ai-tab" data-tab="gen" onclick="switchAITab('gen')">智能补全</div>
+      <div class="ai-tab" data-tab="check" onclick="switchAITab('check')">缺失检查</div>
+    </div>
+    <div class="ai-panel-body">
+      <!-- 语音输入 -->
+      <div id="ai-voice">
+        <div class="voice-area">
+          <div class="voice-btn" id="voice-btn" onclick="toggleVoice()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <div class="voice-status" id="voice-status">点击麦克风开始语音输入</div>
+        </div>
+        <div class="voice-result empty" id="voice-result">识别结果将显示在这里</div>
+        <div class="voice-field-select">
+          <label>填入字段</label>
+          <select id="voice-field">
+            <option value="name">姓名</option>
+            <option value="email">邮箱</option>
+            <option value="location">所在地</option>
+            <option value="position">期望岗位</option>
+            <option value="salary">期望薪资</option>
+            <option value="city">期望城市</option>
+            <option value="intro">个人简介</option>
+          </select>
+        </div>
+        <button class="voice-apply-btn" id="voice-apply" onclick="applyVoice()" disabled>填入选中字段</button>
+        <div class="voice-hint">支持中文语音识别，可多次识别后统一填入。<br>浏览器需授权麦克风权限。</div>
+      </div>
+
+      <!-- 智能补全 -->
+      <div id="ai-gen" style="display:none;">
+        <div class="ai-gen-field">
+          <label>选择要补全的内容</label>
+          <select id="gen-field">
+            <option value="intro">个人简介</option>
+            <option value="work_desc">工作描述（最新一段）</option>
+            <option value="project_desc">项目描述（最新一段）</option>
+          </select>
+        </div>
+        <button class="ai-gen-btn" onclick="aiGenerate()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0-3 3v1a3 3 0 0 0 3 3h1v1a3 3 0 0 0 3 3h1v-1a3 3 0 0 1 3-3h1a3 3 0 0 0 3-3v-1a3 3 0 0 0-3-3h-1V6a3 3 0 0 0-3-3h-1z"/></svg>
+          AI 智能生成
+        </button>
+        <div class="ai-gen-result" id="gen-result" style="display:none;"></div>
+        <button class="ai-gen-apply" id="gen-apply" style="display:none;" onclick="applyGen()">应用到简历</button>
+      </div>
+
+      <!-- 缺失检查 -->
+      <div id="ai-check" style="display:none;">
+        <div class="ai-check-score">
+          <div class="num" id="check-score">0%</div>
+          <div class="label">简历完整度</div>
+        </div>
+        <div class="ai-check-list" id="check-list"></div>
+        <button class="ai-check-refresh" onclick="runCheck()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          重新检查
+        </button>
+      </div>
+    </div>
+  </div>
+
+<!-- 教育背景弹窗 -->
+<div class="modal-mask" id="edu-modal">
+  <div class="modal-box">
+    <div class="modal-head">添加教育背景</div>
+    <div class="modal-body">
+      <div class="modal-field"><label>学校名称</label><input id="edu-school" placeholder="请输入学校名称"></div>
+      <div class="modal-field"><label>专业</label><input id="edu-major" placeholder="请输入专业"></div>
+      <div class="modal-field"><label>学历</label>
+        <select id="edu-degree">
+          <option value="">请选择学历</option>
+          <option value="大专">大专</option>
+          <option value="本科">本科</option>
+          <option value="硕士">硕士</option>
+          <option value="博士">博士</option>
+        </select>
+      </div>
+      <div class="modal-field"><label>起止时间</label><input id="edu-time" placeholder="如：2015.09-2019.06"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn cancel" onclick="closeModal('edu-modal')">取消</button>
+      <button class="modal-btn confirm" onclick="addEdu()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 工作经历弹窗 -->
+<div class="modal-mask" id="work-modal">
+  <div class="modal-box">
+    <div class="modal-head">添加工作经历</div>
+    <div class="modal-body">
+      <div class="modal-field"><label>公司名称</label><input id="work-company" placeholder="请输入公司名称"></div>
+      <div class="modal-field"><label>职位</label><input id="work-position" placeholder="请输入职位"></div>
+      <div class="modal-field"><label>起止时间</label><input id="work-time" placeholder="如：2020.03-至今"></div>
+      <div class="modal-field"><label>工作描述</label><textarea id="work-desc" placeholder="简要描述工作内容和业绩"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn cancel" onclick="closeModal('work-modal')">取消</button>
+      <button class="modal-btn confirm" onclick="addWork()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 项目经验弹窗 -->
+<div class="modal-mask" id="project-modal">
+  <div class="modal-box">
+    <div class="modal-head">添加项目经验</div>
+    <div class="modal-body">
+      <div class="modal-field"><label>项目名称</label><input id="proj-name" placeholder="请输入项目名称"></div>
+      <div class="modal-field"><label>担任角色</label><input id="proj-role" placeholder="如：项目经理/技术负责人"></div>
+      <div class="modal-field"><label>起止时间</label><input id="proj-time" placeholder="如：2021.06-2022.12"></div>
+      <div class="modal-field"><label>项目描述</label><textarea id="proj-desc" placeholder="简要描述项目内容和你的贡献"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn cancel" onclick="closeModal('project-modal')">取消</button>
+      <button class="modal-btn confirm" onclick="addProject()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 技能标签弹窗 -->
+<div class="modal-mask" id="skill-modal">
+  <div class="modal-box">
+    <div class="modal-head">添加技能标签</div>
+    <div class="modal-body">
+      <div class="modal-field"><label>技能名称</label><input id="skill-name" placeholder="如：一级建造师/BIM/造价"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="modal-btn cancel" onclick="closeModal('skill-modal')">取消</button>
+      <button class="modal-btn confirm" onclick="addSkill()">保存</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function(){
+  /* 简历数据 */
+  var resume = {
+    name: '', phone: '138****8866', email: '', location: '', jobStatus: '在职-考虑机会',
+    position: '', salary: '', city: '', arrival: '一个月内',
+    education: [], work: [], projects: [], skills: [], intro: '',
+    resumeFile: null
+  };
+
+  /* 时间格式转换工具：与 auth-qualification 数据同源 */
+  function rangeToTime(start, end) {
+    if (!start && !end) return '';
+    return (start || '') + '-' + (end || '至今');
+  }
+  function timeToRange(timeStr) {
+    if (!timeStr) return {start:'', end:''};
+    var parts = String(timeStr).split(/[-–—~]/);
+    return { start: (parts[0]||'').trim(), end: (parts[1]||'至今').trim() };
+  }
+  /* 统一子项格式：加载时将 start/end 转为 time 字符串供UI使用 */
+  function normalizeItemForUI(item, timeField) {
+    if (!item) return item;
+    var copy = Object.assign({}, item);
+    if (copy.start || copy.end) {
+      copy[timeField || 'time'] = rangeToTime(copy.start, copy.end);
+    }
+    return copy;
+  }
+
+  /* 从 AuthStore 加载（与 auth-qualification 数据同源） */
+  function loadResume() {
+    try {
+      var auth = AuthStore.read();
+      var pe = auth.personalEntry || {};
+      var profile = pe.profile || {};
+      var basic = profile.basic || {};
+      resume.name = basic.name || auth.realname.name || '';
+      resume.phone = basic.mobile || '138****8866';
+      resume.email = basic.email || '';
+      resume.location = basic.location || '';
+      resume.jobStatus = basic.jobStatus || '在职-考虑机会';
+      resume.intro = profile.intro || '';
+      /* 兼容两种时间格式：start/end（入驻页）和 time（编辑页） */
+      resume.education = (profile.education || []).map(function(e){ return normalizeItemForUI(e, 'time'); });
+      resume.work = (profile.work || []).map(function(w){ return normalizeItemForUI(w, 'time'); });
+      resume.projects = (profile.project || []).map(function(p){ return normalizeItemForUI(p, 'time'); });
+      resume.skills = profile.skills || [];
+      /* 兼容 resumeFile 两种格式：字符串（入驻页）和对象（编辑页旧版） */
+      var rf = profile.resumeFile;
+      if (typeof rf === 'string') {
+        resume.resumeFile = rf ? { name: rf, size: 0, type: '', data: '' } : null;
+      } else if (rf && typeof rf === 'object') {
+        resume.resumeFile = rf;
+      } else {
+        resume.resumeFile = null;
+      }
+      var ji = profile.jobIntent || {};
+      resume.position = ji.position || '';
+      resume.salary = ji.salary || '';
+      resume.city = ji.location || '';
+      resume.arrival = ji.arrivalTime || '一个月内';
+    } catch(e) {}
+  }
+
+  /* 填充表单 */
+  function fillForm() {
+    document.getElementById('f-name').value = resume.name;
+    document.getElementById('f-phone').textContent = resume.phone;
+    document.getElementById('f-email').value = resume.email;
+    document.getElementById('f-location').value = resume.location;
+    document.getElementById('f-jobstatus').textContent = resume.jobStatus + ' ›';
+    document.getElementById('f-position').value = resume.position;
+    document.getElementById('f-salary').value = resume.salary;
+    document.getElementById('f-city').value = resume.city;
+    document.getElementById('f-arrival').textContent = resume.arrival + ' ›';
+    document.getElementById('f-intro').value = resume.intro;
+    document.getElementById('f-intro-count').textContent = resume.intro.length;
+    renderEduList();
+    renderWorkList();
+    renderProjectList();
+    renderSkillTags();
+    renderResumeFile();
+    updateProgress();
+  }
+
+  /* 渲染简历文件状态 */
+  function renderResumeFile() {
+    var zone = document.getElementById('upload-zone');
+    var card = document.getElementById('resume-file-card');
+    if (resume.resumeFile) {
+      zone.style.display = 'none';
+      card.style.display = '';
+      document.getElementById('resume-file-name').textContent = resume.resumeFile.name;
+      /* 兼容从入驻页加载的字符串格式（无size信息） */
+      var meta = '已上传';
+      if (resume.resumeFile.size && resume.resumeFile.size > 0) {
+        meta = formatFileSize(resume.resumeFile.size) + ' · 已上传';
+      }
+      document.getElementById('resume-file-meta').textContent = meta;
+    } else {
+      zone.style.display = '';
+      card.style.display = 'none';
+    }
+  }
+
+  /* 格式化文件大小 */
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  /* 处理简历文件上传 */
+  window.handleResumeFile = function(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      UI.toast('文件大小不能超过 10MB', 'warn');
+      input.value = '';
+      return;
+    }
+    var allowedExts = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (allowedExts.indexOf(ext) === -1) {
+      UI.toast('仅支持 PDF / Word / 图片格式', 'warn');
+      input.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      resume.resumeFile = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        data: e.target.result
+      };
+      renderResumeFile();
+      updateProgress();
+      UI.toast('简历文件上传成功', 'ok');
+    };
+    reader.onerror = function() {
+      UI.toast('文件读取失败，请重试', 'warn');
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  };
+
+  /* 预览简历文件 */
+  window.previewResumeFile = function() {
+    if (!resume.resumeFile) return;
+    /* 从入驻页加载的字符串格式无预览数据，提示重新上传 */
+    if (!resume.resumeFile.data) {
+      UI.toast('该简历来自入驻流程，如需预览请重新上传', 'info');
+      return;
+    }
+    var w = window.open();
+    if (w) {
+      if (resume.resumeFile.type && resume.resumeFile.type.indexOf('image/') === 0) {
+        w.document.write('<img src="' + resume.resumeFile.data + '" style="max-width:100%;">');
+      } else {
+        w.document.write('<iframe src="' + resume.resumeFile.data + '" style="width:100%;height:100vh;border:none;"></iframe>');
+      }
+    } else {
+      UI.toast('请允许弹窗以预览文件', 'warn');
+    }
+  };
+
+  /* 删除简历文件 */
+  window.deleteResumeFile = function() {
+    resume.resumeFile = null;
+    renderResumeFile();
+    updateProgress();
+    UI.toast('简历文件已删除', 'ok');
+  };
+
+  /* 渲染教育背景列表 */
+  function renderEduList() {
+    var box = document.getElementById('edu-list');
+    if (!resume.education.length) { box.innerHTML = '<div class="list-empty">暂无教育背景，点击右上角添加</div>'; return; }
+    box.innerHTML = resume.education.map(function(item, idx) {
+      return '<div class="list-item">' +
+        '<div class="list-item-head"><div class="list-item-title">' + item.school + ' · ' + item.major + '</div>' +
+        '<span class="list-item-del" onclick="delEdu(' + idx + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span></div>' +
+        '<div class="list-item-meta">' + item.degree + ' · ' + item.time + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* 渲染工作经历列表 */
+  function renderWorkList() {
+    var box = document.getElementById('work-list');
+    if (!resume.work.length) { box.innerHTML = '<div class="list-empty">暂无工作经历，点击右上角添加</div>'; return; }
+    box.innerHTML = resume.work.map(function(item, idx) {
+      return '<div class="list-item">' +
+        '<div class="list-item-head"><div class="list-item-title">' + item.company + ' · ' + item.position + '</div>' +
+        '<span class="list-item-del" onclick="delWork(' + idx + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span></div>' +
+        '<div class="list-item-meta">' + item.time + '</div>' +
+        (item.desc ? '<div class="list-item-desc">' + item.desc + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  /* 渲染项目经验列表 */
+  function renderProjectList() {
+    var box = document.getElementById('project-list');
+    if (!resume.projects.length) { box.innerHTML = '<div class="list-empty">暂无项目经验，点击右上角添加</div>'; return; }
+    box.innerHTML = resume.projects.map(function(item, idx) {
+      return '<div class="list-item">' +
+        '<div class="list-item-head"><div class="list-item-title">' + item.name + ' · ' + item.role + '</div>' +
+        '<span class="list-item-del" onclick="delProject(' + idx + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span></div>' +
+        '<div class="list-item-meta">' + item.time + '</div>' +
+        (item.desc ? '<div class="list-item-desc">' + item.desc + '</div>' : '') +
+      '</div>';
+    }).join('');
+  }
+
+  /* 渲染技能标签 */
+  function renderSkillTags() {
+    var box = document.getElementById('skill-tags');
+    var html = resume.skills.map(function(skill, idx) {
+      return '<span class="skill-tag">' + skill + '<span class="del" onclick="delSkill(' + idx + ')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></span>';
+    }).join('');
+    html += '<span class="skill-add" onclick="openSkillModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>添加</span>';
+    box.innerHTML = html;
+  }
+
+  /* 计算完成度 */
+  function updateProgress() {
+    var total = 11, filled = 0;
+    if (resume.name) filled++;
+    if (resume.email) filled++;
+    if (resume.location) filled++;
+    if (resume.position) filled++;
+    if (resume.salary) filled++;
+    if (resume.education.length) filled++;
+    if (resume.work.length) filled++;
+    if (resume.projects.length) filled++;
+    if (resume.skills.length) filled++;
+    if (resume.intro) filled++;
+    if (resume.resumeFile) filled++;
+    var pct = Math.round(filled / total * 100);
+    document.getElementById('rpb-pct').textContent = pct + '%';
+    document.getElementById('rpb-fill').style.width = pct + '%';
+    var hint = '';
+    if (pct < 30) hint = '完善简历可提升投递成功率和企业关注度';
+    else if (pct < 60) hint = '继续完善工作经历和项目经验，简历更有竞争力';
+    else if (pct < 90) hint = '简历已较完整，补充技能标签可增加匹配机会';
+    else hint = '简历已非常完整，快去投递心仪的岗位吧';
+    document.getElementById('rpb-hint').textContent = hint;
+  }
+
+  /* 弹窗控制 */
+  window.openModal = function(id) { document.getElementById(id).classList.add('show'); };
+  window.closeModal = function(id) { document.getElementById(id).classList.remove('show'); };
+  window.openEduModal = function() { openModal('edu-modal'); };
+  window.openWorkModal = function() { openModal('work-modal'); };
+  window.openProjectModal = function() { openModal('project-modal'); };
+  window.openSkillModal = function() { openModal('skill-modal'); };
+
+  /* 求职状态选择 */
+  window.openJobStatusSheet = function() {
+    var options = ['在职-考虑机会', '在职-暂不考虑', '离职-正在找工作', '应届毕业生'];
+    var html = options.map(function(opt) {
+      return '<div style="padding:14px 16px;border-bottom:1px solid var(--line-hairline);cursor:pointer;font-size:14px;color:' + (opt===resume.jobStatus?'var(--primary-dim)':'var(--text-1)') + ';" onclick="selectJobStatus(\'' + opt + '\')">' + opt + '</div>';
+    }).join('');
+    var sh = UI.sheet();
+    sh.setText('选择求职状态');
+    sh.html(html);
+    sh.show();
+  };
+  window.selectJobStatus = function(val) { resume.jobStatus = val; document.getElementById('f-jobstatus').textContent = val + ' ›'; UI.closeSheet(); };
+
+  /* 到岗时间选择 */
+  window.openArrivalSheet = function() {
+    var options = ['随时到岗', '一周内', '一个月内', '三个月内', '不确定'];
+    var html = options.map(function(opt) {
+      return '<div style="padding:14px 16px;border-bottom:1px solid var(--line-hairline);cursor:pointer;font-size:14px;color:' + (opt===resume.arrival?'var(--primary-dim)':'var(--text-1)') + ';" onclick="selectArrival(\'' + opt + '\')">' + opt + '</div>';
+    }).join('');
+    var sh = UI.sheet();
+    sh.setText('选择到岗时间');
+    sh.html(html);
+    sh.show();
+  };
+  window.selectArrival = function(val) { resume.arrival = val; document.getElementById('f-arrival').textContent = val + ' ›'; UI.closeSheet(); };
+
+  /* 添加教育背景 */
+  window.addEdu = function() {
+    var school = document.getElementById('edu-school').value.trim();
+    var major = document.getElementById('edu-major').value.trim();
+    var degree = document.getElementById('edu-degree').value;
+    var time = document.getElementById('edu-time').value.trim();
+    if (!school) { UI.toast('请输入学校名称', 'warn'); return; }
+    resume.education.push({ school: school, major: major, degree: degree || '本科', time: time || '至今' });
+    document.getElementById('edu-school').value = '';
+    document.getElementById('edu-major').value = '';
+    document.getElementById('edu-degree').value = '';
+    document.getElementById('edu-time').value = '';
+    closeModal('edu-modal');
+    renderEduList();
+    updateProgress();
+    UI.toast('教育背景已添加', 'ok');
+  };
+  window.delEdu = function(idx) { resume.education.splice(idx, 1); renderEduList(); updateProgress(); };
+
+  /* 添加工作经历 */
+  window.addWork = function() {
+    var company = document.getElementById('work-company').value.trim();
+    var position = document.getElementById('work-position').value.trim();
+    var time = document.getElementById('work-time').value.trim();
+    var desc = document.getElementById('work-desc').value.trim();
+    if (!company) { UI.toast('请输入公司名称', 'warn'); return; }
+    resume.work.push({ company: company, position: position, time: time || '至今', desc: desc });
+    document.getElementById('work-company').value = '';
+    document.getElementById('work-position').value = '';
+    document.getElementById('work-time').value = '';
+    document.getElementById('work-desc').value = '';
+    closeModal('work-modal');
+    renderWorkList();
+    updateProgress();
+    UI.toast('工作经历已添加', 'ok');
+  };
+  window.delWork = function(idx) { resume.work.splice(idx, 1); renderWorkList(); updateProgress(); };
+
+  /* 添加项目经验 */
+  window.addProject = function() {
+    var name = document.getElementById('proj-name').value.trim();
+    var role = document.getElementById('proj-role').value.trim();
+    var time = document.getElementById('proj-time').value.trim();
+    var desc = document.getElementById('proj-desc').value.trim();
+    if (!name) { UI.toast('请输入项目名称', 'warn'); return; }
+    resume.projects.push({ name: name, role: role, time: time || '至今', desc: desc });
+    document.getElementById('proj-name').value = '';
+    document.getElementById('proj-role').value = '';
+    document.getElementById('proj-time').value = '';
+    document.getElementById('proj-desc').value = '';
+    closeModal('project-modal');
+    renderProjectList();
+    updateProgress();
+    UI.toast('项目经验已添加', 'ok');
+  };
+  window.delProject = function(idx) { resume.projects.splice(idx, 1); renderProjectList(); updateProgress(); };
+
+  /* 添加技能标签 */
+  window.addSkill = function() {
+    var name = document.getElementById('skill-name').value.trim();
+    if (!name) { UI.toast('请输入技能名称', 'warn'); return; }
+    if (resume.skills.indexOf(name) !== -1) { UI.toast('该技能已添加', 'warn'); return; }
+    resume.skills.push(name);
+    document.getElementById('skill-name').value = '';
+    closeModal('skill-modal');
+    renderSkillTags();
+    updateProgress();
+    UI.toast('技能标签已添加', 'ok');
+  };
+  window.delSkill = function(idx) { resume.skills.splice(idx, 1); renderSkillTags(); updateProgress(); };
+
+  /* 简介字数统计 */
+  document.getElementById('f-intro').addEventListener('input', function() {
+    document.getElementById('f-intro-count').textContent = this.value.length;
+    resume.intro = this.value;
+    updateProgress();
+  });
+
+  /* 保存简历（与 auth-qualification 数据同源：合并而非覆盖） */
+  window.saveResume = function() {
+    resume.name = document.getElementById('f-name').value.trim();
+    resume.email = document.getElementById('f-email').value.trim();
+    resume.location = document.getElementById('f-location').value.trim();
+    resume.position = document.getElementById('f-position').value.trim();
+    resume.salary = document.getElementById('f-salary').value.trim();
+    resume.city = document.getElementById('f-city').value.trim();
+    resume.intro = document.getElementById('f-intro').value.trim();
+
+    try {
+      var auth = AuthStore.read();
+      if (!auth.personalEntry) auth.personalEntry = {};
+      if (!auth.personalEntry.profile) auth.personalEntry.profile = {};
+      var profile = auth.personalEntry.profile;
+
+      /* basic：合并已有字段，不覆盖 gender/birth/wechat/address 等 */
+      profile.basic = profile.basic || {};
+      profile.basic.name = resume.name;
+      profile.basic.mobile = resume.phone;
+      profile.basic.email = resume.email;
+      profile.basic.location = resume.location;
+      profile.basic.jobStatus = resume.jobStatus;
+
+      /* jobIntent：合并已有字段，不覆盖 salaryRange/minAcceptable/certSubsidy/workType 等 */
+      profile.jobIntent = profile.jobIntent || {};
+      profile.jobIntent.position = resume.position;
+      profile.jobIntent.salary = resume.salary;
+      profile.jobIntent.location = resume.city;
+      profile.jobIntent.arrivalTime = resume.arrival;
+
+      /* education：合并已有子项的扩展字段（certFile等），将time转为start/end */
+      profile.education = (resume.education || []).map(function(item, idx) {
+        var existing = (profile.education && profile.education[idx]) || {};
+        var range = timeToRange(item.time);
+        return Object.assign({}, existing, item, { start: range.start, end: range.end });
+      });
+
+      /* work：合并已有子项的扩展字段（industry/summary/detail等） */
+      profile.work = (resume.work || []).map(function(item, idx) {
+        var existing = (profile.work && profile.work[idx]) || {};
+        var range = timeToRange(item.time);
+        return Object.assign({}, existing, item, { start: range.start, end: range.end });
+      });
+
+      /* project：合并已有子项的扩展字段（projectType/projectScale等） */
+      profile.project = (resume.projects || []).map(function(item, idx) {
+        var existing = (profile.project && profile.project[idx]) || {};
+        var range = timeToRange(item.time);
+        return Object.assign({}, existing, item, { start: range.start, end: range.end });
+      });
+
+      profile.skills = resume.skills;
+      profile.intro = resume.intro;
+
+      /* resumeFile：统一为字符串格式（与入驻页对齐） */
+      if (resume.resumeFile && typeof resume.resumeFile === 'object') {
+        profile.resumeFile = resume.resumeFile.name || '';
+      } else if (typeof resume.resumeFile === 'string') {
+        profile.resumeFile = resume.resumeFile;
+      } else {
+        profile.resumeFile = '';
+      }
+
+      AuthStore.write(auth);
+      UI.toast('简历保存成功', 'ok');
+      setTimeout(function() { history.back(); }, 800);
+    } catch(e) {
+      UI.toast('保存失败，请重试', 'warn');
+    }
+  };
+
+  /* ===== AI 助手 ===== */
+  var recognition = null;
+  var isRecording = false;
+  var voiceText = '';
+  var genResultText = '';
+
+  /* AI面板打开/关闭 */
+  window.openAIPanel = function() {
+    document.getElementById('ai-mask').classList.add('show');
+    document.getElementById('ai-panel').classList.add('show');
+    runCheck();
+  };
+  window.closeAIPanel = function() {
+    document.getElementById('ai-mask').classList.remove('show');
+    document.getElementById('ai-panel').classList.remove('show');
+    if (isRecording) stopVoice();
+  };
+
+  /* AI Tab切换 */
+  window.switchAITab = function(tab) {
+    document.querySelectorAll('.ai-tab').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    document.getElementById('ai-voice').style.display = tab === 'voice' ? '' : 'none';
+    document.getElementById('ai-gen').style.display = tab === 'gen' ? '' : 'none';
+    document.getElementById('ai-check').style.display = tab === 'check' ? '' : 'none';
+    if (tab === 'check') runCheck();
+  };
+
+  /* 语音识别 */
+  function initRecognition() {
+    if (recognition) return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      document.getElementById('voice-status').textContent = '当前浏览器不支持语音识别';
+      document.getElementById('voice-btn').style.opacity = '0.5';
+      return;
+    }
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = function(e) {
+      var text = '';
+      for (var i = 0; i < e.results.length; i++) {
+        text += e.results[i][0].transcript;
+      }
+      voiceText = text;
+      var resultEl = document.getElementById('voice-result');
+      resultEl.textContent = text;
+      resultEl.classList.remove('empty');
+      document.getElementById('voice-apply').disabled = !text.trim();
+    };
+    recognition.onerror = function(e) {
+      isRecording = false;
+      document.getElementById('voice-btn').classList.remove('recording');
+      document.getElementById('voice-status').textContent = '识别出错：' + (e.error || '未知错误');
+    };
+    recognition.onend = function() {
+      if (isRecording) {
+        try { recognition.start(); } catch(e) {}
+      }
+    };
+  }
+
+  window.toggleVoice = function() {
+    initRecognition();
+    if (!recognition) return;
+    if (isRecording) {
+      stopVoice();
+    } else {
+      startVoice();
+    }
+  };
+
+  function startVoice() {
+    try {
+      recognition.start();
+      isRecording = true;
+      document.getElementById('voice-btn').classList.add('recording');
+      document.getElementById('voice-status').textContent = '正在聆听... 再次点击结束';
+    } catch(e) {
+      document.getElementById('voice-status').textContent = '启动失败，请检查麦克风权限';
+    }
+  }
+
+  function stopVoice() {
+    isRecording = false;
+    if (recognition) {
+      try { recognition.stop(); } catch(e) {}
+    }
+    document.getElementById('voice-btn').classList.remove('recording');
+    document.getElementById('voice-status').textContent = voiceText ? '识别完成，可填入字段' : '点击麦克风开始语音输入';
+  }
+
+  /* 语音结果填入 */
+  window.applyVoice = function() {
+    var field = document.getElementById('voice-field').value;
+    var text = voiceText.trim();
+    if (!text) return;
+    switch(field) {
+      case 'name':
+        document.getElementById('f-name').value = text;
+        resume.name = text;
+        break;
+      case 'email':
+        document.getElementById('f-email').value = text;
+        resume.email = text;
+        break;
+      case 'location':
+        document.getElementById('f-location').value = text;
+        resume.location = text;
+        break;
+      case 'position':
+        document.getElementById('f-position').value = text;
+        resume.position = text;
+        break;
+      case 'salary':
+        document.getElementById('f-salary').value = text;
+        resume.salary = text;
+        break;
+      case 'city':
+        document.getElementById('f-city').value = text;
+        resume.city = text;
+        break;
+      case 'intro':
+        document.getElementById('f-intro').value = text;
+        document.getElementById('f-intro-count').textContent = text.length;
+        resume.intro = text;
+        break;
+    }
+    updateProgress();
+    UI.toast('已填入' + document.getElementById('voice-field').selectedOptions[0].text, 'ok');
+    voiceText = '';
+    document.getElementById('voice-result').textContent = '识别结果将显示在这里';
+    document.getElementById('voice-result').classList.add('empty');
+    document.getElementById('voice-apply').disabled = true;
+  };
+
+  /* AI智能生成 */
+  window.aiGenerate = function() {
+    var field = document.getElementById('gen-field').value;
+    var resultEl = document.getElementById('gen-result');
+    var applyBtn = document.getElementById('gen-apply');
+
+    resultEl.style.display = '';
+    resultEl.className = 'ai-gen-result loading';
+    resultEl.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:8px;">AI 正在分析并生成...</span>';
+    applyBtn.style.display = 'none';
+
+    setTimeout(function() {
+      var text = '';
+      if (field === 'intro') {
+        var name = resume.name || '本人';
+        var pos = resume.position || '工程管理';
+        var years = resume.work.length ? (resume.work.length + 3) + '年' : '多年';
+        text = name + '，' + years + '工程行业经验，专注于' + pos + '领域。\n\n' +
+          '具备扎实的专业基础和丰富的项目实战经验，熟悉工程全流程管理，包括项目策划、进度控制、质量管控和成本管理。\n\n' +
+          '持有相关职业资格证书，具备良好的沟通协调能力和团队协作精神，能够高效推进项目落地。\n\n' +
+          '职业目标：在' + (resume.city || '目标城市') + '寻求' + pos + '相关岗位，持续提升专业能力，为企业创造价值。';
+      } else if (field === 'work_desc') {
+        text = '1. 负责项目整体管理，制定项目计划并跟踪执行，确保项目按时按质完成；\n' +
+          '2. 协调设计、施工、监理等各方资源，解决项目推进中的技术和管理问题；\n' +
+          '3. 管控项目成本和质量，建立完善的质量管理体系，项目验收合格率100%；\n' +
+          '4. 负责团队管理和绩效考核，带领团队完成年度目标，团队效率提升30%。';
+      } else if (field === 'project_desc') {
+        text = '项目描述：\n' +
+          '• 项目规模：总建筑面积约X万㎡，合同额X亿元\n' +
+          '• 个人职责：担任项目负责人，全面负责项目管理工作\n' +
+          '• 主要成果：提前X天完成交付，节约成本X%，获得业主好评\n' +
+          '• 技术亮点：应用BIM技术进行管线综合，减少返工率X%';
+      }
+      genResultText = text;
+      resultEl.className = 'ai-gen-result';
+      resultEl.textContent = text;
+      applyBtn.style.display = '';
+    }, 1500);
+  };
+
+  /* 应用生成结果 */
+  window.applyGen = function() {
+    var field = document.getElementById('gen-field').value;
+    if (!genResultText) return;
+    if (field === 'intro') {
+      document.getElementById('f-intro').value = genResultText;
+      document.getElementById('f-intro-count').textContent = genResultText.length;
+      resume.intro = genResultText;
+    } else if (field === 'work_desc') {
+      if (resume.work.length) {
+        resume.work[resume.work.length - 1].desc = genResultText;
+        renderWorkList();
+      } else {
+        UI.toast('请先添加工作经历', 'warn');
+        return;
+      }
+    } else if (field === 'project_desc') {
+      if (resume.projects.length) {
+        resume.projects[resume.projects.length - 1].desc = genResultText;
+        renderProjectList();
+      } else {
+        UI.toast('请先添加项目经验', 'warn');
+        return;
+      }
+    }
+    updateProgress();
+    UI.toast('已应用到简历', 'ok');
+    document.getElementById('gen-result').style.display = 'none';
+    document.getElementById('gen-apply').style.display = 'none';
+  };
+
+  /* 缺失检查 */
+  var checkItems = [
+    { key: 'name', label: '姓名', desc: '让企业知道如何称呼你', field: 'f-name' },
+    { key: 'email', label: '邮箱', desc: '企业发送面试通知的重要渠道', field: 'f-email' },
+    { key: 'location', label: '所在地', desc: '企业判断你是否适合当地岗位', field: 'f-location' },
+    { key: 'position', label: '期望岗位', desc: '明确你的求职方向', field: 'f-position' },
+    { key: 'salary', label: '期望薪资', desc: '帮助企业判断匹配度', field: 'f-salary' },
+    { key: 'education', label: '教育背景', desc: '展示你的学历和专业', field: null },
+    { key: 'work', label: '工作经历', desc: '体现你的工作经验和能力', field: null },
+    { key: 'project', label: '项目经验', desc: '展示你的实战成果', field: null },
+    { key: 'skills', label: '技能标签', desc: '突出你的核心技能和证书', field: null },
+    { key: 'intro', label: '个人简介', desc: '给企业留下第一印象', field: 'f-intro' },
+    { key: 'resumeFile', label: '简历附件', desc: '上传完整简历提升企业关注度', field: null }
+  ];
+
+  function isItemFilled(item) {
+    switch(item.key) {
+      case 'name': return !!resume.name;
+      case 'email': return !!resume.email;
+      case 'location': return !!resume.location;
+      case 'position': return !!resume.position;
+      case 'salary': return !!resume.salary;
+      case 'education': return resume.education.length > 0;
+      case 'work': return resume.work.length > 0;
+      case 'project': return resume.projects.length > 0;
+      case 'skills': return resume.skills.length > 0;
+      case 'intro': return !!resume.intro;
+      case 'resumeFile': return !!resume.resumeFile;
+      default: return false;
+    }
+  }
+
+  window.runCheck = function() {
+    var filled = 0;
+    var listHtml = '';
+    checkItems.forEach(function(item) {
+      var done = isItemFilled(item);
+      if (done) filled++;
+      listHtml += '<div class="ai-check-item" onclick="focusField(\'' + item.key + '\')">' +
+        '<div class="icon ' + (done ? 'done' : 'missing') + '">' +
+          (done
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>') +
+        '</div>' +
+        '<div class="info">' +
+          '<div class="name">' + item.label + (done ? '' : '（待完善）') + '</div>' +
+          '<div class="desc">' + item.desc + '</div>' +
+        '</div>' +
+        '<div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></div>' +
+      '</div>';
+    });
+    var pct = Math.round(filled / checkItems.length * 100);
+    document.getElementById('check-score').textContent = pct + '%';
+    document.getElementById('check-list').innerHTML = listHtml;
+  };
+
+  window.focusField = function(key) {
+    closeAIPanel();
+    setTimeout(function() {
+      var item = checkItems.find(function(i) { return i.key === key; });
+      if (item && item.field) {
+        var el = document.getElementById(item.field);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(function() { el.focus(); }, 300);
+        }
+      } else if (key === 'education') {
+        openEduModal();
+      } else if (key === 'work') {
+        openWorkModal();
+      } else if (key === 'project') {
+        openProjectModal();
+      } else if (key === 'skills') {
+        openSkillModal();
+      } else if (key === 'resumeFile') {
+        var zone = document.getElementById('upload-zone');
+        if (zone) zone.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  };
+
+  /* 初始化 */
+  loadResume();
+  fillForm();
+})();
+</script>
+</body>
+</html>

@@ -2,6 +2,46 @@
 window.DETAIL = (function () {
   function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + name + '"/></svg>'; }
   function mt(iconName, txt) { return icon(iconName) + txt; }
+  /* ---- 信息行操作icon（拨打/复制/导航） ---- */
+  var _ccIcons = {
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    nav: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>'
+  };
+  function ccAction(type, value, locked) {
+    var ic = _ccIcons[type] || _ccIcons.copy;
+    var lockCls = locked ? ' is-locked' : '';
+    return '<span class="cc-action' + lockCls + '" data-cc-action="' + type + '" data-cc-value="' + (value || '').replace(/"/g, '&quot;') + '">' + ic + '</span>';
+  }
+  /* 信息行操作icon点击事件（事件委托） */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.cc-action');
+    if (!btn || btn.classList.contains('is-locked')) return;
+    var type = btn.dataset.ccAction;
+    var value = btn.dataset.ccValue || '';
+    if (type === 'phone') {
+      if (value) { try { window.location.href = 'tel:' + value; } catch (err) { UI.toast('拨号功能暂不可用', 'warn'); } }
+    } else if (type === 'copy' || type === 'contact') {
+      if (value) {
+        var done = function () { UI.toast('已复制：' + value, 'ok'); };
+        var fail = function () { UI.toast('复制失败，请手动复制', 'warn'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(done).catch(fail);
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = value; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); done(); } catch (err) { fail(); }
+          document.body.removeChild(ta);
+        }
+      }
+    } else if (type === 'nav') {
+      if (value) {
+        var url = 'https://uri.amap.com/marker?name=' + encodeURIComponent(value) + '&src=engchain&coordinate=gaode&callnative=1';
+        try { window.open(url, '_blank'); } catch (err) { UI.toast('导航功能暂不可用', 'warn'); }
+      }
+    }
+  });
   /* ---- Markdown 轻量渲染（标题/段落/列表/引用/加粗/链接） ---- */
   function inlineMd(text) {
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -338,7 +378,7 @@ window.DETAIL = (function () {
     var mc = m.contact || {};
     var role = demand ? '采购方' : '供应方';
     var avatar = (c.name || r.company || '企').charAt(0);
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var phoneFull = mc.phone || r.phone || '';
     var wechatFull = mc.wechat || r.wechat || '';
     var addrFull = mc.addr || r.address || r.location || '';
@@ -347,10 +387,10 @@ window.DETAIL = (function () {
         '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + '主体 · 平台已核验</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(mc.name || r.contact)) +
-        row('联系电话', Lock.partial(phoneFull, locked)) +
-        row('微信号', Lock.full(wechatFull, locked)) +
-        row(demand ? '项目/交货地址' : '发货/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确门牌付费可见')) +
+        row('联系人', cfgText(mc.name || r.contact), ccAction('contact', mc.name || r.contact, locked)) +
+        row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
+        row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
+        row(demand ? '项目/交货地址' : '发货/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确门牌付费可见'), ccAction('nav', addrFull, locked)) +
       '</div>' +
       Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 精确单价 · 资质文件', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
@@ -422,7 +462,7 @@ window.DETAIL = (function () {
     var ec = (e && e.contact) || {};
     var role = demand ? '承租方' : '出租方';
     var avatar = (c.name || r.company || '企').charAt(0);
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var phoneFull = ec.phone || r.phone || '';
     var wechatFull = ec.wechat || r.wechat || '';
     var addrFull = ec.addr || r.address || r.location || '';
@@ -431,10 +471,10 @@ window.DETAIL = (function () {
         '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + '主体 · 平台已核验</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(ec.name || r.contact)) +
-        row('联系电话', Lock.partial(phoneFull, locked)) +
-        row('微信号', Lock.full(wechatFull, locked)) +
-        row(demand ? '项目/工地地址' : '设备/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确场地付费可见')) +
+        row('联系人', cfgText(ec.name || r.contact), ccAction('contact', ec.name || r.contact, locked)) +
+        row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
+        row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
+        row(demand ? '项目/工地地址' : '设备/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确场地付费可见'), ccAction('nav', addrFull, locked)) +
       '</div>' +
       Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 费用明细 · 资质文件', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
@@ -535,7 +575,7 @@ window.DETAIL = (function () {
     var cc = c.contact || {};
     var role = demand ? '用工方' : '班组 / 劳务公司';
     var avatar = (c.name || r.company || '劳').charAt(0);
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var rawName = lc.name || cc.name || r.contact || '';
     /* 供应侧联系人即班组长：未解锁显示「X 师傅」占位，解锁原地展开全名（须用 Lock.partial 双份以随 is-unlocked 切换） */
     var name = (!demand && l.foreman && l.foreman.freeName)
@@ -549,10 +589,10 @@ window.DETAIL = (function () {
         '<div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + ' · 平台已核验</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(name)) +
-        row('联系电话', Lock.partial(phone, locked)) +
-        (wechat ? row('微信号', Lock.full(wechat, locked)) : '') +
-        row(demand ? '项目部地址' : '班组驻地', Lock.partial(addr, locked, cfgText(r.location) + ' · 精确地址付费可见')) +
+        row('联系人', cfgText(name), ccAction('contact', rawName, locked)) +
+        row('联系电话', Lock.partial(phone, locked), ccAction('phone', phone, locked)) +
+        (wechat ? row('微信号', Lock.full(wechat, locked), ccAction('copy', wechat, locked)) : '') +
+        row(demand ? '项目部地址' : '班组驻地', Lock.partial(addr, locked, cfgText(r.location) + ' · 精确地址付费可见'), ccAction('nav', addr, locked)) +
       '</div>' +
       Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 精确工资 · 证书业绩', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';
@@ -660,16 +700,16 @@ window.DETAIL = (function () {
     var wx = lc.wechat || '';
     var addr = lc.addr || r.location || '';
     var freeName = rawName.charAt(0) + '顾问';
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
       '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div><div class="cc-id">' +
         '<div class="cc-name">' + cfgText(c.name) + '</div><div class="cc-sub">招商方 · 平台已核验</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('招商顾问', Lock.partial(rawName + ' · ' + title, locked, freeName + ' · ' + title)) +
-        row('联系电话', Lock.partial(phone, locked)) +
-        (wx ? row('微信号', Lock.full(wx, locked)) : '') +
-        row('总部 / 对接地址', Lock.partial(addr, locked, cfgText(r.location) + ' · 详细地址留资可见')) +
+        row('招商顾问', Lock.partial(rawName + ' · ' + title, locked, freeName + ' · ' + title), ccAction('contact', rawName, locked)) +
+        row('联系电话', Lock.partial(phone, locked), ccAction('phone', phone, locked)) +
+        (wx ? row('微信号', Lock.full(wx, locked), ccAction('copy', wx, locked)) : '') +
+        row('总部 / 对接地址', Lock.partial(addr, locked, cfgText(r.location) + ' · 详细地址留资可见'), ccAction('nav', addr, locked)) +
       '</div>' +
       Lock.inline(locked, '免费提交加盟意向后查看联系方式', '招商顾问 1 对 1 · 电话 / 微信 / 详细地址', '免费咨询') +
       '</div>';
@@ -898,16 +938,16 @@ window.DETAIL = (function () {
   function agencyContact(r, c, locked) {
     var ac = r.contact || {};
     var avatar = (c.name || '机').charAt(0);
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
       '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
         '<div class="cc-id"><div class="cc-name">' + cfgText(c.name) + '</div><div class="cc-sub">服务机构 · 平台已认证</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('服务顾问', cfgText(ac.name || '专属顾问')) +
-        row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">免费咨询后可见完整号码</span>') : ac.phone) +
-        row('微信号', locked ? '<span style="color:var(--text-3)">扫码或免费咨询后获取</span>' : ac.wechat) +
-        row('机构地址', locked ? (cfgText(r.location) + ' · <span style="font-size:10px;color:var(--text-4)">免费咨询后可见详细地址</span>') : (ac.addr || r.location)) +
+        row('服务顾问', cfgText(ac.name || '专属顾问'), ccAction('contact', ac.name || '', locked)) +
+        row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">免费咨询后可见完整号码</span>') : ac.phone, ccAction('phone', ac.phone || '', locked)) +
+        row('微信号', locked ? '<span style="color:var(--text-3)">扫码或免费咨询后获取</span>' : ac.wechat, ccAction('copy', ac.wechat || '', locked)) +
+        row('机构地址', locked ? (cfgText(r.location) + ' · <span style="font-size:10px;color:var(--text-4)">免费咨询后可见详细地址</span>') : (ac.addr || r.location), ccAction('nav', ac.addr || r.location || '', locked)) +
       '</div>' +
       '<div class="pw-inline" data-pw-unlock style="background:var(--success-soft);border:1px solid rgba(43,107,79,.2);"><div class="pw-inline-l"><div class="pw-inline-ic" style="background:rgba(43,107,79,.12);color:var(--success);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div><div class="pw-inline-t" style="color:var(--success);">免费提交咨询需求后查看联系方式</div><div class="pw-inline-s">专属顾问 1 对 1 · 电话 / 微信 · 全程不收取信息费</div></div></div><div class="pw-inline-price" style="color:var(--success);">免费咨询</div></div>' +
       '</div>';
@@ -1498,16 +1538,16 @@ window.DETAIL = (function () {
   function coopContact(r, c, locked) {
     var cc = r.contact || {};
     var avatar = (c.name || '企').charAt(0);
-    function row(k, v) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
       '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
         '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || '项目方') + '</div><div class="cc-sub">合作主体 · 平台已核验</div></div>' +
         '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
-        row('对接人', cfgText(cc.name || '项目商务')) +
-        row('联系电话', Lock.partial(cc.phone || '', locked)) +
-        row('微信号', Lock.full(cc.wechat || '', locked)) +
-        row('项目/办公地址', Lock.partial(cc.addr || r.location || '', locked, cfgText(r.location) + ' · 精确地址付费可见')) +
+        row('对接人', cfgText(cc.name || '项目商务'), ccAction('contact', cc.name || '', locked)) +
+        row('联系电话', Lock.partial(cc.phone || '', locked), ccAction('phone', cc.phone || '', locked)) +
+        row('微信号', Lock.full(cc.wechat || '', locked), ccAction('copy', cc.wechat || '', locked)) +
+        row('项目/办公地址', Lock.partial(cc.addr || r.location || '', locked, cfgText(r.location) + ' · 精确地址付费可见'), ccAction('nav', cc.addr || r.location || '', locked)) +
       '</div>' +
       Lock.inline(locked, '解锁沟通权限 · 查看招标文件', '电话 · 微信 · 精确地址 · 全套招标资料', unlockCreditText(r)) + /* [FIX BM-012/BM-013] 价签改积分，文案改「沟通权限」 */
       '</div>';

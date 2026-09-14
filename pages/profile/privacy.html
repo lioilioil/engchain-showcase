@@ -1,0 +1,336 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>隐私设置 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* 固定顶部区域 */
+.privacy-fixed-header { flex: none; background: var(--bg-card); border-bottom: 1px solid var(--line); z-index: 10; }
+
+/* 说明区域 */
+.privacy-notice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; background: linear-gradient(135deg, rgba(201,169,97,0.08), rgba(201,169,97,0.02)); border-bottom: 1px solid var(--line-hairline); transition: all 0.3s; }
+.privacy-notice.hidden { display: none; }
+.notice-close { flex: none; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-3); cursor: pointer; margin-top: -2px; }
+.notice-close:active { background: var(--bg-card-2); }
+.notice-close svg { width: 14px; height: 14px; }
+.privacy-notice-icon { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; }
+.privacy-notice-icon svg { width: 18px; height: 18px; color: var(--primary-dim); flex: none; margin-top: 1px; }
+.privacy-notice-text { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+.privacy-notice-text b { color: var(--text-1); font-weight: 600; }
+
+/* 搜索区域 */
+.search-section { padding: 12px 16px; }
+.search-box { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; }
+.search-box svg { width: 16px; height: 16px; color: var(--text-3); flex: none; }
+.search-box input { flex: 1; border: none; outline: none; background: transparent; font-size: 13px; color: var(--text-1); padding: 0; }
+.search-box input::placeholder { color: var(--text-4); }
+.search-clear { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-card-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.search-clear svg { width: 12px; height: 12px; color: var(--text-3); }
+
+/* Tab 切换 */
+.privacy-tabs { display: flex; gap: 0; padding: 0 16px; margin-bottom: 12px; }
+.privacy-tab { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; font-weight: 600; color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.privacy-tab.active { color: var(--primary-dim); border-bottom-color: var(--primary-dim); }
+.privacy-tab .count { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bg-card-2); color: var(--text-3); font-size: 10px; font-weight: 700; margin-left: 4px; }
+.privacy-tab.active .count { background: rgba(201,169,97,0.15); color: var(--primary-dim); }
+
+/* 企业列表 */
+.company-list { padding: 0 16px; }
+.company-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; }
+.company-avatar { flex: none; width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, #E8D9B5, #C9A961); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; }
+.company-body { flex: 1; min-width: 0; }
+.company-name { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+.company-meta { font-size: 11px; color: var(--text-3); }
+.company-action { flex: none; }
+.block-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+.block-btn.block { background: rgba(200,60,60,0.1); color: var(--error); border: 1px solid rgba(200,60,60,0.2); }
+.block-btn.block:active { background: rgba(200,60,60,0.15); }
+.block-btn.unblock { background: var(--bg-card-2); color: var(--text-2); border: 1px solid var(--line); }
+.block-btn.unblock:active { background: var(--bg-card-2); }
+
+/* 空状态 */
+.empty-state { text-align: center; padding: 60px 20px; }
+.empty-icon { width: 64px; height: 64px; border-radius: 50%; background: var(--bg-card-2); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.empty-icon svg { width: 28px; height: 28px; color: var(--text-3); }
+.empty-title { font-size: 15px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
+.empty-desc { font-size: 12px; color: var(--text-3); line-height: 1.6; }
+
+/* 确认弹窗 */
+.confirm-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: none; align-items: center; justify-content: center; padding: 40px; }
+.confirm-mask.show { display: flex; }
+.confirm-box { background: var(--bg-card); border-radius: 16px; width: 100%; max-width: 300px; overflow: hidden; }
+.confirm-head { padding: 20px 16px 12px; text-align: center; }
+.confirm-title { font-size: 15px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.confirm-text { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.confirm-foot { display: flex; border-top: 1px solid var(--line); }
+.confirm-btn { flex: 1; padding: 14px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; background: transparent; }
+.confirm-btn.cancel { color: var(--text-2); border-right: 1px solid var(--line); }
+.confirm-btn.danger { color: var(--error); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 导航栏 -->
+  <div class="navbar" style="height:50px;">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">隐私设置</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <!-- 固定顶部区域 -->
+  <div class="privacy-fixed-header">
+  <!-- 说明区域 -->
+  <div class="privacy-notice" id="privacy-notice">
+    <div class="privacy-notice-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+      <div class="privacy-notice-text">
+        被屏蔽的企业将<b>无法查看你的简历和投递记录</b>，也无法向你发送面试邀请。你可以随时取消屏蔽，恢复可见性。
+      </div>
+    </div>
+    <span class="notice-close" onclick="closeNotice()" title="关闭提醒">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="6"/></svg>
+    </span>
+  </div>
+
+  <!-- 搜索区域 -->
+  <div class="search-section">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="搜索企业名称，加入屏蔽名单" oninput="onSearch()">
+      <span class="search-clear" id="search-clear" style="display:none;" onclick="clearSearch()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </span>
+    </div>
+  </div>
+
+  <!-- Tab 切换 -->
+  <div class="privacy-tabs">
+    <div class="privacy-tab active" data-tab="search" onclick="switchTab('search')">搜索企业<span class="count" id="search-count">0</span></div>
+    <div class="privacy-tab" data-tab="blocked" onclick="switchTab('blocked')">已屏蔽<span class="count" id="blocked-count">0</span></div>
+  </div>
+  </div><!-- /privacy-fixed-header -->
+
+  <div class="scroll" style="padding:0 0 40px;">
+  <!-- 搜索结果列表 -->
+  <div class="company-list" id="search-list"></div>
+
+  <!-- 已屏蔽列表 -->
+  <div class="company-list" id="blocked-list" style="display:none;"></div>
+  </div><!-- /scroll -->
+
+<!-- 确认弹窗 -->
+<div class="confirm-mask" id="confirm-mask">
+  <div class="confirm-box">
+    <div class="confirm-head">
+      <div class="confirm-title" id="confirm-title">确认屏蔽</div>
+      <div class="confirm-text" id="confirm-text">屏蔽后，该企业将无法查看你的简历和投递记录。</div>
+    </div>
+    <div class="confirm-foot">
+      <button class="confirm-btn cancel" onclick="closeConfirm()">取消</button>
+      <button class="confirm-btn danger" id="confirm-btn" onclick="doConfirm()">确认屏蔽</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function(){
+  var BLOCK_KEY = 'engchain-blocked-companies';
+  var currentTab = 'search';
+  var searchKeyword = '';
+  var pendingAction = null; // { type: 'block'|'unblock', company: {...} }
+  var noticeClosed = false;
+
+  /* 关闭提醒（本次会话有效） */
+  window.closeNotice = function() {
+    var el = document.getElementById('privacy-notice');
+    if (el) { el.classList.add('hidden'); }
+    noticeClosed = true;
+  };
+
+  /* 读取屏蔽列表 */
+  function getBlocked() {
+    try { return JSON.parse(localStorage.getItem(BLOCK_KEY) || '[]'); } catch(e) { return []; }
+  }
+  function saveBlocked(list) {
+    try { localStorage.setItem(BLOCK_KEY, JSON.stringify(list)); } catch(e) {}
+  }
+  function isBlocked(companyId) {
+    return getBlocked().some(function(c) { return c.id === companyId; });
+  }
+
+  /* 获取所有企业列表 */
+  function getAllCompanies() {
+    try { return MOCK.companies || []; } catch(e) { return []; }
+  }
+
+  /* 搜索企业 */
+  function searchCompanies(keyword) {
+    var all = getAllCompanies();
+    if (!keyword) return all;
+    var kw = keyword.toLowerCase();
+    return all.filter(function(c) {
+      return (c.name && c.name.toLowerCase().indexOf(kw) !== -1) ||
+             (c.short && c.short.toLowerCase().indexOf(kw) !== -1) ||
+             (c.industry && c.industry.toLowerCase().indexOf(kw) !== -1);
+    });
+  }
+
+  /* 渲染搜索结果 */
+  function renderSearchList() {
+    var list = searchCompanies(searchKeyword);
+    var box = document.getElementById('search-list');
+    document.getElementById('search-count').textContent = list.length;
+
+    if (!list.length) {
+      box.innerHTML = '<div class="empty-state">' +
+        '<div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>' +
+        '<div class="empty-title">未找到相关企业</div>' +
+        '<div class="empty-desc">请尝试其他关键词搜索</div>' +
+      '</div>';
+      return;
+    }
+
+    box.innerHTML = list.map(function(c) {
+      var blocked = isBlocked(c.id);
+      var avatarChar = (c.short || c.name || '企').charAt(0);
+      return '<div class="company-item">' +
+        '<div class="company-avatar">' + avatarChar + '</div>' +
+        '<div class="company-body">' +
+          '<div class="company-name">' + c.name + '</div>' +
+          '<div class="company-meta">' + (c.industry || '工程服务') + ' · ' + (c.location || '') + '</div>' +
+        '</div>' +
+        '<div class="company-action">' +
+          (blocked
+            ? '<button class="block-btn unblock" onclick="confirmUnblock(\'' + c.id + '\')">已屏蔽</button>'
+            : '<button class="block-btn block" onclick="confirmBlock(\'' + c.id + '\')">屏蔽</button>') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* 渲染已屏蔽列表 */
+  function renderBlockedList() {
+    var blocked = getBlocked();
+    var box = document.getElementById('blocked-list');
+    document.getElementById('blocked-count').textContent = blocked.length;
+
+    if (!blocked.length) {
+      box.innerHTML = '<div class="empty-state">' +
+        '<div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg></div>' +
+        '<div class="empty-title">暂无屏蔽企业</div>' +
+        '<div class="empty-desc">在搜索企业中找到想要屏蔽的企业，点击"屏蔽"按钮即可</div>' +
+      '</div>';
+      return;
+    }
+
+    box.innerHTML = blocked.map(function(c) {
+      var avatarChar = (c.short || c.name || '企').charAt(0);
+      return '<div class="company-item">' +
+        '<div class="company-avatar">' + avatarChar + '</div>' +
+        '<div class="company-body">' +
+          '<div class="company-name">' + c.name + '</div>' +
+          '<div class="company-meta">' + (c.industry || '工程服务') + ' · ' + (c.location || '') + '</div>' +
+        '</div>' +
+        '<div class="company-action">' +
+          '<button class="block-btn unblock" onclick="confirmUnblock(\'' + c.id + '\')">取消屏蔽</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* Tab 切换 */
+  window.switchTab = function(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.privacy-tab').forEach(function(el) {
+      el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    document.getElementById('search-list').style.display = tab === 'search' ? '' : 'none';
+    document.getElementById('blocked-list').style.display = tab === 'blocked' ? '' : 'none';
+    if (tab === 'search') renderSearchList();
+    else renderBlockedList();
+  };
+
+  /* 搜索 */
+  window.onSearch = function() {
+    searchKeyword = document.getElementById('search-input').value.trim();
+    document.getElementById('search-clear').style.display = searchKeyword ? '' : 'none';
+    renderSearchList();
+  };
+  window.clearSearch = function() {
+    document.getElementById('search-input').value = '';
+    searchKeyword = '';
+    document.getElementById('search-clear').style.display = 'none';
+    renderSearchList();
+  };
+
+  /* 确认屏蔽 */
+  window.confirmBlock = function(companyId) {
+    var company = getAllCompanies().find(function(c) { return c.id === companyId; });
+    if (!company) return;
+    pendingAction = { type: 'block', company: company };
+    document.getElementById('confirm-title').textContent = '确认屏蔽';
+    document.getElementById('confirm-text').textContent = '屏蔽后，「' + company.name + '」将无法查看你的简历和投递记录，也无法向你发送面试邀请。';
+    document.getElementById('confirm-btn').textContent = '确认屏蔽';
+    document.getElementById('confirm-mask').classList.add('show');
+  };
+
+  /* 确认取消屏蔽 */
+  window.confirmUnblock = function(companyId) {
+    var blocked = getBlocked();
+    var company = blocked.find(function(c) { return c.id === companyId; });
+    if (!company) {
+      company = getAllCompanies().find(function(c) { return c.id === companyId; });
+    }
+    if (!company) return;
+    pendingAction = { type: 'unblock', company: company };
+    document.getElementById('confirm-title').textContent = '取消屏蔽';
+    document.getElementById('confirm-text').textContent = '取消屏蔽后，「' + company.name + '」将恢复查看你的简历和投递记录的权限。';
+    document.getElementById('confirm-btn').textContent = '确认取消';
+    document.getElementById('confirm-mask').classList.add('show');
+  };
+
+  window.closeConfirm = function() {
+    document.getElementById('confirm-mask').classList.remove('show');
+    pendingAction = null;
+  };
+
+  window.doConfirm = function() {
+    if (!pendingAction) return;
+    var blocked = getBlocked();
+    if (pendingAction.type === 'block') {
+      if (!blocked.some(function(c) { return c.id === pendingAction.company.id; })) {
+        blocked.push(pendingAction.company);
+        saveBlocked(blocked);
+      }
+      UI.toast('已屏蔽该企业', 'ok');
+    } else {
+      blocked = blocked.filter(function(c) { return c.id !== pendingAction.company.id; });
+      saveBlocked(blocked);
+      UI.toast('已取消屏蔽', 'ok');
+    }
+    closeConfirm();
+    renderSearchList();
+    renderBlockedList();
+  };
+
+  /* 初始化 */
+  renderSearchList();
+  renderBlockedList();
+})();
+</script>
+</body>
+</html>
