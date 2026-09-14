@@ -13,10 +13,9 @@
 
   /* iframe 容器：默认 iPhone 16 Pro 比例 390×844，居中 */
   .showcase-frame {
-    width: 390px;
-    height: 844px;
-    max-width: 100%;
-    max-height: 100vh;
+    /* width controlled by JS */
+    /* height controlled by JS */
+    transition: width .25s ease, height .25s ease;
     border: none;
     display: block;
     background: #F4F2EE;
@@ -25,7 +24,7 @@
   [data-theme="dark"] .showcase-frame, body.dark .showcase-frame { background: #1A1816; box-shadow: 0 0 40px rgba(0,0,0,.3); }
 
   /* Pura X View 比例：390×655 */
-  body.model-pura .showcase-frame { height: 655px; }
+  /* Pura height controlled by JS fitFrame() */
 
   /* 手机浏览器全屏模式 */
   body.model-fullscreen .showcase-wrap { align-items: stretch; }
@@ -135,6 +134,34 @@
     } catch(e) { return 'auto'; }
   }
 
+  // 移动设备检测：触摸设备 + 窄屏
+  function isMobileDevice() {
+    var hasTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    return hasTouch && window.innerWidth < 768;
+  }
+
+  // 按目标比例等比计算 iframe 尺寸，适配当前窗口
+  function fitFrame() {
+    var frame = document.getElementById('app-frame');
+    if (!frame) return;
+    if (document.body.classList.contains('model-fullscreen')) {
+      frame.style.width = '100%';
+      frame.style.height = '100%';
+      return;
+    }
+    // iPhone 比例 390:844 ≈ 0.4621；Pura 比例 390:655 ≈ 0.5954
+    var isPura = document.body.classList.contains('model-pura');
+    var ratio = isPura ? 390 / 655 : 390 / 844;
+    var pad = isMobileDevice() ? 0 : 32; // 移动端无边距，桌面端留 16px 边距
+    var availW = Math.max(280, window.innerWidth - pad);
+    var availH = Math.max(400, window.innerHeight - pad);
+    var w = availW;
+    var h = w / ratio;
+    if (h > availH) { h = availH; w = h * ratio; }
+    frame.style.width = Math.round(w) + 'px';
+    frame.style.height = Math.round(h) + 'px';
+  }
+
   function applyModel(model) {
     document.body.classList.remove('model-iphone', 'model-pura', 'model-fullscreen');
     if (model === 'pura') {
@@ -149,18 +176,23 @@
       b.classList.toggle('active', b.getAttribute('data-model') === model);
     });
     try { localStorage.setItem('engchain-showcase-model', model); } catch(e) {}
+    fitFrame();
   }
 
-  // 自动判断：窄窗口（手机浏览器）→ fullscreen；宽窗口 → 上次选择或 iphone
+  // 初始化：移动设备无论 URL 指定什么 model，默认 fullscreen 适配真实屏幕
   var urlModel = getModelFromUrl();
   var initModel;
+  var mobile = isMobileDevice();
   if (urlModel === 'auto' || !urlModel) {
-    if (window.innerWidth < 500) {
+    if (mobile) {
       initModel = 'fullscreen';
     } else {
       try { initModel = localStorage.getItem('engchain-showcase-model') || 'iphone'; } catch(e) { initModel = 'iphone'; }
-      if (initModel === 'fullscreen') initModel = 'iphone'; // 电脑端不默认全屏
+      if (initModel === 'fullscreen') initModel = 'iphone';
     }
+  } else if (urlModel === 'iphone' || urlModel === 'pura') {
+    // 关键修复：移动设备即使 URL 指定了 iphone/pura，也默认 fullscreen
+    initModel = mobile ? 'fullscreen' : urlModel;
   } else {
     initModel = urlModel;
   }
@@ -173,16 +205,21 @@
     });
   });
 
-  // 窗口尺寸变化时自动判断（仅 auto 模式）
+  // 窗口尺寸变化：所有模式都重新计算 iframe 尺寸；auto 模式额外自动切换
   var resizeTimer;
   window.addEventListener('resize', function() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function() {
+      fitFrame();
       if (urlModel === 'auto') {
-        if (window.innerWidth < 500) applyModel('fullscreen');
-        else if (document.body.classList.contains('model-fullscreen')) applyModel('iphone');
+        if (window.innerWidth < 500 && !document.body.classList.contains('model-fullscreen')) applyModel('fullscreen');
+        else if (window.innerWidth >= 500 && document.body.classList.contains('model-fullscreen')) applyModel('iphone');
       }
     }, 200);
+  });
+  // 移动端方向变化时立即重算
+  window.addEventListener('orientationchange', function() {
+    setTimeout(fitFrame, 300);
   });
 
   // 切换器自动隐藏（3秒无操作）
