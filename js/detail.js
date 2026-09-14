@@ -2514,12 +2514,13 @@ window.DETAIL = (function () {
       fileText: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>',
       building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>'
     };
-    /* V2.0: 价值描述标签（按业务类型差异化，带SVG图标和颜色） */
+    /* V2.0: 价值描述标签（按业务类型差异化，带SVG图标和颜色）· V3.2 分组输出 core/trust */
     function valueChips(rec, t) {
       var bk = rec.bizKey;
-      var chips = [];
+      var core = [], trust = [];
       function add(text, type, icon) {
-        chips.push('<span class="chip ' + type + '">' + (icon || _IC.check) + text + '</span>');
+        var html = '<span class="chip ' + type + '">' + (icon || _IC.check) + text + '</span>';
+        if (type === 'trust') trust.push(html); else core.push(html);
       }
       if (bk === 'trade') {
         add('完整尽调报告', 'core', _IC.fileText);
@@ -2565,7 +2566,7 @@ window.DETAIL = (function () {
         add('成交报价明细', 'core', _IC.wallet);
         add('资质证明文件', 'core', _IC.doc);
       }
-      return chips.join('');
+      return { core: core.join(''), trust: trust.join('') };
     }
     /* V2.0: 核心卖点条（SVG图标+保障承诺） */
     function valueBarHtml(rec, up) {
@@ -2640,19 +2641,20 @@ window.DETAIL = (function () {
           '<div class="trust-item">' + _IC.star + '<div class="trust-num">98.6%</div><div class="trust-label">用户好评率</div></div>' +
         '</div></div>';
     }
-    /* V2.0: 解锁内容清单（分组展示） */
+    /* V3.2: 解锁内容清单（默认折叠，点击展开） */
     function unlockListHtml(rec, t, lockRows) {
       var itemNames = (t.inlineLock && t.unlockItems) ? t.unlockItems(rec) : lockRows.map(function (x) { return x.k; });
       if (!itemNames || !itemNames.length) return '';
-      var html = '<div class="us-section">';
-      html += '<div class="section-title">' + _IC.fileText + '解锁内容清单（' + itemNames.length + '项）</div>';
-      html += '<div class="us-unlock-list"><div class="us-unlock-group">';
-      html += '<div class="us-unlock-items">';
-      itemNames.forEach(function (name) {
-        html += '<span class="us-unlock-item">' + _IC.check + name + '</span>';
-      });
-      html += '</div></div></div></div>';
-      return html;
+      var itemsHtml = itemNames.map(function (name) {
+        return '<span class="us-unlock-item">' + _IC.check + name + '</span>';
+      }).join('');
+      return '<div class="us-section us-unlock-section">' +
+        '<div class="section-title unlock-toggle" role="button" tabindex="0">' +
+          _IC.fileText + '解锁内容清单（' + itemNames.length + '项）' +
+          '<span class="unlock-toggle-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>' +
+        '</div>' +
+        '<div class="us-unlock-list" style="display:none">' + itemsHtml + '</div>' +
+        '</div>';
     }
     function openPay() {
       var lockRows = t.lockRows(rec, c);
@@ -2737,17 +2739,28 @@ window.DETAIL = (function () {
           }).join('') + '</div>';
       }
       var payTitle = isDeposit ? '支付保证金后可获取以下完整信息，直接联系出售方' : '解锁后可获取以下核心信息，直接对接';
+      /* V3.2: chips 分组（core/trust），trust 为空时不渲染该行 */
+      var chipsCoreHtml = chips.core ? '<div class="chips-row"><span class="chips-label">核心权益</span><div class="chips-list">' + chips.core + '</div></div>' : '';
+      var chipsTrustHtml = chips.trust ? '<div class="chips-row"><span class="chips-label">安全保障</span><div class="chips-list">' + chips.trust + '</div></div>' : '';
+      var chipsGroupHtml = '<div class="us-chips-group">' + chipsCoreHtml + chipsTrustHtml + '</div>';
       sheet.body().innerHTML =
         '<div class="unlock-sheet">' +
+          /* ===== 核心决策区（一屏可见） ===== */
           '<div class="us-header">' +
             '<div class="us-title">' + payTitle + '</div>' +
-            '<div class="us-chips">' + chips + '</div>' +
+            chipsGroupHtml +
           '</div>' +
-          valueBar +
-          stepsHtml +
-          unlockList +
-          trustHtml +
-          priceHtml + pkgHtml + payMethodHtml +
+          priceHtml +
+          pkgHtml +
+          payMethodHtml +
+          /* ===== 补充信息区（可滚动浏览） ===== */
+          '<div class="us-supplement">' +
+            valueBar +
+            stepsHtml +
+            unlockList +
+            trustHtml +
+          '</div>' +
+          /* ===== 底部固定支付区 ===== */
           '<div class="us-footer">' +
             '<button class="btn btn-primary btn-block btn-lg" id="pay-go">' + (isFree ? '免费解锁' : (isDeposit ? '确认支付 ¥' + Number(up.price).toLocaleString() : '确认解锁')) + '</button>' +
             '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>安全支付 · 平台担保 · 未对接可退</div>' +
@@ -2773,6 +2786,16 @@ window.DETAIL = (function () {
           card.classList.add('selected');
         });
       });
+      /* V3.2: 解锁内容清单折叠/展开 */
+      var toggleEl = sheet.body().querySelector('.unlock-toggle');
+      var listEl = sheet.body().querySelector('.us-unlock-list');
+      if (toggleEl && listEl) {
+        toggleEl.addEventListener('click', function () {
+          var isOpen = listEl.style.display !== 'none';
+          listEl.style.display = isOpen ? 'none' : 'flex';
+          toggleEl.classList.toggle('open', !isOpen);
+        });
+      }
       /* 确认支付 */
       var payBtn = sheet.body().querySelector('#pay-go');
       /* [FIX BM-051] 点击后置灰「支付中...」防重复提交；[FIX BM-010/BM-011] 微信/支付宝/保证金走真实资金动作，不再仅 toast+mark */
