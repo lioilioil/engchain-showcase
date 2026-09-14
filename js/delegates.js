@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════════════════════
    ENGCHAIN · 统一委托模块 v1.0
    ────────────────────────────────────────────────────────────────
    覆盖全系统「委托」事件（资质招商 / 建企买卖 / 人才服务 / 通用委托）：
@@ -415,7 +415,7 @@
         '<button class="btn btn-primary btn-block" style="margin-top:18px;height:46px;" onclick="UI.toast(\'正在接入客服...\',\'ok\');UI.closeSheet();">' +
           '<svg class="ic" style="width:18px;height:18px;" viewBox="0 0 24 24"><use href="#i-chat"/></svg>开始对话' +
         '</button>' +
-        '<div style="font-size:11px;color:var(--text-3);margin-top:12px;">也可拨打热线 400-000-0000</div>' +
+        '<div style="font-size:11px;color:var(--text-3);margin-top:12px;">也可拨打热线 400-888-6688</div>' +
       '</div>'
     );
     s.show();
@@ -423,10 +423,10 @@
   function openCallDialog() {
     UI.dialog({
       title: '联系客服',
-      text: '客服热线：<b style="color:var(--primary);font-size:16px;">400-000-0000</b><br><br>工作时间：周一至周日 9:00 - 21:00',
+      text: '客服热线：<b style="color:var(--primary);font-size:16px;">400-888-6688</b><br><br>工作时间：周一至周日 9:00 - 21:00',
       ok: '拨打',
       cancel: '取消',
-      onOk: function () { UI.toast('正在拨打 400-000-0000', 'ok'); }
+      onOk: function () { UI.toast('正在拨打 400-888-6688', 'ok'); }
     });
   }
 

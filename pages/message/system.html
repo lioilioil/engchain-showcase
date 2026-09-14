@@ -24,7 +24,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </style></head>
 <body>
 <div class="phone">
-  <div class="navbar" style="height:50px;">
+  <div class="navbar">
     <button class="nav-back" onclick="history.back()">‹</button>
     <div class="nav-title">系统消息</div>
     <div class="nav-right"></div>
@@ -73,9 +73,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   /* 头部：图标 + 标题 + 时间 (cls = sf | sr | sc) */
   var TINT_BADGE = { success: '成功', warning: '警告', accent: '通知', muted: '公告' };
+  /* CSS 类名白名单：仅允许预定义 tint，其余 fallback 为 muted，防止类名注入 */
+  var TINT_WHITELIST = ['accent', 'success', 'warning', 'muted'];
+  function safeTint(t) { return TINT_WHITELIST.indexOf(t) >= 0 ? t : 'muted'; }
   function headHTML(m, cls) {
     var badge = (cls === 'sc' && TINT_BADGE[m.tint]) ? '<span class="sc-badge">' + TINT_BADGE[m.tint] + '</span>' : '';
-    return '<div class="' + cls + '-head"><div class="' + cls + '-ic ' + m.tint + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
+    return '<div class="' + cls + '-head"><div class="' + cls + '-ic ' + safeTint(m.tint) + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
       '<div class="' + cls + '-headbody"><div class="' + cls + '-title">' + badge + m.title + '</div><div class="' + cls + '-time">' + m.time + '</div></div></div>';
   }
 
@@ -95,7 +98,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var acts = (m.actions || []).map(function (a) {
         return '<button type="button" class="sc-btn ' + (a.primary ? 'primary' : 'ghost') + '" onclick="event.stopPropagation();markRead(\'' + m.id + '\');location.href=\'' + a.href + '\'">' + a.label + '</button>';
       }).join('');
-      return '<div class="sys-card tint-' + m.tint + '" onclick="markRead(\'' + m.id + '\')">' + headHTML(m, 'sc') +
+      return '<div class="sys-card tint-' + safeTint(m.tint) + '" onclick="markRead(\'' + m.id + '\')">' + headHTML(m, 'sc') +
         '<div class="sc-desc">' + m.desc + '</div>' +
         (m.meta ? '<div class="sc-meta">' + m.meta + '</div>' : '') +
         (acts ? '<div class="sc-actions">' + acts + '</div>' : '') +
@@ -103,7 +106,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     /* 默认：短消息行 */
     return '<div class="sys-item" onclick="markRead(\'' + m.id + '\')">' +
-      '<div class="si-ic ' + m.tint + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
+      '<div class="si-ic ' + safeTint(m.tint) + '"><svg class="ic"><use href="#i-' + m.icon + '"/></svg></div>' +
       '<div class="si-body"><div class="si-title">' + m.title + '</div>' +
       '<div class="si-text">' + m.text + '</div>' +
       '<div class="si-time">' + m.time + '</div></div>' +
