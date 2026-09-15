@@ -56,7 +56,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function(){window.__ROOT__='../../';
 document.querySelectorAll('.ft').forEach(function(el){el.onclick=function(){document.querySelectorAll('.ft').forEach(function(x){x.classList.remove('is-on')});el.classList.add('is-on');var mode=el.getAttribute('data-mode');var fc=document.getElementById('field-code');var fp=document.getElementById('field-pwd');if(mode==='pwd'){if(fc)fc.style.display='none';if(fp)fp.style.display='';}else{if(fc)fc.style.display='';if(fp)fp.style.display='none';}};});
-window.sendCode=function(){UI.toast('验证码已发送','ok');};
+window.sendCode=function(){var phone=document.getElementById('phone').value.trim();if(!/^1[3-9]\d{9}$/.test(phone)){UI.toast('请输入正确的手机号','warn');return;}var btn=document.querySelector('#field-code button');if(btn&&btn.disabled)return;UI.toast('验证码已发送','ok');var sec=60,timer=null;if(btn){btn.disabled=true;var orig=btn.textContent;timer=setInterval(function(){sec--;if(sec<=0){clearInterval(timer);btn.disabled=false;btn.textContent=orig;}else{btn.textContent=sec+'s 后重发';}},1000);}};
 window.togglePwd=function(){var p=document.getElementById('password');var b=document.getElementById('pwd-toggle');if(!p)return;p.type=p.type==='password'?'text':'password';if(b)b.textContent=p.type==='password'?'👁':'🙈';};
 
 /* ---- 历史登录渲染：读取用户表 + 登录历史 → 一键切换 ---- */
@@ -83,8 +83,8 @@ document.getElementById('hist-list').addEventListener('click',function(e){
   else UI.toast('账号不存在','err');
 });
 window.login=function(){if(!document.getElementById('agree').checked){UI.toast('请先同意用户协议','warn');return;}
-  var phone=document.getElementById('phone').value.trim();var st=UI.state.get();
-  try{UI.state.set({loggedIn:true,account:phone||st.account||'demo@engchain.cn',status:'registered',member:false});}catch(e){}
+  var phone=document.getElementById('phone').value.trim();if(!/^1[3-9]\d{9}$/.test(phone)){UI.toast('请输入正确的手机号','warn');return;}/* P3-11 */var st=UI.state.get();var matchedId='';try{if(window.DataBus){var us=DataBus.users()||[];for(var i=0;i<us.length;i++){var u=us[i];if(u&&(u.account===phone||u.phone===phone)){matchedId=u.id;break;}}if(matchedId){var nu=DataBus.login(matchedId);if(nu){if(nu.banned){UI.toast('该账号已被封禁','err');setTimeout(function(){location.href='banned.html';},800);return;}UI.toast('登录成功','ok');setTimeout(function(){location.href='../../home.html';},800);return;}}}}catch(e){}/* P2-17 匹配不到则回退下方手动登录 */
+  try{UI.state.set({loggedIn:true,account:phone||st.account||'demo@engchain.cn',status:'registered'});}catch(e){}/* P3-13 移除硬编码 member:false，交由 DataBus.login 派生 */
   if(window.DataBus) DataBus.audit('登录','账号',phone||'新账号','手动登录（注册会员演示）');
   UI.toast('登录成功','ok');setTimeout(function(){location.href='../../home.html';},800);};
 renderHist();

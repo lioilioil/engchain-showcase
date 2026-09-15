@@ -369,7 +369,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       fillOv('可用余额', '在途金额', '冻结', cache.b);
       main.textContent = '充余额'; main.href = 'recharge.html';
       sub.href = 'withdraw.html';
-      sub.innerHTML = '提现<small id="sub-note">' + cache.b.a + '</small>';
+      var sn = document.getElementById('sub-note'); sub.textContent = '提现'; if (sn) { sn.textContent = cache.b.a; sub.appendChild(sn); }/* P3-18 保留 sub-note 节点，仅改文本 */
       countUp(document.getElementById('balance'), Math.round(BalanceStore.available() * 100) / 100, fmtBal);
       if (txTitle) txTitle.textContent = '收支明细';
       if (txSub) txSub.textContent = '对公审批 · 余额流水';
@@ -378,7 +378,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       fillOv('当前积分', '本月已用', '免费剩余', cache.c);
       main.textContent = '充积分'; main.href = 'credits.html';
       sub.href = '../supply/list.html';
-      sub.innerHTML = '去解锁';
+      var sn2 = document.getElementById('sub-note'); sub.textContent = '去解锁'; if (sn2) { sn2.textContent = ''; sub.appendChild(sn2); }/* P3-18 积分态清空备注但保留节点 */
       countUp(document.getElementById('bal-credits'), CreditStore.read().balance || 0, fmtCred);
       if (txTitle) txTitle.textContent = '积分明细';
       if (txSub) txSub.innerHTML = '<a href="unlock-records.html" style="color:var(--primary);text-decoration:none;">全部积分明细 ›</a>';
@@ -626,8 +626,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   BalanceStore.seedLogs();
   renderBadge();
   renderBanned();
-  renderBalance();
-  renderTx();
+  if (isLoggedIn()) { renderBalance(); }/* P2-8 游客态跳过真实余额渲染 */
+  if (isLoggedIn()) { renderTx(); }/* P2-8 游客态跳过交易流水渲染 */
   renderQuickItems(0);
 
   /* ---- 积分卡：真实账本（engchain-credits）+ 免费额度 + 入驻折扣 ---- */
@@ -660,17 +660,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (tab === 1) fillOv('当前积分', '本月已用', '免费剩余', cache.c);
     } catch (e) {}
   }
-  renderCredits();
+  if (isLoggedIn()) { renderCredits(); }/* P2-8 游客态跳过积分数据渲染 */
 
   /* ---- 卡片动效初始化：激活态 + 3D 倾斜 + 首屏数值翻滚 ---- */
   panelStates();
   bindTilt();
-  countUp(document.getElementById('balance'), Math.round(BalanceStore.available() * 100) / 100, fmtBal);
+  if (isLoggedIn()) { countUp(document.getElementById('balance'), Math.round(BalanceStore.available() * 100) / 100, fmtBal); }/* P2-8 游客态不写入真实余额 */
 
   /* ---- 账本事件联动：充值/提现/审批入账/积分变动后即时刷新 ---- */
-  window.addEventListener('engchain:balance', function () { renderBalance(); renderTx(); });
-  window.addEventListener('engchain:credits', function () { renderCredits(); });
-  window.addEventListener('engchain:store-change', function () { renderBadge(); renderBanned(); renderBalance(); renderTx(); renderCredits(); });
+  window.addEventListener('engchain:balance', function () { if (isLoggedIn()) { renderBalance(); renderTx(); } });/* P2-8 */
+  window.addEventListener('engchain:credits', function () { if (isLoggedIn()) { renderCredits(); } });/* P2-8 */
+  window.addEventListener('engchain:store-change', function () { renderBadge(); renderBanned(); if (isLoggedIn()) { renderBalance(); renderTx(); renderCredits(); } });/* P2-8 */
 })();
 </script>
 </body>
