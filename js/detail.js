@@ -3072,6 +3072,11 @@ window.DETAIL = (function () {
           var phone = sheet.body().querySelector('#ag-phone').value.trim();
           if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
           if (!phone || !/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
+          /* v4.0 留资频控：同一手机号 10 分钟内限 1 次，防垃圾线索 */
+          try {
+            var _lcKey='engchain-lead-clock',_lcNow=Date.now(),_lcMap=JSON.parse(localStorage.getItem(_lcKey)||'{}');
+            if(_lcNow-(Number(_lcMap[phone])||0)<600000){UI.toast('提交过于频繁，请 10 分钟后再试','warn');return;}
+          }catch(e){}
           /* 生成询盘线索：服务商工作台可见（v3.2） */
           try {
             if (window.LeadStore) {
@@ -3086,6 +3091,7 @@ window.DETAIL = (function () {
               });
             }
           } catch (e) {}
+          try { var _lcMap2=JSON.parse(localStorage.getItem('engchain-lead-clock')||'{}'); _lcMap2[phone]=Date.now(); localStorage.setItem('engchain-lead-clock',JSON.stringify(_lcMap2)); }catch(e){}
           sheet.close();
           unlock('咨询需求已提交，联系方式已开放');
         });
