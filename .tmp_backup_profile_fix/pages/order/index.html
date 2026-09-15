@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/order/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的订单 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* 状态chips样式 */
+.filter-chip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--text-2, #666);
+  background: var(--bg-card-2, #f5f3ee);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.filter-chip:active { transform: scale(0.95); }
+.filter-chip.active {
+  background: rgba(201,169,97,0.12);
+  color: #A98A47;
+  border-color: rgba(201,169,97,0.3);
+  font-weight: 600;
+}
+/* [FIX] 订单骨架屏（首次加载脉冲） */
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+.skeleton-card { background: var(--bg-card, #fff); border: 1px solid var(--line, #e8e4dc); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.sk-line { height: 12px; border-radius: 6px; background: #ece8e0; animation: pulse 1.3s ease-in-out infinite; }
+.sk-line + .sk-line { margin-top: 8px; }
+.sk-line.w80 { width: 80%; } .sk-line.w60 { width: 60%; } .sk-line.w40 { width: 40%; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的订单</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="seg" style="margin:12px 14px 8px;">
+    <span class="seg-item is-on" data-tab="all">全部</span>
+    <span class="seg-item" data-tab="normal">普通订单</span>
+    <span class="seg-item" data-tab="mediation">中介托管</span>
+  </div>
+
+  <!-- 状态筛选 chips（E3-15） -->
+  <div class="status-chips" style="display:flex;gap:6px;overflow-x:auto;margin:0 14px 12px;padding:0 2px;">
+    <span class="filter-chip active" data-sf="all">全部</span>
+    <span class="filter-chip" data-sf="pending">待支付</span>
+    <span class="filter-chip" data-sf="serving">进行中</span>
+    <span class="filter-chip" data-sf="await">待验收</span>
+    <span class="filter-chip" data-sf="settled">已完成</span>
+    <span class="filter-chip" data-sf="refunded">已退款</span>
+  </div>
+
+  <div class="scroll" style="padding-top:4px; display:flex; flex-direction:column; min-height:calc(100vh - 230px); padding-bottom:20px;">
+    <div id="order-list"></div>
+    <div id="order-empty" style="display:none;text-align:center;padding:48px 20px;color:var(--text-3);font-size:13px;">
+      <div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="1.6" style="width:30px;height:30px;"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <div id="order-empty-text">暂无订单</div><br><span style="font-size:11px;">去供需大厅发现商机</span>
+    </div>
+
+    <!-- 申诉退款：始终固定在页面底部 -->
+    <div style="margin-top:auto; text-align:center; padding:20px 0 8px;">
+      <a href="../refund/appeal.html" style="color:var(--text-3);font-size:12px;">申诉退款 · 订单 / 余额 7 天无理由</a>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){
+  window.__ROOT__='../../';
+  /* 统一状态映射：普通订单 + 中介托管 */
+  var STATUS_MAP = {
+    pending:      { label: '待支付', cls: 'tag-warning' },
+    serving:      { label: '服务中', cls: 'tag-warning' },
+    await_accept: { label: '待验收', cls: 'tag-gold' },
+    await_confirm:{ label: '待验收', cls: 'tag-gold' },
+    settled:      { label: '已完成', cls: 'tag-success' },
+    cancelled:    { label: '已取消', cls: 'tag-gray' },
+    refunded:     { label: '已退款', cls: 'tag-gray' },
+    partial_refund:{ label: '部分退款', cls: 'tag-gray' },
+    escrowed:     { label: '已托管', cls: 'tag-primary' },
+    disputed:     { label: '纠纷中', cls: 'tag-danger' },
+    draft:        { label: '待支付', cls: 'tag-warning' }
+  };
+  var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
+  var currentTab = 'all';
+/* 状态 chips 分组（E3-15） */
+  var STATUS_GROUPS = {
+    pending:   ['pending', 'draft'],
+    serving:   ['serving', 'escrowed'],
+    await:     ['await_accept', 'await_confirm'],
+    settled:   ['settled'],
+    refunded:  ['refunded', 'partial_refund', 'cancelled']
+  };
+  var statusFilter = 'all';
+function currentUser() {
+    try { return (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) { return null; }
+  }
+
+  /* 空状态插画 */
+  function emptyIcon() {
+    return '<div style="width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="1.6" style="width:30px;height:30px;"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>';
+  }
+
+  /* 读取普通订单（engchain-orders），过滤当前用户 */
+  function getNormalOrders() {
+    var orders = [];
+    try { orders = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders')||'[]'); } catch (e) {}
+    var cu = currentUser();
+    var uid = cu ? (cu.id || '') : '';
+    var acct = cu ? (cu.account || '') : '';
+    return orders.filter(function (o) { return o.owner === uid || o.counterparty === uid || o.counterparty === acct; }).map(function (o) {
+      return {
+        kind: 'normal', id: o.id, title: o.title || '', type: TYPE_MAP[o.type] || o.type, rawType: o.type,
+        counterparty: o.counterparty || '', amount: o.amount, status: o.status,
+        ts: o.ts ? new Date(String(o.ts).replace(/-/g,'/')).getTime() : (o.updatedAt || 0),
+        detailUrl: 'detail.html?id=' + o.id
+      };
+    });
+  }
+
+  /* 读取中介托管订单（engchain-mediation-orders via Mediation.list），过滤当前用户 */
+  function getMediationOrders() {
+    if (!window.Mediation) return [];
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    var list = Mediation.list({ uid: uid });
+    return list.map(function (o) {
+      var sellerName = '';
+      try { var su = DataBus.byId(o.sellerId); if (su) sellerName = su.name || su.company || o.sellerId; } catch (e) {}
+      return {
+        kind: 'mediation', id: o.id, title: o.title || o.svcName || '中介服务订单',
+        type: '中介托管', rawType: 'agency', counterparty: sellerName || o.svcName || '',
+        amount: o.amount, status: o.state,
+        ts: o.createdAt || o.updatedAt || 0,
+        detailUrl: '../agency/order-detail.html?id=' + o.id
+      };
+    });
+  }
+
+  /* [PERF] 防抖工具 */
+  function debounce(fn, wait) {
+    var t;
+    return function () {
+      var ctx = this, args = arguments;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(ctx, args); }, wait);
+    };
+  }
+
+  /* [PERF] 订单数据缓存 */
+  var _orderCache = null;
+  function invalidateCache() { _orderCache = null; }
+
+  function render() {
+    var list = document.getElementById('order-list');
+    var empty = document.getElementById('order-empty');
+    try {
+    var acct = currentUser();
+    if (!acct) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      empty.innerHTML = emptyIcon() + '请先登录查看订单<br><a href="../auth/login.html" style="color:var(--primary);font-size:12px;">去登录</a>';
+      return;
+    }
+    /* [PERF] 使用缓存：首次读取后缓存，事件触发时清除缓存重新读取 */
+    if (!_orderCache) {
+      var _all = [];
+      try {
+        if (currentTab === 'all' || currentTab === 'normal') _all = _all.concat(getNormalOrders());
+        if (currentTab === 'all' || currentTab === 'mediation') _all = _all.concat(getMediationOrders());
+      } catch (e) { console.warn('订单数据读取失败:', e); }
+      _orderCache = _all;
+    }
+    var all = (_orderCache || []).slice();
+    /* 按时间倒序 */
+    all.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+/* 状态 chips 筛选（E3-15，跨 tab 生效） */
+    if (statusFilter !== 'all') {
+      var grp = STATUS_GROUPS[statusFilter] || [];
+      all = all.filter(function (o) { return grp.indexOf(o.status) > -1; });
+    }
+    if (!all.length) {
+      list.innerHTML = '';
+      empty.style.display = 'block';
+      var tip = currentTab === 'mediation' ? '暂无中介托管订单' : (currentTab === 'normal' ? '暂无普通订单' : '暂无订单');
+      empty.innerHTML = emptyIcon() +
+        '<div style="font-weight:600;color:var(--text-1);">' + tip + '</div>' +
+        '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;align-items:center;">' +
+          '<a href="../supply/list.html" style="display:inline-block;padding:10px 30px;border-radius:var(--r-full);background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:600;text-decoration:none;">去供需大厅</a>' +
+          '<a href="../publish/index.html" style="display:inline-block;padding:9px 26px;border-radius:var(--r-full);border:1px solid var(--line);color:var(--text-2);font-size:12px;text-decoration:none;">去发布</a>' +
+        '</div>';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = all.map(function (o) {
+      var st = STATUS_MAP[o.status] || STATUS_MAP.pending;
+      var amt = o.amount ? UI.money(o.amount) : '面议';
+      var escrowBadge = o.kind === 'mediation' ? '<span class="tag tag-gold" style="margin-left:6px;font-size:10px;">托管</span>' : '';
+      return '<div class="card" style="margin-bottom:10px;cursor:pointer;" onclick="location.href=\'' + o.detailUrl + '\'">' +
+        '<div class="fb-between"><span class="text-3 fs-12">订单号 ' + o.id + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="fw-600 fs-14" style="margin-top:8px;">' + (o.title || '') + escrowBadge + '</div>' +
+        '<div class="text-3 fs-12 mt-1">' + o.type + ' · ' + (o.counterparty || '') + '</div>' +
+        '<div class="fb-between" style="margin-top:10px;"><span class="mono fw-700">' + amt + '</span>' +
+        '<span class="link-green fs-12">查看 ›</span></div>' +
+        '</div>';
+    }).join('');
+    } catch (e) {
+      console.error('order render error:', e);
+      if (list) list.innerHTML = '<div class=text-3 style=padding:20px;text-align:center;font-size:12px>加载失败，请刷新</div>';
+      if (empty) empty.style.display = 'none';
+    }
+  }
+
+  /* [PERF] 防抖版render（在render函数定义之后声明） */
+  var scheduleRender = debounce(render, 100);
+
+  document.querySelectorAll('.seg-item').forEach(function(el){
+    el.onclick = function(){
+      document.querySelectorAll('.seg-item').forEach(function(x){x.classList.remove('is-on')});
+      el.classList.add('is-on');
+      currentTab = el.getAttribute('data-tab');
+      invalidateCache();
+      scheduleRender();
+    };
+  });
+
+  /* 状态 chips 点击（E3-15） */
+  document.querySelectorAll('.status-chips .filter-chip').forEach(function (el) {
+    el.onclick = function () {
+      document.querySelectorAll('.status-chips .filter-chip').forEach(function (x) { x.classList.remove('active'); });
+      el.classList.add('active');
+      statusFilter = el.getAttribute('data-sf');
+      scheduleRender();
+    };
+  });
+
+  /* [FIX] 首次加载骨架屏：数据未就绪时显示 3-4 行灰色脉冲卡片 */
+  function showSkeleton() {
+    var list = document.getElementById('order-list');
+    if (!list) return;
+    var sk = '';
+    for (var i = 0; i < 4; i++) {
+      sk += '<div class="skeleton-card">' +
+        '<div class="sk-line w60"></div>' +
+        '<div class="sk-line w80"></div>' +
+        '<div class="sk-line w40"></div>' +
+        '</div>';
+    }
+    list.innerHTML = sk;
+  }
+  /* [PERF] 只监听订单相关事件 */
+  window.addEventListener('engchain:orders', function () { invalidateCache(); scheduleRender(); });
+  window.addEventListener('engchain:mediation', function () { invalidateCache(); scheduleRender(); });
+  /* [PERF] 立即渲染：不等待350ms */
+  showSkeleton();
+  scheduleRender();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1268 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/personnel/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>人员招聘 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* ===== 双端 Tab ===== */
+  .tab-bar { display:flex; background:var(--bg-card); border-bottom:1px solid var(--line); padding:0 16px; }
+  .tab-item { flex:1; text-align:center; padding:12px 0; font-size:14px; font-weight:600; color:var(--text-3); cursor:pointer; position:relative; transition:color var(--d-fast); }
+  .tab-item.active { color:var(--primary-dim); }
+  .tab-item.active::after { content:''; position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:32px; height:3px; border-radius:2px; background:linear-gradient(90deg,var(--primary),var(--primary-dim)); }
+
+  /* ===== 搜索栏 ===== */
+  .search-row { padding:10px 16px; background:var(--bg); }
+  .search-box { display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-full); padding:9px 14px; cursor:pointer; transition:border-color var(--d-fast); }
+  .search-box:active { border-color:var(--primary); }
+  .search-box svg { width:15px; height:15px; color:var(--text-3); flex:none; }
+  .search-box span { font-size:12.5px; color:var(--text-3); }
+
+  /* ===== 搜索层 ===== */
+  .search-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--bg); z-index:200; display:flex; flex-direction:column; opacity:0; visibility:hidden; transition:opacity .2s ease; }
+  .search-overlay.show { opacity:1; visibility:visible; }
+  .so-header { display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--bg); border-bottom:1px solid var(--line); padding-top:calc(10px + env(safe-area-inset-top)); }
+  .so-back { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:var(--bg-card); border:none; cursor:pointer; flex:none; color:var(--text-2); }
+  .so-back svg { width:18px; height:18px; }
+  .so-input-wrap { flex:1; display:flex; align-items:center; gap:6px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-full); padding:8px 12px; min-width:0; }
+  .so-input-wrap:focus-within { border-color:var(--primary); }
+  .so-input-icon { width:14px; height:14px; color:var(--text-3); flex:none; }
+  .so-input { flex:1; border:none; outline:none; background:transparent; font-size:13px; color:var(--text-1); min-width:0; }
+  .so-input::placeholder { color:var(--text-3); }
+  .so-clear { width:18px; height:18px; display:flex; align-items:center; justify-content:center; border:none; background:var(--text-4); border-radius:50%; cursor:pointer; color:#fff; flex:none; padding:0; }
+  .so-clear svg { width:10px; height:10px; }
+  .so-search-btn { padding:7px 14px; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); border:none; border-radius:var(--r-full); font-size:12.5px; font-weight:600; cursor:pointer; flex:none; }
+  .so-body { flex:1; overflow-y:auto; padding:14px 16px; }
+  .so-section { margin-bottom:20px; }
+  .so-sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .so-sec-title { font-size:13px; font-weight:700; color:var(--text-1); }
+  .so-sec-hot { font-size:12px; }
+  .so-sec-clear { width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:none; background:transparent; cursor:pointer; color:var(--text-3); padding:0; }
+  .so-sec-clear svg { width:14px; height:14px; }
+  .so-tags { display:flex; flex-wrap:wrap; gap:8px; }
+  .so-tag { padding:6px 12px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-full); font-size:11.5px; color:var(--text-2); cursor:pointer; transition:all .15s; }
+  .so-tag:active { background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dim); }
+  .so-find-list { display:flex; flex-direction:column; gap:0; }
+  .so-find-item { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .so-find-item:last-child { border-bottom:none; }
+  .so-find-rank { width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--text-3); font-family:var(--font-num); flex:none; }
+  .so-find-rank.rank-1 { color:var(--primary); }
+  .so-find-rank.rank-2 { color:#e67e22; }
+  .so-find-rank.rank-3 { color:#f1c40f; }
+  .so-find-text { font-size:12.5px; color:var(--text-2); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ===== 证书分类栏 ===== */
+  .cat-bar { display:flex; gap:8px; overflow-x:auto; padding:10px 16px 14px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .cat-bar::-webkit-scrollbar { display:none; }
+  .cat-bar-zone { position:relative; }
+  .cat-bar-zone .cat-bar { padding-right:40px; }
+  .cat-bar-fade { position:absolute; top:10px; bottom:14px; right:0; width:28px; background:linear-gradient(90deg,transparent,var(--bg) 92%); pointer-events:none; }
+  /* 卡片标题过长时两行截断，避免括号孤悬换行 */
+  .job-card .jc-title, .jc-head .jc-title { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; word-break:break-word; }
+  .cat-item { flex:none; display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; min-width:58px; padding:4px 2px; border-radius:var(--r-m); transition:background var(--d-fast); }
+  .cat-item:active { background:var(--bg-card-2); }
+  .cat-item .cat-icon { width:44px; height:44px; border-radius:13px; background:var(--bg-card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--text-2); transition:all var(--d-fast); }
+  .cat-item .cat-icon svg { width:20px; height:20px; }
+  .cat-item .cat-label { font-size:10.5px; color:var(--text-2); white-space:nowrap; font-weight:500; line-height:1.2; text-align:center; }
+  .cat-item.active .cat-icon { background:var(--primary-soft); border-color:var(--accent-line); color:var(--primary-dim); box-shadow:0 4px 12px -6px var(--primary-dim); }
+  .cat-item.active .cat-label { color:var(--primary-dim); font-weight:600; }
+
+  /* ===== 核验提示条 ===== */
+  .verify-notice { margin:0 16px 10px; padding:10px 12px; background:rgba(43,107,79,.06); border:1px solid rgba(43,107,79,.15); border-radius:var(--r-m); display:flex; align-items:flex-start; gap:8px; }
+  .verify-notice svg { width:15px; height:15px; color:var(--success); flex:none; margin-top:1px; }
+  .verify-notice span { font-size:11px; color:var(--text-2); line-height:1.5; }
+  .verify-notice b { color:var(--success); font-weight:600; }
+
+  /* ===== 板块标题 ===== */
+  .sec-head { display:flex; align-items:center; justify-content:space-between; margin:0 16px 10px; }
+  .sec-head .sh-title { font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+  .sec-head .sh-more { font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:3px; cursor:pointer; }
+  .sec-head .sh-more:active { opacity:.6; }
+  .sec-head .sh-more svg { width:12px; height:12px; }
+
+  /* ===== 急聘/急寻横向滚动区 ===== */
+  .hot-section { margin-bottom:10px; }
+  .hot-scroll { display:flex; gap:10px; overflow-x:auto; padding:0 16px 4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .hot-scroll::-webkit-scrollbar { display:none; }
+  .hot-card { flex:none; width:224px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l); padding:12px 14px; cursor:pointer; transition:transform var(--d-fast),border-color var(--d-fast); }
+  .hot-card:active { transform:scale(.98); border-color:var(--primary); }
+  .hot-card .hc-tags { display:flex; gap:5px; margin-bottom:6px; flex-wrap:wrap; }
+  .hot-card .hc-title { font-size:13px; font-weight:700; color:var(--text-1); line-height:1.35; margin-bottom:5px; }
+  .hot-card .hc-meta { font-size:10.5px; color:var(--text-3); line-height:1.5; }
+  .hot-card .hc-bottom { display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
+  .hot-card .hc-price { font-family:var(--font-num); font-size:15px; font-weight:700; color:var(--primary-dim); }
+  .hot-card .hc-price .o { font-size:10px; color:var(--text-3); text-decoration:line-through; font-weight:400; margin-left:4px; }
+  .hot-card .hc-btn { font-size:10.5px; font-weight:600; color:var(--primary-dim); background:var(--primary-soft); padding:4px 10px; border-radius:var(--r-full); }
+
+  /* ===== 吸顶筛选栏 ===== */
+  .sticky-filter-bar { position:sticky; top:0; z-index:15; background:var(--bg); padding-bottom:2px; }
+  .sticky-filter-bar::after { content:''; position:absolute; left:0; right:0; bottom:0; height:1px; background:var(--line); opacity:0; transition:opacity var(--d-fast); }
+  .sticky-filter-bar.is-stuck::after { opacity:1; }
+  .filter-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:var(--r-full); background:var(--bg-card-2); border:1px solid var(--line); font-size:11.5px; font-weight:600; color:var(--text-2); cursor:pointer; transition:all var(--d-fast); }
+  .filter-btn:active { transform:scale(.96); }
+  .filter-btn svg { width:14px; height:14px; }
+  .filter-btn.active { background:var(--primary-soft); border-color:var(--accent-line); color:var(--primary-dim); font-weight:600; }
+  .filter-btn .fb-count { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--primary-dim); color:var(--text-inv); font-size:9.5px; font-weight:700; font-family:var(--font-num); }
+
+  /* ===== 排序 tabs ===== */
+  .sort-row { display:flex; align-items:center; padding:0 16px; }
+  .sort-tabs { display:flex; gap:18px; margin:0 16px 2px; }
+  .st-item { flex:none; padding:0 0 6px; font-size:13px; font-weight:500; font-family:var(--font-display); color:var(--text-2); cursor:pointer; position:relative; transition:color var(--d-fast); white-space:nowrap; }
+  .st-item:active { opacity:.6; }
+  .st-item.active { color:var(--text-1); font-weight:600; }
+  .st-item.active::after { content:''; position:absolute; left:15%; right:15%; bottom:0; height:2px; border-radius:2px; background:linear-gradient(90deg,var(--primary),var(--primary-dim)); }
+
+  /* ===== 统计条 ===== */
+  .result-stats { padding:12px 16px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-m); margin:0 16px 10px; font-size:13px; color:var(--text-2); line-height:1.6; }
+  .result-stats b { font-family:var(--font-num); font-size:15px; font-weight:700; }
+  .result-stats .rs-c1 { color:var(--primary-dim); }
+  .result-stats .rs-c2 { color:var(--success); }
+  .result-stats .rs-c3 { color:var(--accent); }
+
+  /* ===== 筛选底部面板 ===== */
+  .filter-mask { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:90; opacity:0; pointer-events:none; transition:opacity .3s ease; }
+  .filter-mask.show { opacity:1; pointer-events:auto; }
+  .filter-sheet { position:fixed; left:0; right:0; bottom:0; z-index:91; background:var(--bg); border-radius:16px 16px 0 0; max-height:80vh; display:flex; flex-direction:column; transform:translateY(100%); transition:transform .35s cubic-bezier(.4,0,.2,1); }
+  .filter-sheet.show { transform:translateY(0); }
+  .fs-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid var(--line); }
+  .fs-title { font-size:15px; font-weight:700; color:var(--text-1); }
+  .fs-reset { font-size:12px; font-weight:600; color:var(--text-3); cursor:pointer; padding:4px 8px; }
+  .fs-body { flex:1; overflow-y:auto; padding:12px 16px; }
+  .fs-group { margin-bottom:16px; }
+  .fs-group-title { font-size:12.5px; font-weight:700; color:var(--text-1); margin-bottom:8px; }
+  .fs-tags { display:flex; flex-wrap:wrap; gap:8px; }
+  .fs-tag { padding:7px 14px; border-radius:var(--r-full); background:var(--bg-card); border:1px solid var(--line); font-size:12px; color:var(--text-2); cursor:pointer; transition:all var(--d-fast); white-space:nowrap; }
+  .fs-tag:active { transform:scale(.96); }
+  .fs-tag.selected { background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dim); font-weight:600; }
+  .fs-tag.disabled { opacity:.35; cursor:not-allowed; pointer-events:none; }
+  .fs-foot { display:flex; gap:10px; padding:12px 16px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .fs-btn { flex:1; padding:11px 0; border-radius:var(--r-full); font-size:13.5px; font-weight:600; border:none; cursor:pointer; transition:transform var(--d-fast); }
+  .fs-btn:active { transform:scale(.97); }
+  .fs-btn.cancel { background:var(--bg-card-2); color:var(--text-2); }
+  .fs-btn.confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); box-shadow:0 4px 12px -3px var(--primary-dim); }
+
+  /* ===== 委托居中弹窗 ===== */
+  .delegate-mask { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; opacity:0; pointer-events:none; transition:opacity .3s ease; }
+  .delegate-mask.show { opacity:1; pointer-events:auto; }
+  .delegate-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.9); z-index:101; width:86%; max-width:340px; background:var(--bg); border-radius:16px; padding:20px; opacity:0; pointer-events:none; transition:all .3s cubic-bezier(.34,1.56,.64,1); }
+  .delegate-modal.show { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+  .dm-close { position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%; background:var(--bg-card-2); border:none; color:var(--text-2); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .dm-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; box-shadow:0 4px 14px -3px var(--primary-dim); }
+  .dm-icon svg { width:22px; height:22px; }
+  .dm-title { font-size:16px; font-weight:700; color:var(--text-1); text-align:center; margin-bottom:6px; }
+  .dm-desc { font-size:12px; color:var(--text-3); text-align:center; line-height:1.6; margin-bottom:14px; }
+  .dm-input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px; color:var(--text-1); background:var(--bg-card); margin-bottom:10px; outline:none; transition:border-color var(--d-fast); box-sizing:border-box; }
+  .dm-input:focus { border-color:var(--primary); }
+  .dm-input::placeholder { color:var(--text-3); }
+  .dm-btn { width:100%; padding:12px 0; border-radius:var(--r-full); background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); font-size:14px; font-weight:600; border:none; cursor:pointer; box-shadow:0 4px 12px -3px var(--primary-dim); transition:transform var(--d-fast); }
+  .dm-btn:active { transform:scale(.97); }
+
+  /* ===== 提交专享委托确认弹窗 ===== */
+  .exclusive-mask { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; opacity:0; pointer-events:none; transition:opacity .3s ease; }
+  .exclusive-mask.show { opacity:1; pointer-events:auto; }
+  .exclusive-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.9); z-index:101; width:86%; max-width:320px; background:var(--bg); border-radius:16px; padding:24px 20px 20px; opacity:0; pointer-events:none; transition:all .3s cubic-bezier(.34,1.56,.64,1); }
+  .exclusive-modal.show { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+  .em-icon { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 4px 14px -3px var(--primary-dim); }
+  .em-icon svg { width:24px; height:24px; }
+  .em-title { font-size:16px; font-weight:700; color:var(--text-1); text-align:center; margin-bottom:8px; }
+  .em-desc { font-size:12.5px; color:var(--text-3); text-align:center; line-height:1.6; margin-bottom:18px; }
+  .em-buttons { display:flex; gap:10px; }
+  .em-btn { flex:1; padding:11px 0; border-radius:var(--r-full); font-size:13.5px; font-weight:600; border:none; cursor:pointer; transition:transform var(--d-fast); }
+  .em-btn:active { transform:scale(.97); }
+  .em-btn-cancel { background:var(--bg-card-2); color:var(--text-2); }
+  .em-btn-confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); box-shadow:0 4px 12px -3px var(--primary-dim); }
+
+  /* 委托弹窗表单 */
+  .dm-form { margin:14px 0 4px; max-height:50vh; overflow-y:auto; }
+  .dm-field { margin-bottom:12px; }
+  .dm-label { display:block; font-size:11.5px; font-weight:600; color:var(--text-1); margin-bottom:6px; }
+  .dm-required { color:var(--accent); }
+  .dm-input { width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:var(--r-m); font-size:12.5px; background:var(--bg-card); box-sizing:border-box; outline:none; transition:border-color .15s; }
+  .dm-input:focus { border-color:var(--primary); }
+  .dm-textarea { width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:var(--r-m); font-size:12px; background:var(--bg-card); box-sizing:border-box; outline:none; resize:none; font-family:inherit; line-height:1.5; transition:border-color .15s; }
+  .dm-textarea:focus { border-color:var(--primary); }
+  .dm-tag-group { display:flex; flex-wrap:wrap; gap:6px; }
+  .dm-tag { padding:5px 10px; border:1px solid var(--line); border-radius:var(--r-full); font-size:11px; color:var(--text-2); cursor:pointer; transition:all .15s; user-select:none; }
+  .dm-tag:active { transform:scale(.96); }
+  .dm-tag.selected { background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dim); font-weight:600; }
+
+  /* ===== 收藏按钮 ===== */
+  .fav-btn { position:absolute; top:10px; right:10px; width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.9); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .15s; z-index:2; padding:0; color:var(--text-3); }
+  .fav-btn svg { width:14px; height:14px; transition:all .15s; }
+  .fav-btn:active { transform:scale(.9); }
+  .fav-btn.active { background:var(--primary-soft); border-color:var(--primary); color:var(--primary-dim); }
+  .fav-btn.active svg { fill:var(--primary-dim); stroke:var(--primary-dim); }
+
+  /* ===== 卡片入场动画 ===== */
+  @keyframes cardFadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ===== 卡片点击加载态 ===== */
+  .card-loading { pointer-events:none; opacity:.6; position:relative; }
+  .card-loading::after { content:""; position:absolute; top:50%; left:50%; width:24px; height:24px; margin:-12px 0 0 -12px; border:2.5px solid var(--primary-soft); border-top-color:var(--primary); border-radius:50%; animation:spin .6s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes successPop { from { transform:scale(0); opacity:0; } to { transform:scale(1); opacity:1; } }
+  @keyframes checkDraw { from { stroke-dasharray: 30; stroke-dashoffset: 30; } to { stroke-dasharray: 30; stroke-dashoffset: 0; } }
+
+  /* ===== 筛选面板已选条件预览 ===== */
+  .fs-selected { display:flex; align-items:flex-start; gap:8px; padding:8px 16px 10px; border-bottom:1px solid var(--line); background:var(--bg-subtle); }
+  .fsl-label { font-size:11px; color:var(--text-3); flex:none; padding-top:3px; }
+  .fsl-tags { display:flex; flex-wrap:wrap; gap:5px; flex:1; min-width:0; }
+  .fsl-tag { display:inline-flex; align-items:center; gap:3px; padding:3px 8px; border-radius:var(--r-full); background:var(--primary-soft); color:var(--primary-dim); font-size:10.5px; font-weight:600; cursor:pointer; transition:all var(--d-fast); }
+  .fsl-tag:active { transform:scale(.95); }
+  .fsl-tag svg { width:10px; height:10px; }
+
+  /* ===== v3.1: 卡片投递按钮 ===== */
+  .card-deliver-btn{display:block;margin:10px 0 0 auto;padding:7px 16px;border:none;border-radius:var(--r-full);background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:11.5px;font-weight:600;cursor:pointer;transition:transform .15s;white-space:nowrap;box-shadow:0 2px 8px -2px var(--primary-dim);}
+  .card-deliver-btn:active{transform:scale(.95);}
+
+  /* ===== v3.1: 投递权限引导弹窗 ===== */
+  .deliver-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:120;opacity:0;pointer-events:none;transition:opacity .3s ease;}
+  .deliver-mask.show{opacity:1;pointer-events:auto;}
+  .deliver-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.9);z-index:121;width:86%;max-width:320px;background:var(--bg);border-radius:16px;padding:24px 20px 20px;opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.34,1.56,.64,1);}
+  .deliver-modal.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
+  .deliver-modal-buttons{display:flex;gap:10px;margin-top:18px;}
+  .deliver-btn{flex:1;padding:11px 0;border-radius:var(--r-full);font-size:13.5px;font-weight:600;border:none;cursor:pointer;transition:transform .15s;}
+  .deliver-btn:active{transform:scale(.97);}
+  .deliver-btn-cancel{background:var(--bg-card-2);color:var(--text-2);}
+  .deliver-btn-confirm{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);box-shadow:0 4px 12px -3px var(--primary-dim);}
+
+  /* ===== 空状态 ===== */
+  .empty-state { display:flex; flex-direction:column; align-items:center; padding:50px 16px 30px; text-align:center; }
+  .es-illustration { width:120px; height:120px; margin-bottom:16px; }
+  .es-title { font-size:15px; font-weight:700; color:var(--text-1); margin-bottom:6px; }
+  .es-desc { font-size:12px; color:var(--text-3); line-height:1.6; margin-bottom:20px; max-width:240px; }
+  .es-btn { padding:9px 20px; border-radius:var(--r-full); font-size:12.5px; font-weight:600; cursor:pointer; transition:all .15s; margin-bottom:8px; min-width:160px; }
+  .es-btn-primary { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); border:none; box-shadow:0 3px 10px -2px var(--primary-dim); }
+  .es-btn-primary:active { transform:scale(.97); }
+  .es-btn-outline { background:transparent; color:var(--primary-dim); border:1px solid var(--primary); }
+  .es-btn-outline:active { background:var(--primary-soft); }
+
+  /* 交叉导流卡片 */
+  .cross-sell-card { display:flex; align-items:center; gap:12px; margin:12px 16px 0; padding:14px 16px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(135deg,var(--bg-card),var(--bg-card-2)); cursor:pointer; transition:transform .2s,border-color .2s; }
+  .cross-sell-card:active { transform:scale(.98); }
+  .cross-sell-card:hover { border-color:var(--primary); }
+  .cs-icon { flex:none; width:40px; height:40px; border-radius:11px; background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft)); display:flex; align-items:center; justify-content:center; }
+  .cs-icon svg { width:20px; height:20px; color:var(--primary-dim); }
+  .cs-body { flex:1; min-width:0; }
+  .cs-title { font-size:13.5px; font-weight:700; color:var(--text-1); line-height:1.4; }
+  .cs-sub { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.5; }
+  .cs-arrow { flex:none; color:var(--text-4); }
+  .cs-arrow svg { width:18px; height:18px; }
+</style>
+</head>
+<body data-tab="me">
+<div class="phone">
+  <!-- 导航 -->
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">人员招聘</div>
+    <div class="nav-right">
+      <button class="icon-btn" onclick="location.href='../search/business.html?type=personnel'" aria-label="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+    </div>
+  </div>
+
+  <div class="scroll no-pad" style="padding-bottom:20px;">
+    <!-- 双端 Tab -->
+    <div class="tab-bar" id="tabBar">
+      <div class="tab-item active" data-tab="enterprise">企业招聘</div>
+      <div class="tab-item" data-tab="talent">持证人才</div>
+    </div>
+
+    <!-- 证书分类 icon 栏（与筛选弹窗 certType 维度联动）右侧渐变遮罩提示可横滑 -->
+    <div class="cat-bar-zone">
+      <div class="cat-bar" id="catBar"></div>
+      <span class="cat-bar-fade" aria-hidden="true"></span>
+    </div>
+
+    <!-- 核验提示条 -->
+    <div class="verify-notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>平台<b>证书四库一平台核验</b>，注册状态实时可查 · 人才免费发布 · 企业付费查看</span>
+    </div>
+
+    <!-- 急聘/急寻横向滚动区 -->
+    <div class="hot-section" id="hotSection">
+      <div class="sec-head">
+        <div class="sh-title" id="hotTitle"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);flex:none;"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg><span id="hotTitleText">急聘岗位</span></div>
+        <div class="sh-more" onclick="var s=document.querySelector('.scroll');s.scrollTop=document.getElementById('stickyFilterBar').offsetTop-8">查看全部 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>
+      <div class="hot-scroll" id="hotScroll"></div>
+    </div>
+
+    <!-- 吸顶筛选栏 -->
+    <div class="sticky-filter-bar" id="stickyFilterBar">
+      <div class="sec-head" style="margin-bottom:2px;">
+        <div class="sh-title" id="listTitle">全部招聘岗位</div>
+        <button type="button" class="filter-btn" id="filterBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+          <span class="fb-label">筛选</span>
+          <span class="fb-count" style="display:none">0</span>
+        </button>
+      </div>
+      <div class="sort-tabs" id="sortTabs"></div>
+    </div>
+
+    <!-- 统计条 -->
+    <div class="result-stats" id="resultStats"></div>
+
+    <!-- 列表 -->
+    <div style="padding:0 0 4px;" id="fullList"></div>
+
+    <!-- 加载更多 -->
+    <button type="button" class="load-more" id="loadMore" style="display:none;">加载更多 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg></button>
+
+    <!-- 交叉导流：人员招聘 -> 服务广场（劳务派遣/猎头/人员配置） -->
+    <div class="cross-sell-card" onclick="location.href='../agency/index.html?scene=personnel'">
+      <div class="cs-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="cs-body">
+        <div class="cs-title">需要劳务派遣 / 猎头 / 人员配置？</div>
+        <div class="cs-sub">入驻中介服务商一对一服务，资金托管 / 未成交退款</div>
+      </div>
+      <div class="cs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></div>
+    </div>
+
+    <!-- 最小高度占位 -->
+    <div id="listSpacer"></div>
+  </div>
+
+  <!-- 筛选底部面板 -->
+  <div class="filter-mask" id="filterMask"></div>
+  <div class="filter-sheet" id="filterSheet">
+    <div class="fs-head">
+      <div class="fs-title">筛选条件</div>
+      <div class="fs-reset" id="filterReset">重置</div>
+    </div>
+    <div class="fs-selected" id="filterSelected" style="display:none;">
+      <span class="fsl-label">已选：</span>
+      <div class="fsl-tags" id="filterSelectedTags"></div>
+    </div>
+    <div class="fs-body" id="filterBody"></div>
+    <div class="fs-foot">
+      <button class="fs-btn cancel" id="filterCancel">取消</button>
+      <button class="fs-btn confirm" id="filterConfirm">确定</button>
+    </div>
+  </div>
+
+  <!-- 委托居中弹窗 -->
+  <div class="delegate-mask" id="delegateMask"></div>
+  <div class="delegate-modal" id="delegateModal">
+    <button class="dm-close" id="dmClose">×</button>
+    <div class="dm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+    <div class="dm-title" id="dmTitle">发布招聘需求</div>
+    <div class="dm-desc" id="dmDesc">填写您的需求，平台专属顾问将在2小时内为您精准匹配</div>
+    <div class="dm-form" id="dmForm">
+      <div class="dm-field">
+        <label class="dm-label">联系人 <span class="dm-required">*</span></label>
+        <input type="text" class="dm-input" id="dmName" placeholder="请输入您的姓名">
+      </div>
+      <div class="dm-field">
+        <label class="dm-label">联系电话 <span class="dm-required">*</span></label>
+        <input type="tel" class="dm-input" id="dmPhone" placeholder="请输入您的手机号">
+      </div>
+      <div class="dm-field">
+        <label class="dm-label" id="dmCertLabel">所需证书类型（可多选）</label>
+        <div class="dm-tag-group" id="dmCertTags"></div>
+      </div>
+      <div class="dm-field">
+        <label class="dm-label" id="dmSalaryLabel">薪资范围</label>
+        <div class="dm-tag-group" id="dmSalaryTags"></div>
+      </div>
+      <div class="dm-field">
+        <label class="dm-label">到岗时间要求</label>
+        <div class="dm-tag-group" id="dmArrivalTags">
+          <span class="dm-tag" data-val="随时到岗">随时到岗</span>
+          <span class="dm-tag" data-val="1周内">1周内</span>
+          <span class="dm-tag" data-val="2周内">2周内</span>
+          <span class="dm-tag" data-val="1个月内">1个月内</span>
+          <span class="dm-tag" data-val="面议">面议</span>
+        </div>
+      </div>
+      <div class="dm-field">
+        <label class="dm-label" id="dmDescLabel">需求描述（选填）</label>
+        <textarea class="dm-textarea" id="dmRemark" rows="2" placeholder="请简要描述您的具体需求，如项目情况、特殊要求等"></textarea>
+      </div>
+    </div>
+    <button class="dm-btn" id="dmSubmit">提交需求</button>
+  </div>
+</div>
+
+<!-- v3.1: 投递权限引导弹窗 -->
+<div class="deliver-mask" id="deliverMask"></div>
+<div class="deliver-modal" id="deliverModal">
+  <div class="dm-icon" style="background:linear-gradient(135deg,rgba(212,76,71,.15),rgba(212,76,71,.05));color:var(--danger);">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  </div>
+  <div class="dm-title" id="deliverModalTitle">暂不支持简历投递</div>
+  <div class="dm-desc" id="deliverModalDesc">请先完成个人入驻并完善简历信息</div>
+  <div class="deliver-modal-buttons">
+    <button class="deliver-btn deliver-btn-cancel" id="deliverCancel">取消</button>
+    <button class="deliver-btn deliver-btn-confirm" id="deliverGoEdit">去完善简历</button>
+  </div>
+</div>
+
+<!-- 提交专享委托确认弹窗 -->
+<div class="exclusive-mask" id="exclusiveMask"></div>
+<div class="exclusive-modal" id="exclusiveModal">
+  <div class="em-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
+  <div class="em-title">提交专享委托</div>
+  <div class="em-desc">确认提交专享委托？平台专属顾问将在2小时内与您联系，为您提供1对1精准匹配服务。</div>
+  <div class="em-buttons">
+    <button class="em-btn em-btn-cancel" id="exclusiveCancel">取消</button>
+    <button class="em-btn em-btn-confirm" id="exclusiveOk">确认提交</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/delegates.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* 确定性匹配度兜底：无 match 字段时按 id 哈希在 62-96 取值，避免出现 "-%" 占位符 */
+  function varyMatch(r) {
+    if (typeof r.match === 'number' && r.match > 0) return r.match;
+    var h = 0, s = String(r.id || r.title || r.name || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return 62 + (h % 35);
+  }
+
+  /* ===== 数据预处理 ===== */
+  var entData = (MOCK.personnels || []).map(function (r) {
+    return Object.assign({}, r, {
+      bizKey: 'personnel',
+      certType: r.certType || r.sub,
+      certLevel: r.certLevel || '—',
+      registerStatus: r.registerStatus || '可转注册',
+      socialSecurity: r.socialSecurity || '可配合',
+      urgent: !!r.urgent,
+      salaryNum: r.salaryNum || 0,
+      salaryRange: r.salaryRange || '面议',
+      match: varyMatch(r)
+    });
+  });
+  /* mergedList 同源：混入 SupplyStore 中用户发布的 personnel 条目 */
+  try {
+    if (window.SupplyStore) {
+      SupplyStore.listActive().forEach(function (r) {
+        if (r.bizKey === 'personnel' && !entData.some(function (y) { return String(y.id) === String(r.id); })) {
+          entData.push(Object.assign({}, r, {
+            certType: r.certType || r.sub, certLevel: r.certLevel || '—',
+            registerStatus: r.registerStatus || '可转注册', socialSecurity: r.socialSecurity || '可配合',
+            urgent: !!r.urgent, salaryNum: r.salaryNum || 0, salaryRange: r.salaryRange || '面议',
+            match: varyMatch(r), _badge: '用户发布'
+          }));
+        }
+      });
+    }
+  } catch (e) {}
+
+  var talentData = (MOCK.talents || []).map(function (r, idx) {
+    var statuses = ['在职·考虑机会', '离职·立即到岗', '在职·考虑机会', '在职·暂不考虑', '离职·立即到岗', '在职·考虑机会'];
+    var regTxt = r.registerStatus && typeof r.registerStatus === 'object' ? r.registerStatus.status : (r.registerStatus || '可转注册');
+    var ssTxt = r.socialSecurity && typeof r.socialSecurity === 'object' ? r.socialSecurity.status : (r.socialSecurity || '可配合');
+    return Object.assign({}, r, {
+      bizKey: 'talent',
+      certType: r.certType || r.sub,
+      certLevel: r.certLevel || '—',
+      registerStatus: regTxt,
+      socialSecurity: ssTxt,
+      urgent: !!r.urgent,
+      experienceNum: r.experienceNum || 0,
+      salaryNum: r.salaryNum || 0,
+      salaryRange: r.salaryRange || ((r.expectedSalary || {}).salaryRange || '面议'),
+      jobStatus: r.currentStatus || r.jobStatus || statuses[idx % statuses.length],
+      match: varyMatch(r)
+    });
+  });
+  /* mergedList 同源：混入 SupplyStore 中用户发布的 talent 条目 */
+  try {
+    if (window.SupplyStore) {
+      SupplyStore.listActive().forEach(function (r) {
+        if (r.bizKey === 'talent' && !talentData.some(function (y) { return String(y.id) === String(r.id); })) {
+          talentData.push(Object.assign({}, r, {
+            certType: r.certType || r.sub, certLevel: r.certLevel || '—',
+            registerStatus: (r.registerStatus && typeof r.registerStatus === 'object') ? r.registerStatus.status : (r.registerStatus || '可转注册'),
+            socialSecurity: (r.socialSecurity && typeof r.socialSecurity === 'object') ? r.socialSecurity.status : (r.socialSecurity || '可配合'),
+            urgent: !!r.urgent, experienceNum: r.experienceNum || 0, salaryNum: r.salaryNum || 0,
+            salaryRange: r.salaryRange || ((r.expectedSalary || {}).salaryRange || '面议'),
+            jobStatus: r.currentStatus || r.jobStatus || '在职·考虑机会',
+            match: varyMatch(r), _badge: '用户发布'
+          }));
+        }
+      });
+    }
+  } catch (e) {}
+
+  /* ===== 状态 ===== */
+  var currentTab = 'enterprise';
+  /* 支持 ?tab=talent 直接落在「持证人才」 */
+  if (new URLSearchParams(location.search).get('tab') === 'talent') currentTab = 'talent';
+  var activeCat = null;
+  var currentSort = 'default';
+  var activeFilters = {};
+  var tempFilters = {};
+
+  /* ===== 证书分类（用于分类图标栏，与筛选弹窗 certType 维度联动） ===== */
+  var CATS = [
+    { key: '建造师', label: '建造师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20"/><path d="M4 20v-8a8 8 0 0 1 16 0v8"/><path d="M9 20v-4h6v4"/></svg>' },
+    { key: '造价工程师', label: '造价工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>' },
+    { key: '监理工程师', label: '监理工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>' },
+    { key: '安全工程师', label: '安全工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>' },
+    { key: '消防工程师', label: '消防工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>' },
+    { key: '结构工程师', label: '结构工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h18"/><path d="M3 3v18"/><path d="M3 3l18 18"/><circle cx="12" cy="12" r="2"/></svg>' },
+    { key: '建筑师', label: '建筑师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>' },
+    { key: '电气工程师', label: '电气工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v6"/><path d="M5 12h14"/><path d="M7 12v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-8"/><circle cx="12" cy="8" r="2"/></svg>' }
+  ];
+
+  /* ===== 排序定义 ===== */
+  var SORTS = {
+    enterprise: [
+      { key: 'default', label: '全部' },
+      { key: 'urgent', label: '急聘' },
+      { key: 'verified', label: '已核验' },
+      { key: 'salary', label: '薪资高到低' }
+    ],
+    talent: [
+      { key: 'default', label: '全部' },
+      { key: 'urgent', label: '急寻' },
+      { key: 'verified', label: '已核验' },
+      { key: 'experience', label: '经验多' }
+    ]
+  };
+
+  /* ===== 筛选维度定义 ===== */
+  var ALL_CERT_TYPES = ['建造师','造价工程师','监理工程师','安全工程师','消防工程师','结构工程师','建筑师','电气工程师','公用设备工程师','土木工程师（岩土）','城乡规划师'];
+  var ALL_CERT_MAJORS = ['建筑工程','市政公用工程','机电工程','公路工程','水利水电工程','矿业工程','港口与航道工程','铁路工程','民航机场工程','通信与广电工程','土木建筑工程','安装工程','交通运输工程','水利工程','房屋建筑工程','机电安装工程','电力工程','化工石油工程','建筑施工安全','化工安全','道路运输安全','其他安全','发输变电','供配电','暖通空调','给水排水','动力','岩土'];
+  var FILTER_DIMS = {
+    enterprise: [
+      { key: 'certType', label: '证书类型', options: ALL_CERT_TYPES },
+      { key: 'certLevel', label: '证书等级', options: ['一级','二级','初级','中级','高级','不分等级'] },
+      { key: 'certMajor', label: '证书专业', options: ALL_CERT_MAJORS },
+      { key: 'registerStatus', label: '注册状态', options: ['未注册','初始注册','已注册','可转注册'] },
+      { key: 'titleLevel', label: '职称', options: ['不限','初级职称','中级职称','高级职称','教授级高工'] },
+      { key: 'urgent', label: '急聘状态', options: ['急聘','普通'] },
+      { key: 'salaryRange', label: '薪资区间', options: ['面议','10万以下','10-20万','20-30万','30万以上'] }
+    ],
+    talent: [
+      { key: 'certType', label: '证书类型', options: ALL_CERT_TYPES },
+      { key: 'certLevel', label: '证书等级', options: ['一级','二级','初级','中级','高级','不分等级'] },
+      { key: 'certMajor', label: '证书专业', options: ALL_CERT_MAJORS },
+      { key: 'registerStatus', label: '注册状态', options: ['未注册','初始注册','已注册','可转注册'] },
+      { key: 'titleLevel', label: '职称', options: ['不限','初级职称','中级职称','高级职称','教授级高工'] },
+      { key: 'urgent', label: '急寻状态', options: ['急寻','普通'] },
+      { key: 'experienceRange', label: '经验区间', options: ['3年以下','3-5年','5-10年','10年以上'] }
+    ]
+  };
+
+  /* ===== 证书类型→适用等级/专业 联动配置 ===== */
+  var BUILDER_MAJORS = ['建筑工程','市政公用工程','机电工程','公路工程','水利水电工程','矿业工程','港口与航道工程','铁路工程','民航机场工程','通信与广电工程'];
+  var CERT_CONFIG = {
+    '建造师':            { levels: ['一级','二级'],    majors: BUILDER_MAJORS },
+    '造价工程师':        { levels: ['一级','二级'],    majors: ['土木建筑工程','安装工程','交通运输工程','水利工程'] },
+    '监理工程师':        { levels: ['不分等级'],       majors: ['房屋建筑工程','市政公用工程','机电安装工程','水利水电工程','公路工程','电力工程','化工石油工程'] },
+    '安全工程师':        { levels: ['初级','中级','高级'], majors: ['建筑施工安全','化工安全','道路运输安全','其他安全'] },
+    '消防工程师':        { levels: ['一级','二级'],    majors: [] },
+    '结构工程师':        { levels: ['一级','二级'],    majors: [] },
+    '建筑师':            { levels: ['一级','二级'],    majors: [] },
+    '电气工程师':        { levels: ['不分等级'],       majors: ['发输变电','供配电'] },
+    '公用设备工程师':    { levels: ['不分等级'],       majors: ['暖通空调','给水排水','动力'] },
+    '土木工程师（岩土）':{ levels: ['不分等级'],       majors: ['岩土'] },
+    '城乡规划师':        { levels: ['不分等级'],       majors: [] }
+  };
+
+  /* ===== 当前数据 ===== */
+  function currentData() { return currentTab === 'enterprise' ? entData : talentData; }
+
+  /* ===== 筛选匹配 ===== */
+  function applyFilters(list) {
+    return list.filter(function (r) {
+      for (var key in activeFilters) {
+        var val = activeFilters[key];
+        if (!val) continue;
+        if (key === 'urgent') {
+          if (val === (currentTab === 'enterprise' ? '急聘' : '急寻') && !r.urgent) return false;
+          if (val === '普通' && r.urgent) return false;
+        } else if (key === 'experienceRange') {
+          var e = r.experienceNum;
+          if (val === '3年以下' && e >= 3) return false;
+          if (val === '3-5年' && (e < 3 || e >= 5)) return false;
+          if (val === '5-10年' && (e < 5 || e >= 10)) return false;
+          if (val === '10年以上' && e < 10) return false;
+        } else if (key === 'titleLevel') {
+          if (val !== '不限' && r[key] !== val) return false;
+        } else {
+          if (r[key] !== val) return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  /* ===== 排序 ===== */
+  function sortArr(list) {
+    var arr = list.slice();
+    if (currentSort === 'urgent') arr.sort(function (a, b) { return (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0); });
+    else if (currentSort === 'verified') arr.sort(function (a, b) { return (b.verified ? 1 : 0) - (a.verified ? 1 : 0); });
+    else if (currentSort === 'salary') arr.sort(function (a, b) { return b.salaryNum - a.salaryNum; });
+    else if (currentSort === 'experience') arr.sort(function (a, b) { return b.experienceNum - a.experienceNum; });
+    return arr;
+  }
+
+  /* ===== 过滤+排序（统一走 applyFilters，certType 由分类栏与弹窗联动） ===== */
+  function filtered() {
+    return sortArr(applyFilters(currentData()));
+  }
+
+  /* ===== 渲染证书分类 icon 栏（与筛选弹窗 certType 维度联动） ===== */
+  function renderCatBar() {
+    var catBar = document.getElementById('catBar');
+    if (!catBar) return;
+    catBar.innerHTML = CATS.map(function (c) {
+      var active = activeFilters.certType === c.key;
+      return '<div class="cat-item' + (active ? ' active' : '') + '" data-cat="' + c.key + '">' +
+        '<div class="cat-icon">' + c.icon + '</div>' +
+        '<span class="cat-label">' + c.label + '</span>' +
+      '</div>';
+    }).join('');
+    catBar.querySelectorAll('.cat-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var key = el.dataset.cat;
+        if (activeFilters.certType === key) {
+          delete activeFilters.certType;
+        } else {
+          activeFilters.certType = key;
+        }
+        currentSort = 'default';
+        renderCatBar();
+        renderSortTabs();
+        updateFilterBtn();
+        renderList();
+        setTimeout(function () { scrollToSticky(); }, 250);
+      });
+    });
+  }
+
+  /* ===== 渲染排序 tabs ===== */
+  function renderSortTabs() {
+    var tabs = document.getElementById('sortTabs');
+    var sorts = SORTS[currentTab];
+    tabs.innerHTML = sorts.map(function (s) {
+      return '<div class="st-item' + (currentSort === s.key ? ' active' : '') + '" data-sort="' + s.key + '">' + s.label + '</div>';
+    }).join('');
+    tabs.querySelectorAll('.st-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        currentSort = el.dataset.sort;
+        renderSortTabs();
+        renderList();
+        setTimeout(function () { scrollToSticky(); }, 250);
+      });
+    });
+  }
+
+  /* ===== 渲染统计条（一句话：当前筛选后总数 + 细分三项，随筛选联动） ===== */
+  function renderStats(list) {
+    var stats = document.getElementById('resultStats');
+    var total = list.length;
+    var verified = list.filter(function (r) { return r.verified; }).length;
+    var urgent = list.filter(function (r) { return r.urgent; }).length;
+    var isEnt = currentTab === 'enterprise';
+    var unit = isEnt ? '家' : '位';
+    var noun = isEnt ? '招聘岗位' : '持证人才';
+    var label3 = isEnt ? '急聘' : '急寻';
+    stats.innerHTML =
+      '当前筛选出 <b class="rs-c1">' + total + '</b> ' + unit + noun + '，其中已核验 <b class="rs-c2">' + verified + '</b> ' + unit + '，' + label3 + ' <b class="rs-c3">' + urgent + '</b> ' + unit;
+  }
+
+  /* ===== 渲染列表（带过渡动效） ===== */
+  var isRendering = false;
+  var pageSize = 6, shownCount = 0;
+
+  function renderList() {
+    var container = document.getElementById('fullList');
+    var loadMoreBtn = document.getElementById('loadMore');
+    if (isRendering) return;
+    isRendering = true;
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(6px)';
+    container.style.transition = 'opacity .2s ease, transform .2s ease';
+    setTimeout(function () {
+      var list = filtered();
+      renderStats(list);
+    if (!list.length) {
+      loadMoreBtn.style.display = 'none';
+      var isEnt = currentTab === 'enterprise';
+      var hasFilter = Object.keys(activeFilters).filter(function (k) { return activeFilters[k]; }).length > 0;
+      container.innerHTML = '<div class="empty-state">' +
+        '<div class="es-illustration">' +
+          '<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+            '<circle cx="60" cy="60" r="50" fill="var(--primary-soft)" opacity="0.5"/>' +
+            '<circle cx="60" cy="60" r="36" fill="var(--bg-card)"/>' +
+            '<path d="M45 52 L55 62 L78 40" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>' +
+            '<circle cx="60" cy="60" r="22" stroke="var(--primary)" stroke-width="2" stroke-dasharray="4 3" opacity="0.4"/>' +
+            '<path d="M52 58 L58 64 L70 52" stroke="var(--primary-dim)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="es-title">' + (hasFilter ? '没有找到匹配的' + (isEnt ? '招聘岗位' : '持证人才') : '暂无' + (isEnt ? '招聘岗位' : '持证人才') + '数据') + '</div>' +
+        '<div class="es-desc">' + (hasFilter ? '当前筛选条件下暂无结果，试试调整筛选条件' : '平台正在持续拓展' + (isEnt ? '企业招聘需求' : '持证人才资源') + '，敬请期待') + '</div>' +
+        (hasFilter ? '<button class="es-btn es-btn-primary" id="emptyReset">重置筛选条件</button>' : '') +
+        '<button class="es-btn es-btn-outline" id="emptyDelegate">' + (isEnt ? '发布招聘需求' : '委托顾问匹配') + '</button>' +
+        '<button class="es-btn es-btn-outline" id="emptyExclusive">提交专享委托</button>' +
+      '</div>';
+      if (hasFilter) {
+        document.getElementById('emptyReset').addEventListener('click', function () {
+          activeFilters = {};
+          currentSort = 'default';
+          renderCatBar();
+          renderSortTabs();
+          shownCount = 0;
+          renderList();
+          UI.toast('已重置筛选条件', 'ok');
+        });
+      }
+      document.getElementById('emptyDelegate').addEventListener('click', function () {
+        if (isEnt) openDelegate();
+        else { UI.toast('委托顾问功能开发中', 'info'); }
+      });
+      document.getElementById('emptyExclusive').addEventListener('click', openExclusiveConfirm);
+    } else {
+      if (shownCount <= 0) shownCount = Math.min(pageSize, list.length);
+      if (shownCount > list.length) shownCount = list.length;
+      container.innerHTML = window.Cards.render(list.slice(0, shownCount), '../supply/detail.html?id=');
+      injectDeliverButtons();
+      if (shownCount < list.length) {
+        loadMoreBtn.style.display = 'flex';
+        loadMoreBtn.innerHTML = '加载更多（' + (list.length - shownCount) + '） <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg>';
+      } else {
+        loadMoreBtn.style.display = 'none';
+        var isEntLf = currentTab === 'enterprise';
+        var lfIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>';
+        container.innerHTML += window.ListFooter.render({
+          icon: lfIcon,
+          title: isEntLf ? '已显示全部公开招聘岗位' : '已显示全部公开持证人才',
+          desc: isEntLf ? '没有更多岗位或存在私密招聘需求，发布需求或提交专享委托获取精准匹配' : '没有更多人才或存在私信人才信息，委托顾问或提交专享委托获取精准匹配',
+          buttons: [
+            { text: isEntLf ? '发布招聘需求' : '委托顾问匹配', style: 'outline', onClick: function () { if (isEntLf) openDelegate(); else UI.toast('委托顾问功能开发中', 'info'); } },
+            { text: '提交专享委托', style: 'outline', onClick: openExclusiveConfirm }
+          ]
+        });
+      }
+    }
+    injectDeliverButtons();
+    container.style.opacity = '1';
+    container.style.transform = 'translateY(0)';
+    ensureMinScrollHeight();
+    updateFilterBtn();
+    isRendering = false;
+    }, 180);
+  }
+
+  /* ===== 渲染急聘/急寻横向滚动区 ===== */
+  function renderHot() {
+    var list = currentData().filter(function (r) { return r.urgent; }).slice(0, 4);
+    var scroll = document.getElementById('hotScroll');
+    var titleText = document.getElementById('hotTitleText');
+    titleText.textContent = currentTab === 'enterprise' ? '急聘岗位' : '急寻人才';
+    if (!list.length) {
+      document.getElementById('hotSection').style.display = 'none';
+      return;
+    }
+    document.getElementById('hotSection').style.display = '';
+    scroll.innerHTML = list.map(function (r) {
+      var tagText = r.verified ? '已核验' : '';
+      var _tu = r.unlockPrice, _ts = (_tu && typeof _tu === 'object') ? _tu.singlePrice : (_tu || 29);
+      var _reg = r.registerStatus && typeof r.registerStatus === 'object' ? r.registerStatus.status : r.registerStatus;
+      var priceText = currentTab === 'enterprise' ? (r.budget || '面议') : ('¥' + _ts);
+      var hotTitleStr = currentTab === 'enterprise' ? r.title : ((r.nameMasked || r.name) + ' · ' + r.title);
+      var metaText = currentTab === 'enterprise'
+        ? r.location + ' · ' + _reg + ' · ' + r.certLevel
+        : r.location + ' · ' + r.experience + '经验 · ' + _reg;
+      return '<a href="../supply/detail.html?id=' + r.id + '" class="hot-card">' +
+        '<div class="hc-tags"><span class="tag" style="font-size:9px;padding:1px 6px;background:rgba(217,119,6,.1);color:var(--accent);border-color:rgba(217,119,6,.2);">' + (currentTab === 'enterprise' ? '急聘' : '急寻') + '</span>' +
+        (tagText ? '<span class="tag tag-success" style="font-size:9px;padding:1px 6px;">' + tagText + '</span>' : '') + '</div>' +
+        '<div class="hc-title">' + hotTitleStr + '</div>' +
+        '<div class="hc-meta">' + metaText + '</div>' +
+        '<div class="hc-bottom"><div class="hc-price">' + priceText + '</div><span class="hc-btn">查看</span></div>' +
+      '</a>';
+    }).join('');
+  }
+
+  /* ===== 筛选按钮状态 ===== */
+  function updateFilterBtn() {
+    var btn = document.getElementById('filterBtn');
+    var cnt = document.querySelector('#filterBtn .fb-count');
+    var count = Object.keys(activeFilters).filter(function (k) { return activeFilters[k]; }).length;
+    if (count > 0) {
+      btn.classList.add('active');
+      cnt.style.display = 'inline-flex';
+      cnt.textContent = count;
+    } else {
+      btn.classList.remove('active');
+      cnt.style.display = 'none';
+    }
+  }
+
+  /* ===== 渲染筛选面板 ===== */
+  function renderFilterPanel() {
+    var dims = FILTER_DIMS[currentTab];
+    var body = document.getElementById('filterBody');
+    body.innerHTML = dims.map(function (dim) {
+      var tags = dim.options.map(function (opt) {
+        var selected = tempFilters[dim.key] === opt;
+        var disabled = '';
+        if (dim.key === 'certLevel' || dim.key === 'certMajor') {
+          var selType = tempFilters.certType;
+          if (selType && CERT_CONFIG[selType]) {
+            var applicable = dim.key === 'certLevel' ? CERT_CONFIG[selType].levels : CERT_CONFIG[selType].majors;
+            if (applicable.indexOf(opt) === -1) disabled = ' disabled';
+          }
+        }
+        return '<div class="fs-tag' + (selected ? ' selected' : '') + disabled + '" data-key="' + dim.key + '" data-val="' + opt + '">' + opt + '</div>';
+      }).join('');
+      return '<div class="fs-group"><div class="fs-group-title">' + dim.label + '</div><div class="fs-tags">' + tags + '</div></div>';
+    }).join('');
+    body.querySelectorAll('.fs-tag').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (el.classList.contains('disabled')) return;
+        var key = el.dataset.key;
+        var val = el.dataset.val;
+        if (tempFilters[key] === val) delete tempFilters[key];
+        else tempFilters[key] = val;
+        /* 切换证书类型时，自动清理不适用的等级/专业筛选 */
+        if (key === 'certType' && tempFilters.certType) {
+          var cfg = CERT_CONFIG[tempFilters.certType];
+          if (cfg) {
+            if (tempFilters.certLevel && cfg.levels.indexOf(tempFilters.certLevel) === -1) delete tempFilters.certLevel;
+            if (tempFilters.certMajor && cfg.majors.indexOf(tempFilters.certMajor) === -1) delete tempFilters.certMajor;
+          }
+        }
+        renderFilterPanel();
+      });
+    });
+    /* 更新已选条件预览 */
+    var selectedArea = document.getElementById('filterSelected');
+    var selectedTags = document.getElementById('filterSelectedTags');
+    var selectedKeys = Object.keys(tempFilters);
+    if (selectedKeys.length === 0) {
+      selectedArea.style.display = 'none';
+    } else {
+      selectedArea.style.display = 'flex';
+      selectedTags.innerHTML = selectedKeys.map(function (k) {
+        var dim = dims.find(function (d) { return d.key === k; });
+        var label = dim ? dim.label : k;
+        var val = tempFilters[k];
+        return '<span class="fsl-tag" data-key="' + k + '">' + label + '：' + val + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>';
+      }).join('');
+      selectedTags.querySelectorAll('.fsl-tag').forEach(function (tag) {
+        tag.addEventListener('click', function () {
+          var k = tag.dataset.key;
+          delete tempFilters[k];
+          renderFilterPanel();
+        });
+      });
+    }
+  }
+
+  /* ===== 筛选面板交互 ===== */
+  function openFilter() {
+    tempFilters = Object.assign({}, activeFilters);
+    renderFilterPanel();
+    document.getElementById('filterMask').classList.add('show');
+    document.getElementById('filterSheet').classList.add('show');
+  }
+  function closeFilter() {
+    document.getElementById('filterMask').classList.remove('show');
+    document.getElementById('filterSheet').classList.remove('show');
+  }
+  document.getElementById('filterBtn').addEventListener('click', openFilter);
+  document.getElementById('filterMask').addEventListener('click', closeFilter);
+  document.getElementById('filterCancel').addEventListener('click', closeFilter);
+  document.getElementById('filterReset').addEventListener('click', function () {
+    tempFilters = {};
+    renderFilterPanel();
+  });
+  document.getElementById('filterConfirm').addEventListener('click', function () {
+    activeFilters = Object.assign({}, tempFilters);
+    closeFilter();
+    currentSort = 'default';
+    shownCount = 0;
+    renderCatBar();
+    renderSortTabs();
+    renderList();
+    setTimeout(function () { scrollToSticky(); }, 250);
+  });
+
+  /* ===== 委托弹窗交互 ===== */
+  var DM_CERT_OPTIONS = ['建造师', '造价工程师', '监理工程师', '安全工程师', '消防工程师', '结构工程师'];
+  var DM_SALARY_OPTIONS_ENT = ['面议', '10万以下', '10-20万', '20-30万', '30万以上'];
+  var DM_SALARY_OPTIONS_TALENT = ['面议', '10万以下', '10-20万', '20-30万', '30万以上'];
+
+  function renderDmTags(containerId, options, multi) {
+    var box = document.getElementById(containerId);
+    box.innerHTML = options.map(function (opt) {
+      return '<span class="dm-tag" data-val="' + opt + '">' + opt + '</span>';
+    }).join('');
+    box.querySelectorAll('.dm-tag').forEach(function (tag) {
+      tag.addEventListener('click', function () {
+        if (multi) {
+          tag.classList.toggle('selected');
+        } else {
+          box.querySelectorAll('.dm-tag').forEach(function (t) { t.classList.remove('selected'); });
+          tag.classList.add('selected');
+        }
+      });
+    });
+  }
+  function resetDmForm() {
+    document.getElementById('dmName').value = '';
+    document.getElementById('dmPhone').value = '';
+    document.getElementById('dmRemark').value = '';
+    document.querySelectorAll('#dmForm .dm-tag.selected').forEach(function (t) { t.classList.remove('selected'); });
+  }
+  function openDelegate() {
+    var isEnt = currentTab === 'enterprise';
+    document.getElementById('dmTitle').textContent = isEnt ? '发布招聘需求' : '委托顾问匹配';
+    document.getElementById('dmDesc').textContent = isEnt
+      ? '填写您的需求，平台专属顾问将在2小时内为您精准匹配持证人才'
+      : '填写您的求职意向，平台专属顾问将为您匹配合适的企业岗位';
+    document.getElementById('dmCertLabel').textContent = isEnt ? '所需证书类型（可多选）' : '持有证书（可多选）';
+    document.getElementById('dmSalaryLabel').textContent = isEnt ? '薪资范围' : '期望薪资';
+    document.getElementById('dmDescLabel').textContent = isEnt ? '需求描述（选填）' : '求职意向（选填）';
+    renderDmTags('dmCertTags', DM_CERT_OPTIONS, true);
+    renderDmTags('dmSalaryTags', isEnt ? DM_SALARY_OPTIONS_ENT : DM_SALARY_OPTIONS_TALENT, false);
+    resetDmForm();
+    document.getElementById('delegateMask').classList.add('show');
+    document.getElementById('delegateModal').classList.add('show');
+  }
+  function closeDelegate() {
+    document.getElementById('delegateMask').classList.remove('show');
+    document.getElementById('delegateModal').classList.remove('show');
+  }
+  document.getElementById('delegateMask').addEventListener('click', closeDelegate);
+  document.getElementById('dmClose').addEventListener('click', closeDelegate);
+
+  /* ===== 加载更多 ===== */
+  document.getElementById('loadMore').addEventListener('click', function () {
+    var list = filtered();
+    shownCount = Math.min(shownCount + pageSize, list.length);
+    renderList();
+  });
+
+  /* ===== 提交专享委托确认弹窗 ===== */
+  function openExclusiveConfirm() {
+    document.getElementById('exclusiveMask').classList.add('show');
+    document.getElementById('exclusiveModal').classList.add('show');
+  }
+  function closeExclusiveConfirm() {
+    document.getElementById('exclusiveMask').classList.remove('show');
+    document.getElementById('exclusiveModal').classList.remove('show');
+  }
+  document.getElementById('exclusiveMask').addEventListener('click', closeExclusiveConfirm);
+  document.getElementById('exclusiveCancel').addEventListener('click', closeExclusiveConfirm);
+  document.getElementById('exclusiveOk').addEventListener('click', function () {
+    closeExclusiveConfirm();
+    try {
+      var ac = Delegates.authContact();
+      Delegates.add({
+        biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
+        type: '专享委托', qualLevel: '', mode: '', budget: '',
+        region: { province: '', city: '', text: '全国' },
+        contact: ac.name, phone: ac.phone, backup: '', note: '',
+        status: '等待承接'
+      });
+    } catch (e) {}
+    UI.toast('已提交专享委托，顾问将在2小时内联系您', 'ok');
+  });
+  /* 暴露给页面内联入口（空态/页脚按钮使用） */
+  window.openDelegate = openDelegate;
+  window.openExclusiveConfirm = openExclusiveConfirm;
+  document.getElementById('dmSubmit').addEventListener('click', function () {
+    var name = document.getElementById('dmName').value.trim();
+    var phone = document.getElementById('dmPhone').value.trim();
+    if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
+    if (!phone) { UI.toast('请输入您的手机号', 'warn'); return; }
+    if (!/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
+    /* 归属统一委托库：记录本次委托（招聘需求 / 委托顾问） */
+    try {
+      var certs = Array.prototype.map.call(document.querySelectorAll('#dmCertTags .dm-tag.selected'), function (t) { return t.dataset.val; });
+      var salaryEl = document.querySelector('#dmSalaryTags .dm-tag.selected');
+      var remark = document.getElementById('dmRemark') ? document.getElementById('dmRemark').value.trim() : '';
+      Delegates.add({
+        biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
+        type: currentTab === 'enterprise' ? '招聘需求' : '委托顾问',
+        qualLevel: '', mode: '', budget: '',
+        region: { province: '', city: '', text: '全国' },
+        contact: name, phone: phone, backup: '',
+        certTypes: certs, salary: salaryEl ? salaryEl.dataset.val : '',
+        note: remark || (certs.length ? '证书/资质：' + certs.join('、') : ''),
+        status: '等待承接'
+      });
+    } catch (e) {}
+    /* 提交成功动画 */
+    var modal = document.getElementById('delegateModal');
+    var form = document.getElementById('dmForm');
+    var submitBtn = document.getElementById('dmSubmit');
+    submitBtn.textContent = '提交中...';
+    submitBtn.style.opacity = '.7';
+    setTimeout(function () {
+      form.style.display = 'none';
+      var successHtml = '<div style="text-align:center;padding:30px 20px 20px;">' +
+        '<div style="width:64px;height:64px;border-radius:50%;background:var(--success-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:successPop .4s ease;">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" style="width:32px;height:32px;animation:checkDraw .5s ease .2s both;"><polyline points="20 6 9 17 4 12"/></svg>' +
+        '</div>' +
+        '<div style="font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:6px;">提交成功</div>' +
+        '<div style="font-size:12.5px;color:var(--text-2);line-height:1.6;">平台专属顾问将在 <b style="color:var(--primary-dim);">2小时内</b> 与您联系<br>请保持电话畅通</div>' +
+        '</div>';
+      modal.insertAdjacentHTML('afterbegin', '<div id="dmSuccess">' + successHtml + '</div>');
+      setTimeout(function () {
+        closeDelegate();
+        setTimeout(function () {
+          var successEl = document.getElementById('dmSuccess');
+          if (successEl) successEl.remove();
+          form.style.display = '';
+          submitBtn.textContent = '提交需求';
+          submitBtn.style.opacity = '1';
+        }, 300);
+      }, 1200);
+    }, 500);
+  });
+
+  /* ===== 双端切换 ===== */
+  document.querySelectorAll('#tabBar .tab-item').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var tab = el.dataset.tab;
+      if (tab === currentTab) return;
+      currentTab = tab;
+      currentSort = 'default';
+      activeFilters = {};
+      shownCount = 0;
+      document.querySelectorAll('#tabBar .tab-item').forEach(function (x) { x.classList.remove('active'); });
+      el.classList.add('active');
+      document.getElementById('listTitle').textContent = tab === 'enterprise' ? '全部招聘岗位' : '全部持证人才';
+      renderCatBar();
+      renderSortTabs();
+      renderHot();
+      renderList();
+    });
+  });
+
+  /* ===== 吸顶检测 ===== */
+  var scrollEl = document.querySelector('.scroll');
+  var stickyBar = document.getElementById('stickyFilterBar');
+  function checkSticky() {
+    if (!stickyBar || !scrollEl) return;
+    var sr = scrollEl.getBoundingClientRect();
+    var br = stickyBar.getBoundingClientRect();
+    if (br.top <= sr.top + 2) stickyBar.classList.add('is-stuck');
+    else stickyBar.classList.remove('is-stuck');
+  }
+  if (scrollEl) scrollEl.addEventListener('scroll', checkSticky);
+  window.addEventListener('resize', checkSticky);
+  setTimeout(checkSticky, 100);
+
+  /* ===== 统一滚动到吸顶栏 ===== */
+  function scrollToSticky() {
+    if (scrollEl && stickyBar) {
+      var barRect = stickyBar.getBoundingClientRect();
+      var scrollRect = scrollEl.getBoundingClientRect();
+      scrollEl.scrollBy({ top: barRect.top - scrollRect.top, behavior: 'smooth' });
+      setTimeout(checkSticky, 300);
+    }
+  }
+
+  /* ===== 最小高度保障 ===== */
+  function ensureMinScrollHeight() {
+    var spacer = document.getElementById('listSpacer');
+    if (!spacer || !stickyBar || !scrollEl) return;
+    var barTop = stickyBar.offsetTop;
+    var barH = stickyBar.offsetHeight;
+    spacer.style.minHeight = '0';
+    var needed = barTop + barH + scrollEl.clientHeight;
+    var current = scrollEl.scrollHeight;
+    if (current < needed) spacer.style.minHeight = (needed - current + 30) + 'px';
+    else spacer.style.minHeight = '0';
+  }
+
+  /* ============================================================
+     v3.1: 简历投递门控
+     ============================================================ */
+  var pendingDeliverId = null;
+  window.checkAndDeliver = function(jobId){
+    pendingDeliverId = jobId;
+    /* 已投递：直接提示 */
+    if(window.ApplyStore && ApplyStore.hasApplied(jobId)){
+      UI.toast('您已投递该岗位，可在「我的投递」中查看状态','info');
+      return;
+    }
+    var result = {can:false, reason:'请先完成个人入驻', userType:''};
+    try{
+      if(window.DataBus && DataBus.canDeliverResume){
+        result = DataBus.canDeliverResume();
+      }
+    }catch(e){ console.warn('canDeliverResume error', e); }
+    if(result.can){
+      /* 有权限：弹出投递表单 */
+      openApplySheet(jobId);
+    } else {
+      /* 无权限：弹出引导弹窗，按身份动态切换 CTA */
+      document.getElementById('deliverModalDesc').textContent = result.reason || '请先完成个人入驻并完善简历信息';
+      setupDeliverCta(result);
+      openDeliverModal();
+    }
+  };
+
+  /* 阶段三：列表页投递表单 */
+  function openApplySheet(jobId){
+    var jobData = null;
+    try{
+      var all = (window.MOCK && MOCK.personnel) ? MOCK.personnel : [];
+      for(var i=0;i<all.length;i++){ if(String(all[i].id)===String(jobId)){ jobData=all[i]; break; } }
+    }catch(e){}
+    var jobTitle = jobData ? (jobData.title || jobData.name || '') : '';
+    var company = jobData ? (jobData.company || '') : '';
+    /* 预填姓名和电话 */
+    var preName = '', prePhone = '';
+    try{
+      var auth = window.AuthStore ? AuthStore.read() : {};
+      if(auth.realname && auth.realname.name) preName = auth.realname.name;
+      if(auth.realname && auth.realname.mobile) prePhone = auth.realname.mobile;
+      if(auth.personalEntry && auth.personalEntry.profile && auth.personalEntry.profile.basic){
+        if(auth.personalEntry.profile.basic.mobile) prePhone = auth.personalEntry.profile.basic.mobile;
+      }
+    }catch(e){}
+    var sh = UI.sheet();
+    sh.setText('投递简历 · ' + (jobTitle||'').substring(0,20));
+    sh.html('<div style="padding:6px 2px 14px;">'+
+      '<div style="font-size:12px;color:var(--text-2);margin-bottom:12px;">投递后企业将在24小时内查看，感兴趣后平台为您对接联系方式</div>'+
+      '<input id="lp-name" placeholder="姓名 *" class="sheet-input" value="'+escHtml(preName)+'">'+
+      '<input id="lp-phone" placeholder="联系电话 *" class="sheet-input" style="margin-top:10px;" value="'+escHtml(prePhone)+'">'+
+      '<textarea id="lp-msg" rows="3" placeholder="自我介绍（选填）" class="sheet-textarea" style="margin-top:10px;"></textarea>'+
+      '<div style="padding:8px 10px;background:rgba(43,107,79,.06);border:1px solid rgba(43,107,79,.15);border-radius:8px;margin-top:10px;"><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">隐私保护：</b>您的联系方式仅在企业确认感兴趣后由平台对接</div></div>'+
+      '<button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="confirmListApply(\''+jobId+'\',\''+escHtml(jobTitle)+'\',\''+escHtml(company)+'\')">提交投递</button>'+
+      '<button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="UI.closeSheet()">取消</button></div>');
+    sh.show();
+  }
+  function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  window.confirmListApply = function(jobId, jobTitle, company){
+    var name = (document.getElementById('lp-name')||{}).value.trim();
+    var phone = (document.getElementById('lp-phone')||{}).value.trim();
+    var msg = (document.getElementById('lp-msg')||{}).value.trim();
+    if(!name){ UI.toast('请输入姓名','warn'); return; }
+    if(!phone || !/^1\d{10}$/.test(phone)){ UI.toast('请输入正确的手机号','warn'); return; }
+    try{
+      if(window.ApplyStore){
+        ApplyStore.add({
+          jobId: jobId, jobTitle: jobTitle, company: company,
+          resumeSnapshot: { name: name, phone: phone },
+          applyMsg: msg, status: 'pending'
+        });
+      }
+    }catch(e){ console.warn('apply error', e); }
+    UI.closeSheet();
+    UI.toast('投递成功，企业将尽快与您联系','ok');
+    /* 更新当前卡片按钮状态 */
+    var cards = document.querySelectorAll('#fullList .job-card');
+    cards.forEach(function(card){
+      var href = card.getAttribute('href') || '';
+      var id = href.indexOf('id=') > -1 ? href.split('id=')[1] : '';
+      if(id === jobId){
+        var btn = card.querySelector('.card-deliver-btn');
+        if(btn){ btn.textContent = '已投递'; btn.style.opacity = '0.6'; btn.style.cursor = 'default'; btn.onclick = null; }
+      }
+    });
+  };
+  /* E2-11：按身份动态切换引导 CTA（未注册→去登录 / 已注册未实名→去实名 / 其余→去完善简历） */
+  var deliverCtaHref = '../profile/auth-qualification.html?mode=edit';
+  function setupDeliverCta(result){
+    var btn = document.getElementById('deliverGoEdit');
+    var loggedIn = false;
+    try { var me = window.DataBus && DataBus.current(); loggedIn = !!(me && me.id); } catch(e){}
+    var rnOk = false;
+    try { var rn = window.AuthStore ? AuthStore.read().realname : null; rnOk = !!(rn && rn.ok); } catch(e){}
+    var label, href;
+    if(!loggedIn){ label='去登录'; href='../auth/login.html'; }
+    else if(!rnOk){ label='去实名'; href='../profile/auth-personal.html'; }
+    else { label='去完善简历'; href='../profile/auth-qualification.html?mode=edit'; }
+    deliverCtaHref = href;
+    if(btn) btn.textContent = label;
+  }
+  function openDeliverModal(){
+    document.getElementById('deliverMask').classList.add('show');
+    document.getElementById('deliverModal').classList.add('show');
+  }
+  function closeDeliverModal(){
+    document.getElementById('deliverMask').classList.remove('show');
+    document.getElementById('deliverModal').classList.remove('show');
+  }
+  document.getElementById('deliverMask').addEventListener('click', closeDeliverModal);
+  document.getElementById('deliverCancel').addEventListener('click', closeDeliverModal);
+  document.getElementById('deliverGoEdit').addEventListener('click', function(){
+    closeDeliverModal();
+    location.href = deliverCtaHref;
+  });
+  /* ESC键关闭 */
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' || e.keyCode === 27){
+      if(document.getElementById('deliverModal').classList.contains('show')){
+        closeDeliverModal();
+      }
+    }
+  });
+
+  /* v3.1: 向渲染后的job-card注入投递按钮 */
+  function injectDeliverButtons(){
+    if(currentTab !== 'enterprise') return;
+    var cards = document.querySelectorAll('#fullList .job-card');
+    cards.forEach(function(card){
+      if(card.querySelector('.card-deliver-btn')) return;
+      var href = card.getAttribute('href') || '';
+      var id = href.indexOf('id=') > -1 ? href.split('id=')[1] : '';
+      var btn = document.createElement('button');
+      btn.className = 'card-deliver-btn';
+      /* 阶段三：已投递的岗位显示已投递状态 */
+      var applied = window.ApplyStore && ApplyStore.hasApplied(id);
+      if(applied){
+        btn.textContent = '已投递';
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'default';
+      } else {
+        btn.textContent = '投递简历';
+        btn.setAttribute('data-id', id);
+        btn.onclick = function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          checkAndDeliver(id);
+        };
+      }
+      card.appendChild(btn);
+    });
+  }
+
+  /* ===== 初始化 ===== */
+  if (currentTab === 'talent') {
+    document.querySelectorAll('#tabBar .tab-item').forEach(function (x) { x.classList.toggle('active', x.dataset.tab === 'talent'); });
+    var _lt = document.getElementById('listTitle'); if (_lt) _lt.textContent = '全部持证人才';
+    var _dt = document.getElementById('delegateTitle'); if (_dt) _dt.textContent = '找不到合适的岗位？委托顾问匹配';
+    var _dd = document.getElementById('delegateDesc'); if (_dd) _dd.textContent = '人才免费委托，平台匹配合适企业';
+  }
+  renderCatBar();
+  renderSortTabs();
+  renderHot();
+  renderList();
+  /* E2-12：完成实名/入驻后，投递按钮状态即时刷新 */
+  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); });
+  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); });
+})();
+</script>
+</body>
+</html>

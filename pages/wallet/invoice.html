@@ -24,7 +24,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="scroll" style="padding-top:8px;">
     <div class="group">
       <div class="row" id="btn-apply"><span class="row-icon" style="background:var(--primary-soft);color:var(--primary)">＋</span><span class="label">申请开票</span><span class="arrow">›</span></div>
-      <div class="row" onclick="UI.toast('已催开票，财务将加急处理','ok')"><span class="row-icon" style="background:rgba(255,214,10,.16)"><svg class="ic"><use href="#i-clock"/></svg></span><span class="label">催开票</span><span class="arrow">›</span></div>
+      <div class="row" onclick="urgeInvoice()"><span class="row-icon" style="background:rgba(255,214,10,.16)"><svg class="ic"><use href="#i-clock"/></svg></span><span class="label">催开票</span><span class="arrow">›</span></div>
       <div class="row" onclick="location.href='invoice-info.html'"><span class="row-icon" style="background:var(--primary-soft);color:var(--primary)"><svg class="ic"><use href="#i-edit"/></svg></span><span class="label">开票信息管理</span><span class="value" id="title-count">0 个抬头</span><span class="arrow">›</span></div>
     </div>
 
@@ -75,6 +75,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function () {
   window.__ROOT__ = '../../';
+  /* P2-7 游客门控：未登录不渲染发票数据、不允许提交申请 */
+  function isLoggedIn() { try { var st = UI.state.get(); return !!(st && st.loggedIn); } catch (e) { return false; } }
+  function ensureGuestGate() {
+    if (isLoggedIn()) return false;
+    var phone = document.querySelector('.phone');
+    if (!phone) return true;
+    var gate = document.createElement('div');
+    gate.style.cssText = 'position:absolute;inset:0;background:var(--bg);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;';
+    gate.innerHTML =
+      '<svg class="ic" viewBox="0 0 24 24" style="width:46px;height:46px;margin-bottom:14px;color:var(--text-2);" aria-hidden="true"><use href="#i-lock"></use></svg>' +
+      '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">登录后查看发票</div>' +
+      '<div style="font-size:12px;color:var(--text-3);text-align:center;margin-bottom:24px;">开票记录与申请仅对登录用户可见</div>' +
+      '<a href="../auth/login.html" style="display:inline-block;padding:12px 40px;background:var(--primary);color:var(--text-inv);border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;">去登录</a>';
+    phone.appendChild(gate);
+    return true;
+  }
   var TITLE_KEY = 'engchain-invoice-titles';
   var invType = '增值税普通发票';
 
@@ -126,7 +142,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
     var settledStates = { settled: 1, paid: 1, completed: 1, finished: 1, done: 1 };
     return orders.filter(function (o) {
-      if (!(o.owner === uid || o.counterparty === acct)) return false;
+      if (!(o.owner === uid || o.counterparty === uid || o.counterparty === acct)) return false;/* P2-6 补全对家为当前用户的可开票订单 */
       return settledStates[o.state] || settledStates[o.status];
     });
   }
@@ -160,7 +176,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var uid = me ? me.id : '';
     var acct = '';
     try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
-    var mine = orders.filter(function (o) { return o.owner === uid || o.counterparty === acct; });
+    var mine = orders.filter(function (o) { return o.owner === uid || o.counterparty === uid || o.counterparty === acct; });/* P2-6 与订单列表过滤一致 */
     sel.innerHTML = '<option value="">不关联订单</option>' + mine.slice(0, 20).map(function (o) {
       var amt = Number(o.amount) || 0;
       return '<option value="' + o.id + '" data-amt="' + amt + '">' + o.id + ' · ' + esc(o.title || '').slice(0, 16) + '（¥' + amt.toLocaleString() + '）</option>';
@@ -205,7 +221,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }).join('');
   }
 
-  function render() {
+  function render() { if (!isLoggedIn()) return;/* P2-7 游客不渲染发票数据 */
     renderTitleSelect();
     renderOrderSelect();
     renderList();
@@ -263,7 +279,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     document.getElementById('apply-form').style.display = 'none';
   };
 
-  window.submitApply = function () {
+  window.submitApply = function () { if (!isLoggedIn()) { UI.toast('请先登录','warn'); return; }/* P2-7 游客禁止提交申请 */
     var titles = loadTitles();
     var titleIdx = document.getElementById('f-title').value;
     var title = titles[titleIdx];
@@ -312,7 +328,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   window.addEventListener('engchain:invoice', render);
   window.addEventListener('engchain:store-change', render);
-  render();
+  /* P3-19 催开票：关联当前待处理发票号，无待处理单时标注演示 */
+  window.urgeInvoice = function () {
+    var id = '';
+    try {
+      var list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []);
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var uid = me ? me.id : '';
+      var mine = (list || []).filter(function (x) { return (!x.uid || x.uid === uid) && x.status !== 'rejected' && x.status !== 'issued'; });
+      if (mine.length) id = mine[0].invoiceNo || mine[0].id || '';
+    } catch (e) {}
+    UI.toast(id ? ('已催开票（发票号：' + id + '），财务将加急处理') : '已催开票，财务将加急处理（演示）', 'ok');
+  };
+
+  if (ensureGuestGate()) { /* P2-7 游客：遮罩登录引导，不渲染、不允许操作 */ } else { render(); }
 })();
 </script>
 </body>
