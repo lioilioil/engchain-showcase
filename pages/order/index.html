@@ -106,13 +106,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
   var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
   var currentTab = 'all';
+  /* P1-5 解析 ?tab= 参数并同步 seg 激活态 */
+  var _tp = new URLSearchParams(location.search).get('tab');
+  if (_tp === 'normal' || _tp === 'mediation') currentTab = _tp;
+  document.querySelectorAll('.seg-item').forEach(function(x){ x.classList.toggle('is-on', x.getAttribute('data-tab')===currentTab); });
 /* 状态 chips 分组（E3-15） */
   var STATUS_GROUPS = {
     pending:   ['pending', 'draft'],
-    serving:   ['serving', 'escrowed'],
+    serving:   ['serving', 'escrowed', 'disputed'],/* P2-12 纠纷中归入服务中 */
     await:     ['await_accept', 'await_confirm'],
     settled:   ['settled'],
-    refunded:  ['refunded', 'partial_refund', 'cancelled']
+    refunded:  ['refunded', 'partial_refund']/* P3-17 取消单从退款分组移出，仅在“全部”可见 */
   };
   var statusFilter = 'all';
 function currentUser() {
@@ -217,7 +221,7 @@ function currentUser() {
     }
     empty.style.display = 'none';
     list.innerHTML = all.map(function (o) {
-      var st = STATUS_MAP[o.status] || STATUS_MAP.pending;
+      var st = STATUS_MAP[o.status] || { label: '未知', cls: 'tag-gray' };/* P3-16 未知状态中性灰色兜底 */
       var amt = o.amount ? UI.money(o.amount) : '面议';
       var escrowBadge = o.kind === 'mediation' ? '<span class="tag tag-gold" style="margin-left:6px;font-size:10px;">托管</span>' : '';
       return '<div class="card" style="margin-bottom:10px;cursor:pointer;" onclick="location.href=\'' + o.detailUrl + '\'">' +
