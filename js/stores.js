@@ -827,6 +827,134 @@
     };
   };
 
+  /* ---- 需求广场（v4.0 双向撮合）：买家发布需求 → 服务商报价 → 买家接受报价生成托管单 ----
+     需求状态机：open(开放报价) → quoted(已有报价) → matched(已接受报价) → closed(已转订单)
+                 / expired(超时自动关闭) / cancelled(买家取消)
+     报价 status：pending(待选择) / accepted(被接受) / declined(被拒绝) / withdrawn(撤回)
+     规则：需求发布即开放（实名即可），超时（commission.demandExpireDays，默认7天）未成交自动关闭；
+           买家可接受一个报价 → 生成订单后 markOrdered 关闭需求；服务商可撤回自己的 pending 报价 */
+  var DemandStore = makeStore('engchain-agency-demands', { items: [] }, 'engchain:demand');
+  DemandStore.expireDays = function () {
+    return (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.demandExpireDays) || 7;
+  };
+  DemandStore.create = function (input) {
+    var s = this.read();
+    var d = Object.assign({
+      id: 'DM' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      buyerId: input.buyerId || '', title: input.title || '', goal: input.goal || '',
+      state: input.state || '', time: input.time || '', budget: input.budget || '',
+      budgetWan: Number(input.budgetWan) || 0, desc: input.desc || '',
+      status: 'open', quotes: [], orderId: '', createdAt: Date.now(),
+      expiresAt: Date.now() + this.expireDays() * 86400000, updatedAt: Date.now()
+    }, input);
+    s.items.unshift(d); this.write(s); return d;
+  };
+  DemandStore._expire = function () {
+    var s = this.read(), now = Date.now(), changed = false;
+    s.items.forEach(function (d) {
+      if ((d.status === 'open' || d.status === 'quoted') && d.expiresAt && d.expiresAt <= now) {
+        d.status = 'expired'; d.updatedAt = now; changed = true;
+      }
+    });
+    if (changed) this.write(s);
+  };
+  DemandStore.list = function (opt) {
+    this._expire();
+    opt = opt || {};
+    var a = this.read().items.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
+    if (opt.buyerId) a = a.filter(function (d) { return d.buyerId === opt.buyerId; });
+    if (opt.sellerId) a = a.filter(function (d) { return (d.quotes || []).some(function (q) { return q.sellerId === opt.sellerId; }); });
+    if (opt.status) a = a.filter(function (d) { return d.status === opt.status; });
+    if (opt.openOnly) a = a.filter(function (d) { return d.status === 'open' || d.status === 'quoted'; });
+    return a;
+  };
+  DemandStore.byId = function (id) {
+    this._expire();
+    var items = this.read().items, i;
+    for (i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  };
+  DemandStore._save = function (d) {
+    var s = this.read(), found = false;
+    s.items.forEach(function (x, i) { if (x.id === d.id) { s.items[i] = d; found = true; } });
+    if (!found) s.items.unshift(d);
+    this.write(s); return d;
+  };
+  /* 服务商报价（需求 open/quoted 均可报；同一服务商对同一需求仅保留一条报价，重复报价视为修改） */
+  DemandStore.quote = function (id, input) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.status !== 'open' && d.status !== 'quoted') return { error: '该需求已结束报价' };
+    var sellerId = input.sellerId || '';
+    if (!sellerId) return { error: '缺少报价方' };
+    var amount = Number(input.amount) || 0;
+    if (!(amount > 0)) return { error: '请输入有效报价金额' };
+    var dup = null;
+    d.quotes.forEach(function (q) { if (q.sellerId === sellerId) dup = q; });
+    if (dup) {
+      dup.amount = amount; dup.note = input.note || dup.note || ''; dup.updatedAt = Date.now();
+    } else {
+      d.quotes.push({
+        id: 'DQ' + Date.now() + Math.floor(Math.random() * 90 + 10),
+        sellerId: sellerId, sellerName: input.sellerName || '', amount: amount,
+        note: input.note || '', status: 'pending', createdAt: Date.now(), updatedAt: Date.now()
+      });
+    }
+    d.status = 'quoted'; d.updatedAt = Date.now();
+    this._save(d); return { demand: d, quote: dup || d.quotes[d.quotes.length - 1] };
+  };
+  DemandStore.quoteOf = function (id, sellerId) {
+    var d = this.byId(id);
+    if (!d || !sellerId) return null;
+    var hit = null;
+    (d.quotes || []).forEach(function (q) { if (q.sellerId === sellerId) hit = q; });
+    return hit;
+  };
+  DemandStore.withdrawQuote = function (id, qid, sellerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    var q = null;
+    d.quotes = d.quotes.filter(function (x) { if (x.id === qid && x.sellerId === sellerId && x.status === 'pending') { q = x; return false; } return true; });
+    if (!q) return { error: '无可撤回的报价' };
+    if (!d.quotes.length) d.status = 'open';
+    d.updatedAt = Date.now(); this._save(d); return d;
+  };
+  /* 买家接受报价：需求 → matched（保留选中报价）；随后在订单创建页按报价生成托管单并 markOrdered */
+  DemandStore.acceptQuote = function (id, qid, buyerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId !== buyerId) return { error: '无权操作该需求' };
+    if (d.status === 'closed' || d.status === 'matched') return { error: '需求已成交' };
+    var q = null;
+    (d.quotes || []).forEach(function (x) { if (x.id === qid) q = x; });
+    if (!q) return { error: '报价不存在' };
+    d.quotes.forEach(function (x) { x.status = (x.id === qid) ? 'accepted' : 'declined'; });
+    d.status = 'matched'; d.selectedQuoteId = qid; d.updatedAt = Date.now();
+    this._save(d); return { demand: d, quote: q };
+  };
+  DemandStore.markOrdered = function (id, orderId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    d.status = 'closed'; d.orderId = orderId || d.orderId || ''; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+  DemandStore.cancel = function (id, buyerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId !== buyerId) return { error: '无权操作该需求' };
+    if (d.status === 'closed') return { error: '已成交需求不可取消' };
+    d.status = 'cancelled'; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+
+  DemandStore.platformClose = function (id, note) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.status === 'closed') return { error: '需求已成交，不可下架' };
+    d.status = 'cancelled'; d.platformClosed = true; d.platformNote = note || ''; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+
   /* ---- 服务评价聚合（v3.2）：订单评价回流到服务卡片，形成口碑资产 ---- */
   var SvcRatingStore = makeStore('engchain-svc-ratings', { items: {} }, 'engchain:svc-rating');
   SvcRatingStore.add = function (svcId, score) {
@@ -993,7 +1121,7 @@
     var total = Math.round(amount * rate);
     /* [FIX BM-027] 修复：原保底仅在 amount>=1000000 时检查（3% 档下 1000000*0.03=30000>10000 永不触发），
        改为所有费率档计算后统一校验保底 minCommission。 */
-    if (amount > 0 && total < cm.minCommission) total = cm.minCommission;
+    if (amount > 0 && amount >= 500000 && total < cm.minCommission) total = cm.minCommission;
     return { rate: rate, fee: total };
   }
 
@@ -1486,6 +1614,7 @@
   window.SupplyStore = SupplyStore;
   window.ApplyStore = ApplyStore;
   window.LeadStore = LeadStore;
+  window.DemandStore = DemandStore;
   window.SvcRatingStore = SvcRatingStore;
   window.ModeStore = ModeStore;
   window.MemberStore = MemberStore;

@@ -23,7 +23,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
 
   <div class="scroll" style="padding-top:8px;padding-bottom:40px;">
-    <!-- 状态筛选 -->
+    <!-- 双视图：我的订单 / 我发布的需求 -->
+    <div class="mo-seg">
+      <button class="seg on" id="seg-orders" onclick="window.switchView('orders')">我的订单</button>
+      <button class="seg" id="seg-demands" onclick="window.switchView('demands')">我发布的需求</button>
+    </div>
+
+    <!-- 状态筛选（订单视图） -->
     <div class="mo-filters" id="mo-filters">
       <span class="chip on" data-f="all">全部</span>
       <span class="chip" data-f="intent">待启动</span>
@@ -32,12 +38,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <span class="chip" data-f="refunded">已退款</span>
     </div>
 
-    <!-- 订单列表 -->
+    <!-- 列表（订单 / 需求共用容器） -->
     <div id="mo-list"><div class="card"><div class="text-3 fs-12">加载中…</div></div></div>
 
     <!-- 说明条 -->
     <div class="mo-note">在线下单的资金由持牌机构托管，按里程碑验收后释放给服务商；未成交全额退款。</div>
   </div>
+</div>
+
+<!-- 需求报价弹层 -->
+<div class="dqm-mask" id="dqm-mask" onclick="window.closeDemandQuotes()"></div>
+<div class="dqm-sheet" id="dqm-sheet">
+  <div class="dqm-head"><span class="dqm-title">机构报价</span><button class="dqm-close" onclick="window.closeDemandQuotes()">✕</button></div>
+  <div class="dqm-sub" id="dqm-sub"></div>
+  <div class="dqm-body" id="dqm-body"></div>
 </div>
 
 <script src="../../js/data.js"></script>
@@ -58,7 +72,17 @@ var GROUPS=[
   {f:'settled',label:'已完成',test:function(o){return o.state==='settled';}},
   {f:'refunded',label:'已退款',test:function(o){return ['refunded','partial_refund','cancelled'].indexOf(o.state)>=0;}}
 ];
-var curF='all';
+var curF='all',curView='orders';
+var DEM_ST={open:{t:'开放报价',c:'var(--success)'},quoted:{t:'已有报价',c:'var(--primary-dim)'},matched:{t:'已匹配·待下单',c:'var(--blue)'},closed:{t:'已成交',c:'var(--text-3)'},expired:{t:'已过期',c:'var(--text-3)'},cancelled:{t:'已取消',c:'var(--text-3)'}};
+window.switchView=function(v){
+  curView=v;
+  var so=document.getElementById('seg-orders'),sd=document.getElementById('seg-demands');
+  if(so)so.classList.toggle('on',v==='orders');
+  if(sd)sd.classList.toggle('on',v==='demands');
+  var fe=document.getElementById('mo-filters');
+  if(fe)fe.style.display=v==='orders'?'':'none';
+  render();
+};
 function renderFilters(){
   var el=document.getElementById('mo-filters');if(!el)return;
   el.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.getAttribute('data-f')===curF);});
@@ -76,9 +100,13 @@ function subOf(o,mm){
   if(o.state==='settled')return '已结算 · 合同额 '+fmt(o.amount);
   if(o.state==='refunded'||o.state==='partial_refund'||o.state==='cancelled')return '退款 '+fmt((o.refund&&o.refund.amount)||o.intentAmount||0);
   if(o.state==='disputed')return '平台介入中 · 合同额 '+fmt(o.amount);
-  return '托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released);
+  var s='托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released);
+  if(o.state==='escrowed'){
+    try{ var est=Mediation.escrowStatus(o.id); if(est&&est.nearAutoCancel)s+=' · 超时未接单'; }catch(e){}
+  }
+  return s;
 }
-function render(){
+function renderOrders(){
   try{ if(window.Mediation&&Mediation.checkIntentTimeout)Mediation.checkIntentTimeout(); }catch(e){}
   var all=Mediation.list({uid:uid,role:'buyer'});
   var g=GROUPS.filter(function(x){return x.f===curF;})[0]||GROUPS[0];
@@ -97,6 +125,99 @@ function render(){
       '</div>';
   }).join('');
 }
+function demExpire(d){
+  if(d.status==='closed')return d.orderId?'单号 '+d.orderId:'已成交';
+  if(d.status==='expired')return '已到期关闭';
+  if(d.status==='cancelled')return '已取消';
+  var days=Math.max(0,Math.ceil((d.expiresAt-Date.now())/86400000));
+  return '距关闭 '+days+' 天';
+}
+function demAction(d){
+  if(d.status==='open')return '<span class="dm-btn" onclick="event.stopPropagation();window.cancelDemand(\''+d.id+'\')">取消需求</span>';
+  if(d.status==='quoted')return '<span class="dm-btn gold" onclick="event.stopPropagation();window.openDemandQuotes(\''+d.id+'\')">查看 '+d.quotes.length+' 家报价</span>';
+  if(d.status==='matched')return '<span class="dm-btn gold" onclick="event.stopPropagation();location.href=\'order.html?demandId='+d.id+'\'">去下单 ›</span>';
+  if(d.status==='closed'&&d.orderId)return '<span class="dm-btn" onclick="event.stopPropagation();location.href=\'order-detail.html?id='+d.orderId+'\'">查看订单</span>';
+  return '';
+}
+function renderDemands(){
+  var el=document.getElementById('mo-list');if(!el)return;
+  var list=window.DemandStore?DemandStore.list({buyerId:uid}):[];
+  if(!list.length){
+    el.innerHTML='<div class="mo-empty">'+
+      '<div class="me-ic2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>'+
+      '<div class="fw-700 fs-14" style="color:var(--text-1);">还没有发布需求</div>'+
+      '<div class="text-3 fs-12" style="margin-top:5px;line-height:1.7;">在服务广场发布服务需求后，机构可报价，您在此查看并选择成交</div>'+
+      '<a class="mo-cta" href="index.html">去发布需求 ›</a></div>';
+    return;
+  }
+  el.innerHTML=list.map(function(d){
+    var st=DEM_ST[d.status]||DEM_ST.open;
+    var qs=d.quotes||[];
+    var qline='';
+    if(d.status==='open')qline='暂无报价 · 已同步需求广场，等待机构响应';
+    else if(qs.length){
+      var amts=qs.map(function(q){return Number(q.amount)||0;}).filter(function(x){return x>0;});
+      var min=amts.length?Math.min.apply(null,amts):0;
+      qline='已有 <b>'+qs.length+'</b> 家机构报价'+(min?'，最低 '+fmt(min):'');
+    } else qline='已发布';
+    return '<div class="mo-card dm-card">'+
+      '<div class="mo-top"><div class="mo-name">'+d.title+'</div>'+
+      '<span class="mo-st" style="color:'+st.c+';background:color-mix(in srgb,'+st.c+' 10%,transparent);border-color:color-mix(in srgb,'+st.c+' 26%,transparent);">'+st.t+'</span></div>'+
+      '<div class="dm-sub">期望 '+((d.time||'').trim()||'面议')+' · 预算 '+(d.budgetWan?d.budgetWan+' 万':'面议')+(d.state?(' · 当前：'+(d.state||'')):'')+'</div>'+
+      '<div class="dm-quote">'+qline+'</div>'+
+      '<div class="mo-foot"><span class="mo-time">'+ftime(d.createdAt)+'</span><span class="dm-exp">'+demExpire(d)+'</span>'+demAction(d)+'</div>'+
+      '</div>';
+  }).join('');
+}
+function render(){
+  if(curView==='demands')renderDemands();
+  else renderOrders();
+}
+window.cancelDemand=function(id){
+  if(!window.DemandStore)return;
+  var r=DemandStore.cancel(id,uid);
+  if(r&&r.error){window.UI&&UI.toast(r.error,'warn');return;}
+  render();
+};
+window.openDemandQuotes=function(id){
+  var d=window.DemandStore?DemandStore.byId(id):null;
+  if(!d)return;
+  var sub=document.getElementById('dqm-sub'),body=document.getElementById('dqm-body');
+  if(sub)sub.textContent=d.title+' · 期望 '+(d.time||'面议')+' · 预算 '+(d.budgetWan?d.budgetWan+' 万':'面议');
+  if(body){
+    var qs=(d.quotes||[]).slice().sort(function(a,b){return (Number(a.amount)||0)-(Number(b.amount)||0);});
+    if(!qs.length){body.innerHTML='<div class="text-3 fs-12" style="text-align:center;padding:26px 0;">暂无报价</div>';}
+    else{
+      body.innerHTML=qs.map(function(q){
+        var sel=d.selectedQuoteId===q.id;
+        var acc=(q.status==='accepted');
+        return '<div class="dqm-item'+(acc?' on':'')+'">'+
+          '<div class="dqm-main"><div class="fw-700 fs-14" style="color:var(--text-1);">'+((q.sellerName||'').trim()||'金V 认证机构')+'</div>'+
+          '<div class="text-3 fs-11" style="margin-top:3px;line-height:1.6;">'+(q.note||'已核验机构报价')+'</div>'+
+          '<div class="text-4 fs-10" style="margin-top:4px;">'+ftime(q.createdAt)+'</div></div>'+
+          '<div class="dqm-right"><b class="mono" style="font-size:15px;color:var(--primary-dim);">'+fmt(q.amount)+'</b>'+
+          (sel?'<span class="dqm-sel">已选择</span>':(d.status==='matched'?'<span class="text-4 fs-10">未选</span>':'<button class="dqm-btn" onclick="window.acceptQuote(\''+d.id+'\',\''+q.id+'\')">接受报价</button>'))+
+          '</div></div>';
+      }).join('');
+    }
+  }
+  var m=document.getElementById('dqm-mask'),sh=document.getElementById('dqm-sheet');
+  if(m)m.classList.add('show');
+  if(sh)sh.classList.add('show');
+};
+window.closeDemandQuotes=function(){
+  var m=document.getElementById('dqm-mask'),sh=document.getElementById('dqm-sheet');
+  if(m)m.classList.remove('show');
+  if(sh)sh.classList.remove('show');
+};
+window.acceptQuote=function(id,qid){
+  if(!window.DemandStore)return;
+  var r=DemandStore.acceptQuote(id,qid,uid);
+  if(r&&r.error){window.UI&&UI.toast(r.error,'warn');return;}
+  window.closeDemandQuotes();
+  window.UI&&UI.toast('已接受报价，请完成意向金支付生成托管单','ok');
+  setTimeout(function(){location.href='order.html?demandId='+id;},600);
+};
 function emptyHtml(filtered){
   return '<div class="mo-empty">'+
     '<div class="me-ic2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>'+
@@ -114,9 +235,15 @@ if(filtersEl)filtersEl.addEventListener('click',function(e){
 });
 render();
 window.addEventListener('engchain:mediation',function(){render();});
+window.addEventListener('engchain:demand',function(){render();});
 })();
 </script>
 <style>
+/* ===== 双视图切换 ===== */
+.mo-seg{display:flex;gap:6px;padding:4px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;}
+.mo-seg .seg{flex:1;padding:8px 0;border:none;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--text-2);background:transparent;cursor:pointer;transition:all var(--d-fast);}
+.mo-seg .seg.on{color:var(--primary-dim);background:var(--bg-card);box-shadow:var(--shadow-xs);font-weight:700;}
+
 /* ===== 状态筛选 ===== */
 .mo-filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .mo-filters::-webkit-scrollbar{display:none;}
@@ -136,6 +263,34 @@ window.addEventListener('engchain:mediation',function(){render();});
 .mo-time{font-size:10.5px;color:var(--text-3);}
 .mo-id{flex:1;min-width:0;font-size:10px;color:var(--text-4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-num);}
 .mo-go{flex:none;font-size:13px;color:var(--primary-dim);}
+
+/* ===== 需求卡 ===== */
+.dm-card{cursor:default;}
+.dm-card:active{transform:none;border-color:var(--line);}
+.dm-sub{font-size:11.5px;color:var(--text-2);margin-top:6px;line-height:1.5;}
+.dm-quote{font-size:11.5px;color:var(--text-2);margin-top:4px;line-height:1.5;background:var(--bg-card-2);border-radius:8px;padding:6px 9px;}
+.dm-quote b{color:var(--primary-dim);}
+.dm-exp{flex:none;font-size:10px;color:var(--text-4);}
+.dm-btn{flex:none;font-size:11px;font-weight:600;color:var(--text-2);background:var(--bg-card-2);border:1px solid var(--line);border-radius:99px;padding:5px 11px;cursor:pointer;transition:all var(--d-fast);}
+.dm-btn:active{transform:scale(.95);}
+.dm-btn.gold{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);}
+
+/* ===== 报价弹层 ===== */
+.dqm-mask{position:fixed;inset:0;background:rgba(10,8,4,.45);opacity:0;pointer-events:none;transition:opacity var(--d);z-index:98;}
+.dqm-mask.show{opacity:1;pointer-events:auto;}
+.dqm-sheet{position:fixed;left:0;right:0;bottom:0;z-index:99;background:var(--bg-card);border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));transform:translateY(102%);transition:transform var(--d) var(--e-out);box-shadow:0 -8px 30px rgba(10,8,4,.18);max-height:72vh;overflow:auto;}
+.dqm-sheet.show{transform:none;}
+.dqm-head{display:flex;align-items:center;justify-content:space-between;}
+.dqm-title{font-size:15px;font-weight:800;color:var(--text-1);}
+.dqm-close{border:none;background:var(--bg-card-2);width:26px;height:26px;border-radius:50%;font-size:12px;color:var(--text-3);cursor:pointer;}
+.dqm-sub{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.6;}
+.dqm-item{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:11px 12px;margin-top:10px;background:var(--bg-card);}
+.dqm-item.on{border-color:var(--accent-line);background:var(--primary-soft);}
+.dqm-main{flex:1;min-width:0;}
+.dqm-right{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.dqm-btn{border:none;background:var(--primary);color:#fff;font-size:11px;font-weight:600;border-radius:99px;padding:6px 14px;cursor:pointer;transition:all var(--d-fast);}
+.dqm-btn:active{transform:scale(.95);}
+.dqm-sel{font-size:10px;font-weight:600;color:var(--success);}
 
 /* ===== 空态 ===== */
 .mo-empty{text-align:center;padding:32px 18px;background:var(--bg-card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-xs);}

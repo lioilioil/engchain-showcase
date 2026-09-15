@@ -106,7 +106,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
         <div class="nf-hint">当前状态 / 期望时限 / 预算均可下拉选择，也支持直接输入自定义内容</div>
         <button class="btn btn-primary btn-block" onclick="window.doMatch()">智能匹配合作机构</button>
-        <div class="nf-note">提交后按目标与条件匹配推荐；无匹配时平台顾问人工对接</div>
+        <div class="nf-note">提交后需求同步发布到「需求广场」，已核验机构可报价；无匹配时平台顾问人工对接</div>
       </div>
     </div>
 
@@ -321,6 +321,15 @@ window.doMatch=function(){
   var goal=document.getElementById('nf-goal').value||'';
   var state=(document.getElementById('nf-state').value||'').trim();
   var budgetWan=parseBudgetWan(document.getElementById('nf-budget').value);
+  /* v4.0 需求广场：发布即落库，服务商可报价 */
+  try{
+    var _buyer=window.DataBus?DataBus.current():null;
+    if(_buyer&&_buyer.id&&window.DemandStore&&typeof DemandStore.create==='function'){
+      DemandStore.create({buyerId:_buyer.id,title:goal||'企业服务',goal:goal||'企业服务',state:state||'',
+        time:(document.getElementById('nf-time').value||'').trim(),budget:(document.getElementById('nf-budget').value||'').trim(),
+        budgetWan:budgetWan,desc:'来自服务广场「发布服务需求」'});
+    }
+  }catch(e){}
   var kw=MATCH_KEY[goal]||goal;
   var list=SVCS.filter(function(s){return new RegExp(kw,'i').test(s.keyword);});
   if(budgetWan>0)list=list.filter(function(s){var p=parseAmt(s.budget);return !p||p<=budgetWan*10000;});
@@ -333,7 +342,7 @@ window.doMatch=function(){
   if(!list.length){
     banner.innerHTML='<div class="mb-head"><span class="mb-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>AI 匹配 · 未找到完全匹配</b></div>'+
       '<div class="text-3 fs-12" style="margin-top:6px;line-height:1.7;">已按「'+goal+'」扩大范围为你展示相近服务；也可以留下联系方式，平台顾问人工对接。</div>'+
-      '<div class="mb-cta" onclick="window.UI&&UI.toast(\'平台顾问将尽快与您联系\',\'ok\')">联系平台顾问 ›</div>';
+      '<div class="mb-cta" onclick="window.contactAdvisor()">联系平台顾问 ›</div>';
   }else{
     var top=list.slice(0,3);
     banner.innerHTML='<div class="mb-head"><span class="mb-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>AI 为你匹配 '+list.length+' 家合作机构</b>'+
@@ -349,6 +358,18 @@ window.doMatch=function(){
   }
   el.parentNode.insertBefore(banner,el);
   banner.scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+/* v4.0 联系平台顾问：真实留资到平台线索（sellerId=platform），供平台运营台跟进 */
+window.contactAdvisor=function(){
+  var u=window.DataBus?DataBus.current():null;
+  if(!u){window.UI&&window.UI.toast('请先登录后再联系顾问','warn');return;}
+  try{
+    if(window.LeadStore&&typeof LeadStore.create==='function'){
+      LeadStore.create({sellerId:'platform',buyerId:u.id||'',name:u.name||'',phone:(u.phone||''),serve:'平台人工对接咨询',urge:'normal',note:'来自服务广场「联系平台顾问」'});
+      window.UI&&window.UI.toast('已提交，平台顾问将尽快与您联系','ok');
+    }else{window.UI&&window.UI.toast('平台顾问将尽快与您联系','ok');}
+  }catch(e){window.UI&&window.UI.toast('已记录，平台顾问将尽快联系您','ok');}
 };
 
 /* ---- 热门搜索 + 搜索历史（本地持久化） ---- */

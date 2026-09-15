@@ -93,13 +93,22 @@ function render(){
       timeoutHtml+
       '<div class="text-3 fs-11" style="margin-top:8px;color:var(--text-3);line-height:1.7;">意向金已锁定合作意向与机构档期；服务启动前可全额退还，启动后自动抵扣服务费并托管全款。超期未启动系统将自动退还。</div></div>';
   }else{
+    /* WP7b 托管单接单超时提醒 */
+    var escSt=null;
+    try{ if(window.Mediation&&Mediation.escrowStatus) escSt=Mediation.escrowStatus(o.id); }catch(e){}
+    var escWarn='';
+    if(escSt){
+      if(escSt.willAutoCancel)escWarn='<div class="intent-warn intent-warn-danger">服务商已 '+escSt.days+' 天未接单，系统将于 '+(escSt.autoCancelDays-escSt.days)+' 天后自动全额退款</div>';
+      else if(escSt.nearAutoCancel)escWarn='<div class="intent-warn intent-warn-warn">服务商已 '+escSt.days+' 天未接单，超过 '+(escSt.autoCancelDays-escSt.days)+' 天将自动全额退款</div>';
+      else if(escSt.isReminded)escWarn='<div class="intent-warn">服务商已 '+escSt.days+' 天未接单，您可撤销并全额退款</div>';
+    }
     html+='<div class="card" style="margin-top:12px;"><div class="fw-600 fs-13" style="margin-bottom:8px;">托管资金</div>'+
       row('托管总额',fmt(o.amount))+
       row('已释放给服务商',fmt(released),'var(--success)')+
       row('监管账户在途',fmt(remain),'var(--primary-dim)')+
       '<div class="fund-bar"><div class="fund-fill" style="width:'+relPct+'%;"></div></div>'+
       '<div class="fund-scale"><span>已释放 '+relPct+'%</span><span>在途 '+(100-relPct)+'%</span></div>'+
-      '<div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">资金由持牌机构托管，按里程碑验收后释放；未成交全额退款，规避二清。</div></div>';
+      '<div class="text-3 fs-11" style="margin-top:6px;color:var(--text-3);line-height:1.7;">资金由持牌机构托管，按里程碑验收后释放；未成交全额退款，规避二清。</div>'+escWarn+'</div>';
   }
   /* 双方 */
   html+='<div class="card" style="margin-top:10px;">'+row('买方',uname(o.buyerId))+row('服务商',uname(o.sellerId)||'待接单')+row('创建时间',ftime(o.createdAt))+'</div>';
@@ -119,7 +128,18 @@ function render(){
       (m.confirmedAt?'<div class="ms-time">'+(m.autoConfirmed?'自动':'买方')+'确认于 '+ftime(m.confirmedAt)+'</div>':'')+'</div></div>';
   }).join('')+'</div>';
   /* 纠纷 */
-  if(o.dispute)html+='<div class="card" style="margin-top:10px;border-color:var(--warning);"><div class="fw-700 fs-13" style="color:var(--warning);">纠纷处理中</div><div class="text-2 fs-12" style="margin-top:6px;">'+o.dispute.reason+'</div><div class="text-3 fs-11" style="margin-top:4px;">发起于 '+ftime(o.dispute.at)+'，平台客服将介入仲裁。</div></div>';
+  if(o.dispute){
+    var arbHtml='';
+    if(o.dispute.arbitratedAt){
+      var arbRes=o.dispute.arbitrateResult==='release'?'放款结算':(o.dispute.arbitrateResult==='refund'?'全额退款':'按比例分账');
+      arbHtml='<div class="text-2 fs-12" style="margin-top:6px;color:var(--success);">平台已仲裁：'+arbRes+(o.dispute.arbitrateNote?(' · '+o.dispute.arbitrateNote):'')+'</div><div class="text-3 fs-11" style="margin-top:4px;">仲裁于 '+ftime(o.dispute.arbitratedAt)+'，结果已同步双方。</div>';
+    }
+    html+='<div class="card" style="margin-top:10px;border-color:'+(o.dispute.arbitratedAt?'var(--success)':'var(--warning)')+'">'+
+      '<div class="fw-700 fs-13" style="color:'+(o.dispute.arbitratedAt?'var(--success)':'var(--warning)')+';">'+(o.dispute.arbitratedAt?'纠纷已仲裁':'纠纷处理中')+'</div>'+
+      '<div class="text-2 fs-12" style="margin-top:6px;">'+(o.dispute.reason||'双方对履约存在争议')+'</div>'+
+      (o.dispute.arbitratedAt?arbHtml:'<div class="text-3 fs-11" style="margin-top:4px;">发起于 '+ftime(o.dispute.at)+'，平台客服将介入仲裁。</div>')+
+      '</div>';
+  }
   /* 时间线 */
   html+='<div class="section-title" style="margin-top:8px;"><div class="st-left">记录时间线</div></div><div class="card" id="tl"></div>';
   root.innerHTML=html;
@@ -147,6 +167,8 @@ function actions(o,role){
   if(role==='seller'&&o.state==='serving'){
     var td=o.milestones.filter(function(m){return m.status==='todo';});
     if(td.length)b.push(btn('primary','提交交付 · '+td[0].label,'deliver('+td[0].idx+')'));
+    var sb=o.milestones.filter(function(m){return m.status==='submitted';});
+    if(sb.length)b.push(btn('ghost','提醒买方验收','remindAccept('+sb[0].idx+')'));
     b.push(btn('ghost','发起纠纷','dispute()'));
   }
   if(role==='buyer'&&o.state==='settled'&&!o.review){b.push(btn('primary','评价订单','review()'));}
@@ -192,12 +214,23 @@ window.dispute=function(){
     '<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="submitDispute()">提交纠纷</button></div>').show();
 };
 window.submitDispute=function(){var t=document.getElementById('dp-note').value.trim();if(!t){UI.toast('请填写纠纷说明','warn');return;}var r=Mediation.dispute(id,uid,t);UI.closeSheet();if(r.error)UI.toast(r.error,'warn');else{UI.toast('已发起，平台介入','ok');reload();}};
+window.remindAccept=function(idx){
+  var o=Mediation.byId(id);if(!o)return;
+  o.milestones.forEach(function(m){if(m.idx===idx)m._reminded=true;});
+  Mediation._write(o);
+  UI.toast('已提醒买方验收，14 天未确认将自动验收','ok');
+};
+var rvScore=5;
 window.review=function(){
-  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-15" style="margin-bottom:10px;">评价本次服务</div>'+
+  rvScore=5;
+  UI.sheet().html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-15" style="margin-bottom:8px;">评价本次服务</div>'+
+    '<div class="rv-stars" id="rv-stars">'+[1,2,3,4,5].map(function(i){return '<span class="rv-star'+(i<=5?' on':'')+'" data-s="'+i+'" onclick="window.setStar('+i+')">★</span>';}).join('')+'</div>'+
+    '<div class="text-3 fs-11" style="margin:6px 0 10px;">评分将计入服务商信用分与榜单口碑</div>'+
     '<textarea class="input" id="rv-txt" rows="2" placeholder="服务评价（选填）"></textarea>'+
     '<button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="submitReview()">提交评价</button></div>').show();
 };
-window.submitReview=function(){var t=document.getElementById('rv-txt').value.trim();Mediation.review(id,5,t);UI.closeSheet();UI.toast('感谢评价','ok');reload();};
+window.setStar=function(s){rvScore=s;var el=document.getElementById('rv-stars');if(!el)return;el.querySelectorAll('.rv-star').forEach(function(x){x.classList.toggle('on',Number(x.getAttribute('data-s'))<=s);});};
+window.submitReview=function(){var t=document.getElementById('rv-txt').value.trim();Mediation.review(id,rvScore||5,t);UI.closeSheet();UI.toast('感谢评价，已计入服务商信用分','ok');reload();};
 window.loadDemoOrder=function(){
   try{
     if(window.Mediation){
@@ -282,6 +315,11 @@ render();
 .intent-warn:not(.intent-warn-danger):not(.intent-warn-warn){background:var(--primary-soft);color:var(--primary-dim);}
 .intent-warn-warn{background:rgba(255,159,10,.1);color:#b86b00;border:1px solid rgba(255,159,10,.2);}
 .intent-warn-danger{background:rgba(255,69,58,.1);color:#d70015;border:1px solid rgba(255,69,58,.2);}
+/* ===== 评价星级 ===== */
+.rv-stars{display:flex;gap:12px;justify-content:center;padding:8px 0 4px;}
+.rv-star{font-size:30px;line-height:1;color:var(--line);cursor:pointer;transition:transform var(--d-fast),color var(--d-fast);}
+.rv-star.on{color:var(--primary-strong);}
+.rv-star:active{transform:scale(1.15);}
 </style>
 </body>
 </html>

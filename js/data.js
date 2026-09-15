@@ -1108,7 +1108,10 @@ window.MOCK = (function () {
         saasTools: { enabled: true, price: 199, durationDays: 30, label: '经营工具', desc: '数据看板+经营分析工具30天', entryTypes: ['construction', 'agency'] }
       },
       /* [FEAT 9.2-5] 质保金预留机制：交易金额5%预留，验收30天后释放 */
-      warranty: { rate: 0.05, releaseDays: 30, label: '质保金', desc: '交易金额5%预留，验收30天后释放' }
+      warranty: { rate: 0.05, releaseDays: 30, label: '质保金', desc: '交易金额5%预留，验收30天后释放' },
+      /* v4.0 托管单超时接单与需求广场有效期配置 */
+      escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '服务商7天未接单提醒买方，15天未接单系统自动全额退款' },
+      demandExpireDays: 7
     },
     /* 企业关注/监控（P0-7.1） */
     monitor: {
