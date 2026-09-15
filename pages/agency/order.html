@@ -131,6 +131,21 @@ if(svcId){
   if(found){svc=found;svcIdx=SVCS.indexOf(found);}
 }
 if(!svc){svcIdx=Math.min(parseInt(params.get('svc')||'0',10)||0,SVCS.length-1);svc=SVCS[svcIdx];}
+/* v4.0 需求广场：接受报价后携 demandId 进入下单页，锁定报价机构与金额 */
+var demandId=params.get('demandId');
+var demandLock=null;
+if(demandId&&window.DemandStore){
+  var _d=DemandStore.byId(demandId);
+  if(_d&&_d.selectedQuoteId){
+    var _q=null;
+    (_d.quotes||[]).forEach(function(x){if(x.id===_d.selectedQuoteId)_q=x;});
+    if(_q){
+      demandLock={demand:_d,quote:_q};
+      var _ssv=SVCS.filter(function(s){return String(s.sellerId)===String(_q.sellerId);});
+      if(_ssv.length){svc=_ssv[0];svcIdx=SVCS.indexOf(svc);svcId=svc.id;}
+    }
+  }
+}
 var me=DataBus.current(),uid=me?me.id:'';
 
 var sumEl=document.getElementById('svc-summary');
@@ -155,18 +170,22 @@ if(!svcId&&svc&&svc.cats&&svc.cats[0]){
 var _displayIdx=_showSVCs.indexOf(svc);if(_displayIdx<0)_displayIdx=0;
 document.getElementById('svc-sel').innerHTML=_showSVCs.map(function(s,i){
   var on=i===_displayIdx;
-  return '<div class="od-card'+(on?' on':'')+'" onclick="pickSvc(\''+s.id+'\')">'+
+  return '<div class="od-card'+(on?' on':'')+'" onclick="'+(demandLock?'':('pickSvc(\''+s.id+'\')'))+'">'+
     '<div class="od-radio"><svg class="ic"><use href="#i-check"/></svg></div>'+
     '<div class="od-av">'+s.icon+'<span class="od-v">金V</span></div>'+
     '<div class="od-main"><div class="fw-600 fs-13 od-name">'+s.name+'</div>'+
     '<div class="od-meta">'+s.cats.join(' · ')+'</div></div>'+
-    '<span class="od-score"><svg class="ic"><use href="#i-star"/></svg>'+s.score.toFixed(1)+'</span>'+
+    '<span class="od-score"><svg class="ic"><use href="#i-star"/></svg>'+(s.score>0?s.score.toFixed(1):'新机构')+'</span>'+
     '</div>';
 }).join('');
 if(!SVCS.length){
   document.getElementById('svc-sel').innerHTML='<div class="card"><div class="text-3 fs-12">暂无可下单的服务，请稍后再试或返回服务广场挑选。</div><div style="margin-top:10px;"><a class="btn btn-primary btn-sm" href="index.html">返回服务广场</a></div></div>';
 } else if(_svcCatLabel){
   document.getElementById('svc-sel').insertAdjacentHTML('afterbegin','<div style="font-size:11px;color:var(--text-3);padding:2px 0 10px;">已按「'+_svcCatLabel+'」筛选 · 仅展示同类服务商</div>');
+if(demandLock){
+  var _ne=document.getElementById('svc-sel');
+  if(_ne)_ne.insertAdjacentHTML('afterbegin','<div style="font-size:11px;color:var(--primary-dim);font-weight:600;padding:2px 0 10px;">来自需求单 '+demandLock.demand.id+' 的机构报价 · 服务机构已锁定，金额以报价为准</div>');
+}
 }
 window.pickSvc=function(sid){location.href='order.html?svcId='+sid;};
 
@@ -174,6 +193,7 @@ var AMTS=[30000,60000,250000,600000,1200000];
 /* 金额预填优先级：URL amount（报价带入）> 未提交草稿 > 服务报价 > 默认 6 万（均可改） */
 var stash=FormStash.get('agency_order_draft');
 var amtParam=parseFloat(params.get('amount'))||0;
+if(demandLock&&demandLock.quote)amtParam=Number(demandLock.quote.amount)||0;
 var curAmt=0;
 if(amtParam>0)curAmt=amtParam;
 else if(stash&&stash.data&&stash.data.amount)curAmt=stash.data.amount;
@@ -187,7 +207,7 @@ function renderQuoteHint(){
   var quoteSrc=amtParam>0||(svc&&svc.quoteTotal>0);
   if(quoteSrc){
     ql.style.display='flex';
-    ql.innerHTML='<span class="ql-k">服务商参考价</span><span class="mono fw-700 ql-v">'+fmt(amtParam>0?amtParam:(svc.quoteTotal||0))+'</span>'+
+    ql.innerHTML='<span class="ql-k">'+(demandLock?('需求单 '+demandLock.demand.id+' 机构报价'):'服务商参考价')+'</span><span class="mono fw-700 ql-v">'+fmt(amtParam>0?amtParam:(svc.quoteTotal||0))+'</span>'+
       '<span class="ql-note">金额按实际方案核定，可与服务商协商后修改</span>';
   }else{
     ql.style.display='none';
@@ -280,6 +300,7 @@ document.getElementById('pay-btn').addEventListener('click',function(){
   var r=commissionRate(amt);
   var o=Mediation.create({buyerId:uid,sellerId:svc.sellerId,svcId:svc.id,svcName:svc.name,category:svc.cats[0],amount:amt});
   if(o.error){paying=false;UI.toast(o.error,'warn');return;}
+  try{if(demandLock&&window.DemandStore)DemandStore.markOrdered(demandId,o.id);}catch(e){}
   var paid=Mediation.payIntent(o.id,'balance');
   paying=false;
   if(paid.error){UI.toast('意向金支付失败：'+paid.error,'warn');return;}

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>演示重置 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">演示环境重置</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:12px;padding-bottom:40px;">
+    <div class="card" style="text-align:center;padding:34px 22px;">
+      <div style="width:64px;height:64px;margin:0 auto 14px;border-radius:20px;background:linear-gradient(135deg,var(--primary-soft),var(--primary-soft-2));display:flex;align-items:center;justify-content:center;">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="var(--primary-dim)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/></svg>
+      </div>
+      <div class="fw-800 fs-17" style="margin-bottom:6px;">一键重置演示环境</div>
+      <div class="text-3 fs-12" style="line-height:1.8;">将订单、需求广场、询盘线索恢复为初始演示状态，<br>并为当前账号补充演示资金、开通中介入驻。</div>
+    </div>
+
+    <div class="card" style="margin-top:10px;">
+      <div class="fw-700 fs-13" style="margin-bottom:10px;">将执行</div>
+      <div class="dr-item"><span class="dr-dot ok"></span>重置托管订单为演示种子数据（含各状态示例）</div>
+      <div class="dr-item"><span class="dr-dot ok"></span>清空需求广场与询盘线索，便于重新走通撮合</div>
+      <div class="dr-item"><span class="dr-dot ok"></span>当前账号充值 ¥500,000 演示资金（原余额保留）</div>
+      <div class="dr-item"><span class="dr-dot ok"></span>开通「中介服务」入驻并激活（若未入驻）</div>
+      <div class="dr-item"><span class="dr-dot gray"></span>不删除用户、实名认证、钱包历史与已发布服务</div>
+    </div>
+
+    <button class="btn btn-primary btn-block btn-lg" id="dr-run" style="margin-top:16px;">执行重置</button>
+    <div class="text-3 fs-11" style="text-align:center;margin-top:10px;line-height:1.7;">重置后自动返回服务广场，可完整体验「发布需求 → 机构报价 → 匹配下单 → 托管履约」闭环</div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+document.getElementById('dr-run').addEventListener('click', function () {
+  var done = [];
+  try {
+    /* 1) 托管订单 → 种子重建 */
+    if (window.Mediation && Mediation.KEY) { localStorage.removeItem(Mediation.KEY); done.push('托管订单'); }
+    /* 2) 需求广场 / 询盘线索 */
+    if (window.DemandStore && DemandStore.KEY) { localStorage.removeItem(DemandStore.KEY); done.push('需求广场'); }
+    if (window.LeadStore && LeadStore.KEY) { localStorage.removeItem(LeadStore.KEY); done.push('询盘线索'); }
+    /* 3) 当前账号演示资金（保留原余额，追加 ¥500,000） */
+    var uid = '';
+    try { var cur = DataBus.current(); if (cur) uid = cur.id; } catch (e) {}
+    if (uid && window.BalanceStore) {
+      var b = BalanceStore.read();
+      b.balance = Math.round((Number(b.balance || 0) + 500000) * 100) / 100;
+      b.totalIn = Math.round((Number(b.totalIn || 0) + 500000) * 100) / 100;
+      b.logs = b.logs || [];
+      b.logs.unshift({ type: 'demo_recharge', amount: 500000, method: '演示', reason: '演示环境一键重置 · 补充资金', ts: Date.now() });
+      BalanceStore.write(b); done.push('演示资金');
+    }
+    /* 4) 开通中介入驻（未入驻时） */
+    try {
+      var u = DataBus.byId(uid);
+      var hasEntry = u && u.entry && (u.entry.status === 'active' || (u.entry.types || []).indexOf('agency') >= 0);
+      if (!hasEntry) { DataBus.entryApprove(uid, 'agency'); done.push('中介入驻'); }
+    } catch (e) {}
+    if (window.DataBus && DataBus.invalidateCache) { try { DataBus.invalidateCache('users'); } catch (e2) {} }
+    UI.toast('演示环境已重置', 'ok');
+    setTimeout(function () { location.href = 'index.html'; }, 600);
+  } catch (e) {
+    UI.toast('重置失败：' + (e && e.message ? e.message : '未知错误'), 'warn');
+  }
+});
+})();
+</script>
+<style>
+.dr-item{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-2);line-height:1.65;margin-bottom:8px;}
+.dr-item:last-child{margin-bottom:0;}
+.dr-dot{flex:none;width:16px;height:16px;border-radius:50%;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;}
+.dr-dot.ok{background:var(--success);}
+.dr-dot.gray{background:var(--text-3);}
+</style>
+</body>
+</html>

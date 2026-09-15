@@ -591,6 +591,7 @@
       this.migrate();
       var a = medRead().list.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
       this.autoConfirm();
+      try { this.checkEscrowTimeout(); } catch (e) {}
       a = medRead().list.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
       opt = opt || {};
       if (opt.uid) a = a.filter(function (o) { return (opt.role === 'seller') ? o.sellerId === opt.uid : (opt.role === 'buyer' ? o.buyerId === opt.uid : (o.buyerId === opt.uid || o.sellerId === opt.uid)); });
@@ -731,15 +732,16 @@
       var s = medRead(), nowTs = Date.now(), changed = false;
       var self = this;
       s.list.forEach(function (o) {
-        if (['serving', 'await_confirm'].indexOf(o.state) < 0) return;
-        o.milestones.forEach(function (m, idx) {
-          if (m.status === 'submitted' && m.dueAt && m.dueAt <= nowTs) { self.confirmMilestone(o.id, idx, true); changed = true; }
-        });
-      });
-        /* [FEAT 9.2-5] lazy warranty release check */
+        if (['serving', 'await_confirm'].indexOf(o.state) >= 0) {
+          o.milestones.forEach(function (m, idx) {
+            if (m.status === 'submitted' && m.dueAt && m.dueAt <= nowTs) { self.confirmMilestone(o.id, idx, true); changed = true; }
+          });
+        }
+        /* [FEAT 9.2-5] lazy warranty release check（须在循环内逐单判断，否则 o 未定义） */
         if (o.warranty && o.warranty.status === 'reserved' && o.warranty.releaseAt && o.warranty.releaseAt <= nowTs) {
           self.releaseWarranty(o.id); changed = true;
         }
+      });
       return changed;
     },
     /* 终验结算：await_confirm → settled，并触发分销订单返佣（基数=实际结算额） */
@@ -854,6 +856,119 @@
       };
     }
     ,
+    /* WP7b 托管单超时检查：服务商接单超时（remindDays 提醒买方，autoCancelDays 自动全额退款） */
+    checkEscrowTimeout: function () {
+      var cfg = RULE('commission.escrow', { remindDays: 7, autoCancelDays: 15 });
+      var remindDays = cfg.remindDays || 7, autoCancelDays = cfg.autoCancelDays || 15;
+      var now = Date.now(), DAY = 86400000;
+      var reminded = [], autoRefunded = [];
+      var s = medRead();
+      s.list.forEach(function (o) {
+        if (o.state !== 'escrowed') return;
+        var days = Math.floor((now - o.createdAt) / DAY);
+        if (days >= autoCancelDays && !o._escrowAutoRefunded) {
+          o._escrowAutoRefunded = true;
+          try {
+            var r = Mediation._fullRefund(o, '服务商超时' + autoCancelDays + '天未接单，系统自动全额退款', '系统自动', 'system');
+            if (!r.error) { autoRefunded.push(o.id); }
+          } catch (e) {}
+        } else if (days >= remindDays && !o._escrowReminded) {
+          o._escrowReminded = true; o._escrowRemindedAt = now; o.updatedAt = now;
+          Mediation._write(o);
+          reminded.push({ id: o.id, days: days, buyerId: o.buyerId, sellerId: o.sellerId });
+        }
+      });
+      return { reminded: reminded, autoRefunded: autoRefunded };
+    },
+    escrowStatus: function (id) {
+      var o = this.byId(id);
+      if (!o || o.state !== 'escrowed') return null;
+      var cfg = RULE('commission.escrow', { remindDays: 7, autoCancelDays: 15 });
+      var days = Math.floor((Date.now() - o.createdAt) / 86400000);
+      return { days: days, remindDays: cfg.remindDays || 7, autoCancelDays: cfg.autoCancelDays || 15, isReminded: !!o._escrowReminded, nearAutoCancel: days >= (cfg.autoCancelDays || 15) - 3, willAutoCancel: days >= (cfg.autoCancelDays || 15) };
+    },
+    /* 平台仲裁内部工具：按未完成里程碑分账。refundRatio=0 全额放款（含佣金/质保金），=1 全额退还买方，0~1 按比例分账 */
+    _releaseAll: function (o, note, by, refundRatio) {
+      var rate = o.ruleSnapshot ? o.ruleSnapshot.rate : 0.08;
+      var warCfg = RULE('commission.warranty', { rate: 0.05, releaseDays: 30 });
+      var warRate = warCfg.rate || 0.05;
+      var rr = Math.min(1, Math.max(0, Number(refundRatio) || 0));
+      var refundedToBuyer = 0, releasedToSeller = 0, feeToPlatform = 0, warToReserve = 0;
+      o.milestones.forEach(function (m) {
+        if (m.status === 'done') return;
+        var release = r2(o.amount * m.pct);
+        var remain = r2(release * (1 - rr));
+        var back = r2(release - remain);
+        if (back > 0) {
+          Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: o.buyerId, toAcct: 'available', amount: back, bizType: 'mediation_arb_refund', bizId: o.id, idemKey: 'arbrf_' + o.id + '_' + m.idx, remark: '仲裁退款（未履约部分）' });
+          safeMoneyAdd(o.buyerId, back, '平台仲裁退款');
+          refundedToBuyer = r2(refundedToBuyer + back);
+        }
+        if (remain > 0) {
+          var fee = r2(remain * rate), war = r2(remain * warRate), net = r2(remain - fee - war);
+          if (net > 0) {
+            Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: o.sellerId, toAcct: 'available', amount: net, bizType: 'mediation_arb_release', bizId: o.id, idemKey: 'arbrel_' + o.id + '_' + m.idx, remark: '仲裁放款' });
+            safeMoneyAdd(o.sellerId, net, '平台仲裁放款');
+            releasedToSeller = r2(releasedToSeller + net);
+          }
+          if (fee > 0) {
+            Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: Ledger.PLATFORM, toAcct: 'platform_income', amount: fee, bizType: 'mediation_arb_fee', bizId: o.id, idemKey: 'arbfee_' + o.id + '_' + m.idx, remark: '仲裁佣金' });
+            feeToPlatform = r2(feeToPlatform + fee);
+          }
+          if (war > 0) {
+            Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: Ledger.PLATFORM, toAcct: 'warranty', amount: war, bizType: 'mediation_arb_war', bizId: o.id, idemKey: 'arbwar_' + o.id + '_' + m.idx, remark: '仲裁质保金预留' });
+            warToReserve = r2(warToReserve + war);
+          }
+          o.warranty = o.warranty || { amount: 0, status: 'reserved' };
+          o.warranty.amount = r2((o.warranty.amount || 0) + war);
+          o.warranty.reservedAt = Date.now();
+          o.warranty.status = 'reserved';
+        }
+        m.status = 'done'; m.confirmedAt = Date.now(); m.autoConfirmed = true;
+        o._commissionAccumulated = r2((o._commissionAccumulated || 0) + feeToPlatform);
+      });
+      return { refundedToBuyer: refundedToBuyer, releasedToSeller: releasedToSeller, feeToPlatform: feeToPlatform, warToReserve: warToReserve };
+    },
+    /* 平台仲裁：disputed → 放款结算 / 全额退款 / 按比例分账，记录仲裁结果并通知双方 */
+    arbitrate: function (id, decision, note, ratio) {
+      var o = this.byId(id);
+      if (!o) return { error: '订单不存在' };
+      if (o.state !== 'disputed') return { error: '仅纠纷中的订单可仲裁' };
+      if (decision !== 'release' && decision !== 'refund' && decision !== 'split') return { error: '无效裁决类型' };
+      var res;
+      if (decision === 'release') { res = this._releaseAll(o, note, 'platform', 0); o.state = 'settled'; o.settledAt = Date.now(); }
+      else if (decision === 'refund') { res = this._releaseAll(o, note, 'platform', 1); o.state = 'refunded'; }
+      else {
+        var rr = Math.min(1, Math.max(0, Number(ratio) || 0));
+        res = this._releaseAll(o, note, 'platform', rr);
+        o.state = rr >= 1 ? 'refunded' : (rr <= 0 ? 'settled' : 'partial_refund');
+      }
+      o.dispute = o.dispute || {};
+      o.dispute.status = 'arbitrated';
+      o.dispute.arbitratedAt = Date.now();
+      o.dispute.arbitrateNote = note || '';
+      o.dispute.arbitrateResult = decision;
+      o.updatedAt = Date.now();
+      if (o.state === 'settled' && o.warranty && o.warranty.amount > 0) {
+        o.warranty.releaseAt = Date.now() + (RULE('commission.warranty', { releaseDays: 30 }).releaseDays || 30) * 86400000;
+      }
+      this._tl(o, '平台仲裁：' + (decision === 'release' ? '放款结算' : (decision === 'refund' ? '全额退款' : '按比例分账')), 'platform', { note: note, refundedToBuyer: res.refundedToBuyer });
+      this._write(o);
+      try {
+        if ((decision === 'release' || (decision === 'split' && o.state === 'partial_refund')) && (o._commissionAccumulated || 0) > 0 && window.CommissionStore && typeof CommissionStore.addFlow === 'function') {
+          var _sel = window.DataBus && DataBus.byId(o.sellerId);
+          CommissionStore.addFlow({ id: uid('CF'), orderId: o.id, buyerId: o.buyerId, sellerId: o.sellerId, uid: o.buyerId, userName: _sel ? _sel.name : (o.sellerId || ''), title: o.title || o.svcName || '', amount: r2(o.amount), fee: o._commissionAccumulated, rate: o.ruleSnapshot ? o.ruleSnapshot.rate : 0.08, milestones: 'mediation-arbitrate', status: 'pending', ts: Date.now(), settleAt: Date.now() });
+        }
+      } catch (e) {}
+      try {
+        if (o.state === 'settled') Rebate.createFromEvent({ sourceType: 'order', sourceUserId: o.buyerId, baseAmount: o.amount, sourceOrderId: o.id });
+        else Rebate.clawback(o.id, (res.refundedToBuyer || 0) / (o.amount || 1));
+      } catch (e) {}
+      emit('engchain:mediation', { id: id, state: o.state, arbitrated: true });
+      return o;
+    },
+
+    /* [FEAT 9.2-5] releaseWarranty: release reserved warranty to seller after releaseDays */
     /* [FEAT 9.2-5] releaseWarranty: release reserved warranty to seller after releaseDays */
     releaseWarranty: function (id) {
       var o = this.byId(id); if (!o || !o.warranty) return { error: 'no warranty on this order' };
