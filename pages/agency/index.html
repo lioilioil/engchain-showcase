@@ -136,10 +136,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
     </div>
 
-    <!-- 服务市场：搜索 + 热门/历史 + 分类 + 服务列表 -->
+    <!-- 服务市场：搜索 + 分类 + 服务列表 -->
     <div class="mkt-search"><svg class="ic"><use href="#i-search"/></svg><input id="mkt-q" class="input" placeholder="搜索服务、机构或关键词"></div>
-    <!-- 热门搜索 / 搜索历史（renderHot 渲染容器） -->
-    <div id="hot-row" class="hot-row"></div>
 
     <div class="mkt-sticky" id="mktSticky">
       <div class="section-title" style="margin-bottom:8px;"><div class="st-left">服务市场</div><span class="more" id="mkt-filter" onclick="window.openFilterSheet()" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><svg class="ic" style="width:14px;height:14px;"><use href="#i-filter"/></svg><span>筛选</span><span class="filter-count" id="filter-count" style="display:none;"></span></span></div>
@@ -252,6 +250,25 @@ var CATS=[
   {id:'labor',label:'劳务派遣',test:function(s){return /劳务|派遣|人力/.test(s.keyword);}},
   {id:'corp',label:'企业服务',test:function(s){return /工商|注册|安许|税务|记账|报税|招投标|标书|企业服务/.test(s.keyword);}}
 ];
+/* [BM-0xx] 分类判定：发布者勾选的 cats 数组优先（一个服务多类目的包含关系），旧数据无 cats 时正则兜底 */
+var CAT_LABEL2ID={'资质代办':'qual','工程担保':'guarantee','造价咨询':'cost','劳务派遣':'labor','企业服务':'corp'};
+function catIdsOf(s){
+  if(s.cats&&Array.isArray(s.cats)&&s.cats.length){
+    var ids=[];
+    s.cats.forEach(function(l){var id=CAT_LABEL2ID[l];if(id&&ids.indexOf(id)<0)ids.push(id);});
+    if(ids.length)return ids;
+  }
+  var ids2=[];
+  CATS.forEach(function(c){if(c.id!=='all'&&c.test(s))ids2.push(c.id);});
+  return ids2;
+}
+function inCat(s,id){
+  if(id==='all')return true;
+  var ids=catIdsOf(s);
+  if(ids.length)return ids.indexOf(id)>=0;
+  var c=CATS.filter(function(x){return x.id===id;})[0];
+  return c?c.test(s):false;
+}
 var curCat='all',curQ='';
 function renderCats(){
   document.getElementById('mkt-cats').innerHTML=CATS.map(function(c){
@@ -348,7 +365,8 @@ window.doMatch=function(){
     banner.innerHTML='<div class="mb-head"><span class="mb-ic"><svg class="ic"><use href="#i-star"/></svg></span><b>AI 为你匹配 '+list.length+' 家合作机构</b>'+
       '<span class="text-3 fs-11" style="margin-left:6px;">'+(state?('当前状态：'+state+' · '):'')+(budgetWan>0?('预算内 ≤'+budgetWan+'万'):'')+(state||budgetWan>0?'':'按目标匹配')+'</span></div>'+
       '<div class="mb-list">'+top.map(function(s){
-        var cat=CATS.filter(function(c){return c.id!=='all'&&c.test(s);})[0];
+        var catIds=catIdsOf(s);
+        var cat=CATS.filter(function(c){return catIds.indexOf(c.id)>=0;})[0];
         return '<div class="mb-item" onclick="location.href=\'../supply/detail.html?id='+s.id+(s.isOrg?'&from=market':'')+'\'">'+
           '<div class="mb-main"><div class="fs-13 fw-600">'+s.title+'</div>'+
           '<div class="text-3 fs-11" style="margin-top:2px;">'+(s.company||'金V 已核验机构')+' · '+(s.cycle||'周期面议')+'</div></div>'+
@@ -372,44 +390,6 @@ window.contactAdvisor=function(){
   }catch(e){window.UI&&window.UI.toast('已记录，平台顾问将尽快联系您','ok');}
 };
 
-/* ---- 热门搜索 + 搜索历史（本地持久化） ---- */
-var HOT_WORDS=['资质升级','工程担保','安许代办','造价审计','劳务派遣'];
-var SQ_KEY='engchain-agency-sq';
-function sqHistory(){try{return JSON.parse(localStorage.getItem(SQ_KEY)||'[]');}catch(e){return[];}}
-function sqAdd(w){
-  w=(w||'').trim();if(!w)return;
-  var h=sqHistory().filter(function(x){return x!==w;});h.unshift(w);h=h.slice(0,5);
-  try{localStorage.setItem(SQ_KEY,JSON.stringify(h));}catch(e){}
-}
-function renderHot(){
-  var hist=sqHistory();
-  var chips=HOT_WORDS.map(function(w){return '<span class="hot-chip" data-w="'+w+'">'+w+'</span>';}).join('');
-  var histHtml=hist.length
-    ? hist.map(function(w){return '<span class="hot-chip hot-hist" data-w="'+w+'">'+w+'<i class="hh-x" data-x="'+w+'">×</i></span>';}).join('')
-    : '';
-  var el=document.getElementById('hot-row');
-  if(!el)return;
-  el.innerHTML=(chips||histHtml)
-    ? '<span class="hot-lab">'+(hist.length?'最近搜索':'热门')+'</span>'+chips+histHtml
-    : '';
-  el.querySelectorAll('.hot-chip[data-w]').forEach(function(c){
-    c.addEventListener('click',function(ev){
-      if(ev.target.classList.contains('hh-x'))return;
-      var w=c.getAttribute('data-w');
-      var q=document.getElementById('mkt-q');if(q)q.value=w;
-      curQ=w;sqAdd(w);renderHot();renderList();
-    });
-  });
-  el.querySelectorAll('.hh-x').forEach(function(x){
-    x.addEventListener('click',function(ev){
-      ev.stopPropagation();
-      var w=x.getAttribute('data-x');
-      try{localStorage.setItem(SQ_KEY,JSON.stringify(sqHistory().filter(function(y){return y!==w;})));}catch(e){}
-      renderHot();
-    });
-  });
-}
-
 /* 筛选状态 */
 var curFilterSeller='all',curFilterPrice='all';
 function parsePrice(b){if(!b)return null;var m=String(b).match(/([\d.]+)/);return m?parseFloat(m[1]):null;}
@@ -429,7 +409,7 @@ function updateFilterCount(){
 function renderList(){
   var list=SVCS.filter(function(s){
     var cat=CATS.filter(function(c){return c.id===curCat;})[0]||CATS[0];
-    return cat.test(s)&&(!curQ||s.keyword.toLowerCase().indexOf(curQ.toLowerCase())>-1)&&sellerMatch(s,curFilterSeller)&&priceInRange(s.budget,curFilterPrice);
+    return inCat(s,curCat)&&(!curQ||s.keyword.toLowerCase().indexOf(curQ.toLowerCase())>-1)&&sellerMatch(s,curFilterSeller)&&priceInRange(s.budget,curFilterPrice);
   });
   updateFilterCount();
   var acc=window.entryAccess?entryAccess():{statusId:'guest'};
@@ -521,8 +501,7 @@ function bindSearch(){
   var q=document.getElementById('mkt-q');
   if(!q)return;
   q.addEventListener('input',function(){curQ=this.value.trim();renderList();});
-  q.addEventListener('keydown',function(e){if(e.key==='Enter'){sqAdd(this.value);renderHot();}});
-  q.addEventListener('blur',function(){if(this.value.trim()){sqAdd(this.value);renderHot();}});
+  q.addEventListener('keydown',function(e){if(e.key==='Enter'){renderList();}});
 }
 
 /* WP6 顺手办轻工具：目标感知材料核验 / 多事项到期提醒 / 政策速查 */
@@ -661,7 +640,7 @@ window.filterPolicy=function(){
 function searchJump(kw,msg){
   var q=document.getElementById('mkt-q');
   if(q)q.value=kw;
-  renderList();renderHot();
+  renderList();
   var s=document.querySelector('.scroll');
   var anchor=document.getElementById('svc-list');
   if(s&&anchor)s.scrollTop=anchor.offsetTop-70;
@@ -669,6 +648,14 @@ function searchJump(kw,msg){
 }
 
 /* C1 买方引导：本页统一为交易引导（服务商经营入口仅在 个人中心·服务经营） */
+/* 并列入口②：下滑到服务市场并高亮搜索框 */
+window.scrollToMarket=function(){
+  var s=document.querySelector('.scroll');
+  var anchor=document.getElementById('svc-list');
+  if(s&&anchor){try{s.scrollTo({top:anchor.offsetTop-72,behavior:'smooth'});}catch(e){s.scrollTop=anchor.offsetTop-72;}}
+  var q=document.getElementById('mkt-q');
+  if(q){q.classList.add('mkt-flash');setTimeout(function(){q.classList.remove('mkt-flash');},1500);}
+};
 function renderRoleHint(){
   var el=document.getElementById('role-hint');if(!el)return;
   el.style.display='block';
@@ -677,14 +664,12 @@ function renderRoleHint(){
   el.innerHTML='<div class="rh rh-buyer">'+
     '<div class="rh-head">'+
       '<span class="rh-ic"><svg class="ic"><use href="#i-sparkle"/></svg></span>'+
-      '<div class="rh-meta"><b>找服务三步走</b><span>三步完成服务对接，全程平台托管</span></div>'+
+      '<div class="rh-meta"><b>服务直达 · 全程托管</b><span>选服务 → 在线下单 → 履约结算，一条链路完成</span></div>'+
     '</div>'+
     '<div class="rh-steps">'+
-      '<div class="rh-step"><span class="rh-si"><svg class="ic"><use href="#i-star"/></svg></span><div class="rh-st-t">选服务 · 比口碑</div><div class="rh-st-s">金V核验·真实报价</div></div>'+
-      '<span class="rh-sl"></span>'+
-      '<div class="rh-step"><span class="rh-si"><svg class="ic"><use href="#i-doc"/></svg></span><div class="rh-st-t">在线下单 · 锁意向</div><div class="rh-st-s">意向金锁定·可退</div></div>'+
-      '<span class="rh-sl"></span>'+
-      '<div class="rh-step"><span class="rh-si"><svg class="ic"><use href="#i-shield"/></svg></span><div class="rh-st-t">验收后 · 结算放款</div><div class="rh-st-s">验收后放款·未成交退</div></div>'+
+      '<div class="rh-entry" onclick="location.href=\'select-service.html\'"><span class="rh-go">›</span><span class="rh-si"><svg class="ic"><use href="#i-star"/></svg></span><div class="rh-st-t">选服务 · 比口碑</div><div class="rh-st-s">金V核验·真实报价<br>按类目找已核验机构</div></div>'+
+      '<div class="rh-entry" onclick="window.scrollToMarket()"><span class="rh-go">›</span><span class="rh-si"><svg class="ic"><use href="#i-doc"/></svg></span><div class="rh-st-t">在线下单 · 锁意向</div><div class="rh-st-s">意向金锁定·可退<br>去服务市场直接下单</div></div>'+
+      '<div class="rh-entry" onclick="location.href=\'my-orders.html?view=orders&f=active\'"><span class="rh-go">›</span><span class="rh-si"><svg class="ic"><use href="#i-shield"/></svg></span><div class="rh-st-t">订单履约 · 进度跟踪</div><div class="rh-st-s">托管资金进度<br>进行中订单一目了然</div></div>'+
     '</div>'+
   '</div>';
   var ec=document.getElementById('my-entry-count');
@@ -701,7 +686,7 @@ function renderAgencyBoardEntry(){
 function render(){
   var mt=document.getElementById('mode-tag');
   if(window.ModeStore&&ModeStore.isBreakIn())mt.textContent='破冰期';else mt.textContent='成熟期';
-  renderCats();renderList();renderHot();renderRoleHint();renderNeedScenes();renderAgencyBoardEntry();
+  renderCats();renderList();renderRoleHint();renderNeedScenes();renderAgencyBoardEntry();
 }
 
 fillGoalOptions();
@@ -829,24 +814,17 @@ window.confirmFilter=function(){
 .rh-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
 .rh-meta b{font-size:12.5px;font-weight:700;color:var(--text-1);}
 .rh-meta span{font-size:10.5px;color:var(--text-3);line-height:1.5;}
-.rh-steps{display:flex;align-items:stretch;gap:0;padding:0 6px;}
-.rh-step{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;padding:0 2px;}
-.rh-si{width:34px;height:34px;border-radius:11px;background:var(--bg-card-2);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;flex:none;}
-.rh-si svg{width:16px;height:16px;stroke-width:1.8;}
-.rh-st-t{font-size:11px;font-weight:700;color:var(--text-1);white-space:nowrap;}
-.rh-st-s{font-size:10.5px;color:var(--text-3);line-height:1.5;}
-.rh-sl{flex:1;min-width:6px;height:1.5px;background:var(--line);margin:16px 3px 0;border-radius:2px;}
-[data-theme="dark"] .rh-sl{background:rgba(255,255,255,.22);}
-
-/* ===== 热门搜索 / 搜索历史 ===== */
-.hot-row{display:flex;align-items:center;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
-.hot-row::-webkit-scrollbar{display:none;}
-.hot-lab{flex:none;font-size:10px;font-weight:700;color:var(--text-3);margin-right:2px;}
-.hot-chip{flex:none;font-size:11px;color:var(--text-2);background:var(--bg-card-2);border:1px solid var(--line);border-radius:99px;padding:9px 12px;cursor:pointer;transition:all var(--d-fast);}
-.hot-chip:active{transform:scale(.95);}
-.hot-chip:hover{border-color:var(--accent-line);color:var(--primary-dim);}
-.hot-chip.hot-hist{background:transparent;color:var(--text-3);}
-.hh-x{font-style:normal;margin-left:4px;color:var(--text-3);opacity:.7;}
+/* 并列三卡入口（按需直达，非流程步骤） */
+.rh-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 2px;}
+.rh-entry{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:10px 9px 9px;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:all var(--d-fast);min-height:104px;}
+.rh-entry:active{transform:scale(.97);border-color:var(--accent-line);}
+[data-theme="dark"] .rh-entry{background:var(--bg-card-2);}
+.rh-entry .rh-si{width:29px;height:29px;border-radius:9px;background:var(--primary-soft);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;flex:none;}
+.rh-entry .rh-si svg{width:15px;height:15px;stroke-width:1.8;}
+.rh-entry .rh-st-t{font-size:11px;font-weight:700;color:var(--text-1);line-height:1.35;white-space:normal;}
+.rh-entry .rh-st-s{font-size:9.5px;color:var(--text-3);line-height:1.5;}
+.rh-entry .rh-go{position:absolute;right:7px;top:8px;width:16px;height:16px;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;padding-bottom:1px;}
+[data-theme="dark"] .rh-entry .rh-go{background:var(--bg-card);}
 
 /* ===== 担保横幅（深色） ===== */
 .escrow-banner{position:relative;overflow:hidden;border-radius:18px;padding:16px;margin-bottom:14px;
@@ -870,10 +848,10 @@ window.confirmFilter=function(){
 
 /* ===== 市场搜索 + 分类 chips ===== */
 .mkt-search{display:flex;align-items:center;gap:8px;height:40px;background:var(--bg-card-2);border:1.5px solid var(--line);border-radius:12px;padding:0 6px 0 12px;margin-bottom:10px;transition:border-color var(--d-fast),box-shadow var(--d-fast),background var(--d-fast);}
+.mkt-search.mkt-flash{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
 .mkt-search:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);background:var(--bg-card);}
 .mkt-search .ic{width:16px;height:16px;color:var(--text-3);flex:none;}
-.mkt-search .input{flex:1;min-width:0;height:100%;border:none;background:transparent;padding:0;font-size:var(--fs-md);color:var(--text-1);box-shadow:none;}
-.sub-chip{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.mkt-search .input{flex:1;min-width:0;height:100%;border:none;background:transparent;padding:0;font-size:var(--fs-md);color:var(--text-1);box-shadow:none;}.sub-chip{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .sub-chip::-webkit-scrollbar{display:none;}
 .sub-chip .chip{flex:none;padding:9px 14px;border-radius:99px;font-size:11.5px;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:all var(--d-fast);}
 .sub-chip .chip:active{transform:scale(.95);}

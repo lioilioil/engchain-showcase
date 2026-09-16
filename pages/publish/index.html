@@ -106,10 +106,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="workbench-kicker">Information desk · ENGCHAIN</div>
       <h1 class="workbench-title" id="workbench-title">信息工作台</h1>
       <p class="workbench-sub">管理发布、草稿与正在发生的对接机会</p>
-      <div class="wb-actions">
-        <a class="wb-action" href="editor.html?role=demand"><div class="wb-action-ic"><svg class="ic"><use href="#i-search"/></svg></div><div><strong>发布需求</strong><span>寻找供应与服务</span></div></a>
-        <a class="wb-action" id="wb-supply" href="editor.html?role=supply"><div class="wb-action-ic"><svg class="ic"><use href="#i-upload"/></svg></div><div><strong>发布供应</strong><span>展示资源与能力</span></div></a>
-      </div>
+      <div class="wb-actions" id="wb-actions"></div>
     </section>
     <section class="wb-section" aria-labelledby="wb-overview-title">
       <div class="wb-section-head"><h2 class="wb-section-title" id="wb-overview-title">当前进展</h2></div>
@@ -117,6 +114,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </section>
     <section class="wb-section" aria-labelledby="wb-manage-title">
       <div class="wb-section-head"><h2 class="wb-section-title" id="wb-manage-title">信息管理</h2></div>
+      <a class="wb-task" id="my-jobs-task" href="../profile/my-jobs.html" style="display:none;"><div class="wb-task-ic"><svg class="ic"><use href="#i-company"/></svg></div><div class="wb-task-main"><div class="wb-task-title">我的招聘</div><div class="wb-task-sub">收简历、处理投递与岗位管理</div></div><span class="wb-task-count" id="my-jobs-count">0</span></a>
       <a class="wb-task" href="records.html"><div class="wb-task-ic"><svg class="ic"><use href="#i-doc"/></svg></div><div class="wb-task-main"><div class="wb-task-title">我的发布</div><div class="wb-task-sub">查看状态、匹配进展和咨询反馈</div></div><span class="wb-task-count" id="record-count">0</span></a>
       <a class="wb-task" href="drafts.html"><div class="wb-task-ic"><svg class="ic"><use href="#i-edit"/></svg></div><div class="wb-task-main"><div class="wb-task-title">草稿箱</div><div class="wb-task-sub">继续完成尚未发布的信息</div></div><span class="wb-task-count" id="draft-count">0</span></a>
       <a class="wb-task" href="unlocked.html"><div class="wb-task-ic"><svg class="ic"><use href="#i-lock"/></svg></div><div class="wb-task-main"><div class="wb-task-title">已解锁线索</div><div class="wb-task-sub">查看有效期、详情与关联订单</div></div><span class="wb-task-count" id="unlock-count">0</span></a>
@@ -159,16 +157,59 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   if (!checkPublishAuth()) return;
 
-  /* 发布供应防呆：非入驻中介企业提示「中介服务需入驻」 */
-  (function () {
-    var isAgency = false;
-    try { isAgency = !!(window.entryAccess && entryAccess().agency); } catch (e) {}
-    if (isAgency) return;
-    var btn = document.getElementById('wb-supply');
-    if (!btn) return;
-    var sub = btn.querySelector('span');
-    if (sub) sub.innerHTML = '展示资源与能力 <em style="font-style:normal;color:var(--warning);font-size:9.5px;display:block;margin-top:1px;">中介服务需入驻中介企业</em>';
+  /* v2 发布按钮身份化：按叠加身份实时渲染可发布入口 */
+  (function renderActions() {
+    var box = document.getElementById('wb-actions');
+    if (!box) return;
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    var per = acc && acc.identity ? acc.identity.personal : 'none';
+    var ent = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var isEnt = ent === 'verified' || ent === 'resident';
+    var isPro = per === 'professional';
+    var isAgency = !!(acc && acc.agency);
+    var btns = [];
+    btns.push({ href: 'editor.html?role=demand', ic: 'i-search', t: '发布需求', sub: '寻找供应与服务' });
+    if (isEnt && !isAgency) btns.push({ href: 'editor.html?role=demand&cat=' + encodeURIComponent('招聘'), ic: 'i-user', t: '发布招聘', sub: '招贤纳士 · 在线收简历' });
+    if (isPro) btns.push({ href: 'editor.html?role=supply&cat=' + encodeURIComponent('求职'), ic: 'i-doc', t: '发布求职', sub: '展示持证与履历' });
+    if (isAgency) btns.push({ href: '../agency/seller-board.html', ic: 'i-briefcase', t: '发布中介服务', sub: '仅服务商工作台发布' });
+    btns.push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应', sub: isAgency ? '材料/设备/劳务等资源' : '展示资源与能力' });
+    box.innerHTML = btns.map(function (b) {
+      return '<a class="wb-action" href="' + b.href + '"><div class="wb-action-ic"><svg class="ic"><use href="#' + b.ic + '"/></svg></div><div><strong>' + b.t + '</strong><span>' + b.sub + '</span></div></a>';
+    }).join('');
   })();
+  /* v2 我的招聘任务卡：企业认证及以上显示（中介不发招聘），count=待处理投递 */
+  (function () {
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    var ent = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var isAgency = !!(acc && acc.agency);
+    var t = document.getElementById('my-jobs-task');
+    if (!t) return;
+    if ((ent !== 'verified' && ent !== 'resident') || isAgency) { t.style.display = 'none'; return; }
+    t.style.display = '';
+    try {
+      var m = window.DataBus && DataBus.current();
+      var apps = (window.ApplyStore && m) ? ApplyStore.byPublisher(m.id) : [];
+      var n = 0;
+      apps.forEach(function (a) { if (a.status === 'pending') n++; });
+      var c = document.getElementById('my-jobs-count');
+      if (c) c.textContent = n || '0';
+    } catch (e) {}
+  })();
+  window.addEventListener('engchain:apply', function () {
+    var t = document.getElementById('my-jobs-task');
+    if (t && t.style.display !== 'none') {
+      try {
+        var m = window.DataBus && DataBus.current();
+        var apps = (window.ApplyStore && m) ? ApplyStore.byPublisher(m.id) : [];
+        var n = 0;
+        apps.forEach(function (a) { if (a.status === 'pending') n++; });
+        var c = document.getElementById('my-jobs-count');
+        if (c) c.textContent = n || '0';
+      } catch (e) {}
+    }
+  });
 
   function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function unlockCount() { try { return Object.keys(JSON.parse(localStorage.getItem('engchain-unlocked') || '{}')).length; } catch (e) { return 0; } }

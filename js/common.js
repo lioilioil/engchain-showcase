@@ -58,8 +58,8 @@ window.UI = (function () {
     const overlay = document.createElement('div');
     overlay.className = 'sheet-overlay';
     document.body.appendChild(overlay);
-    overlay.addEventListener('click', close);
-    wrap.querySelector('.sheet-close').addEventListener('click', close);
+    overlay.addEventListener('click', () => { if (wrap._closable !== false) close(); });
+    wrap.querySelector('.sheet-close').addEventListener('click', () => { if (wrap._closable !== false) close(); });
     wrap.show = () => {
       requestAnimationFrame(() => { overlay.style.opacity = '1'; overlay.style.visibility = 'visible'; wrap.classList.add('show'); });
       document.body.style.overflow = 'hidden';
@@ -67,6 +67,12 @@ window.UI = (function () {
     wrap.setText = (title) => { wrap.querySelector('.sheet-head .fs-17').textContent = title; };
     wrap.body = () => wrap.querySelector('.sheet-body');
     wrap.html = (c) => { wrap.querySelector('.sheet-body').innerHTML = c; return wrap; };
+    /* setClosable(false): hide close btn and block overlay/X close; wrap.close()/UI.closeSheet() still work for primary action buttons */
+    wrap.setClosable = (closable) => {
+      wrap._closable = closable;
+      const btn = wrap.querySelector('.sheet-close');
+      if (btn) btn.style.display = (closable === false) ? 'none' : '';
+    };
     lastSheet = wrap;
     function close() {
       overlay.style.opacity = '0'; overlay.style.visibility = 'hidden'; wrap.classList.remove('show');
@@ -1805,4 +1811,37 @@ window.ListFooter = (function () {
   }
 
   window.EntryTier = { TIERS:TIERS, evaluate:evaluate, current:current, getTier:getTier, render:render, renderProgress:renderProgress };
+})();
+
+/* ============================================================================
+   全局「回到顶部」玻璃按钮（BackToTop）
+   - 所有引入 common.js 的页面通用：手机壳 demo（.phone 内滚动）与桌面端（窗口滚动）自动适配
+   - 样式与逻辑在 js/back-to-top.js（幂等，重复加载无害）
+   ============================================================================ */
+(function () {
+  function loadBackToTop() {
+    if (window.EngchainBackTop) return;
+    /* 以 common.js 自身路径定位 js/ 目录，确保子目录页（pages/xx/、admin/）也能加载 */
+    var src = '';
+    var scripts = document.getElementsByTagName('script');
+    for (var i = 0; i < scripts.length; i++) {
+      var s = scripts[i].src || '';
+      if (s.indexOf('common.js') > -1) { src = s; break; }
+    }
+    var dir = '';
+    if (src) {
+      var idx = src.lastIndexOf('/');
+      if (idx > -1) dir = src.slice(0, idx + 1);
+    }
+    if (!dir) dir = (window.__ROOT__ || '') + 'js/';
+    var el = document.createElement('script');
+    el.src = dir + 'back-to-top.js';
+    el.async = true;
+    document.head.appendChild(el);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadBackToTop);
+  } else {
+    loadBackToTop();
+  }
 })();

@@ -61,9 +61,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .wc-brand{ display:flex; align-items:center; gap:8px; font-size:10px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:#CBB87F; }
   .wc-brand::before{ content:""; width:14px; height:1px; background:#E8D5A3; opacity:.55; }
   .wc-contact{ width:20px; height:13px; color:#CFB15F; opacity:.9; } .wc-contact svg{ width:100%; height:100%; }
-  .wc-badge{ font-size:9px; font-weight:700; letter-spacing:.06em; color:#2A1810; background:linear-gradient(135deg,#F0E2BE,#C9A961); border-radius:6px; padding:3px 9px; white-space:nowrap; box-shadow:0 2px 8px -3px rgba(201,169,97,.7); border:1px solid rgba(255,255,255,.4); }
+  .wc-badge{ font-size:9px; font-weight:700; letter-spacing:.06em; color:#2A1810; background:linear-gradient(135deg,#F0E2BE,#C9A961); border-radius:6px; padding:3px 9px; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,.38), 0 0 0 1px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.55); border:1px solid rgba(255,255,255,.6); position:relative; z-index:2; }
   .wc-amt{ margin-top:9px; display:flex; align-items:baseline; gap:4px; font-family:var(--font-num); font-weight:800; font-size:30px; line-height:1; color:#E8D5A3; letter-spacing:-.01em; font-feature-settings:"tnum" 1,"ss01" 1; text-shadow:0 1px 0 rgba(0,0,0,.35); min-height:1em; }
   .wc-amt .cur{ font-size:14px; font-weight:600; color:#C9B27E; }
+  .wc-amt-tag{ font-family:var(--font-display); font-size:10.5px; font-weight:500; letter-spacing:.02em; color:rgba(207,199,183,.74); margin-left:8px; text-shadow:none; }
   .wc-mid{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
   .wc-chip{ width:42px; height:30px; border-radius:6px; position:relative; box-shadow: inset 0 1px 1px rgba(255,255,255,.55), inset 0 -2px 5px rgba(0,0,0,.32), 0 6px 14px -8px rgba(0,0,0,.7); background:linear-gradient(135deg,#F1E3BE,#C9A961 55%,#A8862F); }
   .wc-chip svg{ position:absolute; inset:0; width:100%; height:100%; }
@@ -173,16 +174,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                   <div class="wc-badge" id="entry-badge">—</div>
                 </div>
               </div>
-              <div class="wc-amt"><span class="cur">¥</span><span id="balance">—</span></div>
+              <div class="wc-amt"><span class="cur">¥</span><span id="balance">—</span><span class="wc-amt-tag">可用余额</span></div>
               <div class="wc-mid">
                 <div class="wc-chip"><svg viewBox="0 0 42 30" fill="none" stroke="rgba(88,62,16,.5)" stroke-width="1"><path d="M13 .5v9M29 .5v9M13 20.5v9M29 20.5v9M.5 15h12M29.5 15h12M21 .5v29M.5 7.5h8M33.5 22.5h8"/></svg></div>
                 <div class="wc-num">**** **** **** 1286</div>
               </div>
               <div class="wc-sub" style="flex-direction:column;align-items:stretch;gap:5px;padding-top:11px;">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">可用余额</span><b id="bal-available">—</b></div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">在途金额<small style="opacity:.6;">（提现中）</small></span><b id="bal-pending">—</b></div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="opacity:.8;">冻结<span id="bal-deposit-tag" style="display:none;font-size:9px;color:#E6A022;margin-left:4px;"></span></span><b id="bal-frozen">—</b></div>
-                <div style="display:flex;justify-content:space-between;align-items:baseline;opacity:.7;"><span>累计入账</span><b id="bal-total">—</b></div>
               </div>
             </div>
           </div>
@@ -488,10 +487,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var avail = BalanceStore.available();
     var pending = Math.round(pendingWithdrawAmount() * 100) / 100;
     document.getElementById('balance').textContent = UI.money(avail);
-    document.getElementById('bal-available').textContent = UI.money(avail);
     document.getElementById('bal-pending').textContent = UI.money(pending);
     document.getElementById('bal-frozen').textContent = UI.money(b.frozen);
-    document.getElementById('bal-total').textContent = UI.money(b.totalIn);
     /* E2-23 入驻审核中且有冻结额：标注含入驻保证金 */
     var tag = document.getElementById('bal-deposit-tag');
     if (tag) {
@@ -623,6 +620,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { if (localStorage.getItem('engchain-balance') === null) { var z = BalanceStore.read(); z.balance = 0; z.frozen = 0; z.totalIn = 0; z.totalRebate = 0; z.logs = []; BalanceStore.write(z); } } catch (e) {}
   })();
   ensureGuestGate();
+  /* ---- 直达提现：个人中心「提现」入口带 action=withdraw，登录后自动跳转提现页 ---- */
+  (function goWithdraw() {
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('action') === 'withdraw' && isLoggedIn()) location.replace('withdraw.html');
+    } catch (e) {}
+  })();
   BalanceStore.seedLogs();
   renderBadge();
   renderBanned();

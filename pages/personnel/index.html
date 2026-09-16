@@ -258,6 +258,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <button class="nav-back" onclick="history.back()">‹</button>
     <div class="nav-title">人员招聘</div>
     <div class="nav-right">
+      <button class="icon-btn" id="navMyJobs" onclick="location.href='../profile/my-jobs.html'" style="display:none;" aria-label="我的招聘"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>
       <button class="icon-btn" onclick="location.href='../search/business.html?type=personnel'" aria-label="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
   </div>
@@ -724,7 +725,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         });
       }
       document.getElementById('emptyDelegate').addEventListener('click', function () {
-        if (isEnt) openDelegate();
+        if (isEnt) { location.href = '../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘'); }
         else { UI.toast('委托顾问功能开发中', 'info'); }
       });
       document.getElementById('emptyExclusive').addEventListener('click', openExclusiveConfirm);
@@ -745,7 +746,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           title: isEntLf ? '已显示全部公开招聘岗位' : '已显示全部公开持证人才',
           desc: isEntLf ? '没有更多岗位或存在私密招聘需求，发布需求或提交专享委托获取精准匹配' : '没有更多人才或存在私信人才信息，委托顾问或提交专享委托获取精准匹配',
           buttons: [
-            { text: isEntLf ? '发布招聘需求' : '委托顾问匹配', style: 'outline', onClick: function () { if (isEntLf) openDelegate(); else UI.toast('委托顾问功能开发中', 'info'); } },
+            { text: isEntLf ? '发布招聘需求' : '委托顾问匹配', style: 'outline', onClick: function () { if (isEntLf) { location.href = '../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘'); } else UI.toast('委托顾问功能开发中', 'info'); } },
             { text: '提交专享委托', style: 'outline', onClick: openExclusiveConfirm }
           ]
         });
@@ -1252,9 +1253,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSortTabs();
   renderHot();
   renderList();
+  /* v2 我的招聘入口：企业认证及以上（叠加身份企业侧）显示；中介入驻不发招聘 */
+  function applyMyJobsNav() {
+    var btn = document.getElementById('navMyJobs');
+    if (!btn) return;
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    var ent = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var isAgency = !!(acc && acc.agency);
+    btn.style.display = ((ent === 'verified' || ent === 'resident') && !isAgency) ? '' : 'none';
+  }
+  applyMyJobsNav();
   /* E2-12：完成实名/入驻后，投递按钮状态即时刷新 */
-  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); });
-  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); });
+  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); applyMyJobsNav(); });
+  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); applyMyJobsNav(); });
 })();
 </script>
 </body>
