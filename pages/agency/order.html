@@ -38,8 +38,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="og-meta"><b>意向金锁定合作 · 资金全程托管</b><span>意向金启动前可退 · 服务启动后托管全款，按里程碑释放给服务商</span></div>
     </div>
 
-    <div class="section-title"><div class="st-left">选择服务商</div></div>
+    <div class="section-title"><div class="st-left">选择服务商</div><span class="more" id="svc-sort-bar" style="display:none;"></span></div>
     <div class="svc-summary" id="svc-summary" style="display:none;"></div>
+    <div id="svc-sort" style="display:flex;gap:7px;margin:-2px 0 10px;"></div>
     <div id="svc-sel"></div>
 
     <div class="section-title" style="margin-top:14px;"><div class="st-left">意向金与托管</div><span class="more" id="quote-hint" style="display:none;"></span></div>
@@ -103,10 +104,23 @@ function normSvc(s){
   var m2=p?/([\d.]+)\s*(万)?/.exec(String(p)):null;
   var bT=qT||(m2?Math.round(parseFloat(m2[1])*(m2[2]?10000:1)):0);
   var dep=/担保|保函/.test(sub)?50000:(/劳务|派遣/.test(sub)?20000:5000);
+  var cid=s.companyId||'';
+  var company='';
+  try{var c=(window.MOCK&&MOCK.companyById)?MOCK.companyById(cid):null;company=(c&&(c.short||c.name))||'';}catch(e){}
+  var h=s.handleCycle||'';
+  var cyc='周期面议';
+  if(h){var hm=/(\d+(?:\.\d+)?)\s*[–\-~]?\s*(\d+(?:\.\d+)?)?\s*个月/.exec(String(h));if(hm)cyc='约'+(hm[2]?hm[1]+'-'+hm[2]:hm[1])+'个月';}
+  var proc=(s.serveProcess&&s.serveProcess.length)?s.serveProcess.map(function(x){return x.title;}):[];
   return { id:s.id, sellerId:s.sellerId||'u2', name:s.title||s.name||'中介服务',
     cats:[s.subType||s.sub||s.category||s.cat||'中介服务'],
     score:(typeof s.rating==='number')?s.rating:(s.score||0),
-    dep:dep, icon:(sub||'服').charAt(0), quoteTotal:bT };
+    dep:dep, icon:(sub||'服').charAt(0), quoteTotal:bT,
+    company:company||s.company||'', sub:sub, cycle:cyc, tags:s.tags||[],
+    successRate:(typeof s.successRate==='number')?s.successRate:null,
+    caseCount:(s.cases&&s.cases.length)?s.cases.length:0,
+    match:s.match||0, quote:s.quote||null, cases:s.cases||[],
+    refundPolicy:s.refundPolicy||'', processTitles:proc,
+    requiredMaterials:s.requiredMaterials||[], serveType:s.serveType||'', targetQualLevel:s.targetQualLevel||'' };
 }
 function svcSource(){
   var out=[];
@@ -152,7 +166,7 @@ var sumEl=document.getElementById('svc-summary');
 if(sumEl&&svc){
   sumEl.style.display='flex';
   sumEl.innerHTML='<span class="ss-ic"><svg class="ic"><use href="#i-check"/></svg></span>'+
-    '<span class="ss-meta"><b>为「'+svc.name+'」在线下单</b><span>'+svc.cats.join(' · ')+' · 金V 已核验 · 资金托管</span></span>';
+    '<span class="ss-meta"><b>为「'+svc.name+'」挑选服务商</b><span>'+svc.cats.join(' · ')+' · 金V 已核验 · 意向金锁定合作，资金全程托管</span></span>';
 }else if(sumEl){sumEl.style.display='none';}
 /* P1 fix: filter service list by category when svc param present */
 var _showSVCs=SVCS,_svcCatLabel='';
@@ -168,26 +182,173 @@ if(!svcId&&svc&&svc.cats&&svc.cats[0]){
   if(_filtered.length>=2){_showSVCs=_filtered;_svcCatLabel=_cat;}
 }
 var _displayIdx=_showSVCs.indexOf(svc);if(_displayIdx<0)_displayIdx=0;
-document.getElementById('svc-sel').innerHTML=_showSVCs.map(function(s,i){
-  var on=i===_displayIdx;
-  return '<div class="od-card'+(on?' on':'')+'" onclick="'+(demandLock?'':('pickSvc(\''+s.id+'\')'))+'">'+
-    '<div class="od-radio"><svg class="ic"><use href="#i-check"/></svg></div>'+
-    '<div class="od-av">'+s.icon+'<span class="od-v">金V</span></div>'+
-    '<div class="od-main"><div class="fw-600 fs-13 od-name">'+s.name+'</div>'+
-    '<div class="od-meta">'+s.cats.join(' · ')+'</div></div>'+
-    '<span class="od-score"><svg class="ic"><use href="#i-star"/></svg>'+(s.score>0?s.score.toFixed(1):'新机构')+'</span>'+
-    '</div>';
-}).join('');
-if(!SVCS.length){
-  document.getElementById('svc-sel').innerHTML='<div class="card"><div class="text-3 fs-12">暂无可下单的服务，请稍后再试或返回服务广场挑选。</div><div style="margin-top:10px;"><a class="btn btn-primary btn-sm" href="index.html">返回服务广场</a></div></div>';
-} else if(_svcCatLabel){
-  document.getElementById('svc-sel').insertAdjacentHTML('afterbegin','<div style="font-size:11px;color:var(--text-3);padding:2px 0 10px;">已按「'+_svcCatLabel+'」筛选 · 仅展示同类服务商</div>');
-if(demandLock){
-  var _ne=document.getElementById('svc-sel');
-  if(_ne)_ne.insertAdjacentHTML('afterbegin','<div style="font-size:11px;color:var(--primary-dim);font-weight:600;padding:2px 0 10px;">来自需求单 '+demandLock.demand.id+' 的机构报价 · 服务机构已锁定，金额以报价为准</div>');
+/* ============ 服务商比选（专业重构）：机构聚合 → 排序 → 决策卡片 ============ */
+function creditOf(sellerId){
+  try{var c=window.svcCreditOf?svcCreditOf(sellerId):null;if(c&&typeof c.score==='number')return c.score;}catch(e){}
+  return 80;
 }
+function payPctsOf(s){
+  try{var ps=s.quote&&s.quote.payStages;if(ps&&ps.length)return ps.map(function(p){return p.pct;}).join('/');}catch(e){}
+  return '';
 }
-window.pickSvc=function(sid){location.href='order.html?svcId='+sid;};
+function refundTagOf(s){
+  var rp=s.refundPolicy||'';
+  if(/不过|未办结退|全额退/.test(rp))return '不过退款';
+  if(/超期/.test(rp)||/赔付/.test(rp))return '超期赔付';
+  return '';
+}
+function buildAgencies(list){
+  var map={};
+  list.forEach(function(s){
+    var key=(s.company||'')+'|'+(s.sellerId||s.id);
+    if(!map[key])map[key]={company:s.company||'',sellerId:s.sellerId,key:key,items:[]};
+    map[key].items.push(s);
+  });
+  var arr=Object.keys(map).map(function(k){
+    var g=map[k];
+    g.items.sort(function(a,b){return (b.match||0)-(a.match||0)||((b.quoteTotal||0)-(a.quoteTotal||0));});
+    var rep=g.items[0];
+    g.rep=rep; g.price=rep.quoteTotal||0; g.cycle=rep.cycle; g.tags=rep.tags||[];
+    g.score=typeof rep.score==='number'?rep.score:0;
+    g.credit=creditOf(rep.sellerId);
+    g.successRate=typeof rep.successRate==='number'?rep.successRate:null;
+    g.caseCount=rep.caseCount||0;
+    g.payPcts=payPctsOf(rep); g.refund=refundTagOf(rep);
+    g.process=rep.processTitles||[]; g.quotes=(rep.quote&&rep.quote.items)||[];
+    g.cases=rep.cases||[]; g.name=rep.name; g.cats=rep.cats; g.sub=rep.sub; g.repId=rep.id;
+    return g;
+  });
+  return arr;
+}
+var _sortMode='reco',_aggs=[];
+function sortAgencies(){
+  var minP=Math.min.apply(null,_aggs.map(function(g){return g.price>0?g.price:Infinity;}));
+  _aggs.forEach(function(g){g.minP=minP;});
+  if(_sortMode==='price')_aggs.sort(function(a,b){return (a.price>0?1:2)-(b.price>0?1:2)||(a.price-b.price);});
+  else if(_sortMode==='score')_aggs.sort(function(a,b){return (b.score-a.score)||(b.credit-a.credit);});
+  else _aggs.sort(function(a,b){return (b.credit*0.45+b.score*12+(b.successRate||0)*0.25+b.caseCount*1.5)-(a.credit*0.45+a.score*12+(a.successRate||0)*0.25+a.caseCount*1.5);});
+}
+function acFmt(n){
+  if(!(n>0))return '面议';
+  if(n>=10000)return '¥'+(n/10000).toLocaleString(undefined,{maximumFractionDigits:1})+'万';
+  return '¥'+Math.round(n).toLocaleString();
+}
+function priceNote(g){
+  if(!(g.price>0))return '按方案报价';
+  var ps=g.payPcts?('分'+g.payPcts+'期'):(g.tags.indexOf('一价全包')>=0?'一价全包':'费用透明');
+  return ps;
+}
+function diffLabel(g){
+  if(!(g.price>0)||!(g.minP>0)||g.minP===Infinity)return '';
+  var d=g.price-g.minP;
+  if(d<=0)return '同类最低价';
+  if(d>=10000)return '较最低价高 ¥'+(d/10000).toFixed(1)+'万';
+  return '较最低价高 ¥'+Math.round(d).toLocaleString();
+}
+function renderAgencies(){
+  _aggs=buildAgencies(_showSVCs);
+  sortAgencies();
+  var el=document.getElementById('svc-sel');
+  var curId=svc?svc.id:'';
+  if(!_aggs.length){
+    el.innerHTML='<div class="card"><div class="text-3 fs-12">暂无可下单的服务商，请稍后再试或返回服务广场挑选。</div><div style="margin-top:10px;"><a class="btn btn-primary btn-sm" href="index.html">返回服务广场</a></div></div>';
+    return;
+  }
+  var hint='';
+  if(_svcCatLabel)hint='已按「'+_svcCatLabel+'」匹配到 '+_aggs.length+' 家服务商 · 按'+( _sortMode==='price'?'价格':(_sortMode==='score'?'评分':'综合推荐'))+'排序';
+  if(demandLock)hint='来自需求单 '+demandLock.demand.id+' 的机构报价 · 服务机构已锁定，金额以报价为准';
+  el.innerHTML=(hint?'<div class="ac-hint">'+hint+'</div>':'')+
+    _aggs.map(function(g,i){
+      var on=curId&&g.items.some(function(s){return String(s.id)===String(curId);});
+      var tags=g.tags.slice(0,3);
+      if(g.refund&&tags.indexOf(g.refund)<0)tags.push(g.refund);
+      var flow=g.process.length?g.process.join(' → '):'';
+      var diff=diffLabel(g);
+      return '<div class="ac-card'+(on?' on':'')+'" data-i="'+i+'">'+
+        '<div class="ac-head" onclick="window.toggleAc('+i+')">'+
+          '<span class="ac-logo">'+(g.company?g.company.charAt(0):'中')+'</span>'+
+          '<div class="ac-main">'+
+            '<div class="ac-name">'+(g.company||'机构服务商')+'<span class="ac-v">金V</span>'+(on?'<span class="ac-cur">当前选择</span>':'')+'</div>'+
+            '<div class="ac-sub">'+g.sub+' · '+g.cycle+'</div>'+
+            '<div class="ac-trust">'+
+              '<span class="at-credit">信用 '+g.credit+'</span>'+
+              '<span class="at-score">★'+(g.score>0?g.score.toFixed(1):'新机构')+'</span>'+
+              (g.successRate?('<span class="at-rate">成功率 '+g.successRate+'%</span>'):'')+
+              (g.caseCount?('<span class="at-case">'+g.caseCount+' 案例</span>'):'')+
+            '</div>'+
+          '</div>'+
+          '<span class="ac-arrow">›</span>'+
+        '</div>'+
+        '<div class="ac-price-row">'+
+          '<span class="ac-price">'+acFmt(g.price)+'</span>'+
+          '<span class="ac-note">'+priceNote(g)+'</span>'+
+          (diff?'<span class="ac-diff'+(diff.indexOf('最低')>=0?' best':'')+'">'+diff+'</span>':'')+
+        '</div>'+
+        (tags.length?'<div class="ac-tags">'+tags.map(function(t){return '<span class="ac-tag">'+t+'</span>';}).join('')+'</div>':'')+
+        (flow?'<div class="ac-flow">流程：'+flow+'</div>':'')+
+        '<div class="ac-foot">'+
+          '<button class="ac-detail" onclick="event.stopPropagation();window.toggleAc('+i+')">方案详情</button>'+
+          '<button class="ac-pick'+(on?' on':'')+'" onclick="event.stopPropagation();window.pickAgency('+i+')">'+(on?'已选择':'选这家')+'</button>'+
+        '</div>'+
+        '<div class="ac-body" id="ac-body-'+i+'">'+acBody(g)+'</div>'+
+      '</div>';
+    }).join('');
+  var bar=document.getElementById('svc-sort-bar');
+  if(bar)bar.style.display=_aggs.length>1?'flex':'none';
+  var sumEl=document.getElementById('svc-summary');
+  if(sumEl&&svc){
+    sumEl.style.display='flex';
+    sumEl.innerHTML='<span class="ss-ic"><svg class="ic"><use href="#i-check"/></svg></span>'+
+      '<span class="ss-meta"><b>'+( _aggs.length>1?('已为你匹配 '+_aggs.length+' 家服务商，请比选后下单'):'为「'+svc.name+'」挑选服务商')+'</b><span>'+svc.cats.join(' · ')+' · 金V 已核验 · 意向金锁定合作，资金全程托管</span></span>';
+  }
+}
+function acBody(g){
+  var h='';
+  if(g.quotes.length){
+    h+='<div class="ab-sec"><div class="ab-t">报价明细</div>'+
+      g.quotes.map(function(q){return '<div class="ab-row"><span>'+q.k+'</span><b class="mono">'+q.v+'</b></div>';}).join('')+'</div>';
+  }
+  if(g.cases.length){
+    h+='<div class="ab-sec"><div class="ab-t">成功案例</div>'+
+      g.cases.slice(0,2).map(function(c){return '<div class="ab-row ab-case"><span>'+c.caseCompany+'</span><b>'+c.caseResult+'</b></div>';}).join('')+'</div>';
+  }
+  var rp=g.rep&&g.rep.refundPolicy;
+  if(rp)h+='<div class="ab-sec"><div class="ab-t">保障条款</div><div class="ab-text">'+rp+'</div></div>';
+  return h||'<div class="ab-text">该机构暂未补充详细方案，可在下单后与服务商确认。</div>';
+}
+window.toggleAc=function(i){
+  var b=document.getElementById('ac-body-'+i);if(!b)return;
+  var open=b.style.display==='block';
+  b.style.display=open?'none':'block';
+  var card=b.closest('.ac-card');
+  if(card)card.classList.toggle('exp',!open);
+};
+window.pickAgency=function(i){
+  var g=_aggs[i];if(!g)return;
+  if(demandLock){UI.toast('需求单报价机构已锁定，不可更换','warn');return;}
+  svc=g.rep;svcId=svc.id;
+  if(g.price>0&&!manualAmt){curAmt=g.price;amtInput.value=curAmt;FormStash.save('agency_order_draft',{amount:curAmt,svc:svc.id});}
+  renderAgencies();
+  var sumEl=document.getElementById('svc-summary');
+  if(sumEl&&svc){
+    sumEl.style.display='flex';
+    sumEl.innerHTML='<span class="ss-ic"><svg class="ic"><use href="#i-check"/></svg></span>'+
+      '<span class="ss-meta"><b>已选择「'+(g.company||g.name)+'」</b><span>'+svc.name+' · '+svc.cats.join(' · ')+' · 金V 已核验 · 资金托管</span></span>';
+  }
+  renderQuoteHint();renderAmtOpts();renderCalc();
+  window.scrollTo({top:0,behavior:'smooth'});
+  UI.toast('已选择 '+(g.company||'该服务商')+'，金额可继续调整','ok');
+};
+/* 排序切换 */
+function renderSortBar(){
+  var el=document.getElementById('svc-sort');
+  if(!el)return;
+  el.innerHTML=[['reco','综合推荐'],['price','价格最低'],['score','评分最高']].map(function(o){
+    return '<span class="ac-sort'+(o[0]===_sortMode?' on':'')+'" data-s="'+o[0]+'">'+o[1]+'</span>';
+  }).join('');
+}
+window.pickSort=function(s){_sortMode=s;renderSortBar();renderAgencies();};
+var manualAmt=false;
 
 var AMTS=[30000,60000,250000,600000,1200000];
 /* 金额预填优先级：URL amount（报价带入）> 未提交草稿 > 服务报价 > 默认 6 万（均可改） */
@@ -216,6 +377,7 @@ function renderQuoteHint(){
   qh.textContent='参考价位 · 可协商';
 }
 renderQuoteHint();
+renderSortBar();renderAgencies();
 function renderAmtOpts(){
   document.getElementById('amt-opts').innerHTML=AMTS.map(function(a){
     var lab=a>=10000?('¥'+Math.round(a/10000)+'万'):fmt(a);
@@ -223,7 +385,7 @@ function renderAmtOpts(){
   }).join('');
 }
 window.setAmt=function(a){curAmt=a;amtInput.value=a;FormStash.save('agency_order_draft',{amount:a,svc:svc.id});renderAmtOpts();renderCalc();};
-amtInput.addEventListener('input',function(){var v=parseFloat(this.value)||0;curAmt=v;renderAmtOpts();renderCalc();FormStash.save('agency_order_draft',{amount:v,svc:svc.id});});
+amtInput.addEventListener('input',function(){var v=parseFloat(this.value)||0;curAmt=v;manualAmt=true;renderAmtOpts();renderCalc();FormStash.save('agency_order_draft',{amount:v,svc:svc.id});});
 
 function renderCalc(){
   var r=window.commissionRate(curAmt||0);
@@ -244,7 +406,9 @@ function renderCalc(){
           '<span class="mono fw-700 fs-12">'+fmt(Domain.round2(curAmt*n))+'</span></div>';
       }).join('')+'</div>'
     : '<div class="text-3 fs-12">金额低于 '+fmt(cm.milestone.minAmount)+'，一次性结算，验收后放款给服务商。</div>';
-  document.getElementById('pay-btn').textContent='支付意向金 '+fmt(intAmt)+' 并确认合作';
+  var ctaEl=document.getElementById('pay-btn');
+  var gName=svc&&svc.company?svc.company:'';
+  ctaEl.textContent=gName?('确认选择 '+gName+' · 付意向金 '+fmt(intAmt)):('支付意向金 '+fmt(intAmt)+' 并确认合作');
 }
 renderAmtOpts();renderCalc();
 
@@ -300,10 +464,10 @@ document.getElementById('pay-btn').addEventListener('click',function(){
   var r=commissionRate(amt);
   var o=Mediation.create({buyerId:uid,sellerId:svc.sellerId,svcId:svc.id,svcName:svc.name,category:svc.cats[0],amount:amt});
   if(o.error){paying=false;UI.toast(o.error,'warn');return;}
-  try{if(demandLock&&window.DemandStore)DemandStore.markOrdered(demandId,o.id);}catch(e){}
   var paid=Mediation.payIntent(o.id,'balance');
-  paying=false;
-  if(paid.error){UI.toast('意向金支付失败：'+paid.error,'warn');return;}
+  if(paid.error){paying=false;UI.toast('意向金支付失败：'+paid.error,'warn');return;}
+  /* v4.0 仅在支付成功后关闭需求（避免支付失败导致需求被误关闭）；成功后保持 paying=true 防双击重复下单 */
+  try{if(demandLock&&window.DemandStore)DemandStore.markOrdered(demandId,o.id);}catch(e){}
   FormStash.clear('agency_order_draft');
   UI.toast('意向金已付 '+fmt(intAmt)+'，服务启动前可全额退款','ok');
   setTimeout(function(){location.href='order-detail.html?id='+o.id;},700);
@@ -391,6 +555,46 @@ document.getElementById('pay-btn').addEventListener('click',function(){
 .od-card-row{display:block;box-shadow:var(--shadow-xs);}
 .od-card-row:active{transform:scale(.985);}
 .od-st{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:6px;border:1px solid;line-height:1.5;}
+
+/* ===== 服务商比选卡（专业重构） ===== */
+.ac-hint{font-size:11px;color:var(--text-3);padding:0 2px 10px;line-height:1.6;}
+.ac-hint b{color:var(--primary-dim);font-weight:700;}
+.ac-sort{flex:none;display:inline-flex;align-items:center;height:26px;min-height:26px;padding:0 11px;font-size:11px;color:var(--text-3);background:var(--bg-card);border:1px solid var(--line);border-radius:999px;cursor:pointer;transition:all .15s;}
+.ac-sort.on{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);font-weight:600;}
+.ac-card{border:1px solid var(--line);border-radius:16px;background:var(--bg-card);margin-bottom:12px;overflow:hidden;box-shadow:var(--shadow-xs);transition:all var(--d-fast);}
+.ac-card.on{border-color:var(--primary);box-shadow:0 6px 20px rgba(201,169,97,.18);}
+.ac-card.exp{border-color:var(--accent-line);}
+.ac-head{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;cursor:pointer;}
+.ac-logo{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:var(--primary-strong);background:linear-gradient(135deg,#2A313C,#161B23);}
+.ac-main{flex:1;min-width:0;}
+.ac-name{display:flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--text-1);}
+.ac-v{flex:none;font-size:9px;font-weight:800;color:#2A1810;background:linear-gradient(135deg,#F0E2BE,#C9A961);border-radius:4px;padding:1.5px 4.5px;line-height:1.4;}
+.ac-cur{flex:none;font-size:9.5px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary-dim));border-radius:4px;padding:1.5px 6px;}
+.ac-sub{font-size:11px;color:var(--text-3);margin-top:3px;}
+.ac-trust{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.at-credit,.at-score,.at-rate,.at-case{font-size:9.5px;font-weight:600;color:var(--text-2);background:var(--bg-card-2);border:1px solid var(--line);border-radius:6px;padding:1.5px 6px;}
+.at-score{color:var(--primary-dim);border-color:var(--accent-line);}
+.ac-arrow{flex:none;width:22px;height:22px;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:2px;transition:transform .2s;}
+.ac-card.exp .ac-arrow{transform:rotate(90deg);}
+.ac-price-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:0 13px;padding:11px 13px;border-radius:12px;background:var(--bg-card-2);}
+.ac-price{font-size:20px;font-weight:800;font-family:var(--font-num);color:var(--primary-dim);}
+.ac-note{font-size:10px;color:var(--text-3);}
+.ac-diff{margin-left:auto;font-size:10px;font-weight:700;color:var(--text-3);}
+.ac-diff.best{color:var(--success);}
+.ac-tags{display:flex;flex-wrap:wrap;gap:5px;padding:9px 13px 0;}
+.ac-tag{font-size:9.5px;color:var(--text-2);background:var(--bg-card-2);border:1px solid var(--line);border-radius:99px;padding:2px 8px;}
+.ac-flow{font-size:10px;color:var(--text-3);padding:8px 13px 0;line-height:1.6;}
+.ac-foot{display:flex;align-items:center;gap:9px;padding:11px 13px 13px;}
+.ac-detail{flex:1;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;}
+.ac-pick{flex:1;height:34px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(201,169,97,.3);}
+.ac-pick.on{background:var(--bg-card-2);color:var(--success);box-shadow:none;border:1px solid color-mix(in srgb,var(--success) 45%,transparent);}
+.ac-body{display:none;border-top:1px dashed var(--line);padding:4px 13px 13px;}
+.ab-sec{padding-top:11px;}
+.ab-t{font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:6px;}
+.ab-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;font-size:11px;color:var(--text-2);}
+.ab-row b{font-weight:700;color:var(--text-1);}
+.ab-row.ab-case b{font-size:10px;color:var(--text-3);}
+.ab-text{font-size:10.5px;color:var(--text-3);line-height:1.7;}
 </style>
 </body>
 </html>

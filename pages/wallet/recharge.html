@@ -20,7 +20,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* —— 金额展示 —— */
   .pay-amount { text-align: center; padding: 6px 0 16px; }
   .pay-amount .pa-label { font-size: 12px; color: var(--text-3); }
-  .pay-amount .pa-num { font-family: var(--font-num); font-size: 30px; font-weight: 700; color: var(--primary-dim); margin-top: 2px; }
+  .pay-amount .pa-value { font-family: var(--font-num); font-size: 30px; font-weight: 700; color: var(--primary-dim); margin-top: 2px; }
 
   /* —— 支付方式（并入初始页） —— */
   .pay-method-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin: 18px 0 10px; display: flex; align-items: center; gap: 6px; }
@@ -106,18 +106,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <span class="amt" data-value="500">¥500</span><span class="amt" data-value="1000">¥1,000</span><span class="amt" data-value="2000">¥2,000</span><span class="amt" data-value="5000">¥5,000</span>
       </div>
 
-      <!-- 积分抵现（v1.3）：兑换比例与抵扣上限均由规则中心 credits.deduct 配置 -->
-      <div id="deductBox" class="glass" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:14px;">
-        <svg class="ic" style="width:18px;height:18px;color:var(--primary);flex:none;"><use href="#i-bolt"/></svg>
-        <div style="flex:1;min-width:0;">
-          <div class="fw-600 fs-13" style="color:var(--text-1);">积分抵现</div>
-          <div class="text-3 fs-11" id="ded-sub" style="margin-top:2px;">当前积分 0</div>
-        </div>
-        <div id="ded-switch" onclick="toggleDeduct()" style="flex:none;width:44px;height:26px;border-radius:99px;background:var(--bg-card-2);position:relative;cursor:pointer;border:1px solid var(--line);transition:background .2s;">
-          <span style="position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>
-        </div>
-      </div>
-
       <!-- 支付方式（并入初始页） -->
       <div class="pay-method-label"><svg class="ic"><use href="#i-card"/></svg> 选择支付方式</div>
       <div class="pm-row on" data-pm="wechat">
@@ -152,7 +140,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js"></script>
+<script src="../../js/common.js?v=20260916"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/domain.js"></script>
@@ -214,7 +202,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
   document.getElementById('amount').addEventListener('input', function () {
     document.querySelectorAll('.amt').forEach(function (x) { x.classList.remove('active'); });
-    renderDeduct();
   });
 
   /* ---- 余额真渲染 ---- */
@@ -224,52 +211,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     document.getElementById('cur-bal').textContent = UI.money(b.balance);
   }
   renderBalance();
-
-  /* ---- 积分抵现（v1.3） ---- */
-  var deductOn = false;
-  window.calcDeduct = function (amt, bal) {
-    var capRate = RULE('credits.deduct.capRate', 0.1);
-    var p2y = RULE('credits.deduct.pointsToYuan', 100);   // 多少积分=¥1（后台可配）
-    var cap = Math.round(amt * capRate * 100) / 100;       // 单笔抵现上限比例
-    var maxByCredit = Math.floor((bal || 0) / p2y);
-    var d = Math.min(cap, maxByCredit);
-    return { d: d, credit: d * p2y };
-  };
-  window.toggleDeduct = function () {
-    var p2y = RULE('credits.deduct.pointsToYuan', 100);
-    var c = CreditStore.read();
-    if ((c.balance || 0) < p2y) { return; }   // 积分不足时开关已置灰，不响应点击、不再 toast
-    deductOn = !deductOn;
-    renderDeduct();
-  };
-  function renderDeduct() {
-    var p2y = RULE('credits.deduct.pointsToYuan', 100);
-    var c = CreditStore.read();
-    var box = document.getElementById('deductBox');
-    var sw = document.getElementById('ded-switch');
-    var sub = document.getElementById('ded-sub');
-    if (!box || !sw || !sub) return;
-    var bal = c.balance || 0;
-    var can = bal >= p2y;
-    var on = deductOn && can;
-    box.style.opacity = can ? 1 : 0.55;
-    sw.style.background = on ? 'var(--primary)' : 'var(--bg-card-2)';
-    sw.firstElementChild.style.left = on ? '20px' : '2px';
-    /* 不可用直接置灰禁用，不依赖点击 toast 提示 */
-    sw.style.pointerEvents = can ? '' : 'none';
-    sw.style.cursor = can ? 'pointer' : 'not-allowed';
-    var amt = parseFloat(document.getElementById('amount').value) || 0;
-    if (can) {
-      var dd = calcDeduct(amt, bal);
-      sub.style.color = '';
-      sub.textContent = '可用积分 ' + bal.toLocaleString() + '，本单最多抵 ¥' + dd.d.toFixed(2);
-    } else {
-      deductOn = false;
-      sub.style.color = 'var(--danger)';
-      sub.textContent = '积分不足 ' + p2y + '，暂不可抵现';
-    }
-  }
-  renderDeduct();
 
   /* ---- 支付方式选择（初始页单选） ---- */
   document.querySelectorAll('.pm-row').forEach(function (row) {
@@ -294,29 +235,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       currentRecord = CorpPay.create({ amount: v, account: CorpPay.BANK, remark: '工程链充值・尾号 4638' });
       openCorpSheet();
     } else {
-      // 余额入账（微信/支付宝即时到账）；开启积分抵现则扣积分、余额按充值面额全额入账
-      var c = CreditStore.read();
-      var dd = (deductOn && (c.balance || 0) >= RULE('credits.deduct.pointsToYuan', 100)) ? calcDeduct(v, c.balance) : { d: 0, credit: 0 };
-      if (dd.credit > 0) CreditStore.consume(dd.credit, '充值抵现');
-      BalanceStore.recharge(v, pm, dd.d > 0 ? { remark: '充值到账 · 积分抵现 ¥' + dd.d.toFixed(2) } : null);
-      showRechargeSuccess(v, dd.d, BalanceStore.read().balance);
+      // 余额入账（微信/支付宝即时到账）
+      BalanceStore.recharge(v, pm, null);
+      showRechargeSuccess(v, BalanceStore.read().balance);
     }
   };
 
   /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式） ---- */
-  function showRechargeSuccess(amount, deductYuan, newBalance) {
+  function showRechargeSuccess(amount, newBalance) {
     var sh = UI.sheet();
     sh.setClosable(false);
-    var deductLine = deductYuan > 0
-      ? '<div class="rs-desc" style="color:var(--primary-dim);">积分抵现 ¥' + deductYuan.toFixed(2) + '</div>'
-      : '';
     sh.html(
       '<div class="recharge-success">' +
         '<div class="rs-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
         '<div class="rs-title">充值成功</div>' +
         '<div class="rs-amount">+¥' + amount.toFixed(2) + ' 已到账</div>' +
         '<div class="rs-desc">当前余额 ¥' + newBalance.toFixed(2) + '</div>' +
-        deductLine +
         '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="rechargeDone()">完成</button>' +
       '</div>'
     ).show();
@@ -353,7 +287,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     corpSheet.show();
   }
   function sheetHtml() {
-    return '<div class="pay-amount" style="padding:2px 0 14px;"><div class="pa-label">转账金额</div><div class="pa-num">' + UI.money(v) + '</div></div>' +
+    return '<div class="pay-amount" style="padding:2px 0 14px;"><div class="pa-label">转账金额</div><div class="pa-value">' + UI.money(v) + '</div></div>' +
       flowHtml(corpStep) + corpStepHtml(corpStep) + sheetFoot();
   }
   function sheetFoot() {
@@ -361,7 +295,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       return '<div class="corp-sheet-foot"><button class="btn btn-primary btn-block btn-lg" onclick="corpCopyNext()">复制信息，下一步</button></div>';
     }
     if (corpStep === 2) {
-      return '<div class="corp-sheet-foot"><button class="btn btn-primary btn-block btn-lg" onclick="corpConfirmNext()">我已转账，确认支付</button></div>';
+      return '<div class="corp-sheet-foot"><button class="btn btn-primary btn-block btn-lg" onclick="corpConfirmNext()">确认已安排支付</button></div>';
     }
     return '';
   }
