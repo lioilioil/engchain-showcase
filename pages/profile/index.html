@@ -852,6 +852,20 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var acc = window.entryAccess ? entryAccess() : { dist: false, agency: false };
     var distUnlocked = acc.dist;
     var agencyUnlocked = acc.agency;
+    /* v2 我的招聘：企业认证及以上（叠加身份企业侧），带待处理投递角标；中介入驻不发招聘 */
+    var entNow = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var agencyNow = !!(acc && acc.agency);
+    if ((entNow === 'verified' || entNow === 'resident') && !agencyNow) {
+      var jobBadge = '';
+      try {
+        var mU = window.DataBus && DataBus.current();
+        var myApps = (window.ApplyStore && mU) ? ApplyStore.byPublisher(mU.id) : [];
+        var pendN = 0;
+        myApps.forEach(function (a) { if (a.status === 'pending') pendN++; });
+        if (pendN > 0) jobBadge = String(pendN);
+      } catch (e) {}
+      items.splice(6, 0, { href: 'my-jobs.html', ic: 'i-company', cls: 'ic-blue', title: '我的招聘', badge: jobBadge });
+    }
 
     q.innerHTML = items.map(function (it) {
       var unlocked = it.unlockKey === 'dist' ? distUnlocked : agencyUnlocked;
@@ -1103,6 +1117,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
   window.addEventListener('engchain:entry', init);
   window.addEventListener('engchain:store-change', init);
   window.addEventListener('engchain:state', init);
+  window.addEventListener('engchain:apply', init);
   window.addEventListener('storage', function (e) {
     if (e.key && e.key.indexOf('engchain-') === 0) init();
   });

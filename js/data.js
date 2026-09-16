@@ -1090,7 +1090,7 @@ window.MOCK = (function () {
     /* 中介佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
     commission: {
       tier: [ { min: 0, rate: 0.08 }, { min: 50000, rate: 0.06 }, { min: 200000, rate: 0.05 }, { min: 500000, rate: 0.04 }, { min: 1000000, rate: 0.03 } ],
-      minCommission: 10000,
+      minCommission: 100, /* [FIX BM-028] 佣金下限改为"最低单笔佣金 ¥100"（小额保护，全部订单生效） */
       milestone: { enable: true, minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], autoConfirmDays: 14, labels: ['合同签订', '服务进度50%', '验收', '质保期满'] },
       deposit: { basic: 5000, engineering: 20000, high: 50000 },
       jumpContract: { warn: true, chatBlockDays: 7, secondChatBlockDays: 30, firstPenalty: 5000, firstSuspendDays: 15, secondClear: true },
@@ -2850,7 +2850,7 @@ window.MOCK = (function () {
   /* ---- 中介服务详情 (建筑企业服务 · 工商注册/资质代办/咨询) ---- */
   const agencies = [
     {
-      id: 'a1', bizType: '中介服务', cat: '中介', sub: '资质升级', verified: true, hot: true, dir: 'supply',
+      id: 'a1', bizType: '中介服务', cat: '中介', sub: '资质升级', verified: true, hot: true, dir: 'supply', cats: ['资质代办'],
       title: '建筑资质升级代办（二级→一级/安许新办延期 全程）',
       budget: '¥18.0', unit: '万元 · 一价全包', location: '成都·天府新区', city: '成都', distance: '—',
       tags: ['资质升级', '安许新办', '一价全包', '不过退款'], time: ago(42), views: 214, match: 86, companyId: 'c-znzx',
@@ -2916,7 +2916,7 @@ window.MOCK = (function () {
       contact: { name: '王顾问（资质部）', phone: '13880091122', wechat: 'wang-zizhi-cd', addr: '成都·天府新区·企业服务中心' }
     },
     {
-      id: 'a2', bizType: '中介服务', cat: '中介', sub: '工商注册', verified: true, hot: false, dir: 'supply',
+      id: 'a2', bizType: '中介服务', cat: '中介', sub: '工商注册', verified: true, hot: false, dir: 'supply', cats: ['资质代办','企业服务'],
       title: '建筑公司工商注册+安许+资质 一条龙代办',
       budget: '¥3.8', unit: '万元 · 全套', location: '贵阳·观山湖', city: '贵阳', distance: '—',
       tags: ['工商注册', '安许代办', '新办建筑', '注册+安全'], time: ago(90), views: 132, match: 78, companyId: 'c-znzx',
@@ -2976,7 +2976,7 @@ window.MOCK = (function () {
       contact: { name: '刘顾问（工商部）', phone: '13985013344', wechat: 'liu-gongshang-gy', addr: '贵阳·观山湖区·政务服务中心旁' }
     },
     {
-      id: 'a3', bizType: '中介服务', cat: '中介', sub: '安许代办', verified: true, hot: true, dir: 'supply',
+      id: 'a3', bizType: '中介服务', cat: '中介', sub: '安许代办', verified: true, hot: true, dir: 'supply', cats: ['资质代办','企业服务'],
       title: '建筑企业 安全生产许可证新办/延期 加急通道',
       budget: '¥6.8', unit: '万元 · 一价全包', location: '西安·雁塔', city: '西安', distance: '—',
       tags: ['安许新办', '延期', '加急', '不过退款'], time: ago(35), views: 156, match: 85, companyId: 'c-znzx',
@@ -3038,7 +3038,7 @@ window.MOCK = (function () {
       contact: { name: '赵顾问（安许部）', phone: '13772015566', wechat: 'zhao-anxu-xa', addr: '西安·雁塔区·建筑科技产业园' }
     },
     {
-      id: 'a4', bizType: '中介服务', cat: '中介', sub: '资质分立', verified: true, hot: false, dir: 'supply',
+      id: 'a4', bizType: '中介服务', cat: '中介', sub: '资质分立', verified: true, hot: false, dir: 'supply', cats: ['资质代办'],
       title: '建筑资质分立/重组 专业代办 全国可办',
       budget: '¥12.0', unit: '万元 · 分期付款', location: '成都·武侯', city: '成都', distance: '—',
       tags: ['资质分立', '重组', '人员剥离', '全国'], time: ago(78), views: 121, match: 82, companyId: 'c-znzx',
@@ -3100,7 +3100,7 @@ window.MOCK = (function () {
       contact: { name: '孙顾问（重组部）', phone: '13688017788', wechat: 'sun-fenli-cd', addr: '成都·武侯区·商务总部基地' }
     },
     {
-      id: 'a5', bizType: '中介服务', cat: '中介', sub: '工程担保', verified: true, hot: true, dir: 'supply',
+      id: 'a5', bizType: '中介服务', cat: '中介', sub: '工程担保', verified: true, hot: true, dir: 'supply', cats: ['工程担保'],
       title: '工程担保代办（投标/履约/预付款保函 全国出函）',
       budget: '¥0.8', unit: '万元/笔起 · 按担保额', location: '成都·武侯', city: '成都', distance: '—',
       tags: ['投标保函', '履约保函', '预付款担保', '电子保函'], time: ago(28), views: 186, match: 84, companyId: 'c-znzx',
@@ -3159,7 +3159,7 @@ window.MOCK = (function () {
       contact: { name: '赵顾问（担保部）', phone: '13785002233', wechat: 'zhao-danbao-cd', addr: '成都·武侯区·金融城' }
     },
     {
-      id: 'a6', bizType: '中介服务', cat: '中介', sub: '造价咨询', verified: true, hot: false, dir: 'supply',
+      id: 'a6', bizType: '中介服务', cat: '中介', sub: '造价咨询', verified: true, hot: false, dir: 'supply', cats: ['造价咨询'],
       title: '造价咨询/结算审核/全过程咨询 按项目计价',
       budget: '¥2.0', unit: '万元/项目起 · 按送审额', location: '成都·高新', city: '成都', distance: '—',
       tags: ['造价咨询', '结算审核', '全过程咨询', '审计'], time: ago(52), views: 143, match: 81, companyId: 'c-znzx',
@@ -3220,7 +3220,7 @@ window.MOCK = (function () {
       contact: { name: '李顾问（造价部）', phone: '13980991144', wechat: 'li-zaojia-cd', addr: '成都·高新区·天府软件园' }
     },
     {
-      id: 'a7', bizType: '中介服务', cat: '中介', sub: '劳务派遣', verified: true, hot: false, dir: 'supply',
+      id: 'a7', bizType: '中介服务', cat: '中介', sub: '劳务派遣', verified: true, hot: false, dir: 'supply', cats: ['劳务派遣'],
       title: '建筑劳务派遣/班组分包 全国进场 用工合规',
       budget: '¥0.2', unit: '万元/人·月起 · 按工种', location: '成都·青羊', city: '成都', distance: '—',
       tags: ['劳务派遣', '班组分包', '用工合规', '持证上岗'], time: ago(61), views: 158, match: 80, companyId: 'c-znzx',

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>选服务 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ===== 选服务页：类型目录 → 机构服务商 → 机构详情 ===== */
+.ss-wrap{padding:0 14px 26px;}
+.ss-intro{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;margin:2px 0 12px;border-radius:14px;background:linear-gradient(135deg,rgba(201,169,97,.10),rgba(201,169,97,.03));border:1px solid var(--accent-line);}
+.ss-intro .si-ic{width:26px;height:26px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary-dim);}
+.ss-intro .si-ic svg{width:14px;height:14px;stroke-width:1.8;}
+.ss-intro .si-meta{flex:1;min-width:0;}
+.ss-intro b{display:block;font-size:12.5px;font-weight:700;color:var(--text-1);}
+.ss-intro i{display:block;font-style:normal;font-size:10.5px;color:var(--text-3);line-height:1.6;margin-top:2px;}
+
+.ss-cats{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.ss-cats::-webkit-scrollbar{display:none;}
+.ss-cat{flex:none;display:inline-flex;align-items:center;gap:5px;height:32px;min-height:32px;padding:0 14px;font-size:12px;font-weight:500;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);border-radius:999px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.ss-cat .cat-n{font-size:10px;color:var(--text-3);}
+.ss-cat.on{color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary-dim));border-color:transparent;font-weight:600;}
+.ss-cat.on .cat-n{color:rgba(255,255,255,.8);}
+
+.ss-head{display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px;}
+.ss-head b{font-size:13px;font-weight:700;color:var(--text-1);}
+.ss-head span{font-size:11px;color:var(--text-3);}
+
+.ag{background:var(--bg-card);border:1px solid var(--line);border-radius:15px;margin-bottom:10px;overflow:hidden;transition:border-color var(--d-fast);}
+.ag.open{border-color:var(--accent-line);}
+.ag-head{display:flex;align-items:center;gap:10px;padding:12px 12px;cursor:pointer;}
+.ag-logo{width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);color:var(--primary-dim);font-size:15px;font-weight:700;}
+.ag-main{flex:1;min-width:0;}
+.ag-name{display:flex;align-items:center;gap:5px;font-size:13.5px;font-weight:700;color:var(--text-1);}
+.ag-v{flex:none;font-size:9px;font-weight:700;color:#fff;background:linear-gradient(135deg,#C9A961,#A98A47);border-radius:4px;padding:1px 4px;}
+.ag-sub{font-size:10.5px;color:var(--text-3);margin-top:3px;line-height:1.5;}
+.ag-cats{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+.ag-cat{font-size:9.5px;color:var(--text-3);background:var(--bg-card-2);border:1px solid var(--line);border-radius:99px;padding:1.5px 7px;}
+.ag-cat.hit{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);}
+.ag-score{flex:none;text-align:center;}
+.ag-score .sc{font-size:15px;font-weight:800;line-height:1;}
+.ag-score .sl{font-size:9px;color:var(--text-3);margin-top:2px;}
+.ag-arrow{flex:none;width:22px;height:22px;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;font-size:12px;transition:transform .2s;}
+.ag.open .ag-arrow{transform:rotate(90deg);}
+
+.ag-body{display:none;border-top:1px solid var(--line);}
+.ag.open .ag-body{display:block;}
+.svc-item{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer;transition:background var(--d-fast);}
+.svc-item:active{background:var(--bg-card-2);}
+.svc-item+.svc-item{border-top:1px dashed var(--line);}
+.svc-main{flex:1;min-width:0;}
+.svc-t{font-size:12px;font-weight:600;color:var(--text-1);line-height:1.45;}
+.svc-meta{font-size:10.5px;color:var(--text-3);margin-top:3px;line-height:1.5;}
+.svc-go{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--primary-dim);white-space:nowrap;}
+
+.ss-empty{padding:34px 20px;text-align:center;}
+.ss-empty .e-ic{width:44px;height:44px;border-radius:14px;margin:0 auto 10px;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;}
+.ss-empty .e-ic svg{width:20px;height:20px;stroke-width:1.8;}
+.ss-empty b{display:block;font-size:13.5px;color:var(--text-1);}
+.ss-empty i{display:block;font-style:normal;font-size:11px;color:var(--text-3);margin-top:5px;line-height:1.6;}
+.ss-empty .e-acts{display:flex;gap:9px;justify-content:center;margin-top:15px;}
+.ss-empty .e-btn{flex:none;padding:8px 16px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);cursor:pointer;}
+.ss-empty .e-btn.primary{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;border-color:transparent;}
+
+.ss-note{margin-top:14px;padding:11px 13px;border-radius:12px;background:var(--bg-card-2);border:1px dashed var(--line);font-size:10.5px;color:var(--text-3);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">选服务</div>
+    <div class="nav-right"><span style="font-size:13px;color:var(--text-2);cursor:pointer;" onclick="location.href='index.html'">服务广场</span></div>
+  </div>
+
+  <div class="scroll">
+    <div class="ss-wrap">
+      <div class="ss-intro">
+        <span class="si-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></span>
+        <div class="si-meta"><b>按类目找服务 · 先选类型，再挑机构</b><i>一个服务可归属多个类目（如"资质+安许"一条龙），多选后会在对应类目下同时出现</i></div>
+      </div>
+
+      <div class="ss-cats" id="ss-cats"></div>
+
+      <div class="ss-head"><b id="ss-title">全部机构</b><span id="ss-count">—</span></div>
+      <div id="ss-list"></div>
+
+      <div class="ss-note">找不到合适机构？可<a href="index.html" style="color:var(--primary-dim);font-weight:600;">去服务广场按关键词搜索</a>，或<a href="javascript:;" onclick="window.UI&&UI.toast('平台顾问将尽快与您联系','ok')" style="color:var(--primary-dim);font-weight:600;">联系平台顾问</a>人工对接。</div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){window.__ROOT__='../../';
+
+/* ---- 数据源：与服务广场 index.html 同源（MOCK 机构服务 + SupplyStore 已上架中介服务） ---- */
+var _BIZ_MAP={'材料':'material','设备':'equipment','劳务':'labor','项目合作':'cooperation','合作':'cooperation','中介服务':'agency','中介':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent'};
+function companyOf(cid){
+  if(!cid)return'';
+  try{var c=(window.MOCK&&MOCK.companyById)?MOCK.companyById(cid):null;return (c&&(c.short||c.name))||'';}catch(e){}
+  return'';
+}
+function cycleOf(h){
+  if(!h)return'';
+  var m=/[（(]?约?\s*(\d+(?:\.\d+)?)\s*[–\-~]?\s*(\d+(?:\.\d+)?)?\s*个月/.exec(String(h));
+  return m?('约'+(m[2]?m[1]+'-'+m[2]:m[1])+'个月'):'';
+}
+function normAgency(s){
+  var cid=s.companyId||'';
+  return {
+    id: s.id, title: s.title || s.name || '中介服务',
+    sub: s.sub || s.subType || s.category || s.cat || '',
+    rating: (typeof s.rating==='number')?s.rating:(s.score||0),
+    orders: s.orders || 0,
+    successRate: (typeof s.successRate==='number')?s.successRate:null,
+    budget: s.budget || s.price || '',
+    unit: s.unit || '',
+    cats: s.cats || [s.subType || s.sub || s.category || '中介服务'],
+    sellerId: s.sellerId || 'u2',
+    isOrg: !!s.serveType,
+    company: companyOf(cid) || s.company || '',
+    cycle: cycleOf(s.handleCycle),
+    caseCount: (s.cases&&s.cases.length)?s.cases.length:0,
+    keyword: [s.title||'', s.sub||'', s.subType||'', s.category||'', s.cat||'', s.company||'', s.desc||'', s.serveType||'', s.targetQualLevel||'', (s.tags||[]).join(' ')].join(' ')
+  };
+}
+function agencySource(){
+  var out=[];
+  var mocks=(window.MOCK&&MOCK.byBizType)?(MOCK.byBizType('agency')||[]):[];
+  mocks.forEach(function(s){out.push(normAgency(s));});
+  if(window.SupplyStore){
+    SupplyStore.listActive().forEach(function(s){
+      var bk=s.bizKey||_BIZ_MAP[s.cat]||'';
+      if(bk==='agency'&&(s.dir||s.type)!=='demand'){out.push(normAgency(s));}
+    });
+  }
+  var seen={},uniq=[];
+  out.forEach(function(s){if(!seen[s.id]){seen[s.id]=1;uniq.push(s);}});
+  return uniq;
+}
+var SVCS=agencySource();
+
+/* ---- 服务类型（与服务广场分类一致，含包含关系） ---- */
+var CATS=[
+  {id:'all',label:'全部',test:function(){return true;}},
+  {id:'qual',label:'资质代办',test:function(s){return /资质|升级|增项|分立|合并|重组|延续|年检|换证/.test(s.keyword);}},
+  {id:'guarantee',label:'工程担保',test:function(s){return /担保|保函/.test(s.keyword);}},
+  {id:'cost',label:'造价咨询',test:function(s){return /造价|审核|咨询|审计/.test(s.keyword);}},
+  {id:'labor',label:'劳务派遣',test:function(s){return /劳务|派遣|人力/.test(s.keyword);}},
+  {id:'corp',label:'企业服务',test:function(s){return /工商|注册|安许|税务|记账|报税|招投标|标书|企业服务/.test(s.keyword);}}
+];
+var curCat='all';
+
+/* [BM-0xx] 分类判定：发布者勾选的 cats 数组优先（一个服务多类目的包含关系），旧数据无 cats 时正则兜底 */
+var CAT_LABEL2ID={'资质代办':'qual','工程担保':'guarantee','造价咨询':'cost','劳务派遣':'labor','企业服务':'corp'};
+function catIdsOf(s){
+  if(s.cats&&Array.isArray(s.cats)&&s.cats.length){
+    var ids=[];
+    s.cats.forEach(function(l){var id=CAT_LABEL2ID[l];if(id&&ids.indexOf(id)<0)ids.push(id);});
+    if(ids.length)return ids;
+  }
+  var ids2=[];
+  CATS.forEach(function(c){if(c.id!=='all'&&c.test(s))ids2.push(c.id);});
+  return ids2;
+}
+function inCat(s,id){
+  if(id==='all')return true;
+  var ids=catIdsOf(s);
+  if(ids.length)return ids.indexOf(id)>=0;
+  var c=CATS.filter(function(x){return x.id===id;})[0];
+  return c?c.test(s):false;
+}
+function creditOf(sellerId){
+  try{
+    if(window.svcCreditOf){var c=svcCreditOf(sellerId);if(c&&typeof c.score==='number')return c.score;}
+  }catch(e){}
+  return 80;
+}
+function scoreColor(sc){return sc>=85?'var(--primary-dim)':(sc>=70?'var(--success)':'var(--text-3)');}
+function budgetRange(items){
+  var nums=[];
+  items.forEach(function(s){
+    var b=String(s.budget||'');
+    var m=b.match(/([\d.]+)/);
+    if(!m)return;
+    var v=parseFloat(m[1]);
+    /* 单位判定：含"万" → 万；纯数字<1000 且无"元" → 视为万口径（中介服务报价习惯）；否则按元 */
+    var isWan = b.indexOf('万')>=0 || (b.indexOf('元')<0 && v<1000);
+    nums.push(isWan? v*10000 : v);
+  });
+  if(!nums.length)return '面议';
+  var lo=Math.min.apply(null,nums),hi=Math.max.apply(null,nums);
+  function fmt(n){
+    if(n>=10000)return '¥'+(n/10000).toLocaleString(undefined,{maximumFractionDigits:1})+'万';
+    return '¥'+Math.round(n).toLocaleString();
+  }
+  return lo===hi?fmt(lo):fmt(lo)+'–'+fmt(hi);
+}
+function agenciesOf(cat){
+  var items=SVCS.filter(function(s){return inCat(s,cat);});
+  var map={};
+  items.forEach(function(s){
+    var key=(s.company||'')+'|'+(s.sellerId||s.id);
+    if(!map[key])map[key]={company:s.company,key:key,sellerId:s.sellerId,isOrg:s.isOrg,items:[]};
+    map[key].items.push(s);
+  });
+  var arr=Object.keys(map).map(function(k){return map[k];});
+  arr.sort(function(a,b){return b.items.length-a.items.length;});
+  return arr;
+}
+
+/* ---- 渲染 ---- */
+function renderCats(){
+  var el=document.getElementById('ss-cats');
+  el.innerHTML=CATS.map(function(c){
+    var n=c.id==='all'?SVCS.length:SVCS.filter(function(s){return inCat(s,c.id);}).length;
+    return '<span class="ss-cat'+(c.id===curCat?' on':'')+'" data-cat="'+c.id+'">'+c.label+'<span class="cat-n">'+n+'</span></span>';
+  }).join('');
+}
+function render(){
+  var ags=agenciesOf(curCat);
+  var title=document.getElementById('ss-title');
+  var cnt=document.getElementById('ss-count');
+  var list=document.getElementById('ss-list');
+  var curTest=CATS.filter(function(c){return c.id===curCat;})[0]||CATS[0];
+  if(title)title.textContent=curCat==='all'?'全部机构':'「'+(CATS.filter(function(c){return c.id===curCat;})[0]||{}).label+'」机构';
+  if(cnt)cnt.textContent=ags.length+' 家机构 · '+SVCS.filter(function(s){return inCat(s,curCat);}).length+' 个服务';
+  if(!ags.length){
+    list.innerHTML='<div class="ss-empty"><div class="e-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M15 9h.01M15 13h.01"/></svg></div><b>该类型下暂无机构服务</b><i>可以换个类型，或去服务广场按关键词搜索</i><div class="e-acts"><button class="e-btn" onclick="location.href=\'index.html\'">去服务广场</button><button class="e-btn primary" onclick="window.UI&&UI.toast(\'平台顾问将尽快与您联系\',\'ok\')">联系平台顾问</button></div></div>';
+    return;
+  }
+  list.innerHTML=ags.map(function(ag,ai){
+    var sc=creditOf(ag.sellerId);
+    var sub=ag.items[0];
+    var catsAll=[];
+    ag.items.forEach(function(s){catIdsOf(s).forEach(function(id){if(catsAll.indexOf(id)<0)catsAll.push(id);});});
+    var catsHtml=catsAll.map(function(id){
+      var lab=(CATS.filter(function(c){return c.id===id;})[0]||{}).label||id;
+      return '<span class="ag-cat'+(id===curCat?' hit':'')+'">'+lab+'</span>';
+    }).join('');
+    var itemsHtml=ag.items.map(function(s){
+      return '<div class="svc-item" onclick="location.href=\'../supply/detail.html?id='+s.id+'&from=market\'">'+
+        '<div class="svc-main"><div class="svc-t">'+s.title+'</div><div class="svc-meta">'+((s.sub||'')+' · '+(s.cycle||'周期面议'))+'</div></div>'+
+        '<span class="svc-go">'+(s.budget?('¥'+String(s.budget).replace(/\D*([\d.]+)\D*/,'$1'))+(s.unit?' '+s.unit:''):'在线下单')+' ›</span>'+
+      '</div>';
+    }).join('');
+    return '<div class="ag" id="ag-'+ai+'" data-open="0">'+
+      '<div class="ag-head" onclick="window.toggleAg('+ai+')">'+
+        '<span class="ag-logo">'+(ag.company?ag.company.charAt(0):'中')+'</span>'+
+        '<div class="ag-main">'+
+          '<div class="ag-name">'+(ag.company||'机构服务商')+(ag.isOrg?'<span class="ag-v">金V</span>':'')+'</div>'+
+          '<div class="ag-sub">'+ag.items.length+' 个服务 · 报价 '+budgetRange(ag.items)+(ag.isOrg?' · 已核验':'')+'</div>'+
+          (catsHtml?'<div class="ag-cats">'+catsHtml+'</div>':'')+
+        '</div>'+
+        '<div class="ag-score"><div class="sc" style="color:'+scoreColor(sc)+';">'+sc+'</div><div class="sl">信用</div></div>'+
+        '<span class="ag-arrow">›</span>'+
+      '</div>'+
+      '<div class="ag-body">'+itemsHtml+'</div>'+
+    '</div>';
+  }).join('');
+}
+window.toggleAg=function(ai){
+  var cards=document.querySelectorAll('.ag');
+  cards.forEach(function(c,idx){
+    var open=idx===ai&&c.getAttribute('data-open')!=='1';
+    c.classList.toggle('open',open);
+    c.setAttribute('data-open',open?'1':'0');
+  });
+};
+
+document.getElementById('ss-cats').addEventListener('click',function(e){
+  var c=e.target&&e.target.closest?e.target.closest('.ss-cat'):null;
+  if(!c)return;
+  curCat=c.getAttribute('data-cat');
+  renderCats();render();
+});
+
+renderCats();render();
+})();
+</script>
+</body>
+</html>

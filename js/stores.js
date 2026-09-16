@@ -679,7 +679,7 @@
   var SupplyStore = makeStore('engchain-supply', { items: [] }, 'engchain:supply');
   SupplyStore.add = function (item) {
     var s = this.read();
-    s.items.unshift(Object.assign({ id: 'SP' + Date.now(), status: 'pending_review', ts: Date.now() }, item));
+    s.items.unshift(Object.assign({ id: 'SP' + Date.now() + Math.floor(Math.random() * 1000), status: 'pending_review', ts: Date.now() }, item));
     this.write(s);
     return s.items[0];
   };
@@ -709,18 +709,44 @@
     s.items = s.items.filter(function (i) { return i.id !== id; });
     this.write(s);
   };
+  /* 岗位/信息上架与下架（active↔off） */
+  SupplyStore.off = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) i.status = 'off'; });
+    this.write(s);
+  };
+  SupplyStore.on = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) i.status = 'active'; });
+    this.write(s);
+  };
 
-  /* ---- 投递记录（v3.1：个人向企业岗位投递简历的持久化存储） ---- */
+  /* 投递记录补充发布者：按 jobId 反查 SupplyStore.publisher（幂等，兼容旧数据） */
+  function applyPublisherOf(jobId) {
+    try {
+      var items = (window.SupplyStore && SupplyStore.read) ? SupplyStore.read().items : [];
+      var hit = null;
+      for (var i = 0; i < items.length; i++) { if (String(items[i].id) === String(jobId)) { hit = items[i]; break; } }
+      return hit ? (hit.publisher || '') : '';
+    } catch (e) { return ''; }
+  }
   var ApplyStore = makeStore('engchain-applies', { items: [] }, 'engchain:apply');
   ApplyStore.add = function (record) {
     var s = this.read();
-    var id = record.id || ('AP' + Date.now());
+    var id = record.id || ('AP' + Date.now() + Math.floor(Math.random() * 1000));
     var item = Object.assign({
       id: id, jobId: '', jobTitle: '', company: '', resumeSnapshot: {},
       applyMsg: '', certsSelected: [], expSelected: '', status: 'pending',
+      publisherId: applyPublisherOf(record.jobId),
       ts: Date.now(), updatedAt: Date.now()
     }, record);
-    var existIdx = s.items.findIndex(function (i) { return i.jobId === item.jobId; });
+    if (!item.publisherId && item.jobId) item.publisherId = applyPublisherOf(item.jobId);
+    var existIdx = s.items.findIndex(function (i) {
+      /* 去重键 = 岗位 + 投递人姓名：不同求职者可投同一岗位；同一人重复投递同岗位则覆盖（防重投） */
+      var n1 = (i.resumeSnapshot && i.resumeSnapshot.name) || '';
+      var n2 = (item.resumeSnapshot && item.resumeSnapshot.name) || '';
+      return i.jobId === item.jobId && n1 === n2;
+    });
     if (existIdx >= 0) {
       item.id = s.items[existIdx].id;
       item.ts = s.items[existIdx].ts;
@@ -732,6 +758,23 @@
     return item;
   };
   ApplyStore.list = function () { return this.read().items; };
+  /* 按岗位聚合投递（企业侧"我的招聘"使用） */
+  ApplyStore.listByJob = function (jobId) {
+    return this.read().items.filter(function (i) { return String(i.jobId) === String(jobId); });
+  };
+  /* 按发布者聚合投递（企业侧收简历）；旧数据无 publisherId 时惰性反查回填 */
+  ApplyStore.byPublisher = function (uid) {
+    var s = this.read();
+    var dirty = false;
+    var out = [];
+    s.items.forEach(function (i) {
+      var pid = i.publisherId;
+      if (!pid && i.jobId) { pid = applyPublisherOf(i.jobId); if (pid) { i.publisherId = pid; dirty = true; } }
+      if (pid === uid) out.push(i);
+    });
+    if (dirty) this.write(s);
+    return out;
+  };
   ApplyStore.byJob = function (jobId) {
     return this.read().items.find(function (i) { return i.jobId === jobId; }) || null;
   };
@@ -1119,9 +1162,10 @@
       rate = MOCK.business.breakin.commissionFirstTier || rate;
     }
     var total = Math.round(amount * rate);
-    /* [FIX BM-027] 修复：原保底仅在 amount>=1000000 时检查（3% 档下 1000000*0.03=30000>10000 永不触发），
-       改为所有费率档计算后统一校验保底 minCommission。 */
-    if (amount > 0 && amount >= 500000 && total < cm.minCommission) total = cm.minCommission;
+    /* [FIX BM-028] 佣金下限（小额保护）：按用户确认改为"最低单笔佣金"。
+       原保底规则（amount>=500000 && total<10000）在 4%/3% 档下永不触发（死逻辑），
+       现改为对全部订单生效的单笔下限，避免超小额订单佣金趋零、也不产生倒挂。 */
+    if (amount > 0 && total < cm.minCommission) total = cm.minCommission;
     return { rate: rate, fee: total };
   }
 
@@ -1163,6 +1207,39 @@
       /* 团队管理：仅企业入驻且类型含 partner 时拥有；个人合伙人无团队管理 */
       hasTeam: isResident && types.indexOf('partner') >= 0
     };
+  }
+
+  /* ---- 发布能力矩阵（v2 叠加身份模型）：按账号实时计算可用品类 ----
+     个人侧：实名→材料/设备/劳务/项目合作(D+S)+资质招商(D)；专业入驻→+求职(S，单独核准)
+     企业侧：认证→材料/设备/劳务/项目合作(D+S)+资质招商(D+S)+招聘(D)+建企买卖(D，非中介)
+             建筑入驻→+建企买卖(S)；中介入驻→资质招商仅D、招聘/建企买卖不可发、+中介服务(S，
+             编辑器内由 data-locked 锁定机制控制仅工作台可见)
+     return: role==='demand'? 需求侧品类数组 : 供应侧品类数组 */
+  function publishableCats(acc, role) {
+    var d = [], s = [];
+    if (!acc || !acc.identity) return role === 'demand' ? d : s;
+    var per = acc.identity.personal || 'none';
+    var ent = acc.identity.enterprise || 'none';
+    var types = acc.types || [];
+    var isAgency = types.indexOf('agency') >= 0;
+    var isConst = types.indexOf('construction') >= 0;
+    var isEnt = ent === 'verified' || ent === 'resident';
+    var isPer = per === 'verified' || per === 'professional';
+    var base = ['材料', '设备', '劳务', '项目合作'];
+    if (isPer || isEnt) { d = d.concat(base); s = s.concat(base); }
+    if (isPer) d.push('资质招商');
+    if (isEnt) {
+      d.push('资质招商');
+      if (!isAgency) {
+        s.push('资质招商');
+        d.push('招聘');
+        d.push('建企买卖');
+      }
+      if (isConst) s.push('建企买卖');
+    }
+    if (per === 'professional') s.push('求职');
+    if (isAgency) s.push('中介服务');
+    return role === 'demand' ? d : s;
   }
 
 
@@ -1631,5 +1708,6 @@
   window.deriveIdentity = deriveIdentity;
   window.creditDiscount = creditDiscount;
   window.entryAccess = entryAccess;
+  window.publishableCats = publishableCats;
   window.svcCreditOf = svcCreditOf;
 })();

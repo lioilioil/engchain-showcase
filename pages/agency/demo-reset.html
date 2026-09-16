@@ -60,16 +60,22 @@ document.getElementById('dr-run').addEventListener('click', function () {
     /* 2) 需求广场 / 询盘线索 */
     if (window.DemandStore && DemandStore.KEY) { localStorage.removeItem(DemandStore.KEY); done.push('需求广场'); }
     if (window.LeadStore && LeadStore.KEY) { localStorage.removeItem(LeadStore.KEY); done.push('询盘线索'); }
-    /* 3) 当前账号演示资金（保留原余额，追加 ¥500,000） */
+    /* 3) 当前账号演示资金（规范化为固定 ¥1,000,000，可重复重置不膨胀） */
     var uid = '';
     try { var cur = DataBus.current(); if (cur) uid = cur.id; } catch (e) {}
-    if (uid && window.BalanceStore) {
-      var b = BalanceStore.read();
-      b.balance = Math.round((Number(b.balance || 0) + 500000) * 100) / 100;
-      b.totalIn = Math.round((Number(b.totalIn || 0) + 500000) * 100) / 100;
-      b.logs = b.logs || [];
-      b.logs.unshift({ type: 'demo_recharge', amount: 500000, method: '演示', reason: '演示环境一键重置 · 补充资金', ts: Date.now() });
-      BalanceStore.write(b); done.push('演示资金');
+    if (uid && window.BalanceStore && typeof BalanceStore.recharge === 'function') {
+      /* 先清空旧台账与余额，再走正式充值链路（钩子同步 Ledger：PLATFORM→用户 available），保证托管支付可用且可对账 */
+      try { if (window.Ledger && Ledger.KEY) localStorage.removeItem(Ledger.KEY); } catch (e0) {}
+      try { if (BalanceStore.KEY) localStorage.removeItem(BalanceStore.KEY); } catch (e1) {}
+      BalanceStore.recharge(1000000, 'demo');
+      /* 规范化到固定额度（清键后默认余额会回种 1286.5，需覆盖为绝对值） */
+      try {
+        var bs = BalanceStore.read();
+        if (bs.balance !== 1000000) { bs.balance = 1000000; bs.totalIn = 1000000; BalanceStore.write(bs); }
+      } catch (e2) {}
+      /* 持久化到用户表：账号切换（如切机构账号报价）后再切回，钱包余额不丢失 */
+      try { if (window.DataBus && DataBus.syncUser) DataBus.syncUser(uid); } catch (e) {}
+      done.push('演示资金（¥100万）');
     }
     /* 4) 开通中介入驻（未入驻时） */
     try {

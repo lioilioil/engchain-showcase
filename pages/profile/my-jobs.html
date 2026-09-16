@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的招聘 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ===== 我的招聘 · 企业侧招聘管理 ===== */
+.mj-empty { text-align:center; padding:56px 20px; }
+.mj-empty-icon { width:64px; height:64px; border-radius:50%; background:var(--bg-card-2); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+.mj-empty-icon svg { width:28px; height:28px; color:var(--text-3); }
+
+/* 统计三宫格 */
+.mj-sum { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 14px 0; }
+.mj-stat { background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:12px 6px 10px; text-align:center; }
+.mj-stat .num { font-size:20px; font-weight:800; color:var(--text-1); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+.mj-stat .num em { font-style:normal; color:var(--primary-dim); }
+.mj-stat .lb { font-size:10.5px; color:var(--text-3); margin-top:3px; }
+.mj-stat.hl { background:linear-gradient(135deg,rgba(201,169,97,.14),rgba(201,169,97,.04)); border-color:rgba(201,169,97,.28); }
+
+/* 岗位卡 */
+.mj-sec { display:flex; align-items:center; gap:6px; margin:18px 16px 10px; }
+.mj-sec svg { width:14px; height:14px; color:var(--primary); flex:none; }
+.mj-sec b { font-size:13px; color:var(--text-1); }
+.mj-sec span { font-size:11px; color:var(--text-3); margin-left:auto; }
+.job-card { background:var(--bg-card); border:1px solid var(--line); border-radius:14px; margin:0 14px 12px; overflow:hidden; transition:transform .15s var(--e-standard); }
+.job-card:active { transform:scale(.985); }
+.jc-head { display:flex; align-items:center; gap:8px; padding:13px 14px 0; }
+.jc-title { flex:1; min-width:0; font-size:14px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.jc-status { flex:none; padding:2.5px 9px; border-radius:999px; font-size:10px; font-weight:700; }
+.js-pending { background:rgba(201,169,97,.13); color:var(--primary-dim); }
+.js-active { background:rgba(43,107,79,.12); color:var(--success); }
+.js-off { background:rgba(120,120,120,.12); color:var(--text-3); }
+.js-rejected { background:rgba(200,60,60,.1); color:var(--error); }
+.jc-sub { display:flex; align-items:center; gap:6px; padding:8px 14px 0; font-size:11px; color:var(--text-3); }
+.jc-sub svg { width:12px; height:12px; flex:none; color:var(--primary); }
+.jc-actions { display:flex; align-items:center; gap:8px; padding:10px 14px 12px; }
+.jc-btn { flex:none; display:inline-flex; align-items:center; gap:4px; padding:6px 11px; border-radius:999px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--bg-card-2); color:var(--text-2); transition:all .15s var(--e-standard); }
+.jc-btn:active { transform:scale(.96); }
+.jc-btn svg { width:12px; height:12px; }
+.jc-btn.primary { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); border-color:transparent; box-shadow:0 3px 10px -3px var(--primary-dim); }
+.jc-btn.danger { color:var(--error); border-color:rgba(200,60,60,.3); }
+.jc-btn.dim { opacity:.72; }
+.jc-note { display:flex; align-items:center; gap:5px; padding:8px 14px 0; font-size:10.5px; color:var(--text-3); }
+.jc-note svg { width:11px; height:11px; flex:none; }
+.jc-note.warn { color:var(--warning); }
+.jc-note.err { color:var(--error); }
+.mj-sec.hist svg { color:var(--text-3); }
+.mj-empty2 { text-align:center; color:var(--text-3); font-size:11.5px; padding:20px 20px; background:var(--bg-card); border:1px dashed var(--line); border-radius:14px; margin:0 14px 12px; }
+.jc-view { margin-left:auto; }
+
+/* 待处理角标（300ms 弹性一次） */
+.jc-badge { min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--error); color:#fff; font-size:9.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; line-height:1; animation:badgePop .3s var(--e-standard) both; }
+@keyframes badgePop { 0%{transform:scale(.5)} 60%{transform:scale(1.25)} 100%{transform:scale(1)} }
+
+/* 投递展开区 */
+.jc-applies { border-top:1px dashed var(--line); margin:0 14px; display:none; }
+.jc-applies.fade-in { animation:mjFade .12s ease-out both; }
+@keyframes mjFade { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+.apply-mini { padding:12px 2px; border-bottom:1px solid var(--line); }
+.apply-mini:last-child { border-bottom:none; }
+.am-top { display:flex; align-items:center; gap:9px; }
+.am-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--primary-soft),var(--primary)); color:#fff; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none; }
+.am-body { flex:1; min-width:0; }
+.am-name { font-size:13px; font-weight:600; color:var(--text-1); }
+.am-meta { font-size:10.5px; color:var(--text-3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.am-status { flex:none; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; }
+.st-pending { background:rgba(201,169,97,.13); color:var(--primary-dim); }
+.st-viewed { background:rgba(60,120,220,.1); color:#3b82c4; }
+.st-interested { background:rgba(43,107,79,.15); color:var(--success); }
+.st-rejected { background:rgba(120,120,120,.12); color:var(--text-3); }
+.am-msg { margin-top:7px; padding:8px 10px; background:var(--bg-card-2); border-radius:8px; font-size:11px; color:var(--text-2); line-height:1.55; }
+.am-phone { margin-top:7px; font-size:11px; color:var(--success); font-weight:600; }
+.am-actions { display:flex; gap:8px; margin-top:9px; }
+.am-btn { flex:1; padding:7px 0; border-radius:999px; font-size:11.5px; font-weight:600; cursor:pointer; border:1px solid var(--line); background:var(--bg-card-2); color:var(--text-2); transition:all .15s var(--e-standard); text-align:center; }
+.am-btn:active { transform:scale(.97); }
+.am-btn.primary { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); border-color:transparent; box-shadow:0 3px 10px -3px var(--primary-dim); }
+.am-btn.done { opacity:.55; cursor:default; }
+.am-btn.done:active { transform:none; }
+
+/* 简历弹层 */
+.mj-res-name { font-size:16px; font-weight:800; color:var(--text-1); margin-bottom:12px; }
+.mj-res-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--line); font-size:12.5px; }
+.mj-res-row span { color:var(--text-3); }
+.mj-res-row b { color:var(--text-1); font-weight:600; }
+.mj-res-msg { margin-top:10px; padding:10px 12px; background:var(--bg-card-2); border-radius:10px; font-size:12px; color:var(--text-2); line-height:1.6; }
+.mj-res-tip { margin-top:10px; font-size:10.5px; color:var(--text-3); line-height:1.5; background:rgba(43,107,79,.06); border:1px solid rgba(43,107,79,.15); border-radius:8px; padding:8px 10px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的招聘</div>
+    <div class="nav-right">
+      <button class="icon-btn" onclick="location.href='../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘')" aria-label="发布招聘"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+  </div>
+
+  <div class="scroll no-pad" style="padding-bottom:120px;">
+    <div id="mj-root"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script>
+(function () {
+  var root = document.getElementById('mj-root');
+  var uid = '';
+
+  function me() { try { return window.DataBus && DataBus.current(); } catch (e) { return null; } }
+  function acc() { try { return window.entryAccess ? entryAccess() : null; } catch (e) { return null; } }
+  function gate() {
+    var a = acc();
+    var ent = a && a.identity ? a.identity.enterprise : 'none';
+    var isAgency = !!(a && a.agency);
+    return (ent === 'verified' || ent === 'resident') && !isAgency;
+  }
+  function myJobs() {
+    uid = me() ? me().id : '';
+    if (!uid) return [];
+    var items = [];
+    try {
+      items = (window.SupplyStore && SupplyStore.read ? SupplyStore.read().items : []).filter(function (i) {
+        return i.publisher === uid && (i.cat === '招聘' || i.category === '招聘') && i.dir === 'demand';
+      });
+    } catch (e) {}
+    return items;
+  }
+  function appliesOf(jobId) {
+    try { return window.ApplyStore ? ApplyStore.listByJob(jobId) : []; } catch (e) { return []; }
+  }
+  function jobStatusMeta(s) {
+    return {
+      pending_review: { t: '待审核', c: 'js-pending' },
+      active: { t: '招聘中', c: 'js-active' },
+      off: { t: '已下架', c: 'js-off' },
+      rejected: { t: '已驳回', c: 'js-rejected' }
+    }[s] || { t: '待审核', c: 'js-pending' };
+  }
+  function applyMeta(s) {
+    return {
+      pending: { t: '待处理', c: 'st-pending' },
+      viewed: { t: '已查看', c: 'st-viewed' },
+      interested: { t: '感兴趣', c: 'st-interested' },
+      rejected: { t: '不合适', c: 'st-rejected' }
+    }[s] || { t: '待处理', c: 'st-pending' };
+  }
+  function maskPhone(p) {
+    p = String(p == null ? '' : p);
+    if (p.length >= 7) return p.slice(0, 3) + '****' + p.slice(7);
+    return p ? p.slice(0, 3) + '****' : '未留电话';
+  }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts), now = new Date(), diff = now - d;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+    if (diff < 604800000) return Math.floor(diff / 86400000) + '天前';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /* ===== 操作 ===== */
+  window.mjSetApply = function (applyId, status) {
+    try {
+      var s = ApplyStore.read();
+      s.items.forEach(function (i) { if (i.id === applyId) { i.status = status; i.updatedAt = Date.now(); } });
+      ApplyStore.write(s);
+    } catch (e) {}
+    UI.toast(status === 'interested' ? '已标记感兴趣，联系方式已展示' : (status === 'rejected' ? '已标记不合适' : '已标记已查看'), status === 'interested' ? 'ok' : 'info');
+    render();
+  };
+  window.mjToggleJob = function (id, toActive) {
+    UI.dialog({
+      title: toActive ? '确认上架该岗位？' : '确认下架该岗位？',
+      text: toActive ? '上架后人才可继续向该岗位投递简历。' : '下架后人才将无法继续投递，可随时重新上架。',
+      ok: toActive ? '确认上架' : '确认下架',
+      cancel: '取消',
+      onOk: function () {
+        try { if (toActive) SupplyStore.on(id); else SupplyStore.off(id); } catch (e) {}
+        UI.toast(toActive ? '已上架' : '已下架', 'ok');
+        render();
+      }
+    });
+  };
+  window.mjEdit = function (id) { location.href = '../publish/editor.html?record=' + encodeURIComponent(id); };
+  window.mjRemove = function (id) {
+    UI.dialog({
+      title: '删除该岗位？',
+      text: '岗位及其收到的全部简历投递将一并删除，且不可恢复。',
+      ok: '确认删除',
+      cancel: '取消',
+      onOk: function () {
+        try {
+          SupplyStore.remove(id);
+          var s = ApplyStore.read();
+          s.items = s.items.filter(function (i) { return i.jobId !== id; });
+          ApplyStore.write(s);
+        } catch (e) {}
+        UI.toast('岗位与关联简历已删除', 'ok');
+        render();
+      }
+    });
+  };
+  window.mjRetract = function (id) {
+    UI.dialog({
+      title: '撤回该待审核岗位？',
+      text: '撤回后岗位将从平台审核队列移除，已收到的投递将一并清除。',
+      ok: '确认撤回',
+      cancel: '取消',
+      onOk: function () {
+        try {
+          SupplyStore.remove(id);
+          var s = ApplyStore.read();
+          s.items = s.items.filter(function (i) { return i.jobId !== id; });
+          ApplyStore.write(s);
+        } catch (e) {}
+        UI.toast('已撤回', 'ok');
+        render();
+      }
+    });
+  };
+  window.mjCopy = function (id) {
+    try {
+      var s = SupplyStore.read();
+      var src = null;
+      s.items.forEach(function (i) { if (i.id === id) src = i; });
+      if (!src) { UI.toast('未找到该信息', 'err'); return; }
+      var copy = Object.assign({}, src);
+      delete copy.id; delete copy.ts; delete copy.status; delete copy.updatedAt;
+      copy.title = src.title + '（复制）';
+      copy.contact = src.contact || {};
+      SupplyStore.add(copy);
+      UI.toast('已复制为新信息，待平台审核', 'ok');
+      render();
+    } catch (e) { UI.toast('复制失败', 'err'); }
+  };
+  window.mjToggleExpand = function (jobId) {
+    var el = document.getElementById('ap-' + jobId);
+    if (!el) return;
+    var open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : '';
+    if (!open) { el.classList.remove('fade-in'); void el.offsetWidth; el.classList.add('fade-in'); }
+  };
+  window.mjViewResume = function (applyId) {
+    try {
+      var items = ApplyStore.list();
+      var ap = null;
+      items.forEach(function (i) { if (i.id === applyId) ap = i; });
+      if (!ap) return;
+      var rs = ap.resumeSnapshot || {};
+      var interested = ap.status === 'interested';
+      var sh = UI.sheet();
+      sh.setText('简历详情 · ' + String(rs.name || '应聘者').substring(0, 8));
+      sh.html(
+        '<div style="padding:4px 2px 14px;">' +
+        '<div class="mj-res-name">' + esc(rs.name || '未填写姓名') + '</div>' +
+        '<div class="mj-res-row"><span>投递时间</span><b>' + fmtTime(ap.ts) + '</b></div>' +
+        '<div class="mj-res-row"><span>联系方式</span><b>' + (interested ? esc(maskPhone(rs.phone)) : '标记感兴趣后展示') + '</b></div>' +
+        (ap.applyMsg ? '<div class="mj-res-msg"><b style="display:block;margin-bottom:4px;">应聘留言</b>' + esc(ap.applyMsg) + '</div>' : '') +
+        '<div class="mj-res-tip">' + (interested ? '已展示脱敏联系方式，可引导对方完善信息' : '平台隐私保护：联系方式仅在您标记「感兴趣」后展示') + '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:14px;">' +
+        '<button class="btn btn-ghost" style="flex:1;" onclick="UI.closeSheet()">关闭</button>' +
+        (ap.status !== 'interested' ? '<button class="btn btn-primary" style="flex:1;" onclick="UI.closeSheet();mjSetApply(\'' + ap.id + '\',\'interested\')">标记感兴趣</button>' : '') +
+        '</div></div>'
+      );
+      sh.show();
+    } catch (e) {}
+  };
+
+  /* ===== 演示数据注入：企业身份首次进入「我的招聘」且无岗位时，按入驻类型预置岗位+投递，实现完整展示 ===== */
+  function ensureDemoData() {
+    var a = acc();
+    var ent = a && a.identity ? a.identity.enterprise : 'none';
+    if (ent !== 'verified' && ent !== 'resident') return false;
+    if (myJobs().length) return false;
+    var meU = me();
+    var uidNow = meU ? meU.id : '';
+    var co = meU ? (meU.company || '') : '';
+    var isConst = !!(a && a.types && a.types.indexOf('construction') >= 0);
+    var pool = [
+      { name: '张敏', phone: '13900005678', msg: '10年房建/市政施工管理经验，一级建造师+安全工程师双证，可随时到岗' },
+      { name: '王工', phone: '13800139002', msg: '市政道路改造项目经验丰富，持证可立即到岗，期望长期合作' },
+      { name: '李婷', phone: '13700998003', msg: '8年安全管理经验，熟悉现场安全标准化，可驻场' },
+      { name: '赵工', phone: '13600778004', msg: '熟悉全站仪/RTK测量，配合度高，可带自有班组' },
+      { name: '陈工', phone: '13500665005', msg: '完整资料归档经验，熟悉四库一平台申报流程' }
+    ];
+    var jobs = isConst
+      ? [
+          { title: '市政道路项目 · 技术负责人（急招）', location: '成都市·高新区', salary: '15-20K', desc: '负责市政道路改造现场技术管理与施工组织，持市政专业建造师优先，项目周期8个月。' },
+          { title: '安全员（持证优先）', location: '成都市·武侯区', salary: '8-11K', desc: '负责项目现场安全管理与隐患排查，需注册安全工程师或安全员C证，可接受驻场。' },
+          { title: '测量员 / 施工员（带班组可谈）', location: '成都市·天府新区', salary: '7-10K', desc: '负责现场测量放线与施工组织，熟悉全站仪、RTK，可带自有班组优先。' }
+        ]
+      : [
+          { title: '工程咨询师 · 造价方向', location: '成都市·青羊区', salary: '12-18K', desc: '负责工程造价咨询与审核，持造价工程师证书优先，双休。' },
+          { title: 'BIM 工程师', location: '成都市·高新区', salary: '10-15K', desc: '负责项目BIM建模与深化，熟悉Revit/Navisworks，2年以上经验。' }
+        ];
+    var sts = ['pending', 'viewed', 'interested', 'rejected'];
+    jobs.forEach(function (j) {
+      try {
+        var rec = SupplyStore.add({
+          title: j.title, cat: '招聘', dir: 'demand',
+          publisher: uidNow, publisherName: meU ? meU.name : '', company: co,
+          location: j.location, desc: j.desc, salary: j.salary, source: 'user_publish'
+        });
+        SupplyStore.approve(rec.id);
+        for (var k = 0; k < 4; k++) {
+          var p = pool[(jobs.indexOf(j) * 2 + k) % pool.length];
+          ApplyStore.add({
+            jobId: rec.id, jobTitle: j.title, company: co,
+            resumeSnapshot: { name: p.name, phone: p.phone },
+            applyMsg: p.msg, status: sts[k], ts: Date.now() - (k + 1) * 3600e3
+          });
+        }
+      } catch (e) {}
+    });
+    /* 演示多状态：1 条待审核（走平台审核流）+ 1 条已下架（历史归集，含 2 条简历） */
+    try {
+      var pend = SupplyStore.add({
+        title: isConst ? '预算员 / 造价员（急招）' : '资料员（驻场）', cat: '招聘', dir: 'demand',
+        publisher: uidNow, publisherName: meU ? meU.name : '', company: co,
+        location: '成都市·锦江区', salary: '9-12K', desc: '负责项目预结算与造价管理，熟练广联达，1年以上经验。', source: 'user_publish'
+      });
+      var offJob = SupplyStore.add({
+        title: isConst ? '资料员（驻场）' : '测量员（驻场）', cat: '招聘', dir: 'demand',
+        publisher: uidNow, publisherName: meU ? meU.name : '', company: co,
+        location: '成都市·双流区', salary: '6-8K', desc: '负责施工资料编制归档，熟悉四库一平台申报。', source: 'user_publish'
+      });
+      SupplyStore.approve(offJob.id);
+      SupplyStore.off(offJob.id);
+      ApplyStore.add({
+        jobId: offJob.id, jobTitle: offJob.title, company: co,
+        resumeSnapshot: { name: pool[0].name, phone: pool[0].phone },
+        applyMsg: pool[0].msg, status: 'pending', ts: Date.now() - 6 * 3600e3
+      });
+      ApplyStore.add({
+        jobId: offJob.id, jobTitle: offJob.title, company: co,
+        resumeSnapshot: { name: pool[1].name, phone: pool[1].phone },
+        applyMsg: pool[1].msg, status: 'viewed', ts: Date.now() - 9 * 3600e3
+      });
+    } catch (e) {}
+    return true;
+  }
+
+  /* ===== 渲染 ===== */
+  function render() {
+    root.innerHTML = '';
+    var _a = acc();
+    var _isAgency = !!(_a && _a.agency);
+    if (!gate()) {
+      if (_isAgency) {
+        root.innerHTML = '<div class="mj-empty">' +
+          '<div class="mj-empty-icon"><svg class="ic"><use href="#i-briefcase"/></svg></div>' +
+          '<div class="fw-600 fs-15" style="color:var(--text-1);margin-bottom:6px;">中介服务商不发布招聘</div>' +
+          '<div class="text-3 fs-12" style="margin-bottom:20px;line-height:1.7;">您已入驻中介服务商，请通过服务商工作台发布中介服务并承接企业委托</div>' +
+          '<button class="btn btn-primary" style="display:inline-block;" onclick="location.href=\'../agency/seller-board.html\'">去服务商工作台</button>' +
+          '</div>';
+      } else {
+        root.innerHTML = '<div class="mj-empty">' +
+          '<div class="mj-empty-icon"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="fw-600 fs-15" style="color:var(--text-1);margin-bottom:6px;">企业认证后开启招聘管理</div>' +
+          '<div class="text-3 fs-12" style="margin-bottom:20px;line-height:1.7;">完成企业认证或入驻后，即可发布招聘岗位、在线收取人才简历并处理投递</div>' +
+          '<button class="btn btn-primary" style="display:inline-block;" onclick="location.href=\'auth-prep.html?type=center\'">去认证中心</button>' +
+          '</div>';
+      }
+      return;
+    }
+    var jobs = myJobs();
+    if (!jobs.length && ensureDemoData()) jobs = myJobs();
+    if (!jobs.length) {
+      root.innerHTML = '<div class="mj-empty">' +
+        '<div class="mj-empty-icon"><svg class="ic"><use href="#i-briefcase"/></svg></div>' +
+        '<div class="fw-600 fs-15" style="color:var(--text-1);margin-bottom:6px;">还没有招聘岗位</div>' +
+        '<div class="text-3 fs-12" style="margin-bottom:20px;">发布招聘岗位后，人才即可向您投递简历</div>' +
+        '<button class="btn btn-primary" style="display:inline-block;" onclick="location.href=\'../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘') + '\'">发布招聘</button>' +
+        '</div>';
+      return;
+    }
+
+    var allApps = [];
+    try { allApps = window.ApplyStore ? ApplyStore.byPublisher(uid) : []; } catch (e) { allApps = []; }
+    var activeJobs = jobs.filter(function (j) { return j.status === 'active'; }).length;
+    var pendingApps = allApps.filter(function (a) { return a.status === 'pending'; }).length;
+    var doing = jobs.filter(function (j) { return j.status === 'pending_review' || j.status === 'active'; });
+    var hist = jobs.filter(function (j) { return j.status === 'off' || j.status === 'rejected'; });
+    var pendReviewN = doing.filter(function (j) { return j.status === 'pending_review'; }).length;
+
+    var html = '<div class="mj-sum">' +
+      '<div class="mj-stat hl"><div class="num">' + activeJobs + '</div><div class="lb">招聘中岗位</div></div>' +
+      '<div class="mj-stat"><div class="num">' + allApps.length + '</div><div class="lb">累计收简历</div></div>' +
+      '<div class="mj-stat"><div class="num"><em>' + pendingApps + '</em></div><div class="lb">待处理</div></div>' +
+      '</div>';
+
+    var I = {
+      eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+      edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+      down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>',
+      up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v5m5-5v5M17 10v5"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>',
+      copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+      trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+      back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>'
+    };
+    function jb(label, cls, ic, fn) {
+      return '<button class="jc-btn' + (cls ? ' ' + cls : '') + '"' + (fn ? ' onclick="' + fn + '"' : '') + '>' + ic + label + '</button>';
+    }
+    function jobCard(job) {
+      var apps = appliesOf(job.id);
+      var pendingN = apps.filter(function (a) { return a.status === 'pending'; }).length;
+      var st = jobStatusMeta(job.status);
+      var city = job.location || job.city || '';
+      var note = '';
+      if (job.status === 'pending_review') {
+        note = '<div class="jc-note warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>平台审核中 · 通过后自动上架，审核前暂不可编辑</div>';
+      } else if (job.status === 'rejected') {
+        note = '<div class="jc-note err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>审核未通过' + (job.rejectNote ? '：' + esc(job.rejectNote) : '，可修改后重新提交') + '</div>';
+      } else if (job.status === 'off') {
+        note = '<div class="jc-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><rect x="3" y="4" width="18" height="16" rx="2"/></svg>已下架 · 人才无法继续投递，可重新上架或删除</div>';
+      }
+      var acts = '';
+      if (job.status === 'pending_review') {
+        acts = jb('查看投递', 'primary jc-view', I.eye, 'mjToggleExpand(\'' + job.id + '\')') +
+          jb('撤回', 'danger', I.back, 'mjRetract(\'' + job.id + '\')') +
+          jb('复制', 'dim', I.copy, 'mjCopy(\'' + job.id + '\')');
+      } else if (job.status === 'active') {
+        acts = jb('查看投递', 'primary jc-view', I.eye, 'mjToggleExpand(\'' + job.id + '\')') +
+          jb('编辑', '', I.edit, 'mjEdit(\'' + job.id + '\')') +
+          jb('下架', '', I.down, 'mjToggleJob(\'' + job.id + '\',false)') +
+          jb('复制', 'dim', I.copy, 'mjCopy(\'' + job.id + '\')');
+      } else if (job.status === 'off') {
+        acts = jb('查看投递', 'primary jc-view', I.eye, 'mjToggleExpand(\'' + job.id + '\')') +
+          jb('重新上架', '', I.up, 'mjToggleJob(\'' + job.id + '\',true)') +
+          jb('删除', 'danger', I.trash, 'mjRemove(\'' + job.id + '\')');
+      } else if (job.status === 'rejected') {
+        acts = jb('查看投递', 'primary jc-view', I.eye, 'mjToggleExpand(\'' + job.id + '\')') +
+          jb('重新提交', '', I.copy, 'mjCopy(\'' + job.id + '\')') +
+          jb('删除', 'danger', I.trash, 'mjRemove(\'' + job.id + '\')');
+      }
+      return '<div class="job-card">' +
+        '<div class="jc-head"><div class="jc-title">' + esc(job.title || '未命名岗位') + '</div>' +
+        '<span class="jc-status ' + st.c + '">' + st.t + '</span></div>' +
+        '<div class="jc-sub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+        (city ? esc(city) + ' · ' : '') + '收简历 <b style="color:var(--text-1);font-weight:700;">' + apps.length + '</b>' +
+        (pendingN > 0 ? ' · 待处理 <span class="jc-badge">' + pendingN + '</span>' : ' · 已处理完') +
+        '</div>' + note +
+        '<div class="jc-actions">' + acts + '</div>' +
+        '<div class="jc-applies" id="ap-' + job.id + '">' +
+        (apps.length ? apps.map(function (a) {
+          var am = applyMeta(a.status);
+          var rs = a.resumeSnapshot || {};
+          var showPhone = a.status === 'interested';
+          return '<div class="apply-mini">' +
+            '<div class="am-top">' +
+            '<div class="am-avatar">' + esc((rs.name || '?').charAt(0)) + '</div>' +
+            '<div class="am-body"><div class="am-name">' + esc(rs.name || '应聘者') + '</div>' +
+            '<div class="am-meta">' + fmtTime(a.ts) + (a.applyMsg ? ' · ' + esc(String(a.applyMsg).substring(0, 18)) : '') + '</div></div>' +
+            '<span class="am-status ' + am.c + '">' + am.t + '</span></div>' +
+            (showPhone ? '<div class="am-phone">联系方式 ' + esc(maskPhone(rs.phone)) + '（已授权）</div>' : '') +
+            '<div class="am-actions">' +
+            '<button class="am-btn" onclick="mjViewResume(\'' + a.id + '\')">查看简历</button>' +
+            (a.status === 'interested' ?
+              '<button class="am-btn done">已感兴趣</button>' :
+              '<button class="am-btn primary" onclick="mjSetApply(\'' + a.id + '\',\'interested\')">感兴趣</button>') +
+            (a.status === 'rejected' ?
+              '<button class="am-btn done">已不合适</button>' :
+              '<button class="am-btn" onclick="mjSetApply(\'' + a.id + '\',\'rejected\')">不合适</button>') +
+            '</div></div>';
+        }).join('') : '<div class="apply-mini" style="text-align:center;color:var(--text-3);font-size:11.5px;padding:16px 0;">' +
+          (job.status === 'pending_review' ? '审核通过前暂不对外展示，无投递' : '暂未收到投递，岗位将在人才市场展示') + '</div>') +
+        '</div></div>';
+    }
+
+    html += '<div class="mj-sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><b>我发布的岗位</b><span>' + doing.length + ' 个' + (pendReviewN ? ' · ' + pendReviewN + ' 待审核' : '') + '</span></div>';
+    if (!doing.length) html += '<div class="mj-empty2">暂无进行中的岗位，发布后经平台审核自动上架</div>';
+    doing.forEach(function (job) { html += jobCard(job); });
+
+    html += '<div class="mj-sec hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg><b>历史岗位</b><span>' + hist.length + ' 个</span></div>';
+    if (!hist.length) html += '<div class="mj-empty2">下架或审核未通过的岗位将归集于此，可查看其收到的简历或删除</div>';
+    hist.forEach(function (job) { html += jobCard(job); });
+
+    root.innerHTML = html;
+  }
+
+  render();
+  window.addEventListener('engchain:apply', render);
+  window.addEventListener('engchain:supply', render);
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'engchain-applies' || e.key === 'engchain-supply' || e.key === 'engchain-auth') render();
+  });
+})();
+</script>
+</body>
+</html>
