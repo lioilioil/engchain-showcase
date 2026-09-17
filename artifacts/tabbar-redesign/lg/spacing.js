@@ -10,8 +10,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // 需求 1 之前的原值（Dock 64 / 图标 24 / 内边距 8 / 外边距 10 / 透镜内缩 5）
 const OLD = `
-:root{ --lg-h:64px; --lg-r:32px; --lg-lens-inset:5px; --lg-lens-r:27px; }
-.app-tabbar{ margin:0 10px !important; padding:0 8px !important; }
+:root{ --old-probe:1; --lg-h:64px; --lg-r:32px; --lg-lens-inset:5px; --lg-lens-r:27px; }
+/* flex / width 必须一起打回 flex:1 撑满。dock.css 现在给标准布局加了
+   「定宽 220 + margin-left:auto」，不覆盖它就会渗进对照组，
+   「改前」列直接量成 220 —— 一次静默失真，而且看起来像「本来就这宽度」。 */
+.app-tabbar, [data-theme="dark"] .app-tabbar{
+  flex:1 1 0 !important; width:auto !important;
+  margin:0 10px !important; padding:0 8px !important;
+}
 .app-tab svg{ width:24px !important; height:24px !important; }
 .app-tab .badge, .app-tab.active .badge{ top:2px !important; }
 `;
@@ -27,21 +33,39 @@ const OLD = `
 
   const measure = async (label, css) => {
     const page = await browser.newPage();
-    // 必须在页面脚本之前注入：common.js 的 positions[]（透镜的 left/width）
-    // 只在 initTabbarGlass 里量一次，之后不随 resize 重测。
-    // 若等页面加载完再 addStyleTag，Tab 宽度变了但透镜宽度仍是旧值，
-    // 「改前」那一列就会量出一个假的 61px。所以这里用 evaluateOnNewDocument
-    // 把对照 CSS 塞在 dock.css 之后、common.js 之前。
+    // 对照组 CSS 必须在 common.js 之前生效：透镜的 positions[]（left/width）
+    // 只在 initTabbarGlass 里量一次，之后不随 resize 重测；等页面加载完再
+    // addStyleTag 的话，Tab 宽度变了而透镜宽度仍是旧值，「改前」那一列会量出假数。
+    // evaluateOnNewDocument 在 document-start 执行，那时 documentElement 尚不存在
+    // （appendChild 会抛错并静默失败），所以这里改为改写 HTML 响应：
+    // 把覆盖样式插在 </head> 之前 —— 位于 dock.css 之后（同优先级下后者胜），
+    // 且早于任何 <script>，时机完全确定，不依赖解析时序。
     if (css) {
-      await page.evaluateOnNewDocument(c => {
-        const s = document.createElement('style');
-        s.textContent = c;
-        document.documentElement.appendChild(s);
-      }, css);
+      await page.setRequestInterception(true);
+      page.on('request', req => {
+        if (req.isNavigationRequest() && req.frame() === page.mainFrame()) {
+          const html = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'home-liquidglass.html'), 'utf8');
+          // 与 build.py 对齐：dock.css 插在「最后一个」</head> 之前
+          const at = html.lastIndexOf('</head>');
+          req.respond({
+            status: 200,
+            contentType: 'text/html; charset=utf-8',
+            body: html.slice(0, at) + '<style id="old-css">' + css + '</style>' + html.slice(at)
+          });
+        } else { req.continue(); }
+      });
     }
     await page.goto(URL, { waitUntil: 'networkidle0' });
     await sleep(2600);
     const m = await page.evaluate(() => {
+      // 对照组是否真的生效 —— 静默失败的注入会让「改前」列直接等于「改后」列，
+      // 看起来像「尺寸没变」，是这套测量最容易骗人的失效模式。
+      const probe = getComputedStyle(document.documentElement).getPropertyValue('--old-probe').trim();
+      const bar0 = document.querySelector('.app-tabbar').getBoundingClientRect();
+      if (probe === '1' && (Math.round(bar0.height) !== 64 || Math.round(bar0.width) !== 278)) {
+        throw new Error('对照 CSS 未生效：--old-probe=1 但 Dock 量到 ' + bar0.width.toFixed(0) + '×'
+          + bar0.height.toFixed(0) + '（应为 278×64）');
+      }
       const bar = document.querySelector('.app-tabbar').getBoundingClientRect();
       const shell = document.querySelector('.app-nav-shell').getBoundingClientRect();
       const orb = document.querySelector('.ai-orb-entry').getBoundingClientRect();

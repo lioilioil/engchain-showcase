@@ -197,7 +197,7 @@ window.UI = (function () {
     root = root || window.__ROOT__ || '';
     const TABS = [
       { key: 'home',     label: '首页', href: root + 'home.html',                          icon: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z"/>' },
-      { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',               icon: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>' },
+      { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',               icon: '<path d="M4 7h16M4 12h16M4 17h16"/>' },
       { key: 'message',  label: '消息', href: root + 'pages/message/index.html',             icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>' },
       { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',             icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' },
     ];
@@ -287,12 +287,17 @@ window.UI = (function () {
     tabs.forEach(function (t, i) { if (t.classList.contains('active')) activeIndex = i; });
 
     // 计算每个 tab 相对 tabbar 的位置和宽度
+    /* 用 offsetLeft/offsetWidth（纯布局值），不用 getBoundingClientRect()。
+       原因：按下态给 .app-tabbar 加了 transform:scale()，而 getBoundingClientRect()
+       返回的是**变换后**的视觉几何；这里的差值又会被写回 .tab-glass 的
+       translateX/width，那些 px 位于同一个被缩放的坐标系内，于是被乘了两次 1.02
+       （透镜最多偏出约 3px，拖动按下的 tab 时肉眼可见）。布局值与 transform 无关。
+       两者数值相同的前提是 .app-tabbar 无边框（liquid-dock.css 里 border:0），
+       offsetLeft 相对 padding 边、getBoundingClientRect 相对 border 边。 */
     function measure() {
-      var parentRect = tabbar.getBoundingClientRect();
       var arr = [];
       tabs.forEach(function (t) {
-        var r = t.getBoundingClientRect();
-        arr.push({ left: r.left - parentRect.left, width: r.width });
+        arr.push({ left: t.offsetLeft, width: t.offsetWidth });
       });
       return arr;
     }
@@ -988,6 +993,15 @@ window.ViewHistory = ViewHistory;
       UI.ensureThinkingOrb(function () { window.ThinkingOrb.initAll(); });
       UI.initTabbarGlass();
     }
+
+    /* 左右滑动切页（全 app 页；模块自判归属表，admin/ 等非 app 页自动跳过） */
+    (function () {
+      if (document.querySelector('script[data-swipe-nav]')) return;
+      var s = document.createElement('script');
+      s.src = (window.__ROOT__ || '') + 'js/swipe-nav.js';
+      s.setAttribute('data-swipe-nav', '');
+      document.head.appendChild(s);
+    })();
     /* ---- Pura X View 侧边栏布局（短屏触发，resize 时也检查，支持运行中切换视口高度） ---- */
     function ensurePuraSidebar() {
       if (!phone) return;
@@ -999,7 +1013,7 @@ window.ViewHistory = ViewHistory;
         var activeTab = document.body.dataset.tab || 'home';
         var SIDEBAR_TABS = [
           { key: 'home',     label: '首页', href: root + 'home.html',                    icon: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z"/>' },
-          { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',       icon: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>' },
+          { key: 'discover', label: '发现', href: root + 'pages/supply/list.html',       icon: '<path d="M4 7h16M4 12h16M4 17h16"/>' },
           { key: 'message',  label: '消息', href: root + 'pages/message/index.html',     icon: '<path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/>' },
           { key: 'me',       label: '我的', href: root + 'pages/profile/index.html',     icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/>' }
         ];
