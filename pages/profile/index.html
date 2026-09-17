@@ -300,14 +300,9 @@ html, body { margin:0; padding:0; background:var(--bg); }
       <span class="wb-cta" id="wb-level-cta" onclick="openMember()">去升级</span>
     </div>
 
-    <!-- ═══ 数据统计（微博四格） ═══ -->
+    <!-- ═══ 数据统计（微博四格 · 按身份动态：企业=收藏/发布/订单/团队，个人=收藏/发布/订单/分享） ═══ -->
     <div class="wb-card" style="padding:16px 8px;">
-      <div class="wb-stats">
-        <div class="wb-stat" onclick="pfKpiJump('fav')"><div class="wb-stat-num" id="pf-kpi-fav">0</div><div class="wb-stat-label">收藏</div></div>
-        <div class="wb-stat" onclick="pfKpiJump('pub')"><div class="wb-stat-num" id="pf-kpi-pub">0</div><div class="wb-stat-label">发布</div></div>
-        <div class="wb-stat" onclick="pfKpiJump('deal')"><div class="wb-stat-num" id="pf-kpi-deal">0</div><div class="wb-stat-label">成交</div></div>
-        <div class="wb-stat" onclick="pfKpiJump('follow')"><div class="wb-stat-num" id="pf-kpi-follow">0</div><div class="wb-stat-label">团队</div></div>
-      </div>
+      <div class="wb-stats" id="pf-kpi-stats"></div>
     </div>
 
     <!-- ═══ 身份认证（双线 + 等级进度 + 权益） ═══ -->
@@ -717,27 +712,57 @@ html, body { margin:0; padding:0; background:var(--bg); }
     }
   }
 
-  /* ---------- 渲染：KPI 数字 ---------- */
+  /* ---------- 渲染：KPI 数字（按身份动态：企业=收藏/发布/订单/团队，个人=收藏/发布/订单/分享） ---------- */
   function renderKPI() {
-    var fav = 0, pub = 0, deal = 0, follow = 0;
+    var idy = currentIdentity();
+    var isEnterprise = idy.enterprise === 'resident';
+    var fourthKey = isEnterprise ? 'team' : 'share';
+    var fourthLabel = isEnterprise ? '团队' : '分享';
+
+    /* 动态渲染四格结构 */
+    var box = document.getElementById('pf-kpi-stats');
+    if (box) {
+      box.innerHTML =
+        '<div class="wb-stat" onclick="pfKpiJump(\'fav\')"><div class="wb-stat-num" id="pf-kpi-fav">0</div><div class="wb-stat-label">收藏</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'pub\')"><div class="wb-stat-num" id="pf-kpi-pub">0</div><div class="wb-stat-label">发布</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'order\')"><div class="wb-stat-num" id="pf-kpi-order">0</div><div class="wb-stat-label">订单</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'' + fourthKey + '\')"><div class="wb-stat-num" id="pf-kpi-' + fourthKey + '">0</div><div class="wb-stat-label">' + fourthLabel + '</div></div>';
+    }
+
+    var fav = 0, pub = 0, order = 0, fourth = 0;
     try {
-      /* E2：收藏数从 FavoriteStore 真实读取（不再硬编码 0） */
+      /* 收藏数 */
       if (window.FavoriteStore) fav = (FavoriteStore.list() || []).length;
+      /* 发布数 */
       if (window.DataBus) {
         if (DataBus.published) pub = DataBus.published().length;
         else if (window.SupplyStore) pub = (SupplyStore.listActive() || []).length;
-        if (DataBus.orders) {
-          var ord = DataBus.orders();
-          deal = ord.filter(function (o) { return o.status === 'settled' || o.status === '已成交'; }).length;
+      }
+      /* 订单数：普通订单 + 中介托管订单 */
+      try {
+        var ord = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders') || '[]');
+        order = ord.length;
+        if (window.Mediation) {
+          var me0 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+          var uid0 = me0 ? me0.id : '';
+          order += (Mediation.list({ uid: uid0 }) || []).length;
         }
-        /* 团队数：分销团队成员计数（KPI 文案已改为「团队」，跳转分销中心） */
-        if (DataBus.distTeam) { try { follow = (DataBus.distTeam() || []).length; } catch (e) {} }
+      } catch (e) {}
+      /* 第四项：企业=团队成员数；个人=分享成功数（邀请绑定数） */
+      if (isEnterprise) {
+        if (window.DataBus && DataBus.distTeam) { try { fourth = (DataBus.distTeam() || []).length; } catch (e) {} }
+      } else {
+        if (window.Referral) {
+          var me1 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+          if (me1 && me1.id) fourth = (Referral.downline(me1.id) || []).length;
+        }
       }
     } catch (e) {}
+
     animateNum('pf-kpi-fav', fav);
     animateNum('pf-kpi-pub', pub);
-    animateNum('pf-kpi-deal', deal);
-    animateNum('pf-kpi-follow', follow);
+    animateNum('pf-kpi-order', order);
+    animateNum('pf-kpi-' + fourthKey, fourth);
   }
 
   function animateNum(id, target) {
@@ -843,7 +868,6 @@ html, body { margin:0; padding:0; background:var(--bg); }
       { href:'../refund/index.html', ic:'i-rotate', cls:'ic-purple', title:'退款售后' },
       { href:'auth-prep.html?type=center', ic:'i-shield', cls:'ic-blue', title:'认证中心' },
       { href:'my-applies.html', ic:'i-briefcase', cls:'ic-green', title:'我的投递' },
-      { href:'../personnel/index.html', ic:'i-user', cls:'ic-green', title:'人才市场' },
       { href:'../platform/dashboard.html', ic:'i-shield', cls:'ic-blue', title:'平台运营台', badge:'演示' },
       { href:'../agency/demo-reset.html', ic:'i-rotate', cls:'ic-orange', title:'演示重置', badge:'演示' }
     ];
@@ -971,7 +995,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
 
   /* ---------- KPI 跳转 ---------- */
   function pfKpiJump(type) {
-    var map = { fav:'../favorite/index.html', pub:'../publish/records.html', deal:'../order/index.html', follow:'../distribution/index.html' };
+    var map = { fav:'../favorite/index.html', pub:'../publish/records.html', order:'../order/index.html', team:'../distribution/index.html', share:'share.html' };
     if (map[type]) location.href = map[type];
   }
   window.pfKpiJump = pfKpiJump;

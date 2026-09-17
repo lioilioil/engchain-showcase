@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的分享 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+<style>
+/* ===== 分享概览卡 ===== */
+.share-overview{display:flex;align-items:stretch;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);margin:10px 16px 0;padding:16px 6px;box-shadow:var(--shadow-card);position:relative;overflow:hidden;}
+.share-overview::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 0% -20%, rgba(238,214,151,.13) 0%, transparent 55%);}
+.so-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;}
+.so-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;margin-bottom:3px;}
+.so-ic svg{width:15px;height:15px;stroke-width:1.8;}
+.so-gold{background:var(--primary-soft);color:var(--primary-dim);}
+.so-green{background:rgba(43,107,79,.09);color:var(--success);}
+.so-blue{background:rgba(45,111,196,.09);color:var(--primary);}
+.so-num{font-size:19px;font-weight:800;color:var(--text-1);font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+.so-gold-num{color:var(--primary-dim);}
+.so-label{font-size:10.5px;color:var(--text-3);}
+.so-sep{width:1px;background:var(--line);flex:none;margin:6px 0;}
+
+/* ===== 分享记录列表 ===== */
+.share-list{padding:14px 16px 100px;}
+.sl-group-label{font-size:12px;font-weight:700;color:var(--text-3);margin:0 0 8px 2px;}
+.sl-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;box-shadow:var(--shadow-xs);padding:0 14px;}
+.sl-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);position:relative;animation:sl-in .4s var(--e-out) both;}
+.sl-row:last-child{border-bottom:none;}
+.sl-row:active{background:var(--bg-alp);border-radius:10px;}
+@keyframes sl-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+.sl-av{width:38px;height:38px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;}
+.sl-av-on{background:linear-gradient(135deg,#F0E2BE,#C9A961);color:#2A1810;box-shadow:0 4px 10px rgba(201,169,97,.3);}
+.sl-av-off{background:var(--bg-card-2);color:var(--text-3);border:1px dashed var(--line);}
+.sl-main{flex:1;min-width:0;}
+.sl-name{font-size:13.5px;font-weight:600;color:var(--text-1);}
+.sl-meta{font-size:11px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.sl-tags{display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap;}
+.slv{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:5px;line-height:1.5;}
+.slv-gold{background:var(--primary-soft);color:var(--primary-dim);}
+.sst{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:6px;border:1px solid;line-height:1.5;}
+.sst-ok{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);}
+.sst-idle{color:var(--text-3);background:var(--bg-card-2);border-color:var(--line);}
+.sl-amt{font-size:14px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums;flex:none;}
+.sl-amt-on{color:var(--primary-dim);}
+.sl-amt-off{color:var(--text-3);}
+
+/* ===== 底部固定操作条 ===== */
+.share-bottom-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,var(--bg) 30%);z-index:100;}
+.share-bottom-bar .btn{height:46px;font-size:15px;font-weight:700;}
+
+/* ===== 空态 ===== */
+.share-empty{padding:64px 28px 40px;text-align:center;}
+.share-empty .se-ic{width:72px;height:72px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);}
+.share-empty .se-ic svg{width:34px;height:34px;color:var(--primary-dim);}
+.share-empty .se-title{font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:8px;}
+.share-empty .se-desc{font-size:13px;color:var(--text-3);line-height:1.8;margin-bottom:24px;}
+
+@media (prefers-reduced-motion: reduce){.sl-row{animation:none;}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">我的分享</div>
+    <div class="nav-right"><button class="icon-btn" onclick="UI.toast('分享邀请码给好友，好友注册即绑定关系','ok')" aria-label="分享规则说明">?</button></div>
+  </div>
+
+  <!-- 分享概览 -->
+  <div class="share-overview">
+    <div class="so-item">
+      <span class="so-ic so-gold"><svg class="ic"><use href="#i-share"/></svg></span>
+      <b class="so-num mono" id="so-total">0</b>
+      <span class="so-label">分享成功</span>
+    </div>
+    <span class="so-sep"></span>
+    <div class="so-item">
+      <span class="so-ic so-green"><svg class="ic"><use href="#i-star"/></svg></span>
+      <b class="so-num mono" id="so-active">0</b>
+      <span class="so-label">有效伙伴</span>
+    </div>
+    <span class="so-sep"></span>
+    <div class="so-item">
+      <span class="so-ic so-blue"><svg class="ic"><use href="#i-wallet"/></svg></span>
+      <b class="so-num mono so-gold-num" id="so-credit">0</b>
+      <span class="so-label">累计积分</span>
+    </div>
+  </div>
+
+  <div class="share-list">
+    <div id="share-records"></div>
+    <div id="share-empty" style="display:none;">
+      <div class="share-empty">
+        <div class="se-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></div>
+        <div class="se-title">还没有分享记录</div>
+        <div class="se-desc">生成专属推广海报，分享给好友注册<br>好友填写邀请码即绑定，双方各得积分奖励</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部操作条 -->
+  <div class="share-bottom-bar">
+    <button class="btn btn-primary btn-block" onclick="goPoster()">
+      <svg class="ic" style="width:18px;height:18px;margin-right:6px;vertical-align:-3px;"><use href="#i-share"/></svg>生成分享海报
+    </button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){
+  window.__ROOT__ = '../../';
+
+  function money(n){ return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtTime(ts){
+    if(!ts) return '';
+    var d = new Date(ts);
+    var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    var hh = String(d.getHours()).padStart(2,'0'), mm = String(d.getMinutes()).padStart(2,'0');
+    return y + '-' + m + '-' + day + ' ' + hh + ':' + mm;
+  }
+
+  /* 登录检查 */
+  var st = {};
+  try { st = UI.state.get(); } catch (e) {}
+  if (!st.loggedIn) {
+    var ph = document.querySelector('.phone');
+    if (ph) {
+      ph.innerHTML = '<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">' +
+        '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 160px;">' +
+          '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">' +
+            '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>' +
+          '</div>' +
+          '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">登录后查看分享记录</div>' +
+          '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">分享邀请码给好友，好友注册即绑定关系，双方各得积分奖励</div>' +
+        '</div>' +
+        '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">' +
+          '<div style="padding:0 24px;">' +
+            '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\'../auth/login.html\'">立即登录</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+    return;
+  }
+
+  var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+  var uid = me ? me.id : '';
+
+  /* 邀请奖励积分（从配置读取，默认50） */
+  function inviteCreditAmount(){
+    try {
+      var cfg = (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.rewards) || {};
+      return cfg.invite || 50;
+    } catch (e) { return 50; }
+  }
+  /* 某被邀人是否有效（有消费产生返佣） */
+  function isActive(inviteeId){
+    if (!window.Rebate) return false;
+    return Rebate.all().some(function(o){ return o.sourceUserId === inviteeId && o.status !== 'clawback'; });
+  }
+
+  function uName(id){
+    var u = window.DataBus ? DataBus.byId(id) : null;
+    return u ? { name: u.name || '用户', company: u.company || '', avatar: (u.name || '友').charAt(0) } : { name: '用户' + id, company: '', avatar: '友' };
+  }
+
+  function recordRow(link, idx){
+    var u = uName(link.inviteeId);
+    var act = isActive(link.inviteeId);
+    var cr = inviteCreditAmount();
+    var lvTxt = link.level === 1 ? '一级' : '二级';
+    var lvCls = link.level === 1 ? 'slv slv-gold' : 'slv';
+    var stCls = act ? 'sst sst-ok' : 'sst sst-idle';
+    var stTxt = act ? '有效伙伴' : '待激活';
+    var amtCls = act ? 'sl-amt-on' : 'sl-amt-off';
+    var dly = 'animation-delay:' + (idx * 45) + 'ms;';
+    return '<div class="sl-row" style="' + dly + '">' +
+      '<span class="sl-av ' + (act ? 'sl-av-on' : 'sl-av-off') + '">' + u.avatar + '</span>' +
+      '<div class="sl-main">' +
+        '<div class="sl-name">' + u.name + (u.company ? ' <span style="font-size:10.5px;font-weight:400;color:var(--text-3);">' + u.company + '</span>' : '') + '</div>' +
+        '<div class="sl-meta">' +
+          '<svg style="width:10px;height:10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
+          fmtTime(link.boundAt) +
+          (link.channel && link.channel !== 'register' ? ' · ' + link.channel : '') +
+        '</div>' +
+        '<div class="sl-tags"><span class="' + lvCls + '">' + lvTxt + '</span><span class="' + stCls + '">' + stTxt + '</span>' + (act ? '' : '<span style="font-size:9.5px;color:var(--text-3);">邀请其完成首笔消费</span>') + '</div>' +
+      '</div>' +
+      '<span class="sl-amt ' + amtCls + '">+' + cr + '分</span>' +
+    '</div>';
+  }
+
+  function render(){
+    if (!window.Referral || !uid) return;
+    var links = Referral.downline(uid).sort(function(a,b){ return b.boundAt - a.boundAt; });
+    var activeCount = 0;
+    links.forEach(function(l){ if (isActive(l.inviteeId)) activeCount++; });
+    var totalCredit = links.length * inviteCreditAmount();
+
+    document.getElementById('so-total').textContent = links.length;
+    document.getElementById('so-active').textContent = activeCount;
+    document.getElementById('so-credit').textContent = totalCredit;
+
+    var box = document.getElementById('share-records');
+    var empty = document.getElementById('share-empty');
+    if (!links.length) {
+      box.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    var l1 = links.filter(function(l){ return l.level === 1; });
+    var l2 = links.filter(function(l){ return l.level === 2; });
+    var html = '<div class="sl-group-label">直推好友（一级 · ' + l1.length + '）</div><div class="sl-card">' + l1.map(recordRow).join('') + '</div>';
+    if (l2.length) {
+      html += '<div class="sl-group-label" style="margin-top:18px;">间推好友（二级 · ' + l2.length + '）</div><div class="sl-card">' + l2.map(recordRow).join('') + '</div>';
+    }
+    box.innerHTML = html;
+  }
+
+  window.goPoster = function(){
+    location.href = '../distribution/poster.html';
+  };
+
+  render();
+  window.addEventListener('engchain:referral', render);
+  window.addEventListener('engchain:rebate', render);
+})();
+</script>
+</body>
+</html>
