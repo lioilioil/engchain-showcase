@@ -14,10 +14,16 @@
   /* ---------------------------------------------------------------- 配置 */
   var CFG = {
     enableWarp: true,        // SVG 位移折射总开关
-    barScale: 6,             // Dock 折射强度（贴图边界内缩 scale/2，故条上取小值）
+    /* Dock（大背景）的折射：alpha 降到 ×0.7 之后，玻璃变透了，
+       边缘就得把折射补强，「这是一块玻璃」才立得住。
+       scale = feDisplacementMap 的最大位移（±scale/2 px），
+       barBand = 折射带从边缘往内的宽度。两者一起决定水滴边缘的观感：
+       只加 scale 会变成一圈硬边，只加 band 会摊薄到看不出来。 */
+    barScale: 9,             // Dock 折射强度（原 6；贴图边界内缩 scale/2，故条上取小值）
+    barBand: 13,             // Dock 边缘折射带宽度（原与 lens 共用 8）
     lensScale: 14,           // 透镜折射强度（背景是玻璃自身，不存在正文拉扯）
     chroma: 2.5,             // 色散：三通道 scale 差值
-    band: 8,                // 边缘折射带宽度（px，从玻璃边缘往内）
+    band: 8,                 // 通用边缘折射带宽度（px，从玻璃边缘往内）—— 仅透镜用
     glMaxDpr: 2,             // WebGL 画布最大像素比
     squashAmp: 0.10,         // 液态挤压最大幅度
     squashRef: 1500          // 挤压参考速度（px/s）
@@ -335,27 +341,32 @@
     }
 
     /* --- 2. 折射滤镜（能力检测通过才挂） --- */
+    /* 尺寸一律取 offsetWidth/offsetHeight（布局值），不用 getBoundingClientRect()。
+       因为按下态给 .app-tabbar 加了 transform:scale()，而 getBoundingClientRect()
+       返回的是**变换后**的视觉尺寸：位移贴图会被按 1.02 倍生成，且 ResizeObserver
+       的尺寸键在每次按下/松手都会变 → 重建两张贴图（含 canvas.toDataURL）。
+       布局值与 transform 无关，这类问题从根上不存在。 */
     function refreshFilters() {
       if (!WARP_OK) return;
       try {
-        var br = tabbar.getBoundingClientRect();
-        if (br.width < 2 || br.height < 2) return;
+        var bw = tabbar.offsetWidth, bh = tabbar.offsetHeight;
+        if (bw < 2 || bh < 2) return;
         var bleed = cssVar(tabbar, '--lg-bleed', 16);
         var rBar = cssVar(tabbar, '--lg-r', 30);
-        var url = makeDisplacementMap(br.width + 2 * bleed, br.height + 2 * bleed,
-                                      br.width, br.height, rBar, CFG.band, CFG.barScale * 0.5);
+        var url = makeDisplacementMap(bw + 2 * bleed, bh + 2 * bleed,
+                                      bw, bh, rBar, CFG.barBand, CFG.barScale * 0.5);
         if (url) {
           installFilter('lg-disp-bar', url, CFG.barScale, CFG.chroma);
           warp.style.filter = 'url(#lg-disp-bar)';
           warp.style.webkitFilter = 'url(#lg-disp-bar)';
         }
         if (glass && lensWarp) {
-          var gr = glass.getBoundingClientRect();
-          if (gr.width > 2 && gr.height > 2) {
+          var gw = glass.offsetWidth, gh = glass.offsetHeight;
+          if (gw > 2 && gh > 2) {
             var lbleed = cssVar(tabbar, '--lg-lens-bleed', 14);
             var lr = cssVar(tabbar, '--lg-lens-r', 27);
-            var lurl = makeDisplacementMap(gr.width + 2 * lbleed, gr.height + 2 * lbleed,
-                                           gr.width, gr.height, lr, CFG.band * 0.8,
+            var lurl = makeDisplacementMap(gw + 2 * lbleed, gh + 2 * lbleed,
+                                           gw, gh, lr, CFG.band * 0.8,
                                            CFG.lensScale * 0.5);
             if (lurl) {
               installFilter('lg-disp-lens', lurl, CFG.lensScale, CFG.chroma);
@@ -483,9 +494,10 @@
     if (window.ResizeObserver) {
       var lastKey = '';
       var ro = new ResizeObserver(function () {
-        var a = tabbar.getBoundingClientRect();
-        var b = glass ? glass.getBoundingClientRect() : { width: 0 };
-        var key = Math.round(a.width) + 'x' + Math.round(a.height) + '|' + Math.round(b.width);
+        // 同样用布局值：ResizeObserver 报的本来就是布局盒，这里若拿
+        // getBoundingClientRect()（变换后的视觉尺寸）去比，等于自己造抖动。
+        var key = tabbar.offsetWidth + 'x' + tabbar.offsetHeight
+                + '|' + (glass ? glass.offsetWidth : 0);
         if (key === lastKey) return;
         lastKey = key;
         refreshFilters();

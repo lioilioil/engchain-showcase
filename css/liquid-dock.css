@@ -1,0 +1,363 @@
+/* @generated 由 artifacts/tabbar-redesign/lg/dock.css 生成 —— 改这里无效，改源文件后跑 sync.py */
+/* ============================================================================
+   Liquid Glass Dock — 唯一来源。经 sync.py 生成 css/liquid-dock.css 后
+   由 apply-demo.py 挂到 app demo 中确实渲染主 tabbar 的 8 个页面。
+   ----------------------------------------------------------------------------
+   双层折射：
+     L0 .lg-base  backdrop-filter 真实模糊 + 调色（所有浏览器，降级基线）
+     L1 .lg-warp  backdrop-filter 抓取「已调色玻璃」为自身像素，
+                  再由 JS 注入 filter:url(#lg-disp-bar) 做位移 → 真实折射
+     L1b .tab-glass/.tg-warp  滑动透镜（同一手法，独立滤镜）
+     L2 .lg-spec  镜面高光 / 内外边缘（保持锐利，不参与折射）
+     L3 canvas.lg-gl  WebGL 静态边缘高光（跨内核增强；刻意不含时间驱动噪声）
+   右侧 .ai-orb-entry（蓝色玻璃球）的位置不受影响：本文件只改 .app-tabbar 及其子层，
+   外加外壳的一条 gap（只作用于 Dock 与球之间）。外壳的定位与尺寸一个字节都不碰，
+   球的左右边缘因此与未改动的 home.html 基线逐像素相同（verify.js 有 A/B 断言）。
+   ========================================================================== */
+
+/* 按下状态的可插值变量。注册成 <number> 才可能被 transition 插值 ——
+   未注册的自定义属性是离散值，过渡时会直接跳变而不是渐变。
+   inherits: true：它设在 .app-tabbar 上，由 .lg-base 继承后用在渐变 alpha 里，
+   所以「按下变不透」是「乘一个数」，而不是另写一份渐变。 */
+@property --lg-press{
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+:root{
+  /* 刻意不覆盖 .app-nav-shell 的高度。
+     app.css 给外壳的高度是 60px，且在所有断点下都不变（媒体查询只动它的
+     display / 定位 / 宽度，从不动 height）。那个 60px 的外壳里放着一个
+     60px 的球，球正好填满、居中——球的位置完全由外壳高度决定。
+     所以这里一旦改外壳高度，球就会重新居中并漂移（设成 64px 时球上移 2px）。
+     球是禁改项，外壳高度就是它的锚点：外壳保持 app.css 原值，
+     只让 56px 的 Dock 在这个 60px 的盒子里自己居中收缩。 */
+  --lg-h: 56px;          /* Dock 高度（原 64px） */
+  --lg-r: 28px;          /* Dock 圆角（= 高度/2，正胶囊） */
+  /* Dock 玻璃宽度：显式定宽，不再靠 flex:1 撑满外壳。
+     flex:1 会把「外壳内容区 − 球 − gap」整段吃掉（272px），两端积出大片空玻璃。
+     定宽后多出来的空间不再进 Dock 内部，而是由 margin-left:auto 全部堆到 Dock 左侧，
+     Dock 因此右移贴住球，两者一起构成贴右的簇（见下方「居右成簇」段）。 */
+  --lg-w: 220px;
+  /* Dock 左右内边距。它同时决定选中玻璃块离 Dock 边缘的余量（= 内边距），
+     与纵向的 --lg-lens-inset(4px) 呼应。 */
+  --lg-pad-x: 6px;
+  /* Dock 与球的间距。取外壳原生 gap 同值：不引入新数字，且 8 < 12（外壳外边距），
+     符合邻近性原则 —— 簇内间距必须小于簇到屏幕边缘的距离，两者才读作一组。
+     它不会移动球：Dock 定宽 + margin-left:auto ⇒ 球的左边缘恒为「外壳右 − 60」，
+     与这里取几像素无关（verify.js 有逐像素 A/B 断言）。 */
+  --lg-orb-gap: 8px;
+  --lg-lens-inset: 4px;  /* 透镜相对 Dock 的内缩（原 5px） */
+  --lg-bleed: 10px;      /* Dock 折射采样区外扩量（0 = 关闭外扩） */
+  --lg-lens-bleed: 9px; /* 透镜折射采样区外扩量 */
+  --lg-lens-r: 24px;     /* 透镜圆角（= (Dock 高 - 2×内缩) / 2，胶囊） */
+  --lg-sq: 1;            /* 透镜横向挤压，由 JS 写入 */
+  --lg-sqy: 1;           /* 透镜纵向补偿，由 JS 写入 */
+  --lg-so: 50%;          /* 透镜缩放原点，由 JS 写入 */
+  /* 按下：整体轻微胀大 + 更不透（= alpha 更高）。
+     只作用于 .app-tabbar 自身，球不在其内，因此按下时球纹丝不动。 */
+  --lg-press-scale: 1.02;
+  --lg-press-boost: .5;  /* 按下时 alpha 的增量比例：×1.5 */
+}
+
+/* 无障碍：视觉隐藏文字，读屏可见（Tab 无可见文字但必须可读） */
+.lg-sr{
+  position:absolute !important; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; border:0;
+}
+
+/* ---- 外壳：只改一条 gap，定位与尺寸全归 app.css ----
+   球的锚点仍是 app.css 原生的外壳 60px 高 + right:12px，本文件不碰。
+   Dock 56px 在外壳里靠 .app-nav-shell 原生的 align-items:center 自动居中，
+   上下各留 2px 空气；短屏收 46px 时上下各 3px。gap 的覆盖见下方「居右成簇」段。 */
+
+/* ---- Dock 本体：清空旧玻璃，改由分层承担 ---- */
+.app-tabbar,
+[data-theme="dark"] .app-tabbar{
+  height: var(--lg-h);
+  border-radius: var(--lg-r);
+  background: none;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  padding: 0 var(--lg-pad-x);
+  cursor: default;
+  touch-action: pan-y;
+  /* 按下/松手两个方向都要过渡，所以 transition 放在常态规则上。
+     只过渡自己声明的两个量，别用 all —— all 会把 JS 每帧写的
+     --lg-sq/--lg-sqy 也拖进过渡，挤压会变成糊的。 */
+  transition: transform .18s cubic-bezier(.34,1.4,.64,1),
+              --lg-press .22s cubic-bezier(.4,0,.2,1);
+}
+.app-tabbar::before,
+.app-tabbar::after{ content: none; }
+
+/* 按下：整体胀大 + 更不透。:active 在触摸拖拽期间保持，松手即复原。
+   缩放走 transform 不碰布局 —— .app-tabbar 本来就是 position:relative，
+   transform 不改变包含块，四个绝对定位层的定位不受影响。
+   折射层会不会因此丢掉 backdrop 采样？实测不会（祖先 transform 下，
+   背后内容滚动 40px 仍引起 Dock 区域 94.5% 像素变化，与基线 93.9% 同量级）。 */
+.app-tabbar:active{
+  cursor: default;
+  transform: scale(var(--lg-press-scale));
+  --lg-press: 1;
+}
+
+/* 按下只留「整体胀大」这一层反馈，取消单个 icon 原有的下沉。
+   app.css 的 .app-tab:active{transform:scale(.92)} 与 .app-tab:active svg{scale(.9)}
+   是旧的「药丸按钮」语法；玻璃块整体响应时再叠一层图标下陷会读成两个东西在动。
+   特异性与 app.css 相同，靠本文件后加载取胜。 */
+.app-tab:active,
+.app-tab:active svg{ transform: none; }
+
+/* ---- 居右成簇：Dock 与球一起贴右 ----
+   把 Dock 右侧的 auto 外边距收掉、只留左侧 auto，剩余空间便全部堆到 Dock 左边，
+   Dock 因此右移贴住球；球本身由外壳 right:12px 钉死，一动不动。
+   定宽 + margin-left:auto 还带来一条可证明的约束：
+       球左边缘 = 外壳右 − 60      （与 --lg-orb-gap 取几像素无关）
+   所以调间距只移动 Dock，物理上不可能带动球。
+
+   flex-shrink 留 1：极窄屏（320px）宁可 Dock 收一点，也不许溢出。 */
+.phone:not(.has-pura-sidebar) .app-tabbar{
+  flex: 0 1 var(--lg-w);
+  width: var(--lg-w);
+  min-width: 0;
+  margin-left: auto;
+  margin-right: 0;
+}
+/* 簇内间距 = 外壳的 gap（它正是「外壳两个子元素之间」的距离）。
+   只覆盖 gap，不动外壳的定位与尺寸 —— 球的锚点仍归 app.css 管。 */
+.phone:not(.has-pura-sidebar) .app-nav-shell{
+  gap: var(--lg-orb-gap);
+}
+
+/* ---- Pura 侧边栏收起态：同一套「居右成簇」 ----
+   ≤720px 高的 Pura 布局有两种状态，此前用 :not(.has-pura-sidebar) 一刀切，
+   结果两边都没管对：
+     展开态 —— .app-nav-shell 被 app.css 设为 display:none，压根没有 Dock；
+     收起态 —— 球是显示的（app.css 给 .ai-orb-entry 52×52），而
+               app.css 的 `.sidebar-collapsed .app-tabbar{flex:1;width:auto}`
+               让 Dock 铺满 366px 的外壳，实测被拉到 306px，两端积出大片空玻璃。
+   收起态于是和正常态是同一种布局（定宽 Dock + 球），就该用同一条规则。
+
+   球仍然不动：Dock 定宽 + margin-left:auto ⇒ 富余空间全堆到 Dock 左侧，
+   球被挤在外壳右缘。实测球 326→378 与改动前逐像素一致。
+   sidebar-right 不必单列 —— 它的外壳是 left:12px + width:366px，
+   与 right:12px 得到同一个盒子（390−12−366=12），实测两者几何完全相同。 */
+.phone.has-pura-sidebar.sidebar-collapsed .app-nav-shell{
+  gap: var(--lg-orb-gap);
+}
+.phone.has-pura-sidebar.sidebar-collapsed .app-tabbar{
+  flex: 0 1 var(--lg-w);
+  width: var(--lg-w);
+  min-width: 0;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* ---- 分层通用 ---- */
+.lg-layer{ position:absolute; inset:0; border-radius:inherit; pointer-events:none; }
+
+/* L0 ── 底色 + 真实背景模糊（基线，永不移除）
+
+   玻璃之所以是玻璃，靠的是 blur 把背景糊掉、saturate 把透过来的颜色提纯，
+   而不是靠白色漆。之前 .36 的白已经把这层画成了一块白板：
+   透光率过低 → 看不到底下内容 → 立体感只能靠阴影硬撑 → 阴影越加越大。
+   现在把颜料压到近乎透明，把 blur 提到 30px 补回「厚度」。
+   上下那点渐变只保留 6% 的落差，用来暗示玻璃有一点厚度，不再做斜面。
+
+   alpha 整体再 ×0.7（浅 .13→.09，深 .36→.28），让底部内容更多地穿透上来。
+   玻璃变透之后，边缘的折射就得补强才撑得住「这是一块玻璃」——
+   那一半在 JS 的 CFG.barScale / CFG.barBand，见 dock.js 顶部配置。
+
+   --lg-a 在这里声明（而非 :root）：自定义属性里的 var() 是在**声明它的元素**上
+   代入的，写进 :root 会把 --lg-press 固化成 0，按下的增量就传不进来。 */
+.lg-base{
+  z-index:0;
+  --lg-a: calc(1 + var(--lg-press-boost) * var(--lg-press));
+  background: linear-gradient(180deg,
+    rgba(255,255,255,calc(.09 * var(--lg-a))) 0%,
+    rgba(255,255,255,calc(.04 * var(--lg-a))) 40%,
+    rgba(255,255,255,calc(.035 * var(--lg-a))) 62%,
+    rgba(255,255,255,calc(.07 * var(--lg-a))) 100%);
+  -webkit-backdrop-filter: blur(30px) saturate(185%) brightness(1.04);
+  backdrop-filter: blur(30px) saturate(185%) brightness(1.04);
+}
+[data-theme="dark"] .lg-base{
+  background: linear-gradient(180deg,
+    rgba(58,58,68,calc(.28 * var(--lg-a))) 0%,
+    rgba(38,38,46,calc(.20 * var(--lg-a))) 40%,
+    rgba(32,32,40,calc(.18 * var(--lg-a))) 62%,
+    rgba(48,48,58,calc(.25 * var(--lg-a))) 100%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%) brightness(.96);
+  backdrop-filter: blur(30px) saturate(160%) brightness(.96);
+}
+
+/* L1 ── 折射层。backdrop-filter 与 filter 同元素是刻意的：
+   祖先元素带 transform 会切断 backdrop 采样，所以 transform 只出现在本元素（透镜）上。
+
+   外扩 --lg-bleed 的原因：折射要「从玻璃外采样」（真实玻璃边缘是把外侧背景压进来），
+   所以先把 backdrop 采样区扩到玻璃之外，再用 clip-path 裁回可见形状。
+   若某内核下 clip-path 与 backdrop-filter 冲突，把 --lg-bleed 置 0 即可退回矩形采样。 */
+.lg-warp{
+  z-index:0;
+  inset: calc(-1 * var(--lg-bleed));
+  border-radius: 0;
+  clip-path: inset(var(--lg-bleed) round var(--lg-r));
+  -webkit-backdrop-filter: blur(5px) saturate(155%);
+  backdrop-filter: blur(5px) saturate(155%);
+}
+
+/* L2 ── 镜面高光 / 内外边缘（锐利层）
+
+   立体感全在这一道边缘上：上缘 1px 的镜面反光 + 一整圈 1px 发丝边。
+   之前这里还叠了一层 44px/20% 的弥散投影——那是 Material 的抬升语法，
+   在玻璃上会读成「一块板浮在半空」，也就是你说的阴影过重。
+   iOS 26 的玻璃几乎不投影，它靠的是边缘和它压暗/模糊了的背景。
+   现在投影收到贴身处（1px 接触影 + 一层很浅的扩散），只负责把 Dock 从页面上「摘」下来。 */
+.lg-spec{
+  z-index:1;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.62),
+    inset 0 -1px 1px rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(255,255,255,.30),
+    0 1px 2px rgba(16,18,22,.05),
+    0 8px 22px -8px rgba(16,18,22,.16);
+}
+[data-theme="dark"] .lg-spec{
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.26),
+    inset 0 -1px 1px rgba(255,255,255,.07),
+    inset 0 0 0 1px rgba(255,255,255,.13),
+    0 1px 3px rgba(0,0,0,.30),
+    0 10px 26px -10px rgba(0,0,0,.42);
+}
+
+/* L3 ── WebGL 高光增强 */
+canvas.lg-gl{
+  position:absolute; inset:0; z-index:3;
+  width:100%; height:100%; display:block;
+  border-radius:inherit;
+  pointer-events:none;
+  opacity:0; transition: opacity .45s cubic-bezier(.4,0,.2,1);
+}
+canvas.lg-gl.lg-ready{ opacity:1; }
+
+/* ---- 滑动透镜：清空旧玻璃块外观，改为液态透镜 ---- */
+.tab-glass,
+[data-theme="dark"] .tab-glass{
+  z-index:2;
+  top: var(--lg-lens-inset);
+  bottom: var(--lg-lens-inset);
+  border-radius: 999px;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.tab-glass.is-first,
+.tab-glass.is-last{ border-radius: 999px; }
+
+.tg-lens{ position:absolute; inset:0; border-radius:inherit; pointer-events:none; }
+
+/* 折射主体：transform / backdrop-filter / filter 同元素（祖先带 transform 会切断 backdrop 采样） */
+.tg-warp{
+  position:absolute;
+  inset: calc(-1 * var(--lg-lens-bleed));
+  border-radius: 0;
+  clip-path: inset(var(--lg-lens-bleed) round var(--lg-lens-r));
+  transform: scaleX(var(--lg-sq)) scaleY(var(--lg-sqy));
+  transform-origin: var(--lg-so) 50%;
+  will-change: transform;
+  -webkit-backdrop-filter: blur(3.5px) saturate(215%) brightness(1.02);
+  backdrop-filter: blur(3.5px) saturate(215%) brightness(1.02);
+}
+[data-theme="dark"] .tg-warp{
+  -webkit-backdrop-filter: blur(3.5px) saturate(190%) brightness(1.05);
+  backdrop-filter: blur(3.5px) saturate(190%) brightness(1.05);
+}
+/* 选中态透镜：它应该比 Dock 更「透」而不是更「白」。
+   原来的 .36 白 + 米色内阴影把它画成了一枚白药丸——那是最重的立体感来源。
+   现在底色几乎不着色（.07），折射（.tg-warp）负责让它看清、看清底下的内容，
+   边缘负责让它成形。选中 = 更厚的一块玻璃，不是一块白色的牌子。 */
+.tg-spec{
+  position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.10) 0%, rgba(255,255,255,.035) 46%,
+    rgba(255,255,255,.04) 74%, rgba(255,255,255,.075) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.74),
+    inset 0 -1px 2px -1px rgba(255,255,255,.20),
+    inset 0 0 0 1px rgba(255,255,255,.40),
+    0 1px 2px rgba(16,18,22,.06),
+    0 6px 16px -7px rgba(16,18,22,.16);
+}
+[data-theme="dark"] .tg-spec{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.085) 0%, rgba(255,255,255,.025) 46%,
+    rgba(255,255,255,.025) 74%, rgba(255,255,255,.06) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),
+    inset 0 -1px 2px -1px rgba(255,255,255,.08),
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 1px 3px rgba(0,0,0,.26),
+    0 8px 20px -9px rgba(0,0,0,.40);
+}
+
+/* ---- Tab：等宽、只显图标（需求 3：不在 tabbar 中显示文字） ---- */
+.app-tab,
+.app-tab.active{
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  gap: 0;
+  z-index: 4;
+}
+/* 需求 3：不在 tabbar 中显示文字。
+   用 clip 视觉隐藏而非 display:none —— 读屏仍能读取「首页/发现/消息/我的」，
+   否则纯图标导航对无障碍是失效的。 */
+.app-tab .tab-label,
+.app-tab.active .tab-label{
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap;
+  opacity: 1;
+}
+.app-tab svg{ width: 21px; height: 21px; }   /* 原 24px */
+.app-tab.active svg{ stroke-width: 2.1; }
+.app-tab.active{ color: var(--primary-dim); }
+
+/* 消息角标：等宽布局下重新定位到图标右上 */
+.app-tab .badge,
+.app-tab.active .badge{
+  left: calc(50% + 3px);
+  right: auto;
+  top: 4px;              /* 图标缩到 21px 后重新贴合图标右上角 */
+  min-width: 15px; height: 15px; border-radius: 8px;
+  font-size: 10px; line-height: 15px;
+}
+
+/* ---- 紧凑断点：与 app.css 的 max-height:720px 保持一致 ---- */
+@media (max-height: 720px){
+  :root{
+    /* 外壳仍沿用 app.css 原值，不在此覆盖 —— 球的位置在短屏下也纹丝不动 */
+    --lg-h: 46px; --lg-r: 23px; --lg-lens-inset: 3px;
+    --lg-lens-r: 20px; --lg-bleed: 13px; --lg-lens-bleed: 11px;
+  }
+  .app-tab svg{ width: 19px; height: 19px; }
+}
+
+/* ---- 降低动态效果：保留静态玻璃，关闭挤压与 WebGL 动画 ---- */
+@media (prefers-reduced-motion: reduce){
+  .tg-warp{ transform: none; }
+  canvas.lg-gl{ display: none; }
+  /* 关掉位移，但保留「按下变不透」—— 那是颜色反馈不是运动，
+     去掉它按下就毫无回应了。 */
+  .app-tabbar:active{ transform: none; }
+}
