@@ -219,8 +219,8 @@ table.tb tr:last-child td{border-bottom:none}
 .app-nav-shell{position:absolute;left:14px;right:14px;bottom:14px;height:64px;z-index:50;display:flex;align-items:center;justify-content:center;gap:10px;pointer-events:none}
 .app-nav-shell>*{pointer-events:auto}
 /* 紧凑胶囊 tabbar */
-.app-tabbar{position:relative;display:flex;align-items:center;gap:4px;height:48px;padding:0 6px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.72) 55%,rgba(255,255,255,.86));-webkit-backdrop-filter:blur(30px) saturate(190%) brightness(1.05);backdrop-filter:blur(30px) saturate(190%) brightness(1.05);border:1px solid rgba(255,255,255,.9);box-shadow:0 14px 40px rgba(22,22,22,.22),0 4px 14px rgba(22,22,22,.10),inset 0 1.5px 2px rgba(255,255,255,.95),inset 0 -1.5px 2px rgba(255,255,255,.3);flex:0 0 auto}
-[data-theme="dark"] .app-tabbar{background:linear-gradient(180deg,rgba(40,40,46,.9),rgba(30,30,36,.78) 55%,rgba(36,36,42,.88));border-color:rgba(255,255,255,.18);box-shadow:0 14px 40px rgba(0,0,0,.6),0 4px 14px rgba(0,0,0,.35),inset 0 1.5px 2px rgba(255,255,255,.14),inset 0 -1.5px 2px rgba(255,255,255,.06)}
+.app-tabbar{position:relative;display:flex;align-items:center;gap:4px;height:48px;padding:0 6px;border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.72) 55%,rgba(255,255,255,.80));-webkit-backdrop-filter:blur(30px) saturate(190%) brightness(1.05);backdrop-filter:blur(30px) saturate(190%) brightness(1.05);border:1px solid rgba(255,255,255,.9);box-shadow:0 14px 40px rgba(22,22,22,.22),0 4px 14px rgba(22,22,22,.10),inset 0 1.5px 2px rgba(255,255,255,.95),inset 0 -1.5px 2px rgba(255,255,255,.3);flex:0 0 auto}
+[data-theme="dark"] .app-tabbar{background:linear-gradient(180deg,rgba(40,40,46,.9),rgba(30,30,36,.78) 55%,rgba(33,33,39,.80));border-color:rgba(255,255,255,.18);box-shadow:0 14px 40px rgba(0,0,0,.6),0 4px 14px rgba(0,0,0,.35),inset 0 1.5px 2px rgba(255,255,255,.14),inset 0 -1.5px 2px rgba(255,255,255,.06)}
 .app-tabbar::before{content:"";position:absolute;top:1.5px;left:18px;right:18px;height:1.5px;border-radius:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.85) 25%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.85) 75%,transparent);pointer-events:none;z-index:4}
 [data-theme="dark"] .app-tabbar::before{background:linear-gradient(90deg,transparent,rgba(255,255,255,.16) 25%,rgba(255,255,255,.22) 50%,rgba(255,255,255,.16) 75%,transparent)}
 .app-tab{position:relative;z-index:3;display:flex;align-items:center;justify-content:center;width:46px;height:100%;color:var(--ink-3);text-decoration:none;cursor:pointer;border-radius:14px;transition:color .22s;outline:none}
@@ -231,19 +231,38 @@ table.tb tr:last-child td{border-bottom:none}
 [data-theme="dark"] .app-tab.active svg{filter:drop-shadow(0 1.5px 5px color-mix(in srgb,var(--pri) 55%,transparent))}
 .app-tab .badge{position:absolute;top:5px;right:3px;min-width:15px;height:15px;border-radius:8px;background:var(--warn);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;font-family:var(--font-n);box-shadow:0 1px 4px rgba(180,83,9,.4);z-index:6}
 
-/* 液态玻璃指示块 —— 常规色块 · 两侧向内镜像（clip-path 让模糊/描边随形状走） */
-.liq{position:absolute;z-index:1;top:5px;left:0;width:34px;height:37px;pointer-events:none;will-change:left,top;
-  background:linear-gradient(180deg,rgba(255,255,255,.60),rgba(255,255,255,.12) 42%,rgba(255,255,255,.28) 80%,rgba(255,255,255,.10));
-  -webkit-backdrop-filter:blur(18px) saturate(160%) brightness(1.08);
-  backdrop-filter:blur(18px) saturate(160%) brightness(1.08);
-  -webkit-clip-path:path('M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z');
+/* 液态玻璃指示块 —— 常规色块 · 两侧向内镜像
+   按开源案例分层实现（本层无 clip-path，让形状化投影可自由下移；模糊/描边随形状走） */
+.liq{position:absolute;z-index:1;top:5px;left:0;width:34px;height:37px;pointer-events:none;will-change:left,top}
+.liq i{position:absolute;inset:0;display:block}
+/* 层0 · 形状化底部投影（对应 Coding Stella --pill-shadow 与掘金 0 8px 32px 双层外投影，改为随形状走）
+   注意：投影层放 .liq 之外（.app-tabbar 内兄弟元素，JS 同步定位），避免被 .liq-bg 的 backdrop-filter 采样吸收 */
+.liq-shadow{position:absolute;z-index:0;width:34px;height:37px;pointer-events:none;left:0;top:0;will-change:left,top;
   clip-path:path('M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z');
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -5px 12px rgba(255,255,255,.20),inset 0 0 0 1px rgba(255,255,255,.38),0 6px 18px -6px rgba(22,22,22,.26);
-  transform-origin:center}
-[data-theme="dark"] .liq{background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.04) 42%,rgba(255,255,255,.08) 80%,rgba(255,255,255,.03));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),inset 0 -5px 12px rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.15),0 6px 18px -6px rgba(0,0,0,.4)}
-.liq svg{position:absolute;inset:0;width:34px;height:37px;pointer-events:none}
-.liq.pop svg{animation:liqPop .22s cubic-bezier(.2,1.3,.4,1)}
+  background:linear-gradient(180deg,rgba(15,17,24,.66),rgba(15,17,24,.30) 62%,rgba(15,17,24,.46));
+  transform:translateY(4px);filter:blur(3px);opacity:1}
+[data-theme="dark"] .liq-shadow{background:linear-gradient(180deg,rgba(0,0,0,.88),rgba(0,0,0,.44) 62%,rgba(0,0,0,.62))}
+/* 层1 · 玻璃本体：透底渐变 + 上缘 rim / 下缘折射（Coding Stella .liquid-nav box-shadow 五层）
+   注：不用 backdrop-filter —— 它会采样并吸收底部形状投影层（CSS 硬性行为），且 bar 背后为固定页面背景，模糊增益有限 */
+.liq-bg{z-index:1;clip-path:path('M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z');
+  background:linear-gradient(180deg,rgba(255,255,255,.90),rgba(255,255,255,.20) 38%,rgba(255,255,255,.40) 76%,rgba(255,255,255,.88));
+  box-shadow:inset 0 2px 3px -1px rgba(255,255,255,.95),inset 0 -2px 4px -1px rgba(255,255,255,.55),inset 0 0 0 1px rgba(255,255,255,.55),inset 0 -6px 14px rgba(184,153,104,.30)}
+/* 层2 · 液态光泽层（掘金 .glass::after 技法：顶部 46% 反射渐变 + 底部内侧亮线） */
+.liq-glow{z-index:2;clip-path:path('M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z');
+  background:linear-gradient(180deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.06) 46%,rgba(255,255,255,0) 100%);
+  box-shadow:inset 0 -9px 8px -8px rgba(255,255,255,.85);opacity:.8}
+[data-theme="dark"] .liq-bg{background:linear-gradient(180deg,rgba(255,255,255,.17),rgba(255,255,255,.045) 40%,rgba(255,255,255,.085) 76%,rgba(255,255,255,.15));
+  box-shadow:inset 0 2px 3px -1px rgba(255,255,255,.20),inset 0 -2px 4px -1px rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.10),inset 0 -6px 14px rgba(201,176,112,.22),inset 2px 0 6px rgba(0,0,0,.35),inset -2px 0 6px rgba(0,0,0,.35)}
+[data-theme="dark"] .liq-glow{background:linear-gradient(180deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.02) 46%,transparent 100%);box-shadow:inset 0 -9px 8px -8px rgba(255,255,255,.35);opacity:.6}
+/* 层3 · 焦散亮纹与底部金折射（SVG） */
+.liq svg{position:absolute;inset:0;width:34px;height:37px;pointer-events:none;z-index:3}
+.liq svg .e-edge{stroke:rgba(255,255,255,.55);stroke-width:1.2;fill:none}
+.liq svg .e-streak{fill:none;stroke:rgba(255,255,255,.85);stroke-linecap:round}
+.liq svg .e-bot{fill:none;stroke:var(--pri);opacity:.5;stroke-linecap:round}
+[data-theme="dark"] .liq svg .e-edge{stroke:rgba(255,255,255,.12)}
+[data-theme="dark"] .liq svg .e-streak{stroke:rgba(255,255,255,.30)}
+[data-theme="dark"] .liq svg .e-bot{opacity:.35}
+.liq.pop .liq-bg,.liq.pop .liq-glow,.liq.pop svg{animation:liqPop .22s cubic-bezier(.2,1.3,.4,1)}
 @keyframes liqPop{from{transform:scale(.82);opacity:.35}to{transform:scale(1);opacity:1}}
 
 /* AI 信息工作台球 —— 原样复制自 app demo（css/app.css .ai-orb-entry/.glass-orb），本次不改 */
@@ -446,12 +465,15 @@ table.tb tr:last-child td{border-bottom:none}
           <div class="diag">
             <h3 style="margin-top:2px">液态玻璃材质分层（已按案例落地）</h3>
             <ul class="pts" style="margin-top:6px">
+              <li><b>底部投影（按案例重做）</b>：选中块<b>下方阴影</b>为形状化投影层——对应 Coding Stella pill 投影（<code>0 4px 12px</code> + <code>0 1px 2px</code>）与掘金外投影（<code>0 8px 32px</code>），改为<b>同 clip-path 阴影层下移 + 模糊</b>实现，随“向内镜像”形状走，落在 bar 内、不超出边界。</li>
               <li><b>透底</b>：白色半透明渐变（无固有实色），透出 Tabbar 与背后的环境光。</li>
-              <li><b>模糊</b>：backdrop blur 18px + saturate 1.6× + brightness 1.08；用 <b>clip-path 随形状裁切</b>，模糊不溢出色块。</li>
-              <li><b>上缘</b>：1px 白色 rim 高光 + 顶部焦散亮纹（中间亮、两端淡）。</li>
-              <li><b>底部</b>：内侧反光 + 极淡主题色折射，营造“浸润感”。</li>
+              <li><b>模糊</b>：backdrop blur 16px + saturate 180% + brightness 1.06；用 <b>clip-path 随形状裁切</b>，模糊不溢出色块。</li>
+              <li><b>上缘</b>：白色 rim 高光（<code>inset 0 2px 3px -1px</code>）+ 顶部焦散亮纹（中间亮、两端淡）。</li>
+              <li><b>底部</b>：下缘折射（<code>inset 0 -2px 4px -1px</code>）+ 内侧反光 + 极淡主题色折射，营造“浸润感”。</li>
+              <li><b>液态光泽层</b>：顶部 46% 反射渐变 + 底部内侧亮线（掘金 <code>.glass::after</code> 技法）。</li>
               <li><b>着色克制</b>：颜色只给<b>图标</b>（前景着色 --primary）；块体保持中性玻璃。</li>
               <li><b>边界约束</b>：块体 34×37px，四周留 ≥5px，不超出 Tabbar 轮廓。</li>
+              <li><b>明暗一致</b>：暗色模式同一形状、同一材质逻辑——更低透明白 + 左右<b>内侧暗影</b>表现凹面，不用外凸白描边，避免“白色圆角胶囊”观感。</li>
             </ul>
           </div>
         </div>
@@ -630,30 +652,23 @@ table.tb tr:last-child td{border-bottom:none}
             <a class="app-tab" data-key="discover" href="#" aria-label="发现" title="发现"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></a>
             <a class="app-tab" data-key="message" href="#" aria-label="消息" title="消息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8 8 0 1 0-3.2 6.4L21 21l-.6-3.2A8 8 0 0 0 21 12Z"/></svg><span class="badge">3</span></a>
             <a class="app-tab" data-key="me" href="#" aria-label="我的" title="我的"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg></a>
-            <!-- 液态玻璃指示块：常规色块 · 两侧向内镜像 -->
+            <!-- 液态玻璃指示块：常规色块 · 两侧向内镜像（投影层为兄弟元素，避开 backdrop-filter 采样） -->
+            <i class="liq-shadow" id="liqShadow" aria-hidden="true"></i>
             <span class="liq" id="liqBlock" aria-hidden="true">
+              <i class="liq-bg"></i>
+              <i class="liq-glow"></i>
               <svg viewBox="0 0 34 37" width="34" height="37" fill="none" aria-hidden="true">
                 <defs>
-                  <linearGradient id="lgx-edge" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stop-color="#fff" stop-opacity="0.95"/>
-                    <stop offset="0.55" stop-color="#fff" stop-opacity="0.25"/>
-                    <stop offset="1" stop-color="#fff" stop-opacity="0.5"/>
-                  </linearGradient>
-                  <linearGradient id="lgx-streak" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-                    <stop offset="0.5" stop-color="#fff" stop-opacity="0.9"/>
-                    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-                  </linearGradient>
                   <filter id="lgx-blur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="1.6"/></filter>
                 </defs>
                 <!-- 与 clip-path 同一路径：S 形两侧向内镜像 -->
-                <path d="M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z" fill="none" stroke="url(#lgx-edge)" stroke-width="1.2"/>
+                <path class="e-edge" d="M5 6 C9.5 4 12.5 3.5 17 3.5 C21.5 3.5 24.5 4 29 6 C25 13 25 24 29 31 C24.5 33.5 21.5 34 17 34 C12.5 34 9.5 33.5 5 31 C9 24 9 13 5 6 Z" stroke-width="1.2"/>
                 <!-- 上缘焦散高光 -->
-                <path d="M9.5 8.8 C12 7.1 16 6.4 20.5 7" stroke="url(#lgx-streak)" stroke-width="1.7" stroke-linecap="round" filter="url(#lgx-blur)"/>
+                <path class="e-streak" d="M9.5 8.8 C12 7.1 16 6.4 20.5 7" stroke-width="1.7" filter="url(#lgx-blur)"/>
                 <!-- 中部细亮纹 -->
-                <path d="M10.5 19.5 C13 18.2 20 17.8 24.5 19" stroke="url(#lgx-streak)" stroke-width="1" stroke-linecap="round" opacity="0.55" filter="url(#lgx-blur)"/>
+                <path class="e-streak" d="M10.5 19.5 C13 18.2 20 17.8 24.5 19" stroke-width="1" opacity="0.6" filter="url(#lgx-blur)"/>
                 <!-- 底部淡主题色折射（浸润感） -->
-                <path d="M10 29.8 C13 31.6 20 32.4 24.5 31.6" stroke="#B89968" stroke-width="1.3" stroke-linecap="round" opacity="0.55" filter="url(#lgx-blur)"/>
+                <path class="e-bot" d="M10 29.8 C13 31.6 20 32.4 24.5 31.6" stroke-width="1.3" filter="url(#lgx-blur)"/>
               </svg>
             </span>
             <!-- 页面气泡：告知即将进入的页面 -->
@@ -715,6 +730,7 @@ table.tb tr:last-child td{border-bottom:none}
   var viewport = $('#viewport');
   var bubble = $('#navBubble');
   var liq = $('#liqBlock');
+  var liqShadow = $('#liqShadow');
   var newTabbar = $('#newTabbar');
   var oldTabbar = $('#oldTabbar');
   var oldGlass = $('#oldGlass');
@@ -767,6 +783,8 @@ table.tb tr:last-child td{border-bottom:none}
     var top = (active.offsetHeight - liq.offsetHeight) / 2;
     liq.style.left = left + 'px';
     liq.style.top = top + 'px';
+    liqShadow.style.left = left + 'px';
+    liqShadow.style.top = top + 'px';
   }
 
   function popLiq(){
