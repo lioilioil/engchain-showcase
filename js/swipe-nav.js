@@ -163,8 +163,7 @@
   var drag = null;
   var springTimer = 0;
   var lastTouchTs = 0;
-  var activeRegion = null;          /* 本次手势正在接力的横滑区（收尾时要还原它的滚动行为） */
-  var activeRegionBehavior = '';
+  var pendingConsumers = [];        /* 收尾时还原链上消费者用 */
 
   function fitScale() {
     var v = parseFloat(getComputedStyle(phone).getPropertyValue('--fit-scale'));
@@ -243,6 +242,90 @@
     return null;
   }
 
+  /* ===================== 链式横向消费者 =====================
+     一次横向手势的位移按顺序「喂」给链上每个消费者：先吃满本区域内的
+     横向滑动（分类条滚动 / 一级两栏切换），全部到边后剩余位移才驱动主页面。
+     页面可在本脚本加载前设置 window.__SWIPE_ZONES__：
+       [{ trigger:'#tab-list', consumers:[ {type:'scroll',el:'#sub-scroll'},
+                                            {type:'seg', canNext,canPrev,next,prev} ] }]
+     触点落在 trigger 内时使用该链；否则退化为默认的「最近横向滚动祖先」单消费者。 */
+
+  /* 原生横向滚动容器：跟手写 scrollLeft，松手停在原位（不回弹） */
+  function scrollConsumer(el) {
+    var rx0 = 0, rmax = 0, prev = '';
+    return {
+      used: 0,
+      begin: function () {
+        rx0 = el.scrollLeft;
+        rmax = Math.max(0, el.scrollWidth - el.clientWidth);
+        prev = el.style.scrollBehavior;
+        if (rmax > 1) el.style.scrollBehavior = 'auto';
+      },
+      consume: function (dx) {
+        if (rmax <= 1) return dx;
+        var want = rx0 - dx;
+        var c = want < 0 ? 0 : (want > rmax ? rmax : want);
+        el.scrollLeft = c;
+        this.used = Math.abs(rx0 - c);
+        return dx - (rx0 - c);
+      },
+      maybeCommit: function () { return false; },
+      reset: function () { el.style.scrollBehavior = prev; }
+    };
+  }
+
+  /* 一级两栏切换的虚拟门：一旦在该方向有栏可切，就吃掉 up to 0.9*屏宽 的位移
+     （几乎吞掉整段手势），只在拖过一整屏后才把剩余位移漏给主页面，
+     保证「先切栏目」不被快速轻扫抢成切页。 */
+  function segConsumer(cfg) {
+    var w = 0, dir = 0, used = 0;
+    return {
+      begin: function () { w = phone.clientWidth * 0.9; dir = 0; used = 0; },
+      consume: function (dx) {
+        if (!dx) return 0;
+        var sign = dx < 0 ? -1 : 1;
+        if (dir === 0) {
+          var can = sign < 0 ? cfg.canNext() : cfg.canPrev();
+          if (!can) return dx;                 /* 该方向已到边 → 不消费，让位主页面 */
+          dir = sign;
+        }
+        if (dir !== sign) return dx;
+        var step = Math.min(Math.abs(dx), w - used);
+        used += step;
+        this.used = used;
+        return dx - (dir < 0 ? -step : step);
+      },
+      maybeCommit: function () {
+        if (dir === 0 || used < w * 0.30) return false;
+        if (dir < 0) cfg.next(); else cfg.prev();
+        return true;
+      },
+      reset: function () {}
+    };
+  }
+
+  function makeConsumers(descs) {
+    var out = [];
+    for (var i = 0; i < descs.length; i++) {
+      var d = descs[i];
+      var el = typeof d.el === 'string' ? document.querySelector(d.el) : d.el;
+      if (d.type === 'scroll' && el) out.push(scrollConsumer(el));
+      else if (d.type === 'seg') out.push(segConsumer(d));
+    }
+    return out;
+  }
+
+  /* 本次手势用哪条消费者链 */
+  function buildChain(tgt) {
+    var zones = window.__SWIPE_ZONES__ || [];
+    for (var i = 0; i < zones.length; i++) {
+      var root = document.querySelector(zones[i].trigger);
+      if (root && root.contains(tgt)) return makeConsumers(zones[i].consumers);
+    }
+    var el = findRegion(tgt);
+    return el ? [scrollConsumer(el)] : [];
+  }
+
   function onStart(e) {
     if (e.type === 'mousedown') {
       if (e.button !== 0) return;
@@ -261,18 +344,9 @@
       axis: null, x: 0, raw: 0,
       s: 1,
       samples: [],
-      region: findRegion(tgt),
-      rx0: 0, rmax: 0
+      consumers: buildChain(tgt)
     };
-    if (drag.region) {
-      drag.rx0 = drag.region.scrollLeft;
-      drag.rmax = drag.region.scrollWidth - drag.region.clientWidth;
-      /* 拖动期间区域位移由 JS 写 scrollLeft 驱动。容器若带 scroll-behavior:smooth，
-         每次写入都会被动画化，区域就追不上手指（一滑一顿）。手势期间临时改 auto。 */
-      activeRegion = drag.region;
-      activeRegionBehavior = drag.region.style.scrollBehavior;
-      drag.region.style.scrollBehavior = 'auto';
-    }
+    drag.consumers.forEach(function (c) { c.begin(); });
   }
 
   function onMove(e) {
@@ -293,14 +367,11 @@
        不换算的话 Pura 侧边栏/预览壳里位移会被放大 */
     var dxl = dx / drag.s;
 
-    /* ① 横向滚动区先吃。用「从起始 scrollLeft 推算目标位置再夹紧」而不是
-       逐段累加，这样区域吃满后反向拖动能正确回滚 */
+    /* ① 链上每个消费者先依次吃掉位移（分类条滚动 → 一级两栏切换），
+       全部到边后剩下的 rest 才是页面位移 */
     var rest = dxl;
-    if (drag.region) {
-      var want = drag.rx0 - dxl;
-      var clamped = want < 0 ? 0 : (want > drag.rmax ? drag.rmax : want);
-      drag.region.scrollLeft = clamped;
-      rest = dxl - (drag.rx0 - clamped);                       /* 区域吃掉之外的，才是页面位移 */
+    for (var ci = 0; ci < drag.consumers.length; ci++) {
+      rest = drag.consumers[ci].consume(rest);
     }
 
     /* ② 该方向没有目标就橡皮筋（不出邻站牌） */
@@ -346,8 +417,34 @@
         passed = dt > 0 && dt < CFG.flickMs && dv * dir > 0 && Math.abs(dv) / dt > CFG.flickV;
       }
     }
-    if (passed) commit(t, dir);
-    else springBack();
+    if (passed) { commit(t, dir); return; }
+
+    /* ① 页面不提交：看链上消费者是否切了一级两栏（吃够虚拟门）。切了就无回弹复位，
+       没切才整体回弹。 */
+    for (var ci = 0; ci < d.consumers.length; ci++) {
+      if (d.consumers[ci].maybeCommit && d.consumers[ci].maybeCommit()) {
+        resetLayersInstant(d.consumers);
+        return;
+      }
+    }
+    springBack();
+  }
+
+  /* 一级两栏切换已提交：内容层瞬时归位，不做回弹动画 */
+  function resetLayersInstant(list) {
+    var ease = 'transform 0s';
+    if (!reduced) {
+      for (var i = 0; i < layers.length; i++) {
+        layers[i].style.transition = ease;
+        layers[i].style.transform = 'translate3d(0,0,0)';
+        layers[i].style.willChange = '';
+      }
+      if (peek) peek.style.clipPath = clipClosed(peek.getAttribute('data-side'));
+      if (peekCard) peekCard.style.transform = 'translateY(-50%)';
+    }
+    cleanupConsumers(list);
+    phone.classList.remove('swipe-active');
+    layers = [];
   }
 
   function onCancel() {
@@ -358,7 +455,14 @@
     springBack();
   }
 
+  /* 收尾时还原链上所有消费者（滚动条的 scrollBehavior 等） */
+  function cleanupConsumers(list) {
+    if (!list) return;
+    for (var i = 0; i < list.length; i++) list[i].reset();
+  }
+
   function beginDrag() {
+    pendingConsumers = drag ? drag.consumers : [];
     curW = phone.clientWidth;
     layers = reduced ? [] : contentLayers();
     phone.classList.add('swipe-active');
@@ -438,7 +542,8 @@
     if (peek) { peek.style.transition = ''; peek.style.clipPath = ''; }
     if (peekCard) { peekCard.style.transition = ''; peekCard.style.transform = ''; }
     phone.classList.remove('swipe-active');
-    if (activeRegion) { activeRegion.style.scrollBehavior = activeRegionBehavior; activeRegion = null; }
+    cleanupConsumers(pendingConsumers);
+    pendingConsumers = [];
     layers = [];
   }
 

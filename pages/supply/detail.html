@@ -239,6 +239,29 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       lockZone.parentNode.insertBefore(note, lockZone.nextSibling);
     }
   } catch (e) {}
+
+  /* [资质招商] openRegion=1（列表卡片「更多」进入）：顺滑定位到「区域名额状态」区块，
+     滚动到位后再自动打开其右侧「查看全部」弹窗，整体按步骤平滑衔接 */
+  try {
+    if (new URLSearchParams(location.search).get('openRegion') === '1') {
+      setTimeout(function () {
+        var sec = null;
+        var sts = document.querySelectorAll('.section-title .st-left');
+        for (var i = 0; i < sts.length; i++) {
+          if ((sts[i].textContent || '').indexOf('区域名额状态') !== -1) { sec = sts[i].closest('.section'); break; }
+        }
+        /* 仅滚动 .scroll 容器（scrollIntoView 会连带滚动祖先容器，导致定位偏差） */
+        var sc = document.querySelector('.scroll');
+        if (sec && sc) {
+          var target = sec.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+          sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }
+        setTimeout(function () {
+          if (rec && rec.nationalRegions && rec.nationalRegions.length && window.DETAIL) DETAIL.openRegionMap();
+        }, 520);
+      }, 240);
+    }
+  } catch (e) {}
 })();
 </script>
 <style>
@@ -297,7 +320,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ===== 全国地图弹窗 ===== */
   .map-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; display:flex; align-items:flex-end; justify-content:center; opacity:0; pointer-events:none; transition:opacity .3s ease; }
   .map-modal.open { opacity:1; pointer-events:auto; }
-  .map-modal .mm-panel { width:100%; max-width:430px; background:var(--bg); border-radius:16px 16px 0 0; height:85vh; max-height:85vh; display:flex; flex-direction:column; transform:translateY(100%); transition:transform .35s cubic-bezier(.4,0,.2,1); }
+  .map-modal .mm-panel { width:100%; max-width:430px; background:var(--bg); border-radius:16px 16px 0 0; height:80vh; max-height:80vh; display:flex; flex-direction:column; transform:translateY(100%); transition:transform .35s cubic-bezier(.4,0,.2,1); }
   .map-modal.open .mm-panel { transform:translateY(0); }
   .map-modal .mm-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; border-bottom:1px solid var(--line); flex:none; }
   .map-modal .mm-title { font-size:15px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }

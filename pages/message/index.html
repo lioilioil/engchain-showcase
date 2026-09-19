@@ -120,10 +120,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var feed = [];
     try { feed = MatchStore.read().feed || []; } catch(e) {}
     if (!feed.length) { UI.toast('暂无推荐，请先设置匹配偏好', 'info'); return; }
-    var rows = feed.slice(0, 5).map(function(f){ return '<div style="padding:10px 2px;border-bottom:1px solid var(--line);"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;"><span class="elip">'+(f.title||'')+'</span><b style="color:var(--primary-dim);flex:none;margin-left:8px;">'+(f.matchScore||0)+'%</b></div><div style="font-size:11.5px;color:var(--text-3);margin-top:3px;">'+(f.cat||'')+' · '+(f.location||'')+'</div></div>'; }).join('');
+    var rows = '<div class="mf-list">'+feed.slice(0, 5).map(function(f){
+      var tp = f.type==='supply' ? 'supply' : 'demand';
+      var tpTxt = f.type==='supply' ? '供应' : '需求';
+      var href = '../supply/detail.html?id=' + (f.sourceId || f.id);
+      return '<a class="mf-card" href="'+href+'">'
+        + '<div class="mf-top"><span class="mf-badge '+tp+'">'+tpTxt+'</span><span class="mf-score"><b>'+(f.matchScore||0)+'</b>% 匹配</span></div>'
+        + '<div class="mf-title">'+(f.title||'')+'</div>'
+        + '<div class="mf-meta">'+(f.cat||'')+' · '+(f.location||'')+'</div>'
+        + '</a>';
+    }).join('') + '</div>';
     feed.forEach(function(f){ try { MatchStore.markRead(f.id); } catch(e) {} });
     renderMatchUnread();
-    var sh = UI.sheet(); sh.setText('智能推荐 · 前5条'); sh.html(rows + '<div style="padding:12px 2px 4px;font-size:11.5px;color:var(--text-3);">完整推荐请前往发现页查看</div>'); sh.show();
+    var foot = '<div class="mf-foot"><a class="mf-cta" href="../supply/list.html">去发现页看全部推荐</a><a class="mf-set" href="../match/preferences.html">调整匹配偏好</a></div>';
+    var sh = UI.sheet(); sh.setText('智能推荐'); sh.html(rows + foot); sh.show();
   };
   /* E2-11：会话为空时渲染空态引导卡，不再硬编码假数据。
      [FIX] 新用户无真实会话时，列表顶部加"演示数据"灰色标注；首次访问种子写入 localStorage，后续可标记已读清零 unread */
@@ -187,6 +197,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <style>
   /* 本页为普通 .scroll（已提供 16px 页面边距），清零 .sys-entry 自带的水平外边距，避免双重缩进，与下方会话行对齐 */
   .sys-entry { margin-left: 0; margin-right: 0; }
+  /* 智能推荐弹窗卡片 */
+  .mf-list{display:flex;flex-direction:column;gap:10px;padding:2px 0 4px;}
+  .mf-card{display:block;background:var(--bg-card-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;text-decoration:none;color:inherit;transition:transform .12s ease,border-color .12s ease;}
+  .mf-card:active{transform:scale(.98);border-color:var(--accent-line);}
+  .mf-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .mf-badge{font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:6px;}
+  .mf-badge.supply{background:rgba(34,139,90,.12);color:#1f9d63;}
+  .mf-badge.demand{background:rgba(217,119,6,.12);color:#d97706;}
+  .mf-score{font-family:var(--font-num);font-size:11px;color:var(--text-3);}
+  .mf-score b{font-size:15px;font-weight:700;color:var(--primary-dim);margin-right:2px;}
+  .mf-title{font-size:13.5px;font-weight:600;line-height:1.4;color:var(--text-1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .mf-meta{font-size:11px;color:var(--text-3);margin-top:7px;display:flex;align-items:center;gap:5px;}
+  .mf-foot{margin-top:14px;}
+  .mf-cta{display:block;height:44px;line-height:44px;text-align:center;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 6px 16px -8px var(--primary-dim);}
+  .mf-set{display:block;text-align:center;margin-top:10px;font-size:12px;color:var(--primary-dim);}
 </style>
 <script src="../../js/liquid-dock.js"></script>
 </body>

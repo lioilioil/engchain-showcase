@@ -1,4 +1,4 @@
-﻿/* ============================================================================
+/* ============================================================================
    工程链 ENGCHAIN — 通用脚本 (common.js)
    Toast / 半屏弹窗 / 居中对话框 / 返回 / iPhone 状态栏 / 支付墙解锁
    ============================================================================ */
@@ -309,12 +309,13 @@ window.UI = (function () {
   document.addEventListener('mousedown', customSheetDelegate, true);
   /* ---- 居中对话框 ---- */
   function dialog(opts) {
-    const o = { title: '', text: '', ok: '确定', cancel: '取消', onOk: null, onCancel: null, danger: false, ...opts };
+    const o = { title: '', text: '', ok: '确定', cancel: '取消', onOk: null, onCancel: null, danger: false, agree: false, agreeHref: '', agreeText: '我已阅读并同意', agreeName: '服务协议', ...opts };
     const ov = document.createElement('div');
     ov.className = 'modal-overlay show';
     ov.innerHTML = `<div class="dialog">
       <div class="d-title"></div>
       <div class="d-text"></div>
+      <div class="d-agree" style="display:none;"></div>
       <div class="d-actions">
         <button class="btn btn-ghost d-cancel"></button>
         <button class="btn d-ok"></button>
@@ -326,7 +327,29 @@ window.UI = (function () {
     ov.querySelector('.d-ok').className = 'btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + ' d-ok';
     ov.querySelector('.d-cancel').textContent = o.cancel;
     function close() { ov.remove(); document.body.style.overflow = ''; }
-    ov.querySelector('.d-ok').addEventListener('click', () => { o.onOk && o.onOk(); close(); });
+    var agreed = false;
+    if (o.agree) {
+      var ag = ov.querySelector('.d-agree'); ag.style.display = '';
+      var link = o.agreeHref ? '<a href="' + o.agreeHref + '">《' + o.agreeName + '》</a>' : '《' + o.agreeName + '》';
+      ag.innerHTML = '<label class="pay-agree"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>' + o.agreeText + link + '</span></label>';
+      ag.querySelector('.pay-agree').addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') { e.preventDefault(); if (o.agreeHref) location.href = o.agreeHref; return; }
+        agreed = !agreed;
+        this.classList.toggle('on', agreed);
+      });
+    }
+
+    ov.querySelector('.d-ok').addEventListener('click', () => {
+      if (o.agree && !agreed) {
+        UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意《' + o.agreeName + '》', ok: '确认并继续支付', cancel: '取消', onOk: function () {
+          agreed = true;
+          var pa = ov.querySelector('.pay-agree'); if (pa) pa.classList.add('on');
+          o.onOk && o.onOk(); close();
+        }});
+        return;
+      }
+      o.onOk && o.onOk(); close();
+    });
     ov.querySelector('.d-cancel').addEventListener('click', () => { o.onCancel && o.onCancel(); close(); });
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
     return ov;
