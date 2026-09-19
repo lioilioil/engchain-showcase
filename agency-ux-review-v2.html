@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务广场 · 交互流程复盘 V2（三方视角交叉验证版）</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#f5f5f7;color:#1d1d1f;line-height:1.6;padding:20px;}
+  .container{max-width:960px;margin:0 auto;}
+
+  .report-header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;border-radius:16px;padding:32px;margin-bottom:24px;}
+  .report-header h1{font-size:22px;font-weight:700;margin-bottom:8px;}
+  .report-header .subtitle{font-size:13px;opacity:.7;margin-bottom:16px;}
+  .report-header .meta{display:flex;gap:16px;font-size:11px;opacity:.6;flex-wrap:wrap;}
+  .version-badge{display:inline-block;background:#0071e3;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;margin-left:8px;}
+
+  .section{background:#fff;border-radius:14px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .section-title{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .section-title .num{width:26px;height:26px;border-radius:8px;background:#0071e3;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none;}
+  .section-desc{font-size:12.5px;color:#6e6e73;margin-bottom:16px;line-height:1.7;}
+
+  /* 角色卡片 */
+  .role-grid{display:flex;gap:12px;flex-wrap:wrap;}
+  .role-card{flex:1;min-width:220px;border:1px solid #e5e5ea;border-radius:12px;padding:16px;}
+  .role-card.buyer{border-top:3px solid #0071e3;}
+  .role-card.seller{border-top:3px solid #b86b00;}
+  .role-card.platform{border-top:3px solid #0a8a48;}
+  .role-name{font-size:14px;font-weight:700;margin-bottom:4px;}
+  .role-tag{font-size:10px;color:#6e6e73;margin-bottom:10px;}
+  .role-card ul{padding-left:16px;font-size:12px;color:#3a3a3c;}
+  .role-card li{margin-bottom:4px;line-height:1.6;}
+  .role-pain{margin-top:10px;padding:8px 10px;background:#fff5f5;border-radius:8px;font-size:11px;color:#d70015;line-height:1.6;}
+
+  /* 路径对比 */
+  .path-compare{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;}
+  .path-col{flex:1;min-width:260px;border-radius:12px;overflow:hidden;border:1px solid #e5e5ea;}
+  .path-head{padding:12px 16px;font-weight:700;font-size:13px;color:#fff;}
+  .path-a .path-head{background:linear-gradient(135deg,#0071e3,#0055b3);}
+  .path-b .path-head{background:linear-gradient(135deg,#5856d6,#342ebb);}
+  .path-body{padding:14px 16px;background:#f9f9fb;}
+  .path-step{font-size:12px;padding:6px 0;border-bottom:1px dashed #e5e5ea;display:flex;gap:8px;}
+  .path-step:last-child{border-bottom:none;}
+  .path-step .step-num{width:18px;height:18px;border-radius:50%;background:#e5e5ea;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none;}
+  .path-problem{margin-top:10px;padding:10px;background:#fff5f5;border-radius:8px;font-size:11px;color:#d70015;line-height:1.6;}
+
+  /* 核心问题 */
+  .core-issue{background:linear-gradient(135deg,#fff5f5,#fff0f0);border:1px solid #ffd6d6;border-radius:12px;padding:18px;margin-bottom:16px;}
+  .core-issue h3{font-size:15px;color:#d70015;margin-bottom:10px;}
+  .core-issue .issue-num{font-size:20px;font-weight:800;color:#d70015;margin-bottom:4px;}
+  .core-issue p{font-size:12.5px;color:#3a3a3c;line-height:1.7;}
+  .core-issue .impact{margin-top:8px;padding:8px 10px;background:#fff;border-radius:6px;font-size:11px;color:#6e6e73;}
+
+  /* 优化项表格 */
+  .opt-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .opt-table th{background:#f5f5f7;padding:10px 8px;text-align:left;font-weight:600;font-size:11px;color:#6e6e73;border-bottom:2px solid #e5e5ea;}
+  .opt-table td{padding:10px 8px;border-bottom:1px solid #f2f2f7;vertical-align:top;}
+  .opt-type{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;}
+  .type-modify{background:#fff4e0;color:#b86b00;}
+  .type-optimize{background:#e0f5e9;color:#0a8a48;}
+  .type-add{background:#e8f0ff;color:#0071e3;}
+  .type-remove{background:#ffe5e5;color:#d70015;}
+  .priority{display:inline-block;width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;font-size:10px;font-weight:700;}
+  .p0{background:#d70015;color:#fff;}
+  .p1{background:#ff9500;color:#fff;}
+  .p2{background:#8e8e93;color:#fff;}
+  .affected{font-size:10px;color:#6e6e73;}
+
+  /* 布局对比 */
+  .layout-compare{display:flex;gap:16px;flex-wrap:wrap;}
+  .layout-col{flex:1;min-width:260px;}
+  .layout-col h4{font-size:13px;font-weight:700;margin-bottom:10px;padding:6px 10px;border-radius:6px;text-align:center;}
+  .layout-col.current h4{background:#ffe5e5;color:#d70015;}
+  .layout-col.proposed h4{background:#e0f5e9;color:#0a8a48;}
+  .layout-block{padding:8px 10px;margin-bottom:4px;border-radius:6px;font-size:11px;text-align:center;line-height:1.4;}
+  .lb-primary{background:#0071e3;color:#fff;font-weight:600;}
+  .lb-secondary{background:#e8f0ff;color:#0071e3;}
+  .lb-tertiary{background:#f5f5f7;color:#6e6e73;}
+  .lb-dark{background:#1d1d1f;color:#f5f5f7;}
+  .lb-warning{background:#fff4e0;color:#b86b00;}
+  .lb-broken{background:#ffe5e5;color:#d70015;border:1px dashed #d70015;}
+  .layout-gap{height:6px;}
+  .layout-label{font-size:10px;color:#8e8e93;text-align:center;margin:8px 0 4px;}
+
+  /* 确认区 */
+  .confirm-box{background:linear-gradient(135deg,#f0f7ff,#e8f0ff);border-radius:14px;padding:20px;text-align:center;}
+  .confirm-box h3{font-size:16px;margin-bottom:8px;}
+  .confirm-box p{font-size:13px;color:#6e6e73;margin-bottom:12px;}
+  .confirm-note{font-size:11px;color:#8e8e93;margin-top:12px;line-height:1.7;}
+
+  .stat-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat-card{flex:1;min-width:90px;background:#f5f5f7;border-radius:10px;padding:14px;text-align:center;}
+  .stat-num{font-size:22px;font-weight:700;}
+  .stat-label{font-size:10.5px;color:#6e6e73;margin-top:2px;}
+  .red{color:#d70015;} .orange{color:#b86b00;} .green{color:#0a8a48;} .blue{color:#0071e3;}
+
+  /* 修正说明 */
+  .correction{background:#fff8e6;border-left:3px solid #ff9500;border-radius:0 10px 10px 0;padding:12px 14px;margin-top:12px;font-size:12px;color:#6b5300;line-height:1.7;}
+  .correction b{color:#b86b00;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="report-header">
+    <h1>服务广场 · 交互流程复盘 V2 <span class="version-badge">三方视角交叉验证版</span></h1>
+    <div class="subtitle">产品经理深度复盘 · 买方/中介/平台三方视角 · 修正V1方案偏差 · 输出可执行修改清单</div>
+    <div class="meta">
+      <span>页面：pages/agency/index.html</span>
+      <span>日期：2026-09-19</span>
+      <span>版本：V2.0（交叉验证修正）</span>
+    </div>
+  </div>
+
+  <!-- 修正说明 -->
+  <div class="correction">
+    <b>⚠ V1方案修正说明：</b>
+    上一版分析存在三个判断偏差，本次重新从三方角色出发进行交叉验证后修正：
+    <br>① V1认为"发布需求"应该降级——实际错误，问题不在于发需求放在哪，而在于"发需求"和"逛市场"两条路径的价值差异不清晰；
+    <br>② V1认为担保横幅位置过早——实际偏差，问题不在于位置，而在于两套流程叙事（3步vs4步）冲突；
+    <br>③ V1忽略了用户分层——新用户和老用户的首屏诉求完全不同，不应一刀切。
+  </div>
+
+  <!-- 一、三方角色分析 -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span>三方角色与核心诉求分析</div>
+    <div class="section-desc">先明确这个页面服务谁，再判断流程设计是否合理</div>
+
+    <div class="role-grid">
+      <div class="role-card buyer">
+        <div class="role-name">需求方 · 建企老板</div>
+        <div class="role-tag">核心用户 · 页面主角</div>
+        <ul>
+          <li><b>画像</b>：40-50岁，企业负责人，对互联网产品不熟练</li>
+          <li><b>诉求</b>：找靠谱机构办资质/担保，别骗钱、别办砸</li>
+          <li><b>心理</b>：怕被骗、怕花冤枉钱、怕麻烦、怕办不下来</li>
+          <li><b>行为</b>：带着具体问题来，想快速看到结果</li>
+        </ul>
+        <div class="role-pain">痛点：不知道"发需求"和"自己找"有什么区别，不知道该走哪条路</div>
+      </div>
+      <div class="role-card seller">
+        <div class="role-name">中介服务商 · 入驻机构</div>
+        <div class="role-tag">次要用户 · 供给侧</div>
+        <ul>
+          <li><b>画像</b>：已入驻的中介机构/个人</li>
+          <li><b>诉求</b>：获取客户线索、管理订单、查看佣金</li>
+          <li><b>行为</b>：主要在seller-board后台操作</li>
+          <li><b>本页角色</b>：服务卡片展示方，不做主要操作</li>
+        </ul>
+        <div class="role-pain">（本页不是他们的主场，入口条件显示即可）</div>
+      </div>
+      <div class="role-card platform">
+        <div class="role-name">平台 · 运营方</div>
+        <div class="role-tag">设计目标方</div>
+        <ul>
+          <li><b>目标</b>：促成交易撮合，建立信任，抽取佣金</li>
+          <li><b>策略</b>：资金托管作为核心信任机制</li>
+          <li><b>定位</b>：本页是"交易引导页"</li>
+          <li><b>关键指标</b>：需求发布率、下单转化率</li>
+        </ul>
+        <div class="role-pain">商业目标：既要有"发需求"的线索量，也要有"直接下单"的成交效率</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 二、核心问题重新定义 -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span>核心问题重新定义（从用户视角）</div>
+    <div class="section-desc">用户说"流程不清晰"，真正的含义是什么？</div>
+
+    <div class="core-issue">
+      <div class="issue-num">问题一</div>
+      <h3>两条并行路径，价值差异不明确</h3>
+      <p>页面顶部有两个入口：<b>"发布服务需求"</b>（主按钮）和<b>"服务市场"</b>（下方列表）。用户完全不知道这两条路径有什么区别、分别适合什么场景、走哪条更划算。</p>
+      <div class="path-compare">
+        <div class="path-col path-a">
+          <div class="path-head">路径A：发布服务需求</div>
+          <div class="path-body">
+            <div class="path-step"><span class="step-num">1</span>点"发布服务需求"</div>
+            <div class="path-step"><span class="step-num">2</span>选场景/填表单（目标、状态、时限、预算）</div>
+            <div class="path-step"><span class="step-num">3</span>点"智能匹配合作机构"</div>
+            <div class="path-step"><span class="step-num">4</span>关闭弹层，列表上方多了个推荐条</div>
+            <div class="path-step"><span class="step-num">5</span>点进服务详情页</div>
+          </div>
+          <div class="path-problem">
+            <b>用户困惑：</b>我填了半天表单，结果还是回到列表看卡片？那我为什么要填？直接逛不行吗？
+          </div>
+        </div>
+        <div class="path-col path-b">
+          <div class="path-head">路径B：浏览服务市场</div>
+          <div class="path-body">
+            <div class="path-step"><span class="step-num">1</span>下滑到"服务市场"</div>
+            <div class="path-step"><span class="step-num">2</span>搜关键词 / 点分类chips</div>
+            <div class="path-step"><span class="step-num">3</span>浏览服务卡片</div>
+            <div class="path-step"><span class="step-num">4</span>点进服务详情页</div>
+          </div>
+          <div class="path-problem">
+            <b>用户困惑：</b>那我为什么要"发布需求"？直接看卡片不就完了？发需求的意义是什么？
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="core-issue">
+      <div class="issue-num">问题二</div>
+      <h3>两套流程叙事并存，用户认知冲突</h3>
+      <p>页面上同时存在两套不同维度的"流程步骤"：<br>
+      ① <b>role-hint的3步</b>：选服务·比口碑 → 在线下单·锁意向 → 订单履约·进度跟踪（交易动作流程）<br>
+      ② <b>担保横幅的4步</b>：在线预付 → 持牌托管 → 履约验收 → 结算服务商（资金流转流程）</p>
+      <div class="impact">
+        <b>用户困惑：</b>到底是3步还是4步？我该按哪个流程走？这两个是什么关系？—— 本质上这是两条不同维度的流程（动作vs资金），但视觉上并列呈现，用户无法区分。
+      </div>
+    </div>
+
+    <div class="core-issue">
+      <div class="issue-num">问题三</div>
+      <h3>用户分层缺失，新老用户同一套界面</h3>
+      <p>新用户第一次来：需要建立信任、理解平台是什么。<br>
+      老用户（有订单）：需要快速查看订单进度。<br>
+      但当前页面对所有用户都展示相同的内容：新用户找不到重点，老用户找不到订单。</p>
+      <div class="impact">
+        <b>用户困惑：</b>我都下过单了，为什么进来还是一堆服务列表？我的订单在哪？
+      </div>
+    </div>
+  </div>
+
+  <!-- 三、优化后目标流程 -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span>优化后的目标用户旅程</div>
+    <div class="section-desc">从用户进入到完成下单的完整路径，两条路径清晰分流</div>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:300px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:#0071e3;">▼ 首屏分流：你想怎么找服务？</div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;background:#e8f0ff;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px;">路径A：发布需求</div>
+            <div style="font-size:11px;color:#6e6e73;margin-bottom:8px;">把需求说清楚<br>让机构主动找你</div>
+            <div style="font-size:10px;background:#0071e3;color:#fff;padding:3px 8px;border-radius:99px;display:inline-block;">适合：不知道选哪家、想货比三家</div>
+          </div>
+          <div style="flex:1;background:#f5f5f7;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px;">路径B：浏览市场</div>
+            <div style="font-size:11px;color:#6e6e73;margin-bottom:8px;">自己逛服务列表<br>比一比哪家好</div>
+            <div style="font-size:10px;background:#8e8e93;color:#fff;padding:3px 8px;border-radius:99px;display:inline-block;">适合：有明确目标、想自己挑</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;font-size:12px;color:#6e6e73;line-height:1.8;">
+      <b>共同终点：</b>两条路径最终都汇聚到「服务详情页」→ 在线咨询/下单 → 资金托管 → 履约验收 → 结算<br>
+      <b>信任节奏：</b>首屏一句话信任背书 → 浏览中卡片带标识 → 决策时详情页详细说明托管机制
+    </div>
+  </div>
+
+  <!-- 四、布局重构对比 -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span>布局重构对比示意</div>
+    <div class="section-desc">左侧当前布局问题，右侧优化后布局</div>
+
+    <div class="layout-compare">
+      <div class="layout-col current">
+        <h4>当前布局（用户视角混乱）</h4>
+        <div class="layout-block lb-tertiary">导航栏</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-primary">发布服务需求（重按钮）</div>
+        <div class="layout-block lb-secondary">我的单（次按钮）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-broken">角色引导条（3步流程）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-broken">顺手办（3个工具）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-dark">担保横幅（4步流程）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-warning">服务市场（搜索+列表）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-tertiary">交叉导流</div>
+      </div>
+      <div class="layout-col proposed">
+        <h4>优化后布局（路径清晰）</h4>
+        <div class="layout-block lb-tertiary">导航栏（带订单角标）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-secondary">一句话信任背书</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-primary">找服务方式选择（双路径分流）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-warning">服务市场（搜索+分类+列表）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-secondary">顺手办工具（收进次级）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-tertiary">交叉导流（弱化推荐）</div>
+      </div>
+    </div>
+
+    <div class="correction">
+      <b>⚠ 修正V1判断：</b>担保横幅不再"下移到列表附近"，而是<b>精简为首屏一句话信任背书</b>，详细的4步托管流程放到服务详情页（决策时刻再详细展示）。这样既不浪费首屏空间，又在用户需要的时候出现。
+    </div>
+  </div>
+
+  <!-- 五、优化项清单 -->
+  <div class="section">
+    <div class="section-title"><span class="num">5</span>最终优化项清单（共14项）</div>
+    <div class="section-desc">P0=必须改（解决核心流程困惑），P1=建议改（提升转化与体验），P2=可选优化</div>
+
+    <table class="opt-table">
+      <thead>
+        <tr>
+          <th style="width:30px;">#</th>
+          <th style="width:55px;">类型</th>
+          <th style="width:45px;">优先级</th>
+          <th>优化项</th>
+          <th>具体内容与理由</th>
+          <th style="width:70px;">影响角色</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- P0 核心流程 -->
+        <tr>
+          <td>1</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>双路径分流明确化</b></td>
+          <td>将"发布服务需求"和"浏览服务市场"设计为两个并列的选择卡片，各自标注适用场景：<br>
+          • <b>发布需求</b>："把需求说清楚，让机构主动找你"——适合不知道选哪家、想货比三家的用户<br>
+          • <b>浏览市场</b>："自己逛一逛，比较几家服务"——适合有明确目标、想自己挑的用户<br>
+          【理由】解决用户"两条路选哪个"的核心困惑</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>统一流程叙事，消除两套步骤冲突</b></td>
+          <td>取消role-hint的3步流程展示卡片；保留资金托管4步流程但<b>从首屏大横幅改为一句话信任背书</b>："已核验机构 · 资金托管保障 · 未成交全额退款"。详细的4步托管流程放到服务详情页（用户真正要下单时再看）。<br>
+          【理由】用户不需要在进入页面时就学习4步流程，决策时刻再详细说明即可</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>"发布需求"的价值闭环强化</b></td>
+          <td>当前填完表单后只是回到列表加了个推荐条，用户觉得"白填了"。优化：<br>
+          • 匹配后弹一个结果卡片，明确告知"已为你匹配X家机构，需求已发布，机构会主动联系你"<br>
+          • 增加"查看我的需求"入口，让用户知道需求去了哪里<br>
+          【理由】让用户感知到"发布需求"确实产生了价值，而不是走个过场</td>
+          <td class="affected">买方</td>
+        </tr>
+
+        <!-- P1 体验提升 -->
+        <tr>
+          <td>4</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>首屏用户分层：有订单用户优先展示</b></td>
+          <td>根据用户状态动态调整首屏：<br>
+          • <b>有进行中订单</b>：首屏顶部先显示"我的进行中订单"卡片（1-2条最新），下面再是找服务入口<br>
+          • <b>无订单新用户</b>：首屏直接是找服务双路径<br>
+          【理由】老用户进来最想先看订单进度，不是继续逛</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>"我的单"入口位置优化</b></td>
+          <td>从首屏双按钮降级为：<br>
+          • 导航栏右侧增加订单角标（有未完成订单时显示数字）<br>
+          • 有订单时首屏顶部显示订单卡片（见第4项）<br>
+          【理由】"我的单"是老用户高频功能，但不是新用户首屏重点</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>顺手办工具重新定位与位置调整</b></td>
+          <td>从主流程中间移到服务列表下方，标题改为"实用工具"。三个工具（材料核验/年检提醒/政策速查）保留，但视觉上弱化，作为"逛累了可以用"的附加工具。<br>
+          【理由】这些工具确实有价值，但不应该打断主浏览流程</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>服务卡片信息精简</b></td>
+          <td>当前13个信息点太多，精简为核心决策信息：<br>
+          • <b>保留</b>：服务名称、机构名+金V标识、评分、价格、周期、CTA按钮<br>
+          • <b>收纳到详情页</b>：成功率、成交数、案例数、好评数、信用分<br>
+          【理由】卡片列表只展示决策最关键的信息，详细信息点进详情看</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>筛选面板去重</b></td>
+          <td>筛选面板中移除"服务分类"选项（页面上方已有分类chips，重复了）。筛选面板只保留：服务方（机构/个人）、价格区间、服务口碑。<br>
+          【理由】分类用chips更直观，筛选面板只做高级筛选</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="opt-type type-add">增加</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>服务市场上移为页面主体</b></td>
+          <td>搜索框 + 分类chips + 服务列表 作为页面核心主体，放在首屏下半部分（双路径选择之后）。用户不需要下滑很远就能看到服务列表。<br>
+          【理由】"逛服务"是核心行为，应该在视觉中心位置</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>中介后台入口视觉降权</b></td>
+          <td>中介专属后台入口（当前金色渐变大卡片）降权为：导航栏内图标入口，或个人中心内入口。只有中介用户点击个人中心时才看到。<br>
+          【理由】中介用户是少数，大卡片占首屏空间且分散注意力</td>
+          <td class="affected">平台</td>
+        </tr>
+
+        <!-- P2 细节 -->
+        <tr>
+          <td>11</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>交叉导流视觉弱化</b></td>
+          <td>"还需要这些"（资质招商/建企买卖/人员招聘）从三个并列大卡片改为"你可能还需要"横向滚动推荐条，视觉上弱化为辅助推荐。<br>
+          【理由】避免分散用户在服务广场的注意力</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>发布需求表单简化第一步</b></td>
+          <td>发布需求弹层第一步只显示5个热门场景快捷按钮（办资质/新办企业/担保保函/造价咨询/劳务派遣），点选后再展开详细表单。减少初始认知负担。<br>
+          【理由】用户面对一堆下拉框会有压力，先选场景更轻松</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>空态体验统一</b></td>
+          <td>搜索无结果、AI匹配无结果、筛选无结果——三处空态统一设计为：换词建议 + 热门服务推荐 + 联系平台顾问，保持一致的兜底体验。</td>
+          <td class="affected">买方</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td><span class="opt-type type-add">增加</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>首次访问引导提示</b></td>
+          <td>新用户首次进入时，在双路径选择区域显示一个轻量气泡提示："不知道怎么选？发布需求，机构会主动联系你"。仅首次显示。<br>
+          【理由】帮新用户快速理解两条路径的区别</td>
+          <td class="affected">买方</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 统计概览 -->
+  <div class="section">
+    <div class="section-title"><span class="num">∑</span>方案概览</div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num red">3</div><div class="stat-label">P0 核心流程必改</div></div>
+      <div class="stat-card"><div class="stat-num orange">7</div><div class="stat-label">P1 体验提升建议改</div></div>
+      <div class="stat-card"><div class="stat-num blue">4</div><div class="stat-label">P2 细节优化可选</div></div>
+      <div class="stat-card"><div class="stat-num green">14</div><div class="stat-label">总计优化项</div></div>
+    </div>
+  </div>
+
+  <!-- 确认区 -->
+  <div class="confirm-box">
+    <h3>以上为V2版完整修改方案（三方视角交叉验证后）</h3>
+    <p>核心修正：从"元素太多太乱"的表象，深入到"两条路径价值不清晰、两套流程叙事冲突、用户分层缺失"三个根因</p>
+    <p style="font-size:12px;color:#8e8e93;">
+      建议执行范围：<br>
+      • <b>最小可行</b>：执行P0的3项 → 解决"流程不清晰"核心问题<br>
+      • <b>推荐执行</b>：P0+P1共10项 → 完整重构首屏体验<br>
+      • <b>完整迭代</b>：全部14项 → 体验全面优化
+    </p>
+    <div class="confirm-note">
+      请确认：执行哪些项？是否有调整？确认后我将开始修改 pages/agency/index.html
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -455,6 +455,8 @@ window.payEnterprise=function(){
       html+='<b style="color:var(--primary-dim);">转账信息：</b>开户名：工程链科技有限公司<br>开户行：中国工商银行成都分行<br>账号：6222 **** **** 8888<br>转账时请备注：企业认证+企业名称';
       html+='</div>';
     }
+    /* [PayBar] 协议勾选 */
+    html+='<label class="pay-agree" id="sheetAgree" style="margin:2px 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="auth.html">《企业认证服务协议》</a></span></label>';
     /* 支付按钮 */
     var btnText=payMethod==='balance'?'确认支付 ¥'+fee:payMethod==='corp'?'提交审核（转账后上传凭证）':'立即支付 ¥'+fee;
     html+='<button class="btn btn-primary btn-block" id="cfm-pay" style="margin-top:6px;">'+btnText+'</button>';
@@ -475,8 +477,16 @@ window.payEnterprise=function(){
         refreshPaySheet();
       });
     });
+    var ag=document.getElementById('sheetAgree');if(ag)ag.addEventListener('click',function(e){if(e.target.tagName==='A')return;this.classList.toggle('on');});
     var payBtn=document.getElementById('cfm-pay');
     if(payBtn)payBtn.onclick=function(){
+      var ag=document.getElementById('sheetAgree');
+      if(ag&&!ag.classList.contains('on')){
+        UI.dialog({title:'确认协议',text:'请确认您已阅读并同意<a href="auth.html">《企业认证服务协议》</a>',ok:'确认并继续支付',cancel:'取消',onOk:function(){
+          ag.classList.add('on'); payBtn.click();
+        }});
+        return;
+      }
       UI.closeSheet();
       if(payMethod==='corp'){
         UI.toast('已提交审核，请转账后上传凭证','ok');

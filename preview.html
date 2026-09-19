@@ -160,6 +160,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .pl-parent.collapsed + .pl-kids { display: none; }
   .pl-sub { font-size: 12.5px; padding: 6px 10px; }
 
+  /* 单页状态/弹层：列项展示但不计入页面统计 */
+  .pl-state { font-size: 11.5px; padding: 4px 10px; color: var(--text-3); font-weight: 400; }
+  .pl-state .pl-name { opacity: .82; font-weight: 400; }
+  .pl-state .pl-path { opacity: .45; font-size: 10px; }
+  .pl-state .pl-copy { opacity: .35; }
+  .pl-state::before { content: "◦"; margin-right: 4px; color: var(--text-4); flex: none; }
+  .pl-state:hover { color: var(--text-2); background: var(--bg-card-2); }
+  .pl-state .ic { display: none; }
+
   /* ---- 右侧设备 ---- */
   .pv-stage { flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 44px; padding: 40px 40px 120px; background: radial-gradient(1100px 720px at 50% -18%, rgba(201, 169, 97, .12), transparent 55%), radial-gradient(900px 600px at 88% 110%, rgba(201, 169, 97, .06), transparent 60%), var(--bg-alp); }
   .device { transform: scale(.82); transform-origin: top center; margin-bottom: -96px; }
@@ -658,6 +667,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/agency/seller-board.html','服务商工作台'],
         ['pages/agency/select-service.html','选择服务品类'],
         ['pages/agency/demo-reset.html','演示重置'],
+        /* ↓ 以下为服务广场单页内状态/弹层，列项展示但不计入页面统计 */
+        { name:'双路径分流卡片（发布需求/浏览市场）', src:'pages/agency/index.html#dual-path', isState:true },
+        { name:'发布需求弹层（场景快捷+澄清表单）', src:'pages/agency/index.html#need-sheet', isState:true },
+        { name:'智能匹配结果（成功提示+机构推荐）', src:'pages/agency/index.html#match-result', isState:true },
+        { name:'筛选面板（服务方/价格/口碑）', src:'pages/agency/index.html#filter-sheet', isState:true },
+        { name:'实用工具·材料核验弹层', src:'pages/agency/index.html#tool-material', isState:true },
+        { name:'实用工具·年检提醒弹层', src:'pages/agency/index.html#tool-remind', isState:true },
+        { name:'实用工具·政策速查弹层', src:'pages/agency/index.html#tool-policy', isState:true },
+        { name:'首次访问引导气泡', src:'pages/agency/index.html#first-hint', isState:true },
+        { name:'进行中订单卡片（动态显示）', src:'pages/agency/index.html#active-orders', isState:true },
       ]}
     ]},
     { name:'企业监控', pages:[
@@ -765,7 +784,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   function itemHtml(it) {
     if (Array.isArray(it)) return leafHtml(it[0], it[1], '', false);
-    var kids = it.children.map(function (c) { return leafHtml(c[0], c[1], 'pl-sub', false); }).join('');
+    if (it && it.isState) return leafHtml(it.src, it.name, 'pl-state', false);
+    var kids = it.children.map(function (c) {
+      if (Array.isArray(c)) return leafHtml(c[0], c[1], 'pl-sub', false);
+      if (c && c.isState) return leafHtml(c.src, c.name, 'pl-state', false);
+      return leafHtml(c.src, c.name, 'pl-sub', false);
+    }).join('');
     return leafHtml(it.src, it.name, 'pl-parent', true) + '<div class="pl-kids">' + kids + '</div>';
   }
 
@@ -778,6 +802,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (src.indexOf('admin/') === 0 || src.indexOf('folder-cards/') === 0) adminCount++;
         else appCount++;
       } else if (it && it.src) {
+        /* 单页状态/弹层：列项展示但不计入页面统计 */
+        if (it.isState) return;
         if (it.src.indexOf('admin/') === 0 || it.src.indexOf('folder-cards/') === 0) adminCount++;
         else appCount++;
         if (it.children) it.children.forEach(countItem);

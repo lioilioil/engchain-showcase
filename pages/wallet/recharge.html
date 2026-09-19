@@ -127,17 +127,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <span class="pm-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span>
       </div>
 
-      <!-- 协议 -->
-      <div class="glass" style="display:flex;gap:10px;padding:14px;margin-top:16px;">
-        <input type="checkbox" id="agree" style="width:18px;height:18px;accent-color:var(--primary);">
-        <label for="agree" style="font-size:12px;color:var(--text-2);line-height:1.6;">我已阅读并同意<span style="color:var(--primary);">《充值协议》</span>，充值后可用于支付、解锁与消费。</label>
-      </div>
-      <!-- 底部留白：避免固定按钮遮盖协议区 -->
-      <div style="height:100px;flex:none;"></div>
+      <!-- 底部留白：避免固定支付栏遮盖 -->
+      <div style="height:120px;flex:none;"></div>
     </div>
   </div>
 
-  <div class="fixed-cta"><button class="btn btn-primary btn-block btn-lg" id="cta">确认充值</button></div>
+  <div class="paybar">
+    <label class="pay-agree" id="agreeRow"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html">《充值协议》</a>，充值后可用于支付、解锁与消费。</span></label>
+    <button class="btn btn-primary btn-block btn-lg" id="cta">确认充值</button>
+  </div>
 </div>
 
 <script src="../../js/data.js"></script>
@@ -227,10 +225,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   /* ---- 确认充值（校验通过） ---- */
   cta.onclick = function () {
+    var rowAgreed = document.getElementById('agreeRow').classList.contains('on');
+    if (!rowAgreed) {
+      UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意<a href="../agreement/user.html">《充值协议》</a>', ok: '确认并继续支付', cancel: '取消', onOk: function () {
+        document.getElementById('agreeRow').classList.add('on');
+        document.getElementById('cta').click();
+      }});
+      return;
+    }
     v = parseFloat(document.getElementById('amount').value) || 0;
     var minRecharge = (MOCK.business.recharge && MOCK.business.recharge.min) || 10;
     if (v < minRecharge) { UI.toast('最低充值金额为 ¥' + minRecharge, 'warn'); return; }
-    if (!document.getElementById('agree').checked) { UI.toast('请先同意充值协议', 'warn'); return; }
     if (pm === 'corp') {
       // 生成对公转账记录（待上传凭证），并打开对公弹窗
       currentRecord = CorpPay.create({ amount: v, account: CorpPay.BANK, remark: '工程链充值・尾号 4638' });
@@ -242,6 +247,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   };
 
+  /* [PayBar] 协议勾选点亮按钮 */
+  var agreeRow = document.getElementById('agreeRow');
+  if (agreeRow) agreeRow.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A') return;
+    var on = this.classList.toggle('on');
+    document.getElementById('cta').classList.toggle('btn-pay-disabled', !on);
+  });
   /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式） ---- */
   function showRechargeSuccess(amount, newBalance) {
     var sh = UI.sheet();

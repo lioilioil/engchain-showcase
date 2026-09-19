@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-engchain-basefix="2">
@@ -497,6 +497,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     subScroll.scrollTo({ left: Math.max(0, Math.min(targetLeft, maxLeft)), behavior: 'smooth' });
   });
   segItems.forEach(function (it) { it.addEventListener('click', function () { segItems.forEach(function (x) { x.classList.toggle('active', x === it); }); renderSubs(it.dataset.flow); }); });
+  /* 手势优先级：在 #tab-list 上左右滑 → 先滚二级分类条 → 到头切 资源/供需 → 再到头切主页面 */
+  function switchFlow(f){ segItems.forEach(function(x){ x.classList.toggle('active', x.dataset.flow===f); }); renderSubs(f); }
+  window.__SWIPE_ZONES__ = window.__SWIPE_ZONES__ || [];
+  window.__SWIPE_ZONES__.push({
+    trigger: '#tab-list',
+    consumers: [
+      { type: 'scroll', el: '#sub-scroll' },
+      { type: 'seg',
+        canNext: function () { return currentFlow === 'resource'; },
+        next:    function () { switchFlow('match'); },
+        canPrev: function () { return currentFlow === 'match'; },
+        prev:    function () { switchFlow('resource'); } }
+    ]
+  });
   renderSubs('resource');
 })();
 </script>

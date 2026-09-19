@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务广场 · 交互流程复盘与优化方案</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#f5f5f7;color:#1d1d1f;line-height:1.6;padding:20px;}
+  .container{max-width:960px;margin:0 auto;}
+
+  /* 头部 */
+  .report-header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#fff;border-radius:16px;padding:32px;margin-bottom:24px;}
+  .report-header h1{font-size:24px;font-weight:700;margin-bottom:8px;}
+  .report-header .subtitle{font-size:14px;opacity:.7;margin-bottom:16px;}
+  .report-header .meta{display:flex;gap:16px;font-size:12px;opacity:.6;flex-wrap:wrap;}
+
+  /* 章节通用 */
+  .section{background:#fff;border-radius:14px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .section-title{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .section-title .num{width:28px;height:28px;border-radius:8px;background:#0071e3;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;}
+  .section-desc{font-size:13px;color:#6e6e73;margin-bottom:16px;line-height:1.7;}
+
+  /* 问题诊断 - 当前流程图 */
+  .current-flow{display:flex;flex-direction:column;gap:6px;}
+  .flow-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;background:#f5f5f7;font-size:13px;}
+  .flow-item .order{width:24px;height:24px;border-radius:6px;background:#e8e8ed;color:#6e6e73;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none;}
+  .flow-item .name{flex:1;font-weight:500;}
+  .flow-item .tag{font-size:10px;padding:2px 8px;border-radius:99px;flex:none;}
+  .tag-problem{background:#ffe5e5;color:#d70015;}
+  .tag-warning{background:#fff4e0;color:#b86b00;}
+  .tag-ok{background:#e0f5e9;color:#0a8a48;}
+  .flow-arrow{text-align:center;color:#c7c7cc;font-size:12px;line-height:1;padding-left:36px;}
+
+  .problem-box{background:#fff5f5;border-left:3px solid #d70015;border-radius:0 10px 10px 0;padding:14px 16px;margin-top:16px;}
+  .problem-box h4{font-size:14px;color:#d70015;margin-bottom:8px;}
+  .problem-box ul{padding-left:18px;font-size:13px;color:#3a3a3c;}
+  .problem-box li{margin-bottom:4px;}
+
+  /* 目标旅程 */
+  .journey{display:flex;gap:0;overflow-x:auto;padding-bottom:8px;}
+  .journey-stage{flex:1;min-width:150px;padding:14px 12px;border-right:1px solid #e5e5ea;position:relative;}
+  .journey-stage:last-child{border-right:none;}
+  .journey-stage .stage-num{font-size:11px;color:#0071e3;font-weight:700;margin-bottom:4px;}
+  .journey-stage .stage-name{font-size:14px;font-weight:700;margin-bottom:6px;}
+  .journey-stage .stage-desc{font-size:11px;color:#6e6e73;line-height:1.6;}
+  .journey-stage .stage-action{margin-top:8px;font-size:10px;background:#f0f7ff;color:#0071e3;padding:4px 8px;border-radius:6px;display:inline-block;}
+
+  /* 检查目标矩阵 */
+  .check-dim{margin-bottom:16px;}
+  .check-dim-title{font-size:15px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e5e5ea;}
+  .check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f2f2f7;}
+  .check-item:last-child{border-bottom:none;}
+  .check-id{font-size:11px;font-weight:700;color:#0071e3;background:#f0f7ff;padding:2px 6px;border-radius:4px;flex:none;margin-top:2px;}
+  .check-content{flex:1;}
+  .check-name{font-size:13px;font-weight:600;}
+  .check-detail{font-size:12px;color:#6e6e73;margin-top:2px;line-height:1.6;}
+
+  /* 优化项清单 */
+  .opt-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .opt-table th{background:#f5f5f7;padding:10px 8px;text-align:left;font-weight:600;font-size:11px;color:#6e6e73;border-bottom:2px solid #e5e5ea;}
+  .opt-table td{padding:10px 8px;border-bottom:1px solid #f2f2f7;vertical-align:top;}
+  .opt-type{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap;}
+  .type-modify{background:#fff4e0;color:#b86b00;}
+  .type-optimize{background:#e0f5e9;color:#0a8a48;}
+  .type-add{background:#e8f0ff;color:#0071e3;}
+  .type-remove{background:#ffe5e5;color:#d70015;}
+  .priority{display:inline-block;width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;font-size:10px;font-weight:700;}
+  .p0{background:#d70015;color:#fff;}
+  .p1{background:#ff9500;color:#fff;}
+  .p2{background:#8e8e93;color:#fff;}
+
+  /* 布局重构示意 */
+  .layout-compare{display:flex;gap:16px;flex-wrap:wrap;}
+  .layout-col{flex:1;min-width:280px;}
+  .layout-col h4{font-size:13px;font-weight:700;margin-bottom:10px;padding:6px 10px;border-radius:6px;text-align:center;}
+  .layout-col.current h4{background:#ffe5e5;color:#d70015;}
+  .layout-col.proposed h4{background:#e0f5e9;color:#0a8a48;}
+  .layout-block{padding:8px 10px;margin-bottom:4px;border-radius:6px;font-size:11px;text-align:center;line-height:1.4;}
+  .lb-primary{background:#0071e3;color:#fff;font-weight:600;}
+  .lb-secondary{background:#e8f0ff;color:#0071e3;}
+  .lb-tertiary{background:#f5f5f7;color:#6e6e73;}
+  .lb-dark{background:#1d1d1f;color:#f5f5f7;}
+  .lb-warning{background:#fff4e0;color:#b86b00;}
+  .lb-broken{background:#ffe5e5;color:#d70015;border:1px dashed #d70015;}
+  .layout-gap{height:6px;}
+
+  /* 确认区 */
+  .confirm-box{background:linear-gradient(135deg,#f0f7ff,#e8f0ff);border-radius:14px;padding:20px;text-align:center;}
+  .confirm-box h3{font-size:16px;margin-bottom:8px;}
+  .confirm-box p{font-size:13px;color:#6e6e73;margin-bottom:16px;}
+  .confirm-note{font-size:11px;color:#8e8e93;margin-top:12px;}
+
+  /* 统计卡片 */
+  .stat-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat-card{flex:1;min-width:100px;background:#f5f5f7;border-radius:10px;padding:14px;text-align:center;}
+  .stat-num{font-size:24px;font-weight:700;}
+  .stat-label{font-size:11px;color:#6e6e73;margin-top:2px;}
+  .red{color:#d70015;} .orange{color:#b86b00;} .green{color:#0a8a48;} .blue{color:#0071e3;}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- 头部 -->
+  <div class="report-header">
+    <h1>服务广场 · 交互流程复盘与优化方案</h1>
+    <div class="subtitle">中介服务板块 · 用户全旅程交互诊断 · 产品经理 × UI设计师 双视角交叉验证</div>
+    <div class="meta">
+      <span>页面：pages/agency/index.html</span>
+      <span>日期：2026-09-19</span>
+      <span>状态：待确认方案</span>
+    </div>
+  </div>
+
+  <!-- 核心结论 -->
+  <div class="section">
+    <div class="section-title"><span class="num">!</span>核心结论：为什么用户感觉流程不清晰？</div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num red">2</div><div class="stat-label">并存且冲突的流程线</div></div>
+      <div class="stat-card"><div class="stat-num orange">8</div><div class="stat-label">首屏可见模块数</div></div>
+      <div class="stat-card"><div class="stat-num red">3</div><div class="stat-label">权重错乱的关键问题</div></div>
+      <div class="stat-card"><div class="stat-num blue">15</div><div class="stat-label">待优化项总数</div></div>
+    </div>
+    <div class="problem-box">
+      <h4>三大根因诊断</h4>
+      <ul>
+        <li><b>流程主线缺失</b>：页面有8个功能模块，但没有一条清晰的"用户操作顺序线"串联它们。用户进入后不知道"第一步该做什么"。</li>
+        <li><b>两套流程打架</b>：role-hint的"选服务→下单→跟踪"3步流程，和escrow-banner的"预付→托管→验收→结算"4步流程，是两套不同维度的流程，视觉上并列呈现导致认知冲突。</li>
+        <li><b>动作权重倒置</b>：最重的动作（发布需求=填表单）放在首屏最顶部，最轻的动作（浏览服务=滑动）放在中间。用户被"推"向重动作，而不是自然地"逛"到决策点。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 一、当前页面流程诊断 -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span>当前页面元素流（从上到下）& 问题标注</div>
+    <div class="section-desc">按照用户实际看到的视觉顺序排列，标注每个模块的问题等级</div>
+
+    <div class="current-flow">
+      <div class="flow-item"><span class="order">1</span><span class="name">导航栏（返回 / 标题 / 模式标签）</span><span class="tag tag-ok">正常</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">2</span><span class="name">双入口：发布服务需求（主按钮）+ 我的单（次按钮）</span><span class="tag tag-problem">问题：动作权重倒置</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">3</span><span class="name">角色引导条（服务直达·全程托管 三卡步骤）</span><span class="tag tag-warning">问题：隐藏后渲染 + 与下方流程重复</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">4</span><span class="name">中介专属后台入口（条件显示）</span><span class="tag tag-ok">条件合理</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">5</span><span class="name">顺手办：材料核验 / 年检提醒 / 政策速查</span><span class="tag tag-problem">问题：打断主流程 + 定位模糊</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">6</span><span class="name">担保横幅（深色背景，4步资金托管流程）</span><span class="tag tag-problem">问题：位置过早 + 与步骤3流程重复</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">7</span><span class="name">服务市场：搜索框 + 分类Chips + 服务列表</span><span class="tag tag-warning">问题：核心浏览区位置偏下</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-item"><span class="order">8</span><span class="name">还需要这些：资质招商 / 建企买卖 / 人员招聘</span><span class="tag tag-ok">位置合理</span></div>
+    </div>
+  </div>
+
+  <!-- 二、优化后目标用户旅程 -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span>优化后的目标用户旅程（5阶段）</div>
+    <div class="section-desc">用户从进入服务广场到完成下单的完整认知路径，每个阶段对应页面上的一个清晰模块</div>
+
+    <div class="journey">
+      <div class="journey-stage">
+        <div class="stage-num">STAGE 1</div>
+        <div class="stage-name">我能解决什么？</div>
+        <div class="stage-desc">用户第一时间理解：这是一个什么平台？能帮我办什么事？</div>
+        <div class="stage-action">对应：平台定位 + 核心价值</div>
+      </div>
+      <div class="journey-stage">
+        <div class="stage-num">STAGE 2</div>
+        <div class="stage-name">我需要什么？</div>
+        <div class="stage-desc">用户明确自己的需求类型，快速进入对应服务分类</div>
+        <div class="stage-action">对应：热门场景快捷入口</div>
+      </div>
+      <div class="journey-stage">
+        <div class="stage-num">STAGE 3</div>
+        <div class="stage-name">有谁能做？</div>
+        <div class="stage-desc">浏览服务商列表，比较口碑、价格、成功率</div>
+        <div class="stage-action">对应：服务市场列表</div>
+      </div>
+      <div class="journey-stage">
+        <div class="stage-num">STAGE 4</div>
+        <div class="stage-name">靠谱吗？怎么付？</div>
+        <div class="stage-desc">决策前确认资金安全、平台担保机制</div>
+        <div class="stage-action">对应：担保/托管说明（贴近下单）</div>
+      </div>
+      <div class="journey-stage">
+        <div class="stage-num">STAGE 5</div>
+        <div class="stage-name">怎么跟踪？</div>
+        <div class="stage-desc">下单后查看进度，管理已发需求和订单</div>
+        <div class="stage-action">对应：我的单入口</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 三、检查目标体系 -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span>检查目标体系（三维度15项）</div>
+    <div class="section-desc">以下为本次复盘的完整检查维度，逐项验证当前页面是否达标</div>
+
+    <!-- 维度A -->
+    <div class="check-dim">
+      <div class="check-dim-title" style="color:#0071e3;">维度A · 产品交互流程</div>
+      <div class="check-item">
+        <span class="check-id">A1</span>
+        <div class="check-content">
+          <div class="check-name">用户旅程主线清晰度</div>
+          <div class="check-detail">用户进入页面后，能否在3秒内理解"正确的操作顺序是什么"？是否有一条贯穿始终的流程线？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">A2</span>
+        <div class="check-content">
+          <div class="check-name">入口动作层级合理性</div>
+          <div class="check-detail">首屏按钮的权重是否与用户决策阶段匹配？轻动作（浏览）应该优先于重动作（填表发布）。</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">A3</span>
+        <div class="check-content">
+          <div class="check-name">流程节点连贯性</div>
+          <div class="check-detail">从"进入→认知→浏览→决策→下单→跟踪"的每一步，是否有明确的视觉引导和跳转衔接？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">A4</span>
+        <div class="check-content">
+          <div class="check-name">操作状态即时反馈</div>
+          <div class="check-detail">用户执行每个操作后（如发布需求、筛选、匹配），能否立即理解"发生了什么"？状态变化是否清晰可见？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">A5</span>
+        <div class="check-content">
+          <div class="check-name">异常/空态兜底引导</div>
+          <div class="check-detail">无匹配结果、无服务、未登录等异常状态下，是否有明确的下一步引导，而不是死路？</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 维度B -->
+    <div class="check-dim">
+      <div class="check-dim-title" style="color:#0a8a48;">维度B · UI视觉设计</div>
+      <div class="check-item">
+        <span class="check-id">B1</span>
+        <div class="check-content">
+          <div class="check-name">信息层级视觉权重</div>
+          <div class="check-detail">通过字号、颜色、间距、背景色，用户能否一眼区分什么是主操作、什么是辅助信息？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">B2</span>
+        <div class="check-content">
+          <div class="check-name">视觉动线流畅度</div>
+          <div class="check-detail">从上到下的自然阅读顺序，是否与用户决策路径一致？是否有突兀的视觉打断？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">B3</span>
+        <div class="check-content">
+          <div class="check-name">信任感视觉表达</div>
+          <div class="check-detail">平台担保、金V认证、资金托管等信任元素，是否在用户决策时刻（而非浏览前）出现并被感知？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">B4</span>
+        <div class="check-content">
+          <div class="check-name">组件风格一致性</div>
+          <div class="check-detail">按钮、标签、卡片、入口的设计语言是否统一？深色横幅与整体浅色风格是否协调？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">B5</span>
+        <div class="check-content">
+          <div class="check-name">服务卡片信息密度</div>
+          <div class="check-detail">单张服务商卡片的信息量是否过载？评分、成功率、成交数、案例数、好评、信用分是否都需要同时展示？</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 维度C -->
+    <div class="check-dim">
+      <div class="check-dim-title" style="color:#b86b00;">维度C · 页面布局与空间</div>
+      <div class="check-item">
+        <span class="check-id">C1</span>
+        <div class="check-content">
+          <div class="check-name">首屏信息密度</div>
+          <div class="check-detail">用户打开后第一眼看到的内容是否恰到好处？是否能在不滚动的情况下理解页面定位？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">C2</span>
+        <div class="check-content">
+          <div class="check-name">模块分组与间距</div>
+          <div class="check-detail">不同功能模块之间是否有清晰的视觉分组？相关的功能是否聚集在一起？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">C3</span>
+        <div class="check-content">
+          <div class="check-name">核心操作位置合理性</div>
+          <div class="check-detail">服务市场（核心浏览区）是否在合理的滚动深度？用户需要下滑多远才能看到主要内容？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">C4</span>
+        <div class="check-content">
+          <div class="check-name">移动端单手操作可达性</div>
+          <div class="check-detail">主操作按钮是否在拇指热区？底部弹层的表单填写是否符合单手操作习惯？</div>
+        </div>
+      </div>
+      <div class="check-item">
+        <span class="check-id">C5</span>
+        <div class="check-content">
+          <div class="check-name">条件显示元素的布局稳定性</div>
+          <div class="check-detail">条件渲染的元素（如role-hint、agency-board）显示/隐藏时，是否导致页面跳动或布局错乱？</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 四、布局重构对比 -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span>布局重构方案对比</div>
+    <div class="section-desc">左侧为当前布局，右侧为优化后布局示意</div>
+
+    <div class="layout-compare">
+      <!-- 当前布局 -->
+      <div class="layout-col current">
+        <h4>当前布局（问题版）</h4>
+        <div class="layout-block lb-tertiary">导航栏</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-primary">发布服务需求（重动作）</div>
+        <div class="layout-block lb-secondary">我的单（次按钮）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-broken">角色引导条 3步流程</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-broken">顺手办（工具打断流程）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-dark">担保横幅 4步流程</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-warning">服务市场（搜索+分类+列表）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-tertiary">交叉导流（还需要这些）</div>
+      </div>
+
+      <!-- 优化布局 -->
+      <div class="layout-col proposed">
+        <h4>优化后布局（清晰版）</h4>
+        <div class="layout-block lb-tertiary">导航栏</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-secondary">平台定位一句话（我能帮你办什么）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-primary">热门场景快捷入口（5个核心场景图标）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-warning">服务市场（搜索+分类+列表）← 核心区上移</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-dark">资金托管保障（贴近列表，决策时可见）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-secondary">顺手办工具（收进次级区域，不打断主流程）</div>
+        <div class="layout-gap"></div>
+        <div class="layout-block lb-tertiary">发布需求 / 我的单（底部固定或次级入口）</div>
+        <div class="layout-block lb-tertiary">交叉导流（还需要这些）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 五、优化项清单 -->
+  <div class="section">
+    <div class="section-title"><span class="num">5</span>逐项优化清单（共15项）</div>
+    <div class="section-desc">按优先级排序，P0=必须改（影响核心流程理解），P1=建议改（提升体验），P2=可选优化</div>
+
+    <table class="opt-table">
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th style="width:60px;">类型</th>
+          <th style="width:50px;">优先级</th>
+          <th>优化项</th>
+          <th>具体内容</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- P0 核心流程问题 -->
+        <tr>
+          <td>1</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>重构首屏入口层级</b></td>
+          <td>将"发布服务需求"从首屏主按钮降级为次级入口；首屏改为"热门服务场景快捷入口"（资质代办/工程担保/造价咨询等图标卡片），让用户先"选场景"而非先"填表单"。</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>统一流程叙事：消除两套流程冲突</b></td>
+          <td>取消role-hint的3步流程展示（选服务→下单→跟踪），将其融合为服务列表内的步骤提示；保留escrow-banner的4步资金托管流程，但位置下移到服务列表区域附近，作为"决策信任背书"而非"流程教学"。</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p0">P0</span></td>
+          <td><b>服务市场区域上移</b></td>
+          <td>将"服务市场"（搜索+分类+列表）从当前第7位上移到首屏可见区域（第3-4位），成为页面核心主体。当前用户需要下滑很远才能看到主要内容，违背"逛"的预期。</td>
+        </tr>
+
+        <!-- P1 体验提升 -->
+        <tr>
+          <td>4</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>顺手办工具位置调整</b></td>
+          <td>将"材料核验/年检提醒/政策速查"三个工具从主流程中间移走，改为：方案A → 收纳到服务列表下方的"实用工具"区域；方案B → 改为服务卡片内的轻量入口（如资质代办卡片带"材料清单"按钮）。</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><span class="opt-type type-add">增加</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>首屏增加平台定位一句话</b></td>
+          <td>在导航栏下方增加一行简短说明，如"找已核验中介机构 · 资金托管更安心"，让新用户3秒内理解页面价值。当前页面没有任何一句话说明"这是什么"。</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>"我的单"入口位置优化</b></td>
+          <td>"我的单"不应与"发布需求"并列在首屏顶部。改为：导航栏右侧增加订单角标入口，或放在页面底部tabbar区域。用户只有下过单才需要看订单，放在首屏浪费首屏空间。</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>担保横幅视觉整合</b></td>
+          <td>深色担保横幅在浅色页面中过于突兀，打断视觉流。改为：浅色卡片样式 + 金色图标点缀，4步流程改为横向进度条样式，融入整体设计语言。</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>服务卡片信息精简</b></td>
+          <td>当前单张卡片包含：标题+金V+信用分+公司名+周期+评分+成功率+成交数+案例数+好评数+价格+保障标签+CTA = 13个信息点。建议精简为：标题+机构名+评分+价格+CTA，其余信息（成功率/案例数/好评）收纳到详情页。</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><span class="opt-type type-add">增加</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>发布需求成功后的状态引导</b></td>
+          <td>当前"智能匹配"后只是在列表上方插入一个match-banner，但用户不知道"接下来会发生什么"。增加：匹配结果页/弹层，明确告知"已为你推荐X家机构，也可直接联系平台顾问"，并给出"查看我的需求"入口。</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td><span class="opt-type type-modify">修改</span></td>
+          <td><span class="priority p1">P1</span></td>
+          <td><b>分类筛选去重</b></td>
+          <td>页面上已有分类chips（全部/资质代办/工程担保...），筛选面板里又有一份完全相同的分类选项，重复且冗余。筛选面板应只保留"服务方/价格/口碑"三个维度，分类统一由页面上方chips控制。</td>
+        </tr>
+
+        <!-- P2 细节优化 -->
+        <tr>
+          <td>11</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>角色引导条（role-hint）精简</b></td>
+          <td>当前三卡（选服务/下单/跟踪）的跳转目标不一致（一个跳select-service.html，一个滚到市场，一个跳my-orders），逻辑割裂。简化为：只保留一行"交易流程：选服务 → 托管下单 → 进度跟踪"的步骤提示条，去掉三个独立入口卡片。</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>交叉导流区域位置</b></td>
+          <td>"还需要这些"（资质招商/建企买卖/人员招聘）放在服务列表下方合理，但建议改为"相关推荐"样式，视觉上弱化一级入口感，避免分散用户注意力。</td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td><span class="opt-type type-add">增加</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>首次访问的流程引导气泡</b></td>
+          <td>新用户首次进入时，增加一个轻量引导气泡（仅首次显示），指向核心区域："先在这里浏览服务 →"，帮助用户建立正确的操作预期。</td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>中介后台入口视觉层级</b></td>
+          <td>中介专属后台入口（金色渐变卡片）当前位置在role-hint下方，视觉权重较高。如果中介用户占比较低，建议降低视觉权重，改为导航栏内的图标入口或个人中心内的入口。</td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td><span class="opt-type type-optimize">优化</span></td>
+          <td><span class="priority p2">P2</span></td>
+          <td><b>空态/无结果体验统一</b></td>
+          <td>当前有两处空态：搜索无结果（empty-card）和AI匹配无结果（match-banner内）。建议统一设计语言，都遵循"换词建议 + 热门推荐 + 联系顾问"的三段式结构。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 确认区 -->
+  <div class="confirm-box">
+    <h3>以上为完整复盘分析与优化方案</h3>
+    <p>共15项优化（3项P0核心流程 + 7项P1体验提升 + 5项P2细节优化）<br>
+    请确认：哪些项需要执行？是否有调整？确认后我将开始修改代码。</p>
+    <div class="confirm-note">
+      建议：至少执行P0的3项，可解决"流程不清晰"的核心问题；<br>
+      如需快速见效，可先执行P0+P1共10项；<br>
+      P2为锦上添花项，可后续迭代。
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
