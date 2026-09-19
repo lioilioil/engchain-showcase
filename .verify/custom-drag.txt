@@ -1,0 +1,96 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="UTF-8">
+<title>Custom Sheet Drag Test</title>
+<style>
+  body { background:#222; font-family: system-ui; }
+  #r { position: fixed; top: 10px; left: 10px; z-index: 9999; white-space: pre-wrap; font-size: 12px; color: #0f0; background: rgba(0,0,0,.8); padding: 10px; border-radius: 6px; max-height: 200px; overflow: auto; }
+  iframe { position: fixed; right: 0; top: 0; width: 430px; height: 950px; border: none; transform: scale(.8); transform-origin: top right; }
+</style>
+</head>
+<body>
+<div id="r">…iframe loaded: 资质招商 · 工程链
+点击筛选按钮…
+filterSheet 打开：是
+filterMask 打开：是
+委托已绑定：否
+filterSheet 高=599，max-height 视觉=599
+句柄存在：fs-head
+句柄 y=982（向上拖 200px）
+向上拖后：sheet-expanded=true，高=760（80%视口=760）
+展开态下拖 120px（&lt;35%）→ 回弹后高=760，仍打开=true
+展开态下拖 400px（&gt;35%）→ sheet 关闭=true，mask 关闭=true
+== 自建 sheet 测试结束 ==
+</div>
+<iframe id="f" src="http://127.0.0.1:8765/pages/franchise/index.html"></iframe>
+<script>
+var log = function(t){ document.getElementById('r').textContent += t + '\n'; };
+window.onerror = function (m, s, l) { log('ERR: ' + m + ' @' + l); return true; };
+
+function dragIn(doc, handleEl, y0, y1){
+  return new Promise(function(res){
+    var rect = handleEl.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    function fire(type, yy){
+      var ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: yy, button: 0 });
+      (type === 'mousemove' || type === 'mouseup' ? doc.defaultView : handleEl).dispatchEvent(ev);
+    }
+    fire('mousedown', y0);
+    var n = 10, i = 0;
+    (function step(){
+      if (i > n) { fire('mouseup', y1); setTimeout(res, 500); return; }
+      fire('mousemove', y0 + (y1 - y0) * i / n);
+      i++; setTimeout(step, 25);
+    })();
+  });
+}
+
+var f = document.getElementById('f');
+f.onload = function () {
+  setTimeout(async function () {
+    try {
+      var doc = f.contentDocument;
+      var win = f.contentWindow;
+      log('iframe loaded: ' + doc.title);
+      var btn = doc.getElementById('filterBtn');
+      if (!btn) { log('filterBtn NOT FOUND'); return; }
+      log('点击筛选按钮…');
+      btn.click();
+      await new Promise(function (r) { setTimeout(r, 400); });
+      var fs = doc.getElementById('filterSheet');
+      var fm = doc.getElementById('filterMask');
+      log('filterSheet 打开：' + (fs.classList.contains('show') ? '是' : '否'));
+      log('filterMask 打开：' + (fm.classList.contains('show') ? '是' : '否'));
+      log('委托已绑定：' + (fs._customDrag ? '是' : '否'));
+      log('filterSheet 高=' + fs.offsetHeight + '，max-height 视觉=' + Math.round(fs.getBoundingClientRect().height));
+
+      var head = fs.querySelector('[data-sheet-drag]');
+      log('句柄存在：' + (head ? head.className : '无'));
+      var hr = head.getBoundingClientRect();
+      log('句柄 y=' + Math.round(hr.top + hr.height / 2) + '（向上拖 200px）');
+      await dragIn(doc, head, hr.top + hr.height / 2, hr.top + hr.height / 2 - 200);
+      fs = doc.getElementById('filterSheet');
+      log('向上拖后：sheet-expanded=' + fs.classList.contains('sheet-expanded') + '，高=' + Math.round(fs.getBoundingClientRect().height) + '（80%视口=' + Math.round(win.innerHeight * 0.8) + '）');
+      var h2 = fs.getBoundingClientRect().height;
+
+      var hr2 = fs.querySelector('[data-sheet-drag]').getBoundingClientRect();
+      await dragIn(doc, fs.querySelector('[data-sheet-drag]'), hr2.top + hr2.height / 2, hr2.top + hr2.height / 2 + 120);
+      fs = doc.getElementById('filterSheet');
+      log('展开态下拖 120px（<35%）→ 回弹后高=' + Math.round(fs.getBoundingClientRect().height) + '，仍打开=' + fs.classList.contains('show'));
+
+      var hr3 = fs.querySelector('[data-sheet-drag]').getBoundingClientRect();
+      await dragIn(doc, fs.querySelector('[data-sheet-drag]'), hr3.top + hr3.height / 2, hr3.top + hr3.height / 2 + 400);
+      fs = doc.getElementById('filterSheet');
+      fm = doc.getElementById('filterMask');
+      log('展开态下拖 400px（>35%）→ sheet 关闭=' + (!fs.classList.contains('show')) + '，mask 关闭=' + (!fm.classList.contains('show')));
+
+      log('== 自建 sheet 测试结束 ==');
+    } catch (e) {
+      log('TEST ERROR: ' + e.message);
+    }
+  }, 800);
+};
+</script>
+
+
+</body></html>

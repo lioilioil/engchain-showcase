@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/distribution/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>佣金提现 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* 佣金提现页（对齐钱包提现页流程；视觉对齐分销中心金色主题） */
+.cw-balance { position:relative; overflow:hidden; border-radius:20px; padding:18px 14px; margin-bottom:14px;
+  background:radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.22) 0%, transparent 55%), linear-gradient(150deg,#252C35 0%,#151A22 46%,#0B0E13 100%);
+  box-shadow:0 1px 2px rgba(22,22,22,.06), 0 10px 28px rgba(22,22,22,.14); }
+.cw-balance::after { content:""; position:absolute; left:10px; right:10px; top:0; height:1px; background:linear-gradient(90deg, transparent, rgba(244,231,200,.55), transparent); }
+.cw-lb { text-align:center; font-size:12px; color:rgba(244,242,238,.72); }
+.cw-amt { text-align:center; font-size:34px; margin-top:6px; letter-spacing:-.5px; font-family:var(--font-num); color:#F7F5F1; }
+.cw-lim { text-align:center; font-size:11px; color:rgba(244,242,238,.55); margin-top:6px; }
+.cw-tip { display:flex; align-items:center; gap:8px; background:rgba(201,169,97,.10); border:1px solid rgba(201,169,97,.28); border-radius:11px; padding:10px 12px; margin-bottom:14px; font-size:11.5px; color:var(--text-2); line-height:1.6; }
+.cw-tip svg { width:15px; height:15px; flex:none; color:var(--primary-dim); }
+.wd-record-row { gap:6px; }
+.wd-rec-card { background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l); padding:12px 14px; margin:0 0 10px; }
+.wd-rec-top { display:flex; justify-content:space-between; align-items:center; }
+.wd-rec-meta { font-size:11px; color:var(--text-3); margin-top:5px; }
+.wd-rec-note { font-size:11px; color:var(--error); margin-top:6px; }
+.wd-rec-foot { display:flex; justify-content:flex-end; margin-top:8px; }
+.wd-steps { display:flex; align-items:flex-start; margin:11px 0 2px; }
+.wd-step { flex:1; min-width:0; text-align:center; }
+.wd-dot { width:18px; height:18px; margin:0 auto; border-radius:50%; background:var(--line); color:var(--text-inv); display:flex; align-items:center; justify-content:center; transition:background .2s var(--e-standard); }
+.wd-dot svg { width:10px; height:10px; }
+.wd-step.done .wd-dot { background:var(--success); }
+.wd-step.active .wd-dot { background:var(--primary); box-shadow:0 0 0 4px var(--primary-soft); }
+.wd-step-lb { font-size:10px; margin-top:5px; color:var(--text-3); white-space:nowrap; }
+.wd-step.done .wd-step-lb, .wd-step.active .wd-step-lb { color:var(--text-1); font-weight:600; }
+.wd-step-line { flex:1 1 0; min-width:10px; height:2px; margin-top:8px; background:var(--line); }
+.wd-step-line.on { background:var(--success); }
+.wd-bank-row { transition:background var(--d-fast); }
+.wd-bank-row.selected { background:var(--primary-soft); }
+.wd-radio { width:18px; height:18px; border-radius:50%; border:2px solid var(--line); flex:none; position:relative; transition:all var(--d-fast); }
+.wd-bank-row.selected .wd-radio { border-color:var(--primary); }
+.wd-bank-row.selected .wd-radio::after { content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:8px; height:8px; border-radius:50%; background:var(--primary); }
+.tx-btn { display:inline-flex; align-items:center; gap:4px; padding:5px 12px; border-radius:999px; font-size:11px; font-weight:600; border:1px solid var(--line); background:var(--bg-card-2); color:var(--text-2); cursor:pointer; transition:all .15s var(--e-standard); }
+.tx-btn:active { transform:scale(.96); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">佣金提现</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding:10px var(--page-pad) 104px;">
+    <!-- 非分销员引导 -->
+    <div id="cw-guide" style="display:none;text-align:center;padding:38px 20px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);">
+      <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">
+        <svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-gift"/></svg>
+      </div>
+      <div class="fw-700" style="font-size:17px;margin-top:16px;">成为分销员后可提现佣金</div>
+      <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">入驻企业或开通个人合伙人后，推广返佣结算发放可提现，支持提现至银行卡，审批通过后打款到账。</div>
+      <a href="../../pages/profile/entry-form.html?type=agency&fin=1" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往企业入驻</a>
+    </div>
+
+    <div id="cw-form">
+    <div class="cw-balance">
+      <div class="cw-lb">可提现佣金（元）</div>
+      <div class="cw-amt" id="cw-avail">—</div>
+      <div class="cw-lim" id="cw-limit">—</div>
+    </div>
+
+    <div class="cw-tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span>佣金 = 分销返佣已结算发放的收益；余额 = 钱包全部可用资金。<b style="color:var(--primary-dim);">本页仅操作佣金提现</b>，余额提现请前往「钱包」。</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label">提现金额</label>
+      <div class="unit-input"><input class="input" id="amount" placeholder="0.00" inputmode="decimal"><span class="unit">¥</span></div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">到账银行卡</label>
+      <div class="group" id="cw-cards"></div>
+      <div class="group" style="margin-top:8px;">
+        <div class="row" onclick="location.href='../wallet/bank-cards.html'">
+          <span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-card"/></svg></span>
+          <span class="label" style="color:var(--primary-dim);">管理银行卡</span><span class="arrow">›</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-3 fs-12" id="cw-fee-hint" style="margin-top:4px;">手续费 ¥0，审批通过后预计 2 小时内到账。</div>
+    <div id="cw-realtime" style="display:none;margin-top:10px;padding:11px 13px;border-radius:11px;background:var(--primary-soft);border:1px solid var(--accent-line);font-size:12px;line-height:1.8;">
+      <div class="fb-between"><span class="text-2">提现金额</span><b class="mono" id="rt-amount">¥0.00</b></div>
+      <div class="fb-between"><span class="text-2">手续费</span><b class="mono" id="rt-fee">¥0.00</b></div>
+      <div class="fb-between" style="border-top:1px dashed var(--line);padding-top:6px;margin-top:6px;"><span class="text-2">实际到账</span><b class="mono" style="color:var(--primary);font-size:14px;" id="rt-arrive">¥0.00</b></div>
+      <div class="text-3" id="rt-warning" style="margin-top:4px;color:var(--danger);"></div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px;"><div class="st-left">佣金提现记录</div></div>
+    <div id="cw-records"></div>
+    </div>
+  </div>
+
+  <div class="fixed-cta" id="cw-cta"><button type="button" class="btn btn-primary btn-block btn-lg" id="withdraw-submit">提交佣金提现申请</button></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var w = MOCK.business.withdraw;
+  var dist = RULE('distribution', { minWithdraw: 100, settleNote: 'T+1' });
+  try { BalanceStore.seedLogs(); } catch (e) { console.warn('BalanceStore.seedLogs failed:', e); }
+
+  var WD_STATUS = { pending: { label: '待审核', cls: 'tag-warning' }, first_ok: { label: '初审通过', cls: 'tag-primary' }, paid: { label: '已到账', cls: 'tag-success' }, rejected: { label: '已驳回', cls: 'tag-gray' }, cancelled: { label: '已撤销', cls: 'tag-gray' } };
+  var WD_STEPS = ['已申请', '审核中', '打款中', '已到账'];
+
+  function currentUser() { try { return (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) { return null; } }
+  /* 佣金提现门控：企业入驻（resident）或个人合伙人（auth.partner.ok）——与分销返佣资格同源 */
+  function isDistributor() {
+    var u = currentUser(); if (!u) return false;
+    if (u.auth && u.auth.partner && u.auth.partner.ok) return true;
+    try { return !!(window.entryAccess && entryAccess().isResident); } catch (e) { return false; }
+  }
+  function isIndividualPartner() {
+    var u = currentUser();
+    return !!(u && u.auth && u.auth.partner && u.auth.partner.ok && (!u.identity || u.identity.enterprise !== 'resident'));
+  }
+
+  /* ---- 佣金可提现口径：累计已发放佣金 − 已申请占用（pending/first_ok/paid 未撤销） ---- */
+  function commissionAvailable() {
+    var u = currentUser(); if (!u) return 0;
+    var st = { available: 0 };
+    try { st = (window.Rebate && Rebate.stat) ? Rebate.stat(u.id) : st; } catch (e) {}
+    var occupied = 0;
+    try {
+      var all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : [];
+      occupied = all.filter(function (x) { return x.uid === u.id && (x.type || '') === 'commission' && ['pending', 'first_ok', 'paid'].indexOf(x.status) >= 0; })
+        .reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0);
+    } catch (e) {}
+    return Math.max(0, Math.round((Number(st.available) - occupied) * 100) / 100);
+  }
+  function todayWithdrawCount() {
+    var u = currentUser(); if (!u) return 0;
+    var all = [];
+    try { all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : []; } catch (e) {}
+    var now = new Date(), y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    return all.filter(function (x) { return x.uid === u.id && (x.type || '') === 'commission'; })
+      .filter(function (x) {
+        var t = new Date(x.appliedAt || 0);
+        return t.getFullYear() === y && t.getMonth() === mo && t.getDate() === d;
+      }).length;
+  }
+  function renderLimit() {
+    var el = document.getElementById('cw-limit'); if (!el) return;
+    el.textContent = '最低 ¥' + dist.minWithdraw + ' · 单笔 ≤¥' + w.singleMax + ' · 每日 ≤' + w.dailyMax + '次（今日已 ' + todayWithdrawCount() + '/' + w.dailyMax + '）';
+  }
+  function renderAvail() {
+    document.getElementById('cw-avail').textContent = UI.money(commissionAvailable());
+  }
+  function fmtTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    if (isNaN(d)) return '';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  /* ---- 银行卡（复用 engchain-bank-cards） ---- */
+  function loadBankCards() {
+    try { var a = JSON.parse(localStorage.getItem('engchain-bank-cards') || '[]'); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function maskCard(no) { var s = String(no || ''); return s.length > 4 ? '尾号 ' + s.slice(-4) : s; }
+  function renderCards() {
+    var box = document.getElementById('cw-cards'); if (!box) return;
+    var cards = loadBankCards();
+    if (!cards.length) {
+      box.innerHTML = '<div class="row" onclick="location.href=\'../wallet/bank-cards.html\'" style="cursor:pointer;">' +
+        '<span class="row-icon" style="background:rgba(234,102,104,.14)"><svg class="ic"><use href="#i-bank"/></svg></span>' +
+        '<span class="label text-3">暂未绑定银行卡，点击去绑定</span><span class="arrow">›</span></div>';
+      return;
+    }
+    var defIdx = cards.findIndex ? cards.findIndex(function (c) { return c.isDefault; }) : -1;
+    if (defIdx < 0) defIdx = 0;
+    box.innerHTML = cards.map(function (c, i) {
+      var checked = i === defIdx ? ' checked' : '';
+      var sel = i === defIdx ? ' selected' : '';
+      var label = (c.bank || '银行卡') + ' · ' + maskCard(c.cardNo) + (c.isDefault ? '（默认）' : '');
+      return '<div class="row wd-bank-row' + sel + '" onclick="selectBank(this)">' +
+        '<span class="row-icon" style="background:rgba(201,169,97,.16)"><svg class="ic"><use href="#i-bank"/></svg></span>' +
+        '<span class="label">' + label + '</span>' +
+        '<span class="wd-radio"></span>' +
+        '<input type="radio" name="acc" value="bank"' + checked + ' data-card="' + (c.bank || '') + ' ' + maskCard(c.cardNo) + '" style="display:none;"></div>';
+    }).join('');
+  }
+  window.selectBank = function (el) {
+    var rows = document.querySelectorAll('.wd-bank-row');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.remove('selected');
+      var inp = rows[i].querySelector('input[name="acc"]');
+      if (inp) inp.checked = false;
+    }
+    el.classList.add('selected');
+    var inp2 = el.querySelector('input[name="acc"]');
+    if (inp2) inp2.checked = true;
+  };
+
+  /* ---- 记录：进度时间线 + 撤销 ---- */
+  function stepIndex(status) {
+    if (status === 'pending') return 1;
+    if (status === 'first_ok') return 2;
+    if (status === 'paid') return 4;
+    return 0;
+  }
+  function timelineHtml(status) {
+    var cur = stepIndex(status);
+    if (!cur) return '';
+    var out = '<div class="wd-steps">';
+    for (var i = 0; i < 4; i++) {
+      var done = i < cur;
+      var active = (i + 1) === cur;
+      if (i > 0) out += '<div class="wd-step-line' + (i < cur ? ' on' : '') + '"></div>';
+      out += '<div class="wd-step' + (done ? ' done' : '') + (active ? ' active' : '') + '">' +
+        '<div class="wd-dot">' + (done ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</div>' +
+        '<div class="wd-step-lb">' + WD_STEPS[i] + '</div></div>';
+    }
+    out += '</div>';
+    return out;
+  }
+  window.cancelWithdraw = function (id) {
+    UI.dialog({
+      title: '撤销提现申请', text: '确定撤销该笔佣金提现申请吗？撤销后资金将解冻回可用余额。', ok: '撤销申请', cancel: '再想想', danger: true,
+      onOk: function () {
+        try {
+          if (window.DataBus && typeof DataBus.withdrawCancel === 'function') {
+            DataBus.withdrawCancel(id);
+          } else {
+            var all = JSON.parse(localStorage.getItem('engchain-withdrawals') || '[]');
+            var w2 = null;
+            for (var i = 0; i < all.length; i++) if (all[i].id === id) { w2 = all[i]; break; }
+            if (w2 && (w2.status === 'pending' || w2.status === 'first_ok')) {
+              w2.status = 'cancelled'; w2.cancelledAt = Date.now(); w2.note = '用户主动撤销';
+              var bs = BalanceStore.read();
+              bs.frozen = Math.max(0, Math.round((bs.frozen - w2.amount) * 100) / 100);
+              BalanceStore.write(bs);
+              localStorage.setItem('engchain-withdrawals', JSON.stringify(all));
+              window.dispatchEvent(new CustomEvent('engchain:withdrawals'));
+            }
+          }
+          UI.toast('已撤销，资金已解冻', 'ok');
+          renderAvail(); renderRecords(); renderLimit();
+        } catch (e) { UI.toast('撤销失败：' + (e.message || e), 'err'); }
+      }
+    });
+  };
+  function renderRecords() {
+    var box = document.getElementById('cw-records'); if (!box) return;
+    var u = currentUser(); var uid = u ? u.id : '';
+    var all = [];
+    try { all = (window.DataBus && DataBus.withdrawals) ? DataBus.withdrawals() : []; } catch (e) {}
+    var mine = all.filter(function (x) { return x.uid === uid && (x.type || '') === 'commission'; });
+    if (!mine.length) { box.innerHTML = '<div class="text-3 fs-12" style="text-align:center;padding:26px 0;">暂无佣金提现记录</div>'; return; }
+    box.innerHTML = mine.map(function (r) {
+      var st = WD_STATUS[r.status] || { label: r.status, cls: 'tag-gray' };
+      var tl = (r.status === 'pending' || r.status === 'first_ok' || r.status === 'paid') ? timelineHtml(r.status) : '';
+      var cancelBtn = (r.status === 'pending') ? '<button class="tx-btn" onclick="cancelWithdraw(\'' + r.id + '\')">撤销申请</button>' : '';
+      return '<div class="wd-rec-card">' +
+        '<div class="wd-rec-top"><span class="mono fw-600" style="font-size:14px;">¥' + Number(r.amount).toLocaleString() + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="wd-rec-meta">' + (r.bank || '') + ' · ' + fmtTime(r.appliedAt) + '</div>' +
+        tl +
+        (r.note ? '<div class="wd-rec-note">' + r.note + '</div>' : '') +
+        (cancelBtn ? '<div class="wd-rec-foot">' + cancelBtn + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  /* ---- 身份门控 ---- */
+  function gate() {
+    var form = document.getElementById('cw-form');
+    var guide = document.getElementById('cw-guide');
+    var cta = document.getElementById('cw-cta');
+    if (isDistributor()) {
+      if (form) form.style.display = '';
+      if (guide) guide.style.display = 'none';
+      if (cta) cta.style.display = '';
+      renderCards();
+      renderAvail();
+      renderRecords();
+      renderLimit();
+    } else {
+      if (form) form.style.display = 'none';
+      if (guide) guide.style.display = '';
+      if (cta) cta.style.display = 'none';
+    }
+  }
+
+  window.withdraw = function () {
+    if (!isDistributor()) { UI.toast('成为分销员后可提现佣金', 'warn'); return; }
+    var _u0 = currentUser();
+    if (_u0 && _u0.banned) { UI.toast('账号已被封禁，无法执行此操作', 'warn'); return; }
+    var amountEl = document.getElementById('amount');
+    var v = parseFloat(amountEl ? amountEl.value : '') || 0;
+    if (v < dist.minWithdraw) { UI.toast('最低提现金额为 ¥' + dist.minWithdraw, 'warn'); if (amountEl) amountEl.focus(); return; }
+    if (v > w.singleMax) { UI.toast('单笔提现上限 ¥' + w.singleMax, 'warn'); return; }
+    var used = todayWithdrawCount();
+    if (used >= w.dailyMax) { UI.toast('今日提现次数已达上限（每日 ' + w.dailyMax + ' 次），请明日再试', 'warn'); return; }
+    var avail = commissionAvailable();
+    if (v > avail) { UI.toast('超过可提现佣金（当前可提 ¥' + avail.toLocaleString() + '）', 'warn'); return; }
+    var accEl = document.querySelector('input[name="acc"]:checked');
+    if (!accEl) { UI.toast('请先绑定或选择到账银行卡', 'warn'); return; }
+    var accName = accEl.getAttribute('data-card') || (accEl.closest('.row') ? accEl.closest('.row').querySelector('.label').textContent : '银行卡');
+    UI.dialog({
+      title: '佣金提现确认', text: '本次提现 <b style="color:var(--primary)">¥' + v.toLocaleString() + '</b> 至' + accName + '，提交后进入平台审批流程，审批通过后打款。', ok: '提交申请', cancel: '取消',
+      onOk: function () {
+        try {
+          var u = currentUser();
+          var r = DataBus.withdrawalApply(u ? u.id : '', v, 'bank', { bank: accName, type: 'commission' });
+          if (!r || r.error) { UI.toast((r && r.error) || '提现申请失败', 'err'); return; }
+          if (amountEl) amountEl.value = '';
+          renderAvail();
+          renderRecords();
+          var sh = UI.sheet();
+          sh.html(
+            '<div style="text-align:center;padding:14px 0;">' +
+              '<div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2E7D50,#4CAF7D);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+              '<svg viewBox="0 0 24 24" style="width:28px;height:28px;stroke:#fff;stroke-width:2.5;fill:none;"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+              '<div style="font-size:17px;font-weight:700;">佣金提现申请已提交</div>' +
+              '<div style="font-size:12px;color:var(--text-2);margin-top:6px;">单号 <span class="mono">' + (r.id || '') + '</span></div>' +
+              '<div style="font-size:12px;color:var(--text-2);margin-top:4px;">审批通过后预计 <b style="color:var(--primary-dim);">2 小时内</b> 到账</div>' +
+              '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="UI.closeSheet()">完成</button>' +
+            '</div>'
+          ).show();
+        } catch (err) {
+          console.error('withdraw submit error:', err);
+          UI.toast('提现申请失败：' + (err.message || err), 'err');
+        }
+      }
+    });
+  };
+
+  gate();
+
+  /* ---- 实时金额/手续费/到账预览 ---- */
+  var FEE_RATE = 0;
+  function fmtMoney(n) { return Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function updateRealtime() {
+    var amountEl = document.getElementById('amount');
+    var box = document.getElementById('cw-realtime');
+    if (!amountEl || !box) return;
+    var v = parseFloat(amountEl.value) || 0;
+    var avail = commissionAvailable();
+    var warn = document.getElementById('rt-warning');
+    if (v <= 0) { box.style.display = 'none'; if (warn) warn.textContent = ''; return; }
+    box.style.display = 'block';
+    var fee = Math.round(v * FEE_RATE * 100) / 100;
+    var arrive = Math.round((v - fee) * 100) / 100;
+    document.getElementById('rt-amount').textContent = '¥' + fmtMoney(v);
+    document.getElementById('rt-fee').textContent = '¥' + fmtMoney(fee);
+    document.getElementById('rt-arrive').textContent = '¥' + fmtMoney(arrive);
+    var localWarn = '';
+    if (v < dist.minWithdraw) localWarn = '最低提现金额 ¥' + dist.minWithdraw + ' 元';
+    else if (v > w.singleMax) localWarn = '单笔上限 ¥' + w.singleMax + ' 元';
+    else if (v > avail) localWarn = '超过可提现佣金（当前 ¥' + avail.toLocaleString() + '）';
+    if (warn) warn.textContent = localWarn;
+  }
+  var amtEl = document.getElementById('amount');
+  if (amtEl) {
+    amtEl.addEventListener('input', updateRealtime);
+    amtEl.addEventListener('blur', updateRealtime);
+  }
+  var _wdBtn = document.getElementById('withdraw-submit');
+  if (_wdBtn) _wdBtn.addEventListener('click', function () { window.withdraw(); });
+  window.addEventListener('engchain:balance', function () { renderAvail(); renderLimit(); });
+  window.addEventListener('engchain:withdrawals', function () { renderRecords(); renderLimit(); renderAvail(); });
+  window.addEventListener('engchain:rebate', function () { renderAvail(); renderLimit(); });
+  window.addEventListener('engchain:auth', gate);
+  window.addEventListener('engchain:entry', gate);
+  window.addEventListener('engchain:store-change', function () { renderCards(); renderAvail(); renderRecords(); renderLimit(); gate(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sheet Drag Verify 2</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<pre id="r" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font-size:12px;padding:8px;white-space:pre-wrap;">…</pre>
+<script src="/js/common.js"></script>
+<script>
+var log = function(t){ document.getElementById('r').textContent += '\n' + t; };
+window.onerror = function(m){ log('ERR: '+m); };
+function fireMouse(el, type, x, y){
+  el.dispatchEvent(new MouseEvent(type, {bubbles:true, cancelable:true, clientX:x, clientY:y, button:0}));
+}
+function dragOnHandle(handle, y0, y1){
+  return new Promise(function(res){
+    var r = handle.getBoundingClientRect();
+    var x = r.left + r.width/2;
+    fireMouse(handle,'mousedown',x,y0);
+    var n=10, i=0;
+    (function step(){
+      if(i>n){ fireMouse(window,'mouseup',x,y1); setTimeout(res, 500); return; }
+      var yy = y0 + (y1-y0)*i/n;
+      fireMouse(window,'mousemove',x,yy);
+      i++; setTimeout(step, 15);
+    })();
+  });
+}
+(async function(){
+  await new Promise(r=>setTimeout(r,200));
+  var html=''; for(var i=0;i<14;i++) html+='<p style="margin:14px 0">演示段落 '+i+'</p>';
+  var s = UI.sheet(); s.setText('测试'); s.html(html); s.show();
+  await new Promise(r=>setTimeout(r,500));
+  var grab = s.querySelector('.sheet-grabzone');
+  log('vh='+window.innerHeight+'  baseH='+s.offsetHeight);
+  // 上拖 250px
+  var gr = grab.getBoundingClientRect(); var gy = gr.top+gr.height/2;
+  await dragOnHandle(grab, gy, gy-250);
+  log('== 上拖250px ==');
+  log('  height='+s.offsetHeight+'  expanded='+s.classList.contains('sheet-expanded'));
+  log('  transform="'+s.style.transform+'"');
+  // 再展开态下拖 100px（应回弹）
+  gr = grab.getBoundingClientRect(); gy = gr.top+gr.height/2;
+  await dragOnHandle(grab, gy, gy+100);
+  log('== 展开态下拖100px(小) ==');
+  log('  height='+s.offsetHeight+'  expanded='+s.classList.contains('sheet-expanded'));
+  log('  仍存在='+document.body.contains(s));
+  log('== 结束 ==');
+})();
+</script>
+</body>
+</html>

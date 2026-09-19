@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Sheet Drag Mini Test</title>
+<link rel="stylesheet" href="../css/app.css">
+<style> body { background:#f5f2ec; padding:20px; } #r { margin-top:16px; white-space:pre-wrap; font-size:12px; background:#fff; border:1px solid #ddd; padding:12px; } </style>
+</head>
+<body>
+<div id="r">…</div>
+<script src="../js/common.js"></script>
+<script>
+var log = function(t){ document.getElementById('r').textContent += t + '\n'; };
+window.onerror = function (m) { log('ERR: ' + m); return true; };
+
+function openSheet(){
+  var sh = UI.sheet();
+  sh.setText('迷你弹窗');
+  sh.html('<div style="padding:6px 2px 14px;"><div class="fw-700 fs-16">标题</div><div style="font-size:13px;line-height:1.7;">内容段落内容段落内容段落内容段落内容段落内容段落内容段落内容段落内容段落。</div><button class="btn btn-block">置底按钮</button></div>');
+  sh.show();
+}
+
+function dragRaw(handleEl, y0, y1, n){
+  n = n || 10;
+  return new Promise(function(res){
+    var rect = handleEl.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    function fire(type, yy){
+      var ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: yy, button: 0 });
+      (type === 'mousemove' || type === 'mouseup' ? window : handleEl).dispatchEvent(ev);
+    }
+    try { fire('mousedown', y0); log('mousedown @' + Math.round(y0)); } catch (e) { log('md ERR ' + e.message); }
+    var i = 0;
+    (function step(){
+      if (i > n) {
+        try { fire('mouseup', y1); log('mouseup @' + Math.round(y1)); } catch (e) { log('mu ERR ' + e.message); }
+        setTimeout(function(){ log('res now'); res(); }, 500);
+        return;
+      }
+      try { fire('mousemove', y0 + (y1 - y0) * i / n); } catch (e) { log('mm ERR ' + e.message); }
+      if (i % 5 === 0) log('mm step ' + i + ' y=' + Math.round(y0 + (y1 - y0) * i / n));
+      i++; setTimeout(step, 25);
+    })();
+  });
+}
+
+(async function(){
+  log('vh=' + window.innerHeight);
+  openSheet();
+  await new Promise(function(r){ setTimeout(r, 400); });
+  var sh = document.querySelector('.sheet');
+  var h0 = sh.offsetHeight;
+  log('h0=' + h0 + '（sheet 顶=' + (window.innerHeight - h0) + '）');
+  var g = sh.querySelector('.sheet-grabzone');
+  var gr = g.getBoundingClientRect();
+  log('grabzone top=' + Math.round(gr.top) + ' half=' + Math.round(gr.height/2) + ' → y0=' + Math.round(gr.top + gr.height/2));
+  var y0 = gr.top + gr.height / 2;
+  log('-- 向下拖 150px --');
+  await dragRaw(g, y0, y0 + 150);
+  var sh2 = document.querySelector('.sheet');
+  log('拖后 sheet 存在：' + (sh2 ? '是' : '否'));
+  if (sh2) {
+    log('  class=' + sh2.className);
+    log('  height=' + sh2.offsetHeight + ' inline=' + (sh2.style.height || '(none)'));
+    var inr = sh2.querySelector('.sheet-inner');
+    log('  inner.transform=' + (inr ? (inr.style.transform || '(none)') : '?'));
+  }
+  log('done');
+})();
+</script>
+</body>
+</html>

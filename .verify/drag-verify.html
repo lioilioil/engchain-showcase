@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sheet Drag Verify</title>
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div style="padding:20px"><button id="openBtn" class="btn btn-primary">打开弹窗</button></div>
+<pre id="r" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#000;color:#0f0;font-size:12px;padding:8px;white-space:pre-wrap;">…</pre>
+<script src="/js/common.js"></script>
+<script>
+var log = function(t){ document.getElementById('r').textContent += '\n' + t; };
+window.onerror = function(m){ log('ERR: '+m); };
+
+function fireMouse(el, type, x, y){
+  el.dispatchEvent(new MouseEvent(type, {bubbles:true, cancelable:true, clientX:x, clientY:y, button:0}));
+}
+function dragOnHandle(handle, y0, y1){
+  return new Promise(function(res){
+    var r = handle.getBoundingClientRect();
+    var x = r.left + r.width/2;
+    fireMouse(handle,'mousedown',x,y0);
+    var n=10, i=0;
+    (function step(){
+      if(i>n){ fireMouse(window,'mouseup',x,y1); setTimeout(res, 450); return; }
+      var yy = y0 + (y1-y0)*i/n;
+      fireMouse(window,'mousemove',x,yy);
+      i++; setTimeout(step, 20);
+    })();
+  });
+}
+
+(async function(){
+  await new Promise(r=>setTimeout(r,200));
+  var btn = document.getElementById('openBtn');
+  var html = '';
+  for(var i=0;i<14;i++) html += '<p style="margin:14px 0">演示段落 '+i+'，用于撑起弹窗高度并检验展开态滚动与置底按钮吸附。</p>';
+  var s1 = UI.sheet(); s1.setText('测试弹窗'); s1.html(html + '<div class="btn-block"><button class="btn btn-primary btn-block">底部置底按钮</button></div>'); s1.show();
+  await new Promise(r=>setTimeout(r,400));
+
+  var sheet = document.querySelector('.sheet');
+  var inner = sheet.querySelector('.sheet-inner');
+  var grab = sheet.querySelector('.sheet-grabzone');
+  var baseH = sheet.offsetHeight;
+  log('vh='+window.innerHeight+'  baseH='+baseH);
+
+  // 1) 未展开向下拖 150px
+  var gr = grab.getBoundingClientRect();
+  var gy = gr.top + gr.height/2;
+  await dragOnHandle(grab, gy, gy+150);
+  log('== 未展开下拖150px ==');
+  log('  sheet存在='+!!document.querySelector('.sheet'));
+  log('  sheet.transform='+sheet.style.transform);
+  log('  inner.transform='+inner.style.transform);
+
+  // 重新打开
+  var s2 = UI.sheet(); s2.setText('测试弹窗2'); s2.html(html); s2.show();
+  await new Promise(r=>setTimeout(r,400));
+  sheet = document.querySelector('.sheet'); inner = sheet.querySelector('.sheet-inner'); grab = sheet.querySelector('.sheet-grabzone');
+  baseH = sheet.offsetHeight;
+  // 2) 向上拖 250px 展开
+  gr = grab.getBoundingClientRect(); gy = gr.top + gr.height/2;
+  await dragOnHandle(grab, gy, gy-250);
+  log('== 上拖250px展开 ==');
+  log('  sheet.height='+sheet.offsetHeight+'  expanded='+sheet.classList.contains('sheet-expanded'));
+  log('  sheet.transform='+sheet.style.transform);
+  // 3) 展开态下拖 100px（小距离应回弹）
+  gr = grab.getBoundingClientRect(); gy = gr.top + gr.height/2;
+  await dragOnHandle(grab, gy, gy+100);
+  log('== 展开态下拖100px(小) ==');
+  log('  sheet.height='+sheet.offsetHeight+'  仍存在='+!!document.querySelector('.sheet'));
+  log('  sheet.transform='+sheet.style.transform);
+  // 4) 展开态下拖 400px（大距离应全收）
+  gr = grab.getBoundingClientRect(); gy = gr.top + gr.height/2;
+  await dragOnHandle(grab, gy, gy+400);
+  log('== 展开态下拖400px(大) ==');
+  log('  sheet存在='+!!document.querySelector('.sheet'));
+  log('== 结束 ==');
+})();
+</script>
+</body>
+</html>

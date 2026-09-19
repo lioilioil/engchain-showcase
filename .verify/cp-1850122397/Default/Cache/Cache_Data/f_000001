@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/company/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业主页 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title" id="nav-title">企业主页</div>
+    <div class="nav-right">
+    </div>
+  </div>
+
+  <div class="scroll" style="padding-bottom:100px;">
+    <!-- 身份头：企业名称（企业为公开主体，全称展示；联系人在付费墙内脱敏） -->
+    <div class="pf-hero">
+      <div class="pf-avatar" id="pf-avatar">企</div>
+      <div class="pf-info">
+        <div class="pf-name"><span id="pf-name">企业名称</span><svg class="pf-verified" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>
+        <div class="pf-sub" id="pf-sub">行业 · 地区</div>
+      </div>
+    </div>
+
+    <!-- 企业数据 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">企业数据</div></div>
+    <div class="card" id="stats" style="padding:16px 0;"></div>
+
+    <!-- 认证档案卡（平台认证信息） -->
+    <div id="cert"></div>
+
+    <!-- 工商基础信息 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">工商基础信息</div></div>
+    <div class="group" id="info"></div>
+
+    <!-- 核心控制人信息（付费墙） -->
+    <div class="section-title" style="margin-top:16px;">
+      <div class="st-left">核心控制人</div>
+      <div id="controller-unlock-status"></div>
+    </div>
+    <div class="core-section" id="controller-section">
+      <div class="core-content" id="controller-content">
+        <div id="controller-card"></div>
+      </div>
+      <div class="core-lock-overlay" id="controller-lock-overlay" style="display:none;">
+        <div class="core-lock-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <div class="core-lock-text">该企业的<b>实际控制人、持股比例、联系方式</b>为核心信息，解锁后可查看全部内容</div>
+        <button class="core-unlock-btn" id="controller-unlock-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          解锁查看核心控制人信息
+        </button>
+      </div>
+    </div>
+
+    <!-- 企业主页内容（用户自主编辑 · Markdown 富文本 + 标签） -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">企业介绍</div></div>
+    <div class="card" id="homepage-content" style="padding:16px 16px 18px;"></div>
+
+    <!-- 该企业发布的供需 -->
+    <div class="section-title" style="margin-top:16px;"><div class="st-left">该企业发布的供需</div></div>
+    <div id="published" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
+  <div class="fixed-cta" style="display:flex;gap:10px;">
+    <button class="dab-icon" data-act="fav" onclick="UI.toast('已收藏企业','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-fav"/></svg></button>
+    <button class="dab-icon" data-act="share" onclick="UI.toast('链接已复制','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-share"/></svg></button>
+    <button class="dab-cta" onclick="UI.toast('已发起联系，等待对方确认','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>联系TA</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/homepage-editor.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var id = new URLSearchParams(location.search).get('id') || 'c-znzjs';
+  var c = MOCK.companyById(id);
+  /* 实际控制人数据兜底 */
+  if (!c.controller) {
+    c.controller = {
+      name: c.legalRep || '实际控制人',
+      title: '实际控制人·董事长',
+      shareRatio: '65%以上',
+      phone: c.contact && c.contact.phone ? c.contact.phone : '138****8888',
+      wechat: (c.short || 'company') + '_boss'
+    };
+  }
+  document.getElementById('nav-title').textContent = '企业主页';
+  /* 身份头填充（企业为公开主体，全称展示；联系人/电话在付费墙内脱敏） */
+  document.getElementById('pf-avatar').textContent = (c.short || c.name || '企').charAt(0);
+  document.getElementById('pf-name').textContent = c.name || '企业主页';
+  document.getElementById('pf-sub').textContent = (c.industry || '—') + (c.location ? ' · ' + c.location : '');
+
+  /* 认证档案卡 V4.1 · 轻量视觉（取消金色深色奢华风，白底+主色认证标识）
+     位移至「该企业发布的供需」（用户提交信息）上方 */
+  document.getElementById('cert').innerHTML = UI.certExpanded(c, { type: 'company' });
+
+  /* 企业主页内容（用户自主编辑：Markdown 富文本 + 标签） */
+  var _defBio = '## 关于' + (c.short || c.name) + '\n\n' +
+    ((c.mainBusiness || '') + '。') + '\n\n' +
+    '- 所属行业：' + (c.industry || '—') + '\n' +
+    '- 资质背书：' + (c.emphasis || '—') + '\n' +
+    '- 经营状态：' + (c.status || '存续（在营）') + '\n\n' +
+    '> （' + (c.short || c.name) + '）已在 ENGCHAIN 平台完成官方认证，欢迎查看下方工商信息与认证档案，洽谈合作。';
+  var _defTags = (c.tags || []).map(function (t) { return t.t || t; });
+  document.getElementById('homepage-content').innerHTML = HomepageEditor.render(c.id, {
+    label: '企业介绍',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4"/></svg>',
+    defaultBio: _defBio,
+    defaultTags: _defTags
+  });
+  HomepageEditor.bind();
+
+  /* 企业数据 */
+  var pub = (c.published || []).length;
+  var stats = [
+    { n: pub, l: '发布供需' },
+    { n: (pub * 3), l: '成交订单' },
+    { n: c.reviewCount, l: '企业评价' },
+    { n: 26, l: '在促合作' }
+  ];
+  document.getElementById('stats').innerHTML = '<div style="display:flex;">' + stats.map(function (s, i) {
+    return '<div style="flex:1;text-align:center;' + (i ? 'border-left:1px solid var(--line);' : '') + '"><div class="mono fw-700" style="font-size:19px;color:var(--primary);">' + s.n + '</div><div class="fs-11 text-2" style="margin-top:2px;">' + s.l + '</div></div>';
+  }).join('') + '</div>';
+
+  /* 工商基础信息（优化排版：分两列展示） */
+  var info = [
+    { k: '所属行业', v: c.industry },
+    { k: '经营范围', v: c.mainBusiness },
+    { k: '资质背书', v: c.emphasis },
+    { k: '信用代码', v: c.creditCode, mono: 1 },
+    { k: '法定代表人', v: c.legalRep },
+    { k: '注册资本', v: c.regCapital || '—' },
+    { k: '成立时间', v: c.founded },
+    { k: '经营状态', v: c.status || '存续（在营）' }
+  ];
+  document.getElementById('info').innerHTML = '<div class="biz-info-grid">' + info.map(function (r) {
+    return '<div class="biz-info-item"><div class="biz-info-label">' + r.k + '</div><div class="biz-info-value ' + (r.mono ? 'mono' : '') + '">' + r.v + '</div></div>';
+  }).join('') + '</div>';
+
+  /* 核心控制人信息（付费墙） */
+  var ctrl = c.controller;
+  var _phoneIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+  var _copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var controllerHtml = '<div class="controller-card">' +
+    '<div class="cc-head">' +
+      '<div class="cc-avatar">' + (ctrl.name ? ctrl.name.charAt(0) : '控') + '</div>' +
+      '<div class="cc-id">' +
+        '<div class="cc-name">' + ctrl.name + '<span class="cc-copy-btn" data-copy="' + ctrl.name + '" title="复制姓名">' + _copyIcon + '</span></div>' +
+        '<div class="cc-sub">' + ctrl.title + '</div>' +
+      '</div>' +
+      '<span class="cc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>实控人认证</span>' +
+    '</div>' +
+    '<div class="cc-list">' +
+      '<div class="cc-row"><span class="k">持股比例</span><span class="v">' + ctrl.shareRatio + '</span></div>' +
+      '<div class="cc-row"><span class="k">联系电话</span><span class="v">' + ctrl.phone + '<span class="cc-phone-btn" data-phone="' + ctrl.phone + '" title="拨打电话">' + _phoneIcon + '</span></span></div>' +
+      '<div class="cc-row"><span class="k">微信号</span><span class="v">' + ctrl.wechat + '<span class="cc-copy-btn" data-copy="' + ctrl.wechat + '" title="复制微信号">' + _copyIcon + '</span></span></div>' +
+    '</div>' +
+    '<div class="cc-tip">实际控制人信息由平台核验，仅供商业合作参考</div>' +
+    '</div>';
+  document.getElementById('controller-card').innerHTML = controllerHtml;
+
+  /* 控制人卡片操作按钮事件 */
+  document.getElementById('controller-card').addEventListener('click', function (e) {
+    var phoneBtn = e.target.closest('.cc-phone-btn');
+    var copyBtn = e.target.closest('.cc-copy-btn');
+    if (phoneBtn && phoneBtn.dataset.phone) {
+      window.location.href = 'tel:' + phoneBtn.dataset.phone;
+    } else if (copyBtn && copyBtn.dataset.copy) {
+      var text = copyBtn.dataset.copy;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { UI.toast('已复制：' + text, 'ok'); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); UI.toast('已复制：' + text, 'ok'); } catch (err) { UI.toast('复制失败', 'warn'); }
+        document.body.removeChild(ta);
+      }
+    }
+  });
+
+  /* 付费墙解锁状态：所有者直接解锁 */
+  var controllerUnlocked = UI.isOwner(c.id);
+  function updateControllerLock() {
+    var section = document.getElementById('controller-section');
+    var overlay = document.getElementById('controller-lock-overlay');
+    var statusEl = document.getElementById('controller-unlock-status');
+    if (controllerUnlocked) {
+      section.classList.remove('locked');
+      overlay.style.display = 'none';
+      statusEl.innerHTML = '<span class="unlocked-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg>' + (UI.isOwner(c.id) ? '本人查看' : '已解锁') + '</span>';
+    } else {
+      section.classList.add('locked');
+      overlay.style.display = 'flex';
+      statusEl.innerHTML = '';
+    }
+  }
+  updateControllerLock();
+
+  /* 解锁按钮事件 */
+  document.getElementById('controller-unlock-btn').addEventListener('click', function () {
+    controllerUnlocked = true;
+    updateControllerLock();
+    UI.toast('已解锁核心控制人信息', 'ok');
+  });
+
+  /* 该企业发布的供需 · 统一目录 */
+  var list = (c.published || []).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean);
+  if (!list.length) {
+    document.getElementById('published').innerHTML = '<div class="pub-empty">该企业暂未发布供需信息</div>';
+  } else {
+  document.getElementById('published').innerHTML = list.map(function (s) {
+    var cls = s.dir === 'demand' ? 'tag-blue' : s.dir === 'supply' ? 'tag-primary' : 'tag-gold';
+    var lbl = s.dir === 'demand' ? '需求' : s.dir === 'supply' ? '供应' : '机会';
+    return '<a href="../supply/detail.html?id=' + s.id + '" class="supply-card"><div class="sc-top"><span class="tag ' + cls + '">' + lbl + '</span>' +
+      '<span class="match-pill match-high" style="margin-left:auto;">' + s.match + '%</span></div>' +
+      '<div class="sc-title elip">' + s.title + '</div>' +
+      '<div class="sc-foot"><span class="sc-price" style="font-size:14px;">' + (s.dir === 'demand' ? s.budget : (s.price || s.budget)) + '</span>' +
+      '<span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>' + s.location + '</span></div></a>';
+  }).join('');
+  }
+})();
+</script>
+<style>
+  .cert-card { margin-left:0; margin-right:0; margin-top:6px; }
+  .group .row .value { color: var(--text-1); font-size: 13px; }
+  .pub-empty { padding:24px 16px; text-align:center; font-size:12px; color:var(--text-3); }
+
+  /* 工商基础信息网格布局 */
+  .biz-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden; }
+  .biz-info-item { padding: 12px 14px; border-bottom: 1px solid var(--line-hairline); }
+  .biz-info-item:nth-child(odd) { border-right: 1px solid var(--line-hairline); }
+  .biz-info-item:nth-last-child(-n+2) { border-bottom: none; }
+  .biz-info-label { font-size: 11px; color: var(--text-3); font-weight: 300; margin-bottom: 4px; }
+  .biz-info-value { font-size: 13px; color: var(--text-1); font-weight: 500; line-height: 1.4; word-break: break-word; }
+  .biz-info-value.mono { font-family: var(--font-num); letter-spacing: .02em; }
+
+  /* 核心控制人卡片 */
+  .controller-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden; }
+  .controller-card .cc-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: linear-gradient(135deg, var(--primary-soft), transparent); border-bottom: 1px solid var(--line-hairline); }
+  .controller-card .cc-avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; }
+  .controller-card .cc-id { flex: 1; min-width: 0; }
+  .controller-card .cc-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
+  .controller-card .cc-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .controller-card .cc-badge { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; background: var(--success-soft); color: var(--success); font-size: 11px; font-weight: 600; }
+  .controller-card .cc-badge svg { width: 12px; height: 12px; }
+  .controller-card .cc-list { padding: 4px 16px; }
+  .controller-card .cc-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line-hairline); font-size: 12.5px; }
+  .controller-card .cc-row:last-child { border-bottom: none; }
+  .controller-card .cc-row .k { flex: none; width: 70px; color: var(--text-3); font-weight: 300; }
+  .controller-card .cc-row .v { flex: 1; color: var(--text-1); font-weight: 500; font-family: var(--font-num); }
+  .controller-card .cc-tip { padding: 10px 16px; background: var(--bg-elevated); font-size: 10.5px; color: var(--text-3); text-align: center; border-top: 1px solid var(--line-hairline); }
+  .controller-card .cc-name { position: relative; display: inline-flex; align-items: center; gap: 6px; }
+  .controller-card .cc-phone-btn, .controller-card .cc-copy-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 5px; cursor: pointer;
+    color: var(--text-3); transition: all 0.15s ease; margin-left: 6px; vertical-align: middle;
+  }
+  .controller-card .cc-phone-btn:hover, .controller-card .cc-copy-btn:hover { background: var(--bg-elevated); color: var(--primary); }
+  .controller-card .cc-phone-btn svg, .controller-card .cc-copy-btn svg { width: 13px; height: 13px; stroke-width: 1.8; }
+  .controller-card .cc-row .v { display: inline-flex; align-items: center; }
+
+  /* 付费墙样式 */
+  .core-section { position: relative; }
+  .core-section.locked .core-content { filter: blur(5px); -webkit-filter: blur(5px); pointer-events: none; user-select: none; -webkit-user-select: none; }
+  .core-lock-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 55%, transparent)); z-index: 5; border-radius: var(--r-l); }
+  .core-lock-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dim); display: flex; align-items: center; justify-content: center; }
+  .core-lock-icon svg { width: 22px; height: 22px; }
+  .core-lock-text { font-size: 12.5px; color: var(--text-2); text-align: center; line-height: 1.6; max-width: 260px; }
+  .core-lock-text b { color: var(--text-1); font-weight: 600; }
+  .core-unlock-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 24px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff; font-size: 13px; font-weight: 600; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,.25); transition: all 0.15s ease; }
+  .core-unlock-btn:active { transform: scale(0.96); }
+  .core-unlock-btn svg { width: 14px; height: 14px; }
+  .unlocked-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; background: var(--success-soft); color: var(--success); font-size: 11px; font-weight: 600; }
+  .unlocked-badge svg { width: 12px; height: 12px; }
+
+  /* 身份头 */
+  .pf-hero{display:flex;align-items:center;gap:14px;margin:14px 16px 6px;padding:16px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--shadow-xs);}
+  .pf-avatar{flex:none;width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;letter-spacing:.02em;}
+  .pf-info{flex:1;min-width:0;}
+  .pf-name{font-size:18px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;line-height:1.3;word-break:break-all;}
+  .pf-verified{flex:none;width:16px;height:16px;color:var(--success);}
+  .pf-sub{font-size:12px;color:var(--text-3);margin-top:4px;}</style>
+</body>
+</html>

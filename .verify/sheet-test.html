@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sheet-drag-test</title>
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  html, body { margin: 0; background: #DDD8CF; height: 100%; overflow: hidden; }
+  .stage { position: relative; width: 430px; height: 100vh; margin: 0 auto; background: var(--bg); overflow: hidden; }
+  .fake-page { padding: 20px; color: var(--text-2); font-size: 13px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="fake-page">
+    <h3 style="margin:0 0 12px">Sheet 通用拖拽验证</h3>
+    <p>模式：<b id="modeLabel"></b></p>
+    <button class="btn btn-primary" id="openBtn" style="width:100%;margin-top:16px">打开弹窗</button>
+    <p style="margin-top:20px">背景页内容……背景页内容……背景页内容……背景页内容……</p>
+  </div>
+</div>
+<script src="../js/common.js"></script>
+<script>
+  const mode = new URLSearchParams(location.search).get('mode') || 'open';
+  document.getElementById('modeLabel').textContent = mode;
+
+  document.getElementById('openBtn').addEventListener('click', function () {
+    const sh = UI.sheet();
+    sh.setText('解锁更多信息');
+    sh.html(
+      '<div style="padding:6px 0">' +
+      '<div style="height:200px;border-radius:12px;background:linear-gradient(180deg,#F0EEE8,#FFFFFF);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-3);font-size:12.5px">内容区</div>' +
+      '<p style="font-size:13px;color:var(--text-2);line-height:1.7;margin:12px 0">这里是弹窗正文内容。按住顶部横线向上拖动可展开至 80% 视口高度；向下拖动可伴随收起。</p>' +
+      '<p style="font-size:13px;color:var(--text-2);line-height:1.7;margin:8px 0">第二段内容……第二段内容……第二段内容……</p>' +
+      '</div>' +
+      '<button class="btn btn-primary btn-block btn-lg" id="t-btn">确认解锁（底部按钮）</button>'
+    );
+    sh.show();
+
+    setTimeout(async () => {
+      const wrap = document.querySelector('.sheet');
+      if (!wrap) return;
+      const grab = wrap.querySelector('.sheet-grabzone');
+      const r = grab.getBoundingClientRect();
+      const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
+      const ev = (t, x, y) => new MouseEvent(t, { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y, button: 0 });
+      const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+      /* 平滑拖动：steps 帧，总时长 durMs —— 步长/步速接近真实手势 */
+      async function drag(dy, steps, dur) {
+        grab.dispatchEvent(ev('mousedown', sx, sy));
+        for (let i = 1; i <= steps; i++) {
+          window.dispatchEvent(ev('mousemove', sx, sy + dy * i / steps));
+          await sleep(dur / steps);
+        }
+        window.dispatchEvent(ev('mouseup', sx, sy + dy));
+        await sleep(800);
+      }
+      async function dragMid(dy, steps, dur) {
+        grab.dispatchEvent(ev('mousedown', sx, sy));
+        for (let i = 1; i <= steps; i++) {
+          window.dispatchEvent(ev('mousemove', sx, sy + dy * i / steps));
+          await sleep(dur / steps);
+        }
+        await sleep(300); /* 停在拖动中，不松手 */
+      }
+      if (mode === 'up') { await drag(-300, 40, 650); }
+      else if (mode === 'down-big') { await drag(-300, 40, 650); await drag(330, 40, 650); }
+      else if (mode === 'down-small') { await drag(-300, 40, 650); await drag(130, 40, 700); }
+      else if (mode === 'down-close') { await drag(170, 40, 550); }
+      else if (mode === 'down-tiny') { await drag(40, 30, 500); }
+      else if (mode === 'fast-down') { await drag(-300, 40, 650); await drag(80, 4, 60); }
+      else if (mode === 'fast-up') { await drag(60, 40, 500); await drag(-80, 4, 60); }
+      else if (mode === 'city-down') {
+        wrap.classList.add('city-sheet');
+        wrap.style.height = Math.round(window.innerHeight * 0.8) + 'px';
+        await sleep(400);
+        await drag(250, 40, 500);
+      }
+      else if (mode === 'mid-up') { await dragMid(-180, 12, 250); }
+      else if (mode === 'mid-down') { await drag(-300, 40, 650); await dragMid(150, 12, 250); }
+      const cur = document.querySelector('.sheet');
+      const st = cur ? ('OPEN' + (cur.classList.contains('sheet-expanded') ? ' EXP' : '')) : 'CLOSED';
+      document.title = 'MODE-' + mode + ' ' + st;
+      document.getElementById('modeLabel').textContent = mode + ' → ' + st;
+    }, 900);
+  });
+  document.getElementById('openBtn').click();
+</script>
+</body>
+</html>

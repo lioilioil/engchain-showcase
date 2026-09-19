@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheet Drag Test</title>
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  body { background:#f5f2ec; padding:20px; font-family: system-ui; }
+  .btnx { background:#b08d3e; color:#fff; border:none; border-radius:10px; padding:10px 18px; cursor:pointer; }
+  #result { margin-top:16px; white-space:pre-wrap; font-size:12px; background:#fff; border:1px solid #ddd; border-radius:8px; padding:12px; min-height:120px; }
+</style>
+</head>
+<body>
+<button class="btnx" id="openBtn" onclick="run()">打开测试弹窗</button>
+<div id="result">等待测试…</div>
+<script>
+  if (location.search.indexOf('auto=1') > -1) {
+    setTimeout(function () { run(); }, 400);
+  }
+</script>
+<script src="../js/common.js"></script>
+<script>
+function log(t){ var r = document.getElementById('result'); r.textContent += t + '\n'; r.scrollTop = r.scrollHeight; }
+window.onerror = function (msg, src, line) { log('SCRIPT ERROR: ' + msg + ' @line' + line); return true; };
+
+function openSheet(){
+  var sh = UI.sheet();
+  sh.setText('测试弹窗');
+  var bodyHtml = '<div style="padding:6px 2px 14px;">' +
+    '<div class="fw-700 fs-16" style="margin-bottom:8px;">内容标题</div>' +
+    '<div style="font-size:13px;line-height:1.7;color:var(--text-2);">';
+  for (var i = 1; i <= 14; i++) bodyHtml += '测试内容段落 ' + i + '：这里是一些演示文本，用于撑起弹窗内容区域高度，检验展开态下的滚动与置底按钮吸附。<br>';
+  bodyHtml += '</div><button class="btn btn-block" id="footBtn">底部置底按钮</button></div>';
+  sh.html(bodyHtml);
+  sh.show();
+  return sh;
+}
+
+function drag(handleEl, fromY, toY, steps){
+  return new Promise(function(res){
+    var rect = handleEl.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    var y0 = (fromY === undefined) ? (rect.top + rect.height / 2) : fromY;
+    var n = steps || 10;
+    function fire(type, yy){
+      var ev = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: yy, button: 0 });
+      (type === 'mousemove' || type === 'mouseup' ? window : handleEl).dispatchEvent(ev);
+    }
+    fire('mousedown', y0);
+    var i = 0;
+    (function step(){
+      if (i > n) { fire('mouseup', toY); setTimeout(res, 500); return; }
+      fire('mousemove', y0 + (toY - y0) * i / n);
+      i++; setTimeout(step, 25);
+    })();
+  });
+}
+
+async function run(){
+  var r = document.getElementById('result');
+  r.textContent = '';
+  log('== Sheet 拖拽动效测试 ==');
+  log('视口高 vh = ' + window.innerHeight + '，80% = ' + Math.round(window.innerHeight * 0.8));
+
+  try {
+    /* 场景1：向上拖 → 展开至 80% */
+    openSheet();
+    await new Promise(function(res){ setTimeout(res, 400); });
+    var sheetEl = document.querySelector('.sheet');
+    var h0 = sheetEl.offsetHeight;
+    log('打开后默认高度 h0 = ' + h0);
+    log('底部按钮提升到 .sheet-foot：' + (document.querySelector('.sheet-foot .btn-block') ? '是' : '否'));
+    log('foot 显示状态：' + (document.querySelector('.sheet-foot').style.display || 'none(CSS)'));
+    var grabZone = document.querySelector('.sheet-grabzone');
+    var gr = grabZone.getBoundingClientRect();
+    log('grabzone 顶 y=' + Math.round(gr.top));
+    await drag(grabZone, gr.top + gr.height/2, gr.top + gr.height/2 - 200);
+    sheetEl = document.querySelector('.sheet');
+    var hUp = sheetEl.offsetHeight;
+    log('向上拖 200px 松手后高度 = ' + hUp + '（期望 ' + Math.round(window.innerHeight * 0.8) + '）');
+    log('sheet-expanded 类：' + (sheetEl.classList.contains('sheet-expanded') ? '有' : '无'));
+    var footRect = document.querySelector('.sheet-foot').getBoundingClientRect();
+    var sheetRect = sheetEl.getBoundingClientRect();
+    log('展开后：sheet bottom=' + Math.round(sheetRect.bottom) + '，foot bottom=' + Math.round(footRect.bottom) + '，foot 吸附弹窗底部=' + (Math.abs(footRect.bottom - sheetRect.bottom) <= 3));
+    if (location.search.indexOf('shot=1') > -1) return; /* 截图模式：停在展开态 */
+
+    /* 场景2：展开后小距离下拖 → 回弹 80% */
+    var g2 = sheetEl.querySelector('.sheet-grabzone');
+    var g2r = g2.getBoundingClientRect();
+    await drag(g2, g2r.top + g2r.height/2, g2r.top + g2r.height/2 + 60);
+    sheetEl = document.querySelector('.sheet');
+    log('展开态下拖 60px 松手后高度 = ' + sheetEl.offsetHeight + '（期望回弹 ' + Math.round(window.innerHeight * 0.8) + '）');
+    log('弹窗仍存在：' + (sheetEl ? '是' : '否'));
+
+    /* 场景3：展开后大距离下拖 → 全部收起 */
+    var g3 = sheetEl.querySelector('.sheet-grabzone');
+    var g3r = g3.getBoundingClientRect();
+    await drag(g3, g3r.top + g3r.height/2, g3r.top + g3r.height/2 + 400);
+    log('展开态下拖 400px 松手后弹窗仍存在：' + (document.querySelector('.sheet') ? '是' : '否（已全部收起）'));
+
+    /* 场景4：未展开态下拖 → 关闭 */
+    openSheet();
+    await new Promise(function(res){ setTimeout(res, 350); });
+    var s2 = document.querySelector('.sheet');
+    var h2 = s2.offsetHeight;
+    var g4 = s2.querySelector('.sheet-grabzone');
+    var g4r = g4.getBoundingClientRect();
+    log('新弹窗 h=' + h2 + '，未展开向下拖 150px');
+    await drag(g4, g4r.top + g4r.height/2, g4r.top + g4r.height/2 + 150);
+    log('未展开下拖 150px 后弹窗仍存在：' + (document.querySelector('.sheet') ? '是' : '否（已关闭）'));
+    log('== 测试结束 ==');
+  } catch (e) {
+    log('TEST ERROR: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-engchain-basefix="2">
@@ -10,50 +10,696 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 })();
 </script><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>行业资讯 · 工程链</title>
+<title>行业总览 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <style>
-  .sub-card{margin:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));border-radius:14px;padding:18px;color:#fff;}
-  .sub-title{font-size:16px;font-weight:700;}
-  .sub-price{font-size:28px;font-weight:800;margin:8px 0 4px;}
-  .sub-price small{font-size:13px;font-weight:400;opacity:0.9;}
-  .sub-benefits{font-size:12px;opacity:0.9;line-height:1.8;}
-  .sub-btns{display:flex;gap:8px;margin-top:14px;}
-  .sub-btn{flex:1;text-align:center;padding:10px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;}
-  .sub-btn-solid{background:#fff;color:var(--primary);}
-  .sub-btn-outline{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);}
-  .cat-tabs{display:flex;gap:6px;padding:12px 12px 0;overflow-x:auto;}
-  .cat-tab{flex-shrink:0;padding:6px 14px;border-radius:999px;font-size:13px;background:var(--bg-card);color:var(--text-2);cursor:pointer;border:1px solid var(--line);}
-  .cat-tab.active{background:var(--primary);color:#fff;border-color:var(--primary);}
-  .report-item{margin:10px 12px;padding:14px;background:var(--bg-card);border-radius:12px;cursor:pointer;}
-  .report-cat{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--primary-pale);color:var(--primary-dim);margin-bottom:6px;}
-  .report-title{font-size:15px;font-weight:700;line-height:1.4;}
-  .report-summary{font-size:12px;color:var(--text-2);line-height:1.6;margin-top:6px;}
-  .report-meta{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--text-3);}
-  .report-lock{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:#fff3e0;color:#e65100;margin-left:6px;}
-  .report-free{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:#e8f5e9;color:#2e7d32;margin-left:6px;}
+/* ═══════════════════════════════════════════════════════════
+   行业总览 V1.0 — 建筑从业者每日必读门户
+   Hero数据看板 + 4 Tab + Feed流 + 业务联动
+   ═══════════════════════════════════════════════════════════ */
+body { background: var(--bg); }
+
+/* ─── 入场动画 ─── */
+.industry-hero,
+.industry-tabs,
+.focus-chip,
+.quick-card,
+.report-card,
+.price-card,
+.service-card,
+.policy-card {
+  animation: fadeInUp .4s ease-out both;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.quick-card:nth-child(1) { animation-delay: .05s; }
+.quick-card:nth-child(2) { animation-delay: .1s; }
+.quick-card:nth-child(3) { animation-delay: .15s; }
+.report-card:nth-child(1) { animation-delay: .05s; }
+.report-card:nth-child(2) { animation-delay: .1s; }
+.report-card:nth-child(3) { animation-delay: .15s; }
+
+/* ─── Hero 数据看板 ─── */
+.industry-hero{
+  margin: 10px 14px 0;
+  padding: 16px 16px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 20px -6px rgba(44,83,100,.4);
+}
+.industry-hero::before{
+  content:'';position:absolute;right:-30px;top:-30px;width:140px;height:140px;
+  border-radius:50%;border:1.5px solid rgba(201,169,97,.15);
+}
+.industry-hero-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:600;
+  color: rgba(255,255,255,.85);
+}
+.industry-hero-title .ih-dot{
+  width:8px;height:8px;border-radius:50%;background:#22c55e;
+  box-shadow:0 0 8px #22c55e;
+  animation: ihpulse 2s ease-in-out infinite;
+}
+@keyframes ihpulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.industry-hero-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;}
+
+.ih-stats{display:flex;margin-top:12px;position:relative;z-index:1;}
+.ih-stat{flex:1;text-align:center;}
+.ih-stat + .ih-stat{border-left:1px solid rgba(255,255,255,.1);}
+.ih-stat-num{
+  font-family:var(--font-num);font-size:22px;font-weight:700;
+  line-height:1;
+}
+.ih-stat-num.up{color:#f87171;}
+.ih-stat-num.down{color:#4ade80;}
+.ih-stat-num.neutral{color:#60a5fa;}
+.ih-stat-label{font-size:10px;color:rgba(255,255,255,.55);margin-top:5px;letter-spacing:.03em;}
+.ih-stat-change{font-size:9px;margin-top:2px;opacity:.8;}
+.ih-stat-change.up{color:#f87171;}
+.ih-stat-change.down{color:#4ade80;}
+
+/* ─── Tab 切换 ─── */
+.industry-tabs{
+  display:flex;margin:14px 16px 0;
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:14px;padding:3px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.industry-tabs::-webkit-scrollbar{display:none;}
+.itab{
+  flex:1;min-width:fit-content;padding:9px 14px;text-align:center;
+  font-size:12.5px;font-weight:600;color:var(--text-2);
+  border-radius:11px;cursor:pointer;white-space:nowrap;
+  transition:all .2s;
+}
+.itab.active{
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);
+  box-shadow:0 3px 10px -3px var(--primary-dim);
+}
+
+/* ─── 快讯时间线 ─── */
+.quick-feed{padding:12px 14px 0;}
+.quick-item{
+  display:flex;gap:10px;position:relative;
+  padding-bottom:12px;
+}
+.quick-rail{
+  flex:none;display:flex;flex-direction:column;align-items:center;
+  width:20px;
+}
+.quick-dot{
+  width:10px;height:10px;border-radius:50%;flex:none;
+  margin-top:4px;z-index:1;
+}
+.quick-dot.red{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15);}
+.quick-dot.orange{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.15);}
+.quick-dot.blue{background:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15);}
+.quick-dot.green{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.15);}
+.quick-line{
+  flex:1;width:1.5px;background:var(--line);
+  margin-top:2px;
+}
+.quick-item:last-child .quick-line{display:none;}
+.quick-body{flex:1;min-width:0;}
+.quick-time{
+  font-size:10.5px;color:var(--text-3);
+  margin-bottom:5px;
+}
+.quick-card{
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:12px;padding:11px 13px;
+  box-shadow:var(--shadow-xs);
+}
+.quick-tag{
+  display:inline-block;font-size:9.5px;font-weight:700;
+  padding:2px 8px;border-radius:999px;margin-bottom:6px;
+}
+.quick-tag.red{background:rgba(239,68,68,.1);color:#ef4444;}
+.quick-tag.orange{background:rgba(245,158,11,.1);color:#d97706;}
+.quick-tag.blue{background:rgba(59,130,246,.1);color:#3b82f6;}
+.quick-tag.green{background:rgba(34,197,94,.1);color:#16a34a;}
+.quick-text{font-size:12.5px;color:var(--text-1);line-height:1.55;}
+
+/* ─── 报告卡片 ─── */
+.report-feed{padding:12px 14px 0;}
+.report-card{
+  background:var(--bg-card);
+  border-radius:14px;padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+  cursor:pointer;
+  transition:transform .2s ease;
+}
+.report-card:active{transform:scale(.98);}
+.report-head{
+  display:flex;align-items:center;gap:8px;margin-bottom:8px;
+}
+.report-cat{
+  font-size:10px;font-weight:600;
+  padding:3px 8px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary-dim);
+}
+.report-badge{
+  font-size:9.5px;font-weight:700;
+  padding:2px 7px;border-radius:999px;
+}
+.report-badge.free{background:rgba(34,197,94,.1);color:#16a34a;}
+.report-badge.locked{background:rgba(245,158,11,.1);color:#d97706;}
+.report-badge.subscribed{background:rgba(201,169,97,.15);color:var(--primary-dim);}
+.report-title{
+  font-size:14.5px;font-weight:700;color:var(--text-1);
+  line-height:1.4;margin-bottom:6px;
+}
+.report-summary{
+  font-size:12px;color:var(--text-2);
+  line-height:1.6;margin-bottom:10px;
+}
+.report-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:10px;border-top:1px solid var(--line);
+  font-size:11px;color:var(--text-3);
+}
+.report-foot .rf-action{
+  color:var(--primary-dim);font-weight:600;
+  display:flex;align-items:center;gap:3px;
+}
+.report-foot .rf-action svg{width:12px;height:12px;}
+
+/* ─── 价格行情卡片 ─── */
+.price-feed{padding:12px 14px 0;}
+.price-card{
+  background:var(--bg-card);
+  border-radius:14px;padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+  transition:transform .2s ease;
+}
+.price-card:active{transform:scale(.98);}
+.price-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.price-name{font-size:13.5px;font-weight:700;color:var(--text-1);}
+.price-trend{
+  font-size:11px;font-weight:700;
+  padding:3px 8px;border-radius:6px;
+}
+.price-trend.up{background:rgba(239,68,68,.1);color:#ef4444;}
+.price-trend.down{background:rgba(34,197,94,.1);color:#16a34a;}
+.price-main{
+  display:flex;align-items:baseline;gap:8px;
+}
+.price-value{
+  font-family:var(--font-num);font-size:26px;font-weight:800;
+  color:var(--text-1);line-height:1;
+}
+.price-unit{font-size:11px;color:var(--text-3);}
+.price-change{
+  font-size:11px;font-weight:600;margin-left:auto;
+}
+.price-change.up{color:#ef4444;}
+.price-change.down{color:#16a34a;}
+.price-bar{
+  display:flex;align-items:flex-end;gap:2px;
+  height:36px;margin-top:12px;
+}
+.price-bar-col{
+  flex:1;border-radius:2px 2px 0 0;
+  background:linear-gradient(to top,var(--primary-soft),var(--primary-dim));
+  opacity:.7;
+}
+.price-bar-col.today{opacity:1;}
+.price-foot{
+  display:flex;justify-content:space-between;
+  margin-top:8px;font-size:10px;color:var(--text-3);
+}
+
+/* ─── 政策卡片 ─── */
+.policy-feed{padding:12px 14px 0;}
+.policy-card{
+  background:var(--bg-card);
+  border-left:3px solid var(--primary);
+  border-radius:12px;padding:13px 15px;
+  margin-bottom:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+  cursor:pointer;
+  transition:transform .2s ease;
+}
+.policy-card:active{transform:scale(.98);}
+.policy-card.impact-good{border-left-color:#22c55e;}
+.policy-card.impact-neutral{border-left-color:#f59e0b;}
+.policy-card.impact-bad{border-left-color:#ef4444;}
+.policy-tag{
+  display:inline-block;font-size:9.5px;font-weight:700;
+  padding:2px 7px;border-radius:999px;margin-bottom:6px;
+  background:var(--bg-card-2);color:var(--text-2);
+}
+.policy-tag.impact-good{background:rgba(34,197,94,.1);color:#16a34a;}
+.policy-tag.impact-neutral{background:rgba(245,158,11,.1);color:#d97706;}
+.policy-tag.impact-bad{background:rgba(239,68,68,.1);color:#ef4444;}
+.policy-title{
+  font-size:13.5px;font-weight:700;color:var(--text-1);
+  line-height:1.4;margin-bottom:5px;
+}
+.policy-summary{
+  font-size:11.5px;color:var(--text-2);
+  line-height:1.6;
+}
+.policy-date{
+  font-size:10.5px;color:var(--text-3);
+  margin-top:8px;
+}
+
+/* ─── 中介服务价格卡片 ─── */
+.service-feed{padding:12px 14px 0;}
+.service-card{
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:14px;padding:14px 16px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow-xs);
+}
+.service-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;
+}
+.service-name{font-size:13.5px;font-weight:700;color:var(--text-1);}
+.service-badge{
+  font-size:10px;font-weight:600;
+  padding:3px 8px;border-radius:6px;
+  background:rgba(201,169,97,.12);color:var(--primary-dim);
+}
+.service-price-row{
+  display:flex;align-items:baseline;gap:6px;
+  margin-bottom:8px;
+}
+.service-price{
+  font-family:var(--font-num);font-size:22px;font-weight:800;
+  color:var(--text-1);line-height:1;
+}
+.service-price-unit{font-size:11px;color:var(--text-3);}
+.service-price-range{
+  font-size:11px;color:var(--text-2);margin-left:auto;
+}
+.service-desc{
+  font-size:11.5px;color:var(--text-2);
+  line-height:1.6;margin-bottom:10px;
+}
+.service-tags{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;
+}
+.service-tag{
+  font-size:10px;color:var(--text-3);
+  background:var(--bg-card-2);
+  padding:3px 8px;border-radius:5px;
+}
+.service-cta{
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  padding:9px;border-radius:9px;
+  background:var(--primary-soft);color:var(--primary-dim);
+  font-size:12px;font-weight:600;text-decoration:none;
+}
+
+/* ─── 订阅转化卡片 ─── */
+.subscribe-card{
+  margin:16px 16px 0;
+  padding:16px;
+  border-radius:16px;
+  background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.04));
+  border:1px solid rgba(201,169,97,.3);
+}
+.sub-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.sub-icon{
+  flex:none;width:38px;height:38px;border-radius:11px;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);
+  display:flex;align-items:center;justify-content:center;
+}
+.sub-icon svg{width:18px;height:18px;}
+.sub-title{font-size:14px;font-weight:700;color:var(--text-1);}
+.sub-desc{font-size:11.5px;color:var(--text-2);line-height:1.6;margin-bottom:12px;}
+.sub-benefits{
+  display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;
+}
+.sub-benefit{
+  font-size:10.5px;color:var(--primary-dim);
+  background:var(--primary-soft);
+  padding:4px 10px;border-radius:999px;
+}
+.sub-btns{display:flex;gap:8px;}
+.sub-btn{
+  flex:1;padding:10px;border-radius:12px;
+  font-size:13px;font-weight:600;
+  border:none;cursor:pointer;text-align:center;
+}
+.sub-btn-solid{
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);
+  box-shadow:0 3px 10px -3px var(--primary-dim);
+}
+.sub-btn-outline{
+  background:transparent;
+  border:1px solid rgba(201,169,97,.4);
+  color:var(--primary-dim);
+}
+
+/* ─── 空状态 ─── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;
+  padding:40px 20px;text-align:center;
+}
+.empty-icon{
+  width:60px;height:60px;border-radius:50%;
+  background:var(--bg-card);border:1px dashed var(--line);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-3);margin-bottom:12px;
+}
+.empty-icon svg{width:26px;height:26px;}
+.empty-title{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:5px;}
+.empty-desc{font-size:12px;color:var(--text-3);line-height:1.6;max-width:220px;}
+
+/* ─── 报告详情弹窗 ─── */
+/* ─── 订阅引导弹窗 ─── */
+.subscribe-sheet{
+  position:fixed;left:0;right:0;bottom:0;
+  background:var(--bg-card);
+  border-radius:20px 20px 0 0;
+  padding:20px 20px 30px;
+  z-index:1000;
+  transform:translateY(100%);
+  transition:transform .35s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 -8px 32px rgba(0,0,0,.12);
+}
+.subscribe-sheet.show{transform:translateY(0);}
+.ss-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.4);
+  z-index:999;opacity:0;
+  transition:opacity .3s ease;
+  pointer-events:none;
+}
+.ss-overlay.show{opacity:1;pointer-events:auto;}
+.ss-handle{
+  width:36px;height:4px;border-radius:2px;
+  background:var(--line);margin:0 auto 16px;
+}
+.ss-title{
+  font-size:17px;font-weight:800;color:var(--text-1);
+  text-align:center;margin-bottom:6px;
+}
+.ss-desc{
+  font-size:12.5px;color:var(--text-2);text-align:center;
+  line-height:1.6;margin-bottom:20px;
+}
+.ss-benefits{
+  display:flex;flex-direction:column;gap:10px;margin-bottom:24px;
+}
+.ss-benefit{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 14px;border-radius:12px;
+  background:var(--bg);
+}
+.ss-benefit-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:var(--primary-soft);
+  display:flex;align-items:center;justify-content:center;
+  flex:none;
+}
+.ss-benefit-name{font-size:13px;font-weight:600;color:var(--text-1);}
+.ss-benefit-desc{font-size:11px;color:var(--text-3);margin-top:1px;}
+.ss-price-row{
+  display:flex;gap:10px;margin-bottom:16px;
+}
+.ss-price-btn{
+  flex:1;padding:14px;border-radius:12px;
+  text-align:center;cursor:pointer;
+  border:1.5px solid var(--line);
+  background:var(--bg-card);
+  transition:all .2s ease;
+}
+.ss-price-btn.selected{
+  border-color:var(--primary);
+  background:var(--primary-soft);
+}
+.ss-price-label{font-size:10.5px;color:var(--text-3);}
+.ss-price-num{
+  font-family:var(--font-num);font-size:20px;font-weight:800;
+  color:var(--text-1);margin-top:2px;
+}
+.ss-price-sub{font-size:10px;color:var(--text-3);margin-top:2px;}
+.ss-cta{
+  width:100%;padding:14px;border:none;border-radius:12px;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+  margin-bottom:10px;
+}
+.ss-dismiss{
+  width:100%;padding:12px;border:none;border-radius:12px;
+  background:transparent;color:var(--text-3);
+  font-size:13px;font-weight:500;cursor:pointer;
+}
+
+.report-modal{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.5);z-index:999;
+}
+.report-modal.show{display:block;}
+.report-modal-sheet{
+  position:absolute;bottom:0;left:0;right:0;
+  max-height:85vh;background:var(--bg);
+  border-radius:20px 20px 0 0;
+  padding:20px 20px 30px;
+  overflow-y:auto;
+}
+.report-modal-handle{
+  width:40px;height:4px;border-radius:2px;
+  background:var(--text-3);opacity:.5;
+  margin:0 auto 16px;
+}
+.report-modal-title{
+  font-size:18px;font-weight:700;color:var(--text-1);
+  line-height:1.4;margin-bottom:8px;
+}
+.report-modal-meta{
+  font-size:11px;color:var(--text-3);margin-bottom:14px;
+}
+.report-modal-content{
+  font-size:14px;line-height:1.8;color:var(--text-1);
+}
+.report-modal-close{
+  margin-top:20px;
+  width:100%;padding:12px;
+  border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);font-size:14px;font-weight:600;
+  cursor:pointer;
+}
 </style>
 </head>
 <body>
 <div class="phone">
   <div class="navbar">
     <button class="nav-back" onclick="history.back()">‹</button>
-    <div class="nav-title">行业资讯</div>
-    <div class="nav-right" style="width:32px;"></div>
+    <div class="nav-title">行业总览</div>
+    <button onclick="openIndustrySettings()" style="width:32px;height:32px;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-2);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:19px;height:19px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
   </div>
-  <div class="scroll" style="padding-bottom:24px;">
-    <!-- [FEAT 9.2-5] 订阅卡片 -->
-    <div class="sub-card" id="sub-card"></div>
-    <!-- 分类标签 -->
-    <div class="cat-tabs" id="cat-tabs"></div>
-    <!-- 报告列表 -->
-    <div id="report-list"></div>
+
+  <div class="scroll" style="padding-bottom:30px;">
+
+    <!-- Hero 数据看板 -->
+    <div class="industry-hero">
+      <div class="industry-hero-title">
+        <span class="ih-dot"></span>
+        今日行业速览
+      </div>
+      <div class="industry-hero-sub">建材价格 · 政策更新 · 市场动态</div>
+      <div class="ih-stats">
+        <div class="ih-stat">
+          <div class="ih-stat-num up">3850</div>
+          <div class="ih-stat-label">螺纹钢 元/吨</div>
+          <div class="ih-stat-change up">↑ 3.2% 本周</div>
+        </div>
+        <div class="ih-stat">
+          <div class="ih-stat-num neutral">5</div>
+          <div class="ih-stat-label">本周政策</div>
+          <div class="ih-stat-change">条新规发布</div>
+        </div>
+        <div class="ih-stat">
+          <div class="ih-stat-num down">485</div>
+          <div class="ih-stat-label">混凝土 元/方</div>
+          <div class="ih-stat-change up">↑ 1.2% 周环比</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="industry-tabs" id="industry-tabs">
+      <div class="itab active" data-tab="quick">快讯</div>
+      <div class="itab" data-tab="reports">深度报告</div>
+      <div class="itab" data-tab="price">价格行情</div>
+      <div class="itab" data-tab="service">中介服务</div>
+      <div class="itab" data-tab="policy">政策法规</div>
+    </div>
+
+    <!-- 快讯 Tab -->
+    <div id="pane-quick">
+      <div class="quick-feed" id="quick-feed"></div>
+    </div>
+
+    <!-- 深度报告 Tab -->
+    <div id="pane-reports" style="display:none;">
+      <div class="report-feed" id="report-feed"></div>
+    </div>
+
+    <!-- 价格行情 Tab -->
+    <div id="pane-price" style="display:none;">
+      <div class="price-feed" id="price-feed"></div>
+    </div>
+
+    <!-- 中介服务 Tab -->
+    <div id="pane-service" style="display:none;">
+      <div class="service-feed" id="service-feed"></div>
+    </div>
+
+    <!-- 政策法规 Tab -->
+    <div id="pane-policy" style="display:none;">
+      <div class="policy-feed" id="policy-feed"></div>
+    </div>
+
+    <!-- 订阅转化卡片（在深度报告Tab底部显示） -->
+    <div id="subscribe-slot"></div>
+
   </div>
 </div>
+
+<!-- 订阅引导弹窗 -->
+<div class="ss-overlay" id="ss-overlay"></div>
+<div class="subscribe-sheet" id="subscribe-sheet">
+  <div class="ss-handle"></div>
+  <div class="ss-title">解锁全部行业数据</div>
+  <div class="ss-desc">订阅后查看全部深度报告、价格走势、政策解读，每周持续更新</div>
+  <div class="ss-benefits">
+    <div class="ss-benefit">
+      <div class="ss-benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="2" style="width:16px;height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      </div>
+      <div>
+        <div class="ss-benefit-name">深度行业报告</div>
+        <div class="ss-benefit-desc">每周更新，覆盖建材/机械/劳务/政策</div>
+      </div>
+    </div>
+    <div class="ss-benefit">
+      <div class="ss-benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="2" style="width:16px;height:16px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div>
+        <div class="ss-benefit-name">实时价格行情</div>
+        <div class="ss-benefit-desc">9大品类每日更新，走势可追溯</div>
+      </div>
+    </div>
+    <div class="ss-benefit">
+      <div class="ss-benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="2" style="width:16px;height:16px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <div class="ss-benefit-name">政策影响评估</div>
+        <div class="ss-benefit-desc">每条新规标注利好/中性/利空</div>
+      </div>
+    </div>
+  </div>
+  <div class="ss-price-row">
+    <div class="ss-price-btn" data-cycle="monthly" onclick="selectPrice(this)">
+      <div class="ss-price-label">月付</div>
+      <div class="ss-price-num">¥29</div>
+      <div class="ss-price-sub">随时取消</div>
+    </div>
+    <div class="ss-price-btn selected" data-cycle="yearly" onclick="selectPrice(this)">
+      <div class="ss-price-label">年付</div>
+      <div class="ss-price-num">¥299</div>
+      <div class="ss-price-sub">省15% · 每天不到1元</div>
+    </div>
+  </div>
+  <button class="ss-cta" onclick="confirmSubscribe()">立即订阅</button>
+  <button class="ss-dismiss" onclick="closeSubscribeSheet()">稍后再说</button>
+</div>
+
+<!-- 行业总览设置弹窗 -->
+<div class="report-modal" id="settings-modal">
+  <div class="report-modal-sheet" style="max-height:80vh;">
+    <div class="report-modal-handle"></div>
+    <div style="font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:20px;">行业总览设置</div>
+
+    <!-- 关注品类 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px;">关注品类（内容将按此过滤）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;" id="settings-focus-chips">
+        <span class="settings-chip" data-cat="all" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--primary-soft);color:var(--primary-dim);border:none;">全部</span>
+        <span class="settings-chip" data-cat="建筑材料" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">建筑材料</span>
+        <span class="settings-chip" data-cat="工程机械" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">工程机械</span>
+        <span class="settings-chip" data-cat="劳务用工" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">劳务用工</span>
+        <span class="settings-chip" data-cat="政策法规" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">政策法规</span>
+        <span class="settings-chip" data-cat="市场分析" style="padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">市场分析</span>
+      </div>
+    </div>
+
+    <!-- 推送设置 -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px;">推送通知</div>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+        <span style="font-size:13.5px;color:var(--text-1);">价格预警</span>
+        <input type="checkbox" id="push-price" checked style="width:18px;height:18px;accent-color:var(--primary-dim);">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+        <span style="font-size:13.5px;color:var(--text-1);">政策更新</span>
+        <input type="checkbox" id="push-policy" checked style="width:18px;height:18px;accent-color:var(--primary-dim);">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+        <span style="font-size:13.5px;color:var(--text-1);">行业快讯</span>
+        <input type="checkbox" id="push-quick" checked style="width:18px;height:18px;accent-color:var(--primary-dim);">
+      </label>
+      <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;">
+        <span style="font-size:13.5px;color:var(--text-1);">周报摘要</span>
+        <input type="checkbox" id="push-weekly" style="width:18px;height:18px;accent-color:var(--primary-dim);">
+      </label>
+    </div>
+
+    <!-- 推送频率 -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px">推送频率</div>
+      <select id="push-freq" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-1);font-size:13.5px;">
+        <option value="realtime">实时推送</option>
+        <option value="daily">每日汇总</option>
+        <option value="weekly">每周汇总</option>
+      </select>
+    </div>
+
+    <button onclick="saveIndustrySettings()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:600;cursor:pointer;">保存设置</button>
+  </div>
+</div>
+
 <!-- 报告详情弹窗 -->
-<div id="report-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:none;">
-  <div style="position:absolute;bottom:0;left:0;right:0;max-height:80vh;background:var(--bg);border-radius:16px 16px 0 0;padding:20px;overflow-y:auto;" id="report-detail"></div>
+<div class="report-modal" id="report-modal">
+  <div class="report-modal-sheet" id="report-modal-sheet">
+    <div class="report-modal-handle"></div>
+    <div class="report-modal-title" id="rm-title"></div>
+    <div class="report-modal-meta" id="rm-meta"></div>
+    <div class="report-modal-content" id="rm-content"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="report-modal-close" style="flex:1;background:var(--bg-card-2);color:var(--text-1);" onclick="closeReportModal()">关闭</button>
+      <a href="../publish/index.html" style="flex:1.5;padding:12px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:14px;font-weight:600;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;">
+        发布采购需求
+      </a>
+    </div>
+  </div>
 </div>
+
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
@@ -61,84 +707,576 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function(){
   window.__ROOT__='../../';
+
   var cfg = (MOCK.business.industryReport) || { categories: [], subscription: {monthly:29, yearly:299} };
-  var curCat = '全部';
-  /* 渲染订阅卡片 */
-  function renderSubCard(){
-    var subbed = ReportStore.isSubscribed();
-    var el = document.getElementById('sub-card');
-    if (subbed) {
-      var s = ReportStore.read();
-      var d = new Date(s.expireAt);
-      el.innerHTML = '<div class="sub-title">已订阅数据报告</div>' +
-        '<div class="sub-price" style="font-size:18px;">有效期至 '+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'</div>' +
-        '<div class="sub-benefits">您可查看全部行业报告，免费更新</div>';
-    } else {
-      el.innerHTML = '<div class="sub-title">行业数据报告订阅</div>' +
-        '<div class="sub-price">¥'+cfg.subscription.monthly+'<small>/月</small> 或 ¥'+cfg.subscription.yearly+'<small>/年</small></div>' +
-        '<div class="sub-benefits">· 每周行业深度报告 · 建材价格走势 · 政策法规解读 · 市场分析数据</div>' +
-        '<div class="sub-btns">'+
-        '<button class="sub-btn sub-btn-solid" onclick="window.__doSub(\'monthly\')">月付 ¥'+cfg.subscription.monthly+'</button>'+
-        '<button class="sub-btn sub-btn-outline" onclick="window.__doSub(\'yearly\')">年付 ¥'+cfg.subscription.yearly+'</button>'+
-        '</div>';
+  var curTab = 'quick';
+
+  /* ═══ 快讯数据（模拟每日更新） ═══ */
+  var QUICK_NEWS = [
+    { time:'14:20', tag:'设备', tagType:'green', text:'12米高空作业车月租报价7500-9000元，国庆前赶工需求上涨，预计价格上浮5-8%' },
+    { time:'11:45', tag:'价格', tagType:'red', text:'成都C30商品混凝土均价485元/方，周环比上涨1.2%，砂石成本传导明显' },
+    { time:'10:30', tag:'价格', tagType:'red', text:'成都螺纹钢价格突破3850元/吨，本周累计上涨3.2%，钢厂减产预期持续发酵' },
+    { time:'09:15', tag:'政策', tagType:'orange', text:'住建部发布工程总承包新规，明确设计施工一体化要求，2027年1月1日起施行' },
+    { time:'昨天', tag:'市场', tagType:'blue', text:'西南基建投资同比增长9.8%，交通水利项目占比超60%，带动建材需求增长' },
+    { time:'昨天', tag:'劳务', tagType:'orange', text:'四川木工日薪同比上涨8%至350-400元，招工难现象持续' },
+    { time:'昨天', tag:'建材', tagType:'red', text:'SBS防水卷材出货量环比增长6%，房地产竣工端回暖带动需求' },
+    { time:'周三', tag:'设备', tagType:'green', text:'挖机租赁需求环比增长12%，成都20吨级月租2.8-3.5万元' },
+    { time:'周三', tag:'市场', tagType:'blue', text:'BIM算量可降低造价误差率至3%以下，成都23%甲级咨询企业已全面应用' },
+    { time:'周二', tag:'建材', tagType:'red', text:'水泥价格结束5周下跌，西南P.O42.5散装环比上涨2.1%' },
+    { time:'周二', tag:'劳务', tagType:'orange', text:'盘扣式架子工日薪400-450元，比传统钢管架子工高出15%' },
+    { time:'周一', tag:'政策', tagType:'blue', text:'农民工工资支付保障新规发布，总包须开设工资专用账户，10月1日起施行' },
+    { time:'周一', tag:'设备', tagType:'green', text:'塔机租赁行业集中度提升，头部企业市场份额从15%升至28%' },
+    { time:'上周五', tag:'市场', tagType:'blue', text:'银行保函占比首次超过60%，工程担保电子化保函渗透率达45%' },
+    { time:'上周四', tag:'政策', tagType:'orange', text:'住建部要求2027年新建建筑建筑垃圾减排30%，成都获批资源化利用试点' },
+    { time:'上周三', tag:'建材', tagType:'red', text:'机制砂均价115元/吨，碎石95元/吨，砂石价格持续高位运行' }
+  ];
+
+  /* ═══ 价格行情数据 ═══ */
+  var PRICE_DATA = [
+    { name:'螺纹钢 HRB400E', value:3850, unit:'元/吨', change:3.2, up:true,
+      bars:[3650,3680,3700,3720,3750,3780,3820,3850],
+      week:'本周走势' },
+    { name:'高线 HPB300', value:3980, unit:'元/吨', change:2.8, up:true,
+      bars:[3820,3850,3880,3900,3920,3940,3960,3980],
+      week:'本周走势' },
+    { name:'商品混凝土 C30', value:485, unit:'元/方', change:1.2, up:true,
+      bars:[472,475,478,478,480,482,483,485],
+      week:'本周走势' },
+    { name:'水泥 P.O42.5', value:385, unit:'元/吨', change:2.1, up:true,
+      bars:[368,370,372,373,375,378,382,385],
+      week:'本周走势' },
+    { name:'SBS防水卷材', value:30, unit:'元/㎡', change:0.8, up:true,
+      bars:[28,28.5,29,29,29.2,29.5,29.8,30],
+      week:'本周走势' },
+    { name:'机制砂', value:115, unit:'元/吨', change:-1.2, up:false,
+      bars:[118,117,117,116,116,115,115,115],
+      week:'本周走势' },
+    { name:'挖掘机租赁 20t', value:31500, unit:'元/月', change:0.5, up:false,
+      bars:[32000,31800,31600,31550,31500,31500,31500,31500],
+      week:'本周走势' },
+    { name:'高空作业车 12m', value:8200, unit:'元/月', change:5.2, up:true,
+      bars:[7800,7850,7900,7950,8000,8050,8120,8200],
+      week:'本周走势' },
+    { name:'盘扣脚手架', value:9.8, unit:'元/㎡/月', change:0, up:false,
+      bars:[9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8],
+      week:'本周走势' }
+  ];
+
+  /* ═══ 中介服务价格数据 ═══ */
+  var SERVICE_DATA = [
+    { name:'资质代办·建筑总承包三级', price:18000, unit:'元/项', range:'1.5-3.5万',
+      desc:'含人员配置、材料整理、申报跟进，含安许代办另加5000元',
+      tags:['建筑资质','代办','约30-45天'] },
+    { name:'代理记账·小规模', price:300, unit:'元/月', range:'200-500元/月',
+      desc:'含税务申报、工商年报、凭证装订，年付9折',
+      tags:['财税','代理记账','按月付费'] },
+    { name:'造价咨询·施工图预算', price:2500, unit:'元/份', range:'2000-8000元',
+      desc:'按工程造价0.1-0.3‰计取，含工程量清单、报价分析',
+      tags:['造价','预算','约7-15天'] },
+    { name:'招标代理·服务类', price:8000, unit:'元/项目', range:'5000-2万',
+      desc:'含招标文件编制、开评标组织、中标通知书发放',
+      tags:['招投标','代理','全流程'] },
+    { name:'工商注册·公司注册', price:0, unit:'元', range:'0-800元',
+      desc:'免费注册（需代账），含营业执照、刻章、银行开户预约',
+      tags:['工商','注册','3-5个工作日'] },
+    { name:'安许代办·安全生产许可证', price:12000, unit:'元/项', range:'8000-1.5万',
+      desc:'含人员考证安排、材料申报、现场核查配合',
+      tags:['安全许可','代办','约20-30天'] },
+    { name:'标书制作·技术标', price:3500, unit:'元/份', range:'2000-6000元',
+      desc:'含技术方案、施工组织设计、进度计划编制',
+      tags:['招投标','标书','按项目复杂度'] },
+    { name:'建筑资质升级·二级升一级', price:60000, unit:'元/项', range:'5-12万',
+      desc:'含业绩整理、人员配置、材料申报全流程服务',
+      tags:['资质升级','代办','约3-6个月'] }
+  ];
+
+  /* ═══ 快讯分类映射 ═══ */
+  var QUICK_CAT_MAP = {
+    '价格': '建筑材料', '建材': '建筑材料',
+    '设备': '工程机械',
+    '劳务': '劳务用工',
+    '政策': '政策法规',
+    '市场': '市场分析'
+  };
+
+  /* ═══ 渲染快讯 ═══ */
+  function renderQuick(){
+    var news = QUICK_NEWS;
+    if (focusCat !== 'all') {
+      news = news.filter(function(n){
+        return QUICK_CAT_MAP[n.tag] === focusCat;
+      });
     }
-  }
-  /* 渲染分类 */
-  function renderCats(){
-    var cats = ['全部'].concat(cfg.categories || []);
-    document.getElementById('cat-tabs').innerHTML = cats.map(function(c){
-      return '<div class="cat-tab'+(c===curCat?' active':'')+'" data-cat="'+c+'">'+c+'</div>';
+    if (!news.length) {
+      document.getElementById('quick-feed').innerHTML = emptyHTML('该分类暂无快讯');
+      return;
+    }
+    var html = news.map(function(n){
+      return '<div class="quick-item">'+
+        '<div class="quick-rail">'+
+          '<span class="quick-dot '+n.tagType+'"></span>'+
+          '<div class="quick-line"></div>'+
+        '</div>'+
+        '<div class="quick-body">'+
+          '<div class="quick-time">'+n.time+'</div>'+
+          '<div class="quick-card">'+
+            '<span class="quick-tag '+n.tagType+'">'+n.tag+'</span>'+
+            '<div class="quick-text">'+n.text+'</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
     }).join('');
-    document.querySelectorAll('.cat-tab').forEach(function(tab){
-      tab.onclick = function(){ curCat = tab.dataset.cat; renderCats(); renderList(); };
-    });
+    var subbed = ReportStore.isSubscribed();
+    if (!subbed) {
+      html += '<div style="margin:12px 0 0;text-align:center;padding:8px 0;">' +
+        '<span style="font-size:11px;color:var(--text-3);">订阅解锁深度报告 · </span>' +
+        '<span onclick="openSubscribeSheet()" style="font-size:11px;color:var(--primary-dim);font-weight:600;cursor:pointer;">了解详情 ›</span>' +
+      '</div>';
+    }
+    document.getElementById('quick-feed').innerHTML = html;
   }
-  /* 渲染报告列表 */
-  function renderList(){
-    var reports = ReportStore.list(curCat);
+
+  /* ═══ 收藏功能 ═══ */
+  function getFavs(){
+    try { return JSON.parse(localStorage.getItem('industry_favs') || '[]'); } catch(e) { return []; }
+  }
+  function isFav(id){ return getFavs().indexOf(id) > -1; }
+  window.toggleFav = function(id){
+    var favs = getFavs();
+    var i = favs.indexOf(id);
+    if (i > -1) { favs.splice(i,1); UI.toast('已取消收藏'); }
+    else { favs.push(id); UI.toast('已收藏','ok'); }
+    localStorage.setItem('industry_favs', JSON.stringify(favs));
+    renderReports();
+  };
+
+  /* ═══ 关注品类过滤 ═══ */
+  var focusCat = localStorage.getItem('industry_focus_cat') || 'all';
+  window.setFocusCat = function(cat){
+    focusCat = cat;
+    localStorage.setItem('industry_focus_cat', cat);
+    document.querySelectorAll('.focus-chip').forEach(function(ch){
+      var active = ch.dataset.cat === cat;
+      ch.classList.toggle('active', active);
+      ch.style.background = active ? 'var(--primary-soft)' : 'var(--bg-card)';
+      ch.style.color = active ? 'var(--primary-dim)' : 'var(--text-2)';
+      ch.style.border = active ? 'none' : '1px solid var(--line)';
+    });
+    // 切换关注品类时重新渲染所有Tab
+    renderQuick();
+    renderReports();
+    renderPrice();
+    renderPolicy();
+  };
+
+
+  /* ═══ 渲染报告 ═══ */
+  function renderReports(){
+    var reports = MOCK.reports || [];
+    if (focusCat !== 'all') reports = reports.filter(function(r){ return r.category === focusCat; });
     var subbed = ReportStore.isSubscribed();
     var html = reports.map(function(r){
       var canRead = r.isFree || subbed;
-      var badge = r.isFree ? '<span class="report-free">免费</span>' : (subbed ? '' : '<span class="report-lock">付费</span>');
-      return '<div class="report-item" onclick="window.__openReport(\''+r.id+'\')">'+
-        '<span class="report-cat">'+r.category+'</span>'+badge+
+      var badge = r.isFree
+        ? '<span class="report-badge free">免费</span>'
+        : (subbed ? '<span class="report-badge subscribed">已订阅</span>' : '<span class="report-badge locked">付费</span>');
+      var action = canRead ? '查看详情 ›' : '订阅后查看 ›';
+      return '<div class="report-card" onclick="openReport(\''+r.id+'\')">'+
+        '<div class="report-head">'+
+          '<span class="report-cat">'+r.category+'</span>'+
+          badge+
+        '</div>'+
         '<div class="report-title">'+r.title+'</div>'+
         '<div class="report-summary">'+r.summary+'</div>'+
-        '<div class="report-meta"><span>'+r.date+'</span><span>'+(canRead?'查看详情 ›':'订阅后查看 ›')+'</span></div>'+
+        '<div class="report-foot">'+
+          '<span>'+r.date+'</span>'+
+          '<span style="display:flex;align-items:center;gap:12px;">'+
+            '<button onclick="event.stopPropagation();toggleFav(\''+r.id+'\')" style="background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:3px;color:'+
+              (isFav(r.id) ? 'var(--primary-dim)' : 'var(--text-3)')+
+              ';font-size:11px;">'+
+              '<svg viewBox="0 0 24 24" fill="'+(isFav(r.id)?'currentColor':'none')+'" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>'+
+              (isFav(r.id)?'已收藏':'收藏')+
+            '</button>'+
+            '<span class="rf-action">'+action+
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>'+
+            '</span>'+
+          '</span>'+
+        '</div>'+
       '</div>';
     }).join('');
-    document.getElementById('report-list').innerHTML = html || '<div style="text-align:center;color:var(--text-3);padding:40px 0;">暂无报告</div>';
+    document.getElementById('report-feed').innerHTML = html || emptyHTML('暂无报告');
   }
-  /* 打开报告详情 */
-  window.__openReport = function(id){
-    var r = (MOCK.reports||[]).filter(function(x){return x.id===id;})[0];
-    if(!r) return;
+
+  /* ═══ 生成SVG折线图 ═══ */
+  function genSparkline(values, color){
+    var w = 300, h = 80, pad = 6;
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    var range = max - min || 1;
+    var stepX = (w - pad*2) / (values.length - 1);
+    var points = values.map(function(v,i){
+      var x = pad + i * stepX;
+      var y = h - pad - ((v - min) / range) * (h - pad*2);
+      return [x,y];
+    });
+    // 折线 path
+    var linePath = points.map(function(p,i){
+      return (i===0?'M':'L') + p[0].toFixed(1) + ',' + p[1].toFixed(1);
+    }).join(' ');
+    // 面积 path
+    var areaPath = linePath + ' L' + points[points.length-1][0].toFixed(1) + ',' + (h-pad) + ' L' + points[0][0].toFixed(1) + ',' + (h-pad) + ' Z';
+    // 最新点
+    var last = points[points.length-1];
+    var gid = 'sg' + Math.random().toString(36).substr(2,6);
+    return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:80px;margin-top:12px;">' +
+      '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="'+color+'" stop-opacity=".25"/>' +
+      '<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      '<path d="'+areaPath+'" fill="url(#'+gid+')"/>' +
+      '<path d="'+linePath+'" fill="none" stroke="'+color+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="3.5" fill="'+color+'" stroke="#fff" stroke-width="1.5"/>' +
+      '</svg>';
+  }
+
+  /* ═══ 价格分类映射 ═══ */
+  var PRICE_CAT_MAP = {
+    '螺纹钢 HRB400E': '建筑材料',
+    '高线 HPB300': '建筑材料',
+    '商品混凝土 C30': '建筑材料',
+    '水泥 P.O42.5': '建筑材料',
+    'SBS防水卷材': '建筑材料',
+    '机制砂': '建筑材料',
+    '挖掘机租赁 20t': '工程机械',
+    '高空作业车 12m': '工程机械',
+    '盘扣脚手架': '劳务用工'
+  };
+
+  /* ═══ 渲染价格行情 ═══ */
+  function renderPrice(){
+    var prices = PRICE_DATA;
+    if (focusCat !== 'all') {
+      prices = prices.filter(function(p){
+        return PRICE_CAT_MAP[p.name] === focusCat;
+      });
+    }
+    if (!prices.length) {
+      document.getElementById('price-feed').innerHTML = emptyHTML('该分类暂无价格行情');
+      return;
+    }
+    var html = prices.map(function(p){
+      var trendCls = p.change === 0 ? '' : (p.up ? 'up' : 'down');
+      var trendText = p.change === 0 ? '持平' : (p.up ? '↑' : '↓') + Math.abs(p.change) + '%';
+      var chartColor = p.change === 0 ? '#94a3b8' : (p.up ? '#ef4444' : '#22c55e');
+      var chart = genSparkline(p.bars, chartColor);
+      return '<div class="price-card">'+
+        '<div class="price-head">'+
+          '<span class="price-name">'+p.name+'</span>'+
+          '<span class="price-trend '+trendCls+'">'+trendText+'</span>'+
+        '</div>'+
+        '<div class="price-main">'+
+          '<span class="price-value">'+p.value+'</span>'+
+          '<span class="price-unit">'+p.unit+'</span>'+
+        '</div>'+
+        chart +
+        '<div class="price-foot">'+
+          '<span>'+p.week+'</span>'+
+          '<span>8个交易日</span>'+
+        '</div>'+
+        '<a href="../publish/index.html?cat='+encodeURIComponent(p.name)+'" style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:10px;padding:8px;border-radius:9px;background:var(--primary-soft);color:var(--primary-dim);font-size:11.5px;font-weight:600;text-decoration:none;">'+
+          '去采购 · 发布需求'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="m9 18 6-6-6-6"/></svg>'+
+        '</a>'+
+      '</div>';
+    }).join('');
     var subbed = ReportStore.isSubscribed();
-    if(!r.isFree && !subbed){ UI.toast('该报告需订阅后查看','warn'); return; }
-    ReportStore.read(id);
-    var modal = document.getElementById('report-modal');
-    var detail = document.getElementById('report-detail');
-    detail.innerHTML = '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">'+r.title+'</div>'+
-      '<div style="font-size:12px;color:var(--text-3);margin-bottom:12px;">'+r.category+' · '+r.date+'</div>'+
-      '<div style="font-size:14px;line-height:1.8;color:var(--text-1);">'+r.content+'</div>'+
-      '<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="document.getElementById(\'report-modal\').style.display=\'none\'">关闭</button>';
-    modal.style.display = 'block';
-  };
-  /* 订阅 */
-  window.__doSub = function(cycle){
-    var r = ReportStore.subscribe(cycle);
-    if(r && r.error){ UI.toast(r.error,'warn'); return; }
-    UI.toast('订阅成功，可查看全部报告','ok');
-    renderSubCard();
-  };
-  /* 点击遮罩关闭 */
-  document.getElementById('report-modal').addEventListener('click', function(e){
-    if(e.target === this) this.style.display = 'none';
+    if (!subbed) {
+      html += '<div style="margin:16px 0 0;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(201,169,97,.1),rgba(201,169,97,.03));border:1px solid rgba(201,169,97,.25);">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:4px;">解锁完整价格历史数据</div>' +
+        '<div style="font-size:11.5px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">订阅后可查看90天价格走势、多品类对比、价格预警推送</div>' +
+        '<button onclick="doSub(\'monthly\')" style="width:100%;padding:9px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12.5px;font-weight:600;cursor:pointer;">立即订阅</button>' +
+      '</div>';
+    }
+    document.getElementById('price-feed').innerHTML = html;
+  }
+
+  /* ═══ 渲染中介服务价格 ═══ */
+  function renderService(){
+    var html = SERVICE_DATA.map(function(s){
+      return '<div class="service-card">'+
+        '<div class="service-head">'+
+          '<span class="service-name">'+s.name+'</span>'+
+          '<span class="service-badge">参考价</span>'+
+        '</div>'+
+        '<div class="service-price-row">'+
+          '<span class="service-price">'+(s.price === 0 ? '免费起' : '¥'+s.price)+'</span>'+
+          '<span class="service-price-unit">'+s.unit+'</span>'+
+          '<span class="service-price-range">区间：'+s.range+'</span>'+
+        '</div>'+
+        '<div class="service-desc">'+s.desc+'</div>'+
+        '<div class="service-tags">'+
+          s.tags.map(function(t){ return '<span class="service-tag">'+t+'</span>'; }).join('')+
+        '</div>'+
+        '<a href="../agency/index.html" class="service-cta">'+
+          '找服务商 · 立即咨询'+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><path d="m9 18 6-6-6-6"/></svg>'+
+        '</a>'+
+      '</div>';
+    }).join('');
+    document.getElementById('service-feed').innerHTML = html;
+  }
+
+  /* ═══ 渲染政策法规 ═══ */
+  function renderPolicy(){
+    var policies = (MOCK.reports || []).filter(function(r){ return r.category === '政策法规'; });
+    var impactMap = {
+      '住建部发布工程总承包新规解读': 'impact-neutral',
+      '建筑业农民工工资支付保障新规要点': 'impact-good',
+      '建筑废料资源化利用政策解读': 'impact-good'
+    };
+    var impactLabel = {
+      'impact-good': '利好行业',
+      'impact-neutral': '中性影响',
+      'impact-bad': '利空'
+    };
+    var html = policies.map(function(r){
+      var impact = impactMap[r.title] || 'impact-neutral';
+      return '<div class="policy-card '+impact+'" onclick="openReport(\''+r.id+'\')">'+
+        '<span class="policy-tag '+impact+'">'+impactLabel[impact]+'</span>'+
+        '<div class="policy-title">'+r.title+'</div>'+
+        '<div class="policy-summary">'+r.summary+'</div>'+
+        '<div class="policy-date">'+r.date+'</div>'+
+      '</div>';
+    }).join('');
+    var subbed = ReportStore.isSubscribed();
+    if (!subbed && html) {
+      html += '<div style="margin:16px 0 0;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(201,169,97,.1),rgba(201,169,97,.03));border:1px solid rgba(201,169,97,.25);">' +
+        '<div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:4px;">获取政策深度解读</div>' +
+        '<div style="font-size:11.5px;color:var(--text-2);line-height:1.6;margin-bottom:10px;">订阅专家政策解读报告，帮你预判政策对业务的影响</div>' +
+        '<button onclick="doSub(\'monthly\')" style="width:100%;padding:9px;border:none;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12.5px;font-weight:600;cursor:pointer;">立即订阅</button>' +
+      '</div>';
+    }
+    document.getElementById('policy-feed').innerHTML = html || emptyHTML('暂无政策');
+  }
+
+  /* ═══ 空状态 ═══ */
+  function emptyHTML(msg){
+    return '<div class="empty-state">'+
+      '<div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></div>'+
+      '<div class="empty-title">暂无内容</div>'+
+      '<div class="empty-desc">'+msg+'</div>'+
+    '</div>';
+  }
+
+  /* ═══ 订阅卡片 ═══ */
+  function renderSubscribe(){
+    var subbed = ReportStore.isSubscribed();
+    var slot = document.getElementById('subscribe-slot');
+    if (subbed) {
+      var s = ReportStore.read();
+      var d = new Date(s.expireAt);
+      slot.innerHTML = '<div class="subscribe-card">'+
+        '<div class="sub-head">'+
+          '<div class="sub-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>'+
+          '<div class="sub-title">已订阅 · 有效期至 '+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'</div>'+
+        '</div>'+
+        '<div class="sub-desc">全部行业报告已解锁，新报告自动更新</div>'+
+      '</div>';
+      return;
+    }
+    slot.innerHTML = '<div onclick="openSubscribeSheet()" style="margin:12px 14px 0;padding:12px 14px;border-radius:12px;background:var(--bg-card);box-shadow:var(--shadow-xs);cursor:pointer;display:flex;align-items:center;gap:12px;">'+
+      '<div style="width:36px;height:36px;border-radius:10px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;flex:none;">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="var(--primary-dim)" stroke-width="2" style="width:18px;height:18px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'+
+      '</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-size:12.5px;font-weight:700;color:var(--text-1);">行业数据订阅</div>'+
+        '<div style="font-size:10.5px;color:var(--text-3);margin-top:2px;">深度报告 · 价格行情 · 政策解读</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--primary-dim);font-weight:600;flex:none;">了解 ›</div>'+
+    '</div>';
+  }
+
+  /* ═══ Tab 切换 ═══ */
+  document.getElementById('industry-tabs').addEventListener('click', function(e){
+    var tab = e.target.closest('.itab');
+    if (!tab) return;
+    document.querySelectorAll('.itab').forEach(function(t){ t.classList.remove('active'); });
+    tab.classList.add('active');
+    curTab = tab.dataset.tab;
+    ['quick','reports','price','service','policy'].forEach(function(p){
+      document.getElementById('pane-'+p).style.display = (p === curTab) ? '' : 'none';
+    });
+    // 切换Tab时重新渲染对应内容
+    if (curTab === 'quick') renderQuick();
+    if (curTab === 'reports') renderReports();
+    if (curTab === 'price') renderPrice();
+    if (curTab === 'service') renderService();
+    if (curTab === 'policy') renderPolicy();
+    renderSubscribe();
   });
-  renderSubCard();
-  renderCats();
-  renderList();
+
+  /* ═══ 推送设置 ═══ */
+  /* ═══ 行业总览设置弹窗 ═══ */
+  window.openIndustrySettings = function(){
+    // 恢复关注品类选中状态
+    document.querySelectorAll('.settings-chip').forEach(function(ch){
+      var active = ch.dataset.cat === focusCat;
+      ch.style.background = active ? 'var(--primary-soft)' : 'var(--bg)';
+      ch.style.color = active ? 'var(--primary-dim)' : 'var(--text-2)';
+      ch.style.border = active ? 'none' : '1px solid var(--line)';
+    });
+    // 恢复推送设置
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem('industry_push') || '{}'); } catch(e){}
+    document.getElementById('push-price').checked = saved.price !== false;
+    document.getElementById('push-policy').checked = saved.policy !== false;
+    document.getElementById('push-quick').checked = saved.quick !== false;
+    document.getElementById('push-weekly').checked = saved.weekly === true;
+    document.getElementById('push-freq').value = saved.freq || 'realtime';
+    document.getElementById('settings-modal').classList.add('show');
+  };
+  window.closeIndustrySettings = function(){
+    document.getElementById('settings-modal').classList.remove('show');
+  };
+  window.saveIndustrySettings = function(){
+    // 保存关注品类
+    var selected = document.querySelector('.settings-chip[style*="primary-soft"]');
+    if (selected) {
+      var cat = selected.dataset.cat;
+      focusCat = cat;
+      localStorage.setItem('industry_focus_cat', cat);
+      renderQuick();
+      renderReports();
+      renderPrice();
+      renderPolicy();
+    }
+    // 保存推送设置
+    var settings = {
+      price: document.getElementById('push-price').checked,
+      policy: document.getElementById('push-policy').checked,
+      quick: document.getElementById('push-quick').checked,
+      weekly: document.getElementById('push-weekly').checked,
+      freq: document.getElementById('push-freq').value
+    };
+    localStorage.setItem('industry_push', JSON.stringify(settings));
+    document.getElementById('settings-modal').classList.remove('show');
+    UI.toast('设置已保存','ok');
+  };
+  // 设置弹窗chip点击
+  document.getElementById('settings-focus-chips').addEventListener('click', function(e){
+    var chip = e.target.closest('.settings-chip');
+    if (!chip) return;
+    document.querySelectorAll('.settings-chip').forEach(function(ch){
+      ch.style.background = 'var(--bg)';
+      ch.style.color = 'var(--text-2)';
+      ch.style.border = '1px solid var(--line)';
+    });
+    chip.style.background = 'var(--primary-soft)';
+    chip.style.color = 'var(--primary-dim)';
+    chip.style.border = 'none';
+  });
+  document.getElementById('settings-modal').addEventListener('click', function(e){
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  /* ═══ 发布采购需求跳转 ═══ */
+  window.goPublishDemand = function(){
+    closeReportModal();
+    location.href = '../publish/index.html';
+  };
+
+  /* ═══ 报告详情弹窗 ═══ */
+  window.openReport = function(id){
+    var r = (MOCK.reports||[]).filter(function(x){ return x.id===id; })[0];
+    if (!r) return;
+    var subbed = ReportStore.isSubscribed();
+    if (!r.isFree && !subbed) { UI.toast('该报告需订阅后查看','warn'); return; }
+    ReportStore.read(id);
+    document.getElementById('rm-title').textContent = r.title;
+    document.getElementById('rm-meta').textContent = r.category + ' · ' + r.date;
+    document.getElementById('rm-content').textContent = r.content;
+    document.getElementById('report-modal').classList.add('show');
+  };
+  window.closeReportModal = function(){
+    document.getElementById('report-modal').classList.remove('show');
+  };
+  document.getElementById('report-modal').addEventListener('click', function(e){
+    if (e.target === this) closeReportModal();
+  });
+
+  /* ═══ 订阅 ═══ */
+  window.doSub = function(cycle){
+    var r = ReportStore.subscribe(cycle);
+    if (r && r.error) { UI.toast(r.error,'warn'); return; }
+    UI.toast('订阅成功，可查看全部报告','ok');
+    closeSubscribeSheet();
+    renderSubscribe();
+  };
+
+  /* ═══ 订阅引导弹窗 ═══ */
+  window.openSubscribeSheet = function(){
+    document.getElementById('subscribe-sheet').classList.add('show');
+    document.getElementById('ss-overlay').classList.add('show');
+  };
+  window.closeSubscribeSheet = function(){
+    document.getElementById('subscribe-sheet').classList.remove('show');
+    document.getElementById('ss-overlay').classList.remove('show');
+    localStorage.setItem('industry_sub_sheet_dismissed', '1');
+  };
+  window.selectPrice = function(el){
+    document.querySelectorAll('.ss-price-btn').forEach(function(b){ b.classList.remove('selected'); });
+    el.classList.add('selected');
+  };
+  window.confirmSubscribe = function(){
+    var selected = document.querySelector('.ss-price-btn.selected');
+    var cycle = selected ? selected.dataset.cycle : 'monthly';
+    doSub(cycle);
+  };
+  document.getElementById('ss-overlay').addEventListener('click', closeSubscribeSheet);
+
+  // 自动弹出：浏览15秒后，如果未订阅且未关闭过，则弹出
+  setTimeout(function(){
+    var subbed = ReportStore.isSubscribed();
+    var dismissed = localStorage.getItem('industry_sub_sheet_dismissed');
+    if (!subbed && !dismissed) {
+      openSubscribeSheet();
+    }
+  }, 15000);
+
+
+
+  /* ═══ 初始渲染 ═══ */
+  renderQuick();
+  renderReports();
+  renderPrice();
+  renderService();
+  renderPolicy();
+  renderSubscribe();
 })();
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

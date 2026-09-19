@@ -1,4 +1,4 @@
-/* ============================================================================
+﻿/* ============================================================================
    工程链 ENGCHAIN — 通用脚本 (common.js)
    Toast / 半屏弹窗 / 居中对话框 / 返回 / iPhone 状态栏 / 支付墙解锁
    ============================================================================ */
@@ -53,7 +53,7 @@ window.UI = (function () {
     // 动态创建 sheet 容器
     const wrap = document.createElement('div');
     wrap.className = 'sheet';
-    wrap.innerHTML = '<div class="grab"></div><div class="sheet-head"><div class="fs-17 fw-600"></div><button class="icon-btn sheet-close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="sheet-body"></div>';
+    wrap.innerHTML = '<div class="sheet-grabzone"><div class="grab"></div></div><div class="sheet-inner"><div class="sheet-head"><div class="fs-17 fw-600"></div><button class="icon-btn sheet-close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="sheet-body"></div></div><div class="sheet-foot"></div>';
     document.body.appendChild(wrap);
     const overlay = document.createElement('div');
     overlay.className = 'sheet-overlay';
@@ -63,6 +63,7 @@ window.UI = (function () {
     wrap.show = () => {
       requestAnimationFrame(() => { overlay.style.opacity = '1'; overlay.style.visibility = 'visible'; wrap.classList.add('show'); });
       document.body.style.overflow = 'hidden';
+      requestAnimationFrame(() => { boostStickyFoot(); bindDrag(); });
     };
     wrap.setText = (title) => { wrap.querySelector('.sheet-head .fs-17').textContent = title; };
     wrap.body = () => wrap.querySelector('.sheet-body');
@@ -79,9 +80,233 @@ window.UI = (function () {
       setTimeout(() => { wrap.remove(); overlay.remove(); document.body.style.overflow = ''; }, 300);
     }
     wrap.close = close;
+    /* ---------- 通用拖拽动效（所有 bottom sheet 生效） ----------
+       横线拖拽区向上拖 → 展开至 80vh；向下拖 → 回弹或收起；
+       foot 置底按钮提升后保持不动，inner（头部+正文）整体跟随上划/下滑 */
+    const inner = wrap.querySelector('.sheet-inner');
+    const grab = wrap.querySelector('.sheet-grabzone');
+    const foot = wrap.querySelector('.sheet-foot');
+    let _expanded = false;
+    let _baseH = 0;
+    const _drag = { on: false, startY: 0, dy: 0, vy: 0, lastY: 0, lastT: 0 };
+    function vh() { return (window.innerHeight || 800); }
+    function isExpanded() { return _expanded || wrap.classList.contains('sheet-expanded') || wrap.classList.contains('city-sheet'); }
+    function setExpanded(on) {
+      _expanded = on;
+      wrap.classList.toggle('sheet-expanded', on);
+      wrap.style.height = on ? (Math.round(vh() * 0.8) + 'px') : '';
+    }
+    function boostStickyFoot() {
+      if (!foot) return;
+      const body = wrap.querySelector('.sheet-body');
+      if (!body) return;
+      let last = null;
+      const blocks = body.querySelectorAll('.btn-block');
+      if (blocks.length) {
+        last = blocks[blocks.length - 1];
+      } else {
+        /* 兜底：sheet-body 最后一个直接子节点若含块级按钮，视为置底操作区 */
+        const kids = body.children;
+        if (kids.length) {
+          const lastKid = kids[kids.length - 1];
+          if (lastKid.querySelector && lastKid.querySelector('.btn')) last = lastKid;
+        }
+      }
+      if (!last) { foot.style.display = 'none'; return; }
+      const group = [];
+      let cur = last;
+      while (cur) {
+        group.unshift(cur);
+        cur = cur.previousElementSibling;
+        if (!cur || !cur.classList || !cur.classList.contains('btn-block')) break;
+      }
+      const grp = document.createElement('div');
+      grp.className = 'sheet-foot-inner';
+      group.forEach(function (n) { grp.appendChild(n); });
+      foot.innerHTML = '';
+      foot.appendChild(grp);
+      foot.style.display = 'block';
+      body.style.paddingBottom = 'calc(var(--sp-5) + 78px)';
+    }
+    function dragOn() {
+      if (_drag.on) return;
+      _drag.on = true;
+      _drag.dy = 0; _drag.vy = 0; _drag.lastY = 0; _drag.lastT = 0;
+      _baseH = wrap.getBoundingClientRect().height;
+      wrap.classList.add('dragging');
+      inner.style.transition = 'none';
+      wrap.style.transition = 'none';
+    }
+    function dragMove(y) {
+      if (!_drag.on) return;
+      const now = Date.now();
+      const dy = y - _drag.startY;
+      if (_drag.lastT) _drag.vy = (y - _drag.lastY) / Math.max(now - _drag.lastT, 1);
+      _drag.lastY = y; _drag.lastT = now; _drag.dy = dy;
+      const h = vh();
+      inner.style.transform = '';
+      if (isExpanded()) {
+        /* 展开态向下拖：整块弹窗本体（含白色背景板）向下收起 */
+        wrap.style.transform = 'translateX(-50%) translateY(' + Math.max(dy, 0) + 'px)';
+      } else if (dy < 0) {
+        /* 未展开向上拖：本体高度增加，背景板顶边上移 */
+        const nh = Math.min(_baseH - dy, h * 0.8);
+        wrap.style.height = nh + 'px';
+        wrap.style.transform = 'translateX(-50%) translateY(0)';
+      } else {
+        /* 未展开向下拖：整块弹窗本体向下收起 */
+        wrap.style.transform = 'translateX(-50%) translateY(' + Math.min(dy, h * 0.8) + 'px)';
+      }
+    }
+    function dragOff() {
+      if (!_drag.on) return;
+      _drag.on = false;
+      wrap.classList.remove('dragging');
+      inner.style.transition = '';
+      wrap.style.transition = '';
+    }
+    function dragEnd() {
+      if (!_drag.on) return;
+      const dy = _drag.dy, sp = _drag.vy;
+      const h = vh();
+      const wasExpanded = isExpanded();
+      dragOff();
+      const fastDown = sp > 0.8 && dy > 30;   /* 快速下甩（含小位移）→ 视为收起意图 */
+      const fastUp = sp < -0.7;               /* 快速上甩 → 视为展开意图 */
+      if (!wasExpanded && (dy < -60 || fastUp)) {
+        setExpanded(true);
+        wrap.style.transform = '';
+      } else if (dy > 0 || fastDown) {
+        if (wasExpanded) {
+          if (dy > h * 0.22 || fastDown) close();
+          else { wrap.style.transform = ''; setExpanded(true); }
+        } else {
+          if (dy > 70 || fastDown) close();
+          else { wrap.style.transform = ''; wrap.style.height = _baseH + 'px'; }
+        }
+      } else {
+        wrap.style.transform = '';
+        if (!wasExpanded) wrap.style.height = _baseH + 'px';
+      }
+    }
+    function bindDrag() {
+      const target = grab || inner;
+      function yOf(e) { return e.touches ? e.touches[0].clientY : e.clientY; }
+      function onStart(e) { _drag.startY = yOf(e); _drag.lastY = yOf(e); _drag.lastT = Date.now(); _drag.dy = 0; _drag.vy = 0; dragOn(); }
+      function onMove(e) { if (_drag.on) { e.preventDefault(); dragMove(yOf(e)); } }
+      function onEnd() { dragEnd(); }
+      target.addEventListener('touchstart', onStart, { passive: false });
+      target.addEventListener('touchmove', onMove, { passive: false });
+      target.addEventListener('touchend', onEnd);
+      target.addEventListener('mousedown', function (e) {
+        if (e.button !== 0) return;
+        onStart(e);
+        const mm = function (ev) { onMove(ev); };
+        const mu = function () { window.removeEventListener('mousemove', mm); window.removeEventListener('mouseup', mu); onEnd(); };
+        window.addEventListener('mousemove', mm);
+        window.addEventListener('mouseup', mu);
+      });
+    }
     return wrap;
   }
 
+  /* ------------------------------------------------------------------
+     页面自建 bottom sheet 的通用拖拽（全局委托）
+     用法：弹窗容器加 [data-sheet-box]，其顶部横线/头部加 [data-sheet-drag]
+     → 自动获得与 UI.sheet 相同的拖拽动效：
+       向上拖 → 展开至视口高 80%；向下拖 → 伴随收起（松手判断回弹或关闭）
+     ------------------------------------------------------------------ */
+  function bindCustomSheetDrag(box) {
+    const handle = box.querySelector('[data-sheet-drag]') || box;
+    const inner = box.querySelector('[data-sheet-inner]') || null;
+    const UP_TRIGGER = 48, DOWN_CLOSE = 72;
+    let st = null;
+    function expandedH() { return Math.round((window.innerHeight || 800) * 0.8); }
+    function closeBox() {
+      box.classList.remove('show', 'sheet-expanded', 'dragging');
+      box.style.height = ''; box.style.transform = '';
+      const maskSel = box.getAttribute('data-sheet-mask');
+      let mask = maskSel ? document.querySelector(maskSel) : null;
+      if (!mask && box.id) {
+        const cand = document.getElementById(box.id.replace(/[Ss]heet$/, 'Mask'));
+        if (cand) mask = cand;
+      }
+      if (mask) mask.classList.remove('show');
+      const ov = box.closest ? box.closest('.filter-overlay, [data-sheet-overlay]') : null;
+      if (ov && ov.classList) { ov.classList.remove('active'); ov.classList.remove('show'); }
+      document.body.style.overflow = '';
+    }
+    function start(e) {
+      if (box._customActive) return;
+      box._customActive = true;
+      st = { startY: e.clientY, endY: e.clientY, baseH: box.offsetHeight || 360, expanded: box.classList.contains('sheet-expanded') || box.classList.contains('city-sheet') };
+      box.style.height = st.baseH + 'px';
+      box.classList.add('dragging');
+      e.preventDefault();
+    }
+    function move(e) {
+      if (!st) return;
+      st.endY = e.clientY;
+      const dy = e.clientY - st.startY;
+      const maxH = expandedH();
+      const targetH = Math.min(Math.max(st.baseH - dy, 96), maxH);
+      box.style.height = targetH + 'px';
+      if (inner && inner !== box) {
+        inner.style.transform = 'translateY(' + Math.max(Math.min(dy, window.innerHeight * 0.6), 0) + 'px)';
+      } else if (dy > 0) {
+        box.style.transform = 'translateY(' + Math.min(dy, window.innerHeight * 0.6) + 'px)';
+      } else if (box.style.transform) {
+        box.style.transform = '';
+      }
+    }
+    function end() {
+      if (!st) return;
+      const dy = st.endY - st.startY;
+      const wasExpanded = st.expanded;
+      const baseH = st.baseH, maxH = expandedH();
+      st = null; box._customActive = false;
+      box.classList.remove('dragging');
+      box.style.transform = '';
+      if (inner && inner !== box) inner.style.transform = '';
+      if (dy < -UP_TRIGGER) {
+        box.classList.add('sheet-expanded');
+        box.style.height = maxH + 'px';
+      } else if (dy > 0) {
+        if (wasExpanded) {
+          if (dy > maxH * 0.35) closeBox();
+          else { box.classList.add('sheet-expanded'); box.style.height = maxH + 'px'; }
+        } else {
+          if (dy > DOWN_CLOSE) closeBox();
+          else box.style.height = baseH + 'px';
+        }
+      } else {
+        box.style.height = (wasExpanded ? maxH : baseH) + 'px';
+      }
+    }
+    function startFrom(e) {
+      if (box._customActive) return;
+      start(e);
+      const moveType = (e.type === 'mousedown') ? 'mousemove' : 'pointermove';
+      const upType = (e.type === 'mousedown') ? 'mouseup' : 'pointerup';
+      const mm = function (ev) { move(ev); };
+      const mu = function () { window.removeEventListener(moveType, mm); window.removeEventListener(upType, mu); end(); };
+      window.addEventListener(moveType, mm);
+      window.addEventListener(upType, mu);
+    }
+    box._customStart = startFrom;
+    handle.addEventListener('pointerdown', startFrom);
+    handle.addEventListener('mousedown', startFrom);
+  }
+  function customSheetDelegate(e) {
+    const h = e.target && e.target.closest ? e.target.closest('[data-sheet-drag]') : null;
+    if (!h) return;
+    const box = (h.closest && h.closest('[data-sheet-box]')) || h.parentElement;
+    if (!box || box.classList.contains('sheet')) return;
+    if (!box._customDrag) { box._customDrag = true; bindCustomSheetDrag(box); }
+    if (box._customStart && !box._customActive) box._customStart(e);
+  }
+  document.addEventListener('pointerdown', customSheetDelegate, true);
+  document.addEventListener('mousedown', customSheetDelegate, true);
   /* ---- 居中对话框 ---- */
   function dialog(opts) {
     const o = { title: '', text: '', ok: '确定', cancel: '取消', onOk: null, onCancel: null, danger: false, ...opts };
@@ -709,6 +934,35 @@ window.UI = (function () {
     '</div>';
     return '<div class="cert-archive"><div class="ca-corner"></div>' + header + summary + tabs + certPanels(c) + footer + '</div>';
   }
+  // 企业/个人主页「展开式」认证：不折叠成详情页紧凑卡，把认证内容直接展开显示
+  function certExpanded(c, opts) {
+    opts = opts || {}; c = c || {};
+    var certs = c.certs || [];
+    var dims = c.dims || [];
+    var gw = dims.length ? (100 / dims.length) : 25;
+    var formula = dims.map(function(d){ return d.k + '(' + Math.round(gw) + '%)×' + d.v; }).join(' + ');
+    var avg = dims.length ? (dims.reduce(function(a,d){ return a + parseFloat(d.v); }, 0) / dims.length) : 0;
+    var o = Object.assign({}, opts, { noLink: true });
+    var html = '<div class="cert-card cert-card--expanded">' +
+      certHeader(c, o) +
+      certSummary(c) +
+      certTags(c) +
+      certOverviewDims(c);
+    if (certs.length) {
+      html += '<div class="cert-panel-title">资质清单</div><div class="cert-cert-list">' +
+        certs.map(function(ct){ return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>'; }).join('') +
+        '</div>';
+    }
+    if (dims.length) {
+      html += '<div class="cert-panel-title">评分明细</div>' +
+        '<div class="cert-score-formula"><p>综合评分 = ' + formula + '</p><p class="cert-score-result">≈ <strong>' + avg.toFixed(1) + '</strong>' + ((c.score && c.score.grade) ? '（' + c.score.grade + '）' : '') + '</p></div>' +
+        '<div class="cert-score-dims">' +
+          dims.map(function(d){ return '<div class="cert-score-dim"><div class="cert-score-dim-top"><span class="cert-score-dim-name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + dimIcon(d.k) + '"/></svg>' + d.k + '</span><span class="cert-score-dim-weight">权重 ' + Math.round(gw) + '%</span><span class="cert-score-dim-val">' + d.v + '</span></div><div class="cert-score-dim-bar"><div class="cert-score-dim-fill" style="width:' + (d.s || 0) + '%"></div></div></div>'; }).join('') +
+        '</div>';
+    }
+    html += certFooter(c, o) + '</div>';
+    return html;
+  }
   // [DEPRECATED V4.0] 企业认证档案 · 弹窗 — 已由页内 Tab 替代，保留仅为向后兼容
   function certModal(c, opts) {
     const o = opts || {};
@@ -853,7 +1107,7 @@ window.UI = (function () {
     }
   });
 
-  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, initTabbarGlass, pageTransition, ensureThinkingOrb, icon, catIcon, certCard, certArchive, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl };
+  return { base, toast, sheet, dialog, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, initTabbarGlass, pageTransition, ensureThinkingOrb, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl };
 })();
 
 /* ============================================================================
@@ -1311,9 +1565,9 @@ window.Cards = (function () {
     } else {
       var fr = fieldsOf(s, ['首批名额', '分成']);
       if (fr.length) body += statRow([
-        ['首批/分成', fr[0]],
-        ['开放', fieldsOf(s, ['开放区域', '开放城市'])[0] || '—'],
-        ['费用', s.budget ? s.budget + '万' : '面议']
+        [fr[0], '首批/分成'],
+        [fieldsOf(s, ['开放区域', '开放城市'])[0] || '—', '开放'],
+        [s.budget ? s.budget + '万' : '面议', '费用']
       ]);
     }
     return body + foot(price, unit, '<div class="jc-company">' + company(s) + '</div>');
@@ -1859,3 +2113,4 @@ window.ListFooter = (function () {
     loadBackToTop();
   }
 })();
+

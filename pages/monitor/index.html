@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-engchain-basefix="2">
@@ -10,14 +10,548 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 })();
 </script><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>企业监控 · 工程链</title>
+<title>企业监控 · 风险雷达 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <style>
-.co-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
-.co-row:last-child{border-bottom:none;}
-.dim{font-size:10px;color:var(--text-3);}
-.feed-item{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);}
-.feed-dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:4px;}
+/* ═══════════════════════════════════════════════════════════
+   企业监控 · 风险雷达 V2.0
+   专家级产品视觉重构：总览仪表盘 + 双Tab + 企业详情 + 添加sheet
+   ═══════════════════════════════════════════════════════════ */
+body { background: var(--bg); }
+
+/* ─── Hero 风险总览 ─── */
+.radar-hero{
+  margin: 10px 14px 0;
+  padding: 18px 16px 14px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0c4a6e 100%);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 24px -6px rgba(15,23,42,.4), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.radar-hero::before{
+  content:'';position:absolute;right:-50px;top:-50px;width:200px;height:200px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(201,169,97,.08) 0%, transparent 70%);
+}
+.radar-hero::after{
+  content:'';position:absolute;left:-30px;bottom:-40px;width:140px;height:140px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(239,68,68,.06) 0%, transparent 70%);
+}
+.radar-hero-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:600;letter-spacing:.02em;
+  color: rgba(255,255,255,.85);
+}
+.radar-hero-title .rh-dot{
+  width:8px;height:8px;border-radius:50%;background:#22c55e;
+  box-shadow:0 0 8px #22c55e;
+  animation: rhpulse 2s ease-in-out infinite;
+}
+@keyframes rhpulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.radar-hero-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;}
+
+.radar-stats{
+  display:flex;margin-top:18px;position:relative;z-index:1;
+}
+.radar-stat{flex:1;text-align:center;}
+.radar-stat + .radar-stat{border-left:1px solid rgba(255,255,255,.1);}
+.radar-stat-num{
+  font-family:var(--font-num);font-size:26px;font-weight:800;
+  line-height:1;letter-spacing:-.02em;
+}
+.radar-stat-num.danger{color:#f87171;}
+.radar-stat-num.warning{color:#fbbf24;}
+.radar-stat-num.ok{color:#4ade80;}
+.radar-stat-label{font-size:10.5px;color:rgba(255,255,255,.55);margin-top:6px;letter-spacing:.03em;}
+
+/* 风险分布条 */
+.radar-riskbar{
+  margin-top:14px;position:relative;z-index:1;
+}
+.radar-riskbar-label{
+  display:flex;justify-content:space-between;
+  font-size:10px;color:rgba(255,255,255,.5);margin-bottom:6px;letter-spacing:.03em;
+}
+.radar-riskbar-track{
+  height:5px;border-radius:3px;overflow:hidden;display:flex;
+  background:rgba(255,255,255,.08);
+}
+.radar-riskbar-seg{height:100%;transition:width .4s;}
+
+/* 7天风险趋势 */
+.radar-trend{
+  margin-top:14px;position:relative;z-index:1;
+}
+.radar-trend-label{
+  display:flex;justify-content:space-between;
+  font-size:10px;color:rgba(255,255,255,.5);margin-bottom:8px;
+}
+.radar-trend-label .rt-up{color:#f87171;}
+.radar-trend-chart{
+  display:flex;align-items:flex-end;gap:6px;
+  height:50px;
+}
+.rtc-bar{
+  flex:1;background:rgba(255,255,255,.15);border-radius:3px 3px 0 0;
+  transition:height .4s;min-height:4px;
+}
+.rtc-bar.warning{background:rgba(251,191,36,.6);}
+.rtc-bar.danger{background:rgba(248,113,113,.6);}
+.radar-trend-days{
+  display:flex;gap:6px;margin-top:4px;
+}
+.radar-trend-days span{
+  flex:1;text-align:center;font-size:9px;color:rgba(255,255,255,.3);
+}
+.radar-riskbar-seg.danger{background:#ef4444;}
+.radar-riskbar-seg.warning{background:#f59e0b;}
+.radar-riskbar-seg.ok{background:#22c55e;}
+
+/* ─── 额度标签 ─── */
+.quota-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 10px;border-radius:999px;
+  background:rgba(201,169,97,.15);color:var(--primary-dim);
+  font-size:10.5px;font-weight:600;
+}
+
+/* ─── Tab 切换 ─── */
+.radar-tabs{
+  display:flex;margin:12px 14px 0;
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:12px;padding:3px;
+}
+.radar-tab{
+  flex:1;padding:8px 0;text-align:center;
+  font-size:12px;font-weight:600;color:var(--text-3);
+  border-radius:9px;cursor:pointer;
+  transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.radar-tab.active{
+  background:var(--bg);
+  color:var(--text-1);
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.radar-tab .rt-count{
+  font-size:10px;font-weight:700;
+  background:rgba(255,255,255,.25);padding:1px 6px;border-radius:999px;
+  font-family:var(--font-num);
+}
+.radar-tab:not(.active) .rt-count{background:var(--bg-card-2);color:var(--text-3);}
+
+/* ─── 企业卡片 ─── */
+.co-card{
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:12px;padding:12px 13px;
+  margin:0 14px 8px;
+  box-shadow:var(--shadow-xs);
+  cursor:pointer;
+  transition:transform var(--d-fast),border-color var(--d-fast);
+  position:relative;overflow:hidden;
+}
+.co-card.danger::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:#ef4444;
+}
+.co-card.warning::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:#f59e0b;
+}
+.co-card:active{transform:scale(.985);}
+.co-card-head{display:flex;align-items:center;gap:10px;}
+.co-avatar{
+  flex:none;width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(135deg,var(--primary-soft),var(--bg-card-2));
+  display:flex;align-items:center;justify-content:center;
+  color:var(--primary-dim);font-weight:700;font-size:16px;
+}
+.co-card-info{flex:1;min-width:0;}
+.co-card-name{
+  font-size:14.5px;font-weight:700;color:var(--text-1);
+  display:flex;align-items:center;gap:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.co-tag{
+  font-size:9px;font-weight:600;
+  padding:2px 7px;border-radius:999px;
+  background:var(--bg-card-2);color:var(--text-3);
+}
+.co-risk-badge{
+  flex:none;
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;
+  padding:3px 10px;border-radius:999px;
+}
+.co-risk-badge.danger{background:rgba(239,68,68,.1);color:#ef4444;}
+.co-risk-badge.warning{background:rgba(245,158,11,.1);color:#d97706;}
+.co-risk-badge.ok{background:rgba(34,197,94,.1);color:#16a34a;}
+.co-risk-badge .crb-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+.co-card-latest{
+  margin-top:10px;padding:9px 11px;
+  background:var(--bg);border-radius:10px;
+  font-size:11.5px;color:var(--text-2);line-height:1.5;
+  display:flex;align-items:flex-start;gap:7px;
+}
+.co-card-latest .cl-icon{flex:none;margin-top:1px;}
+.co-card-latest .cl-icon svg{width:13px;height:13px;}
+.co-card-latest.danger .cl-icon{color:#ef4444;}
+.co-card-latest.warning .cl-icon{color:#d97706;}
+.co-card-latest.ok .cl-icon{color:#16a34a;}
+
+.co-card-dims{
+.co-card-meta{
+  display:flex;gap:8px;margin-top:4px;
+  font-size:10.5px;color:var(--text-3);
+}
+.co-card-meta span{
+  display:flex;align-items:center;gap:3px;
+}
+
+  display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;
+}
+.co-dim-chip{
+  font-size:10px;color:var(--text-2);
+  background:var(--bg-card-2);
+  padding:3px 8px;border-radius:999px;
+}
+.co-card-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+}
+.co-card-time{font-size:10.5px;color:var(--text-3);}
+.co-card-actions{display:flex;gap:8px;}
+.co-card-btn{
+  font-size:11px;font-weight:600;
+  padding:5px 12px;border-radius:999px;
+  border:none;cursor:pointer;
+}
+.co-card-btn.unfollow{background:var(--bg-card-2);color:var(--text-3);}
+.co-card-btn.detail{background:var(--primary-soft);color:var(--primary-dim);}
+
+/* ─── 动态流时间线 ─── */
+.feed-filter{
+  display:flex;gap:6px;padding:0 16px;margin-top:12px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.feed-filter::-webkit-scrollbar{display:none;}
+.ff-chip{
+  flex:none;padding:5px 12px;border-radius:999px;
+  background:var(--bg-card);border:1px solid var(--line);
+  font-size:11px;color:var(--text-2);cursor:pointer;
+  white-space:nowrap;transition:all .2s;
+}
+.ff-chip.active{
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);border-color:transparent;
+}
+
+.feed-timeline{padding:14px 16px 0;}
+.feed-day{
+  text-align:center;font-size:10.5px;color:var(--text-3);
+  margin:16px 0 10px;letter-spacing:.04em;
+}
+.feed-item{
+  display:flex;gap:12px;position:relative;
+  padding-bottom:16px;
+}
+.feed-rail{
+  flex:none;display:flex;flex-direction:column;align-items:center;
+  width:20px;
+}
+.feed-dot{
+  width:10px;height:10px;border-radius:50%;flex:none;
+  margin-top:4px;z-index:1;
+}
+.feed-dot.danger{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.15);}
+.feed-dot.warning{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.15);}
+.feed-dot.ok{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.15);}
+.feed-line{
+  flex:1;width:1.5px;background:var(--line);
+  margin-top:2px;
+}
+.feed-item:last-child .feed-line{display:none;}
+.feed-body{flex:1;min-width:0;}
+.feed-card{
+  background:var(--bg-card);border:1px solid var(--line);
+  border-radius:12px;padding:11px 13px;
+  box-shadow:var(--shadow-xs);
+}
+.feed-dim-tag{
+  display:inline-block;font-size:9.5px;font-weight:700;
+  padding:2px 8px;border-radius:999px;margin-bottom:6px;
+}
+.feed-dim-tag.danger{background:rgba(239,68,68,.1);color:#ef4444;}
+.feed-dim-tag.warning{background:rgba(245,158,11,.1);color:#d97706;}
+.feed-dim-tag.ok{background:rgba(34,197,94,.1);color:#16a34a;}
+.feed-text{font-size:12.5px;color:var(--text-1);line-height:1.55;}
+.feed-meta{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:7px;padding-top:7px;border-top:1px solid var(--line);
+  font-size:10.5px;color:var(--text-3);
+}
+.feed-company{display:flex;align-items:center;gap:4px;}
+.feed-company svg{width:11px;height:11px;}
+
+/* ─── 空状态 ─── */
+.radar-empty{
+  display:flex;flex-direction:column;align-items:center;
+  padding:40px 20px;text-align:center;
+}
+.radar-empty-icon{
+  width:64px;height:64px;border-radius:50%;
+  background:var(--bg-card);border:1px dashed var(--line);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-3);margin-bottom:14px;
+}
+.radar-empty-icon svg{width:28px;height:28px;}
+.radar-empty-title{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:5px;}
+.radar-empty-desc{font-size:12px;color:var(--text-3);line-height:1.6;max-width:240px;}
+
+/* ─── 添加监控 FAB ─── */
+.radar-fab{
+
+  position:fixed;right:18px;bottom:90px;
+  width:48px;height:48px;border-radius:16px;
+  color:var(--text-inv);
+  box-shadow:0 6px 20px -4px var(--primary-dim);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:100;
+  border:none;
+  transition:transform .15s;
+}
+.radar-fab:active{transform:scale(.92);}
+.radar-fab svg{width:22px;height:22px;}
+
+/* ─── 添加监控 Sheet ─── */
+/* ─── 设置弹窗 ─── */
+.report-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:900;opacity:0;visibility:hidden;
+  transition:opacity .3s;
+  display:flex;align-items:flex-end;
+}
+.report-modal.show{opacity:1;visibility:visible;}
+.report-modal-sheet{
+  width:100%;background:var(--bg-card);
+  border-radius:20px 20px 0 0;padding:20px 18px 30px;
+  transform:translateY(100%);transition:transform .3s;
+  max-height:85vh;overflow-y:auto;
+}
+.report-modal.show .report-modal-sheet{transform:translateY(0);}
+.report-modal-handle{
+  width:36px;height:4px;border-radius:2px;background:var(--line);
+  margin:0 auto 16px;
+}
+
+/* ─── 导航设置按钮 ─── */
+.nav-setting{
+  background:none;border:none;cursor:pointer;
+  color:var(--text-2);padding:4px;
+  display:flex;align-items:center;
+}
+
+.add-sheet-mask{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:900;opacity:0;visibility:hidden;
+  transition:opacity .3s;
+}
+.add-sheet-mask.show{opacity:1;visibility:visible;}
+.add-sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:901;
+  background:var(--bg-card);
+  border-radius:20px 20px 0 0;
+  max-height:75vh;
+  transform:translateY(105%);
+  transition:transform .35s cubic-bezier(.22,1,.36,1);
+  display:flex;flex-direction:column;
+}
+.add-sheet.show{transform:translateY(0);}
+.add-sheet-handle{
+  padding:8px 16px 0;
+  display:flex;justify-content:center;
+}
+.add-sheet-handle::after{
+  content:'';width:40px;height:4px;border-radius:2px;
+  background:var(--text-3);opacity:.5;
+}
+.add-sheet-head{
+  padding:10px 18px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.add-sheet-title{font-size:15px;font-weight:700;color:var(--text-1);}
+.add-sheet-close{
+  width:30px;height:30px;border-radius:50%;
+  border:none;background:var(--bg-card-2);
+  color:var(--text-2);font-size:18px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.add-sheet-body{
+  overflow-y:auto;flex:1;padding:0 16px 24px;
+  -webkit-overflow-scrolling:touch;
+}
+.add-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg);border:1px solid var(--line);
+  border-radius:999px;padding:9px 14px;
+  margin-bottom:14px;
+}
+.add-search svg{width:15px;height:15px;color:var(--text-3);flex:none;}
+.add-search input{
+  flex:1;border:none;outline:none;background:transparent;
+  font-size:13px;color:var(--text-1);
+}
+.add-co-row{
+  display:flex;align-items:center;gap:11px;
+  padding:12px 0;border-bottom:1px solid var(--line);
+}
+.add-co-row:last-child{border-bottom:none;}
+.add-co-avatar{
+  flex:none;width:40px;height:40px;border-radius:12px;
+  background:var(--bg-card-2);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--primary-dim);font-weight:700;
+}
+.add-co-info{flex:1;min-width:0;}
+.add-co-name{font-size:13.5px;font-weight:600;color:var(--text-1);}
+.add-co-meta{font-size:11px;color:var(--text-3);margin-top:2px;}
+.add-co-btn{
+  flex:none;padding:6px 14px;border-radius:999px;
+  font-size:11.5px;font-weight:600;
+  border:none;cursor:pointer;
+}
+.add-co-btn.follow{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);}
+.add-co-btn.followed{background:var(--bg-card-2);color:var(--text-3);}
+
+/* ─── 升级 CTA ─── */
+/* ─── 升级 CTA ─── */
+.upgrade-card{
+  margin:12px 14px 100px;
+  padding:14px;
+  border-radius:14px;
+  background:linear-gradient(135deg,rgba(201,169,97,.1),rgba(201,169,97,.03));
+  border:1px solid rgba(201,169,97,.25);
+  display:flex;align-items:center;gap:11px;
+}
+.upgrade-icon{
+  flex:none;width:42px;height:42px;border-radius:12px;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);
+  display:flex;align-items:center;justify-content:center;
+}
+.upgrade-icon svg{width:20px;height:20px;}
+.upgrade-title{font-size:13.5px;font-weight:700;color:var(--text-1);}
+.upgrade-desc{font-size:11px;color:var(--text-3);margin-top:3px;line-height:1.5;}
+.upgrade-btn{
+  flex:none;padding:8px 16px;border-radius:999px;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);font-size:12px;font-weight:600;
+  border:none;cursor:pointer;
+  box-shadow:0 3px 10px -3px var(--primary-dim);
+}
+
+/* ─── 试用/入驻横幅 ─── */
+.trial-banner{
+  margin:12px 16px 0;
+  padding:12px 14px;border-radius:14px;
+  display:flex;align-items:center;gap:10px;
+}
+.trial-banner.active{
+  background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.05));
+  border:1px solid rgba(201,169,97,.3);
+}
+.trial-banner.ended{
+  background:rgba(239,68,68,.06);
+  border:1px solid rgba(239,68,68,.2);
+}
+.trial-banner.locked{
+  background:rgba(201,169,97,.06);
+  border:1px solid rgba(201,169,97,.25);
+}
+.tb-icon{
+  flex:none;width:32px;height:32px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.tb-icon svg{width:16px;height:16px;}
+.trial-banner.active .tb-icon{background:var(--primary-soft);color:var(--primary-dim);}
+.trial-banner.ended .tb-icon{background:rgba(239,68,68,.1);color:#ef4444;}
+.trial-banner.locked .tb-icon{background:var(--primary-soft);color:var(--primary-dim);}
+.tb-body{flex:1;min-width:0;}
+.tb-title{font-size:12.5px;font-weight:700;}
+.trial-banner.active .tb-title{color:var(--primary-dim);}
+.trial-banner.ended .tb-title{color:#ef4444;}
+.trial-banner.locked .tb-title{color:var(--primary-dim);}
+.tb-desc{font-size:11px;color:var(--text-2);margin-top:2px;line-height:1.5;}
+.tb-btn{
+  flex:none;padding:6px 12px;border-radius:999px;
+  font-size:11px;font-weight:600;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim));
+  color:var(--text-inv);border:none;cursor:pointer;
+}
+
+/* ─── 企业详情展开 ─── */
+.co-detail{
+  display:none;
+  margin-top:12px;padding-top:12px;
+  border-top:1px dashed var(--line);
+}
+.co-card.expanded .co-detail{display:block;}
+.co-detail-title{
+  font-size:11px;font-weight:700;color:var(--text-3);
+  margin-bottom:8px;letter-spacing:.03em;
+}
+.co-detail-feed{
+  font-size:11.5px;color:var(--text-2);line-height:1.6;
+  padding:8px 10px;background:var(--bg);border-radius:8px;
+  margin-bottom:6px;
+}
+.co-detail-feed:last-child{margin-bottom:0;}
+.co-detail-feed .cdf-time{color:var(--text-3);font-size:10px;margin-top:2px;}
+
+/* ─── 风险处理按钮 ─── */
+.feed-action-btns{
+  display:flex;gap:8px;margin-top:8px;padding-top:8px;
+  border-top:1px solid var(--line);
+}
+.feed-action-btn{
+  flex:1;padding:6px 0;border-radius:8px;
+  font-size:11px;font-weight:600;text-align:center;
+  border:1px solid var(--line);background:var(--bg);
+  color:var(--text-2);cursor:pointer;transition:all .2s;
+}
+.feed-action-btn:hover{background:var(--bg-card-2);}
+.feed-action-btn.processed{
+  background:rgba(34,197,94,.08);color:#16a34a;border-color:rgba(34,197,94,.2);
+}
+.feed-action-btn.ignored{
+  background:rgba(156,163,175,.08);color:#6b7280;
+}
+
+/* 已处理风险状态 */
+.feed-card.processed{opacity:.6;}
+.feed-card.ignored{opacity:.5;}
+.feed-card.processed .feed-dim-tag{background:rgba(34,197,94,.1);color:#16a34a;}
+.feed-card.ignored .feed-dim-tag{background:rgba(156,163,175,.1);color:#6b7280;}
+
+/* ─── 企业详情操作 ─── */
+.co-detail-actions{
+  display:flex;gap:8px;margin-top:10px;
+}
+.co-detail-btn{
+  flex:1;padding:8px 0;border-radius:10px;
+  font-size:12px;font-weight:600;text-align:center;
+  border:1px solid var(--line);background:var(--bg);
+  color:var(--text-2);cursor:pointer;
+}
+.co-detail-btn.primary{
+  background:linear-gradient(135deg,var(--primary-soft),rgba(201,169,97,.05));
+  color:var(--primary-dim);border-color:rgba(201,169,97,.3);
+}
 </style>
 </head>
 <body>
@@ -25,21 +559,195 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="navbar">
     <button class="nav-back" onclick="history.back()">‹</button>
     <div class="nav-title">企业监控</div>
-    <div class="nav-right"><span class="tag tag-primary" id="quota-tag" style="font-size:10px;">免费 N 家</span></div>
+    <div class="nav-right">
+      <span class="quota-pill" id="quota-tag">--</span>
+      <span class="quota-pill" id="quota-tag">--</span>
+      <button class="nav-setting" onclick="openMonitorSettings()" aria-label="监控设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+</div>
   </div>
 
-  <div class="scroll" style="padding-top:8px;">
-    <div class="ai-folder" style="margin-bottom:12px;">
-      <div class="fw-700 fs-14">风险雷达 · 企业动态监控</div>
-      <div class="text-2 fs-12" style="margin-top:4px;">关注企业后，资质到期 / 项目更新 / 中标 / 司法 / 经营异常 / 工商变更 / 价格行情预警将实时推送，别错过关键信号。</div>
-      <div class="text-3 fs-11" style="margin-top:6px;">每日 09:00 推送 · 免费额度按认证等级递增</div>
+  <div class="scroll" style="padding-bottom:120px;">
+
+    <!-- Hero 风险总览 -->
+    <div class="radar-hero">
+      <div class="radar-hero-title">
+        <span class="rh-dot"></span>
+        风险雷达 · 实时监控中
+      </div>
+      <div class="radar-hero-sub">资质到期 · 司法变更 · 工商动态 · 价格行情 24h 推送</div>
+      <div class="radar-stats">
+        <div class="radar-stat">
+          <div class="radar-stat-num" id="stat-followed">0</div>
+          <div class="radar-stat-label">监控企业</div>
+        </div>
+        <div class="radar-stat">
+          <div class="radar-stat-num danger" id="stat-danger">0</div>
+          <div class="radar-stat-label">高风险</div>
+        </div>
+        <div class="radar-stat">
+          <div class="radar-stat-num warning" id="stat-warning">0</div>
+          <div class="radar-stat-label">预警</div>
+        </div>
+        <div class="radar-stat">
+          <div class="radar-stat-num ok" id="stat-total">0</div>
+          <div class="radar-stat-label">总动态</div>
+        </div>
+      </div>
+      <div class="radar-riskbar">
+        <div class="radar-riskbar-label">
+          <span>风险分布</span>
+          <span id="riskbar-summary">无数据</span>
+        </div>
+        <div class="radar-riskbar-track" id="riskbar-track"></div>
+      </div>
+
+      <!-- 7天风险趋势 -->
+      <div class="radar-trend">
+        <div class="radar-trend-label">
+          <span>近7天风险趋势</span>
+          <span class="rt-up">↑ 较昨日 +2</span>
+        </div>
+        <div class="radar-trend-chart" id="risk-trend-chart">
+          <!-- 迷你柱状图，7天数据 -->
+          <div class="rtc-bar" style="height:30%;"></div>
+          <div class="rtc-bar" style="height:45%;"></div>
+          <div class="rtc-bar" style="height:25%;"></div>
+          <div class="rtc-bar" style="height:60%;"></div>
+          <div class="rtc-bar" style="height:40%;"></div>
+          <div class="rtc-bar danger" style="height:75%;"></div>
+          <div class="rtc-bar warning" style="height:90%;"></div>
+        </div>
+        <div class="radar-trend-days">
+          <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+      </div>
     </div>
 
-    <div class="section-title"><div class="st-left">已关注企业</div><span class="more" id="co-count">0</span></div>
-    <div class="card" id="co-list"></div>
+    <!-- 试用/入驻横幅（动态插入） -->
+    <div id="banner-slot"></div>
 
-    <div class="section-title" style="margin-top:14px;"><div class="st-left">监控动态</div></div>
-    <div class="card" id="feed-list"></div>
+    <!-- Tab 切换 -->
+    <div class="radar-tabs">
+      <div class="radar-tab active" data-tab="companies">
+        监控企业
+        <span class="rt-count" id="tab-count-co">0</span>
+      </div>
+      <div class="radar-tab" data-tab="feed">
+        动态流
+        <span class="rt-count" id="tab-count-feed">0</span>
+      </div>
+    </div>
+
+    <!-- 监控企业列表 -->
+    <div id="pane-companies">
+      <div id="co-list" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- 动态流 -->
+    <div id="pane-feed" style="display:none;">
+      <div class="feed-filter" id="feed-filter">
+        <div class="ff-chip active" data-dim="all">全部</div>
+        <div class="ff-chip" data-dim="danger">高风险</div>
+        <div class="ff-chip" data-dim="warning">预警</div>
+        <div class="ff-chip" data-dim="success">正常</div>
+        <div class="ff-chip" data-dim="资质到期">资质到期</div>
+        <div class="ff-chip" data-dim="司法">司法</div>
+        <div class="ff-chip" data-dim="经营异常">经营异常</div>
+      </div>
+      <div class="feed-timeline" id="feed-list"></div>
+    </div>
+
+    <!-- 升级 CTA -->
+    <div class="upgrade-card" id="upgrade-card">
+      <div class="upgrade-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/></svg>
+      </div>
+      <div class="upgrade-body">
+        <div class="upgrade-title">监控专业版</div>
+        <div class="upgrade-desc" id="upgrade-desc">不限关注数 · 价格行情预警 · 实时推送</div>
+      </div>
+      <button class="upgrade-btn" onclick="location.href='../wallet/membership.html'">升级</button>
+    </div>
+  </div>
+
+  <!-- 添加监控 FAB -->
+  <button class="radar-fab" id="fab-add" aria-label="添加监控企业">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- 添加监控 Sheet -->
+  <div class="add-sheet-mask" id="add-mask"></div>
+  <div class="add-sheet" id="add-sheet">
+    <div class="add-sheet-handle"></div>
+    <div class="add-sheet-head">
+      <div class="add-sheet-title">添加监控企业</div>
+      <button class="add-sheet-close" id="add-close">×</button>
+    </div>
+    <div class="add-sheet-body">
+      <div class="add-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input type="text" id="add-search-input" placeholder="搜索企业名称">
+      </div>
+      <div id="add-list"></div>
+    </div>
+  </div>
+
+  <!-- 监控设置弹窗 -->
+  <div class="report-modal" id="monitor-settings-modal">
+    <div class="report-modal-sheet" style="max-height:80vh;">
+      <div class="report-modal-handle"></div>
+      <div style="font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:20px;">监控设置</div>
+
+      <!-- 推送通知 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px;">推送通知</div>
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+          <span style="font-size:13.5px;color:var(--text-1);">风险预警推送</span>
+          <input type="checkbox" id="ms-push-risk" checked style="width:18px;height:18px;accent-color:var(--primary-dim);">
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);">
+          <span style="font-size:13.5px;color:var(--text-1);">每日摘要</span>
+          <input type="checkbox" id="ms-push-daily" style="width:18px;height:18px;accent-color:var(--primary-dim);">
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;">
+          <span style="font-size:13.5px;color:var(--text-1);">邮件通知</span>
+          <input type="checkbox" id="ms-push-email" style="width:18px;height:18px;accent-color:var(--primary-dim);">
+        </label>
+      </div>
+
+      <!-- 监控维度 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px;">默认监控维度</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;" id="ms-dims">
+          <span class="ms-dim active" data-dim="资质到期" style="padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--primary-soft);color:var(--primary-dim);">资质到期</span>
+          <span class="ms-dim active" data-dim="司法" style="padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--primary-soft);color:var(--primary-dim);">司法</span>
+          <span class="ms-dim active" data-dim="经营异常" style="padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--primary-soft);color:var(--primary-dim);">经营异常</span>
+          <span class="ms-dim" data-dim="工商变更" style="padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">工商变更</span>
+          <span class="ms-dim" data-dim="价格行情预警" style="padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;background:var(--bg);color:var(--text-2);border:1px solid var(--line);">价格行情</span>
+        </div>
+      </div>
+
+      <!-- 推送频率 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px">推送频率</div>
+        <select id="ms-freq" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-1);font-size:13.5px;">
+          <option value="realtime">实时推送</option>
+          <option value="daily">每日汇总</option>
+          <option value="weekly">每周汇总</option>
+        </select>
+      </div>
+
+      <button onclick="saveMonitorSettings()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:600;cursor:pointer;">保存设置</button>
+      <button onclick="exportRiskReport()" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);color:var(--text-1);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        导出月度风险报告
+      </button>
+    </div>
   </div>
 </div>
 
@@ -48,31 +756,57 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
+
+/* ═══ 企业数据源 ═══ */
+var COS=[
+ {id:'c-znzjs',name:'四川中建××建设',tag:'总承包',industry:'房屋建筑',verified:true,capital:'10000万',established:'2015-03',address:'成都·武侯区',legalRep:'张××'},
+ {id:'c-scjc',name:'四川建材集团',tag:'供应',industry:'建材供应',verified:true,capital:'50000万',established:'2008-07',address:'成都·锦江区',legalRep:'李××'},
+ {id:'c-cqjt',name:'重庆建工集团',tag:'总承包',industry:'市政工程',verified:true,capital:'100000万',established:'2001-12',address:'重庆·渝中区',legalRep:'王××'},
+ {id:'c-scrm',name:'蜀安人力',tag:'劳务',industry:'劳务分包',verified:true,capital:'2000万',established:'2019-05',address:'成都·成华区',legalRep:'赵××'},
+ {id:'c-cdbl',name:'成都电力工程',tag:'专业分包',industry:'电力工程',verified:true,capital:'8000万',established:'2012-09',address:'成都·高新区',legalRep:'刘××'},
+ {id:'c-scsw',name:'四川水利水电',tag:'总承包',industry:'水利水电',verified:false,capital:'30000万',established:'2005-04',address:'成都·青羊区',legalRep:'陈××'},
+ {id:'c-cdyy',name:'成都园林工程',tag:'专业分包',industry:'园林绿化',verified:true,capital:'5000万',established:'2016-11',address:'成都·双流区',legalRep:'周××'},
+ {id:'c-csjx',name:'四川机械设备',tag:'供应',industry:'设备租赁',verified:false,capital:'1500万',established:'2020-02',address:'成都·龙泉驿',legalRep:'吴××'}
+];
+function coName(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.name:id;}
+function coTag(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.tag:'';}
+function coCapital(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?('注册资本 '+(x.capital||'--')):'';}
+function coEstablished(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?(x.established||'--'):'';}
+function coAddress(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?(x.address||'--'):'';}
+
+var SAMPLE_DIMS={
+ '资质到期':'「安全生产许可证」将于 2026-12-31 到期，请及时办理延续',
+ '项目更新':'新增中标公示 · 成都 6 号线延伸段土建 3 标段',
+ '中标':'中标公示 · 中标金额 ¥8,600 万',
+ '司法':'新增司法案件 1 起 · 建设工程施工合同纠纷',
+ '经营异常':'经营异常名录提醒 · 年报未按期公示',
+ '工商变更':'法定代表人/注册资本发生变更',
+ '价格行情预警':'商品混凝土 C30 成都周环比 +2.4%，建议关注走势'
+};
+var DIM_COLOR={
+ '资质到期':'warning','项目更新':'success','中标':'success',
+ '司法':'danger','经营异常':'danger','工商变更':'warning','价格行情预警':'warning'
+};
+
+/* ═══ 额度计算（保留原逻辑） ═══ */
 var dims=(MOCK.business.monitor.dimensions||[]).slice();
-/* [FIX] 本地追加"价格行情预警"维度（data.js 不可改，页面级补充） */
 if(dims.indexOf('价格行情预警')<0) dims.push('价格行情预警');
 var limits=MOCK.business.monitor.limits;
-/* [FIX BM-047] 改用 deriveIdentity().entryTypes 数组判断，多类型并行时取最高权限档（partner>agency>construction），
-   不再用旧单值 EntryStore.read().type / deriveStatus() 取错档。监控限额从 MOCK.business.monitor.limits 读取。 */
 var idy=window.deriveIdentity?deriveIdentity():{personal:'none',enterprise:'none',entryTypes:[]};
 var st=idy.primary||'registered';
 var limit=limits.realname||5;
-/* 档位优先级：partner(200) > agency(50) > construction(30) > pro(10) > realname(5) */
 var tierRank=['realname','pro','construction','agency','partner'];
 var achieved=[];
-if(idy.enterprise==='resident' && idy.entryTypes && idy.entryTypes.length){
-  achieved=achieved.concat(idy.entryTypes); /* 入驻类型数组 */
-}
-if(idy.partner) achieved.push('partner');       /* 个人合伙人（与企业入驻 partner 类型分离） */
+if(idy.enterprise==='resident'&&idy.entryTypes&&idy.entryTypes.length){achieved=achieved.concat(idy.entryTypes);}
+if(idy.partner) achieved.push('partner');
 if(idy.personal==='professional'||idy.personal==='full') achieved.push('pro');
 if(idy.personal==='verified'||idy.personal==='professional'||idy.personal==='partner'||idy.personal==='full') achieved.push('realname');
-/* 取 achieved 中权限最高的档 */
 var bestIdx=-1;
-achieved.forEach(function(t){ var i=tierRank.indexOf(t); if(i>bestIdx)bestIdx=i; });
-if(bestIdx>=0){ limit=limits[tierRank[bestIdx]]||limit; }
+achieved.forEach(function(t){var i=tierRank.indexOf(t);if(i>bestIdx)bestIdx=i;});
+if(bestIdx>=0){limit=limits[tierRank[bestIdx]]||limit;}
 if(st==='registered'||st==='guest')limit=0;
 
-/* G1：破冰期非入驻注册用户 7 天免费监控试用（monitorTrialDays） */
+/* 破冰期试用 */
 var trialInfo=null;
 if(window.ModeStore&&ModeStore.isBreakIn()&&st==='registered'){
   var TRIAL_KEY='engchain-monitor-trial';
@@ -86,132 +820,441 @@ if(window.ModeStore&&ModeStore.isBreakIn()&&st==='registered'){
   else{trialInfo={active:false,remain:0};}
 }
 
+/* 额度标签 */
+var quotaTag=document.getElementById('quota-tag');
 if(trialInfo&&trialInfo.active){
-  document.getElementById('quota-tag').textContent='试用剩 '+trialInfo.remain+' 天 · '+limit+' 家';
+  quotaTag.textContent='试用剩 '+trialInfo.remain+' 天 · '+limit+' 家';
 }else{
-  document.getElementById('quota-tag').textContent='可关注 '+limit+' 家';
+  quotaTag.textContent='可关注 '+limit+' 家';
 }
 
-/* 试用状态横幅 */
+/* ═══ 横幅 ═══ */
+var bannerSlot=document.getElementById('banner-slot');
 if(trialInfo){
-  var banner=trialInfo.active
-    ? '<div class="card" style="margin-bottom:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.05));border:1px solid rgba(201,169,97,.3);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--primary);">破冰期免费试用中</div><div class="text-2 fs-11" style="margin-top:3px;">剩余 '+trialInfo.remain+' 天，可关注最多 '+(limits.realname||5)+' 家企业。入驻企业后解锁完整监控额度。</div></div>'
-    : '<div class="card" style="margin-bottom:12px;padding:12px 14px;background:rgba(212,76,71,.06);border:1px solid rgba(212,76,71,.2);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--danger);">免费试用已结束</div><div class="text-2 fs-11" style="margin-top:3px;">入驻企业解锁完整监控（建筑 30 家 / 中介 50 家 / 合伙人 200 家）。</div></div>';
-  var sc=document.querySelector('.scroll');
-  var ref=sc.querySelector('.section-title');
-  if(ref){ref.insertAdjacentHTML('beforebegin',banner);}else{sc.insertAdjacentHTML('afterbegin',banner);}
+  if(trialInfo.active){
+    bannerSlot.innerHTML='<div class="trial-banner active">'+
+      '<div class="tb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>'+
+      '<div class="tb-body"><div class="tb-title">破冰期免费试用中</div>'+
+      '<div class="tb-desc">剩余 '+trialInfo.remain+' 天，可关注最多 '+(limits.realname||5)+' 家企业</div></div>'+
+    '</div>';
+  }else{
+    bannerSlot.innerHTML='<div class="trial-banner ended">'+
+      '<div class="tb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg></div>'+
+      '<div class="tb-body"><div class="tb-title">免费试用已结束</div>'+
+      '<div class="tb-desc">入驻企业解锁完整监控（30~200 家）</div></div>'+
+      '<button class="tb-btn" onclick="location.href=\'../profile/entry.html\'">去入驻</button>'+
+    '</div>';
+  }
 }else if(limit<=0){
-  /* P1-2：成熟期非入驻用户 limit=0，显示入驻解锁提示 */
-  var matureHint='<div class="card" style="margin-bottom:12px;padding:12px 14px;background:rgba(201,169,97,.06);border:1px solid rgba(201,169,97,.25);border-radius:14px;"><div class="fw-600 fs-13" style="color:var(--primary);">入驻企业解锁完整监控</div><div class="text-2 fs-11" style="margin-top:3px;">完成企业入驻后可监控最多 30~200 家企业动态，资质到期 / 项目更新 / 司法变更实时推送。</div><button class="btn btn-primary" style="margin-top:10px;padding:7px 16px;font-size:12px;" onclick="location.href=\'../profile/entry.html\'">去入驻</button></div>';
-  var sc2=document.querySelector('.scroll');
-  var ref2=sc2.querySelector('.section-title');
-  if(ref2){ref2.insertAdjacentHTML('beforebegin',matureHint);}else{sc2.insertAdjacentHTML('afterbegin',matureHint);}
+  bannerSlot.innerHTML='<div class="trial-banner locked">'+
+    '<div class="tb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'+
+    '<div class="tb-body"><div class="tb-title">入驻企业解锁完整监控</div>'+
+    '<div class="tb-desc">建筑 30 家 / 中介 50 家 / 合伙人 200 家</div></div>'+
+    '<button class="tb-btn" onclick="location.href=\'../profile/entry.html\'">去入驻</button>'+
+  '</div>';
 }
 
-/* 企业数据源（示例企业） */
-var COS=[
- {id:'c-znzjs',name:'四川中建××建设',tag:'总承包'},
- {id:'c-scjc',name:'四川建材集团',tag:'供应'},
- {id:'c-cqjt',name:'重庆建工集团',tag:'总承包'},
- {id:'c-scrm',name:'蜀安人力',tag:'劳务'},
- {id:'c-cdbl',name:'成都电力工程',tag:'专业分包'}
-];
-function coName(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.name:id;}
-function coTag(id){var x=COS.filter(function(c){return c.id===id;})[0];return x?x.tag:'';}
+/* ═══ 工具函数 ═══ */
+function fmtTime(ts){
+  var d=new Date(ts);
+  var now=new Date();
+  var diff=now-d;
+  if(diff<3600000) return Math.floor(diff/60000)+' 分钟前';
+  if(diff<86400000) return Math.floor(diff/3600000)+' 小时前';
+  if(diff<604800000) return Math.floor(diff/86400000)+' 天前';
+  return (d.getMonth()+1)+'月'+d.getDate()+'日';
+}
+function riskLevelFor(coId,feed){
+  /* 该企业最近事件决定风险等级 */
+  var items=feed.filter(function(f){return f.company===coId;});
+  if(!items.length) return 'ok';
+  /* 按时间倒序 */
+  items.sort(function(a,b){return b.ts-a.ts;});
+  return items[0].kind;
+}
+function riskText(level){
+  return level==='danger'?'高风险':(level==='warning'?'预警中':'正常');
+}
 
-var SAMPLE_DIMS={
- '资质到期':'「安全生产许可证」将于 2026-12-31 到期，请及时办理延续',
- '项目更新':'新增中标公示 · 成都 6 号线延伸段土建 3 标段',
- '中标':'中标公示 · 中标金额 ¥8,600 万',
- '司法':'新增司法案件 1 起 · 建设工程施工合同纠纷（2026-9）',
- '经营异常':'经营异常名录提醒 · 年报未按期公示',
- '工商变更':'法定代表人/注册资本发生变更（+¥2,000 万）',
- '价格行情预警':'商品混凝土 C30 成都周环比 +2.4%，建议关注走势'
-};
+/* ═══ 渲染：Hero 总览 ═══ */
+function renderHero(){
+  var s=MonitorStore.read();
+  var follows=s.follows.length;
+  var danger=0,warning=0,ok=0;
+  s.feed.forEach(function(f){
+    if(f.kind==='danger')danger++;
+    else if(f.kind==='warning')warning++;
+    else ok++;
+  });
+  document.getElementById('stat-followed').textContent=follows;
+  document.getElementById('stat-danger').textContent=danger;
+  document.getElementById('stat-warning').textContent=warning;
+  document.getElementById('stat-total').textContent=s.feed.length;
+  document.getElementById('tab-count-co').textContent=follows;
+  document.getElementById('tab-count-feed').textContent=s.feed.length;
 
-function renderCo(){
+  /* 风险分布条 */
+  var track=document.getElementById('riskbar-track');
+  var total=danger+warning+ok;
+  if(total===0){
+    track.innerHTML='<div class="radar-riskbar-seg ok" style="width:100%;opacity:.2;"></div>';
+    document.getElementById('riskbar-summary').textContent='暂无监控数据';
+  }else{
+    track.innerHTML=
+      '<div class="radar-riskbar-seg danger" style="width:'+(danger/total*100)+'%"></div>'+
+      '<div class="radar-riskbar-seg warning" style="width:'+(warning/total*100)+'%"></div>'+
+      '<div class="radar-riskbar-seg ok" style="width:'+(ok/total*100)+'%"></div>';
+    document.getElementById('riskbar-summary').textContent=
+      danger+' 风险 · '+warning+' 预警 · '+ok+' 正常';
+  }
+}
+
+/* ═══ 渲染：监控企业列表 ═══ */
+var expandedCo=null;
+function renderCoList(){
   var s=MonitorStore.read();
   var box=document.getElementById('co-list');
-  document.getElementById('co-count').textContent=s.follows.length+' 家';
-  if(!s.follows.length){box.innerHTML='<div class="text-3 fs-12" style="padding:8px 2px;">尚未关注企业，点下方「+ 关注」开始监控</div>';return;}
+  if(!s.follows.length){
+    box.innerHTML='<div class="radar-empty">'+
+      '<div class="radar-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>'+
+      '<div class="radar-empty-title">尚未监控任何企业</div>'+
+      '<div class="radar-empty-desc">点击右下角 + 号，添加合作方或目标企业，开启 7×24 小时风险雷达监控</div>'+
+    '</div>';
+    return;
+  }
   box.innerHTML=s.follows.map(function(f){
-    var isF=MonitorStore.isFollowed(f.companyId);
-    return '<div class="co-row">'+
-      '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:700;flex:none;">'+coName(f.companyId).charAt(0)+'</div>'+
-      '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">'+coName(f.companyId)+' <span class="tag tag-gray" style="font-size:9px;">'+coTag(f.companyId)+'</span></div>'+
-      '<div class="dim">监控维度：资质到期 · 项目 · 司法 · 经营异常</div></div>'+
-      (isF?'<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;" onclick="unfollow(\''+f.companyId+'\')">取消</button>':'')+
+    var level=riskLevelFor(f.companyId,s.feed);
+    var items=s.feed.filter(function(x){return x.company===f.companyId;}).sort(function(a,b){return b.ts-a.ts;});
+    var latest=items[0];
+    var dimChips=dims.slice(0,4).map(function(d){return '<span class="co-dim-chip">'+d+'</span>';}).join('');
+    var detailHtml='';
+    if(items.length){
+      detailHtml='<div class="co-detail">'+
+        '<div class="co-detail-title">最近动态</div>'+
+        items.slice(0,4).map(function(it){
+          return '<div class="co-detail-feed">'+it.text+
+            '<div class="cdf-time">'+it.dim+' · '+fmtTime(it.ts)+'</div></div>';
+        }).join('')+
+      '</div>';
+    }
+    var latestHtml=latest?
+      '<div class="co-card-latest '+latest.kind+'">'+
+        '<span class="cl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg></span>'+
+        '<div><b style="font-weight:600;">'+latest.dim+'</b> · '+latest.text+'</div>'+
+      '</div>':'';
+    return '<div class="co-card '+level+(expandedCo===f.companyId?' expanded':'')+'" data-co="'+f.companyId+'">'+
+      '<div class="co-card-head">'+
+        '<div class="co-avatar">'+coName(f.companyId).charAt(0)+'</div>'+
+        '<div class="co-card-info">'+
+          '<div class="co-card-name">'+coName(f.companyId)+' <span class="co-tag">'+coTag(f.companyId)+'</span></div>'+
+          '<div class="co-card-meta">'+
+            '<span>'+coCapital(f.companyId)+'</span>'+
+            '<span>'+coEstablished(f.companyId)+' 成立</span>'+
+            '<span>'+coAddress(f.companyId)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<span class="co-risk-badge '+level+'"><span class="crb-dot"></span>'+riskText(level)+'</span>'+
+      '</div>'+
+      latestHtml+
+      '<div class="co-card-dims">'+dimChips+'</div>'+
+      '<div class="co-card-foot">'+
+        '<span class="co-card-time">关注于 '+fmtTime(f.ts)+'</span>'+
+        '<div class="co-card-actions">'+
+          '<button class="co-card-btn detail" onclick="event.stopPropagation();toggleDetail(\''+f.companyId+'\')">'+(expandedCo===f.companyId?'收起':'详情')+'</button>'+
+          '<button class="co-card-btn unfollow" onclick="event.stopPropagation();unfollow(\''+f.companyId+'\')">取消关注</button>'+
+        '</div>'+
+      '</div>'+
+      detailHtml+
     '</div>';
   }).join('');
-}
-window.renderCo=renderCo;
-window.unfollow=function(id){MonitorStore.unfollow(id);renderCo();UI.toast('已取消关注','info');};
 
+  /* 绑定卡片展开 */
+  box.querySelectorAll('.co-card').forEach(function(card){
+    card.addEventListener('click',function(){
+      var id=this.dataset.co;
+      toggleDetail(id);
+    });
+  });
+}
+window.toggleDetail=function(id){
+  expandedCo=(expandedCo===id)?null:id;
+  renderCoList();
+};
+window.unfollow=function(id){
+  MonitorStore.unfollow(id);
+  UI.toast('已取消关注','info');
+  if(expandedCo===id)expandedCo=null;
+  renderCoList();renderHero();
+};
+
+/* ═══ 风险处理 ═══ */
+window.resolveFeed=function(id){
+  var s=MonitorStore.read();
+  var item=s.feed.find(function(f){return f.id===id;});
+  if(item){item.resolved=true;}
+  MonitorStore.write(s);
+  UI.toast('已标记为已处理','ok');
+  renderFeed();renderHero();
+};
+window.dismissFeed=function(id){
+  var s=MonitorStore.read();
+  var item=s.feed.find(function(f){return f.id===id;});
+  if(item){item.dismissed=true;}
+  MonitorStore.write(s);
+  UI.toast('已忽略该风险','info');
+  renderFeed();renderHero();
+};
+
+/* ═══ 监控设置弹窗 ═══ */
+window.openMonitorSettings=function(){
+  var saved={};
+  try{saved=JSON.parse(localStorage.getItem('monitor_settings')||'{}');}catch(e){}
+  document.getElementById('ms-push-risk').checked=saved.risk!==false;
+  document.getElementById('ms-push-daily').checked=saved.daily===true;
+  document.getElementById('ms-push-email').checked=saved.email===true;
+  document.getElementById('ms-freq').value=saved.freq||'realtime';
+  document.getElementById('monitor-settings-modal').classList.add('show');
+};
+window.saveMonitorSettings=function(){
+  var settings={
+    risk:document.getElementById('ms-push-risk').checked,
+    daily:document.getElementById('ms-push-daily').checked,
+    email:document.getElementById('ms-push-email').checked,
+    freq:document.getElementById('ms-freq').value
+  };
+  localStorage.setItem('monitor_settings',JSON.stringify(settings));
+  document.getElementById('monitor-settings-modal').classList.remove('show');
+  UI.toast('设置已保存','ok');
+};
+
+/* ═══ 导出风险报告 ═══ */
+window.exportRiskReport=function(){
+  var s=MonitorStore.read();
+  var today=new Date();
+  var month=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0');
+
+  var report=`
+  企业监控·月度风险报告
+  ====================
+  报告月份: '+month+'
+  生成时间: '+today.toLocaleString()+'
+
+  一、监控概览
+  监控企业数: '+s.follows.length+' 家
+  本月风险事件: '+s.feed.length+' 条
+  高风险: '+s.feed.filter(f=>f.kind==='danger').length+' 条
+  预警: '+s.feed.filter(f=>f.kind==='warning').length+' 条
+
+  二、风险明细
+'+s.feed.map(f=>'['+f.dim+'] '+coName(f.company)+' - '+f.text).join('\n')+'
+
+  报告由 工程链·企业监控 自动生成
+  `;
+
+  var blob=new Blob([report],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='风险报告_'+month+'.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+
+  UI.toast('报告已导出','ok');
+  document.getElementById('monitor-settings-modal').classList.remove('show');
+};
+// 设置弹窗点击遮罩关闭
+document.getElementById('monitor-settings-modal').addEventListener('click',function(e){
+  if(e.target===this)this.classList.remove('show');
+});
+// 监控维度选择
+document.getElementById('ms-dims').addEventListener('click',function(e){
+  var chip=e.target.closest('.ms-dim');
+  if(!chip)return;
+  chip.classList.toggle('active');
+  if(chip.classList.contains('active')){
+    chip.style.background='var(--primary-soft)';
+    chip.style.color='var(--primary-dim)';
+    chip.style.border='none';
+  }else{
+    chip.style.background='var(--bg)';
+    chip.style.color='var(--text-2)';
+    chip.style.border='1px solid var(--line)';
+  }
+});
+
+/* ═══ 渲染：动态流 ═══ */
+var currentFilter='all';
 function renderFeed(){
   var s=MonitorStore.read();
   var box=document.getElementById('feed-list');
-  var items=s.feed.slice(0,10);
-  if(!items.length){box.innerHTML='<div class="text-3 fs-12" style="padding:8px 2px;">暂无动态 · 关注企业后自动推送</div>';return;}
-  box.innerHTML=items.map(function(it){
-    var d=new Date(it.ts);var ds=(d.getMonth()+1)+'月'+d.getDate()+'日';
-    var col=it.kind==='warning'?'var(--warning)':(it.kind==='danger'?'var(--danger)':'var(--success)');
-    return '<div class="feed-item"><span class="feed-dot" style="background:'+col+';"></span>'+
-      '<div style="flex:1;min-width:0;"><div class="fs-13" style="line-height:1.5;">'+it.text+'</div>'+
-      '<div class="dim" style="margin-top:2px;">'+coName(it.company)+' · '+it.dim+' · '+ds+'</div></div>'+
+  var items=s.feed.slice().sort(function(a,b){return b.ts-a.ts;});
+  if(currentFilter==='danger'||currentFilter==='warning'||currentFilter==='success'){
+    items=items.filter(function(f){return f.kind===currentFilter;});
+  }else if(currentFilter!=='all'){
+    items=items.filter(function(f){return f.dim===currentFilter;});
+  }
+  if(!items.length){
+    box.innerHTML='<div class="radar-empty">'+
+      '<div class="radar-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg></div>'+
+      '<div class="radar-empty-title">暂无动态</div>'+
+      '<div class="radar-empty-desc">关注企业后，资质/司法/工商变更将自动推送到这里</div>'+
+    '</div>';
+    return;
+  }
+  /* 按天分组 */
+  var html='';
+  var lastDay='';
+  items.forEach(function(it){
+    var d=new Date(it.ts);
+    var dayKey=d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+    var dayLabel='';
+    var now=new Date();
+    if(dayKey===now.getFullYear()+'-'+(now.getMonth()+1)+'-'+now.getDate())dayLabel='今天';
+    else if(dayKey===(now.getFullYear()+'-'+(now.getMonth())+'-'+(now.getDate()-1)))dayLabel='昨天';
+    else dayLabel=(d.getMonth()+1)+'月'+d.getDate()+'日';
+    if(dayKey!==lastDay){html+='<div class="feed-day">'+dayLabel+'</div>';lastDay=dayKey;}
+    var kindClass=it.kind;
+    var dimTag=it.dim||'动态';
+    html+='<div class="feed-item">'+
+      '<div class="feed-rail">'+
+        '<span class="feed-dot '+kindClass+'"></span>'+
+        '<div class="feed-line"></div>'+
+      '</div>'+
+      '<div class="feed-body">'+
+        '<div class="feed-card'+(it.resolved?' resolved':'')+(it.dismissed?' ignored':'')+'">'+
+          '<span class="feed-dim-tag '+kindClass+'">'+dimTag+'</span>'+
+          '<div class="feed-text">'+it.text+'</div>'+
+          '<div class="feed-meta">'+
+            '<span class="feed-company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l8-4 7 4v14M9 9h.01M14 9h.01M9 13h.01M14 13h.01"/></svg>'+coName(it.company)+'</span>'+
+            '<span>'+fmtTime(it.ts)+'</span>'+
+          '</div>'+
+          (it.kind==='danger'||it.kind==='warning' ? 
+            '<div class="feed-action-btns">'+
+              '<button class="feed-action-btn" data-action="resolve" data-id="'+it.id+'">标记已处理</button>'+
+              '<button class="feed-action-btn" data-action="dismiss" data-id="'+it.id+'">忽略</button>'+
+            '</div>' : '') +
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+  box.innerHTML=html;
+}
+
+/* ═══ 风险处理按钮事件委托 ═══ */
+document.getElementById('feed-list').addEventListener('click', function(e){
+  var btn = e.target.closest('.feed-action-btn');
+  if (!btn) return;
+  var action = btn.dataset.action;
+  var id = btn.dataset.id;
+  if (action === 'resolve') resolveFeed(id);
+  else if (action === 'dismiss') dismissFeed(id);
+});
+
+/* ═══ Tab 切换 ═══ */
+document.querySelectorAll('.radar-tab').forEach(function(tab){
+  tab.addEventListener('click',function(){
+    document.querySelectorAll('.radar-tab').forEach(function(t){t.classList.remove('active');});
+    this.classList.add('active');
+    var target=this.dataset.tab;
+    document.getElementById('pane-companies').style.display=target==='companies'?'':'none';
+    document.getElementById('pane-feed').style.display=target==='feed'?'':'none';
+  });
+});
+
+/* ═══ 动态流筛选 ═══ */
+document.getElementById('feed-filter').addEventListener('click',function(e){
+  var chip=e.target.closest('.ff-chip');
+  if(!chip)return;
+  document.querySelectorAll('.ff-chip').forEach(function(c){c.classList.remove('active');});
+  chip.classList.add('active');
+  currentFilter=chip.dataset.dim;
+  renderFeed();
+});
+
+/* ═══ 添加监控 Sheet ═══ */
+var addMask=document.getElementById('add-mask');
+var addSheet=document.getElementById('add-sheet');
+var addList=document.getElementById('add-list');
+var addSearchInput=document.getElementById('add-search-input');
+
+function openAddSheet(){
+  addMask.classList.add('show');
+  addSheet.classList.add('show');
+  document.body.style.overflow='hidden';
+  renderAddList('');
+}
+function closeAddSheet(){
+  addMask.classList.remove('show');
+  addSheet.classList.remove('show');
+  document.body.style.overflow='';
+  addSearchInput.value='';
+}
+document.getElementById('fab-add').addEventListener('click',openAddSheet);
+document.getElementById('add-close').addEventListener('click',closeAddSheet);
+addMask.addEventListener('click',closeAddSheet);
+
+function renderAddList(kw){
+  var s=MonitorStore.read();
+  var filtered=COS.filter(function(c){
+    if(!kw)return true;
+    return c.name.indexOf(kw)>=0||c.tag.indexOf(kw)>=0;
+  });
+  if(!filtered.length){
+    addList.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-3);font-size:12px;">未找到匹配企业</div>';
+    return;
+  }
+  addList.innerHTML=filtered.map(function(c){
+    var isFollowed=MonitorStore.isFollowed(c.id);
+    return '<div class="add-co-row">'+
+      '<div class="add-co-avatar">'+c.name.charAt(0)+'</div>'+
+      '<div class="add-co-info">'+
+        '<div class="add-co-name">'+c.name+(c.verified?' <svg style="width:12px;height:12px;display:inline;vertical-align:-1px;color:var(--success);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>':'')+'</div>'+
+        '<div class="add-co-meta">'+c.tag+' · '+c.industry+'</div>'+
+      '</div>'+
+      (isFollowed
+        ?'<button class="add-co-btn followed">已关注</button>'
+        :'<button class="add-co-btn follow" onclick="follow(\''+c.id+'\')">+ 关注</button>')+
     '</div>';
   }).join('');
 }
-window.renderFeed=renderFeed;
+addSearchInput.addEventListener('input',function(){renderAddList(this.value.trim());});
 
-/* 关注入口（企业列表，点关注写入并推动态） */
-var addBox='<div class="section-title" style="margin-top:14px;"><div class="st-left">添加监控企业</div></div><div class="card">';
-COS.forEach(function(c){
-  addBox+='<div class="co-row"><div style="width:36px;height:36px;border-radius:10px;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;color:var(--primary);font-weight:700;flex:none;">'+c.name.charAt(0)+'</div>'+
-    '<div style="flex:1;min-width:0;"><div class="fw-600 fs-13">'+c.name+'</div><div class="dim">'+c.tag+' · 平台已核验</div></div>'+
-    '<button class="btn btn-primary" style="padding:5px 12px;font-size:11px;" onclick="follow(\''+c.id+'\')">+ 关注</button></div>';
-});
-addBox+='</div>';
-var sc=document.querySelector('.scroll');
-/* [FIX] 监控专业版升级 CTA（破冰期特惠） */
-var isBreakIn = !!(window.ModeStore && ModeStore.isBreakIn());
-var prosPrice = isBreakIn ? '破冰期特惠 ¥99/年' : '¥199/年';
-var subCard = '<div class="card" style="margin-top:14px;padding:14px;background:linear-gradient(135deg,rgba(201,169,97,.12),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.3);border-radius:14px;">'+
-  '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'+
-    '<span style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);display:flex;align-items:center;justify-content:center;flex:none;"><svg class="ic" style="width:17px;height:17px;"><use href="#i-shield"/></svg></span>'+
-    '<div style="flex:1;"><div style="font-size:13.5px;font-weight:700;color:var(--text-1);">升级监控专业版</div>'+
-    '<div style="font-size:11px;color:var(--text-3);margin-top:2px;">不限关注数 + 价格预警 + 实时推送</div></div>'+
-    '<span style="font-size:13px;font-weight:800;color:var(--primary-dim);">'+prosPrice+'</span>'+
-  '</div>'+
-  '<button class="btn btn-primary btn-block" style="margin-top:8px;padding:9px;font-size:12.5px;" onclick="location.href=\'../wallet/membership.html\'">立即升级</button>'+
-'</div>';
-sc.insertAdjacentHTML('beforeend', subCard);
-sc.insertAdjacentHTML('beforeend', addBox);
-
+/* ═══ 关注/取关 ═══ */
 window.follow=function(id){
   var s=MonitorStore.read();
-  /* P1-2 修复：limit=0 时也必须拦截（原条件 limit>0&& 导致成熟期非入驻用户可无限关注） */
   if(s.follows.length>=limit){
-    if(limit<=0){UI.toast('入驻企业解锁完整监控（建筑 30 家 / 中介 50 家 / 合伙人 200 家）','warn');}
-    else{UI.toast('已达关注上限 '+limit+' 家，升级认证可扩容','warn');}
+    if(limit<=0){UI.toast('入驻企业解锁完整监控','warn');}
+    else{UI.toast('已达关注上限 '+limit+' 家','warn');}
     return;
   }
   MonitorStore.follow(id);
   var dim=dims[Math.floor(Math.random()*dims.length)];
-  var kind=dim==='司法'?'danger':(dim==='经营异常'||dim==='价格行情预警'?'warning':'success');
+  var kind=DIM_COLOR[dim]||'success';
   MonitorStore.pushFeed({company:id,dim:dim,kind:kind,text:SAMPLE_DIMS[dim]});
-  UI.toast('已关注 · 推送 '+dim,'ok');
-  renderCo();renderFeed();
+  UI.toast('已关注 · 推送'+dim,'ok');
+  renderAddList(addSearchInput.value.trim());
+  renderCoList();renderHero();renderFeed();
 };
 
-renderCo();renderFeed();
-  /* 跨 tab 自动重渲染：监控数据变更后自动刷新 */
-  var _monRerender = null;
-  function _monRefresh() { if (_monRerender) clearTimeout(_monRerender); _monRerender = setTimeout(function() { renderCo(); renderFeed(); }, 100); }
-  window.addEventListener('storage', function (e) { if (e.key === 'engchain-state' || e.key === 'engchain-auth') _monRefresh(); });
-  window.addEventListener('engchain:state', _monRefresh);
-  window.addEventListener('engchain:auth', _monRefresh);
-  window.addEventListener('engchain:store-change', _monRefresh);
+/* ═══ 升级 CTA 文案 ═══ */
+var isBreakIn=!!(window.ModeStore&&ModeStore.isBreakIn());
+var prosPrice=isBreakIn?'破冰期特惠 ¥99/年':'¥199/年';
+document.getElementById('upgrade-desc').textContent='不限关注数 · 价格行情预警 · 实时推送 · '+prosPrice;
+
+/* ═══ 初始渲染 ═══ */
+renderHero();renderCoList();renderFeed();
+
+/* 跨 tab 自动刷新 */
+var _monRerender=null;
+function _monRefresh(){if(_monRerender)clearTimeout(_monRerender);_monRerender=setTimeout(function(){renderHero();renderCoList();renderFeed();},100);}
+window.addEventListener('storage',function(e){if(e.key==='engchain-state'||e.key==='engchain-auth')_monRefresh();});
+window.addEventListener('engchain:state',_monRefresh);
+window.addEventListener('engchain:auth',_monRefresh);
+window.addEventListener('engchain:store-change',_monRefresh);
 })();
 </script>
 </body>
 </html>
+
+
+

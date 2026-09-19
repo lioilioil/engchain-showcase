@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>全部功能 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   全部功能 V2.0
+   与个人中心一致的 Liquid Glass 设计语言
+   入口完整性 + 权限分层（可进入 / 需登录 / 需认证 / 需入驻 / 付费 / 联系官方）
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --af-gold: #C9A961;
+  --af-gold-deep: #A98A47;
+  --af-gold-light: #E8D9B5;
+  --af-gold-pale: #F5EDD8;
+  --af-text: #2A2722;
+  --af-text-2: #6B6358;
+  --af-text-3: #9A9185;
+  --af-text-4: #C4BCB0;
+  --af-bg: #F2EFE8;
+  --af-card: rgba(255,255,255,0.72);
+  --af-border: rgba(201,169,97,0.18);
+  --af-border-strong: rgba(201,169,97,0.35);
+  --af-shadow-1: 0 1px 2px rgba(42,39,34,0.04), 0 2px 8px rgba(42,39,34,0.03);
+  --af-shadow-2: 0 2px 4px rgba(42,39,34,0.04), 0 8px 24px rgba(42,39,34,0.06);
+  --af-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-theme="dark"] {
+  --af-text: #F0EBE0;
+  --af-text-2: #B0A898;
+  --af-text-3: #7A7265;
+  --af-text-4: #524C42;
+  --af-bg: #0E0D0B;
+  --af-card: rgba(32,30,27,0.7);
+  --af-border: rgba(201,169,97,0.12);
+  --af-border-strong: rgba(201,169,97,0.28);
+  --af-gold: #D4B876;
+  --af-gold-deep: #B89A5A;
+  --af-gold-light: #8A7548;
+  --af-gold-pale: #3A3325;
+  --af-shadow-1: 0 1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15);
+  --af-shadow-2: 0 2px 4px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.2);
+}
+
+body, .phone { background: var(--af-bg); }
+.phone::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 240px;
+  background: radial-gradient(ellipse at center, rgba(201,169,97,0.15) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.af-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* 搜索框 */
+.af-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--af-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--af-border);
+  box-shadow: var(--af-shadow-1);
+  margin-bottom: 20px;
+}
+.af-search svg { width: 16px; height: 16px; color: var(--af-text-3); flex-shrink: 0; }
+.af-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--af-text);
+  outline: none;
+}
+.af-search input::placeholder { color: var(--af-text-4); }
+
+/* 分组标题 */
+.af-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 20px 2px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--af-text);
+}
+.af-group-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--af-gold), var(--af-gold-deep));
+}
+.af-group-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--af-text-3);
+  background: rgba(201,169,97,0.1);
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+/* 功能网格 */
+.af-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 6px;
+}
+
+.af-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: transform 0.2s var(--af-ease);
+  position: relative;
+}
+.af-item:hover { transform: translateY(-2px); }
+.af-item:active { transform: scale(0.95); }
+.af-item.locked { opacity: 0.45; cursor: not-allowed; }
+.af-item.locked:hover { transform: none; }
+
+.af-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: var(--af-shadow-1);
+  transition: box-shadow 0.2s var(--af-ease);
+}
+.af-item:hover .af-icon { box-shadow: var(--af-shadow-2); }
+.af-icon svg { width: 21px; height: 21px; }
+
+.af-icon.ic-gold { background: linear-gradient(135deg, #F5EDD8, #E8D9B5); color: #A98A47; }
+.af-icon.ic-green { background: linear-gradient(135deg, #E0EDE4, #C8DFD0); color: #4A8A5E; }
+.af-icon.ic-blue { background: linear-gradient(135deg, #DCE5F0, #C2D4E8); color: #4A7AA5; }
+.af-icon.ic-red { background: linear-gradient(135deg, #F0DCD8, #E8C8C2); color: #B5554A; }
+.af-icon.ic-orange { background: linear-gradient(135deg, #F0E4D0, #E8D4B0); color: #B58040; }
+.af-icon.ic-purple { background: linear-gradient(135deg, #E4E0F0, #D0C8E8); color: #6A5AA5; }
+.af-icon.ic-muted { background: linear-gradient(135deg, #E8E4DC, #D8D4CC); color: #8A8275; }
+
+[data-theme="dark"] .af-icon.ic-gold { background: linear-gradient(135deg, rgba(201,169,97,0.2), rgba(201,169,97,0.1)); color: #D4B876; }
+[data-theme="dark"] .af-icon.ic-green { background: linear-gradient(135deg, rgba(91,154,111,0.2), rgba(91,154,111,0.1)); color: #7ABA8E; }
+[data-theme="dark"] .af-icon.ic-blue { background: linear-gradient(135deg, rgba(91,138,181,0.2), rgba(91,138,181,0.1)); color: #7AAAD5; }
+[data-theme="dark"] .af-icon.ic-red { background: linear-gradient(135deg, rgba(212,101,90,0.2), rgba(212,101,90,0.1)); color: #E08075; }
+[data-theme="dark"] .af-icon.ic-orange { background: linear-gradient(135deg, rgba(212,148,90,0.2), rgba(212,148,90,0.1)); color: #E0A870; }
+[data-theme="dark"] .af-icon.ic-purple { background: linear-gradient(135deg, rgba(139,123,181,0.2), rgba(139,123,181,0.1)); color: #A898D5; }
+[data-theme="dark"] .af-icon.ic-muted { background: linear-gradient(135deg, rgba(154,145,133,0.15), rgba(154,145,133,0.08)); color: #9A9185; }
+
+/* 状态角标（右下角 16px 圆标）：锁 = 不能进入；¥ = 付费；✓ = 已完成；耳麦 = 联系官方 */
+.af-lock {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--af-bg);
+  border: 1.5px solid var(--af-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--af-text-3);
+  box-shadow: var(--af-shadow-1);
+}
+.af-lock svg { width: 9px; height: 9px; }
+/* 需认证/申请：蓝色锁 */
+.af-lock.auth { background: #E3ECF5; border-color: rgba(74,122,165,0.32); color: #4A7AA5; }
+/* 需入驻（B端）：金色锁 */
+.af-lock.entry { background: #F4E7D3; border-color: rgba(181,128,64,0.34); color: #B58040; }
+[data-theme="dark"] .af-lock.auth { background: rgba(91,138,181,0.18); border-color: rgba(91,138,181,0.4); color: #7AAAD5; }
+[data-theme="dark"] .af-lock.entry { background: rgba(212,148,90,0.16); border-color: rgba(212,148,90,0.36); color: #E0A870; }
+
+.af-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--af-bg);
+  box-shadow: var(--af-shadow-1);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+/* 付费入口 ¥ */
+.af-badge-pay { background: linear-gradient(135deg, #E8D9B5, #C9A961); color: #fff; }
+/* 身份已完成 ✓ */
+.af-badge-ok { background: linear-gradient(135deg, #C8DFD0, #4A8A5E); color: #fff; }
+.af-badge-ok svg { width: 9px; height: 9px; }
+/* 联系官方（客服） */
+.af-badge-hs { background: linear-gradient(135deg, #E4E0F0, #6A5AA5); color: #fff; }
+.af-badge-hs svg { width: 9px; height: 9px; }
+
+.af-label {
+  font-size: 11px;
+  color: var(--af-text-2);
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+.af-item.locked .af-label { color: var(--af-text-3); }
+
+/* 底部提示 */
+.af-footer-tip {
+  text-align: center;
+  padding: 24px 16px 8px;
+  font-size: 10.5px;
+  color: var(--af-text-4);
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">全部功能</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll" style="padding-bottom:100px;">
+  <div class="af-content">
+
+    <!-- 搜索 -->
+    <div class="af-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="搜索功能…" id="af-search-input" oninput="filterFunctions()">
+    </div>
+
+    <!-- 分组容器（数据驱动渲染） -->
+    <div id="af-groups"></div>
+
+    <div class="af-footer-tip">
+      灰色图标为未开通功能，点击查看开通方式与条件<br>
+      锁=需开通 · ¥=付费 · ✓=已开通 · 耳麦=联系官方<br>
+      ENGCHAIN App · Version 3.0.0
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script>
+(function(){
+  window.__ROOT__ = '../../';
+
+  /* 主题同步 */
+  try {
+    var t = localStorage.getItem('engchain-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch(e) {}
+
+  window.go = function(url) { location.href = url; };
+
+  /* ═════════════════════════════════════════════════════════════
+     全部功能入口清单（单一数据源）
+     need 状态：
+       open   = 所有人可进入使用
+       login  = 需登录（游客锁定，灰锁；登录后可用）
+       resume = 需个人入驻（实名 → 专业资质认证）解锁，蓝锁
+       jobs   = 需企业认证（中介入驻不可发招聘），蓝锁
+       dist   = 需企业入驻或个人合伙人，金锁（与 entryAccess 同源）
+       agency = 需中介服务企业入驻，金锁
+       vendor = 需登录+入驻（B端增值道具），游客灰锁，登录后 ¥ 角标
+     pay   = 付费入口标识（金色 ¥ 角标；点击进入对应付费页）
+     hs    = 联系官方入口标识（耳麦角标）
+     okKey = 认证类入口：已完成身份标识（personal/enterprise/partner/pro/resident），绿勾
+     icon  = '<svg...' 开头为内联 SVG，否则为 sprite 图标名
+     ═════════════════════════════════════════════════════════════ */
+  var GROUPS = [
+    { name:'交易服务', items:[
+      { id:'orders',    label:'我的订单',  href:'../order/index.html',          icon:'i-box',      cls:'ic-gold',   need:'login' },
+      { id:'wallet',    label:'我的钱包',  href:'../wallet/index.html',          icon:'i-wallet',   cls:'ic-green',  need:'login' },
+      { id:'invoice',   label:'发票管理',  href:'../wallet/invoice.html',        icon:'i-doc',      cls:'ic-blue',   need:'login' },
+      { id:'refund',    label:'退款售后',  href:'../refund/index.html',          icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l2.5 2.5"/></svg>', cls:'ic-orange', need:'login' },
+      { id:'member',    label:'年度会员',  href:'../wallet/membership.html',    icon:'i-award',    cls:'ic-gold',   need:'open',  pay:true },
+      { id:'upgrades',  label:'增值道具',  href:'../vendor/upgrades.html',       icon:'i-bolt',     cls:'ic-gold',   need:'vendor', pay:true },
+      { id:'match',     label:'智能推荐',  href:'../match/preferences.html',     icon:'i-sparkle',  cls:'ic-purple', need:'login' },
+      { id:'escrow',    label:'资金托管',  href:'../wallet/escrow.html',         icon:'i-shield',   cls:'ic-blue',   need:'login' },
+      { id:'monitor',   label:'企业监控',  href:'../monitor/index.html',         icon:'i-eye',      cls:'ic-orange', need:'login' },
+      { id:'delegate',  label:'我的委托',  href:'delegates.html',                icon:'i-clip',     cls:'ic-purple', need:'login' }
+    ]},
+    { name:'内容管理', items:[
+      { id:'pub-records', label:'发布管理', href:'../publish/records.html',     icon:'i-form',     cls:'ic-blue',   need:'login' },
+      { id:'pub-center',  label:'发布中心', href:'../publish/index.html',        icon:'i-edit',     cls:'ic-gold',   need:'login' },
+      { id:'fav',         label:'我的收藏', href:'../favorite/index.html',       icon:'i-fav',      cls:'ic-red',    need:'login' },
+      { id:'history',     label:'浏览记录', href:'history.html',                 icon:'i-clock',    cls:'ic-gold',   need:'login' },
+      { id:'dashboard',   label:'经营看板', href:'../vendor/dashboard.html',     icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="6" rx="1"/></svg>', cls:'ic-blue', need:'login' },
+      { id:'industry',    label:'行业资讯', href:'../industry/index.html',       icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>', cls:'ic-green', need:'open' },
+      { id:'api',         label:'数据服务', href:'../api/index.html',            icon:'i-swap',     cls:'ic-gold',   need:'open',  pay:true }
+    ]},
+    { name:'市场与服务', items:[
+      { id:'trade',      label:'建企买卖', href:'../trade/index.html',           icon:'i-buil',     cls:'ic-blue',   need:'open' },
+      { id:'personnel',  label:'人员招聘', href:'../personnel/index.html',       icon:'i-recruit',  cls:'ic-green',  need:'open' },
+      { id:'agency-plaza', label:'服务广场', href:'../agency/index.html',        icon:'i-compass',  cls:'ic-purple', need:'open' },
+      { id:'franchise',  label:'资质招商', href:'../franchise/index.html',       icon:'i-badge',    cls:'ic-gold',   need:'open' },
+      { id:'co-create',  label:'共创者计划', href:'../co-create/index.html',     icon:'i-users',    cls:'ic-orange', need:'open' }
+    ]},
+    { name:'人才服务', items:[
+      { id:'resume',   label:'简历投递', href:'my-applies.html',                 icon:'i-file',     cls:'ic-blue',   need:'resume' },
+      { id:'my-applies', label:'我的投递', href:'my-applies.html',               icon:'i-upload',   cls:'ic-green',  need:'login' },
+      { id:'my-jobs',  label:'我的招聘', href:'my-jobs.html',                    icon:'i-briefcase',cls:'ic-gold',   need:'jobs' }
+    ]},
+    { name:'认证入驻', items:[
+      { id:'auth-center', label:'认证中心', href:'auth.html',                    icon:'i-shield',   cls:'ic-blue',   need:'open' },
+      { id:'auth-realname', label:'个人认证', href:'auth-prep.html?type=realname', icon:'i-user',   cls:'ic-green',  need:'open', okKey:'realname' },
+      { id:'auth-pro',     label:'个人入驻', href:'auth-prep.html?type=qualification', icon:'i-wrench', cls:'ic-gold', need:'open', okKey:'pro' },
+      { id:'auth-partner', label:'个人合伙人', href:'auth-prep.html?type=partner', icon:'i-share',  cls:'ic-purple', need:'open', okKey:'partner' },
+      { id:'auth-ent',     label:'企业认证', href:'auth-prep.html?type=enterprise', icon:'i-company', cls:'ic-muted', need:'open', okKey:'enterprise' },
+      { id:'auth-entry',   label:'企业入驻', href:'auth-prep.html?type=entry',   icon:'i-buil',    cls:'ic-gold',   need:'open', okKey:'resident' }
+    ]},
+    { name:'消息互动', items:[
+      { id:'message',  label:'我的消息', href:'../message/index.html',           icon:'i-chat',     cls:'ic-gold',   need:'login' },
+      { id:'feedback', label:'意见反馈', href:'../help/index.html',               icon:'i-feedback', cls:'ic-purple', need:'open', hs:true }
+    ]},
+    { name:'分销与邀请', items:[
+      { id:'dist',     label:'分销中心', href:'../distribution/index.html',      icon:'i-share',    cls:'ic-orange', need:'dist' },
+      { id:'agency-sv', label:'中介服务', href:'../agency/seller-board.html',    icon:'i-briefcase',cls:'ic-blue',   need:'agency' },
+      { id:'share',    label:'我的分享', href:'share.html',                      icon:'i-sparkle',  cls:'ic-red',    need:'login' }
+    ]},
+    { name:'钱包与积分', items:[
+      { id:'credits',    label:'我的积分', href:'../wallet/credits.html',        icon:'i-star',     cls:'ic-orange', need:'login' },
+      { id:'credits-mall', label:'积分商城', href:'../wallet/credits-mall.html', icon:'i-tag',      cls:'ic-gold',   need:'login' },
+      { id:'free-quota', label:'免费额度', href:'../wallet/free-quota.html',     icon:'i-download', cls:'ic-green',  need:'login' },
+      { id:'pay-method', label:'支付方式', href:'../wallet/payment-method.html', icon:'i-card',     cls:'ic-blue',   need:'login' }
+    ]},
+    { name:'系统设置', items:[
+      { id:'general',  label:'通用设置', href:'general-setting.html',            icon:'i-gear',     cls:'ic-muted',  need:'open' },
+      { id:'security', label:'账号安全', href:'security.html',                   icon:'i-lock',     cls:'ic-green',  need:'login' },
+      { id:'notify',   label:'通知设置', href:'notify.html',                     icon:'i-bell',     cls:'ic-orange', need:'login' },
+      { id:'help',     label:'帮助中心', href:'../help/index.html',               icon:'i-help',     cls:'ic-blue',   need:'open', hs:true },
+      { id:'about',    label:'关于我们', href:'about.html',                      icon:'i-info',     cls:'ic-muted',  need:'open' }
+    ]}
+  ];
+
+  var byId = {};
+  GROUPS.forEach(function(g){ g.items.forEach(function(it){ byId[it.id] = it; }); });
+
+  /* ---------- 身份与权限（单一来源：stores.js） ---------- */
+  function loggedIn() {
+    try { return !!(window.UI && UI.state && UI.state.get() && UI.state.get().loggedIn); } catch(e) { return false; }
+  }
+  function identity() {
+    try { return (typeof deriveIdentity === 'function') ? deriveIdentity() : { primary:'guest' }; } catch(e) { return { primary:'guest' }; }
+  }
+  function access() {
+    try { return (typeof entryAccess === 'function') ? entryAccess() : { dist:false, agency:false }; } catch(e) { return { dist:false, agency:false }; }
+  }
+
+  /* ---------- 入口状态计算 ----------
+     返回: 'open' 可进入 | 'login' 需登录 | 'resume' 需个人入驻 | 'jobs' 需企业认证
+           | 'dist' 需入驻/合伙人 | 'agency' 需中介入驻 | 'vendor' 需登录(入驻) */
+  function stateOf(en) {
+    var idy = identity(), acc = access();
+    switch (en.need) {
+      case 'open':  return 'open';
+      case 'login': return loggedIn() ? 'open' : 'login';
+      case 'vendor':
+        if (!loggedIn()) return 'login';
+        return 'open';
+      case 'resume': {
+        if (!loggedIn()) return 'login';
+        var ok = idy.primary === 'pro' || idy.primary === 'partner' || idy.primary === 'enterprise' || idy.primary === 'resident';
+        return ok ? 'open' : 'resume';
+      }
+      case 'jobs': {
+        if (!loggedIn()) return 'login';
+        var ent = idy.enterprise;
+        var okJobs = (ent === 'verified' || ent === 'resident') && !acc.agency;
+        return okJobs ? 'open' : 'jobs';
+      }
+      case 'dist': {
+        if (!loggedIn()) return 'login';
+        return acc.dist ? 'open' : 'dist';
+      }
+      case 'agency': {
+        if (!loggedIn()) return 'login';
+        return acc.agency ? 'open' : 'agency';
+      }
+      default: return 'open';
+    }
+  }
+
+  /* 认证完成标识（认证组绿勾） */
+  function authOk(en) {
+    if (!en.okKey) return false;
+    try {
+      var idy = identity();
+      if (en.okKey === 'realname')  return idy.identities.indexOf('realname') >= 0;
+      if (en.okKey === 'pro')       return idy.identities.indexOf('pro') >= 0;
+      if (en.okKey === 'partner')   return idy.identities.indexOf('partner') >= 0;
+      if (en.okKey === 'enterprise')return idy.identities.indexOf('enterprise') >= 0;
+      if (en.okKey === 'resident')  return idy.identities.indexOf('resident') >= 0;
+    } catch(e) {}
+    return false;
+  }
+
+  /* ---------- 渲染 ---------- */
+  var LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+  var OK_SVG   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>';
+  var HS_SVG   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 18v-2a9 9 0 0 1 18 0v2"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>';
+
+  function iconSvg(en) {
+    if (en.icon.charAt(0) === '<') return en.icon;
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#' + en.icon + '"/></svg>';
+  }
+
+  function itemHtml(en, st) {
+    var locked = (st !== 'open');
+    var badge = '';
+    if (!locked) {
+      if (en.pay) badge = '<span class="af-badge af-badge-pay">¥</span>';
+      else if (authOk(en)) badge = '<span class="af-badge af-badge-ok">' + OK_SVG + '</span>';
+      else if (en.hs) badge = '<span class="af-badge af-badge-hs">' + HS_SVG + '</span>';
+    } else {
+      var lockCls = '';
+      if (st === 'resume' || st === 'jobs') lockCls = ' auth';
+      else if (st === 'dist' || st === 'agency') lockCls = ' entry';
+      badge = '<span class="af-lock' + lockCls + '">' + LOCK_SVG + '</span>';
+    }
+    return '<div class="af-item' + (locked ? ' locked' : '') + '" data-id="' + en.id + '">' +
+      '<div class="af-icon ' + en.cls + '">' + iconSvg(en) + badge + '</div>' +
+      '<span class="af-label">' + en.label + '</span>' +
+    '</div>';
+  }
+
+  function renderAll() {
+    var host = document.getElementById('af-groups');
+    if (!host) return;
+    var html = '';
+    GROUPS.forEach(function(g){
+      html += '<div class="af-group-title">' + g.name + '<span class="af-group-count">' + g.items.length + '项</span></div>';
+      html += '<div class="af-grid" data-group="' + g.name + '">';
+      g.items.forEach(function(en){
+        html += itemHtml(en, stateOf(en));
+      });
+      html += '</div>';
+    });
+    host.innerHTML = html;
+  }
+
+  /* ---------- 点击（事件委托） ---------- */
+  function openOrGuide(en, st) {
+    if (st === 'open') { location.href = en.href; return; }
+    switch (st) {
+      case 'login':  requireLogin('登录后解锁「' + en.label + '」'); break;
+      case 'resume': guideDialog(en.label, '简历投递', '完成<b>个人实名认证</b>并开通<b>个人入驻</b>（专业资质认证）后，即可向平台岗位投递简历、进入人才市场展示。', 'auth.html'); break;
+      case 'jobs':   guideDialog(en.label, '我的招聘', '完成<b>企业认证</b>后可发布招聘岗位并接收简历投递。<br>（中介服务企业暂不支持发布招聘）', 'auth-prep.html?type=enterprise'); break;
+      case 'dist':   guideDialog(en.label, '分销中心', '完成<b>企业入驻</b>（建筑 / 中介 / 合伙人三选一）或申请<b>个人合伙人</b>后开通分销返佣。', 'auth.html'); break;
+      case 'agency': guideDialog(en.label, '中介服务', '完成「<b>中介服务企业</b>」入驻后开通服务经营工作台：<br>服务橱窗、在线接单、托管结算、履约保证金。', 'entry.html'); break;
+      default: location.href = en.href;
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    var item = e.target && e.target.closest ? e.target.closest('.af-item') : null;
+    if (!item) return;
+    var en = byId[item.getAttribute('data-id')];
+    if (!en) return;
+    openOrGuide(en, stateOf(en));
+  });
+
+  /* ---------- 引导：登录 sheet ---------- */
+  window.requireLogin = function(tip) {
+    var txt = tip || '登录后解锁全部功能';
+    if (!window.UI || !UI.sheet) { location.href = '../auth/login.html'; return; }
+    var sh = UI.sheet();
+    sh.setText('登录/注册');
+    sh.html(
+      '<div style="padding:6px 4px 4px;text-align:center;">' +
+        '<div style="font-size:34px;margin-bottom:10px;">🔐</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:6px;">登录后解锁全部功能</div>' +
+        '<div style="font-size:12.5px;color:var(--text-3);line-height:1.6;margin-bottom:18px;">' + txt + '</div>' +
+        '<button type="button" id="af-login-cta" style="width:100%;height:46px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:15px;font-weight:700;cursor:pointer;">立即登录 / 注册</button>' +
+      '</div>'
+    );
+    sh.show();
+    var cta = document.getElementById('af-login-cta');
+    if (cta) cta.addEventListener('click', function(){ location.href = '../auth/login.html'; });
+  };
+
+  /* ---------- 引导：认证 / 入驻 dialog ---------- */
+  function guideDialog(name, title, text, href) {
+    var okLabel = '去开通';
+    var t = title || name + ' · 未开通';
+    if (window.UI && UI.dialog) {
+      UI.dialog({ title: t, text: text, ok: okLabel, cancel: '取消', onOk: function(){ location.href = href; } });
+    } else {
+      location.href = href;
+    }
+  }
+
+  /* ---------- 搜索过滤 ---------- */
+  window.filterFunctions = function() {
+    var kw = document.getElementById('af-search-input').value.trim().toLowerCase();
+    var items = document.querySelectorAll('.af-item');
+    var groups = document.querySelectorAll('.af-group-title');
+    var grids = document.querySelectorAll('.af-grid');
+
+    items.forEach(function(item) {
+      var label = item.querySelector('.af-label').textContent.toLowerCase();
+      var match = !kw || label.indexOf(kw) >= 0;
+      item.style.display = match ? '' : 'none';
+    });
+
+    for (var i = 0; i < grids.length; i++) {
+      var visible = grids[i].querySelectorAll('.af-item:not([style*="display: none"])').length;
+      if (groups[i]) groups[i].style.display = visible > 0 ? '' : 'none';
+    }
+  };
+
+  /* ---------- 初始化 ---------- */
+  renderAll();
+
+  /* 登录/认证/入驻/存储变化后重算入口状态 */
+  function refresh() { renderAll(); }
+  window.addEventListener('engchain:auth', refresh);
+  window.addEventListener('engchain:entry', refresh);
+  window.addEventListener('engchain:state', refresh);
+  window.addEventListener('engchain:store-change', refresh);
+  window.addEventListener('storage', function(e){
+    if (e.key && e.key.indexOf('engchain-') === 0) refresh();
+  });
+})();
+</script>
+</body>
+</html>

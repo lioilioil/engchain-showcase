@@ -11,7 +11,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </script><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>我的团队 · 工程链</title>
-<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css">
 <link rel="stylesheet" href="../../css/iphone-frame.css">
 </head>
 <body>
@@ -59,28 +59,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
-<script src="../../js/domain.js"></script>
+<script src="../../js/domain.js"></script><script src="../../js/guest-gate.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered',distTier:'base',isIndividualPartner:false};
 if(!acc.isResident && !acc.isIndividualPartner){
-  var ph=document.querySelector('.phone');
-  if(ph){ph.innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
-  '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 160px;">'+
-    '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
-      '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'+
-    '</div>'+
-    '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">分销团队</div>'+
-    '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">入驻企业专享 · 完成企业入驻后开通团队管理与分销返佣</div>'+
-  '</div>'+
-  '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
-    '<div style="padding:0 24px;">'+
-      '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+(acc.statusId=='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId=='guest'?'去登录':'去入驻')+'</button>'+
-      '<a href="index.html" style="display:block;margin-top:12px;color:var(--text-3);font-size:12.5px;text-align:center;">返回分销中心 ›</a>'+
-    '</div>'+
-  '</div>'+
-'</div>';}
+  var isGuest=(acc.statusId==='guest');
+  if (window.GuestGate) GuestGate.open({
+    mode:'replace', icon:'users', badge:'游客模式',
+    title:'登录后查看我的团队',
+    note:'团队成员与业绩数据仅对登录用户可见。',
+    btnText: isGuest?'去登录':'去入驻',
+    btnHref: isGuest?'../auth/login.html':'../profile/entry.html',
+    altText:'返回分销中心 ›', altHref:'index.html'
+  });
   return;
 }
 /* 个人合伙人：无团队管理功能，显示空态 */
@@ -125,6 +118,22 @@ function memberRow(link,idx){
     '<div class="m-tags"><span class="'+lvCls+'">'+lvTxt+'</span><span class="'+stCls+'">'+stTxt+'</span>'+(act?'':'<span class="m-hint">邀请其完成首笔消费</span>')+'</div></div>'+
     '<span class="m-amt '+amtCls+'">+¥'+money(c)+'</span></div>';
 }
+/* 树形视图：节点卡片（信息与列表一致，但做成树节点）；cls 决定层级标签（l2 链接自身 level=1，需按所在层级标注） */
+function trNodeHtml(link,idx,cls){
+  var u=uName(link.inviteeId),c=contrib(link.inviteeId),act=isActive(link.inviteeId);
+  var isL2=cls==='tr-l2';
+  var lvTxt=isL2?'二级':'一级';
+  var lvCls=isL2?'mlv mlv-green':'mlv mlv-gold';
+  var stCls=act?'mst mst-ok':'mst mst-idle';
+  var stTxt=act?'有效伙伴':'待激活';
+  var amtCls=act?'m-amt-on':'m-amt-off';
+  var avCls=act?'m-av m-av-on':'m-av m-av-off';
+  return '<div class="tr-node '+cls+'" style="animation-delay:'+(idx*45)+'ms;">'+
+    '<span class="'+avCls+'">'+u.avatar+'</span>'+
+    '<div class="m-main"><div class="m-name">'+u.name+(u.company?' <span class="m-company">'+u.company+'</span>':'')+'</div>'+
+    '<div class="m-tags"><span class="'+lvCls+'">'+lvTxt+'</span><span class="'+stCls+'">'+stTxt+'</span>'+(act?'':'<span class="m-hint">邀请其完成首笔消费</span>')+'</div></div>'+
+    '<span class="m-amt '+amtCls+'">+¥'+money(c)+'</span></div>';
+}
 function render(){
   /* downline 已按档位过滤：非 full 仅返回一级 */
   var links=Referral.downline(uid).sort(function(a,b){return a.level-b.level||b.boundAt-a.boundAt;});
@@ -140,12 +149,26 @@ function render(){
     if(tier==='full'&&l2.length)html+='<div class="group-label" style="margin-top:18px;"><span>间推伙伴（二级 · '+l2.length+'）</span><span class="gl-note">仅合伙人可见</span></div><div class="m-card">'+l2.map(memberRow).join('')+'</div>';
     box.innerHTML=html;
   }else{
+    /* 树形视图：根节点（我）+ 层级连线 */
     var tree=Referral.tree(uid);
-    box.innerHTML='<div class="group-label"><span>邀请关系树（合规上限二级）</span></div>'+tree.map(function(node,i){
-      var p=memberRow(node.l1,i*2);
-      var kids=node.l2.length?'<div class="m-card m-card-kids">'+node.l2.map(function(k,j){return memberRow(k,i*2+j+1);}).join('')+'</div>':'';
-      return '<div class="m-tree-root">'+p+kids+'</div>';
-    }).join('');
+    var meInfo=uName(uid);
+    var l1n=tree.length,l2n=tree.reduce(function(s,n){return s+n.l2.length;},0);
+    var rootHtml=
+      '<div class="tree-me">'+
+        '<span class="tr-av tr-av-me">'+(meInfo.avatar||meInfo.name.charAt(0))+'</span>'+
+        '<div class="m-main"><div class="m-name">'+meInfo.name+'<span class="mlv mlv-gold" style="margin-left:6px;">团队发起人</span></div>'+
+        '<div class="m-tags"><span class="mst mst-ok">直推 '+l1n+' 人</span><span class="mst mst-idle">间推 '+l2n+' 人</span><span class="mst mst-ok">有效 '+lv.active+' 人</span></div></div>'+
+        '<span class="m-amt m-amt-on">¥'+money(Rebate.stat(uid).total)+'</span>'+
+      '</div>';
+    var html=rootHtml;
+    if(tree.length){
+      html+='<div class="tree-lv">'+tree.map(function(node,i){
+        var l1='<div class="tree-branch"><div class="tree-kink-row"><span class="tree-kink"></span>'+trNodeHtml(node.l1,i*2,'tr-l1')+'</div>';
+        var kids=node.l2.length?'<div class="tree-lv tree-lv2">'+node.l2.map(function(k,j){return '<div class="tree-branch"><div class="tree-kink-row"><span class="tree-kink"></span>'+trNodeHtml(k,i*2+j+1,'tr-l2')+'</div></div>';}).join('')+'</div>':'';
+        return l1+kids+'</div>';
+      }).join('')+'</div>';
+    }
+    box.innerHTML='<div class="group-label"><span>邀请关系树（合规上限二级）</span></div>'+html;
   }
 }
 window.toggleView=function(){view=(view==='list'?'tree':'list');var b=document.getElementById('view-toggle');b.innerHTML=view==='list'?'<svg class="ic"><use href="#i-company"/></svg><span>关系树</span>':'<svg class="ic"><use href="#i-doc"/></svg><span>列表</span>';render();};
@@ -199,12 +222,29 @@ window.addEventListener('engchain:rebate',render);
 .m-amt{font-size:14px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums;flex:none;}
 .m-amt-on{color:var(--primary-dim);}
 .m-amt-off{color:var(--text-3);}
-.m-card-kids{margin:8px 0 12px 34px;box-shadow:none;background:var(--bg-card-2);border-color:var(--line);}
-.m-card-kids .m-row{border-color:rgba(0,0,0,.05);}
-.m-tree-root{margin-bottom:14px;}
+/* ===== 邀请关系树 ===== */
+.tree-me{display:flex;align-items:center;gap:12px;padding:14px;background:linear-gradient(135deg,rgba(238,214,151,.16),rgba(201,169,97,.05) 62%);border:1px solid var(--accent-line);border-radius:var(--r-l);box-shadow:var(--shadow-xs);position:relative;animation:tr-in .4s var(--e-out) both;}
+.tr-av-me{width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;background:linear-gradient(135deg,#F0E2BE,#C9A961);color:#2A1810;box-shadow:0 0 0 3px rgba(201,169,97,.22),0 4px 10px rgba(201,169,97,.3);}
+/* 走廊容器：一级内容缩进 40px，竖线由各分支自行绘制 */
+.tree-lv{margin-left:20px;padding-left:40px;}
+.tree-lv2{margin-left:0;padding-left:40px;padding-top:10px;}
+/* 分支：竖线段从上方衔接点（-10px 覆盖分支间距）画到本行拐角，行间自然衔接、无悬空线 */
+.tree-branch{position:relative;padding-bottom:10px;}
+.tree-branch:last-child{padding-bottom:0;}
+.tree-branch::before{content:"";position:absolute;left:-40px;top:-10px;height:34px;width:1.5px;background:var(--accent-line);}
+.tree-lv > .tree-branch:first-child::before,.tree-lv2 > .tree-branch:first-child::before{top:0;height:24px;}
+.tree-lv2 .tree-branch::before{background:var(--line);}
+/* 拐角横线：从竖线到节点左缘 */
+.tree-kink-row{position:relative;}
+.tree-kink{position:absolute;left:-40px;top:24px;width:40px;height:1.5px;background:var(--accent-line);}
+.tree-lv2 .tree-kink{background:var(--line);}
+/* 树节点卡片 */
+.tr-node{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--shadow-xs);animation:tr-in .4s var(--e-out) both;}
+.tr-l2{background:var(--bg-card-2);box-shadow:none;}
+@keyframes tr-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 .gl-note{font-size:10px;color:var(--text-3);font-weight:400;}
 
-@media (prefers-reduced-motion: reduce){.m-row{animation:none;}}
+@media (prefers-reduced-motion: reduce){.m-row,.tr-node,.tree-me{animation:none;}}
 </style>
 </body>
 </html>

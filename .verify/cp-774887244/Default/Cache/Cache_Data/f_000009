@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>我的 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+
+/* ═══════════════════════════════════════════════════════════
+   我的 · 个人中心 — 微博「我的」页参考重设计（Demo）
+   参考：微博APP「我的」页（模块化白卡 × 金色CTA × 密集功能网格）
+   品牌：工程链 暖金（CTA/强调/角标已对齐全站 app.css 色彩令牌）
+   ═══════════════════════════════════════════════════════════ */
+
+/* ---------- 令牌：兼容旧JS内联样式（结构令牌对齐全站 app.css） ---------- */
+:root {
+  --me-gold:var(--gold); --me-gold-deep:var(--primary-dim); --me-gold-light:var(--primary-strong); --me-gold-pale:#F4EEDF;
+  --me-text:var(--text-1); --me-text-2:var(--text-2); --me-text-3:var(--text-3); --me-text-4:var(--text-4);
+  --me-bg:var(--bg); --me-bg-2:var(--bg-card-2);
+  --me-card:var(--bg-card); --me-card-solid:var(--bg-card);
+  --me-border:var(--accent-line); --me-border-strong:rgba(184,153,104,.45);
+  --me-shadow-1:var(--shadow-xs); --me-shadow-2:var(--shadow-sm); --me-shadow-3:var(--shadow-card);
+  --me-green:var(--success); --me-red:var(--error); --me-blue:var(--blue); --me-orange:var(--gold); --me-purple:var(--purple);
+  --me-ease:cubic-bezier(.22,1,.36,1);
+  /* 微博风（色彩已对齐全站：金=品牌金，红=error） */
+  --wb-accent:var(--primary); --wb-accent-2:var(--primary-strong); --wb-red:var(--error);
+  --wb-bg:var(--bg); --wb-card:var(--bg-card);
+  --wb-text-1:var(--text-1); --wb-text-2:var(--text-2); --wb-text-3:var(--text-3);
+  --wb-line:var(--line);
+}
+[data-theme="dark"] {
+  --me-gold-pale:#2B2518;
+  --me-green:var(--success); --me-red:var(--error); --me-blue:var(--blue); --me-orange:var(--gold); --me-purple:var(--purple);
+  --wb-accent:var(--primary); --wb-accent-2:var(--primary-strong);
+  --me-border-strong:rgba(201,176,112,.45);
+}
+
+html, body { margin:0; padding:0; background:var(--bg); }
+/* .phone 背景由 app.css 提供（暖米白 + 顶部金色氛围光），本页不再覆盖以对齐全站 */
+/* 滚动容器：与全站 .scroll 同机制（flex 填充 + 内部滚动），修复 .phone overflow:hidden 裁剪导致无法滑动 */
+.profile-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: transparent;
+  padding-bottom: 48px;
+}
+.profile-content { padding:0 12px; }
+
+/* ---------- 顶部用户信息（白底通栏） ---------- */
+.wb-head { background:var(--wb-card); margin:0 -12px 10px; padding:16px 16px 14px; border-radius:0 0 18px 18px; }
+.wb-top-row { display:flex; align-items:center; gap:12px; }
+.wb-avatar {
+  flex:none; width:56px; height:56px; border-radius:50%;
+  background:linear-gradient(135deg,#E8D9B5,#C9A961); color:#fff;
+  font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 3px #fff, 0 0 0 4px rgba(201,169,97,.3), 0 2px 8px rgba(201,169,97,.28);
+}
+.wb-user-info { flex:1; min-width:0; }
+.wb-name-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.wb-name { font-size:17px; font-weight:700; color:var(--wb-text-1); line-height:1.2; }
+.wb-badges { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.wb-sub { font-size:12px; color:var(--wb-text-2); margin-top:4px; line-height:1.4; cursor:pointer; }
+.wb-settings {
+  flex:none; width:32px; height:32px; border-radius:50%;
+  background:var(--wb-bg); color:var(--wb-text-2);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.wb-settings svg { width:16px; height:16px; }
+.wb-settings:active { transform:scale(.92); }
+
+/* ---------- 等级横幅（深色金，微博「解锁等级」风） ---------- */
+.wb-levelbanner {
+  margin:0 0 10px; border-radius:16px; padding:14px 16px;
+  background:
+    radial-gradient(120% 200% at 88% -30%, rgba(255,214,120,.30), transparent 55%),
+    linear-gradient(135deg,#2C261C 0%, #3A3020 100%);
+  color:#fff; position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:12px;
+}
+.wb-levelbanner::after { content:''; position:absolute; right:-30px; top:-40px; width:130px; height:130px; background:radial-gradient(circle, rgba(255,214,120,.16), transparent 65%); pointer-events:none; }
+.wb-lv-main { flex:none; display:flex; flex-direction:column; align-items:center; gap:2px; }
+.wb-lv-num { font-size:22px; font-weight:800; color:#FFD678; line-height:1; font-variant-numeric:tabular-nums; }
+.wb-lv-tag { font-size:9px; font-weight:700; letter-spacing:1.5px; color:rgba(255,255,255,.5); }
+.wb-lv-mid { flex:1; min-width:0; }
+.wb-lv-title { font-size:13px; font-weight:700; }
+.wb-lv-bar { height:5px; border-radius:999px; background:rgba(255,255,255,.16); margin:9px 0 7px; overflow:hidden; }
+.wb-lv-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#E8B85C,#FFD678); transition:width .8s cubic-bezier(.22,1,.36,1); }
+.wb-lv-next { font-size:10.5px; color:rgba(255,255,255,.55); }
+.wb-chip {
+  flex:none; display:inline-flex; align-items:center; gap:4px;
+  padding:3px 9px; border-radius:999px; font-size:10.5px;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); color:#FFD678;
+}
+.wb-chip .v12-chip-score { font-weight:800; font-variant-numeric:tabular-nums; }
+.wb-chip .v12-chip-level { font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:999px; background:rgba(255,214,120,.18); }
+.wb-cta {
+  flex:none; padding:7px 14px; border-radius:999px;
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary) 45%,var(--primary-dim)); color:var(--text-inv);
+  font-size:12px; font-weight:700; cursor:pointer;
+  box-shadow:0 3px 10px rgba(184,153,104,.35); position:relative; z-index:1;
+}
+.wb-cta:active { transform:scale(.95); }
+
+/* ---------- 白色卡片 ---------- */
+.wb-card { background:var(--wb-card); border-radius:16px; padding:14px 16px; margin-bottom:10px; border:1px solid var(--wb-line); box-shadow:0 1px 2px rgba(0,0,0,.02); }
+.wb-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.wb-card-title { font-size:15px; font-weight:700; color:var(--wb-text-1); display:flex; align-items:center; gap:6px; }
+.wb-t-ic { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
+.wb-card-more { font-size:12px; color:var(--wb-text-3); display:flex; align-items:center; gap:2px; cursor:pointer; font-weight:500; }
+.wb-card-more svg { width:12px; height:12px; }
+.wb-card-more:active { color:var(--wb-accent); }
+
+/* ---------- 数据统计（微博四格） ---------- */
+.wb-stats { display:flex; }
+.wb-stat { flex:1; text-align:center; padding:2px 0; cursor:pointer; position:relative; }
+.wb-stat + .wb-stat::before { content:''; position:absolute; left:0; top:18%; height:64%; width:1px; background:var(--wb-line); }
+.wb-stat-num { font-size:20px; font-weight:800; color:var(--wb-text-1); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+.wb-stat-label { font-size:11.5px; color:var(--wb-text-2); margin-top:3px; }
+.wb-stat:active { opacity:.65; }
+
+/* ---------- 身份认证（双线 + 等级进度 + 权益） ---------- */
+/* 身份双面板（个人认证 / 企业认证） */
+.wb-ident-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.wb-ident-panel { border-radius:12px; border:1px solid var(--wb-line); padding:10px 12px; }
+.wb-ident-panel.wb-p { background:rgba(37,99,235,.05); border-color:rgba(37,99,235,.18); }
+.wb-ident-panel.wb-e { background:rgba(201,169,97,.09); border-color:rgba(201,169,97,.3); }
+[data-theme="dark"] .wb-ident-panel.wb-p { background:rgba(96,165,250,.08); border-color:rgba(96,165,250,.28); }
+[data-theme="dark"] .wb-ident-panel.wb-e { background:rgba(212,184,118,.08); border-color:rgba(212,184,118,.28); }
+.wb-ip-head { display:flex; align-items:center; gap:5px; }
+.wb-ip-ic { flex:none; width:20px; height:20px; display:flex; align-items:center; justify-content:center; color:var(--me-gold-deep); }
+[data-theme="dark"] .wb-ip-ic { color:var(--me-gold); }
+.wb-ip-ic svg { width:14px; height:14px; }
+.wb-ip-name { font-size:11px; font-weight:700; color:var(--wb-text-2); }
+.wb-ip-state { margin-left:auto; flex:none; font-size:9px; font-weight:700; padding:2px 7px; border-radius:999px; background:var(--wb-bg); color:var(--wb-text-3); }
+.wb-ip-state.on { background:rgba(43,107,79,.13); color:var(--me-green); }
+.wb-ip-value { font-size:13px; font-weight:700; color:var(--wb-text-1); margin-top:7px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.wb-ip-hint { font-size:10px; color:var(--wb-text-3); margin-top:4px; line-height:1.4; }
+.wb-ip-progress { margin-top:10px; padding:10px 0 0; border-top:1px dashed var(--wb-line); }
+
+/* 入驻等级进度条（页面级重构版：分段式 + 标题行 + 提示行） */
+.wb-tier { padding:0 2px; }
+.wb-tier-top { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+.wb-tier-name { font-size:13px; font-weight:800; }
+.wb-tier-cur { font-size:10px; font-weight:600; color:var(--wb-text-3); font-variant-numeric:tabular-nums; }
+.wb-tier-segs { display:flex; gap:5px; }
+.wb-tier-seg { flex:1; height:8px; border-radius:999px; background:var(--wb-bg); border:1px solid var(--wb-line); box-sizing:border-box; }
+.wb-tier-seg.on { border-color:transparent; }
+.wb-tier-hint { font-size:10.5px; color:var(--wb-text-3); margin-top:7px; line-height:1.4; }
+.wb-ident-panel .id-badge { margin-left:-2px; }
+/* 面板值行单行适配：紧凑等级徽章，避免「企业入驻 + L1标准建企」换行 */
+.wb-ident-panel .wb-ip-value { font-size:12.5px; }
+.wb-ident-panel .et-tier-badge { flex:none; height:20px; padding:0 6px 0 4px; font-size:10px; gap:3px; }
+.wb-ident-panel .et-tier-lv { min-width:15px; height:13px; padding:0 3px; font-size:8.5px; border-radius:4px; }
+.id-pills-row { display:flex; flex-wrap:wrap; gap:5px; padding:10px 0 2px; }
+.id-pill { display:inline-flex; align-items:center; gap:3px; padding:3px 9px; border-radius:999px; font-size:10px; font-weight:600; background:var(--wb-bg); color:var(--wb-text-2); border:1px solid var(--wb-line); }
+.id-pill.locked { opacity:.5; }
+
+/* ---------- 常用服务 4×2（微博功能网格） ---------- */
+.v12-tool-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px 4px; }
+.v12-tool-grid .tool-item { display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; padding:4px 0; border-radius:12px; }
+.v12-tool-grid .tool-item:active { transform:scale(.93); }
+.v12-tool-grid .tool-icon {
+  width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+  border-radius:14px; position:relative; color:#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.12);
+}
+.v12-tool-grid .tool-icon svg { width:22px; height:22px; position:relative; z-index:1; }
+.v12-tool-grid .tool-item:nth-child(5n+1) .tool-icon { background:linear-gradient(135deg,var(--primary-strong),var(--primary)); box-shadow:0 3px 8px rgba(184,153,104,.25); }
+.v12-tool-grid .tool-item:nth-child(5n+2) .tool-icon { background:linear-gradient(135deg,#52B788,#2B6B4F); box-shadow:0 3px 8px rgba(43,107,79,.22); }
+.v12-tool-grid .tool-item:nth-child(5n+3) .tool-icon { background:linear-gradient(135deg,#6AA6F0,#2563EB); box-shadow:0 3px 8px rgba(37,99,235,.22); }
+.v12-tool-grid .tool-item:nth-child(5n+4) .tool-icon { background:linear-gradient(135deg,#E25B52,#B3261E); box-shadow:0 3px 8px rgba(179,38,30,.22); }
+.v12-tool-grid .tool-item:nth-child(5n+5) .tool-icon { background:linear-gradient(135deg,#A78BFA,#7C5BBD); box-shadow:0 3px 8px rgba(124,91,189,.22); }
+.v12-tool-grid .tool-label { font-size:11px; color:var(--wb-text-2); font-weight:500; line-height:1.3; text-align:center; }
+.v12-tool-grid .tool-badge {
+  position:absolute; top:-5px; right:-5px; min-width:16px; height:16px; padding:0 4px;
+  background:var(--wb-red); color:#fff; font-size:9px; font-weight:800; border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 5px rgba(179,38,30,.4); border:1.5px solid var(--wb-card); z-index:2;
+}
+
+/* ---------- 任务中心（banner→任务行） ---------- */
+.pf-banner { border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; margin-bottom:8px; background:var(--wb-bg); border:1px solid var(--wb-line); }
+.pf-banner:last-child { margin-bottom:0; }
+.pf-banner .pb-body { flex:1; min-width:0; }
+.pf-banner .pb-title { font-size:13px; font-weight:700; color:var(--wb-text-1); }
+.pf-banner .pb-sub { font-size:11px; color:var(--wb-text-2); margin-top:2px; line-height:1.45; }
+.pf-banner .pb-cta { flex:none; padding:5px 12px !important; border-radius:999px !important; font-size:11.5px !important; font-weight:700 !important; cursor:pointer; }
+.pf-banner.review { background:var(--accent-soft); border-color:rgba(184,153,104,.25); }
+.pf-banner.review .pb-title { color:var(--primary-dim); }
+.pf-banner.review .pb-cta, .pf-banner.guide .pb-cta, .pf-banner.breakin .pb-cta { color:var(--text-inv) !important; background:linear-gradient(135deg,var(--primary-strong),var(--primary) 45%,var(--primary-dim)) !important; }
+.pf-banner.breakin { background:linear-gradient(135deg, rgba(184,153,104,.14), rgba(184,153,104,.06)); border:1px solid rgba(184,153,104,.3); cursor:pointer; }
+.pf-banner.breakin .pb-title { color:var(--primary-dim); }
+.pf-banner.breakin .pb-sub { color:var(--wb-text-2); }
+.pf-banner.guide { background:var(--wb-bg); border:1px dashed rgba(201,169,97,.45); }
+.glass { background:var(--me-card); border-radius:12px; border:1px solid var(--wb-line); }
+.renew-ic { flex:none; width:32px; height:32px; border-radius:50%; background:rgba(184,153,104,.12); display:flex; align-items:center; justify-content:center; color:var(--primary-dim); }
+.renew-title { color:var(--primary-dim) !important; }
+.renew-cta { font-size:11.5px; font-weight:700; color:var(--primary-dim) !important; cursor:pointer; padding:0 !important; border-radius:0 !important; background:transparent !important; }
+[data-theme="dark"] .renew-title, [data-theme="dark"] .renew-cta { color:var(--gold) !important; }
+[data-theme="dark"] .pf-banner.breakin .pb-title { color:var(--gold); }
+
+/* ---------- 我的钱包 ---------- */
+.wb-wallet-row { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+.wb-bal-label { font-size:11.5px; color:var(--wb-text-3); margin-bottom:5px; }
+.wb-balance { display:flex; align-items:baseline; gap:2px; }
+.wb-balance .cur { font-size:15px; font-weight:700; color:var(--wb-accent); }
+.wb-balance .num { font-size:30px; font-weight:800; color:var(--wb-text-1); letter-spacing:-1px; font-variant-numeric:tabular-nums; }
+.wb-wallet-actions { display:flex; gap:8px; flex:none; }
+.wb-btn { padding:8px 18px; border-radius:999px; font-size:12.5px; font-weight:700; cursor:pointer; border:none; }
+.wb-btn-primary { background:linear-gradient(135deg,var(--primary-strong),var(--primary) 45%,var(--primary-dim)); color:var(--text-inv); box-shadow:0 3px 10px rgba(184,153,104,.3); }
+.wb-btn-ghost { background:var(--wb-bg); color:var(--wb-text-2); border:1px solid var(--wb-line); }
+.wb-btn:active { transform:scale(.95); }
+.v12-order-states { display:flex; margin-top:12px; padding-top:12px; border-top:1px solid var(--wb-line); }
+.v12-order-states .order-item { display:flex; flex-direction:column; align-items:center; gap:5px; flex:1; cursor:pointer; padding:4px 0; border-radius:10px; }
+.v12-order-states .order-item:active { opacity:.65; }
+.v12-order-states .order-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; color:var(--wb-text-1); background:var(--wb-bg); border-radius:11px; position:relative; }
+.v12-order-states .order-icon svg { width:19px; height:19px; }
+.v12-order-states .order-label { font-size:11px; color:var(--wb-text-2); font-weight:500; }
+.v12-order-states .order-badge {
+  position:absolute; top:-5px; right:-5px; min-width:15px; height:15px; padding:0 4px;
+  background:var(--wb-red); color:#fff; font-size:9px; font-weight:800; border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 5px rgba(179,38,30,.4); border:1.5px solid var(--wb-card);
+}
+
+/* ---------- 最近浏览（产品卡横滑） ---------- */
+.v12-history-scroll { display:flex; gap:10px; overflow-x:auto; padding:2px 2px 6px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.v12-history-scroll::-webkit-scrollbar { display:none; }
+.history-card { flex:none; width:108px; border-radius:12px; overflow:hidden; cursor:pointer; background:var(--wb-card); border:1px solid var(--wb-line); }
+.history-card:active { transform:scale(.96); }
+.history-img { height:68px; background:linear-gradient(135deg, var(--me-gold-pale), var(--wb-bg)); display:flex; align-items:center; justify-content:center; position:relative; color:var(--me-gold-deep); }
+.history-img svg { width:28px; height:28px; opacity:.55; }
+.history-tag { position:absolute; top:6px; left:6px; padding:1px 6px; border-radius:5px; font-size:9px; font-weight:700; }
+.history-tag.hot { background:rgba(179,38,30,.14); color:var(--error); }
+.history-tag.new { background:rgba(43,107,79,.14); color:var(--success); }
+.history-body { padding:8px 10px; }
+.history-name { font-size:11.5px; font-weight:600; color:var(--wb-text-1); line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:30px; }
+.history-loc { font-size:10px; color:var(--wb-text-3); margin-top:3px; display:flex; align-items:center; gap:3px; }
+.history-loc svg { width:9px; height:9px; }
+.history-price { font-size:13px; font-weight:700; color:var(--wb-accent); margin-top:2px; }
+.history-price .unit { font-size:10px; font-weight:500; color:var(--wb-text-3); }
+
+/* ---------- 页脚 ---------- */
+.me-footer { text-align:center; padding:22px 16px 8px; color:var(--wb-text-3); font-size:10.5px; line-height:1.8; }
+
+/* ---------- 暗色微调 ---------- */
+[data-theme="dark"] .wb-avatar { box-shadow:0 0 0 3px #1C1C1E, 0 0 0 4px rgba(201,169,97,.35), 0 2px 8px rgba(0,0,0,.4); }
+[data-theme="dark"] .wb-ip-state.on { background:rgba(82,183,136,.13); }
+[data-theme="dark"] .history-tag.hot { background:rgba(242,139,130,.14); }
+[data-theme="dark"] .history-tag.new { background:rgba(82,183,136,.14); }
+
+</style>
+<link rel="stylesheet" href="../../css/liquid-dock.css">
+</head>
+<body data-tab="me">
+<div class="phone">
+<div class="profile-page">
+  <div class="profile-content">
+
+    <!-- ═══ 顶部：用户信息（微博风白底通栏） ═══ -->
+    <div class="wb-head">
+      <div class="wb-top-row">
+        <div class="wb-avatar" id="pf-avatar">游</div>
+        <div class="wb-user-info">
+          <div class="wb-name-row">
+            <span class="wb-name" id="pf-username">游客</span>
+            <div class="wb-badges" id="pf-badges"></div>
+          </div>
+          <div class="wb-sub" id="pf-usersub" onclick="openMember()">登录后解锁全部功能</div>
+        </div>
+        <div class="wb-settings" onclick="location.href='settings.html'" title="设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 等级横幅（深色金，微博「解锁等级」风） ═══ -->
+    <div class="wb-levelbanner">
+      <div class="wb-lv-main">
+        <div class="wb-lv-num"><span id="pf-level-num">1</span></div>
+        <div class="wb-lv-tag">LEVEL</div>
+      </div>
+      <div class="wb-lv-mid">
+        <div class="wb-lv-title">点亮等级 · 解锁全部权益</div>
+        <div class="wb-lv-bar"><div class="wb-lv-fill" id="pf-level-fill" style="width:0%"></div></div>
+        <div class="wb-lv-next">下一级 Lv.<span id="pf-level-next">2</span></div>
+      </div>
+      <span class="wb-chip" id="pf-credit-chip" title="诚信分">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;flex:none;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span class="v12-chip-score" id="cs-score">--</span>分
+        <span class="v12-chip-level" id="cs-level">--</span>
+      </span>
+      <span class="wb-cta" id="wb-level-cta" onclick="openMember()">去升级</span>
+    </div>
+
+    <!-- ═══ 数据统计（微博四格 · 按身份动态：企业=收藏/发布/订单/团队，个人=收藏/发布/订单/分享） ═══ -->
+    <div class="wb-card" style="padding:16px 8px;">
+      <div class="wb-stats" id="pf-kpi-stats"></div>
+    </div>
+
+    <!-- ═══ 身份认证（双线 + 等级进度 + 权益） ═══ -->
+    <div class="wb-card" id="wb-ident-card">
+      <div class="wb-card-head">
+        <span class="wb-card-title"><span class="wb-t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--wb-accent);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>身份认证</span>
+        <span class="wb-card-more" onclick="location.href='auth-prep.html?type=center'">认证中心 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="v12-dualline" id="pf-dualline-wrap"></div>
+    </div>
+
+    <!-- ═══ 常用服务（4×2 网格） ═══ -->
+    <div class="wb-card">
+      <div class="v12-tool-grid" id="pf-quick-scroll"></div>
+    </div>
+
+    <!-- ═══ 任务中心 ═══ -->
+    <div class="wb-card" id="wb-task-card">
+      <div class="wb-card-head">
+        <span class="wb-card-title"><span class="wb-t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--wb-accent);"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg></span>任务中心</span>
+        <span class="wb-card-more">完成认证解锁更多权益</span>
+      </div>
+      <div id="pf-entry-banner"></div>
+      <div id="pf-breakin-banner"></div>
+      <div id="pf-banned-banner"></div>
+      <div id="pf-credit-guide" style="display:none;margin-bottom:8px;"></div>
+      <div id="entry-renew-banner" style="display:none;margin-bottom:8px;">
+        <div class="pf-banner renew">
+          <span class="renew-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <div class="pb-body">
+            <div class="pb-title renew-title">入驻即将到期</div>
+            <div class="pb-sub" id="entry-renew-desc" style="color:var(--me-text-2);"></div>
+          </div>
+          <span class="pb-cta renew-cta" onclick="__renewEntry()">续费 ›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 我的钱包 ═══ -->
+    <div class="wb-card">
+      <div class="wb-card-head">
+        <span class="wb-card-title"><span class="wb-t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--wb-accent);"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg></span>我的钱包</span>
+        <span class="wb-card-more" onclick="pfWalletAction('view')">查看详情 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="wb-wallet-row" onclick="pfWalletAction('view')">
+        <div>
+          <div class="wb-bal-label">账户余额</div>
+          <div class="wb-balance"><span class="cur">¥</span><span class="num" id="pf-wallet-balance">0.00</span></div>
+        </div>
+        <div class="wb-wallet-actions">
+          <div class="wb-btn wb-btn-primary" onclick="event.stopPropagation();pfWalletAction('recharge')">充值</div>
+          <div class="wb-btn wb-btn-ghost" onclick="event.stopPropagation();pfWalletAction('withdraw')">提现</div>
+        </div>
+      </div>
+      <div class="v12-order-states" id="pf-order-states"></div>
+    </div>
+
+    <!-- ═══ 最近浏览 ═══ -->
+    <div class="wb-card">
+      <div class="wb-card-head" style="margin-bottom:10px;">
+        <span class="wb-card-title"><span class="wb-t-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--wb-accent);"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></span>最近浏览</span>
+        <span class="wb-card-more" onclick="location.href='history.html'">查看全部 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </div>
+      <div class="v12-history-scroll" id="pf-history"></div>
+    </div>
+
+    <!-- ═══ 页脚 ═══ -->
+    <footer class="me-footer">
+      <div>ENGCHAIN App · Version 3.0.0 (Build 2026.08)</div>
+      <div>UID: <span id="pf-footer-uid">--</span> · 工程链科技 © 2026</div>
+    </footer>
+
+  </div>
+</div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/delegates.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* ---------- 主题切换 ---------- */
+  function getTheme() {
+    try { return localStorage.getItem('engchain-theme') || 'light'; } catch (e) { return 'light'; }
+  }
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+  function toggleTheme() {
+    var t = getTheme() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('engchain-theme', t); } catch (e) {}
+    applyTheme(t);
+  }
+  window.toggleTheme = toggleTheme;
+  applyTheme(getTheme());
+
+  /* ---------- 身份配置 ---------- */
+  var ID_CFG = {
+    guest: { level:0, label:'游客', titleIcon:'i-user', nextText:'登录后解锁全部功能',
+      benefits:[{name:'浏览供需列表',icon:'i-eye',owned:true},{name:'收藏与关注',icon:'i-star',owned:false},{name:'发布供需信息',icon:'i-form',owned:false}] },
+    registered: { level:1, label:'注册会员', titleIcon:'i-user', nextText:'完成个人认证，解锁发布供需与联系洽谈权益',
+      benefits:[{name:'浏览供需列表',icon:'i-eye',owned:true},{name:'收藏与关注',icon:'i-star',owned:true},{name:'发布供需信息',icon:'i-form',owned:false}] },
+    realname: { level:2, label:'个人认证', titleIcon:'i-shield', nextText:'您已完成实名认证，下一步开通个人入驻，解锁人才展示与简历投递',
+      benefits:[{name:'发布供需信息',icon:'i-form',owned:true},{name:'联系洽谈解锁',icon:'i-chat',owned:true},{name:'投递简历应聘',icon:'i-file',owned:false}] },
+    pro: { level:3, label:'专业工程师', titleIcon:'i-award', nextText:'已解锁全部个人权益，可申请企业入驻拓展业务',
+      benefits:[{name:'发布供需信息',icon:'i-form',owned:true},{name:'联系洽谈解锁',icon:'i-chat',owned:true},{name:'投递简历应聘',icon:'i-file',owned:true}] },
+    partner: { level:3, label:'合作伙伴', titleIcon:'i-briefcase', nextText:'合作伙伴权益已全部开通',
+      benefits:[{name:'发布供需信息',icon:'i-form',owned:true},{name:'联系洽谈解锁',icon:'i-chat',owned:true},{name:'投递简历应聘',icon:'i-file',owned:true}] },
+    enterprise: { level:4, label:'企业认证', titleIcon:'i-company', nextText:'企业权益已全部开通',
+      benefits:[{name:'发布供需信息',icon:'i-form',owned:true},{name:'联系洽谈解锁',icon:'i-chat',owned:true},{name:'投递简历应聘',icon:'i-file',owned:true}] },
+    resident: { level:5, label:'入驻企业', titleIcon:'i-buil', nextText:'入驻企业全部权益已开通',
+      benefits:[{name:'发布供需信息',icon:'i-form',owned:true},{name:'联系洽谈解锁',icon:'i-chat',owned:true},{name:'投递简历应聘',icon:'i-file',owned:true}] }
+  };
+
+  function currentIdentity() {
+    try {
+      if (window.deriveIdentity) return deriveIdentity();
+    } catch (e) {}
+    return { primary:'guest', enterprise:'', identities:[] };
+  }
+
+  /* ---------- 渲染：用户头部 ---------- */
+  function renderHeader() {
+    var st = {};
+    try { st = UI.state.get(); } catch (e) {}
+    var idy = currentIdentity();
+    var isReal = idy.primary === 'realname' || idy.primary === 'pro' || idy.primary === 'partner' || idy.primary === 'enterprise' || idy.primary === 'resident';
+
+    var name = st.user || (st.loggedIn ? '工程用户' : '游客');
+    var nameEl = document.getElementById('pf-username');
+    if (nameEl) nameEl.textContent = name;
+    var avatarEl = document.getElementById('pf-avatar');
+    if (avatarEl) avatarEl.textContent = name.charAt(0) || '游';
+
+    /* E3-17 封禁状态：通过副标题显示 */
+    var isBanned = false;
+    try { var me = (window.DataBus && DataBus.current) ? DataBus.current() : null; isBanned = !!(me && me.banned); } catch (e) {}
+
+    var sub = document.getElementById('pf-usersub');
+    if (sub) {
+      if (isBanned) sub.textContent = '账号已被封禁，功能受限';
+      else if (!st.loggedIn) sub.textContent = '登录后解锁全部功能';
+      else if (isReal) sub.textContent = '';
+      else sub.textContent = '注册用户 · 完成认证解锁更多权益';
+    }
+  }
+
+  /* ---------- 入驻类型 → 标签 / 徽标（E1-15 单一来源） ---------- */
+  var ENTRY_TYPE_MAP = {
+    construction: { label: '建筑入驻', badge: '蓝V', cls: 'blueV' },
+    agency:       { label: '中介入驻', badge: '金V', cls: 'goldV' },
+    partner:      { label: '合伙人入驻', badge: '专属', cls: 'exclusive' }
+  };
+  function entryBadgeHtml(type) {
+    return window.IdBadge ? IdBadge.render(type, 'md') : '';
+  }
+  function entryLabelText(type) {
+    var m = ENTRY_TYPE_MAP[type];
+    return m ? (m.label + ' · ' + m.badge) : '入驻企业';
+  }
+
+  /* ---------- 渲染：身份卡（环形进度） ---------- */
+  function renderIdentity() {
+    var idy = currentIdentity(), cfg = ID_CFG[idy.primary] || ID_CFG.registered;
+    var eStatus = {};
+    try { if (window.EntryStore) eStatus = EntryStore.read() || {}; } catch (e) {}
+    var isReview = (eStatus.status === 'pending' || eStatus.status === 'review' || eStatus.status === 'first_ok');
+    var types = idy.entryTypes || [];
+
+    /* E1-15 入驻类型化标题 */
+    var titleText = cfg.label;
+    if (idy.enterprise === 'resident' && types.length) {
+      titleText = entryLabelText(types[0]);
+    } else if (idy.partner && idy.identities.indexOf('partner') >= 0) {
+      titleText = '个人合伙人';
+    }
+
+    /* 身份徽章渲染到 pf-badges 容器 */
+    var badgeBox = document.getElementById('pf-badges');
+    if (badgeBox) {
+      var badgeHtml = '';
+      /* 入驻类型徽章 */
+      if (idy.enterprise === 'resident' && types.length && window.IdBadge) {
+        badgeHtml += IdBadge.render(types[0], 'sm');
+      } else if (idy.partner && idy.identities.indexOf('partner') >= 0 && window.IdBadge) {
+        badgeHtml += IdBadge.render('individual', 'sm');
+      }
+      /* 等级标签 */
+      badgeHtml += '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:rgba(201,169,97,.15);color:var(--primary-dim);border:1px solid rgba(201,169,97,.3);">Lv.' + cfg.level + '</span>';
+      badgeBox.innerHTML = badgeHtml;
+    }
+
+    /* E1-19 副标题分工：#pf-usersub 由 renderHeader 负责基础信息（封禁/游客/认证态）。
+       此处仅在「入驻审核中」且未封禁时，追加覆盖为审核状态；非审核中一律不写回，避免相互覆盖。 */
+    var subEl = document.getElementById('pf-usersub');
+    if (subEl && isReview) {
+      var _renewBanned = false;
+      try { var _me0 = (window.DataBus && DataBus.current) ? DataBus.current() : null; _renewBanned = !!( _me0 && _me0.banned); } catch (e) {}
+      if (!_renewBanned) subEl.textContent = '入驻审核中 · 预计 3-5 个工作日完成，结果将短信通知';
+    }
+
+    /* 权益 pills 渲染到双线身份区域下方 */
+    var dualBox = document.getElementById('pf-dualline-wrap');
+    if (dualBox && cfg.benefits && cfg.benefits.length) {
+      var pillsHtml = '<div class="id-pills-row">';
+      for (var i = 0; i < cfg.benefits.length; i++) {
+        var b = cfg.benefits[i];
+        var iconSvg = b.owned
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:11px;height:11px;"><path d="M20 6L9 17l-5-5"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+        pillsHtml += '<span class="id-pill' + (b.owned ? '' : ' locked') + '">' + iconSvg + b.name + '</span>';
+      }
+      pillsHtml += '</div>';
+      /* 检查是否已添加pills，避免重复 */
+      if (!dualBox.querySelector('.id-pills-row')) {
+        var pillsWrap = document.createElement('div');
+        pillsWrap.className = 'id-pills-row';
+        pillsWrap.innerHTML = pillsHtml;
+        dualBox.appendChild(pillsWrap);
+      }
+    }
+  }
+
+  /* [微博风] 入驻等级进度条：页面级重构（替代共享 EntryTier.renderProgress 的旧版错乱输出） */
+  var TIER_HINTS = {
+    construction: ['年项目≥20 或 二级资质', '年项目≥50 或 一级资质', '特级资质 或 年项目≥100'],
+    agency: ['成交订单≥10', '成交订单≥20 或 好评率≥90%', '成交订单≥50 且 好评率≥95%'],
+    partner: ['累计佣金≥5000 或 邀请≥5人', '累计佣金≥20000 或 团队≥10人', '累计佣金≥50000 或 团队≥20人']
+  };
+  function pfTierProgress(type, level) {
+    var t = window.EntryTier ? EntryTier.getTier(type, level) : null;
+    if (!t) return '';
+    var lv = Math.max(1, Math.min(4, level || 1));
+    var segs = '';
+    for (var i = 1; i <= 4; i++) {
+      var on = i <= lv;
+      segs += '<i class="wb-tier-seg' + (on ? ' on' : '') + '"' + (on ? ' style="background:' + t.color + ';"' : '') + '></i>';
+    }
+    var hint = lv >= 4 ? '已达最高等级' : ((TIER_HINTS[type] && TIER_HINTS[type][lv - 1]) || '继续提升');
+    return '<div class="wb-tier">' +
+      '<div class="wb-tier-top"><span class="wb-tier-name" style="color:' + t.color + ';">' + t.name + '</span><span class="wb-tier-cur">Lv.' + lv + ' / 4</span></div>' +
+      '<div class="wb-tier-segs">' + segs + '</div>' +
+      '<div class="wb-tier-hint">' + hint + '</div>' +
+    '</div>';
+  }
+
+  /* ---------- E1-12 双线身份区：个人线 + 企业线 + 入驻类型徽标 ---------- */
+  var PERSONAL_LABEL = {
+    none: '未认证', verified: '个人实名', professional: '个人入驻(资质)',
+    partner: '个人合伙人', full: '个人入驻 + 个人合伙人'
+  };
+  var ENTERPRISE_LABEL = {
+    none: '未认证', verified: '企业认证', resident: '企业入驻'
+  };
+  function renderDualLine() {
+    var box = document.getElementById('pf-dualline-wrap');
+    if (!box) return;
+    var idy = currentIdentity();
+    var st = {}; try { st = UI.state.get(); } catch (e) {}
+    var identCard = document.getElementById('wb-ident-card');
+    if (identCard) identCard.style.display = st.loggedIn ? '' : 'none';
+    if (!st.loggedIn) { box.innerHTML = ''; return; }
+
+    var personalVal = PERSONAL_LABEL[idy.personal] || '未认证';
+    var enterpriseVal = ENTERPRISE_LABEL[idy.enterprise] || '未认证';
+
+    /* 入驻类型徽标（蓝V/金V/专属） */
+    var badges = '';
+    (idy.entryTypes || []).forEach(function (t) { badges += entryBadgeHtml(t); });
+    /* 个人合伙人徽章 */
+    if (idy.partner && idy.identities.indexOf('partner') >= 0) {
+      badges += (window.IdBadge ? IdBadge.render('individual', 'md') : '<span class="entry-badge exclusive">个人合伙人</span>');
+    }
+    /* 系统自动判定的入驻等级（非用户选择） */
+    var tierBadge = '';
+    var tierProgress = '';
+    if (idy.enterprise === 'resident' && window.EntryTier) {
+      var _ttype = (idy.entryTypes && idy.entryTypes[0]) || 'construction';
+      if (idy.partner && idy.identities.indexOf('partner') >= 0) _ttype = 'partner';
+      var _tlevel = EntryTier.evaluate(_ttype);
+      tierBadge = EntryTier.render(_ttype, _tlevel);
+      tierProgress = pfTierProgress(_ttype, _tlevel);
+    }
+
+    /* E1-17 resident 权益卡片（折扣/佣金率/分销权限） */
+    var extra = '';
+    if (idy.enterprise === 'resident') {
+      var discount = '';
+      try { if (window.creditDiscount) discount = Math.round(creditDiscount() * 100) + '%'; } catch (e) {}
+      var acc = window.entryAccess ? entryAccess() : {};
+      extra = '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--me-border);display:flex;gap:8px;">' +
+        '<div style="flex:1;text-align:center;"><div style="font-size:16px;font-weight:800;color:var(--me-gold-deep);">' + (discount || '80%') + '</div><div style="font-size:10px;color:var(--me-text-3);">积分折扣</div></div>' +
+        '<div style="flex:1;text-align:center;"><div style="font-size:16px;font-weight:800;color:var(--me-gold-deep);">' + (acc.distTier === 'full' ? '二级' : '一级') + '</div><div style="font-size:10px;color:var(--me-text-3);">分销权限</div></div>' +
+        '<div style="flex:1;text-align:center;"><div style="font-size:16px;font-weight:800;color:var(--me-gold-deep);">专属</div><div style="font-size:10px;color:var(--me-text-3);">入驻服务</div></div>' +
+      '</div>';
+    }
+
+    var personalOk = idy.personal !== 'none';
+    var enterpriseOk = idy.enterprise !== 'none';
+    var pState = personalOk ? '<span class="wb-ip-state on">已认证</span>' : '<span class="wb-ip-state">待认证</span>';
+    var eState = enterpriseOk ? '<span class="wb-ip-state on">已认证</span>' : '<span class="wb-ip-state">待认证</span>';
+    var pHint = personalOk ? '实名信息已加密保护' : '完成实名认证解锁更多权益';
+    var eHint = idy.enterprise === 'resident' ? '入驻权益已生效 · 专属服务' : (enterpriseOk ? '企业资质已认证' : '企业入驻享专属权益');
+
+    box.innerHTML =
+      '<div class="wb-ident-grid">' +
+        '<div class="wb-ident-panel wb-p">' +
+          '<div class="wb-ip-head">' +
+            '<span class="wb-ip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>' +
+            '<span class="wb-ip-name">个人认证</span>' + pState +
+          '</div>' +
+          '<div class="wb-ip-value">' + personalVal + badges + '</div>' +
+          '<div class="wb-ip-hint">' + pHint + '</div>' +
+        '</div>' +
+        '<div class="wb-ident-panel wb-e">' +
+          '<div class="wb-ip-head">' +
+            '<span class="wb-ip-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/><path d="M9 10h.01M15 10h.01M9 14h.01M15 14h.01"/></svg></span>' +
+            '<span class="wb-ip-name">企业认证</span>' + eState +
+          '</div>' +
+          '<div class="wb-ip-value">' + enterpriseVal + tierBadge + '</div>' +
+          '<div class="wb-ip-hint">' + eHint + '</div>' +
+        '</div>' +
+      '</div>' +
+      (tierProgress ? '<div class="wb-ip-progress">' + tierProgress + '</div>' : '');
+  }
+
+  /* ---------- E1-19 入驻审核中横幅 ---------- */
+  function renderEntryBanner() {
+    var box = document.getElementById('pf-entry-banner');
+    if (!box) return;
+    var st = {}; try { st = UI.state.get(); } catch (e) {}
+    if (!st.loggedIn) { box.innerHTML = ''; return; }
+    var e = {}; try { if (window.EntryStore) e = EntryStore.read() || {}; } catch (ex) {}
+    if (e.status === 'pending' || e.status === 'review' || e.status === 'first_ok') {
+      box.innerHTML =
+        '<div class="pf-banner review">' +
+          '<span style="flex:none;width:34px;height:34px;border-radius:50%;background:rgba(212,148,90,.18);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:#B58040;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>' +
+          '<div class="pb-body"><div class="pb-title">入驻审核中 · 预计 3-5 个工作日</div><div class="pb-sub">资料已提交，平台审核通过后自动开通全部入驻权益</div></div>' +
+          '<span class="pb-cta" style="font-size:11.5px;font-weight:700;color:#B58040;cursor:pointer;" onclick="location.href=\'entry.html\'">进度 ›</span>' +
+        '</div>';
+    } else {
+      box.innerHTML = '';
+    }
+  }
+
+  /* ---------- E2 破冰期建筑入驻限时横幅 ---------- */
+  function renderBreakinBanner() {
+    var box = document.getElementById('pf-breakin-banner');
+    if (!box) return;
+    var on = !!(window.ModeStore && ModeStore.isBreakIn());
+    var idy = currentIdentity();
+    if (on && idy.enterprise !== 'resident') {
+      box.innerHTML =
+        '<div class="pf-banner breakin" onclick="location.href=\'entry.html\'">' +
+          '<div class="pb-body"><div class="pb-title">建筑入驻限时 0 元</div><div class="pb-sub">破冰期专享 · 中介入驻 5 折 · 名额有限</div></div>' +
+          '<span class="pb-cta" style="font-size:12px;font-weight:700;background:rgba(255,255,255,.22);padding:6px 12px;border-radius:999px;">立即入驻 ›</span>' +
+        '</div>';
+    } else {
+      box.innerHTML = '';
+    }
+  }
+
+  /* ---------- E3-17 封禁用户横幅 + 入口置灰 ---------- */
+  function renderBannedBanner() {
+    var box = document.getElementById('pf-banned-banner');
+    if (!box) return;
+    var isBanned = false;
+    try { var me = (window.DataBus && DataBus.current) ? DataBus.current() : null; isBanned = !!(me && me.banned); } catch (e) {}
+    if (isBanned) {
+      box.innerHTML =
+        '<div class="pf-banner" style="background:rgba(179,38,30,.1);border:1px solid rgba(179,38,30,.35);margin-bottom:12px;">' +
+          '<div class="pb-body"><div class="pb-title" style="color:var(--me-red);">账号已封禁</div><div class="pb-sub" style="color:var(--me-text-2);">交易与发布功能已暂停，如需申诉请查看详情</div></div>' +
+          '<span class="pb-cta" style="font-size:12px;font-weight:700;color:var(--me-red);cursor:pointer;" onclick="location.href=\'../auth/banned.html\'">封禁详情 ›</span>' +
+        '</div>';
+      /* 功能入口置灰 */
+      var quick = document.getElementById('pf-quick-scroll');
+      if (quick) quick.classList.add('is-banned-dim');
+    } else {
+      box.innerHTML = '';
+    }
+  }
+
+  /* ---------- E2 诚信分游客/未认证隐藏，替换为引导 ---------- */
+  function renderCreditGuide() {
+    /* Hero区中的诚信分胶囊：游客/注册未认证时隐藏，由引导卡片替代（避免 "--分/80分" 占位与引导重复展示） */
+    var creditChip = document.getElementById('pf-credit-chip');
+    var guide = document.getElementById('pf-credit-guide');
+    var idy = currentIdentity();
+    var locked = idy.isGuest || idy.primary === 'guest' || idy.primary === 'registered';
+    if (creditChip) creditChip.style.display = locked ? 'none' : '';
+    if (guide) {
+      if (locked) {
+        guide.style.display = '';
+        guide.innerHTML =
+          '<div class="glass guide" style="padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:12px;" onclick="location.href=\'auth-prep.html?type=center\'">' +
+            '<span style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--me-text);">诚信分</div><div style="font-size:11px;color:var(--me-text-3);margin-top:2px;">完成实名认证解锁诚信分，分数影响发布/提现权限</div></span>' +
+            '<span style="flex:none;font-size:11.5px;font-weight:700;color:var(--me-gold-deep);">去认证 ›</span>' +
+          '</div>';
+      } else {
+        guide.style.display = 'none';
+        guide.innerHTML = '';
+      }
+    }
+  }
+
+  /* ---------- 渲染：KPI 数字（按身份动态：企业=收藏/发布/订单/团队，个人=收藏/发布/订单/分享） ---------- */
+  function renderKPI() {
+    var idy = currentIdentity();
+    var isEnterprise = idy.enterprise === 'resident';
+    var fourthKey = isEnterprise ? 'team' : 'share';
+    var fourthLabel = isEnterprise ? '团队' : '分享';
+
+    /* 动态渲染四格结构 */
+    var box = document.getElementById('pf-kpi-stats');
+    if (box) {
+      box.innerHTML =
+        '<div class="wb-stat" onclick="pfKpiJump(\'fav\')"><div class="wb-stat-num" id="pf-kpi-fav">0</div><div class="wb-stat-label">收藏</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'pub\')"><div class="wb-stat-num" id="pf-kpi-pub">0</div><div class="wb-stat-label">发布</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'order\')"><div class="wb-stat-num" id="pf-kpi-order">0</div><div class="wb-stat-label">订单</div></div>' +
+        '<div class="wb-stat" onclick="pfKpiJump(\'' + fourthKey + '\')"><div class="wb-stat-num" id="pf-kpi-' + fourthKey + '">0</div><div class="wb-stat-label">' + fourthLabel + '</div></div>';
+    }
+
+    var fav = 0, pub = 0, order = 0, fourth = 0;
+    try {
+      /* 收藏数 */
+      if (window.FavoriteStore) fav = (FavoriteStore.list() || []).length;
+      /* 发布数 */
+      if (window.DataBus) {
+        if (DataBus.published) pub = DataBus.published().length;
+        else if (window.SupplyStore) pub = (SupplyStore.listActive() || []).length;
+      }
+      /* 订单数：普通订单 + 中介托管订单 */
+      try {
+        var ord = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders') || '[]');
+        order = ord.length;
+        if (window.Mediation) {
+          var me0 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+          var uid0 = me0 ? me0.id : '';
+          order += (Mediation.list({ uid: uid0 }) || []).length;
+        }
+      } catch (e) {}
+      /* 第四项：企业=团队成员数；个人=分享成功数（邀请绑定数） */
+      if (isEnterprise) {
+        if (window.DataBus && DataBus.distTeam) { try { fourth = (DataBus.distTeam() || []).length; } catch (e) {} }
+      } else {
+        if (window.Referral) {
+          var me1 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+          if (me1 && me1.id) fourth = (Referral.downline(me1.id) || []).length;
+        }
+      }
+    } catch (e) {}
+
+    animateNum('pf-kpi-fav', fav);
+    animateNum('pf-kpi-pub', pub);
+    animateNum('pf-kpi-order', order);
+    animateNum('pf-kpi-' + fourthKey, fourth);
+  }
+
+  function animateNum(id, target) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var start = 0, dur = 600, t0 = null;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(start + (target - start) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ---------- 渲染：钱包 ---------- */
+  function renderWallet() {
+    var bal = 0;
+    try {
+      var wal = (window.DataBus && DataBus.wallet) ? DataBus.wallet() : JSON.parse(localStorage.getItem('engchain-wallet') || '{}');
+      bal = wal.balance != null ? wal.balance : 0;
+    } catch (e) {}
+    var txt = Number(bal).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var b1 = document.getElementById('pf-wallet-balance');
+    if (b1) b1.textContent = txt;
+  }
+
+  /* ---------- 渲染：页脚 UID（动态读取当前用户，不再硬编码） ---------- */
+  function renderFooterUid() {
+    var el = document.getElementById('pf-footer-uid');
+    if (!el) return;
+    var uid = '';
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (me && me.id) uid = me.id;
+    } catch (e) {}
+    if (!uid) {
+      try { var st = UI.state.get(); uid = st.account || st.user || ''; } catch (e) {}
+    }
+    el.textContent = uid ? String(uid) : '未登录';
+  }
+
+  /* ---------- 渲染：订单状态 ---------- */
+  function renderOrderStates() {
+    var states = [
+      { key:'all', label:'全部', icon:'i-box' },
+      { key:'normal', label:'普通订单', icon:'i-card' },
+      { key:'mediation', label:'中介服务', icon:'i-shield' }
+    ];
+    var counts = { all:0, normal:0, mediation:0 };
+    /* E1-03 游客态：订单数清零，显示"登录后查看"，不展示硬编码/模拟订单数 */
+    var st0 = {}; try { st0 = UI.state.get(); } catch (e) {}
+    var guest = !st0.loggedIn;
+    if (!guest) {
+      try {
+        /* 普通订单 */
+        var ord = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders') || '[]');
+        counts.normal = ord.length;
+        counts.all += ord.length;
+        /* 中介托管订单 */
+        if (window.Mediation) {
+          try {
+            var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+            var uid = me ? me.id : '';
+            var med = Mediation.list({ uid: uid });
+            counts.mediation = med.length;
+            counts.all += med.length;
+          } catch (e2) {}
+        }
+      } catch (e) {}
+    }
+
+    var html = states.map(function (st) {
+      var iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#' + st.icon + '"/></svg>';
+      return '<div class="order-item" onclick="event.stopPropagation();location.href=\'../order/index.html?tab=' + st.key + '\'">' +
+        '<div class="order-icon" style="position:relative;">' + iconSvg +
+          (counts[st.key] > 0 ? '<span class="order-badge">' + counts[st.key] + '</span>' : '') +
+        '</div>' +
+        '<span class="order-label">' + st.label + '</span>' +
+      '</div>';
+    }).join('');
+
+    var el1 = document.getElementById('pf-order-states');
+    if (el1) el1.innerHTML = html;
+  }
+
+  /* ---------- 渲染：常用功能网格 ---------- */
+  function renderQuick() {
+    var q = document.getElementById('pf-quick-scroll'); if (!q) return;
+    var st; try { st = UI.state.get(); } catch (e) { st = {}; }
+    var guest = !st.loggedIn;
+
+    var delegateCount = 0;
+    try { if (window.Delegates) delegateCount = Delegates.counts().all; } catch (e) {}
+
+    /* 常用服务：仅保留本页其他区域未出现的独立入口（订单/钱包/收藏/发布/消息由卡片、KPI、底部Tab承担，不再重复） */
+    var items = [
+      { href:'delegates.html', ic:'i-doc', cls:'ic-blue', title:'委托管理', badge:delegateCount > 0 ? String(delegateCount) : '' },
+      { href:'../distribution/index.html', ic:'i-share', cls:'ic-gold', title:'分销中心', lock:true, unlockKey:'dist' },
+      { href:'../agency/seller-board.html', ic:'i-briefcase', cls:'ic-purple', title:'服务经营', lock:true, unlockKey:'agency' },
+      { href:'../wallet/invoice.html', ic:'i-doc', cls:'ic-orange', title:'发票管理' },
+      { href:'../refund/index.html', ic:'i-rotate', cls:'ic-purple', title:'退款售后' },
+      { href:'auth-prep.html?type=center', ic:'i-shield', cls:'ic-blue', title:'认证中心' },
+      { href:'my-applies.html', ic:'i-briefcase', cls:'ic-green', title:'我的投递' },
+      { href:'../platform/dashboard.html', ic:'i-shield', cls:'ic-blue', title:'平台运营台', badge:'演示' },
+      { href:'../agency/demo-reset.html', ic:'i-rotate', cls:'ic-orange', title:'演示重置', badge:'演示' }
+    ];
+
+    /* 权限解锁条件（单一来源 entryAccess：分销=入驻/个人合伙人；服务经营=中介入驻） */
+    var acc = window.entryAccess ? entryAccess() : { dist: false, agency: false };
+    var distUnlocked = acc.dist;
+    var agencyUnlocked = acc.agency;
+    /* v2 我的招聘：企业认证及以上（叠加身份企业侧），带待处理投递角标；中介入驻不发招聘 */
+    var entNow = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var agencyNow = !!(acc && acc.agency);
+    if ((entNow === 'verified' || entNow === 'resident') && !agencyNow) {
+      var jobBadge = '';
+      try {
+        var mU = window.DataBus && DataBus.current();
+        var myApps = (window.ApplyStore && mU) ? ApplyStore.byPublisher(mU.id) : [];
+        var pendN = 0;
+        myApps.forEach(function (a) { if (a.status === 'pending') pendN++; });
+        if (pendN > 0) jobBadge = String(pendN);
+      } catch (e) {}
+      items.splice(6, 0, { href: 'my-jobs.html', ic: 'i-company', cls: 'ic-blue', title: '我的招聘', badge: jobBadge });
+    }
+
+    q.innerHTML = items.map(function (it) {
+      var unlocked = it.unlockKey === 'dist' ? distUnlocked : agencyUnlocked;
+      var isLocked = it.lock && !unlocked;
+      /* E1-02 游客点击任意受限功能 → 登录引导 sheet（原无反应） */
+      var click = guest
+        ? 'onclick="requireLoginSheet(\'登录后解锁「' + it.title + '」\')"'
+        : (isLocked ? 'onclick="quickLocked(\'' + it.unlockKey + '\')"' : 'onclick="location.href=\'' + it.href + '\'"');
+      var iconSvg = it.ic === 'i-rotate'
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l2.5 2.5"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#' + it.ic + '"/></svg>';
+      var lockStyle = isLocked ? 'opacity:.5;filter:grayscale(.5);' : '';
+      return '<div class="tool-item" ' + click + ' style="' + lockStyle + '">' +
+        '<div class="tool-icon" style="position:relative;">' + iconSvg +
+          (it.badge ? '<span class="tool-badge">' + it.badge + '</span>' : '') +
+        '</div>' +
+        '<span class="tool-label">' + it.title + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* ---------- E1-02 游客点击受限功能 → 登录引导 sheet（而非无反应/toast） ---------- */
+  function isGuestNow() {
+    try { return !UI.state.get().loggedIn; } catch (e) { return true; }
+  }
+  window.isGuestNow = isGuestNow;
+  window.requireLoginSheet = function (tip) {
+    var txt = tip || '登录后解锁全部功能';
+    if (!window.UI || !UI.sheet) { location.href = '../auth/login.html'; return; }
+    var sh = UI.sheet();
+    sh.setText('登录/注册');
+    sh.html(
+      '<div style="padding:6px 4px 4px;text-align:center;">' +
+        '<div style="font-size:34px;margin-bottom:10px;">🔐</div>' +
+        '<div style="font-size:16px;font-weight:700;color:var(--text-1);margin-bottom:6px;">登录后解锁全部功能</div>' +
+        '<div style="font-size:12.5px;color:var(--text-3);line-height:1.6;margin-bottom:18px;">' + txt + '</div>' +
+        '<button type="button" id="pf-login-cta" style="width:100%;height:46px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:15px;font-weight:700;cursor:pointer;">立即登录</button>' +
+      '</div>'
+    );
+    sh.show();
+    var cta = document.getElementById('pf-login-cta');
+    if (cta) cta.addEventListener('click', function () { location.href = '../auth/login.html'; });
+  };
+  /* E1-02 钱包充值/提现：游客 → 登录引导；已登录 → 钱包页 */
+  window.pfWalletAction = function (action) {
+    if (isGuestNow()) { window.requireLoginSheet('充值、提现、解锁入驻等资金与交易功能均需先登录账号'); return; }
+    if (action === 'view') location.href = '../wallet/index.html';
+    else location.href = '../wallet/index.html?action=' + action;
+  };
+
+  /* ---------- 锁定入口点击引导（分销/服务经营/简历投递） ---------- */
+  window.quickLocked = function (key) {
+    var cfg = {
+      dist: { title: '分销中心 · 未开通', text: '完成<b>企业入驻</b>（建筑/中介/合伙人三选一）或申请<b>个人合伙人</b>后开通分销返佣。', href: 'auth-prep.html?type=center' },
+      agency: { title: '服务经营 · 未开通', text: '完成「<b>中介服务企业</b>」入驻后开通服务经营工作台：<br>服务橱窗、在线接单、托管结算、履约保证金。', href: 'entry.html' },
+      resume: { title: '简历投递 · 未开通', text: '完成<b>个人入驻</b>（专业资质认证）后开通简历投递与人才展示。', href: 'auth-prep.html?type=center' }
+    };
+    var c = cfg[key] || { title: '功能未开通', text: '前往认证中心查看开通条件', href: 'auth-prep.html?type=center' };
+    if (window.UI && UI.dialog) UI.dialog({ title: c.title, text: c.text, ok: '去开通', cancel: '取消', onOk: function () { location.href = c.href; } });
+    else location.href = c.href;
+  };
+
+  /* ---------- 渲染：最近浏览 ---------- */
+  function renderHistory() {
+    /* 从 ViewHistory 读取最近4条真实浏览记录（仅1个月内） */
+    var items = [];
+    try { items = window.ViewHistory ? ViewHistory.recent(4) : []; } catch (e) { items = []; }
+
+    var el1 = document.getElementById('pf-history');
+    if (!el1) return;
+
+    if (items.length === 0) {
+      el1.innerHTML =
+        '<div style="padding:20px 12px;text-align:center;color:var(--me-text-3);font-size:12.5px;">' +
+          '暂无浏览记录，<span onclick="location.href=\'../supply/list.html\'" style="color:var(--me-gold-deep);cursor:pointer;font-weight:600;">去发现</span>' +
+        '</div>';
+      return;
+    }
+
+    /* 分类图标映射 */
+    var ICONS = {
+      cooperation: 'i-box', material: 'i-box', equipment: 'i-tool',
+      labor: 'i-scaffold', agency: 'i-doc'
+    };
+
+    var html = items.map(function (it) {
+      var icon = ICONS[it.bizKey] || 'i-doc';
+      var price = it.price || '面议';
+      return '<div class="history-card" onclick="location.href=\'../supply/detail.html?id=' + encodeURIComponent(it.id) + '\'">' +
+        '<div class="history-img">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><use href="#' + icon + '"/></svg>' +
+        '</div>' +
+        '<div class="history-body">' +
+          '<div class="history-name">' + (it.title || '未命名条目') + '</div>' +
+          '<div class="history-loc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' + (it.city || '未知地区') + '</div>' +
+          '<div class="history-price">' + price + '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    el1.innerHTML = html;
+  }
+
+  /* ---------- KPI 跳转 ---------- */
+  function pfKpiJump(type) {
+    var map = { fav:'../favorite/index.html', pub:'../publish/records.html', order:'../order/index.html', team:'../distribution/index.html', share:'share.html' };
+    if (map[type]) location.href = map[type];
+  }
+  window.pfKpiJump = pfKpiJump;
+
+  function openMember() {
+    var st; try { st = UI.state.get(); } catch (e) { st = {}; }
+    if (!st.loggedIn) {
+      /* 游客：跳转登录页 */
+      location.href = '../auth/login.html';
+    } else {
+      /* 已登录未认证：跳转认证引导页 */
+      location.href = 'auth-prep.html?type=center';
+    }
+  }
+  window.openMember = openMember;
+
+
+  /* [FEAT 9.2-2] 渲染诚信分 */
+  /* ---------- 渲染：等级进度条 ---------- */
+  function renderLevelProgress() {
+    try {
+      var idy = currentIdentity();
+      var cfg = ID_CFG[idy.primary] || ID_CFG.registered;
+      var st = {}; try { st = UI.state.get(); } catch (e) {}
+      var isGuest = !st.loggedIn || idy.primary === 'guest';
+      var elNum = document.getElementById('pf-level-num');
+      var elFill = document.getElementById('pf-level-fill');
+      var elNext = document.getElementById('pf-level-next');
+      var elBar = elFill ? elFill.parentElement : null;   /* .v12-level-bar */
+      /* P3-3 游客态：不再显示 Lv.0，改为「未登录」并隐藏下一级与进度条 */
+      if (isGuest) {
+        if (elNum && elNum.parentElement) elNum.parentElement.textContent = '未登录';
+        if (elNext && elNext.parentElement) elNext.parentElement.style.display = 'none';
+        if (elBar) elBar.style.display = 'none';
+        var ctaEl = document.getElementById('wb-level-cta');
+        if (ctaEl) ctaEl.textContent = '立即登录';
+        return;
+      }
+      var ctaEl2 = document.getElementById('wb-level-cta');
+      if (ctaEl2) ctaEl2.textContent = '去升级';
+      var level = cfg.level || 1;
+      var nextLevel = Math.min(level + 1, 5);
+      var pct = (level / 5) * 100;
+      if (elNum) elNum.textContent = level;
+      if (elFill) elFill.style.width = pct + '%';
+      if (elNext) elNext.textContent = nextLevel;
+    } catch (e) {}
+  }
+
+  function renderCreditScore() {
+    try {
+      var me = DataBus.current(); var uid = me ? me.id : '';
+      var info = window.svcCreditOf ? svcCreditOf(uid) : { score: 80, level: '新入驻' };
+      var score = info.score || 80;
+      var csCfg = (MOCK.business.creditScore) || { thresholds: {}, levels: [] };
+      var levelLabel = '观察', levelColor = 'gray';
+      (csCfg.levels || []).forEach(function (lv) {
+        if (score >= lv.min) { levelLabel = lv.label; levelColor = lv.color; }
+      });
+      var elScore = document.getElementById('cs-score');
+      var elLevel = document.getElementById('cs-level');
+      if (elScore) elScore.textContent = score;
+      if (elLevel) {
+        elLevel.textContent = levelLabel;
+        /* 暗色主题下提升徽章文字亮度，保证可读性 */
+        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var c = levelColor === 'gold' ? (dark ? '#D4B876' : '#C9A961')
+              : levelColor === 'silver' ? (dark ? '#B0A898' : '#8A8A8A')
+              : levelColor === 'bronze' ? (dark ? '#C08A4E' : '#B87333')
+              : (dark ? '#8A7E6A' : '#9A9185');
+        elLevel.style.color = c;
+      }
+    } catch (e) {}
+  }
+  /* [FEAT 9.2-2] 入驻年度订阅到期提醒 */
+  function renderEntryRenew() {
+    try {
+      if (window.EntryStore && EntryStore.needRenew && EntryStore.needRenew()) {
+        var banner = document.getElementById('entry-renew-banner');
+        if (banner) {
+          var s = EntryStore.read();
+          var daysLeft = Math.ceil((s.expireAt - Date.now()) / 864e5);
+          var desc = document.getElementById('entry-renew-desc');
+          if (desc) desc.textContent = '剩余 ' + daysLeft + ' 天到期，续费后可继续享受全部权益';
+          banner.style.display = '';
+        }
+      }
+    } catch(e) {}
+  }
+  window.__renewEntry = function() {
+    try {
+      var s = EntryStore.read();
+      var t = MOCK.entryTypeById(s.type);
+      var price = (t && t.yearly) ? t.yearly.price : 0;
+      var r = EntryStore.renew(price);
+      if (r && r.error) { UI.toast(r.error, 'warn'); return; }
+      UI.toast('续费成功，入驻有效期延长一年', 'ok');
+      setTimeout(function(){ location.reload(); }, 1000);
+    } catch(e) { UI.toast('续费失败: ' + e.message, 'warn'); }
+  };
+
+  /* ---------- 任务中心：无任务行时整卡隐藏（微博风） ---------- */
+  function refreshTaskCenter() {
+    var card = document.getElementById('wb-task-card');
+    if (!card) return;
+    var has = ['pf-entry-banner', 'pf-breakin-banner', 'pf-banned-banner', 'pf-credit-guide', 'entry-renew-banner'].some(function (id) {
+      var el = document.getElementById(id);
+      return el && el.innerHTML.trim() !== '' && el.style.display !== 'none';
+    });
+    card.style.display = has ? '' : 'none';
+  }
+
+  /* ---------- 初始化 ---------- */
+  var _pfInited = false;
+  function init() {
+    renderHeader();
+    renderDualLine();        /* E1-12 双线身份 + 入驻徽标（先用 innerHTML 渲染双线） */
+    renderIdentity();        /* 再追加权益 pills 与徽章，避免被 renderDualLine 的 innerHTML 整体覆盖 */
+    renderEntryBanner();     /* E1-19 入驻审核中横幅 */
+    renderBreakinBanner();   /* E2 破冰期建筑入驻横幅 */
+    renderBannedBanner();    /* E3-17 封禁横幅 */
+    renderCreditGuide();     /* E2 诚信分游客引导 */
+    renderKPI();
+    renderWallet();
+    renderOrderStates();
+    renderQuick();
+    renderHistory();
+    renderCreditScore();
+    renderLevelProgress();
+    renderEntryRenew(); /* [FEAT 9.2-2] */
+    refreshTaskCenter(); /* [微博风] 任务中心空态整卡隐藏 */
+    renderFooterUid();  /* P3-2 页脚 UID 动态化 */
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  /* E1-11 身份/入驻/存储变化后重新渲染整个页面（认证/入驻返回自动刷新） */
+  window.addEventListener('engchain:auth', init);
+  window.addEventListener('engchain:entry', init);
+  window.addEventListener('engchain:store-change', init);
+  window.addEventListener('engchain:state', init);
+  window.addEventListener('engchain:apply', init);
+  window.addEventListener('storage', function (e) {
+    if (e.key && e.key.indexOf('engchain-') === 0) init();
+  });
+})();
+</script>
+<script src="../../js/liquid-dock.js"></script>
+</body>
+</html>
