@@ -11,7 +11,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </script><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>收益明细 · 工程链</title>
-<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css">
 <link rel="stylesheet" href="../../css/iphone-frame.css">
 </head>
 <body>
@@ -61,7 +61,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
-<script src="../../js/domain.js"></script>
+<script src="../../js/domain.js"></script><script src="../../js/guest-gate.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -69,22 +69,15 @@ function fmt(ts){var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}retu
 var acc=window.entryAccess?entryAccess():{isResident:false,dist:false,statusId:'registered'};
 /* [FIX BM-028/BM-029] 门控统一为 entryAccess().dist（企业入驻 或 个人合伙人），个人合伙人须可访问收益页 */
 if(!acc.dist){
-  var ph=document.querySelector('.phone');
-  if(ph){ph.innerHTML='<div style="display:flex;flex-direction:column;min-height:100%;padding:0 24px;position:relative;">'+
-  '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:48px 0 160px;">'+
-    '<div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 28px rgba(31,78,153,.32),0 0 0 7px rgba(31,78,153,.07);">'+
-      '<svg style="width:36px;height:36px;color:#fff;" viewBox="0 0 24 24" fill="none"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
-    '</div>'+
-    '<div style="font-size:20px;font-weight:800;color:var(--text-1);margin-bottom:10px;letter-spacing:.4px;">分销收益</div>'+
-    '<div style="font-size:13px;color:var(--text-3);line-height:1.75;">入驻企业 / 个人合伙人专享 · 完成入驻后查看分销返佣明细</div>'+
-  '</div>'+
-  '<div style="position:sticky;bottom:0;left:0;right:0;padding:14px 0 calc(14px + env(safe-area-inset-bottom));margin:0 -24px;background:linear-gradient(180deg,transparent,var(--bg) 28%);z-index:10;">'+
-    '<div style="padding:0 24px;">'+
-      '<button class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(31,78,153,.38);" onclick="location.href=\''+(acc.statusId=='guest'?'../auth/login.html':'../profile/entry.html')+'\'">'+(acc.statusId=='guest'?'去登录':'去入驻')+'</button>'+
-      '<a href="index.html" style="display:block;margin-top:12px;color:var(--text-3);font-size:12.5px;text-align:center;">返回分销中心 ›</a>'+
-    '</div>'+
-  '</div>'+
-'</div>';}
+  var isGuest=(acc.statusId==='guest');
+  if (window.GuestGate) GuestGate.open({
+    mode:'replace', icon:'lock', badge:'游客模式',
+    title:'登录后查看收益',
+    note:'入驻企业或个人合伙人专享，完成入驻后查看分销返佣明细。',
+    btnText: isGuest?'去登录':'去入驻',
+    btnHref: isGuest?'../auth/login.html':'../profile/entry.html',
+    altText:'返回分销中心 ›', altHref:'index.html'
+  });
   return;
 }
 var me=DataBus.current(),uid=me?me.id:'';
@@ -175,12 +168,13 @@ window.addEventListener('engchain:rebate',function(){renderSummary();renderList(
 .es-green{background:rgba(43,107,79,.09);color:var(--success);}
 .es-blue{background:rgba(37,99,235,.09);color:var(--blue);}
 .es-label{font-size:10.5px;color:var(--text-3);}
-.es-val{font-size:16px;font-weight:800;color:var(--text-1);font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+.es-val{font-size:16px;font-weight:800;color:var(--text-1);font-family:var(--font-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;white-space:nowrap;}
 .es-val.green{color:var(--primary-dim);}
 .es-sep{width:1px;background:var(--line);flex:none;margin:8px 0;}
 
 /* ===== 列表卡片 ===== */
-.er-list{padding:0 16px;}
+.er-list{padding:0;}
+.scroll>.group-label{padding-left:0;padding-right:0;}
 .er-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;box-shadow:var(--shadow-xs);}
 .er-row{display:flex;align-items:center;gap:12px;padding:14px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background var(--d-fast);animation:er-in .4s var(--e-out) both;}
 .er-row:last-child{border-bottom:none;}

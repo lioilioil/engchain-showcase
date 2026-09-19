@@ -65,14 +65,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
     </div>
     <div class="qt-mask" id="qt-mask" onclick="closeQuickTool()"></div>
-    <div class="qt-sheet" id="qt-sheet">
-      <div class="qt-sheet-head"><span class="qt-sheet-title" id="qt-sheet-title">顺手办</span><button class="qt-sheet-close" onclick="closeQuickTool()">✕</button></div>
+    <div class="qt-sheet" id="qt-sheet" data-sheet-box data-sheet-mask="#qt-mask">
+      <div class="qt-sheet-head" data-sheet-drag><span class="qt-sheet-title" id="qt-sheet-title">顺手办</span><button class="qt-sheet-close" onclick="closeQuickTool()">✕</button></div>
       <div class="qt-sheet-body" id="qt-sheet-body"></div>
     </div>
     <!-- 发布服务需求：底部弹层表单（入口按钮触发，聚焦单任务输入） -->
     <div class="ns-mask" id="ns-mask" onclick="closeNeedSheet()"></div>
-    <div class="ns-sheet" id="ns-sheet">
-      <div class="ns-grab"></div>
+    <div class="ns-sheet" id="ns-sheet" data-sheet-box data-sheet-mask="#ns-mask">
+      <div class="ns-grab" data-sheet-drag></div>
       <div class="ns-title-row"><span class="ns-title">发布服务需求</span><button class="ns-close" onclick="closeNeedSheet()">✕</button></div>
       <div class="ns-sub">填目标与条件，AI 匹配已核验合作机构</div>
       <div class="ns-body">
@@ -170,8 +170,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
 <!-- 筛选面板 -->
 <div class="filter-mask" id="filterMask" onclick="window.closeFilterSheet()"></div>
-<div class="filter-sheet" id="filterSheet">
-  <div class="filter-grab"></div>
+<div class="filter-sheet" id="filterSheet" data-sheet-box data-sheet-mask="#filterMask">
+  <div class="filter-grab" data-sheet-drag></div>
   <div class="filter-head">
     <span class="filter-title">筛选服务</span>
     <button class="filter-close" onclick="window.closeFilterSheet()">✕</button>
@@ -242,7 +242,7 @@ function agencySource(){
 window.SVCS=agencySource();
 
 /* ---- 分类 chips ---- */
-var CATS=[
+window.CATS=[
   {id:'all',label:'全部',test:function(){return true;}},
   {id:'qual',label:'资质代办',test:function(s){return /资质|升级|增项|分立|合并|重组|延续|年检|换证/.test(s.keyword);}},
   {id:'guarantee',label:'工程担保',test:function(s){return /担保|保函/.test(s.keyword);}},
@@ -269,8 +269,8 @@ function inCat(s,id){
   var c=CATS.filter(function(x){return x.id===id;})[0];
   return c?c.test(s):false;
 }
-var curCat='all',curQ='';
-function renderCats(){
+curCat='all';curQ='';
+window.renderCats=function(){
   document.getElementById('mkt-cats').innerHTML=CATS.map(function(c){
     return '<span class="chip'+(c.id===curCat?' on':'')+'" data-cat="'+c.id+'" onclick="window.pickCat(\''+c.id+'\')">'+c.label+'</span>';
   }).join('');
@@ -391,7 +391,7 @@ window.contactAdvisor=function(){
 };
 
 /* 筛选状态 */
-var curFilterSeller='all',curFilterPrice='all';
+curFilterSeller='all';curFilterPrice='all';curFilterRate='all';
 function parsePrice(b){if(!b)return null;var m=String(b).match(/([\d.]+)/);return m?parseFloat(m[1]):null;}
 function priceInRange(b,range){if(range==='all')return true;if(range==='quote')return !b||String(b).indexOf('面议')>-1||String(b).indexOf('按需')>-1;var p=parsePrice(b);if(p===null)return range==='quote';if(range==='under500')return p<500;if(range==='500-2000')return p>=500&&p<2000;if(range==='2000-5000')return p>=2000&&p<5000;if(range==='over5000')return p>=5000;return true;}
 function sellerMatch(s,type){if(type==='all')return true;if(type==='org')return !!s.isOrg;if(type==='personal')return !s.isOrg;return true;}
@@ -400,16 +400,17 @@ function updateFilterCount(){
   if(curCat!=='all')cnt++;
   if(curFilterSeller!=='all')cnt++;
   if(curFilterPrice!=='all')cnt++;
+  if(curFilterRate!=='all')cnt++;
   var el=document.getElementById('filter-count');
   if(el){
     if(cnt>0){el.style.display='inline-flex';el.textContent=cnt;}
     else{el.style.display='none';}
   }
 }
-function renderList(){
+window.renderList=function(){
   var list=SVCS.filter(function(s){
     var cat=CATS.filter(function(c){return c.id===curCat;})[0]||CATS[0];
-    return inCat(s,curCat)&&(!curQ||s.keyword.toLowerCase().indexOf(curQ.toLowerCase())>-1)&&sellerMatch(s,curFilterSeller)&&priceInRange(s.budget,curFilterPrice);
+    return inCat(s,curCat)&&(!curQ||s.keyword.toLowerCase().indexOf(curQ.toLowerCase())>-1)&&sellerMatch(s,curFilterSeller)&&priceInRange(s.budget,curFilterPrice)&&rateMatch(s,curFilterRate);
   });
   updateFilterCount();
   var acc=window.entryAccess?entryAccess():{statusId:'guest'};
@@ -701,6 +702,8 @@ window.addEventListener('engchain:entry', render);
 })();
 
 /* ---- 筛选面板 ---- */
+/* [FIX] 筛选状态提升为全局：筛选面板函数与主渲染 IIFE 共享同一份状态 */
+var curCat='all',curQ='',curFilterSeller='all',curFilterPrice='all',curFilterRate='all';
 var FILTER_SELLER=[
   {id:'all',label:'全部'},
   {id:'org',label:'机构服务'},
@@ -714,7 +717,18 @@ var FILTER_PRICE=[
   {id:'over5000',label:'¥5000以上'},
   {id:'quote',label:'按需报价'}
 ];
-var tempFilterSeller='all',tempFilterPrice='all';
+var FILTER_RATE=[
+  {id:'all',label:'全部'},
+  {id:'high',label:'高分服务 · 4.5分以上'},
+  {id:'hot',label:'热门服务 · 10单以上'}
+];
+var tempFilterSeller='all',tempFilterPrice='all',tempFilterRate='all';
+function rateMatch(s,type){
+  if(type==='all')return true;
+  if(type==='high')return Number(s.rating||0)>=4.5;
+  if(type==='hot')return Number(s.orders||0)>=10;
+  return true;
+}
 function renderFilterBody(){
   var body=document.getElementById('filterBody');
   if(!body)return;
@@ -727,15 +741,20 @@ function renderFilterBody(){
   var priceHtml='<div class="filter-group"><div class="filter-group-label">价格区间</div><div class="filter-options">'+
     FILTER_PRICE.map(function(p){return '<span class="filter-opt'+(p.id===tempFilterPrice?' active':'')+'" data-fprice="'+p.id+'">'+p.label+'</span>';}).join('')+
   '</div></div>';
-  body.innerHTML=catHtml+sellerHtml+priceHtml;
+  var rateHtml='<div class="filter-group"><div class="filter-group-label">服务口碑</div><div class="filter-options">'+
+    FILTER_RATE.map(function(r){return '<span class="filter-opt'+(r.id===tempFilterRate?' active':'')+'" data-frate="'+r.id+'">'+r.label+'</span>';}).join('')+
+  '</div></div>';
+  body.innerHTML=catHtml+sellerHtml+priceHtml+rateHtml;
   body.querySelectorAll('.filter-opt').forEach(function(el){
     el.onclick=function(){
       var cat=el.getAttribute('data-fcat');
       var seller=el.getAttribute('data-fseller');
       var price=el.getAttribute('data-fprice');
+      var rate=el.getAttribute('data-frate');
       if(cat){curCat=cat;}
       if(seller){tempFilterSeller=seller;}
       if(price){tempFilterPrice=price;}
+      if(rate){tempFilterRate=rate;}
       renderFilterBody();
     };
   });
@@ -743,6 +762,7 @@ function renderFilterBody(){
 window.openFilterSheet=function(){
   tempFilterSeller=curFilterSeller;
   tempFilterPrice=curFilterPrice;
+  tempFilterRate=curFilterRate;
   renderFilterBody();
   document.getElementById('filterMask').classList.add('show');
   document.getElementById('filterSheet').classList.add('show');
@@ -752,12 +772,13 @@ window.closeFilterSheet=function(){
   document.getElementById('filterSheet').classList.remove('show');
 };
 window.resetFilter=function(){
-  curCat='all';tempFilterSeller='all';tempFilterPrice='all';
+  curCat='all';tempFilterSeller='all';tempFilterPrice='all';tempFilterRate='all';
   renderFilterBody();
 };
 window.confirmFilter=function(){
   curFilterSeller=tempFilterSeller;
   curFilterPrice=tempFilterPrice;
+  curFilterRate=tempFilterRate;
   renderCats();
   renderList();
   closeFilterSheet();

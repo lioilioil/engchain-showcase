@@ -1033,7 +1033,7 @@ window.MOCK = (function () {
         }, talent: 29 },
       tradeDeposit: 5000,
       free: { agency: true, personnel: true },
-      freeQuota: { monthly: 5 },
+      freeQuota: { monthly: 3 },
       /* 积分获取渠道奖励（v1.3：注册/签到/实名/入驻/邀请 多渠道；后台可调） */
       rewards: {
         register: 50,            /* 注册即送 */
@@ -1135,15 +1135,15 @@ window.MOCK = (function () {
       enabled: true,
       entry: { construction: 0, agency: 14999 },
       commissionFirstTier: 0.05,
-      registerBonus: 3,
+      registerBonus: 2,
       monitorTrialDays: 7,
       guestSample: 1
     },
     /* [FEAT 9.2-4] 游客/注册/实名 每日免费浏览摘要额度，跨天重置（FreeQuotaStore 单一来源） */
     freeDailyQuota: {
-      guest: 3,
-      registered: 5,
-      realname: 10,
+      guest: 2,
+      registered: 3,
+      realname: 5,
       resetHour: 0,
       label: '每日免费浏览'
     },

@@ -1,0 +1,117 @@
+/* ============================================================================
+   glass-upgrade.css —— 液态玻璃卡片/模块升级规则表（轻量纯 CSS）
+   ----------------------------------------------------------------------------
+   设计目标：
+   · 与已上线的液态玻璃 tabbar 同一视觉语言，但不引入 WebGL/SVG 折射——
+     那些只在底部 tabbar 一个实例上跑，铺到全 App 卡片会成倍增加合成层与重绘。
+     这里只用 backdrop-filter 模糊 + 半透明 + 边缘高光，CPU/GPU 代价可控。
+   · 通用性：一张文件，全站各页面只需 <link> 一次 + <html data-glass="on"> 即生效，
+     不需要逐页改类名。规则全部走 app.css 已有的设计令牌（--glass-bg / --glass-border /
+     --r-* / --shadow-*），明暗主题自动跟随。
+   · 门控：仅当 <html data-glass="on"> 时规则才命中；未加该属性的页面完全不受影响。
+     试点副本页启用，正式页待确认后再批量加属性。
+   · 降级：backdrop-filter 不支持时（旧 Safari / Firefox 部分场景），--glass-bg 本身是
+     半透明实色，仍可读，只是没有背后模糊。
+   ========================================================================== */
+
+html[data-glass="on"] {
+  /* 玻璃强度统一令牌：一处调，全站变 */
+  --lg-blur: 18px;
+  --lg-sat: 175%;
+}
+
+/* ---------------------------------------------------------------------------
+   1. 通用卡面 —— .card / .group / .stat-tile / .supply-card / .wb-action
+   把原来的实色 --bg-card 换成玻璃：半透明底 + 背后模糊 + 顶部高光描边
+--------------------------------------------------------------------------- */
+html[data-glass="on"] .card,
+html[data-glass="on"] .group,
+html[data-glass="on"] .stat-tile,
+html[data-glass="on"] .supply-card,
+html[data-glass="on"] .wb-action,
+html[data-glass="on"] .cert-archive,
+html[data-glass="on"] .unlock-pkg,
+html[data-glass="on"] .up-card,
+html[data-glass="on"] .pm-item {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  /* 液态玻璃质感：顶部一道细高光（模拟边缘折射），底部一道弱暗边增加厚度 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .55),
+    inset 0 -1px 0 rgba(22, 22, 22, .04),
+    0 4px 16px rgba(22, 22, 22, .06);
+}
+[data-theme="dark"] html[data-glass="on"] .card,
+[data-theme="dark"] html[data-glass="on"] .group,
+[data-theme="dark"] html[data-glass="on"] .stat-tile,
+[data-theme="dark"] html[data-glass="on"] .supply-card,
+[data-theme="dark"] html[data-glass="on"] .wb-action,
+[data-theme="dark"] html[data-glass="on"] .cert-archive {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .10),
+    inset 0 -1px 0 rgba(0, 0, 0, .25),
+    0 4px 16px rgba(0, 0, 0, .30);
+}
+
+/* ---------------------------------------------------------------------------
+   2. 小工具面 —— .icon-btn / .seg / .input / .sr-search
+   这些是"悬浮在内容上"的控件，玻璃化后与背景更融
+--------------------------------------------------------------------------- */
+html[data-glass="on"] .icon-btn,
+html[data-glass="on"] .seg,
+html[data-glass="on"] .sr-search {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(calc(var(--lg-blur) - 4px)) saturate(var(--lg-sat));
+  backdrop-filter: blur(calc(var(--lg-blur) - 4px)) saturate(var(--lg-sat));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), var(--shadow-xs);
+}
+
+/* ---------------------------------------------------------------------------
+   3. 首页金刚区模块磁贴 —— .module-tile
+   它们本身带背景图，只需把底衬提亮成玻璃感，不换图
+--------------------------------------------------------------------------- */
+html[data-glass="on"] .module-tile {
+  -webkit-backdrop-filter: blur(2px) saturate(140%);
+  backdrop-filter: blur(2px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .25),
+    0 2px 10px rgba(22, 22, 22, .08);
+}
+
+/* ---------------------------------------------------------------------------
+   4. 列表行 / 单元格内的小卡 —— 原本 --bg-card-2 的衬底，玻璃化后更轻
+--------------------------------------------------------------------------- */
+html[data-glass="on"] .group .row {
+  background: transparent;
+}
+html[data-glass="on"] .group .row + .row {
+  border-top: 1px solid var(--line-hairline);
+}
+
+/* ---------------------------------------------------------------------------
+   5. 弹窗 / Sheet 面板 —— 已是浮层，玻璃化后与下层内容透叠
+--------------------------------------------------------------------------- */
+html[data-glass="on"] .sheet,
+html[data-glass="on"] .dialog-panel,
+html[data-glass="on"] .unlock-sheet {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+}
+
+/* ---------------------------------------------------------------------------
+   6. 性能护栏：列表快速滚动时不强制重绘玻璃
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html[data-glass="on"] .card,
+  html[data-glass="on"] .group,
+  html[data-glass="on"] .stat-tile,
+  html[data-glass="on"] .supply-card,
+  html[data-glass="on"] .wb-action {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
