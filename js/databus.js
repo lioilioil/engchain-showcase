@@ -258,8 +258,8 @@ window.DataBus = (function () {
     var u = byId(id); if (!u) return null;
     if (window.AuthStore) u.auth = JSON.parse(JSON.stringify(AuthStore.read()));
     if (window.EntryStore) u.entry = JSON.parse(JSON.stringify(EntryStore.read()));
-    if (window.BalanceStore) { var b = BalanceStore.read(); u.balance = { balance: b.balance, frozen: b.frozen, totalIn: b.totalIn }; }
-    if (window.CreditStore) { var c = CreditStore.read(); u.credits = { balance: c.balance, quota: c.quota || { month: '', used: 0 } }; }
+    if (window.BalanceStore) { var b = BalanceStore.read(); u.balance = { balance: b.balance, frozen: b.frozen, totalIn: b.totalIn, totalRebate: b.totalRebate || 0, logs: (b.logs || []).slice(0, 50) }; }
+    if (window.CreditStore) { var c = CreditStore.read(); u.credits = { balance: c.balance, logs: (c.logs || []).slice(0, 50), quota: c.quota || { month: '', used: 0 } }; }
     var a = loadUsers();
     for (var i = 0; i < a.length; i++) if (a[i].id === id) { a[i] = u; break; }
     saveUsers(a);
@@ -1132,7 +1132,7 @@ window.DataBus = (function () {
     var u = byId(uid);
     var w = { id: 'WD' + String(Date.now()).slice(-9), uid: uid, userName: u ? u.name : uid,
               amount: amt, method: method || 'bank', bank: (extra && extra.bank) || '银行 · 尾号 ****',
-              status: 'pending', appliedAt: Date.now(), note: '' };
+              type: (extra && extra.type) || 'balance', status: 'pending', appliedAt: Date.now(), note: '' };
     var a = loadWithdrawals(); a.unshift(w); saveWithdrawals(a);
     audit('提现申请', '提现审批', w.userName, '¥' + amt + ' 已冻结（今日第 ' + (dc.count + 1) + ' 次）');
     return w;

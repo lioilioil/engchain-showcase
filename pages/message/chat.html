@@ -13,36 +13,180 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <title>聊天 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <style>
-  /* P1: enlarge back button touch target to 44px minimum */
+  /* —— 聊天页专用样式（不影响 app.css 全局） —— */
+  /* 头部触达 */
   .nav-back{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;padding:10px;margin:-10px 0;font-size:22px;line-height:1;}
+  .nav-title{display:flex;flex-direction:column;align-items:center;line-height:1.25;}
+  .cert-mini{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:999px;background:var(--primary-soft);color:var(--primary-dim);font-size:9px;font-weight:600;letter-spacing:.03em;}
+  .cert-mini svg{width:9px;height:9px;}
+
+  /* 会话上下文条：当前对接业务 */
+  .ctx-bar{margin:0 16px 10px;padding:10px 12px;border-radius:14px;background:var(--bg-card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;cursor:pointer;box-shadow:var(--shadow-xs);}
+  .ctx-bar:active{background:var(--bg-card-2);}
+  .ctx-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .ctx-ic svg{width:17px;height:17px;}
+  .ctx-body{flex:1;min-width:0;}
+  .ctx-title{font-size:12px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;}
+  .ctx-sub{font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ctx-go{flex:none;color:var(--text-3);display:flex;align-items:center;}
+  .ctx-go svg{width:14px;height:14px;}
+
+  /* 消息时间线 */
+  .mc-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #timeline{display:flex;flex-direction:column;gap:14px;padding:12px 16px 18px;min-height:100%;}
+  .mc-day{display:flex;justify-content:center;}
+  .mc-day span{padding:4px 12px;border-radius:999px;background:rgba(120,120,120,.08);color:var(--text-3);font-size:10px;letter-spacing:.05em;}
+
+  /* 气泡行：头像 + 内容 */
+  .mc-row{display:flex;gap:8px;align-items:flex-start;max-width:100%;}
+  .mc-row.mine{flex-direction:row-reverse;}
+  .mc-avatar{flex:none;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8a7a5c,#6b5d44);}
+  .mc-row.mine .mc-avatar{background:linear-gradient(135deg,var(--primary),var(--accent-pressed));color:var(--text-inv);}
+  .mc-body{max-width:76%;display:flex;flex-direction:column;}
+  .mc-row.mine .mc-body{align-items:flex-end;}
+  .mc-sender{font-size:9.5px;color:var(--text-3);margin:0 4px 3px;}
+  .mc-bubble{padding:10px 14px;border-radius:16px;font-size:var(--fs-md);line-height:1.55;word-break:break-word;}
+  .mc-bubble.text{background:var(--bg-card-2);color:var(--text-1);border-bottom-left-radius:4px;box-shadow:var(--shadow-xs);}
+  .mc-row.mine .mc-bubble.text{background:var(--primary);color:var(--text-inv);border-bottom-right-radius:4px;box-shadow:0 1px 2px rgba(201,169,97,.24);}
+  .mc-meta{font-size:9.5px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:4px;}
+  .mc-meta .mc-tick{color:var(--accent-pressed);}
+  .mc-meta .mc-sending{color:var(--text-3);}
+
+  /* 系统提示条（居中） */
+  .mc-sys{display:flex;justify-content:center;}
+  .mc-sys span{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;background:var(--primary-soft);color:var(--primary-dim);font-size:10px;line-height:1.5;text-align:center;}
+  .mc-sys.warn span{background:rgba(217,119,6,.1);color:#b45309;}
+  .mc-sys.ok span{background:rgba(22,163,74,.1);color:#15803d;}
+
+  /* —— 富交互卡片 —— */
+  .mc-card{width:min(272px,78vw);background:var(--bg-card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-sm);}
+  .mc-row.mine .mc-card{border-color:rgba(201,169,97,.28);}
+  .mc-card-head{display:flex;align-items:center;gap:8px;padding:11px 12px 0;}
+  .mc-card-ic{flex:none;width:30px;height:30px;border-radius:9px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .mc-card-ic svg{width:15px;height:15px;}
+  .mc-card-title{font-size:12.5px;font-weight:700;color:var(--text-1);line-height:1.3;}
+  .mc-card-sub{font-size:9.5px;color:var(--text-3);margin-top:1px;}
+  .mc-card-desc{padding:8px 12px 0;font-size:11px;color:var(--text-2);line-height:1.55;}
+  .mc-card-fields{margin:8px 12px 0;border-top:1px dashed var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px;}
+  .mc-field{display:flex;align-items:baseline;gap:8px;font-size:10.5px;}
+  .mc-field b{flex:none;width:52px;color:var(--text-3);font-weight:500;font-size:10px;}
+  .mc-field span{flex:1;color:var(--text-1);font-weight:600;}
+  .mc-field span.green{color:var(--primary-dim);}
+  .mc-card-actions{display:flex;gap:8px;padding:11px 12px 12px;}
+  .mc-btn{flex:1;height:32px;border-radius:10px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all var(--d-fast) var(--e-standard);}
+  .mc-btn.primary{background:linear-gradient(135deg,var(--primary),var(--accent-pressed));color:var(--text-inv);box-shadow:0 2px 8px rgba(201,169,97,.3);}
+  .mc-btn.primary:active{transform:scale(.96);}
+  .mc-btn.ghost{background:var(--bg-card-2);color:var(--text-2);border:1px solid var(--line);}
+  .mc-btn.ghost:active{background:var(--bg-card);}
+  .mc-btn:disabled{opacity:.55;pointer-events:none;}
+  .mc-card-state{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;background:rgba(22,163,74,.07);color:#15803d;font-size:10.5px;font-weight:600;}
+  .mc-card-state.rejected{background:rgba(120,120,120,.07);color:var(--text-3);}
+  .mc-card-state svg{width:12px;height:12px;}
+
+  /* 文件消息 */
+  .mc-file{width:min(250px,74vw);background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:11px 12px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-xs);}
+  .mc-file-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .mc-file-ic svg{width:16px;height:16px;}
+  .mc-file-body{flex:1;min-width:0;}
+  .mc-file-name{font-size:11.5px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mc-file-meta{font-size:9.5px;color:var(--text-3);margin-top:2px;}
+  .mc-file-go{flex:none;color:var(--text-3);display:flex;align-items:center;}
+  .mc-file-go svg{width:13px;height:13px;}
+
+  /* 输入区 */
+  .mc-input{flex:0 0 auto;position:relative;z-index:2;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--bg);background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line);}
+  .mc-quick{display:flex;align-items:center;gap:8px;padding:0 0 10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
+  .mc-quick::-webkit-scrollbar{display:none;}
+  .cq-label{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--primary-dim);font-family:var(--font-display);}
+  .cq-label svg{width:12px;height:12px;stroke-width:1.7;}
+  .cq-chip{flex:0 0 auto;display:inline-flex;align-items:center;padding:7px 12px;border-radius:var(--r-full);background:var(--bg-card);border:1px solid var(--line);font-size:var(--fs-sm);color:var(--text-2);white-space:nowrap;cursor:pointer;transition:all var(--d-fast) var(--e-standard);box-shadow:var(--shadow-xs);}
+  .cq-chip:active{transform:scale(.96);background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);}
+  .mc-composer{display:flex;align-items:flex-end;gap:8px;}
+  .cc-attach{flex:0 0 auto;width:42px;height:42px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:background var(--d-fast),transform var(--d-fast);}
+  .cc-attach:active{background:var(--bg-card-2);transform:scale(.94);}
+  .cc-attach svg{width:18px;height:18px;stroke-width:1.7;}
+  .cc-attach.open{background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);}
+  .cc-field{flex:1;display:flex;align-items:flex-end;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:21px;padding:4px 4px 4px 16px;transition:border-color var(--d-fast);}
+  .cc-field:focus-within{border-color:var(--accent-line);}
+  .cc-field input{flex:1;height:34px;border:0;outline:0;background:transparent;font-size:var(--fs-md);color:var(--text-1);min-width:0;}
+  .cc-field input::placeholder{color:var(--text-3);}
+  .cc-send{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--accent-pressed));color:var(--text-inv);cursor:pointer;transition:transform var(--d-fast),box-shadow var(--d-fast),opacity var(--d-fast);box-shadow:0 4px 12px rgba(201,169,97,.32);}
+  .cc-send:active{transform:scale(.9);}
+  .cc-send svg{width:17px;height:17px;stroke-width:2;}
+  .cc-send.disabled{opacity:.4;pointer-events:none;}
+
+  /* 扩展面板（+ 弹出） */
+  .mc-panel{display:none;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 4px 12px;border-top:1px solid var(--line);margin-top:10px;}
+  .mc-panel.show{display:grid;}
+  .mc-panel-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;border-radius:12px;cursor:pointer;}
+  .mc-panel-item:active{background:var(--bg-card-2);}
+  .mc-panel-item .mp-ic{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;}
+  .mc-panel-item .mp-ic svg{width:19px;height:19px;}
+  .mc-panel-item span{font-size:9.5px;color:var(--text-2);}
+  .tint-a{background:var(--primary-soft);color:var(--primary-dim);}
+  .tint-b{background:rgba(46,102,255,.1);color:#2e66ff;}
+  .tint-c{background:rgba(139,123,181,.13);color:#8B7BB5;}
+  .tint-d{background:rgba(217,119,6,.1);color:#d97706;}
+
+  /* 回到底部 */
+  .mc-back{position:absolute;right:16px;bottom:calc(118px + env(safe-area-inset-bottom,0px));width:34px;height:34px;border-radius:50%;background:var(--bg-card);border:1px solid var(--line);box-shadow:var(--shadow-md);display:none;align-items:center;justify-content:center;color:var(--text-2);z-index:5;cursor:pointer;}
+  .mc-back.show{display:flex;}
+  .mc-back svg{width:16px;height:16px;}
+  .mc-back:active{background:var(--bg-card-2);}
+
+  /* 聊天专用：输入框内表情/长度提示 */
+  .mc-count{position:absolute;right:52px;bottom:calc(16px + env(safe-area-inset-bottom,0px));font-size:9px;color:var(--text-3);pointer-events:none;}
 </style></head>
 <body>
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 2v4M8 2v4M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
 <div class="phone">
   <div class="navbar">
     <button class="nav-back" onclick="history.back()">‹</button>
-    <div class="nav-title"><span id="c-name">李工</span><div style="font-size:10px;color:var(--text-3);font-weight:400;" id="c-role">四川中建××建设</div></div>
-    <div class="nav-right"><button class="icon-btn" onclick="UI.toast('更多操作','ok')">⋯</button></div>
-  </div>
-
-  <div class="scroll no-pad">
-    <div style="display:flex;justify-content:center;padding:14px 0;"><span class="tag tag-gray">今天 09:12</span></div>
-    <div id="bubbles" style="padding:0 14px 8px;display:flex;flex-direction:column;gap:10px;"></div>
-  </div>
-
-  <!-- 输入区：智能快捷回复 + 输入栏 -->
-  <div class="chat-input">
-    <div class="chat-quick" id="quick">
-      <span class="cq-label"><svg class="ic"><use href="#i-sparkle"/></svg>智能建议</span>
-      <span class="cq-chip" onclick="send('可以的，请发详细报价')">可以的，请发详细报价</span>
-      <span class="cq-chip" onclick="send('请发一下您的报价单')">请发一下您的报价单</span>
-      <span class="cq-chip" onclick="send('感谢，我的电话是13x')">感谢，我的电话是13x</span>
+    <div class="nav-title">
+      <span style="display:flex;align-items:center;gap:6px;"><span id="c-name">李工</span><span class="cert-mini" id="c-cert"><svg class="ic"><use href="#i-shield"/></svg>个人认证</span></span>
+      <div style="font-size:10px;color:var(--text-3);font-weight:400;" id="c-role">四川中建××建设</div>
     </div>
-    <div class="chat-composer">
-      <button type="button" class="cc-attach" onclick="UI.toast('暂不支持发送附件','ok')" aria-label="附件"><svg class="ic"><use href="#i-clip"/></svg></button>
+    <div class="nav-right"><button class="icon-btn" onclick="openMore()" aria-label="更多"><svg class="ic"><use href="#i-more"/></svg></button></div>
+  </div>
+
+  <!-- 会话上下文条：当前对接业务 -->
+  <div class="ctx-bar" id="ctx-bar" onclick="openContext()">
+    <div class="ctx-ic"><svg class="ic"><use href="#i-box"/></svg></div>
+    <div class="ctx-body">
+      <div class="ctx-title" id="ctx-title">正在对接 · 商品混凝土采购</div>
+      <div class="ctx-sub" id="ctx-sub">成都天府新区商业综合体 · C30/C40 · ¥135万</div>
+    </div>
+    <div class="ctx-go"><svg class="ic"><use href="#i-chev-right"/></svg></div>
+  </div>
+
+  <div class="mc-scroll" id="scroller">
+    <div id="timeline"></div>
+  </div>
+  <button class="mc-back" id="back-btn" onclick="scrollBottom()" aria-label="回到底部"><svg class="ic"><use href="#i-arrow-down"/></svg></button>
+
+  <!-- 输入区 -->
+  <div class="mc-input">
+    <div class="mc-quick" id="quick"></div>
+    <div class="mc-composer">
+      <button type="button" class="cc-attach" id="btn-attach" onclick="togglePanel()" aria-label="更多发送方式"><svg class="ic"><use href="#i-plus"/></svg></button>
       <div class="cc-field">
-        <input id="msg" placeholder="输入消息…" onkeydown="if(event.key==='Enter')send()">
-        <button type="button" class="cc-send" onclick="send()" aria-label="发送"><svg class="ic"><use href="#i-upload"/></svg></button>
+        <input id="msg" placeholder="输入消息…" maxlength="500" onkeydown="if(event.key==='Enter')send()" oninput="onInput()">
+        <button type="button" class="cc-send" id="btn-send" onclick="send()" aria-label="发送"><svg class="ic"><use href="#i-upload"/></svg></button>
       </div>
+    </div>
+    <div class="mc-panel" id="panel">
+      <div class="mc-panel-item" onclick="sendCard('contact')"><div class="mp-ic tint-a"><svg class="ic"><use href="#i-shield"/></svg></div><span>发名片</span></div>
+      <div class="mc-panel-item" onclick="sendCard('quote')"><div class="mp-ic tint-b"><svg class="ic"><use href="#i-doc"/></svg></div><span>发报价单</span></div>
+      <div class="mc-panel-item" onclick="sendCard('appoint')"><div class="mp-ic tint-c"><svg class="ic"><use href="#i-calendar"/></svg></div><span>预约对接</span></div>
+      <div class="mc-panel-item" onclick="sendFile()"><div class="mp-ic tint-d"><svg class="ic"><use href="#i-clip"/></svg></div><span>发文件</span></div>
     </div>
   </div>
 </div>
@@ -54,21 +198,320 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.__ROOT__ = '../../';
   var id = new URLSearchParams(location.search).get('id') || 'c1';
   var conv = MOCK.conversations.find(function (c) { return c.id === id; }) || MOCK.conversations[0];
+
+  /* —— 会话元信息：认证标识 / 主页链接 / 当前对接业务 —— */
+  var META = {
+    c1: { cert: '个人认证', certIcon: 'shield', href: '../personal/index.html?id=p-jzs1',
+      ctx: { title: '正在对接 · 商品混凝土采购', sub: '成都天府新区商业综合体 · C30/C40 · ¥135万', href: '../supply/detail.html?id=1001', icon: 'box' } },
+    c2: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 盘扣脚手架租赁', sub: '双排盘扣脚手架 · 3000㎡ · 含运输', href: '../supply/detail.html?id=1005', icon: 'box' } },
+    c3: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 劳务班组进场', sub: '钢筋工班组 12 人 · 预计进场 9-20', href: '../supply/detail.html?id=1004', icon: 'users' } },
+    c4: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 项目合作洽谈', sub: '重庆×建设集团 · 市政项目联合体', href: '../supply/detail.html?id=cp1', icon: 'share' } },
+    c5: { cert: '官方客服', certIcon: 'bell', href: '../message/system.html',
+      ctx: { title: '平台客服 · 服务中', sub: '回复时间 09:00-18:00 · 紧急请致电 400-xxx', href: null, icon: 'bell' } }
+  };
+  var meta = META[id] || { cert: '平台认证', certIcon: 'shield', href: null, ctx: null };
+
   document.getElementById('c-name').textContent = conv.name;
   document.getElementById('c-role').textContent = conv.role;
+  document.getElementById('c-cert').innerHTML = '<svg class="ic"><use href="#i-' + meta.certIcon + '"/></svg>' + meta.cert;
+  if (meta.ctx) {
+    document.getElementById('ctx-title').textContent = meta.ctx.title;
+    document.getElementById('ctx-sub').textContent = meta.ctx.sub;
+    document.querySelector('.ctx-ic').innerHTML = '<svg class="ic"><use href="#i-' + meta.ctx.icon + '"/></svg>';
+    if (!meta.ctx.href) document.querySelector('.ctx-go').style.display = 'none';
+  } else {
+    document.getElementById('ctx-bar').style.display = 'none';
+  }
+  window.openContext = function () {
+    if (meta.ctx && meta.ctx.href) location.href = meta.ctx.href;
+  };
+  window.openMore = function () {
+    var sh = UI.sheet();
+    sh.setText(conv.name);
+    var rows = [
+      meta.href ? { label: '查看对方主页', icon: 'shield', act: function () { location.href = meta.href; } } : null,
+      { label: '清除聊天记录', icon: 'trash', act: function () { clearChat(); } },
+      { label: '投诉 / 举报', icon: 'alert', act: function () { UI.toast('已记录，平台将在 1 个工作日内核实', 'ok'); } }
+    ].filter(Boolean);
+    sh.html(rows.map(function (r) {
+      return '<div style="display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;" onclick="UI.closeSheet();(' + r.act.toString() + ')()">' +
+        '<svg class="ic" style="width:18px;height:18px;color:var(--text-2);"><use href="#i-' + r.icon + '"/></svg><span style="font-size:13px;">' + r.label + '</span></div>';
+    }).join(''));
+    sh.show();
+  };
 
-  var bubbles = MOCK.chats[conv.id] || [];
-  var scroller = document.querySelector('.scroll');
-  function scrollBottom() { scroller.scrollTop = scroller.scrollHeight; }
-  function render() {
-    document.getElementById('bubbles').innerHTML = bubbles.map(function (m) {
-      return '<div style="align-self:' + (m.me ? 'flex-end' : 'flex-start') + ';max-width:76%;">' +
-        '<div class="chat-bubble ' + (m.me ? 'green' : 'gray') + '">' + m.text + '</div>' +
-        '<div class="text-3" style="font-size:9px;margin-top:3px;text-align:' + (m.me ? 'right' : 'left') + ';">' + m.t + (m.me ? ' · 已读' : '') + '</div></div>';
+  /* —— 会话演示数据（含富交互卡片） ——
+     type: text 文本 | card 富交互卡片 | system 系统提示条 | file 文件消息
+     card.kind: supply 供需 | quote 报价 | contact 名片 | appoint 预约 | order 订单 */
+  var CHATS = {
+    c1: [
+      { me: false, type: 'text', text: '您好，看到您在找商品混凝土C30/C40，请问型号规格确认了吗？', t: '08:02' },
+      { me: true,  type: 'text', text: '需要C30，单次3000方，大概什么时候能供货？', t: '08:15' },
+      { me: false, type: 'system', text: '对方已查看您的项目需求', t: '08:20' },
+      { me: false, type: 'card', t: '08:21', card: {
+        kind: 'supply', title: '成都天府新区商业综合体', sub: '材料采购 · 需求详情', icon: 'box',
+        desc: '急需商品混凝土 C30/C40，主体结构施工阶段，要求绿色环保认证及预拌混凝土资质。',
+        fields: [['品类', '预拌商品混凝土'], ['数量', '3000 m³/次'], ['预算', '¥1,350,000'], ['地点', '成都市·天府新区']],
+        actions: [{ label: '查看需求详情', primary: true, act: 'supply' }] } },
+      { me: false, type: 'text', text: '我们仓库现货充足，明天即可安排泵送，您项目地址在哪？', t: '09:12' },
+      { me: true,  type: 'text', text: '天府新区核心区，麻烦先发一份报价单，含泵送和税。', t: '09:14' },
+      { me: true,  type: 'card', t: '09:14', card: {
+        kind: 'quote', title: '报价单 · C30 商品混凝土', sub: '四川中建××建设 → 供方', icon: 'doc',
+        desc: '按 C30 预拌混凝土含泵送报价，量大可议，账期按月结算。',
+        fields: [['单价', '¥468/m³'], ['含泵送', '含 37m 汽车泵'], ['税率', '13% 专票'], ['账期', '月结 30 天'], ['有效期', '2026-09-25']],
+        actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '再议', ghost: true, act: 'reject-quote' }],
+        state: 'pending' } },
+      { me: false, type: 'system', text: '提示：请勿线下交易，通过平台订单成交可享资金保障', t: '09:16' }
+    ],
+    c2: [
+      { me: false, type: 'text', text: '您好，这是我们的盘扣脚手架报价单，请查收', t: '08:40' },
+      { me: false, type: 'file', name: '盘扣脚手架报价单.pdf', size: '284 KB', t: '08:40' },
+      { me: true,  type: 'text', text: '收到，请问含运费吗？', t: '08:45' },
+      { me: false, type: 'text', text: '成都市内含运输，专票统一开', t: '08:47' },
+      { me: false, type: 'card', t: '08:48', card: {
+        kind: 'quote', title: '报价单 · 盘扣脚手架', sub: '四川××租赁 → 需方', icon: 'doc',
+        desc: '双排盘扣脚手架租赁报价，含运输与卸货，押金可退。',
+        fields: [['租金', '¥9.8/㎡/月'], ['面积', '3000 ㎡'], ['运输', '成都市内免费'], ['押金', '¥20,000'], ['账期', '月结']],
+        actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '暂不', ghost: true, act: 'reject-quote' }],
+        state: 'pending' } },
+      { me: false, type: 'card', t: '08:50', card: {
+        kind: 'contact', title: '四川××租赁有限公司', sub: '企业认证 · 机械租赁', icon: 'shield',
+        desc: '主营盘扣脚手架、塔吊、施工电梯租赁，注册资金 5000 万。',
+        fields: [['信用', 'AAA 级'], ['存续', '在营'], ['服务', '成都全域']],
+        actions: [{ label: '查看企业主页', primary: true, act: 'company' }] } }
+    ],
+    c3: [
+      { me: false, type: 'text', text: '您好，钢筋工班组 12 人，随时可以进场', t: '昨天' },
+      { me: true,  type: 'text', text: '需要做实名报备吗？进场时间约一下', t: '昨天' },
+      { me: false, type: 'card', t: '昨天 17:40', card: {
+        kind: 'appoint', title: '班组进场预约', sub: '钢筋工班组 · 12 人', icon: 'calendar',
+        desc: '建议进场时间与现场对接安排。',
+        fields: [['班组', '钢筋工 ×12 人'], ['建议时间', '09-20 08:00'], ['地点', '成都天府新区项目现场'], ['备注', '自带小型机具']],
+        actions: [{ label: '确认进场', primary: true, act: 'confirm-appoint' }, { label: '改时间', ghost: true, act: 'reject-appoint' }],
+        state: 'pending' } }
+    ],
+    c4: [
+      { me: false, type: 'card', t: '昨天 14:02', card: {
+        kind: 'contact', title: '重庆×建设集团', sub: '企业认证 · 建筑施工总承包特级', icon: 'shield',
+        desc: '西南区域市政与房建龙头，寻求市政项目联合体合作。',
+        fields: [['信用', 'AAA 级'], ['总承包', '特级'], ['合作', '联合体/分包']],
+        actions: [{ label: '查看企业主页', primary: true, act: 'company' }] } },
+      { me: false, type: 'text', text: '重庆片区市政项目 3 个在建，寻有资质的分包方', t: '昨天 14:03' },
+      { me: true,  type: 'text', text: '我们有房建总承包一级，市政二级，可以聊聊合作模式', t: '昨天 14:10' },
+      { me: false, type: 'text', text: '好的，资料发我看看，改天约个时间细聊', t: '昨天 14:12' }
+    ],
+    c5: [
+      { me: false, type: 'card', t: '周一 09:20', card: {
+        kind: 'order', title: '发票已开具成功', sub: '平台客服 · 财务', icon: 'wallet',
+        desc: '您申请的增值税专用发票已开具，可在线查看或下载。',
+        fields: [['发票号', 'EC2026090xxx'], ['金额', '¥126,000'], ['抬头', '四川省××建设有限公司']],
+        actions: [{ label: '查看发票', primary: true, act: 'order' }] } },
+      { me: false, type: 'text', text: '如需人工服务请在 09:00-18:00 内留言，紧急问题可致电平台热线。', t: '周一 09:21' }
+    ]
+  };
+
+  /* —— 快捷回复（场景化） —— */
+  var QUICK = {
+    c1: ['型号确认 C30，请发报价', '项目地址发您，方便排产', '泵送车辆白天可进场吗？', '合作愉快，请出平台订单'],
+    c2: ['含运输和卸货吗？', '开几个点的专票？', '押金什么时候退？', '可以按季度结算吗？'],
+    c3: ['确认 09-20 进场', '需要提前报备实名', '工人保险买了吗？', '住宿谁安排？'],
+    c4: ['资料整理后发您', '可以约个时间细聊', '合作模式是怎样的？', '资质证书已发，请查收'],
+    c5: ['怎么联系人工客服？', '我的发票什么时候开？', '如何提升账号等级？', '有使用问题要反馈']
+  };
+
+  /* —— 消息渲染 —— */
+  var scroller = document.getElementById('scroller');
+  var timeline = document.getElementById('timeline');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+
+  var AVATAR_TINT = [
+    'linear-gradient(135deg,#8a7a5c,#6b5d44)',
+    'linear-gradient(135deg,#5b6770,#3f4a52)',
+    'linear-gradient(135deg,#7c6b8a,#5c4d68)',
+    'linear-gradient(135deg,#5d7a6b,#456052)',
+    'linear-gradient(135deg,#7a6b5d,#5e5246)'
+  ];
+  function avatarFor(name, idx) { return '<div class="mc-avatar" style="background:' + AVATAR_TINT[idx % AVATAR_TINT.length] + ';">' + esc((name || '?').slice(0, 1)) + '</div>'; }
+
+  function cardHTML(m) {
+    var card = m.card || {};
+    var acts = '';
+    if ((!card.state || card.state === 'pending') && card.actions) {
+      acts = '<div class="mc-card-actions">' + card.actions.map(function (a) {
+        if (!a.act) return '<button type="button" class="mc-btn ' + (a.primary ? 'primary' : 'ghost') + '" disabled>' + esc(a.label) + '</button>';
+        return '<button type="button" class="mc-btn ' + (a.primary ? 'primary' : 'ghost') + '" onclick="event.stopPropagation();cardAct(\'' + m._id + '\',\'' + a.act + '\')">' + esc(a.label) + '</button>';
+      }).join('') + '</div>';
+    } else if (card.state === 'done') {
+      acts = '<div class="mc-card-state"><svg class="ic"><use href="#i-check"/></svg>已' + esc(card.stateText || '确认') + '</div>';
+    } else if (card.state === 'rejected') {
+      acts = '<div class="mc-card-state rejected"><svg class="ic"><use href="#i-x"/></svg>' + esc(card.stateText || '已拒绝') + '</div>';
+    }
+    var fields = (card.fields || []).map(function (f) {
+      return '<div class="mc-field"><b>' + esc(f[0]) + '</b><span class="' + (/¥|￥|%|元|万/.test(f[1]) ? 'green' : '') + '">' + esc(f[1]) + '</span></div>';
     }).join('');
+    return '<div class="mc-card">' +
+      '<div class="mc-card-head"><div class="mc-card-ic"><svg class="ic"><use href="#i-' + esc(card.icon || 'doc') + '"/></svg></div>' +
+      '<div style="flex:1;min-width:0;"><div class="mc-card-title">' + esc(card.title) + '</div><div class="mc-card-sub">' + esc(card.sub || '') + '</div></div></div>' +
+      (card.desc ? '<div class="mc-card-desc">' + esc(card.desc) + '</div>' : '') +
+      (fields ? '<div class="mc-card-fields">' + fields + '</div>' : '') +
+      acts + '</div>';
+  }
+  function fileHTML(m) {
+    return '<div class="mc-file">' +
+      '<div class="mc-file-ic"><svg class="ic"><use href="#i-doc"/></svg></div>' +
+      '<div class="mc-file-body"><div class="mc-file-name">' + esc(m.name || '文件') + '</div><div class="mc-file-meta">' + esc(m.size || '') + ' · PDF</div></div>' +
+      '<div class="mc-file-go"><svg class="ic"><use href="#i-download"/></svg></div></div>';
+  }
+
+  function msgHTML(m, senderName) {
+    var cls = m.me ? 'mc-row mine' : 'mc-row';
+    var body;
+    if (m.type === 'card') {
+      body = '<div class="mc-bubble" style="background:transparent;box-shadow:none;padding:0;border-radius:0;max-width:100%;">' + cardHTML(m) + '</div>';
+    } else if (m.type === 'file') {
+      body = '<div class="mc-bubble" style="background:transparent;box-shadow:none;padding:0;border-radius:0;">' + fileHTML(m) + '</div>';
+    } else if (m.type === 'system') {
+      return '<div class="mc-sys ' + (m.tone || '') + '"><span>' + esc(m.text) + '</span></div>';
+    } else {
+      body = '<div class="mc-bubble text">' + esc(m.text) + '</div>';
+    }
+    var meta = m.me
+      ? '<div class="mc-meta"><span class="' + (m.status === 'sending' ? 'mc-sending' : 'mc-tick') + '">' + (m.status === 'sending' ? '发送中' : '已读') + '</span><span>' + esc(m.t || '') + '</span></div>'
+      : '<div class="mc-meta"><span>' + esc(m.t || '') + '</span></div>';
+    return '<div class="' + cls + '">' + avatarFor(m.me ? '我' : senderName, m._ai || 0) +
+      '<div class="mc-body">' + body + meta + '</div></div>';
+  }
+
+  var convId = conv.id;
+  var messages = (CHATS[convId] || []).map(function (m, i) { m._id = convId + '-' + i; m._ai = (conv.name || '?').charCodeAt(0) % 5; return m; });
+  var _seq = 100;
+
+  function dayLabel(t) {
+    if (/^昨天/.test(t)) return '昨天';
+    if (/^刚刚|^\d{2}:\d{2}/.test(t)) return '今天';
+    return '更早';
+  }
+  function render() {
+    var html = '';
+    var lastDay = '';
+    messages.forEach(function (m) {
+      var d = dayLabel(m.t);
+      if (d !== lastDay) { html += '<div class="mc-day"><span>' + d + '</span></div>'; lastDay = d; }
+      html += msgHTML(m, conv.name);
+    });
+    timeline.innerHTML = html;
     scrollBottom();
   }
+  function scrollBottom() {
+    scroller.scrollTop = scroller.scrollHeight;
+    document.getElementById('back-btn').classList.remove('show');
+  }
+  scroller.addEventListener('scroll', function () {
+    var nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 60;
+    document.getElementById('back-btn').classList.toggle('show', !nearBottom);
+  });
   render();
+
+  /* —— 卡片动作 —— */
+  window.cardAct = function (mid, act) {
+    var m = null;
+    messages.forEach(function (x) { if (x._id === mid) m = x; });
+    if (!m || !m.card) return;
+    var c = m.card;
+    if (act === 'supply') { location.href = '../supply/detail.html?id=1001'; return; }
+    if (act === 'company') { location.href = '../company/index.html?id=c-znzjs'; return; }
+    if (act === 'my-home') { location.href = '../personal/index.html?id=p-jzs1'; return; }
+    if (act === 'order') { location.href = '../order/index.html'; return; }
+    if (act === 'confirm-quote') {
+      c.state = 'done'; c.stateText = '确认报价';
+      messages.push({ me: false, type: 'system', text: '已确认报价，等待对方生成平台订单', t: '刚刚' });
+      setTimeout(function () {
+        messages.push({ me: false, type: 'card', t: '刚刚', card: {
+          kind: 'order', title: '平台订单已生成', sub: '请在线签署确认', icon: 'box',
+          desc: '对方已按确认报价生成平台订单，签署后即可安排发货/进场。',
+          fields: [['订单号', 'EC2026091' + (_seq++)], ['金额', c.fields && c.fields[0] ? c.fields[0][1] : '—'], ['保障', '平台资金担保']],
+          actions: [{ label: '去处理订单', primary: true, act: 'order' }] } });
+        render();
+      }, 1000);
+    } else if (act === 'reject-quote') {
+      c.state = 'rejected'; c.stateText = '已婉拒';
+      messages.push({ me: false, type: 'system', text: '您已婉拒该报价，可继续与对方协商', t: '刚刚' });
+    } else if (act === 'confirm-appoint') {
+      c.state = 'done'; c.stateText = '确认进场';
+      messages.push({ me: false, type: 'system', text: '进场已确认：09-20 08:00 · 成都天府新区项目现场', t: '刚刚' });
+      setTimeout(function () {
+        messages.push({ me: false, type: 'text', text: '好的，届时现场会有专人对接，实名报备资料我这边准备。', t: '刚刚' });
+        render();
+      }, 900);
+    } else if (act === 'reject-appoint') {
+      c.state = 'rejected'; c.stateText = '已改期';
+      messages.push({ me: false, type: 'system', text: '已通知对方调整时间', t: '刚刚' });
+    }
+    render();
+  };
+
+  /* —— 输入 / 发送 —— */
+  var input = document.getElementById('msg');
+  var btnSend = document.getElementById('btn-send');
+  function onInput() { btnSend.classList.toggle('disabled', !input.value.trim()); }
+  input.addEventListener('input', onInput);
+  onInput();
+
+  window.togglePanel = function () {
+    var panel = document.getElementById('panel');
+    var open = panel.classList.toggle('show');
+    document.getElementById('btn-attach').classList.toggle('open', open);
+  };
+
+  window.sendFile = function () {
+    UI.toast('演示环境暂不支持上传文件，可发送报价单/名片卡片', 'info');
+  };
+
+  window.sendCard = function (kind) {
+    document.getElementById('panel').classList.remove('show');
+    document.getElementById('btn-attach').classList.remove('open');
+    var now = new Date();
+    var hm = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+    var mine = { me: true, type: 'card', t: hm, _id: 'mine-' + (_seq++), _ai: 0, card: null };
+    if (kind === 'contact') {
+      mine.card = {
+        kind: 'contact', title: '我的企业名片', sub: '个人认证 · 供方', icon: 'shield',
+        desc: '四川省××建设有限公司，房建总承包一级，可承接西南区域项目。',
+        fields: [['信用', 'AAA 级'], ['资质', '总承包一级'], ['区域', '四川/重庆']],
+        actions: [{ label: '查看我的主页', primary: true, act: 'my-home' }] };
+      messages.push(mine);
+      setTimeout(function () {
+        messages.push({ me: false, type: 'text', text: '收到您的名片，稍后联系。', t: '刚刚' });
+        render();
+      }, 1100);
+    } else if (kind === 'quote') {
+      mine.card = {
+        kind: 'quote', title: '报价单 · C30 商品混凝土', sub: '供方 → 需方', icon: 'doc',
+        desc: '含泵送含税报价，量大可议。',
+        fields: [['单价', '¥468/m³'], ['含泵送', '含 37m 汽车泵'], ['税率', '13% 专票'], ['账期', '月结 30 天']],
+        actions: [{ label: '等待对方确认', primary: true, act: '' }], state: 'pending' };
+      messages.push(mine);
+      setTimeout(function () {
+        messages.push({ me: false, type: 'system', text: '对方已查看报价单', t: '刚刚' });
+        render();
+      }, 1000);
+    } else if (kind === 'appoint') {
+      mine.card = {
+        kind: 'appoint', title: '预约现场对接', sub: '项目现场 · 双方确认', icon: 'calendar',
+        desc: '建议时间，待对方确认。',
+        fields: [['建议时间', '今天 14:00'], ['地点', '成都天府新区项目现场'], ['事项', '洽谈供货/进场细节']],
+        actions: [{ label: '等待对方确认', primary: true, act: '' }], state: 'pending' };
+      messages.push(mine);
+      setTimeout(function () {
+        messages.push({ me: false, type: 'system', text: '对方暂未回复预约，可稍后提醒', t: '刚刚' });
+        render();
+      }, 1000);
+    }
+    render();
+  };
 
   /* [FIX BM-039] 聊天内容正则扫描：发送前检测手机号/微信/QQ 等站外联系方式。
      优先调用领域层 JumpContract.scanMessage（如已就绪）；否则用本地正则兜底。
@@ -77,7 +520,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (window.JumpContract && typeof JumpContract.scanMessage === 'function') {
       try { return JumpContract.scanMessage(text); } catch (e) {}
     }
-    /* 本地正则兜底：手机号 / 微信号 / QQ号 */
     var hits = [];
     if (/(?:1[3-9]\d{9})/.test(text)) hits.push('手机号');
     if (/(?:微信|vx|VX|vX|wx|WX|weixin|WeChat|加微)/.test(text)) hits.push('微信号');
@@ -95,8 +537,39 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     } catch (e) {}
   }
 
+  /* 场景化模拟回复 */
+  function autoReply(text) {
+    if (convId === 'c1') {
+      if (/报价/.test(text) && !/收到|确认/.test(text)) {
+        setTimeout(function () {
+          messages.push({ me: false, type: 'card', t: '刚刚', card: {
+            kind: 'quote', title: '报价单 · C30 商品混凝土', sub: '四川中建××建设 → 需方', icon: 'doc',
+            desc: '按 C30 含泵送报价，量大可议。',
+            fields: [['单价', '¥468/m³'], ['含泵送', '含 37m 汽车泵'], ['税率', '13% 专票'], ['账期', '月结 30 天']],
+            actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '再议', ghost: true, act: 'reject-quote' }],
+            state: 'pending' } });
+          render();
+        }, 1300);
+        return;
+      }
+      if (/地址|位置/.test(text)) {
+        setTimeout(function () { messages.push({ me: false, type: 'text', text: '收到，已记录项目地址，明天 9 点前回复排产计划。', t: '刚刚' }); render(); }, 1100);
+        return;
+      }
+    }
+    setTimeout(function () {
+      var replies = [
+        '收到，我这边核实一下尽快回复您。',
+        '好的，相关信息已同步给业务负责人。',
+        '了解，稍后给您详细答复。'
+      ];
+      messages.push({ me: false, type: 'text', text: replies[Math.floor(Math.random() * replies.length)], t: '刚刚' });
+      render();
+    }, 1100);
+  }
+
   window.send = function (text) {
-    var v = (text || document.getElementById('msg').value).trim();
+    var v = (text || input.value).trim();
     if (!v) return;
     /* [FIX BM-039] 发送前扫描站外联系方式 */
     var scan = scanContact(v);
@@ -105,16 +578,46 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       UI.toast('检测到疑似' + types + '，为保障交易安全，请通过平台沟通', 'warn');
       riskLog(v, scan.types || []);
     }
-    var now = new Date().getHours() + ':' + new Date().getMinutes().toString().padStart(2, '0');
-    bubbles.push({ me: true, text: v, t: now });
-    document.getElementById('msg').value = '';
+    var now = new Date();
+    var hm = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+    var m = { me: true, type: 'text', text: v, t: hm, status: 'sending', _id: 'send-' + (_seq++), _ai: 0 };
+    messages.push(m);
+    input.value = '';
+    onInput();
     render();
-    // 模拟对方回复
-    setTimeout(function () {
-      bubbles.push({ me: false, text: '收到，我这边核实一下尽快回复您。', t: '刚刚' });
-      render();
-    }, 1200);
+    setTimeout(function () { m.status = 'read'; render(); }, 600);
+    autoReply(v);
   };
+
+  /* 清除聊天记录 */
+  window.clearChat = function () {
+    var sh = UI.sheet();
+    sh.setText('清除聊天记录');
+    sh.html('<div style="font-size:12.5px;color:var(--text-2);line-height:1.7;padding:2px 0 14px;">将清空与「' + esc(conv.name) + '」的全部聊天记录，此操作不可恢复。</div>' +
+      '<button type="button" class="btn btn-danger" style="width:100%;" onclick="UI.closeSheet();doClearChat()">确认清除</button>');
+    sh.show();
+  };
+  window.doClearChat = function () {
+    messages = [];
+    _seq = 100;
+    render();
+    UI.toast('聊天记录已清除', 'ok');
+  };
+
+  /* 快捷回复（事件委托，避免内联引号转义问题） */
+  var quickBox = document.getElementById('quick');
+  quickBox.innerHTML = '<span class="cq-label"><svg class="ic"><use href="#i-sparkle"/></svg>智能建议</span>' +
+    (QUICK[convId] || QUICK.c1).map(function (q) {
+      return '<span class="cq-chip" data-q="' + esc(q) + '">' + esc(q) + '</span>';
+    }).join('') +
+    '<span class="cq-chip" id="quick-more"><svg class="ic" style="width:11px;height:11px;"><use href="#i-plus"/></svg>更多</span>';
+  quickBox.addEventListener('click', function (e) {
+    var chip = e.target.closest('.cq-chip');
+    if (!chip) return;
+    if (chip.id === 'quick-more') { togglePanel(); return; }
+    var q = chip.getAttribute('data-q');
+    if (q) send(q);
+  });
 })();
 </script>
 </body>

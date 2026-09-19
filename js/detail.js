@@ -108,10 +108,12 @@ window.DETAIL = (function () {
       if (bizKey === 'trade') return 30;
       return -1;
     },
-    /* 免费/不设锁类别：企业招聘 personnel（投递流程替代付费墙）、中介服务 agency（免费留资咨询）；资质招商 franchise 走分级积分解锁（inlineLock），留资/解锁前联系方式先模糊 */
+    /* 免费/不设锁类别：企业招聘 personnel（投递流程替代付费墙）、publish；
+       中介服务 agency（免费留资咨询）— 不需付费但需留资后才能查看联系方式，故不直接归入isFree免解锁 */
     isFree: function (bizKey) { return bizKey === 'personnel' || bizKey === 'publish'; },
     isUnlocked: function (rec) {
       if (!rec) return false;
+      /* personnel/publish完全免费，直接解锁；agency需留资后才能解锁，走UnlockStore记录判定 */
       if (this.isFree(rec.bizKey)) return true;
       var rec0 = this._read()[this._key(rec)];
       if (!rec0) return false;
@@ -182,6 +184,26 @@ window.DETAIL = (function () {
       d.status = 'released'; d.releasedAt = now; changed = true;
     });
     if (changed) _tradeDepositWrite(arr);
+  }
+  /* [FIX AUDIT-04] trade 建企买卖成交后保证金扣除：成交确认时调用，将冻结保证金转为平台收入，台账状态更新为 committed。
+     调用时机：买卖双方确认成交/签署合同后；参数 ref 为信息ID，amount 为保证金金额，buyerId/sellerId 可选。 */
+  function commitTradeDeposit(ref, amount, buyerId, sellerId) {
+    if (!window.BalanceStore) return { ok: false, reason: 'balance_store_unavailable' };
+    var arr = _tradeDepositRead(); var now = Date.now(); var found = null;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].ref === String(ref) && arr[i].status === 'frozen') { found = arr[i]; break; }
+    }
+    if (!found) return { ok: false, reason: 'deposit_not_found' };
+    var depAmount = amount || found.amount;
+    var s = BalanceStore.read();
+    /* 冻结金额转为平台收入：frozen -= amount，同时写 trade_deposit_committed 流水（支出端）和 platform_income 流水（收入端） */
+    s.frozen = Math.max(0, Math.round((s.frozen - depAmount) * 100) / 100);
+    s.logs.unshift({ type: 'trade_deposit_committed', amount: -depAmount, method: 'deposit', reason: '建企买卖成交保证金扣除', ts: now, ref: ref, buyerId: buyerId || '', sellerId: sellerId || '' });
+    s.logs.unshift({ type: 'platform_income', amount: depAmount, method: 'deposit', reason: '建企买卖成交平台收入', ts: now, ref: ref });
+    BalanceStore.write(s);
+    found.status = 'committed'; found.committedAt = now; found.buyerId = buyerId || ''; found.sellerId = sellerId || '';
+    _tradeDepositWrite(arr);
+    return { ok: true, amount: depAmount, status: 'committed' };
   }
   /* [FIX BM-012] 锁区价签统一从 MOCK.business.credits.consume 读取，文案为「N 积分 / 次」；trade 保证金保留人民币；免费类显示「免费咨询」 */
   function unlockCreditText(rec) {
@@ -376,16 +398,11 @@ window.DETAIL = (function () {
   function matContact(r, c, m, locked) {
     var demand = matIsDemand(r);
     var mc = m.contact || {};
-    var role = demand ? '采购方' : '供应方';
-    var avatar = (c.name || r.company || '企').charAt(0);
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var phoneFull = mc.phone || r.phone || '';
     var wechatFull = mc.wechat || r.wechat || '';
     var addrFull = mc.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
-        '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + '主体 · 平台已核验</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('联系人', cfgText(mc.name || r.contact), ccAction('contact', mc.name || r.contact, locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
@@ -460,16 +477,11 @@ window.DETAIL = (function () {
   function equipContact(r, c, e, locked) {
     var demand = equipIsDemand(r);
     var ec = (e && e.contact) || {};
-    var role = demand ? '承租方' : '出租方';
-    var avatar = (c.name || r.company || '企').charAt(0);
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var phoneFull = ec.phone || r.phone || '';
     var wechatFull = ec.wechat || r.wechat || '';
     var addrFull = ec.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
-        '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + '主体 · 平台已核验</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('联系人', cfgText(ec.name || r.contact), ccAction('contact', ec.name || r.contact, locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
@@ -573,8 +585,6 @@ window.DETAIL = (function () {
   function laborContact(r, c, l, locked, demand) {
     var lc = (l && l.contact) || {};
     var cc = c.contact || {};
-    var role = demand ? '用工方' : '班组 / 劳务公司';
-    var avatar = (c.name || r.company || '劳').charAt(0);
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     var rawName = lc.name || cc.name || r.contact || '';
     /* 供应侧联系人即班组长：未解锁显示「X 师傅」占位，解锁原地展开全名（须用 Lock.partial 双份以随 is-unlocked 切换） */
@@ -585,9 +595,6 @@ window.DETAIL = (function () {
     var wechat = lc.wechat || r.wechat || '';
     var addr = lc.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div><div class="cc-id">' +
-        '<div class="cc-name">' + cfgText(c.name || r.company) + '</div><div class="cc-sub">' + role + ' · 平台已核验</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('联系人', cfgText(name), ccAction('contact', rawName, locked)) +
         row('联系电话', Lock.partial(phone, locked), ccAction('phone', phone, locked)) +
@@ -693,7 +700,6 @@ window.DETAIL = (function () {
     var fc = r.fc || {};
     var lc = fc.contact || {};
     var cc = c.contact || {};
-    var avatar = (c.name || '企').charAt(0);
     var rawName = lc.name || cc.name || '';
     var title = lc.title || cc.title || '招商顾问';
     var phone = lc.phone || cc.phone || '';
@@ -702,9 +708,6 @@ window.DETAIL = (function () {
     var freeName = rawName.charAt(0) + '顾问';
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div><div class="cc-id">' +
-        '<div class="cc-name">' + cfgText(c.name) + '</div><div class="cc-sub">招商方 · 平台已核验</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('招商顾问', Lock.partial(rawName + ' · ' + title, locked, freeName + ' · ' + title), ccAction('contact', rawName, locked)) +
         row('联系电话', Lock.partial(phone, locked), ccAction('phone', phone, locked)) +
@@ -937,12 +940,8 @@ window.DETAIL = (function () {
   /* 机构联系卡：信息全免费，仅联系方式在「免费提交咨询需求」后原地开放 */
   function agencyContact(r, c, locked) {
     var ac = r.contact || {};
-    var avatar = (c.name || '机').charAt(0);
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
-        '<div class="cc-id"><div class="cc-name">' + cfgText(c.name) + '</div><div class="cc-sub">服务机构 · 平台已认证</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('服务顾问', cfgText(ac.name || '专属顾问'), ccAction('contact', ac.name || '', locked)) +
         row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">免费咨询后可见完整号码</span>') : ac.phone, ccAction('phone', ac.phone || '', locked)) +
@@ -1447,8 +1446,27 @@ window.DETAIL = (function () {
     if (r.revenue && r.revenue.length) h += revenueSection(r.revenue);
     /* 转让流程 */
     if (r.transferProcess && r.transferProcess.length) h += transferProcessSection(r.transferProcess);
+    /* 转让方联系方式：就近打码，缴纳保证金后原地明文（与其他业务线联系方式卡同构，不含重复认证信息） */
+    h += sec('转让方联系方式', tradeContact(r, c, locked));
     h += Lock.inline(locked, '缴纳保证金查看完整信息', '完整尽调 · 风险明细 · 转让方联系方式', '¥5,000 可退保证金');
     return h;
+  }
+  /* 转让方联系卡：建企买卖缺联系方式模块（此前 inlineLock 且正文无联系卡），补齐并与 6 类联系卡同构；
+     删除头像/公司名/认证标签（与认证卡重复），仅保留联系方式明细 + 就近打码 */
+  function tradeContact(r, c, locked) {
+    var tc = c.contact || {};
+    function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
+    var phoneFull = tc.phone || r.phone || '';
+    var wechatFull = tc.wechat || r.wechat || '';
+    var addrFull = tc.addr || r.fullAddress || r.address || r.location || '';
+    return '<div class="contact-card">' +
+      '<div class="cc-list">' +
+        row('联系人', cfgText(tc.name || r.contact || '转让方'), ccAction('contact', tc.name || r.contact || '', locked)) +
+        row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
+        (wechatFull ? row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) : '') +
+        row('详细地址', Lock.partial(addrFull, locked, cfgText(r.location || '') + ' · 详细地址保证金解锁'), ccAction('nav', addrFull, locked)) +
+      '</div>' +
+    '</div>';
   }
   function tradeLock(r, c) {
     return [
@@ -1537,12 +1555,8 @@ window.DETAIL = (function () {
   /* ⑤ 合作方联系卡：主体免费，电话/微信/门牌就近打码 */
   function coopContact(r, c, locked) {
     var cc = r.contact || {};
-    var avatar = (c.name || '企').charAt(0);
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
-      '<div class="cc-head"><div class="cc-avatar">' + avatar + '</div>' +
-        '<div class="cc-id"><div class="cc-name">' + cfgText(c.name || '项目方') + '</div><div class="cc-sub">合作主体 · 平台已核验</div></div>' +
-        '<span class="cc-badge">' + icon('check') + '已认证</span></div>' +
       '<div class="cc-list">' +
         row('对接人', cfgText(cc.name || '项目商务'), ccAction('contact', cc.name || '', locked)) +
         row('联系电话', Lock.partial(cc.phone || '', locked), ccAction('phone', cc.phone || '', locked)) +
@@ -2314,9 +2328,9 @@ window.DETAIL = (function () {
       }).join('') + '</div>';
     // 注册与社保
     var regHtml = '<div style="display:flex;flex-direction:column;gap:10px;">' +
-      '<div style="padding:10px 12px;border-radius:8px;background:rgba(201,169,97,0.06);border:0.5px solid rgba(201,169,97,0.12);">' +
-        '<div style="font-size:10px;font-weight:700;color:var(--accent-light);margin-bottom:6px;letter-spacing:0.03em;">注册状态</div>' +
-        '<div style="font-size:10px;color:rgba(255,240,200,0.85);line-height:1.6;">' +
+      '<div style="padding:10px 12px;border-radius:8px;background:var(--bg-card-2);border:0.5px solid var(--line);">' +
+        '<div style="font-size:10px;font-weight:700;color:var(--primary-dim);margin-bottom:6px;letter-spacing:0.03em;">注册状态</div>' +
+        '<div style="font-size:10px;color:var(--text-2);line-height:1.6;">' +
           '<div>状态：' + (regStatus.status || '—') + '</div>' +
           '<div>注册单位：' + (regStatus.registerUnitMasked || regStatus.registerUnit || '—') + '</div>' +
           '<div>注册专业：' + (regStatus.registerMajor || '—') + '</div>' +
@@ -2324,23 +2338,23 @@ window.DETAIL = (function () {
         '</div></div>' +
       '<div style="padding:10px 12px;border-radius:8px;background:rgba(127,212,168,0.06);border:0.5px solid rgba(127,212,168,0.15);">' +
         '<div style="font-size:10px;font-weight:700;color:var(--success);margin-bottom:6px;letter-spacing:0.03em;">社保状态</div>' +
-        '<div style="font-size:10px;color:rgba(255,240,200,0.85);line-height:1.6;">' +
+        '<div style="font-size:10px;color:var(--text-2);line-height:1.6;">' +
           '<div>状态：' + (ss.status || '—') + '</div>' +
           '<div>缴纳单位：' + (ss.payUnitMasked || ss.payUnit || '—') + '</div>' +
           '<div>唯一社保：' + (ss.uniqueSocial ? '是 ✓' : '否') + '</div>' +
           '<div>最近缴纳：' + (ss.lastPayMonth || '—') + '</div>' +
         '</div></div>' +
     '</div>';
-    // 头部
+    // 头部（名称可点击 → 个人主页）
     var header = '<div class="cert-header">' +
       '<div class="cert-badge-wrap"><div class="cert-seal">' + UI.icon('award', '') + '</div>' +
-        '<div class="cert-badge-text"><div class="cert-badge-title">' + UI.esc(nm) +
-          '<svg class="verified-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
+        '<div class="cert-badge-text"><div class="cert-badge-title"><span class="cert-name-link" data-home-url="../personal/index.html?id=' + rec.id + '" style="cursor:pointer;">' + UI.esc(nm) +
+          '<svg class="verified-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span></div>' +
         '<div class="cert-badge-sub">个人持证人才 · 简历信息已核验</div>' +
         '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div>' +
       '<div class="cert-score"><div class="cert-score-row"><span class="cert-score-num">' + (rec.match || '—') + '</span><span class="cert-score-max">%</span></div>' +
         '<div class="cert-score-label">匹配度</div>' +
-        '<div class="cert-score-grade" style="background:linear-gradient(135deg,rgba(201,169,97,0.15),rgba(201,169,97,0.05));border-color:rgba(201,169,97,0.3);color:var(--accent-light);">✦ ' + (rec.certLevel || '持证') + '</div></div>' +
+        '<div class="cert-score-grade" style="background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary);">✦ ' + (rec.certLevel || '持证') + '</div></div>' +
     '</div>';
     // 底部
     var footer = '<div class="cert-footer">' +
@@ -2379,14 +2393,31 @@ window.DETAIL = (function () {
     if (phoneEl) phoneEl.classList.toggle('is-unlocked', !!unlocked);
     if ($('nav-title')) $('nav-title').textContent = t.label;
     if ($('hero')) $('hero').innerHTML = t.hero(rec, c);
+    var certHtml = '';
     if ($('cert')) {
       var home = (rec.bizKey === 'talent' || rec.bizKey === 'franchise' || rec.bizKey === 'trade') ? null : ('../company/index.html?id=' + c.id);
       var isAgency = rec.bizKey === 'agency';
-      $('cert').innerHTML = rec.bizKey === 'talent' ? talentCertHtml(rec) : UI.certCard(c, { home: home, compact: true, goldV: isAgency });
+      certHtml = rec.bizKey === 'talent' ? talentCertHtml(rec) : UI.certCard(c, { home: home, compact: true, goldV: isAgency });
       // V4.0: 认证卡已改为页内 Tab 结构，无需弹窗点击事件
+      // V4.1: 认证卡位移至「用户提交信息（业务正文）」与「平台信息（平台保障）」之间
+      $('cert').style.display = 'none';
     }
-    var __bodyHtml = t.sections(rec, c) + guaranteeSec(rec) + relatedSec(rec);
+    var __bodyHtml = t.sections(rec, c) + certHtml + guaranteeSec(rec) + relatedSec(rec);
     if ($('body')) $('body').innerHTML = __bodyHtml;
+    /* [FIX HOME-NAV] 认证卡名称跳转主页：homeUrl 生成的是相对根路径，在详情页 base(pages/supply/) 下会解析错误，
+       统一重写为相对本页的正确路径（c- → ../company/，其他 → ../personal/） */
+    try {
+      var _bodyZone = $('body');
+      if (_bodyZone) {
+        _bodyZone.querySelectorAll('.cert-name-link, .ca-name-link').forEach(function (lnk) {
+          var _u = lnk.getAttribute('data-home-url') || '';
+          var _m = /[?&]id=([^&]+)/.exec(_u);
+          if (!_m) return;
+          var _id = decodeURIComponent(_m[1]);
+          lnk.setAttribute('data-home-url', (_id.indexOf('c-') === 0 ? '../company/' : '../personal/') + 'index.html?id=' + _id);
+        });
+      }
+    } catch (e) {}
     if ($('lock')) {
       /* [FIX E1-06] applyHtml 仅招聘类(personnel/talent)渲染，其余 7 类不渲染，避免遮挡解锁 CTA */
       var _RECRUIT_BIZ = { personnel: 1, talent: 1 };
@@ -3050,7 +3081,7 @@ window.DETAIL = (function () {
             '<div style="margin-bottom:12px;"><label style="font-size:11.5px;font-weight:600;color:var(--text-1);display:block;margin-bottom:6px;">联系电话 <span style="color:var(--accent);">*</span></label><input type="tel" id="ag-phone" placeholder="请输入您的手机号" value="13800008866" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-m);font-size:13px;background:var(--bg-card);box-sizing:border-box;outline:none;"></div>' +
             '<div style="padding:8px 10px;background:var(--success-soft);border-radius:8px;margin-bottom:12px;"><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;"><b style="color:var(--success);">免费咨询保障：</b>报价、材料与案例已全部公开，留资仅用于顾问对接；服务不过按约退款，平台不代收代办费，款项均对公签约。</div></div>' +
           '</div>' +
-          '<button class="btn btn-primary btn-block btn-lg" id="ag-submit">免费提交并解锁沟通权限</button>'; /* [FIX BM-013] 清除「查看联系方式」表述 */
+          '<button class="btn btn-primary btn-block btn-lg" id="ag-submit">免费提交咨询需求</button>'; /* [FIX BM-013] 清除「查看联系方式」表述；[FIX AGENCY-GUEST-LOCK] 游客提交后不直接解锁，需登录 */
         function agBind(gid) {
           sheet.body().querySelectorAll('#' + gid + ' .cs-tag').forEach(function (tag) {
             tag.addEventListener('click', function () {
@@ -3093,6 +3124,24 @@ window.DETAIL = (function () {
           } catch (e) {}
           try { var _lcMap2=JSON.parse(localStorage.getItem('engchain-lead-clock')||'{}'); _lcMap2[phone]=Date.now(); localStorage.setItem('engchain-lead-clock',JSON.stringify(_lcMap2)); }catch(e){}
           sheet.close();
+          /* [FIX AGENCY-GUEST-LOCK] agency留资后游客不再直接解锁：改为登录引导提示，保持阻止解锁。
+             已登录用户留资后直接解锁；游客留资后仅保存线索，引导登录后再解锁联系方式。 */
+          var _isGuestAgency = false;
+          try { if (window.DataBus && DataBus.current) { var _cur = DataBus.current(); _isGuestAgency = !_cur || _cur.status === 'guest'; } } catch (e) {}
+          if (_isGuestAgency) {
+            UI.toast('咨询需求已提交，登录后可查看顾问联系方式并保存咨询记录', 'warn');
+            setTimeout(function () {
+              try {
+                if (window.location && window.location.href) {
+                  var _loginUrl = '../auth/login.html?redirect=' + encodeURIComponent(window.location.href);
+                  if (confirm('登录后可查看服务顾问联系方式并保存咨询记录，是否立即登录？')) {
+                    location.href = _loginUrl;
+                  }
+                }
+              } catch (e) {}
+            }, 800);
+            return; /* 阻止解锁，保持内容锁定 */
+          }
           unlock('咨询需求已提交，联系方式已开放');
         });
         sheet.show();
@@ -3208,19 +3257,25 @@ window.DETAIL = (function () {
       var payName = method === 'alipay' ? '支付宝' : (method === 'credit' ? '积分支付' : '微信支付');
       /* [FIX E1-09] 支付方式二选一，严禁双扣费：微信/支付宝只扣人民币余额，绝不调 CreditStore.consume；积分支付只扣积分，绝不碰 BalanceStore */
       if (method === 'credit') {
-        if (window.CreditStore) CreditStore.consume(costCredit, '解锁沟通权限 · ' + ((rec.title || rec.name || '') + '').slice(0, 12), { method: method });
+        if (window.CreditStore) {
+          var consumeResult = CreditStore.consume(costCredit, '解锁沟通权限 · ' + ((rec.title || rec.name || '') + '').slice(0, 12), { method: method });
+          if (consumeResult === null) { UI.toast('积分不足，请先充值积分', 'warn'); return; }
+        }
         UnlockStore.mark(rec);
         UI.toast('已扣 ' + costCredit + ' 积分', 'ok');
         unlock();
         return;
       }
+      /* [FIX AUDIT-01] 余额校验前置：余额不足时直接返回，不写流水、不标记解锁、不执行unlock，避免未付费即可解锁的安全漏洞 */
       if (window.BalanceStore) {
-        var s = BalanceStore.read();
-        s.logs.unshift({ type: 'unlock_sim_pay', amount: -rmb, method: method, reason: payName + ' · 单次解锁模拟支付', ts: Date.now(), ref: rec.id });
-        if (BalanceStore.available() >= rmb) {
-          s.balance = Math.round((s.balance - rmb) * 100) / 100;
-          s.logs.unshift({ type: 'unlock_cny_pay', amount: -rmb, method: method, reason: payName + '扣款 · 单次解锁', ts: Date.now(), ref: rec.id });
+        if (BalanceStore.available() < rmb) {
+          UI.toast('余额不足，需 ¥' + rmb + '，请先充值人民币', 'warn');
+          return;
         }
+        var s = BalanceStore.read();
+        s.balance = Math.round((s.balance - rmb) * 100) / 100;
+        s.logs.unshift({ type: 'unlock_sim_pay', amount: -rmb, method: method, reason: payName + ' · 单次解锁模拟支付', ts: Date.now(), ref: rec.id });
+        s.logs.unshift({ type: 'unlock_cny_pay', amount: -rmb, method: method, reason: payName + '扣款 · 单次解锁', ts: Date.now(), ref: rec.id });
         s.logs.unshift({ type: 'platform_income', amount: rmb, method: method, reason: '单次解锁平台收入（模拟）', ts: Date.now(), ref: rec.id });
         BalanceStore.write(s);
       }

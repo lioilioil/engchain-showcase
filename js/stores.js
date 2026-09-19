@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    js/stores.js —— 商业模式 v1.2 Store 基建（COMMERCE-EXECUTION-MANUAL §2.1）
    遵循 common.js 的 stateStore / CorpPay 范式：
    - 所有 localStorage 键统一 engchain-* 前缀
@@ -172,10 +172,10 @@
   /* [FEAT 9.2-2] 惰性过期清理：扫描 logs 中 expireAt<=now 的入账流水，批量扣减 balance 并写 credits_expired 汇总流水。
      内部直接读写 LS（_rawLoad/write），避免 read() 递归调用。 */
   var _creditExpireLastRun = 0;
-  CreditStore.expireDue = function () {
+  CreditStore.expireDue = function (force) {
     var now = Date.now();
-    /* 节流：每60秒最多执行一次，避免每次 read() 都扫描 logs */
-    if (now - _creditExpireLastRun < 60000) return 0;
+    /* 节流：每60秒最多执行一次，避免每次 read() 都扫描 logs；consume() 调用时 force=true 绕过节流，确保消费前余额准确 */
+    if (!force && now - _creditExpireLastRun < 60000) return 0;
     _creditExpireLastRun = now;
     var s = this._rawLoad();
     var expiredTotal = 0;
@@ -204,7 +204,7 @@
     return sum;
   };
   CreditStore.consume = function (cost, reason, meta) {
-    this.expireDue(); /* [FEAT 9.2-2] 消费前先惰性清理过期积分 */
+    this.expireDue(true); /* [FIX AUDIT-07] 消费前强制执行过期清理，绕开60秒节流，确保余额准确 */
     var s = this._rawLoad(); if (s.balance < cost) return null;
     s.balance -= cost;
     var rec = Object.assign({ type: 'unlock', credits: -cost, reason: reason || '信息解锁', ts: Date.now(), status: 'success' }, meta || {});
@@ -1431,12 +1431,12 @@
   var FreeQuotaStore = makeStore('engchain-free-quota', { date: '', used: 0 }, 'engchain:free-quota');
   FreeQuotaStore._today = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
   FreeQuotaStore._limit = function () {
-    var q = (MOCK.business.freeDailyQuota) || { guest: 3, registered: 5, realname: 10 };
+    var q = (MOCK.business.freeDailyQuota) || { guest: 2, registered: 3, realname: 5 };
     var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
-    if (idy.isGuest) return q.guest || 3;
-    var realnameOk = (idy.personal === 'verified' || idy.personal === 'professional' || idy.personal === 'full' ||
-                      idy.enterprise === 'verified' || idy.enterprise === 'resident');
-    return realnameOk ? (q.realname || 10) : (q.registered || 5);
+    if (idy.isGuest) return q.guest || 2;
+    var realnameOk = (idy.personal === 'verified' || idy.personal === 'professional' || idy.personal === 'full' || idy.personal === 'partner' ||
+                      idy.enterprise === 'verified' || idy.enterprise === 'resident' || idy.partner === true);
+    return realnameOk ? (q.realname || 5) : (q.registered || 3);
   };
   FreeQuotaStore.remaining = function () {
     var s = this.read(); var today = this._today();
@@ -1547,9 +1547,13 @@
     if (category && category !== '全部') reports = reports.filter(function (r) { return r.category === category; });
     return reports;
   };
+  var _origReportRead = ReportStore.read;
   ReportStore.read = function (id) {
-    var s = this.read();
-    if (s.readIds.indexOf(id) < 0) { s.readIds.push(id); this.write(s); }
+    var s = _origReportRead.call(this);
+    if (id !== undefined) {
+      if (s.readIds.indexOf(id) < 0) { s.readIds.push(id); this.write(s); }
+    }
+    return s;
   };
   ReportStore.isRead = function (id) {
     return (this.read().readIds || []).indexOf(id) >= 0;
@@ -1711,3 +1715,4 @@
   window.publishableCats = publishableCats;
   window.svcCreditOf = svcCreditOf;
 })();
+

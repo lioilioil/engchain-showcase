@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业成员管理 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ===== 企业成员管理 ===== */
+.om-comp { background:var(--bg-card); border:1px solid var(--line); border-radius:16px; margin:14px; padding:16px; }
+.om-comp-name { font-size:16px; font-weight:800; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.om-verified { flex:none; font-size:9px; font-weight:700; color:#fff; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); padding:2px 7px; border-radius:999px; letter-spacing:.5px; }
+.om-comp-meta { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:11px; color:var(--text-3); }
+.om-comp-meta b { color:var(--text-2); font-weight:600; }
+.om-cap { margin-top:12px; padding-top:11px; border-top:1px dashed var(--line); display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-3); }
+.om-cap-bar { flex:1; height:5px; border-radius:999px; background:var(--bg-card-2); overflow:hidden; }
+.om-cap-fill { height:100%; background:linear-gradient(90deg,var(--primary-strong),var(--primary)); }
+
+.om-sec { display:flex; align-items:center; gap:6px; margin:18px 16px 10px; }
+.om-sec svg { width:14px; height:14px; color:var(--primary); flex:none; }
+.om-sec b { font-size:13px; color:var(--text-1); }
+.om-sec span { font-size:11px; color:var(--text-3); margin-left:auto; }
+.om-sec .om-badge { min-width:16px; height:16px; padding:0 5px; border-radius:999px; background:var(--error); color:#fff; font-size:9.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+
+.pending-card { background:var(--bg-card); border:1px solid rgba(201,169,97,.3); border-radius:14px; margin:0 14px 10px; padding:13px 14px; }
+.pc-top { display:flex; align-items:center; gap:10px; }
+.pc-ava { flex:none; width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#E8D9B5,#C9A961); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.pc-info { flex:1; min-width:0; }
+.pc-name { font-size:13.5px; font-weight:700; color:var(--text-1); }
+.pc-note { font-size:11px; color:var(--text-3); margin-top:2px; line-height:1.45; }
+.pc-acts { display:flex; gap:8px; margin-top:11px; }
+.pc-btn { flex:1; padding:8px 0; border-radius:999px; font-size:12.5px; font-weight:700; cursor:pointer; border:none; }
+.pc-btn.ok { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); }
+.pc-btn.no { background:var(--bg-card-2); color:var(--text-2); border:1px solid var(--line); }
+
+.member-card { background:var(--bg-card); border:1px solid var(--line); border-radius:14px; margin:0 14px 10px; padding:13px 14px; display:flex; align-items:center; gap:11px; }
+.mc-ava { flex:none; width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#E8D9B5,#C9A961); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:16px; }
+.mc-info { flex:1; min-width:0; }
+.mc-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.mc-time { font-size:10.5px; color:var(--text-3); margin-top:2px; }
+.role-tag { flex:none; font-size:9.5px; font-weight:700; padding:2.5px 8px; border-radius:999px; }
+.role-owner { background:rgba(184,153,104,.15); color:var(--primary-dim); border:1px solid rgba(184,153,104,.35); }
+.role-admin { background:rgba(37,99,235,.1); color:var(--blue); }
+.role-member { background:var(--bg-card-2); color:var(--text-3); border:1px solid var(--line); }
+.mc-remove { flex:none; font-size:11.5px; font-weight:600; color:var(--error); padding:6px 12px; border-radius:999px; border:1px solid rgba(200,60,60,.3); cursor:pointer; background:transparent; }
+.mc-remove:active { transform:scale(.95); }
+.mc-self { flex:none; font-size:10.5px; color:var(--text-3); }
+
+.om-empty { text-align:center; color:var(--text-3); font-size:12px; padding:26px 20px; background:var(--bg-card); border:1px dashed var(--line); border-radius:14px; margin:0 14px 10px; line-height:1.6; }
+
+/* 邀请 sheet 候选人 */
+.cand { display:flex; align-items:center; gap:11px; padding:11px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+.cand:last-child { border-bottom:none; }
+.cand:active { background:var(--bg-card-2); }
+.cand-ava { flex:none; width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#E8D9B5,#C9A961); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.cand-info { flex:1; min-width:0; }
+.cand-name { font-size:14px; font-weight:700; color:var(--text-1); }
+.cand-sub { font-size:10.5px; color:var(--text-3); margin-top:2px; }
+.cand-check { flex:none; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--line); display:flex; align-items:center; justify-content:center; }
+.cand.sel .cand-check { background:var(--primary); border-color:var(--primary); }
+.cand.sel .cand-check svg { display:block; }
+.cand-check svg { display:none; width:13px; height:13px; color:#fff; }
+.role-pick { display:flex; gap:8px; margin:14px 4px 6px; }
+.role-opt { flex:1; text-align:center; padding:9px 0; border-radius:12px; border:1px solid var(--line); background:var(--bg-card-2); font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.role-opt.sel { border-color:var(--primary); background:rgba(184,153,104,.1); color:var(--primary-dim); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()">‹</button>
+    <div class="nav-title">企业成员管理</div>
+    <div class="nav-right">
+      <button class="icon-btn" id="om-invite-btn" aria-label="邀请成员"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    </div>
+  </div>
+  <div class="scroll no-pad" style="padding-bottom:120px;">
+    <div id="om-root"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
+<script>
+(function () {
+  var root = document.getElementById('om-root');
+  var ROLE_LABEL = { owner: '企业主', admin: '管理员', member: '成员' };
+
+  function me() { try { return window.DataBus && DataBus.current(); } catch (e) { return null; } }
+  function qs(name) { var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search); return m ? decodeURIComponent(m[1]) : ''; }
+
+  /* 确定要管理的 org：URL 指定 > 当前代表 org > 第一个可管理 org */
+  function resolveOrg() {
+    var u = me(); if (!u || !window.OrgsStore) return null;
+    var byUrl = qs('orgId');
+    if (byUrl) {
+      var m = OrgsStore.membershipOf(u.id, byUrl);
+      if (m && (m.role === 'owner' || m.role === 'admin')) return m.org;
+    }
+    var cur = OrgsStore.currentMembership();
+    if (cur && (cur.role === 'owner' || cur.role === 'admin')) return cur.org;
+    var list = OrgsStore.orgsOf(u.id);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].role === 'owner' || list[i].role === 'admin') return list[i].org;
+    }
+    return null;
+  }
+
+  function esc(s) { return window.UI && UI.esc ? UI.esc(s) : String(s); }
+  function fmtDate(ts) { if (!ts) return ''; var d = new Date(ts); return (d.getMonth() + 1) + '月' + d.getDate() + '日加入'; }
+
+  function renderGate(text) {
+    root.innerHTML =
+      '<div class="om-empty" style="margin-top:60px;">' +
+        (text || '你当前不是任何企业的管理员。<br>企业主/管理员可邀请员工、管理成员与审批加入申请。') +
+      '</div>';
+  }
+
+  function render() {
+    var org = resolveOrg();
+    var u = me();
+    if (!u) { renderGate('请先登录'); return; }
+    if (!org) { renderGate(); document.getElementById('om-invite-btn').style.display = 'none'; return; }
+    document.getElementById('om-invite-btn').style.display = '';
+
+    var myRole = OrgsStore.myRole(org.orgId);
+    var isOwner = myRole === 'owner';
+    var members = OrgsStore.members(org.orgId);
+    var cap = org.memberLimit || OrgsStore.MEMBER_LIMIT;
+    var used = OrgsStore.memberCount(org);
+    var joins = OrgsStore.pendingJoins(org.orgId);
+    var typeLabel = (org.entryTypes && org.entryTypes[0] === 'construction') ? '建筑入驻' : (org.entStatus === 'resident' ? '企业入驻' : '企业认证');
+
+    var html = '';
+
+    /* 企业信息卡 */
+    html +=
+      '<div class="om-comp">' +
+        '<div class="om-comp-name">' + esc(org.shortName || org.co) + ' <span class="om-verified">已认证</span></div>' +
+        '<div class="om-comp-meta">' +
+          '<span>统一社会信用代码 <b>' + esc(org.code || '—') + '</b></span>' +
+          '<span>法定代表人 <b>' + esc(org.legal || '—') + '</b></span>' +
+          '<span>类型 <b>' + typeLabel + '</b></span>' +
+        '</div>' +
+        '<div class="om-cap">' +
+          '<span>成员 ' + used + '/' + cap + '</span>' +
+          '<div class="om-cap-bar"><div class="om-cap-fill" style="width:' + Math.min(100, used / cap * 100) + '%;"></div></div>' +
+        '</div>' +
+      '</div>';
+
+    /* 待审批加入申请 */
+    if (joins.length) {
+      html += '<div class="om-sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg><b>待审批申请</b><span class="om-badge">' + joins.length + '</span></div>';
+      joins.forEach(function (j) {
+        html +=
+          '<div class="pending-card">' +
+            '<div class="pc-top">' +
+              '<div class="pc-ava">' + esc((j.name || '?').charAt(0)) + '</div>' +
+              '<div class="pc-info"><div class="pc-name">' + esc(j.name) + '</div>' +
+              '<div class="pc-note">' + (j.note ? esc(j.note) : '申请加入本企业号') + '</div></div>' +
+            '</div>' +
+            '<div class="pc-acts">' +
+              '<button class="pc-btn ok" onclick="omApprove(\'' + j.joinId + '\')">通过</button>' +
+              '<button class="pc-btn no" onclick="omReject(\'' + j.joinId + '\')">驳回</button>' +
+            '</div>' +
+          '</div>';
+      });
+    }
+
+    /* 成员列表 */
+    html += '<div class="om-sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><b>成员</b><span>' + used + ' 人</span></div>';
+    members.sort(function (a, b) {
+      var order = { owner: 0, admin: 1, member: 2 };
+      return (order[a.role] || 9) - (order[b.role] || 9);
+    });
+    members.forEach(function (m) {
+      var selfTag = (m.uid === (u && u.id)) ? '<span class="mc-self">（我）</span>' : '';
+      var removeBtn = '';
+      if (isOwner && m.uid !== org.ownerUid && m.uid !== (u && u.id)) {
+        removeBtn = '<button class="mc-remove" onclick="omRemove(\'' + m.uid + '\')">移除</button>';
+      } else if (isOwner && m.uid === (u && u.id)) {
+        removeBtn = '';
+      }
+      html +=
+        '<div class="member-card">' +
+          '<div class="mc-ava">' + esc(m.avatar || (m.name || '?').charAt(0)) + '</div>' +
+          '<div class="mc-info"><div class="mc-name">' + esc(m.name) + selfTag + ' <span class="role-tag role-' + m.role + '">' + (ROLE_LABEL[m.role] || '成员') + '</span></div>' +
+          '<div class="mc-time">' + fmtDate(m.joinedAt) + '</div></div>' +
+          removeBtn +
+        '</div>';
+    });
+
+    root.innerHTML = html;
+  }
+
+  /* 邀请：选择已实名且未在本企业的成员 */
+  var lastSheetRef = null;
+
+  function openInvite() {
+    var org = resolveOrg(); if (!org) return;
+    if (OrgsStore.memberCount(org) >= (org.memberLimit || OrgsStore.MEMBER_LIMIT)) { UI.toast.warn('成员数已达上限，如需扩容请联系平台'); return; }
+    var all = (window.DataBus && DataBus.users) ? DataBus.users() : [];
+    var cands = [];
+    all.forEach(function (u) {
+      if (!u) return;
+      var real = u.auth && u.auth.realname && u.auth.realname.ok;
+      if (!real) return;                                  /* 未实名不可被邀 */
+      if (OrgsStore.membershipOf(u.id, org.orgId)) return; /* 已在企业 */
+      var hasInv = (org.invites || []).some(function (iv) { return iv.targetUid === u.id && iv.status === 'pending'; });
+      if (hasInv) return;
+      cands.push(u);
+    });
+
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('邀请成员加入「' + (org.shortName || org.co) + '」');
+    sh._selUid = null; sh._selRole = 'member';
+    if (!cands.length) {
+      sh.html('<div class="om-empty">暂无可邀请的实名用户。<br>员工需先完成实名认证，再由企业邀请。</div>');
+    } else {
+      var listHtml = '<div style="padding:4px 2px 2px;max-height:46vh;overflow-y:auto;">';
+      cands.forEach(function (c, i) {
+        listHtml +=
+          '<div class="cand" data-uid="' + c.id + '" onclick="omPickCand(this)">' +
+            '<div class="cand-ava">' + esc((c.avatar || c.name || '?').charAt(0)) + '</div>' +
+            '<div class="cand-info"><div class="cand-name">' + esc(c.name) + '</div>' +
+            '<div class="cand-sub">' + (c.tag || '已实名认证用户') + '</div></div>' +
+            '<div class="cand-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+          '</div>';
+      });
+      listHtml += '</div>';
+      listHtml +=
+        '<div class="role-pick">' +
+          '<div class="role-opt sel" data-role="member" onclick="omPickRole(this)">成员 · 发布与招聘</div>' +
+          '<div class="role-opt" data-role="admin" onclick="omPickRole(this)">管理员 · 协助管理</div>' +
+        '</div>';
+      listHtml += '<button type="button" id="om-send" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:6px;">发送邀请</button>';
+      sh.html(listHtml);
+      sh.show();
+      sh._selUid = null; sh._selRole = 'member';
+      document.getElementById('om-send').addEventListener('click', function () {
+        if (!sh._selUid) { UI.toast.warn('请先选择要邀请的成员'); return; }
+        var r = OrgsStore.invite(org.orgId, sh._selUid, sh._selRole);
+        if (r && r.error) { UI.toast.warn(r.error); return; }
+        UI.closeSheet(); UI.toast.ok('邀请已发送，待对方接受'); render();
+      });
+    }
+  }
+  window.omPickCand = function (el) {
+    document.querySelectorAll('.cand').forEach(function (c) { c.classList.remove('sel'); });
+    el.classList.add('sel');
+    var sh = lastSheetRef; if (sh) sh._selUid = el.getAttribute('data-uid');
+  };
+  window.omPickRole = function (el) {
+    document.querySelectorAll('.role-opt').forEach(function (r) { r.classList.remove('sel'); });
+    el.classList.add('sel');
+    var sh = lastSheetRef; if (sh) sh._selRole = el.getAttribute('data-role');
+  };
+  var lastSheetRef = null;
+  window.__omTrackSheet = function (sh) { lastSheetRef = sh; };
+
+  window.omApprove = function (joinId) {
+    var r = OrgsStore.approveJoin(joinId);
+    if (r && r.error) { UI.toast.warn(r.error); return; }
+    UI.toast.ok('已通过，成员已加入企业'); render();
+  };
+  window.omReject = function (joinId) {
+    UI.dialog({ title: '驳回申请', text: '确定驳回该成员的加入申请吗？', ok: '驳回', cancel: '再想想', danger: true, onOk: function () {
+      OrgsStore.rejectJoin(joinId); UI.toast('已驳回'); render();
+    }});
+  };
+  window.omRemove = function (uid) {
+    var org = resolveOrg();
+    UI.dialog({ title: '移除成员', text: '移除后该成员将失去本企业身份与发布/招聘权限。', ok: '移除', cancel: '取消', danger: true, onOk: function () {
+      var r = OrgsStore.removeMember(org.orgId, uid);
+      if (r && r.error) { UI.toast.warn(r.error); return; }
+      UI.toast.ok('已移除'); render();
+    }});
+  };
+
+  document.getElementById('om-invite-btn').addEventListener('click', openInvite);
+
+  render();
+  window.addEventListener('engchain:org', render);
+  window.addEventListener('engchain:apply', render);
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'engchain-orgs' || e.key === 'engchain-users') render();
+  });
+})();
+</script>
+</body>
+</html>

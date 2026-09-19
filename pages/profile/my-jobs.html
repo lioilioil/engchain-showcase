@@ -114,6 +114,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
 <script>
 (function () {
   var root = document.getElementById('mj-root');
@@ -127,13 +128,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var isAgency = !!(a && a.agency);
     return (ent === 'verified' || ent === 'resident') && !isAgency;
   }
+  function scopeUids() {
+    var uid = me() ? me().id : '';
+    if (window.OrgsStore) {
+      var cur = OrgsStore.currentMembership();
+      if (cur && cur.org && cur.org.members) {
+        var ids = cur.org.members.filter(function (m) { return m.status === 'active'; }).map(function (m) { return m.uid; });
+        if (ids.indexOf(uid) < 0) ids.push(uid);
+        return ids;
+      }
+    }
+    return [uid];
+  }
   function myJobs() {
     uid = me() ? me().id : '';
     if (!uid) return [];
+    var allow = scopeUids();
     var items = [];
     try {
       items = (window.SupplyStore && SupplyStore.read ? SupplyStore.read().items : []).filter(function (i) {
-        return i.publisher === uid && (i.cat === '招聘' || i.category === '招聘') && i.dir === 'demand';
+        return allow.indexOf(i.publisher) >= 0 && (i.cat === '招聘' || i.category === '招聘') && i.dir === 'demand';
       });
     } catch (e) {}
     return items;
@@ -393,7 +407,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
 
     var allApps = [];
-    try { allApps = window.ApplyStore ? ApplyStore.byPublisher(uid) : []; } catch (e) { allApps = []; }
+    try {
+      if (window.ApplyStore) {
+        var _allow = scopeUids();
+        _allow.forEach(function (au) { allApps = allApps.concat(ApplyStore.byPublisher(au) || []); });
+      }
+    } catch (e) { allApps = []; }
     var activeJobs = jobs.filter(function (j) { return j.status === 'active'; }).length;
     var pendingApps = allApps.filter(function (a) { return a.status === 'pending'; }).length;
     var doing = jobs.filter(function (j) { return j.status === 'pending_review' || j.status === 'active'; });
