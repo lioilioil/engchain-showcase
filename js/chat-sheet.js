@@ -1,6 +1,6 @@
-﻿/* ============================================================
+/* ============================================================
  * ChatSheet v1.0 — 半屏聊天弹窗组件
- * 自下向上展开，默认 80vh，上滑全屏（100vh），全屏后不可下拉收起
+ * 自下向上展开，高度上限为视口 80vh；上滑触发展开（仍不超 80vh），下拉收起
  * 用法：ChatSheet.open({ name, role, cert, convId, ctx })
  * ============================================================ */
 (function () {
@@ -17,14 +17,14 @@
     border-radius:20px 20px 0 0;
     box-shadow:0 -8px 40px rgba(0,0,0,.2);
     display:flex;flex-direction:column;
-    height:80vh;
+    height:80vh;max-height:80vh;
     transform:translateY(105%);
     transition:transform .38s cubic-bezier(.22,1,.36,1);
     overflow:hidden;
   }
   .cs-sheet.show{transform:translateY(0);}
   .cs-sheet.dragging{transition:none;}
-  .cs-sheet.full{height:100vh;border-radius:0;}
+  .cs-sheet.full{height:80vh;max-height:80vh;border-radius:20px 20px 0 0;}
 
   /* 顶部拖拽手柄区 */
   .cs-handle{flex:none;padding:6px 16px 0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;}

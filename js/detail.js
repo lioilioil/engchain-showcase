@@ -2773,15 +2773,14 @@ window.DETAIL = (function () {
       /* V3.2: chips 分组（core/trust），trust 为空时不渲染该行 */
       var chipsCoreHtml = chips.core ? '<div class="chips-row"><span class="chips-label">核心权益</span><div class="chips-list">' + chips.core + '</div></div>' : '';
       var chipsTrustHtml = chips.trust ? '<div class="chips-row"><span class="chips-label">安全保障</span><div class="chips-list">' + chips.trust + '</div></div>' : '';
-      var chipsGroupHtml = '<div class="us-chips-group">' + chipsCoreHtml + chipsTrustHtml + '</div>';
+      var chipsGroupHtml = chipsCoreHtml ? '<div style="font-size:11px;color:var(--text-3);margin:2px 0 0;">解锁内容：完整联系方式 · 精确成交价 · 资质检测文件</div>' : '';
       sheet.body().innerHTML =
         '<div class="unlock-sheet">' +
           /* ===== 核心决策区（一屏可见） ===== */
           '<div class="us-header">' +
-            '<div class="us-title">' + payTitle + '</div>' +
-            chipsGroupHtml +
-          '</div>' +
           priceHtml +
+          '</div>' +
+            chipsGroupHtml +
           pkgHtml +
           payMethodHtml +
           /* ===== 补充信息区（可滚动浏览） ===== */
@@ -2789,10 +2788,10 @@ window.DETAIL = (function () {
             valueBar +
             stepsHtml +
             unlockList +
-            trustHtml +
           '</div>' +
           /* ===== 底部固定支付区 ===== */
           '<div class="us-footer">' +
+            '<label class="pay-agree" id="unlockAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html">《信息解锁服务协议》</a></span></label>' +
             '<button class="btn btn-primary btn-block btn-lg" id="pay-go">' + (isFree ? '免费解锁' : (isDeposit ? '确认支付 ¥' + Number(up.price).toLocaleString() : '确认解锁')) + '</button>' +
             '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>安全支付 · 平台担保 · 未对接可退</div>' +
           '</div>' +
@@ -2827,10 +2826,19 @@ window.DETAIL = (function () {
           toggleEl.classList.toggle('open', !isOpen);
         });
       }
+      /* 协议勾选切换 */
+      var agreeRow = sheet.body().querySelector('#unlockAgree');
+      var agreed = false;
+      if (agreeRow) {
+        agreeRow.addEventListener('click', function (e) {
+          e.preventDefault();
+          agreed = !agreed;
+          agreeRow.classList.toggle('on', agreed);
+        });
+      }
       /* 确认支付 */
       var payBtn = sheet.body().querySelector('#pay-go');
-      /* [FIX BM-051] 点击后置灰「支付中...」防重复提交；[FIX BM-010/BM-011] 微信/支付宝/保证金走真实资金动作，不再仅 toast+mark */
-      payBtn.addEventListener('click', function () {
+      function doPay() {
         if (payBtn.disabled) return;
         var _origBtnText = payBtn.textContent;
         payBtn.disabled = true;
@@ -2848,8 +2856,31 @@ window.DETAIL = (function () {
             simulatePayUnlock(rec, up, method);
           }
         }, 600);
+      }
+      payBtn.addEventListener('click', function () {
+        if (!agreed) {
+          UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意<a href="../agreement/user.html">《信息解锁服务协议》</a>', ok: '确认并继续支付', cancel: '取消', onOk: function () {
+            agreed = true;
+            if (agreeRow) agreeRow.classList.add('on');
+            doPay();
+          }});
+          return;
+        }
+        doPay();
       });
       sheet.show();
+      /* [FIX] 将协议行 + 安全提示移入底部 foot 区，与按钮在一起 */
+      setTimeout(function(){
+        var footInner=document.querySelector('.sheet-foot-inner');
+        var agree=document.getElementById('unlockAgree');
+        var secure=document.querySelector('.us-secure');
+        if(footInner){
+          if(agree) footInner.insertBefore(agree, footInner.firstChild);
+          if(secure) footInner.appendChild(secure);
+        }
+        var uf=document.querySelector('.us-footer');
+        if(uf) uf.style.display='none';
+      },50);
     }
     /* v3.1: 简历投递门控（动态文案+按钮+跳转） */
     /* 根据 canDeliverResume 返回的 reason 判断拦截类型，返回完整的弹窗配置 */
@@ -3058,6 +3089,18 @@ window.DETAIL = (function () {
         UI.toast('投递成功，企业将尽快与您联系', 'ok');
       });
       sheet.show();
+      /* [FIX] 将协议行 + 安全提示移入底部 foot 区，与按钮在一起 */
+      setTimeout(function(){
+        var footInner=document.querySelector('.sheet-foot-inner');
+        var agree=document.getElementById('unlockAgree');
+        var secure=document.querySelector('.us-secure');
+        if(footInner){
+          if(agree) footInner.insertBefore(agree, footInner.firstChild);
+          if(secure) footInner.appendChild(secure);
+        }
+        var uf=document.querySelector('.us-footer');
+        if(uf) uf.style.display='none';
+      },50);
     }
     /* ---- 资质招商：免费加盟意向登记（留资转化，提交即原地开放联系方式，不收取信息费） ---- */
     function openConsult(rec, c) {
@@ -3196,6 +3239,18 @@ window.DETAIL = (function () {
         }, 300);
       });
       sheet.show();
+      /* [FIX] 将协议行 + 安全提示移入底部 foot 区，与按钮在一起 */
+      setTimeout(function(){
+        var footInner=document.querySelector('.sheet-foot-inner');
+        var agree=document.getElementById('unlockAgree');
+        var secure=document.querySelector('.us-secure');
+        if(footInner){
+          if(agree) footInner.insertBefore(agree, footInner.firstChild);
+          if(secure) footInner.appendChild(secure);
+        }
+        var uf=document.querySelector('.us-footer');
+        if(uf) uf.style.display='none';
+      },50);
     }
     /* M3：积分/免费额度/保证金 三种解锁执行（免费额度优先 → 扣积分 → 不足去充值） */
     function payGo(rec, up) {
