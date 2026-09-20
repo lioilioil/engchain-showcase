@@ -1,4 +1,4 @@
-﻿/* =====================================================================
+/* =====================================================================
    js/stores.js —— 商业模式 v1.2 Store 基建（COMMERCE-EXECUTION-MANUAL §2.1）
    遵循 common.js 的 stateStore / CorpPay 范式：
    - 所有 localStorage 键统一 engchain-* 前缀
@@ -997,6 +997,15 @@
     d.status = 'cancelled'; d.platformClosed = true; d.platformNote = note || ''; d.updatedAt = Date.now();
     this._save(d); return d;
   };
+  /* [FEAT 9.2-1+] 需求广场精准解锁：标记需求已被某服务商解锁（先到先得，防重复），返回是否首次 */
+  DemandStore.unlockLead = function (id, sellerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId === sellerId) return { error: '不可解锁自己发布的需求' };
+    if (d.unlockedBy) return { error: '该需求已被其他服务商解锁' };
+    d.unlockedBy = sellerId; d.unlockedAt = Date.now();
+    this._save(d); return d;
+  };
 
   /* ---- 服务评价聚合（v3.2）：订单评价回流到服务卡片，形成口碑资产 ---- */
   var SvcRatingStore = makeStore('engchain-svc-ratings', { items: {} }, 'engchain:svc-rating');
@@ -1245,7 +1254,7 @@
 
   /* ---- [FEAT 9.2-1] 增值道具 Store（R6 B端增值道具） ----
      键 engchain-upgrades，结构 { items: [{id, type, targetId, startedAt, expireAt, status}] } */
-  var UpgradeStore = makeStore('engchain-upgrades', { items: [] }, 'engchain:upgrades');
+  var UpgradeStore = makeStore('engchain-upgrades', { items: [], meta: {} }, 'engchain:upgrades');
   UpgradeStore.purchase = function (type, targetId) {
     var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades[type]) || null;
     if (!cfg || !cfg.enabled) return { error: '该道具未上架' };
@@ -1264,9 +1273,13 @@
       }
     }
     if (!canBuy) return { error: '您的入驻类型暂不支持购买该道具' };
-    /* 扣减费用 */
-    var price = cfg.price || 0;
-    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (cfg.label || type) });
+    /* 置顶道具必须指定目标信息（组合包名额除外，走 applyTop） */
+    if (type === 'topListing' && !targetId) return { error: '请先选择要置顶的供需信息' };
+    /* 扣减费用（新客礼首购立减） */
+    var price = this.effectivePrice(cfg.price || 0);
+    var _mg = (MOCK.business.commission.vendorUpgrades.marketing) || {};
+    var _gd = (_mg.newGift || {}).discount || 0;
+    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (cfg.label || type) + (this.newGiftClaimed() ? '' : '（新客礼立减¥' + _gd + '）') });
     if (!consumed) return { error: '余额不足，无法购买' };
     /* 创建道具记录 */
     var now = Date.now();
@@ -1278,13 +1291,93 @@
       startedAt: now,
       expireAt: duration ? now + duration : 0,
       count: cfg.count || 0,
+      used: 0,
       status: 'active',
       purchasedAt: now
     };
     var s = this.read();
     s.items.unshift(item);
     this.write(s);
+    if (!this.newGiftClaimed()) this.claimNewGift();
     return item;
+  };
+  /* [FEAT 9.2-1+] 营销层：meta 读写与新客礼状态 */
+  UpgradeStore.meta = function () { return this.read().meta || {}; };
+  UpgradeStore.newGiftClaimed = function () { return !!(this.meta() && this.meta().newGiftClaimed); };
+  UpgradeStore.claimNewGift = function () {
+    var s = this.read();
+    if (!s.meta) s.meta = {};
+    s.meta.newGiftClaimed = true; s.meta.newGiftClaimedAt = Date.now();
+    this.write(s);
+  };
+  /* 新客礼：首次购买立减；返回优惠后的应付价（无优惠则原价） */
+  UpgradeStore.effectivePrice = function (price) {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var mg = vus.marketing || {};
+    if (mg.newGift && mg.newGift.enabled && !this.newGiftClaimed() && price > 0) {
+      return Math.max(0, Math.round((price - (mg.newGift.discount || 0)) * 100) / 100);
+    }
+    return price;
+  };
+  /* 组合包购买：按 marketing.combo 配置一次创建多个道具（置顶名额先建后应用） */
+  UpgradeStore.purchaseCombo = function () {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var mg = vus.marketing || {};
+    var combo = mg.combo;
+    if (!combo || !combo.enabled) return { error: '组合包未上架' };
+    var price = this.effectivePrice(combo.price || 0);
+    var _gd = (mg.newGift || {}).discount || 0;
+    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (combo.label || '流量组合包') + (this.newGiftClaimed() ? '' : '（新客礼立减¥' + _gd + '）') });
+    if (!consumed) return { error: '余额不足，无法购买' };
+    var now = Date.now();
+    var items = [];
+    (combo.items || []).forEach(function (c) {
+      var cfg = vus[c.type];
+      if (!cfg || !cfg.enabled) return;
+      for (var k = 0; k < (c.qty || 1); k++) {
+        var duration = (cfg.durationDays || 0) * 86400000;
+        var isTop = c.type === 'topListing';
+        items.push({
+          id: 'UG' + Date.now() + Math.floor(Math.random() * 90 + 10) + k,
+          type: c.type,
+          targetId: '',
+          startedAt: isTop ? 0 : now,
+          expireAt: isTop ? 0 : (duration ? now + duration : 0),
+          count: isTop ? 0 : (cfg.count || 0),
+          used: 0,
+          status: 'active',
+          purchasedAt: now,
+          fromCombo: true
+        });
+      }
+    });
+    if (!items.length) { BalanceStore.refund(price, '组合包退款：无可创建道具', {}); return { error: '组合包无可创建道具' }; }
+    var s = this.read();
+    s.items = items.concat(s.items);
+    this.write(s);
+    if (!this.newGiftClaimed()) this.claimNewGift();
+    return items;
+  };
+  /* 应用置顶名额：组合包未使用的 topListing 名额 → 指定目标信息，开始置顶计时 */
+  UpgradeStore.applyTop = function (itemId, targetId) {
+    var s = this.read();
+    var hit = null;
+    (s.items || []).forEach(function (it) { if (it.id === itemId) hit = it; });
+    if (!hit) return { error: '名额不存在' };
+    if (hit.type !== 'topListing' || hit.targetId) return { error: '该名额已使用' };
+    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades.topListing) || {};
+    if (!cfg.enabled) return { error: '该道具未上架' };
+    var now = Date.now();
+    var activeTop = this.listActive();
+    for (var i = 0; i < activeTop.length; i++) {
+      var t = activeTop[i];
+      if (t.type === 'topListing' && t.targetId === targetId) return { error: '该信息已在置顶中' };
+    }
+    hit.targetId = targetId;
+    hit.startedAt = now;
+    hit.expireAt = now + (cfg.durationDays || 7) * 86400000;
+    this.write(s);
+    return hit;
   };
   UpgradeStore.isActive = function (type, targetId) {
     var now = Date.now();
@@ -1292,6 +1385,8 @@
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (it.type !== type || it.status !== 'active') continue;
+      /* 未使用名额不视为生效（topListing 空 targetId，组合包名额待应用） */
+      if (it.type === 'topListing' && !it.targetId) continue;
       if (targetId && it.targetId && it.targetId !== targetId) continue;
       if (it.expireAt && it.expireAt <= now) continue;
       return true;
@@ -1315,6 +1410,7 @@
     Object.keys(vus).forEach(function (key) {
       var cfg = vus[key];
       if (!cfg || !cfg.enabled) return;
+      if (key === 'marketing') return; /* 营销配置非道具 */
       var allowed = cfg.entryTypes || [];
       var canBuy = false;
       if (isIndividualPartner && (key === 'topListing' || key === 'saasTools')) canBuy = true;
@@ -1329,6 +1425,44 @@
   };
   UpgradeStore.countActiveByType = function (type) {
     return this.listActive().filter(function (it) { return it.type === type; }).length;
+  };
+  /* [FEAT 9.2-1+] 线索包配额：usage 已用 / remaining 剩余 / consume 消耗 1 条 */
+  UpgradeStore.usage = function (type) {
+    var used = 0;
+    this.listActive().forEach(function (it) { if (it.type === type) used += (it.used || 0); });
+    return used;
+  };
+  UpgradeStore.remaining = function (type) {
+    var rem = 0;
+    this.listActive().forEach(function (it) { if (it.type === type) rem += Math.max(0, (it.count || 0) - (it.used || 0)); });
+    return rem;
+  };
+  UpgradeStore.consume = function (type, meta) {
+    var now = Date.now();
+    var s = this.read();
+    var hit = null;
+    (s.items || []).forEach(function (it) {
+      if (hit) return;
+      if (it.type !== type || it.status !== 'active') return;
+      if (it.expireAt && it.expireAt <= now) return;
+      if ((it.count || 0) - (it.used || 0) <= 0) return;
+      hit = it;
+    });
+    if (!hit) {
+      var _lb = ((MOCK.business.commission.vendorUpgrades || {})[type] || {}).label || type;
+      return { error: '暂无可用' + _lb + '配额' };
+    }
+    hit.used = (hit.used || 0) + 1;
+    this.write(s);
+    return { item: hit, used: hit.used, remaining: Math.max(0, (hit.count || 0) - hit.used) };
+  };
+  /* 到期提醒：返回在 days 天内到期的生效道具 */
+  UpgradeStore.expireSoon = function (days) {
+    var now = Date.now(), out = [];
+    this.listActive().forEach(function (it) {
+      if (it.expireAt && it.expireAt - now <= days * 86400000 && it.expireAt > now) out.push(it);
+    });
+    return out;
   };
 
   /* ---- [FEAT 9.2-3] 供需匹配智能推送 Store ----

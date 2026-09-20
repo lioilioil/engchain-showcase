@@ -181,14 +181,21 @@
     '</div>';
   }
 
-  /* ---------- 小旗帜渲染 ---------- */
+  /* ---------- 小旗帜渲染 ----------
+     视觉规则（与 App 金色品牌一致，暗色主题自适应）：
+     - 左侧 3px 金色竖条锚定"营销"语义，避免与正文卡片混淆；
+     - "限时"胶囊标签强化行动暗示；
+     - 文字单行省略，保证任何宽度下不换行、不撑高卡片。 */
   function renderSmallFlag(card) {
     var root = window.__ROOT__ || '';
-    return '<div class="promo-card promo-flag" data-id="' + card.id + '" style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;background:rgba(201,169,97,.08);border:1px solid rgba(201,169,97,.2);font-size:11px;color:var(--text-2);cursor:pointer;box-sizing:border-box;overflow:hidden;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
-      '<span style="flex:none;font-size:13px;">' + card.icon + '</span>' +
+    return '<div class="promo-card promo-flag" data-id="' + card.id + '" style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 6px;border-radius:10px;background:linear-gradient(90deg,rgba(201,169,97,.14),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.26);font-size:11px;color:var(--text-2);cursor:pointer;box-sizing:border-box;overflow:hidden;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
+      '<span style="flex:none;width:3px;height:20px;border-radius:2px;background:linear-gradient(180deg,var(--primary-strong),var(--primary-dim));"></span>' +
+      '<span style="flex:none;font-size:14px;">' + card.icon + '</span>' +
+      '<span style="flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#FBF8F1;font-size:9px;font-weight:700;letter-spacing:.05em;">限时</span>' +
       '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;">' + card.shortText + '</span>' +
-      '<span class="promo-close" data-id="' + card.id + '" style="flex:none;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.25;border-radius:50%;" onclick="event.stopPropagation();PromoCards.close(\'' + card.id + '\')">' +
-        '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
+      '<span style="flex:none;color:var(--primary-dim);font-size:11px;font-weight:700;white-space:nowrap;">去查看 ›</span>' +
+      '<span class="promo-close" data-id="' + card.id + '" style="flex:none;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.35;border-radius:50%;" onclick="event.stopPropagation();PromoCards.close(\'' + card.id + '\')">' +
+        '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
       '</span>' +
     '</div>';
   }
@@ -336,33 +343,76 @@
     return card ? renderSmallFlag(card) : '';
   }
 
-  /* ---------- 列表页：每N条插入小旗帜 ---------- */
+  /* ---------- 列表页：按内容流插入小旗帜 ----------
+     插入规则（深度优化版）：
+     - 首条：第 4 条后（首屏可见区，用户在浏览前几条后即触达）；
+     - 间隔：之后每 10 条一张（降低打扰密度，原每 6 条偏密）；
+     - 上限：单列表最多 3 张，避免整屏被营销占满；
+     - 无内容（空列表/加载中）时不注入。
+     实现：先取快照数组（避免 live NodeList 因注入自身导致索引漂移），
+     再按固定位置一次性插入。 */
   function injectIntoList(listEl, itemSelector, interval) {
     if (!listEl) return;
-    interval = interval || 6;
+    interval = interval || 10;
     /* 移除之前注入的小旗帜 */
     var old = listEl.querySelectorAll('.promo-flag.injected');
     old.forEach(function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
 
-    var items = listEl.querySelectorAll(itemSelector);
+    var all = Array.prototype.slice.call(listEl.querySelectorAll(itemSelector));
+    var items = all.filter(function (el) { return !el.classList || !el.classList.contains('promo-flag'); });
     if (!items.length) return;
     var card = getSmallFlag('list');
     if (!card) return;
 
-    /* 在每 interval 条后插入，位置在区间内随机 */
-    for (var i = interval - 1; i < items.length; i += interval) {
-      var insertAfter = items[i];
+    var flagHtml = renderSmallFlag(card);
+    var MAX_FLAGS = 3;
+    var positions = [];
+    for (var i = 3; i < items.length; i += interval) positions.push(i);
+    var injectedCount = 0;
+    positions.forEach(function (idx) {
+      if (injectedCount >= MAX_FLAGS) return;
+      var insertAfter = items[idx];
+      if (!insertAfter || !insertAfter.parentNode) return;
       var flag = document.createElement('div');
-      flag.innerHTML = renderSmallFlag(card);
+      flag.innerHTML = flagHtml;
       flag = flag.firstElementChild;
       flag.classList.add('injected');
-      flag.style.margin = '8px 0';
-      if (insertAfter.nextSibling) listEl.insertBefore(flag, insertAfter.nextSibling);
-      else listEl.appendChild(flag);
-    }
+      flag.style.margin = '10px 0';
+      if (insertAfter.nextSibling) insertAfter.parentNode.insertBefore(flag, insertAfter.nextSibling);
+      else insertAfter.parentNode.appendChild(flag);
+      injectedCount++;
+    });
   }
 
-  /* ---------- 详情页/我的页：注入1张小旗帜 ---------- */
+  /* ---------- 详情页/我的页：语义锚点注入 1 张小旗帜 ----------
+     插入规则（深度优化版，替代"一律追加到容器末尾"）：
+     - detail：优先插到付费解锁区 #lock 之前（用户读完正文、面临解锁决策时触达）；
+               页面无付费墙（#lock 为空/隐藏）时，插到正文 #body 之后；
+               两者皆无则回退到容器内容 55% 处（避免落到页脚）。
+     - me：插到"数据统计卡"（第一个 .wb-card）之后、钱包之前 ——
+           用户看完自己的收藏/发布/订单数据后立即引导下一步行动。
+     兜底：容器内容中间偏前（35%），绝不追加到页脚。 */
+  function findSemanticAnchor(containerEl, region) {
+    try {
+      if (region === 'detail') {
+        var lock = containerEl.querySelector('#lock');
+        if (lock && lock.style.display !== 'none' && (lock.innerHTML || '').trim()) {
+          return { node: lock, mode: 'before' };
+        }
+        var body = containerEl.querySelector('#body');
+        if (body) {
+          var after = body.nextElementSibling;
+          return { node: after || body, mode: after ? 'before' : 'after' };
+        }
+      } else if (region === 'me') {
+        var cards = containerEl.querySelectorAll('.wb-card');
+        if (cards.length >= 2) return { node: cards[1], mode: 'before' };
+        if (cards.length === 1) return { node: cards[0], mode: 'after' };
+      }
+    } catch (e) {}
+    return null;
+  }
+
   function injectIntoContainer(containerEl, region) {
     if (!containerEl) return;
     /* 移除之前注入的 */
@@ -375,7 +425,24 @@
     var flag = wrap.firstElementChild;
     flag.classList.add('injected');
     flag.style.margin = '10px 0';
-    containerEl.appendChild(flag);
+
+    /* 语义锚点优先；无锚点时插到内容流中间偏前，避免落在页脚 */
+    var anchor = findSemanticAnchor(containerEl, region);
+    if (anchor && anchor.node) {
+      if (anchor.mode === 'after' && anchor.node.parentNode) {
+        if (anchor.node.nextSibling) anchor.node.parentNode.insertBefore(flag, anchor.node.nextSibling);
+        else anchor.node.parentNode.appendChild(flag);
+      } else if (anchor.node.parentNode) {
+        anchor.node.parentNode.insertBefore(flag, anchor.node);
+      } else {
+        containerEl.appendChild(flag);
+      }
+      return;
+    }
+    var children = containerEl.children;
+    if (!children.length) { containerEl.appendChild(flag); return; }
+    var at = Math.min(children.length - 1, Math.max(1, Math.floor(children.length * 0.35)));
+    containerEl.insertBefore(flag, children[at]);
   }
 
   /* ---------- 导出 ---------- */
@@ -408,11 +475,25 @@
     autoInitCarousel();
   }
 
-  /* 自动注入小旗帜：列表页每6条插入1张、详情页/我的页各1张 */
+  /* ---------- 列表场景白名单判定 ----------
+     营销卡只进"内容浏览流"（发现/搜索结果），
+     排除消息页、返佣记录、订单工作台等事务性列表，避免突兀。 */
+  function isListEligible() {
+    try {
+      var b = document.body;
+      if (b && b.getAttribute && b.getAttribute('data-tab') === 'message') return false;
+      if (document.getElementById('ms-list')) return false;                    /* 服务商工作台 */
+      var listEl = document.getElementById('list');
+      if (listEl && listEl.className && String(listEl.className).indexOf('er-list') >= 0) return false; /* 返佣记录 */
+    } catch (e) {}
+    return true;
+  }
+
+  /* 自动注入小旗帜：列表页按内容流插入、详情页/我的页按语义锚点插入 */
   function autoInjectFlags() {
-    /* 列表页：#list 容器，每6条插入1张 */
+    /* 列表页：内容浏览流才注入（首条在第 4 条后、每 10 条 1 张、最多 3 张） */
     var listEl = document.getElementById('list');
-    if (listEl) {
+    if (listEl && isListEligible()) {
       /* [FIX 卡死] 注入期间断开观察器、完成后恢复：
          injectIntoList 的移除+插入自身会触发 MutationObserver，而观察回调是异步投递的，
          简单的重入标志无法拦截（回调执行时注入早已结束、标志已复位），会形成
@@ -421,7 +502,7 @@
       var listObserver = null;
       var doInject = function () {
         if (listObserver) listObserver.disconnect();
-        try { injectIntoList(listEl, '#list > *', 6); }
+        try { injectIntoList(listEl, '#list > *', 10); }
         finally { if (listObserver) listObserver.observe(listEl, { childList: true }); }
       };
       setTimeout(doInject, 600);
@@ -431,14 +512,14 @@
       } catch (e) {}
     }
 
-    /* 详情页：有 .detail-actionbar 的页面，.scroll 容器底部注入1张 */
+    /* 详情页：有 .detail-actionbar 的页面，旗帜插到付费解锁区 #lock 之前（决策点） */
     var detailScroll = document.querySelector('.scroll');
     var detailActionbar = document.querySelector('.detail-actionbar');
     if (detailScroll && detailActionbar) {
       setTimeout(function () { injectIntoContainer(detailScroll, 'detail'); }, 500);
     }
 
-    /* 我的页：.profile-content 注入1张 */
+    /* 我的页：.profile-content 插到数据统计卡之后（行动引导点） */
     var profileContent = document.querySelector('.profile-content');
     if (profileContent) {
       setTimeout(function () { injectIntoContainer(profileContent, 'me'); }, 500);
