@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/help/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>意见反馈 · 工程链</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23C9A961'/%3E%3Cpath d='M3 21h18M5 21V7l7-4 7 4v14' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ============================================================
+   意见反馈 · 设计系统令牌化（与帮助中心 V3.3 同体系）
+   布局：类型 → 描述（计数）→ 截图（选填）→ 联系方式（选填）→ 提交
+   ============================================================ */
+.fb-scroll{height:100%;overflow-y:auto;padding:10px 16px calc(var(--sp-6) + 20px);}
+.fb-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-xl);padding:16px;margin-bottom:12px;box-shadow:var(--shadow-xs);}
+.fb-label{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:12px;}
+.fb-label .req{color:var(--error);font-weight:700;}
+.fb-label .opt{font-size:11px;color:var(--text-3);font-weight:400;}
+.fb-label svg{width:16px;height:16px;color:var(--primary-dim);flex:none;}
+
+/* 类型选择：四枚圆角胶囊（chips），单选 */
+.fb-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.fb-chip{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 2px 8px;border-radius:var(--r-m);background:var(--bg-card-2);border:1.5px solid transparent;cursor:pointer;transition:all .18s;-webkit-tap-highlight-color:transparent;}
+.fb-chip svg{width:20px;height:20px;color:var(--text-3);transition:color .18s;}
+.fb-chip span{font-size:11px;color:var(--text-2);font-weight:500;transition:color .18s;}
+.fb-chip.active{background:var(--primary-soft);border-color:rgba(184,153,104,.45);}
+.fb-chip.active svg{color:var(--primary-dim);}
+.fb-chip.active span{color:var(--primary-dim);font-weight:700;}
+.fb-chip:active{transform:scale(.96);}
+
+/* 描述输入 */
+.fb-textarea-wrap{position:relative;}
+.fb-textarea{width:100%;box-sizing:border-box;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg);padding:12px;font-size:13.5px;line-height:1.7;color:var(--text-1);min-height:132px;resize:none;outline:none;font-family:inherit;transition:border-color .2s,box-shadow .2s;}
+.fb-textarea:focus{border-color:var(--primary);box-shadow:var(--shadow-focus);}
+.fb-textarea::placeholder{color:var(--text-3);}
+.fb-count{position:absolute;right:10px;bottom:9px;font-size:11px;color:var(--text-3);background:var(--bg-card);padding:0 4px;border-radius:6px;}
+.fb-count.over{color:var(--error);}
+
+/* 截图位：三枚九宫格，虚线加号位 + 已添加缩略图 */
+.fb-shots{display:flex;gap:10px;flex-wrap:wrap;}
+.fb-shot{width:84px;height:84px;border-radius:var(--r-m);overflow:hidden;position:relative;flex:none;}
+.fb-shot-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1.5px dashed var(--line-strong);background:var(--bg-card-2);color:var(--text-3);cursor:pointer;transition:all .18s;}
+.fb-shot-add svg{width:22px;height:22px;}
+.fb-shot-add span{font-size:10.5px;}
+.fb-shot-add:active{transform:scale(.96);border-color:var(--primary);}
+.fb-shot-img{width:100%;height:100%;background:linear-gradient(135deg,#E8E3D8,#D8D0BE);display:flex;align-items:center;justify-content:center;color:rgba(90,78,54,.55);}
+.fb-shot-img svg{width:26px;height:26px;}
+.fb-shot-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(20,18,15,.62);color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;line-height:1;}
+[data-theme="dark"] .fb-shot-img{background:linear-gradient(135deg,#2C2C2E,#3A3A3C);color:rgba(255,255,255,.4);}
+
+/* 联系方式 */
+.fb-input{width:100%;box-sizing:border-box;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg);padding:0 12px;height:44px;font-size:13.5px;color:var(--text-1);outline:none;transition:border-color .2s,box-shadow .2s;}
+.fb-input:focus{border-color:var(--primary);box-shadow:var(--shadow-focus);}
+.fb-input::placeholder{color:var(--text-3);}
+
+/* 提交与说明 */
+.fb-submit{width:100%;height:48px;border-radius:var(--r-l);font-size:15px;font-weight:700;margin-top:4px;}
+.fb-note{font-size:11px;color:var(--text-3);line-height:1.7;margin-top:12px;text-align:center;padding:0 8px;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">意见反馈</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <main class="scroll fb-scroll" id="fbScroll">
+    <!-- 反馈类型 -->
+    <section class="fb-card">
+      <div class="fb-label"><svg class="ic" viewBox="0 0 24 24"><use href="#i-feedback"/></svg>反馈类型<span class="req">*</span></div>
+      <div class="fb-chips" id="fbChips">
+        <button type="button" class="fb-chip active" data-type="功能建议"><svg class="ic" viewBox="0 0 24 24"><use href="#i-star"/></svg><span>功能建议</span></button>
+        <button type="button" class="fb-chip" data-type="Bug 上报"><svg class="ic" viewBox="0 0 24 24"><use href="#i-tool"/></svg><span>Bug 上报</span></button>
+        <button type="button" class="fb-chip" data-type="体验问题"><svg class="ic" viewBox="0 0 24 24"><use href="#i-eye"/></svg><span>体验问题</span></button>
+        <button type="button" class="fb-chip" data-type="合作咨询"><svg class="ic" viewBox="0 0 24 24"><use href="#i-chat"/></svg><span>合作咨询</span></button>
+      </div>
+    </section>
+
+    <!-- 问题描述 -->
+    <section class="fb-card">
+      <div class="fb-label"><svg class="ic" viewBox="0 0 24 24"><use href="#i-doc"/></svg>问题描述<span class="req">*</span></div>
+      <div class="fb-textarea-wrap">
+        <textarea id="fbText" class="fb-textarea" maxlength="500" placeholder="请详细描述您的建议或遇到的问题，越具体越便于我们定位与改进…（不少于 5 个字）"></textarea>
+        <div class="fb-count" id="fbCount">0 / 500</div>
+      </div>
+    </section>
+
+    <!-- 截图（选填） -->
+    <section class="fb-card">
+      <div class="fb-label"><svg class="ic" viewBox="0 0 24 24"><use href="#i-clip"/></svg>相关截图<span class="opt">选填 · 最多 3 张</span></div>
+      <div class="fb-shots" id="fbShots">
+        <button type="button" class="fb-shot fb-shot-add" id="fbAddShot" aria-label="添加截图"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>添加截图</span></button>
+      </div>
+    </section>
+
+    <!-- 联系方式（选填） -->
+    <section class="fb-card">
+      <div class="fb-label"><svg class="ic" viewBox="0 0 24 24"><use href="#i-mail"/></svg>联系方式<span class="opt">选填 · 便于回访</span></div>
+      <input id="fbContact" class="fb-input" type="text" inputmode="tel" maxlength="30" placeholder="手机号或微信号">
+    </section>
+
+    <button type="button" class="btn btn-primary btn-block fb-submit" id="fbSubmit">提交反馈</button>
+    <div class="fb-note">提交后我们将在 1–3 个工作日内处理并回复<br>优质反馈将有机会获得信用积分奖励</div>
+  </main>
+</div>
+
+<script src="../../js/common.js"></script>
+<script>
+(function(){
+  window.__ROOT__='../../';
+  var CHIPS=['功能建议','Bug 上报','体验问题','合作咨询'];
+  var MAX_SHOTS=3;
+  var shots=0;
+
+  /* 类型单选 */
+  var chipsWrap=document.getElementById('fbChips');
+  chipsWrap.addEventListener('click',function(e){
+    var chip=e.target.closest('.fb-chip');
+    if(!chip)return;
+    chipsWrap.querySelectorAll('.fb-chip').forEach(function(c){c.classList.remove('active');});
+    chip.classList.add('active');
+  });
+
+  /* 字数统计 */
+  var text=document.getElementById('fbText');
+  var count=document.getElementById('fbCount');
+  text.addEventListener('input',function(){
+    var n=text.value.length;
+    count.textContent=n+' / 500';
+    count.classList.toggle('over',n>=500);
+  });
+
+  /* 截图添加（演示：生成占位缩略图，可删除） */
+  document.getElementById('fbAddShot').addEventListener('click',function(){
+    if(shots>=MAX_SHOTS){UI.toast('最多添加 3 张截图','warn');return;}
+    shots++;
+    var wrap=document.createElement('div');
+    wrap.className='fb-shot';
+    wrap.innerHTML='<div class="fb-shot-img"><svg class="ic" viewBox="0 0 24 24"><use href="#i-image"/></svg></div>'+
+      '<button type="button" class="fb-shot-del" aria-label="删除截图">×</button>';
+    wrap.querySelector('.fb-shot-del').addEventListener('click',function(){
+      wrap.remove();shots--;
+      if(shots>=MAX_SHOTS)document.getElementById('fbAddShot').style.display='';
+    });
+    var add=document.getElementById('fbAddShot');
+    add.parentNode.insertBefore(wrap,add);
+    if(shots>=MAX_SHOTS)add.style.display='none';
+  });
+
+  /* 提交 */
+  document.getElementById('fbSubmit').addEventListener('click',function(){
+    var active=chipsWrap.querySelector('.fb-chip.active');
+    var type=active&&active.dataset.type||CHIPS[0];
+    var t=text.value.trim();
+    if(t.length<5){UI.toast('请至少描述 5 个字','warn');text.focus();return;}
+    if(!window.UI||!UI.dialog){
+      UI.toast&&UI.toast('反馈已提交，感谢您的支持','ok');
+      setTimeout(function(){history.back();},800);
+      return;
+    }
+    UI.dialog({
+      title:'提交成功',
+      text:'<div style="text-align:center;padding:4px 0 6px;"><div style="font-size:13px;color:var(--text-2);line-height:1.8;">感谢您的反馈（'+type+'）<br>我们将在 1–3 个工作日内处理并回复</div></div>',
+      ok:'知道了',
+      cancel:'',
+      onOk:function(){history.back();}
+    });
+  });
+})();
+</script>
+</body>
+</html>

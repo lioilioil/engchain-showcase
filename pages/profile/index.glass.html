@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN" data-glass="on">
 <head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <script data-engchain-basefix="2">
 (function(){
 function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
@@ -71,6 +72,10 @@ html, body { margin:0; padding:0; background:var(--bg); }
 .wb-name-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .wb-name { font-size:17px; font-weight:700; color:var(--wb-text-1); line-height:1.2; }
 .wb-badges { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+/* 头部徽章统一规格：认证标签（蓝V/金V/专属）与等级标签（Lv.x）等高 21px、同字号/圆角/边框，形成统一视觉逻辑 */
+#pf-badges .id-badge-sm { height:21px; padding:0 8px 0 6px; font-size:10px; gap:4px; }
+#pf-badges .id-badge-sm .id-badge-icon { width:11px; height:11px; }
+#pf-badges .lv-badge { display:inline-flex; align-items:center; height:21px; padding:0 8px; border-radius:999px; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; background:rgba(201,169,97,.15); color:var(--primary-dim); border:1px solid rgba(201,169,97,.3); }
 .wb-sub { font-size:12px; color:var(--wb-text-2); margin-top:4px; line-height:1.4; cursor:pointer; }
 .wb-settings {
   flex:none; width:32px; height:32px; border-radius:50%;
@@ -505,7 +510,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
         badgeHtml += IdBadge.render('individual', 'sm');
       }
       /* 等级标签 */
-      badgeHtml += '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:rgba(201,169,97,.15);color:var(--primary-dim);border:1px solid rgba(201,169,97,.3);">Lv.' + cfg.level + '</span>';
+      badgeHtml += '<span class="lv-badge">Lv.' + cfg.level + '</span>';
       badgeBox.innerHTML = badgeHtml;
     }
 
@@ -758,9 +763,15 @@ html, body { margin:0; padding:0; background:var(--bg); }
           order += (Mediation.list({ uid: uid0 }) || []).length;
         }
       } catch (e) {}
-      /* 第四项：企业=团队成员数；个人=分享成功数（邀请绑定数） */
+      /* 第四项：企业=本企业组织团队成员数（OrgsStore，与分销团队无关）；个人=分享成功数（邀请绑定数） */
       if (isEnterprise) {
-        if (window.DataBus && DataBus.distTeam) { try { fourth = (DataBus.distTeam() || []).length; } catch (e) {} }
+        try {
+          if (window.OrgsStore && window.DataBus && DataBus.current) {
+            var me2 = DataBus.current();
+            var orgsOf = (me2 && OrgsStore.orgsOf) ? (OrgsStore.orgsOf(me2.id) || []) : [];
+            if (orgsOf.length) fourth = OrgsStore.memberCount(orgsOf[0].org);
+          }
+        } catch (e) {}
       } else {
         if (window.Referral) {
           var me1 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
@@ -881,7 +892,9 @@ html, body { margin:0; padding:0; background:var(--bg); }
       { href:'../industry/index.html', ic:'i-doc', cls:'ic-blue', title:'行业总览' },
       { href:'my-applies.html', ic:'i-briefcase', cls:'ic-green', title:'我的投递' },
       { href:'../platform/dashboard.html', ic:'i-shield', cls:'ic-blue', title:'平台运营台', badge:'演示' },
-      { href:'../agency/demo-reset.html', ic:'i-rotate', cls:'ic-orange', title:'演示重置', badge:'演示' }
+      { href:'../agency/demo-reset.html', ic:'i-rotate', cls:'ic-orange', title:'演示重置', badge:'演示' },
+      /* 全部功能：快捷工具末尾「更多」入口，参考其他快捷入口视觉 */
+      { href:'all-functions.html', ic:'i-grid', cls:'ic-gold', title:'更多', nav:true }
     ];
 
     /* 权限解锁条件（单一来源 entryAccess：分销=入驻/个人合伙人；服务经营=中介入驻） */
@@ -921,7 +934,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
       var unlocked = it.unlockKey === 'dist' ? distUnlocked : agencyUnlocked;
       var isLocked = it.lock && !unlocked;
       /* E1-02 游客点击任意受限功能 → 登录引导 sheet（原无反应） */
-      var click = guest
+      var click = guest && !it.nav
         ? 'onclick="requireLoginSheet(\'登录后解锁「' + it.title + '」\')"'
         : (isLocked ? 'onclick="quickLocked(\'' + it.unlockKey + '\')"' : 'onclick="location.href=\'' + it.href + '\'"');
       var iconSvg = it.ic === 'i-rotate'
@@ -1114,7 +1127,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
 
   /* ---------- KPI 跳转 ---------- */
   function pfKpiJump(type) {
-    var map = { fav:'../favorite/index.html', pub:'../publish/records.html', order:'../order/index.html', team:'../distribution/index.html', share:'share.html' };
+    /* 企业身份"团队" = 本企业组织团队（企业成员管理）；分销中心另有常用服务独立入口，与团队无关 */
+    var map = { fav:'../favorite/index.html', pub:'../publish/records.html', order:'../order/index.html', team:'org-members.html', share:'share.html' };
     if (map[type]) location.href = map[type];
   }
   window.pfKpiJump = pfKpiJump;

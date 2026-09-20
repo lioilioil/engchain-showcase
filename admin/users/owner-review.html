@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企业主验证审核 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="users/owner-review.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>企业主验证审核</h1>
+        <div class="sub">用户与认证中心 · 企业主移交身份验证（法人认证 / 实际控制人验证）后台审核 · 通过后企业主移交正式生效，App 端即时同步</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
+    </div>
+
+    <div class="kpis" id="kpi"></div>
+
+    <div class="card card-pad">
+      <div class="card-h">
+        <span class="card-t">待审核验证单</span>
+        <span class="card-s" id="count"></span>
+      </div>
+      <div id="table-wrap"></div>
+    </div>
+  </main>
+</div>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script src="../../js/orgs.js" defer></script>
+<script>
+function bootOwnerReview(){ (function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function fmtTime(ts) {
+    try { var d = new Date(ts); var p = function (n) { return n < 10 ? '0' + n : n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); } catch (e) { return '-'; }
+  }
+  function maskIdNo(s) { return String(s || '').replace(/^(\d{6})\d{8}(\d{4})$/, '$1********$2'); }
+  function modeLabel(m) { return m === 'legal' ? '<span class="badge badge-gold">法人认证</span>' : '<span class="badge badge-info">实际控制人验证</span>'; }
+  function userName(uid) { var u = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null; return u ? u.name : uid; }
+
+  function allTransfers() {
+    try {
+      var orgs = OrgsStore.list();
+      var out = [];
+      orgs.forEach(function (org) {
+        (org.transfers || []).forEach(function (t) { out.push({ org: org, transfer: t }); });
+      });
+      return out;
+    } catch (e) { return []; }
+  }
+  function pendingReviews() {
+    return allTransfers().filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'pending'; });
+  }
+
+  function renderKPI() {
+    var all = allTransfers();
+    var pending = pendingReviews().length;
+    var done = all.filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'approved'; }).length;
+    var rejected = all.filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'rejected'; }).length;
+    var cards = [
+      ['待审核', pending, 'warn', '法人/实控人验证队列'],
+      ['已生效', done, 'up', '企业主移交完成'],
+      ['已驳回', rejected, 'down', '验证被驳回'],
+      ['申请总数', all.length, 'gold', '历史移交申请']
+    ];
+    $('#kpi').innerHTML = cards.map(function (k) {
+      return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
+    }).join('');
+  }
+
+  function renderTable() {
+    var list = pendingReviews();
+    $('#count').textContent = '待审核 ' + list.length + ' 单';
+    if (!list.length) {
+      $('#table-wrap').innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted);">暂无待审核的企业主验证单</div>';
+      return;
+    }
+    $('#table-wrap').innerHTML =
+      '<table class="table">' +
+      '<thead><tr>' +
+        '<th>企业</th><th>发起人 → 接收人</th><th>验证方式</th><th>申请人 / 证件</th><th>材料核验</th><th>提交时间</th><th>操作</th>' +
+      '</tr></thead><tbody>' +
+      list.map(function (x) {
+        var t = x.transfer, org = x.org;
+        var v = t.verify || {};
+        var material;
+        if (v.mode === 'legal') {
+          material = '姓名须与法定代表人「' + esc(org.legal || '—') + '」一致' + (v.name === org.legal ? '<span class="tx-success"> · 一致</span>' : '<span class="tx-danger"> · 不一致</span>');
+        } else {
+          material = '实际控制人声明' + (v.payload && v.payload.declaration ? '<span class="tx-success"> · 已勾选</span>' : '<span class="tx-danger"> · 未勾选</span>');
+        }
+        return '<tr>' +
+          '<td><div class="tx-semibold">' + esc(org.shortName || org.co) + '</div><div class="tx-muted-sm">' + esc(org.co || '') + '</div></td>' +
+          '<td>' + esc(userName(t.fromUid)) + ' → <b>' + esc(userName(t.toUid)) + '</b></td>' +
+          '<td>' + modeLabel(v.mode) + '</td>' +
+          '<td><div class="tx-semibold">' + esc(v.name || '—') + '</div><div class="tx-mono tx-muted-sm">' + maskIdNo(v.idNo) + '</div></td>' +
+          '<td>' + material + '</td>' +
+          '<td class="tx-muted-sm">' + fmtTime(v.submittedAt) + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="btn btn-sm btn-primary" onclick="ownerReview(\'' + t.id + '\', true)">通过并移交</button>' +
+            '<button class="btn btn-sm btn-ghost" onclick="ownerReview(\'' + t.id + '\', false)">驳回</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
+  window.ownerReview = function (transferId, approve) {
+    var r = OrgsStore.reviewOwnerVerify(transferId, approve);
+    if (r && r.error) { if (window.Admin && Admin.toast) Admin.toast(r.error, 'error'); else alert(r.error); return; }
+    if (window.Admin && Admin.toast) Admin.toast(approve ? '已通过，企业主移交已生效' : '已驳回该验证单', approve ? 'success' : '');
+    renderKPI(); renderTable();
+  };
+
+  $('#btn-refresh').addEventListener('click', function () { renderKPI(); renderTable(); if (window.Admin && Admin.toast) Admin.toast('已刷新'); });
+  renderKPI();
+  renderTable();
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-orgs') { renderKPI(); renderTable(); } });
+})(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootOwnerReview); else bootOwnerReview();
+</script>
+</body>
+</html>

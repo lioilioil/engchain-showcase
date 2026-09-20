@@ -1,4 +1,4 @@
-﻿/* ============================================================================
+/* ============================================================================
    工程链 ENGCHAIN · 管理后台 — 共享脚本 admin.js（Phase 1）
    - 三栏骨架：顶栏（brand/面包屑/搜索/主题/账号）+ 侧边部门导航 + 内容区
    - 主题联动：engchain-theme（与 App/preview 同源，storage 事件实时跟随）
@@ -26,7 +26,8 @@
     { sec: '用户与认证', items: [
       { t: '用户管理', f: 'users/users.html' },
       { t: '认证审核', f: 'users/auth-review.html' },
-      { t: '入驻审核', f: 'users/entry-review.html' } ] },
+      { t: '入驻审核', f: 'users/entry-review.html' },
+      { t: '企业主验证审核', f: 'users/owner-review.html' } ] },
     { sec: '资金中心', items: [
       { t: '钱包总览', f: 'finance/wallet.html' },
       { t: '充值 / 对公审批', f: 'finance/recharge.html' },
@@ -293,6 +294,7 @@
     'users/users.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'users/auth-review.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>',
     'users/entry-review.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22a4 4 0 0 0 4-4"/><path d="M6 22h4"/><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18"/><path d="M12 6v4"/><path d="M10 8h4"/></svg>',
+    'users/owner-review.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
     'finance/wallet.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>',
     'finance/recharge.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
     'finance/withdraw.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14v2"/><path d="M12 6v2"/><path d="M6 12H4"/><path d="M20 12h-2"/><path d="m6.3 18.3-1.4-1.4"/><path d="m19.1 5.1-1.4 1.4"/><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/></svg>',
@@ -434,7 +436,7 @@
   var PAGE_SEC = {
     'index.html': '总览',
     'operations/supply.html': '运营中心', 'operations/orders.html': '运营中心', 'operations/messages.html': '运营中心',
-    'users/users.html': '用户与认证', 'users/auth-review.html': '用户与认证', 'users/entry-review.html': '用户与认证',
+    'users/users.html': '用户与认证', 'users/auth-review.html': '用户与认证', 'users/entry-review.html': '用户与认证', 'users/owner-review.html': '用户与认证',
     'finance/wallet.html': '资金中心', 'finance/recharge.html': '资金中心', 'finance/withdraw.html': '资金中心',
     'finance/credits.html': '资金中心', 'finance/commission.html': '资金中心', 'finance/invoice.html': '资金中心',
     'distribution/overview.html': '分销中心', 'distribution/team.html': '分销中心', 'distribution/payout.html': '分销中心',

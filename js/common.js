@@ -724,7 +724,9 @@ window.UI = (function () {
     'swap':     '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
     'users':    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     'wrench':   '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
-    'compass':  '<circle cx="12" cy="12" r="9"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>'
+    'compass':  '<circle cx="12" cy="12" r="9"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>',
+    /* 全部功能/更多：九宫格 */
+    'grid':     '<rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/>'
   };
   function injectSprite() {
     if (document.getElementById('engchain-sprite')) return;
@@ -1536,7 +1538,7 @@ window.Cards = (function () {
 
   function statRow(items) {
     return '<div style="display:flex;border-top:1px solid var(--line);padding:9px 0 8px;margin:9px 0 4px;">' + items.map(function (it) {
-      return '<div style="flex:1;text-align:center;"><div style="font-family:var(--font-num);font-size:14.5px;font-weight:700;' + (it[2] ? 'color:' + it[2] + ';' : 'color:var(--primary-dim);') + '">' + esc(it[0]) + '</div><div style="font-size:9.5px;color:var(--text-3);margin-top:1px;">' + esc(it[1]) + '</div></div>';
+      return '<div style="flex:1;min-width:0;text-align:center;"><div style="font-family:var(--font-num);font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' + (it[2] ? 'color:' + it[2] + ';' : 'color:var(--primary-dim);') + '">' + esc(it[0]) + '</div><div style="font-size:9.5px;color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(it[1]) + '</div></div>';
     }).join('') + '</div>';
   }
 

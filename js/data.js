@@ -1102,10 +1102,22 @@ window.MOCK = (function () {
       intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30 },
       /* [FEAT 9.2-1] R6 B端增值道具：激活架构预留（topListing/leadPack/saasTools） */
       /* [FEAT 9.2-4] 入驻类型差异：entryTypes 限制不同入驻类型可购买的道具 */
+      /* [FEAT 9.2-1+] 服务商升级页增量：effectAnchor 效果锚点（说服层）；marketing 营销层（新客礼/限时特惠/组合包，非独立SKU）。
+         注意：leadPack 不使用 packs 字段——talent 详情页条数包 UI 的消费链路未接通（data-pw-unlock 只走单条解锁），
+         启用 packs 会点亮不可用的条数包入口；线索包消费通道为「需求广场精准解锁」（seller-board 消耗配额走 LeadStore）。 */
       vendorUpgrades: {
-        topListing: { enabled: true, price: 99, durationDays: 7, label: '服务置顶', desc: '供需信息置顶展示7天', entryTypes: ['construction', 'agency', 'partner'] },
-        leadPack: { enabled: true, price: 299, count: 50, label: '线索包', desc: '获取50条精准询盘线索', entryTypes: ['agency'] },
-        saasTools: { enabled: true, price: 199, durationDays: 30, label: '经营工具', desc: '数据看板+经营分析工具30天', entryTypes: ['construction', 'agency'] }
+        topListing: { enabled: true, price: 99, durationDays: 7, label: '服务置顶', desc: '供需信息置顶展示7天', entryTypes: ['construction', 'agency', 'partner'],
+          effectAnchor: { text: '置顶后曝光显著提升', sub: '广场排序置前 + 金色置顶标识' } },
+        leadPack: { enabled: true, price: 299, count: 50, label: '线索包', desc: '获取50条精准询盘线索', entryTypes: ['agency'],
+          effectAnchor: { text: '低至 ¥6/条', sub: '对比人才单条解锁 ¥29' } },
+        saasTools: { enabled: true, price: 199, durationDays: 30, label: '经营工具', desc: '数据看板+经营分析工具30天', entryTypes: ['construction', 'agency'],
+          effectAnchor: { text: '解锁全量经营数据', sub: '未开通仅看 3 天摘要' } },
+        /* 营销层配置（非独立SKU）：newGift=首购立减；countdown=限时倒计时（hoursLeft 首次进入后起算，localStorage 固化）；combo=组合包 */
+        marketing: {
+          newGift: { enabled: true, label: '新客礼', desc: '首次购买任一增值道具立减 ¥20', discount: 20, quota: 50, used: 27 },
+          countdown: { enabled: true, label: '限时特惠', desc: '组合包限时 8 折，倒计时结束后恢复原价', hoursLeft: 51 },
+          combo: { enabled: true, label: '流量组合包', desc: '2 次服务置顶（名额 7 天） + 50 条精准线索', original: 497, price: 398, items: [ { type: 'topListing', qty: 2 }, { type: 'leadPack', qty: 1 } ] }
+        }
       },
       /* [FEAT 9.2-5] 质保金预留机制：交易金额5%预留，验收30天后释放 */
       warranty: { rate: 0.05, releaseDays: 30, label: '质保金', desc: '交易金额5%预留，验收30天后释放' },
