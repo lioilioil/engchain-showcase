@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <script data-engchain-basefix="2">
 (function(){
 function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
@@ -69,7 +70,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function markMsgRead(id) { var ids = readMsgIds(); if (ids.indexOf(id) < 0) { ids.push(id); writeMsgIds(ids); } }
   function markAllMsgRead() { var ids = readMsgs().map(function(m){return m.id;}); writeMsgIds(ids); }
   function readMsgs() {
-    try { return (window.DataBus && DataBus.messages()) || []; } catch (e) { return []; }
+    try {
+      var all = (window.DataBus && DataBus.messages()) || [];
+      /* 定向消息（企业邀请/移交通知等）仅本人可见；广播消息（无 targetUid）所有人可见 */
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (!me) return all;
+      return all.filter(function (m) { return !m.targetUid || m.targetUid === me.id; });
+    } catch (e) { return []; }
   }
   function sysUnreadCount() {
     var list = readMsgs();
@@ -98,7 +105,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<span class="fw-600 fs-13 elip" style="flex:1;">' + (m.title || '') + '</span>' +
         '<span class="text-3" style="font-size:10px;">' + fmtTs(m.ts) + '</span></div>' +
         '<div class="text-2 fs-12" style="line-height:1.6;">' + (m.body || '') + '</div>' +
-        '<div class="text-3" style="font-size:10px;margin-top:4px;">发送对象：' + (m.target || '全部用户') + '</div></div>';
+        '<div class="text-3" style="font-size:10px;margin-top:4px;">发送对象：' + (m.direct ? '仅本人' : (m.target || '全部用户')) + '</div></div>';
     }).join('') || '<div class="text-3" style="font-size:12px;padding:14px 4px;">暂无运营消息，后台发布后将实时同步至 App</div>';
   }
 

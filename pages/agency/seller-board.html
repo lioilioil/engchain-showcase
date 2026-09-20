@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <script data-engchain-basefix="2">
 (function(){
 function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
@@ -17,7 +18,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <body>
 <div class="phone">
   <div class="navbar">
-    <button class="nav-back" onclick="history.back()">‹</button>
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">服务商工作台</div>
     <div class="nav-right"><button onclick="location.href='index.html'" style="color:var(--text-2);font-size:13px;">服务广场</button></div>
   </div>
@@ -78,6 +79,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div class="lead-t"><b>询盘线索</b><span id="lead-sub">买家咨询将实时汇聚</span></div>
         <span class="lead-count" id="lead-count">0</span>
       </div>
+      <div id="lead-quota" style="display:none;margin:0 0 8px;padding:7px 10px;background:rgba(74,122,165,.08);border-radius:8px;font-size:11px;color:#4A7AA5;"></div>
       <div id="lead-list"><div class="text-3 fs-12" style="padding:12px 0;text-align:center;">加载中…</div></div>
     </div>
 
@@ -153,7 +155,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="guide-acts">
         <button class="btn btn-ghost btn-sm" onclick="location.href='../help/index.html'">帮助中心</button>
         <button class="btn btn-ghost btn-sm" onclick="location.href='../wallet/invoice.html'">发票管理</button>
-        <button class="btn btn-primary btn-sm" onclick="location.href='../vendor/upgrades.html'">获取流量扶持</button>
+        <button class="btn btn-primary btn-sm" style="position:relative;" onclick="location.href='../vendor/upgrades.html'">获取流量扶持<span id="ng-dot" style="display:none;position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:#E74C3C;border:2px solid var(--bg);"></span></button>
       </div>
     </div>
   </div>
@@ -327,6 +329,7 @@ function leadStatusLabel(k){for(var i=0;i<LEAD_STATUS.length;i++)if(LEAD_STATUS[
 function leadStatusColor(k){for(var i=0;i<LEAD_STATUS.length;i++)if(LEAD_STATUS[i].k===k)return LEAD_STATUS[i].c;return 'var(--text-3)';}
 function renderLeads(){
   if(!window.LeadStore)return;
+  renderLeadQuota();
   var all=LeadStore.list({sellerId:uid});
   var fresh=all.filter(function(l){return l.status==='new';}).length;
   var box=document.getElementById('lead-list'),cnt=document.getElementById('lead-count'),sub=document.getElementById('lead-sub');
@@ -353,6 +356,63 @@ function renderLeads(){
         }).join('')+'</span></div>'+
     '</div>';
   }).join('')+(all.length>12?'<div class="text-3 fs-10" style="text-align:center;padding-top:8px;">仅显示最近 12 条</div>':'');
+}
+/* [FEAT 9.2-1+] 线索包配额展示（询盘线索卡） */
+function renderLeadQuota(){
+  var el=document.getElementById('lead-quota');
+  if(!el)return;
+  if(!window.UpgradeStore)return;
+  var rem=UpgradeStore.remaining('leadPack');
+  var used=UpgradeStore.usage('leadPack');
+  if(rem>0||used>0){
+    el.style.display='';
+    el.innerHTML='<b>线索包</b> 剩余 '+rem+' 条 · 已用 '+used+' 条 <span style="margin-left:8px;cursor:pointer;color:#4A7AA5;font-weight:600;" onclick="location.href=\'../vendor/upgrades.html\'">去续购 ›</span>';
+  }else{
+    el.style.display='none';
+  }
+}
+/* [FEAT 9.2-1+] 需求广场精准解锁按钮（线索包配额消耗，先到先得） */
+function leadBtnFor(d){
+  if(!window.UpgradeStore) return '';
+  var lp=null;
+  try{ lp=UpgradeStore.listAvailable().filter(function(x){return x.key==='leadPack';})[0]; }catch(e){}
+  if(!lp||!lp.available) return '';
+  var rem=UpgradeStore.remaining('leadPack');
+  if(d.unlockedBy===uid) return '<span class="dm-sel" style="background:rgba(74,122,165,.1);color:#4A7AA5;border-color:rgba(74,122,165,.3);">已解锁</span>';
+  if(d.unlockedBy) return '<span class="text-4 fs-10" style="white-space:nowrap;">已被解锁</span>';
+  if(rem>0) return '<span class="dm-btn" onclick="window.leadUnlock(\''+d.id+'\')">精准解锁</span>';
+  return '<span class="dm-btn" onclick="window.goBuyLead()">开线索包</span>';
+}
+/* [FEAT 9.2-1+] 精准解锁：消耗 1 条线索包配额 → 写入询盘线索（LeadStore） */
+window.leadUnlock=function(id){
+  if(!window.UpgradeStore||!window.DemandStore||!window.LeadStore)return;
+  var d=DemandStore.byId(id);
+  if(!d){if(window.UI)UI.toast('需求不存在','err');return;}
+  var r=UpgradeStore.consume('leadPack');
+  if(r&&r.error){if(window.UI)UI.toast(r.error,'err');return;}
+  var u=DataBus.byId(d.buyerId)||{};
+  var phone=(u.auth&&u.auth.realname&&u.auth.realname.mobile)||'138****0000';
+  var dl=DemandStore.unlockLead(id,uid);
+  if(dl&&dl.error){
+    /* 占用失败回滚配额 */
+    var s=UpgradeStore.read();var hit=null;
+    (s.items||[]).forEach(function(it){if(!hit&&it.type==='leadPack'&&it.status==='active'&&(it.used||0)>0)hit=it;});
+    if(hit){hit.used=(hit.used||0)-1;UpgradeStore.write(s);}
+    if(window.UI)UI.toast(dl.error,'err');
+    return;
+  }
+  LeadStore.create({sellerId:uid,buyerId:d.buyerId,svcName:d.title||'需求广场',name:u.name||'买家',phone:phone,serve:d.title||'',urge:'normal',note:'来自需求广场精准解锁'});
+  renderLeads();renderDemands();renderStats();
+  if(window.UI)UI.toast('已解锁 1 条精准线索，已写入询盘线索','ok');
+};
+window.goBuyLead=function(){location.href='../vendor/upgrades.html';};
+/* [FEAT 9.2-1+] 新客礼未领取红点（获取流量扶持按钮） */
+function renderNgDot(){
+  var el=document.getElementById('ng-dot');
+  if(!el)return;
+  var claimed=false;
+  try{claimed=!!(window.UpgradeStore&&UpgradeStore.newGiftClaimed());}catch(e){}
+  el.style.display=claimed?'none':'';
 }
 window.setLeadStatus=function(id,k){
   if(!window.LeadStore)return;
@@ -406,6 +466,7 @@ function renderDemands(){
     if(dView==='open'){
       var has=DemandStore.quoteOf(d.id,uid);
       btns=has?'<span class="dm-btn" onclick="window.quoteSheet(\''+d.id+'\')">修改报价</span>':'<span class="dm-btn" onclick="window.quoteSheet(\''+d.id+'\')">报价 ›</span>';
+      btns+=leadBtnFor(d);
     }else if(mineQ){
       if(mineQ.status==='accepted')btns='<span class="dm-sel">买家已接受</span>';
       else if(d.status==='closed')btns='<span class="text-4 fs-10">已成交</span>';
@@ -627,7 +688,7 @@ function renderKpi(){
   } catch (e) {}
   renderStats();renderNotice();
 }
-renderHead();renderQuick();renderTabs();renderList();renderKpi();renderMyServices();renderLeads();renderDemands();
+renderHead();renderQuick();renderTabs();renderList();renderKpi();renderMyServices();renderLeads();renderDemands();renderNgDot();
 document.getElementById('k-todo-tile').addEventListener('click',function(){setSbPane('orders');setTab('escrowed');});
 document.getElementById('k-doing-tile').addEventListener('click',function(){setSbPane('orders');setTab('serving');});
 document.getElementById('k-income-tile').addEventListener('click',function(){setSbPane('orders');renderIncomeSheet();});
@@ -636,6 +697,7 @@ window.addEventListener('engchain:mediation',function(){renderList();renderKpi()
 window.addEventListener('engchain:supply',function(){renderMyServices();renderNotice();});
 window.addEventListener('engchain:lead',function(){renderLeads();renderStats();});
 window.addEventListener('engchain:demand',function(){renderDemands();renderNotice();});
+window.addEventListener('engchain:upgrades',function(){renderLeadQuota();renderDemands();renderNgDot();});
 })();
 </script>
 <!-- 页面级补充图标（全站 SPRITE 未覆盖的网格图标） -->
