@@ -29,9 +29,11 @@ window.OrgsStore = (function () {
   var now = Date.now();
   var MEMBER_LIMIT = 10;
 
-  /* ---- seed：预置两家演示企业实体 ----
+  /* ---- seed：预置三家演示企业实体 ----
      org1 川×建设（建筑入驻 resident）：owner=u1 陈建国；预置一条给 u5 的待接受邀请(admin)
      org2 成×工程咨询（建筑入驻 resident）：owner=u3 王强；u5 已是 member
+     org3 ×诚劳务（建筑入驻 resident）：企业主空缺（ownerUid:''），成员 u4 张敏
+     → 登录 u4 可演示「企业主为空」：空态邀请按钮 → 邀请企业主（默认身份=企业主）→ 短信 → 邀请入驻标签
      → 登录 u5 可完整演示：待接受邀请 + 多企业身份切换 + 员工代表企业发招聘 */
   function seedOrgs() {
     return [
@@ -60,6 +62,17 @@ window.OrgsStore = (function () {
         members: [
           { uid: 'u3', role: 'owner', status: 'active', joinedAt: now - DAY * 60 },
           { uid: 'u5', role: 'member', status: 'active', joinedAt: now - DAY * 20 }
+        ],
+        invites: [], joins: []
+      },
+      {
+        orgId: 'org3', co: '成都×诚劳务有限公司', shortName: '×诚劳务',
+        code: '91510100MA9×××33K', legal: '罗×军',
+        entryTypes: ['construction'], entStatus: 'resident',
+        enterpriseQual: ['建筑业企业资质 · 施工劳务不分等级'],
+        expireAt: now + YEAR, ownerUid: '', memberLimit: MEMBER_LIMIT,
+        members: [
+          { uid: 'u4', role: 'member', status: 'active', joinedAt: now - DAY * 10 }
         ],
         invites: [], joins: []
       }
@@ -105,8 +118,8 @@ window.OrgsStore = (function () {
   /* 当前代表企业：读 UI.state.currentOrgId，校验仍 active 后返回 {org, role} */
   function currentMembership() {
     var u = me(); if (!u) return null;
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return null;   /* [S5] */
     var st = (window.UI && UI.state) ? UI.state.get() : {};
-    if (st.loggedIn === false) return null;
     var cur = st.currentOrgId || null;
     if (cur && cur !== 'personal') {
       var m = membershipOf(u.id, cur);
@@ -115,13 +128,12 @@ window.OrgsStore = (function () {
     return null;
   }
 
-  /* ---- 身份投影：账号原始 auth/entry + 当前代表企业覆盖 ---- */
+  /* ---- 身份投影：L2 Store 基础 + 当前代表企业覆盖（[S1] base 从 L2 读，与 deriveIdentity 同源） ---- */
   function projectAuth() {
     var u = me(); if (!u || !window.AuthStore || !window.EntryStore) return;
-    var st = (window.UI && UI.state) ? UI.state.get() : {};
-    if (st.loggedIn === false) return;
-    var baseAuth = JSON.parse(JSON.stringify(u.auth || {}));
-    var baseEntry = JSON.parse(JSON.stringify(u.entry || {}));
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return;   /* [S5] 统一游客判断 */
+    var baseAuth = JSON.parse(JSON.stringify(AuthStore.read() || {}));
+    var baseEntry = JSON.parse(JSON.stringify(EntryStore.read() || {}));
     var m = currentMembership();
     if (m) {
       var org = m.org;
@@ -171,11 +183,34 @@ window.OrgsStore = (function () {
   }
 
   /* ============ 邀请制（企业侧发起） ============ */
-  /* 邀请某已注册实名成员加入企业；role: 'admin' | 'member' */
+  /* 角色文案 */
+  function roleLabel(r) { return r === 'owner' ? '企业主' : r === 'admin' ? '管理员' : '成员'; }
+  /* 企业是否已有 active 企业主 */
+  function hasOwner(orgId) {
+    var org = get(orgId); if (!org) return false;
+    return (org.members || []).some(function (m) { return m.role === 'owner' && m.status === 'active'; });
+  }
+  /* 待接受的企业主邀请（每企业最多一条） */
+  function ownerInviteOf(orgId) {
+    var org = get(orgId); if (!org) return null;
+    var list = org.invites || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].role === 'owner' && list[i].status === 'pending') return list[i];
+    }
+    return null;
+  }
+  /* 谁能邀请：owner/admin 可邀任意身份；企业主空缺时，普通成员可邀企业主 */
+  function canInvite(org, cm, role) {
+    if (!org || !cm) return false;
+    if (cm.role === 'owner' || cm.role === 'admin') return true;
+    if (role === 'owner' && !hasOwner(org.orgId) && !ownerInviteOf(org.orgId)) return true;
+    return false;
+  }
+  /* 邀请某已注册实名成员加入企业；role: 'owner' | 'admin' | 'member' */
   function invite(orgId, targetUid, role) {
     var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
     var cm = membershipOf(u.id, orgId);
-    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可邀请成员' };
+    if (!canInvite(org, cm, role)) return { error: '仅企业主/管理员可邀请成员' };
     if (!targetUid) return { error: '请选择被邀请人' };
     var target = (window.DataBus && DataBus.byId) ? DataBus.byId(targetUid) : null;
     if (!target) return { error: '用户不存在' };
@@ -183,17 +218,31 @@ window.OrgsStore = (function () {
     if (membershipOf(targetUid, orgId)) return { error: '该成员已在企业内' };
     /* 上限 */
     if (memberCount(org) >= org.memberLimit) return { error: '成员数已达上限（' + org.memberLimit + '人），如需扩容请联系平台' };
+    /* 企业主邀请唯一性 */
+    if (role === 'owner') {
+      if (hasOwner(orgId)) return { error: '该企业已有企业主，不能再邀请企业主' };
+      if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理' };
+    }
     /* 重复 pending 邀请 */
     for (var i = 0; i < org.invites.length; i++) {
       if (org.invites[i].targetUid === targetUid && org.invites[i].status === 'pending') return { error: '已向该成员发出邀请，等待其接受' };
     }
-    org.invites.push({
-      inviteId: 'inv-' + orgId + '-' + targetUid, targetUid: targetUid,
-      mobile: (target.auth && target.auth.realname && target.auth.realname.mobile) || '',
-      role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now()
-    });
+    var rl = roleLabel(role || 'member');
+    var iv = {
+      inviteId: 'inv-' + orgId + '-' + targetUid + '-' + Date.now(), targetUid: targetUid,
+      mobile: maskMobile(target.mobile || ''), mobileRaw: target.mobile || '',
+      name: target.name, role: role || 'member', status: 'pending', inviterUid: u.id,
+      createdAt: Date.now(), via: 'users', sendAt: Date.now(), sendCount: 1
+    };
+    org.invites.push(iv);
     save(a);
-    if (window.DataBus && DataBus.audit) DataBus.audit('邀请成员', '企业', target.name, '邀请加入 ' + (org.shortName || org.co) + ' 担任 ' + (role === 'admin' ? '管理员' : '成员'));
+    /* 已认证用户：短信 + 站内消息双通道提醒 */
+    sendSms(target.mobile || '', '【工程链】' + (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl + '，请登录 App 在企业成员管理中确认。');
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(target.id, '企业邀请通知', (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl + '，请进入「企业成员管理」查看并确认。');
+    } catch (e) {}
+    if (window.DataBus && DataBus.audit) DataBus.audit('邀请成员', '企业', target.name, '邀请加入 ' + (org.shortName || org.co) + ' 担任 ' + rl);
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
     return { ok: true };
   }
   /* 某用户待接受的邀请 */
@@ -216,10 +265,23 @@ window.OrgsStore = (function () {
         if (iv.inviteId === inviteId && iv.status === 'pending') {
           if (iv.targetUid !== u.id) return { error: '该邀请不属于当前账号' };
           if (memberCount(org) >= org.memberLimit) { iv.status = 'revoked'; save(a); return { error: '企业成员已满，邀请失效' }; }
-          iv.status = 'accepted';
+          iv.status = 'accepted'; iv.updatedAt = Date.now();
           org.members.push({ uid: u.id, role: iv.role, status: 'active', joinedAt: Date.now() });
+          if (iv.role === 'owner') {
+            /* 企业主邀请：原 owner 降为管理员，ownerUid 落到新企业主 */
+            (org.members || []).forEach(function (m) {
+              if (m.uid !== u.id && m.role === 'owner' && m.status === 'active') m.role = 'admin';
+            });
+            org.ownerUid = u.id;
+          }
           save(a);
-          if (window.DataBus && DataBus.audit) DataBus.audit('接受邀请', '企业', u.name, '加入 ' + (org.shortName || org.co));
+          if (window.DataBus && DataBus.audit) DataBus.audit('接受邀请', '企业', u.name, '加入 ' + (org.shortName || org.co) + ' 担任 ' + roleLabel(iv.role));
+          try {
+            if (window.DataBus && DataBus.pushDirectMessage && iv.inviterUid && iv.inviterUid !== u.id) {
+              DataBus.pushDirectMessage(iv.inviterUid, '成员已加入企业', u.name + ' 已接受邀请，成为 ' + (org.shortName || org.co) + ' 的' + roleLabel(iv.role) + '。');
+            }
+          } catch (e) {}
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
           /* 接受后自动代表该企业 */
           if (window.UI && UI.state) UI.state.set({ currentOrgId: org.orgId });
           projectAuth();
@@ -236,7 +298,9 @@ window.OrgsStore = (function () {
       var org = a[i];
       for (var j = 0; j < org.invites.length; j++) {
         if (org.invites[j].inviteId === inviteId && org.invites[j].status === 'pending') {
-          org.invites[j].status = 'rejected'; save(a); return { ok: true };
+          org.invites[j].status = 'rejected'; org.invites[j].updatedAt = Date.now(); save(a);
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          return { ok: true };
         }
       }
     }
@@ -247,7 +311,7 @@ window.OrgsStore = (function () {
   function requestJoin(orgId, note) {
     var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
     var st = (window.UI && UI.state) ? UI.state.get() : {};
-    if (st.loggedIn === false) return { error: '请先登录' };
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return { error: '请先登录' };   /* [S5] */
     if (!(u.auth && u.auth.realname && u.auth.realname.ok)) return { error: '需先完成实名认证，才能代表企业' };
     if (membershipOf(u.id, orgId)) return { error: '你已在该企业内' };
     for (var i = 0; i < org.joins.length; i++) {
@@ -299,7 +363,8 @@ window.OrgsStore = (function () {
     return (org.members || []).map(function (m) {
       var u = (window.DataBus && DataBus.byId) ? DataBus.byId(m.uid) : null;
       return { uid: m.uid, role: m.role, status: m.status, joinedAt: m.joinedAt,
-        name: u ? u.name : m.uid, avatar: u ? u.avatar : '?' };
+        name: u ? u.name : m.uid, avatar: u ? u.avatar : '?',
+        mobile: u ? maskMobile(u.mobile || '') : '' };
     }).filter(function (x) { return x.status === 'active'; });
   }
   function canManage(orgId) {
@@ -326,13 +391,16 @@ window.OrgsStore = (function () {
     return { ok: true };
   }
 
-  /* ============ 手机号搜索邀请（v1.1） ============
+  /* ============ 手机号搜索邀请（v1.2） ============
      输入手机号 → 判定该手机号用户状态：
-       - 已注册且已实名认证 → 生成邀请 + 短信 + 站内消息提醒
-       - 已注册未实名       → 短信邀请（引导完成实名认证）
-       - 未注册             → 短信邀请（引导注册）
+       - 已注册且已实名认证 → 生成邀请 + 短信 + 站内消息提醒（case: verified）
+       - 已注册未实名       → 短信邀请引导认证（case: unverified）
+       - 未注册             → 短信邀请引导注册（case: unregistered，姓名取自表单）
+     邀请记录统一写入 org.invites（含 role: owner 企业主邀请）；
+     短信 1 个被邀请账号 1 天 1 次（sendAt / canSendInviteSms / sendInviteSms）。
      短信为演示模拟：写 engchain-sms 短信箱 + 页面 toast 提示。 */
   var SMS_KEY = 'engchain-sms';
+  var SMS_DAY = 24 * 3600 * 1000; /* 一个邀请账号 1 天发送 1 次 */
   function loadSms() {
     try { var raw = LS.getItem(SMS_KEY); var a = raw ? JSON.parse(raw) : []; if (Array.isArray(a)) return a; } catch (e) {}
     return [];
@@ -347,14 +415,69 @@ window.OrgsStore = (function () {
     return rec;
   }
   function smsInbox() { return loadSms(); }
-  function roleLabel(r) { return r === 'admin' ? '管理员' : '成员'; }
-
-  function inviteByMobile(orgId, mobile, role) {
+  function inviteSmsText(orgName, rl, target, name) {
+    if (target) {
+      var real = !!(target.auth && target.auth.realname && target.auth.realname.ok);
+      if (real) return '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '，请登录 App 在企业成员管理中确认。';
+      return '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '。您的账号尚未完成实名认证，请登录 App 完成实名认证后接受邀请。';
+    }
+    return '【工程链】' + orgName + ' 邀请' + (name || '您') + '加入企业团队担任' + rl + '。请注册工程链账号并完成实名认证后加入。';
+  }
+  /* 短信发送限制检查：pending 且距上次发送 ≥ 24h */
+  function canSendInviteSms(orgId, inviteId) {
+    var org = get(orgId); if (!org) return { ok: false, reason: '企业不存在' };
+    var inv = null;
+    for (var i = 0; i < (org.invites || []).length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { ok: false, reason: '邀请不存在' };
+    if (inv.status !== 'pending') return { ok: false, reason: '邀请已处理' };
+    if (inv.sendAt && (Date.now() - inv.sendAt < SMS_DAY)) {
+      return { ok: false, reason: '今日已发送', remain: SMS_DAY - (Date.now() - inv.sendAt) };
+    }
+    return { ok: true };
+  }
+  /* 补发邀请短信：1 天 1 次，超次数返回 error（按钮置灰由 canSendInviteSms 控制） */
+  /* 邀请发起人可管理自己创建的待接受邀请（企业主空缺时，普通成员发起的企业主邀请） */
+  function canManageInvite(org, cm, inv, uid) {
+    if (canInvite(org, cm, inv ? inv.role : '')) return true;
+    if (!inv || inv.status !== 'pending') return false;
+    return inv.inviterUid === uid;
+  }
+  function sendInviteSms(orgId, inviteId) {
     var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
     var cm = membershipOf(u.id, orgId);
-    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可邀请成员' };
+    var inv = null;
+    for (var i = 0; i < org.invites.length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { error: '邀请不存在' };
+    if (!canManageInvite(org, cm, inv, u.id)) return { error: '仅企业主/管理员可发送邀请短信' };
+    if (inv.status !== 'pending') return { error: '邀请已处理，无需再发送' };
+    var chk = canSendInviteSms(orgId, inviteId);
+    if (!chk.ok) return { error: chk.reason === '今日已发送' ? '今日已发送过邀请短信，请明天再试' : chk.reason };
+    var mobile = inv.mobileRaw || '';
+    if (!/^1\d{10}$/.test(mobile)) {
+      var target = inv.targetUid ? ((window.DataBus && DataBus.byId) ? DataBus.byId(inv.targetUid) : null) : null;
+      mobile = (target && target.mobile) || '';
+    }
+    if (!/^1\d{10}$/.test(mobile)) return { error: '该邀请缺少可用手机号' };
+    var rl = roleLabel(inv.role);
+    sendSms(mobile, inviteSmsText(org.shortName || org.co, rl, inv.targetUid ? ((window.DataBus && DataBus.byId) ? DataBus.byId(inv.targetUid) : null) : null, inv.name));
+    inv.sendAt = Date.now(); inv.sendCount = (inv.sendCount || 0) + 1; inv.updatedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('补发邀请短信', '企业', inv.name || maskMobile(mobile), '补发 ' + (org.shortName || org.co) + ' 邀请短信（' + roleLabel(inv.role) + '）');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, sms: maskMobile(mobile) };
+  }
+
+  /* 手机号邀请（含企业主角色与姓名）；role: 'member' | 'admin' | 'owner' */
+  function inviteByMobile(orgId, mobile, role, name) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!canInvite(org, cm, role)) return { error: '仅企业主/管理员可邀请成员' };
     var p = String(mobile || '').replace(/\s+/g, '');
     if (!/^1\d{10}$/.test(p)) return { error: '请输入正确的 11 位手机号' };
+    if (role === 'owner') {
+      if (hasOwner(orgId)) return { error: '该企业已有企业主，不能再邀请企业主' };
+      if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理' };
+    }
     if (memberCount(org) >= org.memberLimit) return { error: '成员数已达上限（' + org.memberLimit + '人），如需扩容请联系平台' };
     var orgName = org.shortName || org.co;
     var rl = roleLabel(role || 'member');
@@ -362,38 +485,114 @@ window.OrgsStore = (function () {
 
     if (target) {
       if (membershipOf(target.id, orgId)) return { error: '该手机号用户已是本企业成员' };
-      var real = !!(target.auth && target.auth.realname && target.auth.realname.ok);
-      if (!real) {
-        /* 已注册未实名：短信邀请引导认证 */
-        sendSms(p, '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '。您的账号尚未完成实名认证，请登录 App 完成实名认证后接受邀请。');
-        (org.mobileInvites = org.mobileInvites || []).push({ id: 'mi-' + Date.now(), mobile: p, result: 'unverified', targetUid: target.id, role: role || 'member', status: 'sent', invitedAt: Date.now() });
-        save(a);
-        if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（未认证）', '企业', target.name, '短信邀请 ' + maskMobile(p) + ' 完成实名认证后加入 ' + orgName);
-        return { ok: true, case: 'unverified', uid: target.id, name: target.name, sms: maskMobile(p) };
-      }
-      /* 已实名认证：生成邀请 + 短信 + 站内消息提醒 */
       for (var i = 0; i < org.invites.length; i++) {
         if (org.invites[i].targetUid === target.id && org.invites[i].status === 'pending') return { error: '已向该用户发出邀请，等待其接受' };
       }
-      org.invites.push({
-        inviteId: 'inv-' + orgId + '-' + target.id + '-' + Date.now(), targetUid: target.id,
-        mobile: maskMobile(p), role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now(), via: 'mobile'
-      });
+      var real = !!(target.auth && target.auth.realname && target.auth.realname.ok);
+      var inv = {
+        inviteId: 'inv-' + orgId + '-' + (target.id || 'm') + '-' + Date.now(), targetUid: target.id,
+        mobile: maskMobile(p), mobileRaw: p, name: target.name || name || '',
+        role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now(),
+        via: 'mobile', sendAt: Date.now(), sendCount: 1
+      };
+      org.invites.push(inv);
       save(a);
-      sendSms(p, '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '，请登录 App 在企业成员管理中确认。');
-      try {
-        if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(target.id, '企业邀请通知', orgName + ' 邀请您加入企业团队担任' + rl + '，请进入"企业成员管理"查看并确认。');
-      } catch (e) {}
-      if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（已认证）', '企业', target.name, '短信+站内消息邀请加入 ' + orgName + ' 担任 ' + rl);
-      return { ok: true, case: 'verified', uid: target.id, name: target.name, sms: maskMobile(p) };
+      sendSms(p, inviteSmsText(orgName, rl, target, name));
+      window.dispatchEvent(new CustomEvent('engchain:org', {}));
+      if (real) {
+        try {
+          if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(target.id, '企业邀请通知', orgName + ' 邀请您加入企业团队担任' + rl + '，请进入「企业成员管理」查看并确认。');
+        } catch (e) {}
+        if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（已认证）', '企业', target.name, '短信+站内消息邀请加入 ' + orgName + ' 担任 ' + rl);
+        return { ok: true, case: 'verified', uid: target.id, name: target.name, sms: maskMobile(p) };
+      }
+      if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（未认证）', '企业', target.name, '短信邀请 ' + maskMobile(p) + ' 完成实名认证后加入 ' + orgName);
+      return { ok: true, case: 'unverified', uid: target.id, name: target.name, sms: maskMobile(p) };
     }
 
     /* 未注册：短信邀请注册 */
-    sendSms(p, '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '。请注册工程链账号并完成实名认证后加入，回复 Y 确认。');
-    (org.mobileInvites = org.mobileInvites || []).push({ id: 'mi-' + Date.now(), mobile: p, result: 'unregistered', role: role || 'member', status: 'sent', invitedAt: Date.now() });
+    var inv2 = {
+      inviteId: 'inv-' + orgId + '-m-' + Date.now(), targetUid: null,
+      mobile: maskMobile(p), mobileRaw: p, name: name || '',
+      role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now(),
+      via: 'mobile', sendAt: Date.now(), sendCount: 1
+    };
+    org.invites.push(inv2);
     save(a);
+    sendSms(p, inviteSmsText(orgName, rl, null, name));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
     if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（未注册）', '企业', maskMobile(p), '短信邀请注册工程链后加入 ' + orgName);
     return { ok: true, case: 'unregistered', sms: maskMobile(p) };
+  }
+
+  /* ============ 邀请修改（v1.2） ============
+     修改待接受邀请的姓名 / 手机号 / 身份；手机号变更会重新识别注册状态并重置短信频率。 */
+  function updateInvite(orgId, inviteId, patch) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    var inv = null;
+    for (var i = 0; i < org.invites.length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { error: '邀请不存在' };
+    if (!canManageInvite(org, cm, inv, u.id)) return { error: '仅企业主/管理员可修改邀请' };
+    if (inv.status !== 'pending') return { error: '邀请已处理，无法修改' };
+    patch = patch || {};
+    var changed = false;
+
+    if (patch.mobile !== undefined && patch.mobile !== null) {
+      var nm = String(patch.mobile).replace(/\s+/g, '');
+      if (!/^1\d{10}$/.test(nm)) return { error: '请输入正确的 11 位手机号' };
+      if (nm !== (inv.mobileRaw || '')) {
+        var t2 = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(nm) : null;
+        if (t2) {
+          if (membershipOf(t2.id, orgId)) return { error: '该手机号用户已是本企业成员' };
+          for (var i = 0; i < org.invites.length; i++) {
+            var oi = org.invites[i];
+            if (oi.inviteId !== inviteId && oi.targetUid === t2.id && oi.status === 'pending') return { error: '已向该用户发出邀请，等待其接受' };
+          }
+          inv.targetUid = t2.id; inv.name = t2.name;
+        } else {
+          inv.targetUid = null;
+        }
+        inv.mobileRaw = nm; inv.mobile = maskMobile(nm);
+        inv.sendAt = 0; inv.sendCount = 0; /* 更换手机号 = 新账号，重置 1 天 1 次频率 */
+        changed = true;
+      }
+    }
+    if (patch.name !== undefined && patch.name !== null && String(patch.name).trim() !== (inv.name || '')) {
+      inv.name = String(patch.name).trim(); changed = true;
+    }
+    if (patch.role !== undefined && patch.role !== inv.role) {
+      if (patch.role === 'owner') {
+        if (hasOwner(orgId)) return { error: '该企业已有企业主，不能改设为企业主' };
+        var curOwnerInv = ownerInviteOf(orgId);
+        if (curOwnerInv && curOwnerInv.inviteId !== inviteId) return { error: '已有待接受的企业主邀请' };
+      }
+      inv.role = patch.role; changed = true;
+    }
+    if (!changed) return { error: '未做任何修改' };
+    inv.updatedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('修改企业邀请', '企业', inv.name || inv.mobile, '修改 ' + (org.shortName || org.co) + ' 的邀请信息');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+
+  /* ============ 邀请通知（消息页「通知」栏目） ============
+     某用户收到的企业邀请（含待处理 / 已接受 / 已拒绝），按最近更新时间倒序。 */
+  function inviteNoticesFor(uid) {
+    var a = load(), out = [];
+    if (!uid) return out;
+    a.forEach(function (org) {
+      (org.invites || []).forEach(function (iv) {
+        if (iv.targetUid === uid && (iv.status === 'pending' || iv.status === 'accepted' || iv.status === 'rejected')) {
+          out.push({ org: org, invite: iv });
+        }
+      });
+    });
+    out.sort(function (x, y) {
+      return ((y.invite.updatedAt || y.invite.createdAt) || 0) - ((x.invite.updatedAt || x.invite.createdAt) || 0);
+    });
+    return out;
   }
 
   /* ============ 退出企业 ============ */
@@ -606,6 +805,9 @@ window.OrgsStore = (function () {
     requestJoin: requestJoin, pendingJoins: pendingJoins, approveJoin: approveJoin, rejectJoin: rejectJoin,
     removeMember: removeMember,
     inviteByMobile: inviteByMobile, smsInbox: smsInbox, sendSms: sendSms,
+    hasOwner: hasOwner, ownerInviteOf: ownerInviteOf,
+    canSendInviteSms: canSendInviteSms, sendInviteSms: sendInviteSms,
+    updateInvite: updateInvite, inviteNoticesFor: inviteNoticesFor,
     leave: leave,
     transfersOf: transfersOf, pendingTransferForUser: pendingTransferForUser,
     ownerConfirmingTransfers: ownerConfirmingTransfers,

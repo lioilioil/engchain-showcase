@@ -1091,9 +1091,8 @@
   function deriveIdentity() {
     var a = AuthStore.read();
     var e = EntryStore.read();
-    var st = (window.UI && UI.state) ? UI.state.get() : {};
-    /* 显式退出登录 → 游客 */
-    if (st && st.loggedIn === false) {
+    /* [S5] 统一游客判断口径（DataBus.isGuest：loggedIn===false 或 status==='guest'） */
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) {
       return { personal: 'none', partner: false, enterprise: 'none', identities: [], entryTypes: [], isGuest: true, primary: 'guest',
         personalEntryUserType: 'jobseeker', personalEntryResumeComplete: false };
     }
