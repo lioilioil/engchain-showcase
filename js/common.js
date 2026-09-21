@@ -2139,3 +2139,69 @@ window.ListFooter = (function () {
   }
 })();
 
+
+/* ============================================================================
+   通用底部弹窗拖拽交互（drag handle 上下滑动关闭）
+   用法：给底部弹窗加 .sheet-draggable 类，并在顶部加 <div class="sheet-drag-handle"></div>
+   ============================================================================ */
+(function () {
+  function initDrag(sheet) {
+    if (sheet._dragInit) return;
+    sheet._dragInit = true;
+    var handle = sheet.querySelector('.sheet-drag-handle');
+    if (!handle) return;
+    var startY = 0, currentY = 0, dragging = false;
+
+    handle.addEventListener('touchstart', function (e) {
+      dragging = true;
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      sheet.classList.add('sheet-dragging');
+    }, { passive: true });
+
+    handle.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      currentY = e.touches[0].clientY;
+      var dy = currentY - startY;
+      if (dy > 0) {
+        sheet.style.transform = 'translateY(' + dy + 'px)';
+      }
+    }, { passive: true });
+
+    handle.addEventListener('touchend', function (e) {
+      if (!dragging) return;
+      dragging = false;
+      sheet.classList.remove('sheet-dragging');
+      var dy = e.changedTouches[0].clientY - startY;
+      if (dy > 80) {
+        // 下滑超过阈值，关闭弹窗
+        var closeBtn = sheet.closest('.sheet-overlay, .modal-overlay, .report-modal, .filter-modal') || sheet.parentElement;
+        if (closeBtn && closeBtn.classList.contains('show')) closeBtn.classList.remove('show');
+        else if (sheet.classList.contains('show')) sheet.classList.remove('show');
+        sheet.style.transform = '';
+      } else {
+        // 回弹
+        sheet.style.transform = '';
+      }
+    }, { passive: true });
+
+    // 点击 handle 也关闭（PC 端）
+    handle.addEventListener('click', function () {
+      var overlay = sheet.closest('.sheet-overlay, .modal-overlay, .report-modal, .filter-modal') || sheet.parentElement;
+      if (overlay && overlay.classList.contains('show')) overlay.classList.remove('show');
+    });
+  }
+
+  function initAll() {
+    document.querySelectorAll('.sheet-draggable').forEach(initDrag);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll);
+  } else {
+    initAll();
+  }
+
+  // 暴露给外部手动调用
+  window.SheetDrag = { init: initDrag, initAll: initAll };
+})();
