@@ -321,6 +321,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     .fs-dialog-hd { padding: 16px 16px 12px; }
     .fs-body { padding: 14px 16px 18px; }
   }
+/* preview 专属：回到顶部按钮固定于左侧边栏（.pv-side 320px）中间位置；
+     覆盖全局 back-to-top.js 的视口底部居中定位；显示/消失与点击逻辑保持不变 */
+  body > .engchain-backtop,
+  body > .engchain-backtop.is-show,
+  body > .engchain-backtop:hover,
+  body > .engchain-backtop:active {
+    left: 160px !important;   /* 边栏宽度 320px 的水平中心 */
+    top: 50% !important;      /* 边栏垂直居中 */
+    bottom: auto !important;  /* 覆盖 JS 动态写入的 bottom 内联值 */
+    transform: translate(-50%, -50%) scale(1) !important;
+  }
 </style>
 </head>
 <body>
@@ -1132,15 +1143,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { localStorage.removeItem('engchain-unlocked'); } catch (e) {}
     if (window.CreditStore) { var c = CreditStore.read(); c.quota = { month: new Date().getFullYear() + '-' + (new Date().getMonth() + 1), used: 0 }; CreditStore.write(c); }
   }
+  /* [S3 FIX] 演示身份 ↔ 用户表预设用户映射：选择器 = DataBus.login(uid)，不再手写 syncBusinessState。
+     login() 自动写 L2 Store（认证/入驻/余额），与 deriveIdentity / orgs.projectAuth 同源，消除双轨跳变。 */
+  var STATUS_USER_MAP = { guest:'u7', registered:'u6', realname:'u5', pro:'u4', enterprise:'u3', resident:'u1' };
+  var ENTRY_USER_MAP  = { construction:'u1', agency:'u2', partner:'u8' };
   sel.addEventListener('change', function (e) {
     var v = e.target.value;
-    var s = loadState();
-    s.status = v;
-    s.demoOverride = v;           /* 演示选择器显式覆盖：业务 Store 按所选身份写入，App 端对齐逻辑不得回写 */
-    s.loggedIn = v !== 'guest';   /* 游客 = 未登录；其余身份均为已登录 */
-    s.member = statusById(v).level >= 3; /* 达到个人专业入驻及以上才解锁 */
-    saveState(s);
-    syncBusinessState(v);
+    var uid = STATUS_USER_MAP[v];
+    if (!uid) return;
+    if (window.DataBus && DataBus.login) DataBus.login(uid);
     renderState(); renderEntry(); renderKPI(); reloadFrame();
   });
   /* ---- M5：运营周期（破冰期/成熟期）切换 + 两周期逻辑差异说明 ---- */
@@ -1197,8 +1208,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   selEntry.addEventListener('change', function () {
     if (selEntry.disabled || !selEntry.value) { selEntry.value = ''; return; } /* 门控防御：仅启用态可选 */
-    var st = loadState(); st.status='resident'; st.demoOverride='resident'; saveState(st);
-    syncBusinessState('resident'); /* 统一写入 auth 前提 + entry（取当前已选类型） */
+    /* [S3] 入驻类型 ↔ 企业入驻用户映射：建筑=u1 / 中介=u2 / 合伙人=u8 */
+    var uid = ENTRY_USER_MAP[selEntry.value];
+    if (uid && window.DataBus && DataBus.login) DataBus.login(uid);
     var label = entryTypeName(selEntry.value) || '';
     UI.toast('已设为：' + label + '（企业入驻）','ok');
     renderState(); renderEntry(); renderKPI(); reloadFrame();
@@ -1256,8 +1268,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var anyEntry = !!(e.type && e.active);
     if (!anyAuth && !anyEntry) {
       var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-      var cuSt = (cu && window.DataBus && DataBus.statusOf) ? DataBus.statusOf(cu) : '';
-      syncBusinessState(cu && cuSt !== 'guest' ? cuSt : 'registered');
+      /* [S3] 首屏空 Store 时按当前账号 login 对齐，不再手写 syncBusinessState */
+      if (cu && window.DataBus && DataBus.login) DataBus.login(cu.id);
     }
   })();
   renderState();

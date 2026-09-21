@@ -908,14 +908,14 @@ window.MOCK = (function () {
   /* ---- 系统消息 (平台通知) ----
      type: row(默认·短消息) | long(长内容) | rich(富文本长内容) | card(富交互卡片) */
   const systemMessages = [
-    { id: 's1', icon: 'box', tint: 'accent', title: '订单解锁成功', text: '您已解锁「成都天府新区商业综合体项目」的完整联系方式，可与对方直接洽谈合作。', time: '今天 09:20', date: '今天', unread: true },
-    { id: 's2', icon: 'wallet', tint: 'success', title: '提现已到账', text: '您申请的 ¥1,000 提现已到账尾号 1234 的银行卡，请注意查收。', time: '昨天 14:05', date: '昨天', unread: true },
-    { id: 's3', icon: 'shield', tint: 'warning', title: '资质认证已通过', text: '您的「建筑劳务分包 · 不分等级」资质已通过人工审核，可在发布或接单时对外展示。', time: '昨天 10:30', date: '昨天', unread: false },
+    { id: 's1', icon: 'box', tint: 'accent', title: '订单解锁成功', text: '您已解锁「成都天府新区商业综合体项目」的完整联系方式，可与对方直接洽谈合作。', time: '今天 09:20', date: '今天', unread: true, action: { label: '查看商机', href: '../supply/detail.html?id=1001', primary: true } },
+    { id: 's2', icon: 'wallet', tint: 'success', title: '提现已到账', text: '您申请的 ¥1,000 提现已到账尾号 1234 的银行卡，请注意查收。', time: '昨天 14:05', date: '昨天', unread: true, action: { label: '查看资金明细', href: '../wallet/index.html', primary: true } },
+    { id: 's3', icon: 'shield', tint: 'warning', title: '资质认证已通过', text: '您的「建筑劳务分包 · 不分等级」资质已通过人工审核，可在发布或接单时对外展示。', time: '昨天 10:30', date: '昨天', unread: false, action: { label: '查看我的认证', href: '../profile/auth.html', primary: true } },
     { id: 's4', icon: 'bell', tint: 'muted', title: '平台公告', text: '关于规范发布商品混凝土类供应信息并核查企业资质的公告，请广大会员及时了解并遵守。', time: '周一 09:00', date: '上周', unread: false },
     { id: 's5', icon: 'info', tint: 'muted', title: '版本更新通知', text: '工程链 3.0 全新上线，新增 AI 智能发布、供需精准匹配与账号安全升级。', time: '2026-08-20', date: '更早', unread: false },
 
     /* —— 长内容 (长篇正文，可展开/收起) —— */
-    { id: 's6', type: 'long', icon: 'doc', tint: 'accent', title: '《工程链用户服务协议》修订说明', time: '今天 11:00', date: '今天', unread: true,
+    { id: 's6', type: 'long', icon: 'doc', tint: 'accent', title: '《工程链用户服务协议》修订说明', time: '今天 11:00', date: '今天', unread: true, action: { label: '查看协议全文', href: '../agreement/user.html', primary: true },
       body: '<p>为持续优化平台服务，我们对《用户服务协议》及相关规则进行了修订，现就主要调整向您说明，请在使用前仔细阅读。</p><p>本轮修订重点涉及账号安全、供需发布规范、资质审核以及资金结算等条款；您继续使用即视为接受修订后的协议。如需查看完整文本，可前往「关于我们 → 用户协议」。</p><p>本卡为演示「长内容」消息的排版：正文可完整折行、随正文长度自适应，并支持展开 / 收起，用于承载较长的平台通知或规则变更说明。</p>' },
 
     /* —— 富文本长内容 (标题/加粗/列表/重点提示) —— */

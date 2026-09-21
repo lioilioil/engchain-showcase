@@ -69,8 +69,14 @@ body { background: var(--bg); }
 }
 .ep-search-btn:active { opacity: .85; }
 
-/* 内容区 */
-.ep-body { padding: 0 0 100px; }
+/* 内容区（滚动容器：.phone 为 overflow:hidden，内部滚动必须在此层） */
+.ep-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding: 0 0 100px;
+}
 
 /* 双模式 Tab */
 .ep-tabs {
@@ -369,6 +375,42 @@ body { background: var(--bg); }
   border: none; cursor: pointer;
 }
 
+/* ═══ 付费深度锁定（企查查式）与工商报告 ═══ */
+.epq-lock { position: relative; margin-top: 2px; }
+.epq-lock .epq-blur { filter: blur(5px); opacity: .4; pointer-events: none; user-select: none; }
+.epq-lock-mask {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 0; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,.15), var(--bg-card) 78%);
+  border-radius: 10px;
+}
+.epq-lock-ic {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--bg-card); box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; justify-content: center; color: var(--primary-dim);
+}
+.epq-lock-ic svg { width: 15px; height: 15px; }
+.epq-lock-tip { font-size: 11px; color: var(--text-3); }
+.epq-lock-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 32px; padding: 0 16px; border: none; border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+  color: var(--text-inv); font-size: 12.5px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 3px 10px -3px var(--primary-dim);
+}
+.epq-lock-btn:active { opacity: .85; }
+.epq-lock-btn svg { width: 12px; height: 12px; }
+.epq-report {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  width: 100%; height: 40px; margin-top: 12px;
+  border: 1px solid var(--primary); border-radius: 10px;
+  background: var(--primary-soft); color: var(--primary-dim);
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.epq-report svg { width: 14px; height: 14px; }
+.epq-report:active { opacity: .8; }
+.epq-report .price { font-family: var(--font-num); font-weight: 700; }
+
 /* 加载态 */
 .ep-loading {
   display: flex; align-items: center; justify-content: center;
@@ -633,7 +675,15 @@ body { background: var(--bg); }
         { name: '陈晓东', position: '总工程师' }
       ],
       branches: ['北京中辉建工集团上海分公司', '北京中辉建工集团成都分公司', '北京中辉建工集团广州分公司'],
-      risk: { law: 0, court: 1, execute: 0, dishonest: 0 }
+      risk: { law: 0, court: 1, execute: 0, dishonest: 0 },
+      investments: [
+        { name: '北京中辉建材有限公司', amount: '3000万元', ratio: '60%' },
+        { name: '成都中辉劳务有限责任公司', amount: '800万元', ratio: '40%' }
+      ],
+      changes: [
+        { date: '2023-05-12', item: '注册资本', content: '由 8000万元 变更为 10000万元' },
+        { date: '2022-11-03', item: '经营范围', content: '新增建筑装修装饰工程设计与施工' }
+      ]
     },
     '成都建工': {
       keyNo: '91510100MA6CXXXX2B',
@@ -661,7 +711,13 @@ body { background: var(--bg); }
         { name: '张伟', position: '财务负责人' }
       ],
       branches: ['成都建工第一工程有限公司绵阳分公司', '成都建工第一工程有限公司德阳分公司'],
-      risk: { law: 2, court: 0, execute: 0, dishonest: 0 }
+      risk: { law: 2, court: 0, execute: 0, dishonest: 0 },
+      investments: [
+        { name: '成都建工建材检测有限公司', amount: '2000万元', ratio: '100%' }
+      ],
+      changes: [
+        { date: '2023-01-18', item: '企业名称', content: '由 成都建工第一建筑工程有限公司 变更为 成都建工第一工程有限公司' }
+      ]
     },
     '四川华西': {
       keyNo: '91510000MA6CXXXX9K',
@@ -799,7 +855,332 @@ body { background: var(--bg); }
     '</div>';
   }
 
-  /* ===== 渲染：企查查工商卡片 ===== */
+  /* ===== 渲染：企查查工商卡片（免费基础 + 付费深度分层） ===== */
+  var QCC_PAY = { unlock: 2.00 }; /* 深度信息单次解锁（元）；PDF 报告生成免费 */
+  var QCC_BUY_KEY = 'engchain_qcc_purchases';
+  function qccPurchases() {
+    try { return JSON.parse(localStorage.getItem(QCC_BUY_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function qccSavePurchases(p) { try { localStorage.setItem(QCC_BUY_KEY, JSON.stringify(p)); } catch (e) {} }
+  var QCC_DEEP_TTL = 24 * 3600 * 1000; /* 深度解锁有效期：付费后 24 小时 */
+  function qccUnlocked(keyNo) {
+    var p = qccPurchases(); var rec = p[keyNo];
+    if (!rec || !rec.unlockAt) return false;
+    return (Date.now() - rec.unlockAt) < QCC_DEEP_TTL;
+  }
+  function qccMarkUnlocked(keyNo) {
+    var p = qccPurchases(); p[keyNo] = p[keyNo] || {};
+    p[keyNo].unlockAt = Date.now(); qccSavePurchases(p);
+  }
+  function qccBalance() {
+    try { return window.BalanceStore ? BalanceStore.available() : 0; } catch (e) { return 0; }
+  }
+  /* 付费确认与扣款（复用钱包账本，余额不足引导充值） */
+  function qccPay(amount, title, desc, onPaid) {
+    var av = qccBalance();
+    if (av + 1e-9 < amount) {
+      UI.dialog({
+        title: '余额不足', ok: '去充值', cancel: '取消',
+        text: '当前可用余额 <b>¥' + av.toFixed(2) + '</b>，本次需要 <b>¥' + amount.toFixed(2) + '</b>。<br><span style="font-size:11px;color:var(--text-3);">充值后返回即可继续。</span>',
+        onOk: function () { location.href = '../wallet/index.html'; }
+      });
+      return;
+    }
+    UI.dialog({
+      title: title, ok: '确认支付 ¥' + amount.toFixed(2), cancel: '取消',
+      text: desc,
+      onOk: function () {
+        var s = BalanceStore.consume(amount, 'qcc', { remark: title });
+        if (!s) { UI.toast('扣费失败，请重试', 'warn'); return; }
+        onPaid();
+      }
+    });
+  }
+  /* 解锁深度信息（企查查式单家解锁） */
+  window.unlockQccDeep = function (keyNo) {
+    qccPay(QCC_PAY.unlock, '解锁深度信息', '本次付费 ¥' + QCC_PAY.unlock.toFixed(2) + '，解锁后 <b>24 小时内</b>可查看该企业深度工商数据（股东、主要人员、对外投资、变更记录、分支机构、司法风险）。', function () {
+      qccMarkUnlocked(keyNo);
+      UI.toast('已解锁，24 小时内可查看深度信息', 'ok');
+      var kw = searchInput.value.trim();
+      if (kw) doSearch(kw);
+    });
+  };
+  /* 生成工商报告入口（PDF 生成器在 v2 补丁） */
+  window.genQccReport = function (keyNo) {
+    var db = null;
+    Object.keys(QCC_MOCK_DB).forEach(function (k) { if (QCC_MOCK_DB[k].keyNo === keyNo) db = QCC_MOCK_DB[k]; });
+    if (!db) { UI.toast('未找到该企业数据', 'warn'); return; }
+    var full = qccUnlocked(keyNo);
+    buildQccReportPdf(db, full ? 'full' : 'basic').then(function (ok) {
+      if (!ok) { UI.toast('报告生成失败，请重试', 'warn'); return; }
+      UI.toast(full ? '完整报告已生成，开始下载' : '基础报告已生成，开始下载', 'ok');
+    });
+  };
+
+  /* ═══════════ 工商报告 PDF 生成器（纯前端 canvas→JPEG→PDF，无外部依赖） ═══════════ */
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+  var QCC_PDF = { W: 992, H: 1403, M: 56, FONT: '"Microsoft YaHei","PingFang SC","Helvetica Neue",sans-serif' };
+  function pdfText(ctx, text, x, y, size, color, weight) {
+    ctx.font = (weight || '400') + ' ' + size + 'px ' + QCC_PDF.FONT;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    ctx.fillText(text, x, y);
+  }
+  function pdfWrap(text, perLine) {
+    var lines = []; var i;
+    for (i = 0; i < text.length; i += perLine) lines.push(text.slice(i, i + perLine));
+    return lines.length ? lines : [''];
+  }
+  /* 手写 PDF：嵌入 JPEG 图像（DCTDecode），A4 版面 */
+  function jpegsToPdf(pages) {
+    var enc = new TextEncoder(); var parts = []; var offset = 0; var offsets = [0];
+    function es(sv) { var u = enc.encode(sv); parts.push(u); offset += u.length; }
+    function eb(u8) { parts.push(u8); offset += u8.length; }
+    es('%PDF-1.4\n');
+    var kids = []; var perPage = 3;
+    var total = 2 + pages.length * perPage;
+    var bodies = [];
+    bodies.push({ text: '<< /Type /Catalog /Pages 2 0 R >>' });
+    bodies.push({ text: '' });
+    pages.forEach(function (p, i) {
+      var pageN = 3 + i * perPage, contentN = 4 + i * perPage, imgN = 5 + i * perPage;
+      kids.push(pageN + ' 0 R');
+      bodies.push({ text: '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 ' + imgN + ' 0 R >> >> /Contents ' + contentN + ' 0 R >>' });
+      var st = 'q 595 0 0 842 0 0 cm /Im0 Do Q';
+      bodies.push({ text: '<< /Length ' + st.length + ' >>\nstream\n' + st + '\nendstream' });
+      var b64 = p.url.split(',')[1];
+      var bin = atob(b64); var u8 = new Uint8Array(bin.length);
+      for (var j = 0; j < bin.length; j++) u8[j] = bin.charCodeAt(j);
+      bodies.push({ text: '<< /Type /XObject /Subtype /Image /Width ' + p.w + ' /Height ' + p.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + u8.length + ' >>\nstream\n', bin: u8, tail: '\nendstream' });
+    });
+    bodies[1].text = '<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + pages.length + ' >>';
+    for (var k = 0; k < bodies.length; k++) {
+      offsets.push(offset);
+      var b = bodies[k];
+      es((k + 1) + ' 0 obj\n' + b.text);
+      if (b.bin) eb(b.bin);
+      if (b.tail) es(b.tail);
+      es('\nendobj\n');
+    }
+    var xrefStart = offset;
+    var x = 'xref\n0 ' + (total + 1) + '\n0000000000 65535 f \n';
+    for (var oi = 1; oi < offsets.length; oi++) {
+      x += (('0000000000' + offsets[oi]).slice(-10) + ' 00000 n \n');
+    }
+    es(x);
+    es('trailer\n<< /Size ' + (total + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF');
+    return new Blob(parts, { type: 'application/pdf' });
+  }
+  /* 生成完整报告 PDF 并触发下载（成功返回 true） */
+  function buildQccReportPdf(db, mode) {
+    try {
+      var full = (mode !== 'basic');
+      var now = new Date();
+      var ts = now.getFullYear() + pad2(now.getMonth() + 1) + pad2(now.getDate()) + pad2(now.getHours()) + pad2(now.getMinutes());
+      var dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+      var reportNo = 'QCC-' + ts;
+      var W = QCC_PDF.W, H = QCC_PDF.H, M = QCC_PDF.M;
+      var availW = W - M * 2;
+      var risk = db.risk || { law: 0, court: 0, execute: 0, dishonest: 0 };
+      var scLines = pdfWrap(db.businessScope || '—', 70).length;
+      var brLines = pdfWrap((db.branches || []).join('　　'), 34).length;
+      var h = 0;
+      h += 168; h += 46 + 12 * 32; h += 46 + scLines * 20 + 8;
+      if (full) {
+        h += 46 + (db.shareholders || []).length * 46;
+        h += 46 + (db.keyPeople || []).length * 32;
+        h += 46 + (db.investments || []).length * 46;
+        h += 46 + brLines * 26 + 8;
+        h += 46 + (db.changes || []).length * 32;
+        h += 46 + 128;
+      }
+      h += 46 + 4 * 2 * 20 + 30; /* 注意事项区 */
+      h += 20;
+      var pages = []; var canvas; var ctx; var y; var pageIdx;
+      function finishPage() { pages[pageIdx] = { url: canvas.toDataURL('image/jpeg', 0.9), w: W, h: H }; }
+      function ensure(hh) { if (y + hh > H - 66) { finishPage(); newPage(); } }
+      function newPage() {
+        canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+        ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, W, H);
+        ctx.save(); ctx.globalAlpha = .05; ctx.translate(W / 2, H / 2); ctx.rotate(-Math.PI / 6);
+        ctx.fillStyle = '#B89968'; ctx.font = '700 76px ' + QCC_PDF.FONT;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('工程链 · 仅供决策参考', 0, 0); ctx.restore();
+        pageIdx = pages.length; pages.push(null); y = M;
+        if (pageIdx > 0) {
+          pdfText(ctx, db.entName + ' · 工商信息报告（续）', M, 18, 10, '#9A8050', '600');
+          ctx.fillStyle = '#B89968'; ctx.fillRect(M, 38, availW, 2); y = 56;
+        }
+      }
+      function section(title) {
+        ensure(34);
+        ctx.fillStyle = '#B89968'; ctx.fillRect(M, y + 2, 4, 14);
+        pdfText(ctx, title, M + 12, y, 13, '#6B4F26', '700');
+        y += 28;
+      }
+      function note(text) {
+        pdfWrap(text, 80).forEach(function (ln) {
+          ensure(22); pdfText(ctx, ln, M, y, 11, '#4A4A4A'); y += 20;
+        });
+        y += 6;
+      }
+      newPage();
+      /* 报告头 */
+      ctx.fillStyle = '#2B2723'; ctx.fillRect(M, y, availW, 118);
+      ctx.fillStyle = '#B89968'; ctx.fillRect(M, y, 6, 118);
+      pdfText(ctx, 'ENGCHAIN · 工程链', M + 20, y + 14, 12, '#D4C09A', '700');
+      pdfText(ctx, db.entName, M + 20, y + 36, 23, '#FFFFFF', '700');
+      pdfText(ctx, '企业工商信息报告' + (full ? '（完整版）' : '（基础版）'), M + 20, y + 74, 13, '#D4C09A', '600');
+      pdfText(ctx, '报告编号 ' + reportNo, W - M - 210, y + 16, 10, '#9A8050', '600');
+      pdfText(ctx, '生成时间 ' + now.toLocaleString('zh-CN'), W - M - 210, y + 32, 10, '#9A8050');
+      y += 140;
+      pdfText(ctx, '数据来源：企查查 API（模拟数据，仅作产品演示） · 数据更新至最新工商登记', M, y, 10, '#9A8050');
+      y += 28;
+      /* 一、基础工商信息 */
+      section('一、基础工商信息');
+      var rows = [
+        ['法定代表人', db.operName], ['统一社会信用代码', db.keyNo],
+        ['注册资本', db.regCap], ['实缴资本', db.actualCap || '—'],
+        ['成立日期', db.estiblishTime], ['企业状态', db.regStatus],
+        ['企业类型', db.companyType], ['所属行业', db.industry],
+        ['登记机关', db.regInstitute], ['注册地址', db.regLocation],
+        ['营业期限', db.startDate + ' 至 ' + db.endDate], ['参保人数', db.staffNum || '—']
+      ];
+      rows.forEach(function (r) {
+        ensure(30);
+        pdfText(ctx, r[0], M, y, 11.5, '#9A8050', '600');
+        pdfText(ctx, r[1], M + 170, y, 12, '#2A2A2A', '400');
+        ctx.strokeStyle = 'rgba(0,0,0,.07)';
+        ctx.beginPath(); ctx.moveTo(M, y + 25); ctx.lineTo(W - M, y + 25); ctx.stroke();
+        y += 32;
+      });
+      y += 6;
+      /* 二、经营范围 */
+      section('二、经营范围');
+      pdfWrap(db.businessScope || '—', 70).forEach(function (ln) {
+        ensure(22); pdfText(ctx, ln, M, y, 12, '#4A4A4A'); y += 20;
+      });
+      y += 8;
+      if (full) {
+        /* 三、股东信息 */
+        section('三、股东信息');
+        (db.shareholders || []).forEach(function (sd) {
+          ensure(44);
+          pdfText(ctx, sd.name, M, y, 12, '#2A2A2A', '600');
+          pdfText(ctx, sd.type + ' · 认缴 ' + sd.amount + ' · 持股 ' + sd.ratio, M, y + 21, 10.5, '#9A8050');
+          y += 46;
+        });
+        y += 4;
+        /* 四、主要人员 */
+        section('四、主要人员');
+        (db.keyPeople || []).forEach(function (p) {
+          ensure(30);
+          pdfText(ctx, p.position, M, y, 11.5, '#9A8050', '600');
+          pdfText(ctx, p.name, M + 170, y, 12, '#2A2A2A');
+          y += 32;
+        });
+        y += 4;
+        /* 五、对外投资 */
+        if ((db.investments || []).length) {
+          section('五、对外投资');
+          (db.investments || []).forEach(function (iv) {
+            ensure(44);
+            pdfText(ctx, iv.name, M, y, 12, '#2A2A2A', '600');
+            pdfText(ctx, '认缴 ' + iv.amount + ' · 持股 ' + iv.ratio, M, y + 21, 10.5, '#9A8050');
+            y += 46;
+          });
+          y += 4;
+        }
+        /* 六、分支机构 */
+        section('六、分支机构（' + (db.branches || []).length + '）');
+        pdfWrap((db.branches || []).join('　　'), 34).forEach(function (ln) {
+          ensure(28); pdfText(ctx, ln, M, y, 11, '#4A4A4A'); y += 26;
+        });
+        y += 8;
+        /* 七、变更记录 */
+        if ((db.changes || []).length) {
+          section('七、变更记录');
+          (db.changes || []).forEach(function (c) {
+            ensure(30);
+            pdfText(ctx, c.date, M, y, 11.5, '#9A8050', '600');
+            pdfText(ctx, c.item + '：' + c.content, M + 120, y, 11.5, '#2A2A2A');
+            y += 32;
+          });
+          y += 4;
+        }
+        /* 八、司法风险 */
+        section('八、司法风险');
+        ensure(128);
+        var items = [
+          ['法律诉讼', risk.law, risk.law ? '#E4572E' : '#2E7D32'],
+          ['法院公告', risk.court, risk.court ? '#E4572E' : '#2E7D32'],
+          ['被执行', risk.execute, risk.execute ? '#DC2626' : '#2E7D32'],
+          ['失信信息', risk.dishonest, risk.dishonest ? '#DC2626' : '#2E7D32']
+        ];
+        var cellW = (availW - 12) / 2, cellH = 52;
+        items.forEach(function (it, idx) {
+          var cx = M + (idx % 2) * (cellW + 12);
+          var cy = y + Math.floor(idx / 2) * (cellH + 10);
+          ctx.fillStyle = '#FAF7F0';
+          ctx.fillRect(cx, cy, cellW, cellH);
+          ctx.strokeStyle = 'rgba(0,0,0,.08)'; ctx.strokeRect(cx, cy, cellW, cellH);
+          pdfText(ctx, it[1] + '', cx + 14, cy + 10, 18, it[2], '700');
+          pdfText(ctx, it[0], cx + 60, cy + 15, 11, '#9A8050');
+        });
+        y += 2 * (cellH + 10) + 6;
+      }
+      /* 注意事项（文件永久有效；数据时点/来源/免责） */
+      section('注意事项');
+      note('1. 数据时点：本报告生成于 ' + dateStr + '，所展示的工商信息以该时点的登记数据为准。');
+      note('2. 数据来源：企查查 API（本系统为产品演示，接入模拟数据），数据更新至最新工商登记。');
+      note('3. 免责声明：本报告仅供决策参考，不对数据的准确性、完整性、及时性作出保证，不构成任何法律、投资或交易建议。');
+      note('4. 本报告文件由您自行留存，永久有效；如企业数据发生变更，请以官方最新登记信息为准。');
+      y += 12;
+      finishPage();
+      /* 每页页脚 */
+      for (var pi = 0; pi < pages.length; pi++) {
+        (function (pi) {
+          var img = new Image();
+          img.onload = function () {
+            var c = document.createElement('canvas'); c.width = W; c.height = H;
+            var cx = c.getContext('2d');
+            cx.drawImage(img, 0, 0);
+            cx.strokeStyle = 'rgba(0,0,0,.1)';
+            cx.beginPath(); cx.moveTo(M, H - 70); cx.lineTo(W - M, H - 70); cx.stroke();
+            pdfText(cx, '免责声明：本报告由工程链平台基于模拟工商数据自动生成，仅供决策参考，不构成任何法律或投资建议。', M, H - 62, 9.5, '#9A8050');
+            pdfText(cx, '第 ' + (pi + 1) + ' 页 / 共 ' + pages.length + ' 页', W - M - 130, H - 40, 9.5, '#9A8050');
+            pages[pi].url = c.toDataURL('image/jpeg', 0.9);
+            pages[pi]._done = true;
+          };
+          img.src = pages[pi].url;
+        })(pi);
+      }
+      /* 等待页脚异步绘制完成后下载 */
+      return new Promise(function (resolve) {
+        var tries = 0;
+        var timer = setInterval(function () {
+          tries++;
+          if (pages.every(function (p) { return p._done; }) || tries > 100) {
+            clearInterval(timer);
+            try {
+              var blob = jpegsToPdf(pages);
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = url;
+              a.download = '工商报告-' + (full ? '完整版' : '基础版') + '-' + db.entName + '-' + ts + '.pdf';
+              document.body.appendChild(a); a.click();
+              setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+              resolve(true);
+            } catch (e) { resolve(false); }
+          }
+        }, 60);
+      });
+    } catch (e) {
+      return Promise.resolve(false);
+    }
+  }
+
   function renderQccCard(d) {
     var risk = d.risk || { law: 0, court: 0, execute: 0, dishonest: 0 };
     var riskHtml =
@@ -810,6 +1191,7 @@ body { background: var(--bg); }
         '<div class="epq-risk-item"><div class="rn ' + (risk.dishonest ? 'bad' : 'ok') + '">' + risk.dishonest + '</div><div class="rl">失信信息</div></div>' +
       '</div>';
 
+    /* 免费层：基础工商信息 */
     var rows = [
       ['法定代表人', '<span class="hl">' + d.operName + '</span>'],
       ['统一社会信用代码', d.keyNo],
@@ -841,6 +1223,34 @@ body { background: var(--bg); }
       return '<div style="display:inline-block;font-size:11px;padding:3px 8px;margin:2px;background:var(--bg-card-2);border-radius:var(--r-full);color:var(--text-2);">' + b + '</div>';
     }).join('');
 
+    /* 深度层（付费锁定，对齐企查查信息层次）：股东 / 主要人员 / 对外投资 / 分支机构 / 变更记录 / 司法风险 */
+    var invRows = (d.investments || []).map(function (iv) {
+      return '<div class="epq-row"><span class="k">对外投资</span><span class="v"><b>' + iv.name + '</b><br><span style="font-size:11px;color:var(--text-3);">认缴 ' + iv.amount + ' · 持股 ' + iv.ratio + '</span></span></div>';
+    }).join('');
+    var chgRows = (d.changes || []).map(function (c) {
+      return '<div class="epq-row"><span class="k">' + c.date + '</span><span class="v">' + c.item + '：' + c.content + '</span></div>';
+    }).join('');
+    var deepBlocks =
+      '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>股东信息</div>' +
+      shRows +
+      '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>主要人员</div>' +
+      peopleRows +
+      ((d.investments && d.investments.length) ? '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 19 17 23 15.79 13.88"/></svg>对外投资</div><div>' + invRows + '</div>' : '') +
+      ((d.branches && d.branches.length) ? '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分支机构（' + d.branches.length + '）</div><div>' + branchHtml + '</div>' : '') +
+      ((d.changes && d.changes.length) ? '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>变更记录</div><div>' + chgRows + '</div>' : '') +
+      '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>司法风险</div>' +
+      riskHtml;
+
+    var unlocked = qccUnlocked(d.keyNo);
+    var deepHtml = unlocked
+      ? deepBlocks
+      : '<div class="epq-lock"><div class="epq-blur">' + deepBlocks + '</div>' +
+        '<div class="epq-lock-mask">' +
+          '<div class="epq-lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>' +
+          '<div class="epq-lock-tip">股东 · 主要人员 · 对外投资 · 分支机构 · 变更记录 · 司法风险</div>' +
+          '<button class="epq-lock-btn" onclick="unlockQccDeep(\'' + d.keyNo + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>解锁深度信息 ¥' + QCC_PAY.unlock.toFixed(2) + '</button>' +
+        '</div></div>';
+
     return '<div class="ep-qcc-card">' +
       '<div class="epq-head" onclick="this.parentElement.classList.toggle(\'open\')">' +
         '<div class="epq-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>' +
@@ -854,19 +1264,14 @@ body { background: var(--bg); }
       '<div class="epq-body">' +
         '<div class="epq-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>工商信息</div>' +
         rowsHtml +
-        '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>股东信息</div>' +
-        shRows +
-        '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>主要人员</div>' +
-        peopleRows +
-        ((d.branches && d.branches.length) ? '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分支机构（' + d.branches.length + '）</div><div>' + branchHtml + '</div>' : '') +
-        '<div class="epq-section-title" style="margin-top:14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>风险信息概览</div>' +
-        riskHtml +
-        '<div class="epq-section-title">经营范围</div>' +
+        '<div class="epq-section-title" style="margin-top:14px;">经营范围</div>' +
         '<div style="font-size:11.5px;color:var(--text-2);line-height:1.6;">' + d.businessScope + '</div>' +
+        deepHtml +
         '<div class="epq-actions">' +
           '<button class="epq-btn epq-btn-primary" onclick="location.href=\'../franchise/index.html\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>查看合作机会</button>' +
           '<button class="epq-btn epq-btn-ghost" onclick="location.href=\'../trade/index.html\'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>建企买卖</button>' +
         '</div>' +
+        '<button class="epq-report" onclick="genQccReport(\'' + d.keyNo + '\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' + (qccUnlocked(d.keyNo) ? '生成完整报告 PDF（免费）' : '生成基础报告 PDF（免费）') + '</button>' +
       '</div>' +
     '</div>';
   }
@@ -912,7 +1317,7 @@ body { background: var(--bg); }
 
     beforeSearch.style.display = 'none';
     afterSearch.style.display = '';
-    document.querySelector('.phone').scrollTop = 0;
+    document.querySelector('.ep-body').scrollTop = 0;
 
     if (currentMode === 'certified') {
       var results = searchCertified(kw);

@@ -163,10 +163,15 @@ window.DataBus = (function () {
   function history() { var h = []; try { h = JSON.parse(LS.getItem(HIST_KEY) || '[]'); } catch (e) {} return Array.isArray(h) ? h : []; }
   function saveHistory(h) { try { LS.setItem(HIST_KEY, JSON.stringify(h)); } catch (e) {} _cacheSet('history', h); return h; }
 
+  /* ---- [S5 FIX] 统一游客判断口径：loggedIn===false 或 status==='guest' ---- */
+  function isGuest() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    return (st.loggedIn === false) || (st.status === 'guest');
+  }
   /* ---- 当前登录用户：engchain-state.account 匹配用户表；显式登出 → 游客；无匹配回退默认 u1 ---- */
   function current() {
     var st = (window.UI && UI.state) ? UI.state.get() : {};
-    if (st.loggedIn === false) return byId('u7') || null;
+    if (isGuest()) return byId('u7') || null;
     var acct = st.account || '';
     var a = loadUsers(), i;
     for (i = 0; i < a.length; i++) if (a[i].account === acct) return a[i];
@@ -205,9 +210,15 @@ window.DataBus = (function () {
     return u;
   }
 
-  /* ---- 退出（游客态） ---- */
+  /* ---- 退出（游客态） ----
+     [S2 FIX] 退出时清空 L2 业务 Store（认证/入驻/余额/积分），并清 demoOverride/currentOrgId，
+     避免残留数据污染下次登录（原只设 loggedIn=false，Store 残留导致身份跳变）。 */
   function logout() {
-    if (window.UI && UI.state) UI.state.set({ loggedIn: false, status: 'guest', member: false });
+    try { if (window.AuthStore && AuthStore.reset) AuthStore.reset(); } catch (e) {}
+    try { if (window.EntryStore && EntryStore.reset) EntryStore.reset(); } catch (e) {}
+    try { if (window.BalanceStore && BalanceStore.reset) BalanceStore.reset(); } catch (e) {}
+    try { if (window.CreditStore && CreditStore.reset) CreditStore.reset(); } catch (e) {}
+    if (window.UI && UI.state) UI.state.set({ loggedIn: false, status: 'guest', member: false, demoOverride: null, currentOrgId: null });
     try { LS.removeItem('engchain-unlocked'); } catch (e) {}
     window.dispatchEvent(new CustomEvent('engchain:login', { detail: { id: 'u7' } }));
     audit('退出登录', '账号', '', '当前账号已登出');
@@ -1023,10 +1034,10 @@ window.DataBus = (function () {
   function seedMessages() {
     var t = function (d) { return new Date(Date.now() - d * 864e5).toISOString().slice(0, 10); };
     return [
-      { id:'MSG1005', type:'公告', title:'破冰期扶持政策延续', body:'建筑企业 0 元入驻、中介 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target:'全部用户', ts:t(1) },
-      { id:'MSG1004', type:'系统', title:'对公转账入账优化', body:'对公转账审批通过后将自动入账至钱包余额，无需手动确认。', target:'入驻企业', ts:t(2) },
+      { id:'MSG1005', type:'公告', title:'破冰期扶持政策延续', body:'建筑企业 0 元入驻、中介 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target:'全部用户', ts:t(1), action:{ label:'查看活动', href:'../co-create/index.html' } },
+      { id:'MSG1004', type:'系统', title:'对公转账入账优化', body:'对公转账审批通过后将自动入账至钱包余额，无需手动确认。', target:'入驻企业', ts:t(2), action:{ label:'查看钱包', href:'../wallet/index.html' } },
       { id:'MSG1003', type:'风控', title:'防跳单治理规则提醒', body:'平台将对线下跳单行为实施警告、禁聊、罚款直至清退处罚，请遵守撮合规则。', target:'全部用户', ts:t(4) },
-      { id:'MSG1002', type:'活动', title:'共创者计划招募', body:'诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与佣金阶段性减免。', target:'认证企业', ts:t(6) },
+      { id:'MSG1002', type:'活动', title:'共创者计划招募', body:'诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与佣金阶段性减免。', target:'认证企业', ts:t(6), action:{ label:'立即参与', href:'../co-create/index.html' } },
       { id:'MSG1001', type:'系统', title:'平台例行维护通知', body:'本周六 02:00-04:00 系统例行维护，期间部分功能暂不可用，敬请谅解。', target:'全部用户', ts:t(8) }
     ];
   }
@@ -1047,7 +1058,7 @@ window.DataBus = (function () {
   function saveMessages(a) { try { LS.setItem(MSG_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('messages', a); return a; }
   function publishMessage(m) {
     var a = loadMessages();
-    a.unshift({ id: 'MSG' + String(Date.now()).slice(-5), type: m.type || '公告', title: m.title || '', body: m.body || '', target: m.target || '全部用户', ts: new Date().toISOString().slice(0, 10), admin: true });
+    a.unshift({ id: 'MSG' + String(Date.now()).slice(-5), type: m.type || '公告', title: m.title || '', body: m.body || '', target: m.target || '全部用户', ts: new Date().toISOString().slice(0, 10), admin: true, action: m.action || null, detail: m.detail || null });
     saveMessages(a);
     window.dispatchEvent(new CustomEvent('engchain:messages', { detail: a[0] }));
     return a[0];
@@ -1572,21 +1583,27 @@ window.DataBus = (function () {
     try {
       if (!window.UI || !UI.state || !window.AuthStore || !window.EntryStore) return;
       var st = UI.state.get();
-      if (st.loggedIn === false) return;              /* 显式退出 → 保持游客 */
-      if (st.demoOverride) return;                    /* preview 演示选择器显式覆盖 → 尊重 */
+      if (isGuest()) return;                          /* [S5] 统一游客判断 */
+      if (st.demoOverride) return;                    /* 历史演示标记残留 → 尊重 */
       var u = current();
       if (!u || u.status === 'guest') return;         /* 游客 → 不写身份 */
       var a = AuthStore.read(), e = EntryStore.read();
-      var anyAuth = !!(a && ((a.realname && a.realname.ok) || (a.enterprise && a.enterprise.ok) ||
-        (a.qual && a.qual.ok) || (a.partner && a.partner.ok) || (a.personalEntry && a.personalEntry.ok)));
-      var anyEntry = !!(e && ((e.types && e.types.length && e.active) || (e.type && e.active)));
-      if (anyAuth || anyEntry) return;                /* 已有身份数据 → 尊重，不覆盖 */
+      var snapA = u.auth || {}, snapE = u.entry || {};
+      /* [S4 FIX] 一致性校验：L2 Store 与 L1 用户表快照关键字段不一致 → 重对齐 */
+      var authMatch = (!!(a && a.enterprise && a.enterprise.ok)) === (!!(snapA.enterprise && snapA.enterprise.ok))
+        && (!!(a && a.realname && a.realname.ok)) === (!!(snapA.realname && snapA.realname.ok))
+        && (!!(a && a.partner && a.partner.ok)) === (!!(snapA.partner && snapA.partner.ok))
+        && (!!(a && (a.qual && a.qual.ok || a.personalQual && a.personalQual.ok || a.personalEntry && a.personalEntry.ok)))
+        === (!!(snapA && (snapA.qual && snapA.qual.ok || snapA.personalQual && snapA.personalQual.ok || snapA.personalEntry && snapA.personalEntry.ok)));
+      var entryMatch = (!!(e && e.active && e.status === 'active')) === (!!(snapE.active && snapE.status === 'active'));
+      if (authMatch && entryMatch) return;            /* 一致 → 尊重，不覆盖 */
+      /* 不一致 → 按 L1 用户表重对齐 L2 */
       var st2 = statusOf(u);
-      AuthStore.write(JSON.parse(JSON.stringify(u.auth || {})));
-      EntryStore.write(JSON.parse(JSON.stringify(u.entry || {})));
+      AuthStore.write(JSON.parse(JSON.stringify(snapA)));
+      EntryStore.write(JSON.parse(JSON.stringify(snapE)));
       UI.state.set({
         user: u.name, company: u.company || '', account: u.account || '',
-        loggedIn: u.status !== 'guest', status: st2,
+        loggedIn: true, status: st2,
         member: (st2 === 'resident' || st2 === 'enterprise' || st2 === 'pro' || st2 === 'partner')
       });
     } catch (err) { /* 对齐失败不阻塞页面 */ }
@@ -1598,7 +1615,7 @@ window.DataBus = (function () {
   return {
     USERS_KEY: USERS_KEY, HIST_KEY: HIST_KEY, AUDIT_KEY: AUDIT_KEY,
     users: loadUsers, byId: byId, byMobile: byMobile, current: current, history: history,
-    login: login, logout: logout, resetAll: resetAll, audit: audit, syncUser: syncUser, stats: stats,
+    login: login, logout: logout, resetAll: resetAll, audit: audit, syncUser: syncUser, stats: stats, isGuest: isGuest,
     ensureCurrentSynced: ensureCurrentSynced,
     seed: seedUsers,
     /* Phase 2 运营中心 */

@@ -21,11 +21,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="topbar">
       <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
       <div class="topbar-title">消息</div>
-      <div class="topbar-right"><span style="color:var(--text-3);font-size:12px;">共 <span class="green" id="total-unread">0</span> 条未读</span></div>
+      <div class="topbar-right"><button type="button" class="msg-search-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic" style="width:20px;height:20px;"><use href="#i-search"/></svg></button></div>
     </div>
     <div class="msg-tabs" id="msg-tabs">
       <button class="msg-tab active" data-tab="conv">会话<span class="mt-badge" id="badge-conv" style="display:none;">0</span></button>
       <button class="msg-tab" data-tab="notice">通知<span class="mt-badge" id="badge-notice" style="display:none;">0</span></button>
+    </div>
+    <div class="msg-search" id="msg-search" style="display:none;">
+      <div class="msg-search-box">
+        <svg class="ic msg-search-ic"><use href="#i-search"/></svg>
+        <input class="msg-search-input" id="msg-search-input" type="search" placeholder="搜索会话与通知" autocomplete="off">
+        <button type="button" class="msg-search-clear" id="msg-search-clear" aria-label="清空">×</button>
+      </div>
+      <button type="button" class="msg-search-cancel" id="msg-search-cancel">取消</button>
     </div>
   </div>
 
@@ -34,22 +42,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div id="list"></div>
     </div>
     <div id="pane-notice" style="display:none;">
-      <a class="sys-entry" href="system.html">
-        <div class="se-ic accent"><svg class="ic"><use href="#i-bell"/></svg></div>
-        <div class="se-body">
-          <div class="se-top"><span class="se-name">系统消息</span><span class="se-time" id="sys-last-time">今天</span></div>
-          <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span></div>
-        </div>
-      </a>
-      <div id="ops-list"></div>
-      <a class="sys-entry" href="#" onclick="showMatchFeed();return false;">
-        <div class="se-ic" style="background:rgba(139,123,181,.15);color:#8B7BB5;"><svg class="ic"><use href="#i-star"/></svg></div>
-        <div class="se-body">
-          <div class="se-top"><span class="se-name">智能推荐</span><span class="se-time" id="match-time">今日更新</span></div>
-          <div class="se-last"><span class="se-preview" id="match-preview">根据您的偏好推送匹配供需</span><span class="badge" id="match-unread" style="display:none;">0</span></div>
-        </div>
-      </a>
+      <div class="notice-subbar" id="notice-subbar">
+        <button type="button" class="nsub active" data-cat="全部">全部</button>
+        <button type="button" class="nsub" data-cat="公告">公告</button>
+        <button type="button" class="nsub" data-cat="订单">订单</button>
+        <button type="button" class="nsub" data-cat="资金">资金</button>
+        <button type="button" class="nsub" data-cat="认证">认证</button>
+        <button type="button" class="nsub" data-cat="系统">系统</button>
+        <button type="button" class="nsub" data-cat="风控">风控</button>
+        <button type="button" class="nsub" data-cat="活动">活动</button>
+        <button type="button" class="nsub" data-cat="邀请">邀请</button>
+        <button type="button" class="nsub" data-cat="推荐">推荐</button>
+      </div>
+      <div id="notice-list"></div>
     </div>
+    <div id="msg-search-res" style="display:none;"></div>
   </div>
 </div>
 
@@ -57,11 +64,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
 
-  var TYPE_STYLE = { '公告': 'gold', '系统': 'info', '风控': 'danger', '活动': 'warn' };
+  var TYPE_STYLE = { '公告': 'gold', '系统': 'info', '风控': 'danger', '活动': 'warn', '订单': 'info', '资金': 'success', '认证': 'accent', '邀请': 'gold', '推荐': 'accent' };
   function fmtTs(ts) {
     if (!ts) return '';
     var d = new Date(String(ts).indexOf('-') === 0 ? ts : (String(ts).length === 10 ? ts + 'T00:00:00' : ts));
@@ -91,36 +99,380 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var readIds = readMsgIds();
     return list.filter(function (m) { return readIds.indexOf(m.id) < 0; }).length;
   }
-  function renderOps() {
-    var list = readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
-    var latest = list[0] || {};
-    document.getElementById('sys-last').textContent = latest.title ? (latest.title + '：' + (latest.body || '').slice(0, 32)) : '';
-    document.getElementById('sys-last-time').textContent = fmtTs(latest.ts) || '';
-    var su = document.getElementById('sys-unread');
-    var unread = sysUnreadCount();
-    su.textContent = unread;
-    su.style.display = unread ? '' : 'none';
-    /* 运营公告区（前 3 条） */
-    var ops = document.getElementById('ops-list');
-    if (!ops) return;
-    ops.innerHTML = list.slice(0, 3).map(function (m) {
-      var st = TYPE_STYLE[m.type] || 'info';
-      var stc = st === 'gold' ? 'var(--primary)' : st === 'danger' ? '#dc2626' : st === 'warn' ? '#d97706' : 'var(--primary)';
-      var stbg = st === 'gold' ? 'rgba(201,169,97,.15)' : st === 'danger' ? 'rgba(220,38,38,.1)' : st === 'warn' ? 'rgba(217,119,6,.1)' : 'rgba(46,102,255,.08)';
-      return '<div style="padding:14px 4px;border-bottom:1px solid var(--line);">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-        '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:' + stc + ';background:' + stbg + ';">' + (m.type || '系统') + '</span>' +
-        '<span class="fw-600 fs-13 elip" style="flex:1;">' + (m.title || '') + '</span>' +
-        '<span class="text-3" style="font-size:10px;">' + fmtTs(m.ts) + '</span></div>' +
-        '<div class="text-2 fs-12" style="line-height:1.6;">' + (m.body || '') + '</div>' +
-        '<div class="text-3" style="font-size:10px;margin-top:4px;">发送对象：' + (m.direct ? '仅本人' : (m.target || '全部用户')) + '</div></div>';
-    }).join('') || '<div class="text-3" style="font-size:12px;padding:14px 4px;">暂无运营消息，后台发布后将实时同步至 App</div>';
+  /* ================= 消息页 v2：通知分页合并 + 搜索 =================
+     消息类型真实枚举（经数据源核实）：
+     - 运营消息 type = { 公告, 系统, 风控, 活动 }；定向系统消息(direct:true) type='系统'
+     - 原 system.html 静态消息主题 = { 订单, 资金, 认证, 公告 }（无独立"交易"类型，交易相关归入订单/资金）
+     - 独立消息流：企业邀请（engchain-orgs）、智能推荐（engchain-matches）
+     子 bar 修正：全部 / 公告 / 订单 / 资金 / 认证 / 系统 / 风控 / 活动 / 邀请 / 推荐 */
+  var noticeFilter = '全部';
+  var curTab = 'conv';
+  var searchMode = false;
+
+  /* 系统消息已读（独立键，避免与运营消息 engchain-msg-read 混用） */
+  var SYS_READ_KEY = 'engchain-sys-read';
+  function readSysIds() { try { return JSON.parse(localStorage.getItem(SYS_READ_KEY) || '[]'); } catch (e) { return []; } }
+  function writeSysIds(ids) { try { localStorage.setItem(SYS_READ_KEY, JSON.stringify(ids)); } catch (e) {} }
+  function isSysRead(id) { return readSysIds().indexOf(id) >= 0; }
+  function markSysRead(id) { var ids = readSysIds(); if (ids.indexOf(id) < 0) { ids.push(id); writeSysIds(ids); } }
+  function sysMsgUnreadCount() {
+    try { return ((window.MOCK && MOCK.systemMessages) || []).filter(function (m) { return !isSysRead(m.id); }).length; } catch (e) { return 0; }
   }
 
-  
-  renderOps();
-  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages') renderOps(); });
-  window.addEventListener('engchain:messages', function () { renderOps(); });
+  function tsNum(t) { if (!t) return 0; var d = new Date(String(t).length === 10 ? t + 'T00:00:00' : t); return isNaN(d) ? 0 : d.getTime(); }
+
+  /* 类型标签配色（沿用 TYPE_STYLE 视觉语言） */
+  function catStyle(cat) {
+    var map = {
+      '公告': { c: 'var(--primary)', b: 'rgba(201,169,97,.15)' },
+      '订单': { c: 'var(--primary-dim)', b: 'rgba(46,102,255,.08)' },
+      '资金': { c: '#2E9E5B', b: 'rgba(46,158,91,.1)' },
+      '认证': { c: '#8B7BB5', b: 'rgba(139,123,181,.12)' },
+      '系统': { c: 'var(--primary-dim)', b: 'rgba(46,102,255,.08)' },
+      '风控': { c: '#dc2626', b: 'rgba(220,38,38,.1)' },
+      '活动': { c: '#d97706', b: 'rgba(217,119,6,.1)' },
+      '邀请': { c: 'var(--primary-dim)', b: 'rgba(184,153,104,.13)' },
+      '推荐': { c: '#8B7BB5', b: 'rgba(139,123,181,.12)' }
+    };
+    var st = map[cat] || map['系统'];
+    return 'color:' + st.c + ';background:' + st.b;
+  }
+
+  /* 系统消息主题 → 类型（标题关键词映射；"交易"无独立类型，归入订单/资金） */
+  function catOfSys(m) {
+    var t = (m.title || '') + (m.text || '') + (m.desc || '');
+    if (/公告/.test(m.title || '')) return '公告';
+    if (/订单|解锁/.test(t)) return '订单';
+    if (/提现|到账|转账|佣金|结算|入账|余额|钱包|资金/.test(t)) return '资金';
+    if (/认证|资质|审核/.test(t)) return '认证';
+    return '公告';
+  }
+
+  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 智能推荐），按时间倒序 */
+  function buildNoticeItems() {
+    var items = [];
+    readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); }).forEach(function (m) {
+      var cat = TYPE_STYLE[m.type] ? m.type : '系统';
+      var _guess = guessAction(m.title || '', m.body || '');
+      items.push({
+        kind: 'msg', cat: cat, id: m.id, title: m.title || '',
+        body: (m.body || '') + (m.target ? ' · ' + (m.direct ? '仅本人' : m.target) : ''),
+        time: fmtTs(m.ts), ts: tsNum(m.ts), unread: !isMsgRead(m.id),
+        actions: m.action ? [m.action] : (_guess ? [_guess] : []),
+        detail: m.detail || m.body || ''
+      });
+    });
+    ((window.MOCK && MOCK.systemMessages) || []).forEach(function (m, i) {
+      items.push({
+        kind: 'sys', cat: catOfSys(m), id: m.id, title: m.title || '',
+        body: m.text || m.desc || '', time: m.time || '',
+        ts: Date.now() - (i + 1) * 3600e3, unread: !isSysRead(m.id),
+        actions: (m.actions && m.actions.length) ? m.actions.slice(0, 2) : (m.action ? [m.action] : []),
+        detail: m.body ? String(m.body).replace(/<[^>]*>/g, ' ') : (m.text || m.desc || '')
+      });
+    });
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (me && window.OrgsStore) {
+        OrgsStore.inviteNoticesFor(me.id).slice(0, 20).forEach(function (item) {
+          var org = item.org, iv = item.invite;
+          var rl = { owner: '企业主', admin: '管理员', member: '成员' }[iv.role] || '成员';
+          items.push({
+            kind: 'inv', cat: '邀请', id: iv.inviteId,
+            title: (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl,
+            body: iv.name ? '（' + esc(iv.name) + '）' : '',
+            time: fmtInvTime(iv.updatedAt || iv.createdAt), ts: tsNum(iv.updatedAt || iv.createdAt || 0),
+            unread: iv.status === 'pending', invite: iv
+          });
+        });
+      }
+    } catch (e) {}
+    try {
+      var feed = (MatchStore.read && MatchStore.read().feed) || [];
+      feed.forEach(function (x) {
+        items.push({
+          kind: 'match', cat: '推荐', id: x.sourceId || x.id, title: x.title || '',
+          body: (x.type === 'supply' ? '供应' : '需求') + ' · ' + (x.cat || '') + (x.location ? ' · ' + x.location : ''),
+          time: '', ts: 0, unread: !x.read, match: x
+        });
+      });
+    } catch (e) {}
+    return items.sort(function (a, b) { return b.ts - a.ts; });
+  }
+
+  /* 通知未读角标 = 运营 + 系统 + 邀请 + 推荐 */
+  function renderNoticeBadge() {
+    var n = sysUnreadCount() + sysMsgUnreadCount() + inviteUnreadCount();
+    try { n += (MatchStore.listUnread ? MatchStore.listUnread().length : 0); } catch (e) {}
+    var bn = document.getElementById('badge-notice');
+    if (!bn) return;
+    bn.textContent = n; bn.style.display = n ? '' : 'none';
+  }
+
+  /* 统一通知列表渲染（按子 bar 筛选） */
+  function renderNoticeList() {
+    var box = document.getElementById('notice-list');
+    if (!box) return;
+    var items = buildNoticeItems().filter(function (x) { return noticeFilter === '全部' || x.cat === noticeFilter; });
+    if (!items.length) {
+      box.innerHTML = '<div class="n-empty">' + (noticeFilter === '全部' ? '暂无通知' : '暂无「' + esc(noticeFilter) + '」类通知') + '</div>';
+      return;
+    }
+    box.innerHTML = items.map(function (x) {
+      var dot = x.unread ? '<span class="n-dot"></span>' : '';
+      var click = '';
+      if (x.kind === 'msg') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
+      if (x.kind === 'sys') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
+      if (x.kind === 'match') click = ' onclick="showMatchFeed();return false;"';
+      var acts = '';
+      if (x.kind === 'inv') {
+        acts = x.invite.status === 'pending'
+          ? '<div class="inv-act-row">' +
+              '<button class="inv-act ok" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'accept\',this)">确认加入</button>' +
+              '<button class="inv-act no" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'reject\',this)">拒绝</button>' +
+            '</div>'
+          : '<span class="inv-act-state ' + (x.invite.status === 'accepted' ? 'done' : 'no') + '">' + (x.invite.status === 'accepted' ? '已加入' : '已拒绝') + '</span>';
+      }
+      if ((x.kind === 'msg' || x.kind === 'sys') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办/.test((x.title || '') + (x.body || ''));
+        acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
+          var on = 'event.stopPropagation();readNotice(\'' + esc(x.id) + '\',\'' + x.kind + '\')';
+          var href = esc(a.href || '#');
+          var label = esc(a.label || '查看详情');
+          if (ai === 0) {
+            if (needAct) return '<a class="n-btn primary" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+            return '<a class="n-link" href="' + href + '" onclick="' + on + '">' + label + ' ›</a>';
+          }
+          return '<a class="n-link muted" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+        }).join('') + '</div>';
+      }
+      var score = (x.kind === 'match' && x.match && x.match.matchScore != null) ? '<div class="n-score">' + x.match.matchScore + '% 匹配</div>' : '';
+      return '<div class="n-item" data-kind="' + x.kind + '"' + click + '>' +
+        '<div class="n-head"><span class="n-cat" style="' + catStyle(x.cat) + '">' + esc(x.cat) + '</span>' +
+        '<span class="n-title">' + esc(x.title) + '</span>' +
+        (x.time ? '<span class="n-time">' + esc(x.time) + '</span>' : '') + '</div>' +
+        '<div class="n-body">' + (x.body ? esc(x.body) : '') + '</div>' +
+        score + acts + dot +
+        '</div>';
+    }).join('');
+  }
+  /* ---- 消息交互：业务动作跳转 + 详情 sheet + 关键词兜底 ---- */
+  function guessAction(title, body) {
+    var t = title + ' ' + body;
+    if (/成员已加入|已接受邀请|加入企业|企业主|移交/.test(t)) return { label: '查看成员', href: '../profile/org-members.html' };
+    if (/认证|资质/.test(t)) return { label: '查看我的认证', href: '../profile/auth.html' };
+    if (/提现|到账|转账|佣金|入账|余额|钱包/.test(t)) return { label: '查看资金明细', href: '../wallet/index.html' };
+    if (/共创|招募|活动/.test(t)) return { label: '立即参与', href: '../co-create/index.html' };
+    return null;
+  }
+  function noticeItemById(id, kind) {
+    var list = buildNoticeItems();
+    for (var i = 0; i < list.length; i++) if (list[i].kind === kind && String(list[i].id) === String(id)) return list[i];
+    return null;
+  }
+  window.openNotice = function (id, kind) {
+    if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
+    else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
+    var it = noticeItemById(id, kind);
+    if (!it) return;
+    /* 有明确业务落点：直接进入主操作 */
+    if (it.actions && it.actions.length && it.actions[0].href && it.actions[0].href !== '#') {
+      location.href = it.actions[0].href;
+      return;
+    }
+    showNoticeDetail(it);
+  };
+  function showNoticeDetail(it) {
+    var head = '<div class="nd-head"><span class="n-cat" style="' + catStyle(it.cat) + '">' + esc(it.cat) + '</span>' +
+      '<span class="nd-time">' + esc(it.time || '') + '</span></div>' +
+      '<div class="nd-title">' + esc(it.title) + '</div>' +
+      '<div class="nd-body">' + esc(it.detail || it.body || '') + '</div>';
+    var foot = '';
+    if (it.actions && it.actions.length) {
+      foot = '<div class="nd-acts">' + it.actions.map(function (a, ai) {
+        return '<a class="n-btn ' + (ai === 0 ? 'primary' : 'ghost') + '" href="' + esc(a.href || '#') + '">' + esc(a.label || '查看详情') + '</a>';
+      }).join('') + '</div>';
+    }
+    var sh = UI.sheet(); sh.setText('通知详情'); sh.html('<div class="nd">' + head + foot + '</div>'); sh.show();
+  }
+  window.readNotice = function (id, kind) {
+    if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
+    else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
+  };
+  function bindSubbar() {
+    var bar = document.getElementById('notice-subbar');
+    if (!bar) return;
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.nsub') : null;
+      if (!b) return;
+      noticeFilter = b.getAttribute('data-cat');
+      var all = bar.querySelectorAll('.nsub');
+      for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i] === b);
+      renderNoticeList();
+    });
+  }
+
+  /* ========== 搜索：会话 + 通知联合过滤 ========== */
+  function setSearchMode(on) {
+    searchMode = on;
+    document.getElementById('msg-search').style.display = on ? 'flex' : 'none';
+    document.getElementById('msg-tabs').style.display = on ? 'none' : 'flex';
+    document.getElementById('msg-search-res').style.display = on ? '' : 'none';
+    document.getElementById('pane-conv').style.display = (on || curTab !== 'conv') ? 'none' : '';
+    document.getElementById('pane-notice').style.display = (on || curTab !== 'notice') ? 'none' : '';
+    if (on) {
+      var inp = document.getElementById('msg-search-input');
+      inp.value = ''; renderSearch('');
+      setTimeout(function () { try { inp.focus(); } catch (e) {} }, 60);
+    } else {
+      renderNoticeList();
+    }
+  }
+  function renderSearch(kw) {
+    var box = document.getElementById('msg-search-res');
+    if (!box) return;
+    kw = (kw || '').trim();
+    if (!kw) { box.innerHTML = '<div class="n-empty">输入关键词，搜索会话与通知</div>'; return; }
+    var low = kw.toLowerCase();
+    var hits = [];
+    (readConvs().list || []).forEach(function (c) {
+      if ((c.name || '').toLowerCase().indexOf(low) >= 0 || (c.last || '').toLowerCase().indexOf(low) >= 0 || (c.role || '').toLowerCase().indexOf(low) >= 0) {
+        hits.push({ kind: 'conv', cat: '会话', id: c.id, title: c.name || '', body: c.last || '', time: c.time || '', unread: !!c.unread });
+      }
+    });
+    buildNoticeItems().forEach(function (x) {
+      if ((x.title || '').toLowerCase().indexOf(low) >= 0 || (x.body || '').toLowerCase().indexOf(low) >= 0) hits.push(x);
+    });
+    if (!hits.length) {
+      box.innerHTML = '<div class="n-empty">未找到与「' + esc(kw) + '」相关的会话或通知</div>';
+      return;
+    }
+    box.innerHTML = '<div class="sr-hint">共 ' + hits.length + ' 条结果</div>' + hits.map(function (x) {
+      var dot = x.unread ? '<span class="n-dot"></span>' : '';
+      var open = '';
+      if (x.kind === 'conv') open = ' onclick="openSearchConv(\'' + esc(x.id) + '\')"';
+      if (x.kind === 'msg') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
+      if (x.kind === 'sys') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
+      if (x.kind === 'match') open = ' onclick="showMatchFeed();return false;"';
+      var acts = '';
+      if (x.kind === 'inv' && x.invite && x.invite.status === 'pending') {
+        acts = '<div class="inv-act-row">' +
+          '<button class="inv-act ok" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'accept\',this)">确认加入</button>' +
+          '<button class="inv-act no" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'reject\',this)">拒绝</button>' +
+          '</div>';
+      }
+      if ((x.kind === 'msg' || x.kind === 'sys') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办/.test((x.title || '') + (x.body || ''));
+        acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
+          var on = 'event.stopPropagation();readNotice(\'' + esc(x.id) + '\',\'' + x.kind + '\')';
+          var href = esc(a.href || '#');
+          var label = esc(a.label || '查看详情');
+          if (ai === 0) {
+            if (needAct) return '<a class="n-btn primary" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+            return '<a class="n-link" href="' + href + '" onclick="' + on + '">' + label + ' ›</a>';
+          }
+          return '<a class="n-link muted" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+        }).join('') + '</div>';
+      }
+      return '<div class="n-item" data-kind="' + x.kind + '"' + open + '>' +
+        '<div class="n-head"><span class="n-cat" style="' + catStyle(x.cat) + '">' + esc(x.cat) + '</span>' +
+        '<span class="n-title">' + esc(x.title) + '</span>' +
+        (x.time ? '<span class="n-time">' + esc(x.time) + '</span>' : '') + '</div>' +
+        '<div class="n-body">' + (x.body ? esc(x.body) : '') + '</div>' +
+        acts + dot + '</div>';
+    }).join('');
+  }
+  window.openSearchConv = function (id) {
+    try {
+      var convs = JSON.parse(localStorage.getItem(CONV_DEMO_KEY) || '[]');
+      var changed = false;
+      convs.forEach(function (c) { if (c.id === id && c.unread) { c.unread = 0; changed = true; } });
+      if (changed) localStorage.setItem(CONV_DEMO_KEY, JSON.stringify(convs));
+    } catch (err) {}
+    location.href = 'chat.html?id=' + id;
+  };
+  function bindSearch() {
+    var btn = document.getElementById('msg-search-btn');
+    var cancel = document.getElementById('msg-search-cancel');
+    var clear = document.getElementById('msg-search-clear');
+    var input = document.getElementById('msg-search-input');
+    if (btn) btn.addEventListener('click', function () { setSearchMode(true); });
+    if (cancel) cancel.addEventListener('click', function () { setSearchMode(false); });
+    if (clear) clear.addEventListener('click', function () { input.value = ''; renderSearch(''); try { input.focus(); } catch (e) {} });
+    if (input) input.addEventListener('input', function () { renderSearch(input.value); });
+  }
+
+  function esc(s) { return window.UI && UI.esc ? UI.esc(s) : String(s); }
+
+  /* ---- 企业邀请通知：邀请公司团队成员入驻 → 通知栏目确认/解决 ---- */
+  function inviteUnreadCount() {
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (!me || !window.OrgsStore) return 0;
+      return OrgsStore.inviteNoticesFor(me.id).filter(function (x) { return x.invite.status === 'pending'; }).length;
+    } catch (e) { return 0; }
+  }
+  function fmtInvTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  function renderInviteNotices() {
+    var box = document.getElementById('invite-notices');
+    if (!box) return;
+    var list = [];
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (me && window.OrgsStore) list = OrgsStore.inviteNoticesFor(me.id);
+    } catch (e) {}
+    if (!list.length) { box.innerHTML = ''; return; }
+    var roleTxt = { owner: '企业主', admin: '管理员', member: '成员' };
+    box.innerHTML =
+      '<div class="inv-sec-head">企业邀请</div>' +
+      list.slice(0, 6).map(function (item) {
+        var org = item.org, iv = item.invite;
+        var rl = roleTxt[iv.role] || '成员';
+        var pending = iv.status === 'pending';
+        var acts = pending
+          ? '<div class="inv-act-row">' +
+              '<button class="inv-act ok" onclick="omInviteAct(\'' + iv.inviteId + '\',\'accept\',this)">确认加入</button>' +
+              '<button class="inv-act no" onclick="omInviteAct(\'' + iv.inviteId + '\',\'reject\',this)">拒绝</button>' +
+            '</div>'
+          : '<span class="inv-act-state ' + (iv.status === 'accepted' ? 'done' : 'no') + '">' + (iv.status === 'accepted' ? '已加入' : '已拒绝') + '</span>';
+        return '<div class="inv-notice" data-status="' + iv.status + '">' +
+          '<div class="inv-n-head"><span class="inv-type">企业邀请</span><span class="inv-time">' + fmtInvTime(iv.updatedAt || iv.createdAt) + '</span></div>' +
+          '<div class="inv-n-body">' + esc(org.shortName || org.co) + ' 邀请您加入企业团队担任<b>' + rl + '</b>' + (iv.name ? '（' + esc(iv.name) + '）' : '') + '</div>' +
+          acts +
+        '</div>';
+      }).join('');
+  }
+  window.omInviteAct = function (inviteId, action, btn) {
+    if (!window.OrgsStore) return;
+    var doAct = function () {
+      var r;
+      if (action === 'accept') {
+        r = OrgsStore.acceptInvite(inviteId);
+        if (r && r.error) { UI.toast.err(r.error); return; }
+        UI.toast.ok('已确认加入，企业身份已生效');
+      } else {
+        r = OrgsStore.rejectInvite(inviteId);
+        if (r && r.error) { UI.toast.err(r.error); return; }
+        UI.toast('已拒绝该邀请');
+      }
+      renderConvs();
+      if (searchMode) { var _si = document.getElementById('msg-search-input'); if (_si) renderSearch(_si.value); }
+    };
+    if (action === 'accept') {
+      UI.dialog({ title: '确认加入企业', text: '确认接受该邀请并加入企业团队吗？加入后将叠加该企业的发布与招聘身份。', ok: '确认加入', cancel: '取消', onOk: doAct });
+    } else {
+      UI.dialog({ title: '拒绝邀请', text: '确定拒绝该企业邀请吗？', ok: '拒绝', cancel: '取消', danger: true, onOk: doAct });
+    }
+  };
+
+  /* 通知分页统一渲染（不再跳转 system.html） */
+  renderNoticeBadge(); renderNoticeList(); bindSubbar(); bindSearch();
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY) refreshAll(); });
+  window.addEventListener('engchain:messages', function () { refreshAll(); });
 
   /* [FEAT 9.2-3] 进入消息中心时生成/更新智能推荐 */
   try { MatchStore.generate(); } catch(e) {}
@@ -185,18 +537,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var sysUnread = sysUnreadCount();
     var matchUnread = 0;
     try { matchUnread = MatchStore.listUnread().length; } catch (e) {}
-    var total = convUnread + sysUnread + matchUnread;
-    document.getElementById('total-unread').textContent = total;
+    var sysMsgUnread = sysMsgUnreadCount();
+    var inviteUnread = inviteUnreadCount();
     var bc = document.getElementById('badge-conv');
     bc.textContent = convUnread; bc.style.display = convUnread ? '' : 'none';
     var bn = document.getElementById('badge-notice');
-    var noticeUnread = sysUnread + matchUnread;
+    var noticeUnread = sysUnread + sysMsgUnread + matchUnread + inviteUnread;
     bn.textContent = noticeUnread; bn.style.display = noticeUnread ? '' : 'none';
+    renderNoticeBadge(); renderNoticeList();
   }
   renderConvs();
   (function(){
     var tabs = document.querySelectorAll('#msg-tabs .msg-tab');
     function activate(name){
+      curTab = name;
       tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab===name); });
       document.getElementById('pane-conv').style.display = name==='conv' ? '' : 'none';
       document.getElementById('pane-notice').style.display = name==='notice' ? '' : 'none';
@@ -205,7 +559,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       t.addEventListener('click', function(){ activate(t.dataset.tab); });
     });
     try {
-      var noticeU = sysUnreadCount() + (MatchStore.listUnread().length||0);
+      var noticeU = sysUnreadCount() + sysMsgUnreadCount() + (MatchStore.listUnread().length||0) + inviteUnreadCount();
       if (noticeU > 0) activate('notice');
     } catch(e){}
   })();
@@ -223,10 +577,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     } catch (err) {}
   });
   /* [FIX] 登录/退出/入驻后消息列表刷新 */
-  window.addEventListener('engchain:auth', renderConvs);
-  window.addEventListener('engchain:entry', renderConvs);
+  function refreshAll() { renderConvs(); renderNoticeBadge(); renderNoticeList(); }
+  window.addEventListener('engchain:auth', refreshAll);
+  window.addEventListener('engchain:entry', refreshAll);
+  window.addEventListener('engchain:org', refreshAll);
   window.addEventListener('storage', function (e) {
-    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages') renderConvs();
+    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages' || e.key === 'engchain-orgs') refreshAll();
   });
 })();
 </script>
@@ -252,6 +608,68 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .mf-foot{margin-top:14px;}
   .mf-cta{display:block;height:44px;line-height:44px;text-align:center;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 6px 16px -8px var(--primary-dim);}
   .mf-set{display:block;text-align:center;margin-top:10px;font-size:12px;color:var(--primary-dim);}
+
+  /* ---- 消息页 v2：搜索 + 通知分页合并 ---- */
+  .msg-search-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease;}
+  .msg-search-btn:active{transform:scale(.94);}
+  .msg-search{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .msg-search-box{flex:1;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:999px;}
+  .msg-search-ic{width:16px;height:16px;color:var(--text-3);flex:none;}
+  .msg-search-input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:13px;color:var(--text-1);}
+  .msg-search-input::-webkit-search-cancel-button{display:none;}
+  .msg-search-clear{width:20px;height:20px;border:none;border-radius:50%;background:var(--bg-card-3);color:var(--text-3);font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+  .msg-search-cancel{border:none;background:transparent;color:var(--primary-dim);font-size:13px;font-weight:600;padding:0 4px;cursor:pointer;flex:none;}
+  .notice-subbar{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .notice-subbar::-webkit-scrollbar{display:none;}
+  .nsub{flex:none;height:30px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card-2);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s ease;}
+  .nsub.active{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);border-color:transparent;}
+  .n-item{position:relative;padding:14px 4px;border-bottom:1px solid var(--line);}
+  .n-dot{position:absolute;left:0;top:18px;width:6px;height:6px;border-radius:50%;background:var(--error);}
+  .n-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .n-cat{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;flex:none;}
+  .n-title{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .n-time{font-size:10px;color:var(--text-3);flex:none;}
+  .n-body{font-size:12px;line-height:1.6;color:var(--text-2);}
+  .n-score{margin-top:6px;font-size:11px;color:var(--text-3);}
+  .n-empty{text-align:center;color:var(--text-3);font-size:12px;padding:48px 20px;line-height:1.7;}
+  .sr-hint{padding:8px 4px 4px;font-size:11px;color:var(--text-3);letter-spacing:.02em;}
+
+  /* ---- 消息页 v4：业务动作按钮（成熟消息中心样式） ---- */
+  :root{--primary-deep:#6B4F26;}
+  .n-acts{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px;}
+  .n-btn{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;border:none;cursor:pointer;transition:transform .12s ease,opacity .12s ease;}
+  .n-btn:active{transform:scale(.96);}
+  .n-btn.primary{background:var(--primary-deep);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+  .n-btn.primary:active{opacity:.9;}
+  .n-link{font-size:12px;font-weight:600;color:var(--primary-deep);text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:1px;padding:4px 0;line-height:1;}
+  .n-link:active{opacity:.75;}
+  .n-link.muted{color:var(--text-3);font-weight:500;}
+  .nd{padding:2px 2px 8px;}
+  .nd-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .nd-time{font-size:10px;color:var(--text-3);margin-left:auto;}
+  .nd-title{font-size:16px;font-weight:700;line-height:1.5;color:var(--text-1);}
+  .nd-body{margin-top:12px;font-size:13px;line-height:1.9;color:var(--text-2);white-space:pre-wrap;word-break:break-word;}
+  .nd-acts{margin-top:18px;display:flex;flex-direction:column;gap:8px;}
+  .nd-acts .n-btn{height:44px;font-size:14px;width:100%;border-radius:10px;}
+  .nd-acts .n-btn.primary{background:var(--primary-deep);color:#fff;box-shadow:none;}
+  .nd-acts .n-btn.ghost{background:var(--bg-card-2);color:var(--text-2);border:1px solid var(--line);}
+
+  /* 企业邀请通知卡片（通知栏目） */
+  .inv-sec-head { display:flex; align-items:center; gap:6px; margin:16px 4px 8px; font-size:11px; font-weight:800; color:var(--primary-dim); letter-spacing:.06em; }
+  .inv-sec-head::after { content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent); }
+  .inv-notice { background:var(--bg-card); border:1px solid rgba(201,169,97,.3); border-radius:14px; padding:12px 13px; margin-bottom:10px; }
+  .inv-n-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .inv-type { font-size:10px; font-weight:700; color:var(--primary-dim); background:rgba(184,153,104,.13); border:1px solid rgba(184,153,104,.35); padding:2px 8px; border-radius:999px; }
+  .inv-time { font-size:10px; color:var(--text-3); margin-left:auto; }
+  .inv-n-body { font-size:12.5px; line-height:1.6; color:var(--text-1); }
+  .inv-n-body b { color:var(--primary-dim); }
+  .inv-act-row { display:flex; gap:8px; margin-top:11px; }
+  .inv-act { flex:1; height:38px; border-radius:999px; font-size:12.5px; font-weight:700; border:none; cursor:pointer; }
+  .inv-act.ok { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); }
+  .inv-act.no { background:var(--bg-card-2); color:var(--text-2); border:1px solid var(--line); }
+  .inv-act-state { display:inline-block; margin-top:9px; font-size:11px; font-weight:700; color:var(--primary-dim); background:rgba(184,153,104,.1); border:1px solid rgba(184,153,104,.3); padding:3px 10px; border-radius:999px; }
+  .inv-act-state.done { color:#2E9E5B; background:rgba(46,158,91,.1); border-color:rgba(46,158,91,.3); }
+  .inv-act-state.no { color:var(--text-3); background:var(--bg-card-2); border-color:var(--line); }
 </style>
 <script src="../../js/liquid-dock.js"></script>
 </body>
