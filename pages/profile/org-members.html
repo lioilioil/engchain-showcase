@@ -114,6 +114,46 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .vf-field input:focus { border-color:var(--primary); }
 .vf-check { display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:11.5px; color:var(--text-2); }
 .vf-check input { width:16px; height:16px; accent-color:var(--primary); }
+
+/* ===== 新增：成员搜索 / 首字母索引 / 企业主栏目 / 邀请卡片 ===== */
+.om-search { display:flex; align-items:center; gap:8px; margin:0 14px 10px; padding:0 12px; height:40px; border:1.5px solid var(--line); border-radius:999px; background:var(--bg-card); }
+.om-search svg { width:15px; height:15px; color:var(--text-3); flex:none; }
+.om-search input { flex:1; min-width:0; border:none; outline:none; background:transparent; font-size:13px; color:var(--text-1); }
+.om-search input::placeholder { color:var(--text-3); }
+
+.om-member-wrap { display:flex; gap:2px; padding:0 14px 0 4px; }
+.om-groups { flex:1; min-width:0; }
+.om-groups .om-empty { margin:0 0 10px; }
+.om-azbar { flex:none; width:20px; display:flex; flex-direction:column; align-items:center; gap:2px; position:sticky; top:64px; height:calc(100dvh - 150px); min-height:120px; justify-content:center; }
+.om-az { width:18px; height:18px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--text-3); cursor:pointer; }
+.om-az.on { background:var(--primary); color:var(--text-inv); }
+.om-az:active { transform:scale(.92); }
+.om-letter-head { display:flex; align-items:center; gap:6px; margin:2px 14px 6px; font-size:11px; font-weight:800; color:var(--primary-dim); letter-spacing:.06em; scroll-margin-top:110px; }
+.om-letter-head::after { content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent); }
+
+.om-owner-card { margin:0 14px 10px; border-radius:14px; border:1.5px solid rgba(184,153,104,.45); background:linear-gradient(180deg,rgba(184,153,104,.08),transparent); overflow:hidden; }
+.om-owner-inner { display:flex; align-items:center; gap:11px; padding:13px 14px; }
+.om-owner-empty { text-align:center; padding:20px 16px; }
+.oe-t { font-size:13px; font-weight:700; color:var(--text-2); }
+.oe-s { font-size:11px; color:var(--text-3); margin:4px 0 12px; line-height:1.6; }
+.om-owner-inv { display:flex; align-items:center; gap:11px; padding:13px 14px; }
+.oi-info { flex:1; min-width:0; }
+.oi-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.oi-sub { font-size:10.5px; color:var(--text-3); margin-top:3px; line-height:1.5; }
+.oi-acts { display:flex; gap:7px; flex:none; }
+.oi-btn { font-size:11px; font-weight:700; padding:6px 11px; border-radius:999px; border:1px solid var(--accent-line); color:var(--primary-dim); background:rgba(184,153,104,.08); cursor:pointer; }
+.oi-btn:active { transform:scale(.95); }
+.oi-btn.off { color:var(--text-3); background:var(--bg-card-2); border-color:var(--line); cursor:default; }
+.oi-btn.ghost { color:var(--text-2); background:var(--bg-card-2); border-color:var(--line); }
+.inv-tag { flex:none; font-size:9.5px; font-weight:700; color:var(--primary-dim); background:rgba(184,153,104,.12); border:1px solid rgba(184,153,104,.35); padding:2.5px 8px; border-radius:999px; }
+
+.om-detect { margin:8px 2px 0; font-size:11px; line-height:1.5; }
+.om-detect.ok { color:#2E9E5B; }
+.om-detect.warn { color:#B7791F; }
+.om-users-head { display:flex; align-items:center; gap:8px; margin:2px 2px 6px; }
+.om-users-head span:first-child { font-size:11px; color:var(--text-3); flex:1; }
+.om-sel-count { font-size:11px; font-weight:700; color:var(--primary-dim); }
+.role-opt.disabled { opacity:.45; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -268,138 +308,401 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     }
 
-    /* 成员列表 */
+    /* 成员区域 */
     html += '<div class="om-sec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><b>成员</b><span>' + used + ' 人</span></div>';
-    members.sort(function (a, b) {
-      var order = { owner: 0, admin: 1, member: 2 };
-      return (order[a.role] || 9) - (order[b.role] || 9);
-    });
-    members.forEach(function (m) {
-      var selfTag = (m.uid === (u && u.id)) ? '<span class="mc-self">（我）</span>' : '';
-      var actBtns = '';
-      if (m.uid === (u && u.id)) {
-        if (m.role !== 'owner') actBtns += '<button class="mc-leave" onclick="omLeave(\'' + org.orgId + '\')">退出</button>';
-      } else if (isManager && m.role !== 'owner') {
-        actBtns += '<button class="mc-transfer" onclick="omRequestTransfer(\'' + org.orgId + '\',\'' + m.uid + '\')">移交</button>';
-        if (isOwner) {
-          actBtns += '<button class="mc-remove" onclick="omRemove(\'' + m.uid + '\')">移除</button>';
-        }
-      }
-      html +=
-        '<div class="member-card">' +
-          '<div class="mc-ava">' + esc(m.avatar || (m.name || '?').charAt(0)) + '</div>' +
-          '<div class="mc-info"><div class="mc-name">' + esc(m.name) + selfTag + ' <span class="role-tag role-' + m.role + '">' + (ROLE_LABEL[m.role] || '成员') + '</span></div>' +
-          '<div class="mc-time">' + fmtDate(m.joinedAt) + '</div></div>' +
-          actBtns +
-        '</div>';
-    });
 
-    /* 提示条 */
+    /* 企业主栏目：企业主成员 / 邀请入驻 / 空缺空态 */
+    var ownerMember = null, ownerInv = null;
+    members.forEach(function (m) { if (m.role === 'owner') ownerMember = m; });
+    try { ownerInv = OrgsStore.ownerInviteOf(org.orgId); } catch (e) {}
+
+    if (ownerMember) {
+      var selfTag = (ownerMember.uid === (u && u.id)) ? '<span class="mc-self">（我）</span>' : '';
+      html +=
+        '<div class="om-owner-card"><div class="om-owner-inner">' +
+          '<div class="mc-ava">' + esc(ownerMember.avatar || (ownerMember.name || '?').charAt(0)) + '</div>' +
+          '<div class="mc-info"><div class="mc-name">' + esc(ownerMember.name) + selfTag + ' <span class="role-tag role-owner">企业主</span></div>' +
+          '<div class="mc-time">' + fmtDate(ownerMember.joinedAt) + '</div></div>' +
+        '</div></div>';
+    } else if (ownerInv) {
+      var invU = (ownerInv.targetUid && window.DataBus && DataBus.byId) ? DataBus.byId(ownerInv.targetUid) : null;
+      var canSms = OrgsStore.canSendInviteSms(org.orgId, ownerInv.inviteId);
+      var sendBtnHtml = canSms.ok
+        ? '<button class="oi-btn" onclick="omSendInviteSms(\'' + ownerInv.inviteId + '\')">发送邀请</button>'
+        : '<button class="oi-btn off" onclick="UI.toast.warn(\'今日已发送过邀请短信，请明天再试\')">今日已发送</button>';
+      html +=
+        '<div class="om-owner-card"><div class="om-owner-inv">' +
+          '<div class="mc-ava">' + esc((ownerInv.name || '?').charAt(0)) + '</div>' +
+          '<div class="oi-info">' +
+            '<div class="oi-name">' + esc(ownerInv.name || '待确认用户') + ' <span class="inv-tag">邀请入驻</span></div>' +
+            '<div class="oi-sub">' + esc(ownerInv.mobile || '') + ' · 企业主 · ' + fmtTime(ownerInv.createdAt) + ' 发出' + (invU && invU.auth && invU.auth.realname && invU.auth.realname.ok ? ' · 已实名' : ' · 待实名') + '</div>' +
+          '</div>' +
+          '<div class="oi-acts">' + sendBtnHtml + '<button class="oi-btn ghost" onclick="omOpenEditInvite(\'' + ownerInv.inviteId + '\')">修改</button></div>' +
+        '</div></div>';
+    } else {
+      html +=
+        '<div class="om-owner-card"><div class="om-owner-empty">' +
+          '<div class="oe-t">企业主空缺</div>' +
+          '<div class="oe-s">邀请公司法定代表人或负责人担任企业主，<br>行使企业认证、成员管理与签约权限。</div>' +
+          '<button class="pc-btn ok" style="max-width:200px;margin:0 auto;" onclick="openInvite(true)">邀请企业主</button>' +
+        '</div></div>';
+    }
+
+    /* 搜索 + 首字母索引（企业主固定置顶，其余按姓名首字母 A-Z 分组） */
+    html +=
+      '<div class="om-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>' +
+      '<input id="om-search-input" placeholder="搜索成员姓名 / 手机号"></div>' +
+      '<div class="om-member-wrap"><div class="om-azbar" id="om-azbar"></div><div class="om-groups" id="om-groups"></div></div>';
+
+
     if (isManager) {
       html +=
         '<div style="margin:14px 16px 0;font-size:10.5px;color:var(--text-3);line-height:1.7;">' +
-          '· 邀请：输入手机号邀请成员，平台将自动校验对方认证状态（已认证 → 短信+站内消息提醒；未认证/未注册 → 短信邀请）。<br>' +
+          '· 邀请：手机号邀请（已注册自动确认 + 短信 1 天 1 次）或从已实名用户多选邀请；企业主空缺时可邀请企业主。<br>' +
           '· 退出：成员可自助退出本企业；企业主退出前需先移交企业主身份。<br>' +
           '· 移交：企业主/管理员可将企业主身份移交给成员，接收人需完成法人认证或实际控制人验证（后台审核）。' +
         '</div>';
     }
 
     root.innerHTML = html;
+    renderMemberList();
+    var si = document.getElementById('om-search-input');
+    if (si) { si.value = omSearchKw; si.oninput = function () { omSearchKw = this.value; renderMemberList(); }; }
+    bindMemberScroll();
   }
 
-  /* ============ 邀请：手机号搜索 + 已认证用户选择 ============ */
+  /* ============ 邀请：手机号邀请（姓名+三身份+注册识别）+ 已认证用户多选 ============ */
   var lastSheetRef = null;
+  var omSearchKw = '';
 
-  function openInvite() {
+  /* ---- 中文姓名 → 拼音首字母（锚字二分 + 常用字表兜底，未知归 #） ---- */
+  var PY_MAP = { '陈':'C','李':'L','王':'W','张':'Z','赵':'Z','刘':'L','周':'Z','吴':'W','郑':'Z','川':'C','诚':'C','成':'C','建':'J','国':'G','强':'Q','敏':'M','磊':'L','洋':'Y','航':'H','雅':'Y','罗':'L','军':'J','科':'K','技':'J','设':'S','有':'Y','限':'X','公':'G','司':'S','家':'J','安':'A','智':'Z','慧':'H','宏':'H','达':'D','鑫':'X','源':'Y','宇':'Y','晨':'C','曦':'X','涛':'T','波':'B','鹏':'P','飞':'F','云':'Y','松':'S','梅':'M','兰':'L','竹':'Z','菊':'J','杰':'J','俊':'J','峰':'F','伟':'W','芳':'F','艳':'Y','静':'J','丽':'L','娟':'J','秀':'X','明':'M','亮':'L','刚':'G','勇':'Y','志':'Z','荣':'R','华':'H','富':'F','贵':'G','金':'J','银':'Y','德':'D','福':'F','春':'C','夏':'X','秋':'Q','冬':'D','新':'X','中':'Z','大':'D','小':'X','永':'Y','光':'G','辉':'H','玉':'Y','珍':'Z','红':'H','平':'P','文':'W','武':'W','超':'C','龙':'L','虎':'H','马':'M','牛':'N','杨':'Y','黄':'H','徐':'X','朱':'Z','孙':'S','胡':'H','郭':'G','何':'H','高':'G','林':'L','郑':'Z','程':'C','范':'F','石':'S','姚':'Y','谭':'T','廖':'L','邹':'Z','熊':'X','金':'J','陆':'L','郝':'H','孔':'K','白':'B','崔':'C','康':'K','毛':'M','邱':'Q','秦':'Q','江':'J','史':'S','顾':'G','侯':'H','邵':'S','孟':'M','龙':'L','万':'W','段':'D','雷':'L','钱':'Q','汤':'T','尹':'Y','黎':'L','易':'Y','常':'C','武':'W','乔':'Q','贺':'H','赖':'L','龚':'G','文':'W' };
+  var PY_ANCHORS = ['啊','芭','擦','搭','蛾','发','噶','哈','击','喀','垃','妈','拿','哦','啪','期','然','撒','塌','挖','昔','压','匝'];
+  var PY_LETTERS = ['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','W','X','Y','Z'];
+  function pyInitial(name) {
+    var ch = String(name || '').trim().charAt(0);
+    if (!ch) return '#';
+    var c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) return ch;
+    if (c >= 97 && c <= 122) return ch.toUpperCase();
+    if (c < 0x4E00 || c > 0x9FFF) return '#';
+    if (PY_MAP[ch]) return PY_MAP[ch];
+    var idx = -1;
+    for (var i = 0; i < PY_ANCHORS.length; i++) {
+      try { if (ch.localeCompare(PY_ANCHORS[i], 'zh-CN') >= 0) idx = i; else break; } catch (e) { break; }
+    }
+    return idx >= 0 ? PY_LETTERS[idx] : '#';
+  }
+  function maskMobile(m) { return String(m || '').replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'); }
+  function roleOptHtml(role, label) {
+    return '<div class="role-opt" data-role="' + role + '" onclick="omPickRole(this)">' + label + '</div>';
+  }
+
+  window.openInvite = openInvite;
+  function openInvite(fromOwnerEmpty) {
     var org = resolveOrg(); if (!org) return;
     if (OrgsStore.memberCount(org) >= (org.memberLimit || OrgsStore.MEMBER_LIMIT)) { UI.toast.warn('成员数已达上限，如需扩容请联系平台'); return; }
     var sh = UI.sheet();
     lastSheetRef = sh;
     sh.setText('邀请成员加入「' + (org.shortName || org.co) + '」');
-    sh._selRole = 'member'; sh._selUid = null; sh._tab = 'mobile';
+    sh._selRole = fromOwnerEmpty ? 'owner' : 'member';
+    sh._selUids = []; sh._detected = null; sh._tab = 'mobile';
+    sh._invName = ''; sh._invMobile = '';
     sh.html(invShellHtml());
     sh.show();
     bindInvEvents();
+    setInvRole(sh._selRole);
   }
 
   function invShellHtml() {
+    var org = resolveOrg(); if (!org) return '';
+    var hasOwn = OrgsStore.hasOwner(org.orgId);
+    var ownerOpt = hasOwn
+      ? '<div class="role-opt disabled" data-role="owner" onclick="UI.toast.warn(\'该企业已有企业主\')">企业主</div>'
+      : roleOptHtml('owner', '企业主');
     return '' +
       '<div class="inv-tabs">' +
         '<div class="inv-tab on" data-tab="mobile" onclick="omInvTab(this)">手机号邀请</div>' +
         '<div class="inv-tab" data-tab="users" onclick="omInvTab(this)">从已认证用户选择</div>' +
       '</div>' +
       '<div id="inv-pane-mobile">' +
+        '<div class="vf-field"><label>被邀请人姓名</label><input id="om-name" class="mob-input" placeholder="请输入姓名（必填）"></div>' +
         '<div class="mob-row"><input class="mob-input" id="om-mobile" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
-        '<div class="mob-tip">输入手机号后，系统自动校验对方认证状态：<br><b>已认证</b> → 发送邀请并短信 + 站内消息提醒；<b>未认证 / 未注册</b> → 发送短信邀请。</div>' +
-        '<div class="role-pick">' +
-          '<div class="role-opt sel" data-role="member" onclick="omPickRole(this)">成员 · 发布与招聘</div>' +
-          '<div class="role-opt" data-role="admin" onclick="omPickRole(this)">管理员 · 协助管理</div>' +
-        '</div>' +
-        '<button type="button" id="om-send-mobile" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:6px;">发送邀请</button>' +
+        '<div id="om-detect" class="om-detect"></div>' +
+        '<div class="mob-tip">输入手机号后自动识别注册状态：<b>已注册</b> → 弹出确认邀请；<b>未注册</b> → 直接发送注册邀请短信。<br>短信邀请 1 天 1 次。</div>' +
       '</div>' +
       '<div id="inv-pane-users" style="display:none;">' +
-        '<div class="mob-tip">从平台已实名认证用户中选择邀请对象。</div>' +
-        '<div id="inv-user-list" style="max-height:40vh;overflow-y:auto;padding:2px;"></div>' +
-        '<div class="role-pick">' +
-          '<div class="role-opt sel" data-role="member" onclick="omPickRole(this)">成员 · 发布与招聘</div>' +
-          '<div class="role-opt" data-role="admin" onclick="omPickRole(this)">管理员 · 协助管理</div>' +
-        '</div>' +
-        '<button type="button" id="om-send" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:6px;">发送邀请</button>' +
-      '</div>';
+        '<div class="om-users-head"><span>从平台已实名认证用户中选择邀请对象（可多选）</span><span class="om-sel-count" id="om-sel-count">已选 0 人</span></div>' +
+        '<div id="inv-user-list" style="max-height:34vh;overflow-y:auto;padding:2px;"></div>' +
+      '</div>' +
+      '<div class="role-pick" id="om-inv-rolepick">' +
+        '<div class="role-opt" data-role="member" onclick="omPickRole(this)">成员</div>' +
+        '<div class="role-opt" data-role="admin" onclick="omPickRole(this)">管理员</div>' +
+        ownerOpt +
+      '</div>' +
+      '<button type="button" id="om-send" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:6px;">发送邀请</button>';
+  }
+
+  function setInvRole(role) {
+    var pick = document.getElementById('om-inv-rolepick');
+    if (pick) pick.querySelectorAll('.role-opt').forEach(function (r) {
+      r.classList.toggle('sel', r.getAttribute('data-role') === role && !r.classList.contains('disabled'));
+    });
+    var sh = lastSheetRef; if (sh) sh._selRole = role;
+    omRefreshSelCount();
   }
 
   function bindInvEvents() {
     var org = resolveOrg(); if (!org) return;
+    var sh = lastSheetRef;
+    var nameEl = document.getElementById('om-name');
+    var mobEl = document.getElementById('om-mobile');
+    if (nameEl) nameEl.value = (sh && sh._invName) || '';
+    if (mobEl) {
+      mobEl.value = (sh && sh._invMobile) || '';
+      mobEl.addEventListener('input', omDetectMobile);
+      mobEl.addEventListener('blur', omDetectMobile);
+      mobEl.addEventListener('change', omDetectMobile);
+    }
+
+    /* 已认证用户候选：多选 + 脱敏手机号 */
     var all = (window.DataBus && DataBus.users) ? DataBus.users() : [];
     var cands = [];
-    all.forEach(function (u) {
-      if (!u) return;
-      var real = u.auth && u.auth.realname && u.auth.realname.ok;
+    all.forEach(function (c) {
+      if (!c) return;
+      var real = c.auth && c.auth.realname && c.auth.realname.ok;
       if (!real) return;
-      if (OrgsStore.membershipOf(u.id, org.orgId)) return;
-      var hasInv = (org.invites || []).some(function (iv) { return iv.targetUid === u.id && iv.status === 'pending'; });
+      if (OrgsStore.membershipOf(c.id, org.orgId)) return;
+      var hasInv = (org.invites || []).some(function (iv) { return iv.targetUid === c.id && iv.status === 'pending'; });
       if (hasInv) return;
-      cands.push(u);
+      cands.push(c);
     });
     var listEl = document.getElementById('inv-user-list');
     if (listEl) {
       listEl.innerHTML = cands.length ? cands.map(function (c) {
-        return '<div class="cand" data-uid="' + c.id + '" onclick="omPickCand(this)">' +
+        var selCls = (sh && sh._selUids && sh._selUids.indexOf(c.id) > -1) ? ' sel' : '';
+        return '<div class="cand' + selCls + '" data-uid="' + c.id + '" onclick="omPickCand(this)">' +
           '<div class="cand-ava">' + esc((c.avatar || c.name || '?').charAt(0)) + '</div>' +
-          '<div class="cand-info"><div class="cand-name">' + esc(c.name) + '</div>' +
-          '<div class="cand-sub">' + (c.tag || '已实名认证用户') + '</div></div>' +
+          '<div class="cand-info"><div class="cand-name">' + esc(c.name) + ' <span class="role-tag role-member" style="font-size:9px;">已实名</span></div>' +
+          '<div class="cand-sub">' + esc(maskMobile(c.mobile || '')) + (c.tag ? ' · ' + esc(c.tag) : '') + '</div></div>' +
           '<div class="cand-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>' +
         '</div>';
       }).join('') : '<div class="om-empty" style="margin:6px 0;">暂无可邀请的实名用户。<br>员工需先完成实名认证，再由企业邀请。</div>';
     }
     var sendBtn = document.getElementById('om-send');
-    if (sendBtn) {
-      sendBtn.onclick = function () {
-        var sh = lastSheetRef;
-        if (!sh || !sh._selUid) { UI.toast.warn('请先选择要邀请的成员'); return; }
-        var r = OrgsStore.invite(org.orgId, sh._selUid, sh._selRole);
-        if (r && r.error) { UI.toast.warn(r.error); return; }
-        UI.closeSheet(); UI.toast.ok('邀请已发送，待对方接受'); render();
-      };
+    if (sendBtn) sendBtn.onclick = function () {
+      var cur = lastSheetRef;
+      if (cur && cur._tab === 'users') omSubmitUsers(); else omSubmitMobile();
+    };
+    omRefreshSelCount();
+  }
+
+  function omRefreshSelCount() {
+    var sh = lastSheetRef;
+    var el = document.getElementById('om-sel-count');
+    if (el) el.textContent = '已选 ' + ((sh && sh._selUids) ? sh._selUids.length : 0) + ' 人';
+  }
+
+  /* 手机号输入即识别注册状态 */
+  function omDetectMobile() {
+    var sh = lastSheetRef; if (!sh) return;
+    var inp = document.getElementById('om-mobile');
+    var box = document.getElementById('om-detect');
+    var v = inp ? inp.value.replace(/\s+/g, '') : '';
+    if (!/^1\d{10}$/.test(v)) { if (box) box.innerHTML = ''; sh._detected = null; return; }
+    var t = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(v) : null;
+    sh._detected = t || null;
+    if (box) {
+      if (t) {
+        var real = !!(t.auth && t.auth.realname && t.auth.realname.ok);
+        box.innerHTML = '<span class="om-detect ok">已注册：' + esc(t.name) + '（' + esc(maskMobile(t.mobile || '')) + '）' + (real ? ' · 已实名认证' : ' · 未实名') + '</span>';
+      } else {
+        box.innerHTML = '<span class="om-detect warn">该手机号未注册，将发送注册邀请短信</span>';
+      }
     }
-    var sendMob = document.getElementById('om-send-mobile');
-    if (sendMob) {
-      sendMob.onclick = function () {
-        var sh = lastSheetRef;
-        var inp = document.getElementById('om-mobile');
-        var mobile = inp ? inp.value : '';
-        var r = OrgsStore.inviteByMobile(org.orgId, mobile, sh ? sh._selRole : 'member');
-        if (r && r.error) { UI.toast.err(r.error); return; }
-        UI.closeSheet();
-        if (r.case === 'verified') {
-          UI.toast.ok('已发送邀请：短信+站内消息已提醒 ' + r.sms + '（' + r.name + '）');
-        } else if (r.case === 'unverified') {
-          UI.toast.warn('该手机号已注册但未实名认证，已发送短信邀请引导认证');
-        } else {
-          UI.toast.ok('该手机号未注册，已发送注册邀请短信');
-        }
-        render();
-      };
+  }
+
+  /* 手机号邀请提交：已注册 → 确认邀请弹窗；未注册 → 直接发短信 */
+  function omSubmitMobile() {
+    var sh = lastSheetRef; var org = resolveOrg(); if (!sh || !org) return;
+    var nameEl = document.getElementById('om-name');
+    var inp = document.getElementById('om-mobile');
+    var name = nameEl ? nameEl.value.trim() : '';
+    var mobile = inp ? inp.value.replace(/\s+/g, '') : '';
+    var role = sh._selRole || 'member';
+    if (!name) { UI.toast.warn('请填写被邀请人姓名'); return; }
+    if (!/^1\d{10}$/.test(mobile)) { UI.toast.warn('请输入正确的 11 位手机号'); return; }
+    var orgName = org.shortName || org.co;
+    var doSend = function () {
+      var r = OrgsStore.inviteByMobile(org.orgId, mobile, role, name);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      if (r.case === 'verified') UI.toast.ok('已发送邀请：短信+站内消息已提醒 ' + r.name + '（' + r.sms + '）');
+      else if (r.case === 'unverified') UI.toast.warn('该手机号已注册未实名，已发送短信邀请引导认证');
+      else UI.toast.ok('该手机号未注册，已发送注册邀请短信');
+      render();
+    };
+    if (sh._detected) {
+      UI.dialog({
+        title: '确认邀请',
+        text: '已注册用户 <b>' + esc(sh._detected.name) + '</b>（' + esc(maskMobile(sh._detected.mobile || '')) + '）将收到邀请短信，邀请其加入「' + esc(orgName) + '」担任<b>' + (ROLE_LABEL[role] || '成员') + '</b>。确认发送？',
+        ok: '确认发送', cancel: '再想想',
+        onOk: doSend
+      });
+    } else {
+      doSend();
+    }
+  }
+
+  /* 已认证用户多选提交 */
+  function omSubmitUsers() {
+    var sh = lastSheetRef; var org = resolveOrg(); if (!sh || !org) return;
+    var role = sh._selRole || 'member';
+    var uids = sh._selUids || [];
+    if (!uids.length) { UI.toast.warn('请先选择要邀请的用户'); return; }
+    var okN = 0, errs = [];
+    uids.forEach(function (uid) {
+      var r = OrgsStore.invite(org.orgId, uid, role);
+      if (r && r.error) errs.push(r.error); else okN++;
+    });
+    UI.closeSheet();
+    if (okN) UI.toast.ok('已发送 ' + okN + ' 条邀请' + (errs.length ? '，' + errs.length + ' 条未成功' : ''));
+    if (errs.length && !okN) UI.toast.err(errs[0]);
+    render();
+  }
+
+  /* 企业主邀请卡：补发短信（1 天 1 次，超限置灰） */
+  window.omSendInviteSms = function (inviteId) {
+    var org = resolveOrg(); if (!org) return;
+    var r = OrgsStore.sendInviteSms(org.orgId, inviteId);
+    if (r && r.error) { UI.toast.err(r.error); return; }
+    UI.toast.ok('邀请短信已发送（' + r.sms + '）');
+    render();
+  };
+
+  /* 企业主邀请卡：修改邀请（姓名 / 手机号 / 身份） */
+  window.omOpenEditInvite = function (inviteId) {
+    var org = resolveOrg(); if (!org) return;
+    var inv = null;
+    (org.invites || []).forEach(function (iv) { if (iv.inviteId === inviteId) inv = iv; });
+    if (!inv) { UI.toast.warn('邀请不存在'); return; }
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('修改邀请 · ' + (org.shortName || org.co));
+    var hasOwn = OrgsStore.hasOwner(org.orgId);
+    var ownerOpt = hasOwn
+      ? '<div class="role-opt disabled" data-role="owner" onclick="UI.toast.warn(\'该企业已有企业主\')">企业主</div>'
+      : roleOptHtml('owner', '企业主');
+    sh.html(
+      '<div style="padding:2px 2px 4px;">' +
+        '<div class="vf-field"><label>被邀请人姓名</label><input id="ed-name" class="mob-input" placeholder="请输入姓名"></div>' +
+        '<div class="vf-field"><label>手机号</label><input id="ed-mobile" class="mob-input" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
+        '<div class="role-pick" id="om-edit-rolepick">' +
+          roleOptHtml('member', '成员') + roleOptHtml('admin', '管理员') + ownerOpt +
+        '</div>' +
+        '<button type="button" id="ed-save" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">保存修改</button>' +
+      '</div>'
+    );
+    sh.show();
+    sh._selRole = inv.role || 'member';
+    document.getElementById('ed-name').value = inv.name || '';
+    document.getElementById('ed-mobile').value = inv.mobileRaw || '';
+    var pick = document.getElementById('om-edit-rolepick');
+    if (pick) pick.querySelectorAll('.role-opt').forEach(function (r) {
+      r.classList.toggle('sel', r.getAttribute('data-role') === sh._selRole && !r.classList.contains('disabled'));
+    });
+    document.getElementById('ed-save').onclick = function () {
+      var name = document.getElementById('ed-name').value.trim();
+      var mobile = document.getElementById('ed-mobile').value.replace(/\s+/g, '');
+      var role = sh._selRole || inv.role;
+      if (!name) { UI.toast.warn('请填写姓名'); return; }
+      if (!/^1\d{10}$/.test(mobile)) { UI.toast.warn('请输入正确的 11 位手机号'); return; }
+      var r = OrgsStore.updateInvite(org.orgId, inviteId, { name: name, mobile: mobile, role: role });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      UI.toast.ok('已保存修改');
+      render();
+    };
+  };
+
+  /* 字母索引跳转 + 滚动高亮 */
+  window.omAzJump = function (L) {
+    var el = document.querySelector('.om-letter-head[data-letter="' + L + '"]');
+    if (!el) el = document.querySelector('.member-card[data-letter="' + L + '"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var bar = document.getElementById('om-azbar');
+    if (bar) bar.querySelectorAll('.om-az').forEach(function (z) { z.classList.toggle('on', z.getAttribute('data-letter') === L); });
+  };
+  function omOnScroll() {
+    var bar = document.getElementById('om-azbar');
+    if (!bar) return;
+    var cur = '';
+    document.querySelectorAll('.om-letter-head').forEach(function (h) {
+      if (h.getBoundingClientRect().top <= 110) cur = h.getAttribute('data-letter');
+    });
+    bar.querySelectorAll('.om-az').forEach(function (z) { z.classList.toggle('on', z.getAttribute('data-letter') === cur); });
+  }
+  function bindMemberScroll() {
+    var sc = document.querySelector('.phone .scroll');
+    if (!sc) return;
+    sc.removeEventListener('scroll', omOnScroll);
+    sc.addEventListener('scroll', omOnScroll, { passive: true });
+  }
+
+  /* 成员列表分组渲染（搜索时仅刷新分组，保持输入焦点） */
+  function renderMemberList() {
+    var org = resolveOrg(); var u = me();
+    var azEl = document.getElementById('om-azbar');
+    var gEl = document.getElementById('om-groups');
+    if (!gEl || !org) return;
+    var members = OrgsStore.members(org.orgId);
+    var myRole = OrgsStore.myRole(org.orgId);
+    var isOwner = myRole === 'owner';
+    var isManager = isOwner || myRole === 'admin';
+    var sortList = members.filter(function (m) { return m.role !== 'owner'; }); /* 企业主已在顶部栏目 */
+    var kw = (omSearchKw || '').toLowerCase();
+    if (kw) {
+      sortList = sortList.filter(function (m) {
+        return (m.name || '').toLowerCase().indexOf(kw) > -1 || (m.mobile || '').indexOf(kw) > -1;
+      });
+    }
+    sortList.sort(function (a, b) {
+      var la = pyInitial(a.name), lb = pyInitial(b.name);
+      if (la === lb) return (a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
+      if (la === '#') return 1; if (lb === '#') return -1;
+      return la < lb ? -1 : 1;
+    });
+    var groups = '', letterSet = [], currentLetter = '';
+    sortList.forEach(function (m) {
+      var L = pyInitial(m.name);
+      if (L !== currentLetter) {
+        currentLetter = L; letterSet.push(L);
+        groups += '<div class="om-letter-head" data-letter="' + L + '">' + (L === '#' ? '#' : L) + '</div>';
+      }
+      var isSelf = m.uid === (u && u.id);
+      var actBtns = '';
+      if (m.uid === (u && u.id)) {
+        if (m.role !== 'owner') actBtns += '<button class="mc-leave" onclick="omLeave(\'' + org.orgId + '\')">退出</button>';
+      } else if (isManager && m.role !== 'owner') {
+        actBtns += '<button class="mc-transfer" onclick="omRequestTransfer(\'' + org.orgId + '\',\'' + m.uid + '\')">移交</button>';
+        if (isOwner) actBtns += '<button class="mc-remove" onclick="omRemove(\'' + m.uid + '\')">移除</button>';
+      }
+      groups +=
+        '<div class="member-card" data-letter="' + L + '">' +
+          '<div class="mc-ava">' + esc(m.avatar || (m.name || '?').charAt(0)) + '</div>' +
+          '<div class="mc-info"><div class="mc-name">' + esc(m.name) + (isSelf ? '<span class="mc-self">（我）</span>' : '') + ' <span class="role-tag role-' + m.role + '">' + (ROLE_LABEL[m.role] || '成员') + '</span></div>' +
+          '<div class="mc-time">' + fmtDate(m.joinedAt) + (m.mobile ? ' · ' + esc(m.mobile) : '') + '</div></div>' +
+          actBtns +
+        '</div>';
+    });
+    if (!sortList.length) {
+      groups += '<div class="om-empty">' + (kw ? '没有匹配的成员' : '暂无其他成员') + '</div>';
+    }
+    gEl.innerHTML = groups;
+    if (azEl) {
+      azEl.innerHTML = kw ? '' : letterSet.map(function (L) {
+        return '<div class="om-az" data-letter="' + L + '" onclick="omAzJump(\'' + L + '\')">' + (L === '#' ? '#' : L) + '</div>';
+      }).join('');
     }
   }
 
@@ -413,15 +716,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var sh = lastSheetRef; if (sh) sh._tab = tab;
   };
   window.omPickCand = function (el) {
-    document.querySelectorAll('.cand').forEach(function (c) { c.classList.remove('sel'); });
-    el.classList.add('sel');
-    var sh = lastSheetRef; if (sh) sh._selUid = el.getAttribute('data-uid');
+    var sh = lastSheetRef; if (!sh) return;
+    var uid = el.getAttribute('data-uid');
+    var uids = sh._selUids || (sh._selUids = []);
+    var i = uids.indexOf(uid);
+    if (i > -1) {
+      uids.splice(i, 1); el.classList.remove('sel');
+    } else {
+      if (sh._selRole === 'owner' && uids.length >= 1) { UI.toast.warn('企业主邀请仅可选择 1 人'); return; }
+      uids.push(uid); el.classList.add('sel');
+    }
+    omRefreshSelCount();
   };
   window.omPickRole = function (el) {
-    document.querySelectorAll('.role-opt').forEach(function (r) { r.classList.remove('sel'); });
+    if (el.classList.contains('disabled')) { UI.toast.warn('该企业已有企业主'); return; }
+    var pick = el.closest ? el.closest('.role-pick') : null;
+    (pick ? pick.querySelectorAll('.role-opt') : document.querySelectorAll('.role-opt')).forEach(function (r) { r.classList.remove('sel'); });
     el.classList.add('sel');
     var sh = lastSheetRef; if (sh) sh._selRole = el.getAttribute('data-role');
   };
+
 
   window.omApprove = function (joinId) {
     var r = OrgsStore.approveJoin(joinId);
@@ -524,7 +838,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (w) w.style.display = verifyMode === 'controller' ? '' : 'none';
   };
 
-  document.getElementById('om-invite-btn').addEventListener('click', openInvite);
+  document.getElementById('om-invite-btn').addEventListener('click', function () { openInvite(false); });
 
   render();
   window.addEventListener('engchain:org', render);
