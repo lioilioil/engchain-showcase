@@ -23,25 +23,33 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="topbar-title">消息</div>
       <div class="topbar-right"><span style="color:var(--text-3);font-size:12px;">共 <span class="green" id="total-unread">0</span> 条未读</span></div>
     </div>
+    <div class="msg-tabs" id="msg-tabs">
+      <button class="msg-tab active" data-tab="conv">会话<span class="mt-badge" id="badge-conv" style="display:none;">0</span></button>
+      <button class="msg-tab" data-tab="notice">通知<span class="mt-badge" id="badge-notice" style="display:none;">0</span></button>
+    </div>
   </div>
 
   <div class="scroll" style="padding-top:6px;">
-    <a class="sys-entry" href="system.html">
-      <div class="se-ic accent"><svg class="ic"><use href="#i-bell"/></svg></div>
-      <div class="se-body">
-        <div class="se-top"><span class="se-name">系统消息</span><span class="se-time" id="sys-last-time">今天</span></div>
-        <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span></div>
-      </div>
-    </a>
-    <div id="list"></div>
-    <!-- [FEAT 9.2-3] 智能推荐入口 -->
-    <a class="sys-entry" href="#" onclick="showMatchFeed();return false;">
-      <div class="se-ic" style="background:rgba(139,123,181,.15);color:#8B7BB5;"><svg class="ic"><use href="#i-star"/></svg></div>
-      <div class="se-body">
-        <div class="se-top"><span class="se-name">智能推荐</span><span class="se-time" id="match-time">今日更新</span></div>
-        <div class="se-last"><span class="se-preview" id="match-preview">根据您的偏好推送匹配供需</span><span class="badge" id="match-unread" style="display:none;">0</span></div>
-      </div>
-    </a>
+    <div id="pane-conv">
+      <div id="list"></div>
+    </div>
+    <div id="pane-notice" style="display:none;">
+      <a class="sys-entry" href="system.html">
+        <div class="se-ic accent"><svg class="ic"><use href="#i-bell"/></svg></div>
+        <div class="se-body">
+          <div class="se-top"><span class="se-name">系统消息</span><span class="se-time" id="sys-last-time">今天</span></div>
+          <div class="se-last"><span class="se-preview" id="sys-last"></span><span class="badge" id="sys-unread" style="display:none;">0</span></div>
+        </div>
+      </a>
+      <div id="ops-list"></div>
+      <a class="sys-entry" href="#" onclick="showMatchFeed();return false;">
+        <div class="se-ic" style="background:rgba(139,123,181,.15);color:#8B7BB5;"><svg class="ic"><use href="#i-star"/></svg></div>
+        <div class="se-body">
+          <div class="se-top"><span class="se-name">智能推荐</span><span class="se-time" id="match-time">今日更新</span></div>
+          <div class="se-last"><span class="se-preview" id="match-preview">根据您的偏好推送匹配供需</span><span class="badge" id="match-unread" style="display:none;">0</span></div>
+        </div>
+      </a>
+    </div>
   </div>
 </div>
 
@@ -109,7 +117,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }).join('') || '<div class="text-3" style="font-size:12px;padding:14px 4px;">暂无运营消息，后台发布后将实时同步至 App</div>';
   }
 
-  document.getElementById('list').insertAdjacentHTML('beforebegin', '<div id="ops-list"></div>');
+  
   renderOps();
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages') renderOps(); });
   window.addEventListener('engchain:messages', function () { renderOps(); });
@@ -177,9 +185,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var sysUnread = sysUnreadCount();
     var matchUnread = 0;
     try { matchUnread = MatchStore.listUnread().length; } catch (e) {}
-    document.getElementById('total-unread').textContent = convUnread + sysUnread + matchUnread;
+    var total = convUnread + sysUnread + matchUnread;
+    document.getElementById('total-unread').textContent = total;
+    var bc = document.getElementById('badge-conv');
+    bc.textContent = convUnread; bc.style.display = convUnread ? '' : 'none';
+    var bn = document.getElementById('badge-notice');
+    var noticeUnread = sysUnread + matchUnread;
+    bn.textContent = noticeUnread; bn.style.display = noticeUnread ? '' : 'none';
   }
   renderConvs();
+  (function(){
+    var tabs = document.querySelectorAll('#msg-tabs .msg-tab');
+    function activate(name){
+      tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab===name); });
+      document.getElementById('pane-conv').style.display = name==='conv' ? '' : 'none';
+      document.getElementById('pane-notice').style.display = name==='notice' ? '' : 'none';
+    }
+    tabs.forEach(function(t){
+      t.addEventListener('click', function(){ activate(t.dataset.tab); });
+    });
+    try {
+      var noticeU = sysUnreadCount() + (MatchStore.listUnread().length||0);
+      if (noticeU > 0) activate('notice');
+    } catch(e){}
+  })();
   /* [FIX] 点击会话跳转 chat.html 前清除该会话未读数 */
   document.getElementById('list').addEventListener('click', function (e) {
     var a = e.target.closest('a[href*="chat.html?id="]');
@@ -204,6 +233,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <style>
   /* 本页为普通 .scroll（已提供 16px 页面边距），清零 .sys-entry 自带的水平外边距，避免双重缩进，与下方会话行对齐 */
   .sys-entry { margin-left: 0; margin-right: 0; }
+  .msg-tabs{display:flex;gap:6px;margin-top:10px;padding:3px;background:var(--bg-card-2);border-radius:12px;border:1px solid var(--line);}
+  .msg-tab{flex:1;height:36px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:all .18s ease;}
+  .msg-tab.active{background:var(--bg-card);color:var(--text-1);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  .mt-badge{min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--error);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
   /* 智能推荐弹窗卡片 */
   .mf-list{display:flex;flex-direction:column;gap:10px;padding:2px 0 4px;}
   .mf-card{display:block;background:var(--bg-card-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;text-decoration:none;color:inherit;transition:transform .12s ease,border-color .12s ease;}
