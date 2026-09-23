@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布编辑器三模式执行方案：富文本与 Markdown 一致性</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231a1f18'/%3E%3Cpath d='M6 8h12M6 12h12M6 16h8' stroke='%23d8c8a0' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f5f3ee; --card:#ffffff; --ink:#1a1f18; --ink-2:#4a5248; --ink-3:#8a9188;
+    --line:#e3e0d8; --primary:#2b6b4f; --primary-dim:#1f523c; --primary-soft:#e6efe9;
+    --accent:#b89868; --accent-soft:#f4ecdd; --warn:#a86a2f; --err:#a83a2a;
+    --r:12px; --shadow:0 1px 3px rgba(26,31,24,.06), 0 8px 24px -12px rgba(26,31,24,.14);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; font-size:15px; line-height:1.75;}
+  .wrap{max-width:1080px; margin:0 auto; padding:48px 28px 96px;}
+  /* ===== 封面 ===== */
+  .cover{background:linear-gradient(160deg,#16261e 0%,#1f523c 55%,#2b6b4f 100%); border-radius:20px; padding:52px 48px 44px; color:#fff; margin-bottom:40px; position:relative; overflow:hidden;}
+  .cover::after{content:""; position:absolute; right:-60px; top:-60px; width:240px; height:240px; border-radius:50%; background:radial-gradient(circle, rgba(216,200,160,.22), transparent 65%);}
+  .cover .tag{display:inline-block; padding:4px 12px; border-radius:999px; background:rgba(255,255,255,.14); font-size:12px; letter-spacing:.08em; margin-bottom:16px;}
+  .cover h1{font-size:30px; font-weight:800; line-height:1.35; letter-spacing:.01em;}
+  .cover .sub{margin-top:14px; font-size:14.5px; color:rgba(255,255,255,.85); max-width:640px;}
+  .cover .meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px;}
+  .cover .meta span{font-size:12px; padding:5px 12px; border-radius:8px; background:rgba(255,255,255,.12);}
+  /* ===== 章节 ===== */
+  section{margin-top:44px;}
+  h2{font-size:21px; font-weight:800; display:flex; align-items:center; gap:12px; margin-bottom:6px; letter-spacing:.02em;}
+  h2 .no{flex:none; width:30px; height:30px; border-radius:9px; background:var(--primary); color:#fff; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:800;}
+  .sec-lead{color:var(--ink-2); font-size:13.5px; margin-bottom:18px; max-width:760px;}
+  h3{font-size:16px; font-weight:700; margin:26px 0 10px; padding-left:12px; border-left:3px solid var(--primary);}
+  h4{font-size:14px; font-weight:700; margin:18px 0 8px; color:var(--primary-dim);}
+  p{margin:8px 0;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:22px 24px; box-shadow:var(--shadow); margin:14px 0;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr;} .cover{padding:36px 24px;} .wrap{padding:24px 16px 72px;}}
+  /* ===== 表格 ===== */
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; table-layout:fixed;}
+  colgroup col{width:auto;}
+  th{background:var(--primary-soft); color:var(--primary-dim); font-weight:700; text-align:left; padding:9px 12px; border:1px solid var(--line); font-size:12.5px;}
+  td{padding:9px 12px; border:1px solid var(--line); vertical-align:top; background:#fff;}
+  tr:nth-child(even) td{background:#faf9f6;}
+  .mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; font-size:12.5px; background:#f0efe9; border:1px solid var(--line); border-radius:6px; padding:1px 6px; color:var(--primary-dim);}
+  pre{background:#1a1f18; color:#e8e6df; border-radius:10px; padding:16px 18px; font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; font-size:12.5px; line-height:1.7; overflow-x:auto; margin:12px 0;}
+  pre .c{color:#7d8a7d;} pre .k{color:#d8c8a0;} pre .s{color:#a8c8b4;}
+  /* ===== 标签与提示 ===== */
+  .pill{display:inline-block; padding:2px 10px; border-radius:999px; font-size:11.5px; font-weight:600; margin-right:6px;}
+  .pill.g{background:var(--primary-soft); color:var(--primary-dim);}
+  .pill.a{background:var(--accent-soft); color:#8a6a35;}
+  .pill.r{background:#f7e8e4; color:var(--err);}
+  .callout{border-radius:10px; padding:14px 16px; margin:12px 0; font-size:13.5px;}
+  .callout.warn{background:var(--accent-soft); border:1px solid #e8d9bd;}
+  .callout.err{background:#f9eae6; border:1px solid #ecc9c1;}
+  .callout.ok{background:var(--primary-soft); border:1px solid #cfe2d6;}
+  .callout b{color:inherit;}
+  ul,ol{margin:8px 0 8px 22px;}
+  li{margin:4px 0;}
+  /* ===== 架构图 ===== */
+  .fig{background:#fff; border:1px solid var(--line); border-radius:var(--r); padding:20px; margin:14px 0; overflow-x:auto;}
+  .fig svg{display:block; margin:0 auto; min-width:640px;}
+  .legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--ink-2); margin-top:8px; justify-content:center;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .dot{width:12px; height:12px; border-radius:4px; display:inline-block;}
+  /* ===== 时间轴 ===== */
+  .timeline{display:grid; grid-template-columns:90px 44px 1fr; gap:0; margin:16px 0;}
+  .tl-phase{padding:6px 0; text-align:right; font-size:13px; font-weight:700; color:var(--primary-dim);}
+  .tl-rail{position:relative;}
+  .tl-rail::before{content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--line); transform:translateX(-50%);}
+  .tl-rail .tl-dot{position:absolute; top:12px; left:50%; transform:translateX(-50%); width:14px; height:14px; border-radius:50%; background:var(--primary); border:3px solid #fff; box-shadow:0 0 0 2px var(--primary);}
+  .tl-card{padding:6px 0 22px 6px;}
+  .tl-card .inner{background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13px;}
+  .tl-card .t{font-weight:700; font-size:13.5px; margin-bottom:4px;}
+  .tl-card .d{color:var(--ink-2); font-size:12.5px;}
+  /* ===== 检查清单 ===== */
+  .check{list-style:none; margin-left:0;}
+  .check li{padding:6px 0 6px 28px; position:relative; font-size:13.5px;}
+  .check li::before{content:""; position:absolute; left:2px; top:11px; width:14px; height:14px; border-radius:5px; background:var(--primary-soft); border:1.5px solid var(--primary);}
+  .check li.done::before{background:var(--primary); border-color:var(--primary);}
+  .check li.done::after{content:""; position:absolute; left:5px; top:14px; width:8px; height:5px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg);}
+  .foot{margin-top:56px; padding-top:20px; border-top:1px solid var(--line); color:var(--ink-3); font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="cover">
+  <span class="tag">方案文档 · 非执行稿</span>
+  <h1>发布编辑器三模式执行方案<br>纯文本 / 富文本 / Markdown 与详情页展示一致性</h1>
+  <div class="sub">针对 <span class="mono" style="color:#d8c8a0">pages/publish/editor.html</span>（发布需求 / 发布供应双角色）的"详细描述"区域，设计三模式编辑能力，核心目标是<b>编辑器预览与详情页渲染的展示信息、展示效果完全一致</b>；通过统一渲染管线 + 文本组件码机制实现，AI 作为可选增强路径。</div>
+  <div class="meta">
+    <span>编制角色：产品经理 · 前端开发专家 · 后端开发专家 · UI 设计专家</span>
+    <span>复核角色：全栈开发专家</span>
+    <span>日期：2026-09-22</span>
+  </div>
+</div>
+
+<!-- ===== 一、任务定义 ===== -->
+<section id="s1">
+  <h2><span class="no">1</span>任务定义与验收原则</h2>
+  <p class="sec-lead">用户目标原文："按照三种模式考虑：当前现状的模式、富文本、markdown。新增的富文本模式、markdown 模式，需要充分实现编辑器本身对应的详情页的展示信息以及展示效果的一致性，而不是简单的进行单一输入内容的渲染展示。如果该功能需要 AI 接入，可以考虑；或者通过文本中可以便捷插入组件码的方式来实现。"</p>
+  <div class="card">
+    <h3>1.1 任务边界</h3>
+    <ul>
+      <li><b>范围</b>：编辑器 <span class="mono">editor.html</span> 的"详细描述"输入区域升级为三模式；详情页渲染能力同步升级；数据层兼容三格式。</li>
+      <li><b>非范围</b>：9 类业态的动态字段体系（kvlist/taglist/steplist 等）、关键参数区、图片/文件上传、付费墙/解锁、列表页卡片视觉改版——均保持现状，仅通过渲染管线收口。</li>
+      <li><b>交付形态</b>：本文件为执行方案（含四角色设计、组件码规范、分阶段执行计划、全栈复核结论），不包含代码修改。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>1.2 一致性验收标准（产品级）</h3>
+    <ol>
+      <li><b>结构一致</b>：同一内容，在编辑器预览面板与发布后详情页中，标题层级、列表、表格、引用、代码块的<b>结构完全相同</b>。</li>
+      <li><b>效果一致</b>：字体、颜色、间距、组件卡片的<b>视觉样式一致</b>（同一 CSS 变量与排版规范）。</li>
+      <li><b>组件一致</b>：文本内插入的组件码，在预览与详情页渲染为<b>同一组件样式</b>。</li>
+      <li><b>摘要一致</b>：列表/搜索/我的发布中的纯文本摘要，从同一内容提取，无 HTML 残留、无断句错乱。</li>
+      <li><b>兼容一致</b>：历史纯文本数据零迁移成本可读，复制上次发布 / 草稿恢复保持格式不丢失。</li>
+    </ol>
+    <div class="callout ok"><b>核心架构判断</b>：实现"一致性"的唯一可靠方式是<b>单一渲染管线</b>——编辑器预览与详情页调用<b>同一个渲染函数</b>（同一份代码、同一套样式类），而非各自实现一遍。任何"两处各写一套渲染"的方案都必然出现偏差。</div>
+  </div>
+</section>
+
+<!-- ===== 二、现状基线 ===== -->
+<section id="s2">
+  <h2><span class="no">2</span>现状基线（探查证据）</h2>
+  <p class="sec-lead">以下结论来自对 <span class="mono">editor.html</span>、<span class="mono">js/detail.js</span>、<span class="mono">pages/supply/detail.html</span>、<span class="mono">js/publish-workbench.js</span>、<span class="mono">pages/publish/records.html</span> 的代码级核查。</p>
+  <div class="card">
+    <h3>2.1 编辑器现状</h3>
+    <table>
+      <colgroup><col style="width:20%"><col style="width:44%"><col style="width:36%"></colgroup>
+      <tr><th>项</th><th>现状</th><th>与目标差距</th></tr>
+      <tr><td>描述输入</td><td><span class="mono">f-desc</span> 为纯 <span class="mono">textarea</span>，placeholder 文案为"支持简单的Markdown格式"，<b>但实际不渲染任何 Markdown</b>（误导性文案）</td><td>无模式选择、无预览、无渲染</td></tr>
+      <tr><td>数据收集</td><td><span class="mono">collectData()</span> 输出 <span class="mono">description: fields.desc.value.trim()</span> 纯文本，无格式标记字段</td><td>缺 <span class="mono">contentFormat</span> / 内容源字段</td></tr>
+      <tr><td>预览面板</td><td><span class="mono">renderPreview()</span> 将 <span class="mono">d.description</span> 直接拼接进 innerHTML（<b>未转义、未渲染</b>，存在 XSS 隐患）</td><td>需接入统一渲染 + 安全清洗</td></tr>
+      <tr><td>结构化信息</td><td>9 类业态动态字段（material/equipment/labor/cooperation/franchise/trade/agency/personnel/talent），字段类型 kvlist/taglist/steplist/chips/text，存 <span class="mono">dynFields</span></td><td>字段在描述区<b>之外</b>，无法在正文任意位置插入</td></tr>
+      <tr><td>脚本引入</td><td>common.js / stores.js / databus.js / publish-workbench.js / guest-gate.js（<b>未引入 detail.js</b>）</td><td>需新增公共渲染模块并在两端引入</td></tr>
+    </table>
+    <h3>2.2 详情页现状（js/detail.js）</h3>
+    <table>
+      <colgroup><col style="width:24%"><col style="width:44%"><col style="width:32%"></colgroup>
+      <tr><th>项</th><th>现状</th><th>说明</th></tr>
+      <tr><td>Markdown 渲染器</td><td><span class="mono">renderMarkdown(md)</span> + <span class="mono">inlineMd()</span> 已存在（L52/L46），支持 #/##/###、引用、ul/ol、段落、<b>加粗</b>、链接、<span class="mono">行内代码</span></td><td><b>已具备基础能力</b>，缺表格/代码块/图片/嵌套列表/组件码</td></tr>
+      <tr><td>md 样式</td><td><span class="mono">.md-content</span> 完整样式已存在（supply/detail.html L277-289）</td><td>缺表格/代码块样式；仅 trade 业态"企业介绍"接线</td></tr>
+      <tr><td>desc 渲染</td><td>多数业态 <span class="mono">r.desc</span> → <span class="mono">.ds-text</span> 纯文本；仅 trade 用 <span class="mono">r.descMd</span> → <span class="mono">renderMarkdown()</span> → <span class="mono">.md-content</span></td><td>渲染通道不统一：同一字段在不同业态渲染方式不同</td></tr>
+      <tr><td>富文本</td><td>无任何富文本渲染支持</td><td>需新增安全富文本渲染（白名单）</td></tr>
+      <tr><td>组件区块</td><td>各业态专业渲染器（material/equipment/…）生成"关键参数/品类详情/服务介绍"等区块</td><td>区块由<b>结构化字段</b>驱动，与描述文本无关联</td></tr>
+    </table>
+    <h3>2.3 数据与列表现状</h3>
+    <table>
+      <colgroup><col style="width:24%"><col style="width:44%"><col style="width:32%"></colgroup>
+      <tr><th>项</th><th>现状</th><th>说明</th></tr>
+      <tr><td>存储</td><td><span class="mono">PublishStore</span>（localStorage <span class="mono">engchain-publish</span>，schema v1），记录含 <span class="mono">description</span> 纯文本</td><td>升级需 v2 迁移（读时默认 + 写时兼容）</td></tr>
+      <tr><td>列表摘要</td><td>records.html 用 <span class="mono">esc(r.desc||r.description)</span> 转义后两行截断</td><td>已安全，需扩展为按格式提取纯文本</td></tr>
+      <tr><td>需求侧详情</td><td><b>无独立需求详情页</b>；需求展示于"我的发布"（records）+ 首页/列表卡片；供应走 <span class="mono">supply/detail.html</span></td><td>需求侧一致性 = 预览面板（编辑器内）为首要落点；详情页能力复用至需求场景时自然继承</td></tr>
+      <tr><td>匹配/搜索</td><td><span class="mono">computeMatch</span> 用 <span class="mono">data.description</span> 取词</td><td>改从纯文本投影取词，不受格式影响</td></tr>
+    </table>
+    <div class="callout warn"><b>关键结论</b>：项目<b>已有 Markdown 渲染器和 .md-content 样式</b>（trade 业态已打通），说明"详情页渲染 Markdown"的技术路线已被验证；缺口在于：① 渲染器能力不完整（无表格/代码块/组件码）；② 未推广到全部业态与编辑器；③ 编辑器不产生格式化的内容字段；④ 富文本完全缺失；⑤ 预览与详情各写一套。</div>
+  </div>
+</section>
+<!-- ===== 三、产品经理设计 ===== -->
+<section id="s3">
+  <h2><span class="no">3</span>产品经理设计：三模式定义与产品逻辑</h2>
+  <p class="sec-lead">产品层回答三个问题：三种模式分别服务什么用户与场景、模式之间如何切换与互转、什么机制保证"编辑所见 = 发布所得"。</p>
+
+  <div class="card">
+    <h3>3.1 三模式定义（产品口径）</h3>
+    <table>
+      <colgroup><col style="width:16%"><col style="width:30%"><col style="width:28%"><col style="width:26%"></colgroup>
+      <tr><th>模式</th><th>适用场景</th><th>交互形态</th><th>存储格式</th></tr>
+      <tr>
+        <td><span class="pill g">模式A</span>纯文本</td>
+        <td>简单供需（一句话/短描述）、快速发布、低学习成本用户</td>
+        <td>现有 textarea 不变，无工具栏，保持轻量</td>
+        <td><span class="mono">format=plain</span>，纯文本</td>
+      </tr>
+      <tr>
+        <td><span class="pill a">模式B</span>Markdown</td>
+        <td>工程类长描述（项目概况/技术要求/工期条款/资质要求等结构化内容）、习惯源码编辑的用户</td>
+        <td>源码编辑 + 实时预览分栏；工具栏提供标题/列表/表格/引用/组件快捷插入（生成语法）</td>
+        <td><span class="mono">format=md</span>，Markdown 源文本</td>
+      </tr>
+      <tr>
+        <td><span class="pill r">模式C</span>富文本</td>
+        <td>希望所见即所得、从 Word/微信复制粘贴长内容的用户（建筑行业乙方常见）</td>
+        <td>轻量富文本编辑器（工具栏：加粗/斜体/标题/列表/引用/表格/图片/组件）；粘贴自动清洗</td>
+        <td><span class="mono">format=rich</span>，白名单 HTML</td>
+      </tr>
+    </table>
+    <h3>3.2 模式切换与互转</h3>
+    <ul>
+      <li><b>入口</b>：描述区顶部"内容格式"segmented 三段切换（纯文本 / Markdown / 富文本），与现有"详细描述"标题同排。</li>
+      <li><b>切换保留内容</b>：切换时执行无损互转——
+        <ul>
+          <li>plain → md：文本按空行分段（不引入额外语法），保真。</li>
+          <li>md → plain：strip 为纯文本（去掉语法标记）。</li>
+          <li>md → rich：renderContent(md) 生成 HTML 载入富文本编辑器。</li>
+          <li>rich → md：富文本内容序列化为 Markdown（自研轻量 serializer，覆盖白名单子集）。</li>
+        </ul>
+      </li>
+      <li><b>用户偏好记忆</b>：记住用户上次选择的模式（localStorage），下次默认进入。</li>
+      <li><b>模式与业态不绑定</b>：9 类业态均可使用任意模式；不做"品类强绑定"，避免过度约束。</li>
+    </ul>
+    <h3>3.3 一致性产品逻辑</h3>
+    <ul>
+      <li><b>预览即详情</b>：编辑器右上"预览"按钮打开的面板，其描述区域渲染逻辑与详情页<b>完全同源</b>（同一渲染函数 + 同一 CSS）。产品验收点：在预览面板截图与详情页截图做像素对比。</li>
+      <li><b>格式不降级</b>：发布、存草稿、复制上次发布、编辑历史中，contentFormat 全程保留，不因中间环节丢失。</li>
+      <li><b>历史数据</b>：老数据视为 plain，正常展示，无迁移提示、无升级门槛。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>3.4 组件码机制（产品口径）</h3>
+    <p>目标：用户能在描述<b>正文任意位置</b>插入结构化组件，详情页渲染为与现有动态字段区块<b>同风格</b>的卡片。区别于现有动态字段（表单内独立区块），组件码是<b>文本流内的结构化片段</b>，表达力更强（可插在上下文中间）。</p>
+    <table>
+      <colgroup><col style="width:18%"><col style="width:40%"><col style="width:42%"></colgroup>
+      <tr><th>组件</th><th>用途示例</th><th>编辑交互</th></tr>
+      <tr><td><span class="mono">params</span> 参数表</td><td>"关键参数：材质 Q355B / 厚度 16mm / 屈服强度 355MPa"</td><td>插入向导：键值对表单 → 生成组件码</td></tr>
+      <tr><td><span class="mono">table</span> 通用表格</td><td>工期节点表、验收标准表</td><td>向导：行列数 + 单元格编辑</td></tr>
+      <tr><td><span class="mono">steps</span> 流程步骤</td><td>"交易流程：对接→审核→合同→进场→结算"</td><td>向导：步骤列表（复用 steplist 视觉）</td></tr>
+      <tr><td><span class="mono">files</span> 文件清单</td><td>"资质文件：质检报告 / 合格证"</td><td>向导：文件名清单（详情页展示文件块）</td></tr>
+      <tr><td><span class="mono">contact</span> 联系人卡片</td><td>正文中插入对接人信息卡</td><td>向导：姓名/职务/电话</td></tr>
+    </table>
+    <div class="callout ok"><b>产品决策</b>：v1 组件仅 5 种，全部为<b>纯结构组件</b>（不承载脚本、不承载可执行内容），组件码语法统一、可手写、可删除、可批量替换。图片墙/文件上传等沿用现有表单能力，不引入文本内嵌。</div>
+  </div>
+
+  <div class="card">
+    <h3>3.5 AI 接入（产品口径 · 可选增强）</h3>
+    <table>
+      <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+      <tr><th>AI 能力</th><th>产品价值</th></tr>
+      <tr><td>① 文本 → Markdown/富文本 格式化</td><td>用户粘贴长文本，一键整理为结构化的 Markdown（标题/列表/表格），降低学习成本</td></tr>
+      <tr><td>② 文本 → 组件码 智能识别</td><td>识别描述中的参数、流程、资质清单，生成对应组件码插入正文</td></tr>
+      <tr><td>③ 一致性体检</td><td>提交前检查组件码/表格语法完整性，提示修复</td></tr>
+    </table>
+    <p><b>定位</b>：AI 是<b>生产力增强</b>，非必需依赖——三模式与组件码全链路离线可用；AI 仅在用户主动点击"AI 整理"时介入。接入方式见 7.4。</p>
+  </div>
+</section>
+
+<!-- ===== 四、前端开发专家设计 ===== -->
+<section id="s4">
+  <h2><span class="no">4</span>前端开发专家设计：统一渲染管线与编辑器实现</h2>
+  <p class="sec-lead">前端层回答：如何用一个渲染函数同时服务编辑器预览与详情页；三模式编辑器各自怎么实现；组件码如何解析与安全渲染。</p>
+
+  <div class="card">
+    <h3>4.1 核心架构：统一内容渲染管线</h3>
+    <div class="fig">
+      <svg viewBox="0 0 900 430" xmlns="http://www.w3.org/2000/svg" font-family="'PingFang SC','Microsoft YaHei',sans-serif">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2b6b4f"/></marker>
+        </defs>
+        <!-- 三个输入源 -->
+        <rect x="20" y="30" width="180" height="58" rx="10" fill="#e6efe9" stroke="#2b6b4f"/>
+        <text x="110" y="56" text-anchor="middle" font-size="13" font-weight="700" fill="#1f523c">纯文本 plain</text>
+        <text x="110" y="74" text-anchor="middle" font-size="10.5" fill="#4a5248">textarea 现状轻量输入</text>
+        <rect x="20" y="110" width="180" height="58" rx="10" fill="#f4ecdd" stroke="#b89868"/>
+        <text x="110" y="136" text-anchor="middle" font-size="13" font-weight="700" fill="#8a6a35">Markdown 源码</text>
+        <text x="110" y="154" text-anchor="middle" font-size="10.5" fill="#4a5248">源码 + 实时预览分栏</text>
+        <rect x="20" y="190" width="180" height="58" rx="10" fill="#f7e8e4" stroke="#a83a2a"/>
+        <text x="110" y="216" text-anchor="middle" font-size="13" font-weight="700" fill="#a83a2a">富文本 HTML</text>
+        <text x="110" y="234" text-anchor="middle" font-size="10.5" fill="#4a5248">轻量所见即所得编辑器</text>
+        <!-- 组件码注入 -->
+        <rect x="20" y="300" width="180" height="58" rx="10" fill="#fff" stroke="#8a9188" stroke-dasharray="5 4"/>
+        <text x="110" y="326" text-anchor="middle" font-size="13" font-weight="700" fill="#4a5248">组件码</text>
+        <text x="110" y="344" text-anchor="middle" font-size="10.5" fill="#8a9188">:::cmp params ...</text>
+        <!-- 统一渲染器 -->
+        <rect x="330" y="100" width="260" height="180" rx="14" fill="#1f523c"/>
+        <text x="460" y="140" text-anchor="middle" font-size="15" font-weight="800" fill="#fff">ContentRenderer</text>
+        <text x="460" y="164" text-anchor="middle" font-size="11" fill="#cfe2d6">js/content-render.js · 唯一渲染实现</text>
+        <text x="460" y="190" text-anchor="middle" font-size="11" fill="#cfe2d6">renderContent(content, format)</text>
+        <text x="460" y="212" text-anchor="middle" font-size="10.5" fill="#cfe2d6">plain → 转义+段落化</text>
+        <text x="460" y="230" text-anchor="middle" font-size="10.5" fill="#cfe2d6">md → renderMarkdown(升级版)</text>
+        <text x="460" y="248" text-anchor="middle" font-size="10.5" fill="#cfe2d6">rich → sanitizeRich(白名单)</text>
+        <text x="460" y="266" text-anchor="middle" font-size="10.5" fill="#d8c8a0">组件码解析（三格式通用）</text>
+        <!-- 消费端 -->
+        <rect x="700" y="40" width="180" height="58" rx="10" fill="#fff" stroke="#2b6b4f"/>
+        <text x="790" y="64" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f523c">编辑器预览面板</text>
+        <text x="790" y="82" text-anchor="middle" font-size="10.5" fill="#8a9188">renderPreview() 同函数</text>
+        <rect x="700" y="150" width="180" height="58" rx="10" fill="#fff" stroke="#2b6b4f"/>
+        <text x="790" y="174" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1f523c">详情页 detail.js</text>
+        <text x="790" y="192" text-anchor="middle" font-size="10.5" fill="#8a9188">.ds-text / .md-content 统一</text>
+        <rect x="700" y="260" width="180" height="58" rx="10" fill="#fff" stroke="#8a9188"/>
+        <text x="790" y="284" text-anchor="middle" font-size="12.5" font-weight="700" fill="#4a5248">列表/搜索/匹配</text>
+        <text x="790" y="302" text-anchor="middle" font-size="10.5" fill="#8a9188">stripToText 纯文本投影</text>
+        <!-- 箭头 -->
+        <path d="M200 59 H330" stroke="#2b6b4f" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M200 139 H330" stroke="#2b6b4f" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M200 219 H330" stroke="#2b6b4f" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M200 329 L290 329 L290 240 H330" stroke="#8a9188" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#ar)"/>
+        <path d="M460 280 L460 330 L700 330 L700 298" stroke="#2b6b4f" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+        <path d="M460 280 L460 330 L790 330 L790 318" stroke="#2b6b4f" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+        <path d="M590 110 H700" stroke="#2b6b4f" stroke-width="2" marker-end="url(#ar)"/>
+        <path d="M590 210 H700" stroke="#2b6b4f" stroke-width="2" marker-end="url(#ar)"/>
+      </svg>
+      <div class="legend">
+        <span><span class="dot" style="background:#2b6b4f"></span>渲染管线（唯一实现）</span>
+        <span><span class="dot" style="background:#8a9188"></span>组件码注入路径</span>
+        <span><span class="dot" style="background:#b89868"></span>Markdown 输入</span>
+        <span><span class="dot" style="background:#a83a2a"></span>富文本输入</span>
+      </div>
+    </div>
+    <ul>
+      <li><b>新文件</b>：<span class="mono">js/content-render.js</span>（无依赖、ES5、约 400 行），包含：<span class="mono">renderContent(content, format)</span>、<span class="mono">renderMarkdownV2()</span>（升级：表格/代码块/图片/组件码/嵌套列表）、<span class="mono">sanitizeRich(html)</span>（DOMParser 白名单）、<span class="mono">stripToText(content, format)</span>（摘要用）、<span class="mono">serializeRichToMd(html)</span>（互转用）。</li>
+      <li><b>接线</b>：editor.html 与详情页（detail.js 所在页面）均引入 content-render.js；detail.js 中 <span class="mono">.ds-text</span> 路径替换为 <span class="mono">renderContent(rec.description, rec.contentFormat || 'plain')</span>；<span class="mono">.md-content</span> 路径同步收口（descMd 历史字段并入统一路径）。</li>
+      <li><b>降级</b>：content-render.js 加载失败时，detail.js 回退到现有纯文本渲染（不白屏）；预览面板回退到现状。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>4.2 编辑器三模式实现方案</h3>
+    <h4>模式 A 纯文本</h4>
+    <p>保持 <span class="mono">f-desc</span> textarea 不动，仅修正 placeholder 文案（去掉"支持简单的Markdown格式"误导），改为"补充项目概况、要求、工期、资质等信息"。渲染走 <span class="mono">renderContent(plain)</span>（转义 + 空行分段）。</p>
+    <h4>模式 B Markdown</h4>
+    <ul>
+      <li>容器：textarea（源码）+ 顶栏工具条（标题 H1/H2/H3、粗体、斜体、列表、有序列表、引用、表格、链接、插入组件）——点击在光标处插入对应语法。</li>
+      <li>预览：源码区下方/右侧"预览"分栏（移动端切换式），实时调用 <span class="mono">renderContent(md)</span>，300ms 防抖。</li>
+      <li>表格输入：工具栏"表格"打开 3×3 栅格选择器 → 生成 <span class="mono">| 表头 | ... |</span> 语法块。</li>
+    </ul>
+    <h4>模式 C 富文本（关键技术决策）</h4>
+    <div class="callout err"><b>前端决策点</b>：项目为<b>移动端优先的离线单文件 H5</b>（无构建链、无框架），原生 contenteditable 在 iOS/Android WebView 上存在光标漂移、工具栏失焦、execCommand 兼容性等系列问题。<b>推荐方案：不直接使用 contenteditable 做主力编辑，采用"标记化富文本"策略</b>——底层仍是带轻量语法（<span class="mono">**粗体** / ## 标题 / - 列表 / | 表格 |</span>）的文本编辑，工具栏按钮在光标处注入语法标记并实时预览，视觉上呈现富文本效果；该策略与 Markdown 模式共享渲染器，互转零成本，且彻底规避移动端 contenteditable 风险。</div>
+    <p><b>方案对比（给决策留档）</b>：</p>
+    <table>
+      <colgroup><col style="width:22%"><col style="width:39%"><col style="width:39%"></colgroup>
+      <tr><th>方案</th><th>优点</th><th>缺点/风险</th></tr>
+      <tr><td>方案 C1：标记化富文本（推荐）</td><td>移动端零风险、与 md 互转零成本、离线自包含、实现量小（≈300 行）</td><td>粘贴 Word 富文本需清洗转语法；不是"真 WYSIWYG"（预览与输入分离）</td></tr>
+      <tr><td>方案 C2：contenteditable 自研</td><td>真所见即所得</td><td>移动端光标/键盘/工具栏坑多；execCommand 已废弃；需大量兼容处理（高风险、高成本）</td></tr>
+      <tr><td>方案 C3：第三方库（wangEditor/Tiptap CDN）</td><td>功能完整</td><td>引入 CDN 依赖（项目当前零依赖）；体积大；定制风格成本；离线不可用</td></tr>
+    </table>
+    <p><b>建议</b>：v1 采用 C1（标记化富文本，编辑器内始终"语法 + 实时预览"双轨，体验接近富文本）；若后续桌面端/Web 端形态出现且有构建能力，再评估 C2/C3 升级。C1 的存储格式仍为 <span class="mono">format=rich</span>？——<b>否</b>：C1 实际存储与 md 相同语法，为避免语义混乱，<b>统一将 C1 的输出按 format=md 存储</b>，"富文本"作为编辑交互形态存在（产品层面仍是三种模式，技术层 md 与 rich 共用一个渲染内核；若未来引入 C3，rich 才独立存储 HTML）。此决策大幅简化数据层与渲染层。</div>
+    <h4>粘贴清洗</h4>
+    <p>粘贴 Word/微信内容时（模式 B/C），读取 clipboardData 的 text/html 与 text/plain：HTML 存在时经 DOMParser 提取结构（标题/段落/列表/表格），转换为 Markdown 语法（复用并重写原 <span class="mono">aiCleanText</span> 思路，产出为安全 md 而非 HTML）；纯文本直接按空行分段。</p>
+  </div>
+
+  <div class="card">
+    <h3>4.3 组件码机制（技术规格）</h3>
+    <h4>语法（Markdown 友好、可手写）</h4>
+    <pre><span class="k">:::cmp</span> <span class="s">params</span>
+<span class="c">材质: Q355B</span>
+<span class="c">厚度: 16mm</span>
+<span class="c">屈服强度: 355MPa</span>
+<span class="k">:::</span></pre>
+    <p>或单行紧凑形式（表格/步骤场景）：</p>
+    <pre><span class="k">:::cmp</span> <span class="s">steps|交易流程</span>
+<span class="c">1. 需求对接</span>
+<span class="c">2. 资质审核</span>
+<span class="c">3. 合同签订</span>
+<span class="k">:::</span></pre>
+    <ul>
+      <li><b>解析</b>：<span class="mono">renderContent</span> 内部用正则扫描 <span class="mono">:::cmp\s+(\w+)(?:\|([^\n]+))?\n([\s\S]*?)\n:::</span>，按类型调用组件渲染器（白名单类型表：params/table/steps/files/contact），输出带 <span class="mono">class="content-cmp content-cmp-类型"</span> 的静态结构。</li>
+      <li><b>未识别类型</b>：降级为 <span class="mono">:::cmp</span> 原样文本（不隐藏、不报错），保证数据可逆。</li>
+      <li><b>安全</b>：组件内容一律纯文本取值 + 转义输出；不解析任何 HTML/JS；键值对以"第一个冒号"切分。</li>
+      <li><b>样式</b>：组件视觉复用详情页现有区块风格（边框卡片、键名灰、键值深色），保证与动态字段区块同语言。</li>
+    </ul>
+    <h4>编辑器内插入向导</h4>
+    <p>工具栏"插入组件"→ 半屏 sheet（类型选择 + 简易表单）→ 生成组件码插入光标处。Markdown 模式下即普通文本插入；富文本（C1）模式下同样插入语法块。</p>
+  </div>
+</section>
+<!-- CONTENT_MARKER_B -->
+
+
+</div>
+</body>
+</html>

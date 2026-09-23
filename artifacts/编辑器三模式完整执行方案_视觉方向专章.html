@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布编辑器三模式完整执行方案（纯文本 / 富文本 / Markdown）· 视觉方向专章</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%230B1322'/%3E%3Cpath d='M4 6h16M4 10h16M4 14h10' stroke='%23FF9F43' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M4 18h6' stroke='%23E8EEF9' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#EEF1F6; --card:#FFFFFF; --ink:#16233B; --ink-2:#5F7393; --ink-3:#93A3BC;
+    --line:#D8E0EC; --line-2:#C6D2E4; --blue:#0B1322; --blue-2:#131F36; --blue-3:#1C2B45;
+    --orange:#E56B2F; --orange-soft:#FDEBDD; --orange-2:#C0441C;
+    --mono:"JetBrains Mono","SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --r:14px; --shadow:0 1px 3px rgba(11,19,34,.06), 0 10px 28px -14px rgba(11,19,34,.18);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.78;}
+  .wrap{max-width:1080px; margin:0 auto; padding:48px 28px 96px;}
+  /* ===== 封面（蓝图纸 · 工程钢构） ===== */
+  .cover{background:linear-gradient(155deg,#0B1322 0%,#131F36 52%,#1C2B45 100%); border-radius:22px; padding:54px 50px 46px; color:#fff; margin-bottom:40px; position:relative; overflow:hidden;}
+  .cover::before{content:""; position:absolute; inset:0; opacity:.5; background-image:linear-gradient(rgba(232,238,249,.05) 1px, transparent 1px),linear-gradient(90deg, rgba(232,238,249,.05) 1px, transparent 1px); background-size:26px 26px; pointer-events:none;}
+  .cover::after{content:""; position:absolute; right:-70px; top:-70px; width:260px; height:260px; border-radius:50%; background:radial-gradient(circle, rgba(255,159,67,.16), transparent 65%);}
+  .cover .tag{display:inline-block; padding:4px 12px; border-radius:999px; background:rgba(255,159,67,.16); border:1px solid rgba(255,159,67,.4); color:#FFB96E; font-size:12px; letter-spacing:.08em; margin-bottom:18px; font-weight:600;}
+  .cover h1{font-size:31px; font-weight:800; line-height:1.35; letter-spacing:.01em; position:relative;}
+  .cover h1 .thin{color:#9FB0CC; font-weight:400;}
+  .cover .sub{margin-top:14px; font-size:14.5px; color:rgba(232,238,249,.88); max-width:720px; position:relative; line-height:1.75;}
+  .cover .sub b{color:#FFB96E;}
+  .cover .meta{display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; position:relative;}
+  .cover .meta span{font-size:12px; padding:5px 12px; border-radius:8px; background:rgba(232,238,249,.1); border:1px solid rgba(232,238,249,.14);}
+  .cover .meta span b{color:#FFB96E;}
+  /* ===== 章节 ===== */
+  section{margin-top:48px;}
+  h2{font-size:22px; font-weight:800; display:flex; align-items:center; gap:12px; margin-bottom:6px; letter-spacing:.02em;}
+  h2 .no{flex:none; width:32px; height:32px; border-radius:10px; background:var(--blue); color:#fff; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:800; border:1px solid rgba(255,255,255,.08);}
+  h2 .no.acc{background:var(--orange); color:#fff;}
+  .sec-lead{color:var(--ink-2); font-size:13.5px; margin-bottom:18px; max-width:780px;}
+  h3{font-size:16.5px; font-weight:700; margin:28px 0 10px; padding-left:12px; border-left:3px solid var(--orange);}
+  h4{font-size:14px; font-weight:700; margin:20px 0 8px; color:var(--blue-2);}
+  p{margin:8px 0;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:22px 24px; box-shadow:var(--shadow); margin:14px 0;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  @media (max-width:760px){.grid2,.grid3{grid-template-columns:1fr;} .cover{padding:38px 24px;} .wrap{padding:24px 16px 72px;}}
+  /* ===== 表格 ===== */
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; table-layout:fixed;}
+  th{background:#E7EDF7; color:var(--blue-2); font-weight:700; text-align:left; padding:9px 12px; border:1px solid var(--line-2); font-size:12.5px;}
+  td{padding:9px 12px; border:1px solid var(--line); vertical-align:top; background:#fff;}
+  tr:nth-child(even) td{background:#F8FAFD;}
+  .mono{font-family:var(--mono); font-size:12.5px; background:#EEF2F8; border:1px solid var(--line-2); border-radius:6px; padding:1px 6px; color:var(--orange-2);}
+  pre{background:var(--blue); color:#E8EEF9; border-radius:10px; padding:16px 18px; font-family:var(--mono); font-size:12.5px; line-height:1.7; overflow-x:auto; margin:12px 0;}
+  pre .c{color:#6B7D9E;} pre .k{color:#FFB96E;} pre .s{color:#8FD0A8;} pre .o{color:#7FB0E8;}
+  /* ===== 标签与提示 ===== */
+  .pill{display:inline-block; padding:2px 10px; border-radius:999px; font-size:11.5px; font-weight:600; margin-right:6px;}
+  .pill.b{background:var(--blue); color:#fff;}
+  .pill.o{background:var(--orange-soft); color:var(--orange-2);}
+  .pill.g{background:#E6F2EA; color:#2B6B4F;}
+  .pill.r{background:#F8E9E6; color:#A83A2A;}
+  .callout{border-radius:10px; padding:14px 16px; margin:12px 0; font-size:13.5px;}
+  .callout.warn{background:var(--orange-soft); border:1px solid #F0D3B8;}
+  .callout.err{background:#FAEBE7; border:1px solid #EDCCC3;}
+  .callout.ok{background:#E9F3EE; border:1px solid #CDE2D6;}
+  .callout b{color:inherit;}
+  ul,ol{margin:8px 0 8px 22px;}
+  li{margin:4px 0;}
+  /* ===== 架构图 ===== */
+  .fig{background:#fff; border:1px solid var(--line); border-radius:var(--r); padding:20px; margin:14px 0; overflow-x:auto;}
+  .fig svg{display:block; margin:0 auto; min-width:640px;}
+  .legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--ink-2); margin-top:8px; justify-content:center;}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .dot{width:12px; height:12px; border-radius:4px; display:inline-block;}
+  /* ===== 视觉令牌卡（专章用） ===== */
+  .swatch-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:12px 0;}
+  .sw{background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .sw .chip{height:52px; border-bottom:1px solid var(--line);}
+  .sw .info{padding:8px 10px; font-size:12px;}
+  .sw .info b{display:block; font-size:12.5px; color:var(--ink);}
+  .sw .info code{font-family:var(--mono); font-size:11px; color:var(--ink-2);}
+  .type-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin:12px 0;}
+  .ty{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  .ty b{display:block; font-size:14px; margin-bottom:4px;}
+  .ty small{color:var(--ink-2); font-size:12px;}
+  .ty .demo{font-family:var(--mono); font-size:12px; color:var(--orange-2); margin-top:8px; background:#F4F7FB; border-radius:6px; padding:6px 8px; display:block;}
+  /* ===== 时间轴 ===== */
+  .timeline{display:grid; grid-template-columns:88px 44px 1fr; gap:0; margin:16px 0;}
+  .tl-phase{padding:6px 0; text-align:right; font-size:13px; font-weight:700; color:var(--blue-2);}
+  .tl-rail{position:relative;}
+  .tl-rail::before{content:""; position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--line-2); transform:translateX(-50%);}
+  .tl-rail .tl-dot{position:absolute; top:12px; left:50%; transform:translateX(-50%); width:14px; height:14px; border-radius:50%; background:var(--orange); border:3px solid #fff; box-shadow:0 0 0 2px var(--orange);}
+  .tl-card{padding:6px 0 22px 6px;}
+  .tl-card .inner{background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font-size:13px;}
+  .tl-card .t{font-weight:700; font-size:13.5px; margin-bottom:4px;}
+  .tl-card .d{color:var(--ink-2); font-size:12.5px;}
+  /* ===== 检查清单 ===== */
+  .check{list-style:none; margin-left:0;}
+  .check li{padding:6px 0 6px 28px; position:relative; font-size:13.5px;}
+  .check li::before{content:""; position:absolute; left:2px; top:11px; width:14px; height:14px; border-radius:5px; background:#E7EDF7; border:1.5px solid var(--blue);}
+  .check li.done::before{background:var(--blue); border-color:var(--blue);}
+  .check li.done::after{content:""; position:absolute; left:5px; top:14px; width:8px; height:5px; border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg);}
+  .check li.half::before{background:var(--orange); border-color:var(--orange);}
+  .check li.half::after{content:""; position:absolute; left:4px; top:15px; width:10px; height:2px; background:#fff;}
+  .foot{margin-top:56px; padding-top:20px; border-top:1px solid var(--line-2); color:var(--ink-3); font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+  /* 同构预览示意 */
+  .sim{background:var(--blue); border-radius:14px; padding:18px; color:#E8EEF9; font-size:12.5px; margin:12px 0;}
+  .sim .bar{display:flex; gap:8px; margin-bottom:10px; align-items:center;}
+  .sim .seg{display:flex; gap:4px; background:rgba(255,255,255,.08); border-radius:999px; padding:3px; width:fit-content;}
+  .sim .seg i{font-style:normal; padding:3px 12px; border-radius:999px; font-size:11px;}
+  .sim .seg i.on{background:var(--orange); color:#fff; font-weight:700;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="cover">
+  <span class="tag">执行方案 · 非执行稿 · v3.1（优化调整版）</span>
+  <h1>发布编辑器三模式完整执行方案<br><span class="thin">纯文本 / 富文本 / Markdown 与详情页展示一致性</span></h1>
+  <div class="sub">针对 <b>pages/publish/editor.html</b>（发布需求 / 发布供应双角色）的「详细描述」区域，设计三模式编辑能力。核心目标：<b>编辑器预览与详情页渲染的展示信息、展示效果完全一致</b>；通过<b>单一渲染管线 + 文本组件码</b>实现；AI 作为可选增强路径（不进首期）。本版新增 <b>第 10 章「视觉方向」专章</b>，从视觉母题、设计令牌到三模式编辑体验逐层明确描述。<br><b>v3.1 优化调整</b>：依据评审结论调整执行优先级——<b>以「纯文本 + 组件码 + 实时预览」为主路径（默认即用，零学习成本）</b>；<b>富文本 / Markdown 降级为「高级可选」模式</b>（默认隐藏入口，设置中开启），首期只保证其渲染能力、编辑体验后置。</div>
+  <div class="meta">
+    <span><b>编制</b>：产品经理 · 前端开发专家 · 后端开发专家 · UI 设计专家</span>
+    <span><b>复核</b>：全栈开发专家</span>
+    <span><b>日期</b>：2026-09-23</span>
+    <span><b>基座</b>：editor.html（patch28 聚焦修复 + AI 智能补全已移除）</span>
+  </div>
+</div>
+
+<!-- ===== 一、任务定义 ===== -->
+<section id="s1">
+  <h2><span class="no">1</span>任务定义与验收原则</h2>
+  <p class="sec-lead">用户目标原文与验收口径，本方案一切设计的判定基准。</p>
+  <div class="card">
+    <h3>1.1 用户目标原文</h3>
+    <blockquote style="border-left:3px solid var(--orange); padding-left:16px; color:var(--ink-2); margin:10px 0;">
+      「按照三种模式考虑：当前的现状的模式、富文本、markdown。新增的富文本模式、markdown 模式，需要充分实现编辑器本身对应的详情页的展示信息以及展示效果的一致性，而不是简单的进行单一输入内容的渲染展示。如果该功能需要 AI 接入，可以考虑；或者通过文本中可以便捷插入组件码的方式来实现。」
+    </blockquote>
+  </div>
+  <div class="card">
+    <h3>1.2 任务边界</h3>
+    <ul>
+      <li><b>范围</b>：编辑器 <span class="mono">editor.html</span> 的「详细描述」输入区升级为三模式（<b>纯文本主路径 + 富文本 / Markdown 高级可选</b>）；详情页/详情弹层渲染能力同步升级；数据层兼容三格式。</li>
+      <li><b>非范围</b>：9 类业态的动态字段体系、关键参数区、图片/文件上传、付费墙/解锁、列表页卡片视觉改版——保持现状，仅通过渲染管线收口。</li>
+      <li><b>已前置完成</b>：聚焦位移 bug（overflow:hidden + scrollIntoView → overflow:clip + 容器内滚动，patch28）；「AI 智能补全」行及其功能逻辑已彻底删除（ai-* 残留 = 0，共享逻辑未破坏）。</li>
+      <li><b>交付形态</b>：本文件为完整执行方案（含四角色设计、组件码规范、视觉方向专章、分阶段计划、全栈复核结论），不包含代码修改。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>1.3 一致性验收标准（产品级）</h3>
+    <ol>
+      <li><b>结构一致</b>：同一内容在编辑器预览面板与发布后详情页中，标题层级、列表、表格、引用、代码块的<b>结构完全相同</b>。</li>
+      <li><b>效果一致</b>：字体、颜色、间距、组件卡片的<b>视觉样式一致</b>（同一套 CSS 变量与排版规范）。</li>
+      <li><b>组件一致</b>：文本内插入的组件码，在预览与详情页渲染为<b>同一组件样式</b>。</li>
+      <li><b>摘要一致</b>：列表 / 搜索 / 我的发布中的纯文本摘要，从同一内容提取，无 HTML 残留、无断句错乱。</li>
+      <li><b>兼容一致</b>：历史纯文本数据零迁移成本可读；复制上次发布 / 草稿恢复保持格式不丢失。</li>
+    </ol>
+    <div class="callout ok"><b>核心架构判断</b>：实现「一致性」的唯一可靠方式是<b>单一渲染管线</b>——编辑器预览与详情页调用<b>同一个渲染函数</b>（同一份代码、同一套样式类），而非各自实现一遍。任何「两处各写一套渲染」的方案都必然出现偏差。</div>
+  </div>
+</section>
+
+<!-- ===== 二、专家成员 ===== -->
+<section id="s2">
+  <h2><span class="no">2</span>专家成员与职责矩阵</h2>
+  <p class="sec-lead">本方案的编制由四个专业角色协同完成，并交由全栈开发专家多角度复核。各角色在方案中的具体产出如下。</p>
+  <div class="card">
+    <table>
+      <colgroup><col style="width:16%"><col style="width:30%"><col style="width:34%"><col style="width:20%"></colgroup>
+      <tr><th>角色</th><th>核心职责</th><th>本方案产出</th><th>状态</th></tr>
+      <tr><td><b>产品经理</b></td><td>定义三模式用户路径、一致性验收口径、组件码产品化、AI 边界</td><td>第 1 / 4 / 6 / 11 章</td><td><span class="pill b">已编制</span></td></tr>
+      <tr><td><b>前端开发专家</b></td><td>编辑器 DOM/交互、统一渲染管线、工具栏与预览、性能与可达性</td><td>第 5 / 8 章 + 10.3–10.7</td><td><span class="pill b">已编制</span></td></tr>
+      <tr><td><b>后端开发专家</b></td><td>数据契约、格式字段兼容、搜索索引、XSS 防线、零迁移策略</td><td>第 7 / 9 章 + 12 章</td><td><span class="pill b">已编制</span></td></tr>
+      <tr><td><b>UI 设计专家</b></td><td>视觉母题、设计令牌、三模式视觉规范、动效与明暗双主题</td><td>第 10 章（专章）</td><td><span class="pill o">本次重点</span></td></tr>
+      <tr><td><b>全栈开发专家</b></td><td>从性能 / 安全 / 兼容 / 可维护 / 一致性五角度复核全部方案</td><td>第 13 章复核结论</td><td><span class="pill g">复核通过</span></td></tr>
+    </table>
+  </div>
+  <div class="callout warn"><b>协作约定</b>：本方案中「视觉方向」由 UI 设计专家牵头、前端开发专家评审落地的可行性（CSS 变量统一、动效降级、明暗主题），产品经理确认视觉与功能一致性验收的关系。三处角色结论冲突时，以「编辑所见 = 详情所呈」为最高仲裁原则。</div>
+</section>
+
+<!-- ===== 三、现状基线 ===== -->
+<section id="s3">
+  <h2><span class="no">3</span>现状基线</h2>
+  <p class="sec-lead">改造前的真实代码事实（已核查 editor.html / records.html），所有方案必须建立在这些事实上。</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>3.1 编辑器现状</h3>
+      <ul>
+        <li>「详细描述」为单一大文本框 <span class="mono">#f-desc</span>（textarea），placeholder 提示「支持简单的 Markdown 格式」，但<b>实际无任何渲染</b>——纯文本存储。</li>
+        <li>数据链路：<span class="mono">collectData() → description</span> 原样存字符串；草稿 / 自动保存 / 复制上次发布均读写该字段。</li>
+        <li>主题系统：浅色 / 深色双主题（<span class="mono">[data-theme="dark"]</span>）；编辑器作用域主题色「需求=金（默认）、供应=绿」<span class="mono">#pub-content[data-role="supply"]</span> 覆写 <span class="mono">--primary</span>。</li>
+        <li>交互约束：已修复的聚焦位移 bug 确立两条铁律——<b>滚动容器显式 overflow:clip；焦点元素用容器内滚动而非 scrollIntoView(center)</b>。三模式编辑器必须继承这两条铁律。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>3.2 详情展示现状</h3>
+      <ul>
+        <li>发布成功后的详情弹层（editor.html ~2350 行）：<span class="mono">'&lt;div …&gt;' + d.description + '&lt;/div&gt;'</span> <b>直接 innerHTML 拼接</b>——纯文本时代无风险，富文本 / Markdown 时代必须接入统一渲染 + 消毒。</li>
+        <li>列表卡摘要（records.html ~232 行）：<span class="mono">esc(r.desc)</span> 转义后纯文本两行截断——是「摘要一致」的现成出口。</li>
+        <li>搜索关键词：由 title + description 前 80 字截取（editor.html ~2217 行）——富文本 / Markdown 后需从<b>纯文本提取层</b>取词，避免把语法符号当关键词。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card">
+    <h3>3.3 基线结论</h3>
+    <ul>
+      <li>三模式改造的<b>唯一侵入点</b>是「详细描述」字段及其渲染出口；其余表单字段（标题 / 品类 / 规格 / 联系人 / 交易要求等）零改动。</li>
+      <li>渲染出口共三处：<b>详情弹层（富文本渲染）</b>、<b>列表摘要（纯文本提取）</b>、<b>搜索索引（纯文本提取）</b>。三处统一收口到一个渲染模块，即完成「一致性」的数据面闭环。</li>
+      <li>「AI 智能补全」已删除：确认无 ai-* 残留、共享逻辑（表单校验 / 草稿 / 提交）未被破坏，双角色（demand / supply）回归通过。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 四、三模式功能设计 ===== -->
+<section id="s4">
+  <h2><span class="no">4</span>三模式功能设计</h2>
+  <p class="sec-lead">三种模式的产品定义：各自做什么、怎么切换、切走切回不丢内容。模式是「视图 + 输入方式」的切换，<b>底层数据始终是同一份结构化内容</b>。<b>v3.1 优先级调整：纯文本 + 组件码 + 实时预览为主路径（默认即用）；富文本 / Markdown 为高级可选（默认隐藏，设置中开启）。</b></p>
+  <div class="card">
+    <table>
+      <colgroup><col style="width:14%"><col style="width:30%"><col style="width:30%"><col style="width:26%"></colgroup>
+      <tr><th>模式</th><th>输入方式</th><th>实时预览</th><th>定位</th></tr>
+      <tr><td><b>纯文本</b><br><span class="pill g">主路径 · 默认</span></td><td>大文本框直接输入</td><td>逐段成文，格式零损耗（现状行为）</td><td>最快路径：贴进来就能发，零学习成本</td></tr>
+      <tr><td><b>Markdown</b><br><span class="pill r">高级可选</span></td><td>等宽源码区 + 语法高亮</td><td>可切换「源码 / 预览」，或双栏并排</td><td>结构化表达：标题 / 列表 / 表格 / 代码</td></tr>
+      <tr><td><b>富文本</b><br><span class="pill r">高级可选</span></td><td>contenteditable 所见即所得 + 工具栏</td><td>编辑区下方实时渲染（同管线）</td><td>零学习成本：选中即加粗，不用记语法</td></tr>
+    </table>
+    <p style="font-size:12.5px; color:var(--ink-2); margin-top:10px;">高级可选模式<b>默认不展示入口</b>：在「设置 - 编辑器」中开启后，segment 才扩展为三态。开启与否不影响任何已有发布与草稿——主路径始终可用。</p>
+  </div>
+  <div class="grid3">
+    <div class="card"><h3>4.1 模式切换</h3>
+      <ul>
+        <li>顶部 segment 控件：<b>默认单态（纯文本 + 组件插入按钮）</b>；开启高级模式后扩展为 <b>纯文本 / Markdown / 富文本</b>三态。</li>
+        <li>切换即时生效，<b>内容一份不丢</b>：纯文本 ↔ Markdown ↔ 富文本互相转换，转换规则由统一中间层（结构化 AST）保证。</li>
+        <li>切换后光标尽量保持语义位置（按段落近似定位）。</li>
+        <li>v3.1：未开启高级模式的用户不可见 segment，保持现状表单外观，彻底零学习成本。</li>
+      </ul>
+    </div>
+    <div class="card"><h3>4.2 工具栏（按模式变化）</h3>
+      <ul>
+        <li><b>纯文本</b>：无工具栏，保留字数统计 + 组件插入入口。</li>
+        <li><b>Markdown</b>：快捷插入语法（标题 / 加粗 / 列表 / 引用 / 表格 / 代码块）+ 插入组件。</li>
+        <li><b>富文本</b>：B / I / H2 / 列表 / 引用 / 表格 / 代码块 + 插入组件 + 清格式。</li>
+      </ul>
+    </div>
+    <div class="card"><h3>4.3 实时预览</h3>
+      <ul>
+        <li>三模式共用同一个 <span class="mono">livepane</span> 预览区，调用<b>统一渲染函数</b>。</li>
+        <li>富文本模式：编辑区下方实时渲染（压缩编辑区高度保证首屏可见）。</li>
+        <li>Markdown 模式：源码 / 预览切换，预览同样走统一渲染。</li>
+        <li>组件码在预览中即时渲染为组件卡片。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout warn"><b>切换一致性铁律</b>：任何模式下的「所见」（含组件卡、标题层级、表格）在切换后不得走样；切换操作不触发重新输入，只触发「同一内容换视图」。若某格式在目标模式不可表达（如纯文本无表格），降级为<b>可读的标记文本</b>并在预览提示「该结构在纯文本模式以标记展示」。</div>
+</section>
+
+<!-- ===== 五、统一渲染管线 ===== -->
+<section id="s5">
+  <h2><span class="no">5</span>统一渲染管线（一致性核心）</h2>
+  <p class="sec-lead">「编辑所见 = 详情所呈」的工程实现：一套解析器 + 一套渲染器 + 一套样式，所有出口共用。</p>
+  <div class="card">
+    <h3>5.1 单一渲染函数</h3>
+    <p>新增共享模块 <span class="mono">render.js</span>（或 editor.html 内共享作用域），暴露两个纯函数：</p>
+    <pre><span class="k">renderContent</span>(store) <span class="c">// 输入 {format, content} → 输出安全 HTML</span>
+<span class="k">extractText</span>(store)   <span class="c">// 输入 {format, content} → 输出纯文本（摘要 / 搜索用）</span></pre>
+    <ul>
+      <li><b>编辑器预览</b> = <span class="mono">renderContent(store)</span> 渲染进 <span class="mono">.livepane</span>。</li>
+      <li><b>详情弹层</b> = 同一个 <span class="mono">renderContent(store)</span> 渲染进详情容器。</li>
+      <li><b>列表摘要 / 搜索</b> = <span class="mono">extractText(store)</span> 取纯文本。</li>
+    </ul>
+  </div>
+  <div class="fig">
+    <svg viewBox="0 0 860 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#E56B2F"/></marker>
+      </defs>
+      <rect x="20" y="60" width="150" height="80" rx="12" fill="#0B1322"/>
+      <text x="95" y="92" text-anchor="middle" fill="#E8EEF9" font-size="13" font-weight="700">store</text>
+      <text x="95" y="112" text-anchor="middle" fill="#9FB0CC" font-size="11">{format, content}</text>
+      <rect x="230" y="60" width="170" height="80" rx="12" fill="#1C2B45"/>
+      <text x="315" y="92" text-anchor="middle" fill="#FFB96E" font-size="13" font-weight="700">renderContent()</text>
+      <text x="315" y="112" text-anchor="middle" fill="#9FB0CC" font-size="11">统一解析 + 消毒 + 渲染</text>
+      <rect x="460" y="20" width="150" height="56" rx="12" fill="#E9F3EE" stroke="#CDE2D6"/>
+      <text x="535" y="46" text-anchor="middle" fill="#2B6B4F" font-size="12" font-weight="700">编辑器 .livepane</text>
+      <text x="535" y="62" text-anchor="middle" fill="#5F7393" font-size="10">实时预览</text>
+      <rect x="460" y="90" width="150" height="56" rx="12" fill="#E9F3EE" stroke="#CDE2D6"/>
+      <text x="535" y="116" text-anchor="middle" fill="#2B6B4F" font-size="12" font-weight="700">详情弹层 / 详情页</text>
+      <text x="535" y="132" text-anchor="middle" fill="#5F7393" font-size="10">发布后展示</text>
+      <rect x="670" y="60" width="170" height="80" rx="12" fill="#FDEBDD" stroke="#F0D3B8"/>
+      <text x="755" y="92" text-anchor="middle" fill="#C0441C" font-size="13" font-weight="700">extractText()</text>
+      <text x="755" y="112" text-anchor="middle" fill="#5F7393" font-size="11">纯文本提取</text>
+      <rect x="670" y="160" width="170" height="34" rx="8" fill="#fff" stroke="#D8E0EC"/>
+      <text x="755" y="181" text-anchor="middle" fill="#5F7393" font-size="11">列表摘要 · 搜索索引</text>
+      <line x1="170" y1="100" x2="228" y2="100" stroke="#E56B2F" stroke-width="2" marker-end="url(#arw)"/>
+      <line x1="400" y1="80" x2="458" y2="48" stroke="#2B6B4F" stroke-width="2" marker-end="url(#arw)"/>
+      <line x1="400" y1="100" x2="458" y2="118" stroke="#2B6B4F" stroke-width="2" marker-end="url(#arw)"/>
+      <line x1="400" y1="112" x2="668" y2="112" stroke="#E56B2F" stroke-width="2" marker-end="url(#arw)"/>
+      <line x1="755" y1="140" x2="755" y2="158" stroke="#E56B2F" stroke-width="2" marker-end="url(#arw)"/>
+      <text x="315" y="156" text-anchor="middle" fill="#93A3BC" font-size="10">同一份代码 · 同一套样式类</text>
+    </svg>
+    <div class="legend">
+      <span><i class="dot" style="background:#0B1322"></i>统一数据契约</span>
+      <span><i class="dot" style="background:#E56B2F"></i>统一渲染管线</span>
+      <span><i class="dot" style="background:#2B6B4F"></i>所有展示出口共用</span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>5.2 安全设计（XSS 防线）</h3>
+    <ul>
+      <li>渲染输出<b>只允许白名单标签</b>（p / h2–h4 / ul ol li / table / blockquote / pre code / strong em / br / a[href 白名单协议]），其余一律转义。</li>
+      <li><span class="mono">renderContent</span> 内部先解析为 AST，再按白名单生成 HTML——<b>绝不直接 innerHTML 用户原文</b>。</li>
+      <li>链接强制 <span class="mono">rel="noopener nofollow"</span> + <span class="mono">target="_blank"</span>；图片仅允许组件码内嵌（见第 6 章），正文不渲染任意 img。</li>
+      <li>现有详情弹层的裸 innerHTML 拼接（editor.html ~2350 行）必须替换为 <span class="mono">renderContent()</span> 输出。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 六、组件码规范 ===== -->
+<section id="s6">
+  <h2><span class="no">6</span>组件码规范</h2>
+  <p class="sec-lead">用「一行组件码」把表格、流程、附件、联系方式沉淀为结构化卡片：录入与展示共用同一份数据，编辑器和详情页不再是两张皮。</p>
+  <div class="card">
+    <h3>6.1 四类组件</h3>
+    <table>
+      <colgroup><col style="width:16%"><col style="width:22%"><col style="width:40%"><col style="width:22%"></colgroup>
+      <tr><th>类型</th><th>组件码</th><th>渲染为（编辑器预览 = 详情一致）</th><th>典型场景</th></tr>
+      <tr><td>参数表</td><td><span class="mono">::params</span> 键:值 行</td><td>「产品参数」两列表格卡</td><td>规格 / 尺寸 / 材质 / 执行标准</td></tr>
+      <tr><td>生产步骤</td><td><span class="mono">::steps</span> 步骤行</td><td>「生产 / 施工流程」编号时间轴卡</td><td>工序 / 工期 / 验收节点</td></tr>
+      <tr><td>文件附件</td><td><span class="mono">::files</span> 名称+说明</td><td>「文件资料」附件列表卡</td><td>资质 / 检测报告 / 图纸清单</td></tr>
+      <tr><td>联系方式</td><td><span class="mono">::contact</span> 字段行</td><td>「联系方式」字段卡</td><td>联系人 / 电话 / 微信 / 地址</td></tr>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>6.2 组件码语法</h3>
+      <pre><span class="o">::params</span>
+型号: HM200×200×8×12
+材质: Q355B
+标准: GB/T 11263</pre>
+      <p style="font-size:12.5px; color:var(--ink-2);">独立成块（前后空行），首行为类型标记，后续行为「键: 值」或步骤行。语法容错：缺值行自动忽略并提示。</p>
+    </div>
+    <div class="card"><h3>6.3 插入交互</h3>
+      <ul>
+        <li>编辑器工具栏「插入组件」按钮 → 底部弹出 bottom sheet，四类组件选择。</li>
+        <li>选择后按当前模式插入：<b>Markdown / 纯文本</b>插入组件码文本；<b>富文本</b>插入一个不可编辑的组件占位块（底层仍是组件码）。</li>
+        <li>组件卡右下角「编辑」按钮 → 弹窗按字段编辑，保存后回写组件码并重渲染。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout ok"><b>一致性红利</b>：组件码使「表格 / 流程 / 附件 / 联系」从正文文本中<b>结构化分离</b>——详情页、列表摘要（组件标题）、搜索索引（组件关键词）全部从同一份组件数据派生，天然一致。</div>
+</section>
+
+<!-- ===== 七、数据契约 ===== -->
+<section id="s7">
+  <h2><span class="no">7</span>数据契约与兼容</h2>
+  <p class="sec-lead">存储格式、迁移、草稿恢复、搜索摘要的兼容策略——历史数据零迁移是硬约束。</p>
+  <div class="card">
+    <h3>7.1 存储契约</h3>
+    <ul>
+      <li>发布记录新增字段：<span class="mono">descFormat</span>（'text' | 'md' | 'rich'）+ <span class="mono">descRaw</span>（原始内容，按格式存储）+ 保留 <span class="mono">description</span>（渲染后纯文本或 HTML，按需）。</li>
+      <li><b>兼容规则</b>：<span class="mono">descFormat</span> 缺失或 'text' 时，一律按纯文本渲染——<b>历史数据零迁移</b>。</li>
+      <li>草稿 / 自动保存：同步保存 format，恢复时按原模式打开并还原内容。</li>
+      <li>复制上次发布：携带 format 还原，格式不丢失。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>7.2 摘要与搜索</h3>
+    <ul>
+      <li>列表摘要 = <span class="mono">extractText({format, content})</span>，先剥离组件码块，再取正文前 N 字——避免把语法符号当摘要。</li>
+      <li>搜索索引 = 标题 + <span class="mono">extractText()</span> 纯文本 + 组件标题（如「产品参数」）。</li>
+      <li>全部为<b>读取侧派生</b>，不改写存量写入逻辑；存储侧仅加字段，不动表结构。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 八、前端实现方案 ===== -->
+<section id="s8">
+  <h2><span class="no">8</span>前端实现方案</h2>
+  <p class="sec-lead">前端开发专家给出的实现路径：DOM 结构、状态机、交互清单、性能与可达性约束。</p>
+  <div class="grid2">
+    <div class="card"><h3>8.1 DOM 与状态</h3>
+      <ul>
+        <li>以「详细描述」卡片为改造单元，内部结构：<span class="mono">.mode-seg</span>（默认单态，高级开启后三态）+ <span class="mono">.toolbar</span>（按模式渲染）+ <span class="mono">.edit-area</span>（textarea / pre / contenteditable 三态）+ <span class="mono">.livepane</span>（统一预览）。</li>
+        <li>状态：<span class="mono">mode ∈ {text, md, rich}</span> + <span class="mono">store = {format, content}</span> + <span class="mono">advancedEnabled</span>（高级模式开关，持久化于设置），切换 = 内容经中间层转换 + 换视图，不丢数据。</li>
+        <li>富文本用 contenteditable + <b>防抖 300ms</b> 同步 store；Markdown 用 textarea + 输入即解析。<b>v3.1：首期只实现 Markdown / 富文本的「渲染」能力，编辑器（语法高亮 / contenteditable 工具栏）后置到 P2</b>——渲染管线先行，编辑体验灰度。</li>
+      </ul>
+    </div>
+    <div class="card"><h3>8.2 交互清单</h3>
+      <ul>
+        <li>模式切换：<b>主路径下 segment 不可见</b>，仅「插入组件」按钮；开启高级模式后 segment 点击即时切换，切换时 toast 轻提示「内容已保留」。</li>
+        <li>工具栏按钮：Markdown 模式插入语法标记到光标位；富文本模式执行 execCommand（B / I / H2 / 列表 / 引用 / 表格 / 代码块）——均在 P2 落地。</li>
+        <li>组件插入：bottom sheet 选择 → 插入组件码 / 占位块 → livepane 即时渲染（P1 主路径核心交互）。</li>
+        <li>字数统计：三模式统一按<b>纯文本</b>计数（含组件块计为结构块），校验逻辑沿用现有 98/5000 规则。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card"><h3>8.3 性能与可达性</h3>
+    <ul>
+      <li>渲染防抖：输入停止 200–300ms 后重渲染 livepane；长内容（&gt;2000 字）节流渲染。</li>
+      <li><b>继承聚焦铁律</b>：编辑器滚动容器显式 <span class="mono">overflow:clip</span>；模式切换 / 工具栏聚焦用容器内滚动定位，<b>禁止 scrollIntoView(center)</b>（patch28 教训）。</li>
+      <li>键盘可达：segment 可用方向键切换；工具栏按钮有 aria-label；富文本区支持 Tab 插入代码块；焦点环在明暗双主题下均满足 3:1 对比。</li>
+      <li>动效一律 <span class="mono">prefers-reduced-motion</span> 降级（与视觉方向 10.7 一致）。</li>
+      <li>历史兼容：草稿 / 复制上次发布 / 自动恢复按 <span class="mono">descFormat</span> 还原模式与内容。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 九、后端实现方案 ===== -->
+<section id="s9">
+  <h2><span class="no">9</span>后端实现方案</h2>
+  <p class="sec-lead">后端开发专家给出的方案：存储、校验、搜索、安全的服务端视角；首期追求「最小后端改动」。</p>
+  <div class="grid2">
+    <div class="card"><h3>9.1 存储与写入</h3>
+      <ul>
+        <li>发布记录增加 <span class="mono">descFormat</span>（默认 'text'）与 <span class="mono">descRaw</span>（原始内容）；<span class="mono">description</span> 字段保留为纯文本摘要（写入时由前端 extractText 结果填充，服务端只做长度校验）。</li>
+        <li>服务端校验：三格式统一限长（如 5000 字符）；<b>拒绝</b>富文本 / Markdown 原始内容中的脚本标签与危险协议（写入侧白名单校验，纵深防御）。</li>
+        <li>草稿接口同步携带 format，恢复原样。</li>
+      </ul>
+    </div>
+    <div class="card"><h3>9.2 读取与搜索</h3>
+      <ul>
+        <li>列表 / 搜索读取 <span class="mono">description</span>（纯文本摘要）——现字段零改动即兼容。</li>
+        <li>详情读取 <span class="mono">{descFormat, descRaw}</span> 交给前端统一渲染（渲染必须在客户端完成，服务端不拼 HTML）。</li>
+        <li>搜索索引：写入侧用 <span class="mono">extractText</span> 的纯文本建索引；组件标题（如「产品参数」）作为附加关键词。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout ok"><b>结论</b>：后端改动收敛为「两个可空字段 + 写入校验 + 索引派生」，不迁移存量数据、不动表结构、不加中间件。若宿主环境无法加字段，退路是 <b>descFormat 内嵌约定</b>（description 首行注释标记），仍保持零迁移。</div>
+</section>
+
+<!-- ===== 十、视觉方向（专章） ===== -->
+<section id="s10">
+  <h2><span class="no acc">10</span>视觉方向（专章）</h2>
+  <p class="sec-lead">本版方案的核心增补：由 UI 设计专家牵头，把三模式编辑器的视觉方向<b>单独成章、逐层明确</b>。它既是设计规范，也直接作为实施时的 CSS 变量与组件样式基准。视觉总原则一句话：<b>「蓝图纸上的发布台」——信息像工程图纸一样清晰分层，行动像橙色扳手一样一眼可点。</b></p>
+
+  <div class="card">
+    <h3>10.1 视觉母题：蓝图纸 · 工程钢构</h3>
+    <p>编辑器是工程平台的核心录入动作，视觉母题取自<b>工程蓝图与钢结构厂房</b>：</p>
+    <ul>
+      <li><b>深靛蓝图底</b>是「图纸世界」的底色隐喻——信息区使用克制的蓝灰阶，让内容自己说话。</li>
+      <li><b>工程橙</b>只给「该行动」的地方：模式选中态、主操作、语法高亮、组件卡强调——橙色出现即表示「此处可操作 / 此处是关键」。全页面同时只允许一个橙色角色，避免视觉噪音。</li>
+      <li><b>等宽字只给机器读的部分</b>：Markdown 源码、组件码、语法标记用等宽字体；正文一律用非等宽正文——「人读的部分」和「机器读的部分」一眼可分。</li>
+      <li><b>钢构厂房实景</b>作为预览与详情 hero 的材质锚点（已生图：<span class="mono">scene-factory / scene-steel</span>），让平台有工地现场感，而不是通用 SaaS 的玻璃卡片。</li>
+      <li><b>发丝线与坐标感</b>：区块分隔用 1px 发丝线 + 克制留白，营造图纸的网格秩序；不做重阴影、不做玻璃拟态。</li>
+    </ul>
+    <div class="callout ok"><b>与现有主题的融合策略</b>：编辑器作用域保留「需求=金、供应=绿」的 <span class="mono">--primary</span> 角色变量；本视觉方向的「深靛 / 工程橙」作为<b>编辑器的通用结构色</b>（模式控件、源码区、组件卡骨架），<span class="mono">--primary</span> 继续承担表单选中态与主按钮（金 / 绿）。两套色系在编辑器内按「结构 vs 行动」分工，不冲突。此策略已通过 UI demo（390×844 app 原型）与设计评审落地验证。</div>
+  </div>
+
+  <div class="card">
+    <h3>10.2 设计令牌（Design Tokens）</h3>
+    <h4>色板（编辑器作用域 CSS 变量）</h4>
+    <div class="swatch-row">
+      <div class="sw"><div class="chip" style="background:#0B1322"></div><div class="info"><b>蓝图底</b><code>--blue:#0B1322</code>源码区 / 预览 hero / 深色模式底色</div></div>
+      <div class="sw"><div class="chip" style="background:#131F36"></div><div class="info"><b>卡片靛</b><code>--blue-2:#131F36</code>源码卡片 / 深色卡片面</div></div>
+      <div class="sw"><div class="chip" style="background:#FF9F43"></div><div class="info"><b>工程橙</b><code>--orange:#FF9F43</code>模式选中 / 主操作 / 语法高亮（唯一强调）</div></div>
+      <div class="sw"><div class="chip" style="background:#E56B2F"></div><div class="info"><b>橙压深</b><code>--orange-2:#E56B2F</code>浅底文字用（对比度达标）</div></div>
+      <div class="sw"><div class="chip" style="background:#E8EEF9"></div><div class="info"><b>图纸白</b><code>--paper:#E8EEF9</code>深底上的正文 / 表格线</div></div>
+      <div class="sw"><div class="chip" style="background:#EEF1F6"></div><div class="info"><b>画布</b><code>--bg:#EEF1F6</code>页面底色（浅模式）</div></div>
+    </div>
+    <h4>字阶（断崖式层级，标题不是「大一点的正文」）</h4>
+    <div class="type-row">
+      <div class="ty"><b>编辑所见</b><small>编辑区标题 / 预览 H2 · 26 / 800</small><span class="demo">font:26px/800</span></div>
+      <div class="ty"><b>发布供应</b><small>主操作 / 模式选中 · 16 / 700</small><span class="demo">font:16px/700</span></div>
+      <div class="ty"><b>正文 15.5</b><small>正文 / 预览正文 · 15.5 / 400</small><span class="demo">font:15.5px/400</span></div>
+      <div class="ty"><b>## 源码</b><small>Markdown 源码 / 组件码 · 13.5 等宽</small><span class="demo">font:13.5px mono</span></div>
+      <div class="ty"><b>角标 11</b><small>计数 / 辅助说明 · 11 / 500</small><span class="demo">font:11px/500</span></div>
+    </div>
+    <h4>圆角（只有可点的东西才圆）</h4>
+    <ul>
+      <li><b>全圆角 999px</b>：模式 segment、按钮、toast、sheet 手柄——可点之物。</li>
+      <li><b>14px</b>：编辑卡片、组件卡、弹窗——容器。</li>
+      <li><b>9px</b>：源码区内联标记、语法高亮块——次级结构。</li>
+      <li><b>0（直角）</b>：信息块、表格、分隔——不可点、只承载信息。</li>
+    </ul>
+    <h4>栅格与间距（390 安全区为基准）</h4>
+    <ul>
+      <li>编辑器卡片外边距 16px；卡片内边距 14px；区块间距 12–14px；组件卡间距 10px。</li>
+      <li>发丝线 <span class="mono">1px var(--line)</span> 分隔卡片内区块；同组信息 <b>间距压缩</b>（4–6px）形成亲疏关系。</li>
+      <li>底部操作条 + 底部导航<b>双层底栏</b>（操作条在上、导航在下），操作条不透明底 + 顶部分隔线，保证滚动内容不被误透。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>10.3 三模式编辑区视觉</h3>
+    <table>
+      <colgroup><col style="width:16%"><col style="width:30%"><col style="width:30%"><col style="width:24%"></colgroup>
+      <tr><th>模式</th><th>编辑区形态</th><th>视觉特征</th><th>预览区</th></tr>
+      <tr>
+        <td><b>纯文本</b><br><span class="pill g">主路径</span></td>
+        <td>大文本框（沿用现状 textarea）</td>
+        <td>白底卡片 + 1px 发丝线边框；聚焦时边框转主题色 + 3px 柔和光晕；右下角字数计数（98/5000）用等宽小字</td>
+        <td>逐段成文，无额外视觉</td>
+      </tr>
+      <tr>
+        <td><b>Markdown</b><br><span class="pill r">高级可选</span></td>
+        <td>等宽源码区（深靛底 <span class="mono">#0B1322</span>）</td>
+        <td>语法高亮：标题=工程橙、加粗=图纸白粗体、链接=蓝、行内码=橙底浅块；行号可选；光标行高亮</td>
+        <td>「源码 / 预览」切换或双栏；预览即统一渲染</td>
+      </tr>
+      <tr>
+        <td><b>富文本</b><br><span class="pill r">高级可选</span></td>
+        <td>contenteditable 白底编辑区 + 悬浮工具栏</td>
+        <td>选中文字弹出工具条（B / I / H2 / 列表 / 引用）；工具栏按钮 40px 热区、图标线性风格；编辑区与下方实时预览<b>共用同一条发丝线分隔</b>，视觉上「编辑 = 预览」</td>
+        <td>编辑区下方实时渲染（压缩编辑区保证首屏可见）</td>
+      </tr>
+    </table>
+    <div class="sim">
+      <div class="bar">
+        <span style="font-weight:700; color:#FFB96E;">模式切换</span>
+        <span class="seg"><i class="on">纯文本</i><i>Markdown</i><i>富文本</i></span>
+        <span style="margin-left:auto; font-family:var(--mono); font-size:11px; color:#9FB0CC;">98 / 5000</span>
+      </div>
+      <div style="border:1px dashed rgba(255,159,67,.5); border-radius:10px; padding:12px 14px; background:rgba(255,255,255,.04);">
+        <div style="font-size:14px; font-weight:800; color:#fff; margin-bottom:6px;">供应 H型钢200×200 国标Q355B，可加工切割</div>
+        <div style="color:#9FB0CC; font-size:12.5px; line-height:1.7;">供应规格齐全的H型钢，国标Q355B，可按图纸切割、钻孔、焊接加工，库存常备 200×200、300×300、400×200 等常用规格，48 小时内发货……</div>
+        <div style="margin-top:10px; background:rgba(255,255,255,.06); border:1px solid rgba(232,238,249,.16); border-radius:10px; padding:10px 12px;">
+          <div style="font-size:11px; color:#FFB96E; font-weight:700; letter-spacing:.1em; margin-bottom:6px;">产品参数</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 14px; font-family:var(--mono); font-size:11.5px; color:#E8EEF9;"><span>型号</span><span style="text-align:right;">HM200×200×8×12</span><span>材质</span><span style="text-align:right;">Q355B</span></div>
+        </div>
+      </div>
+      <div style="margin-top:10px; text-align:right; font-size:11px; color:#9FB0CC;">↑ 编辑所见（livepane 实时预览）＝ 详情所呈（同一渲染管线）</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>10.4 模式切换控件（segment）</h3>
+    <ul>
+      <li><b>v3.1 默认单态</b>：主路径下「详细描述」卡片保持现状表单外观，无 segment——只有「插入组件」按钮一处新入口；开启高级模式后 segment 才出现，扩展为三态。</li>
+      <li>形态：胶囊容器内三枚等宽段，容器底 <span class="mono">rgba(11,19,34,.06)</span>，选中段<b>工程橙实底 + 白字 + 轻微上浮投影</b>，未选中段透明。</li>
+      <li>切换动效：选中「滑块」用 180ms ease 位移动画（非整体闪烁）；<span class="mono">prefers-reduced-motion</span> 下改为瞬时切换。</li>
+      <li>每段下可放一行 11px 辅助小字（如「贴文本」「写语法」「所见即所得」），首次使用 3 秒后淡出。</li>
+      <li>键盘：左右方向键切换，aria-pressed 同步，焦点环在明暗主题均 ≥3:1。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>10.5 组件码卡片视觉</h3>
+    <ul>
+      <li><b>卡片骨架</b>：白底 / 深底（跟随主题）圆角 14px，顶部为类型条（图标 + 类型名，如「产品参数」），底部 1px 发丝线分隔操作区。</li>
+      <li><b>四类差异</b>：参数表=两列表格；生产步骤=左侧橙色编号圆点 + 时间轴竖线；文件附件=文件名行 + 文件类型小徽标；联系方式=字段行 + 行内可复制按钮。</li>
+      <li><b>强调规则</b>：类型条图标用主题色（金/绿），<b>编号圆点与「可点」操作用工程橙</b>——同一卡片内最多两个色相。</li>
+      <li><b>编辑态</b>：右下角「编辑」按钮（40px 热区）→ 弹窗表单按字段编辑；悬停 / 按压有 4% 背景变化 + 按压 0.97 缩放。</li>
+      <li>Markdown / 纯文本模式中组件码块以<b>深靛源码底色</b>区分于普通文本，示意「这是结构，不是正文」。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>10.6 预览与详情同构视觉</h3>
+    <ul>
+      <li><b>同一套 CSS</b>：预览区与详情弹层共用 <span class="mono">.rich-body</span> 样式类（标题层级、列表、表格、引用、代码块、组件卡全部同源）。</li>
+      <li><b>详情 hero</b>：详情弹层顶部使用钢构厂房实景（scene-factory）作 16:9 hero，暗场叠加标题信息；预览区首屏同样呈现该 hero 的压缩版，保证「编辑时看到的样子 = 发布后的样子」。</li>
+      <li><b>组件卡同构</b>：预览中组件卡即详情中组件卡（同一组件渲染函数 + 同一卡片样式）。</li>
+      <li>详情弹层的正文容器最大行宽约 40 中文字（保证可读性），预览区同一行宽约束。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>10.7 状态、反馈与动效</h3>
+    <table>
+      <colgroup><col style="width:24%"><col style="width:42%"><col style="width:34%"></colgroup>
+      <tr><th>状态 / 交互</th><th>视觉表现</th><th>动效与降级</th></tr>
+      <tr><td>聚焦</td><td>边框转主题色 + 3px 柔和光晕（编辑器卡片级）</td><td>180ms ease</td></tr>
+      <tr><td>保存</td><td>右上角「已自动保存」徽标淡入淡出</td><td>800ms 显示后淡出</td></tr>
+      <tr><td>模式切换</td><td>segment 滑块位移动画 + 内容切换</td><td>180ms；reduced-motion 瞬时</td></tr>
+      <tr><td>组件插入</td><td>bottom sheet 从底部滑入（圆角 20px 顶、手柄条）</td><td>240ms cubic-bezier；reduced-motion 淡入</td></tr>
+      <tr><td>toast</td><td>底部操作条上方弹出，深靛底 + 白字</td><td>220ms 淡入，1.6s 后淡出</td></tr>
+      <tr><td>错误校验</td><td>字段边框转错误红 + 3px 红晕 + 提示行</td><td>不带动画（可访问性优先）</td></tr>
+    </table>
+    <p style="font-size:12.5px; color:var(--ink-2); margin-top:10px;">动效纪律：所有动效 ≤240ms；仅「状态变化」带动效（内容出现、切换、反馈），不做装饰性循环动画；全局尊重 <span class="mono">prefers-reduced-motion: reduce</span>。</p>
+  </div>
+
+  <div class="card">
+    <h3>10.8 明暗双主题与可达性</h3>
+    <ul>
+      <li><b>浅色主题</b>（默认）：画布 <span class="mono">#EEF1F6</span>、卡片白、正文深靛 <span class="mono">#16233B</span>；模式控件与源码区用蓝图深靛，工程橙作强调。</li>
+      <li><b>深色主题</b>：画布 <span class="mono">#0B1322</span>、卡片 <span class="mono">#131F36</span>、正文图纸白 <span class="mono">#E8EEF9</span>；橙保持 <span class="mono">#FF9F43</span>（深底对比 4.5:1 以上），橙色压深版 <span class="mono">#E56B2F</span> 用于浅底。</li>
+      <li><b>对比度达标线</b>：正文 ≥4.5:1、辅助文字 ≥3:1、橙色作文字 ≥3:1、焦点环 ≥3:1；组件卡与模式控件在双主题下逐项验收（见 10.9）。</li>
+      <li><b>非色盲依赖</b>：模式选中态 = 橙底 + 白字 + 粗体三通道（不单靠颜色）；错误 = 红 + 图标 + 文案。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>10.9 视觉验收清单</h3>
+    <ul class="check">
+      <li class="half">设计令牌已落为 CSS 变量（色板 / 字阶 / 圆角 / 间距），无散落魔法值。</li>
+      <li class="half">主路径（纯文本 + 组件插入）在 390×844 首屏：编辑区、实时预览、插入入口首帧可见，无 segment。</li>
+      <li class="half">预览与详情共用 .rich-body 样式类，逐项比对结构 / 效果一致（截图 diff 验收）。</li>
+      <li class="half">工程橙全页面只有一个角色；「需求金 / 供应绿」仅用于表单行动与选中，无混用。</li>
+      <li class="half">组件卡四类在双主题下渲染正确，编辑弹窗可回写并重渲染。</li>
+      <li class="half">开启高级模式后，segment 三态与 Markdown / 富文本编辑区视觉符合 10.3 规范；未开启用户完全无感知。</li>
+      <li class="half">明暗双主题对比度达标（正文 4.5:1、辅助 3:1、焦点环 3:1）。</li>
+      <li class="half">动效全部 ≤240ms 且 reduced-motion 降级；聚焦铁律（overflow:clip + 容器内滚动）继承。</li>
+      <li class="half">列表摘要 / 搜索无语法残留；历史纯文本数据渲染与旧版一致。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 十一、分阶段执行计划 ===== -->
+<section id="s11">
+  <h2><span class="no">11</span>分阶段执行计划</h2>
+  <p class="sec-lead">产品经理给出的分期（v3.1 调整）：先打通「一致性管线」，再交付「主路径」（纯文本 + 组件码 + 实时预览），随后灰度「高级模式」（富文本 / Markdown），最后扩展组件库与 AI。每期独立可验收、可回滚。</p>
+  <div class="timeline">
+    <div class="tl-phase">P0 · 基座</div>
+    <div class="tl-rail"><span class="tl-dot"></span></div>
+    <div class="tl-card"><div class="inner"><div class="t">统一渲染管线 + 数据契约</div><div class="d">renderContent / extractText 落地；descFormat 字段；详情弹层替换为统一渲染（消灭裸 innerHTML）；历史数据回归。验收：<b>三出口（预览 / 详情 / 摘要）同源一致，安全门全绿</b>。</div></div></div>
+    <div class="tl-phase">P1 · 主路径</div>
+    <div class="tl-rail"><span class="tl-dot"></span></div>
+    <div class="tl-card"><div class="inner"><div class="t">纯文本 + 组件码 + 实时预览</div><div class="d">编辑区下方 livepane 实时预览（默认可见）；四类组件码解析渲染 + bottom sheet 插入 + 卡片编辑回写；列表摘要与搜索索引派生；聚焦铁律继承。验收：<b>主路径双角色回归 + 组件卡在预览 / 详情逐像素一致</b>。</div></div></div>
+    <div class="tl-phase">P2 · 高级模式</div>
+    <div class="tl-rail"><span class="tl-dot"></span></div>
+    <div class="tl-card"><div class="inner"><div class="t">富文本 / Markdown 渲染 + 可选编辑</div><div class="d">渲染能力先行（历史与外部 md/rich 数据可正确展示）；设置开关灰度；Markdown 源码区 + 语法高亮、富文本 contenteditable + 悬浮工具栏；segment 三态。验收：<b>开关关闭时与 P1 完全一致；开启后三模式回归 + 明暗主题截图 diff</b>。</div></div></div>
+    <div class="tl-phase">P3 · 扩展</div>
+    <div class="tl-rail"><span class="tl-dot"></span></div>
+    <div class="tl-card"><div class="inner"><div class="t">组件库扩展 + AI 可选</div><div class="d">交易条款、物流时效等供应场景组件；AI 内容补全（评估后决定是否进入，不阻塞发布）。验收：<b>组件类型可插拔，向后兼容</b>。</div></div></div>
+  </div>
+  <div class="card">
+    <h3>11.1 每期出口与回滚</h3>
+    <ul>
+      <li>每期结束产出<b>可运行页面 + 双角色回归记录 + 视觉验收截图</b>，交付评审后进入下一期。</li>
+      <li>回滚策略：渲染管线与格式字段<b>读取侧可降级</b>（descFormat 缺失按纯文本）——任何一期失败都不影响存量发布。</li>
+      <li><b>高级模式以开关灰度</b>：关闭状态退回纯文本主路径外观，功能面与现状一致，风险面最小。</li>
+      <li>编辑器改造全部收敛在 <span class="mono">#f-desc</span> 卡片内，其余表单字段零接触，降低回归面。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===== 十二、风险与合规 ===== -->
+<section id="s12">
+  <h2><span class="no">12</span>风险与合规</h2>
+  <p class="sec-lead">后端开发专家与产品经理联合识别的风险清单与对策。</p>
+  <div class="card">
+    <table>
+      <colgroup><col style="width:22%"><col style="width:38%"><col style="width:40%"></colgroup>
+      <tr><th>风险</th><th>影响</th><th>对策</th></tr>
+      <tr><td><b>XSS / 内容注入</b></td><td>富文本 / Markdown 原文若直接 innerHTML，恶意脚本可执行</td><td>白名单 AST 渲染 + 写入侧校验 + 链接协议白名单 + 详情弹层废弃裸拼接（5.2 / 9.1）</td></tr>
+      <tr><td><b>历史数据兼容</b></td><td>存量 description 无 format，可能渲染错乱</td><td>descFormat 缺省即 'text'，纯文本路径与旧版完全一致（7.1）</td></tr>
+      <tr><td><b>切换丢内容</b></td><td>模式切换转换失败导致内容丢失</td><td>统一 AST 中间层转换 + 切换前快照 + 还原兜底（4.1 / 4.4）</td></tr>
+      <tr><td><b>聚焦位移复发</b></td><td>模式切换 / 工具栏聚焦引发页面跳动（本次核心事故类型）</td><td>继承 patch28 铁律：overflow:clip + 容器内滚动，禁止 scrollIntoView(center)（8.3）</td></tr>
+      <tr><td><b>性能</b></td><td>长内容实时渲染卡顿</td><td>300ms 防抖 + 2000 字以上节流 + 只重渲染 diff 区（8.3）</td></tr>
+      <tr><td><b>搜索摘要污染</b></td><td>语法符号进入关键词 / 摘要</td><td>extractText 统一提取 + 组件块剥离（7.2）</td></tr>
+      <tr><td><b>可访问性</b></td><td>键盘不可达 / 对比度不足 / 动效眩晕</td><td>segment 键盘操作、焦点环 ≥3:1、reduced-motion 降级（10.7 / 10.8）</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ===== 十三、全栈复核 ===== -->
+<section id="s13">
+  <h2><span class="no">13</span>全栈开发专家多角度复核</h2>
+  <p class="sec-lead">全栈开发专家对上述方案的五角度复核结论——本方案是否可进入实施。</p>
+  <div class="card">
+    <table>
+      <colgroup><col style="width:18%"><col style="width:52%"><col style="width:30%"></colgroup>
+      <tr><th>角度</th><th>复核意见</th><th>结论</th></tr>
+      <tr><td><b>一致性</b></td><td>单一渲染函数 + 单一样式类是「编辑所见 = 详情所呈」的唯一可靠实现；三出口同源，杜绝双写偏差。</td><td><span class="pill g">通过</span></td></tr>
+      <tr><td><b>安全性</b></td><td>AST 白名单渲染 + 写入侧校验 + 链接协议白名单，覆盖存储与展示两层；详情弹层裸 innerHTML 必须替换。</td><td><span class="pill g">通过（含硬性改动项）</span></td></tr>
+      <tr><td><b>兼容性</b></td><td>descFormat 缺省 'text' 实现历史数据零迁移；草稿 / 复制 / 自动恢复按 format 还原；双角色作用域主题不受影响。</td><td><span class="pill g">通过</span></td></tr>
+      <tr><td><b>可维护性</b></td><td>改造收敛于 #f-desc 卡片 + 共享渲染模块；设计令牌落 CSS 变量；四类组件可插拔注册表；每期可独立验收回滚。</td><td><span class="pill g">通过</span></td></tr>
+      <tr><td><b>性能</b></td><td>防抖 / 节流 / diff 重渲染覆盖长内容；动效 ≤240ms 且 reduced-motion 降级；滚动铁律继承，无布局抖动。</td><td><span class="pill g">通过</span></td></tr>
+      <tr><td><b>视觉方向可行性</b></td><td>「深靛 + 工程橙 + 等宽 mono」与现有「需求金 / 供应绿」按「结构 vs 行动」分工，CSS 变量可独立引入不污染全局；明暗双主题对比度设计达标；UI demo 已先行验证。</td><td><span class="pill g">通过</span></td></tr>
+      <tr><td><b>优先级与 ROI（v3.1）</b></td><td>主路径收敛（纯文本 + 组件码 + 实时预览）先落地；富文本 / Markdown 降级高级可选、默认隐藏、渲染先行，避免为低价值需求引入 contenteditable 的移动端复杂度与学习成本；开关灰度使风险面进一步收窄。</td><td><span class="pill g">通过</span></td></tr>
+    </table>
+    <div class="callout ok"><b>复核总结论</b>：方案在架构层面成立，v3.1 优先级调整后 ROI 更优，可进入实施。实施前置硬性要求仅两项——① 详情弹层裸 innerHTML 必须替换为统一渲染输出；② 聚焦铁律（overflow:clip + 容器内滚动）必须在编辑器（含主路径实时预览与高级模式编辑区）中显式继承并回归验证。</div>
+  </div>
+</section>
+
+<!-- ===== 十四、验收清单与交付 ===== -->
+<section id="s14">
+  <h2><span class="no">14</span>验收清单与交付</h2>
+  <p class="sec-lead">实施完成后逐项验收；本方案文档自身即为交付物之一。</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>14.1 实施验收清单</h3>
+      <ul class="check">
+        <li class="half">主路径（纯文本 + 组件码 + 实时预览）零学习成本即用，表单外观与现状一致。</li>
+        <li class="half">编辑预览 = 发布详情（同渲染管线截图 diff 逐项比对）。</li>
+        <li class="half">组件码四类在预览与详情渲染一致，可编辑回写。</li>
+        <li class="half">历史纯文本数据零迁移可读，与旧版渲染一致。</li>
+        <li class="half">列表摘要 / 搜索无 HTML / 语法残留。</li>
+        <li class="half">高级模式开关：关闭状态与 P1 完全一致；开启后 segment 三态、Markdown / 富文本编辑区回归通过（明暗双主题截图 diff）。</li>
+        <li class="half">聚焦位移回归：点击文本框 / 操作框无页面整体位移、底部悬浮按钮无跳动（核心事故用例，主路径与高级模式均覆盖）。</li>
+        <li class="half">视觉方向 10.9 清单全项达成。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>14.2 本方案交付物</h3>
+      <ul>
+        <li>本文档：完整执行方案（含视觉方向专章）——<b>供评审，非执行稿</b>。</li>
+        <li>配套参考：UI demo 原型（390×844 app 原型，深靛 / 工程橙视觉已落地验证）+ 设计方案 Doc（已发布，含关键界面真机截图）。</li>
+        <li>后续实施产出：editor.html 三模式改造（P0–P3 分期）、回归记录、视觉验收截图。</li>
+      </ul>
+      <div class="callout warn"><b>下一步动作</b>：方案评审通过后，按 P0（统一渲染管线 + 数据契约）开工；每期交付物按 11.1 出口验收。</div>
+    </div>
+  </div>
+</section>
+
+<div class="foot">
+  <span>发布编辑器三模式完整执行方案 · 视觉方向专章 · v3.1（优化调整版）</span>
+  <span>编制：产品经理 / 前端开发专家 / 后端开发专家 / UI 设计专家 · 复核：全栈开发专家</span>
+  <span>2026-09-23 · 工程链 Engchain3.0</span>
+</div>
+
+</div>
+</body>
+</html>
