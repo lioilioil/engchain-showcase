@@ -44,6 +44,19 @@
       <div id="table-wrap"></div>
       <div id="pager-wrap"></div>
     </div>
+
+    <div class="card card-pad" id="ent-change-card">
+      <div class="card-h">
+        <span class="card-t">企业留档变更审核</span>
+        <span class="card-s" id="ent-change-count"></span>
+        <button class="btn btn-sm btn-outline" id="btn-ent-mock" title="预置一条日常变更待审核用于演示">注入日常变更</button>
+        <button class="btn btn-sm btn-outline" id="btn-ent-mock-annual" title="预置一条年度复核待审核用于演示" style="margin-left:8px;">注入年度复核</button>
+        <button class="btn btn-sm btn-outline" id="btn-ent-mock-legal" title="预置一条法人变更待审核用于演示" style="margin-left:8px;">注入法人变更</button>
+      </div>
+      <div id="ent-pending-wrap"></div>
+      <div class="sec-title-sm" style="margin-top:18px;margin-bottom:8px;">已处理记录</div>
+      <div id="ent-history-wrap"></div>
+    </div>
   </main>
 </div>
 <script src="../../js/data.js" defer></script>
@@ -54,8 +67,8 @@
 (function () {
   'use strict';
   var $ = function (s) { return document.querySelector(s); };
-  var TYPE = { realname: '实名认证', enterprise: '企业认证', personalQual: '个人资质', payment: '资金账户' };
-  var TYPE_ICON = { realname: '个人', enterprise: '企业', personalQual: '专业', payment: '资金' };
+  var TYPE = { realname: '实名认证', enterprise: '企业认证', personalQual: '个人资质', partner: '个人合伙人', payment: '资金账户' };
+  var TYPE_ICON = { realname: '个人', enterprise: '企业', personalQual: '专业', partner: '合伙', payment: '资金' };
   var PAGE_SIZE = 10;
   var page = 1;
   var filters = { type: 'realname', scope: 'pending', keyword: '' };
@@ -74,29 +87,37 @@
     return type;
   }
 
+  /* 个人入驻记录：personalEntry 优先（v3.0），与 stores.deriveIdentityStates 同口径 */
+  function peOf(u) {
+    var a = u.auth || {};
+    return a.personalEntry || a.personalQual || a.qual || { ok: false, status: '' };
+  }
+
   function pendingOf(type) {
     return users().filter(function (u) {
       if (u.status === 'guest') return false;
-      var f = authField(type);
-      if (type === 'payment') return !(u.auth && u.auth.payment && u.auth.payment.ok);
-      if (type === 'personalQual') {
-        var pq = (u.auth && u.auth.personalQual) || (u.auth && u.auth.qual) || { ok: false };
-        return !pq.ok;
-      }
-      return !(u.auth && u.auth[f] && u.auth[f].ok);
+      var a = u.auth || {};
+      if (type === 'payment') return !(a.payment && a.payment.ok);
+      /* [Bug B] 实名为二要素+活体自动核验，业务上不进入人工待审队列，恒为空，
+         避免把"从未实名 / 已驳回"用户都计入待审；其余认证仅统计真正 status='pending' 的申请。 */
+      if (type === 'realname') return false;
+      if (type === 'personalQual') return peOf(u).status === 'pending';
+      if (type === 'partner') return !!(a.partner && a.partner.status === 'pending');
+      if (type === 'enterprise') return !!(a.enterprise && a.enterprise.status === 'pending');
+      return false;
     });
   }
 
   function approvedOf(type) {
     return users().filter(function (u) {
       if (u.status === 'guest') return false;
-      var f = authField(type);
-      if (type === 'payment') return !!(u.auth && u.auth.payment && u.auth.payment.ok);
-      if (type === 'personalQual') {
-        var pq = (u.auth && u.auth.personalQual) || (u.auth && u.auth.qual) || { ok: false };
-        return !!pq.ok;
-      }
-      return !!(u.auth && u.auth[f] && u.auth[f].ok);
+      var a = u.auth || {};
+      if (type === 'payment') return !!(a.payment && a.payment.ok);
+      if (type === 'realname') return !!(a.realname && a.realname.ok);
+      if (type === 'personalQual') return !!peOf(u).ok;
+      if (type === 'partner') return !!(a.partner && a.partner.ok);
+      if (type === 'enterprise') return !!(a.enterprise && a.enterprise.ok);
+      return false;
     });
   }
 
@@ -127,7 +148,7 @@
   }
 
   function renderKPI() {
-    var types = ['realname', 'enterprise', 'personalQual', 'payment'];
+    var types = ['realname', 'enterprise', 'personalQual', 'partner', 'payment'];
     var pendingTotal = types.reduce(function (s, t) { return s + pendingOf(t).length; }, 0);
     var approvedTotal = types.reduce(function (s, t) { return s + approvedOf(t).length; }, 0);
     var allDone = doneList();
@@ -135,7 +156,7 @@
     var today = fmtDate(Date.now());
     var todayNew = allDone.filter(function (x) { return fmtDate(x.ts) === today; }).length;
     var cards = [
-      ['待审核', pendingTotal, 'warn', '四类认证待审合计'],
+      ['待审核', pendingTotal, 'warn', '五类认证待审合计'],
       ['已通过', approvedTotal, 'up', '认证通过用户数'],
       ['已驳回', rejectedTotal, 'down', '历史驳回记录'],
       ['今日新增', todayNew, 'gold', '今日处理记录']
@@ -153,6 +174,7 @@
           { value: 'realname', label: '实名认证' },
           { value: 'enterprise', label: '企业认证' },
           { value: 'personalQual', label: '个人资质' },
+          { value: 'partner', label: '个人合伙人' },
           { value: 'payment', label: '资金账户' }
         ]},
         { key: 'scope', label: '处理范围', type: 'select', options: [
@@ -203,7 +225,7 @@
           { key: 'submitTime', label: '提交时间', width: '140px', render: function (row) {
             var a = row.auth || {};
             var f = authField(filters.type);
-            var ts = (a[f] && a[f].ts) || row.createdAt || Date.now();
+            var ts = (a[f] && (a[f].submittedAt || a[f].ts)) || row.createdAt || Date.now();
             return '<span class="tx-muted-sm">' + fmtTime(ts) + '</span>';
           }},
           { key: 'status', label: '状态', width: '90px', render: function () { return statusBadge('pending'); } },
@@ -261,10 +283,14 @@
       '<div class="sec-title-sm">认证信息 · ' + TYPE[filters.type] + '</div>' +
       '<div class="ud-grid">' +
       '<div class="dg"><div class="k">认证类型</div><div class="v">' + TYPE[filters.type] + '（' + TYPE_ICON[filters.type] + '）</div></div>' +
-      '<div class="dg"><div class="k">提交时间</div><div class="v">' + fmtTime(authData.ts || u.createdAt || Date.now()) + '</div></div>' +
+      '<div class="dg"><div class="k">提交时间</div><div class="v">' + fmtTime(authData.submittedAt || authData.ts || u.createdAt || Date.now()) + '</div></div>' +
       (filters.type === 'enterprise' ? '<div class="dg"><div class="k">企业名称</div><div class="v">' + esc(u.company || '-') + '</div></div>' : '') +
       (filters.type === 'enterprise' ? '<div class="dg"><div class="k">统一社会信用代码</div><div class="v">' + esc(authData.license || '待核验') + '</div></div>' : '') +
       (filters.type === 'personalQual' ? '<div class="dg"><div class="k">资质清单</div><div class="v tx-regular">' + esc(qualList) + '</div></div>' : '') +
+      (filters.type === 'partner' ? '<div class="dg"><div class="k">合作渠道</div><div class="v tx-regular">' + esc((authData.channel || []).join('、') || '-') + '</div></div>'
+        + '<div class="dg"><div class="k">合作意向</div><div class="v">' + esc(authData.intent || '-') + '</div></div>'
+        + '<div class="dg"><div class="k">自我介绍</div><div class="v tx-regular">' + esc(authData.intro || '-') + '</div></div>'
+        + '<div class="dg"><div class="k">相关经验</div><div class="v tx-regular">' + esc(authData.experience || '-') + '</div></div>' : '') +
       (filters.type === 'payment' ? '<div class="dg"><div class="k">钱包余额</div><div class="v">¥' + (u.balance ? u.balance.balance : 0) + '</div></div>' : '') +
       (filters.type === 'realname' ? '<div class="dg"><div class="k">实名状态</div><div class="v">' + (a.realname && a.realname.ok ? '已认证' : '待审核') + '</div></div>' : '') +
       '</div>' +
@@ -339,10 +365,290 @@
     if (ok) Admin.log('数据导出', '认证审核', '', '认证审核.csv · ' + rows.length + ' 条');
   }
 
+  /* ========== 企业留档变更审核（pendingChanges） ========== */
+  var ENT_FIELDS = { co: '企业名称', code: '统一社会信用代码', legal: '法定代表人', shortName: '企业简称', registeredAddress: '注册地址' };
+  var B_FIELDS = ['co', 'code', 'legal', 'shortName', 'registeredAddress'];
+
+  function entUserLabel() {
+    try {
+      var s = AuthStore.read();
+      var rn = s.realname || {};
+      if (rn.name) return rn.name + (rn.mobile ? '（' + rn.mobile + '）' : '');
+    } catch (e) {}
+    try { if (window.DataBus && DataBus.currentUser) return DataBus.currentUser.name || DataBus.currentUser.account; } catch (e) {}
+    return '当前登录用户';
+  }
+
+  function entRowsFor(pc, annual) {
+    var cur = {};
+    try { cur = AuthStore.read().enterprise || {}; } catch (e) {}
+    var rows = [];
+    B_FIELDS.forEach(function (f) {
+      var nv = pc[f] || '';
+      var ov = cur[f] || '';
+      if (annual) {
+        rows.push({ field: f, label: ENT_FIELDS[f], oldV: ov, newV: nv || ov, unchanged: !nv || nv === ov });
+      } else if (nv && nv !== ov) {
+        rows.push({ field: f, label: ENT_FIELDS[f], oldV: ov, newV: nv, unchanged: false });
+      }
+    });
+    return rows;
+  }
+
+  function entFilesHtml(pc) {
+    return (pc.files || []).map(function (f, i) {
+      var nm = (typeof f === 'string') ? f : (f.name || f.url || ('附件' + (i + 1)));
+      return '<span class="badge badge-outline" style="margin-right:6px;">' + esc(nm) + '</span>';
+    }).join('') || '<span class="tx-muted-sm">无</span>';
+  }
+
+  function entCardHtml(pc, annual) {
+    var cur = {};
+    try { cur = AuthStore.read().enterprise || {}; } catch (e) {}
+    var rows = entRowsFor(pc, annual);
+    var rowsHtml = rows.map(function (r) {
+      var newCell = r.unchanged
+        ? '<span class="tx-muted-sm">维持原值</span>'
+        : '<span style="font-weight:600;color:var(--primary);">' + esc(r.newV) + '</span>';
+      return '<tr>' +
+        '<td style="padding:6px 12px;color:var(--text-muted);">' + esc(r.label) + '</td>' +
+        '<td style="padding:6px 12px;">' + esc(r.oldV || '（空）') + '</td>' +
+        '<td style="padding:6px 12px;color:var(--text-muted);">→</td>' +
+        '<td style="padding:6px 12px;">' + newCell + '</td>' +
+      '</tr>';
+    }).join('');
+    var legalChanged = !!(pc.legal && pc.legal !== (cur.legal || ''));
+    var headBadges;
+    if (annual) {
+      headBadges = '<span class="badge badge-warning">待审核</span><span class="badge" style="background:var(--warning-dim);color:var(--warning);">年度复核</span>';
+      if (legalChanged) headBadges += '<span class="badge badge-danger">法人变更</span>';
+    } else if (legalChanged) {
+      headBadges = '<span class="badge badge-warning">待审核</span><span class="badge badge-danger">法人变更·严格核验</span>';
+    } else {
+      headBadges = '<span class="badge badge-warning">待审核</span>';
+    }
+    var lastReview = '';
+    if (annual) {
+      var la = 0;
+      try { la = (AuthStore.read().enterprise || {}).lastReviewAt || 0; } catch (e) {}
+      if (la) lastReview = '<span class="tx-muted-sm">上次复核 ' + fmtTime(la) + '</span>';
+    }
+    var borderColor = annual ? 'var(--warning)' : (legalChanged ? 'var(--danger)' : 'var(--border)');
+    var legalPrompt = (legalChanged && !annual)
+      ? '<div style="margin:0 0 12px;padding:8px 10px;background:var(--danger-dim);border-radius:6px;color:var(--danger);font-size:12px;">请审核员核验法人变更佐证材料（变更核准通知书/股东会决议等）</div>'
+      : '';
+    return '<div style="border:1px solid ' + borderColor + ';border-radius:8px;padding:14px;margin-bottom:10px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' +
+        headBadges +
+        '<span class="tx-semibold">' + esc(entUserLabel()) + '</span>' +
+        '<span class="tx-muted-sm">' + (annual ? '企业年度认证复核申请' : '企业留档字段变更申请') + '</span>' +
+        lastReview +
+        '<span style="flex:1;"></span>' +
+        '<span class="tx-muted-sm">提交时间 ' + fmtTime(pc.submittedAt) + '</span>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tbody>' + rowsHtml + '</tbody></table>' +
+      '<div style="margin-bottom:8px;"><span class="tx-muted-sm">变更原因：</span>' + esc(pc.reason || '（未填写）') + '</div>' +
+      '<div style="margin-bottom:12px;"><span class="tx-muted-sm">佐证材料：</span>' + entFilesHtml(pc) + '</div>' +
+      legalPrompt +
+      '<div style="text-align:right;">' +
+        '<button class="btn btn-sm btn-primary" data-entact="approve">通过</button> ' +
+        '<button class="btn btn-sm btn-ghost" data-entact="reject">驳回</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderEntPending() {
+    var wrap = $('#ent-pending-wrap');
+    var count = $('#ent-change-count');
+    var pc = null;
+    try { pc = AuthStore.getPendingEnterpriseChange(); } catch (e) {}
+    if (!wrap) return;
+    var isPending = !!(pc && pc.status === 'pending');
+    var annual = isPending && pc.reviewType === 'annual';
+    if (count) count.textContent = '待审核 ' + (isPending ? 1 : 0) + ' 条';
+    var html = '';
+    html += '<div class="sec-title-sm" style="margin:4px 0 8px;">日常变更审核</div>';
+    if (isPending && !annual) html += entCardHtml(pc, false);
+    else html += '<div class="tx-muted-sm" style="padding:8px 0 16px;">暂无日常变更待审核</div>';
+    html += '<div class="sec-title-sm" style="margin:4px 0 8px;">年度认证复核</div>';
+    if (isPending && annual) html += entCardHtml(pc, true);
+    else html += '<div class="tx-muted-sm" style="padding:8px 0;">暂无年度认证复核待审</div>';
+    wrap.innerHTML = html;
+  }
+
+  function renderEntHistory() {
+    var wrap = $('#ent-history-wrap');
+    if (!wrap) return;
+    var hist = [];
+    var rejected = null;
+    try {
+      var s = AuthStore.read();
+      hist = (s.enterprise && s.enterprise.changeHistory) || [];
+      var pc = AuthStore.getPendingEnterpriseChange();
+      if (pc && pc.status === 'rejected') rejected = pc;
+    } catch (e) {}
+    var html = '';
+    if (hist.length) {
+      var rows = hist.slice().reverse().slice(0, 10).map(function (h) {
+        var typeBadge = h.reviewType === 'annual'
+          ? '<span class="badge" style="background:var(--warning-dim);color:var(--warning);">年度复核</span>'
+          : '<span class="badge badge-outline">日常变更</span>';
+        if (h.field === 'legal') typeBadge += ' <span class="badge badge-danger" style="margin-left:4px;">法人</span>';
+        return '<tr>' +
+          '<td style="padding:6px 12px;">' + esc(ENT_FIELDS[h.field] || h.field) + '</td>' +
+          '<td style="padding:6px 12px;">' + typeBadge + '</td>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">' + esc(h.oldValue || '（空）') + '</td>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">→</td>' +
+          '<td style="padding:6px 12px;font-weight:600;">' + esc(h.newValue) + '</td>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">' + fmtTime(h.approvedAt || h.changedAt) + '</td>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">' + esc(h.operator || '-') + '</td>' +
+        '</tr>';
+      }).join('');
+      html += '<div style="margin-bottom:6px;" class="tx-semibold">已通过（' + hist.length + '）</div>' +
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;"><thead><tr style="color:var(--text-muted);font-size:12px;">' +
+        '<th style="text-align:left;padding:4px 12px;">字段</th><th style="text-align:left;padding:4px 12px;">类型</th><th style="text-align:left;padding:4px 12px;">旧值</th><th style="width:20px;"></th><th style="text-align:left;padding:4px 12px;">新值</th><th style="text-align:left;padding:4px 12px;">审核时间</th><th style="text-align:left;padding:4px 12px;">操作人</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+    } else {
+      html += '<div class="tx-muted-sm" style="margin-bottom:14px;">暂无已通过的变更记录</div>';
+    }
+    if (rejected) {
+      var rAnnual = rejected.reviewType === 'annual';
+      var rRows = entRowsFor(rejected, rAnnual);
+      var rHtml = rRows.map(function (r) {
+        return '<tr>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">' + esc(r.label) + '</td>' +
+          '<td style="padding:6px 12px;">' + esc(r.oldV || '（空）') + '</td>' +
+          '<td style="padding:6px 12px;color:var(--text-muted);">→</td>' +
+          '<td style="padding:6px 12px;text-decoration:line-through;color:var(--text-muted);">' + esc(r.newV) + '</td>' +
+        '</tr>';
+      }).join('');
+      var rTypeBadge = rAnnual ? '<span class="badge" style="background:var(--warning-dim);color:var(--warning);">年度复核</span> ' : '';
+      html += '<div style="margin-bottom:6px;" class="tx-semibold"><span class="badge badge-danger">已驳回</span> ' + rTypeBadge + '最近一次驳回申请</div>' +
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tbody>' + rHtml + '</tbody></table>' +
+        '<div class="tx-muted-sm" style="margin-bottom:6px;">提交时间：' + fmtTime(rejected.submittedAt) + '</div>' +
+        '<div style="margin-bottom:14px;"><span class="tx-muted-sm">驳回原因：</span><span style="color:var(--danger);">' + esc(rejected.rejectReason || '（未填写）') + '</span></div>';
+    } else {
+      html += '<div class="tx-muted-sm">暂无已驳回的变更记录</div>';
+    }
+    wrap.innerHTML = html;
+  }
+
+  function renderEntChange() { renderEntPending(); renderEntHistory(); }
+
+  function entApprove() {
+    var pc = null;
+    try { pc = AuthStore.getPendingEnterpriseChange(); } catch (e) {}
+    var annual = !!(pc && pc.reviewType === 'annual');
+    Admin.confirm({
+      title: annual ? '通过企业年度认证复核' : '通过企业留档变更',
+      body: '<div class="calc-tip mt-10">' + (annual
+        ? '通过后将确认本年度企业资质并重置下次复核周期（1年）；B类全字段写入正式企业信息。'
+        : '通过后新值将写入正式企业字段，旧值进入变更历史；App 端企业信息即时更新。') + '</div>',
+      ok: '确认通过',
+      onYes: function () {
+        var legalChg = !!(pc && pc.legal && pc.legal !== ((AuthStore.read().enterprise || {}).legal || ''));
+        try { AuthStore.approveEnterpriseChange('admin'); } catch (e) {}
+        var msg = '已通过，企业信息已更新';
+        if (annual) {
+          var due = 0;
+          try { due = (AuthStore.read().enterprise || {}).reviewDueAt || 0; } catch (e) {}
+          msg = '年度复核已通过，企业信息已更新，下次复核：' + fmtDate(due);
+        }
+        if (legalChg) msg += '；法人变更已生效';
+        Admin.toast(msg);
+        renderEntChange(); renderKPI();
+      }
+    });
+  }
+
+  function entReject() {
+    var pc = null;
+    try { pc = AuthStore.getPendingEnterpriseChange(); } catch (e) {}
+    var annual = !!(pc && pc.reviewType === 'annual');
+    Admin.confirm({
+      title: annual ? '驳回企业年度认证复核' : '驳回企业留档变更',
+      body: '<div class="form-item"><label>驳回原因</label><input class="input" id="ent-reject-note" placeholder="请输入驳回原因（必填，将同步至用户端）…" maxlength="100"></div>',
+      ok: '确认驳回', danger: true,
+      onYes: function () {
+        var note = '';
+        try { note = document.getElementById('ent-reject-note').value.trim(); } catch (e) {}
+        if (!note) { Admin.toast('请填写驳回原因'); return; }
+        try { AuthStore.rejectEnterpriseChange(note, 'admin'); } catch (e) {}
+        Admin.toast(annual ? '年度复核已驳回' : '已驳回');
+        renderEntChange(); renderKPI();
+      }
+    });
+  }
+
+  function entMock() {
+    var s = AuthStore.read();
+    if (!s.enterprise) s.enterprise = {};
+    s.enterprise.ok = true;
+    if (!s.enterprise.co) s.enterprise.co = '旧公司';
+    if (!s.enterprise.code) s.enterprise.code = '91510100OLD';
+    s.enterprise.pendingChanges = {
+      co: '新公司', code: '91510100NEW', legal: '', shortName: '', registeredAddress: '',
+      reason: '公司更名', files: [], submittedAt: Date.now(),
+      status: 'pending', rejectReason: '', reviewType: 'daily'
+    };
+    AuthStore.write(s);
+    Admin.toast('已注入日常变更待审核数据');
+    renderEntChange(); renderKPI();
+  }
+
+  function entMockAnnual() {
+    var s = AuthStore.read();
+    if (!s.enterprise) s.enterprise = {};
+    s.enterprise.ok = true;
+    s.enterprise.co = '旧公司';
+    s.enterprise.code = '91510100OLD';
+    s.enterprise.legal = '张旧法人';
+    s.enterprise.shortName = '旧简称';
+    s.enterprise.registeredAddress = '成都市旧地址';
+    s.enterprise.lastReviewAt = Date.now() - 400 * 864e5;
+    s.enterprise.annualStatus = 'under_review';
+    s.enterprise.pendingChanges = {
+      co: '年审新公司', code: '91510100NEW', legal: '李新法人', shortName: '年审新简称',
+      registeredAddress: '成都市高新区新地址',
+      reason: '年度资质复核', files: [], submittedAt: Date.now(),
+      status: 'pending', rejectReason: '', reviewType: 'annual'
+    };
+    AuthStore.write(s);
+    Admin.toast('已注入年度复核待审数据');
+    renderEntChange(); renderKPI();
+  }
+
+  function entMockLegal() {
+    var s = AuthStore.read();
+    if (!s.enterprise) s.enterprise = {};
+    s.enterprise.ok = true;
+    if (!s.enterprise.legal) s.enterprise.legal = '旧法人';
+    s.enterprise.pendingChanges = {
+      co: '', code: '', legal: '新法人', shortName: '', registeredAddress: '',
+      reason: '法人变更', files: ['变更核准通知书.pdf', '股东会决议.pdf'], submittedAt: Date.now(),
+      status: 'pending', rejectReason: '', reviewType: 'daily'
+    };
+    AuthStore.write(s);
+    Admin.toast('已注入法人变更待审核数据');
+    renderEntChange(); renderKPI();
+  }
+
   function bind() {
-    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); Admin.toast('已刷新'); };
+    $('#btn-refresh').onclick = function () { renderKPI(); renderTable(); renderEntChange(); Admin.toast('已刷新'); };
     $('#btn-export').onclick = doExport;
+    var em = $('#btn-ent-mock');
+    if (em) em.onclick = entMock;
+    var ea = $('#btn-ent-mock-annual');
+    if (ea) ea.onclick = entMockAnnual;
+    var el = $('#btn-ent-mock-legal');
+    if (el) el.onclick = entMockLegal;
     document.addEventListener('click', function (e) {
+      var eb = e.target.closest('[data-entact]');
+      if (eb) {
+        if (eb.getAttribute('data-entact') === 'approve') entApprove();
+        else if (eb.getAttribute('data-entact') === 'reject') entReject();
+        return;
+      }
       var b = e.target.closest('button[data-act]');
       if (!b) return;
       var id = b.getAttribute('data-id');
@@ -352,7 +658,14 @@
       if (b.getAttribute('data-act') === 'approve') approveDialog(u);
       else if (b.getAttribute('data-act') === 'reject') rejectDialog(u);
     });
-    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); updateQueueProgress(); });
+    window.addEventListener('engchain:auth', function () { renderKPI(); renderTable(); renderEntChange(); updateQueueProgress(); });
+    /* [Bug D] App/调试面板在其它文档提交后，已打开的后台列表自动刷新（storage 仅跨文档触发） */
+    window.addEventListener('storage', function (e) {
+      if (e && e.key === 'engchain-users') {
+        if (window.DataBus && DataBus.invalidateCache) DataBus.invalidateCache();
+        renderKPI(); renderTable(); renderEntChange(); updateQueueProgress();
+      }
+    });
     var ba=document.getElementById('btn-batch-approve');
     if(ba)ba.onclick=function(){
       var ids=[];document.querySelectorAll('.row-chk:checked').forEach(function(c){ids.push(c.getAttribute('data-id'));});
@@ -382,7 +695,7 @@
     if(cnt)cnt.textContent='已选 '+checked.length+' 项';
   };
   function updateQueueProgress(){
-    var types=['realname','enterprise','personalQual','payment'];
+    var types=['realname','enterprise','personalQual','partner','payment'];
     var pending=types.reduce(function(s,t){return s+pendingOf(t).length;},0);
     var done=doneList();
     var today=new Date().toISOString().slice(0,10);
@@ -390,7 +703,7 @@
     var el=document.getElementById('queue-progress');
     if(el)el.textContent='待审 '+pending+' · 今日已审 '+todayDone;
   }
-  function render() { renderKPI(); renderFilterBar(); renderTable(); updateQueueProgress(); }
+  function render() { renderKPI(); renderFilterBar(); renderTable(); renderEntChange(); updateQueueProgress(); }
   function init() { bind(); render(); }
   document.addEventListener('DOMContentLoaded', init);
 })();

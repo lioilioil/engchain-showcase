@@ -51,6 +51,8 @@
     'pages/agency/index.html': 'home.html',
     'pages/agreement/privacy.html': 'pages/profile/settings.html',
     'pages/agreement/user.html': 'pages/profile/settings.html',
+    'pages/agreement/credit.html': 'pages/profile/settings.html',
+    'pages/agreement/disclaimer.html': 'pages/profile/settings.html',
     'pages/api/index.html': 'pages/profile/all-functions.html',
     'pages/auth/banned.html': 'pages/auth/login.html',
     'pages/auth/login.html': 'home.html',

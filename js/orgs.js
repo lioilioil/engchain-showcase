@@ -51,6 +51,14 @@ window.OrgsStore = (function () {
         ],
         joins: [
           { joinId: 'join-org1-u4', uid: 'u4', name: '张敏', note: '申请加入贵司市场部企业号，协助发布招聘', status: 'pending', createdAt: now - DAY * 1 }
+        ],
+        /* 演示：企业主（实际控制人）变更审批单 —— 目标 u3 已注册已实名，后台可审批通过 */
+        ownerChanges: [
+          { id: 'oc-org1-demo', name: '王强', mobile: '136****3456', mobileRaw: '13600003456',
+            reason: '实际控制人调整：股权变更后由王强实际控制企业经营',
+            status: 'pending', targetUid: 'u3', targetVerified: true,
+            createdBy: 'u1', createdByName: '陈建国', createdAt: now - DAY,
+            reviewedAt: 0, reviewedBy: '', reviewNote: '', smsAt: 0, smsCount: 0 }
         ]
       },
       {
@@ -774,6 +782,132 @@ window.OrgsStore = (function () {
     return null;
   }
 
+  /* ============ 企业主变更（实际控制人） + 后台审批（v1.3） ============
+     企业主 = 企业实际控制人（非工商登记的法定代表人）。变更流程：
+       企业主/管理员发起 → 填写姓名/手机号/变更原因 → 后台审批 → 通过后新企业主生效（原企业主转管理员）。
+       变更目标未注册 / 未实名认证时，发起侧可在弹窗内发「邀请」与「提醒实名认证」短信（同手机号同类型 1 天 1 次），
+       引导其注册并完成实名认证后，后台方可审批通过。 */
+  function ownerChangesOf(orgId) { var org = get(orgId); return (org && org.ownerChanges) || []; }
+  /* 当前待审批的企业主变更（每企业最多一条 pending） */
+  function pendingOwnerChangeOf(orgId) {
+    var list = ownerChangesOf(orgId);
+    for (var i = 0; i < list.length; i++) if (list[i].status === 'pending') return list[i];
+    return null;
+  }
+  function ownerChangeById(changeId) {
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var list = a[i].ownerChanges || [];
+      for (var j = 0; j < list.length; j++) if (list[j].id === changeId) return { org: a[i], change: list[j] };
+    }
+    return null;
+  }
+  /* 跨企业汇总：后台审核工作台使用 */
+  function pendingOwnerChangesAll() {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      (org.ownerChanges || []).forEach(function (c) { if (c.status === 'pending') out.push({ org: org, change: c }); });
+    });
+    return out;
+  }
+
+  /* 发起企业主变更（仅企业主/管理员；每企业同时仅一条待审批） */
+  function requestOwnerChange(orgId, payload) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可发起企业主变更' };
+    if (pendingOwnerChangeOf(orgId)) return { error: '已有待审批的企业主变更，请先等待审批结果' };
+    var name = String((payload && payload.name) || '').trim();
+    var mobile = String((payload && payload.mobile) || '').replace(/\s+/g, '');
+    var reason = String((payload && payload.reason) || '').trim();
+    if (!name) return { error: '请填写新企业主姓名' };
+    if (!/^1\d{10}$/.test(mobile)) return { error: '请输入正确的 11 位手机号' };
+    if (!reason) return { error: '请填写变更原因' };
+    var target = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(mobile) : null;
+    var rec = {
+      id: 'oc-' + Date.now(), name: name, mobile: maskMobile(mobile), mobileRaw: mobile,
+      reason: reason, status: 'pending',
+      targetUid: target ? target.id : null,
+      targetVerified: !!(target && target.auth && target.auth.realname && target.auth.realname.ok),
+      createdBy: u.id, createdByName: u.name, createdAt: Date.now(),
+      reviewedAt: 0, reviewedBy: '', reviewNote: '', smsAt: 0, smsCount: 0
+    };
+    (org.ownerChanges = org.ownerChanges || []).push(rec);
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('发起企业主变更', '企业', u.name, '申请将 ' + (org.shortName || org.co) + ' 企业主（实际控制人）变更为 ' + name + '（' + maskMobile(mobile) + '）');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, changeId: rec.id };
+  }
+
+  /* 变更目标短信：type='invite' 邀请注册并实名 | 'verify' 提醒实名认证；同手机号同类型 1 天 1 次 */
+  function ocSmsCan(org, mobile, type) {
+    var t0 = Date.now();
+    var list = (org.ownerChangeSms || []).filter(function (s) {
+      return s.mobileRaw === mobile && s.type === type && (t0 - s.ts < SMS_DAY);
+    });
+    return list.length === 0;
+  }
+  function sendOwnerChangeSms(orgId, type, name, mobile) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可操作' };
+    var p = String(mobile || '').replace(/\s+/g, '');
+    if (!/^1\d{10}$/.test(p)) return { error: '请输入正确的 11 位手机号' };
+    if (!ocSmsCan(org, p, type)) return { error: '今日已向该手机号发送过，请明天再试' };
+    var orgName = org.shortName || org.co;
+    var text = type === 'invite'
+      ? '【工程链】' + orgName + ' 正在申请将企业主（实际控制人）变更为您。请注册工程链账号并完成实名认证，以便确认该变更。'
+      : '【工程链】' + orgName + ' 企业主变更需实名认证。请尽快登录工程链完成实名认证，便于后台审批与身份核验。';
+    sendSms(p, text);
+    (org.ownerChangeSms = org.ownerChangeSms || []).push({ mobileRaw: p, type: type, ts: Date.now() });
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit(type === 'invite' ? '企业主变更·邀请' : '企业主变更·实名提醒', '企业', maskMobile(p), (type === 'invite' ? '邀请注册并实名认证' : '提醒实名认证') + ' · ' + orgName);
+    return { ok: true, sms: maskMobile(p) };
+  }
+
+  /* 后台审批企业主变更：通过 → 目标成为企业主（原企业主转管理员）；变更目标须已注册（实名状态供审核参考） */
+  function reviewOwnerChange(changeId, approve) {
+    var a = load();
+    var org = null, c = null;
+    for (var i = 0; i < a.length && !c; i++) {
+      var list = a[i].ownerChanges || [];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === changeId) { org = a[i]; c = list[j]; break; }
+      }
+    }
+    if (!org || !c) return { error: '变更单不存在' };
+    if (c.status !== 'pending') return { error: '该变更单已处理' };
+    if (approve) {
+      if (!c.targetUid) return { error: '变更目标尚未注册，无法通过；请先邀请其注册并完成实名认证' };
+      (org.members || []).forEach(function (m) {
+        if (m.role === 'owner' && m.status === 'active' && m.uid !== c.targetUid) m.role = 'admin';
+      });
+      var tm = null;
+      for (var k = 0; k < (org.members || []).length; k++) {
+        if (org.members[k].uid === c.targetUid) { tm = org.members[k]; break; }
+      }
+      if (tm) { tm.role = 'owner'; tm.status = 'active'; }
+      else { (org.members = org.members || []).push({ uid: c.targetUid, role: 'owner', status: 'active', joinedAt: Date.now() }); }
+      org.ownerUid = c.targetUid;
+      c.status = 'approved'; c.reviewedAt = Date.now();
+      save(a);
+      try {
+        if (window.DataBus && DataBus.pushDirectMessage) {
+          DataBus.pushDirectMessage(c.targetUid, '企业主变更已生效', '您已成为 ' + (org.shortName || org.co) + ' 的企业主（实际控制人）。');
+          if (c.createdBy && c.createdBy !== c.targetUid) DataBus.pushDirectMessage(c.createdBy, '企业主变更已生效', '您申请的 ' + (org.shortName || org.co) + ' 企业主变更已通过，' + c.name + ' 已成为新企业主。');
+        }
+      } catch (e) {}
+      if (window.DataBus && DataBus.audit) DataBus.audit('审核通过企业主变更', '企业', c.name, (org.shortName || org.co) + ' 企业主变更为 ' + c.name);
+      return { ok: true };
+    }
+    c.status = 'rejected'; c.reviewedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主变更', '企业', c.name, (org.shortName || org.co) + ' 企业主变更被驳回');
+    return { ok: true };
+  }
+
   /* ============ 登录 / 重置联动 ============ */
   function onLogin() {
     var u = me(); if (!u) return;
@@ -814,6 +948,10 @@ window.OrgsStore = (function () {
     requestTransfer: requestTransfer, confirmTransfer: confirmTransfer, rejectTransfer: rejectTransfer,
     submitOwnerVerify: submitOwnerVerify, reviewOwnerVerify: reviewOwnerVerify,
     pendingOwnerReviews: pendingOwnerReviews, transferById: transferById,
+    ownerChangesOf: ownerChangesOf, pendingOwnerChangeOf: pendingOwnerChangeOf,
+    ownerChangeById: ownerChangeById, pendingOwnerChangesAll: pendingOwnerChangesAll,
+    requestOwnerChange: requestOwnerChange, sendOwnerChangeSms: sendOwnerChangeSms,
+    reviewOwnerChange: reviewOwnerChange,
     switchOrg: switchOrg, projectAuth: projectAuth, defaultOrgIdFor: defaultOrgIdFor,
     init: init
   };

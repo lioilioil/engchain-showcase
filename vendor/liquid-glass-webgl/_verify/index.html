@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Liquid Glass — vendor smoke test</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font: 15px/1.5 system-ui, sans-serif;
+    background:
+      radial-gradient(60% 50% at 15% 20%, #ff6b35 0%, transparent 60%),
+      radial-gradient(50% 60% at 85% 30%, #4d5bff 0%, transparent 60%),
+      radial-gradient(70% 60% at 50% 90%, #00d4a0 0%, transparent 65%),
+      #0b0d12;
+    color: #fff;
+  }
+  /* High-contrast stripes: refraction and edge capture are obvious against them */
+  .stripes {
+    position: fixed; inset: 0; pointer-events: none; opacity: .5;
+    background: repeating-linear-gradient(45deg,
+      rgba(255,255,255,.55) 0 12px, transparent 12px 26px);
+  }
+  .stage { position: relative; padding: 48px 24px; display: grid; gap: 28px; justify-items: center; }
+  h1 { font-size: 30px; margin: 0; letter-spacing: -.02em; }
+
+  .card {
+    width: 320px; height: 130px; border-radius: 26px;
+    display: grid; place-content: center; text-align: center;
+    font-weight: 650; font-size: 19px;
+  }
+  .dock {
+    width: 300px; height: 64px; border-radius: 32px;
+    display: grid; place-content: center; font-weight: 600;
+  }
+  #toggle { width: 84px; height: 28px; }
+</style>
+</head>
+<body>
+<div class="stripes"></div>
+<div class="stage">
+  <h1>Liquid Glass vendor check</h1>
+  <div class="card" id="card">real WebGL2 refraction</div>
+  <div class="dock" id="dock">dock / tabbar</div>
+  <div id="nav" style="width:330px;height:56px"></div>
+  <div id="toggle"></div>
+  <div id="report" style="font:13px ui-monospace,monospace;opacity:.85"></div>
+</div>
+
+<script>
+  // Count real WebGL contexts, not canvas elements — some canvases are 2D capture layers.
+  // Must run before the module below. One count per canvas (getContext is idempotent).
+  window.__ctx = { webgl2: 0, canvas2d: 0, list: [] };
+  const seen = new WeakSet();
+  const origGetContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+    const ctx = origGetContext.call(this, type, ...rest);
+    if (ctx && !seen.has(this) && (type === 'webgl2' || type === '2d')) {
+      seen.add(this);
+      window.__ctx[type === 'webgl2' ? 'webgl2' : 'canvas2d']++;
+      // Recorded at creation; `isConnected` is re-read at the end of the run, so a
+      // probe context that is discarded never counts as a live one.
+      window.__ctx.list.push({ canvas: this, type });
+    }
+    return ctx;
+  };
+  window.__liveContexts = () => {
+    const live = { webgl2: 0, canvas2d: 0, byOwner: {} };
+    for (const { canvas, type } of window.__ctx.list) {
+      if (!canvas.isConnected) continue;
+      const key = type === 'webgl2' ? 'webgl2' : 'canvas2d';
+      live[key]++;
+      const owner = canvas.parentElement?.id || canvas.parentElement?.className || '(unknown)';
+      if (type === 'webgl2') live.byOwner[owner] = (live.byOwner[owner] || 0) + 1;
+    }
+    return live;
+  };
+</script>
+<script type="module">
+  const result = { supported: null, card: null, dock: null, toggle: null, errors: [], canvases: 0 };
+  window.__lgResult = result;
+
+  window.addEventListener('error', (e) => result.errors.push('ERROR: ' + e.message));
+  window.addEventListener('unhandledrejection', (e) => result.errors.push('REJECT: ' + e.reason));
+
+  try {
+    const { LiquidGlass, LiquidGlassSwitch, DEFAULT_MATERIAL, SLIDERS } = await import('../src/index.js');
+
+    // ?only=card|dock|switch|none — isolate one surface to measure its real context cost
+    const only = new URLSearchParams(location.search).get('only');
+    result.only = only;
+
+    result.supported = LiquidGlass.isSupported();
+    result.materialKeys = Object.keys(DEFAULT_MATERIAL);
+    result.materialCount = result.materialKeys.length;
+    result.sliderCount = SLIDERS.length;
+
+    // Default material must be the V2 set, not the V1 orphan shape
+    result.isV2 = 'refraction' in DEFAULT_MATERIAL && !('squircle' in DEFAULT_MATERIAL);
+
+    const want = (name) => !only || only === 'all' || only === name;
+
+    const card = want('card') ? new LiquidGlass('#card', { tint: 0.2, frost: 0.3 }) : null;
+    const dock = want('dock')
+      ? new LiquidGlass('#dock', {
+          tint: 0.55, frost: 0.35, tintTone: 'dark',
+          material: { refraction: 96, rim: 0.3, dispersion: 3 },
+        })
+      : null;
+
+    await Promise.all([card?.ready, dock?.ready].filter(Boolean));
+    if (card) result.card = { mode: card.mode, supported: card.supported, hasCanvas: !!card.canvas, hasGlass: !!card.glass };
+    if (dock) result.dock = { mode: dock.mode, hasCanvas: !!dock.canvas };
+    result.elementAttr = document.getElementById('card').dataset.liquidGlass;
+
+    // Negative control: a V1-only key must throw under V2
+    try {
+      new LiquidGlass('#report', { material: { squircle: 2.0 } });
+      result.v1KeyThrows = false;
+    } catch (err) {
+      result.v1KeyThrows = /Unknown Liquid Glass V2 material parameter/.test(err.message);
+      result.v1KeyMessage = err.message;
+    }
+
+    if (want('nav')) {
+      try {
+        const { LiquidGlassNavbar } = await import('../src/index.js');
+        new LiquidGlassNavbar('#nav', {
+          items: [{ value: 'a', label: 'Home' }, { value: 'b', label: 'Work' }, { value: 'c', label: 'Read' }],
+          value: 'a',
+        });
+        await new Promise(r => setTimeout(r, 400));
+        result.nav = { ok: !!document.querySelector('#nav canvas') };
+      } catch (err) { result.nav = { error: String(err) }; }
+    }
+
+    if (want('switch')) {
+      try {
+        new LiquidGlassSwitch('#toggle', { checked: true });
+        await new Promise(r => setTimeout(r, 400));
+        result.toggle = { ok: !!document.querySelector('#toggle canvas') };
+      } catch (err) { result.toggle = { error: String(err) }; }
+    }
+
+    result.canvases = document.querySelectorAll('canvas').length;
+    result.canvasOwners = [...document.querySelectorAll('canvas')].map((c) => ({
+      id: c.parentElement?.id || c.parentElement?.className || c.parentElement?.tagName,
+      cls: c.className || '(none)',
+      w: c.width, h: c.height,
+    }));
+    // Did the deliberately-failing mount leak a WebGL context?
+    result.reportHasCanvas = !!document.querySelector('#report canvas');
+    result.liveContexts = window.__liveContexts();
+  } catch (err) {
+    result.errors.push('FATAL: ' + (err && err.stack || err));
+  }
+
+  const el = document.getElementById('report');
+  el.textContent = JSON.stringify(result, null, 1).slice(0, 1400);
+  window.__lgDone = true;
+</script>
+</body>
+</html>
