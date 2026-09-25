@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>历史文件 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   历史文件 V2.2
+   全站文件统一档案：按生成/上传/发送/收到时间倒序，来源标签标记；
+   · 点击卡片 → 弹窗（下载 / 转发）
+   · 长按卡片 → 批量管理态（全选 / 多选 / 底部悬浮 删除·下载·转发）
+   · 首次进入弹出操作提示气泡
+   · 右上角“操作记录”：自下而上弹窗，按时间倒序展示每次文件操作（生成/下载/转发/删除/撤销）
+   转发出口：邮箱客户端（mailto）/ 指定会话消息窗口（逐条文件消息）。
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --hf-gold: #C9A961;
+  --hf-gold-deep: #A98A47;
+  --hf-bg: #F2EFE8;
+  --hf-card: rgba(255,255,255,0.82);
+  --hf-border: rgba(201,169,97,0.16);
+  --hf-text: #2A2722;
+  --hf-text-2: #6B6358;
+  --hf-text-3: #9A9185;
+  --hf-shadow: 0 1px 2px rgba(42,39,34,0.04), 0 2px 8px rgba(42,39,34,0.03);
+}
+[data-theme="dark"] {
+  --hf-gold: #D4B876;
+  --hf-gold-deep: #B89A5A;
+  --hf-bg: #0E0D0B;
+  --hf-card: rgba(32,30,27,0.74);
+  --hf-border: rgba(201,169,97,0.12);
+  --hf-text: #F0EBE0;
+  --hf-text-2: #B0A898;
+  --hf-text-3: #7A7265;
+  --hf-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15);
+}
+
+body, .phone { background: var(--hf-bg); }
+.phone::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 240px;
+  background: radial-gradient(ellipse at center, rgba(201,169,97,0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 导航栏 */
+.hf-navbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 8px 0 4px;
+  flex: 0 0 auto;
+}
+.hf-nav-back {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: var(--hf-text);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+.hf-nav-back:active { background: rgba(201,169,97,0.12); }
+.hf-nav-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--hf-text);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: font-size .2s;
+}
+.hf-nav-clear {
+  font-size: 13px;
+  color: var(--hf-gold-deep);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background 0.2s;
+  font-weight: 500;
+}
+.hf-nav-clear:active { background: rgba(201,169,97,0.12); }
+.hf-nav-clear:disabled { color: var(--hf-text-3); cursor: default; opacity: 0.4; }
+/* 批量管理态：左上“返回” / 右上“全选” 链接 */
+.hf-nav-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hf-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.hf-nav-link:active { background: rgba(201,169,97,0.12); }
+.hf-nav-link.accent { color: var(--hf-gold-deep); }
+/* 管理态“返回”文字链接：覆盖返回图标的固定宽高，避免“返回”二字换行 */
+.hf-nav-back.hf-nav-link {
+  width: auto;
+  height: auto;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+/* 内容区 */
+.hf-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 40px;
+  -webkit-overflow-scrolling: touch;
+}
+.hf-content.hf-manage { padding-bottom: 104px; }
+
+/* 日期分组标题 */
+.hf-date-group {
+  font-size: 12px;
+  color: var(--hf-text-3);
+  font-weight: 600;
+  margin: 16px 0 8px;
+  padding-left: 2px;
+  letter-spacing: 0.3px;
+}
+.hf-date-group:first-child { margin-top: 8px; }
+
+/* 文件卡片 */
+.hf-row { position: relative; margin-bottom: 8px; }
+.hf-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--hf-card);
+  border: 1px solid var(--hf-border);
+  box-shadow: var(--hf-shadow);
+  transition: transform 0.22s, box-shadow 0.22s, border-color 0.22s, background 0.22s;
+  cursor: pointer;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.hf-card:active { transform: scale(0.985); }
+.hf-card.selected {
+  border-color: var(--hf-gold);
+  background: rgba(201,169,97,0.10);
+}
+/* 批量管理态 · 左侧多选圆 */
+.hf-check {
+  flex-shrink: 0;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(201,169,97,0.75);
+  background: rgba(255,255,255,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+}
+[data-theme="dark"] .hf-check { background: rgba(255,255,255,0.08); }
+.hf-check svg { width: 12px; height: 12px; }
+.hf-check.on {
+  background: linear-gradient(135deg, var(--hf-gold), var(--hf-gold-deep));
+  border-color: transparent;
+  color: #fff;
+}
+.hf-file-ic {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  color: #fff;
+  letter-spacing: .02em;
+}
+.hf-file-ic.pdf { background: linear-gradient(135deg,#e74c3c,#c0392b); }
+.hf-file-ic.doc { background: linear-gradient(135deg,#3498db,#2980b9); }
+.hf-file-ic.img { background: linear-gradient(135deg,#27ae60,#1e8449); }
+.hf-file-ic.zip { background: linear-gradient(135deg,#9b59b6,#8e44ad); }
+.hf-file-ic.oth { background: linear-gradient(135deg,#5dade2,#2e86c1); }
+.hf-body { flex: 1; min-width: 0; }
+.hf-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--hf-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.hf-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.hf-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.hf-tag.src-qcc { background: rgba(201,169,97,0.16); color: var(--hf-gold-deep); }
+.hf-tag.src-edit { background: rgba(52,152,219,0.14); color: #2e86c1; }
+.hf-tag.src-view { background: rgba(39,174,96,0.14); color: #1e8449; }
+.hf-tag.src-chat { background: rgba(142,68,173,0.12); color: #8e44ad; }
+.hf-tag.src-fwd { background: rgba(230,126,34,0.14); color: #d35400; }
+.hf-tag.src-other { background: var(--hf-border); color: var(--hf-text-3); }
+[data-theme="dark"] .hf-tag.src-qcc { color: #D4B876; }
+[data-theme="dark"] .hf-tag.src-edit { color: #5dade2; }
+[data-theme="dark"] .hf-tag.src-view { color: #58d68d; }
+[data-theme="dark"] .hf-tag.src-chat { color: #bb8fce; }
+[data-theme="dark"] .hf-tag.src-fwd { color: #edbb99; }
+.hf-time {
+  font-size: 10.5px;
+  color: var(--hf-text-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hf-note {
+  font-size: 11px;
+  color: var(--hf-text-2);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hf-note .fwd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #d35400;
+  background: rgba(230,126,34,0.14);
+}
+[data-theme="dark"] .hf-note .fwd-badge { color: #edbb99; }
+
+/* 批量管理态 · 底部悬浮操作栏（按钮行无背景） */
+.hf-mbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom));
+  background: none;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.hf-mbar.hide { opacity: 0; transform: translateY(16px); }
+.hf-mbtn {
+  pointer-events: auto;
+  border: none;
+  border-radius: 999px;
+  min-width: 96px;
+  height: 44px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+  box-shadow: 0 6px 16px rgba(42,39,34,0.16);
+}
+.hf-mbtn:active { transform: scale(0.96); }
+.hf-mbtn:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
+.hf-mbtn svg { width: 16px; height: 16px; }
+.hf-mbtn.del { background: linear-gradient(135deg,#e74c3c,#c0392b); color: #fff; }
+.hf-mbtn.dl  { background: linear-gradient(135deg, var(--hf-gold), var(--hf-gold-deep)); color: #fff; }
+.hf-mbtn.fwd {
+  background: rgba(255,255,255,0.92);
+  color: var(--hf-gold-deep);
+  border: 1px solid var(--hf-border);
+}
+[data-theme="dark"] .hf-mbtn.fwd { background: rgba(32,30,27,0.92); }
+
+/* 撤销提示（防误删兜底） */
+.hf-undo {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(42,39,34,0.92);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  animation: hf-undo-in 0.25s ease-out;
+}
+.hf-undo button {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--hf-gold);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+@keyframes hf-undo-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* 首次进入操作提示气泡 */
+.hf-hint {
+  position: absolute;
+  top: calc(48px + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px 11px 18px;
+  border-radius: 999px;
+  background: rgba(42,39,34,0.94);
+  color: #fff;
+  font-size: 12.5px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+  cursor: pointer;
+  white-space: nowrap;
+  animation: hf-hint-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.hf-hint::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: rgba(42,39,34,0.94);
+}
+.hf-hint-txt { line-height: 1; }
+.hf-hint-btn {
+  border: none;
+  background: none;
+  color: var(--hf-gold);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+.hf-hint.out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px);
+  transition: opacity 0.25s, transform 0.25s;
+}
+@keyframes hf-hint-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* 弹窗选项（点击卡片 / 转发目标选择） */
+.hf-sheet-opt {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 14px;
+  border-radius: 14px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+  cursor: pointer;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  transition: opacity 0.15s;
+}
+.hf-sheet-opt:active { opacity: 0.75; }
+.hf-sheet-opt svg { width: 20px; height: 20px; color: var(--primary-dim); flex: none; }
+.hf-sheet-opt em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--text-3); font-weight: 500; }
+
+/* 操作记录弹窗（自下而上，按时间倒序，超 N 条局部展示 + 展开） */
+.op-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.op-row:last-child { border-bottom: none; }
+.op-ic {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 8px;
+  color: #fff;
+  letter-spacing: .02em;
+}
+.op-ic.pdf { background: linear-gradient(135deg,#e74c3c,#c0392b); }
+.op-ic.doc { background: linear-gradient(135deg,#3498db,#2980b9); }
+.op-ic.img { background: linear-gradient(135deg,#27ae60,#1e8449); }
+.op-ic.zip { background: linear-gradient(135deg,#9b59b6,#8e44ad); }
+.op-ic.oth { background: linear-gradient(135deg,#5dade2,#2e86c1); }
+.op-main { flex: 1; min-width: 0; }
+.op-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-sub { display: flex; align-items: center; gap: 6px; margin-top: 3px; min-width: 0; }
+.op-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.op-pill.op-created { background: rgba(201,169,97,0.16); color: var(--hf-gold-deep); }
+.op-pill.op-download { background: rgba(52,152,219,0.14); color: #2e86c1; }
+.op-pill.op-forward { background: rgba(230,126,34,0.14); color: #d35400; }
+.op-pill.op-delete { background: rgba(231,76,60,0.14); color: #c0392b; }
+.op-pill.op-undo { background: var(--hf-border); color: var(--hf-text-3); }
+[data-theme="dark"] .op-pill.op-created { color: #D4B876; }
+[data-theme="dark"] .op-pill.op-download { color: #5dade2; }
+[data-theme="dark"] .op-pill.op-forward { color: #edbb99; }
+[data-theme="dark"] .op-pill.op-delete { color: #ff8a80; }
+[data-theme="dark"] .op-pill.op-undo { color: #8a8378; }
+.op-detail {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.op-time { flex: none; font-size: 10.5px; color: var(--text-3); }
+.op-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--hf-border);
+  background: var(--hf-card);
+  color: var(--hf-gold-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.op-more-btn:active { opacity: 0.7; }
+
+/* 空状态 */
+.hf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+.hf-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(201,169,97,0.12), rgba(201,169,97,0.04));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hf-gold-deep);
+  margin-bottom: 16px;
+}
+.hf-empty-icon svg { width: 32px; height: 32px; opacity: 0.6; }
+.hf-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--hf-text);
+  margin-bottom: 6px;
+}
+.hf-empty-desc {
+  font-size: 12.5px;
+  color: var(--hf-text-3);
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.hf-empty-btn {
+  padding: 11px 36px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--hf-gold), var(--hf-gold-deep));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(201,169,97,0.3);
+}
+.hf-empty-btn:active { transform: scale(0.97); }
+.hf-empty-tip { font-size: 11px; color: var(--hf-text-3); margin-top: 14px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- 导航栏 -->
+  <div class="hf-navbar">
+    <button class="hf-nav-back" id="hf-back">‹</button>
+    <div class="hf-nav-title" id="hf-nav-title">历史文件</div>
+    <button class="hf-nav-clear" id="hf-oplog">操作记录</button>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="hf-content" id="hf-content"></div>
+
+  <!-- 批量管理态 · 底部悬浮操作栏（无背景） -->
+  <div class="hf-mbar hide" id="hf-mbar">
+    <button class="hf-mbtn del" id="m-del" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除</button>
+    <button class="hf-mbtn dl" id="m-dl" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>下载</button>
+    <button class="hf-mbtn fwd" id="m-fwd" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>转发</button>
+  </div>
+</div>
+
+<script>window.__ENGCHAIN_SILENT_FILE_RECORD = true;</script>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/file-download.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var content = document.getElementById('hf-content');
+  var backBtn = document.getElementById('hf-back');
+  var oplogBtn = document.getElementById('hf-oplog');
+  var navTitle = document.getElementById('hf-nav-title');
+  var mbar = document.getElementById('hf-mbar');
+  var mDel = document.getElementById('m-del');
+  var mDl = document.getElementById('m-dl');
+  var mFwd = document.getElementById('m-fwd');
+
+  var MODE = 'normal';      // normal | manage
+  var selected = {};        // 批量管理选中 id -> true
+  var undoRecords = [];     // 已删除记录（可撤销）
+  var undoTimer = null;
+
+  /* 图标 */
+  var IC_DL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  var IC_FWD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>';
+  var IC_MAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>';
+  var IC_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+  var IC_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  /* 来源标签配色（sourceKey → class） */
+  function srcCls(key) {
+    return { qcc: 'src-qcc', edit: 'src-edit', view: 'src-view', detail: 'src-view', chat: 'src-chat', fwd: 'src-fwd', other: 'src-other' }[key] || 'src-other';
+  }
+  /* 事件动词：生成/上传/发送/收到/转发 */
+  function verbFor(it) {
+    if (it.event === '转发到会话' || (it.source || '') === '转发到会话') return '转发于';
+    if (it.sourceKey === 'qcc') return '生成于';
+    if (it.sourceKey === 'edit') return '上传于';
+    if (it.sourceKey === 'detail') return '下载于';
+    if (it.sourceKey === 'view') return '浏览于';
+    if ((it.source || '').indexOf('收到') > -1) return '收到于';
+    if ((it.source || '').indexOf('发送') > -1) return '发送于';
+    return '生成于';
+  }
+  /* 文件类型图标块 */
+  function fileIc(name) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    var cls = 'oth', label = 'F';
+    if (ext === 'pdf') { cls = 'pdf'; label = 'PDF'; }
+    else if (ext === 'doc' || ext === 'docx') { cls = 'doc'; label = 'DOC'; }
+    else if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp' || ext === 'gif') { cls = 'img'; label = 'IMG'; }
+    else if (ext === 'zip' || ext === 'rar' || ext === '7z') { cls = 'zip'; label = 'ZIP'; }
+    else if (ext) { label = ext.slice(0, 3).toUpperCase(); }
+    return '<div class="hf-file-ic ' + cls + '">' + label + '</div>';
+  }
+  /* 日期分组 */
+  function dateGroup(ts) {
+    var d = new Date(ts), now = new Date();
+    var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var diff = Math.floor((today - day) / 864e5);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '昨天';
+    if (diff <= 7) return diff + '天前';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  function fmtTime(ts) {
+    var d = new Date(ts), now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    var hh = (d.getHours() < 10 ? '0' : '') + d.getHours();
+    var mm = (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    return sameDay ? hh + ':' + mm : ((d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hh + ':' + mm);
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+
+  /* 查找文件记录 */
+  function findFile(id) {
+    var r = null;
+    try { FileStore.list().forEach(function (f) { if (f.id === id) r = f; }); } catch (e) {}
+    return r;
+  }
+  function listFiles() { try { return FileStore.list(); } catch (e) { return []; } }
+  function selCount() { var n = 0; for (var k in selected) if (selected[k]) n++; return n; }
+  function allSelected() {
+    var items = listFiles();
+    return items.length > 0 && items.every(function (it) { return !!selected[it.id]; });
+  }
+
+  /* ── 批量管理态 ── */
+  function syncNavbar() {
+    var n = selCount();
+    if (MODE === 'manage') {
+      backBtn.textContent = '返回';
+      backBtn.classList.add('hf-nav-link');
+      oplogBtn.textContent = allSelected() ? '取消全选' : '全选';
+      oplogBtn.classList.add('hf-nav-link', 'accent');
+      oplogBtn.disabled = false;
+      navTitle.textContent = n ? '已选 ' + n + ' 项' : '选择文件';
+      mbar.classList.remove('hide');
+      content.classList.add('hf-manage');
+    } else {
+      backBtn.textContent = '‹';
+      backBtn.classList.remove('hf-nav-link');
+      oplogBtn.textContent = '操作记录';
+      oplogBtn.classList.remove('hf-nav-link', 'accent');
+      oplogBtn.disabled = false;
+      navTitle.textContent = '历史文件';
+      mbar.classList.add('hide');
+      content.classList.remove('hf-manage');
+    }
+    mDel.disabled = mDl.disabled = mFwd.disabled = (MODE !== 'manage' || n === 0);
+  }
+  function enterManage(id) {
+    if (MODE === 'manage') return;
+    MODE = 'manage';
+    selected = {};
+    if (id) selected[id] = true;
+    render();
+  }
+  function exitManage() {
+    if (MODE !== 'manage') return;
+    MODE = 'normal';
+    selected = {};
+    render();
+  }
+  function toggleSel(id, on) {
+    if (on === undefined) on = !selected[id];
+    if (on) selected[id] = true; else delete selected[id];
+    var card = content.querySelector('.hf-card[data-id="' + id + '"]');
+    if (card) {
+      card.classList.toggle('selected', !!selected[id]);
+      var ck = card.querySelector('.hf-check');
+      if (ck) ck.classList.toggle('on', !!selected[id]);
+    }
+    syncNavbar();
+  }
+
+  /* ── 渲染列表 ── */
+  function render() {
+    var items = listFiles();
+    if (!items.length && MODE === 'manage') { MODE = 'normal'; selected = {}; }
+    syncNavbar();
+
+    if (!items.length) {
+      content.innerHTML =
+        '<div class="hf-empty">' +
+          '<div class="hf-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>' +
+          '<div class="hf-empty-title">暂无历史文件</div>' +
+          '<div class="hf-empty-desc">企业信息查询生成的工商报告、详情页附件、<br>会话中发送或收到的文件都会收录在这里</div>' +
+          '<button class="hf-empty-btn" id="hf-go-qcc">去企业信息查询</button>' +
+          '<div class="hf-empty-tip">文件按生成 / 上传 / 发送 / 收到时间倒序排列，<br>点击查看操作，长按批量管理，右上角查看操作记录。</div>' +
+        '</div>';
+      var go = document.getElementById('hf-go-qcc');
+      if (go) go.addEventListener('click', function () { location.href = '../search/enterprise.html'; });
+      return;
+    }
+
+    /* 按日期分组（FileStore.list 已按 time 倒序） */
+    var groups = {};
+    items.forEach(function (it) {
+      var g = dateGroup(it.time || it.createdAt || Date.now());
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(it);
+    });
+
+    var html = '';
+    Object.keys(groups).forEach(function (g) {
+      html += '<div class="hf-date-group">' + g + '</div>';
+      groups[g].forEach(function (it) {
+        var fwdN = it.forwarded || 0;
+        var isSel = !!selected[it.id];
+        html +=
+          '<div class="hf-row">' +
+            '<div class="hf-card' + (isSel ? ' selected' : '') + '" data-id="' + esc(it.id) + '">' +
+              (MODE === 'manage' ? '<div class="hf-check' + (isSel ? ' on' : '') + '">' + IC_CHECK + '</div>' : '') +
+              fileIc(it.name) +
+              '<div class="hf-body">' +
+                '<div class="hf-name">' + esc(it.name) + '</div>' +
+                '<div class="hf-meta">' +
+                  '<span class="hf-tag ' + srcCls(it.sourceKey) + '">' + esc(it.source || '其他') + '</span>' +
+                  '<span class="hf-time">' + verbFor(it) + ' ' + esc(it.timeText || fmtTime(it.time || it.createdAt)) + '</span>' +
+                '</div>' +
+                (it.note ? '<div class="hf-note">' + esc(it.note) +
+                  (fwdN ? '<span class="fwd-badge">已转发 ' + fwdN + ' 次</span>' : '') +
+                  '</div>' : '') +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      });
+    });
+    content.innerHTML = html;
+    maybeShowHint();
+  }
+
+  /* ── 首次进入操作提示气泡 ── */
+  function maybeShowHint() {
+    try { if (localStorage.getItem('engchain-hf-hint')) return; } catch (e) {}
+    if (MODE !== 'normal' || !listFiles().length) return;
+    if (document.querySelector('.hf-hint')) return;
+    var el = document.createElement('div');
+    el.className = 'hf-hint';
+    el.innerHTML = '<span class="hf-hint-txt">长按文件可操作转发、下载</span><button class="hf-hint-btn">知道了</button>';
+    document.querySelector('.phone').appendChild(el);
+    var done = false;
+    function dismiss() {
+      if (done) return;
+      done = true;
+      el.classList.add('out');
+      setTimeout(function () { el.remove(); }, 260);
+      try { localStorage.setItem('engchain-hf-hint', '1'); } catch (e) {}
+    }
+    el.addEventListener('click', dismiss);
+    setTimeout(dismiss, 6000);
+  }
+
+  /* ── 撤销删除 ── */
+  function showUndo() {
+    hideUndo();
+    var el = document.createElement('div');
+    el.className = 'hf-undo';
+    var label = undoRecords.length > 1 ? '已删除 ' + undoRecords.length + ' 个文件' : '已删除「' + esc(undoRecords[0].rec.name) + '」';
+    el.innerHTML = '<span>' + label + '</span><button id="hf-undo-btn">撤销</button>';
+    document.querySelector('.phone').appendChild(el);
+    el.querySelector('#hf-undo-btn').addEventListener('click', undoDelete);
+    undoTimer = setTimeout(hideUndo, 5000);
+  }
+  function hideUndo() {
+    if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+    var el = document.querySelector('.hf-undo');
+    if (el) el.remove();
+  }
+  function undoDelete() {
+    var st = FileStore.read();
+    var items = st.items || [];
+    undoRecords.slice().reverse().forEach(function (u) {
+      var idx = Math.min(u.idx, items.length);
+      items.splice(idx, 0, u.rec);
+      opPush({ fid: u.rec.id, name: u.rec.name, type: 'undo', label: '撤销删除' });
+    });
+    FileStore.write(st);
+    undoRecords = [];
+    hideUndo();
+    render();
+  }
+  /* 删除（统一入口：批量栏；带撤销） */
+  function doDelete(id) {
+    var st = FileStore.read();
+    var items = st.items || [];
+    var idx = -1, rec = null;
+    items.forEach(function (it, i) { if (it.id === id) { rec = it; idx = i; } });
+    if (!rec) return;
+    try { FileStore.remove(id); } catch (e) {}
+    delete selected[id];
+    opPush({ fid: id, name: rec.name, type: 'delete', label: '删除' });
+    undoRecords.push({ rec: rec, idx: idx });
+    render();
+    showUndo();
+  }
+
+  /* ── 下载 ── */
+  function kbSize(size) {
+    if (typeof size === 'number') return size;
+    var s = String(size == null ? '' : size).trim().toUpperCase();
+    var m = /^([\d.]+)\s*(KB|MB|GB)?$/.exec(s);
+    if (!m) return 2048;
+    var n = parseFloat(m[1]), u = m[2] || 'KB';
+    if (u === 'MB') n *= 1024; else if (u === 'GB') n *= 1024 * 1024;
+    return Math.max(1, Math.round(n));
+  }
+  function downloadFiles(ids) {
+    var files = ids.map(findFile).filter(Boolean);
+    if (!files.length) return;
+    files.forEach(function (f) { opPush({ fid: f.id, name: f.name, type: 'download', label: '下载' }); });
+    if (window.FileDownload) {
+      var pending = {};
+      files.forEach(function (f) { pending[f.id] = true; FileDownload.start(f.id, f.name, kbSize(f.size)); });
+      UI.toast('开始下载 ' + files.length + ' 个文件', 'ok');
+      var tries = 0;
+      var iv = setInterval(function () {
+        tries++;
+        var done = true;
+        files.forEach(function (f) {
+          var r = FileDownload.get(f.id);
+          if (!r || (r.status !== 'completed' && r.status !== 'failed')) done = false;
+        });
+        if (done || tries > 40) {
+          clearInterval(iv);
+          UI.toast(files.length > 1 ? '文件下载完成' : '「' + files[0].name + '」下载完成', 'ok');
+        }
+      }, 600);
+    } else {
+      files.forEach(function (f) {
+        if (f.href) {
+          var a = document.createElement('a');
+          a.href = f.href; a.download = f.name;
+          document.body.appendChild(a); a.click(); a.remove();
+        }
+      });
+      UI.toast('开始下载 ' + files.length + ' 个文件', 'ok');
+    }
+  }
+
+  /* ── 转发 ── */
+  /* 点击卡片弹窗：下载 / 转发 */
+  function openFileSheet(id) {
+    var file = findFile(id);
+    if (!file) { UI.toast('文件不存在或已删除', 'warn'); return; }
+    var sh = UI.sheet();
+    sh.setText(file.name);
+    sh.html(
+      '<div style="font-size:11.5px;color:var(--text-3);padding:2px 2px 12px;line-height:1.6;">选择要执行的操作</div>' +
+      '<div class="hf-sheet-opt" onclick="UI.closeSheet();hfAct(\'dl\',\'' + file.id + '\')">' + IC_DL + '<span>下载</span></div>' +
+      '<div class="hf-sheet-opt" onclick="UI.closeSheet();hfAct(\'fwd\',\'' + file.id + '\')">' + IC_FWD + '<span>转发</span></div>'
+    );
+    sh.show();
+  }
+  window.hfAct = function (act, id) {
+    if (act === 'dl') downloadFiles([id]);
+    else if (act === 'fwd') openForward(id);
+  };
+
+  /* 转发：选择出口（邮箱客户端 / 指定消息会话窗口） */
+  function openForward(ids) {
+    ids = (Array.isArray(ids) ? ids.slice() : [ids]).filter(Boolean);
+    if (!ids.length) return;
+    var files = ids.map(findFile).filter(Boolean);
+    if (!files.length) { UI.toast('文件不存在或已删除', 'warn'); return; }
+    var sh = UI.sheet();
+    sh.setText(files.length > 1 ? '转发 ' + files.length + ' 个文件' : '转发文件');
+    sh.html(
+      '<div style="font-size:11.5px;color:var(--text-3);padding:2px 2px 12px;line-height:1.6;">选择转发方式</div>' +
+      '<div class="hf-sheet-opt" onclick="UI.closeSheet();hfForwardMail(\'' + ids.join(',') + '\')">' + IC_MAIL + '<span>邮箱</span><em>载入邮件客户端</em></div>' +
+      '<div class="hf-sheet-opt" onclick="UI.closeSheet();hfForwardConv(\'' + ids.join(',') + '\')">' + IC_CHAT + '<span>消息会话</span><em>发送到指定会话窗口</em></div>'
+    );
+    sh.show();
+  }
+
+  /* 出口①：邮箱客户端（mailto，浏览器不附带真实附件，携带文件信息） */
+  window.hfForwardMail = function (idsStr) {
+    var files = String(idsStr || '').split(',').map(findFile).filter(Boolean);
+    if (!files.length) return;
+    var subject = files.length > 1 ? '转发文件（' + files.length + ' 个）' : '转发文件：' + files[0].name;
+    var body = '你好，\n\n向你转发以下文件：\n' +
+      files.map(function (f) { return '· ' + f.name + (f.size ? '（' + f.size + '）' : ''); }).join('\n') +
+      '\n\n—— 来自工程链';
+    window.location.href = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    files.forEach(function (f) { opPush({ fid: f.id, name: f.name, type: 'forward', label: '转发', detail: '邮箱' }); });
+    UI.toast('已调起邮箱客户端', 'ok');
+  };
+
+  /* 出口②：消息会话窗口（逐条文件消息发送，fwd 参数逗号分隔多文件） */
+  window.hfForwardConv = function (idsStr) {
+    var ids = String(idsStr || '').split(',').filter(Boolean);
+    var files = ids.map(findFile).filter(Boolean);
+    if (!files.length) { UI.toast('文件不存在或已删除', 'warn'); return; }
+    var sh = UI.sheet();
+    sh.setText('选择接收会话');
+    sh.html(
+      '<div style="font-size:11.5px;color:var(--text-3);padding:0 2px 10px;line-height:1.6;">' + (files.length > 1 ? '所选 ' + files.length + ' 个文件将逐条发送到对方会话窗口。' : '文件将以消息形式发送到对方会话窗口。') + '</div>' +
+      (MOCK.conversations || []).map(function (c) {
+        return '<div style="display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line);cursor:pointer;" ' +
+          'onclick="UI.closeSheet();location.href=\'../message/chat.html?id=' + encodeURIComponent(c.id) + '&fwd=' + encodeURIComponent(ids.join(',')) + '\'">' +
+          '<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary-soft),var(--bg-card-2));color:var(--primary-dim);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex:none;">' + esc(c.avatar || (c.name || '?').slice(0, 1)) + '</div>' +
+          '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:600;color:var(--text-1);">' + esc(c.name) + '</div><div style="font-size:11px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(c.role || '') + '</div></div>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:var(--text-3);flex:none;"><path d="M9 18l6-6-6-6"/></svg>' +
+        '</div>';
+      }).join('') +
+      '<div style="font-size:10.5px;color:var(--text-3);padding:10px 2px 2px;line-height:1.6;">文件支持转发至平台会话消息窗口，或载入邮箱客户端。</div>'
+    );
+    sh.show();
+  };
+
+  /* ── 操作记录（OpLog）：右上角入口，自下而上弹窗 ── */
+  function oplog() {
+    try {
+      if (!window.OpLog) return [];
+      if (OpLog.invalidateCache) OpLog.invalidateCache();   /* 每次打开读最新持久化流水 */
+      return OpLog.list();
+    } catch (e) { return []; }
+  }
+  function opPush(rec) {
+    try { if (window.OpLog && OpLog.push) OpLog.push(rec); } catch (e) {}
+  }
+  /* 兼容历史数据：为 OpLog 上线前已存在的文件补齐建档/转发流水（幂等） */
+  function backfillOpLog() {
+    try {
+      if (!window.OpLog || !OpLog.push || !OpLog.read) return;
+      var items = listFiles();
+      var logs = OpLog.read().items || [];
+      var created = {}, fwdN = {};
+      logs.forEach(function (l) {
+        if (l.type === 'created' && l.fid) created[l.fid] = true;
+        if (l.type === 'forward' && l.fid) fwdN[l.fid] = (fwdN[l.fid] || 0) + 1;
+      });
+      items.forEach(function (it) {
+        if (!created[it.id]) opPush({ fid: it.id, name: it.name, ts: it.time || it.createdAt || Date.now(), type: 'created', label: verbFor(it).replace('于', ''), detail: it.source || '' });
+        var f = it.forwarded || 0, c = fwdN[it.id] || 0;
+        for (var i = c; i < f; i++) opPush({ fid: it.id, name: it.name, ts: it.time || Date.now(), type: 'forward', label: '转发', detail: '会话' });
+      });
+    } catch (e) {}
+  }
+  function opIc(name) {
+    var ext = (name.split('.').pop() || '').toLowerCase();
+    var cls = 'oth', label = 'F';
+    if (ext === 'pdf') { cls = 'pdf'; label = 'PDF'; }
+    else if (ext === 'doc' || ext === 'docx') { cls = 'doc'; label = 'DOC'; }
+    else if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp' || ext === 'gif') { cls = 'img'; label = 'IMG'; }
+    else if (ext === 'zip' || ext === 'rar' || ext === '7z') { cls = 'zip'; label = 'ZIP'; }
+    else if (ext) { label = ext.slice(0, 3).toUpperCase(); }
+    return '<div class="op-ic ' + cls + '">' + label + '</div>';
+  }
+  function opRows(items) {
+    return items.map(function (l) {
+      var pill = 'op-created';
+      if (l.type === 'download') pill = 'op-download';
+      else if (l.type === 'forward') pill = 'op-forward';
+      else if (l.type === 'delete') pill = 'op-delete';
+      else if (l.type === 'undo') pill = 'op-undo';
+      var label = l.label || (l.type === 'created' ? '生成' : (l.type === 'forward' ? '转发' : l.type));
+      return '<div class="op-row">' + opIc(l.name) +
+        '<div class="op-main">' +
+          '<div class="op-name">' + esc(l.name) + '</div>' +
+          '<div class="op-sub"><span class="op-pill ' + pill + '">' + esc(label) + '</span>' +
+          (l.detail ? '<span class="op-detail">' + esc(l.detail) + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="op-time">' + fmtTime(l.ts) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+  function openOpLog() {
+    var items = oplog();
+    var sh = UI.sheet();
+    sh.setText('操作记录');
+    if (!items.length) {
+      sh.html('<div style="padding:44px 16px;text-align:center;color:var(--text-3);font-size:13px;line-height:1.9;">暂无操作记录<br><span style="font-size:11px;color:var(--text-3);">对文件的生成、下载、转发、删除等操作会记录在这里</span></div>');
+      sh.show();
+      return;
+    }
+    var cap = 5;
+    sh.html(
+      '<div style="padding:2px 2px 10px;font-size:11.5px;color:var(--text-3);">共 ' + items.length + ' 条 · 按时间倒序' + (items.length > cap ? ' · 先展示最近 ' + cap + ' 条' : '') + '</div>' +
+      '<div id="hf-oplog-list" style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">' + opRows(items.slice(0, cap)) + '</div>'
+    );
+    if (items.length > cap) {
+      var foot = document.createElement('div');
+      foot.style.cssText = 'text-align:center;padding:12px 0 4px;';
+      var more = document.createElement('button');
+      more.className = 'op-more-btn';
+      more.textContent = '展开全部 ' + items.length + ' 条记录';
+      foot.appendChild(more);
+      sh.body().appendChild(foot);
+      more.addEventListener('click', function () {
+        var list = document.getElementById('hf-oplog-list');
+        if (list) list.innerHTML = opRows(items);
+        foot.remove();
+      });
+    }
+    sh.show();
+  }
+
+  /* ── 手势：点击弹窗 / 长按批量（互斥） ── */
+  var gs = null;
+  function cancelGesture() {
+    if (!gs) return;
+    if (gs.timer) clearTimeout(gs.timer);
+    gs = null;
+  }
+
+  content.addEventListener('pointerdown', function (e) {
+    var card = e.target.closest('.hf-card');
+    if (!card || !e.isPrimary) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (MODE === 'manage') return;                                  /* 管理态：点按切换勾选 */
+    gs = {
+      id: e.pointerId,
+      fid: card.getAttribute('data-id'),
+      x0: e.clientX, y0: e.clientY, t0: Date.now(),
+      dx: 0, dy: 0, long: false, moved: false, timer: null
+    };
+    gs.timer = setTimeout(function () {
+      if (!gs || gs.moved) return;
+      var fid = gs.fid;
+      gs.long = true;
+      gs = null;
+      /* 抑制长按松手后紧随的 click，避免把刚选中的项再切掉 */
+      window.__hfSuppressClick = Date.now() + 400;
+      enterManage(fid);
+    }, 550);
+    try { card.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  content.addEventListener('pointermove', function (e) {
+    if (!gs || e.pointerId !== gs.id) return;
+    gs.dx = e.clientX - gs.x0;
+    gs.dy = e.clientY - gs.y0;
+    if (Math.abs(gs.dy) > 10 && Math.abs(gs.dy) > Math.abs(gs.dx)) { cancelGesture(); return; }  /* 纵向滚动让位浏览器 */
+    if (Math.abs(gs.dx) > 10 || Math.abs(gs.dy) > 10) gs.moved = true;                            /* 发生位移即取消长按 */
+  });
+
+  function onPointerEnd(e) {
+    if (!gs || e.pointerId !== gs.id) return;
+    clearTimeout(gs.timer);
+    if (gs.long) { gs = null; return; }
+    /* 点击：短按无位移 → 弹窗 */
+    var dt = Date.now() - gs.t0;
+    var moved = Math.max(Math.abs(gs.dx), Math.abs(gs.dy)) > 10;
+    if (!moved && dt < 350 && gs.fid) openFileSheet(gs.fid);
+    gs = null;
+  }
+  content.addEventListener('pointerup', onPointerEnd);
+  content.addEventListener('pointercancel', function (e) { if (gs && e.pointerId === gs.id) cancelGesture(); });
+
+  /* 事件委托：管理态勾选切换 */
+  content.addEventListener('click', function (e) {
+    if (window.__hfSuppressClick && Date.now() < window.__hfSuppressClick) return;
+    if (MODE === 'manage') {
+      var card = e.target.closest('.hf-card');
+      if (card) toggleSel(card.getAttribute('data-id'));
+    }
+  });
+
+  /* ── 导航栏 ── */
+  backBtn.addEventListener('click', function () {
+    if (MODE === 'manage') { exitManage(); return; }
+    if (document.referrer && document.referrer.indexOf(location.hostname) !== -1) window.history.back();
+    else location.href = 'index.html';
+  });
+  /* 正常态=操作记录；管理态=全选/取消全选 */
+  oplogBtn.addEventListener('click', function () {
+    if (MODE === 'manage') {
+      var items = listFiles();
+      if (allSelected()) selected = {}; else items.forEach(function (it) { selected[it.id] = true; });
+      render();
+      return;
+    }
+    openOpLog();
+  });
+
+  /* 批量操作栏 */
+  mDel.addEventListener('click', function () { if (MODE === 'manage' && selCount()) Object.keys(selected).forEach(doDelete); });
+  mDl.addEventListener('click', function () { if (MODE === 'manage' && selCount()) downloadFiles(Object.keys(selected)); });
+  mFwd.addEventListener('click', function () { if (MODE === 'manage' && selCount()) openForward(Object.keys(selected)); });
+
+  /* 跨页同步 */
+  window.addEventListener('engchain:files', render);
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-history-files') render(); });
+
+  backfillOpLog();
+  render();
+})();
+</script>
+</body>
+</html>

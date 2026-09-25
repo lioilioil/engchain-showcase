@@ -110,7 +110,9 @@ window.DataBus = (function () {
     try { a = JSON.parse(LS.getItem(USERS_KEY) || '[]'); } catch (e) { return; }
     if (!Array.isArray(a) || !a.length) return;
     var dirty = false;
-    var entryMap = { u3: 'construction', u4: 'partner', u5: 'agency', u6: 'construction' };
+    /* [Bug C 修复] 移除历史 entryMap 假注入（原逻辑每次加载都给 u3/u4/u5/u6 凭空写入入驻 pending，
+       导致后台入驻待办长期挂 4 条、且 u5/u6 连入驻门槛都不满足）。seedUsers 已给每个用户完整 entry，
+       入驻待审只能来自真实 entryApply 或演示场景工厂。此处仅保留 mobile/payment/空 entry 兜底。 */
     /* 演示手机号（明文，供"手机号搜索邀请"匹配；auth.realname.mobile 保留脱敏展示） */
     var mobileMap = { u1: '13800001234', u2: '13700002345', u3: '13600003456', u4: '13900005678', u5: '13500004567', u6: '13400005678', u8: '13300008901', u9: '13200009012' };
     a.forEach(function (u) {
@@ -122,10 +124,7 @@ window.DataBus = (function () {
           : { ok: !!(u.auth.enterprise && u.auth.enterprise.ok), ts: 0 };
         dirty = true;
       }
-      if (!u.entry) { u.entry = { type: null, orderId: null, status: null, active: false, paidAt: 0, expireAt: 0 }; dirty = true; }
-      if (!u.entry.type && u.status !== 'guest' && !u.banned && entryMap[u.id]) {
-        u.entry.type = entryMap[u.id]; u.entry.status = 'pending'; u.entry.note = ''; dirty = true;
-      }
+      if (!u.entry) { u.entry = { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0, note: '' }; dirty = true; }
     });
     if (dirty) { try { LS.setItem(USERS_KEY, JSON.stringify(a)); } catch (e) {} }
   }
@@ -184,8 +183,16 @@ window.DataBus = (function () {
     if (!u) return null;
     if (window.AuthStore) AuthStore.write(JSON.parse(JSON.stringify(u.auth || {})));
     if (window.EntryStore) EntryStore.write(JSON.parse(JSON.stringify(u.entry || {})));
-    if (window.BalanceStore) BalanceStore.write(JSON.parse(JSON.stringify(u.balance || { balance:0, frozen:0, totalIn:0, logs:[] })));
-    if (window.CreditStore) CreditStore.write(JSON.parse(JSON.stringify(u.credits || { balance:0, logs:[], quota:{ month:'', used:0 } })));
+    /* [健壮性修复] 种子/快照的 balance、credits 往往不含 logs（种子余额只有数字字段）。
+       整体 write 会使 Store 缓存的 logs 变为 undefined，随后任何真实扣费/退款/积分变动
+       执行 logs.unshift 即抛 TypeError。写入前兜底 logs / quota。 */
+    var balSnap = JSON.parse(JSON.stringify(u.balance || { balance: 0, frozen: 0, totalIn: 0 }));
+    if (!Array.isArray(balSnap.logs)) balSnap.logs = [];
+    if (window.BalanceStore) BalanceStore.write(balSnap);
+    var crSnap = JSON.parse(JSON.stringify(u.credits || { balance: 0 }));
+    if (!Array.isArray(crSnap.logs)) crSnap.logs = [];
+    if (!crSnap.quota) crSnap.quota = { month: '', used: 0 };
+    if (window.CreditStore) CreditStore.write(crSnap);
     if (window.UI && UI.state) {
       UI.state.set({
         user: u.name, company: u.company || '', account: u.account || '',
@@ -252,8 +259,15 @@ window.DataBus = (function () {
     try { loadDistTeam(); } catch (e) {}
     try { loadDistFlows(); } catch (e) {}
     /* 当前状态设为游客 */
+    /* [SIDEBAR FIX] 同时清空四个当前身份 Store 的内存缓存与存储态（与 logout 同构）。
+       否则本窗口点"重置"时 storage 事件不触发，第二修的 L2 缓存仍返回上一账号快照，
+       造成主身份已是游客、但五轨道徽章/余额行仍串号显示上一账号。 */
+    try { if (window.AuthStore && AuthStore.reset) AuthStore.reset(); } catch (e) {}
+    try { if (window.EntryStore && EntryStore.reset) EntryStore.reset(); } catch (e) {}
+    try { if (window.BalanceStore && BalanceStore.reset) BalanceStore.reset(); } catch (e) {}
+    try { if (window.CreditStore && CreditStore.reset) CreditStore.reset(); } catch (e) {}
     if (window.UI && UI.state) {
-      UI.state.set({ user: '', company: '', account: '', status: 'guest', loggedIn: false, member: false });
+      UI.state.set({ user: '', company: '', account: '', status: 'guest', loggedIn: false, member: false, demoOverride: null, currentOrgId: null });
     }
     /* 清除付费墙解锁记录 */
     try { LS.removeItem('engchain-unlocked'); LS.removeItem('engchain-personal-unlocks'); } catch (e) {}
@@ -338,6 +352,9 @@ window.DataBus = (function () {
     return base;
   }
   function entryLabel(type) { return TYPE_LABEL[type] || type; }
+  /* 认证域中文标签（仅用于认证审批/提交的审计日志；入驻三类仍用 entryLabel，避免 partner 语义混淆） */
+  var AUTH_LABEL = { realname: '实名认证', qual: '个人资质认证', personalQual: '个人资质认证', enterprise: '企业认证', payment: '资金账户认证', partner: '个人合伙人认证' };
+  function authLabel(type) { return AUTH_LABEL[type] || (entryLabel(type) + '认证'); }
   /* 按 auth/entry 权威字段重算 u.identity（与 stores.deriveIdentity 同口径 v3.0），保证后台列表与状态一致 */
   function recomputeIdentity(u) {
     if (!u) return;
@@ -402,9 +419,12 @@ window.DataBus = (function () {
     for (var i = 0; i < a.length; i++) if (a[i].id === u.id) { a[i] = u; break; }
     saveUsers(a);
   }
-  /* 认证审批（type: realname / enterprise / qual / payment） */
+  /* 认证审批（type: realname / enterprise / qual / payment / partner） */
   function authApprove(id, type, note) {
     var u = byId(id); if (!u) return null;
+    /* [Bug A 修复] 后台"个人资质"tab 传 personalQual，归一到 qual 轨道，
+       复用下方 qual 分支对 qual/personalQual/personalEntry 的三写，保证个人入驻身份正确晋升为 pro。 */
+    if (type === 'personalQual') type = 'qual';
     var t = Date.now();
     if (type === 'payment') {
       if (!u.auth) u.auth = {};
@@ -441,14 +461,25 @@ window.DataBus = (function () {
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     var synced = syncSnapshotIfCurrent(u);
-    audit('认证通过', '认证审核', u.name, entryLabel(type) + '认证' + (synced ? '（已同步当前账号）' : ''));
+    audit('认证通过', '认证审核', u.name, authLabel(type) + (synced ? '（已同步当前账号）' : ''));
     return u;
   }
   function authReject(id, type, note) {
     var u = byId(id); if (!u) return null;
+    /* [Bug A 修复] 与 authApprove 同口径：personalQual 归一到 qual，保证个人入驻驳回三写一致 */
+    if (type === 'personalQual') type = 'qual';
     if (type === 'payment') { if (u.auth) u.auth.payment = { ok: false, ts: 0, note: note || '资料不齐' }; }
     else if (u.auth && u.auth[type]) { u.auth[type].ok = false; u.auth[type].status = 'rejected'; u.auth[type].note = note || '资料不齐';
-      if (type === 'qual') u.auth.personalQual = JSON.parse(JSON.stringify(u.auth.qual));
+      if (type === 'qual') {
+        u.auth.personalQual = JSON.parse(JSON.stringify(u.auth.qual));
+        /* [Bug A 修复] deriveIdentity / auth.html 优先读 personalEntry，必须同步驳回态，
+           否则 App 个人入驻会一直卡在"审核中"而不是显示驳回原因 */
+        if (u.auth.personalEntry) {
+          u.auth.personalEntry.ok = false;
+          u.auth.personalEntry.status = 'rejected';
+          u.auth.personalEntry.note = note || '资料不齐';
+        }
+      }
     }
     else return null;
     /* [FIX BM-003] 修复：原企业认证驳回不退费（提交即扣，驳回仅置状态）。
@@ -469,7 +500,7 @@ window.DataBus = (function () {
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
-    audit('认证驳回', '认证审核', u.name, entryLabel(type) + '：' + (note || '资料不齐'));
+    audit('认证驳回', '认证审核', u.name, authLabel(type) + '：' + (note || '资料不齐'));
     return u;
   }
   /* ===== 入驻两级审批（任务 2-3）：pending(待初审) → first_ok(初审通过·待终审) → active(终审通过·入驻生效) ===== */
@@ -648,7 +679,7 @@ window.DataBus = (function () {
       /* v3.0：同步写入 personalEntry（个人入驻新结构，含 profile 占位） */
       if (!u.auth.personalEntry) u.auth.personalEntry = { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [],
         profile: { basic: {}, education: [], work: [], project: [], skills: [], jobIntent: {}, intro: '', resumeFile: '' } };
-      u.auth.personalEntry.ok = false; u.auth.personalEntry.status = 'pending';
+      u.auth.personalEntry.ok = false; u.auth.personalEntry.status = 'pending'; u.auth.personalEntry.note = '';
       u.auth.personalEntry.submittedAt = t; u.auth.personalEntry.list = q.list;
       u.auth.personalEntry.certs = certs;
     } else if (type === 'partner') {
@@ -662,7 +693,7 @@ window.DataBus = (function () {
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
     audit(type === 'realname' ? '实名认证（自动核验）' : '提交认证申请', '认证审核', u.name,
-      entryLabel(type) + (type === 'realname' ? ' · 人脸与二要素核验通过' : ' · 待后台审核'));
+      authLabel(type) + (type === 'realname' ? ' · 人脸与二要素核验通过' : ' · 待后台审核'));
     return { ok: true, pending: type !== 'realname', user: u };
   }
   /* 企业认证续费：已认证用户支付后即时延长一年 */
@@ -1570,6 +1601,138 @@ window.DataBus = (function () {
     return { can: true, reason: '', userType: 'jobseeker' };
   }
 
+  /* ============================================================================
+     演示场景工厂（仅用于 preview 调试面板 / 自动化演示，不参与正常 App 业务提交）
+     - resetUserToSeed(id)：单用户还原 seed 干净基线 + 清其入驻费台账残留；当前账号则 login 同步
+     - applyDemoScenario(key)：先还原干净基线并登录 → 再进入终态/审核中/驳回；
+       硬约束：全程余额/冻结保持该用户种子值（认证传 fee=0；入驻待审走 0 费 0 保证金直写）
+     ============================================================================ */
+  function _seedById(id) {
+    var seeds = seedUsers();
+    for (var i = 0; i < seeds.length; i++) if (seeds[i].id === id) return JSON.parse(JSON.stringify(seeds[i]));
+    return null;
+  }
+  function _overwriteUser(u) {
+    var a = loadUsers();
+    for (var i = 0; i < a.length; i++) if (a[i].id === u.id) { a[i] = u; break; }
+    saveUsers(a);
+  }
+  /* 清除某 uid 的入驻费台账残留（终审会写台账但不扣款；反复演示不应虚增收入） */
+  function _removeEntryFeesFor(uid) {
+    var fees = [];
+    try { fees = JSON.parse(LS.getItem(ENTRYFEE_KEY) || '[]'); } catch (e) {}
+    if (Array.isArray(fees) && fees.length) {
+      var kept = fees.filter(function (f) { return f.uid !== uid; });
+      if (kept.length !== fees.length) { try { LS.setItem(ENTRYFEE_KEY, JSON.stringify(kept)); } catch (e2) {} }
+    }
+  }
+  function resetUserToSeed(id) {
+    var seed = _seedById(id);
+    if (!seed) return null;
+    _overwriteUser(seed);
+    _removeEntryFeesFor(id);
+    var cu = current();
+    if (cu && cu.id === id) login(id);   /* 当前登录即该用户：login 同步全量 Store（余额也回种子） */
+    return seed;
+  }
+
+  /* 入驻待审演示直写：在"不扣入驻费、不冻保证金（余额恒定）"前提下，造出与 entryApply 同构的
+     pending / first_ok 记录，随后由后台走真实两级审批（entryFirstApprove/entryFinalApprove/entryReject）。
+     仅演示工厂使用；正常 App 提交仍走 entryApply 全资金链路。 */
+  function _demoEntryUnderReview(uid, type, stage) {
+    var u = byId(uid); if (!u) return null;
+    var t = Date.now();
+    var prevTypes = (u.entry && u.entry.types && u.entry.types.length) ? u.entry.types.slice()
+      : (u.entry && u.entry.type ? [u.entry.type] : []);
+    if (prevTypes.indexOf(type) < 0) prevTypes.push(type);
+    u.entry = {
+      type: type, types: prevTypes, orderId: null,
+      status: stage === 'first_ok' ? 'first_ok' : 'pending', active: false,
+      paidAt: 0, expireAt: 0,
+      fee: 0, depositType: DEPOSIT_TYPE[type] || 'basic', depositAmount: 0, depositPaid: 0,
+      contact: u.company || '演示联系人', tel: u.mobile || '', scope: '演示经营范围',
+      submittedAt: t, note: '',
+      intro: { founded: '2018', capital: '500万', staffSize: '30人', desc: '演示企业，用于审核联动' },
+      cases: [], address: { province: '四川省', city: '成都市', district: '高新区', detail: '演示地址×号' },
+      website: '', attachments: [], qualifications: [], cycle: 'once'
+    };
+    if (stage === 'first_ok') { u.entry.firstBy = '运营初审'; u.entry.firstAt = t; u.entry.firstNote = '资料初审通过'; }
+    recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
+    saveUsersPatch(u);
+    syncSnapshotIfCurrent(u);
+    window.dispatchEvent(new CustomEvent('engchain:entry', { detail: u.entry }));
+    return u;
+  }
+
+  /* 场景表：group = start(起点终态) / review(审核中) / reject(已驳回) */
+  var DEMO_SCENARIOS = {
+    /* A 起点身份（终态） */
+    guest: { label: '游客（未登录）', group: 'start', base: 'u7' },
+    registered: { label: '注册会员', group: 'start', base: 'u6' },
+    realname: { label: '个人认证（实名）', group: 'start', base: 'u5' },
+    pro: { label: '个人入驻（专业人才）', group: 'start', base: 'u4' },
+    partner: { label: '个人合伙人', group: 'start', base: 'u9' },
+    enterprise: { label: '企业工商认证（未入驻）', group: 'start', base: 'u3' },
+    resident_construction: { label: '企业入驻 · 建筑企业', group: 'start', base: 'u1' },
+    resident_agency: { label: '企业入驻 · 中介服务', group: 'start', base: 'u2' },
+    resident_partner: { label: '企业入驻 · 合伙人企业', group: 'start', base: 'u8' },
+    /* B 审核中 */
+    rev_qual: { label: '个人入驻 · 审核中', group: 'review', base: 'u5', build: function (uid) {
+      authApply('qual', { list: ['一级建造师（建筑工程）', '注册安全工程师'] }); } },
+    rev_partner: { label: '个人合伙人 · 审核中', group: 'review', base: 'u5', build: function (uid) {
+      authApply('partner', { channel: ['社群', '朋友圈'], intent: '两者兼有', intro: '演示：擅长社群与短视频推广', experience: '演示：3 年渠道拓展经验' }); } },
+    rev_enterprise: { label: '企业工商认证 · 审核中', group: 'review', base: 'u5', build: function (uid) {
+      authApply('enterprise', { co: '演示认证科技有限公司', code: '91510100DEMO99', legal: '张演示', registeredAddress: '四川省成都市高新区演示路 1 号' }, 0); } },
+    entry_construction_pending: { label: '企业入驻·建筑 · 待初审', group: 'review', base: 'u3', build: function (uid) {
+      _demoEntryUnderReview(uid, 'construction', 'pending'); } },
+    entry_agency_pending: { label: '企业入驻·中介 · 待初审', group: 'review', base: 'u3', build: function (uid) {
+      _demoEntryUnderReview(uid, 'agency', 'pending'); } },
+    entry_partner_pending: { label: '企业入驻·合伙人企业 · 待初审', group: 'review', base: 'u3', build: function (uid) {
+      _demoEntryUnderReview(uid, 'partner', 'pending'); } },
+    entry_construction_first: { label: '企业入驻·建筑 · 待终审', group: 'review', base: 'u3', build: function (uid) {
+      _demoEntryUnderReview(uid, 'construction', 'pending'); entryFirstApprove(uid, 'construction', '资料初审通过'); } },
+    /* C 已驳回 */
+    rej_qual: { label: '个人入驻 · 已驳回', group: 'reject', base: 'u5', build: function (uid) {
+      authApply('qual', { list: ['一级建造师（建筑工程）'] });
+      authReject(uid, 'qual', '证书编号无法核验，请补充原件照片'); } },
+    rej_partner: { label: '个人合伙人 · 已驳回', group: 'reject', base: 'u5', build: function (uid) {
+      authApply('partner', { channel: ['社群'], intent: '推广获客', intro: '演示', experience: '演示' });
+      authReject(uid, 'partner', '推广渠道信息不完整，请补充有效资源说明'); } },
+    rej_enterprise: { label: '企业工商认证 · 已驳回', group: 'reject', base: 'u5', build: function (uid) {
+      authApply('enterprise', { co: '演示认证科技有限公司', code: '91510100DEMO99', legal: '张演示', registeredAddress: '四川省成都市高新区演示路 1 号' }, 0);
+      authReject(uid, 'enterprise', '营业执照信息与登记不一致，请核对后重新提交'); } },
+    rej_entry: { label: '企业入驻·建筑 · 已驳回', group: 'reject', base: 'u3', build: function (uid) {
+      _demoEntryUnderReview(uid, 'construction', 'pending');
+      entryReject(uid, 'construction', '企业资质材料不齐全，请补充建筑业企业资质证书', 'first'); } }
+  };
+
+  function applyDemoScenario(key) {
+    var sc = DEMO_SCENARIOS[key];
+    if (!sc) return { ok: false, error: '未知演示场景：' + key };
+    var uid = sc.base;
+    /* 1. 还原干净基线（幂等、不串状态，余额回种子）；确保以该账号登录 */
+    resetUserToSeed(uid);
+    var cu0 = current();
+    if (!cu0 || cu0.id !== uid) login(uid);
+    var balBefore = window.BalanceStore ? { balance: BalanceStore.read().balance, frozen: BalanceStore.read().frozen } : null;
+    /* 2. 进入目标态（终态无需 build） */
+    if (typeof sc.build === 'function') sc.build(uid);
+    var balAfter = window.BalanceStore ? { balance: BalanceStore.read().balance, frozen: BalanceStore.read().frozen } : null;
+    var result = {
+      ok: true, key: key, label: sc.label, group: sc.group, uid: uid,
+      balanceBefore: balBefore, balanceAfter: balAfter,
+      balanceUnchanged: !!(balBefore && balAfter && balBefore.balance === balAfter.balance && balBefore.frozen === balAfter.frozen)
+    };
+    if (typeof window.deriveIdentityStates === 'function') result.states = window.deriveIdentityStates().states;
+    audit('演示场景', '调试面板', sc.label, '切换至：' + sc.label + (result.balanceUnchanged ? '（余额未变）' : ''));
+    return result;
+  }
+  function demoScenarioList() {
+    return Object.keys(DEMO_SCENARIOS).map(function (k) {
+      return { key: k, label: DEMO_SCENARIOS[k].label, group: DEMO_SCENARIOS[k].group, base: DEMO_SCENARIOS[k].base };
+    });
+  }
+
   /* ---- 启动一致性：业务 Store 与用户表对齐（修复"我的"等页身份误降级为注册会员） ----
      权威：用户表 engchain-users；login()/authApply/entryApply 均维护"stores == 当前用户快照"。
      破坏该不变量的历史路径：
@@ -1653,7 +1816,29 @@ window.DataBus = (function () {
     PUNISH_STEPS: PUNISH_STEPS,
     /* v3.1：简历投递门控 */
     canDeliverResume: canDeliverResume,
+    /* 演示场景工厂（preview 调试面板 / 自动化） */
+    resetUserToSeed: resetUserToSeed,
+    applyDemoScenario: applyDemoScenario,
+    demoScenarioList: demoScenarioList,
     /* v2.0：内存缓存管理 */
     invalidateCache: function (key) { _cacheClear(key); }
   };
+
+  /* [Bug D 数据层根治] 跨文档联动：其它标签页/文档写入 engchain-* 业务数据后，
+     本页 DataBus 的 users/orders/entryFees 等读穿内存缓存若不清，会一直渲染旧数据
+     （如总览首页停留时，后台审批/调试面板改了用户状态，KPI 与待办不刷新）。
+     在数据层统一监听 storage：业务键变更即清空本页 DataBus 缓存，下次读取自动重建；
+     主题/侧栏等偏好键与纯 UI 解锁键不涉及 DataBus 缓存，跳过。
+     这样所有后台页/App 页无需各自再写一遍失效逻辑，杜绝遗漏。 */
+  try {
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      var _SKIP_CACHE_KEYS = { 'engchain-theme': 1, 'engchain-sidenav': 1, 'engchain-unlocked': 1, 'engchain-personal-unlocks': 1 };
+      window.addEventListener('storage', function (e) {
+        if (!e || !e.key) return;
+        if (String(e.key).indexOf('engchain-') !== 0) return;
+        if (_SKIP_CACHE_KEYS[e.key]) return;
+        _cacheClear();   /* 全量失效，读穿时按最新 localStorage 重建，简单且不会漏键 */
+      });
+    }
+  } catch (eStorageBind) { /* 无 storage 环境（如 Node 桩）静默跳过 */ }
 })();

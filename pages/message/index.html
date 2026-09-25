@@ -16,12 +16,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="../../css/liquid-dock.css">
 </head>
 <body data-tab="message">
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8.5v5.2l-4-2.4v-2.8L3 5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
 <div class="phone">
   <div class="page-header" style="padding-top:10px;">
     <div class="topbar">
       <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
       <div class="topbar-title">消息</div>
-      <div class="topbar-right"><button type="button" class="msg-search-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic" style="width:20px;height:20px;"><use href="#i-search"/></svg></button></div>
+      <div class="topbar-right"><button type="button" class="msg-search-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic" style="width:20px;height:20px;"><use href="#i-search"/></svg></button><button type="button" class="msg-search-btn" id="msg-settings-btn" aria-label="会话设置" title="设置"><svg class="ic" style="width:20px;height:20px;"><use href="#i-gear"/></svg></button></div>
     </div>
     <div class="msg-tabs" id="msg-tabs">
       <button class="msg-tab active" data-tab="conv">会话<span class="mt-badge" id="badge-conv" style="display:none;">0</span></button>
@@ -42,17 +47,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div id="list"></div>
     </div>
     <div id="pane-notice" style="display:none;">
-      <div class="notice-subbar" id="notice-subbar">
-        <button type="button" class="nsub active" data-cat="全部">全部</button>
-        <button type="button" class="nsub" data-cat="公告">公告</button>
-        <button type="button" class="nsub" data-cat="订单">订单</button>
-        <button type="button" class="nsub" data-cat="资金">资金</button>
-        <button type="button" class="nsub" data-cat="认证">认证</button>
-        <button type="button" class="nsub" data-cat="系统">系统</button>
-        <button type="button" class="nsub" data-cat="风控">风控</button>
-        <button type="button" class="nsub" data-cat="活动">活动</button>
-        <button type="button" class="nsub" data-cat="邀请">邀请</button>
-        <button type="button" class="nsub" data-cat="推荐">推荐</button>
+      <div class="notice-bar-row">
+        <div class="notice-subbar" id="notice-subbar">
+          <button type="button" class="nsub active" data-cat="全部">全部</button>
+          <button type="button" class="nsub" data-cat="公告">公告</button>
+          <button type="button" class="nsub" data-cat="订单">订单</button>
+          <button type="button" class="nsub" data-cat="资金">资金</button>
+          <button type="button" class="nsub" data-cat="认证">认证</button>
+          <button type="button" class="nsub" data-cat="系统">系统</button>
+          <button type="button" class="nsub" data-cat="风控">风控</button>
+          <button type="button" class="nsub" data-cat="活动">活动</button>
+          <button type="button" class="nsub" data-cat="邀请">邀请</button>
+          <button type="button" class="nsub" data-cat="推荐">推荐</button>
+        </div>
+        <div class="notice-selected" id="notice-selected" style="display:none;"></div>
+        <div class="notice-filter" id="notice-filter">
+          <button type="button" class="notice-filter-btn" id="notice-filter-btn" aria-label="筛选通知"><svg class="ic"><use href="#i-filter"/></svg>筛选<span class="nf-dot" id="notice-filter-dot" style="display:none;"></span></button>
+        </div>
       </div>
       <div id="notice-list"></div>
     </div>
@@ -106,6 +117,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
      - 独立消息流：企业邀请（engchain-orgs）、智能推荐（engchain-matches）
      子 bar 修正：全部 / 公告 / 订单 / 资金 / 认证 / 系统 / 风控 / 活动 / 邀请 / 推荐 */
   var noticeFilter = '全部';
+  /* 通知筛选：时间范围（all/today/7d/30d），类型复用 noticeFilter（与子 bar 联动） */
+  var noticeTimeFilter = 'all';
+  var TIME_OPTS = [{ v: 'all', l: '全部时间' }, { v: 'today', l: '今天' }, { v: '7d', l: '近7天' }, { v: '30d', l: '近30天' }];
+  function timeMatch(ts, range) {
+    if (!ts) return range === 'all';
+    var now = Date.now();
+    if (range === 'today') {
+      var d = new Date(ts), t = new Date();
+      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+    }
+    if (range === '7d') return now - ts <= 7 * 86400e3;
+    if (range === '30d') return now - ts <= 30 * 86400e3;
+    return true;
+  }
   var curTab = 'conv';
   var searchMode = false;
 
@@ -213,7 +238,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function renderNoticeList() {
     var box = document.getElementById('notice-list');
     if (!box) return;
-    var items = buildNoticeItems().filter(function (x) { return noticeFilter === '全部' || x.cat === noticeFilter; });
+    var items = buildNoticeItems().filter(function (x) { return (noticeFilter === '全部' || x.cat === noticeFilter) && timeMatch(x.ts, noticeTimeFilter); });
     if (!items.length) {
       box.innerHTML = '<div class="n-empty">' + (noticeFilter === '全部' ? '暂无通知' : '暂无「' + esc(noticeFilter) + '」类通知') + '</div>';
       return;
@@ -308,8 +333,105 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       noticeFilter = b.getAttribute('data-cat');
       var all = bar.querySelectorAll('.nsub');
       for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i] === b);
+      renderNoticeFilterBar();
       renderNoticeList();
+      updateFilterLink();
     });
+  }
+
+  /* ========== 通知筛选：分类行右侧「筛选」链接 + 自下而上弹窗（时间/类型） ========== */
+  function noticeFilterActive() { return noticeFilter !== '全部' || noticeTimeFilter !== 'all'; }
+  function updateFilterLink() {
+    var btn = document.getElementById('notice-filter-btn');
+    var dot = document.getElementById('notice-filter-dot');
+    if (!btn) return;
+    btn.classList.toggle('active', noticeFilterActive());
+    if (dot) dot.style.display = noticeFilterActive() ? '' : 'none';
+  }
+  function openNoticeFilter() {
+    var types = ['全部', '公告', '订单', '资金', '认证', '系统', '风控', '活动', '邀请', '推荐'];
+    var sh = UI.sheet();
+    sh.setText('筛选通知');
+    var timeChips = TIME_OPTS.map(function (o) {
+      return '<button type="button" class="flt-chip' + (noticeTimeFilter === o.v ? ' active' : '') + '" data-tv="' + o.v + '">' + o.l + '</button>';
+    }).join('');
+    var typeChips = types.map(function (t) {
+      return '<button type="button" class="flt-chip' + (noticeFilter === t ? ' active' : '') + '" data-tv="' + t + '">' + t + '</button>';
+    }).join('');
+    sh.html(
+      '<div class="flt-sec"><div class="flt-label">时间</div><div class="flt-chips" id="flt-time">' + timeChips + '</div></div>' +
+      '<div class="flt-sec"><div class="flt-label">类型</div><div class="flt-chips" id="flt-type">' + typeChips + '</div></div>' +
+      '<div class="flt-actions">' +
+        '<button type="button" class="btn btn-ghost" id="flt-reset">重置</button>' +
+        '<button type="button" class="btn btn-primary" id="flt-ok">确定</button>' +
+      '</div>'
+    );
+    sh.show();
+    var timeBox = sh.body().querySelector('#flt-time');
+    var typeBox = sh.body().querySelector('#flt-type');
+    var _t = noticeTimeFilter, _ty = noticeFilter;
+    function bindChips(box, setter) {
+      box.addEventListener('click', function (e) {
+        var c = e.target.closest ? e.target.closest('.flt-chip') : null;
+        if (!c) return;
+        var all = box.querySelectorAll('.flt-chip');
+        for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
+        c.classList.add('active');
+        setter(c.getAttribute('data-tv'));
+      });
+    }
+    bindChips(timeBox, function (v) { _t = v; });
+    bindChips(typeBox, function (v) { _ty = v; });
+    sh.body().querySelector('#flt-reset').addEventListener('click', function () {
+      _t = 'all'; _ty = '全部';
+      var tc = timeBox.querySelectorAll('.flt-chip'), tc2 = typeBox.querySelectorAll('.flt-chip');
+      for (var i = 0; i < tc.length; i++) tc[i].classList.toggle('active', tc[i].getAttribute('data-tv') === 'all');
+      for (var j = 0; j < tc2.length; j++) tc2[j].classList.toggle('active', tc2[j].getAttribute('data-tv') === '全部');
+    });
+    sh.body().querySelector('#flt-ok').addEventListener('click', function () {
+      noticeTimeFilter = _t; noticeFilter = _ty;
+      renderNoticeFilterBar();
+      renderNoticeList();
+      updateFilterLink();
+      UI.closeSheet();
+    });
+  }
+  /* 筛选生效后视图切换：隐藏原子 bar，改为展示已选筛选标签（带 × 清除） */
+  var TIME_LABEL = { today: '今天', '7d': '近7天', '30d': '近30天' };
+  function renderNoticeFilterBar() {
+    var bar = document.getElementById('notice-subbar');
+    var sel = document.getElementById('notice-selected');
+    if (!bar || !sel) return;
+    if (!noticeFilterActive()) {
+      bar.style.display = ''; sel.style.display = 'none';
+      var all = bar.querySelectorAll('.nsub');
+      for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].getAttribute('data-cat') === noticeFilter);
+      return;
+    }
+    bar.style.display = 'none'; sel.style.display = 'flex';
+    var chips = [];
+    if (noticeTimeFilter !== 'all') chips.push('<span class="nsel-chip"><span class="nsel-label">时间</span>' + esc(TIME_LABEL[noticeTimeFilter] || noticeTimeFilter) + '<span class="nsel-x" data-k="time"><svg class="ic"><use href="#i-x"/></svg></span></span>');
+    if (noticeFilter !== '全部') chips.push('<span class="nsel-chip"><span class="nsel-label">类型</span>' + esc(noticeFilter) + '<span class="nsel-x" data-k="type"><svg class="ic"><use href="#i-x"/></svg></span></span>');
+    sel.innerHTML = chips.join('');
+  }
+  function bindSelectedBar() {
+    var sel = document.getElementById('notice-selected');
+    if (!sel) return;
+    sel.addEventListener('click', function (e) {
+      var x = e.target.closest ? e.target.closest('.nsel-x') : null;
+      if (!x) return;
+      var k = x.getAttribute('data-k');
+      if (k === 'time') noticeTimeFilter = 'all';
+      else noticeFilter = '全部';
+      renderNoticeFilterBar(); renderNoticeList(); updateFilterLink();
+    });
+  }
+  function bindNoticeFilter() {
+    var btn = document.getElementById('notice-filter-btn');
+    if (btn) btn.addEventListener('click', openNoticeFilter);
+    bindSelectedBar();
+    renderNoticeFilterBar();
+    updateFilterLink();
   }
 
   /* ========== 搜索：会话 + 通知联合过滤 ========== */
@@ -402,6 +524,50 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (input) input.addEventListener('input', function () { renderSearch(input.value); });
   }
 
+  /* ========== 会话设置：清除会话记录 / 设置常用语 / 投诉举报 ========== */
+  function clearConvs() {
+    UI.dialog({
+      title: '清除会话记录',
+      text: '确定清除全部会话记录吗？<br>清除后记录<b>不可恢复</b>。',
+      ok: '清除', cancel: '取消', danger: true,
+      onOk: function () {
+        try { localStorage.removeItem(CONV_DEMO_KEY); } catch (e) {}
+        try { localStorage.setItem(CONV_CLEARED_KEY, '1'); } catch (e) {}
+        renderConvs();
+        UI.toast('会话记录已清除', 'ok');
+      }
+    });
+  }
+  function openSettings() {
+    var sh = UI.sheet();
+    sh.setText('会话设置');
+    var items = [
+      { icon: 'trash', title: '清除会话记录', sub: '删除全部会话与聊天记录，不可恢复', tint: 'rgba(179,38,30,.1);color:var(--error)', act: 'clear' },
+      { icon: 'edit', title: '设置常用语', sub: '按「一级分类 · 二级分类 · 内容」管理', tint: 'rgba(46,102,255,.1);color:var(--primary-dim)', act: 'phrases' },
+      { icon: 'alert', title: '投诉 / 举报', sub: '举报违规会话或消息，平台1-3个工作日核实', tint: 'rgba(217,119,6,.12);color:#d97706', act: 'complaint' }
+    ];
+    sh.html(items.map(function (it) {
+      return '<div class="set-item" data-act="' + it.act + '">' +
+        '<div class="si-ic" style="background:' + it.tint + '"><svg class="ic"><use href="#i-' + it.icon + '"/></svg></div>' +
+        '<div class="si-body"><div class="si-title">' + it.title + '</div><div class="si-sub">' + it.sub + '</div></div>' +
+        '<svg class="ic" style="width:14px;height:14px;color:var(--text-3);flex:none;"><use href="#i-chev-r"/></svg></div>';
+    }).join(''));
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var it = e.target.closest ? e.target.closest('.set-item') : null;
+      if (!it) return;
+      UI.closeSheet();
+      var act = it.getAttribute('data-act');
+      if (act === 'clear') clearConvs();
+      else if (act === 'phrases') location.href = 'phrases.html';
+      else location.href = 'complaint.html';
+    });
+  }
+  function bindSettings() {
+    var btn = document.getElementById('msg-settings-btn');
+    if (btn) btn.addEventListener('click', openSettings);
+  }
+
   function esc(s) { return window.UI && UI.esc ? UI.esc(s) : String(s); }
 
   /* ---- 企业邀请通知：邀请公司团队成员入驻 → 通知栏目确认/解决 ---- */
@@ -470,7 +636,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
 
   /* 通知分页统一渲染（不再跳转 system.html） */
-  renderNoticeBadge(); renderNoticeList(); bindSubbar(); bindSearch();
+  renderNoticeBadge(); renderNoticeList(); bindSubbar(); bindSearch(); bindNoticeFilter(); bindSettings();
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY) refreshAll(); });
   window.addEventListener('engchain:messages', function () { refreshAll(); });
 
@@ -505,7 +671,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* E2-11：会话为空时渲染空态引导卡，不再硬编码假数据。
      [FIX] 新用户无真实会话时，列表顶部加"演示数据"灰色标注；首次访问种子写入 localStorage，后续可标记已读清零 unread */
   var CONV_DEMO_KEY = 'engchain-conversations';
+  var CONV_CLEARED_KEY = 'engchain-convs-cleared';
   function readConvs() {
+    try {
+      if (localStorage.getItem(CONV_CLEARED_KEY)) return { list: [], demo: false };
+    } catch (e) {}
     try {
       var raw = localStorage.getItem(CONV_DEMO_KEY);
       if (raw) {
@@ -547,6 +717,43 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     renderNoticeBadge(); renderNoticeList();
   }
   renderConvs();
+
+  /* ========== 双击 tab：滚动到未读（最新未读 → 依次下一条） ========== */
+  var jumpIdx = { conv: 0, notice: 0 };
+  function unreadTargets(name) {
+    var rows = [];
+    if (name === 'conv') {
+      var as = document.querySelectorAll('#list a[href*="chat.html?id="]');
+      for (var i = 0; i < as.length; i++) if (as[i].querySelector('.badge')) rows.push(as[i]);
+      return rows;
+    }
+    var items = document.querySelectorAll('#notice-list .n-item');
+    for (var j = 0; j < items.length; j++) if (items[j].querySelector('.n-dot')) rows.push(items[j]);
+    return rows;
+  }
+  function scrollToUnread(name) {
+    var targets = unreadTargets(name);
+    if (!targets.length) {
+      jumpIdx[name] = 0;
+      UI.toast(name === 'conv' ? '暂无未读会话' : '当前筛选下暂无未读通知', 'info');
+      return;
+    }
+    var idx = jumpIdx[name] % targets.length;
+    var el = targets[idx];
+    jumpIdx[name]++;
+    if (el._jumpTimer) clearTimeout(el._jumpTimer);
+    el.classList.remove('n-jump'); void el.offsetWidth; el.classList.add('n-jump');
+    el._jumpTimer = setTimeout(function () { el.classList.remove('n-jump'); }, 1600);
+    /* 精确滚动：将未读行定位到滚动容器顶部（即使已在视口内也执行） */
+    var sc = document.querySelector('.scroll');
+    if (sc) {
+      var top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+      try { sc.scrollTo({ top: top, behavior: 'smooth' }); } catch (e) { sc.scrollTop = top; }
+    } else {
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { el.scrollIntoView(); }
+    }
+  }
+
   (function(){
     var tabs = document.querySelectorAll('#msg-tabs .msg-tab');
     function activate(name){
@@ -557,6 +764,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     tabs.forEach(function(t){
       t.addEventListener('click', function(){ activate(t.dataset.tab); });
+      t.addEventListener('dblclick', function(e){
+        e.preventDefault();
+        activate(t.dataset.tab);
+        scrollToUnread(t.dataset.tab);
+      });
     });
     try {
       var noticeU = sysUnreadCount() + sysMsgUnreadCount() + (MatchStore.listUnread().length||0) + inviteUnreadCount();
@@ -670,6 +882,47 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .inv-act-state { display:inline-block; margin-top:9px; font-size:11px; font-weight:700; color:var(--primary-dim); background:rgba(184,153,104,.1); border:1px solid rgba(184,153,104,.3); padding:3px 10px; border-radius:999px; }
   .inv-act-state.done { color:#2E9E5B; background:rgba(46,158,91,.1); border-color:rgba(46,158,91,.3); }
   .inv-act-state.no { color:var(--text-3); background:var(--bg-card-2); border-color:var(--line); }
+
+  /* ---- 通知筛选：分类行右侧筛选链接 + 左侧渐变遮盖 ---- */
+  .notice-bar-row{position:relative;}
+  .notice-subbar{padding-right:0;}
+  .notice-filter{position:absolute;top:2px;right:0;bottom:10px;display:flex;align-items:center;background:linear-gradient(90deg,rgba(0,0,0,0) 0%,var(--bg) 26%,var(--bg) 100%);padding-left:34px;pointer-events:none;z-index:2;}
+  /* 筛选生效后：原子 bar 切换为已选筛选标签（标签样式 + 可清除） */
+  .notice-selected{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .notice-selected::-webkit-scrollbar{display:none;}
+  .nsel-chip{flex:none;height:30px;padding:0 6px 0 12px;border-radius:999px;border:1px solid rgba(184,153,104,.45);background:rgba(184,153,104,.08);color:var(--primary-dim);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:default;}
+  .nsel-label{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-3);}
+  .nsel-x{flex:none;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer;transition:background .12s ease;}
+  .nsel-x:active{background:rgba(0,0,0,.1);}
+  .nsel-x .ic{width:10px;height:10px;}
+  .notice-filter-btn{pointer-events:auto;position:relative;flex:none;height:30px;padding:0 12px 0 9px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:all .15s ease;}
+  .notice-filter-btn .ic{width:13px;height:13px;}
+  .notice-filter-btn:active{transform:scale(.96);}
+  .notice-filter-btn.active{color:var(--primary-dim);border-color:rgba(184,153,104,.45);background:rgba(184,153,104,.08);}
+  .nf-dot{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--error);border:2px solid var(--bg);}
+
+  /* 筛选弹窗 */
+  .flt-sec{margin-bottom:20px;}
+  .flt-label{font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.06em;margin-bottom:10px;}
+  .flt-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .flt-chip{flex:none;height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card-2);color:var(--text-2);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s ease;}
+  .flt-chip.active{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);border-color:transparent;}
+  .flt-actions{display:flex;gap:10px;padding-top:4px;}
+  .flt-actions .btn{flex:1;height:44px;border-radius:12px;font-size:14px;font-weight:600;}
+
+  /* 会话设置菜单 */
+  .set-item{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .set-item:last-child{border-bottom:none;}
+  .set-item:active{opacity:.72;}
+  .si-ic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none;}
+  .si-ic svg{width:18px;height:18px;}
+  .si-body{flex:1;min-width:0;}
+  .si-title{font-size:13.5px;font-weight:600;color:var(--text-1);}
+  .si-sub{font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;}
+
+  /* 双击滚动未读目标高亮 */
+  @keyframes n-jump-bg{0%{background:rgba(184,153,104,.26);}100%{background:transparent;}}
+  .n-jump{animation:n-jump-bg 1.6s ease 1;}
 </style>
 <script src="../../js/liquid-dock.js"></script>
 </body>

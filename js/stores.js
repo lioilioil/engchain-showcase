@@ -62,10 +62,14 @@
      旧 qual 字段保留为兼容别名（取 personalQual + enterpriseQual 合并） */
   var AuthStore = makeStore('engchain-auth',
     { realname: { ok: false, ts: 0, name: '', idNo: '', mobile: '', idMask: '' },
-      enterprise: { ok: false, expireAt: 0, co: '', code: '', legal: '', status: '', note: '', fee: 0, submittedAt: 0,
+      enterprise: { ok: false, expireAt: 0, co: '', code: '', legal: '', status: '', note: '', fee: 0, submittedAt: 0, contactName: '', contactPhone: '', contactWechat: '', address: '', region: '',
         shortName: '', nameBasis: '', nameProof: [],
         /* [FEAT 9.2-3] 多维资质核验：5项逐项提交/审核 */
-        dimensions: { business: { status: 'pending', submittedAt: 0, files: [] }, legal: { status: 'pending', submittedAt: 0, files: [] }, qualification: { status: 'pending', submittedAt: 0, files: [] }, bank: { status: 'pending', submittedAt: 0, files: [] }, office: { status: 'pending', submittedAt: 0, files: [] } } },
+        dimensions: { business: { status: 'pending', submittedAt: 0, files: [] }, legal: { status: 'pending', submittedAt: 0, files: [] }, qualification: { status: 'pending', submittedAt: 0, files: [] }, bank: { status: 'pending', submittedAt: 0, files: [] }, office: { status: 'pending', submittedAt: 0, files: [] } },
+        registeredAddress: '',
+        lastReviewAt: 0, reviewDueAt: 0, annualStatus: 'ok', annualNote: '',
+        pendingChanges: { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' },
+        changeHistory: [] },
       personalQual: { ok: false, list: [], certs: [], status: '', note: '', submittedAt: 0 },
       personalEntry: { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [],
         userType: 'jobseeker', resumeComplete: false, /* v3.1：个人入驻两类用户区分（jobseeker求职/standard标准）+ 简历完成标记 */
@@ -109,6 +113,137 @@
     else if (doneCount >= 2) level = 'basic';
     var levelLabelMap = { none: '未认证', basic: '基础认证', advanced: '高级认证', full: '完整认证' };
     return { list: list, doneCount: doneCount, total: cfg.length, level: level, levelLabel: levelLabelMap[level] || '未认证' };
+  };
+
+  /* [FEAT 留档审核] 读取待审核变更（安全兜底，旧数据无 pendingChanges 时返回 none） */
+  AuthStore.getPendingEnterpriseChange = function () {
+    var s = this.read();
+    var pc = (s.enterprise && s.enterprise.pendingChanges) || {};
+    return {
+      co: pc.co || '', code: pc.code || '', legal: pc.legal || '', shortName: pc.shortName || '',
+      registeredAddress: pc.registeredAddress || '',
+      reason: pc.reason || '', files: pc.files || [], submittedAt: pc.submittedAt || 0,
+      status: pc.status || 'none', rejectReason: pc.rejectReason || '', reviewType: pc.reviewType || 'daily'
+    };
+  };
+  /* [FEAT 留档审核] 提交B类字段变更：未认证直接写回正式字段，已认证写入 pendingChanges（正式字段冻结） */
+  AuthStore.submitEnterpriseChange = function (payload) {
+    payload = payload || {};
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.ok) {
+      if (payload.co !== undefined && payload.co !== null) s.enterprise.co = payload.co;
+      if (payload.code !== undefined && payload.code !== null) s.enterprise.code = payload.code;
+      if (payload.legal !== undefined && payload.legal !== null) s.enterprise.legal = payload.legal;
+      if (payload.shortName !== undefined && payload.shortName !== null) s.enterprise.shortName = payload.shortName;
+      if (payload.registeredAddress !== undefined && payload.registeredAddress !== null) s.enterprise.registeredAddress = payload.registeredAddress;
+      return this.write(s);
+    }
+    /* 法人变更严格材料校验：legal 有变化时必须有佐证材料(>=1)和变更原因 */
+    var legalChanged = !!(payload.legal && payload.legal !== s.enterprise.legal);
+    if (legalChanged && (!payload.reason || !payload.files || payload.files.length < 1)) {
+      return { ok: false, msg: '法人变更需上传佐证材料（如变更核准通知书/股东会决议），并填写变更原因' };
+    }
+    s.enterprise.pendingChanges = {
+      co: payload.co || '', code: payload.code || '', legal: payload.legal || '', shortName: payload.shortName || '',
+      registeredAddress: payload.registeredAddress || '',
+      reason: payload.reason || '', files: payload.files || [], submittedAt: Date.now(),
+      status: 'pending', rejectReason: '', reviewType: payload.reviewType || 'daily'
+    };
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 审核通过：pending值写入正式字段，旧值入 changeHistory，清空 pendingChanges，广播 engchain:auth */
+  AuthStore.approveEnterpriseChange = function (operator) {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.pendingChanges) return s;
+    var pc = s.enterprise.pendingChanges;
+    if (pc.status !== 'pending') return s;
+    if (!s.enterprise.changeHistory) s.enterprise.changeHistory = [];
+    var now = Date.now();
+    var fields = ['co', 'code', 'legal', 'shortName', 'registeredAddress'];
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (pc[f] && pc[f] !== s.enterprise[f]) {
+        s.enterprise.changeHistory.push({ field: f, oldValue: s.enterprise[f], newValue: pc[f], changedAt: pc.submittedAt, approvedAt: now, operator: operator || '', reviewType: pc.reviewType || 'daily' });
+        s.enterprise[f] = pc[f];
+      }
+    }
+    /* 年度复核通过：更新年检时间戳与状态 */
+    if (pc.reviewType === 'annual') {
+      s.enterprise.lastReviewAt = now;
+      s.enterprise.reviewDueAt = now + 365 * 864e5;
+      s.enterprise.annualStatus = 'ok';
+      s.enterprise.annualNote = '';
+    }
+    s.enterprise.pendingChanges = { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' };
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 审核驳回：记录 rejectReason，正式值不变，pendingChanges 保留 rejected 状态供用户查看 */
+  AuthStore.rejectEnterpriseChange = function (reason, operator) {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.pendingChanges) return s;
+    s.enterprise.pendingChanges.status = 'rejected';
+    s.enterprise.pendingChanges.rejectReason = reason || '';
+    /* 年度复核驳回：标记年检状态 */
+    if (s.enterprise.pendingChanges.reviewType === 'annual') {
+      s.enterprise.annualStatus = 'rejected';
+      s.enterprise.annualNote = reason || '';
+    }
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 撤回待审核变更（用户主动取消） */
+  AuthStore.withdrawEnterpriseChange = function () {
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    s.enterprise.pendingChanges = { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' };
+    /* 撤回年度复核：恢复年检状态为 due（仍需复核） */
+    if (s.enterprise.annualStatus === 'under_review') s.enterprise.annualStatus = 'due';
+    return this.write(s);
+  };
+
+  /* [FEAT 年度复核] 提交年度认证复核：要求B类全字段，reviewType='annual'，annualStatus='under_review' */
+  AuthStore.submitAnnualReview = function (payload) {
+    payload = payload || {};
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.ok) return { ok: false, msg: '企业未认证，无需年度复核' };
+    var pc = s.enterprise.pendingChanges || {};
+    if (pc.status === 'pending') return { ok: false, msg: '已有待审核变更，请勿重复提交' };
+    /* 年度复核要求B类全字段（co/code/legal/registeredAddress 为必填，shortName可选） */
+    if (!payload.co || !payload.code || !payload.legal || !payload.registeredAddress) {
+      return { ok: false, msg: '年度复核需填写企业名称、税号、法人、注册地址' };
+    }
+    /* 年度复核基线要求佐证材料（营业执照等）；legal变更不再叠加日常法人材料要求 */
+    if (!payload.files || payload.files.length < 1) {
+      return { ok: false, msg: '年度复核需上传佐证材料（营业执照等）' };
+    }
+    s.enterprise.pendingChanges = {
+      co: payload.co, code: payload.code, legal: payload.legal,
+      shortName: payload.shortName || s.enterprise.shortName,
+      registeredAddress: payload.registeredAddress,
+      reason: payload.reason || '年度信息更新', files: payload.files || [],
+      submittedAt: Date.now(), status: 'pending', rejectReason: '', reviewType: 'annual'
+    };
+    s.enterprise.annualStatus = 'under_review';
+    this.write(s);
+    return { ok: true };
+  };
+  /* [FEAT 年度复核] 检查年检状态：距上次复核满365天→due，返回当前状态 */
+  AuthStore.checkAnnualStatus = function () {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.ok) return 'none';
+    var st = s.enterprise.annualStatus || 'ok';
+    if (st === 'ok' || st === 'due') {
+      var last = s.enterprise.lastReviewAt || 0;
+      var due = !last || (Date.now() - last >= 365 * 864e5);
+      if (due && st !== 'due') {
+        s.enterprise.annualStatus = 'due';
+        s.enterprise.reviewDueAt = last ? last + 365 * 864e5 : Date.now();
+        this.write(s);
+        st = 'due';
+      }
+    }
+    return st;
   };
 
   /* ---- 入驻记录（R2，v2.0 多类型并行 + v3.0 扩展资料） ----
@@ -398,6 +533,8 @@
   /* [FIX BM-007] 保证金转正（终审入驻）：frozen 划转至实缴 depositPaid（frozen -= amt 且 balance -= amt）。 */
   BalanceStore.commitDeposit = function (amount, reason) {
     var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    /* [健壮性] 0 元保证金（演示/partner 审核制）不产生流水，与 consume/freeze/rebate 的 0 守卫一致 */
+    if (amt <= 0) return s;
     s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
     s.balance = Math.max(0, Math.round((s.balance - amt) * 100) / 100);
     s.logs.unshift({ type: 'deposit_paid', amount: -amt, method: 'deposit', reason: reason || '保证金缴纳', ts: Date.now() });
@@ -1133,6 +1270,83 @@
       personalEntryUserType: peUserType, personalEntryResumeComplete: peResumeComplete };
   }
 
+  /* ---- v3.0 五轨道"成长路径"状态推导（与认证中心 auth.html 同源的唯一权威） ----
+     入参可省略，默认读当前 AuthStore/EntryStore；亦可显式传入 auth/entry 快照用于断言。
+     返回：
+       states  : { realname, 'personal-entry', partner, enterprise, entry }
+                 每轨取值 locked(未解锁) / todo(待开通) / review(审核中) / reject(已驳回) / done(已通过)
+       notes   : 各轨驳回/提示文案（实名轨恒为空，实名自动核验）
+       doneN   : 已点亮轨道数（0–5）
+       priority: 当前应引导用户处理的轨道 key——先 reject 后 review；企业线优先于个人线；无则 null
+       idy     : 同步计算的 deriveIdentity() 结果（供权益/主身份展示）
+     说明：实名为基石且为二要素+活体自动核验通过，业务上只有 todo/done（无 review/reject 写入路径）。 */
+  var IDENTITY_STATE_KEYS = ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'];
+  var IDENTITY_PRIORITY_ORDER = ['enterprise', 'entry', 'partner', 'personal-entry', 'realname'];
+  function deriveIdentityStates(authArg, entryArg) {
+    var a = authArg || (window.AuthStore ? AuthStore.read() : {});
+    var e = entryArg || (window.EntryStore ? EntryStore.read() : {});
+    var now = Date.now();
+    var states = {}, notes = {};
+
+    var rnDone = !!(a.realname && a.realname.ok);
+    states.realname = rnDone ? 'done' : (a.realname && a.realname.status === 'pending' ? 'review' : 'todo');
+    notes.realname = '';
+
+    var pe = a.personalEntry || a.personalQual || a.qual || { ok: false, list: [], status: '', note: '' };
+    notes['personal-entry'] = pe.note || '';
+    states['personal-entry'] = (function () {
+      if (pe.ok && pe.list && pe.list.length) return 'done';
+      if (!rnDone) return 'locked';
+      if (pe.status === 'pending') return 'review';
+      if (!pe.ok && pe.note) return 'reject';
+      return 'todo';
+    })();
+
+    var pt = a.partner || { ok: false, status: '', note: '' };
+    notes.partner = pt.note || '';
+    states.partner = (function () {
+      if (pt.ok) return 'done';
+      if (!rnDone) return 'locked';
+      if (pt.status === 'pending') return 'review';
+      if (pt.status === 'rejected' || (!pt.ok && pt.note)) return 'reject';
+      return 'todo';
+    })();
+
+    var ent = a.enterprise || { ok: false, expireAt: 0, status: '', note: '' };
+    notes.enterprise = ent.note || '';
+    states.enterprise = (function () {
+      if (ent.ok && ent.expireAt > now) return 'done';
+      if (!rnDone) return 'locked';
+      if (ent.status === 'pending') return 'review';
+      if (ent.status === 'rejected' || (!ent.ok && ent.note)) return 'reject';
+      return 'todo';
+    })();
+
+    var types = (e.types && e.types.length) ? e.types : (e.type ? [e.type] : []);
+    notes.entry = e.note || '';
+    states.entry = (function () {
+      if (!rnDone) return 'locked';
+      if (types.length && e.active && e.status === 'active') return 'done';
+      if (e.status === 'pending' || e.status === 'first_ok') return 'review';
+      if (!e.active && e.status === 'rejected') return 'reject';
+      return 'todo';
+    })();
+
+    var priority = null;
+    for (var r = 0; r < IDENTITY_PRIORITY_ORDER.length; r++) {
+      if (states[IDENTITY_PRIORITY_ORDER[r]] === 'reject') { priority = IDENTITY_PRIORITY_ORDER[r]; break; }
+    }
+    if (!priority) {
+      for (var v = 0; v < IDENTITY_PRIORITY_ORDER.length; v++) {
+        if (states[IDENTITY_PRIORITY_ORDER[v]] === 'review') { priority = IDENTITY_PRIORITY_ORDER[v]; break; }
+      }
+    }
+    var doneN = 0;
+    for (var i = 0; i < IDENTITY_STATE_KEYS.length; i++) if (states[IDENTITY_STATE_KEYS[i]] === 'done') doneN++;
+
+    return { states: states, notes: notes, doneN: doneN, priority: priority, idy: deriveIdentity() };
+  }
+
   /* ---- 状态推导：据认证/入驻记录返回当前有效用户状态 id（六级，@deprecated 兼容旧代码） ----
      v2.0：内部调用 deriveIdentity()，返回主身份单值；新代码应直接使用 deriveIdentity() */
   function deriveStatus() {
@@ -1815,10 +2029,170 @@
     return (this.read().monthly) || [];
   };
 
+  /* ---- 历史文件（FileStore）：全站文件事件统一收口 ----
+     记录企业在「工商信息查询 / 详情页编辑 / 浏览详情页 / 会话消息发送·接收 / 转发」等场景
+     生成、上传、发送、收到的文件，按最近事件时间倒序展示，带来源标签。
+     键 engchain-history-files，结构 { items: [ { id, name, ext, size, source, sourceKey,
+     time, createdAt, timeText, href, note, forwarded, event } ] }
+     add() 对同名文件做“去重置新”（同一文件再次生成/上传/发送只刷新时间，不重复建档）。 */
+  var FileStore = makeStore('engchain-history-files', { items: [] }, 'engchain:files');
+  FileStore.list = function () {
+    var s = this.read();
+    return (s.items || []).slice().sort(function (a, b) { return (b.time || 0) - (a.time || 0); });
+  };
+  FileStore.count = function () {
+    return ((this.read().items) || []).length;
+  };
+  FileStore.add = function (rec) {
+    if (!rec || !rec.name) return null;
+    var s = this.read();
+    var items = s.items || [];
+    var now = Date.now();
+    var base = {
+      id: 'f' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      name: rec.name,
+      ext: rec.ext || 'PDF',
+      size: rec.size || '',
+      source: rec.source || '其他',
+      sourceKey: rec.sourceKey || 'other',
+      time: rec.time || now,
+      createdAt: now,
+      timeText: rec.timeText || '',
+      href: rec.href || '',
+      note: rec.note || '',
+      forwarded: 0,
+      event: rec.event || ''
+    };
+    var dup = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name === base.name) { dup = items[i]; break; }
+    }
+    if (dup) {
+      dup.time = base.time;
+      dup.timeText = base.timeText || dup.timeText;
+      dup.source = base.source || dup.source;
+      dup.sourceKey = base.sourceKey || dup.sourceKey;
+      dup.href = base.href || dup.href;
+      dup.note = base.note || dup.note;
+      dup.ext = base.ext || dup.ext;
+      dup.size = base.size || dup.size;
+      if (base.event) dup.event = base.event;
+      this.write(s);
+      return dup;
+    }
+    items.unshift(base);
+    if (items.length > 200) items.length = 200;
+    this.write(s);
+    return base;
+  };
+  FileStore.remove = function (id) {
+    var s = this.read();
+    s.items = (s.items || []).filter(function (it) { return it.id !== id; });
+    this.write(s);
+  };
+  FileStore.clear = function () {
+    this.write({ items: [] });
+  };
+  /* 转发：文件被转发到会话窗口 → 刷新最近事件时间并计数 */
+  FileStore.markForwarded = function (id, convName) {
+    var s = this.read();
+    var it = null;
+    (s.items || []).forEach(function (x) { if (x.id === id) it = x; });
+    if (!it) return null;
+    it.forwarded = (it.forwarded || 0) + 1;
+    it.time = Date.now();
+    it.event = '转发到会话';
+    it.note = convName ? ('转发至 ' + convName) : it.note;
+    this.write(s);
+    return it;
+  };
+  /* ---- 操作记录（OpLog）：文件每次操作的按时间流水 ----
+     由 FileStore.add / markForwarded 及历史文件页的 下载/转发/删除/撤销 写入；
+     键 engchain-oplog，结构 { items: [ { id, ts, fid, name, type, label, detail } ] }。
+     type: created 生成类 / download / forward / delete / undo */
+  var OpLog = makeStore('engchain-oplog', { items: [] }, 'engchain:oplog');
+  OpLog.list = function () {
+    var s = this.read();
+    return (s.items || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+  };
+  OpLog.push = function (rec) {
+    if (!rec || !rec.name) return;
+    var s = this.read();
+    var items = s.items || [];
+    items.push({
+      id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      ts: rec.ts || Date.now(),
+      fid: rec.fid || '',
+      name: rec.name,
+      type: rec.type || 'created',
+      label: rec.label || '',
+      detail: rec.detail || ''
+    });
+    if (items.length > 200) items.splice(0, items.length - 200);
+    this.write(s);
+  };
+  function opCreatedLabel(it) {
+    if (it.sourceKey === 'qcc') return '生成';
+    if (it.sourceKey === 'edit') return '上传';
+    if (it.sourceKey === 'detail') return '下载';
+    if (it.sourceKey === 'view') return '浏览';
+    if ((it.source || '').indexOf('收到') > -1) return '收到';
+    if ((it.source || '').indexOf('发送') > -1) return '发送';
+    if (it.event === '转发到会话') return '转发';
+    return '生成';
+  }
+  /* 采集钩子：文件建档（生成/上传/浏览/发送/收到）与 转发到会话 自动落流水 */
+  var _fsAdd = FileStore.add;
+  FileStore.add = function (rec) {
+    var out = _fsAdd.call(this, rec);
+    if (out) {
+      try { OpLog.push({ fid: out.id, name: out.name, ts: out.time || Date.now(), type: 'created', label: opCreatedLabel(out), detail: out.source || '' }); } catch (e) {}
+    }
+    return out;
+  };
+  var _fsMark = FileStore.markForwarded;
+  FileStore.markForwarded = function (id, convName) {
+    var out = _fsMark.call(this, id, convName);
+    if (out) {
+      try { OpLog.push({ fid: out.id, name: out.name, ts: Date.now(), type: 'forward', label: '转发', detail: convName ? ('会话：' + convName) : '会话' }); } catch (e) {}
+    }
+    return out;
+  };
+
+  /* 会话消息源：文件消息发送/接收落库（去重键 = 会话id + 文件名） */
+  FileStore.ensureChatFile = function (convId, name, size, me) {
+    var s = this.read();
+    var items = s.items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].note && items[i].note.indexOf('会话·' + convId) === 0 && items[i].name === name) return items[i];
+    }
+    return this.add({
+      name: name, size: size, ext: 'PDF',
+      source: me ? '会话消息·发送' : '会话消息·收到',
+      sourceKey: 'chat',
+      note: '会话·' + convId
+    });
+  };
+
   window.AuthStore = AuthStore;
   window.EntryStore = EntryStore;
   window.CreditStore = CreditStore;
   window.CheckinStore = CheckinStore;
+  /* [健壮性修复] 余额/积分 Store 可能被缺少 logs 的快照整体覆盖（如登录同步种子余额），
+     保证 read()/get() 永远返回带 logs 数组（积分另带 quota）的对象，杜绝 logs.unshift 崩溃。 */
+  (function () {
+    var _br = BalanceStore.read.bind(BalanceStore);
+    BalanceStore.read = function () { var s = _br(); if (!Array.isArray(s.logs)) s.logs = []; return s; };
+    BalanceStore.get = BalanceStore.read;
+    var _cr = CreditStore.read.bind(CreditStore);
+    CreditStore.read = function () {
+      var s = _cr();
+      if (!Array.isArray(s.logs)) s.logs = [];
+      if (!s.quota) s.quota = { month: '', used: 0 };
+      return s;
+    };
+    CreditStore.get = CreditStore.read;
+  })();
   window.BalanceStore = BalanceStore;
   window.AgencyOrderStore = AgencyOrderStore;
   window.InvoiceStore = InvoiceStore;
@@ -1839,10 +2213,13 @@
   window.ReportStore = ReportStore;
   window.ApiStore = ApiStore;
   window.RevenueStore = RevenueStore;
+  window.FileStore = FileStore;
+  window.OpLog = OpLog;
   /* 派生规则暴露给后台复用（规则同源：后台佣金试算/身份派生与 App 同一函数） */
   window.commissionRate = commissionRate;
   window.deriveStatus = deriveStatus;
   window.deriveIdentity = deriveIdentity;
+  window.deriveIdentityStates = deriveIdentityStates;
   window.creditDiscount = creditDiscount;
   window.entryAccess = entryAccess;
   window.publishableCats = publishableCats;

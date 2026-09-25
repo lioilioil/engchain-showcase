@@ -148,6 +148,27 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (c.dataset.v === (prefs.location || '')) c.classList.add('on');
   });
 
+  /* [Auth 连通] 用户未手动设置地区时，用已认证地域兜底默认选中 */
+  try {
+    if (!prefs.location && window.AuthStore && AuthStore.read) {
+      var a = AuthStore.read() || {};
+      var en = a.enterprise || {};
+      var basic = (a.personalEntry && a.personalEntry.profile && a.personalEntry.profile.basic) || {};
+      var region = en.region || basic.location || '';
+      if (region) {
+        var matched = null;
+        document.querySelectorAll('#loc-chips .pref-chip').forEach(function (c) {
+          var v = c.dataset.v;
+          if (v && region.indexOf(v) >= 0) matched = c;
+        });
+        if (matched) {
+          document.querySelectorAll('#loc-chips .pref-chip').forEach(function (c) { c.classList.remove('on'); });
+          matched.classList.add('on');
+        }
+      }
+    }
+  } catch (e) {}
+
   window.savePrefs = function () {
     var btn = document.querySelector('.pref-save');
     if (btn && btn.disabled) return;

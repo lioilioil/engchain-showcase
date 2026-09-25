@@ -375,12 +375,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="form-group">
       <div class="form-row" onclick="showToast('暂不支持自定义上传，可选择上方预设头像')">
         <span class="form-row-label">手机号</span>
-        <span class="form-row-value">138****8866</span>
+        <span class="form-row-value" id="ep-mobile">138****8866</span>
         <span class="form-row-arrow">›</span>
       </div>
       <div class="form-row" onclick="showToast('暂不支持自定义上传，可选择上方预设头像')">
         <span class="form-row-label">微信号</span>
-        <span class="form-row-value">未绑定</span>
+        <span class="form-row-value" id="ep-wechat">未绑定</span>
         <span class="form-row-arrow">›</span>
       </div>
     </div>
@@ -414,6 +414,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -459,6 +460,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           document.getElementById('ep-nickname').value = name;
         } catch (e) {}
       }
+      /* [Auth 连通] 从 AuthStore 预填已认证信息：仅在本页未保存时填充 */
+      try {
+        var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+        var rn = auth.realname || {};
+        var en = auth.enterprise || {};
+        var basic = (auth.personalEntry && auth.personalEntry.profile && auth.personalEntry.profile.basic) || {};
+        if (!saved.nickname && rn.name) {
+          document.getElementById('ep-nickname').value = rn.name;
+          document.getElementById('ep-avatar').textContent = rn.name.charAt(0) || '游';
+        }
+        var cityEl = document.getElementById('ep-city');
+        if (cityEl && !cityEl.value) { cityEl.value = en.region || basic.location || ''; }
+        var mobEl = document.getElementById('ep-mobile');
+        if (mobEl) mobEl.textContent = rn.mobile ? rn.mobile : '未绑定';
+        var wxEl = document.getElementById('ep-wechat');
+        if (wxEl) wxEl.textContent = basic.wechat ? basic.wechat : '未绑定';
+      } catch (e) {}
     } catch (e) {}
   }
 
@@ -549,8 +567,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         st.user = nickname;
         UI.state.set(st);
       } catch (e) {}
+      /* [Auth 连通] 写回 AuthStore 并广播 engchain:auth */
+      try {
+        if (window.AuthStore && AuthStore.read) {
+          var auth = AuthStore.read() || {};
+          if (!auth.personalEntry) auth.personalEntry = {};
+          if (!auth.personalEntry.profile) auth.personalEntry.profile = {};
+          if (!auth.personalEntry.profile.basic) auth.personalEntry.profile.basic = {};
+          var cityVal = document.getElementById('ep-city').value.trim();
+          auth.personalEntry.profile.basic.nickname = nickname;
+          auth.personalEntry.profile.basic.location = cityVal;
+          if (!auth.enterprise) auth.enterprise = {};
+          auth.enterprise.region = cityVal;
+          AuthStore.write(auth);
+        }
+      } catch (e) {}
     } catch (e) {}
-    showToast('保存成功');
+    showToast('已保存并同步至认证信息');
     setTimeout(function () { history.back(); }, 800);
   };
 
