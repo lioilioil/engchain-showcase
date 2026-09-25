@@ -74,6 +74,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="fixed-cta" style="display:flex;gap:10px;">
     <button class="dab-icon" data-act="fav" onclick="UI.toast('已收藏企业','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-fav"/></svg></button>
     <button class="dab-icon" data-act="share" onclick="UI.toast('链接已复制','ok')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-share"/></svg></button>
+    <button class="dab-cta" id="join-org-btn" style="display:none;">申请加入企业</button>
     <button class="dab-cta" id="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>联系TA</button>
   </div>
 </div>
@@ -81,6 +82,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
 <script src="../../js/homepage-editor.js"></script>
 <script src="../../js/chat-sheet.js"></script>
 <script>
@@ -97,6 +100,57 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       phone: c.contact && c.contact.phone ? c.contact.phone : '138****8888',
       wechat: (c.short || 'company') + '_boss'
     };
+  }
+
+  /* ---- 企业成员管理联动：orgId 参数 → 展示企业号信息 + 「申请加入企业」入口 ----
+     补全「待审批申请」完整执行路径：员工在企业页申请 → org.joins → 管理员在企业成员管理审批。 */
+  var orgIdParam = new URLSearchParams(location.search).get('orgId');
+  var joinBtn = document.getElementById('join-org-btn');
+  var orgEntity = (orgIdParam && window.OrgsStore) ? OrgsStore.get(orgIdParam) : null;
+  if (orgEntity) {
+    var orgOwner = null;
+    (orgEntity.members || []).forEach(function (m) { if (m.role === 'owner' && m.status === 'active') orgOwner = m; });
+    var orgOwnerUser = orgOwner && window.DataBus && DataBus.byId ? DataBus.byId(orgOwner.uid) : null;
+    c.name = orgEntity.co || c.name;
+    c.short = orgEntity.shortName || c.short;
+    c.legalRep = orgEntity.legal || c.legalRep;
+    c.creditCode = orgEntity.code || c.creditCode;
+    c.industry = (orgEntity.entryTypes || []).join('、') || '企业入驻';
+    c.controller = {
+      name: (orgOwnerUser && orgOwnerUser.name) || orgEntity.legal || '实际控制人',
+      title: '企业主 · 实际控制人',
+      shareRatio: '—', phone: '—', wechat: '—'
+    };
+    if (joinBtn) {
+      joinBtn.style.display = '';
+      function renderJoinCta() {
+        var u = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+        if (!u) { joinBtn.textContent = '登录后申请加入'; joinBtn.classList.add('off'); return; }
+        /* 每次实时重读企业实体，保证提交申请/审批后按钮状态即时刷新 */
+        var live = OrgsStore.get(orgIdParam);
+        if (!live) { joinBtn.textContent = '申请加入企业'; joinBtn.classList.remove('off'); return; }
+        if (OrgsStore.membershipOf(u.id, live.orgId)) { joinBtn.textContent = '已在企业内'; joinBtn.classList.add('off'); return; }
+        var hasJoin = (live.joins || []).some(function (j) { return j.uid === u.id && j.status === 'pending'; });
+        if (hasJoin) { joinBtn.textContent = '已申请 · 待审批'; joinBtn.classList.add('off'); return; }
+        joinBtn.textContent = '申请加入企业';
+        joinBtn.classList.remove('off');
+        joinBtn.onclick = function () {
+          UI.dialog({
+            title: '申请加入企业',
+            text: '确认向 <b>' + UI.esc(live.shortName || live.co) + '</b> 提交加入申请吗？提交后由企业管理员在「企业成员管理 · 待审批申请」中审批。',
+            ok: '提交申请', cancel: '取消',
+            onOk: function () {
+              var r = OrgsStore.requestJoin(live.orgId, '');
+              if (r && r.error) { UI.toast.warn(r.error); return; }
+              UI.toast.ok('已提交加入申请，等待企业审批');
+              renderJoinCta();
+            }
+          });
+        };
+      }
+      renderJoinCta();
+      window.addEventListener('engchain:org', renderJoinCta);
+    }
   }
   document.getElementById('nav-title').textContent = '企业主页';
   /* 身份头填充（企业为公开主体，全称展示；联系人/电话在付费墙内脱敏） */
@@ -327,6 +381,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   #homepage-content .he-head{display:flex;align-items:center;justify-content:flex-start;margin-bottom:12px;}
   #homepage-content .he-title{display:flex;align-items:center;font-size:13px;font-weight:700;color:var(--text-1);padding-left:9px;border-left:3px solid var(--primary);gap:0;line-height:1.2;}
   #homepage-content .he-title svg{display:none;}
-  #homepage-content .he-edit-btn{margin-left:auto;}</style>
+  #homepage-content .he-edit-btn{margin-left:auto;}
+  /* 申请加入企业按钮（企业成员管理联动） */
+  #join-org-btn.off { opacity:.62; pointer-events:none; }</style>
 </body>
 </html>

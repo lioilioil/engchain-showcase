@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>已认证企业留档字段变更审核流 · 产品方案</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --ink-2:#3d3d3d; --ink-3:#6b6b6b; --ink-4:#9a9a9a;
+    --line:#e6e2d9; --line-2:#f0ece3; --paper:#fbf9f4; --card:#ffffff;
+    --accent:#8a6d3b; --accent-soft:#f3ecdd;
+    --ok:#2f7d4f; --ok-bg:#e7f3eb; --warn:#b8860b; --warn-bg:#fbf1d8;
+    --bad:#b3402f; --bad-bg:#fbe9e6; --info:#2b6cb0; --info-bg:#e7f0fa;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.7;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 28px 120px}
+  header.hero{border-bottom:2px solid var(--ink);padding-bottom:28px;margin-bottom:40px}
+  .kicker{font-size:12px;letter-spacing:.18em;color:var(--accent);font-weight:700;text-transform:uppercase}
+  h1{font-size:30px;line-height:1.25;margin:10px 0 12px;font-weight:800;letter-spacing:-.01em}
+  .sub{color:var(--ink-3);font-size:14px;max-width:780px}
+  .meta{display:flex;flex-wrap:wrap;gap:18px;margin-top:18px;font-size:12.5px;color:var(--ink-3)}
+  .meta b{color:var(--ink-2);font-weight:600}
+  h2{font-size:21px;margin:50px 0 6px;font-weight:800;display:flex;align-items:baseline;gap:12px}
+  h2 .no{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:700}
+  h3{font-size:16px;margin:28px 0 10px;font-weight:700}
+  p{margin:10px 0}
+  .lead{color:var(--ink-2);font-size:15.5px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:11.5px;font-weight:600;font-family:var(--mono)}
+  .t-fact{background:var(--info-bg);color:var(--info)}
+  .t-infer{background:var(--warn-bg);color:var(--warn)}
+  .t-decision{background:var(--accent-soft);color:var(--accent)}
+  .t-todo{background:var(--bad-bg);color:var(--bad)}
+  .grid{display:grid;gap:16px;margin:18px 0}
+  .grid.c2{grid-template-columns:1fr 1fr}
+  .grid.c3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:760px){.grid.c2,.grid.c3{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+  .card h4{margin:0 0 6px;font-size:14.5px;font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:14px 0}
+  th,td{padding:9px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line-2)}
+  th{background:#f6f1e6;font-weight:700;font-size:12px;color:var(--ink-2)}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:var(--mono);font-size:12px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
+  .p-ok{background:var(--ok-bg);color:var(--ok)}
+  .p-bad{background:var(--bad-bg);color:var(--bad)}
+  .p-warn{background:var(--warn-bg);color:var(--warn)}
+  .p-info{background:var(--info-bg);color:var(--info)}
+  ul{margin:8px 0;padding-left:22px}li{margin:4px 0}
+  .note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+  .note.bad{border-color:var(--bad);background:var(--bad-bg)}
+  .note.ok{border-color:var(--ok);background:var(--ok-bg)}
+  .note.warn{border-color:var(--warn);background:var(--warn-bg)}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--line-2);padding:1px 5px;border-radius:4px}
+  pre{background:#2b2620;color:#f0e9d8;border-radius:8px;padding:16px 18px;overflow:auto;font-size:12.5px;line-height:1.6}
+  pre .c{color:#8a7a5e} pre .k{color:#d9b878} pre .s{color:#9ecf9e}
+  /* flowchart */
+  .flowchart{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px 22px;margin:18px 0;overflow-x:auto}
+  .fc-row{display:flex;justify-content:center;align-items:stretch;gap:14px;flex-wrap:wrap;margin:6px 0}
+  .node{border:1.5px solid var(--ink);border-radius:10px;padding:10px 16px;background:var(--paper);font-size:13px;font-weight:600;text-align:center;min-width:130px;line-height:1.4}
+  .node.start{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .node.decide{border-radius:40px;border-style:dashed;border-color:var(--accent);background:var(--accent-soft)}
+  .node.direct{border-color:var(--ok);background:var(--ok-bg)}
+  .node.review{border-color:var(--warn);background:var(--warn-bg)}
+  .node.done{border-color:var(--info);background:var(--info-bg)}
+  .node .small{display:block;font-weight:400;font-size:11px;color:var(--ink-3);margin-top:3px}
+  .arrow{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink-4);font-size:18px;min-width:20px}
+  .arrow .lbl{font-size:10.5px;color:var(--ink-3);font-weight:700}
+  .branch{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin:4px 0}
+  .col{display:flex;flex-direction:column;align-items:center;gap:6px}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-4)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-3);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">Product Design · Field Governance</div>
+  <h1>已认证企业留档字段变更审核流 · 产品方案</h1>
+  <div class="sub">在不破坏"联系方式即时生效"体验的前提下，把<b>企业名称 / 统一社会信用代码 / 法人 / 简称</b>等资质留档字段，与可自由修改的联系信息字段分离：已认证企业修改留档字段必须走审核流，未认证企业保持即时写回。本方案仅设计，不含代码实施。</div>
+  <div class="meta">
+    <span><b>权威源</b> <code class="mono">AuthStore.enterprise</code></span>
+    <span><b>关联</b> 用户信息资产连通深度研判（2026-09-23）</span>
+    <span><b>日期</b> 2026-09-23</span>
+  </div>
+  <div class="legend">
+    <span><span class="tag t-fact">事实</span> 代码已佐证</span>
+    <span><span class="tag t-infer">推断</span> 由事实推出</span>
+    <span><span class="tag t-decision">产品判断</span> 主动取舍</span>
+    <span><span class="tag t-todo">待确认</span> 需确认</span>
+  </div>
+</header>
+
+<!-- ============ 0 背景与问题 ============ -->
+<h2><span class="no">00</span>背景与问题</h2>
+<p class="lead">当前全站对用户信息的写回遵循"改完即写回 AuthStore + 广播 + toast"的即时模式（编辑器 <code>syncAuthChanges</code>、联系方式页 <code>save()</code>、发票新建抬头）。这套模式对<b>联系方式</b>合理，但对<b>企业身份留档字段</b>存在信任风险。</p>
+
+<div class="note bad"><b>已坐实的风险点（事实，含行号）：</b>
+<ul style="margin:6px 0 0">
+  <li><code>pages/wallet/invoice-title-new.html:120-121</code>：新增企业抬头保存时，<b>无条件</b>执行 <code>auth.enterprise.co = name; auth.enterprise.code = tax; AuthStore.write(auth)</code>，不判断 <code>enterprise.ok</code>。已认证企业可通过"开一张发票抬头"静默改掉企业名称和税号。</li>
+  <li><code>pages/profile/contact.html:72</code>：联系方式保存时执行 <code>a.enterprise.co = 公司名称</code>。这是一个"联系信息"页，却隐式写了企业名称这个留档字段。</li>
+</ul>
+</div>
+
+<div class="note warn"><b>一处与任务背景的事实修正：</b>背景认为"contact.html 不涉及 co/code、无需改动"。但代码中 contact.html 已连通 AuthStore，第 72 行确实写 <code>enterprise.co</code>。因此 <b>contact.html 必须纳入审核流的强制范围</b>（至少对 <code>co</code> 字段）。本方案按代码事实修正，而非按旧认知。</div>
+
+<!-- ============ 1 字段边界 ============ -->
+<h2><span class="no">01</span>字段边界定义</h2>
+<p>把 <code>AuthStore.enterprise</code> 下的字段按"是否构成企业法定身份留档"分为两类。<span class="tag t-decision">产品判断</span> 分类依据：该字段变更是否影响认证可信度、是否需要营业执照等佐证。</p>
+
+<div class="grid c2">
+  <div class="card">
+    <h4><span class="pill p-ok">A 类 · 联系信息（即时生效）</span></h4>
+    <p style="font-size:13px;color:var(--ink-3);margin:4px 0 8px">可在任意页面直接写回 AuthStore，即时生效 + toast，无需审核。</p>
+    <table style="margin:0">
+      <thead><tr><th>字段</th><th>路径</th></tr></thead>
+      <tbody>
+        <tr><td>联系人姓名</td><td class="mono">enterprise.contactName</td></tr>
+        <tr><td>联系电话</td><td class="mono">enterprise.contactPhone</td></tr>
+        <tr><td>微信号</td><td class="mono">enterprise.contactWechat / personalEntry.profile.basic.wechat</td></tr>
+        <tr><td>办公地址</td><td class="mono">enterprise.address</td></tr>
+        <tr><td>所在地区</td><td class="mono">enterprise.region</td></tr>
+        <tr><td>实名手机</td><td class="mono">realname.mobile</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h4><span class="pill p-bad">B 类 · 资质留档（已认证需审核）</span></h4>
+    <p style="font-size:13px;color:var(--ink-3);margin:4px 0 8px">已认证企业修改时走审核流；未认证企业可直接写回。</p>
+    <table style="margin:0">
+      <thead><tr><th>字段</th><th>路径</th></tr></thead>
+      <tbody>
+        <tr><td>企业名称</td><td class="mono">enterprise.co</td></tr>
+        <tr><td>统一社会信用代码</td><td class="mono">enterprise.code</td></tr>
+        <tr><td>法定代表人</td><td class="mono">enterprise.legal</td></tr>
+        <tr><td>企业简称</td><td class="mono">enterprise.shortName</td></tr>
+        <tr><td>命名依据</td><td class="mono">enterprise.nameBasis / nameProof</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="note"><b>边界说明：</b><code>enterprise.address</code>（办公地址）虽在企业实体上，但按任务要求归入 A 类联系信息、即时生效；只有"营业执照注册地址"才属留档，当前 schema 未单独建模，<span class="tag t-todo">待确认</span> 是否需要拆分"注册地址 vs 办公地址"。</div>
+
+<!-- ============ 2 审核流设计 ============ -->
+<h2><span class="no">02</span>审核流设计</h2>
+
+<h3>2.1 流程图 <span class="tag t-decision">产品判断</span></h3>
+<div class="flowchart">
+  <div class="fc-row"><div class="node start">用户在任意页面修改 B 类字段（co / code / legal / shortName）</div></div>
+  <div class="fc-row"><div class="arrow">↓</div></div>
+  <div class="fc-row"><div class="node decide">判断 enterprise.ok？</div></div>
+  <div class="fc-row">
+    <div class="arrow"><span class="lbl">false 未认证</span><span>↓</span></div>
+    <div class="arrow"><span class="lbl">true 已认证</span><span>↓</span></div>
+  </div>
+  <div class="branch">
+    <div class="col">
+      <div class="node direct">直接写回正式字段<span class="small">即时生效 + toast</span></div>
+    </div>
+    <div class="col">
+      <div class="node review">生成 pendingChanges（status=pending）<span class="small">原 co/code 保持不变</span></div>
+      <div class="arrow">↓</div>
+      <div class="node">提交：新值 + 变更原因 + 佐证材料<span class="small">营业执照照片等</span></div>
+      <div class="arrow">↓</div>
+      <div class="node decide">审核结果</div>
+      <div class="branch">
+        <div class="col">
+          <div class="node done">审核通过<span class="small">新值写入正式字段</span></div>
+          <div class="arrow"><span class="lbl">↓</span></div>
+          <div class="node done">旧值入 changeHistory<span class="small">清空 pendingChanges + 通知用户</span></div>
+        </div>
+        <div class="col">
+          <div class="node" style="border-color:var(--bad);background:var(--bad-bg)">审核驳回<span class="small">清空 pendingChanges</span></div>
+          <div class="arrow"><span class="lbl">↓</span></div>
+          <div class="node" style="border-color:var(--bad);background:var(--bad-bg)">记录 rejectReason<span class="small">原值不变 + 通知用户</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>2.2 状态机 <span class="tag t-decision">产品判断</span></h3>
+<table>
+  <thead><tr><th>环节</th><th>触发</th><th>系统行为</th><th>用户可见</th></tr></thead>
+  <tbody>
+    <tr><td>触发入口</td><td>任意页修改 B 类字段且 enterprise.ok=true</td><td>拦截直接写回，转入申请流程</td><td>输入框旁"已认证，修改需审核"标识</td></tr>
+    <tr><td>变更申请</td><td>用户提交新值</td><td>写入 <code>pendingChanges</code>（含 reason/files/submittedAt/status=pending）；<b>正式 co/code 不变</b></td><td>"变更申请已提交，预计 1-3 个工作日审核"</td></tr>
+    <tr><td>待审核中</td><td>—</td><td>对外仍展示正式值；新值仅存 pendingChanges</td><td>当前生效值 + 待审核新值并列展示</td></tr>
+    <tr><td>审核通过</td><td>审核员操作</td><td>pendingChanges 值写入正式 co/code；旧值 push 进 changeHistory；清空 pendingChanges；广播 engchain:auth</td><td>站内通知"企业名称/税号变更已生效"</td></tr>
+    <tr><td>审核驳回</td><td>审核员操作</td><td>清空 pendingChanges，记录 rejectReason；正式值不变</td><td>站内通知 + 驳回原因"未通过：…"</td></tr>
+    <tr><td>未认证直改</td><td>enterprise.ok=false 时修改 B 类字段</td><td>直接写回正式字段（沿用现状）</td><td>即时生效 toast</td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 关键规则 <span class="tag t-decision">产品判断</span></h3>
+<ul>
+  <li><b>单一权威：</b>所有写 B 类字段的入口（发票抬头、联系方式页、企业认证页）必须调用同一个"写企业字段"的守卫函数，禁止各自直接 <code>enterprise.co = ...</code>。</li>
+  <li><b>原值冻结：</b>pending 期间，对外展示、撮合、发票抬头均以正式 co/code 为准，pendingChanges 不参与任何业务读取。</li>
+  <li><b>并发申请：</b>已有 pendingChanges 未完结时，不允许再次提交；用户可"撤回"（清空 pendingChanges）。</li>
+  <li><b>审核主体：</b>复用现有企业认证审核通道（admin 端 auth-review），不新建独立后台。</li>
+</ul>
+
+<!-- ============ 3 与当前实现的差异 ============ -->
+<h2><span class="no">03</span>与当前实现的差异说明</h2>
+<table>
+  <thead><tr><th>入口</th><th>当前行为（事实）</th><th>改造后行为</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">wallet/invoice-title-new.html</td>
+      <td>保存企业抬头时<b>无条件</b>写 enterprise.co/code（:120-121），toast"已同步至企业认证信息"</td>
+      <td>enterprise.ok=true 时：<b>不再覆盖正式字段</b>，改为生成 pendingChanges（若用户勾选"同时更新企业认证信息"）；enterprise.ok=false 时维持现状直接写回。抬头本体仍存 engchain-invoice-titles。</td>
+    </tr>
+    <tr>
+      <td class="mono">profile/contact.html</td>
+      <td>保存时写 enterprise.co（:72）+ enterprise.address（:73）<span class="pill p-bad">背景认知有误，实际写了 co</span></td>
+      <td><code>co</code> 走 B 类守卫（已认证→pendingChanges）；<code>address</code> 属 A 类，维持即时写回。</td>
+    </tr>
+    <tr>
+      <td class="mono">publish/editor.html</td>
+      <td>syncAuthChanges 只写 contactName/contactPhone/contactWechat（A 类），不涉及 co/code</td>
+      <td><b>无需改动</b>。本方案明确其边界：编辑器不碰 B 类字段。</td>
+    </tr>
+    <tr>
+      <td class="mono">profile/auth-enterprise.html</td>
+      <td>企业认证主表单，编辑 co/code/legal，自带 status/note/submittedAt 审核模型</td>
+      <td>作为审核流的"正式编辑入口"：已认证企业在此修改 B 类字段时，天然走重新提交流程（与 pendingChanges 机制对齐，避免双轨）。</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ============ 4 UI/UX ============ -->
+<h2><span class="no">04</span>UI / UX 要点</h2>
+<div class="grid c2">
+  <div class="card">
+    <h4>输入态标识</h4>
+    <ul>
+      <li>已认证企业的企业名称/税号输入框旁显示 <span class="pill p-warn">已认证 · 修改需审核</span> 徽标。</li>
+      <li>未认证企业不显示徽标，输入框可直接编辑。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>提交后状态</h4>
+    <ul>
+      <li>提交后 toast / 状态条："变更申请已提交，预计 1-3 个工作日审核"。</li>
+      <li>提交表单必含：新值、变更原因（必填）、佐证材料（营业执照照片，必传）。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>审核中并列展示</h4>
+    <ul>
+      <li>企业认证页同时显示：<b>当前生效值</b>（旧）与 <b>待审核新值</b>（高亮 + 状态"审核中"）。</li>
+      <li>提供"撤回申请"操作。</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>结果通知</h4>
+    <ul>
+      <li>通过/驳回均发站内通知；驳回必须展示 rejectReason。</li>
+      <li>个人中心 / 企业认证页展示审核进度与历史变更记录（changeHistory）。</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ 5 数据结构 ============ -->
+<h2><span class="no">05</span>数据结构扩展建议</h2>
+<p>在 <code>AuthStore.enterprise</code> 中新增两个字段（向后兼容，旧数据无此两字段时按空处理）：</p>
+<pre>
+enterprise: {
+  ...原有字段...,
+  <span class="c">// 待审核的留档字段变更（已认证企业修改时暂存于此，不覆盖正式值）</span>
+  <span class="k">pendingChanges</span>: {
+    <span class="k">co</span>: <span class="s">''</span>,            <span class="c">// 新企业名称</span>
+    <span class="k">code</span>: <span class="s">''</span>,          <span class="c">// 新统一社会信用代码</span>
+    <span class="k">reason</span>: <span class="s">''</span>,       <span class="c">// 变更原因（必填）</span>
+    <span class="k">files</span>: [],          <span class="c">// 佐证材料（营业执照照片等）</span>
+    <span class="k">submittedAt</span>: 0,    <span class="c">// 提交时间戳</span>
+    <span class="k">status</span>: <span class="s">'none'</span>,  <span class="c">// none | pending | approved | rejected</span>
+    <span class="k">rejectReason</span>: <span class="s">''</span> <span class="c">// 驳回原因（status=rejected 时填写）</span>
+  },
+  <span class="c">// 历史变更记录（审核通过后追加）</span>
+  <span class="k">changeHistory</span>: [
+    { field: <span class="s">'co'</span>, oldValue: <span class="s">'旧名称'</span>, newValue: <span class="s">'新名称'</span>,
+      changedAt: 0, approvedAt: 0, operator: <span class="s">''</span> }
+  ]
+}
+</pre>
+<div class="note"><b>兼容性：</b><code>pendingChanges</code> 缺省为 <code>{status:'none'}</code>，旧版页面读到 undefined 时按"无待审"处理，不影响现有读取。审核通过/驳回后清空 pendingChanges 但保留 changeHistory。</div>
+
+<!-- ============ 6 验收标准 ============ -->
+<h2><span class="no">06</span>验收标准</h2>
+<table>
+  <thead><tr><th>#</th><th>验收条件</th><th>验证方式</th></tr></thead>
+  <tbody>
+    <tr><td>AC-1</td><td>已认证企业（enterprise.ok=true）在发票抬头/联系方式页修改 co 或 code → 生成 pendingChanges，正式 co/code 不变</td><td>改值后读 engchain-auth：正式字段未变、pendingChanges.status=pending</td></tr>
+    <tr><td>AC-2</td><td>未认证企业（enterprise.ok=false）修改 co/code → 直接生效</td><td>同上，正式字段即时更新，无 pendingChanges</td></tr>
+    <tr><td>AC-3</td><td>审核通过 → 新值写入正式字段，旧值进入 changeHistory，pendingChanges 清空，触发 engchain:auth</td><td>模拟审核通过后读数据 + 监听事件</td></tr>
+    <tr><td>AC-4</td><td>审核驳回 → 正式值不变，pendingChanges 清空且 rejectReason 有值，用户可见原因</td><td>模拟驳回后读数据 + 页面展示</td></tr>
+    <tr><td>AC-5</td><td>全站所有写 co/code 的入口（invoice-title-new、contact、auth-enterprise）统一走守卫函数，无绕过</td><td>代码走查：不再出现裸 <code>enterprise.co =</code> / <code>enterprise.code =</code></td></tr>
+    <tr><td>AC-6</td><td>pending 期间，对外展示与撮合仍读正式 co/code，不读 pendingChanges</td><td>设置 pendingChanges 后打开企业详情/搜索，确认展示旧值</td></tr>
+  </tbody>
+</table>
+
+<!-- ============ 7 待确认 ============ -->
+<h2><span class="no">07</span>待确认事项</h2>
+<ul>
+  <li><span class="tag t-todo">待确认</span> <b>办公地址 vs 注册地址：</b>当前 enterprise.address 同时承担办公地址（contact.html:73 即时写回）与企业地址。是否需要拆分为两个字段，避免"办公地址即时改"与"注册地址需审核"混淆。</li>
+  <li><span class="tag t-todo">待确认</span> <b>发票抬头与企业认证的关系：</b>新增发票抬头时，是否默认询问"是否同步更新企业认证信息"，还是仅在用户主动勾选时才生成 pendingChanges。</li>
+  <li><span class="tag t-todo">待确认</span> <b>审核 SLA：</b>"1-3 个工作日"为建议值，需与运营/审核团队确认实际时效，并在 UI 上展示。</li>
+  <li><span class="tag t-todo">待确认</span> <b>法人(legal)变更：</b>法人变更涉及工商变更，是否需要比企业名称更严格的材料（如变更核准通知书），还是与 co/code 同一套材料即可。</li>
+</ul>
+
+<footer>
+  工程链 Engchain3.0 · 已认证企业留档字段变更审核流 · 产品方案（仅设计，不含代码实施）· 2026-09-23<br>
+  事实均含代码行号佐证；与任务背景不一致处（contact.html 实际写 enterprise.co）已按代码事实修正并标注。
+</footer>
+
+</div>
+</body>
+</html>

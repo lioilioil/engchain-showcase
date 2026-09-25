@@ -172,6 +172,11 @@
         r.status = 'completed';
         r.completedAt = Date.now();
         clearInterval(timers[id]);
+        /* [历史文件] 详情页文件下载完成 → 历史文件（来源：详情页下载）
+           （页面设置 __ENGCHAIN_SILENT_FILE_RECORD=true 时跳过，避免覆写历史页记录来源） */
+        try {
+          if (window.FileStore && !window.__ENGCHAIN_SILENT_FILE_RECORD) FileStore.add({ name: r.name, size: fmtSize(r.size), source: '详情页下载', sourceKey: 'detail', note: document.title || '' });
+        } catch (e) {}
       }
       setRecord(id, r);
       refreshUI(id);
@@ -261,6 +266,10 @@
           } else {
             UI.toast('打开已缓存文件：' + rec.name, 'ok');
           }
+          /* [历史文件] 浏览详情页已缓存文件 → 历史文件（来源：浏览详情页） */
+          try {
+            if (window.FileStore) FileStore.add({ name: rec.name, size: fmtSize(rec.size), source: '浏览详情页', sourceKey: 'view', note: document.title || '' });
+          } catch (e) {}
         } else if (rec && rec.status === 'downloading') {
           UI.toast('文件下载中，请稍候', 'info');
         } else {

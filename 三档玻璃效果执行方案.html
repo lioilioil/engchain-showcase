@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENGCHAIN 三档玻璃效果 · 完整执行方案</title>
+<style>
+  :root{
+    --bg:#f7f6f3; --card:#fff; --ink:#1a1a1a; --ink2:#555; --ink3:#888;
+    --line:#e5e2db; --accent:#a98a47; --accent-soft:rgba(169,138,71,.1);
+    --code-bg:#f0ede6; --ok:#2b6b4f; --warn:#b8860b; --danger:#b33;
+    --r:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;font-size:15px}
+  .wrap{max-width:960px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+  h1 .sub{display:block;font-size:15px;font-weight:400;color:var(--ink2);margin-top:8px}
+  h2{font-size:22px;font-weight:700;margin:48px 0 16px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
+  h3{font-size:17px;font-weight:700;margin:28px 0 10px;color:var(--accent)}
+  h4{font-size:15px;font-weight:700;margin:18px 0 8px}
+  p{margin:8px 0}
+  .lead{font-size:16px;color:var(--ink2);margin:16px 0 24px}
+  .meta{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0 32px;font-size:13px;color:var(--ink3)}
+  .meta span{background:var(--card);border:1px solid var(--line);padding:4px 12px;border-radius:20px}
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13.5px;background:var(--card);border-radius:var(--r);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  th{background:var(--accent-soft);text-align:left;padding:10px 12px;font-weight:700;font-size:13px;white-space:nowrap;border-bottom:2px solid var(--line)}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#faf9f6}
+  .tag{display:inline-block;padding:1px 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap}
+  .tag-off{background:#eee;color:#666}
+  .tag-std{background:rgba(37,99,235,.1);color:#2563eb}
+  .tag-enh{background:rgba(169,138,71,.15);color:var(--accent)}
+  .tag-danger{background:rgba(179,51,51,.1);color:var(--danger)}
+  .tag-ok{background:rgba(43,107,79,.1);color:var(--ok)}
+  .tag-warn{background:rgba(184,134,11,.1);color:var(--warn)}
+  code{background:var(--code-bg);padding:1px 6px;border-radius:4px;font-family:"SF Mono",Consolas,monospace;font-size:12.5px;color:#7a5c1e}
+  pre{background:#1e1e1e;color:#d4d4d4;padding:16px 18px;border-radius:var(--r);overflow-x:auto;margin:12px 0 20px;font-size:12.5px;line-height:1.6;font-family:"SF Mono",Consolas,monospace}
+  pre code{background:none;color:inherit;padding:0}
+  .callout{border-left:4px solid var(--accent);background:var(--card);padding:14px 18px;margin:16px 0;border-radius:0 var(--r) var(--r) 0}
+  .callout.warn{border-color:var(--warn);background:#fffbf0}
+  .callout.danger{border-color:var(--danger);background:#fff5f5}
+  .callout.ok{border-color:var(--ok);background:#f3f9f5}
+  .callout b{display:block;margin-bottom:4px}
+  ul,ol{margin:8px 0 16px 24px}
+  li{margin:4px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
+  .mini-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+  .mini-card h4{margin-top:0;color:var(--accent)}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 24px;margin:24px 0}
+  .toc h3{margin-top:0}
+  .toc ol{margin-left:20px}
+  .toc a{color:var(--ink);text-decoration:none}
+  .toc a:hover{color:var(--accent)}
+  .page-group{margin:20px 0}
+  .page-group h4{background:var(--accent-soft);padding:6px 12px;border-radius:6px;cursor:default}
+  .compact-table td{padding:6px 10px;font-size:12.5px}
+  .compact-table th{padding:7px 10px;font-size:12px}
+  .footer-note{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--ink3)}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr}.wrap{padding:24px 14px}h1{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>ENGCHAIN 三档玻璃效果 · 完整执行方案
+  <span class="sub">关闭 / 标准（CSS 玻璃拟态）/ 增强（WebGL 真实折射）—— 逐页归类 · 落地实现 · 安全保障 · 可测验收</span>
+</h1>
+
+<div class="meta">
+  <span>📅 方案日期：2026-09-25</span>
+  <span>📂 项目：D:\Engchain3.0（纯静态 Web）</span>
+  <span>📄 页面覆盖：约 115 个 HTML</span>
+  <span>🔒 状态：待审批，未执行任何代码改动</span>
+</div>
+
+<p class="lead">本方案由专家 UI 设计师与前端工程师联合完成，基于对项目全部页面和关键文件的实际读取核实。所有类名、行号、文件路径均来自真实代码；不确定处明确标注「待确认」。<b>本方案仅用于审批，未经同意不执行任何代码修改。</b></p>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">三档定义与总览</a></li>
+  <li><a href="#s2">UI 归类细分规则</a>
+    <ul>
+      <li>2.1 容器类型 Taxonomy（14 类）</li>
+      <li>2.2 增强档候选位置（精选 6 处）</li>
+      <li>2.3 逐页归类总表</li>
+      <li>2.4 重点页面逐容器明细</li>
+    </ul>
+  </li>
+  <li><a href="#s3">实现方案（具体文件与改动点）</a>
+    <ul>
+      <li>3.1 状态管理（common.js glass 对象）</li>
+      <li>3.2 持久化与重置（databus.js KEEP）</li>
+      <li>3.3 防闪烁内联脚本</li>
+      <li>3.4 标准档（CSS 玻璃）</li>
+      <li>3.5 增强档（WebGL Loader）</li>
+      <li>3.6 设置页 UI</li>
+      <li>3.7 文件改动清单</li>
+      <li>3.8 可行性评估</li>
+    </ul>
+  </li>
+  <li><a href="#s4">安全保障与既有成果保护</a>
+    <ul>
+      <li>4.1 不可改动红线清单</li>
+      <li>4.2 风险识别与缓解</li>
+      <li>4.3 备份与回滚</li>
+      <li>4.4 灰度路径</li>
+    </ul>
+  </li>
+  <li><a href="#s5">可测量验收标准</a></li>
+  <li><a href="#s6">执行顺序与安全门禁</a></li>
+  <li><a href="#s7">待确认事项</a></li>
+</ol>
+</div>
+
+<!-- ==================== 1. 三档定义 ==================== -->
+<h2 id="s1">一、三档定义与总览</h2>
+
+<table>
+  <tr><th>档位</th><th>用户感知</th><th>localStorage</th><th>DOM 门控</th><th>渲染方式</th><th>默认</th></tr>
+  <tr>
+    <td><span class="tag tag-off">关闭 off</span></td>
+    <td>实色卡片，与现状完全一致</td>
+    <td><code>engchain-glass = 'off'</code></td>
+    <td>&lt;html&gt; 无 data-glass</td>
+    <td>app.css 既有实色令牌</td>
+    <td><b>是</b>（保守默认）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-std">标准 standard</span></td>
+    <td>毛玻璃卡片 + 边缘高光，全站统一</td>
+    <td><code>engchain-glass = 'standard'</code></td>
+    <td><code>data-glass="on"</code></td>
+    <td>glass-upgrade.css 的 CSS backdrop-filter</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-enh">增强 enhanced</span></td>
+    <td>标准玻璃基础上，精选英雄面有真实折射</td>
+    <td><code>engchain-glass = 'enhanced'</code></td>
+    <td><code>data-glass="on" data-glass-level="enhanced"</code></td>
+    <td>CSS 玻璃全量 + WebGL 液态折射（仅英雄面）</td>
+    <td></td>
+  </tr>
+</table>
+
+<div class="callout">
+  <b>💡 为什么默认关闭？</b>
+  批量挂载 glass-upgrade.css 本身是一次全站视觉变更，不应在用户首次升级时静默打开。由用户在设置页主动选择，后续灰度稳定后再考虑调整默认值。首次访问用户视觉与现状完全一致，零感知。
+</div>
+
+<div class="callout warn">
+  <b>⚠️ 方案核实中发现的两个既有问题（执行时顺带修复）</b>
+  <ol>
+    <li><b>glass-upgrade.css 暗色选择器 bug</b>：L46 现写法 <code>[data-theme="dark"] html[data-glass="on"]</code> 永远不命中（data-theme 直接挂在 html 上，正确应为 <code>html[data-theme="dark"][data-glass="on"]</code>）。当前暗色主题下的玻璃阴影微调<b>实际未生效</b>。</li>
+    <li><b>engchain:theme 不是 CustomEvent</b>：common.js L1247 的 <code>engchain:theme</code> 实际是 <code>postMessage</code> 消息类型（宿主预览 iframe 下发主题），theme.set() 内部不 dispatch 任何事件。因此 glass↔theme 联动改用 <code>MutationObserver</code> 监听 <code>data-theme</code> 属性，零侵入。</li>
+  </ol>
+</div>
+
+<!-- ==================== 2. UI 归类 ==================== -->
+<h2 id="s2">二、UI 归类细分规则</h2>
+
+<p>对全部约 115 个页面逐页读取容器结构后，归纳出 <b>14 类容器形态</b>，每类有明确的玻璃档位倾向。以下不是"谁替换谁"的一句话概括，而是按容器类型、用途、主次层级、明暗表现逐一判定。</p>
+
+<h3>2.1 容器类型 Taxonomy（14 类）</h3>
+
+<table class="compact-table">
+  <tr><th>#</th><th>容器类型</th><th>典型类名</th><th>默认档位</th><th>归类逻辑</th></tr>
+  <tr><td>1</td><td>顶部导航栏</td><td>.navbar / .nav-back / .editor-navbar</td><td><span class="tag tag-std">标准</span></td><td>悬浮于内容之上，窄条面 backdrop-filter 开销小，毛玻璃增强悬浮感</td></tr>
+  <tr><td>2</td><td>英雄面/主视觉卡</td><td>.hero-card / .mem-hero / .wal-card / .pf-hero / .dist-hero</td><td><span class="tag tag-enh">增强（精选）</span></td><td>大尺寸、高印象、低频浏览；WebGL 折射强化品牌质感，全站≤6处</td></tr>
+  <tr><td>3</td><td>通用内容卡</td><td>.card / .group / .wb-card / .supply-card / .svc-card</td><td><span class="tag tag-std">标准</span></td><td>glass-upgrade.css 已覆盖的主力面，信息密度中等，玻璃化收益大于性能成本</td></tr>
+  <tr><td>4</td><td>统计/数据卡</td><td>.stat-tile / .c-stat / .ov-cell / .kpi-tile / .earn-summary</td><td><span class="tag tag-std">标准</span></td><td>小尺寸数据块，半透玻璃与背景形成层次；主视觉焦点可升级增强</td></tr>
+  <tr><td>5</td><td>金刚区/功能磁贴</td><td>.home-kk / .kk-ic / .module-tile / .quick-grid / .af-grid</td><td><span class="tag tag-std">标准</span></td><td>图标+文字小面，玻璃化增加悬浮感；首页金刚区可升级增强</td></tr>
+  <tr><td>6</td><td>分段Tab/控件</td><td>.seg / .seg-item / .sub-tabs / .ep-tabs / .msg-tabs</td><td><span class="tag tag-std">标准</span></td><td>glass-upgrade.css 已覆盖；小控件面性能无忧</td></tr>
+  <tr><td>7</td><td>搜索栏/输入框容器</td><td>.app-search / .sr-search / .bs-search-box / .filter-bar</td><td><span class="tag tag-std">标准</span></td><td>半透搜索栏是玻璃拟态标志性场景；.filter-bar 已手写 backdrop-filter</td></tr>
+  <tr><td>8</td><td>列表行（长列表）</td><td>.group .row / .tx-row / .n-item / .apply-item / .dl-card</td><td><span class="tag tag-off">关闭</span></td><td>快速滚动时 backdrop-filter 导致合成层重绘卡顿与视觉噪点；实色行更清晰</td></tr>
+  <tr><td>9</td><td>表单输入域</td><td>.field / .ap-field / .form-row / .ef-field / .input</td><td><span class="tag tag-off">关闭</span></td><td>聚焦状态需实色对比保证可读性；玻璃透叠降低输入框识别度</td></tr>
+  <tr><td>10</td><td>源码/长文本编辑区</td><td>.form-field .textarea / .ai-input-panel textarea</td><td><span class="tag tag-off">关闭（强制）</span></td><td>等宽阅读+连续输入，半透明让叠层文字穿过，严重影响光标定位</td></tr>
+  <tr><td>11</td><td>聊天消息气泡</td><td>.mc-bubble / .mc-card / .pc-card</td><td><span class="tag tag-off">关闭（强制）</span></td><td>消息流需实色对比区分收发双方，半透明气泡滚动时糊成一片</td></tr>
+  <tr><td>12</td><td>浮层/底部弹层</td><td>.sheet / .dialog-panel / .unlock-sheet / .avatar-sheet / .modal-mask</td><td><span class="tag tag-std">标准</span></td><td>悬浮在内容之上，玻璃透叠效果最佳；glass-upgrade.css 已覆盖核心面</td></tr>
+  <tr><td>13</td><td>协议/法律正文区</td><td>.ag-hero（头）/ 文章正文 &lt;article&gt;</td><td>头<span class="tag tag-std">标准</span> / 正文<span class="tag tag-off">关闭</span></td><td>长文连续阅读，实色纸感最利于法律文本高对比度与长时间阅读</td></tr>
+  <tr><td>14</td><td>空状态/引导提示</td><td>.de-empty / .bs-empty / .wb-empty / .first-hint / .trust-bar</td><td><span class="tag tag-off">关闭</span></td><td>信息量极低、偶发，上玻璃收益为零；实色浅底足够</td></tr>
+</table>
+
+<h3>2.2 增强档候选位置（精选 6 处）</h3>
+
+<p>增强档（WebGL 真实折射）严格控制数量——每页最多 1 处，全站精选 <b>6 处候选</b>（最终执行时可根据视觉走查取舍为 4-5 处）。选择标准：大尺寸 + 页面视觉焦点 + 低频高印象 + 品牌/付费关键路径。</p>
+
+<table>
+  <tr><th>#</th><th>页面</th><th>容器</th><th>选择器</th><th>选择理由</th></tr>
+  <tr><td>1</td><td>home.html</td><td>重点项目/共创轮播英雄卡</td><td><code>.hero-carousel .hero-card</code></td><td>首页最大视觉焦点，大尺寸+低频高印象</td></tr>
+  <tr><td>2</td><td>home.html</td><td>金刚区图标磁贴</td><td><code>.home-kk .kk-ic</code></td><td>品牌入口磁贴，高频点击；水晶折射增加旗舰感</td></tr>
+  <tr><td>3</td><td>wallet/index.html</td><td>余额银行卡轮播</td><td><code>.wal-card</code></td><td>财务英雄面，银行卡形态需要真实光泽，支付场景信任感</td></tr>
+  <tr><td>4</td><td>wallet/membership.html</td><td>会员首屏</td><td><code>.mem-hero</code></td><td>付费转化焦点，会员尊贵感需要材质升级</td></tr>
+  <tr><td>5</td><td>company/index.html</td><td>企业身份头</td><td><code>.pf-hero</code></td><td>企业展示门面，B端企业形象需要高级质感</td></tr>
+  <tr><td>6</td><td>distribution/index.html</td><td>佣金总览 Hero</td><td><code>.dist-hero</code></td><td>大尺寸收益主视觉，低频访问高印象</td></tr>
+</table>
+
+<div class="callout danger">
+  <b>🚫 硬性排除</b>
+  底部液态 Dock（<code>.app-nav-shell</code>）、AI 球容器（<code>.ai-orb-entry</code>）、tabbar —— 已上线且 verify.js 有逐像素 A/B 断言，<b>禁止叠加 WebGL</b>。增强档 loader 的选择器黑名单必须包含这些类名。
+</div>
+
+<h3>2.3 逐页归类总表</h3>
+
+<p>以下按页面目录分组，每页列出核心容器及建议档位。完整逐容器明细见 2.4 节重点页面。</p>
+
+<div class="page-group">
+<h4>📱 根目录页面</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>home.html（首页）</td><td>顶部眉标/AI搜索栏/活动轮播/英雄轮播/金刚区/分段Tab/信息流卡</td><td>导航+搜索+卡片<span class="tag tag-std">标准</span>；英雄卡+金刚区磁贴<span class="tag tag-enh">增强</span>；福利条/内嵌轮播<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>index.html（入口）</td><td>广告跳转壳</td><td>纯跳转页<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>home.glass.html 等试点页</td><td>同 home.html</td><td>改造为 fix 脚本驱动，不再硬编码 data-glass</td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>👤 pages/profile/（个人中心组，约30页）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html（个人中心）</td><td>用户信息头/钱包卡/身份认证卡/成长等级卡/任务卡/服务网格/历史卡</td><td>头部+卡片<span class="tag tag-std">标准</span>；历史项/页脚<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>auth.html（认证中心）</td><td>认证概览头/下一步网格/安全提示/英雄宣传卡/认证列表</td><td>卡片<span class="tag tag-std">标准</span>；列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>auth-personal/enterprise/partner/qualification</td><td>步骤条/表单组/上传区/人脸采集/选择卡</td><td>步骤条+上传卡+选择卡<span class="tag tag-std">标准</span>；表单输入<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>entry.html / entry-form.html</td><td>入驻类型卡/对比表/表单组/材料卡</td><td>类型卡+材料卡<span class="tag tag-std">标准</span>；对比表+表单<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>delegates / delegate-detail / edit</td><td>统计条/筛选/委托方卡列表/详情/表单</td><td>统计+筛选<span class="tag tag-std">标准</span>；列表行+表单<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>edit-profile / resume-edit</td><td>头像区/表单区/上传区/AI助手面板</td><td>头像+上传+AI面板<span class="tag tag-std">标准</span>；表单输入<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>settings / general-setting / security</td><td>设置分组列表</td><td>分组外框<span class="tag tag-std">标准</span>；列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>my-applies / my-jobs / history</td><td>管理卡/空态/投递列表/职位卡</td><td>管理卡<span class="tag tag-std">标准</span>；列表行+空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>org-members / privacy / about / 其余短页</td><td>公司卡/搜索/Tab/列表/信息卡</td><td>卡片+搜索+Tab<span class="tag tag-std">标准</span>；列表行<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>💰 pages/wallet/（钱包组，约16页）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html（钱包首页）</td><td>概览格/银行卡轮播/积分卡/操作行/快捷入口/交易记录</td><td>银行卡<span class="tag tag-enh">增强</span>；其余卡片<span class="tag tag-std">标准</span>；交易流水行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>recharge / withdraw</td><td>金额展示/金额输入/支付方式/步骤条/支付栏</td><td>金额展示+步骤条+支付栏<span class="tag tag-std">标准</span>；输入+列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>membership.html（会员中心）</td><td>会员英雄区/价值指标/权益对比表/权益网格/开通栏</td><td>会员英雄区<span class="tag tag-enh">增强</span>；指标+网格<span class="tag tag-std">标准</span>；对比表<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>credits / credits-mall / credits-rules</td><td>概览/积分包网格/商品网格/日志</td><td>卡片+网格<span class="tag tag-std">标准</span>；日志行+支付方式行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>bank-cards / invoice系列 / payment-method</td><td>卡号输入/银行卡列表/发票信息卡/表单</td><td>信息卡外框<span class="tag tag-std">标准</span>；输入+列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>free-quota / escrow / corp-pay / unlock-records</td><td>额度英雄区/步骤卡/FAQ/统计条/记录卡</td><td>英雄区+步骤卡+统计<span class="tag tag-std">标准</span>；FAQ+记录行<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>🔍 pages/search/（搜索组，4页）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html（搜索首页）</td><td>搜索栏/AI文件夹/搜索历史组</td><td>搜索栏+AI卡<span class="tag tag-std">标准</span>；历史行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>enterprise.html（企业搜索）</td><td>搜索栏/分类Tab/热门标签/企业认证卡/统计/锁定遮罩</td><td>搜索+Tab+卡片+遮罩<span class="tag tag-std">标准</span>；热门列表项<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>business.html（商机搜索）</td><td>搜索栏/热门标签/商机结果卡</td><td>搜索+标签<span class="tag tag-std">标准</span>；结果列表卡<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>result.html（搜索结果）</td><td>吸顶搜索栏/方向Tab/分类栏/AI标签</td><td>全部<span class="tag tag-std">标准</span>（吸顶栏玻璃效果最佳）；空态<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>🏢 pages/company/（企业主页）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html</td><td>企业英雄头/核心信息/锁定遮罩/工商网格/控制人卡/供需卡/浮动按钮</td><td>企业英雄头<span class="tag tag-enh">增强</span>；信息卡+遮罩+网格+浮动按钮<span class="tag tag-std">标准</span>；供需列表行<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>📝 pages/publish/（发布工作台组）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html（工作台）</td><td>Hero主行动区/进展大卡/管理工具/待处理富卡/空态</td><td>Hero+卡片<span class="tag tag-std">标准</span>；主按钮+工具行+空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>editor.html / editor-redesign.html</td><td>顶部工具栏/步骤指示器/表单卡/输入框/品类网格/预览Sheet/专业信息Sheet</td><td>工具栏+表单卡外框+Sheet+品类网格<span class="tag tag-std">标准</span>；<b>输入框/长文本区强制<span class="tag tag-off">关闭</span></b></td></tr>
+  <tr><td>drafts / unlocked / records</td><td>导航/草稿卡/线索卡/筛选栏/记录卡</td><td>导航+卡片+筛选栏<span class="tag tag-std">标准</span>；按钮+空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>success.html</td><td>成功图标/结果信息卡/底部CTA</td><td>信息卡（已有.glass类）+CTA<span class="tag tag-std">标准</span>；成功图标<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>🤝 pages/agency/ + pages/order/（代理与订单组）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>agency/index.html（服务广场）</td><td>导航/搜索/进行中订单/双路径分流卡/吸顶分类/服务卡/导流/Sheet</td><td>导航+卡片+吸顶栏+Sheet<span class="tag tag-std">标准</span>；搜索输入+提示条+空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>agency/seller-board.html</td><td>KPI磁贴/信用卡/线索卡/需求卡/快捷入口/保证金卡</td><td>全部卡片<span class="tag tag-std">标准</span>；说明卡<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>agency/order + order/index + order/detail</td><td>导航/Seg/状态筛选/订单卡/键值行/履约进度/底部按钮</td><td>导航+Seg+订单卡+进度卡<span class="tag tag-std">标准</span>；键值行+按钮<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>💬 pages/message/（消息组）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>index.html（消息中心）</td><td>Topbar/会话Tab/搜索框/会话列表/通知子栏/通知条目/企业邀请卡/Sheet</td><td>Topbar+Tab+子栏+邀请卡+Sheet<span class="tag tag-std">标准</span>；<b>会话列表+通知条目<span class="tag tag-off">关闭</span></b></td></tr>
+  <tr><td>chat.html（聊天页）</td><td>导航/消息气泡流/业务卡/底部输入栏/扩展面板</td><td>导航+输入栏+扩展面板<span class="tag tag-std">标准</span>；<b>消息气泡+业务卡强制<span class="tag tag-off">关闭</span></b></td></tr>
+  <tr><td>complaint / phrases / system</td><td>导航/投诉表单卡/分类chips/常用语分组</td><td>导航+表单卡+chips+分组<span class="tag tag-std">标准</span>；输入+常用语条目<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>📣 pages/distribution/ + pages/franchise/ + pages/vendor/（分销加盟服务商组）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>distribution/index.html</td><td>导航/分销Hero/快捷入口/等级卡/规则卡</td><td>分销Hero<span class="tag tag-enh">增强</span>；入口+等级卡<span class="tag tag-std">标准</span>；规则文本<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>distribution/earnings / team / withdraw</td><td>收益汇总/记录卡/统计/余额/金额输入</td><td>汇总+统计+余额<span class="tag tag-std">标准</span>；记录行+输入<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>distribution/poster / rules</td><td>海报画布/规则正文</td><td><span class="tag tag-off">关闭</span>（海报需实色准确预览；规则纯文本阅读）</td></tr>
+  <tr><td>franchise/index.html</td><td>导航/加盟Hero/排序Tab/加盟卡/导流卡</td><td>导航+Hero+Tab+卡片<span class="tag tag-std">标准</span>；提示条<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>vendor/dashboard.html</td><td>导航/KPI Hero/图表卡/范围Tab/排行卡</td><td>全部<span class="tag tag-std">标准</span>（图表卡毛玻璃衬托效果好）</td></tr>
+  <tr><td>vendor/upgrades.html</td><td>导航/营销Hero/计费卡/套餐卡/道具卡</td><td>营销Hero<span class="tag tag-enh">增强</span>（备选）；卡片<span class="tag tag-std">标准</span>；列表行<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>🔐 pages/auth/ + pages/agreement/ + pages/help/ + pages/refund/（登录协议帮助退款组）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>核心容器</th><th>档位要点</th></tr>
+  <tr><td>auth/login / register</td><td>品牌区/登录表单卡/登录方式Tab/输入框/主按钮</td><td>表单卡+Tab<span class="tag tag-std">标准</span>；输入框+主按钮+品牌区<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>auth/banned</td><td>封禁说明卡/申诉渠道卡</td><td>卡片<span class="tag tag-std">标准</span>；键值行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>agreement/*（4页）</td><td>进度条/协议Hero头/场景Tab/协议正文</td><td>Hero头+Tab<span class="tag tag-std">标准</span>；<b>正文强制<span class="tag tag-off">关闭</span></b></td></tr>
+  <tr><td>help/index / feedback</td><td>导航/搜索/分类宫格/热门列表/客服卡/反馈表单</td><td>导航+宫格+客服卡+表单外框<span class="tag tag-std">标准</span>；搜索输入+FAQ+输入区<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>refund/index / appeal</td><td>导航/退款Hero/政策卡/场景卡/流程时间线/申诉表单</td><td>导航+Hero+政策卡+时间线+表单外框<span class="tag tag-std">标准</span>；场景阅读+输入<span class="tag tag-off">关闭</span></td></tr>
+</table>
+</div>
+
+<div class="page-group">
+<h4>📦 其余单页目录（supply / personal / trade / industry / monitor / personnel / platform / co-create / match / guide / favorite / api）</h4>
+<table class="compact-table">
+  <tr><th>页面</th><th>档位要点</th></tr>
+  <tr><td>supply/list + detail</td><td>导航+Seg+供需卡+筛选Sheet+底部操作栏<span class="tag tag-std">标准</span>；空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>personal/index</td><td>头部+内容卡<span class="tag tag-std">标准</span>；键值行+简介正文<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>trade/index</td><td>Hero+筛选条+卡片<span class="tag tag-std">标准</span></td></tr>
+  <tr><td>industry/index</td><td>资讯卡片<span class="tag tag-std">标准</span>；正文阅读区<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>monitor/index</td><td>雷达Hero+统计磁贴<span class="tag tag-std">标准</span>；告警列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>personnel/index</td><td>吸顶筛选条+列表卡+Sheet<span class="tag tag-std">标准</span></td></tr>
+  <tr><td>platform/dashboard</td><td>统计<span class="tag tag-std">标准</span>；明细流水行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>co-create/index</td><td>Hero+身份卡<span class="tag tag-std">标准</span>（底图不玻璃）</td></tr>
+  <tr><td>match/preferences</td><td>偏好卡+chips<span class="tag tag-std">标准</span></td></tr>
+  <tr><td>guide/index</td><td>步骤卡<span class="tag tag-std">标准</span>；列表行<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>favorite/index</td><td>Seg+供需卡<span class="tag tag-std">标准</span>；空态<span class="tag tag-off">关闭</span></td></tr>
+  <tr><td>api/index</td><td><b>代码/文档阅读区整体<span class="tag tag-off">关闭</span></b>；仅顶部导航<span class="tag tag-std">标准</span></td></tr>
+</table>
+</div>
+
+<h3>2.4 重点页面逐容器明细</h3>
+
+<h4>home.html（首页）</h4>
+<table class="compact-table">
+  <tr><th>容器</th><th>类名</th><th>类型</th><th>主次</th><th>明色表现</th><th>暗色表现</th><th>档位</th><th>理由</th></tr>
+  <tr><td>顶部眉标+位置栏</td><td>.app-top</td><td>导航</td><td>次</td><td>无背景，浮于页面底色</td><td>文字色自适应</td><td><span class="tag tag-std">标准</span></td><td>窄条导航，半透开销极小</td></tr>
+  <tr><td>AI搜索栏</td><td>.app-search</td><td>操作控件</td><td>主</td><td>实色圆角矩形+AI渐变按钮</td><td>无特殊覆盖</td><td><span class="tag tag-std">标准</span></td><td>玻璃拟态标志性场景</td></tr>
+  <tr><td>常驻福利条</td><td>#home-welfare-bar</td><td>反馈</td><td>末</td><td>实色白卡，小字通知</td><td>跟随--bg-card</td><td><span class="tag tag-off">关闭</span></td><td>纯文本通知，玻璃模糊小字</td></tr>
+  <tr><td>活动卡片轮播</td><td>#home-promo-carousel</td><td>内容卡</td><td>次</td><td>JS动态生成实色卡</td><td>待确认</td><td><span class="tag tag-std">标准</span></td><td>营销卡非高频滚动，性能可接受</td></tr>
+  <tr><td>重点项目/共创轮播</td><td>.hero-carousel .hero-card</td><td>英雄面</td><td>主</td><td>深色渐变背景卡</td><td>卡片本身深色</td><td><span class="tag tag-enh">增强</span></td><td>首页最大视觉焦点</td></tr>
+  <tr><td>金刚区五大频道</td><td>.home-kk .kk-ic</td><td>金刚区</td><td>主</td><td>46px圆角方块，品类色软背景</td><td>有dark覆盖色调调亮</td><td><span class="tag tag-enh">增强</span></td><td>品牌记忆点，水晶折射增旗舰感</td></tr>
+  <tr><td>供需分段Tab</td><td>.home-tabs .seg</td><td>操作控件</td><td>主</td><td>分段控件</td><td>无特殊覆盖</td><td><span class="tag tag-std">标准</span></td><td>吸顶时半透效果最佳</td></tr>
+  <tr><td>信息流卡片</td><td>#tab-list .supply-card</td><td>内容卡</td><td>主</td><td>通用卡面</td><td>无特殊覆盖</td><td><span class="tag tag-std">标准</span></td><td>玻璃主力受益面</td></tr>
+  <tr><td>信息流内嵌轮播</td><td>.app-carousel .ac-slide</td><td>内容卡</td><td>末</td><td>深色渐变slide</td><td>不适用</td><td><span class="tag tag-off">关闭</span></td><td>已有复杂渐变背景，玻璃冲突</td></tr>
+</table>
+
+<h4>wallet/index.html（钱包首页）</h4>
+<table class="compact-table">
+  <tr><th>容器</th><th>类名</th><th>类型</th><th>档位</th><th>理由</th></tr>
+  <tr><td>概览统计格</td><td>.ov-grid .ov-cell</td><td>统计卡</td><td><span class="tag tag-std">标准</span></td><td>小数据块玻璃化层次分明</td></tr>
+  <tr><td>银行卡轮播</td><td>.car-wrap .wal-card</td><td>英雄面</td><td><span class="tag tag-enh">增强</span></td><td>财务英雄面，银行卡需真实光泽</td></tr>
+  <tr><td>积分卡</td><td>.wal-card--credits</td><td>统计卡</td><td><span class="tag tag-std">标准</span></td><td>随轮播统一视觉</td></tr>
+  <tr><td>操作行</td><td>.act-row .btn-main</td><td>操作控件</td><td><span class="tag tag-std">标准</span></td><td>按钮组玻璃化</td></tr>
+  <tr><td>快捷入口网格</td><td>.quick-grid .quick-item</td><td>金刚区</td><td><span class="tag tag-std">标准</span></td><td>功能磁贴</td></tr>
+  <tr><td>交易记录</td><td>.tx-head .tx-row</td><td>列表行</td><td><span class="tag tag-off">关闭</span></td><td>长列表流水行，实色保证扫读</td></tr>
+</table>
+
+<h4>publish/editor.html（发布编辑器）</h4>
+<table class="compact-table">
+  <tr><th>容器</th><th>类名</th><th>类型</th><th>档位</th><th>理由</th></tr>
+  <tr><td>顶部导航工具栏</td><td>.editor-navbar</td><td>导航</td><td><span class="tag tag-std">标准</span></td><td>固定顶栏毛玻璃</td></tr>
+  <tr><td>步骤指示器</td><td>.step-indicator</td><td>导航/进度</td><td><span class="tag tag-std">标准</span></td><td>轻量控件面</td></tr>
+  <tr><td>表单卡片</td><td>.form-card</td><td>内容卡/表单组</td><td><span class="tag tag-std">标准</span></td><td>卡片容器可玻璃</td></tr>
+  <tr><td><b>输入框/多行描述区</b></td><td><code>.form-field .input/.textarea</code></td><td>表单</td><td><span class="tag tag-off">关闭（强制）</span></td><td>连续输入，玻璃破坏光标与可读性</td></tr>
+  <tr><td>品类选择网格</td><td>.cat-grid .cat-cell</td><td>选择控件</td><td><span class="tag tag-std">标准</span></td><td>磁贴式选择</td></tr>
+  <tr><td>预览Bottom Sheet</td><td>.preview-panel</td><td>浮层</td><td><span class="tag tag-std">标准</span></td><td>浮层天然玻璃</td></tr>
+  <tr><td>专业信息Sheet</td><td>.pro-panel</td><td>浮层</td><td><span class="tag tag-std">标准</span></td><td>浮层；内部输入区关闭</td></tr>
+  <tr><td>离开确认弹窗</td><td>.leave-dialog</td><td>浮层/dialog</td><td><span class="tag tag-std">标准</span></td><td>dialog天然玻璃</td></tr>
+</table>
+
+<h4>message/chat.html（聊天页）</h4>
+<table class="compact-table">
+  <tr><th>容器</th><th>类名</th><th>类型</th><th>档位</th><th>理由</th></tr>
+  <tr><td>顶部导航</td><td>.navbar</td><td>导航</td><td><span class="tag tag-std">标准</span></td><td>导航条</td></tr>
+  <tr><td><b>消息气泡流</b></td><td><code>.mc-bubble</code></td><td>消息</td><td><span class="tag tag-off">关闭（强制）</span></td><td>需实色对比区分收发双方</td></tr>
+  <tr><td>业务卡片消息</td><td>.mc-card</td><td>消息</td><td><span class="tag tag-off">关闭（强制）</span></td><td>嵌入气泡流</td></tr>
+  <tr><td>底部输入栏</td><td>.mc-input .mc-composer</td><td>操作控件/浮层</td><td><span class="tag tag-std">标准</span></td><td>固定底栏毛玻璃</td></tr>
+  <tr><td>扩展功能面板</td><td>.mc-panel</td><td>浮层</td><td><span class="tag tag-std">标准</span></td><td>弹出面板</td></tr>
+</table>
+
+<!-- ==================== 3. 实现方案 ==================== -->
+<h2 id="s3">三、实现方案（具体文件与改动点）</h2>
+
+<h3>3.1 状态管理（common.js 新增 glass 对象）</h3>
+
+<p>在 <code>js/common.js</code> L398（theme 对象紧后）新增 <code>glass</code> 对象，完全镜像 theme 的 API 风格，并在 L1135 return 对象中导出为 <code>UI.glass</code>。</p>
+
+<pre><code>/* 玻璃效果三档：off | standard | enhanced
+   off = 无 data-glass；standard = data-glass="on"（纯CSS）；
+   enhanced = data-glass="on" + data-glass-level="enhanced"（CSS + WebGL hero） */
+const GLASS_TIERS = ['off', 'standard', 'enhanced'];
+const glass = {
+  TIERS: GLASS_TIERS,
+  get() {
+    var t = document.documentElement.getAttribute('data-glass-level');
+    var on = document.documentElement.hasAttribute('data-glass');
+    if (!on) return 'off';
+    return t === 'enhanced' ? 'enhanced' : 'standard';
+  },
+  set(tier) {
+    if (GLASS_TIERS.indexOf(tier) === -1) tier = 'off';
+    var el = document.documentElement;
+    if (tier === 'off') {
+      el.removeAttribute('data-glass');
+      el.removeAttribute('data-glass-level');
+    } else {
+      el.setAttribute('data-glass', 'on');
+      if (tier === 'enhanced') el.setAttribute('data-glass-level', 'enhanced');
+      else el.removeAttribute('data-glass-level');
+    }
+    try { localStorage.setItem('engchain-glass', tier); } catch (e) {}
+    // 通知增强档 loader：切到 enhanced 时建实例，切走时销毁
+    try { window.dispatchEvent(new CustomEvent('engchain:glass', { detail: { tier: tier } })); } catch (e) {}
+  },
+  next() {
+    var i = GLASS_TIERS.indexOf(this.get());
+    return this.set(GLASS_TIERS[(i + 1) % GLASS_TIERS.length]);
+  },
+};</code></pre>
+
+<div class="callout">
+  <b>🔗 与 theme 的联动方式</b>
+  经核实，common.js L1247 的 <code>engchain:theme</code> 是 postMessage 消息（宿主预览 iframe 下发主题），不是 DOM CustomEvent，theme.set() 内部也不 dispatch 事件。因此增强档 loader 内部使用 <code>MutationObserver</code> 监听 <code>&lt;html data-theme&gt;</code> 属性变化，<b>不修改 common.js 的 theme 对象</b>，零侵入。
+</div>
+
+<h3>3.2 持久化与重置（databus.js KEEP 白名单）</h3>
+
+<p><code>js/databus.js</code> L232 当前为：</p>
+<pre><code>var KEEP = ['engchain-theme', 'engchain-sidenav'];</code></pre>
+<p>修改为：</p>
+<pre><code>var KEEP = ['engchain-theme', 'engchain-sidenav', 'engchain-glass'];</code></pre>
+<p>同时更新 L229-230 注释。风险等级：低。仅白名单加一项，与 theme/sidenav 行为一致——用户点「全局重置」后玻璃档位偏好不被清除。</p>
+
+<h3>3.3 防闪烁（FOUC）内联脚本</h3>
+
+<p>镜像现有 <code>data-theme-fix</code> 的 IIFE 风格，在每个页面 <code>&lt;head&gt;</code> 最顶部、theme-fix 脚本紧后插入：</p>
+
+<pre><code>&lt;script data-glass-fix="1"&gt;(function(){try{var g=localStorage.getItem('engchain-glass');var el=document.documentElement;if(g==='standard'){el.setAttribute('data-glass','on');}else if(g==='enhanced'){el.setAttribute('data-glass','on');el.setAttribute('data-glass-level','enhanced');}}catch(e){}})();&lt;/script&gt;</code></pre>
+
+<p><b>head 脚本顺序：</b></p>
+<ol>
+  <li><code>&lt;script data-theme-fix="1"&gt;</code>（已有，必须第一）</li>
+  <li><code>&lt;script data-glass-fix="1"&gt;</code>（新增，紧随其后）</li>
+  <li><code>&lt;script data-engchain-basefix="2"&gt;</code>（已有，保持原位）</li>
+</ol>
+
+<p><b>批量挂载方式：</b>约 115 个 HTML 文件，用一次性 PowerShell 脚本做<b>幂等注入</b>——递归扫描 .html（排除 node_modules/vendor），已含 <code>data-glass-fix</code> 的跳过，在 <code>data-theme-fix</code> 闭合后插入。相对路径从该文件已有的 app.css link 反推，根目录页用 <code>css/</code>，内页用 <code>../../css/</code>。执行前先 dry-run 输出待改文件清单，人工抽样确认后再写盘。</p>
+
+<h3>3.4 标准档（CSS 玻璃）</h3>
+
+<h4>3.4.1 glass-upgrade.css 需补充的内容</h4>
+
+<p><b>a. 修复暗色选择器 bug（必须）：</b>L46 现写法 <code>[data-theme="dark"] html[data-glass="on"]</code> 永远不命中，改为：</p>
+<pre><code>html[data-theme="dark"][data-glass="on"] .card,
+html[data-theme="dark"][data-glass="on"] .group,
+html[data-theme="dark"][data-glass="on"] .stat-tile,
+html[data-theme="dark"][data-glass="on"] .supply-card,
+html[data-theme="dark"][data-glass="on"] .wb-action,
+html[data-theme="dark"][data-glass="on"] .cert-archive {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .10),
+    inset 0 -1px 0 rgba(0, 0, 0, .25),
+    0 4px 16px rgba(0, 0, 0, .30);
+}</code></pre>
+
+<p><b>b. 新增 enhanced 档门控令牌 + hero canvas 兜底样式（追加到文件末尾）：</b></p>
+<pre><code>/* enhanced 档：CSS 玻璃再加强一点模糊/饱和 */
+html[data-glass="on"][data-glass-level="enhanced"] {
+  --lg-blur: 24px;
+  --lg-sat: 190%;
+}
+/* hero 容器由 WebGL canvas 接管，CSS 玻璃作为底层兜底 */
+html[data-glass="on"] [data-glass-hero] {
+  position: relative;
+}
+html[data-glass="on"] [data-glass-hero] &gt; canvas.lg-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border-radius: inherit; pointer-events: none; z-index: 0;
+}</code></pre>
+
+<p><b>c. 暗色下对比度覆盖（待视觉走查后定值）：</b>暗色主题 <code>--glass-bg: rgba(255,255,255,.06)</code> 提亮极弱，需在 <code>html[data-theme="dark"][data-glass="on"]</code> 作用域内新增覆盖令牌，将暗色卡片底色提到实测达标值（预估 <code>rgba(255,255,255,.10~.12)</code>），首批不调，由视觉走查后补。</p>
+
+<h4>3.4.2 批量推广到全站</h4>
+<p>与 3.3 的批量脚本同一轮完成：在每个页面 <code>&lt;link app.css&gt;</code> 之后插入 <code>&lt;link glass-upgrade.css&gt;</code>。正式页 <code>&lt;html&gt;</code> 标签保持无 <code>data-glass</code>，由 fix 脚本根据 localStorage 决定。</p>
+
+<h4>3.4.3 试点页处理</h4>
+<p><code>home.glass.html</code>、<code>company/index.glass.html</code>、<code>profile/index.glass.html</code> 去掉硬编码 <code>data-glass="on"</code>，改为与正式页一致的 fix 脚本驱动。不删除文件，保留作为视觉已验收标记。</p>
+
+<h3>3.5 增强档（WebGL Loader）</h3>
+
+<h4>3.5.1 源码集成</h4>
+<p>将技能目录的 <code>src/</code> 整体复制到项目 <code>vendor/liquid-glass/src/</code>（纯 ESM 零依赖，21 个 .js 文件）。项目跑在本地服务器 <code>127.0.0.1:8765</code>，ESM import 不受 file:// CORS 限制。</p>
+
+<h4>3.5.2 新建 js/glass-enhanced.js</h4>
+<p>以 <code>&lt;script type="module"&gt;</code> 加载（module 默认 defer，天然在 DOMContentLoaded 后执行）。核心职责：</p>
+
+<table>
+  <tr><th>职责</th><th>实现方式</th></tr>
+  <tr><td>实例白名单</td><td>只对标注 <code>data-glass-hero</code> 属性的元素创建 LiquidGlass 实例</td></tr>
+  <tr><td>实例上限</td><td>单页最多 <b>4 个</b>（Dock AI球已占1个，留余量；超出的 hero 只享受 CSS 玻璃）</td></tr>
+  <tr><td>档位响应</td><td>监听 <code>engchain:glass</code> CustomEvent，切到 enhanced 时 build，切走时 destroyAll</td></tr>
+  <tr><td>主题联动</td><td><code>MutationObserver</code> 监听 <code>data-theme</code>，切换 tintTone（light↔dark），调实例 update() 或重建</td></tr>
+  <tr><td>降级</td><td>prefers-reduced-motion / prefers-reduced-transparency 时不创建实例，回退标准档；WebGL2 不可用时回退标准档</td></tr>
+  <tr><td>性能预算</td><td>maxDpr: 1.5（默认2，移动端平衡清晰度与填充率）；requestIdleCallback 创建（超时1200ms兜底）</td></tr>
+  <tr><td>销毁</td><td><code>pagehide</code> 事件 destroyAll；每个实例 try/catch 包裹，单个失败不影响其他</td></tr>
+</table>
+
+<pre><code>// js/glass-enhanced.js 骨架（type=module）
+import { LiquidGlass } from '../vendor/liquid-glass/src/index.js';
+
+const HERO_SELECTOR = '[data-glass-hero]';
+const MAX_INSTANCES = 4;
+let instances = [];
+
+function tier() { /* 读 html 属性判断 enhanced */ }
+function reducedTransparency() { /* matchMedia 检测 */ }
+function webglOK() { /* 创建 canvas 检测 webgl2 */ }
+
+function destroyAll() {
+  instances.forEach(({ glass }) => { try { glass.destroy(); } catch (e) {} });
+  instances = [];
+}
+
+function build() {
+  destroyAll();
+  if (tier() !== 'enhanced') return;
+  if (reducedTransparency() || !webglOK()) return; // 回退 standard CSS 玻璃
+  var tone = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  var els = Array.prototype.slice.call(
+    document.querySelectorAll(HERO_SELECTOR), 0, MAX_INSTANCES
+  );
+  els.forEach(function (el) {
+    try {
+      var g = new LiquidGlass(el, {
+        tint: 0.6, tintTone: tone, frost: 0.85,
+        backdrop: 'auto', maxDpr: 1.5,
+        respectReducedTransparency: true,
+      });
+      instances.push({ el: el, glass: g });
+    } catch (e) { /* 单个失败不影响其他 */ }
+  });
+}
+
+window.addEventListener('engchain:glass', build);
+new MutationObserver(function () { /* 主题切换时 update tintTone */ })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+if ('requestIdleCallback' in window) requestIdleCallback(build, { timeout: 1200 });
+else window.addEventListener('load', function () { setTimeout(build, 200); });
+window.addEventListener('pagehide', destroyAll);</code></pre>
+
+<h4>3.5.3 元素标注方式</h4>
+<p><b>推荐 HTML 声明式 <code>data-glass-hero</code> 属性</b>，不用 JS 选择器查询。理由：声明式内容/设计方可见，与"只对重点容器用 WebGL"的克制原则一致，loader 逻辑极简不耦合业务类名，与现有 data-* 门控风格统一。</p>
+
+<h3>3.6 设置页 UI（pages/profile/general-setting.html）</h3>
+
+<p>在 L27 "显示"分组内、"深色模式"行之后新增"玻璃效果"三档选择器，复用现有 <code>.seg</code> 类：</p>
+
+<pre><code>&lt;div class="row"&gt;
+  &lt;span class="label"&gt;玻璃效果&lt;/span&gt;
+  &lt;div class="seg" id="seg-glass" role="radiogroup" aria-label="玻璃效果"&gt;
+    &lt;button type="button" data-tier="off" class="seg-opt"&gt;关闭&lt;/button&gt;
+    &lt;button type="button" data-tier="standard" class="seg-opt"&gt;标准&lt;/button&gt;
+    &lt;button type="button" data-tier="enhanced" class="seg-opt"&gt;增强&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+<p>JS 绑定：点击调用 <code>UI.glass.set()</code> 实时生效 + dispatch engchain:glass + toast 提示 + 同步选中态。<b>顺带接通现有未接线的"深色模式"switch</b>（当前 L28 的 switch 是静态元素，无 onchange、无 checked 初始化），否则设置页两个显示项一个能点一个不能点，体验割裂。</p>
+
+<h3>3.7 文件改动清单</h3>
+
+<table>
+  <tr><th>文件</th><th>操作</th><th>改动摘要</th><th>风险</th></tr>
+  <tr><td>js/common.js</td><td>修改</td><td>L398 后新增 glass 对象（~30行）；L1135 return 追加 glass</td><td><span class="tag tag-warn">中</span></td></tr>
+  <tr><td>js/databus.js</td><td>修改</td><td>L232 KEEP 追加 'engchain-glass'；注释更新</td><td><span class="tag tag-ok">低</span></td></tr>
+  <tr><td>css/glass-upgrade.css</td><td>修改</td><td>修复 L46 暗色选择器；末尾追加 enhanced 令牌 + hero canvas 兜底（~40行）</td><td><span class="tag tag-warn">中</span></td></tr>
+  <tr><td>js/glass-enhanced.js</td><td><b>新增</b></td><td>WebGL loader：白名单/上限/降级/主题联动/销毁（~120行，ESM）</td><td><span class="tag tag-warn">中</span></td></tr>
+  <tr><td>vendor/liquid-glass/src/*</td><td><b>新增</b></td><td>从技能目录复制整个 src（21个.js，纯ESM零依赖）</td><td><span class="tag tag-ok">低</span></td></tr>
+  <tr><td>pages/profile/general-setting.html</td><td>修改</td><td>新增玻璃效果 seg + JS 绑定；可选接通深色 switch</td><td><span class="tag tag-ok">低</span></td></tr>
+  <tr><td>全站 ~115 个 .html</td><td>批量修改</td><td>head 注入 data-glass-fix 脚本；app.css link 后加 glass-upgrade.css link</td><td><span class="tag tag-danger">高</span></td></tr>
+  <tr><td>3 个试点页 .glass.html</td><td>修改</td><td>去掉硬编码 data-glass，改由 fix 脚本驱动</td><td><span class="tag tag-ok">低</span></td></tr>
+  <tr><td>tools/verify-glass.js</td><td><b>新增</b></td><td>三档切换自动化验证脚本（复用 puppeteer 模式）</td><td><span class="tag tag-ok">低</span></td></tr>
+</table>
+
+<div class="callout ok">
+  <b>✅ 明确不碰的文件</b>
+  <code>css/liquid-dock.css</code>、<code>js/liquid-dock.js</code>、<code>.app-nav-shell</code>、AI 球相关、<code>app.css</code> 既有令牌值、<code>verify.js</code> 的 A/B 断言、<code>data-theme-fix</code> 脚本。
+</div>
+
+<h3>3.8 可行性评估</h3>
+
+<div class="grid2">
+  <div class="mini-card">
+    <h4>✅ 无阻塞点</h4>
+    <ul>
+      <li>ESM import：本地服务器非 file://，模块脚本正常加载</li>
+      <li>backdrop-filter：Chrome 76+/Safari 9+/Firefox 103+ 均支持，不支持时半透明实色兜底</li>
+      <li>主题联动：MutationObserver 零侵入解决</li>
+      <li>液态 Dock：hero 白名单显式排除，canvas pointer-events:none</li>
+    </ul>
+  </div>
+  <div class="mini-card">
+    <h4>⚠️ 可控风险</h4>
+    <ul>
+      <li>WebGL 上下文 16 上限：hero 限 4 个 + 兜底回退</li>
+      <li>暗色对比度：--glass-bg .06 偏弱，需视觉走查后调覆盖值</li>
+      <li>批量注入 115 文件：必须幂等脚本 + dry-run + diff 审查</li>
+    </ul>
+  </div>
+</div>
+
+<p><b>工作量估算：约 9-11 人时</b>（common.js 0.5h + databus 0.1h + CSS 0.5h + WebGL loader 2-3h + vendor 0.5h + 设置UI 1h + 批量注入 2h + 试点页 0.3h + 视觉走查 2-3h）。</p>
+
+<!-- ==================== 4. 安全保障 ==================== -->
+<h2 id="s4">四、安全保障与既有成果保护</h2>
+
+<h3>4.1 不可改动红线清单</h3>
+
+<table class="compact-table">
+  <tr><th>#</th><th>文件/规则</th><th>具体内容</th><th>为什么不能动</th><th>动了会怎样</th></tr>
+  <tr><td>R1</td><td>css/liquid-dock.css</td><td>L1: @generated 构建产物，唯一来源是 artifacts/tabbar-redesign/lg/dock.css + sync.py</td><td>直接改会被下次 sync.py 覆盖</td><td>verify.js 有逐字节对比断言，直接 FAIL</td></tr>
+  <tr><td>R2</td><td>app.css .app-nav-shell height:60px</td><td>AI 球的位置锚点——60px 壳装 60px 球，球心=壳心</td><td>球位置完全由外壳高度决定</td><td>改 64px 球上移 2px，verify.js 六项逐像素断言误差&lt;0.01 直接 FAIL</td></tr>
+  <tr><td>R3</td><td>.ai-orb-entry 尺寸与定位</td><td>verify.js L243-251 六项 A/B 断言</td><td>AI 球是独立入口，不属 Dock 簇</td><td>玻璃选择器若意外命中，球位置漂移，截图+数值双重失败</td></tr>
+  <tr><td>R4</td><td>app.css 既有设计令牌值</td><td>--bg-card / --glass-bg / --glass-border / --r-* / --shadow-*</td><td>全站主视觉系统，glass-upgrade.css 声明"全部走已有令牌"</td><td>改全局值影响 off 档页面，破坏 A/B 基线</td></tr>
+  <tr><td>R5</td><td>data-theme-fix 防闪烁脚本</td><td>内联在 head，首帧前读 localStorage 设 data-theme</td><td>三档需并行新增 glass 读取，但不能改既有逻辑</td><td>改坏主题防闪烁导致全站 FOUC，影响面远大于玻璃升级</td></tr>
+  <tr><td>R6</td><td>verify.js 所有 PASS 断言</td><td>同步产物校验、球 A/B 断言、Dock 尺寸、Pura 视口矩阵</td><td>这是 Dock 升级的回归保护网</td><td>删/改断言让 Dock 回归失去保护</td></tr>
+  <tr><td>R7</td><td>试点页 A/B 对照关系</td><td>home.glass.html ↔ home.html 等三对</td><td>试点副本是灰度实验载体</td><td>把 data-glass 加到正式页破坏对照，无法区分玻璃效果与其他改动</td></tr>
+  <tr><td>R8</td><td>--lg-orb-gap / --lg-w / --lg-h 等 Dock 令牌</td><td>liquid-dock.css L36-50 锁定值</td><td>Dock 与球的几何关系</td><td>改变 Dock↔球簇几何，触发系列断言</td></tr>
+</table>
+
+<h3>4.2 风险识别与缓解</h3>
+
+<table class="compact-table">
+  <tr><th>风险</th><th>描述</th><th>概率</th><th>缓解措施</th><th>回滚</th></tr>
+  <tr>
+    <td><span class="tag tag-danger">A 视觉回归</span></td>
+    <td>暗色 --glass-bg: rgba(255,255,255,.06) 叠加 #1C1C1E ≈ rgb(42,42,44)，次级文字可能跌破 WCAG AA 4.5:1</td>
+    <td><b>高</b></td>
+    <td>不改全局 --glass-bg；在 dark+glass 作用域新增覆盖令牌提到 .10~.12；次级文字单独提亮度</td>
+    <td>移除覆盖规则，回退实色卡</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-warn">B 性能回归</span></td>
+    <td>backdrop-filter 长列表合成层压力；WebGL 上下文超限</td>
+    <td>中</td>
+    <td>列表行 .group .row 保持 transparent 不加 backdrop-filter；enhanced hero 限 4 个；长列表页 enhanced 自动降级</td>
+    <td>帧率&lt;50fps 时移除 data-glass</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-warn">C FOUC</span></td>
+    <td>glass 读取若放在外部 JS，首帧实色→玻璃闪烁</td>
+    <td>中高</td>
+    <td>head 内联 data-glass-fix 同步执行，在首次绘制前完成；不得在 defer/async JS 中设置</td>
+    <td>首帧默认 off，JS ready 后再切（接受一次闪烁）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-danger">D 状态丢失</span></td>
+    <td>databus.js KEEP 当前不含 engchain-glass，用户点重置后档位被清</td>
+    <td><b>确定</b></td>
+    <td>把 'engchain-glass' 加入 KEEP 白名单（与 theme 同类）；监听 storage 事件同步多标签页</td>
+    <td>从 KEEP 删掉 engchain-glass</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-warn">E Dock 联动</span></td>
+    <td>glass-upgrade.css 选择器过宽污染 Dock 渲染管线</td>
+    <td>中</td>
+    <td>所有选择器带 html[data-glass] 前缀且只命中业务类，禁止裸 * 或 .app-tabbar/.lg-*；WebGL loader 排除 canvas.lg-gl</td>
+    <td>跑 verify.js 全套，任何 FAIL 即关闭 glass</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-warn">F WebGL 泄漏</span></td>
+    <td>页面切换时实例未 destroy，上下文累积触发丢失</td>
+    <td>中高</td>
+    <td>pagehide destroyAll；实例上限 4；webglcontextlost 事件自动降级</td>
+    <td>检测上下文丢失即关闭 enhanced 回退 standard</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-ok">G 无障碍</span></td>
+    <td>当前无 prefers-reduced-transparency 处理</td>
+    <td>低概率高影响</td>
+    <td>新增 @media (prefers-reduced-transparency: reduce) 规则：enhanced 不建实例，standard 也关 backdrop-filter</td>
+    <td>media query 加 !important 兜底</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-ok">H 兼容性</span></td>
+    <td>旧浏览器不支持 backdrop-filter / WebGL2</td>
+    <td>低</td>
+    <td>backdrop-filter 已有 -webkit- 前缀，不支持时半透明实色兜底；enhanced 启动前检测 WebGL2，不可用降级 standard</td>
+    <td>特性检测失败即停留在 standard</td>
+  </tr>
+</table>
+
+<h3>4.3 备份与回滚</h3>
+
+<h4>备份方案</h4>
+<table class="compact-table">
+  <tr><th>备份对象</th><th>命名规范</th><th>时机</th></tr>
+  <tr><td>css/glass-upgrade.css</td><td>glass-upgrade.css.bak-YYYYMMDD</td><td>升级开始前</td></tr>
+  <tr><td>js/databus.js</td><td>databus.js.bak-YYYYMMDD</td><td>修改前</td></tr>
+  <tr><td>js/common.js</td><td>common.js.bak-YYYYMMDD</td><td>修改前</td></tr>
+  <tr><td>pages/profile/general-setting.html</td><td>general-setting.html.bak-YYYYMMDD</td><td>修改前</td></tr>
+  <tr><td>app.css / liquid-dock.css / liquid-dock.js</td><td colspan="2"><b>不备份也不修改（红线）</b></td></tr>
+</table>
+
+<h4>回滚触发条件（任一即回滚）</h4>
+<ol>
+  <li>verify.js 任何一条 FAIL（Dock/球回归被破坏）</li>
+  <li>verify-orb.js 截图出现 AI 球位置或渲染差异</li>
+  <li>暗色主题下正文对比度实测 &lt; 4.5:1</li>
+  <li>长列表页滚动帧率 &lt; 45fps 持续 3 秒以上</li>
+  <li>WebGL 上下文数超过 14</li>
+  <li>用户报告首帧闪烁无法接受</li>
+  <li>databus 重置后 glass 状态不一致</li>
+</ol>
+
+<h4>回滚步骤</h4>
+<ol>
+  <li><b>紧急降级</b>：移除 <code>data-glass</code> 属性，立即停止 WebGL，CSS 玻璃规则因门控失效全部卸载</li>
+  <li><b>清理 localStorage</b>：<code>localStorage.removeItem('engchain-glass')</code></li>
+  <li><b>恢复备份</b>：用 .bak 文件覆盖 databus.js / common.js / glass-upgrade.css</li>
+  <li><b>验证 Dock</b>：跑 verify.js 全 PASS 证明 Dock 完好</li>
+</ol>
+
+<h3>4.4 灰度路径</h3>
+
+<table>
+  <tr><th>阶段</th><th>范围</th><th>验证门槛（全过才进下一阶段）</th></tr>
+  <tr><td><b>阶段 0</b><br>试点页对照</td><td>仅 3 个 .glass.html 试点副本页</td><td>verify.js 全 PASS；对比度达标；无 FOUC；帧率达标</td></tr>
+  <tr><td><b>阶段 1</b><br>内部小流量</td><td>试点页 + 1-2 个高频正式页（如 home.html），默认仍 off，仅设置页可手动切</td><td>阶段0 + 多标签同步 + databus重置 + 无障碍降级</td></tr>
+  <tr><td><b>阶段 2</b><br>全站 standard</td><td>所有页面启用门控，默认档位 = standard（enhanced 仍手动开启）</td><td>阶段1 + 全站人工回归无 P0/P1 问题</td></tr>
+  <tr><td><b>阶段 3</b><br>enhanced 灰度</td><td>enhanced 默认关闭，仅内部用户可开</td><td>阶段2 + WebGL 无泄漏 + 连续3天无上下文丢失</td></tr>
+</table>
+
+<!-- ==================== 5. 验收标准 ==================== -->
+<h2 id="s5">五、可测量验收标准</h2>
+
+<h3>A. 功能验收</h3>
+<table class="compact-table">
+  <tr><th>#</th><th>验收项</th><th>测量方法</th><th>通过判据</th></tr>
+  <tr><td>A1</td><td>三档切换生效</td><td>设置页切档后查 document.documentElement.getAttribute('data-glass')</td><td>off→无属性；standard→"on"；enhanced→"on"+data-glass-level="enhanced"</td></tr>
+  <tr><td>A2</td><td>localStorage 持久化</td><td>切档后查 localStorage，F5 刷新后查属性</td><td>刷新前后档位字符串完全相等</td></tr>
+  <tr><td>A3</td><td>跨页保持</td><td>home 切 enhanced → 跳 wallet → 返回 home</td><td>全程 data-glass 值不变</td></tr>
+  <tr><td>A4</td><td>防闪烁</td><td>puppeteer evaluateOnNewDocument 首帧前注入探针，第一帧 RAF 时查属性</td><td>首帧属性已设置；首帧与第500ms帧卡片像素差异 &lt; 5/255</td></tr>
+  <tr><td>A5</td><td>重置保护</td><td>调 databus.resetAll() 后查 localStorage</td><td>engchain-glass 不被清除</td></tr>
+  <tr><td>A6</td><td>设置页 UI 同步</td><td>切档后查看选择器高亮态</td><td>选中态与 data-glass 实际值一一对应</td></tr>
+</table>
+
+<h3>B. 视觉验收</h3>
+<table class="compact-table">
+  <tr><th>#</th><th>验收项</th><th>测量方法</th><th>通过判据</th></tr>
+  <tr><td>B1</td><td>明色标准档对比度</td><td>.card 正文文字，合成背景色测对比度</td><td>≥ 4.5:1（WCAG AA）</td></tr>
+  <tr><td>B2</td><td>暗色标准档对比度</td><td>同上，暗色主题下</td><td>≥ 4.5:1；不达标则调覆盖值后重测</td></tr>
+  <tr><td>B3</td><td>增强档文字清晰</td><td>enhanced 下卡片文字不被折射扭曲到模糊</td><td>文字边缘可辨，tint 0.5-0.8</td></tr>
+  <tr><td>B4</td><td>AI 球逐像素一致</td><td>跑 verify.js 第4节 A/B 断言</td><td>orbW/orbH/orbL/orbR/orbOff/orbDisp 六项误差 &lt; 0.01；shellH 误差 &lt; 0.01</td></tr>
+  <tr><td>B5</td><td>无穿模错位</td><td>人工检查玻璃卡与 Dock/浮层/背景图叠放</td><td>不遮挡 Dock 可点击区；sheet 不透出不可点击元素；无 z-index 穿透</td></tr>
+</table>
+
+<h3>C. 性能验收</h3>
+<table class="compact-table">
+  <tr><th>#</th><th>验收项</th><th>测量方法</th><th>通过判据</th></tr>
+  <tr><td>C1</td><td>WebGL 上下文数</td><td>enhanced 单页 document.querySelectorAll('canvas').length</td><td>≤ 5（4 玻璃透镜 + 1 Dock lg-gl），远低于 16 硬限制</td></tr>
+  <tr><td>C2</td><td>滚动帧率</td><td>supply/list.html 快速滚动 5 秒，DevTools Performance</td><td>standard 档平均 ≥ 50fps，无持续 &lt; 45fps</td></tr>
+  <tr><td>C3</td><td>首屏开销</td><td>对比 off vs standard 的 TTI</td><td>差值 ≤ 100ms</td></tr>
+  <tr><td>C4</td><td>内存无泄漏</td><td>enhanced 下连续切换 10 次页面，统计 canvas 数</td><td>canvas 数不累积（始终 ≤ 4）；无 webglcontextlost 事件</td></tr>
+</table>
+
+<h3>D. 无障碍验收</h3>
+<table class="compact-table">
+  <tr><th>#</th><th>验收项</th><th>测量方法</th><th>通过判据</th></tr>
+  <tr><td>D1</td><td>prefers-reduced-motion</td><td>puppeteer emulateMediaFeatures，查 .card 的 backdrop-filter</td><td>计算值为 none（glass-upgrade.css L108-117 生效）</td></tr>
+  <tr><td>D2</td><td>prefers-reduced-transparency</td><td>同上，enhanced 下查玻璃透镜 canvas 数</td><td>0 个新 WebGL 实例；standard backdrop-filter 为 none</td></tr>
+  <tr><td>D3</td><td>键盘 focus 可见</td><td>Tab 遍历玻璃卡片，查 :focus-visible</td><td>--shadow-focus 高亮清晰，focus 轮廓对比度 ≥ 3:1</td></tr>
+  <tr><td>D4</td><td>屏幕阅读器</td><td>检查是否新增/删除 DOM 节点、改 aria-*</td><td>DOM 结构与 off 档完全一致，无语义改变</td></tr>
+</table>
+
+<!-- ==================== 6. 执行顺序 ==================== -->
+<h2 id="s6">六、执行顺序与安全门禁</h2>
+
+<pre><code>[步骤1] 备份 glass-upgrade.css / common.js / databus.js / general-setting.html
+   │  门禁：备份文件存在且大小 > 0
+   ▼
+[步骤2] 新增 head 内联 data-glass-fix 脚本（批量注入 ~115 文件）
+   │  门禁：FOUC 检测(A4)通过；data-theme-fix 未被改动
+   ▼
+[步骤3] 扩展 glass-upgrade.css（修复暗色选择器 + enhanced 令牌 + 暗色对比度覆盖）
+   │  门禁：B1/B2 对比度达标；D1/D2 降级生效
+   ▼
+[步骤4] 修改 databus.js KEEP 白名单
+   │  门禁：A5 重置保护通过
+   ▼
+[步骤5] common.js 新增 glass 对象 + 导出
+   │  门禁：A1 三档属性正确
+   ▼
+[步骤6] 编写 tools/verify-glass.js 自动化脚本
+   │  门禁：A1/A2/A3/A6 功能断言全 PASS
+   ▼
+[步骤7] 3 个试点页启用三档（去掉硬编码）
+   │  门禁：verify.js 全 PASS；verify-orb.js 截图无差异；B4 球逐像素一致
+   ▼
+⛔ 【暂停点 1】人工确认试点页视觉/性能/无障碍全部达标
+   ▼
+[步骤8] enhanced 档 WebGL loader（glass-enhanced.js + vendor 复制）
+   │  门禁：C1 上下文 ≤5；C4 无泄漏；B3 文字清晰
+   ▼
+[步骤9] 设置页三档选择器 UI + 接通深色 switch
+   │  门禁：A6 同步一致
+   ▼
+⛔ 【暂停点 2】完整人工回归清单 P0/P1 全通过
+   ▼
+[步骤10] 阶段1→2→3 灰度（每阶段门禁见 4.4）</code></pre>
+
+<div class="callout">
+  <b>🔀 并行与串行</b><br>
+  <b>可并行</b>：步骤2（防闪烁脚本）与步骤3（CSS 门控）操作不同文件可并行；步骤6（自动化脚本）可与步骤7（试点页）并行。<br>
+  <b>必须串行</b>：步骤4（KEEP）在步骤5验证前；步骤8（WebGL）在步骤7（CSS 门控稳定）之后——先确保纯 CSS 档稳定再叠 WebGL；所有 glass-upgrade.css 改动在跑 verify.js 之前完成。
+</div>
+
+<!-- ==================== 7. 待确认 ==================== -->
+<h2 id="s7">七、待确认事项（落地前需核实/决策）</h2>
+
+<table>
+  <tr><th>#</th><th>事项</th><th>影响</th><th>建议</th></tr>
+  <tr><td>1</td><td>LiquidGlass 实例是否暴露 update(opts) 方法</td><td>主题切换时是 update 还是 destroy+重建</td><td>执行前读 vendor/liquid-glass/src/index.js 确认；无则用重建</td></tr>
+  <tr><td>2</td><td>common.js pageTransition 是否做 SPA 式视图替换</td><td>是否需要在 pageTransition 内插 destroyAll 钩子</td><td>若只是 CSS过渡+整页跳转，pagehide 足够</td></tr>
+  <tr><td>3</td><td>暗色 enhanced 档 --lg-blur:24px + 顶部白高光是否过亮</td><td>暗色视觉质量</td><td>首批不调，视觉走查后微调</td></tr>
+  <tr><td>4</td><td>增强档最终取 4 处还是 6 处</td><td>WebGL 性能预算与视觉覆盖</td><td>建议首批 4 处（home英雄卡+金刚区、钱包卡、会员、企业头），分销Hero和vendor Hero 留作二期</td></tr>
+  <tr><td>5</td><td>阶段1灰度选哪 1-2 个高频正式页</td><td>灰度风险控制</td><td>建议 home.html + wallet/index.html</td></tr>
+  <tr><td>6</td><td>supply/detail、agreement 正文、industry/api 的具体容器类名</td><td>归类精确度</td><td>执行前对照各页 style 块二次确认</td></tr>
+  <tr><td>7</td><td>是否接通现有未接线的"深色模式"switch</td><td>设置页体验一致性</td><td>建议接通（低风险，否则两个显示项一个能点一个不能点）</td></tr>
+</table>
+
+<div class="footer-note">
+  <p>本方案基于 2026-09-25 对 D:\Engchain3.0 项目全部页面和关键文件的实际读取核实编写。所有类名、行号、文件路径均来自真实代码；标注「待确认」处为执行前需二次核实的事项。<b>本方案仅用于审批，未经用户同意不执行任何代码修改。</b></p>
+  <p>方案编制：专家 UI 设计师（逐页归类）+ 专家前端工程师（实现方案）+ 专家质量保障工程师（安全验收）联合完成。</p>
+</div>
+
+</div>
+</body>
+</html>

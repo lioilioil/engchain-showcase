@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#0E171D">
+<title>认证中心 · 工程链</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   认证中心重设计 · 「工程信任通行证」
+   人格：深墨青场 × 哑光金 × 3D 信任徽章 × 无衬线冷静
+   机制：Hero 只留一个主角（徽章）；双轨成长路径承载信息结构；
+         五状态驱动同一套组件；主操作常驻拇指区。
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0E171D;
+  --hero:#0A1217;
+  --surface:#16222A;
+  --surface-2:#1E2D37;
+  --ink:#F2EEE4;
+  --dim:rgba(242,238,228,.62);
+  --faint:rgba(242,238,228,.38);
+  --line:rgba(214,196,150,.16);
+  --line-2:rgba(255,255,255,.07);
+  --gold:#C6A05B;
+  --gold-hi:#E3C885;
+  --gold-deep:#8F7139;
+  --gold-soft:rgba(198,160,91,.13);
+  --steel:#8FB0C4;
+  --steel-soft:rgba(143,176,196,.13);
+  --coral:#E08372;
+  --coral-soft:rgba(224,131,114,.13);
+  --r-shell:20px;
+  --r-card:14px;
+  --r-ctrl:10px;
+  --ease:cubic-bezier(.22,.75,.3,1);
+  --dock:84px;
+  --font-num:'Barlow','PingFang SC',sans-serif;
+  /* 取景框台面：深墨青氛围 + 金/青两团光 */
+  --frame:#101A21;
+  --frame-2:#26343D;
+  --stage-1:#15242C;
+  --stage-2:#070D10;
+  --halo-1:#C6A05B;
+  --halo-2:#2E6B63;
+  --halo-a:.28;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);overflow:hidden;
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;min-height:24px}
+img,svg{display:block;max-width:100%}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.ic{width:100%;height:100%}
+
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:radial-gradient(130% 90% at 50% 6%,var(--stage-1),var(--stage-2) 74%)}
+.stage::before{content:"";position:absolute;inset:-18%;z-index:0;pointer-events:none;
+  opacity:var(--halo-a);filter:blur(90px);
+  background:
+    radial-gradient(38% 30% at 20% 22%,var(--halo-1),transparent 70%),
+    radial-gradient(44% 36% at 80% 76%,var(--halo-2),transparent 70%)}
+#app{position:relative;z-index:1;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+@media(min-width:760px){
+  #app{width:390px;height:min(844px,86vh);border-radius:44px;
+    box-shadow:0 0 0 11px var(--frame),0 0 0 13px var(--frame-2),0 44px 110px rgba(0,0,0,.55)}
+  .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);
+    width:112px;height:26px;border-radius:15px;background:var(--frame);z-index:60}
+}
+@media(max-width:759px){.notch{display:none}.stage::before{display:none}}
+
+/* ── 状态栏 ── */
+.statusbar{position:absolute;top:0;left:0;right:0;z-index:55;height:44px;padding:0 22px;
+  display:flex;align-items:center;justify-content:space-between;pointer-events:none;
+  font-size:13px;font-weight:600;color:var(--ink)}
+.sb-r{display:flex;align-items:center;gap:5px}
+.sb-r i{display:block;background:currentColor;border-radius:1px}
+.sb-r .sig{width:15px;height:10px;
+  clip-path:polygon(0 72%,18% 72%,18% 100%,0 100%,0 72%,27% 46%,45% 46%,45% 100%,27% 100%,
+    27% 46%,54% 22%,72% 22%,72% 100%,54% 100%,54% 22%,82% 0,100% 0,100% 100%,82% 100%)}
+.sb-r .wifi{width:14px;height:10px;
+  clip-path:polygon(50% 100%,32% 74%,68% 74%,50% 100%,50% 66%,20% 40%,28% 30%,72% 30%,80% 40%,
+    50% 66%,50% 24%,8% 12%,14% 2%,86% 2%,92% 12%)}
+.sb-r .bat{width:22px;height:11px;border-radius:3px;position:relative;box-shadow:inset 0 0 0 1px currentColor}
+.sb-r .bat::before{content:"";position:absolute;inset:2px;width:64%;background:currentColor;border-radius:1px}
+
+/* ── 导航栏：返回 + 页名 + 体系说明 ── */
+.topbar{position:absolute;top:0;left:0;right:0;z-index:50;
+  padding:calc(env(safe-area-inset-top) + 50px) 14px 10px;
+  display:flex;align-items:center;gap:6px;
+  background:linear-gradient(180deg,var(--hero) 70%,rgba(10,18,23,0))}
+.tbtn{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  color:var(--ink);flex:none}
+.tbtn:active{transform:scale(.92)}
+.tbtn .ic{width:19px;height:19px}
+.nav-title{flex:1;text-align:center;font-size:16px;font-weight:700;letter-spacing:.02em}
+.nav-help{font-size:11.5px;color:var(--gold-hi);padding:7px 12px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(198,160,91,.08);flex:none}
+.nav-help:active{transform:scale(.95)}
+
+#flow{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  padding:calc(env(safe-area-inset-top) + 96px) 16px calc(var(--dock) + env(safe-area-inset-bottom) + 22px)}
+#flow::-webkit-scrollbar{display:none}
+
+/* ══════════ HERO：信任通行证 ══════════ */
+.hero{position:relative;border-radius:var(--r-shell);overflow:hidden;background:var(--hero);
+  border:1px solid var(--line);min-height:430px;
+  box-shadow:0 2px 6px rgba(0,0,0,.3),0 24px 50px -22px rgba(0,0,0,.6)}
+.hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:center 18%;opacity:.92;will-change:transform}
+.hero-scrim{position:absolute;inset:0;
+  background:
+    linear-gradient(180deg,rgba(10,18,23,.34) 0%,rgba(10,18,23,.06) 30%,rgba(10,18,23,.78) 68%,var(--hero) 100%),
+    radial-gradient(120% 60% at 0% 100%,rgba(198,160,91,.12),transparent 60%)}
+.hero-inner{position:relative;padding:18px 18px 18px;min-height:430px;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.hero-eyebrow{display:flex;align-items:center;gap:7px;margin-bottom:auto;padding-top:118px;
+  font-family:var(--font-num);font-size:10.5px;font-weight:600;letter-spacing:.2em;
+  color:var(--gold-hi);text-transform:uppercase}
+.hero-eyebrow::before{content:"";width:18px;height:1px;background:var(--gold)}
+.hero-badge{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;
+  font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:4px 11px;border-radius:999px;
+  margin-bottom:11px;border:1px solid transparent}
+.hero-badge .ic{width:12px;height:12px}
+.b-gold{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#221A0C;border:0}
+.b-ghost{background:var(--gold-soft);color:var(--gold-hi);border-color:var(--line)}
+.b-steel{background:var(--steel-soft);color:var(--steel);border-color:rgba(143,176,196,.3)}
+.b-coral{background:var(--coral-soft);color:var(--coral);border-color:rgba(224,131,114,.32)}
+.b-done{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#221A0C;border:0}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(143,176,196,.5)}70%{box-shadow:0 0 0 7px rgba(143,176,196,0)}100%{box-shadow:0 0 0 0 rgba(143,176,196,0)}}
+.hero-title{font-size:25px;font-weight:800;line-height:1.28;letter-spacing:.01em;margin-bottom:7px}
+.hero-desc{font-size:12.5px;line-height:1.65;color:var(--dim);margin-bottom:13px}
+.hero-reason{display:flex;gap:8px;align-items:flex-start;background:var(--coral-soft);
+  border:1px solid rgba(224,131,114,.28);border-radius:var(--r-ctrl);padding:10px 12px;margin-bottom:12px}
+.hero-reason .ic{width:15px;height:15px;color:var(--coral);flex:none;margin-top:1px}
+.hero-reason b{color:var(--coral);font-weight:700}
+.hero-reason span{font-size:11.5px;line-height:1.6;color:var(--dim)}
+
+/* 审核步骤条 */
+.steps{display:flex;align-items:flex-start;margin:2px 0 14px}
+.step{flex:1;text-align:center;position:relative;font-size:10px;color:var(--faint)}
+.step .sd{width:18px;height:18px;border-radius:50%;margin:0 auto 5px;display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line-2);position:relative;z-index:2}
+.step .sd .ic{width:10px;height:10px}
+.step::before{content:"";position:absolute;top:9px;left:-50%;width:100%;height:2px;background:var(--line-2);z-index:1}
+.step:first-child::before{display:none}
+.step.done{color:var(--gold-hi)}
+.step.done .sd{background:linear-gradient(135deg,var(--gold-hi),var(--gold));border-color:var(--gold);color:#221A0C}
+.step.done::before{background:var(--gold)}
+.step.active{color:var(--steel)}
+.step.active .sd{border-color:var(--steel);color:var(--steel);
+  box-shadow:0 0 0 4px rgba(143,176,196,.12);animation:breathe 1.6s infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 8px rgba(143,176,196,0)}}
+
+/* 完成度分段 */
+.prog{display:flex;align-items:center;gap:11px}
+.prog-bars{flex:1;display:flex;gap:5px}
+.prog-bars i{height:5px;flex:1;border-radius:99px;background:rgba(255,255,255,.10);
+  overflow:hidden;position:relative}
+.prog-bars i b{position:absolute;inset:0;border-radius:99px;width:0;
+  background:linear-gradient(90deg,var(--gold-deep),var(--gold-hi));transition:width .9s var(--ease)}
+.prog-txt{font-size:11px;color:var(--dim);white-space:nowrap}
+.prog-txt b{font-family:var(--font-num);font-size:17px;font-weight:800;color:var(--gold-hi)}
+
+/* Hero 事实点（仅未认证态） */
+.hero-facts{display:flex;gap:14px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line-2)}
+.hf{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
+.hf .ic{width:13px;height:13px;color:var(--gold)}
+
+/* ══════════ 权益带 ══════════ */
+.sec-head{display:flex;align-items:baseline;gap:8px;margin:22px 2px 11px}
+.sec-head h3{font-size:15px;font-weight:700;letter-spacing:.02em}
+.sec-head .cnt{margin-left:auto;font-size:11px;color:var(--faint);font-family:var(--font-num)}
+.sec-head .sub{font-size:10.5px;color:var(--faint)}
+.benefits{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-shell);padding:14px 10px}
+.bf{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bf-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:var(--gold-soft);color:var(--gold-hi);border:1px solid var(--line)}
+.bf-ic .ic{width:18px;height:18px}
+.bf b{font-size:11.5px;font-weight:700;line-height:1.2}
+.bf span{font-size:10px;color:var(--faint);line-height:1.3}
+
+/* ══════════ 双轨成长路径 ══════════ */
+.path-found{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:90px;
+  background:linear-gradient(135deg,rgba(198,160,91,.14),rgba(198,160,91,.04) 55%,var(--surface));
+  border:1px solid var(--line);border-radius:var(--r-card);padding:12px 13px}
+.path-found:active{transform:scale(.985)}
+.pf-img{width:50px;height:50px;border-radius:12px;object-fit:cover;flex:none;
+  border:1px solid var(--line)}
+.pf-body{flex:1;min-width:0}
+.pf-tag{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--gold-hi);
+  font-family:var(--font-num)}
+.pf-name{font-size:15px;font-weight:700;margin:1px 0 2px}
+.pf-desc{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-seal{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;
+  border:1px solid var(--line);color:var(--faint)}
+.pf-seal .ic{width:17px;height:17px}
+.pf-seal.done{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#221A0C;border:0;
+  box-shadow:0 4px 12px rgba(198,160,91,.4)}
+.pf-seal.todo{color:var(--gold-hi);border-color:var(--gold);background:var(--gold-soft)}
+.pf-seal.review{color:var(--steel);border-color:var(--steel);background:var(--steel-soft)}
+.pf-seal.reject{color:var(--coral);border-color:var(--coral);background:var(--coral-soft)}
+
+.fork{margin:0 auto;width:calc(100% - 90px);height:34px;position:relative}
+.fork svg{width:100%;height:100%}
+.branches{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.branch-label{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  color:var(--dim);margin-bottom:8px;padding-left:2px}
+.branch-label i{width:6px;height:6px;border-radius:2px;background:var(--gold);flex:none}
+.branch-label span:last-child{margin-left:auto;font-weight:500;font-size:10.5px;color:var(--faint);font-family:var(--font-num)}
+.branch.e .branch-label i{background:var(--halo-2);box-shadow:0 0 8px rgba(46,107,99,.8)}
+.bnodes{display:flex;flex-direction:column;gap:9px}
+.bnode{display:flex;align-items:center;gap:9px;text-align:left;width:100%;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-card);padding:9px 10px}
+.bnode:active{transform:scale(.975);border-color:var(--line)}
+.bnode.done{border-color:rgba(198,160,91,.32);
+  background:linear-gradient(135deg,rgba(198,160,91,.10),var(--surface) 60%)}
+.bnode.locked{opacity:.55}
+.bn-img{width:38px;height:38px;border-radius:10px;object-fit:cover;flex:none;border:1px solid var(--line-2)}
+.bnode.locked .bn-img{filter:grayscale(.7)}
+.bn-lock{position:absolute;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  background:rgba(8,14,18,.55);color:var(--dim)}
+.bn-lock .ic{width:15px;height:15px}
+.bn-imgwrap{position:relative;flex:none}
+.bn-body{flex:1;min-width:0}
+.bn-name{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bn-desc{font-size:10px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bn-state{flex:none;width:18px;height:18px;color:var(--gold)}
+.bn-state .ic{width:100%;height:100%}
+.bn-state.review{color:var(--steel)}.bn-state.reject{color:var(--coral)}.bn-state.todo{color:var(--gold)}
+.bn-state.locked{color:var(--faint)}
+
+/* ══════════ 全部身份 ══════════ */
+.ilist{display:flex;flex-direction:column;gap:8px}
+.irow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-card);padding:11px 12px}
+.irow:active{transform:scale(.985);border-color:var(--line)}
+.irow.done{border-color:rgba(198,160,91,.28)}
+.ir-img{width:42px;height:42px;border-radius:11px;object-fit:cover;flex:none;border:1px solid var(--line-2)}
+.ir-body{flex:1;min-width:0}
+.ir-name{font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+.ir-tag{font-size:10px;font-weight:600;color:var(--gold-hi);background:var(--gold-soft);
+  border:1px solid var(--line);padding:1px 6px;border-radius:99px}
+.ir-desc{font-size:10.5px;color:var(--faint);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ir-right{display:flex;align-items:center;gap:5px;flex:none}
+.spill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:3px 8px;border-radius:999px;white-space:nowrap}
+.spill .ic{width:10px;height:10px}
+.spill.done{color:var(--gold-hi);background:var(--gold-soft)}
+.spill.review{color:var(--steel);background:var(--steel-soft)}
+.spill.reject{color:var(--coral);background:var(--coral-soft)}
+.spill.todo{color:var(--gold-hi);border:1px solid var(--line)}
+.spill.locked{color:var(--faint);border:1px solid var(--line-2)}
+.ir-arrow{width:14px;height:14px;color:var(--faint);flex:none}
+
+/* ══════════ 隐私保护卡（可展开） ══════════ */
+.faq{margin-top:14px;background:var(--surface);border:1px solid var(--line-2);
+  border-radius:var(--r-card);overflow:hidden}
+.faq-hd{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:14px 15px}
+.faq-hd .ic-q{width:16px;height:16px;color:var(--gold-hi);flex:none}
+.faq-hd b{flex:1;font-size:13px;font-weight:700;text-align:left}
+.faq-hd .ic-c{width:14px;height:14px;color:var(--faint);transition:transform .3s var(--ease)}
+.faq.open .ic-c{transform:rotate(180deg)}
+.faq-more{max-height:0;overflow:hidden;transition:max-height .36s var(--ease)}
+.faq.open .faq-more{max-height:300px}
+.faq-inner{padding:0 15px 14px;border-top:1px solid var(--line-2)}
+.fm{display:flex;gap:9px;padding:11px 0 0}
+.fm .ic{width:15px;height:15px;color:var(--gold);flex:none;margin-top:1px}
+.fm b{display:block;font-size:12px;font-weight:700;margin-bottom:1px}
+.fm span{font-size:11px;color:var(--dim);line-height:1.6}
+
+.trust{display:flex;justify-content:center;gap:16px;margin:18px 0 4px;flex-wrap:wrap}
+.trust span{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--faint)}
+.trust .ic{width:12px;height:12px;color:var(--gold)}
+.demo-entry{display:flex;justify-content:center;margin-top:14px}
+.demo-btn{font-size:11px;color:var(--faint);border:1px dashed var(--line);border-radius:999px;
+  padding:7px 15px}
+.demo-btn:active{transform:scale(.96);color:var(--gold-hi)}
+
+/* ══════════ 底部主操作坞 ══════════ */
+.dock{position:absolute;left:0;right:0;bottom:0;z-index:50;
+  padding:11px 16px calc(env(safe-area-inset-bottom) + 12px);
+  background:linear-gradient(180deg,rgba(14,23,29,0),var(--bg) 32%);
+  display:flex;gap:10px}
+.cta-main{flex:1;height:48px;border-radius:12px;font-size:15px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .15s var(--ease)}
+.cta-main:active{transform:scale(.98)}
+.cta-main .ic{width:17px;height:17px}
+.cta-gold{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#221A0C;
+  box-shadow:0 6px 20px rgba(198,160,91,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.cta-steel{background:linear-gradient(135deg,#A9C4D4,#7FA0B6);color:#10202B;
+  box-shadow:0 6px 20px rgba(143,176,196,.28)}
+.cta-coral{background:linear-gradient(135deg,#E89384,#C96B5C);color:#2A120E;
+  box-shadow:0 6px 20px rgba(224,131,114,.3)}
+.cta-ghost{background:var(--surface);color:var(--gold-hi);border:1px solid var(--line)}
+.cta-done{background:linear-gradient(135deg,var(--gold-hi),var(--gold));color:#221A0C;
+  box-shadow:0 6px 20px rgba(198,160,91,.35)}
+.dock-ico{width:48px;height:48px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:var(--surface);border:1px solid var(--line);color:var(--gold-hi)}
+.dock-ico .ic{width:19px;height:19px}
+.dock-ico:active{transform:scale(.95)}
+
+/* ══════════ 半屏面板（身份详情 / 状态切换） ══════════ */
+.scrim{position:absolute;inset:0;z-index:88;background:rgba(5,10,13,.6);
+  backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .26s var(--ease)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:90;max-height:82%;overflow-y:auto;
+  background:var(--surface);border-radius:22px 22px 0 0;border:1px solid var(--line);
+  border-bottom:0;padding:0 0 calc(env(safe-area-inset-bottom) + 20px);
+  transform:translateY(102%);transition:transform .32s var(--ease);scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet.on{transform:none}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 4px}
+.sh-banner{position:relative;height:104px;margin:8px 14px 0;border-radius:var(--r-card);overflow:hidden}
+.sh-banner img{width:100%;height:100%;object-fit:cover}
+.sh-banner::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(10,18,23,.15),rgba(10,18,23,.78))}
+.sh-cap{position:absolute;left:13px;bottom:10px;z-index:2;display:flex;align-items:center;gap:8px}
+.sh-cap b{font-size:17px;font-weight:800}
+.sh-cap span{font-size:10px;font-weight:600;color:var(--gold-hi);background:var(--gold-soft);
+  border:1px solid var(--line);padding:2px 7px;border-radius:99px}
+.sh-body{padding:15px 18px 0}
+.sh-state{display:flex;gap:9px;align-items:flex-start;border-radius:var(--r-ctrl);
+  padding:11px 13px;margin-bottom:14px;font-size:11.5px;line-height:1.6}
+.sh-state .ic{width:16px;height:16px;flex:none;margin-top:1px}
+.sh-state b{font-weight:700}
+.sh-state.done{background:var(--gold-soft);border:1px solid var(--line);color:var(--gold-hi)}
+.sh-state.review{background:var(--steel-soft);border:1px solid rgba(143,176,196,.3);color:var(--steel)}
+.sh-state.reject{background:var(--coral-soft);border:1px solid rgba(224,131,114,.3);color:var(--coral)}
+.sh-state.todo{background:var(--surface-2);border:1px solid var(--line-2);color:var(--dim)}
+.sh-state.locked{background:var(--surface-2);border:1px solid var(--line-2);color:var(--dim)}
+.sh-sec-t{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--faint);
+  margin:0 2px 9px}
+.sh-benefits{display:flex;flex-direction:column;gap:9px;margin-bottom:15px}
+.sh-benefits div{display:flex;gap:9px;font-size:12.5px;line-height:1.5;color:var(--dim)}
+.sh-benefits .ic{width:15px;height:15px;color:var(--gold);flex:none;margin-top:2px}
+.sh-meta{display:flex;gap:9px;margin-bottom:17px}
+.sh-meta div{flex:1;background:var(--surface-2);border:1px solid var(--line-2);
+  border-radius:var(--r-ctrl);padding:9px 11px}
+.sh-meta b{display:block;font-size:10px;color:var(--faint);font-weight:600;margin-bottom:2px}
+.sh-meta span{font-size:12px;font-weight:700;color:var(--ink)}
+.sh-cta{margin:0 18px}
+.sh-cta button{width:100%;height:46px;border-radius:12px;font-size:14.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:7px}
+.sh-cta button .ic{width:16px;height:16px}
+.sh-cta button:active{transform:scale(.98)}
+
+/* 演示状态选择 */
+.demo-title{font-size:15px;font-weight:800;text-align:center;margin:4px 0 3px}
+.demo-sub{font-size:10.5px;color:var(--faint);text-align:center;margin-bottom:14px}
+.demo-opts{padding:0 16px;display:flex;flex-direction:column;gap:8px}
+.demo-opt{display:flex;align-items:center;gap:11px;background:var(--surface-2);
+  border:1px solid var(--line-2);border-radius:var(--r-card);padding:12px 14px;text-align:left}
+.demo-opt:active{transform:scale(.98)}
+.demo-opt.on{border-color:var(--gold);background:rgba(198,160,91,.1)}
+.do-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;
+  background:var(--gold-soft);color:var(--gold-hi)}
+.do-ic .ic{width:15px;height:15px}
+.do-body{flex:1;min-width:0}
+.do-body b{display:block;font-size:13px}
+.do-body span{font-size:10.5px;color:var(--faint)}
+.do-check{width:17px;height:17px;color:var(--gold);opacity:0}
+.demo-opt.on .do-check{opacity:1}
+.demo-note{margin:14px 20px 0;font-size:10px;line-height:1.6;color:var(--faint);text-align:center}
+
+/* ══════════ Toast ══════════ */
+.toast{position:absolute;left:50%;bottom:calc(var(--dock) + 22px);z-index:96;
+  transform:translate(-50%,14px);opacity:0;pointer-events:none;max-width:80%;text-align:center;
+  padding:11px 18px;border-radius:999px;background:rgba(7,13,17,.94);color:var(--ink);
+  border:1px solid var(--line);font-size:12.5px;line-height:1.5;
+  transition:opacity .26s var(--ease),transform .26s var(--ease)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* 入场 */
+.rv{opacity:0;transform:translateY(12px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.hl-path{animation:hl 1.5s var(--ease) 1}
+@keyframes hl{0%,100%{box-shadow:0 0 0 0 rgba(198,160,91,0)}30%{box-shadow:0 0 0 3px rgba(198,160,91,.45)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="stage"><div id="app">
+  <div class="notch"></div>
+
+  <div class="statusbar">
+    <span class="num">9:41</span>
+    <span class="sb-r"><i class="sig"></i><i class="wifi"></i><i class="bat"></i></span>
+  </div>
+
+  <div class="topbar">
+    <button class="tbtn" id="btnBack" aria-label="返回">
+      <svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></svg>
+    </button>
+    <div class="nav-title">认证中心</div>
+    <button class="nav-help" id="btnHelp">认证说明</button>
+  </div>
+
+  <div id="flow">
+    <!-- ── HERO ── -->
+    <section class="hero rv in" id="hero">
+      <img class="hero-img" id="heroImg" src="assets/hero-medal.jpg" alt="工程信任徽章">
+      <div class="hero-scrim"></div>
+      <div class="hero-inner">
+        <div class="hero-eyebrow" id="heroEyebrow">ENGCHAIN · TRUST PASSPORT</div>
+        <div id="heroDynamic"></div>
+        <div class="prog">
+          <div class="prog-bars" id="progBars"></div>
+          <div class="prog-txt"><b id="progNum">0</b><span> / 5 已点亮</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 权益带 ── -->
+    <div class="sec-head rv"><h3>认证后你将获得</h3><span class="sub">身份越完整，信任越高</span></div>
+    <div class="benefits rv">
+      <div class="bf"><div class="bf-ic"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.2,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0Z"/></svg></div><b>官方标识</b><span>昵称加 V</span></div>
+      <div class="bf"><div class="bf-ic"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23L31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Z"/></svg></div><b>优先推荐</b><span>匹配排序靠前</span></div>
+      <div class="bf"><div class="bf-ic"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M232,216H208V40a16,16,0,0,0-16-16H64A16,16,0,0,0,48,40V216H24a8,8,0,0,0,0,16H232a8,8,0,0,0,0-16Zm-40,0H176V40h16ZM64,40h96V216H64Zm80,92a12,12,0,1,1-12-12A12,12,0,0,1,144,132Z"/></svg></div><b>发布供需</b><span>对接生意机会</span></div>
+      <div class="bf"><div class="bf-ic"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M176,160a39.89,39.89,0,0,0-28.62,12.09l-46.1-29.63a39.8,39.8,0,0,0,0-28.92l46.1-29.63a40,40,0,1,0-8.66-13.45l-46.1,29.63a40,40,0,1,0,0,55.82l46.1,29.63A40,40,0,1,0,176,160Zm0-128a24,24,0,1,1-24,24A24,24,0,0,1,176,32ZM64,152a24,24,0,1,1,24-24A24,24,0,0,1,64,152Zm112,72a24,24,0,1,1,24-24A24,24,0,0,1,176,224Z"/></svg></div><b>分销收益</b><span>推广分佣权益</span></div>
+    </div>
+
+    <!-- ── 双轨成长路径 ── -->
+    <div class="sec-head rv"><h3>身份成长路径</h3><span class="cnt num" id="pathCount">0 / 5</span></div>
+    <button class="path-found rv" data-id="realname">
+      <img class="pf-img" src="assets/identity-realname.jpg" alt="">
+      <div class="pf-body">
+        <div class="pf-tag">FOUNDATION · 基石身份</div>
+        <div class="pf-name">个人认证</div>
+        <div class="pf-desc">实名 + 人脸核验 · 全程免费 · 约 1 分钟</div>
+      </div>
+      <span class="pf-seal" id="foundSeal"></span>
+    </button>
+
+    <div class="fork rv" aria-hidden="true">
+      <svg viewBox="0 0 260 34" preserveAspectRatio="none">
+        <path d="M130 0 V12 M130 12 H52 V30 M130 12 H208 V30" fill="none" stroke="rgba(198,160,91,.4)" stroke-width="1.4" stroke-dasharray="3 4"/>
+      </svg>
+    </div>
+
+    <div class="branches rv">
+      <div class="branch p">
+        <div class="branch-label"><i></i><span>个人发展线</span><span id="cntP">0/2</span></div>
+        <div class="bnodes" id="nodesP"></div>
+      </div>
+      <div class="branch e">
+        <div class="branch-label"><i></i><span>企业经营线</span><span id="cntE">0/2</span></div>
+        <div class="bnodes" id="nodesE"></div>
+      </div>
+    </div>
+
+    <!-- ── 全部身份 ── -->
+    <div class="sec-head rv"><h3>全部认证身份</h3><span class="cnt" id="listCount">完成 0 / 5</span></div>
+    <div class="ilist rv" id="iList"></div>
+
+    <!-- ── 隐私保护 ── -->
+    <div class="faq rv" id="faq">
+      <button class="faq-hd" id="faqHd">
+        <svg class="ic ic-q" viewBox="0 0 256 256" fill="currentColor"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.2,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0Z"/></svg>
+        <b>认证信息如何被保护？</b>
+        <svg class="ic ic-c" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>
+      </button>
+      <div class="faq-more"><div class="faq-inner">
+        <div class="fm"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Z"/></svg><div><b>全程加密传输与存储</b><span>证件与人脸信息采用加密通道传输，脱敏存储，非核验人员不可见。</span></div></div>
+        <div class="fm"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg><div><b>仅用于真实性核验</b><span>认证信息只用于平台身份与资质核验，不会用于任何未经授权的用途。</span></div></div>
+        <div class="fm"><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M128,48C93.12,48,61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4a8,8,0,0,0,0-6.5C247,124,238.49,105.18,219.66,86.35,194.57,61.26,162.88,48,128,48Z"/><circle cx="128" cy="128" r="32" fill="currentColor" style="color:#16222A"/><circle cx="128" cy="128" r="20"/></svg><div><b>进度实时同步可查</b><span>认证与入驻审核状态由后台实时同步，驳回原因透明可见，可随时补充重提。</span></div></div>
+      </div></div>
+    </div>
+
+    <div class="trust rv">
+      <span><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.27,47,25.53a8,8,0,0,0,4.2,0c1-.26,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Z"/></svg>加密保护</span>
+      <span><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>官方核验</span>
+      <span><svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76Z"/></svg>隐私透明</span>
+    </div>
+
+    <div class="demo-entry rv">
+      <button class="demo-btn" id="btnDemo">原型演示 · 切换用户状态</button>
+    </div>
+  </div>
+
+  <!-- ── 底部主操作 ── -->
+  <div class="dock">
+    <button class="cta-main cta-gold" id="ctaMain"></button>
+    <button class="dock-ico" id="ctaSub" style="display:none" aria-label="次要操作"></button>
+  </div>
+
+  <!-- ── 半屏面板 ── -->
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+
+  <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   数据：五个身份（与线上 auth.html 同一套口径）
+   ══════════════════════════════════════════════════════════════ */
+const ICONS={
+  check:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>',
+  clock:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>',
+  warn:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></svg>',
+  lock:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96Z"/></svg>',
+  arrow:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg>',
+  share:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M176,160a39.89,39.89,0,0,0-28.62,12.09l-46.1-29.63a39.8,39.8,0,0,0,0-28.92l46.1-29.63a40,40,0,1,0-8.66-13.45l-46.1,29.63a40,40,0,1,0,0,55.82l46.1,29.63A40,40,0,1,0,176,160Zm0-128a24,24,0,1,1-24,24A24,24,0,0,1,176,32ZM64,152a24,24,0,1,1,24-24A24,24,0,0,1,64,152Zm112,72a24,24,0,1,1,24-24A24,24,0,0,1,176,224Z"/></svg>',
+  chevR:'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M90.34,61.66a8,8,0,0,1,11.32,0l80,80a8,8,0,0,1,0,11.32l-80,80a8,8,0,0,1-11.32-11.32L164.69,148,40,148a8,8,0,0,1,0-16H164.69L90.34,73a8,8,0,0,1,0-11.32Z"/></svg>'
+};
+
+const IDENTITIES=[
+  {key:'realname',name:'个人认证',tag:'基石',line:'F',img:'assets/identity-realname.jpg',
+   desc:'实名认证 · 人脸核验 · 免费',
+   benefit:'解锁其他全部身份的基础',
+   benefits:['昵称获得官方实名标识，沟通更可信','解锁人才入驻、合伙人、企业认证全部入口','人脸核验约 1 分钟，全程免费'],
+   fee:'免费',time:'约 1 分钟'},
+  {key:'personal-entry',name:'个人入驻',tag:'人才',line:'P',img:'assets/identity-personal-entry.jpg',
+   desc:'专业资质 · 完整简历 · 免费',
+   benefit:'解锁人才展示与岗位匹配',
+   benefits:['获得专业人才档案与展示主页','岗位与项目优先按资质匹配推荐','资质背书提升接单成功率'],
+   fee:'免费',time:'1–3 个工作日'},
+  {key:'partner',name:'个人合伙人',tag:'分销',line:'P',img:'assets/identity-partner.jpg',
+   desc:'分销意向 · 推广渠道 · 免费',
+   benefit:'解锁二级分销与推广权益',
+   benefits:['生成专属推广链接，邀请即享分佣','解锁二级分销网络与收益看板','参与平台合伙人专属激励活动'],
+   fee:'免费',time:'1–2 个工作日'},
+  {key:'enterprise',name:'企业工商认证',tag:'企业',line:'E',img:'assets/identity-enterprise.jpg',
+   desc:'工商信息核验 · ¥999 / 年',
+   benefit:'解锁企业经营与发布权限',
+   benefits:['企业名称旁展示官方核验标识','提升供需发布与合作洽谈信任度','企业资质信息全站同步可见'],
+   fee:'¥999 / 年',time:'1–3 个工作日'},
+  {key:'entry',name:'企业入驻',tag:'经营',line:'E',img:'assets/identity-entry.jpg',
+   desc:'入驻缴费 · 审核通过后开通',
+   benefit:'解锁发布供需与平台经营权益',
+   benefits:['开通企业店铺与供需发布权限','获得平台经营位与流量扶持','线上接单、结算一体化经营'],
+   fee:'入驻费',time:'1–3 个工作日'}
+];
+const byKey=k=>IDENTITIES.find(d=>d.key===k);
+
+/* 五个演示场景（线上页由 AuthStore / EntryStore 实时推导，原型内置同口径数据） */
+const SCENARIOS={
+  guest:{label:'未认证访客',sub:'尚未完成实名，一切身份待解锁',icon:'user',
+    states:{realname:'todo','personal-entry':'locked',partner:'locked',enterprise:'locked',entry:'locked'}},
+  choose:{label:'已实名 · 选方向',sub:'实名已完成，个人/企业两条线待选',icon:'arrow',
+    states:{realname:'done','personal-entry':'todo',partner:'todo',enterprise:'todo',entry:'todo'}},
+  review:{label:'审核进行中',sub:'企业工商认证资料正在核验',icon:'clock',
+    states:{realname:'done','personal-entry':'done',partner:'todo',enterprise:'review',entry:'todo'}},
+  reject:{label:'申请被驳回',sub:'企业工商认证需补充资料后重提',icon:'warn',
+    states:{realname:'done','personal-entry':'todo',partner:'todo',enterprise:'reject',entry:'todo'}},
+  done:{label:'全部已点亮',sub:'五项身份全部通过，权益全开',icon:'check',
+    states:{realname:'done','personal-entry':'done',partner:'done',enterprise:'done',entry:'done'}}
+};
+let scenario='guest';
+
+const STATE_UI={
+  todo:{pill:'去开通',sealText:'',mini:'todo'},
+  review:{pill:'审核中'},
+  done:{pill:'已通过'},
+  reject:{pill:'已驳回'},
+  locked:{pill:'未解锁'}
+};
+
+/* ── toast ── */
+const toastEl=document.getElementById('toast');let toastT;
+function toast(msg){
+  toastEl.textContent=msg;toastEl.classList.add('on');
+  clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),1700);
+}
+
+/* ── HERO 渲染 ── */
+function renderHero(){
+  const st=SCENARIOS[scenario].states;
+  const box=document.getElementById('heroDynamic');
+  const img=document.getElementById('heroImg');
+  let html='';
+  if(scenario==='guest'){
+    img.src='assets/hero-medal.jpg';
+    html='<span class="hero-badge b-gold">第一步 · 实名认证</span>'+
+      '<h1 class="hero-title">点亮你的<br>工程信任通行证</h1>'+
+      '<p class="hero-desc">完成实名与人脸核验，约 1 分钟、全程免费。<br>这是开通其余四项身份、解锁全部平台权益的基石。</p>'+
+      '<div class="hero-facts">'+
+        '<span class="hf">'+ICONS.check+'约 1 分钟</span>'+
+        '<span class="hf">'+ICONS.check+'全程免费</span>'+
+        '<span class="hf">'+ICONS.check+'加密核验</span>'+
+      '</div>';
+  }else if(scenario==='choose'){
+    img.src='assets/hero-medal.jpg';
+    html='<span class="hero-badge b-ghost">下一步 · 二选一或都要</span>'+
+      '<h1 class="hero-title">选择你的<br>发展方向</h1>'+
+      '<p class="hero-desc">实名认证已完成。沿「个人发展线」接单赚钱，或沿「企业经营线」入驻做生意——两条线可同时点亮。</p>';
+  }else if(scenario==='review'){
+    img.src='assets/identity-enterprise.jpg';
+    html='<span class="hero-badge b-steel"><i class="pulse-dot"></i>审核中</span>'+
+      '<h1 class="hero-title">「企业工商认证」<br>正在核验</h1>'+
+      '<p class="hero-desc">资料已提交，平台通常在 1–3 个工作日内完成工商核验，结果实时同步。</p>'+
+      '<div class="steps">'+
+        '<div class="step done"><div class="sd">'+ICONS.check+'</div>提交资料</div>'+
+        '<div class="step active"><div class="sd"><i class="pulse-dot"></i></div>平台核验</div>'+
+        '<div class="step"><div class="sd">3</div>认证完成</div>'+
+      '</div>';
+  }else if(scenario==='reject'){
+    img.src='assets/identity-enterprise.jpg';
+    html='<span class="hero-badge b-coral">'+ICONS.warn+'待处理</span>'+
+      '<h1 class="hero-title">「企业工商认证」<br>暂未通过</h1>'+
+      '<div class="hero-reason">'+ICONS.warn+
+        '<span><b>驳回原因：</b>营业执照照片模糊、关键信息不完整。请上传清晰原件照片后重新提交，历史资料已保留。</span></div>';
+  }else{
+    img.src='assets/hero-medal.jpg';
+    html='<span class="hero-badge b-done">'+ICONS.check+'全部完成</span>'+
+      '<h1 class="hero-title">五项身份<br>全部已点亮</h1>'+
+      '<p class="hero-desc">你已获得平台完整信任标识，人才匹配、分销推广与企业经营权益全部开通。</p>';
+  }
+  box.innerHTML=html;
+
+  /* 完成度 */
+  const doneN=IDENTITIES.filter(d=>st[d.key]==='done').length;
+  const bars=document.getElementById('progBars');
+  bars.innerHTML=IDENTITIES.map(d=>'<i><b style="width:'+(st[d.key]==='done'?'100%':'0')+'"></b></i>').join('');
+  requestAnimationFrame(()=>{bars.querySelectorAll('b').forEach((b,i)=>{
+    if(IDENTITIES[i]&&st[IDENTITIES[i].key]==='done')b.style.width='100%';});});
+  document.getElementById('progNum').textContent=doneN;
+}
+
+/* ── 主操作坞 ── */
+function renderDock(){
+  const btn=document.getElementById('ctaMain'),sub=document.getElementById('ctaSub');
+  const map={
+    guest:['cta-gold','立即实名认证'+ICONS.arrow,()=>toast('即将跳转实名认证 · 人脸核验（约 1 分钟）')],
+    choose:['cta-ghost','查看成长路径 ↓',()=>{document.querySelector('.branches').scrollIntoView({behavior:'smooth',block:'center'});
+      document.querySelectorAll('.bnode').forEach(n=>n.classList.remove('hl-path'));
+      document.querySelectorAll('.bnode:not(.locked)').forEach(n=>n.classList.add('hl-path'));
+      setTimeout(()=>document.querySelectorAll('.bnode').forEach(n=>n.classList.remove('hl-path')),1600);}],
+    review:['cta-steel','查看审核进度'+ICONS.arrow,()=>toast('跳转审核进度页 · 结果将实时同步')],
+    reject:['cta-coral','重新提交申请'+ICONS.arrow,()=>openIdentity('enterprise')],
+    done:['cta-done','分享我的信任名片'+ICONS.share,()=>toast('信任名片已生成，去分享给合作伙伴')]
+  };
+  const[cls,txt,fn]=map[scenario];
+  btn.className='cta-main '+cls;btn.innerHTML=txt;btn.onclick=fn;
+  if(scenario==='review'||scenario==='reject'){
+    sub.style.display='grid';
+    sub.innerHTML=scenario==='review'?ICONS.clock:ICONS.warn;
+    sub.onclick=()=>openIdentity('enterprise');
+  }else{sub.style.display='none';}
+}
+
+/* ── 路径节点 / 列表 ── */
+function stateIcon(st){
+  if(st==='done')return ICONS.check;
+  if(st==='review')return '<span class="pulse-dot" style="background:var(--steel)"></span>';
+  if(st==='reject')return ICONS.warn;
+  if(st==='locked')return ICONS.lock;
+  return ICONS.chevR;
+}
+function renderPath(){
+  const st=SCENARIOS[scenario].states;
+  const found=st.realname;
+  const seal=document.getElementById('foundSeal');
+  seal.className='pf-seal '+found;
+  seal.innerHTML=found==='done'?ICONS.check:found==='review'?'<span class="pulse-dot" style="background:var(--steel)"></span>':ICONS.chevR;
+  document.querySelector('.path-found').classList.toggle('done',found==='done');
+
+  const nodeHtml=d=>{
+    const s=st[d.key];
+    return '<button class="bnode '+(s==='done'?'done':'')+(s==='locked'?' locked':'')+'" data-id="'+d.key+'">'+
+      '<span class="bn-imgwrap"><img class="bn-img" src="'+d.img+'" alt="">'+
+      (s==='locked'?'<span class="bn-lock">'+ICONS.lock+'</span>':'')+'</span>'+
+      '<span class="bn-body"><span class="bn-name">'+d.name+'</span>'+
+      '<span class="bn-desc">'+(s==='locked'?'需先完成实名认证':d.benefit)+'</span></span>'+
+      '<span class="bn-state '+s+'">'+stateIcon(s)+'</span></button>';
+  };
+  document.getElementById('nodesP').innerHTML=IDENTITIES.filter(d=>d.line==='P').map(nodeHtml).join('');
+  document.getElementById('nodesE').innerHTML=IDENTITIES.filter(d=>d.line==='E').map(nodeHtml).join('');
+  const pn=IDENTITIES.filter(d=>d.line==='P'&&st[d.key]==='done').length;
+  const en=IDENTITIES.filter(d=>d.line==='E'&&st[d.key]==='done').length;
+  document.getElementById('cntP').textContent=pn+'/2';
+  document.getElementById('cntE').textContent=en+'/2';
+  document.getElementById('pathCount').textContent=(IDENTITIES.filter(d=>st[d.key]==='done').length)+' / 5';
+}
+function renderList(){
+  const st=SCENARIOS[scenario].states;
+  document.getElementById('iList').innerHTML=IDENTITIES.map(d=>{
+    const s=st[d.key];
+    return '<button class="irow '+(s==='done'?'done':'')+'" data-id="'+d.key+'">'+
+      '<img class="ir-img" src="'+d.img+'" alt="">'+
+      '<span class="ir-body">'+
+        '<span class="ir-name">'+d.name+'<span class="ir-tag">'+d.tag+'</span></span>'+
+        '<span class="ir-desc">'+d.desc+'</span></span>'+
+      '<span class="ir-right"><span class="spill '+s+'">'+spillIcon(s)+STATE_UI[s].pill+'</span>'+
+      '<svg class="ir-arrow" viewBox="0 0 256 256" fill="currentColor"><path d="M90.34,61.66a8,8,0,0,1,11.32,0l80,80a8,8,0,0,1,0,11.32l-80,80a8,8,0,0,1-11.32-11.32L164.69,148,40,148a8,8,0,0,1,0-16H164.69L90.34,73a8,8,0,0,1,0-11.32Z"/></svg>'+
+      '</span></button>';
+  }).join('');
+  document.getElementById('listCount').textContent='完成 '+IDENTITIES.filter(d=>st[d.key]==='done').length+' / 5';
+}
+function spillIcon(s){
+  if(s==='done')return ICONS.check;
+  if(s==='review')return '<span class="pulse-dot" style="background:var(--steel)"></span>';
+  if(s==='reject')return ICONS.warn;
+  if(s==='locked')return ICONS.lock;
+  return '';
+}
+
+/* ── 半屏面板：身份详情 ── */
+const scrim=document.getElementById('scrim'),sheet=document.getElementById('sheet');
+function setSheet(on){
+  scrim.classList.toggle('on',on);sheet.classList.toggle('on',on);
+}
+scrim.onclick=()=>setSheet(false);
+function stateBanner(d,s){
+  const map={
+    done:['done',ICONS.check,'<b>已通过 · 权益已开通</b><br>该身份标识已在你的主页、名片与合作场景中展示。'],
+    review:['review','<span class="pulse-dot" style="background:var(--steel)"></span>','<b>审核中 · 预计 1–3 个工作日</b><br>平台正在核验你的资料，结果将实时同步，无需重复提交。'],
+    reject:['reject',ICONS.warn,'<b>未通过 · 按驳回原因补充后可重新提交</b><br>已为你保留历史填写资料，修改后一键再提交。'],
+    todo:['todo',ICONS.arrow,'<b>尚未开通</b><br>'+d.benefit+'，准备好相关资料即可开始。'],
+    locked:['locked',ICONS.lock,'<b>尚未解锁</b><br>请先完成「个人认证」（实名 + 人脸核验），通过后自动解锁本身份。']
+  };
+  const[cls,ic,txt]=map[s];
+  return '<div class="sh-state '+cls+'">'+ic+'<div>'+txt+'</div></div>';
+}
+function openIdentity(key){
+  const d=byKey(key);if(!d)return;
+  const s=SCENARIOS[scenario].states[key];
+  const ctaMap={
+    done:['查看认证详情','cta-gold'],
+    review:['查看审核进度','cta-steel'],
+    reject:['重新提交申请','cta-coral'],
+    todo:['去开通 · '+d.fee,'cta-gold'],
+    locked:['先完成实名认证','cta-ghost']
+  };
+  const[ctaTxt,ctaCls]=ctaMap[s];
+  sheet.innerHTML=
+    '<div class="grab"></div>'+
+    '<div class="sh-banner"><img src="'+d.img+'" alt="">'+
+      '<div class="sh-cap"><b>'+d.name+'</b><span>'+d.tag+'身份</span></div></div>'+
+    '<div class="sh-body">'+
+      stateBanner(d,s)+
+      '<div class="sh-sec-t">开通后你将获得</div>'+
+      '<div class="sh-benefits">'+d.benefits.map(b=>'<div>'+ICONS.check+'<span>'+b+'</span></div>').join('')+'</div>'+
+      '<div class="sh-meta"><div><b>费用</b><span>'+d.fee+'</span></div>'+
+      '<div><b>预计耗时</b><span>'+d.time+'</span></div></div>'+
+    '</div>'+
+    '<div class="sh-cta"><button class="'+ctaCls+'" id="shCta">'+ctaTxt+ICONS.arrow+'</button></div>';
+  setSheet(true);
+  document.getElementById('shCta').onclick=()=>{
+    if(s==='locked'){setSheet(false);setScenario('guest');toast('已定位到基石身份：个人认证');return;}
+    toast('演示环境：跳转「'+d.name+'」流程页');
+  };
+}
+
+/* ── 演示状态切换面板 ── */
+function openDemo(){
+  sheet.innerHTML='<div class="grab"></div>'+
+    '<div class="demo-title">切换演示状态</div>'+
+    '<div class="demo-sub">仅用于原型预览 · 线上页面由认证数据实时推导</div>'+
+    '<div class="demo-opts">'+Object.keys(SCENARIOS).map(k=>{
+      const sc=SCENARIOS[k];
+      const ic=(k==='guest')?'<svg class="ic" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,0,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/></svg>'
+        :(k==='choose')?ICONS.arrow:(k==='review')?ICONS.clock:(k==='reject')?ICONS.warn:ICONS.check;
+      return '<button class="demo-opt '+(scenario===k?'on':'')+'" data-sc="'+k+'">'+
+        '<span class="do-ic">'+ic+'</span>'+
+        '<span class="do-body"><b>'+sc.label+'</b><span>'+sc.sub+'</span></span>'+
+        '<span class="do-check">'+ICONS.check+'</span></button>';
+    }).join('')+'</div>'+
+    '<div class="demo-note">同一套组件随状态切换：主视觉、主操作、路径节点、身份列表联动变化。</div>';
+  setSheet(true);
+  sheet.querySelectorAll('.demo-opt').forEach(b=>b.onclick=()=>{
+    setScenario(b.dataset.sc);setSheet(false);
+    toast('演示状态：'+SCENARIOS[b.dataset.sc].label);
+  });
+}
+
+/* ── 事件委托：节点 / 列表点击 ── */
+document.getElementById('flow').addEventListener('click',e=>{
+  const t=e.target.closest('[data-id]');
+  if(t)openIdentity(t.dataset.id);
+});
+document.getElementById('btnDemo').onclick=openDemo;
+document.getElementById('btnBack').onclick=()=>toast('返回「我的」');
+document.getElementById('btnHelp').onclick=()=>{document.getElementById('faq').classList.add('open');
+  document.getElementById('faq').scrollIntoView({behavior:'smooth',block:'center'});};
+document.getElementById('faqHd').onclick=()=>document.getElementById('faq').classList.toggle('open');
+
+/* ── 场景渲染总入口 ── */
+function setScenario(k){
+  scenario=k;
+  renderHero();renderDock();renderPath();renderList();
+  document.getElementById('flow').scrollTo({top:0,behavior:'smooth'});
+}
+setScenario('guest');
+
+/* ── 入场揭示：进屏才播（阅读次序） ── */
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}
+}),{threshold:.08});
+document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+
+/* ── signature motion：徽章随滚动轻微视差 ── */
+const heroImg=document.getElementById('heroImg'),flow=document.getElementById('flow');
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(!reduce)flow.addEventListener('scroll',()=>{
+  const y=Math.max(0,-flow.getBoundingClientRect().top);
+  heroImg.style.transform='translateY('+(Math.min(y*.06,22))+'px) scale(1.05)';
+},{passive:true});
+
+/* ── 关键屏声明（截图器只枚举这份清单） ── */
+window.__UI_CAPTURE__={
+  reset:async()=>{setSheet(false);document.getElementById('sheet').innerHTML='';setScenario('guest');
+    document.getElementById('faq').classList.remove('open');
+    await new Promise(r=>setTimeout(r,520));},
+  states:[
+    {id:'guest',label:'未认证访客'},
+    {id:'choose',label:'已实名选方向',go:async()=>setScenario('choose')},
+    {id:'review',label:'审核进行中',go:async()=>setScenario('review')},
+    {id:'reject',label:'申请被驳回',go:async()=>setScenario('reject')},
+    {id:'done',label:'全部已点亮',go:async()=>setScenario('done')},
+    {id:'identity-sheet',label:'身份详情卡',go:async()=>{setScenario('choose');
+      await new Promise(r=>setTimeout(r,300));openIdentity('enterprise');}},
+    {id:'faq-open',label:'隐私保护展开',go:async()=>{document.getElementById('faq').classList.add('open');
+      document.getElementById('faq').scrollIntoView({block:'center'});
+      await new Promise(r=>setTimeout(r,400));}}
+  ]};
+</script>
+</body>
+</html>

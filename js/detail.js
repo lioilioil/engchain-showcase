@@ -2791,7 +2791,7 @@ window.DETAIL = (function () {
           '</div>' +
           /* ===== 底部固定支付区 ===== */
           '<div class="us-footer">' +
-            '<label class="pay-agree" id="unlockAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html">《信息解锁服务协议》</a></span></label>' +
+            '<label class="pay-agree" id="unlockAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html#credits">《信息解锁服务协议》</a></span></label>' +
             '<button class="btn btn-primary btn-block btn-lg" id="pay-go">' + (isFree ? '免费解锁' : (isDeposit ? '确认支付 ¥' + Number(up.price).toLocaleString() : '确认解锁')) + '</button>' +
             '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>安全支付 · 平台担保 · 未对接可退</div>' +
           '</div>' +
@@ -2859,7 +2859,7 @@ window.DETAIL = (function () {
       }
       payBtn.addEventListener('click', function () {
         if (!agreed) {
-          UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意<a href="../agreement/user.html">《信息解锁服务协议》</a>', ok: '确认并继续支付', cancel: '取消', onOk: function () {
+          UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意<a href="../agreement/user.html#credits">《信息解锁服务协议》</a>', ok: '确认并继续支付', cancel: '取消', onOk: function () {
             agreed = true;
             if (agreeRow) agreeRow.classList.add('on');
             doPay();

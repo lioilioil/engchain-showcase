@@ -211,6 +211,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div class="ap-field ap-field-ro"><label>命名依据</label><b class="fs-13" id="d-basis">—</b></div>
         <div class="ap-field ap-field-ro"><label>信用代码</label><b class="fs-13 mono" id="d-code">—</b></div>
         <div class="ap-field ap-field-ro"><label>法定代表人</label><b class="fs-13" id="d-legal">—</b></div>
+        <div class="ap-field ap-field-ro"><label>办公地址</label><b class="fs-13 text-2" id="d-address">—</b></div>
+        <div class="ap-field ap-field-ro"><label>注册地址</label><b class="fs-13 text-2" id="d-regaddr">—</b></div>
         <div class="ap-field ap-field-ro" style="border:none;"><label>有效期至</label><b class="fs-13" id="d-expire">—</b></div>
       </div>
       <!-- [FEAT 9.2-3] 认证等级与多维核验进度 -->
@@ -222,6 +224,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div id="dim-progress-done"></div>
         <div class="text-3 fs-11" style="margin-top:8px;line-height:1.6;">完成必选项=基础认证，完成3项以上=高级认证，完成全部5项=完整认证</div>
       </div>
+      <!-- [FEAT 年度复核] 年检状态条/发起/复核中 -->
+      <div id="annual-review-box" style="margin-bottom:14px;"></div>
+      <!-- [FEAT 留档审核] 已认证企业：变更留档信息入口/审核中/驳回 -->
+      <div id="ent-change-box" style="margin-bottom:14px;"></div>
       <div class="card ae-fee" id="renew-card">
         <div class="fw-600 fs-14" style="margin-bottom:6px;">认证有效期</div>
         <div class="text-3 fs-12" style="line-height:1.7;margin-bottom:12px;" id="expire-note"></div>
@@ -388,13 +394,238 @@ function fillDone(a){
   document.getElementById('d-basis').textContent=basisLabel(a.enterprise.nameBasis);
   document.getElementById('d-code').textContent=a.enterprise.code||'—';
   document.getElementById('d-legal').textContent=a.enterprise.legal||st.user||'—';
+  document.getElementById('d-address').textContent=a.enterprise.address||'—';
+  document.getElementById('d-regaddr').textContent=a.enterprise.registeredAddress||'—';
   document.getElementById('d-expire').textContent=fmtD(a.enterprise.expireAt);
   var days=Math.ceil((a.enterprise.expireAt-Date.now())/864e5);
   document.getElementById('expire-note').textContent='当前认证有效期至 '+fmtD(a.enterprise.expireAt)+'（剩余 '+days+' 天），到期后续费即可保持认证企业权益。';
   /* E2-13：已认证用户进入页面需渲染维度进度条与等级徽标 */
   renderDimProgress();
+  /* [FEAT 留档审核] 渲染变更留档信息区块（申请/审核中/驳回） */
+  renderEntChange(a);
+  /* [FEAT 年度复核] 渲染年检状态条 */
+  renderAnnualReview(a);
 }
 window.toForm=function(){var a=cur();a.enterprise.note='';AuthStore.write(a);render();};
+
+/* [FEAT 留档审核] 变更留档信息：申请/审核中/驳回/撤回 UI */
+function entChangeFormHtml(en, pc){
+  var p = pc || {};
+  var h = '<div class="group ap-group">';
+  h += '<div class="ap-field"><label>新企业名称</label><input id="ec-co" class="ap-input" placeholder="与营业执照一致" value="'+(p.co||en.co||'')+'"></div>';
+  h += '<div class="ap-field"><label>新信用代码</label><input id="ec-code" class="ap-input mono" placeholder="18位统一社会信用代码" maxlength="18" value="'+(p.code||en.code||'')+'"></div>';
+  h += '<div class="ap-field"><label>新法定代表人</label><input id="ec-legal" class="ap-input" placeholder="法人姓名（变更需材料）" value="'+(p.legal||en.legal||'')+'" oninput="toggleEcLegalTip()"></div>';
+  h += '<div class="ap-field"><label>新注册地址</label><input id="ec-regaddr" class="ap-input" placeholder="营业执照注册地址" value="'+(p.registeredAddress||en.registeredAddress||'')+'"></div>';
+  h += '<div id="ec-legal-tip" style="display:none;padding:8px 12px;margin:6px 0;background:rgba(212,76,71,.06);border:1px solid var(--danger);border-radius:8px;font-size:12px;color:var(--danger);line-height:1.6;">法人变更需上传<b>变更核准通知书或股东会决议</b>等佐证材料，并填写变更原因。</div>';
+  h += '<div class="ap-field" style="align-items:flex-start;flex-direction:column;gap:6px;"><label style="width:auto;">佐证材料 <span id="ec-files-req" style="color:var(--danger);display:none;">*必填</span></label><div id="ec-upload" onclick="uploadEcFile()" style="width:100%;border:1.5px dashed var(--line);border-radius:10px;padding:12px;cursor:pointer;text-align:center;font-size:12px;color:var(--text-3);">点击上传佐证材料（PDF/JPG）</div><div id="ec-file-list" style="font-size:12px;color:var(--text-2);line-height:1.8;"></div></div>';
+  h += '<div class="ap-field" style="align-items:flex-start;flex-direction:column;gap:6px;border-bottom:none;"><label style="width:auto;">变更原因 *</label><textarea id="ec-reason" class="ap-input" style="text-align:left;min-height:60px;resize:vertical;" placeholder="请说明变更原因，如：公司更名/法人变更等">'+(p.reason||'')+'</textarea></div>';
+  h += '</div>';
+  return h;
+}
+function renderEntChange(a){
+  var box = document.getElementById('ent-change-box');
+  if(!box) return;
+  var en = a.enterprise || {};
+  var pc;
+  try { pc = AuthStore.getPendingEnterpriseChange(); } catch(e) { pc = {status:'none'}; }
+  var html = '';
+  if(pc.status === 'pending'){
+    html += '<div class="group-title">留档信息变更 · 审核中</div>';
+    html += '<div class="card" style="padding:14px;margin-bottom:12px;border:1px solid var(--warning);background:rgba(214,158,46,.06);">';
+    html += '<div class="fs-13" style="line-height:1.8;">已提交变更申请，预计 <b>1-3 个工作日</b> 完成审核，审核期间当前留档信息保持不变。</div></div>';
+    html += '<div class="group ap-group">';
+    html += '<div class="ap-field ap-field-ro"><label>当前企业名称</label><b class="fs-13 text-2">'+(en.co||'—')+'</b></div>';
+    html += '<div class="ap-field ap-field-ro"><label>待审核名称</label><b class="fs-13" style="color:var(--primary);">'+(pc.co||'—')+'</b></div>';
+    if(pc.code) html += '<div class="ap-field ap-field-ro"><label>待审核税号</label><b class="fs-13 mono" style="color:var(--primary);">'+pc.code+'</b></div>';
+    if(pc.legal) html += '<div class="ap-field ap-field-ro"><label>待审核法人</label><b class="fs-13" style="color:var(--primary);">'+pc.legal+'</b></div>';
+    if(pc.registeredAddress) html += '<div class="ap-field ap-field-ro"><label>待审核注册地址</label><b class="fs-13" style="color:var(--primary);">'+pc.registeredAddress+'</b></div>';
+    html += '<div class="ap-field ap-field-ro"><label>变更原因</label><b class="fs-13 text-2">'+(pc.reason||'—')+'</b></div>';
+    html += '<div class="ap-field ap-field-ro" style="border:none;"><label>提交时间</label><b class="fs-13 text-2">'+fmtD(pc.submittedAt)+'</b></div>';
+    html += '</div>';
+    html += '<button class="btn btn-ghost btn-block" onclick="withdrawEntChange()">撤回申请</button>';
+  } else if(pc.status === 'rejected'){
+    html += '<div class="group-title">留档信息变更 · 已驳回</div>';
+    html += '<div class="card" style="padding:12px 14px;margin-bottom:12px;border:1px solid var(--danger);background:rgba(212,76,71,.06);">';
+    html += '<div class="fs-13" style="color:var(--danger);line-height:1.7;"><b>驳回原因：</b>'+(pc.rejectReason||'资料不齐，请修改后重新提交')+'</div></div>';
+    html += '<div class="group-title">重新提交变更</div>';
+    html += entChangeFormHtml(en, pc);
+    html += '<button class="btn btn-primary btn-block" onclick="submitEntChange()">重新提交变更申请</button>';
+  } else {
+    html += '<div class="group-title">留档信息变更</div>';
+    html += '<div class="text-3 fs-12" style="padding:0 4px 10px;line-height:1.6;">企业名称、信用代码、法人等留档信息变更需提交审核，通过后全站生效。</div>';
+    html += '<div id="ent-change-form" style="display:none;">' + entChangeFormHtml(en, null) + '</div>';
+    html += '<button class="btn btn-ghost btn-block" id="ent-change-open" onclick="showEntChangeForm()">申请变更留档信息</button>';
+    html += '<button class="btn btn-primary btn-block" id="ent-change-submit" style="display:none;margin-top:10px;" onclick="submitEntChange()">提交变更申请</button>';
+  }
+  box.innerHTML = html;
+}
+window.showEntChangeForm = function(){
+  var f = document.getElementById('ent-change-form');
+  if(f) f.style.display = '';
+  var o = document.getElementById('ent-change-open');
+  if(o) o.style.display = 'none';
+  var s = document.getElementById('ent-change-submit');
+  if(s) s.style.display = '';
+};
+window.__ecFiles = window.__ecFiles || [];
+window.uploadEcFile = function(){
+  var name = '佐证材料_' + (window.__ecFiles.length + 1) + '.jpg';
+  window.__ecFiles.push({name: name, type: 'support'});
+  var list = document.getElementById('ec-file-list');
+  if(list) list.textContent = '已上传：' + window.__ecFiles.map(function(f){return f.name;}).join('、');
+  UI.toast('已上传 1 份佐证材料','ok');
+};
+window.toggleEcLegalTip = function(){
+  var legal = ((document.getElementById('ec-legal')||{}).value||'').trim();
+  var cur = (AuthStore.read().enterprise||{}).legal || '';
+  var changed = legal && legal !== cur;
+  var tip = document.getElementById('ec-legal-tip');
+  var req = document.getElementById('ec-files-req');
+  if(tip) tip.style.display = changed ? '' : 'none';
+  if(req) req.style.display = changed ? '' : 'none';
+};
+window.submitEntChange = function(){
+  var co = (document.getElementById('ec-co')||{}).value || ''; co = co.trim();
+  var code = ((document.getElementById('ec-code')||{}).value || '').trim().toUpperCase();
+  var legal = ((document.getElementById('ec-legal')||{}).value || '').trim();
+  var reason = ((document.getElementById('ec-reason')||{}).value || '').trim();
+  if(!co){UI.toast('请填写新企业名称','warn');return;}
+  if(code && !/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(code)){UI.toast('信用代码应为18位','warn');return;}
+  if(!reason){UI.toast('请填写变更原因','warn');return;}
+  var regaddr = ((document.getElementById('ec-regaddr')||{}).value||'').trim();
+  /* [法人变更校验] 新法人与当前不同时，强制材料+原因 */
+  var curLegal = (AuthStore.read().enterprise||{}).legal || '';
+  var legalChanged = legal && legal !== curLegal;
+  if(legalChanged && (!window.__ecFiles || window.__ecFiles.length < 1)){
+    UI.toast('法人变更需上传佐证材料（如变更核准通知书/股东会决议）','warn'); return;
+  }
+  if(legalChanged && !reason){
+    UI.toast('法人变更需填写变更原因','warn'); return;
+  }
+  var r;
+  try { r = AuthStore.submitEnterpriseChange({co:co, code:code, legal:legal, shortName:'', registeredAddress:regaddr, reason:reason, files:(window.__ecFiles||[])}); }
+  catch(e) { UI.toast('提交失败：'+e.message,'warn'); return; }
+  if(r && r.ok === false){ UI.toast(r.msg||'变更提交失败','warn'); return; }
+  window.__ecFiles = [];
+  UI.toast('变更申请已提交，待审核','ok');
+  render();
+};
+window.withdrawEntChange = function(){
+  UI.dialog({title:'撤回确认',text:'撤回后当前企业留档信息不变，可随时重新发起变更。',ok:'确认撤回',cancel:'取消',onOk:function(){
+    AuthStore.withdrawEnterpriseChange();
+    UI.toast('已撤回变更申请','ok');
+    render();
+  }});
+};
+
+/* [FEAT 年度复核] 年检状态条 + 发起/复核中/撤回 */
+function annualReviewFormHtml(en){
+  var h = '<div class="group ap-group">';
+  h += '<div class="ap-field"><label>企业名称</label><input id="ar-co" class="ap-input" value="'+(en.co||'')+'"></div>';
+  h += '<div class="ap-field"><label>信用代码</label><input id="ar-code" class="ap-input mono" value="'+(en.code||'')+'"></div>';
+  h += '<div class="ap-field"><label>法定代表人</label><input id="ar-legal" class="ap-input" value="'+(en.legal||'')+'"></div>';
+  h += '<div class="ap-field"><label>注册地址</label><input id="ar-regaddr" class="ap-input" value="'+(en.registeredAddress||'')+'"></div>';
+  h += '<div class="ap-field" style="align-items:flex-start;flex-direction:column;gap:6px;"><label style="width:auto;">说明 / 变更原因</label><textarea id="ar-reason" class="ap-input" style="text-align:left;min-height:50px;resize:vertical;" placeholder="年度复核说明（选填）"></textarea></div>';
+  h += '<div class="ap-field" style="align-items:flex-start;flex-direction:column;gap:6px;border-bottom:none;"><label style="width:auto;">佐证材料 <span style="color:var(--danger);">*必填</span></label><div id="ar-upload" onclick="uploadArFile()" style="width:100%;border:1.5px dashed var(--line);border-radius:10px;padding:12px;cursor:pointer;text-align:center;font-size:12px;color:var(--text-3);">点击上传营业执照等（PDF/JPG）</div><div id="ar-file-list" style="font-size:12px;color:var(--text-2);line-height:1.8;"></div></div>';
+  h += '</div>';
+  return h;
+}
+function renderAnnualReview(a){
+  var box = document.getElementById('annual-review-box');
+  if(!box) return;
+  var en = a.enterprise || {};
+  var ar;
+  try { ar = AuthStore.checkAnnualStatus(); } catch(e) { ar = 'ok'; }
+  /* checkAnnualStatus 返回字符串状态（'ok'|'due'|'under_review'|'rejected'），兼容对象形式 */
+  var status = (typeof ar === 'string') ? ar : (ar.status || 'ok');
+  var html = '';
+  /* 已有日常待审核变更时，不允许发起年度复核 */
+  var pc;
+  try { pc = AuthStore.getPendingEnterpriseChange(); } catch(e) { pc = {status:'none', reviewType:'daily'}; }
+  var hasDailyPending = pc.status === 'pending' && pc.reviewType !== 'annual';
+
+  if(status === 'under_review'){
+    html += '<div class="group-title">企业信息年度复核</div>';
+    html += '<div class="card" style="padding:14px;margin-bottom:12px;border:1px solid var(--primary);background:var(--primary-soft);">';
+    html += '<div class="fw-700 fs-14" style="color:var(--primary-dim);margin-bottom:6px;">年度复核审核中</div>';
+    html += '<div class="fs-12" style="color:var(--text-2);line-height:1.7;">提交时间：'+fmtD(pc.submittedAt||en.lastReviewAt)+' · 预计 1-3 个工作日完成审核</div>';
+    html += '</div>';
+    html += '<div class="group ap-group">';
+    html += '<div class="ap-field ap-field-ro"><label>企业名称</label><b class="fs-13 text-2">'+(pc.co||en.co||'—')+'</b></div>';
+    html += '<div class="ap-field ap-field-ro"><label>信用代码</label><b class="fs-13 mono text-2">'+(pc.code||en.code||'—')+'</b></div>';
+    html += '<div class="ap-field ap-field-ro"><label>法定代表人</label><b class="fs-13 text-2">'+(pc.legal||en.legal||'—')+'</b></div>';
+    html += '<div class="ap-field ap-field-ro" style="border:none;"><label>注册地址</label><b class="fs-13 text-2">'+(pc.registeredAddress||en.registeredAddress||'—')+'</b></div>';
+    html += '</div>';
+    html += '<button class="btn btn-ghost btn-block" onclick="withdrawEntChange()">撤回复核申请</button>';
+  } else if(status === 'rejected'){
+    html += '<div class="group-title">企业信息年度复核</div>';
+    html += '<div class="card" style="padding:12px 14px;margin-bottom:12px;border:1px solid var(--danger);background:rgba(212,76,71,.06);">';
+    html += '<div class="fs-13" style="color:var(--danger);line-height:1.7;"><b>年度复核未通过：</b>'+(en.annualNote||pc.rejectReason||'资料不齐')+'</div></div>';
+    html += annualReviewFormHtml(en);
+    html += '<button class="btn btn-primary btn-block" onclick="submitAnnualReview()">重新提交年度复核</button>';
+  } else if(status === 'due'){
+    html += '<div class="group-title">企业信息年度复核</div>';
+    html += '<div class="card" style="padding:12px 14px;margin-bottom:12px;border:1px solid var(--warning);background:rgba(214,158,46,.06);">';
+    html += '<div class="fs-13" style="color:var(--warning);line-height:1.6;">企业信息年度复核已到期，请及时发起复核以保持企业认证有效。</div></div>';
+    if(hasDailyPending){
+      html += '<div class="card" style="padding:12px 14px;font-size:12px;color:var(--text-2);line-height:1.6;">存在待审核的日常变更，请先处理完毕后再发起年度复核。</div>';
+    } else {
+      html += '<button class="btn btn-primary btn-block" onclick="showAnnualReviewForm()">发起年度复核</button>';
+      html += '<div id="annual-review-form" style="display:none;margin-top:10px;">' + annualReviewFormHtml(en) + '</div>';
+      html += '<button class="btn btn-primary btn-block" id="annual-review-submit" style="display:none;margin-top:10px;" onclick="submitAnnualReview()">提交年度复核</button>';
+    }
+  } else {
+    /* ok */
+    var due = en.reviewDueAt ? fmtD(en.reviewDueAt) : '—';
+    html += '<div class="group-title">企业信息年度复核</div>';
+    html += '<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:10px;">';
+    html += '<span style="width:32px;height:32px;border-radius:50%;background:rgba(46,164,79,.12);color:var(--success);display:flex;align-items:center;justify-content:center;flex:none;font-weight:700;">✓</span>';
+    html += '<div class="fs-13" style="color:var(--text-2);line-height:1.6;">年检正常，下次复核：<b style="color:var(--text-1);">'+due+'</b></div>';
+    html += '</div>';
+  }
+  box.innerHTML = html;
+}
+window.showAnnualReviewForm = function(){
+  var f = document.getElementById('annual-review-form');
+  if(f) f.style.display = '';
+  var s = document.getElementById('annual-review-submit');
+  if(s) s.style.display = '';
+  /* 隐藏同卡片内的"发起年度复核"按钮（兄弟按钮） */
+  var box = document.getElementById('annual-review-box');
+  if(box){
+    var btns = box.querySelectorAll('button');
+    for(var i=0;i<btns.length;i++){
+      if(btns[i].textContent.indexOf('发起年度复核')>=0) btns[i].style.display='none';
+    }
+  }
+};
+window.__arFiles = window.__arFiles || [];
+window.uploadArFile = function(){
+  var name = '营业执照_' + (window.__arFiles.length + 1) + '.jpg';
+  window.__arFiles.push({name: name, type: 'license'});
+  var list = document.getElementById('ar-file-list');
+  if(list) list.textContent = '已上传：' + window.__arFiles.map(function(f){return f.name;}).join('、');
+  UI.toast('已上传营业执照','ok');
+};
+window.submitAnnualReview = function(){
+  var co = ((document.getElementById('ar-co')||{}).value||'').trim();
+  var code = ((document.getElementById('ar-code')||{}).value||'').trim().toUpperCase();
+  var legal = ((document.getElementById('ar-legal')||{}).value||'').trim();
+  var regaddr = ((document.getElementById('ar-regaddr')||{}).value||'').trim();
+  var reason = ((document.getElementById('ar-reason')||{}).value||'').trim();
+  if(!co||!code||!legal||!regaddr){UI.toast('请填写完整的企业名称、税号、法人、注册地址','warn');return;}
+  /* [年度复核] 始终强制材料（legal 变化不额外叠加要求，年度基线已覆盖） */
+  if(!window.__arFiles || window.__arFiles.length < 1){
+    UI.toast('年度复核需上传佐证材料（营业执照等）','warn'); return;
+  }
+  var r;
+  try { r = AuthStore.submitAnnualReview({co:co, code:code, legal:legal, registeredAddress:regaddr, shortName:'', reason:reason||'年度复核', files:window.__arFiles}); }
+  catch(e) { UI.toast('提交失败：'+e.message,'warn'); return; }
+  if(r && r.ok === false){ UI.toast(r.msg||'年度复核提交失败','warn'); return; }
+  window.__arFiles = [];
+  UI.toast('年度复核已提交，等待审核','ok');
+  render();
+};
 function validUscc(c){return /^[0-9A-HJ-NPQRTUWXY]{18}$/.test(c.toUpperCase());}
 
 window.payEnterprise=function(){

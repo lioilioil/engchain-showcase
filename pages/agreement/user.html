@@ -149,16 +149,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .af-contact .go{flex:none;font-size:12px;font-weight:600;color:var(--primary-dim);}
 .af-copy{margin-top:16px;font-size:10.5px;color:var(--text-4);text-align:center;line-height:1.8;}
 
-/* —— 回到顶部 —— */
-.ag-top{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:25;
-  width:42px;height:42px;border-radius:50%;border:1px solid var(--accent-line);
-  background:var(--bg-card);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;
-  box-shadow:var(--shadow-float);cursor:pointer;opacity:0;transform:translateY(10px);pointer-events:none;
-  transition:opacity .25s ease,transform .25s ease;}
-.ag-top.show{opacity:1;transform:none;pointer-events:auto;}
-.ag-top svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-.ag-top:active{transform:scale(.95);}
-.ag-top:focus-visible{outline:2px solid var(--primary);outline-offset:2px;}
+/* —— 回到顶部：由全局 back-to-top.js 统一提供（底部居中玻璃按钮），此处不再本地实现 —— */
 
 /* —— 滚动揭示动效（仅允许动效时生效；默认完全可见） —— */
 @media (prefers-reduced-motion: no-preference){
@@ -172,12 +163,56 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .ag-panel-enter{animation:none;}
   .ag-progress i{transition:none;}
 }
+
+/* —— 目录页（默认状态） —— */
+.ag-catalog{padding:18px 16px 26px;}
+.ag-catalog-group{margin-top:6px;}
+.ag-catalog-label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.1em;
+  color:var(--text-3);margin:0 2px 9px;}
+.ag-catalog-label::after{content:"";flex:1;height:1px;background:var(--line);}
+.ag-catalog-list{background:var(--bg-card);border:1px solid var(--line);border-radius:15px;
+  box-shadow:var(--shadow-card);overflow:hidden;}
+.ag-cat-item{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;
+  border-bottom:1px solid var(--line);transition:background var(--d-fast);}
+.ag-cat-item:last-child{border-bottom:none;}
+.ag-cat-item:active{background:var(--bg-card-2);}
+.ag-cat-ic{flex:none;width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  background:var(--primary-soft);color:var(--primary-dim);}
+.ag-cat-ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.ag-cat-body{flex:1;min-width:0;}
+.ag-cat-name{font-size:14px;font-weight:700;color:var(--text-1);line-height:1.3;}
+.ag-cat-desc{font-size:11px;color:var(--text-3);margin-top:3px;line-height:1.5;}
+.ag-cat-arrow{flex:none;color:var(--text-4);}
+.ag-cat-arrow svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* —— 阅读态切换 —— */
+body.ag-reading .ag-catalog, body.ag-reading .ag-hero{display:none;}
+body:not(.ag-reading) .ag-panels{display:none;}
+body.ag-reading .ag-panel{display:none;}
+body.ag-reading .ag-panel.on{display:block;}
+.read-back{display:none;}
+body.ag-reading .read-back{display:flex;}
+body.ag-reading .nav-back{display:none;}
+/* [FIX] 阅读态返回按钮改为通用返回 icon（与 nav-back 一致：无文字、44px 热区） */
+.read-back{position:absolute;left:0;top:0;width:44px;height:50px;align-items:center;justify-content:center;
+  padding:0;border:0;background:none;color:var(--text-1);cursor:pointer;z-index:22;}
+.read-back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+.read-back:active{opacity:.6;}
+
+/* -- reading ap-head fix v2 -- */
+body.ag-reading .ap-head{display:block !important;align-items:stretch !important;gap:0 !important;}
+body.ag-reading .ap-head > *{display:block !important;width:100% !important;margin-left:0 !important;}
+body.ag-reading .ap-head .ap-ver{display:inline-flex;width:auto !important;}
+body.ag-reading .ap-head .ap-title{display:block !important;}
+body.ag-reading .ap-head .ap-desc{display:block !important;}
+body.ag-reading .ap-head .ap-chips{display:flex;width:100% !important;}
 </style></head>
 <body>
 <div class="phone">
   <div class="navbar">
     <button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <div class="nav-title">协议中心</div>
+    <button class="read-back" id="readBack" type="button" aria-label="返回目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title" id="navTitle">协议中心</div>
     <div class="nav-right"></div>
   </div>
 
@@ -210,30 +245,46 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
     </header>
 
-    <!-- ===== 场景 Tab ===== -->
-    <nav class="ag-tabs" id="agTabs" role="tablist" aria-label="协议场景">
-      <div class="ag-tabs-in">
-        <button class="ag-tab on" role="tab" aria-selected="true" aria-controls="p-service" data-panel="service">
-          <svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg>服务协议</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-privacy" data-panel="privacy">
-          <svg viewBox="0 0 24 24"><path d="M12 2.5 4.5 5v5.6c0 4.6 3.2 8.4 7.5 9.9 4.3-1.5 7.5-5.3 7.5-9.9V5L12 2.5z"/><path d="M8.8 11.8l2.2 2.3 4.2-4.6"/></svg>隐私政策</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-recharge" data-panel="recharge">
-          <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>充值协议</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-credits" data-panel="credits">
-          <svg viewBox="0 0 24 24"><path d="M12 2.8l2.5 5.4 5.9.7-4.4 4 1.2 5.8L12 15.7l-5.2 3 1.2-5.8-4.4-4 5.9-.7L12 2.8z"/></svg>积分协议</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-trade" data-panel="trade">
-          <svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/><path d="M12 14.5v2"/></svg>交易托管</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-auth" data-panel="auth">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.4 4-5 7.5-5s6.3 1.6 7.5 5"/></svg>认证授权</button>
-        <button class="ag-tab" role="tab" aria-selected="false" aria-controls="p-franchise" data-panel="franchise">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M12 3.4v6M12 14.6v6M3.4 12h6M14.6 12h6"/><path d="M6.5 6.5l4.3 4.3M13.2 13.2l4.3 4.3M17.5 6.5l-4.3 4.3M10.8 13.2l-4.3 4.3"/></svg>加盟分销</button>
+    <!-- ===== 目录页 ===== -->
+    <div class="ag-catalog" id="agCatalog">
+      <div class="ag-catalog-group">
+        <div class="ag-catalog-label">账户与合规</div>
+        <div class="ag-catalog-list">
+          <div class="ag-cat-item" data-panel="service"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6V3z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">用户服务协议</div><div class="ag-cat-desc">注册登录 · 账号安全 · 平台规则</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="privacy"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M12 2.5 4.5 5v5.6c0 4.6 3.2 8.4 7.5 9.9 4.3-1.5 7.5-5.3 7.5-9.9V5L12 2.5z"/><path d="M8.8 11.8l2.2 2.3 4.2-4.6"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">隐私政策</div><div class="ag-cat-desc">信息收集 · 使用 · 共享 · 您的权利</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="auth"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.4 4-5 7.5-5s6.3 1.6 7.5 5"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">认证与授权服务协议</div><div class="ag-cat-desc">实名认证 · 企业入驻 · 第三方登录</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        </div>
       </div>
-    </nav>
+      <div class="ag-catalog-group">
+        <div class="ag-catalog-label">资金与交易</div>
+        <div class="ag-catalog-list">
+          <div class="ag-cat-item" data-panel="recharge"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h4"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">余额充值与提现协议</div><div class="ag-cat-desc">充值 · 提现 · 发票 · 退款</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="credits"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M12 2.8l2.5 5.4 5.9.7-4.4 4 1.2 5.8L12 15.7l-5.2 3 1.2-5.8-4.4-4 5.9-.7L12 2.8z"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">积分与会员服务协议</div><div class="ag-cat-desc">积分获取 · 解锁消费 · 年度会员</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="trade"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/><path d="M12 14.5v2"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">交易与资金托管协议</div><div class="ag-cat-desc">意向金 · 托管 · 佣金 · 质保金 · 跳单</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="franchise"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M12 3.4v6M12 14.6v6M3.4 12h6M14.6 12h6"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">加盟与分销协议</div><div class="ag-cat-desc">加盟费 · 资质授权 · 分销返佣提现</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        </div>
+      </div>
+      <div class="ag-catalog-group">
+        <div class="ag-catalog-label">行为与规则</div>
+        <div class="ag-catalog-list">
+          <div class="ag-cat-item" data-panel="publish"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2z"/><path d="M12 12v7"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">信息发布规范</div><div class="ag-cat-desc">供需信息 · 真实义务 · 审核处置</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="communication"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">沟通与交易秩序规则</div><div class="ag-cat-desc">IM会话 · 禁止跳单 · 防骚扰</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="activity"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">平台活动规则</div><div class="ag-cat-desc">签到 · 邀请 · 新人福利 · 奖励发放</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        </div>
+      </div>
+      <div class="ag-catalog-group">
+        <div class="ag-catalog-label">公示与声明</div>
+        <div class="ag-catalog-list">
+          <div class="ag-cat-item" data-panel="credit"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.5 13l2.5 8-6-3-6 3 2.5-8"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">失信主体公示规则</div><div class="ag-cat-desc">失信认定 · 公示期限 · 异议申诉</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+          <div class="ag-cat-item" data-panel="disclaimer"><div class="ag-cat-ic"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8-7 9.5C8 19 5 15.4 5 11V6l7-3z"/><path d="M8.8 11.8l2.2 2.3 4.2-4.6"/></svg></div><div class="ag-cat-body"><div class="ag-cat-name">免责声明</div><div class="ag-cat-desc">信息风险 · 交易自负 · 第三方责任</div></div><div class="ag-cat-arrow"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        </div>
+      </div>
+    </div>
 
     <main class="ag-panels">
       <!-- ══════════ 场景一 · 用户服务协议 ══════════ -->
       <section class="ag-panel on" id="p-service" role="tabpanel" aria-label="用户服务协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>全部服务</b></span>
           <h2 class="ap-title">工程链用户服务协议</h2>
           <p class="ap-desc">本协议适用于您注册、登录及使用工程链平台（含 App、网页端等全部服务形态）的行为，是您与成都工程链科技有限公司之间就平台服务订立的契约。</p>
@@ -394,7 +445,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景二 · 隐私政策 ══════════ -->
       <section class="ag-panel" id="p-privacy" role="tabpanel" aria-label="隐私政策">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>个人信息全场景</b></span>
           <h2 class="ap-title">工程链隐私政策</h2>
           <p class="ap-desc">我们深知个人信息对您的重要性，将依据《中华人民共和国个人信息保护法》《中华人民共和国网络安全法》《中华人民共和国数据安全法》《中华人民共和国电子商务法》等法律法规，遵循合法、正当、必要和诚信原则处理您的个人信息。</p>
@@ -538,7 +589,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景三 · 余额充值协议 ══════════ -->
       <section class="ag-panel" id="p-recharge" role="tabpanel" aria-label="余额充值协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>支付 / 充值 / 提现</b></span>
           <h2 class="ap-title">工程链余额充值协议</h2>
           <p class="ap-desc">本协议适用于您在"钱包-充值"功能中向平台账户余额充值，以及使用、提现、退款等全部相关行为。</p>
@@ -647,7 +698,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景四 · 积分服务协议 ══════════ -->
       <section class="ag-panel" id="p-credits" role="tabpanel" aria-label="积分服务协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>积分 / 解锁 / 会员</b></span>
           <h2 class="ap-title">工程链积分服务协议</h2>
           <p class="ap-desc">本协议适用于您在本平台获取、充值、消费积分，以及开通年度解锁会员等积分相关权益的全部行为。</p>
@@ -754,7 +805,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景五 · 交易与资金托管协议 ══════════ -->
       <section class="ag-panel" id="p-trade" role="tabpanel" aria-label="交易与资金托管协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>交易 / 意向金 / 托管 / 佣金</b></span>
           <h2 class="ap-title">工程链交易与资金托管协议</h2>
           <p class="ap-desc">本协议适用于您通过平台达成的服务交易，以及意向金、资金托管、里程碑结算、佣金、质保金等全部交易保障安排。</p>
@@ -860,7 +911,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景六 · 认证与授权服务协议 ══════════ -->
       <section class="ag-panel" id="p-auth" role="tabpanel" aria-label="认证与授权服务协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>认证 / 授权 / 入驻</b></span>
           <h2 class="ap-title">工程链认证与授权服务协议</h2>
           <p class="ap-desc">本协议适用于您在本平台进行的个人实名认证、企业认证、企业入驻，以及第三方账号授权登录与设备权限授权等全部认证授权行为。</p>
@@ -961,7 +1012,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <!-- ══════════ 场景七 · 加盟与分销协议 ══════════ -->
       <section class="ag-panel" id="p-franchise" role="tabpanel" aria-label="加盟与分销协议">
-        <div class="ap-head">
+        <div class="ap-head" style="display:block !important;">
           <span class="ap-ver">适用场景 · <b>加盟 / 资质授权 / 分销</b></span>
           <h2 class="ap-title">工程链加盟与分销协议</h2>
           <p class="ap-desc">本协议适用于您在本平台参与企业加盟、资质合作，以及加入分销计划、获取分销收益的全部行为。</p>
@@ -1060,6 +1111,366 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </article>
       </section>
 
+      <!-- ══════════ 行为规范 · 信息发布规范 ══════════ -->
+      <section class="ag-panel" id="p-publish" role="tabpanel" aria-label="信息发布规范">
+        <div class="ap-head" style="display:block !important;">
+          <span class="ap-ver">适用场景 · <b>发布供需信息</b></span>
+          <h2 class="ap-title">工程链信息发布规范</h2>
+          <p class="ap-desc">本规范适用于您在本平台发布工程需求、供应、招聘、报价、招商等各类信息的全部行为，是《用户服务协议》第四章的细化规则。</p>
+          <div class="ap-chips">
+            <button class="ap-chip" data-jump="pub-1">一、发布资质</button>
+            <button class="ap-chip" data-jump="pub-2">二、信息真实义务</button>
+            <button class="ap-chip" data-jump="pub-3">三、禁止发布内容</button>
+            <button class="ap-chip" data-jump="pub-4">四、审核与处置</button>
+            <button class="ap-chip" data-jump="pub-5">五、信息修改与删除</button>
+            <button class="ap-chip" data-jump="pub-6">六、违规处理</button>
+          </div>
+        </div>
+        <article class="clause" id="pub-1" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">一</div><h3 class="cl-title">发布资质<small>认证要求 · 发布权限</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>1.1 实名认证：</b>发布供需信息前须完成个人实名认证。企业用户发布企业相关信息的，建议完成企业认证以提升信息可信度与曝光权重。</li>
+              <li><b>1.2 发布数量：</b>未认证用户每日发布数量受限；完成认证后发布额度相应提升，具体以页面提示为准。平台有权根据账号信用状况调整发布权限。</li>
+              <li><b>1.3 账号主体一致：</b>发布信息所留联系方式、企业名称须与认证主体一致。不得冒用他人或企业名义发布信息。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="pub-2" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">二</div><h3 class="cl-title">信息真实义务<small>内容要求 · 材料真实</small></h3></div>
+          <div class="cl-body">
+            <p><b>2.1 内容真实。</b>您发布的项目需求、供应能力、资质业绩、报价、联系方式等信息应真实、准确、完整，不得夸大、虚构或误导。</p>
+            <p><b>2.2 材料一致。</b>上传的营业执照、资质证书、人员证书、业绩合同等图片材料应与实际一致，不得伪造、涂改或使用过期证照。</p>
+            <p><b>2.3 及时更新。</b>信息内容发生变化的（如价格调整、项目状态变更、资质到期），您应及时修改或下架相关信息。</p>
+          </div>
+        </article>
+        <article class="clause" id="pub-3" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">三</div><h3 class="cl-title">禁止发布内容<small>违法违规 · 扰乱秩序</small></h3></div>
+          <div class="cl-body">
+            <p>您承诺不在平台发布以下内容：</p>
+            <ul>
+              <li>违反法律法规、公序良俗的信息（含涉政、色情、赌博、暴力、毒品、走私等）；</li>
+              <li>虚假项目、虚假资质、虚假业绩、伪造证照等欺诈性信息；</li>
+              <li>恶意刷单、虚假报价、炒信、虚假评价等扰乱交易秩序的内容；</li>
+              <li>未经许可的广告、垃圾信息、第三方推广或导流内容；</li>
+              <li>侵犯他人知识产权、商业秘密或个人信息的内容；</li>
+              <li>与工程行业无关的信息、重复信息或恶意刷屏内容；</li>
+              <li>含有"包过""百分百中标""挂靠资质"等违法违规承诺的信息。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="pub-4" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">四</div><h3 class="cl-title">审核与处置<small>机器审核 · 人工复核</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>4.1 先审后发：</b>平台对发布信息实行机器审核加人工抽检。未通过审核的信息不予展示，您可修改后重新提交。</li>
+              <li><b>4.2 举报处理：</b>其他用户举报违规信息的，平台将在收到举报后及时复核。确认违规的，依规下架或删除。</li>
+              <li><b>4.3 信息展示：</b>平台对信息展示位置、排序拥有自主决定权，不因发布行为承诺任何特定曝光效果。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="pub-5" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">五</div><h3 class="cl-title">信息修改与删除<small>自主管理 · 平台处置</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li>您可在"我的-发布记录"中自行修改或下架已发布的信息。</li>
+              <li>信息进入交易流程（已被意向金锁定、已下单）的，修改与下架可能受限，需按《交易与资金托管协议》执行。</li>
+              <li>因违反本规范被平台下架的信息，在限制期内不得重新发布相同内容。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="pub-6" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">六</div><h3 class="cl-title">违规处理<small>阶梯处置 · 失信公示</small></h3></div>
+          <div class="cl-body">
+            <p>对违反本规范的行为，平台视情节轻重采取以下一项或多项措施：</p>
+            <ul>
+              <li>警告、信息驳回或下架；</li>
+              <li>扣除诚信分、限制发布数量或发布权限；</li>
+              <li>冻结相关账号功能；</li>
+              <li>情节严重的，列入失信名单并公示（详见《失信主体公示规则》）；</li>
+              <li>涉嫌违法犯罪的，依法移送有关机关。</li>
+            </ul>
+          </div>
+        </article>
+      </section>
+
+      <!-- ══════════ 行为规范 · 沟通与交易秩序规则 ══════════ -->
+      <section class="ag-panel" id="p-communication" role="tabpanel" aria-label="沟通与交易秩序规则">
+        <div class="ap-head" style="display:block !important;">
+          <span class="ap-ver">适用场景 · <b>IM会话 / 聊天 / 防跳单</b></span>
+          <h2 class="ap-title">工程链沟通与交易秩序规则</h2>
+          <p class="ap-desc">本规则适用于您通过平台站内会话、IM聊天、电话沟通等方式与其他用户交流的全部行为，旨在维护平台撮合秩序，防范跳单与骚扰。</p>
+          <div class="ap-chips">
+            <button class="ap-chip" data-jump="cmm-1">一、会话使用规范</button>
+            <button class="ap-chip" data-jump="cmm-2">二、禁止跳单</button>
+            <button class="ap-chip" data-jump="cmm-3">三、禁止骚扰与营销</button>
+            <button class="ap-chip" data-jump="cmm-4">四、证据留存</button>
+            <button class="ap-chip" data-jump="cmm-5">五、违规处理</button>
+            <button class="ap-chip" data-jump="cmm-6">六、举报渠道</button>
+          </div>
+        </div>
+        <article class="clause" id="cmm-1" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">一</div><h3 class="cl-title">会话使用规范<small>沟通目的 · 行为边界</small></h3></div>
+          <div class="cl-body">
+            <p><b>1.1 沟通目的：</b>站内会话仅用于工程业务相关的咨询、报价、对接与洽谈，您应通过平台会话与交易相对方沟通。</p>
+            <p><b>1.2 文明沟通：</b>交流中应尊重对方，不得使用侮辱、威胁、恐吓、歧视性语言，不得恶意刷屏或反复发送无关信息。</p>
+            <p><b>1.3 信息安全：</b>会话中不要轻易点击不明链接、下载未知文件，不要向对方泄露账号密码、验证码等敏感信息。</p>
+          </div>
+        </article>
+        <article class="clause" id="cmm-2" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">二</div><h3 class="cl-title">禁止跳单<small>违约情形 · 后果</small></h3></div>
+          <div class="cl-body">
+            <p><b>2.1 跳单定义：</b>通过平台获取交易机会、信息或联系方式后，绕开平台私下成交（含诱导对方取消订单后线下交易、利用平台信息与第三方成交等），构成违约。</p>
+            <div class="cl-notice">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+              <div><b>违约后果：</b>首次违约限制沟通功能7天并警告；再次违约限制沟通30天、支付违约金并暂停服务；情节严重的永久封号并依法追偿。详见《交易与资金托管协议》第八条。</div>
+            </div>
+          </div>
+        </article>
+        <article class="clause" id="cmm-3" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">三</div><h3 class="cl-title">禁止骚扰与营销<small>违规行为 · 处置</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li>未经对方同意，不得频繁发送消息、反复推销无关服务；</li>
+              <li>不得在会话中发送广告链接、二维码、第三方平台导流信息；</li>
+              <li>不得利用会话对其他用户进行商业贿赂、回扣约定等违规洽谈；</li>
+              <li>不得冒充平台工作人员或以平台名义进行沟通。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="cmm-4" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">四</div><h3 class="cl-title">证据留存<small>记录保全 · 争议处理</small></h3></div>
+          <div class="cl-body">
+            <p>平台将依法留存站内会话记录作为交易争议处理的证据。您在会话中的承诺、报价、约定均可能作为争议处理的参考依据。建议您通过平台会话进行重要业务沟通，不要仅依赖电话或线下口头约定。</p>
+          </div>
+        </article>
+        <article class="clause" id="cmm-5" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">五</div><h3 class="cl-title">违规处理<small>阶梯措施</small></h3></div>
+          <div class="cl-body">
+            <p>违反本规则的，平台可视情节采取：警告、限制会话功能、限制发布权限、扣除诚信分、冻结账号、永久封禁等措施。涉嫌违法的依法移送有关机关。</p>
+          </div>
+        </article>
+        <article class="clause" id="cmm-6" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">六</div><h3 class="cl-title">举报渠道<small>投诉方式 · 处理时效</small></h3></div>
+          <div class="cl-body">
+            <p>遇到骚扰、跳单诱导、欺诈等违规会话，您可在会话页面点击举报按钮，或通过"我的-帮助与反馈"提交举报。平台将在收到举报后3个工作日内核查并反馈结果。</p>
+          </div>
+        </article>
+      </section>
+
+      <!-- ══════════ 行为规范 · 平台活动规则 ══════════ -->
+      <section class="ag-panel" id="p-activity" role="tabpanel" aria-label="平台活动规则">
+        <div class="ap-head" style="display:block !important;">
+          <span class="ap-ver">适用场景 · <b>签到 / 邀请 / 新人福利</b></span>
+          <h2 class="ap-title">工程链平台活动规则</h2>
+          <p class="ap-desc">本规则适用于平台开展的每日签到、邀请有礼、新人注册福利、充值优惠等各类营销活动，是您参与平台活动时应遵守的统一规则。</p>
+          <div class="ap-chips">
+            <button class="ap-chip" data-jump="act-1">一、活动性质</button>
+            <button class="ap-chip" data-jump="act-2">二、签到与任务</button>
+            <button class="ap-chip" data-jump="act-3">三、邀请有礼</button>
+            <button class="ap-chip" data-jump="act-4">四、奖励发放与失效</button>
+            <button class="ap-chip" data-jump="act-5">五、规则调整与终止</button>
+            <button class="ap-chip" data-jump="act-6">六、异常处理</button>
+          </div>
+        </div>
+        <article class="clause" id="act-1" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">一</div><h3 class="cl-title">活动性质<small>营销让利 · 非承诺</small></h3></div>
+          <div class="cl-body">
+            <p>平台活动为营销让利行为，所赠送的积分、免费解锁额度、优惠券等均为平台对用户的额外回馈，不构成平台对您的任何投资承诺或收益保证。活动奖励的具体内容、数量、期限以各活动页面公示为准。</p>
+          </div>
+        </article>
+        <article class="clause" id="act-2" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">二</div><h3 class="cl-title">签到与任务<small>获取方式 · 发放规则</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>每日签到：</b>每日登录后在积分页面完成签到即可领取积分，连续签到可获额外奖励。签到奖励当日有效，中断后重新计算。</li>
+              <li><b>任务奖励：</b>完成实名认证、首次发布信息、完善企业资料等指定任务可获对应积分奖励，详见活动页面说明。</li>
+              <li><b>奖励到账：</b>任务完成后奖励即时或按活动规则到账，逾期未领取视为自动放弃。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="act-3" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">三</div><h3 class="cl-title">邀请有礼<small>邀请规则 · 双方奖励</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li>您可通过分享专属邀请链接邀请新用户注册。被邀请人完成注册后，双方均可获得约定奖励。</li>
+              <li>被邀请人须为平台从未注册过的新用户，同一设备、同一手机号、同一支付账号视为同一用户。</li>
+              <li>禁止通过刷单、虚假注册、技术作弊等方式套取邀请奖励，一经发现平台有权收回奖励并依规处理。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="act-4" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">四</div><h3 class="cl-title">奖励发放与失效<small>有效期 · 不可转让</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li>活动赠送的积分、优惠券等奖励自到账之日起按《积分服务协议》规定的有效期管理，到期自动失效。</li>
+              <li>奖励仅限本人使用，不可转让、不可兑换现金、不可用于平台外交易。</li>
+              <li>因用户主动注销账号、账号被封禁等原因导致的奖励失效，平台不予以补发。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="act-5" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">五</div><h3 class="cl-title">规则调整与终止<small>公示方式 · 权利保留</small></h3></div>
+          <div class="cl-body">
+            <p>平台有权根据运营需要调整活动规则、奖励内容或终止活动，调整将通过活动页面、站内公告等方式提前公示。活动变更后您继续参与即视为接受变更后的规则。</p>
+          </div>
+        </article>
+        <article class="clause" id="act-6" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">六</div><h3 class="cl-title">异常处理<small>作弊追缴 · 法律责任</small></h3></div>
+          <div class="cl-body">
+            <p>如发现用户通过技术手段、虚假身份、恶意串通等方式套取活动奖励，平台有权采取以下措施：收回违规所得奖励、暂停活动参与资格、限制账号功能，情节严重的永久封禁账号并依法追究法律责任。</p>
+          </div>
+        </article>
+      </section>
+
+      <!-- ══════════ 公示 · 失信主体公示规则 ══════════ -->
+      <section class="ag-panel" id="p-credit" role="tabpanel" aria-label="失信主体公示规则">
+        <div class="ap-head" style="display:block !important;">
+          <span class="ap-ver">适用场景 · <b>全局公示</b></span>
+          <h2 class="ap-title">工程链失信主体公示规则</h2>
+          <p class="ap-desc">为营造透明、诚信、健康的工程撮合环境，维护平台用户合法权益，依据《民法典》《电子商务法》等法律法规及《用户服务协议》制定本规则。</p>
+          <div class="ap-chips">
+            <button class="ap-chip" data-jump="crt-1">一、失信行为认定</button>
+            <button class="ap-chip" data-jump="crt-2">二、公示规则</button>
+            <button class="ap-chip" data-jump="crt-3">三、处理措施</button>
+            <button class="ap-chip" data-jump="crt-4">四、守信激励</button>
+            <button class="ap-chip" data-jump="crt-5">五、更新与生效</button>
+          </div>
+        </div>
+        <article class="clause" id="crt-1" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">一</div><h3 class="cl-title">失信行为认定<small>认定依据 · 行为类型</small></h3></div>
+          <div class="cl-body">
+            <p>平台基于用户行为记录、交易履约情况、司法机关或行政机关公开信息、其他用户投诉举报及核查结果等，综合认定以下行为构成失信行为：</p>
+            <ul>
+              <li><b>虚假信息：</b>发布虚假、伪造、盗用的企业资质、证书、工程业绩、供需信息或报价。</li>
+              <li><b>恶意违约：</b>交易达成后无正当理由拒不履行、单方恶意中止交易或恶意拖欠、克扣款项。</li>
+              <li><b>欺诈行为：</b>以虚构交易、伪造凭证、诱导线下转账等方式实施欺诈。</li>
+              <li><b>滥用权益：</b>恶意薅取积分、补贴、意向金退款或利用平台规则漏洞牟利。</li>
+              <li><b>侵权与违规：</b>抄袭盗用他人内容、侵犯知识产权、泄露商业秘密或个人信息、发布违法违规信息。</li>
+              <li><b>拒不配合：</b>拒不履行平台生效处理决定、拒不配合平台或监管部门调查核实。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="crt-2" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">二</div><h3 class="cl-title">公示规则<small>内容 · 范围 · 期限 · 申诉</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>公示内容：</b>经认定的失信主体，平台将依据行为严重程度公示其主体名称（企业名称或脱敏后的个人昵称/姓名）、失信行为摘要、处理措施及公示期限。</li>
+              <li><b>公示范围：</b>失信信息将在平台"失信公示"专区及涉事信息详情页公开展示，供交易相对方与平台用户查询参考。</li>
+              <li><b>公示期限：</b>一般失信行为公示6个月；严重失信行为公示12个月；涉嫌违法犯罪的，将依法移送有关机关并长期公示。</li>
+              <li><b>异议申诉：</b>被公示主体对认定结果有异议的，可在公示期内通过"我的-帮助与反馈"提交申诉材料，平台将在7个工作日内复核并反馈。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="crt-3" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">三</div><h3 class="cl-title">处理措施<small>阶梯处置</small></h3></div>
+          <div class="cl-body">
+            <p>平台可视失信行为情节轻重，采取一项或多项措施：</p>
+            <ul>
+              <li>警告、诚信分扣减；</li>
+              <li>限制发布信息、限制解锁查看、限制参与活动等部分功能；</li>
+              <li>冻结或扣除保证金、意向金及违规所得；</li>
+              <li>暂停或终止账号使用，列入失信名单并公示；</li>
+              <li>依法向有关主管部门报告，配合司法与行政执法。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="crt-4" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">四</div><h3 class="cl-title">守信激励<small>信用积累 · 权益提升</small></h3></div>
+          <div class="cl-body">
+            <p>平台鼓励诚实守信经营：信用记录良好的用户将获得更高等级权益、更多曝光机会、优先撮合与专属服务。用户可通过完成认证、按时履约、完善企业信息等行为积累信用，失信信息消除后信用将逐步恢复。</p>
+          </div>
+        </article>
+        <article class="clause" id="crt-5" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">五</div><h3 class="cl-title">更新与生效<small>规则修订 · 联系我们</small></h3></div>
+          <div class="cl-body">
+            <p>平台可能根据法律法规变化与业务发展适时修订本规则，重大变更将通过站内公告、页面显著提示等方式公示。本规则自公示之日起生效，与《用户服务协议》配套适用。</p>
+            <ul>
+              <li>客服热线：400-888-6688</li>
+              <li>在线客服：App内"我的-帮助与反馈"</li>
+            </ul>
+          </div>
+        </article>
+      </section>
+
+      <!-- ══════════ 公示 · 免责声明 ══════════ -->
+      <section class="ag-panel" id="p-disclaimer" role="tabpanel" aria-label="免责声明">
+        <div class="ap-head" style="display:block !important;">
+          <span class="ap-ver">适用场景 · <b>全局</b></span>
+          <h2 class="ap-title">工程链免责声明</h2>
+          <p class="ap-desc">在您使用本平台服务前，请仔细阅读并充分理解本声明全部内容。您注册、登录、使用或以其他方式接受本平台服务，即视为您已阅读并同意本声明的全部条款。</p>
+          <div class="ap-chips">
+            <button class="ap-chip" data-jump="dsc-1">一、信息真实性</button>
+            <button class="ap-chip" data-jump="dsc-2">二、交易风险自负</button>
+            <button class="ap-chip" data-jump="dsc-3">三、不可抗力</button>
+            <button class="ap-chip" data-jump="dsc-4">四、第三方服务</button>
+            <button class="ap-chip" data-jump="dsc-5">五、数据安全</button>
+            <button class="ap-chip" data-jump="dsc-6">六、知识产权</button>
+            <button class="ap-chip" data-jump="dsc-7">七、责任限制</button>
+          </div>
+        </div>
+        <article class="clause" id="dsc-1" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">一</div><h3 class="cl-title">信息真实性与核验责任<small>用户发布 · 认证不担保</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>发布信息由用户自行提供。</b>本平台上的供需信息、企业资质、证书、报价、图片等内容均由注册用户自行发布、上传，平台不对其真实性、准确性、完整性、合法性作任何明示或默示的保证。</li>
+              <li><b>认证不代表担保。</b>平台开展的实名认证、企业认证、资质核验等仅是对用户提交材料的表面形式审查，不构成对用户履约能力、经营状况、资质有效性的实质担保。</li>
+              <li><b>信息变化提示。</b>平台展示的信息可能存在滞后、遗漏或与实际不符的情形，相关信息以交易双方最终书面确认为准。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="dsc-2" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">二</div><h3 class="cl-title">交易风险自负<small>撮合服务 · 资金托管</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>平台为信息撮合服务提供方。</b>本平台仅提供信息发布、展示、搜索、匹配、撮合及辅助交易等服务，不参与交易双方的实质洽谈与合同订立。</li>
+              <li><b>交易由双方自行负责。</b>您与交易相对方之间达成的合同、承诺、款项支付及履约行为，由交易双方依据法律规定和合同约定自行承担权利义务与风险。</li>
+              <li><b>意向金与托管资金。</b>平台提供的意向金、保证金及交易资金托管服务仅按双方指令与平台规则执行划转，不构成对交易标的、履约结果或资金收益的任何担保。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="dsc-3" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">三</div><h3 class="cl-title">不可抗力与第三方原因<small>免责范围</small></h3></div>
+          <div class="cl-body">
+            <p>因不可抗力（自然灾害、战争、政府行为、政策调整、网络与电力故障、通信中断、黑客攻击、病毒侵入等）导致服务中断、延迟或数据丢失，或因第三方原因（支付机构、认证机构、运营商、云服务商等）导致的服务异常或损失，本平台将在法律允许的最大范围内不承担相应责任，但将尽合理努力及时恢复服务并协助处理。</p>
+          </div>
+        </article>
+        <article class="clause" id="dsc-4" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">四</div><h3 class="cl-title">链接与第三方服务<small>外部链接 · 第三方接入</small></h3></div>
+          <div class="cl-body">
+            <p>本平台可能包含指向第三方网站、应用或服务的链接，或接入第三方提供的支付、认证、短信、云存储等服务。前述第三方服务由其运营方独立提供并承担责任，本平台不对第三方服务的内容、质量、安全及其可能给您造成的损失承担责任。</p>
+          </div>
+        </article>
+        <article class="clause" id="dsc-5" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">五</div><h3 class="cl-title">数据与信息安全<small>安全措施 · 用户责任</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li>本平台将采取合理的技术与管理措施保护平台及用户数据安全，但无法保证在任何情况下均绝对安全、无差错、无中断。</li>
+              <li>因您自身原因（账号密码泄露、未妥善保管登录凭证、主动向他人透露信息等）导致的信息泄露或财产损失，由您自行承担。</li>
+              <li>您在平台上发布、传播的信息与内容，由您自行承担相应法律责任。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="dsc-6" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">六</div><h3 class="cl-title">知识产权声明<small>平台权利 · 用户内容</small></h3></div>
+          <div class="cl-body">
+            <ul>
+              <li><b>平台权利：</b>本平台相关的软件、程序、界面设计、商标、标识、文案、数据模型、算法及平台自身创作内容，其知识产权归平台运营方或相关权利人所有。</li>
+              <li><b>用户内容：</b>用户在本平台发布的文字、图片、影像等内容的著作权归用户或相关权利人所有；您授予平台为提供、优化服务之目的在合理范围内使用该等内容的非独占许可。</li>
+            </ul>
+          </div>
+        </article>
+        <article class="clause" id="dsc-7" style="scroll-margin-top:118px;">
+          <div class="clause-head"><div class="cl-num">七</div><h3 class="cl-title">责任限制与声明更新<small>责任上限 · 修订</small></h3></div>
+          <div class="cl-body">
+            <p>在法律允许的最大范围内，除因平台故意或重大过失导致的情形外，本平台对您因使用或无法使用服务而产生的间接损失、附带损失、惩罚性损失或利润损失不承担责任。我们可能适时修订本声明，重大变更将通过站内公告等方式公示。本声明与《用户服务协议》配套适用，冲突之处以服务协议为准。</p>
+            <ul>
+              <li>客服热线：400-888-6688</li>
+              <li>在线客服：App内"我的-帮助与反馈"</li>
+            </ul>
+          </div>
+        </article>
+      </section>
       <!-- ===== 页脚公示区 ===== -->
       <footer class="ag-footer">
         <div class="af-title">
@@ -1084,10 +1495,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </main>
   </div>
 
-  <!-- 回到顶部 -->
-  <button class="ag-top" id="agTop" aria-label="回到顶部">
-    <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-  </button>
 </div>
 
 <script src="../../js/data.js"></script>
@@ -1231,82 +1638,84 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   }
 
-  /* ─────────── 2. 场景 Tab 切换 ─────────── */
-  var tabs = document.querySelectorAll('.ag-tab');
+  /* ─────────── 2. 目录/阅读态路由 ─────────── */
+  var catItems = document.querySelectorAll('.ag-cat-item');
   var panels = document.querySelectorAll('.ag-panel');
   var scroller = document.getElementById('agScroller');
   var panelIds = {};
-  panels.forEach(function (p) { panelIds[p.id.replace('p-', '')] = p; });
+  panels.forEach(function(p){ panelIds[p.id.replace('p-','')] = p; });
 
-  function setActive(name, opts) {
-    opts = opts || {};
+  var panelTitles = {
+    service:'用户服务协议', privacy:'隐私政策', auth:'认证与授权',
+    recharge:'充值与提现', credits:'积分与会员', trade:'交易与托管',
+    franchise:'加盟与分销', publish:'信息发布规范', communication:'沟通秩序规则',
+    activity:'活动规则', credit:'失信公示规则', disclaimer:'免责声明'
+  };
+
+  function enterReading(name){
     var panel = panelIds[name];
-    if (!panel) return;
-    var changed = false;
-    tabs.forEach(function (t) {
-      var on = t.dataset.panel === name;
-      if (on !== t.classList.contains('on')) changed = true;
-      t.classList.toggle('on', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    panels.forEach(function (p) {
-      var on = p === panel;
-      p.classList.toggle('on', on);
-      if (on && changed) {
-        p.classList.remove('ag-panel-enter');
-        void p.offsetWidth;
-        p.classList.add('ag-panel-enter');
-      }
-    });
-    /* 滚回面板顶部（Tab 切换后从头阅读） */
-    scroller.scrollTo({ top: 0, behavior: opts.smooth === false ? 'auto' : 'smooth' });
+    if(!panel) return;
+    document.body.classList.add('ag-reading');
+    panels.forEach(function(p){ p.classList.remove('on'); });
+    panel.classList.add('on');
+    var nt = document.getElementById('navTitle');
+    if(nt) nt.textContent = panelTitles[name] || '协议中心';
+    scroller.scrollTop = 0;
     refreshReveal();
     updateProgress();
   }
 
-  function tabFromHash() {
-    var h = (location.hash || '').replace('#', '');
-    if (h && panelIds[h]) return h;
-    return 'service';
+  function exitReading(){
+    document.body.classList.remove('ag-reading');
+    panels.forEach(function(p){ p.classList.remove('on'); });
+    var nt = document.getElementById('navTitle');
+    if(nt) nt.textContent = '协议中心';
+    scroller.scrollTop = 0;
+    try { if(history.replaceState){ history.replaceState(null,'',location.href.split('#')[0]); } } catch(e) {}
   }
 
-  tabs.forEach(function (t) {
-    t.addEventListener('click', function () {
-      var name = t.dataset.panel;
-      if (history.replaceState) {
-        history.replaceState(null, '', '#' + name);
-      } else {
-        location.hash = name;
-      }
-      setActive(name);
+  function routeFromHash(){
+    var h = (location.hash||'').replace('#','');
+    if(h && panelIds[h]){ enterReading(h); }
+    else { exitReading(); }
+  }
+
+  catItems.forEach(function(item){
+    item.addEventListener('click', function(){
+      var name = item.dataset.panel;
+      /* [FIX] file:// 下 <base> 使相对 hash 解析为不同文件，replaceState 抛 SecurityError，
+         目录点击因此失效；改用绝对 URL 拼 hash，失败时退回 location.hash */
+      try {
+        if(history.replaceState){ history.replaceState(null,'',location.href.split('#')[0]+'#'+name); }
+        else { location.hash = name; }
+      } catch(e){ location.hash = name; }
+      enterReading(name);
     });
   });
+
+  var rb = document.getElementById('readBack');
+  if(rb) rb.addEventListener('click', exitReading);
+
+  window.addEventListener('hashchange', routeFromHash);
 
   /* 章节目录 chip 跳转 */
-  document.querySelectorAll('.ap-chip').forEach(function (c) {
-    c.addEventListener('click', function () {
+  document.querySelectorAll('.ap-chip').forEach(function(c){
+    c.addEventListener('click', function(){
       var target = document.getElementById(c.dataset.jump);
-      if (target) {
+      if(target){
         var top = target.getBoundingClientRect().top + scroller.scrollTop - 60;
-        scroller.scrollTo({ top: top, behavior: 'smooth' });
+        scroller.scrollTo({ top: top, behavior:'smooth' });
       }
     });
   });
-
-  /* hashchange（含隐私政策跳转、浏览器前进后退） */
-  window.addEventListener('hashchange', function () { setActive(tabFromHash(), { smooth: false }); });
-
-  /* ─────────── 3. 阅读进度 + 回到顶部 ─────────── */
+  /* ─────────── 3. 阅读进度（回到顶部由全局 back-to-top.js 统一提供，不再本地实现） ─────────── */
   var prog = document.getElementById('agProg');
-  var topBtn = document.getElementById('agTop');
   function updateProgress() {
     var max = scroller.scrollHeight - scroller.clientHeight;
     var p = max > 0 ? Math.min(1, scroller.scrollTop / max) : 0;
     if (prog) prog.style.transform = 'scaleX(' + p + ')';
-    if (topBtn) topBtn.classList.toggle('show', scroller.scrollTop > 420);
   }
   scroller.addEventListener('scroll', updateProgress, { passive: true });
-  topBtn.addEventListener('click', function () { scroller.scrollTo({ top: 0, behavior: 'smooth' }); });
 
   /* ─────────── 4. 章节滚动揭示（尊重减少动态偏好） ─────────── */
   var canAnimate = window.matchMedia && window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
@@ -1325,7 +1734,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ─────────── 5. 初始化 ─────────── */
   fillStatic();
   renderTables();
-  setActive(tabFromHash(), { smooth: false });
+  routeFromHash();
   refreshReveal();
   updateProgress();
 })();

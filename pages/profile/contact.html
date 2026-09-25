@@ -25,10 +25,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="scroll" style="padding-top:8px;">
     <div class="note" style="margin-bottom:14px;">开启后，您的联系方式将对已解锁用户可见。</div>
 
-    <div class="field"><label class="field-label">手机号码</label><input class="input" value="138****8866"></div>
-    <div class="field"><label class="field-label">微信号</label><input class="input" value="chenjg2026"></div>
-    <div class="field"><label class="field-label">公司名称</label><input class="input" value="四川省××建设有限公司"></div>
-    <div class="field"><label class="field-label">办公地址</label><input class="input" value="四川省天府新区成都直管区"></div>
+    <div class="field"><label class="field-label">手机号码</label><input class="input" id="c-mobile" placeholder="请输入手机号"></div>
+    <div class="field"><label class="field-label">微信号</label><input class="input" id="c-wechat" placeholder="请输入微信号"></div>
+    <div class="field"><label class="field-label">公司名称</label><input class="input" id="c-company" placeholder="请输入公司名称"></div>
+    <div class="field"><label class="field-label">办公地址</label><input class="input" id="c-addr" placeholder="请输入办公地址"></div>
 
     <div class="f-flex" style="justify-content:space-between;padding:4px 0 0;margin-top:12px;">
       <div class="text-2 fs-13">联系方式公开</div>
@@ -39,8 +39,67 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
 <script>
-(function(){window.__ROOT__='../../';window.save=function(){UI.toast('已保存','ok');setTimeout(function(){history.back()},700);};})();
+(function(){
+  window.__ROOT__='../../';
+  /* [Auth 连通] 页面加载从 AuthStore 预填联系信息（仅空时） */
+  function prefill(){
+    try{
+      if(!window.AuthStore||!AuthStore.read) return;
+      var a=AuthStore.read()||{};
+      var rn=a.realname||{}, en=a.enterprise||{};
+      var basic=(a.personalEntry&&a.personalEntry.profile&&a.personalEntry.profile.basic)||{};
+      if(!document.getElementById('c-mobile').value) document.getElementById('c-mobile').value = rn.mobile||'';
+      if(!document.getElementById('c-wechat').value) document.getElementById('c-wechat').value = basic.wechat||'';
+      if(!document.getElementById('c-company').value) document.getElementById('c-company').value = en.co||'';
+      if(!document.getElementById('c-addr').value) document.getElementById('c-addr').value = en.address||'';
+    }catch(e){}
+  }
+  prefill();
+  /* [Auth 连通] 跨标签页认证信息更新时无条件同步4个认证字段（认证值以最新 AuthStore 为准） */
+  function syncAuth() {
+    try{
+      if(!window.AuthStore||!AuthStore.read) return;
+      var a=AuthStore.read()||{};
+      var rn=a.realname||{}, en=a.enterprise||{};
+      var basic=(a.personalEntry&&a.personalEntry.profile&&a.personalEntry.profile.basic)||{};
+      document.getElementById('c-mobile').value = rn.mobile||'';
+      document.getElementById('c-wechat').value = basic.wechat||'';
+      document.getElementById('c-company').value = en.co||'';
+      document.getElementById('c-addr').value = en.address||'';
+    }catch(e){}
+  }
+  window.addEventListener('storage', function(e){ if(e.key==='engchain-auth') syncAuth(); });
+  /* [Auth 连通] 保存写回 AuthStore 并广播 engchain:auth */
+  window.save=function(){
+    var toastMsg='已保存并同步至认证信息';
+    try{
+      if(window.AuthStore&&AuthStore.read){
+        var a=AuthStore.read()||{};
+        if(!a.realname) a.realname={};
+        if(!a.enterprise) a.enterprise={};
+        if(!a.personalEntry) a.personalEntry={};
+        if(!a.personalEntry.profile) a.personalEntry.profile={};
+        if(!a.personalEntry.profile.basic) a.personalEntry.profile.basic={};
+        /* A类字段（手机/微信/地址）直接写，即时生效 */
+        a.realname.mobile=document.getElementById('c-mobile').value.trim();
+        a.personalEntry.profile.basic.wechat=document.getElementById('c-wechat').value.trim();
+        a.enterprise.address=document.getElementById('c-addr').value.trim();
+        AuthStore.write(a);
+        /* B类字段（企业名称 co）走审核守卫 */
+        var newCo=document.getElementById('c-company').value.trim();
+        var oldCo=(a.enterprise.co||'');
+        if(newCo && newCo!==oldCo){
+          AuthStore.submitEnterpriseChange({co:newCo, reason:'联系方式页更新企业名称', files:[]});
+          if(a.enterprise.ok){ toastMsg='企业名称变更申请已提交，待审核'; }
+        }
+      }
+    }catch(e){}
+    UI.toast(toastMsg,'ok');
+    setTimeout(function(){history.back()},700);
+  };
+})();
 </script>
 </body>
 </html>

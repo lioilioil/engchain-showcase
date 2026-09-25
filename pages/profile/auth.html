@@ -1,75 +1,336 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
-<script data-engchain-basefix="2">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>认证中心 - 工程链</title>
+<script>
+/* 必须在所有内容渲染前同步执行，防止暗色模式闪白 */
 (function(){
-function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
-var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
-if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
-rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+  try{
+    var t = localStorage.getItem('engchain-theme');
+    if(t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){}
 })();
-</script><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>认证中心 · 工程链</title>
+</script>
 <link rel="stylesheet" href="../../css/app.css">
+<style>
+/* =========================================================================
+   认证中心 ·「工程信任通行证」
+   视觉全部沿用全站令牌（var(--…)），随明暗主题自适应；
+   仅勋章 Hero/缩略图为自带深色的品牌主视觉（明暗通用）。
+   ========================================================================= */
+.scroll.au-scroll{ padding:6px var(--page-pad) calc(var(--actionbar-reserve) + 10px); }
+
+/* —— 顶部勋章 Hero —— */
+.at-hero{ position:relative; border-radius:var(--r-xl); overflow:hidden; border:1px solid var(--line);
+  box-shadow:var(--shadow-card); min-height:248px; display:flex; flex-direction:column; justify-content:flex-end;
+  background:#0E171D; isolation:isolate; }
+.at-hero-img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+.at-hero-scrim{ position:absolute; inset:0; z-index:1;
+  background:linear-gradient(165deg, rgba(10,18,24,.10) 0%, rgba(10,18,24,.42) 46%, rgba(8,15,20,.92) 100%); }
+.at-hero-inner{ position:relative; z-index:2; padding:18px 18px 16px; color:#F2EEE4; }
+.at-eyebrow{ display:inline-flex; align-items:center; gap:7px; font-size:11px; font-weight:600;
+  letter-spacing:.14em; color:#E2C789; text-transform:uppercase; }
+.at-eyebrow::before{ content:""; width:3px; height:12px; border-radius:2px; background:linear-gradient(#EBD39B,#B89968); }
+.at-hbadge{ display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:5px 12px;
+  border-radius:var(--r-full); font-size:11.5px; font-weight:600; line-height:1;
+  color:#F6F2E8; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28);
+  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.at-hbadge.done{ color:#201708; background:linear-gradient(135deg,#EBD39B,#C6A05B); border-color:transparent; }
+.at-hbadge.reject{ color:#FFE1DE; background:rgba(179,38,30,.42); border-color:rgba(242,139,130,.55); }
+.at-hbadge.review{ color:#DCEBFF; background:rgba(37,99,235,.40); border-color:rgba(120,170,255,.55); }
+.at-hdot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+.at-hdot.pulse{ animation:atPulse 1.4s ease-in-out infinite; }
+@keyframes atPulse{ 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.45;transform:scale(.8)} }
+.at-hero-title{ margin:10px 0 0; font-family:var(--font-display); font-size:23px; font-weight:700;
+  letter-spacing:-.01em; line-height:1.22; color:#FBF8F0; }
+.at-hero-desc{ margin:7px 0 0; font-size:12.5px; line-height:1.62; color:rgba(242,238,228,.80); }
+.at-hero-desc b{ color:#EBD39B; font-weight:600; }
+/* 审核三步 */
+.at-steps{ display:flex; align-items:center; gap:0; margin-top:14px; }
+.at-step{ display:flex; align-items:center; gap:7px; font-size:11px; color:rgba(242,238,228,.62); }
+.at-step .sd{ width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  border:1.5px solid rgba(255,255,255,.32); flex:none; }
+.at-step .sd svg{ width:11px; height:11px; }
+.at-step.done{ color:#F2EEE4; } .at-step.done .sd{ background:#C6A05B; border-color:#C6A05B; color:#201708; }
+.at-step.cur{ color:#FFFFFF; font-weight:600; } .at-step.cur .sd{ border-color:#8FB6FF; color:#CFE0FF; }
+.at-step.cur .sd .at-hdot{ background:#8FB6FF; }
+.at-steps .ln{ flex:1; height:1.5px; min-width:14px; margin:0 8px; background:rgba(255,255,255,.22); }
+.at-steps .ln.on{ background:linear-gradient(90deg,#C6A05B,rgba(198,160,91,.3)); }
+/* 驳回原因 */
+.at-reason{ margin-top:13px; padding:11px 13px; border-radius:var(--r-m);
+  background:rgba(179,38,30,.16); border:1px solid rgba(242,139,130,.4); }
+.at-reason .rt{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:#FFB4AE; }
+.at-reason .rt svg{ width:14px; height:14px; }
+.at-reason p{ margin:5px 0 0; font-size:11.5px; line-height:1.55; color:rgba(255,225,222,.82); }
+/* 权益快览（完成态） */
+.at-hfacts{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:14px; }
+.at-hfact{ display:flex; flex-direction:column; align-items:center; gap:5px; padding:9px 4px;
+  border-radius:var(--r-m); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
+  text-align:center; }
+.at-hfact svg{ width:17px; height:17px; color:#E2C789; }
+.at-hfact span{ font-size:10px; color:rgba(242,238,228,.78); line-height:1.2; }
+/* 五段进度 */
+.at-hprog{ display:flex; align-items:center; gap:9px; margin-top:14px; }
+.at-seg{ flex:1; display:flex; gap:4px; }
+.at-seg i{ flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.16); display:block; }
+.at-seg i.on{ background:linear-gradient(90deg,#EBD39B,#C6A05B); }
+.at-hprog .pn{ font-family:var(--font-num); font-size:12px; font-weight:700; color:#F2EEE4; flex:none;
+  font-variant-numeric:tabular-nums; }
+.at-hprog .pl{ flex:none; font-size:10.5px; color:rgba(242,238,228,.6); }
+
+/* —— 区块标题 —— */
+.at-sec{ margin-top:22px; }
+.at-sec-head{ display:flex; align-items:baseline; justify-content:space-between; margin:0 2px 11px; }
+.at-sec-head h3{ margin:0; font-size:15px; font-weight:700; color:var(--text-1); letter-spacing:-.01em; }
+.at-sec-head .cnt{ font-size:11px; color:var(--text-3); font-family:var(--font-num); font-weight:600; }
+.at-sec-head .cnt b{ color:var(--primary-dim); }
+
+/* —— 权益带 —— */
+.at-benefits{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.at-benefit{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l);
+  padding:13px 12px; box-shadow:var(--shadow-xs); }
+.at-benefit .bi{ width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+  background:var(--primary-soft); color:var(--primary-dim); margin-bottom:9px; }
+.at-benefit .bi svg{ width:18px; height:18px; }
+.at-benefit strong{ display:block; font-size:13px; font-weight:700; color:var(--text-1); }
+.at-benefit span{ display:block; margin-top:3px; font-size:11px; line-height:1.45; color:var(--text-3); }
+
+/* —— 成长路径 —— */
+.at-found{ display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  background:var(--bg-card); border:1px solid var(--accent-line); border-radius:var(--r-l);
+  padding:12px 13px; box-shadow:var(--shadow-sm); position:relative; cursor:pointer;
+  transition:transform var(--d-fast) var(--e-out); }
+.at-found:active{ transform:scale(.985); }
+.at-found::before{ content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px;
+  border-radius:0 2px 2px 0; background:linear-gradient(var(--primary-strong),var(--primary-dim)); }
+.at-fimg{ width:46px; height:46px; border-radius:12px; object-fit:cover; flex:none;
+  border:1px solid var(--line); background:#0E171D; }
+.at-found .fm{ flex:1; min-width:0; }
+.at-found .ft{ display:flex; align-items:center; gap:8px; }
+.at-found .ft strong{ font-size:14.5px; font-weight:700; color:var(--text-1); }
+.at-found .fd{ margin-top:3px; font-size:11.5px; color:var(--text-3); line-height:1.4;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-found > svg.ic{ width:17px; height:17px; color:var(--text-4); flex:none; }
+.at-fork{ display:block; width:100%; height:96px; margin:-2px 0; }
+.at-fork .fl{ fill:none; stroke:var(--primary-dim); stroke-width:1.5; stroke-dasharray:3 4; opacity:.55; }
+.at-fork .fdot{ fill:var(--primary); }
+.at-fork .flab{ font-size:10px; fill:var(--text-3); }
+.at-branches{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.at-branch{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l);
+  padding:11px 11px 6px; box-shadow:var(--shadow-xs); }
+.at-branch .bh{ display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+.at-branch .bh svg{ width:14px; height:14px; color:var(--primary-dim); }
+.at-branch .bh b{ font-size:12.5px; font-weight:700; color:var(--text-1); }
+.at-brow{ display:flex; align-items:center; gap:8px; width:100%; padding:7px 2px; text-align:left;
+  cursor:pointer; border:0; background:none; border-radius:var(--r-s); }
+.at-brow:active{ background:var(--glass-bg-2); }
+.at-brow img{ width:28px; height:28px; border-radius:8px; object-fit:cover; flex:none;
+  border:1px solid var(--line); background:#0E171D; }
+.at-brow.lk img{ filter:grayscale(1) opacity(.5); }
+.at-brow .bn{ flex:1; min-width:0; font-size:12px; font-weight:600; color:var(--text-1);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-brow.lk .bn{ color:var(--text-3); }
+
+/* —— 全身份列表 —— */
+.at-ilist{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l);
+  overflow:hidden; box-shadow:var(--shadow-xs); }
+.at-irow{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:none;
+  border:0; border-bottom:1px solid var(--line-hairline); padding:13px 14px; cursor:pointer;
+  transition:background var(--d-fast); }
+.at-irow:last-child{ border-bottom:0; }
+.at-irow:active{ background:var(--glass-bg-2); }
+.at-irow > img{ width:42px; height:42px; border-radius:11px; object-fit:cover; flex:none;
+  border:1px solid var(--line); background:#0E171D; }
+.at-irow.lk > img{ filter:grayscale(1) opacity(.45); }
+.at-irow .im{ flex:1; min-width:0; }
+.at-irow .im strong{ display:block; font-size:14px; font-weight:600; color:var(--text-1); }
+.at-irow .im span{ display:block; margin-top:2px; font-size:11.5px; color:var(--text-3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-irow.lk .im strong{ color:var(--text-3); }
+.at-irow > svg.ic.arr{ width:16px; height:16px; color:var(--text-4); flex:none; }
+
+/* 状态 pill（列表/路径/Sheet 通用） */
+.at-pill{ display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:var(--r-full);
+  font-size:10.5px; font-weight:600; line-height:1.4; white-space:nowrap; flex:none; }
+.at-pill svg{ width:11px; height:11px; }
+.at-pill.done{ color:var(--primary-dim); background:var(--primary-soft); }
+.at-pill.review{ color:var(--info); background:var(--info-soft); }
+.at-pill.reject{ color:var(--error); background:var(--error-soft); }
+.at-pill.todo{ color:var(--text-2); background:var(--bg-card-2); }
+.at-pill.locked{ color:var(--text-3); background:var(--glass-bg-2); }
+
+/* —— 隐私 FAQ —— */
+.at-faq{ margin-top:10px; }
+.at-faq-item{ background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-m);
+  margin-bottom:9px; overflow:hidden; }
+.at-faq-q{ width:100%; display:flex; align-items:center; gap:10px; padding:13px 14px; text-align:left;
+  background:none; border:0; cursor:pointer; }
+.at-faq-q .qi{ width:30px; height:30px; border-radius:9px; flex:none; display:flex; align-items:center;
+  justify-content:center; background:var(--primary-soft); color:var(--primary-dim); }
+.at-faq-q .qi svg{ width:16px; height:16px; }
+.at-faq-q b{ flex:1; font-size:13px; font-weight:600; color:var(--text-1); }
+.at-faq-q .at-faq-arrow{ width:15px; height:15px; color:var(--text-4); transition:transform var(--d-norm) var(--e-out); flex:none; }
+.at-faq-item.open .at-faq-arrow{ transform:rotate(180deg); }
+.at-faq-a{ max-height:0; overflow:hidden; transition:max-height var(--d-norm) var(--e-out); }
+.at-faq-a p{ margin:0; padding:0 14px 14px 54px; font-size:12px; line-height:1.65; color:var(--text-3); }
+.at-faq-item.open .at-faq-a{ max-height:180px; }
+
+/* 底部安全行 */
+.at-safe{ margin-top:18px; display:flex; align-items:center; justify-content:center; gap:14px;
+  color:var(--text-4); font-size:11px; }
+.at-safe span{ display:inline-flex; align-items:center; gap:5px; }
+.at-safe svg{ width:13px; height:13px; }
+
+/* —— 底部主操作坞 —— */
+.at-dock{ position:absolute; left:0; right:0; bottom:0; z-index:20;
+  padding:12px var(--page-pad) calc(12px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg, transparent, var(--bg) 42%); }
+.at-cta{ -webkit-tap-highlight-color:transparent; width:100%; height:50px; border:0; cursor:pointer;
+  border-radius:var(--r-l); font-size:15px; font-weight:700; letter-spacing:.01em; color:var(--text-inv);
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary)); box-shadow:var(--shadow-float);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform var(--d-fast) var(--e-out); font-family:var(--font); }
+.at-cta:active{ transform:scale(.98); }
+.at-cta svg{ width:17px; height:17px; }
+.at-cta.ghost{ background:var(--bg-card); color:var(--text-1); border:1px solid var(--line-strong);
+  box-shadow:var(--shadow-xs); }
+
+/* —— 半屏身份详情 —— */
+.at-scrim{ position:absolute; inset:0; z-index:50; background:rgba(10,10,10,.5);
+  opacity:0; pointer-events:none; transition:opacity var(--d-norm) var(--e-out); }
+.at-scrim.show{ opacity:1; pointer-events:auto; }
+.at-sheet{ position:absolute; left:0; right:0; bottom:0; z-index:51; background:var(--bg);
+  border-radius:var(--r-2xl) var(--r-2xl) 0 0; box-shadow:var(--shadow-xl);
+  transform:translateY(102%); transition:transform var(--d-slow) var(--e-emph);
+  max-height:88%; display:flex; flex-direction:column; }
+.at-sheet.show{ transform:translateY(0); }
+.at-grab{ width:38px; height:4px; border-radius:2px; background:var(--line-strong); margin:9px auto 0; flex:none; }
+.at-sheet-body{ padding:6px 18px calc(20px + env(safe-area-inset-bottom,0px)); overflow-y:auto; }
+.at-sb-banner{ height:118px; border-radius:var(--r-l); overflow:hidden; position:relative; margin:8px 0 14px;
+  background:#0E171D; border:1px solid var(--line); }
+.at-sb-banner img{ width:100%; height:100%; object-fit:cover; }
+.at-sb-banner .sc{ position:absolute; left:12px; right:12px; bottom:10px; }
+.at-sb-banner .sc h4{ margin:0; font-size:17px; font-weight:700; color:#FBF8F0;
+  text-shadow:0 1px 8px rgba(0,0,0,.5); }
+.at-sb-head{ display:flex; align-items:center; gap:9px; margin-bottom:4px; }
+.at-sb-status{ font-size:12px; color:var(--text-2); line-height:1.55; margin:2px 0 13px; }
+.at-sb-meta{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:14px; }
+.at-sb-cell{ background:var(--bg-card-2); border-radius:var(--r-m); padding:10px 12px; }
+.at-sb-cell .k{ font-size:10.5px; color:var(--text-3); }
+.at-sb-cell .v{ margin-top:3px; font-size:13.5px; font-weight:700; color:var(--text-1); font-family:var(--font-num); }
+.at-sb-bl{ font-size:12px; font-weight:700; color:var(--text-1); margin:0 0 9px; }
+.at-sb-ben{ display:flex; align-items:flex-start; gap:9px; margin-bottom:9px; }
+.at-sb-ben svg{ width:16px; height:16px; color:var(--primary-dim); flex:none; margin-top:1px; }
+.at-sb-ben span{ font-size:12.5px; line-height:1.5; color:var(--text-2); }
+.at-sheet .at-cta{ margin-top:14px; }
+
+/* —— Toast —— */
+.at-toast{ position:absolute; left:50%; bottom:104px; transform:translate(-50%,14px); z-index:60;
+  background:rgba(22,22,22,.92); color:#fff; font-size:12.5px; padding:10px 16px; border-radius:var(--r-full);
+  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; max-width:80%; text-align:center; }
+.at-toast.show{ opacity:1; transform:translate(-50%,0); }
+
+/* 路径区高亮（CTA「查看成长路径」锚定反馈） */
+.at-branches.flash .at-branch{ animation:atFlash 1.1s var(--e-out); }
+@keyframes atFlash{ 0%{ box-shadow:0 0 0 0 rgba(184,153,104,0); }
+  30%{ box-shadow:0 0 0 3px var(--accent-line); } 100%{ box-shadow:var(--shadow-xs); } }
+</style>
 </head>
 <body>
 <div class="phone">
-  <div class="navbar">
-    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <!-- 导航 -->
+  <header class="navbar">
+    <div class="nav-left">
+      <a class="nav-back" onclick="history.back();return false" aria-label="返回">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+    </div>
     <div class="nav-title">认证中心</div>
-    <div class="nav-right"></div>
-  </div>
+    <div class="nav-right">
+      <a id="nav-faq" class="nav-back" style="font-size:12px;min-width:auto;padding:0 6px;color:var(--text-2)">说明</a>
+    </div>
+  </header>
 
-  <div class="scroll au-scroll">
+  <main class="scroll au-scroll">
+    <!-- 勋章 Hero（render 注入） -->
+    <section id="at-hero"></section>
 
-    <!-- ===== ① 当前状态总览（轻量条） ===== -->
-    <div class="au-overview">
-      <div class="ov-left">
-        <div class="ov-avatar" id="ov-avatar">
-          <svg class="ic" style="width:22px;height:22px;"><use href="#i-user"/></svg>
+    <!-- 认证权益 -->
+    <section class="at-sec">
+      <div class="at-sec-head"><h3>认证后你将获得</h3></div>
+      <div class="at-benefits" id="at-benefits"></div>
+    </section>
+
+    <!-- 身份成长路径 -->
+    <section class="at-sec">
+      <div class="at-sec-head"><h3>身份成长路径</h3><span class="cnt">先实名 · 再选方向</span></div>
+      <button class="at-found" id="at-found" data-id="realname"></button>
+      <svg class="at-fork" viewBox="0 0 320 96" preserveAspectRatio="none" aria-hidden="true">
+        <path class="fl" d="M160 2 V30 C160 42 92 44 80 60 L80 88"/>
+        <path class="fl" d="M160 2 V30 C160 42 228 44 240 60 L240 88"/>
+        <circle class="fdot" cx="160" cy="2" r="3"/>
+        <circle class="fdot" cx="80" cy="90" r="3"/>
+        <circle class="fdot" cx="240" cy="90" r="3"/>
+        <text class="flab" x="80" y="95" text-anchor="middle">个人线</text>
+        <text class="flab" x="240" y="95" text-anchor="middle">企业线</text>
+      </svg>
+      <div class="at-branches" id="at-branches"></div>
+    </section>
+
+    <!-- 全部认证身份 -->
+    <section class="at-sec" id="at-list">
+      <div class="at-sec-head"><h3>全部认证身份</h3><span class="cnt" id="at-count"></span></div>
+      <div class="at-ilist" id="at-ilist"></div>
+    </section>
+
+    <!-- 隐私 FAQ -->
+    <section class="at-sec" id="at-faq-sec">
+      <div class="at-sec-head"><h3>认证与隐私说明</h3></div>
+      <div class="at-faq" id="at-faq">
+        <div class="at-faq-item">
+          <button class="at-faq-q" type="button">
+            <span class="qi"><svg class="ic"><use href="#i-shield"/></svg></span>
+            <b>资料会被公开吗？</b>
+            <svg class="at-faq-arrow ic"><use href="#i-chev-r" style="transform:rotate(90deg)"/></svg>
+          </button>
+          <div class="at-faq-a"><p>你提交的身份证、营业执照、资质文件等仅用于平台核验，全程加密存储，不会公开展示。平台内只显示认证身份与核验标识。</p></div>
         </div>
-        <div class="ov-info">
-          <div class="ov-name" id="ov-name">未认证用户</div>
-          <div class="ov-sub" id="ov-sub">完成实名认证解锁平台全部权益</div>
+        <div class="at-faq-item">
+          <button class="at-faq-q" type="button">
+            <span class="qi"><svg class="ic"><use href="#i-badge"/></svg></span>
+            <b>认证状态如何同步？</b>
+            <svg class="at-faq-arrow ic"><use href="#i-chev-r" style="transform:rotate(90deg)"/></svg>
+          </button>
+          <div class="at-faq-a"><p>提交后通常在 1–3 个工作日内完成审核，结果会实时更新到本页与你的个人主页。通过后对应身份与权益立即生效。</p></div>
+        </div>
+        <div class="at-faq-item">
+          <button class="at-faq-q" type="button">
+            <span class="qi"><svg class="ic"><use href="#i-lock"/></svg></span>
+            <b>为什么要先实名认证？</b>
+            <svg class="at-faq-arrow ic"><use href="#i-chev-r" style="transform:rotate(90deg)"/></svg>
+          </button>
+          <div class="at-faq-a"><p>实名认证是一切专业身份的信任基石。完成后，个人入驻、合伙人、企业认证与企业入驻才会解锁，确保平台内每一个身份都真实可信。</p></div>
         </div>
       </div>
-      <div class="ov-progress">
-        <div class="ov-p-num"><b id="ov-done">0</b><span>/5</span></div>
-        <div class="ov-p-bar"><div class="ov-p-fill" id="ov-p-fill"></div></div>
-        <div class="ov-p-label">认证完成度</div>
+      <div class="at-safe">
+        <span><svg class="ic"><use href="#i-shield"/></svg>加密保护</span>
+        <span><svg class="ic"><use href="#i-badge"/></svg>官方核验</span>
+        <span><svg class="ic"><use href="#i-eye"/></svg>隐私透明</span>
       </div>
-    </div>
+    </section>
+  </main>
 
-    <!-- ===== ② 主行动推荐区（最大视觉权重，场景化） ===== -->
-    <div id="au-hero-action"></div>
+  <!-- 底部主操作 -->
+  <div class="at-dock"><button class="at-cta" id="at-cta"></button></div>
 
-    <!-- ===== ③ 可选进阶方向（中等卡片，2-3个） ===== -->
-    <div class="au-section" id="au-next-section">
-      <div class="sec-title">
-        <span class="sec-bar"></span>
-        <span class="sec-text">你还可以开通</span>
-      </div>
-      <div class="next-grid" id="au-next-grid"></div>
-    </div>
+  <!-- 身份详情半屏卡 -->
+  <div class="at-scrim" id="at-scrim"></div>
+  <aside class="at-sheet" id="at-sheet" aria-hidden="true"></aside>
 
-    <!-- ===== ④ 全部身份列表（紧凑列表） ===== -->
-    <div class="au-section">
-      <div class="sec-title">
-        <span class="sec-bar"></span>
-        <span class="sec-text">全部认证身份</span>
-        <span class="sec-count" id="all-count">5 项</span>
-      </div>
-      <div class="all-list" id="au-all-list"></div>
-    </div>
-
-    <!-- ===== 安全提示 ===== -->
-    <div class="au-safe glass">
-      <svg class="ic" style="width:15px;height:15px;color:var(--primary);flex:none;margin-top:2px;"><use href="#i-shield"/></svg>
-      <span>认证信息仅用于平台真实性核验，全程加密受隐私保护；认证与入驻审核进度由后台实时同步。</span>
-    </div>
-  </div>
+  <!-- Toast -->
+  <div class="at-toast" id="at-toast"></div>
 </div>
 
 <script src="../../js/data.js"></script>
@@ -77,468 +338,340 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script>
-(function(){window.__ROOT__='../../';
+/* 认证中心
+   —— 五状态推导 / 跳转 / 实时刷新逻辑保持与真实数据流一致 —— */
+(function(){
+  'use strict';
+  window.__ROOT__ = '../../';
 
-/* 五身份状态：todo 未开始 / review 审核中 / done 已通过 / reject 已驳回 / locked 锁定 */
-function prep(type){return 'auth-prep.html?type='+type;}
+  var IMG = '../../assets/auth/';
+  var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
 
-/* 状态文字与样式 */
-function stateText(st){
-  return {todo:'未开通',review:'审核中',done:'已通过',reject:'已驳回',locked:'未解锁'}[st]||'未开通';
-}
-function stateColor(st){
-  return {todo:'var(--text-3)',review:'var(--warning)',done:'var(--primary)',reject:'var(--error)',locked:'var(--text-4)'}[st]||'var(--text-3)';
-}
+  /* 五类身份定义（name/desc/applyHref/detailHref 沿用真实页面；补充展示素材与静态说明） */
+  var IDENTITY_DEFS = [
+    { key:'realname', name:'个人认证', line:'F',
+      desc:'完成实名认证，解锁全部认证身份的基础',
+      img:IMG+'identity-realname.jpg', fee:'免费', time:'约 1 分钟',
+      applyHref:'auth-prep.html?type=realname', detailHref:'auth-personal.html',
+      benefits:['平台内展示实名可信标识','解锁全部进阶认证身份','恢复评论、收藏、私信等基础功能'] },
+    { key:'personal-entry', name:'个人入驻', line:'P',
+      desc:'个人人才资质入库，获得个人从业者认证',
+      img:IMG+'identity-personal-entry.jpg', fee:'免费', time:'1–3 工作日',
+      applyHref:'auth-prep.html?type=qualification', detailHref:'entry-personal-result.html',
+      benefits:['获得平台人才身份标识','优先获得项目邀约与派单','可投递、认领平台任务'] },
+    { key:'partner', name:'个人合伙人', line:'P',
+      desc:'平台分销合伙人身份，邀请成交可获得佣金',
+      img:IMG+'identity-partner.jpg', fee:'免费', time:'1–2 工作日',
+      applyHref:'auth-prep.html?type=partner', detailHref:'auth-partner.html?mode=detail',
+      benefits:['获得专属分销合伙人资格','邀请好友成交可获得佣金','独立合伙人后台查看收益'] },
+    { key:'enterprise', name:'企业工商认证', line:'E',
+      desc:'企业工商信息认证，认证服务费 ¥999/年',
+      img:IMG+'identity-enterprise.jpg', fee:'¥999 / 年', time:'1–3 工作日',
+      applyHref:'auth-prep.html?type=enterprise', detailHref:'auth-enterprise.html',
+      benefits:['获得官方企业可信标识','企业发布内容获更高可信度','可进一步开通企业入驻'] },
+    { key:'entry', name:'企业入驻', line:'E',
+      desc:'企业经营资质入驻审核，通过后可开店、发布供需、接单',
+      img:IMG+'identity-entry.jpg', fee:'入驻费', time:'1–3 工作日',
+      applyHref:'auth-prep.html?type=entry', detailHref:'entry-result.html',
+      benefits:['开设平台线上经营门店','全平台发布供需信息','承接平台订单与合作'] }
+  ];
+  var DEF_BY_KEY = {}; IDENTITY_DEFS.forEach(function(d){ DEF_BY_KEY[d.key]=d; });
 
-/* 身份数据定义 */
-var IDENTITY_DEFS=[
-  {key:'realname',name:'个人认证',tag:'基石',icon:'<svg class="ic" style="width:16px;height:16px;"><use href="#i-user"/></svg>',
-    desc:'实名认证 · 人脸核验 · 免费',benefit:'解锁全部身份的基础',
-    applyHref:prep('realname'),detailHref:'auth-personal.html',
-    color:'var(--primary)',bg:'var(--primary-soft)'},
-  {key:'personal-entry',name:'个人入驻',tag:'人才',icon:'<svg class="ic" style="width:16px;height:16px;"><use href="#i-form"/></svg>',
-    desc:'专业资质 · 完整简历 · 免费',benefit:'解锁人才展示与岗位匹配',
-    applyHref:prep('qualification'),detailHref:'entry-personal-result.html',
-    color:'#5B8DB8',bg:'rgba(91,141,184,.12)'},
-  {key:'partner',name:'个人合伙人',tag:'分销',icon:'<svg class="ic" style="width:16px;height:16px;"><use href="#i-star"/></svg>',
-    desc:'分销意向 · 推广渠道 · 免费',benefit:'解锁二级分销与推广权益',
-    applyHref:prep('partner'),detailHref:'auth-partner.html?mode=detail',
-    color:'#B8860B',bg:'rgba(184,134,11,.1)'},
-  {key:'enterprise',name:'企业工商认证',tag:'企业',icon:'<svg class="ic" style="width:16px;height:16px;"><use href="#i-company"/></svg>',
-    desc:'工商核验 · ¥999/年',benefit:'解锁企业经营与发布权限',
-    applyHref:prep('enterprise'),detailHref:'auth-enterprise.html',
-    color:'var(--primary-dim)',bg:'var(--primary-soft)'},
-  {key:'entry',name:'企业入驻',tag:'经营',icon:'<svg class="ic" style="width:16px;height:16px;"><use href="#i-shield"/></svg>',
-    desc:'入驻费 · 缴费审核',benefit:'解锁发布供需与经营权益',
-    applyHref:prep('entry'),detailHref:'entry-result.html',
-    color:'var(--primary)',bg:'var(--primary-soft)'}
-];
+  var HERO_BENEFITS = [
+    {ic:'award', t:'官方可信标识'}, {ic:'star', t:'优先推荐'},
+    {ic:'briefcase', t:'发布供需'}, {ic:'wallet', t:'分销收益'}
+  ];
 
-/* 计算当前优先级最高的待处理项（驳回 > 审核中） */
-function findPriorityItem(states){
-  for(var i=0;i<IDENTITY_DEFS.length;i++){
-    if(states[IDENTITY_DEFS[i].key]==='reject'){
-      return {type:'reject',item:IDENTITY_DEFS[i]};
+  var PILL = {
+    todo:  {t:'待开通', ic:'chev-r'},
+    review:{t:'审核中', ic:'clock'},
+    done:  {t:'已核验', ic:'check'},
+    reject:{t:'需处理', ic:'info'},
+    locked:{t:'未解锁', ic:'lock'}
+  };
+  var STATUS_TEXT = {
+    todo:'尚未开通，完成认证后即可使用对应权益。',
+    review:'资料已提交，正在官方核验中，结果会实时同步到本页。',
+    reject:'本次认证未通过，请按提示补充资料后重新提交。',
+    done:'已通过官方核验，对应身份与权益已生效。',
+    locked:'需先完成「个人认证（实名）」后解锁。'
+  };
+
+  function prep(type){ return 'auth-prep.html?type='+type; }
+  window.go = function(u){ location.href = u; };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var current = { states:{}, notes:{}, doneN:0, priority:null, idy:null };
+
+  function pillHtml(st){
+    var p = PILL[st] || PILL.todo;
+    return '<span class="at-pill '+st+'"><svg class="ic"><use href="#i-'+p.ic+'"/></use></svg>'+p.t+'</span>';
+  }
+
+  /* ============ 渲染 ============ */
+  function render(){
+    /* 五轨道状态统一来自 stores.deriveIdentityStates（App / 后台 / preview 唯一权威），
+       本页只负责把 priorityKey 映射回展示定义，不再内联推导，避免规则分叉。 */
+    var ds = window.deriveIdentityStates
+      ? deriveIdentityStates()
+      : { states:{}, notes:{}, doneN:0, priority:null, idy:deriveIdentity() };
+    var states = ds.states, notes = ds.notes, idy = ds.idy;
+    var priority = ds.priority ? DEF_BY_KEY[ds.priority] : null;
+    var doneN = ds.doneN;
+
+    current = { states:states, notes:notes, doneN:doneN, priority:priority, idy:idy };
+
+    renderHero(states, priority, idy, doneN, notes);
+    renderBenefits();
+    renderPath(states);
+    renderList(states, doneN);
+    renderDock(states, priority, doneN);
+  }
+
+  function primaryLabel(idy){
+    var map = {
+      guest:'访客 · 未实名', registered:'注册用户 · 未实名', realname:'实名用户',
+      pro:'认证个人人才', partner:'认证合伙人', enterprise:'企业认证 · 已核验', resident:'企业入驻 · 已入驻'
+    };
+    return map[idy.primary] || '未实名用户';
+  }
+
+  /* —— Hero —— */
+  function heroBadge(scene){
+    var map = {
+      guest:['待完成首步','',false], choose:['认证进行中','',false],
+      review:['审核中','review',true], reject:['需处理','reject',false],
+      done:['信任通行证已点亮','done',false]
+    };
+    var m = map[scene];
+    return '<span class="at-hbadge '+m[1]+'"><span class="at-hdot'+(m[2]?' pulse':'')+'"></span>'+m[0]+'</span>';
+  }
+
+  function stepsHtml(){
+    return '<div class="at-steps">'
+      +'<div class="at-step done"><span class="sd"><svg class="ic"><use href="#i-check"/></svg></span>提交资料</div>'
+      +'<span class="ln on"></span>'
+      +'<div class="at-step cur"><span class="sd"><span class="at-hdot pulse"></span></span>官方核验</div>'
+      +'<span class="ln"></span>'
+      +'<div class="at-step"><span class="sd"></span>完成</div>'
+      +'</div>';
+  }
+  function factsHtml(){
+    return '<div class="at-hfacts">'+HERO_BENEFITS.map(function(b){
+      return '<div class="at-hfact"><svg class="ic"><use href="#i-'+b.ic+'"/></svg><span>'+b.t+'</span></div>';
+    }).join('')+'</div>';
+  }
+  function progHtml(doneN, label){
+    var segs='';
+    for (var i=0;i<5;i++){ segs+='<i class="'+(i<doneN?'on':'')+'"></i>'; }
+    return '<div class="at-hprog"><div class="at-seg">'+segs+'</div>'
+      + '<span class="pn">'+doneN+'/5</span><span class="pl">'+(label||'身份已点亮')+'</span></div>';
+  }
+
+  function renderHero(states, priority, idy, doneN, notes){
+    var rn = states.realname;
+    var scene, title, desc, img, body='', eyebrow = primaryLabel(idy);
+
+    if (rn==='todo'){
+      scene='guest'; img=IMG+'hero-medal.jpg';
+      title='先点亮你的实名身份';
+      desc='完成「个人认证」是开启工程链全部专业身份与权益的第一步，全程加密，约 1 分钟完成。';
+      body=progHtml(0,'从实名认证开始');
+    } else if (priority && states[priority.key]==='reject'){
+      scene='reject'; img=priority.img;
+      title=priority.name+' 暂未通过';
+      desc='补充资料后重新提交，审核通过即可点亮该身份。';
+      var note = notes[priority.key];
+      body='<div class="at-reason"><div class="rt"><svg class="ic"><use href="#i-info"/></svg>请处理后重新提交</div>'
+        +'<p>'+esc(note || '提交的资料缺少或不符合部分要求，请按页面提示补充完整、清晰的材料后再次提交。')+'</p></div>'
+        +progHtml(doneN);
+    } else if (priority && states[priority.key]==='review'){
+      scene='review'; img=priority.img;
+      title=priority.name+' 资料审核中';
+      desc='平台正在核验你提交的资料，通常 <b>1–3 个工作日</b>内完成，结果实时同步。';
+      body=stepsHtml()+progHtml(doneN);
+    } else if (doneN>=5){
+      scene='done'; img=IMG+'hero-medal.jpg';
+      title='工程信任通行证已点亮';
+      desc='五重身份全部通过官方核验，你已成为工程链完整认证用户，享受全部信任权益。';
+      body=factsHtml()+progHtml(5,'全部身份已点亮');
+    } else {
+      scene='choose'; img=IMG+'hero-medal.jpg';
+      title='选择你的发展方向';
+      desc='实名认证已完成。沿<b>个人线</b>成为认证人才 / 合伙人，或沿<b>企业线</b>完成企业认证与入驻。';
+      body=progHtml(doneN,'已点亮，继续升级');
     }
+
+    $('at-hero').innerHTML =
+      '<div class="at-hero">'
+      + '<img class="at-hero-img" src="'+img+'" alt="">'
+      + '<div class="at-hero-scrim"></div>'
+      + '<div class="at-hero-inner">'
+      +   '<span class="at-eyebrow">'+esc(eyebrow)+'</span>'
+      +   heroBadge(scene)
+      +   '<h2 class="at-hero-title">'+title+'</h2>'
+      +   '<p class="at-hero-desc">'+desc+'</p>'
+      +   body
+      + '</div></div>';
   }
-  for(var i=0;i<IDENTITY_DEFS.length;i++){
-    if(states[IDENTITY_DEFS[i].key]==='review'){
-      return {type:'review',item:IDENTITY_DEFS[i]};
+
+  /* —— 权益带 —— */
+  function renderBenefits(){
+    var data=[
+      {ic:'award', t:'官方可信标识', s:'认证后获得平台专属身份徽章'},
+      {ic:'star', t:'优先推荐', s:'认证用户内容获得更多曝光'},
+      {ic:'briefcase', t:'发布供需', s:'开店、发布信息、承接订单'},
+      {ic:'wallet', t:'分销收益', s:'成为合伙人，邀请成交赚佣金'}
+    ];
+    $('at-benefits').innerHTML = data.map(function(b){
+      return '<div class="at-benefit"><span class="bi"><svg class="ic"><use href="#i-'+b.ic+'"/></svg></span>'
+        +'<strong>'+b.t+'</strong><span>'+b.s+'</span></div>';
+    }).join('');
+  }
+
+  /* —— 成长路径 —— */
+  function renderPath(states){
+    var rn = DEF_BY_KEY.realname, rs = states.realname;
+    $('at-found').innerHTML =
+      '<img class="at-fimg" src="'+rn.img+'" alt="">'
+      +'<div class="fm"><div class="ft"><strong>'+rn.name+'</strong>'+pillHtml(rs)+'</div>'
+      +'<div class="fd">信任基石 · 其余身份的前置认证</div></div>'
+      +'<svg class="ic"><use href="#i-chev-r"/></svg>';
+
+    var branchDefs=[
+      {title:'个人发展线', ic:'user', keys:['personal-entry','partner']},
+      {title:'企业发展线', ic:'company', keys:['enterprise','entry']}
+    ];
+    $('at-branches').innerHTML = branchDefs.map(function(br){
+      var rows=br.keys.map(function(k){
+        var d=DEF_BY_KEY[k], st=states[k], lk=st==='locked'?' lk':'';
+        return '<button class="at-brow'+lk+'" data-id="'+k+'">'
+          +'<img src="'+d.img+'" alt="">'
+          +'<span class="bn">'+d.name+'</span>'+pillHtml(st)+'</button>';
+      }).join('');
+      return '<div class="at-branch"><div class="bh"><svg class="ic"><use href="#i-'+br.ic+'"/></svg>'
+        +'<b>'+br.title+'</b></div>'+rows+'</div>';
+    }).join('');
+  }
+
+  /* —— 全身份列表 —— */
+  function renderList(states, doneN){
+    $('at-count').innerHTML = '<b>'+doneN+'</b> / 5 已完成';
+    $('at-ilist').innerHTML = IDENTITY_DEFS.map(function(d){
+      var st=states[d.key], lk=st==='locked'?' lk':'';
+      return '<button class="at-irow'+lk+'" data-id="'+d.key+'">'
+        +'<img src="'+d.img+'" alt="">'
+        +'<div class="im"><strong>'+d.name+'</strong><span>'+d.desc+'</span></div>'
+        +pillHtml(st)
+        +'<svg class="ic arr"><use href="#i-chev-r"/></svg></button>';
+    }).join('');
+  }
+
+  /* —— 底部主 CTA —— */
+  function renderDock(states, priority, doneN){
+    var cta=$('at-cta'), label, href='', scrollTo='';
+    if (states.realname==='todo'){
+      label='立即实名认证'; href=prep('realname');
+    } else if (priority && states[priority.key]==='reject'){
+      label='重新提交申请'; href=priority.applyHref;
+    } else if (priority && states[priority.key]==='review'){
+      label='查看审核进度'; href=priority.detailHref;
+    } else if (doneN>=5){
+      label='查看全部认证'; scrollTo='at-list';
+    } else {
+      label='查看成长方向'; scrollTo='at-branches';
     }
-  }
-  return null;
-}
-
-/* 渲染：主行动区（根据场景动态变化） */
-function renderHeroAction(states, priority){
-  var el=document.getElementById('au-hero-action');
-  if(!el)return;
-
-  var rejectItem=priority&&priority.type==='reject'?priority.item:null;
-  var reviewItem=priority&&priority.type==='review'?priority.item:null;
-
-  /* 场景3：未完成实名认证 → 第一步 */
-  if(!rejectItem&&!reviewItem&&states.realname!=='done'){
-    var def=IDENTITY_DEFS[0];
-    el.innerHTML=
-      '<div class="hero-card hero-gold">'+
-        '<div class="hero-glow"></div>'+
-        '<div class="hero-badge">第一步</div>'+
-        '<div class="hero-title">完成实名认证，开启全部权益</div>'+
-        '<div class="hero-desc">这是开通其他所有身份的基础，完成人脸核验仅需 1 分钟，全程免费。</div>'+
-        '<div class="hero-benefits">'+
-          '<div class="hb-item"><svg class="ic" style="width:13px;height:13px;color:var(--success);"><use href="#i-check"/></svg>解锁个人入驻 · 人才匹配</div>'+
-          '<div class="hb-item"><svg class="ic" style="width:13px;height:13px;color:var(--success);"><use href="#i-check"/></svg>解锁企业认证 · 经营权限</div>'+
-          '<div class="hb-item"><svg class="ic" style="width:13px;height:13px;color:var(--success);"><use href="#i-check"/></svg>解锁全部发布与沟通功能</div>'+
-        '</div>'+
-        '<button class="hero-btn" onclick="go(\''+def.applyHref+'\')">立即实名认证</button>'+
-      '</div>';
-    return;
+    cta.innerHTML = label;
+    cta.dataset.href = href;
+    cta.dataset.scroll = scrollTo;
   }
 
-  /* 场景4：已完成实名认证，其他都没做 → 选择发展方向 */
-  if(!rejectItem&&!reviewItem&&states.realname==='done'){
-    var notDone=IDENTITY_DEFS.filter(function(d){return d.key!=='realname'&&states[d.key]==='todo';});
-    if(notDone.length>=2){
-      el.innerHTML=
-        '<div class="hero-card hero-light">'+
-          '<div class="hero-badge hero-badge-blue">下一步</div>'+
-          '<div class="hero-title">选择你的发展方向</div>'+
-          '<div class="hero-desc">实名认证已完成！你可以根据自己的需求，选择以下方向继续开通：</div>'+
-          '<div class="hero-choices">'+
-            notDone.slice(0,3).map(function(d){
-              return '<div class="hc-item" onclick="go(\''+d.applyHref+'\')">'+
-                '<div class="hc-ic" style="background:'+d.bg+';color:'+d.color+';">'+d.icon+'</div>'+
-                '<div class="hc-body">'+
-                  '<div class="hc-name">'+d.name+'</div>'+
-                  '<div class="hc-desc">'+d.benefit+'</div>'+
-                '</div>'+
-                '<svg class="ic" style="width:16px;height:16px;color:var(--text-3);flex:none;"><use href="#i-chev-r"/></svg>'+
-              '</div>';
-            }).join('')+
-          '</div>'+
-        '</div>';
-      return;
+  /* —— 身份详情半屏卡 —— */
+  function openIdentity(key){
+    var d=DEF_BY_KEY[key]; if(!d) return;
+    var st=current.states[key];
+    var ctaLabel, ctaHref=d.detailHref;
+    if (st==='done'){ ctaLabel='查看认证详情'; ctaHref=d.detailHref; }
+    else if (st==='review'){ ctaLabel='查看审核进度'; ctaHref=d.detailHref; }
+    else if (st==='reject'){ ctaLabel='重新提交申请'; ctaHref=d.applyHref; }
+    else if (st==='locked'){ ctaLabel='先完成实名认证'; ctaHref=prep('realname'); }
+    else { ctaLabel='立即开通'; ctaHref=d.applyHref; }
+
+    var ben=d.benefits.map(function(b){
+      return '<div class="at-sb-ben"><svg class="ic"><use href="#i-check"/></svg><span>'+b+'</span></div>';
+    }).join('');
+
+    $('at-sheet').innerHTML =
+      '<div class="at-grab"></div>'
+      +'<div class="at-sheet-body">'
+      +'<div class="at-sb-banner"><img src="'+d.img+'" alt="">'
+      +  '<div class="sc"><h4>'+d.name+'</h4></div></div>'
+      +'<div class="at-sb-head">'+pillHtml(st)+'</div>'
+      +'<p class="at-sb-status">'+STATUS_TEXT[st]+'</p>'
+      +'<div class="at-sb-meta"><div class="at-sb-cell"><div class="k">认证费用</div><div class="v">'+d.fee+'</div></div>'
+      +  '<div class="at-sb-cell"><div class="k">预计耗时</div><div class="v">'+d.time+'</div></div></div>'
+      +'<p class="at-sb-bl">认证后可获得</p>'+ben
+      +'<button class="at-cta" id="at-sb-cta">'+ctaLabel+'</button>'
+      +'</div>';
+    $('at-sheet').setAttribute('aria-hidden','false');
+    $('at-scrim').classList.add('show');
+    $('at-sheet').classList.add('show');
+    $('at-sb-cta').addEventListener('click', function(){ go(ctaHref); });
+  }
+  function closeSheet(){
+    $('at-scrim').classList.remove('show');
+    $('at-sheet').classList.remove('show');
+    $('at-sheet').setAttribute('aria-hidden','true');
+  }
+
+  /* —— Toast —— */
+  var toastTimer=null;
+  function toast(msg){
+    var t=$('at-toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('show'); },2200);
+  }
+
+  /* ============ 事件 ============ */
+  function scrollToId(id, flashSel){
+    var el=$(id); if(!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+    if (flashSel){ var f=$(flashSel); if(f){ f.classList.remove('flash'); void f.offsetWidth; f.classList.add('flash'); } }
+  }
+
+  document.addEventListener('click', function(ev){
+    var idEl = ev.target.closest('[data-id]');
+    if (idEl){ openIdentity(idEl.getAttribute('data-id')); return; }
+  });
+  $('at-cta').addEventListener('click', function(){
+    var h=this.dataset.href, s=this.dataset.scroll;
+    if (h){ go(h); } else if (s){
+      if (s==='at-branches') scrollToId('at-branches','at-branches');
+      else scrollToId(s);
     }
-  }
-
-  /* 场景5：有被驳回的 → 重新提交 */
-  if(rejectItem){
-    el.innerHTML=
-      '<div class="hero-card hero-warn">'+
-        '<div class="hero-badge hero-badge-red">待处理</div>'+
-        '<div class="hero-title">「'+rejectItem.name+'」申请未通过</div>'+
-        '<div class="hero-desc">上次提交的资料存在问题，请根据驳回原因补充修改后重新提交。</div>'+
-        '<button class="hero-btn hero-btn-red" onclick="go(\''+rejectItem.applyHref+'\')">重新提交申请</button>'+
-      '</div>';
-    return;
-  }
-
-  /* 场景6：有审核中的 → 查看进度 */
-  if(reviewItem){
-    el.innerHTML=
-      '<div class="hero-card hero-info">'+
-        '<div class="hero-badge hero-badge-orange">审核中</div>'+
-        '<div class="hero-title">「'+reviewItem.name+'」正在审核</div>'+
-        '<div class="hero-desc">平台正在核验你的资料，预计 1-3 个工作日完成，结果将实时同步。</div>'+
-        '<button class="hero-btn hero-btn-orange" onclick="go(\''+reviewItem.detailHref+'\')">查看审核进度</button>'+
-      '</div>';
-    return;
-  }
-
-  /* 场景7：全部完成 */
-  el.innerHTML=
-    '<div class="hero-card hero-success">'+
-      '<div class="hero-check">'+
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:28px;height:28px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'+
-      '</div>'+
-      '<div class="hero-title">全部认证已完成！</div>'+
-      '<div class="hero-desc">你已解锁平台全部权益，可以正常使用所有功能了。</div>'+
-    '</div>';
-}
-
-/* 渲染：可选进阶方向 */
-function renderNextGrid(states){
-  var el=document.getElementById('au-next-grid');
-  var section=document.getElementById('au-next-section');
-  if(!el||!section)return;
-
-  var candidates=IDENTITY_DEFS.filter(function(d){
-    return states[d.key]==='todo'||states[d.key]==='locked';
+  });
+  $('at-scrim').addEventListener('click', closeSheet);
+  $('nav-faq').addEventListener('click', function(){
+    var sec=$('at-faq-sec'); sec.scrollIntoView({behavior:'smooth', block:'start'});
+    var first=document.querySelector('.at-faq-item'); if(first && !first.classList.contains('open')) first.classList.add('open');
+  });
+  document.querySelectorAll('.at-faq-q').forEach(function(btn){
+    btn.addEventListener('click', function(){ btn.closest('.at-faq-item').classList.toggle('open'); });
   });
 
-  if(candidates.length===0){
-    section.style.display='none';
-    return;
+  /* ============ 实时刷新（与真实数据流一致） ============ */
+  function onStoreChange(e){
+    if (!e || !e.key) return;
+    if (['engchain-users','engchain-auth','engchain-entry'].indexOf(e.key) !== -1) render();
   }
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener('engchain:auth', render);
+  window.addEventListener('engchain:entry', render);
+  window.addEventListener('engchain:store-change', render);
 
-  section.style.display='block';
-  el.innerHTML=candidates.map(function(d){
-    var st=states[d.key];
-    var locked=st==='locked';
-    return '<div class="next-card'+(locked?' locked':'')+'" onclick="go(\''+(locked?prep('realname'):d.applyHref)+'\')">'+
-      '<div class="nc-ic" style="background:'+d.bg+';color:'+d.color+';">'+
-        (locked
-          ?'<svg class="ic" style="width:16px;height:16px;"><use href="#i-lock"/></svg>'
-          :d.icon)
-        +'</div>'+
-      '<div class="nc-name">'+d.name+'</div>'+
-      '<div class="nc-desc">'+(locked?'需先完成实名认证':d.benefit)+'</div>'+
-      '<div class="nc-state" style="color:'+stateColor(st)+'">'+stateText(st)+'</div>'+
-    '</div>';
-  }).join('');
-}
-
-/* 渲染：全部身份列表 */
-function renderAllList(states){
-  var el=document.getElementById('au-all-list');
-  if(!el)return;
-
-  el.innerHTML=IDENTITY_DEFS.map(function(d){
-    var st=states[d.key];
-    var done=st==='done';
-    var locked=st==='locked';
-    var clickHref=done?d.detailHref:(locked?prep('realname'):d.applyHref);
-
-    /* 状态图标 */
-    var statusIcon='';
-    if(done){
-      statusIcon='<span class="al-status al-done"><svg class="ic" style="width:12px;height:12px;"><use href="#i-check"/></svg>已通过</span>';
-    }else if(locked){
-      statusIcon='<span class="al-status al-locked"><svg class="ic" style="width:11px;height:11px;"><use href="#i-lock"/></svg>未解锁</span>';
-    }else if(st==='review'){
-      statusIcon='<span class="al-status al-review"><i></i>审核中</span>';
-    }else if(st==='reject'){
-      statusIcon='<span class="al-status al-reject">已驳回</span>';
-    }else{
-      statusIcon='<span class="al-status al-todo">去开通</span>';
-    }
-
-    return '<div class="al-item" onclick="go(\''+clickHref+'\')">'+
-      '<div class="al-ic" style="background:'+d.bg+';color:'+d.color+';">'+
-        (locked?'<svg class="ic" style="width:15px;height:15px;"><use href="#i-lock"/></svg>':d.icon)+
-      '</div>'+
-      '<div class="al-body">'+
-        '<div class="al-name">'+d.name+'<span class="al-tag">'+d.tag+'</span></div>'+
-        '<div class="al-desc">'+d.desc+'</div>'+
-      '</div>'+
-      statusIcon+
-      '<svg class="ic al-arrow" style="width:15px;height:15px;color:var(--text-3);flex:none;"><use href="#i-chev-r"/></svg>'+
-    '</div>';
-  }).join('');
-}
-
-/* 主渲染函数 */
-function render(){
-  var a=AuthStore.read(), e=EntryStore.read(), idy=deriveIdentity();
-  var now=Date.now();
-
-  /* ---- 五身份状态计算 ---- */
-  var rnDone=!!(a.realname&&a.realname.ok);
-  var rnState=rnDone?'done':((a.realname&&a.realname.status==='pending')?'review':'todo');
-
-  var pe=a.personalEntry||a.personalQual||a.qual||{ok:false,list:[],status:'',note:''};
-  var peDone=!!(pe.ok&&pe.list&&pe.list.length);
-  var peState=!rnDone?'locked':(peDone?'done':(pe.status==='pending'?'review':(!pe.ok&&pe.note?'reject':'todo')));
-
-  var pt=a.partner||{ok:false,status:'',note:''};
-  var ptDone=!!pt.ok;
-  var ptState=!rnDone?'locked':(ptDone?'done':(pt.status==='pending'?'review':(!pt.ok&&pt.note?'reject':'todo')));
-
-  var ent=a.enterprise||{ok:false,expireAt:0,status:'',note:''};
-  var entDone=!!(ent.ok&&ent.expireAt>now);
-  var entState=!rnDone?'locked':(entDone?'done':(ent.status==='pending'?'review':(!ent.ok&&ent.note?'reject':'todo')));
-
-  var types=(e.types&&e.types.length)?e.types:(e.type?[e.type]:[]);
-  var entrDone=!!(types.length&&e.active&&e.status==='active');
-  var entrReview=['pending','first_ok'].indexOf(e.status)>=0;
-  var entrState=!rnDone?'locked':(entrDone?'done':(entrReview?'review':(!e.active&&e.status==='rejected'?'reject':'todo')));
-
-  var states={
-    'realname':rnState,
-    'personal-entry':peState,
-    'partner':ptState,
-    'enterprise':entState,
-    'entry':entrState
-  };
-
-  /* ---- 计算优先级待处理项 ---- */
-  var priority=findPriorityItem(states);
-
-  /* ---- 顶部概览 ---- */
-  var doneN=[rnState,peState,ptState,entState,entrState].filter(function(s){return s==='done';}).length;
-  document.getElementById('ov-done').textContent=doneN;
-  document.getElementById('ov-p-fill').style.width=(doneN/5*100)+'%';
-
-  /* 当前身份名称 */
-  var primaryLabels={
-    guest:'未认证用户',
-    registered:'已注册',
-    realname:'个人认证 · 已实名',
-    pro:'个人入驻 · 专业人才',
-    partner:'个人合伙人',
-    enterprise:'企业认证 · 已核验',
-    resident:'企业入驻 · 经营中'
-  };
-  document.getElementById('ov-name').textContent=primaryLabels[idy.primary]||'已注册用户';
-
-  /* 副标题根据状态变化 */
-  var subText='';
-  if(rnState!=='done')subText='完成实名认证解锁平台全部权益';
-  else if(priority&&priority.type==='reject')subText='有申请待处理，请尽快完成';
-  else if(priority&&priority.type==='review')subText='有申请正在审核中';
-  else if(doneN===5)subText='全部认证已完成，解锁全部权益';
-  else subText='完成更多认证解锁更多权益';
-  document.getElementById('ov-sub').textContent=subText;
-
-  /* 头像样式根据当前身份 */
-  var avatarEl=document.getElementById('ov-avatar');
-  if(idy.primary==='resident'||idy.primary==='enterprise'){
-    avatarEl.style.background='var(--primary-soft)';
-    avatarEl.style.color='var(--primary-dim)';
-    avatarEl.innerHTML='<svg class="ic" style="width:22px;height:22px;"><use href="#i-company"/></svg>';
-  }else if(idy.primary==='pro'||idy.primary==='realname'){
-    avatarEl.style.background='var(--primary-soft)';
-    avatarEl.style.color='var(--primary-dim)';
-    avatarEl.innerHTML='<svg class="ic" style="width:22px;height:22px;"><use href="#i-user"/></svg>';
-  }else{
-    avatarEl.style.background='var(--bg-card-2)';
-    avatarEl.style.color='var(--text-3)';
-    avatarEl.innerHTML='<svg class="ic" style="width:22px;height:22px;"><use href="#i-user"/></svg>';
-  }
-
-  /* ---- 三个区域渲染 ---- */
-  renderHeroAction(states, priority);
-  renderNextGrid(states);
-  renderAllList(states);
-
-  /* 全部数量 */
-  document.getElementById('all-count').textContent=doneN+'/5 已完成';
-}
-
-window.go=function(u){location.href=u;};
-render();
-
-/* 后台在另一标签页审批后实时刷新 */
-window.addEventListener('storage',function(ev){
-  if(['engchain-users','engchain-auth','engchain-entry'].indexOf(ev.key)>=0)render();
-});
-window.addEventListener('engchain:auth',render);
-window.addEventListener('engchain:entry',render);
-window.addEventListener('engchain:store-change',render);
-
-/* 入场动效 */
-document.querySelectorAll('.au-overview,#au-hero-action,.au-section,.au-safe').forEach(function(el,i){
-  if(!el)return;
-  el.style.opacity='0';el.style.transform='translateY(10px)';
-  setTimeout(function(){el.style.transition='all .45s var(--e-out)';el.style.opacity='1';el.style.transform='none';},70*i);
-});
+  document.addEventListener('DOMContentLoaded', render);
+  if (document.readyState !== 'loading') render();
 })();
 </script>
-<style>
-.au-scroll{padding:12px var(--page-pad) 32px;}
-
-/* ========== ① 顶部状态总览条 ========== */
-.au-overview{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;
-  background:var(--bg-card);border:1px solid var(--line);border-radius:16px;margin-bottom:14px;
-  box-shadow:var(--shadow-xs);}
-.ov-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0;}
-.ov-avatar{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;}
-.ov-info{flex:1;min-width:0;}
-.ov-name{font-size:15px;font-weight:700;color:var(--text-1);line-height:1.3;}
-.ov-sub{font-size:11.5px;color:var(--text-3);margin-top:3px;line-height:1.4;}
-.ov-progress{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;width:76px;}
-.ov-p-num{font-size:16px;font-weight:800;color:var(--text-1);font-family:var(--font-num);line-height:1;}
-.ov-p-num b{font-size:18px;color:var(--primary);}
-.ov-p-num span{font-size:12px;color:var(--text-3);font-weight:500;}
-.ov-p-bar{width:100%;height:6px;background:var(--bg-card-2);border-radius:99px;overflow:hidden;}
-.ov-p-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-dim));border-radius:99px;transition:width .8s var(--e-out);}
-.ov-p-label{font-size:10px;color:var(--text-3);white-space:nowrap;}
-
-/* ========== ② 主行动推荐卡片 ========== */
-#au-hero-action{margin-bottom:20px;}
-.hero-card{position:relative;overflow:hidden;border-radius:18px;padding:20px 18px;box-shadow:var(--shadow-card);}
-.hero-glow{position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;
-  background:radial-gradient(circle,rgba(201,169,97,.2),transparent 70%);pointer-events:none;}
-
-/* 金色主题：第一步认证 */
-.hero-gold{background:linear-gradient(145deg,#2A313C,#161B23 60%,#0F1319);border:1px solid rgba(201,169,97,.25);}
-.hero-gold .hero-badge{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);}
-.hero-gold .hero-title{color:#fff;}
-.hero-gold .hero-desc{color:rgba(255,255,255,.65);}
-.hero-gold .hb-item{color:rgba(255,255,255,.75);}
-
-/* 浅色主题：选择方向 */
-.hero-light{background:var(--bg-card);border:1px solid var(--line);}
-.hero-light .hero-badge{background:var(--primary-soft);color:var(--primary-dim);}
-.hero-light .hero-title{color:var(--text-1);}
-.hero-light .hero-desc{color:var(--text-3);}
-
-/* 警告主题：待处理/驳回 */
-.hero-warn{background:linear-gradient(145deg,#FFF5F5,#FFF0F0);border:1px solid rgba(179,38,30,.2);}
-.hero-warn .hero-badge{background:rgba(179,38,30,.1);color:var(--error);}
-.hero-warn .hero-title{color:var(--text-1);}
-.hero-warn .hero-desc{color:var(--text-2);}
-.hero-btn-red{background:linear-gradient(135deg,#B3261E,#931B16);}
-
-/* 信息主题：审核中 */
-.hero-info{background:linear-gradient(145deg,#FFFBEB,#FEF3C7);border:1px solid rgba(214,158,46,.2);}
-.hero-info .hero-badge{background:rgba(214,158,46,.12);color:var(--warning);}
-.hero-info .hero-title{color:var(--text-1);}
-.hero-info .hero-desc{color:var(--text-2);}
-.hero-btn-orange{background:linear-gradient(135deg,#D69E2E,#B7791F);}
-
-/* 成功主题：全部完成 */
-.hero-success{background:var(--bg-card);border:1px solid rgba(10,138,72,.2);text-align:center;padding:24px 18px;}
-.hero-success .hero-check{width:56px;height:56px;border-radius:50%;background:rgba(10,138,72,.1);color:#0A8A48;
-  display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
-.hero-success .hero-title{color:var(--text-1);}
-.hero-success .hero-desc{color:var(--text-3);}
-
-/* 通用卡片元素 */
-.hero-badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;
-  letter-spacing:.05em;margin-bottom:10px;}
-.hero-badge-blue{background:rgba(91,141,184,.12);color:#5B8DB8;}
-.hero-badge-orange{background:rgba(214,158,46,.12);color:var(--warning);}
-.hero-badge-red{background:rgba(179,38,30,.1);color:var(--error);}
-.hero-title{font-size:18px;font-weight:800;line-height:1.3;margin-bottom:6px;}
-.hero-desc{font-size:12.5px;line-height:1.6;margin-bottom:14px;}
-.hero-benefits{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-.hb-item{display:flex;align-items:center;gap:6px;font-size:12px;}
-.hb-item .ic{flex:none;}
-.hero-btn{display:block;width:100%;height:46px;border:none;border-radius:12px;
-  background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);
-  font-size:15px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;
-  box-shadow:0 4px 14px rgba(201,169,97,.3);}
-.hero-btn:active{transform:scale(.98);}
-
-/* 选择方向卡片 */
-.hero-choices{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
-.hc-item{display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg-card-2);
-  border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:all .15s;}
-.hc-item:active{transform:scale(.98);border-color:var(--primary);}
-.hc-ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;}
-.hc-body{flex:1;min-width:0;}
-.hc-name{font-size:14px;font-weight:600;color:var(--text-1);}
-.hc-desc{font-size:11px;color:var(--text-3);margin-top:2px;}
-
-/* ========== ③ 可选进阶方向 ========== */
-.au-section{margin-bottom:20px;}
-.sec-title{display:flex;align-items:center;gap:7px;margin-bottom:12px;padding:0 2px;}
-.sec-bar{width:3px;height:14px;background:var(--primary);border-radius:2px;}
-.sec-text{font-size:14px;font-weight:700;color:var(--text-1);}
-.sec-count{margin-left:auto;font-size:11px;color:var(--text-3);font-weight:500;}
-.next-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.next-card{padding:14px 12px;background:var(--bg-card);border:1px solid var(--line);
-  border-radius:14px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;text-align:center;}
-.next-card:active{transform:scale(.97);border-color:var(--primary);}
-.next-card.locked{opacity:.7;}
-.nc-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
-.nc-name{font-size:13.5px;font-weight:700;color:var(--text-1);margin-bottom:3px;}
-.nc-desc{font-size:10.5px;color:var(--text-3);line-height:1.4;margin-bottom:6px;}
-.nc-state{font-size:11px;font-weight:600;}
-
-/* ========== ④ 全部身份列表 ========== */
-.all-list{display:flex;flex-direction:column;gap:8px;}
-.al-item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--bg-card);
-  border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:all .15s;}
-.al-item:active{transform:scale(.98);}
-.al-ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none;}
-.al-body{flex:1;min-width:0;}
-.al-name{font-size:13.5px;font-weight:600;color:var(--text-1);display:flex;align-items:center;gap:6px;}
-.al-tag{font-size:9px;font-weight:600;color:var(--text-3);background:var(--bg-card-2);
-  padding:1px 6px;border-radius:99px;}
-.al-desc{font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;}
-.al-status{flex:none;font-size:11px;font-weight:600;white-space:nowrap;
-  display:inline-flex;align-items:center;gap:3px;}
-.al-done{color:var(--primary);}
-.al-review{color:var(--warning);}
-.al-review i{width:6px;height:6px;border-radius:50%;background:var(--warning);animation:au-pulse 1.3s infinite;}
-.al-reject{color:var(--error);}
-.al-todo{color:var(--primary-dim);font-weight:600;}
-.al-locked{color:var(--text-4);font-weight:500;}
-.al-locked .ic{width:10px;height:10px;}
-.al-arrow{flex:none;opacity:.6;}
-
-@keyframes au-pulse{0%{box-shadow:0 0 0 0 rgba(214,158,46,.45);}70%{box-shadow:0 0 0 7px rgba(214,158,46,0);}100%{box-shadow:0 0 0 0 rgba(214,158,46,0);}}
-
-/* ========== 安全提示 ========== */
-.au-safe{display:flex;gap:8px;align-items:flex-start;padding:13px 15px;font-size:12px;color:var(--text-2);line-height:1.7;}
-
-/* ========== 375px 适配 ========== */
-@media(max-width:375px){
-  .au-overview{padding:12px 14px;gap:10px;}
-  .ov-avatar{width:40px;height:40px;}
-  .ov-name{font-size:14px;}
-  .ov-sub{font-size:11px;}
-  .ov-progress{width:68px;}
-  .hero-card{padding:18px 16px;}
-  .hero-title{font-size:16px;}
-  .next-grid{gap:8px;}
-  .next-card{padding:12px 10px;}
-  .al-item{padding:11px 12px;}
-  .al-ic{width:34px;height:34px;}
-}
-</style>
 </body>
 </html>

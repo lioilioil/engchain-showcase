@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>滚动边缘渐进式模糊 · 视觉验证样片</title>
+<style>
+/* ============ 复刻项目设计令牌（css/app.css） ============ */
+:root{
+  --bg:#f7f6f3; --bg-card:#ffffff; --bg-card-2:#f3f1ec; --bg-elev:#fff;
+  --ink-1:#1a1a1a; --ink-2:#555; --ink-3:#8a8a86;
+  --line:#e7e4dd; --line-hairline:rgba(0,0,0,.06);
+  --primary:#a98a47; --primary-dim:#8a6f38; --primary-soft:rgba(169,138,71,.12);
+  --phone-w:390px; --phone-h:800px; --page-pad:16px; --r-l:16px;
+  /* —— 本次效果的可调令牌（落地时放进 app.css :root） —— */
+  --edge-h:42px;          /* 边缘羽化带高度 */
+  --edge-blur:20px;       /* 背景模糊半径 */
+  --edge-sat:160%;
+  --edge-fill:94%;        /* 最外缘与页面底色的融合度（越高越"消失"） */
+  --edge-dur:.22s;
+}
+html[data-theme="dark"]{
+  --bg:#161616; --bg-card:#202022; --bg-card-2:#262629; --bg-elev:#232325;
+  --ink-1:#f2f2f2; --ink-2:#b6b6b0; --ink-3:#86868a;
+  --line:#2e2e31; --line-hairline:rgba(255,255,255,.08);
+  --primary:#c9a961; --primary-dim:#d4b876; --primary-soft:rgba(201,169,97,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#eceae5;color:#23231f;min-height:100vh;}
+.stage{display:flex;gap:32px;align-items:flex-start;padding:28px;flex-wrap:wrap;justify-content:center;}
+
+/* ============ 控制面板 ============ */
+.panel{width:288px;background:#fff;border:1px solid #ddd8cf;border-radius:18px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.06);font-size:13px;position:sticky;top:28px;}
+.panel h1{font-size:16px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px;}
+.panel .sub{font-size:11.5px;color:#8a8780;line-height:1.5;margin-bottom:16px;}
+.ctrl{margin-bottom:15px;}
+.ctrl label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#4a4740;margin-bottom:6px;}
+.ctrl label b{color:#a98a47;font-weight:700;}
+.ctrl input[type=range]{width:100%;accent-color:#a98a47;}
+.seg{display:flex;gap:4px;background:#f1efe9;border-radius:10px;padding:3px;}
+.seg button{flex:1;border:0;background:transparent;padding:7px 4px;border-radius:8px;font-size:12px;font-weight:600;color:#76726a;cursor:pointer;}
+.seg button.on{background:#fff;color:#1a1a1a;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+.toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:#4a4740;}
+.switch{width:42px;height:25px;border-radius:20px;background:#d8d4cb;position:relative;cursor:pointer;transition:background .2s;flex:none;}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s;}
+.switch.on{background:#a98a47;} .switch.on::after{left:20px;}
+.legend{margin-top:16px;padding-top:14px;border-top:1px dashed #ddd8cf;font-size:11px;color:#9a968d;line-height:1.7;}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+
+/* ============ 手机框（复刻 .phone / .navbar / .status-bar / .scroll） ============ */
+.phone{position:relative;width:var(--phone-w);height:var(--phone-h);background:var(--bg);border-radius:40px;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 24px 70px rgba(0,0,0,.22),0 2px 0 rgba(255,255,255,.6) inset;border:10px solid #0d0d0f;}
+.status-bar{flex:0 0 auto;height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-size:13px;font-weight:600;color:var(--ink-1);}
+.status-bar .icons{display:flex;gap:5px;align-items:center;font-size:11px;}
+.navbar{flex:0 0 auto;height:48px;display:flex;align-items:center;gap:8px;padding:0 12px;position:relative;z-index:9;}
+.navbar .back{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink-1);font-size:19px;}
+.navbar .ntitle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:600;color:var(--ink-1);}
+/* 关键：统一滚动容器，容器内滚动（与项目 .scroll 完全一致） */
+.scroll{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:0 var(--page-pad);-webkit-overflow-scrolling:touch;position:relative;}
+.scroll::-webkit-scrollbar{width:0;}
+.scene-title-hint{font-size:11px;color:var(--ink-3);text-align:center;padding:2px 0 12px;}
+
+/* ---- 列表场景内容 ---- */
+.card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+.card .ct{font-size:14px;font-weight:700;color:var(--ink-1);margin-bottom:5px;display:flex;align-items:center;gap:7px;}
+.card .cd{font-size:12px;color:var(--ink-2);line-height:1.6;}
+.card .cm{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--primary-soft);color:var(--primary-dim);}
+.price{font-size:15px;font-weight:800;color:var(--primary-dim);}
+.banner{height:120px;border-radius:14px;margin-bottom:12px;background:linear-gradient(135deg,#caa85e,#9c7d3f);color:#fff;padding:16px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 8px 20px rgba(150,120,50,.28);}
+.banner b{font-size:17px;} .banner span{font-size:11px;opacity:.9;}
+
+/* ---- 底部悬浮 Dock（复刻液态 dock 占位，自带毛玻璃） ---- */
+.dock{position:absolute;left:14px;right:14px;bottom:14px;height:58px;z-index:50;border-radius:22px;display:flex;align-items:center;justify-content:space-around;
+  background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid rgba(255,255,255,.35);box-shadow:0 10px 30px rgba(0,0,0,.18);}
+html[data-theme="dark"] .dock{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);}
+.dock .di{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9.5px;color:var(--ink-2);width:48px;}
+.dock .di.on{color:var(--primary-dim);} .dock .di .i{width:23px;height:23px;border-radius:8px;background:currentColor;opacity:.85;}
+.scroll.has-dock{padding-bottom:92px;}
+
+/* ---- 固定支付底栏场景 ---- */
+.paybar{flex:0 0 auto;z-index:60;background:var(--bg-card);border-top:1px solid var(--line);padding:11px 16px calc(11px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;}
+.paybar .pbtn{flex:1;height:42px;border:0;border-radius:22px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:700;}
+.paybar .pp{font-size:11px;color:var(--ink-3);} .paybar .pp b{display:block;font-size:16px;color:var(--primary-dim);}
+
+/* ---- 聊天场景 ---- */
+.chat-scroll{display:flex;flex-direction:column;justify-content:flex-end;padding-top:14px;padding-bottom:14px;}
+.bub{max-width:74%;padding:10px 13px;border-radius:16px;font-size:13px;line-height:1.5;margin-bottom:10px;color:var(--ink-1);}
+.bub.other{background:var(--bg-card-2);align-self:flex-start;border-bottom-left-radius:5px;}
+.bub.mine{background:linear-gradient(135deg,#c9a961,#b08e4e);color:#fff;align-self:flex-end;border-bottom-right-radius:5px;}
+.composer{flex:0 0 auto;z-index:60;display:flex;gap:8px;align-items:center;padding:9px 12px calc(10px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line);}
+.composer .inp{flex:1;height:36px;border-radius:18px;background:var(--bg-card-2);border:1px solid var(--line);display:flex;align-items:center;padding:0 14px;font-size:12px;color:var(--ink-3);}
+.composer .send{width:36px;height:36px;border-radius:50%;border:0;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:15px;}
+
+/* ============================================================================
+   ★★★ 本次优化核心：滚动边缘渐进式模糊 ★★★
+   两个 sticky 边缘层，注入到 .scroll 内部首/尾；不跟随内容滚走。
+   原理：backdrop-filter 把滑到边缘的内容"糊开"；自身 mask 让模糊带由外缘
+   向内渐隐；再叠一层到页面底色的渐变把内容"融"进背景 —— 三层合成即渐进模糊。
+   ============================================================================ */
+.edge-fade{position:sticky;left:0;right:0;height:var(--edge-h);z-index:8;pointer-events:none;
+  -webkit-backdrop-filter:blur(var(--edge-blur)) saturate(var(--edge-sat));backdrop-filter:blur(var(--edge-blur)) saturate(var(--edge-sat));
+  opacity:1;transition:opacity var(--edge-dur) ease;will-change:opacity;}
+.edge-fade--top{top:0;margin-bottom:calc(var(--edge-h) * -1);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--bg) var(--edge-fill)),transparent);
+  -webkit-mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.65) 38%,transparent 100%);
+          mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.65) 38%,transparent 100%);}
+.edge-fade--bottom{bottom:0;margin-top:calc(var(--edge-h) * -1);
+  background:linear-gradient(0deg,color-mix(in srgb,var(--bg) var(--edge-fill)),transparent);
+  -webkit-mask-image:linear-gradient(0deg,#000 0%,rgba(0,0,0,.65) 38%,transparent 100%);
+          mask-image:linear-gradient(0deg,#000 0%,rgba(0,0,0,.65) 38%,transparent 100%);}
+/* 到顶/到底门控：该方向不能再滚时，隐藏对应边缘层，首屏/末屏保持干净 */
+.scroll.at-top .edge-fade--top{opacity:0;}
+.scroll.at-bottom .edge-fade--bottom{opacity:0;}
+/* 内容不足一屏：两个边缘层都隐藏（由 JS 加 .no-edge） */
+.scroll.no-edge .edge-fade{opacity:0;}
+/* 聊天：最新消息需清晰，关闭底部边缘（顶部历史渐隐保留） */
+.scroll.no-edge-bottom .edge-fade--bottom{display:none;}
+/* 仅淡出档（低端机/无障碍降级）：去掉 backdrop-filter，保留底色渐变羽化 */
+.scroll.edge-fade-only .edge-fade{-webkit-backdrop-filter:none;backdrop-filter:none;}
+/* 总开关关闭：连模糊层带羽化都隐藏（= 现状基线，内容硬切） */
+.scroll.edge-off .edge-fade{display:none;}
+@media (prefers-reduced-transparency: reduce){
+  .edge-fade{-webkit-backdrop-filter:none;backdrop-filter:none;}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 控制面板 -->
+  <div class="panel">
+    <h1>滚动边缘 · 渐进式模糊</h1>
+    <div class="sub">上下滑动中间手机，观察内容到达顶部/底部边缘时被渐进地模糊并融入背景，而非硬切。到顶/到底自动收起羽化。</div>
+
+    <div class="ctrl toggle"><span>启用渐进模糊（关=现状硬切基线）</span><div class="switch on" id="swOn"></div></div>
+    <div class="ctrl"><label>边缘羽化带高度 <b id="vH">42px</b></label><input type="range" id="rH" min="20" max="80" step="2" value="42"></div>
+    <div class="ctrl"><label>模糊半径 <b id="vB">20px</b></label><input type="range" id="rB" min="0" max="40" step="1" value="20"></div>
+    <div class="ctrl"><label>底色融合度 <b id="vF">94%</b></label><input type="range" id="rF" min="60" max="100" step="1" value="94"></div>
+
+    <div class="ctrl"><label>渲染模式</label>
+      <div class="seg" id="segMode">
+        <button data-m="blur" class="on">真模糊</button>
+        <button data-m="fade">仅淡出</button>
+      </div>
+    </div>
+    <div class="ctrl"><label>场景</label>
+      <div class="seg" id="segScene">
+        <button data-s="list" class="on">列表+Dock</button>
+        <button data-s="pay">固定底栏</button>
+        <button data-s="chat">聊天</button>
+      </div>
+    </div>
+    <div class="ctrl toggle"><span>深色主题</span><div class="switch" id="swDark"></div></div>
+
+    <div class="legend">
+      <div><span class="dot" style="background:#a98a47"></span>模糊层：sticky + backdrop-filter，不随内容滚走</div>
+      <div><span class="dot" style="background:#b8b3a8"></span>渐隐：mask 由外缘向内衰减模糊层可见度</div>
+      <div><span class="dot" style="background:#7bbf8a"></span>融合：底色渐变把内容融进 --bg</div>
+      <div style="margin-top:7px;">到顶隐上缘、到底隐下缘、不足一屏全隐；底部 Dock/底栏自带毛玻璃并自然盖住下段。</div>
+    </div>
+  </div>
+
+  <!-- 手机 -->
+  <div class="phone">
+    <div class="status-bar"><span>9:41</span><span class="icons">●●● 5G ▮</span></div>
+
+    <!-- 顶部栏（流式，不滚动） -->
+    <div class="navbar" id="nav">
+      <div class="back">‹</div>
+      <div class="ntitle" id="navTitle">供需列表</div>
+    </div>
+
+    <!-- 统一滚动容器：边缘层作为其内部首/子，sticky 吸附 -->
+    <div class="scroll has-dock" id="scroller">
+      <div class="edge-fade edge-fade--top" aria-hidden="true"></div>
+      <div id="content"></div>
+      <div class="edge-fade edge-fade--bottom" aria-hidden="true"></div>
+    </div>
+
+    <!-- 底部形态：Dock / 支付栏 / 输入栏（默认列表显示 Dock） -->
+    <div class="dock" id="dock">
+      <div class="di on"><span class="i"></span>首页</div>
+      <div class="di"><span class="i"></span>发现</div>
+      <div class="di"><span class="i" style="border-radius:50%;width:30px;height:30px;background:linear-gradient(135deg,#c9a961,#a98a47)"></span>发布</div>
+      <div class="di"><span class="i"></span>消息</div>
+      <div class="di"><span class="i"></span>我的</div>
+    </div>
+    <div class="paybar" id="paybar" style="display:none;">
+      <div class="pp">合计<b>¥ 13,500</b></div>
+      <button class="pbtn">立即下单</button>
+    </div>
+    <div class="composer" id="composer" style="display:none;">
+      <div class="inp">发送消息…</div>
+      <button class="send">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var root = document.documentElement;
+var scroller = document.getElementById('scroller');
+var content = document.getElementById('content');
+
+/* ---- 三种场景的演示数据 ---- */
+var CARDS = [
+  {t:'成都天府新区商业综合体', d:'急需商品混凝土 C30/C40，月需求量大，需方直连，平台已核验。', tag:'重点项目', p:'¥135万'},
+  {t:'高新区钢结构加工厂供货', d:'长期回收/供应废旧钢筋、钢板，可签年度框架，价格随行情。', tag:'供应', p:'¥48万'},
+  {t:'锦江区幕墙劳务班组', d:'20 人成建制班组，持证上岗，承接商业/住宅幕墙安装。', tag:'劳务', p:'电议'},
+  {t:'武侯区塔吊租赁', d:'QTZ80 塔吊 3 台，含司机与维保，短租长租均可。', tag:'设备', p:'¥2.6万/月'},
+  {t:'双流建材批量采购', d:'水泥、加气砖、防水卷材集中采购，寻求一级经销商报价。', tag:'需求', p:'¥76万'},
+  {t:'青羊区园林绿化工程', d:'市政道路绿化升级，需苗木供应及施工，账期月结。', tag:'分包', p:'¥32万'},
+  {t:'成华区消防工程合作', d:'一级消防资质，寻综合体项目消防安装分包合作。', tag:'合作', p:'面议'},
+  {t:'温江脚手架专业分包', d:'盘扣式脚手架搭设拆除一体化，含材料运输。', tag:'劳务', p:'¥18万'},
+  {t:'郫都区商砼站寻砂石', d:'日产 3000 方，机制砂、碎石稳定需求，预付款。', tag:'需求', p:'¥210万'},
+  {t:'天府新区BIM咨询服务', d:'全过程 BIM 建模、碰撞检查、管线综合，甲级团队。', tag:'服务', p:'¥8万'}
+];
+function listHTML(){
+  var h = '<div class="banner"><b>共创者计划</b><span>首批共创成员 · 流量扶持 · 专属认证 · 权益从优</span></div>';
+  CARDS.forEach(function(c){
+    h += '<div class="card"><div class="ct"><span class="tag">'+c.tag+'</span>'+c.t+'</div>'+
+         '<div class="cd">'+c.d+'</div><div class="cm"><span class="price">'+c.p+'</span><span class="tag">查看详情 ›</span></div></div>';
+  });
+  return h;
+}
+function payHTML(){
+  var h='';
+  for(var i=0;i<9;i++){var c=CARDS[i];
+    h += '<div class="card"><div class="ct">'+c.t+'</div><div class="cd">'+c.d+'</div><div class="cm"><span class="price">'+c.p+'</span></div></div>';}
+  return h;
+}
+function chatHTML(){
+  var msgs=[['other','你好，看到你们发布的 C30 混凝土需求，我们是天府新区直营搅拌站。'],
+    ['mine','你好，月需求量大概 8000 方，能做到什么价位？'],
+    ['other','C30 现款 ¥415/方，含泵送；量到 1 万方可以再让 5 块。'],
+    ['mine','质量和资质都有吧？需要先看报告和合格证。'],
+    ['other','全套配合比报告、出厂合格证、28 天强度报告都随货提供，可以先送样检测。'],
+    ['mine','行，那先发一份报价单和资质到我邮箱。'],
+    ['other','好的，半小时内发你。另外付款方式我们希望月结 70%。'],
+    ['mine','可以谈，先看资料，没问题约个时间现场看站。'],
+    ['other','没问题，随时欢迎。我把定位也一起发你。'],
+    ['mine','好，资料收到后我尽快回复。']];
+  return msgs.map(function(m){return '<div class="bub '+m[0]+'">'+m[1]+'</div>';}).join('');
+}
+
+/* ---- 场景切换 ---- */
+var dock=document.getElementById('dock'),pay=document.getElementById('paybar'),comp=document.getElementById('composer');
+var navTitle=document.getElementById('navTitle');
+function setScene(s){
+  scroller.classList.remove('has-dock','no-edge-bottom','chat-scroll');
+  dock.style.display='none';pay.style.display='none';comp.style.display='none';
+  scroller.scrollTop=0;
+  if(s==='list'){
+    content.innerHTML=listHTML();dock.style.display='flex';scroller.classList.add('has-dock');navTitle.textContent='供需列表';
+  }else if(s==='pay'){
+    content.innerHTML=payHTML();pay.style.display='flex';scroller.style.paddingBottom='';navTitle.textContent='确认订单';
+  }else{
+    content.innerHTML=chatHTML();comp.style.display='flex';
+    scroller.classList.add('chat-scroll','no-edge-bottom');
+    navTitle.textContent='华西建材 · 张工';
+    scroller.scrollTop=scroller.scrollHeight; // 聊天进入定位到底
+  }
+  requestAnimationFrame(update);
+}
+
+/* ============================================================================
+   ★ 边缘门控核心：rAF 节流监听滚动，仅在跨"到顶/到底/可滚"状态时切类 ★
+   ============================================================================ */
+var ticking=false, lastState='';
+function update(){
+  var canScroll = scroller.scrollHeight - scroller.clientHeight > 3;
+  var atTop = scroller.scrollTop <= 3;
+  var atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 3;
+  scroller.classList.toggle('no-edge', !canScroll);
+  scroller.classList.toggle('at-top', atTop);
+  scroller.classList.toggle('at-bottom', atBottom);
+  ticking=false;
+}
+scroller.addEventListener('scroll',function(){
+  if(!ticking){ticking=true;requestAnimationFrame(update);}
+},{passive:true});
+/* 异步内容 / 尺寸变化时重算 */
+new ResizeObserver(function(){requestAnimationFrame(update);}).observe(content);
+window.addEventListener('resize',function(){requestAnimationFrame(update);});
+
+/* ---- 控件绑定 ---- */
+function bindRange(id,vid,fn){var r=document.getElementById(id),v=document.getElementById(vid);
+  r.addEventListener('input',function(){v.textContent=this.value+(id==='rF'?'%':'px');fn(this.value);});}
+bindRange('rH','vH',function(v){root.style.setProperty('--edge-h',v+'px');});
+bindRange('rB','vB',function(v){root.style.setProperty('--edge-blur',v+'px');});
+bindRange('rF','vF',function(v){root.style.setProperty('--edge-fill',v+'%');});
+
+document.getElementById('swOn').addEventListener('click',function(){
+  this.classList.toggle('on');scroller.classList.toggle('edge-off',!this.classList.contains('on'));});
+document.getElementById('swDark').addEventListener('click',function(){
+  this.classList.toggle('on');root.setAttribute('data-theme',this.classList.contains('on')?'dark':'light');});
+
+document.getElementById('segMode').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  scroller.classList.toggle('edge-fade-only',b.dataset.m==='fade');});
+document.getElementById('segScene').addEventListener('click',function(e){
+  var b=e.target.closest('button');if(!b)return;
+  this.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  setScene(b.dataset.s);});
+
+/* ---- 初始 ---- */
+setScene('list');
+</script>
+</body>
+</html>

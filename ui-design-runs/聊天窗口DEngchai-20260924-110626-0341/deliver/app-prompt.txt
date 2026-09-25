@@ -1,0 +1,639 @@
+请根据以下**完整的 HTML 代码**创建一个网页应用：聊天窗口（D:/Engchain3.0/… · 设计方案（产品界面）。
+技术类型 arch_type=jspage。
+
+**请直接使用提供的 HTML 代码，不要做任何修改、不要重写、不要精简、不要按你自己的理解重新设计。**
+这份 HTML 是已经定稿的设计，你的职责是把它原样上屏。
+图片链接已经全部替换成公网 URL，直接用即可。
+禁止新增任何交互、动效、组件或页面；禁止替换或补充图片；禁止调整配色、字号与间距。
+如果你认为某处可以改进，**不要改**，在总结里说明即可。
+
+完整 HTML 代码如下：
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#F5F2EB">
+<title>工程链 · 会话 · 发名片</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   工程链 App · 会话窗口「发名片」改版原型
+   revise · mobile-app · 亮场暖纸 · 无衬线冷静 · 实拍影像 · 网格字段
+   单金强调（只给名片认证/主按钮/头部点缀）+ 暖墨中性
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#F5F2EB;               /* 聊天页暖纸底 */
+  --surface:#FFFFFF;          /* 卡片 */
+  --surface-2:#F1EDE3;        /* 次级填充 */
+  --ink:#211C12;              /* 暖墨文字 */
+  --dim:rgba(33,28,18,.54);
+  --line:rgba(33,28,18,.09);
+  --gold:#A87F35;             /* 金：名片认证 / 主按钮 / 头部点缀 */
+  --gold-deep:#8A6727;
+  --gold-soft:rgba(168,127,53,.11);
+  --inv:#FDFAF2;              /* 深底暖白 */
+  --night:#0B1120;            /* 名片头深蓝墨（与照片同族） */
+
+  --r-shell:22px;
+  --r-card:16px;
+  --r-ctl:10px;
+  --r-pill:999px;
+
+  --shadow-card:0 1px 2px rgba(33,28,18,.05),0 10px 24px -10px rgba(33,28,18,.12),0 26px 54px -26px rgba(33,28,18,.14);
+  --ease:cubic-bezier(.22,.75,.3,1);
+
+  /* 取景框：亮场暖机身，台面是暖纸世界的延伸 */
+  --frame:#FBF9F4;
+  --frame-2:#D9D1C0;
+  --stage-1:#EFE9DC;
+  --stage-2:#CFC6B2;
+  --halo-1:#A87F35;
+  --halo-2:#2C3A4A;
+  --halo-a:.24;
+  --tab:0px;                  /* 会话页无底部 tab */
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);overflow:hidden;
+  font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;min-height:24px}
+input{font:inherit;color:inherit}
+img,svg{display:block;max-width:100%}
+
+/* ── 台面 ── */
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:radial-gradient(130% 90% at 50% 8%,var(--stage-1),var(--stage-2) 72%)}
+.stage::before{content:"";position:absolute;inset:-18%;z-index:0;pointer-events:none;opacity:var(--halo-a);filter:blur(90px);
+  background:radial-gradient(38% 30% at 22% 24%,var(--halo-1),transparent 70%),
+             radial-gradient(42% 34% at 78% 74%,var(--halo-2),transparent 70%)}
+#app{position:relative;z-index:1;width:100%;height:100%;overflow:hidden;background:var(--bg)}
+@media(min-width:760px){
+  #app{width:390px;height:min(844px,86vh);border-radius:44px;
+    box-shadow:0 0 0 11px var(--frame),0 0 0 13px var(--frame-2),0 44px 100px rgba(33,28,18,.30)}
+  .notch{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:112px;height:26px;border-radius:15px;background:var(--frame);z-index:60}
+}
+@media(max-width:759px){.notch{display:none}.stage::before{display:none}}
+
+/* ── 状态栏 ── */
+.statusbar{position:absolute;top:0;left:0;right:0;z-index:55;height:44px;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;pointer-events:none;font-size:13px;font-weight:600}
+.sb-r{display:flex;align-items:center;gap:5px}
+.sb-r i{display:block;background:currentColor;border-radius:1px}
+.sb-r .sig{width:15px;height:10px;clip-path:polygon(0 72%,18% 72%,18% 100%,0 100%,0 72%,27% 46%,45% 46%,45% 100%,27% 100%,27% 46%,54% 22%,72% 22%,72% 100%,54% 100%,54% 22%,82% 0,100% 0,100% 100%,82% 100%)}
+.sb-r .wifi{width:14px;height:10px;clip-path:polygon(50% 100%,32% 74%,68% 74%,50% 100%,50% 66%,20% 40%,28% 30%,72% 30%,80% 40%,50% 66%,50% 24%,8% 12%,14% 2%,86% 2%,92% 12%)}
+.sb-r .bat{width:22px;height:11px;border-radius:3px;position:relative;box-shadow:inset 0 0 0 1px currentColor}
+.sb-r .bat::before{content:"";position:absolute;inset:2px;width:64%;background:currentColor;border-radius:1px}
+
+/* ── 会话顶栏 ── */
+.topbar{position:absolute;top:0;left:0;right:0;z-index:50;
+  padding:calc(env(safe-area-inset-top) + 50px) 12px 10px;
+  display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,var(--bg) 72%,rgba(245,242,235,0))}
+.tb-back{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--ink);background:var(--surface);border:1px solid var(--line)}
+.tb-back svg{width:17px;height:17px}
+.tb-peer{flex:1;min-width:0;display:flex;align-items:center;gap:9px}
+.tb-av{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--inv);font-size:14px;font-weight:700;position:relative;
+  background:linear-gradient(135deg,#5B6770,#3F4A52)}
+.tb-av::after{content:"";position:absolute;right:0;bottom:0;width:9px;height:9px;border-radius:50%;background:#3F9B5F;border:2px solid var(--bg)}
+.tb-who{min-width:0}
+.tb-name{font-size:14.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-sub{font-size:10.5px;color:var(--dim);margin-top:1px}
+.tb-more{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--dim);background:var(--surface);border:1px solid var(--line)}
+.tb-more svg{width:17px;height:17px}
+
+/* ── 消息流 ── */
+#flow{position:relative;z-index:10;height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  padding:calc(env(safe-area-inset-top) + 100px) 16px calc(166px + env(safe-area-inset-bottom))}
+#flow::-webkit-scrollbar{display:none}
+
+.day{display:flex;justify-content:center;margin:12px 0 16px}
+.day span{display:inline-flex;align-items:center;padding:3px 11px;border-radius:999px;background:rgba(33,28,18,.05);color:var(--dim);font-size:10px;letter-spacing:.04em}
+
+.msg{display:flex;align-items:flex-start;gap:8px;margin-bottom:16px}
+.msg.mine{flex-direction:row-reverse}
+.av{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--inv);font-size:13px;font-weight:700;
+  background:linear-gradient(135deg,#8A7A5C,#6B5D44)}
+.av.peer{background:linear-gradient(135deg,#5B6770,#3F4A52)}
+.bubble{padding:9px 13px;border-radius:14px;font-size:13.5px;line-height:1.6;max-width:76%;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 2px rgba(33,28,18,.04)}
+.msg.mine .bubble{background:#E9E2D2;border-color:rgba(168,127,53,.16)}
+.meta{font-size:9.5px;color:var(--dim);margin-top:4px;text-align:left}
+.msg.mine .meta{text-align:right}
+.meta .tick{color:#3F9B5F;font-weight:600}
+
+/* 对方正在输入 */
+.typing{display:inline-flex;align-items:center;gap:4px;padding:11px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.typing i{width:5px;height:5px;border-radius:50%;background:rgba(33,28,18,.34);animation:tp 1.1s var(--ease) infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes tp{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-3px);opacity:1}}
+
+/* ── 名片卡（核心改版对象）── */
+.premium-card{width:100%;border-radius:var(--r-card);overflow:hidden;background:var(--surface);
+  border:1px solid rgba(33,28,18,.08);box-shadow:var(--shadow-card);
+  animation:cardIn .5s var(--ease) both}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pc-head{position:relative;height:112px;overflow:hidden;background:#0B1120}
+.pc-head img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 60%}
+.pc-head::after{content:"";position:absolute;inset:0;z-index:1;
+  background:linear-gradient(180deg,rgba(8,11,20,.28) 0%,rgba(8,11,20,.46) 62%,rgba(8,11,20,.74) 100%)}
+.pc-head::before{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;z-index:3;
+  background:linear-gradient(90deg,#E3C184,rgba(227,193,132,.34) 46%,rgba(227,193,132,.06))}
+.pc-in{position:absolute;inset:0;z-index:4;padding:14px 15px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.pc-top{display:flex;align-items:flex-start;gap:10px}
+.pc-logo{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#E7C98B;
+  background:rgba(253,250,242,.10);border:1px solid rgba(253,250,242,.22)}
+.pc-logo svg{width:19px;height:19px}
+.pc-tit{flex:1;min-width:0}
+.pc-name{font-size:15.5px;font-weight:800;color:#FDFAF2;letter-spacing:.01em;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-badge{display:inline-flex;align-items:center;gap:4px;margin-top:5px;padding:2px 8px;border-radius:999px;
+  background:rgba(227,193,132,.16);border:1px solid rgba(227,193,132,.42);color:#EACB8E;font-size:9.5px;font-weight:700;letter-spacing:.06em}
+.pc-badge svg{width:10px;height:10px}
+.pc-legal{display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(253,250,242,.8)}
+.pc-legal svg{width:11px;height:11px;color:#E7C98B;flex:none}
+.pc-legal b{color:#FDFAF2;font-weight:600}
+.pc-body{padding:12px 14px 13px}
+.pc-holder{display:flex;align-items:center;gap:10px}
+.pc-ava{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--inv);font-size:13.5px;font-weight:700;
+  background:linear-gradient(135deg,#8A7A5C,#6B5D44)}
+.pc-who{flex:1;min-width:0}
+.pc-person{font-size:13.5px;font-weight:700;color:var(--ink)}
+.pc-person small{font-weight:500;color:var(--dim);font-size:10.5px;margin-left:6px}
+.pc-role{font-size:10.5px;color:var(--dim);margin-top:1px;display:flex;align-items:center;gap:5px}
+.pc-role svg{width:11px;height:11px;color:var(--gold);flex:none}
+.pc-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:11px;padding-top:11px;border-top:1px solid rgba(33,28,18,.07)}
+.pc-field{min-width:0;display:flex;flex-direction:column;gap:2px}
+.pc-field.full{grid-column:1/-1}
+.pc-field .k{display:flex;align-items:center;gap:4px;font-size:9.5px;color:rgba(33,28,18,.46);letter-spacing:.03em}
+.pc-field .k svg{width:10px;height:10px}
+.pc-field .v{font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-field .v.wrap{white-space:normal;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;line-height:1.5}
+.pc-quals{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.pc-qual{display:inline-flex;align-items:center;gap:4px;padding:3.5px 9px;border-radius:7px;font-size:10px;font-weight:600;
+  background:var(--gold-soft);color:var(--gold-deep);border:1px solid rgba(168,127,53,.22)}
+.pc-qual svg{width:10px;height:10px}
+.pc-foot{display:flex;align-items:center;gap:5px;margin-top:11px;padding-top:9px;border-top:1px dashed rgba(33,28,18,.09);
+  font-size:9px;color:rgba(33,28,18,.44)}
+.pc-foot .ok{color:#3F9B5F;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+.pc-foot .ok svg{width:9px;height:9px}
+.pc-foot .sp{margin-left:auto;display:inline-flex;align-items:center;gap:3px}
+.pc-foot .sp svg{width:9px;height:9px;color:var(--gold)}
+.pc-actions{display:flex;gap:8px;margin-top:12px}
+.pc-btn{flex:1;height:36px;border-radius:10px;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:transform var(--ease) .12s}
+.pc-btn:active{transform:scale(.97)}
+.pc-btn svg{width:14px;height:14px}
+.pc-btn.gold{background:linear-gradient(135deg,#B8924A,#96702E);color:#FDFAF2;box-shadow:0 3px 10px rgba(168,127,53,.30)}
+.pc-btn.ghost{background:#F4F0E5;color:#5A4A26;border:1px solid rgba(168,127,53,.20)}
+
+/* ── 输入区 ── */
+.composer-wrap{position:absolute;left:0;right:0;bottom:0;z-index:40;
+  padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:var(--bg);
+  background:color-mix(in srgb,var(--bg) 90%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.quick{display:flex;gap:7px;padding:0 2px 9px;overflow-x:auto;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.q-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:999px;font-size:11px;color:var(--dim);
+  background:var(--surface);border:1px solid var(--line);white-space:nowrap;cursor:pointer;transition:all .2s var(--ease)}
+.q-chip svg{width:11px;height:11px}
+.q-chip.on{background:var(--gold-soft);border-color:rgba(168,127,53,.35);color:var(--gold-deep);font-weight:600}
+.composer{display:flex;align-items:flex-end;gap:8px}
+.c-add{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);transition:all .2s var(--ease)}
+.c-add svg{width:17px;height:17px;transition:transform .24s var(--ease)}
+.c-add.open{background:var(--gold-soft);border-color:rgba(168,127,53,.4);color:var(--gold-deep)}
+.c-add.open svg{transform:rotate(45deg)}
+.c-field{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+  border-radius:20px;padding:2px 2px 2px 14px;transition:border-color .2s var(--ease)}
+.c-field:focus-within{border-color:rgba(168,127,53,.45)}
+.c-field input{flex:1;height:36px;border:0;outline:0;background:transparent;font-size:13.5px;min-width:0}
+.c-field input::placeholder{color:var(--dim)}
+.c-send{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--inv);
+  background:linear-gradient(135deg,#B8924A,#96702E);box-shadow:0 3px 10px rgba(168,127,53,.3)}
+.c-send svg{width:15px;height:15px}
+
+/* ── 加号面板 ── */
+.panel{position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--surface);border-radius:20px 20px 0 0;
+  padding:8px 16px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -10px 34px rgba(33,28,18,.10);
+  transform:translateY(105%);transition:transform .3s var(--ease)}
+.panel.on{transform:none}
+.panel .grab{width:38px;height:4px;border-radius:2px;background:rgba(33,28,18,.12);margin:8px auto 12px}
+.p-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.p-item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0 10px;border-radius:14px;cursor:pointer;transition:background .18s}
+.p-item:active{background:var(--surface-2)}
+.p-item .pi-ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center}
+.p-item .pi-ic svg{width:19px;height:19px}
+.p-item span{font-size:10.5px;color:rgba(33,28,18,.66);font-weight:500}
+.t-gold{background:var(--gold-soft);color:var(--gold-deep)}
+.t-blue{background:rgba(62,96,155,.10);color:#3E609B}
+.t-vio{background:rgba(124,108,168,.12);color:#6C5B98}
+.t-grn{background:rgba(63,155,95,.10);color:#2F7C4C}
+
+/* ── 发名片预览 sheet ── */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:90;background:var(--surface);border-radius:24px 24px 0 0;
+  padding:10px 16px calc(16px + env(safe-area-inset-bottom));
+  box-shadow:0 -12px 40px rgba(33,28,18,.16);
+  transform:translateY(105%);transition:transform .34s var(--ease)}
+.sheet.on{transform:none}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:rgba(33,28,18,.12);margin:8px auto 4px}
+.sh-head{display:flex;align-items:center;justify-content:center;position:relative;padding:8px 0 12px}
+.sh-title{font-size:15px;font-weight:700;color:var(--ink)}
+.sh-close{position:absolute;right:0;top:6px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--dim);background:var(--surface-2)}
+.sh-close svg{width:14px;height:14px}
+.sh-preview{padding:3px 2px 4px}
+.sh-tip{display:flex;align-items:center;gap:5px;justify-content:center;margin:2px 0 12px;font-size:10.5px;color:var(--dim)}
+.sh-tip svg{width:11px;height:11px;color:var(--gold)}
+.sh-note{display:flex;align-items:flex-start;gap:6px;margin-top:12px;padding:9px 11px;border-radius:10px;background:var(--gold-soft);
+  font-size:10px;color:var(--gold-deep);line-height:1.6}
+.sh-note svg{flex:none;width:12px;height:12px;margin-top:1px}
+.sh-acts{display:flex;gap:10px;margin-top:14px}
+.sh-btn{flex:1;height:44px;border-radius:12px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform .12s var(--ease)}
+.sh-btn:active{transform:scale(.98)}
+.sh-btn svg{width:15px;height:15px}
+.sh-btn.ghost{background:var(--surface-2);color:var(--dim);border:1px solid var(--line)}
+.sh-btn.gold{background:linear-gradient(135deg,#B8924A,#96702E);color:#FDFAF2;box-shadow:0 4px 14px rgba(168,127,53,.32)}
+.sh-btn.gold:disabled{opacity:.55}
+
+/* ── 我的主页弹层 ── */
+.hmodal{position:absolute;left:0;right:0;top:0;bottom:0;z-index:80;background:var(--surface);
+  transform:translateX(100%);transition:transform .32s var(--ease);overflow-y:auto;scrollbar-width:none}
+.hmodal::-webkit-scrollbar{display:none}
+.hmodal.on{transform:none}
+.hm-head{position:relative;height:132px;overflow:hidden;background:#0B1120}
+.hm-head img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 62%}
+.hm-head::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,11,20,.26),rgba(8,11,20,.72))}
+.hm-back{position:absolute;left:14px;top:calc(env(safe-area-inset-top) + 14px);z-index:3;width:32px;height:32px;border-radius:50%;
+  display:grid;place-items:center;color:var(--inv);background:rgba(253,250,242,.16);border:1px solid rgba(253,250,242,.24)}
+.hm-back svg{width:15px;height:15px}
+.hm-id{position:absolute;left:16px;right:16px;bottom:14px;z-index:3;display:flex;align-items:flex-end;gap:12px}
+.hm-logo{flex:none;width:46px;height:46px;border-radius:13px;display:grid;place-items:center;color:#E7C98B;
+  background:rgba(253,250,242,.12);border:1px solid rgba(253,250,242,.26)}
+.hm-logo svg{width:23px;height:23px}
+.hm-tit{flex:1;min-width:0}
+.hm-name{font-size:16px;font-weight:800;color:#FDFAF2;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-badge{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:2px 8px;border-radius:999px;background:rgba(227,193,132,.16);
+  border:1px solid rgba(227,193,132,.42);color:#EACB8E;font-size:9.5px;font-weight:700}
+.hm-badge svg{width:10px;height:10px}
+.hm-body{padding:16px 16px calc(22px + env(safe-area-inset-bottom))}
+.hm-sec{margin-bottom:18px}
+.hm-sec-t{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:10px}
+.hm-sec-t svg{width:13px;height:13px;color:var(--gold)}
+.hm-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hm-fact{display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:11px;background:var(--surface-2);font-size:11.5px}
+.hm-fact svg{width:13px;height:13px;color:var(--gold);flex:none}
+.hm-fact b{font-weight:700}
+.hm-fact span{color:var(--dim);margin-left:auto;font-size:10.5px}
+.hm-quals{display:flex;flex-direction:column;gap:8px}
+.hm-qual{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:11px;border:1px solid var(--line)}
+.hm-qual .ic{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--gold-soft);color:var(--gold-deep)}
+.hm-qual .ic svg{width:13px;height:13px}
+.hm-qual .q{flex:1;min-width:0}
+.hm-qual .qn{font-size:12px;font-weight:600}
+.hm-qual .qno{font-size:9.5px;color:var(--dim);margin-top:1px}
+.hm-qual .ql{font-size:9.5px;color:var(--gold-deep);font-weight:600;flex:none}
+.hm-desc{font-size:12px;color:rgba(33,28,18,.66);line-height:1.75;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.hm-cases{display:flex;flex-direction:column;gap:10px}
+.hm-case{display:flex;gap:10px;align-items:center}
+.hm-case img{flex:none;width:74px;height:52px;border-radius:9px;object-fit:cover}
+.hm-case .c{min-width:0}
+.hm-case .cn{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-case .cm{font-size:10px;color:var(--dim);margin-top:2px}
+.hm-call{display:flex;gap:8px}
+.hm-call a{flex:1;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;text-decoration:none}
+.hm-call .ph{background:var(--gold-soft);color:var(--gold-deep);border:1px solid rgba(168,127,53,.24)}
+.hm-call .gl{background:var(--surface-2);color:var(--dim);border:1px solid var(--line)}
+.hm-call svg{width:14px;height:14px}
+
+/* ── Toast ── */
+.toast{position:absolute;left:50%;bottom:120px;z-index:120;transform:translate(-50%,12px);opacity:0;pointer-events:none;
+  padding:10px 18px;border-radius:999px;background:rgba(20,16,8,.88);color:#FDFAF2;font-size:12.5px;
+  transition:opacity .26s var(--ease),transform .26s var(--ease);max-width:78%;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="stage"><div id="app">
+  <div class="notch"></div>
+
+  <div class="statusbar">
+    <span>11:06</span>
+    <span class="sb-r"><i class="sig"></i><i class="wifi"></i><i class="bat"></i></span>
+  </div>
+
+  <div class="topbar">
+    <button class="tb-back" onclick="toast('已返回会话列表')"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg></button>
+    <div class="tb-peer">
+      <div class="tb-av">张</div>
+      <div class="tb-who">
+        <div class="tb-name">张建国 · 中建八局西南公司</div>
+        <div class="tb-sub">C30 混凝土 · 项目对接中</div>
+      </div>
+    </div>
+    <button class="tb-more" onclick="toast('更多操作')"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128Zm56-12a12,12,0,1,0,12,12A12,12,0,0,0,196,116ZM60,116a12,12,0,1,0,12,12A12,12,0,0,0,60,116Z"/></svg></button>
+  </div>
+
+  <div id="flow">
+    <div class="day"><span>今天 09:12</span></div>
+
+    <div class="msg">
+      <div class="av peer">张</div>
+      <div><div class="bubble">陈总您好，C30 混凝土的报价麻烦发一份，项目计划 8 月进场。</div>
+      <div class="meta">09:12</div></div>
+    </div>
+
+    <div class="msg">
+      <div class="av peer">张</div>
+      <div><div class="bubble">另外贵司的企业名片也发我一张，内部走个流程备案。</div>
+      <div class="meta">09:13</div></div>
+    </div>
+
+    <div class="msg mine">
+      <div class="av">陈</div>
+      <div><div class="bubble">好的张总，报价单整理好马上发您，名片先发您一张。</div>
+      <div class="meta"><span class="tick">✓ 已读</span> · 09:14</div></div>
+    </div>
+
+    <div id="card-slot"></div>
+    <div id="typing-slot"></div>
+  </div>
+
+  <div class="composer-wrap">
+    <div class="quick" id="quick">
+      <button class="q-chip on">C30 型号确认</button>
+      <button class="q-chip">项目地址发您</button>
+      <button class="q-chip">泵送车辆可进场</button>
+      <button class="q-chip">合作愉快</button>
+    </div>
+    <div class="composer">
+      <button class="c-add" id="btn-add" onclick="togglePanel()"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg></button>
+      <div class="c-field"><input id="cinput" placeholder="输入消息…" autocomplete="off"></div>
+      <button class="c-send" onclick="toast('消息已发送')"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M237.9,200.1,141.85,32.18a16,16,0,0,0-27.89,0l-95.89,168a16,16,0,0,0,19.26,22.92L128,192.45l90.67,30.63A16.22,16.22,0,0,0,224,224a16,16,0,0,0,13.86-23.9Zm-14.05,7.84L136,178.26V120a8,8,0,0,0-16,0v58.26L32.16,207.94,32,208,127.86,40,224,208Z"/></svg></button>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <div class="grab"></div>
+    <div class="p-grid">
+      <button class="p-item" onclick="openCardSheet()">
+        <span class="pi-ic t-gold"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M200,112a8,8,0,0,1-8,8H152a8,8,0,0,1,0-16h40A8,8,0,0,1,200,112Zm-8,24H152a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm40-80V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Zm-80.26-34a8,8,0,1,1-15.5,4c-2.63-10.26-13.06-18-24.25-18s-21.61,7.74-24.25,18a8,8,0,1,1-15.5-4,39.84,39.84,0,0,1,17.19-23.34,32,32,0,1,1,45.12,0A39.76,39.76,0,0,1,135.75,166ZM96,136a16,16,0,1,0-16-16A16,16,0,0,0,96,136Z"/></svg></span>
+        <span>发名片</span>
+      </button>
+      <button class="p-item" onclick="toast('发报价单（原型入口）')">
+        <span class="pi-ic t-blue"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/></svg></span>
+        <span>发报价单</span>
+      </button>
+      <button class="p-item" onclick="toast('预约对接（原型入口）')">
+        <span class="pi-ic t-vio"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/></svg></span>
+        <span>预约对接</span>
+      </button>
+      <button class="p-item" onclick="toast('发文件（原型入口）')">
+        <span class="pi-ic t-grn"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/></svg></span>
+        <span>发文件</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 发名片预览 sheet -->
+  <div class="sheet" id="card-sheet">
+    <div class="grab"></div>
+    <div class="sh-head">
+      <div class="sh-title">发名片</div>
+      <button class="sh-close" onclick="closeCardSheet()"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></button>
+    </div>
+    <div class="sh-preview" id="sheet-card"></div>
+    <div class="sh-tip"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>发送后将以上方样式展示给对方</div>
+    <div class="sh-note"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M208,40H48A16,16,0,0,0,32,56v56c0,52.72,25.52,84.67,46.93,102.19,23.06,18.86,46,25.26,47,25.53a8,8,0,0,0,4.2,0c1-.27,23.91-6.67,47-25.53C198.48,196.67,224,164.72,224,112V56A16,16,0,0,0,208,40Zm0,72c0,37.07-13.66,67.16-40.6,89.42A129.3,129.3,0,0,1,128,223.62a128.25,128.25,0,0,1-38.92-21.81C61.82,179.51,48,149.3,48,112l0-56,160,0ZM82.34,141.66a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35a8,8,0,0,1,11.32,11.32l-56,56a8,8,0,0,1-11.32,0Z"/></svg>名片信息取自企业认证档案：工商注册、资质、注册资本等由平台核验后自动带入，无需手动填写。</div>
+    <div class="sh-acts">
+      <button class="sh-btn ghost" onclick="closeCardSheet()">取消</button>
+      <button class="sh-btn gold" id="btn-send" onclick="sendCard()"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M237.9,200.1,141.85,32.18a16,16,0,0,0-27.89,0l-95.89,168a16,16,0,0,0,19.26,22.92L128,192.45l90.67,30.63A16.22,16.22,0,0,0,224,224a16,16,0,0,0,13.86-23.9Zm-14.05,7.84L136,178.26V120a8,8,0,0,0-16,0v58.26L32.16,207.94,32,208,127.86,40,224,208Z"/></svg><span id="send-txt">发送名片</span></button>
+    </div>
+  </div>
+
+  <!-- 我的主页弹层 -->
+  <div class="hmodal" id="hmodal">
+    <div class="hm-head">
+      <img src="https://aka.doubaocdn.com/s/zJWVasWFXW" alt="">
+      <button class="hm-back" onclick="closeHome()"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg></button>
+      <div class="hm-id">
+        <div class="hm-logo"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M240,208H224V96a16,16,0,0,0-16-16H144V32a16,16,0,0,0-24.88-13.32L39.12,72A16,16,0,0,0,32,85.34V208H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM208,96V208H144V96ZM48,85.34,128,32V208H48ZM112,112v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm-32,0v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm0,56v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Zm32,0v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Z"/></svg></div>
+        <div class="hm-tit">
+          <div class="hm-name" id="hm-name">四川省××建设有限公司</div>
+          <span class="hm-badge"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></svg>企业认证 · 平台核验</span>
+        </div>
+      </div>
+    </div>
+    <div class="hm-body">
+      <div class="hm-sec">
+        <div class="hm-sec-t"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,56H176V48a24,24,0,0,0-24-24H104A24,24,0,0,0,80,48v8H40A16,16,0,0,0,24,72V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V72A16,16,0,0,0,216,56ZM96,48a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM216,72v41.61A184,184,0,0,1,128,136a184.07,184.07,0,0,1-88-22.38V72Zm0,128H40V131.64A200.19,200.19,0,0,0,128,152a200.25,200.25,0,0,0,88-20.37V200ZM104,112a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,112Z"/></svg>企业概况</div>
+        <div class="hm-facts">
+          <div class="hm-fact"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M24,104H48v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16H208V104h24a8,8,0,0,0,4.19-14.81l-104-64a8,8,0,0,0-8.38,0l-104,64A8,8,0,0,0,24,104Zm40,0H96v64H64Zm80,0v64H112V104Zm48,64H160V104h32ZM128,41.39,203.74,88H52.26ZM248,208a8,8,0,0,1-8,8H16a8,8,0,0,1,0-16H240A8,8,0,0,1,248,208Z"/></svg>注册资本<b>5000 万</b></div>
+          <div class="hm-fact"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z"/></svg>成立<b>2008</b></div>
+          <div class="hm-fact"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>人员<b>101-500</b></div>
+          <div class="hm-fact"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,128Zm0-112a88.1,88.1,0,0,0-88,88c0,31.4,14.51,64.68,42,96.25a254.19,254.19,0,0,0,41.45,38.3,8,8,0,0,0,9.18,0A254.19,254.19,0,0,0,174,200.25c27.45-31.57,42-64.85,42-96.25A88.1,88.1,0,0,0,128,16Zm0,206c-16.53-13-72-60.75-72-118a72,72,0,0,1,144,0C200,161.23,144.53,209,128,222Z"/></svg>区域<span>四川 · 成都</span></div>
+        </div>
+      </div>
+      <div class="hm-sec">
+        <div class="hm-sec-t"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,136a8,8,0,0,1-8,8H72a8,8,0,0,1,0-16h48A8,8,0,0,1,128,136Zm-8-40H72a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm112,65.47V224A8,8,0,0,1,220,231l-24-13.74L172,231A8,8,0,0,1,160,224V200H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216a16,16,0,0,1,16,16V86.53a51.88,51.88,0,0,1,0,74.94ZM160,184V161.47A52,52,0,0,1,216,76V56H40V184Zm56-12a51.88,51.88,0,0,1-40,0v38.22l16-9.16a8,8,0,0,1,7.94,0l16,9.16Zm16-48a36,36,0,1,0-36,36A36,36,0,0,0,232,124Z"/></svg>资质清单</div>
+        <div class="hm-quals">
+          <div class="hm-qual">
+            <span class="ic"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,96A88,88,0,1,0,72,163.83V240a8,8,0,0,0,11.58,7.16L128,225l44.43,22.21A8.07,8.07,0,0,0,176,248a8,8,0,0,0,8-8V163.83A87.85,87.85,0,0,0,216,96ZM56,96a72,72,0,1,1,72,72A72.08,72.08,0,0,1,56,96ZM168,227.06l-36.43-18.21a8,8,0,0,0-7.16,0L88,227.06V174.37a87.89,87.89,0,0,0,80,0ZM128,152A56,56,0,1,0,72,96,56.06,56.06,0,0,0,128,152Zm0-96A40,40,0,1,1,88,96,40,40,0,0,1,128,56Z"/></svg></span>
+            <div class="q"><div class="qn">建筑工程施工总承包</div><div class="qno">证书编号 D2510××××</div></div>
+            <span class="ql">贰级</span>
+          </div>
+          <div class="hm-qual">
+            <span class="ic"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M216,96A88,88,0,1,0,72,163.83V240a8,8,0,0,0,11.58,7.16L128,225l44.43,22.21A8.07,8.07,0,0,0,176,248a8,8,0,0,0,8-8V163.83A87.85,87.85,0,0,0,216,96ZM56,96a72,72,0,1,1,72,72A72.08,72.08,0,0,1,56,96ZM168,227.06l-36.43-18.21a8,8,0,0,0-7.16,0L88,227.06V174.37a87.89,87.89,0,0,0,80,0ZM128,152A56,56,0,1,0,72,96,56.06,56.06,0,0,0,128,152Zm0-96A40,40,0,1,1,88,96,40,40,0,0,1,128,56Z"/></svg></span>
+            <div class="q"><div class="qn">市政公用工程施工总承包</div><div class="qno">证书编号 D3510××××</div></div>
+            <span class="ql">叁级</span>
+          </div>
+        </div>
+      </div>
+      <div class="hm-sec">
+        <div class="hm-sec-t"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM200,216H56V40h88V88a8,8,0,0,0,8,8h48V216Z"/></svg>企业简介</div>
+        <p class="hm-desc">成立于 2008 年，集房屋建筑、市政公用、装饰装修、机电安装于一体的综合性建筑施工企业。累计施工面积超 200 万㎡，工程合格率 100%，多次获评四川省优质工程。</p>
+      </div>
+      <div class="hm-sec">
+        <div class="hm-sec-t"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M240,208H224V96a16,16,0,0,0-16-16H144V32a16,16,0,0,0-24.88-13.32L39.12,72A16,16,0,0,0,32,85.34V208H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM208,96V208H144V96ZM48,85.34,128,32V208H48ZM112,112v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm-32,0v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm0,56v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Zm32,0v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Z"/></svg>代表案例</div>
+        <div class="hm-cases">
+          <div class="hm-case">
+            <img src="https://aka.doubaocdn.com/s/o4BlLoK9B3" alt="">
+            <div class="c"><div class="cn">成都天府新区××商业综合体</div><div class="cm">房屋建筑 · 18 万㎡ · 2023-2025</div></div>
+          </div>
+          <div class="hm-case">
+            <img src="https://aka.doubaocdn.com/s/SRcUmXYuKb" alt="">
+            <div class="c"><div class="cn">成都市××市政道路改造工程</div><div class="cm">市政公用 · 4.2km · 2022-2023</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="hm-call">
+        <a class="ph" href="javascript:;" onclick="toast('呼叫 138****1234（原型）')"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M222.37,158.46l-47.11-21.11-.13-.06a16,16,0,0,0-15.17,1.4,8.12,8.12,0,0,0-.75.56L134.87,160c-15.42-7.49-31.34-23.29-38.83-38.51l20.78-24.71c.2-.25.39-.5.57-.77a16,16,0,0,0,1.32-15.06l0-.12L97.54,33.64a16,16,0,0,0-16.62-9.52A56.26,56.26,0,0,0,32,80c0,79.4,64.6,144,144,144a56.26,56.26,0,0,0,55.88-48.92A16,16,0,0,0,222.37,158.46ZM176,208A128.14,128.14,0,0,1,48,80,40.2,40.2,0,0,1,82.87,40a.61.61,0,0,0,0,.12l21,47L83.2,111.86a6.13,6.13,0,0,0-.57.77,16,16,0,0,0-1,15.7c9.06,18.53,27.73,37.06,46.46,46.11a16,16,0,0,0,15.75-1.14,8.44,8.44,0,0,0,.74-.56L168.89,152l47,21.05h0s.08,0,.11,0A40.21,40.21,0,0,1,176,208Z"/></svg>电话联系</a>
+        <a class="gl" href="javascript:;" onclick="toast('打开企业官网（原型）')"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,24h0A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm88,104a87.61,87.61,0,0,1-3.33,24H174.16a157.44,157.44,0,0,0,0-48h38.51A87.61,87.61,0,0,1,216,128ZM102,168H154a115.11,115.11,0,0,1-26,45A115.27,115.27,0,0,1,102,168Zm-3.9-16a140.84,140.84,0,0,1,0-48h59.88a140.84,140.84,0,0,1,0,48ZM40,128a87.61,87.61,0,0,1,3.33-24H81.84a157.44,157.44,0,0,0,0,48H43.33A87.61,87.61,0,0,1,40,128ZM154,88H102a115.11,115.11,0,0,1,26-45A115.27,115.27,0,0,1,154,88Zm52.33,0H170.71a135.28,135.28,0,0,0-22.3-45.6A88.29,88.29,0,0,1,206.37,88ZM107.59,42.4A135.28,135.28,0,0,0,85.29,88H49.63A88.29,88.29,0,0,1,107.59,42.4ZM49.63,168H85.29a135.28,135.28,0,0,0,22.3,45.6A88.29,88.29,0,0,1,49.63,168Zm98.78,45.6a135.28,135.28,0,0,0,22.3-45.6h35.66A88.29,88.29,0,0,1,148.41,213.6Z"/></svg>企业官网</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+/* ═════════════ 名片数据源：DataBus 当前用户 → 企业认证档案 → 兜底 ═════════
+   对应真实 chat.html 的 myProfile() 增强版。字段全部来自
+   DataBus.current().auth.enterprise（工商）/ .entry.intro（注册资本/成立/规模）
+   / .entry.qualifications（资质）/ .entry.scope（主营）/ .entry.address（区域）。 */
+const PROFILE = {
+  name: '陈建国',
+  role: '法定代表人',
+  tag: '入驻企业 · 建筑',
+  company: '四川省××建设有限公司',
+  short: '川×建设',
+  code: '91510100MA6××××12X',
+  legal: '陈建国',
+  capital: '5000 万',
+  founded: '2008',
+  staff: '101-500 人',
+  quals: ['建筑工程施工总承包贰级', '市政公用工程施工总承包叁级'],
+  scope: '房屋建筑工程 · 市政公用工程 · 装饰装修 · 机电安装',
+  region: '四川 · 成都',
+  phone: '138****1234',
+  site: 'www.sc-js.example.com'
+};
+
+/* Phosphor regular 图标路径 */
+const IC = {
+  bld:'M240,208H224V96a16,16,0,0,0-16-16H144V32a16,16,0,0,0-24.88-13.32L39.12,72A16,16,0,0,0,32,85.34V208H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM208,96V208H144V96ZM48,85.34,128,32V208H48ZM112,112v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm-32,0v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm0,56v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Zm32,0v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Z',
+  cert:'M128,136a8,8,0,0,1-8,8H72a8,8,0,0,1,0-16h48A8,8,0,0,1,128,136Zm-8-40H72a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm112,65.47V224A8,8,0,0,1,220,231l-24-13.74L172,231A8,8,0,0,1,160,224V200H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216a16,16,0,0,1,16,16V86.53a51.88,51.88,0,0,1,0,74.94ZM160,184V161.47A52,52,0,0,1,216,76V56H40V184Zm56-12a51.88,51.88,0,0,1-40,0v38.22l16-9.16a8,8,0,0,1,7.94,0l16,9.16Zm16-48a36,36,0,1,0-36,36A36,36,0,0,0,232,124Z',
+  bank:'M24,104H48v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16H208V104h24a8,8,0,0,0,4.19-14.81l-104-64a8,8,0,0,0-8.38,0l-104,64A8,8,0,0,0,24,104Zm40,0H96v64H64Zm80,0v64H112V104Zm48,64H160V104h32ZM128,41.39,203.74,88H52.26ZM248,208a8,8,0,0,1-8,8H16a8,8,0,0,1,0-16H240A8,8,0,0,1,248,208Z',
+  clock:'M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z',
+  users:'M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z',
+  pin:'M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,128Zm0-112a88.1,88.1,0,0,0-88,88c0,31.4,14.51,64.68,42,96.25a254.19,254.19,0,0,0,41.45,38.3,8,8,0,0,0,9.18,0A254.19,254.19,0,0,0,174,200.25c27.45-31.57,42-64.85,42-96.25A88.1,88.1,0,0,0,128,16Zm0,206c-16.53-13-72-60.75-72-118a72,72,0,0,1,144,0C200,161.23,144.53,209,128,222Z',
+  cny:'M56,56a8,8,0,0,1,8-8H192a8,8,0,0,1,0,16H64A8,8,0,0,1,56,56ZM216,160a8,8,0,0,0-8,8v16H176a16,16,0,0,1-16-16V120h48a8,8,0,0,0,0-16H48a8,8,0,0,0,0,16H96v8a56.06,56.06,0,0,1-56,56,8,8,0,0,0,0,16,72.08,72.08,0,0,0,72-72v-8h32v48a32,32,0,0,0,32,32h40a8,8,0,0,0,8-8V168A8,8,0,0,0,216,160Z',
+  case:'M216,56H176V48a24,24,0,0,0-24-24H104A24,24,0,0,0,80,48v8H40A16,16,0,0,0,24,72V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V72A16,16,0,0,0,216,56ZM96,48a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM216,72v41.61A184,184,0,0,1,128,136a184.07,184.07,0,0,1-88-22.38V72Zm0,128H40V131.64A200.19,200.19,0,0,0,128,152a200.25,200.25,0,0,0,88-20.37V200ZM104,112a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,112Z',
+  globe:'M128,24h0A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm88,104a87.61,87.61,0,0,1-3.33,24H174.16a157.44,157.44,0,0,0,0-48h38.51A87.61,87.61,0,0,1,216,128ZM102,168H154a115.11,115.11,0,0,1-26,45A115.27,115.27,0,0,1,102,168Zm-3.9-16a140.84,140.84,0,0,1,0-48h59.88a140.84,140.84,0,0,1,0,48ZM40,128a87.61,87.61,0,0,1,3.33-24H81.84a157.44,157.44,0,0,0,0,48H43.33A87.61,87.61,0,0,1,40,128ZM154,88H102a115.11,115.11,0,0,1,26-45A115.27,115.27,0,0,1,154,88Zm52.33,0H170.71a135.28,135.28,0,0,0-22.3-45.6A88.29,88.29,0,0,1,206.37,88ZM107.59,42.4A135.28,135.28,0,0,0,85.29,88H49.63A88.29,88.29,0,0,1,107.59,42.4ZM49.63,168H85.29a135.28,135.28,0,0,0,22.3,45.6A88.29,88.29,0,0,1,49.63,168Zm98.78,45.6a135.28,135.28,0,0,0,22.3-45.6h35.66A88.29,88.29,0,0,1,148.41,213.6Z',
+  check:'M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z',
+  medal:'M216,96A88,88,0,1,0,72,163.83V240a8,8,0,0,0,11.58,7.16L128,225l44.43,22.21A8.07,8.07,0,0,0,176,248a8,8,0,0,0,8-8V163.83A87.85,87.85,0,0,0,216,96ZM56,96a72,72,0,1,1,72,72A72.08,72.08,0,0,1,56,96ZM168,227.06l-36.43-18.21a8,8,0,0,0-7.16,0L88,227.06V174.37a87.89,87.89,0,0,0,80,0ZM128,152A56,56,0,1,0,72,96,56.06,56.06,0,0,0,128,152Zm0-96A40,40,0,1,1,88,96,40,40,0,0,1,128,56Z'
+};
+function ic(n,s){return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="'+IC[n]+'"/></svg>';}
+
+/* ── 名片卡渲染（数据驱动，预览与发送共用）── */
+function cardHTML(){
+  return '<div class="premium-card">'+
+    '<div class="pc-head"><img src="https://aka.doubaocdn.com/s/zJWVasWFXW" alt="">'+
+      '<div class="pc-in">'+
+        '<div class="pc-top">'+
+          '<div class="pc-logo">'+ic('bld',19)+'</div>'+
+          '<div class="pc-tit">'+
+            '<div class="pc-name">'+PROFILE.company+'</div>'+
+            '<span class="pc-badge">'+ic('check',10)+'企业认证 · 已核验</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="pc-legal">'+ic('cert',11)+'<span>法定代表人 <b>'+PROFILE.legal+'</b> · '+PROFILE.tag+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="pc-body">'+
+      '<div class="pc-holder">'+
+        '<div class="pc-ava">'+PROFILE.name.slice(0,1)+'</div>'+
+        '<div class="pc-who">'+
+          '<div class="pc-person">'+PROFILE.name+'<small>'+PROFILE.role+'</small></div>'+
+          '<div class="pc-role">'+ic('case',11)+PROFILE.tag+' · 建筑工程施工总承包贰级</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="pc-fields">'+
+        '<div class="pc-field"><span class="k">'+ic('bank',10)+'注册资本</span><span class="v">'+PROFILE.capital+'</span></div>'+
+        '<div class="pc-field"><span class="k">'+ic('clock',10)+'成立时间</span><span class="v">'+PROFILE.founded+'</span></div>'+
+        '<div class="pc-field"><span class="k">'+ic('users',10)+'人员规模</span><span class="v">'+PROFILE.staff+'</span></div>'+
+        '<div class="pc-field"><span class="k">'+ic('pin',10)+'经营区域</span><span class="v">'+PROFILE.region+'</span></div>'+
+        '<div class="pc-field full"><span class="k">'+ic('case',10)+'主营范围</span><span class="v wrap">'+PROFILE.scope+'</span></div>'+
+      '</div>'+
+      '<div class="pc-quals">'+PROFILE.quals.map(function(q){return '<span class="pc-qual">'+ic('medal',10)+q+'</span>';}).join('')+'</div>'+
+      '<div class="pc-foot"><span class="ok">'+ic('check',9)+'工商注册号 '+PROFILE.code+' · 存续</span><span class="sp">'+ic('globe',9)+'平台核验</span></div>'+
+      '<div class="pc-actions">'+
+        '<button class="pc-btn gold" onclick="event.stopPropagation();openHome()">'+ic('bld',14)+'查看我的主页</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ── 基础交互 ── */
+const toastEl=document.getElementById('toast');let toastT;
+function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('on'),1600);}
+
+const panel=document.getElementById('panel'),btnAdd=document.getElementById('btn-add');
+function togglePanel(force){
+  const open = force===undefined ? !panel.classList.contains('on') : force;
+  panel.classList.toggle('on',open);
+  btnAdd.classList.toggle('open',open);
+}
+
+/* 快捷语：控件文案/选中态跟着状态走 */
+document.querySelectorAll('.q-chip').forEach(c=>{
+  c.onclick=()=>{
+    document.querySelectorAll('.q-chip').forEach(x=>x.classList.toggle('on',x===c));
+  };
+});
+
+/* 输入框 Enter 也是打开面板的一条通路（一个意图多条通路） */
+document.getElementById('cinput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){togglePanel();e.preventDefault();}
+});
+
+/* ── 发名片：预览 → 发送 ── */
+const sheet=document.getElementById('card-sheet');
+const sheetCard=document.getElementById('sheet-card');
+sheetCard.innerHTML=cardHTML();
+let cardSent=false, sentSeq=0;
+
+function openCardSheet(){togglePanel(false);sheet.classList.add('on');}
+function closeCardSheet(){sheet.classList.remove('on');}
+
+function sendCard(){
+  const btn=document.getElementById('btn-send'),txt=document.getElementById('send-txt');
+  btn.disabled=true;txt.textContent='已发送';
+  setTimeout(()=>{btn.disabled=false;txt.textContent='发送名片';},900);
+  if(cardSent){closeCardSheet();toast('名片已发送');return;}
+  cardSent=true;
+  const slot=document.getElementById('card-slot');
+  slot.innerHTML='<div class="msg mine"><div class="av">陈</div><div><div style="width:min(284px,86vw)">'+cardHTML()+'</div><div class="meta"><span class="tick">✓ 已读</span> · 11:06</div></div></div>';
+  closeCardSheet();
+  toast('名片已发送');
+  /* 等待做成内容：对方正在输入 → 回复 */
+  const ts=document.getElementById('typing-slot');
+  ts.innerHTML='<div class="msg"><div class="av peer">张</div><div><div class="typing"><i></i><i></i><i></i></div></div></div>';
+  document.getElementById('flow').scrollTop=1e6;
+  setTimeout(()=>{
+    ts.innerHTML='<div class="msg"><div class="av peer">张</div><div><div class="bubble">收到，名片我这边留档了，报价单发过来后走平台订单。</div><div class="meta">刚刚</div></div></div>';
+    document.getElementById('flow').scrollTop=1e6;
+  },1600);
+}
+
+/* ── 我的主页 ── */
+const hmodal=document.getElementById('hmodal');
+function openHome(){hmodal.classList.add('on');}
+function closeHome(){hmodal.classList.remove('on');}
+
+/* ── 关键屏声明（截图器只枚举它，不猜按钮）── */
+window.__UI_CAPTURE__={
+  reset:async()=>{
+    document.getElementById('hmodal').classList.remove('on');
+    closeCardSheet();togglePanel(false);
+    document.querySelectorAll('.q-chip').forEach((x,i)=>x.classList.toggle('on',i===0));
+  },
+  states:[
+    {id:'chat',    label:'会话首页', go:async()=>{}},
+    {id:'panel',   label:'加号面板', go:async()=>togglePanel(true)},
+    {id:'preview', label:'发名片预览', go:async()=>{togglePanel(true);openCardSheet();}},
+    {id:'sent',    label:'名片已发送', go:async()=>{
+      sendCard();
+      await new Promise(r=>setTimeout(r,1800));      // 等对方回复落定后再定位
+      const f=document.getElementById('flow'),sl=document.getElementById('card-slot');
+      if(f&&sl) f.scrollTop=f.getBoundingClientRect().top+sl.offsetTop-190;
+    }},
+    {id:'home',    label:'我的主页', go:async()=>{if(!cardSent)sendCard();openHome();}}
+  ]
+};
+</script>
+</body>
+</html>
+
+
+请严格按照上面的 HTML 代码创建应用，不要做任何修改。

@@ -295,7 +295,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var loc = document.getElementById('app-location');
     var locText = document.getElementById('app-location-text');
     var saved = localStorage.getItem('engchain-city');
-    if (saved) locText.textContent = saved;
+    if (saved) { locText.textContent = saved; }
+    else {
+      /* [Auth 连通] 首次进入未设置城市时，默认用已认证地域兜底 */
+      try {
+        var au = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+        var en = au.enterprise || {};
+        var basic = (au.personalEntry && au.personalEntry.profile && au.personalEntry.profile.basic) || {};
+        var region = en.region || basic.location || '';
+        if (region) locText.textContent = region;
+      } catch (e) {}
+    }
     function openCity() {
       UI.cityPicker({
         current: locText.textContent,

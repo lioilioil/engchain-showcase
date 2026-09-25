@@ -15,8 +15,8 @@
   <main class="main">
     <div class="page-head">
       <div>
-        <h1>企业主验证审核</h1>
-        <div class="sub">用户与认证中心 · 企业主移交身份验证（法人认证 / 实际控制人验证）后台审核 · 通过后企业主移交正式生效，App 端即时同步</div>
+        <h1>企业主验证与变更审核</h1>
+        <div class="sub">用户与认证中心 · 企业主移交身份验证（法人认证 / 实际控制人验证）与「企业主变更（实际控制人）」后台审核 · 通过后 App 端即时同步生效</div>
       </div>
       <button class="btn btn-outline" id="btn-refresh"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>刷新</button>
     </div>
@@ -29,6 +29,14 @@
         <span class="card-s" id="count"></span>
       </div>
       <div id="table-wrap"></div>
+    </div>
+
+    <div class="card card-pad" style="margin-top:20px;">
+      <div class="card-h">
+        <span class="card-t">待审核企业主变更（实际控制人）</span>
+        <span class="card-s" id="oc-count"></span>
+      </div>
+      <div id="oc-table-wrap"></div>
     </div>
   </main>
 </div>
@@ -63,17 +71,32 @@ function bootOwnerReview(){ (function () {
   function pendingReviews() {
     return allTransfers().filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'pending'; });
   }
+  function allOwnerChanges() {
+    try {
+      var orgs = OrgsStore.list();
+      var out = [];
+      orgs.forEach(function (org) {
+        (org.ownerChanges || []).forEach(function (c) { out.push({ org: org, change: c }); });
+      });
+      return out;
+    } catch (e) { return []; }
+  }
+  function pendingOwnerChanges() {
+    return allOwnerChanges().filter(function (x) { return x.change.status === 'pending'; });
+  }
 
   function renderKPI() {
     var all = allTransfers();
     var pending = pendingReviews().length;
     var done = all.filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'approved'; }).length;
     var rejected = all.filter(function (x) { return x.transfer.verify && x.transfer.verify.status === 'rejected'; }).length;
+    var ocAll = allOwnerChanges();
+    var ocPending = ocAll.filter(function (x) { return x.change.status === 'pending'; }).length;
     var cards = [
       ['待审核', pending, 'warn', '法人/实控人验证队列'],
       ['已生效', done, 'up', '企业主移交完成'],
-      ['已驳回', rejected, 'down', '验证被驳回'],
-      ['申请总数', all.length, 'gold', '历史移交申请']
+      ['变更待审', ocPending, 'gold', '企业主变更（实际控制人）'],
+      ['变更累计', ocAll.length, 'up', '历史变更申请']
     ];
     $('#kpi').innerHTML = cards.map(function (k) {
       return '<div class="kpi"><div class="k">' + k[0] + '</div><div class="v num">' + k[1] + '</div><div class="d ' + (k[2] === 'gold' ? 'gold' : k[2] === 'down' ? 'down' : k[2] === 'warn' ? 'warn' : 'up') + '">' + k[3] + '</div></div>';
@@ -117,6 +140,57 @@ function bootOwnerReview(){ (function () {
       '</tbody></table>';
   }
 
+  /* 企业主变更（实际控制人）审核表 */
+  function ownerRegBadge(c) {
+    if (c.targetUid) {
+      return c.targetVerified
+        ? '<span class="badge badge-success">已注册 · 已实名</span>'
+        : '<span class="badge badge-warning">已注册 · 未实名</span>';
+    }
+    return '<span class="badge badge-danger">未注册</span>';
+  }
+  function renderOwnerChangeTable() {
+    var list = pendingOwnerChanges();
+    $('#oc-count').textContent = '待审核 ' + list.length + ' 单';
+    if (!list.length) {
+      $('#oc-table-wrap').innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted);">暂无待审核的企业主变更</div>';
+      return;
+    }
+    $('#oc-table-wrap').innerHTML =
+      '<table class="table">' +
+      '<thead><tr>' +
+        '<th>企业</th><th>现任企业主 → 变更目标</th><th>变更原因</th><th>注册状态</th><th>提交人</th><th>提交时间</th><th>操作</th>' +
+      '</tr></thead><tbody>' +
+      list.map(function (x) {
+        var c = x.change, org = x.org;
+        var curOwner = '';
+        (org.members || []).forEach(function (m) { if (m.role === 'owner' && m.status === 'active') curOwner = userName(m.uid); });
+        var approveBtn = c.targetUid
+          ? '<button class="btn btn-sm btn-primary" onclick="ownerChangeReview(\'' + c.id + '\', true)">通过并生效</button>'
+          : '<button class="btn btn-sm btn-primary" disabled title="变更目标尚未注册，请先邀请其注册并完成实名认证">通过并生效</button>';
+        return '<tr>' +
+          '<td><div class="tx-semibold">' + esc(org.shortName || org.co) + '</div><div class="tx-muted-sm">' + esc(org.co || '') + '</div></td>' +
+          '<td>' + esc(curOwner || '空缺') + ' → <b>' + esc(c.name) + '</b><div class="tx-mono tx-muted-sm">' + esc(c.mobile || '') + '</div></td>' +
+          '<td><div class="tx-muted-sm" style="max-width:220px;">' + esc(c.reason || '—') + '</div></td>' +
+          '<td>' + ownerRegBadge(c) + '</td>' +
+          '<td class="tx-muted-sm">' + esc(c.createdByName || '—') + '</td>' +
+          '<td class="tx-muted-sm">' + fmtTime(c.createdAt) + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            approveBtn +
+            '<button class="btn btn-sm btn-ghost" onclick="ownerChangeReview(\'' + c.id + '\', false)">驳回</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table>';
+  }
+
+  window.ownerChangeReview = function (changeId, approve) {
+    var r = OrgsStore.reviewOwnerChange(changeId, approve);
+    if (r && r.error) { if (window.Admin && Admin.toast) Admin.toast(r.error, 'error'); else alert(r.error); return; }
+    if (window.Admin && Admin.toast) Admin.toast(approve ? '已通过，企业主变更已生效' : '已驳回该企业主变更', approve ? 'success' : '');
+    renderKPI(); renderOwnerChangeTable(); renderTable();
+  };
+
   window.ownerReview = function (transferId, approve) {
     var r = OrgsStore.reviewOwnerVerify(transferId, approve);
     if (r && r.error) { if (window.Admin && Admin.toast) Admin.toast(r.error, 'error'); else alert(r.error); return; }
@@ -124,10 +198,11 @@ function bootOwnerReview(){ (function () {
     renderKPI(); renderTable();
   };
 
-  $('#btn-refresh').addEventListener('click', function () { renderKPI(); renderTable(); if (window.Admin && Admin.toast) Admin.toast('已刷新'); });
+  $('#btn-refresh').addEventListener('click', function () { renderKPI(); renderTable(); renderOwnerChangeTable(); if (window.Admin && Admin.toast) Admin.toast('已刷新'); });
   renderKPI();
   renderTable();
-  window.addEventListener('storage', function (e) { if (e.key === 'engchain-orgs') { renderKPI(); renderTable(); } });
+  renderOwnerChangeTable();
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-orgs') { renderKPI(); renderTable(); renderOwnerChangeTable(); } });
 })(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootOwnerReview); else bootOwnerReview();
 </script>
