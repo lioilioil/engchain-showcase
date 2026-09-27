@@ -18,8 +18,11 @@
      于是 deriveIdentity / publishableCats / entryAccess / my-jobs 等现有页面
      零改动即按"当前代表企业"工作；能力 = 个人侧 ∪ 企业侧（并集不互斥）。
 
-   角色三档：owner 企业主 / admin 管理员(HR) / member 普通成员。
-   钱与企业主体操作只归 owner；admin/member 共享企业发布与招聘处理能力。
+   v2（2026-09-27 重构）：单账号·资质挂载·外显分离。企业认证/入驻是挂在个人账号上的资质，
+   仅本人申请+后台审批/登录同步写入；组织成员(owner/admin/member)只是任职，绝不回写个人资质；
+   currentOrgId/displayOrgId 仅为用户手动选择的外显署名主体，不自动、不还原、零权益变化。
+
+   角色三档：owner 企业主 / admin 管理员(HR) / member 普通成员（仅作用于组织数据与可署名范围）。
    ============================================================================ */
 window.OrgsStore = (function () {
   'use strict';
@@ -123,70 +126,67 @@ window.OrgsStore = (function () {
   }
   function memberCount(org) { return (org.members || []).filter(function (m) { return m.status === 'active'; }).length; }
 
-  /* 当前代表企业：读 UI.state.currentOrgId，校验仍 active 后返回 {org, role} */
-  function currentMembership() {
+  /* 当前外显署名企业 orgId：仅用户手动选择；兼容旧键 currentOrgId；成员关系失效则回 null(个人) */
+  function currentDisplayOrgId() {
     var u = me(); if (!u) return null;
-    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return null;   /* [S5] */
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return null;
     var st = (window.UI && UI.state) ? UI.state.get() : {};
-    var cur = st.currentOrgId || null;
-    if (cur && cur !== 'personal') {
-      var m = membershipOf(u.id, cur);
-      if (m) return m;
-    }
+    var cur = (st.displayOrgId != null) ? st.displayOrgId : st.currentOrgId;
+    if (cur && cur !== 'personal' && membershipOf(u.id, cur)) return cur;
     return null;
   }
 
-  /* ---- 身份投影：L2 Store 基础 + 当前代表企业覆盖（[S1] base 从 L2 读，与 deriveIdentity 同源） ---- */
-  function projectAuth() {
-    var u = me(); if (!u || !window.AuthStore || !window.EntryStore) return;
-    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return;   /* [S5] 统一游客判断 */
-    var baseAuth = JSON.parse(JSON.stringify(AuthStore.read() || {}));
-    var baseEntry = JSON.parse(JSON.stringify(EntryStore.read() || {}));
+  /* 当前外显企业的成员记录（纯展示上下文，不含任何权限语义） */
+  function currentMembership() {
+    var u = me(); if (!u) return null;
+    var id = currentDisplayOrgId(); if (!id) return null;
+    return membershipOf(u.id, id);
+  }
+
+  /* 外显署名主体：{kind:'personal'} 或 {kind:'org', orgId,name,co,role}；只供展示，不授权 */
+  function displaySubject() {
+    var u = me();
+    if (!u) return { kind: 'guest', orgId: null, name: '', co: '', role: '' };
     var m = currentMembership();
-    if (m) {
-      var org = m.org;
-      /* 企业认证投影（个人线 realname/personalEntry 不动） */
-      baseAuth.enterprise = {
-        ok: true, expireAt: org.expireAt, co: org.co, code: org.code, legal: org.legal,
-        shortName: org.shortName, nameBasis: '品牌简称', nameProof: []
-      };
-      baseAuth.enterpriseQual = { ok: !!(org.enterpriseQual && org.enterpriseQual.length), list: (org.enterpriseQual || []).slice() };
-      /* 入驻投影 */
-      if (org.entStatus === 'resident') {
-        baseEntry = {
-          types: org.entryTypes.slice(), type: org.entryTypes[0], active: true, status: 'active',
-          orderId: baseEntry.orderId || null, paidAt: baseEntry.paidAt || 0, expireAt: org.expireAt
-        };
-      } else {
-        baseEntry = { types: [], type: null, active: false, status: 'none', orderId: null, paidAt: 0, expireAt: 0 };
-      }
-    }
-    AuthStore.write(baseAuth);
-    EntryStore.write(baseEntry);
-    var companyName = m ? (m.org.shortName || m.org.co) : (u.company || '');
-    if (window.UI && UI.state) UI.state.set({
-      company: companyName, orgRole: m ? m.role : '', orgName: m ? (m.org.shortName || m.org.co) : ''
-    });
+    if (m) return { kind: 'org', orgId: m.org.orgId, name: m.org.shortName || m.org.co, co: m.org.co, role: m.role };
+    return { kind: 'personal', orgId: null, name: u.name || '', co: '', role: '' };
   }
 
-  /* 登录某账号后，为其选默认代表企业：有 active 成员身份则取第一个，否则纯个人 */
-  function defaultOrgIdFor(uid) {
-    var list = orgsOf(uid);
-    return list.length ? list[0].org.orgId : null;
+  /* 企业经营动作上下文（只读）：在企业页需要“以哪家企业署名”时使用。
+     能否做企业向动作仍须由 identity-policy 按【本人资质】门控，本函数不授予任何权益。 */
+  function actingContext() {
+    var m = currentMembership();
+    if (!m) return null;
+    return {
+      orgId: m.org.orgId, co: m.org.co, shortName: m.org.shortName || m.org.co,
+      legal: m.org.legal, code: m.org.code, role: m.role,
+      entryTypes: (m.org.entryTypes || []).slice(), entStatus: m.org.entStatus
+    };
   }
 
-  /* 切换当前代表企业（orgId 传 null / 'personal' 表示以个人身份对外） */
+  /* 双校验：在该企业有任职 且 本人具备对应企业向资质，仅决定可否“以该企业名义署名/操作”。
+     recruit/publish（招聘/企业发布）：本人企业认证(verified)或入驻(resident)；其余企业动作：须本人入驻。 */
+  function canActFor(orgId, actionKey) {
+    var u = me(); if (!u || !membershipOf(u.id, orgId)) return false;
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    if (!acc || !acc.identity) return false;
+    var ent = acc.identity.enterprise;
+    if (actionKey === 'recruit' || actionKey === 'publish') return ent === 'verified' || ent === 'resident';
+    return !!acc.isResident;
+  }
+
+  /* 手动切换外显署名主体（orgId 传 null/'personal' = 本人）。纯展示：不写任何资质 Store，
+     不派发 auth/entry，仅广播 engchain:display 供展示层刷新；不自动、需用户显式调用。 */
   function switchOrg(orgId) {
     var u = me(); if (!u) return false;
-    if (orgId && orgId !== 'personal' && !membershipOf(u.id, orgId)) {
+    var id = (orgId && orgId !== 'personal') ? orgId : null;
+    if (id && !membershipOf(u.id, id)) {
       if (window.UI && UI.toast) UI.toast.err('你未加入该企业');
       return false;
     }
-    if (window.UI && UI.state) UI.state.set({ currentOrgId: orgId || null });
-    projectAuth();
-    window.dispatchEvent(new CustomEvent('engchain:org', {}));
-    window.dispatchEvent(new CustomEvent('engchain:auth', {}));
-    window.dispatchEvent(new CustomEvent('engchain:entry', {}));
+    if (window.UI && UI.state) UI.state.set({ displayOrgId: id, currentOrgId: id });
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: id } }));
     return true;
   }
 
@@ -289,11 +289,9 @@ window.OrgsStore = (function () {
               DataBus.pushDirectMessage(iv.inviterUid, '成员已加入企业', u.name + ' 已接受邀请，成为 ' + (org.shortName || org.co) + ' 的' + roleLabel(iv.role) + '。');
             }
           } catch (e) {}
+          /* v2：接受邀请后不自动切换外显（切换必须用户手动），停留个人身份，不改任何资质 */
           window.dispatchEvent(new CustomEvent('engchain:org', {}));
-          /* 接受后自动代表该企业 */
-          if (window.UI && UI.state) UI.state.set({ currentOrgId: org.orgId });
-          projectAuth();
-          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: currentDisplayOrgId() } }));
           return { ok: true, orgId: org.orgId };
         }
       }
@@ -614,8 +612,8 @@ window.OrgsStore = (function () {
     }
     save(a);
     var st = (window.UI && UI.state) ? UI.state.get() : {};
-    if (st.currentOrgId === orgId) { UI.state.set({ currentOrgId: null }); }
-    projectAuth();
+    if (st.displayOrgId === orgId || st.currentOrgId === orgId) { UI.state.set({ displayOrgId: null, currentOrgId: null, company: '', orgRole: '', orgName: '' }); }
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: null } }));
     window.dispatchEvent(new CustomEvent('engchain:org', {}));
     if (window.DataBus && DataBus.audit) DataBus.audit('退出企业', '企业', u.name, '退出 ' + (org.shortName || org.co));
     return { ok: true };
@@ -911,19 +909,25 @@ window.OrgsStore = (function () {
   /* ============ 登录 / 重置联动 ============ */
   function onLogin() {
     var u = me(); if (!u) return;
-    var def = defaultOrgIdFor(u.id);
-    if (window.UI && UI.state) UI.state.set({ currentOrgId: def });
-    projectAuth();
+    /* v2：不自动选企业、不投影资质。仅校验已保存的手动外显是否仍有效，失效回个人。 */
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var saved = (st.displayOrgId != null) ? st.displayOrgId : st.currentOrgId;
+    var valid = (saved && saved !== 'personal' && membershipOf(u.id, saved)) ? saved : null;
+    if (window.UI && UI.state) UI.state.set({ displayOrgId: valid, currentOrgId: valid, company: '', orgRole: '', orgName: '' });
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: valid } }));
     window.dispatchEvent(new CustomEvent('engchain:org', {}));
   }
-  function onReset() { try { LS.removeItem(KEY); } catch (e) {} load(); }
+  function onReset() {
+    try { LS.removeItem(KEY); } catch (e) {} load();
+    try { if (window.UI && UI.state) UI.state.set({ displayOrgId: null, currentOrgId: null, company: '', orgRole: '', orgName: '' }); } catch (e) {}
+  }
 
   /* 启动即绑定事件（脚本加载时执行一次） */
   function init() {
     load();
     window.addEventListener('engchain:login', onLogin);
     window.addEventListener('engchain:reset', onReset);
-    /* 页面首次进入（非经 login 事件，如直接打开且 state 已在）补一次投影 */
+    /* 页面首次进入：仅对齐已保存的手动外显（不自动选企业、不投影资质） */
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function () { onLogin(); });
     } else { onLogin(); }
@@ -952,7 +956,9 @@ window.OrgsStore = (function () {
     ownerChangeById: ownerChangeById, pendingOwnerChangesAll: pendingOwnerChangesAll,
     requestOwnerChange: requestOwnerChange, sendOwnerChangeSms: sendOwnerChangeSms,
     reviewOwnerChange: reviewOwnerChange,
-    switchOrg: switchOrg, projectAuth: projectAuth, defaultOrgIdFor: defaultOrgIdFor,
+    switchOrg: switchOrg,
+    currentDisplayOrgId: currentDisplayOrgId, displaySubject: displaySubject,
+    actingContext: actingContext, canActFor: canActFor,
     init: init
   };
 })();

@@ -991,7 +991,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
           '<div class="pf-banner review" style="margin-bottom:8px;">' +
             '<span style="flex:none;width:34px;height:34px;border-radius:50%;background:rgba(212,148,90,.18);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--primary);"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg></span>' +
             '<div class="pb-body"><div class="pb-title">' + UI.esc(org.shortName || org.co) + ' 邀请你加入企业号</div>' +
-            '<div class="pb-sub">担任' + (ROLE_LABEL[iv.role] || '成员') + '，将可代表该企业发布与招聘</div></div>' +
+            '<div class="pb-sub">在该企业担任' + (ROLE_LABEL[iv.role] || '成员') + '（仅组织角色，不改变你的个人资质与权益）</div></div>' +
             '<span class="pb-cta" style="margin-right:6px;cursor:pointer;" onclick="pfAcceptInvite(\'' + iv.inviteId + '\')">接受</span>' +
             '<span class="pb-cta" style="cursor:pointer;background:var(--wb-bg)!important;color:var(--wb-text-2)!important;border:1px solid var(--wb-line);" onclick="pfRejectInvite(\'' + iv.inviteId + '\')">拒绝</span>' +
           '</div>';
@@ -1002,12 +1002,12 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var list = OrgsStore.orgsOf(me.id);
     if (list.length) {
       var cur = OrgsStore.currentMembership();
-      var curLabel = cur ? ('以「' + (cur.org.shortName || cur.org.co) + '」· ' + (ROLE_LABEL[cur.role] || '')) : '以个人身份';
+      var curLabel = cur ? ((cur.org.shortName || cur.org.co) + '（' + (ROLE_LABEL[cur.role] || '成员') + '）') : '本人（个人）';
       html +=
         '<div class="pf-banner" style="cursor:pointer;" onclick="pfOpenOrgSwitch()">' +
           '<span style="flex:none;width:34px;height:34px;border-radius:50%;background:rgba(184,153,104,.14);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--primary-dim);"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-4h6v4"/></svg></span>' +
-          '<div class="pb-body"><div class="pb-title" style="font-size:12.5px;">当前代表：' + curLabel + '</div>' +
-          '<div class="pb-sub">已加入 ' + list.length + ' 家企业 · 点击切换对外身份</div></div>' +
+          '<div class="pb-body"><div class="pb-title" style="font-size:12.5px;">对外显示为：' + curLabel + '</div>' +
+          '<div class="pb-sub">已加入 ' + list.length + ' 家企业 · 仅切换对外署名，不影响权益与数据</div></div>' +
           '<span class="wb-card-more" style="color:var(--primary-dim);">切换 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>' +
         '</div>';
     }
@@ -1018,7 +1018,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
   window.pfAcceptInvite = function (inviteId) {
     var r = OrgsStore.acceptInvite(inviteId);
     if (r && r.error) { UI.toast.warn(r.error); return; }
-    UI.toast.ok('已加入企业，当前已切换为该企业身份');
+    UI.toast.ok('已加入企业；可在下方“对外身份”中手动选择署名');
   };
   window.pfRejectInvite = function (inviteId) {
     UI.dialog({ title: '拒绝邀请', text: '确定拒绝该企业的加入邀请吗？', ok: '拒绝', cancel: '再想想', onOk: function () {
@@ -1041,7 +1041,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     });
     sh.html(
       '<div style="padding:4px 2px 8px;">' +
-        '<div style="font-size:11.5px;color:var(--text-3);padding:0 4px 10px;line-height:1.5;">切换后，你发布信息、招聘与看到的数据将以所选身份对外。个人权益不受影响。</div>' +
+        '<div style="font-size:11.5px;color:var(--text-3);padding:0 4px 10px;line-height:1.5;">这里仅切换对外<b>显示的署名</b>（如资料名、以企业名义发布/签约时的主体名）。<b>不会</b>自动改变你的资质、权益、余额账户、发票抬头或可见数据；企业向操作仍需你本人具备对应资质。</div>' +
         rows +
       '</div>'
     );
@@ -1060,7 +1060,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var ok = OrgsStore.switchOrg(orgId);
     if (!ok) { UI.toast.warn('切换失败'); return; }
     UI.closeSheet();
-    UI.toast.ok(orgId ? '已切换企业身份' : '已切回个人身份');
+    UI.toast.ok(orgId ? '对外署名已切换为该企业（权益不变）' : '已切回本人署名（权益不变）');
   };
 
   /* ---------- E1-02 游客点击受限功能 → 登录引导 sheet（而非无反应/toast） ---------- */
@@ -1305,6 +1305,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
   window.addEventListener('engchain:state', init);
   window.addEventListener('engchain:apply', init);
   window.addEventListener('engchain:org', init);
+  window.addEventListener('engchain:display', init);
   window.addEventListener('storage', function (e) {
     if (e.key && e.key.indexOf('engchain-') === 0) init();
   });
