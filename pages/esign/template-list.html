@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>合同模板 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">选择合同模板</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view"><div class="es-scroll no-pad" id="v" style="padding-top:12px;"></div></div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var v = ES.$('#v');
+  var curCat = 'all';
+  var CATS = [['all', '全部'], ['purchase', '采购租赁'], ['contract', '工程承包'], ['coop', '合作框架'], ['general', '企业常用']];
+  function fieldCount(t) { return t.fields.length + 2; } // 合同名称 + 对方信息在后续步骤
+  function render() {
+    var list = ES.TEMPLATES.filter(function (t) { return curCat === 'all' || t.cat === curCat; });
+    v.innerHTML =
+      '<div class="es-muted" style="margin:0 14px 10px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);font-size:11px;line-height:1.6;">范本仅供参考，不构成法律意见。使用前请自行审核合同内容，必要时咨询专业律师。</div>' +
+      '<div class="es-chips" style="margin-bottom:12px;">' + CATS.map(function (c) {
+        return '<button class="es-chip' + (curCat === c[0] ? ' on' : '') + '" data-cat="' + c[0] + '">' + c[1] + '</button>';
+      }).join('') + '</div>' +
+      '<div style="padding:0 14px 30px;">' + list.map(function (t) {
+        return '<div class="es-card es-tpl" data-id="' + t.id + '" style="cursor:pointer;">' +
+          '<div style="display:flex;align-items:flex-start;gap:11px;">' +
+          '<span style="width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:var(--es-gold-soft);color:var(--es-gold-deep);flex:none;">' + ES.ic('doc') + '</span>' +
+          '<div style="flex:1;min-width:0;"><div style="font-size:14.5px;font-weight:600;color:var(--text-1);">' + ES.esc(t.name) + '</div>' +
+          '<div class="es-muted" style="margin-top:3px;">' + ES.esc(t.desc) + '</div>' +
+          '<span class="es-badge b-other" style="margin-top:8px;display:inline-block;">需填 ' + fieldCount(t) + ' 项</span></div>' +
+          '<span style="color:var(--text-3);align-self:center;">' + ES.ic('chevron') + '</span></div></div>';
+      }).join('') + '</div>';
+    v.querySelectorAll('[data-cat]').forEach(function (ch) {
+      ch.onclick = function () { curCat = ch.getAttribute('data-cat'); render(); };
+    });
+    v.querySelectorAll('.es-tpl').forEach(function (it) {
+      it.onclick = function () {
+        var id = it.getAttribute('data-id');
+        var d = ES.Draft.get();
+        if (!d || d.via === 'upload') { d = ES.newDraft(); d.via = 'template'; }
+        d.templateId = id;
+        d.title = d.title || ES.tpl(id).name;
+        ES.Draft.set(d);
+        location.href = 'template-fill.html?id=' + encodeURIComponent(id);
+      };
+    });
+  }
+  render();
+});
+</script>
+</body>
+</html>

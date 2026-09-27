@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>退款审核 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="esign/refunds.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>退款审核</h1>
+        <div class="sub">电子签 · 次数包退款申请（应退 = 实付 − 已用次数 × 单次价）· 通过即核销未用次数并原路退回</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh">刷新</button>
+    </div>
+    <div class="kpis" id="kpi"></div>
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">退款单</span><span class="card-s" id="c-count"></span></div>
+      <div id="c-filter"></div>
+      <div id="c-table"></div>
+      <div id="c-pager"></div>
+    </div>
+  </main>
+</div>
+<script>window.__ROOT__ = "../../";</script>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function dts(ts) { if (!ts) return '—'; var d = new Date(ts); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2) + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2); }
+
+  var ALLOWED = ['finance', 'super'];
+  function role() { try { return localStorage.getItem('engchain-role') || 'super'; } catch (e) { return 'super'; } }
+  if (ALLOWED.indexOf(role()) < 0) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var m = document.querySelector('.main'); if (m) m.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;text-align:center;"><div style="font-size:18px;font-weight:700;margin-bottom:8px;">当前角色无权访问「退款审核」</div><div class="sub">退款资金操作仅对财务 / 超管开放，请在右上角切换身份。</div></div>';
+    });
+    return;
+  }
+
+  var RS = { pending:['badge-warning','待审核'], approved:['badge-success','已通过'], rejected:['badge-danger','已驳回'] };
+  var state = { filters:{ kw:'', status:'pending' }, page:1, pageSize:12, paginator:null };
+  function rows(){ try { return EsignStore.adminListRefunds(); } catch (e) { return []; } }
+  function filtered(){
+    var f = state.filters;
+    return rows().filter(function(r){
+      if (f.status && r.status !== f.status) return false;
+      if (f.kw) { var k=f.kw.toLowerCase(); if ((r.id+r.orderId+(r.ownerName||'')+(r.ownerCompany||'')).toLowerCase().indexOf(k)<0) return false; }
+      return true;
+    });
+  }
+  function badge(s){ var m=RS[s]||['badge-outline',s||'—']; return '<span class="badge '+m[0]+'">'+m[1]+'</span>'; }
+
+  function renderKPI(){
+    var all = rows(), pend = all.filter(function(r){return r.status==='pending';});
+    var k = [
+      ['待审核', pend.length+' 单', 'gold','需尽快处理'],
+      ['待退金额', money(pend.reduce(function(a,r){return a+Number(r.refundAmount||0);},0)), 'gold', '待审核申请合计'],
+      ['已通过', all.filter(function(r){return r.status==='approved';}).length+' 单', 'up','已核销并退回'],
+      ['已驳回', all.filter(function(r){return r.status==='rejected';}).length+' 单', 'down','不符合退款条件']
+    ];
+    $('#kpi').innerHTML = k.map(function(x){ return '<div class="kpi"><div class="k">'+x[0]+'</div><div class="v num">'+x[1]+'</div><div class="d '+x[2]+'">'+x[3]+'</div></div>'; }).join('');
+  }
+
+  function renderTable(){
+    var list = filtered();
+    $('#c-count').textContent = list.length + ' 单退款';
+    var start = (state.page-1)*state.pageSize;
+    Admin.TableRenderer.render({ container:'#c-table',
+      columns: [
+        { key:'id', label:'退款单号', width:'140px', render:function(r){ return '<span class="mono">'+esc(r.id)+'</span>'; } },
+        { key:'user', label:'申请人', render:function(r){ return '<b>'+esc(r.ownerName||r.uid)+'</b><div class="sub" style="font-size:11px;">'+esc(r.ownerCompany||'')+'</div>'; } },
+        { key:'orderId', label:'关联订单', width:'140px', render:function(r){ return '<span class="mono">'+esc(r.orderId)+'</span><div class="sub">已用 '+r.usedTimes+' 次 · 扣减 '+money(r.deduct)+'</div>'; } },
+        { key:'refundAmount', label:'应退金额', width:'110px', render:function(r){ return '<b class="mono" style="color:var(--success);">'+money(r.refundAmount)+'</b>'; } },
+        { key:'reason', label:'退款原因', render:function(r){ return esc(r.reason||'—'); } },
+        { key:'status', label:'状态', width:'100px', render:function(r){ var b = badge(r.status); if(r.status==='approved'&&!r.credited) b+='<div class="sub" style="font-size:10px;color:var(--warning);">待用户会话到账</div>'; return b; } },
+        { key:'createdAt', label:'申请时间', width:'140px', render:function(r){ return dts(r.createdAt); } },
+        { key:'ops', label:'操作', width:'150px', render:function(r){
+            if (r.status !== 'pending') return '<button class="btn btn-sm btn-outline" data-act="detail">详情</button>';
+            return '<button class="btn btn-sm btn-outline" data-act="detail">详情</button> ' +
+              '<button class="btn btn-sm btn-primary" data-perm="payout" data-act="approve">通过</button> ' +
+              '<button class="btn btn-sm btn-danger" data-perm="payout" data-act="reject">驳回</button>';
+          } }
+      ],
+      data: list.slice(start,start+state.pageSize),
+      options:{ emptyText:'暂无退款申请' }
+    });
+    if (!state.paginator) {
+      state.paginator = new Admin.Paginator({ container:'#c-pager', total:list.length, pageSize:state.pageSize,
+        onChange:function(p,ps){ state.page=p; state.pageSize=ps; renderTable(); } });
+    } else { state.paginator.pageSize=state.pageSize; state.paginator.setTotal(list.length); }
+    if (Admin.applyPerms) Admin.applyPerms();
+  }
+
+  function detailHtml(r){
+    return '<div class="drawer-section"><div class="ds-grid">' +
+      '<div class="ds-item"><span class="ds-k">退款单号</span><span class="ds-v mono">'+esc(r.id)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">状态</span><span class="ds-v">'+badge(r.status)+(r.status==='approved'&&!r.credited?'（待用户会话到账）':'')+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">申请人</span><span class="ds-v">'+esc(r.ownerName)+'（'+esc(r.uid)+'）'+esc(r.ownerCompany||'')+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">关联订单</span><span class="ds-v mono">'+esc(r.orderId)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">实付金额</span><span class="ds-v">'+money(r.amount)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">已用次数</span><span class="ds-v">'+r.usedTimes+' 次</span></div>' +
+      '<div class="ds-item"><span class="ds-k">已消耗（单价×次数）</span><span class="ds-v">'+money(r.deduct)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">应退金额</span><span class="ds-v"><b style="color:var(--success);">'+money(r.refundAmount)+'</b></span></div>' +
+      '<div class="ds-item"><span class="ds-k">申请时间</span><span class="ds-v">'+dts(r.createdAt)+'</span></div>' +
+      (r.handledAt ? '<div class="ds-item"><span class="ds-k">处理时间</span><span class="ds-v">'+dts(r.handledAt)+'</span></div>' : '') +
+      '<div class="ds-item ds-full"><span class="ds-k">用户原因</span><span class="ds-v">'+esc(r.reason||'—')+'</span></div>' +
+      (r.handlerNote ? '<div class="ds-item ds-full"><span class="ds-k">处理备注</span><span class="ds-v">'+esc(r.handlerNote)+'</span></div>' : '') +
+      '</div></div>';
+  }
+  function openDetail(r){
+    var footer = r.status==='pending'
+      ? '<button class="btn btn-danger" data-perm="payout" data-act="reject">驳回申请</button><button class="btn btn-primary" data-perm="payout" data-act="approve">审核通过并退款</button>'
+      : '';
+    var drawer = Admin.Drawer.open({ title:'退款单 · '+r.id, content:detailHtml(r), footer:footer, width:'520px' });
+    if (Admin.applyPerms) Admin.applyPerms();
+    drawer.panel.querySelectorAll('[data-act]').forEach(function(btn){
+      btn.onclick = function(){ var act = btn.getAttribute('data-act'); drawer.close(); if (act==='approve') askApprove(r); else if (act==='reject') askReject(r); };
+    });
+  }
+
+  function askApprove(r){
+    Admin.Modal.open({ title:'审核通过 · 原路退款', width:'460px',
+      content:'<div style="line-height:1.9;">退款单 <span class="mono">'+esc(r.id)+'</span><br>申请人：<b>'+esc(r.ownerName)+'</b> · 应退 <b style="color:var(--success);">'+money(r.refundAmount)+'</b><br>' +
+        '通过后将核销该订单未用签署次数，并退回至用户钱包余额；用户不在线时将在其下次进入 App 时自动到账。</div>' +
+        '<div class="form-item" style="margin-top:10px;"><label>处理备注（可选）</label><input class="input" id="ap-note" maxlength="50" placeholder="如：符合退款规则"></div>',
+      footer:'<button class="btn btn-ghost" id="ap-cancel">取消</button><button class="btn btn-primary" id="ap-ok">确认通过并退款</button>' });
+    setTimeout(function(){
+      var m = document.querySelector('.modal-dialog:last-of-type'); if(!m) return;
+      m.querySelector('#ap-cancel').onclick = function(){ m.closest('.modal-overlay').remove(); };
+      m.querySelector('#ap-ok').onclick = function(){
+        var note = m.querySelector('#ap-note').value.trim();
+        var rr = EsignStore.approveRefund(r.id, note);
+        m.closest('.modal-overlay').remove();
+        if (rr && rr.ok) { Admin.toast(rr.refund.credited ? '已通过并到账 '+money(rr.refund.refundAmount) : '已通过，退款将在用户下次进入 App 时到账', 'success'); Admin.log('电子签退款通过','退款审核',r.id,money(rr.refund.refundAmount)+(note?' · '+note:'')); render(); }
+        else Admin.toast((rr && rr.error) || '操作失败', 'error');
+      };
+    },50);
+  }
+  function askReject(r){
+    Admin.Modal.open({ title:'驳回退款申请', width:'460px',
+      content:'<div class="form-item"><label>驳回原因（必填，将展示给用户）</label><input class="input" id="rj-note" maxlength="60" placeholder="如：次数包已使用超过可退范围"></div>',
+      footer:'<button class="btn btn-ghost" id="rj-cancel">取消</button><button class="btn btn-danger" id="rj-ok">确认驳回</button>' });
+    setTimeout(function(){
+      var m = document.querySelector('.modal-dialog:last-of-type'); if(!m) return;
+      m.querySelector('#rj-cancel').onclick = function(){ m.closest('.modal-overlay').remove(); };
+      m.querySelector('#rj-ok').onclick = function(){
+        var note = m.querySelector('#rj-note').value.trim();
+        if (!note) { Admin.toast('请填写驳回原因','error'); return; }
+        var rr = EsignStore.rejectRefund(r.id, note);
+        m.closest('.modal-overlay').remove();
+        if (rr && rr.ok) { Admin.toast('已驳回该退款申请','success'); Admin.log('电子签退款驳回','退款审核',r.id,note); render(); }
+        else Admin.toast((rr && rr.error) || '操作失败','error');
+      };
+    },50);
+  }
+
+  function renderFilter(){
+    Admin.FilterBar.render({ container:'#c-filter',
+      fields:[
+        { key:'kw', label:'搜索', type:'text', placeholder:'退款单号/订单号/申请人' },
+        { key:'status', label:'状态', type:'select', options:[
+          { value:'', label:'全部状态' }, { value:'pending', label:'待审核' },
+          { value:'approved', label:'已通过' }, { value:'rejected', label:'已驳回' } ] }
+      ],
+      onFilter:function(v){ state.filters={ kw:v.kw||'', status:v.status===undefined?'':v.status }; state.page=1; renderTable(); },
+      onReset:function(){ state.filters={ kw:'', status:'' }; state.page=1; renderTable(); }
+    });
+  }
+  function render(){ renderKPI(); renderTable(); }
+  function init(){
+    renderFilter();
+    $('#btn-refresh').onclick = function(){ render(); Admin.toast('已刷新'); };
+    $('#c-table').addEventListener('click', function(e){
+      var b = e.target.closest('button[data-act]'); if(!b) return;
+      e.stopPropagation();
+      var tr = b.closest('tr'); var rid = tr ? tr.querySelector('.mono').textContent.trim() : '';
+      var r = rows().filter(function(x){ return x.id===rid; })[0];
+      if (!r) return;
+      if (b.getAttribute('data-act')==='detail') openDetail(r);
+      if (b.getAttribute('data-act')==='approve') askApprove(r);
+      if (b.getAttribute('data-act')==='reject') askReject(r);
+    });
+    render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('engchain:esign', render);
+})();
+</script>
+</body>
+</html>

@@ -266,6 +266,8 @@ window.DataBus = (function () {
     try { if (window.EntryStore && EntryStore.reset) EntryStore.reset(); } catch (e) {}
     try { if (window.BalanceStore && BalanceStore.reset) BalanceStore.reset(); } catch (e) {}
     try { if (window.CreditStore && CreditStore.reset) CreditStore.reset(); } catch (e) {}
+    /* 电子签：重置回 byUid 种子（次数/合同/订单/退款/草稿），保证演示可重复 */
+    try { if (window.EsignStore && EsignStore.reset) EsignStore.reset(); } catch (e) {}
     if (window.UI && UI.state) {
       UI.state.set({ user: '', company: '', account: '', status: 'guest', loggedIn: false, member: false, demoOverride: null, currentOrgId: null });
     }

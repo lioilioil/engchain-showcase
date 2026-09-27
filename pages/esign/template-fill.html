@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>填写合同内容 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='template-list.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title" id="navt">填写合同内容</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:86px;"></div>
+      <div class="es-foot-bar" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var tid = ES.qs('id') || (ES.Draft.get() || {}).templateId || 't-material';
+  var t = ES.tpl(tid);
+  ES.$('#navt').textContent = t.name;
+  var d = ES.Draft.get() && ES.Draft.get().via !== 'upload' ? ES.Draft.get() : ES.newDraft();
+  d.via = 'template'; d.templateId = t.id;
+  var v = ES.$('#v');
+
+  function inputHTML(f) {
+    var k = f[0], label = f[1], req = f[2], type = f[3], opts = f[4];
+    var val = d[k] || '';
+    if (type === 'textarea') return '<div class="es-field" data-k="' + k + '"><label>' + label + (req ? ' <span class="req">*</span>' : '') + '</label>' +
+      '<textarea name="' + k + '" placeholder="请填写' + label + '">' + ES.esc(val) + '</textarea><div class="errmsg">请填写' + label + '</div></div>';
+    if (type === 'select') return '<div class="es-field" data-k="' + k + '"><label>' + label + (req ? ' <span class="req">*</span>' : '') + '</label>' +
+      '<select name="' + k + '"><option value="">请选择</option>' + opts.map(function (o) {
+        return '<option value="' + ES.esc(o) + '"' + (val === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>';
+    var inp = '<input name="' + k + '" type="' + (type === 'number' ? 'number' : (type || 'text')) + '"' +
+      (type === 'date' ? '' : ' placeholder="请输入' + label + '"') + ' value="' + ES.esc(val) + '"' + (type === 'number' ? ' min="0" step="0.01"' : '') + '>';
+    return '<div class="es-field" data-k="' + k + '"><label>' + label + (req ? ' <span class="req">*</span>' : '') + '</label>' + inp + '<div class="errmsg">请填写' + label + '</div></div>';
+  }
+
+  function render() {
+    v.innerHTML = ES.stepsHTML(1) +
+      '<div class="es-card">' +
+        '<div class="es-field"><label>合同名称 <span class="req">*</span></label>' +
+        '<input id="fTitle" maxlength="40" placeholder="如：钢材采购合同" value="' + ES.esc(d.title || t.name) + '">' +
+        '<div class="errmsg">请填写合同名称</div><div class="tip">仅签署双方可见，建议包含标的与项目</div></div>' +
+        t.fields.map(inputHTML).join('') +
+      '</div>' +
+      '<div class="es-muted" style="margin:2px 2px 0;">信息已自动保存为草稿，退出后可从「发起合同」继续。</div>';
+  }
+  function collect() {
+    d.title = ES.$('#fTitle').value.trim();
+    t.fields.forEach(function (f) {
+      var el = v.querySelector('[name="' + f[0] + '"]');
+      d[f[0]] = el ? el.value.trim() : '';
+    });
+    if (!d.title) d.title = t.name;
+    d.id = d.id || ('DR' + Date.now());
+    ES.Draft.set(d);
+  }
+  function validate() {
+    var ok = true;
+    v.querySelectorAll('.es-field').forEach(function (f) { f.classList.remove('err'); });
+    if (!ES.$('#fTitle').value.trim()) { ES.$('#fTitle').closest('.es-field').classList.add('err'); ok = false; }
+    t.fields.forEach(function (f) {
+      if (!f[2]) return;
+      var el = v.querySelector('[name="' + f[0] + '"]');
+      if (!el || !el.value.trim()) { var wrap = el.closest('.es-field'); wrap.classList.add('err'); ok = false; }
+    });
+    if (!ok) UI.toast('请先完成标 * 的必填项', 'warn');
+    return ok;
+  }
+
+  var foot = ES.$('.es-foot-bar');
+  foot.innerHTML = '<div class="es-actions"><button class="es-btn ghost" id="bBack">上一步</button>' +
+    '<button class="es-btn primary" id="bNext">' + ES.ic('users') + '下一步：签署方</button></div>';
+  ES.$('#bBack').onclick = function () { location.href = 'template-list.html'; };
+  ES.$('#bNext').onclick = function () {
+    collect();
+    if (!validate()) return;
+    location.href = 'parties.html';
+  };
+  render();
+});
+</script>
+</body>
+</html>

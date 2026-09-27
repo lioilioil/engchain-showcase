@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>确认并发送 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='fields.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">确认并发送</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:150px;"></div>
+      <div class="es-foot-bar" style="position:absolute;left:0;right:0;bottom:0;margin:0;">
+        <div class="es-agree" id="agree" style="padding:0 4px 10px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span>我已核对合同内容与签署方，同意<a href="agreement.html">《电子签名服务协议》</a>及<a href="agreement.html">《电子签用户告知书》</a>，知晓电子签名与纸质签名具同等法律效力。</span></div>
+        <div class="es-actions"><button class="es-btn ghost" id="bBack">返回修改</button>
+          <button class="es-btn primary" id="bSend">确认无误并发送</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var d = ES.Draft.get();
+  if (!d || !d.parties || !d.parties.length) { UI.toast('草稿信息不完整，请重新发起', 'warn'); setTimeout(function(){location.href='choose-type.html';},600); return; }
+  var v = ES.$('#v');
+  var agreed = false;
+  var pricing = EsignStore.pricing();
+  var quota = (ES.bundle().sub.quota || {});
+
+  function checkRow(label, val, ok) {
+    return '<div style="display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);align-items:flex-start;">' +
+      '<span style="color:' + (ok ? 'var(--es-moss)' : 'var(--danger)') + ';flex:none;margin-top:1px;">' + ES.ic(ok ? 'check' : 'warning') + '</span>' +
+      '<span style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:var(--text-1);">' + label + '</div>' +
+      '<div class="es-muted" style="margin-top:2px;word-break:break-all;">' + val + '</div></span></div>';
+  }
+  function render() {
+    var parties = [{ name: (ES.user()||{}).name, company: (ES.user()||{}).company || '个人合伙人', role: d.meRole }]
+      .concat(d.parties.map(function (cp, i) { return { name: cp.name, company: cp.company, role: (i === 0 ? (d.meRole === '甲方' ? '乙方' : '甲方') : ('第 ' + (i + 2) + ' 方')) }; }));
+    var partyText = parties.map(function (p) { return p.role + '：' + p.company + '（' + p.name + '）'; }).join('<br>');
+    var fieldsPlaced = Object.keys(d.fieldsPlaced || {}).length;
+    var checks = [
+      ['合同名称与金额', ES.esc(d.title) + (d.amount ? ' · ' + ES.money(Number(d.amount)) : ' · 无金额'), !!d.title],
+      ['合同正文', d.via === 'upload' ? ES.esc(d.fileName || '已上传 PDF') : ES.tpl(d.templateId).name + '（结构化填写）', true],
+      ['签署方（' + parties.length + ' 方）', partyText, parties.length >= 2],
+      ['签署顺序', d.signOrder === 'sequential' ? '顺序签署：我方先签，再依次通知对方' : '无序签署：各方同时收到链接', true],
+      ['签章位置', '已放置 ' + fieldsPlaced + '/' + parties.length + ' 处签章位', fieldsPlaced >= parties.length]
+    ];
+    v.innerHTML = ES.stepsHTML(4) +
+      '<div class="es-card" style="margin-top:12px;"><div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:4px;">发送前终检</div>' +
+        checks.map(function (c) { return checkRow(c[0], c[1], c[2]); }).join('') + '</div>' +
+      '<div class="es-card">' +
+        '<div class="es-kv"><span class="k">本次消耗</span><span class="v">1 次签署次数</span></div>' +
+        '<div class="es-kv"><span class="k">发送后剩余</span><span class="v es-mono">' + Math.max(0, (quota.remaining || 0) - 1) + ' 次</span></div>' +
+        '<div class="es-kv"><span class="k">签署有效期</span><span class="v">' + pricing.signValidDays + ' 天（逾期自动失效）</span></div>' +
+        '<div class="es-kv"><span class="k">撤回规则</span><span class="v">对方签署前可撤回，次数原路退回</span></div>' +
+      '</div>' +
+      '<div class="es-card" style="font-size:11.5px;color:var(--text-3);line-height:1.8;">发送后系统向各方手机发送签署链接；各方经实名认证后完成签署，全部签署后生成合同编号与司法存证。演示环境不发送真实短信。</div>';
+  }
+  ES.$('#agree').onclick = function () { agreed = !agreed; ES.$('#agree').classList.toggle('on', agreed); ES.$('#bSend').disabled = !agreed; };
+  ES.$('#bSend').disabled = true;
+  ES.$('#bBack').onclick = function () { location.href = 'fields.html'; };
+  ES.$('#bSend').onclick = function () {
+    if (!agreed) return;
+    var btn = ES.$('#bSend'); btn.disabled = true; btn.textContent = '正在发送…';
+    var res = ES.sendFromDraft(d);
+    btn.disabled = false; btn.textContent = '确认无误并发送';
+    if (!res.ok) {
+      if (res.code === 'NO_QUOTA') {
+        UI.dialog({ title: '签署次数不足', text: '发起 1 份合同需要消耗 1 次签署次数，当前剩余 ' + (quota.remaining || 0) + ' 次。', ok: '去购买', cancel: '稍后', onOk: function () { location.href = 'packages.html'; } });
+      } else if (res.code === 'NEED_DIST') {
+        UI.dialog({ title: '暂未开通电子签', text: '完成企业入驻或个人合伙人认证后可发起签署。', ok: '去认证', onOk: function () { location.href = '../profile/auth.html'; } });
+      } else if (res.code === 'GUEST') {
+        UI.toast('请先登录后再发起', 'warn');
+      } else if (res.code === 'BAD_PARTIES') {
+        UI.toast('签署方信息不完整，请返回检查', 'warn');
+      } else {
+        UI.toast(res.message || '发送失败，请稍后重试', 'err');
+      }
+      return;
+    }
+    ES.Draft.clear();
+    UI.toast('合同已发起，签署链接已生成（演示）', 'ok');
+    setTimeout(function () { location.href = 'detail.html?id=' + encodeURIComponent(res.contract.id); }, 650);
+  };
+  render();
+});
+</script>
+</body>
+</html>

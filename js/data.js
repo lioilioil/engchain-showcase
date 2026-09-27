@@ -1015,6 +1015,18 @@ window.MOCK = (function () {
         full: { min: 5, label: '完整认证', desc: '完成全部5项核验' }
       }
     },
+    /* ---- 电子签（次数包定价 · 全板块单一数据源；电子签重构新增，不改既有字段） ---- */
+    esign: {
+      provider: 'e签宝',
+      validYears: 2,        /* 次数包有效期（年） */
+      refundUnit: 10,       /* 退款时按已用次数扣除的演示单价（元/次） */
+      signValidDays: 7,     /* 单笔合同对方签署链接有效期（天） */
+      packages: [
+        { id: 'single', name: '单次体验',   times: 1,   price: 10,  orig: null, tag: '' },
+        { id: 'p10',    name: '10 次签署包', times: 10,  price: 80,  orig: 100,  tag: '热门' },
+        { id: 'p100',   name: '100 次签署包', times: 100, price: 600, orig: 1000, tag: '最划算' }
+      ]
+    },
     /* 解锁积分体系（R3+R4，Q3 统一积分；取代旧 unlock.items 条数包） */
     credits: {
       currency: '积分',

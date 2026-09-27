@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>确认盖章位置 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='parties.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">确认盖章位置</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:92px;background:var(--bg-inset);"></div>
+      <div class="es-foot-bar" style="position:absolute;left:0;right:0;bottom:0;margin:0;">
+        <div class="es-actions">
+          <button class="es-btn ghost" id="bBack">上一步</button>
+          <button class="es-btn primary" id="bNext">下一步：确认发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var d = ES.Draft.get();
+  if (!d || !d.parties || !d.parties.length) { UI.toast('请先完善合同内容与签署方', 'warn'); setTimeout(function(){location.href='choose-type.html';},500); return; }
+  d.fieldsPlaced = d.fieldsPlaced || {};
+  var v = ES.$('#v');
+
+  var parties = [{ key: 'me', name: ((ES.user()||{}).name||'我方'), company: (ES.user()||{}).company || '个人合伙人', kind: 'mine' }]
+    .concat(d.parties.map(function (cp, i) { return { key: 'cp' + (i + 1), name: cp.name, company: cp.company, kind: 'other' }; }));
+
+  function render() {
+    var secs = ES.docSections(d).map(function (s) { return '<h3>' + s[0] + '</h3>' + s[1]; }).join('');
+    var slots = parties.map(function (p, i) {
+      var placed = d.fieldsPlaced[p.key];
+      return '<div class="es-stamp ' + p.kind + (placed ? ' placed' : '') + '" data-key="' + p.key + '" ' +
+        'style="left:' + (8 + (i % 2) * 54) + '%;top:' + (40 + i * 6) + '%;">' +
+        (placed ? ('<b>' + ES.esc(p.company.length > 6 ? p.company.slice(0, 6) : p.company) + '</b><span style="margin-top:2px;">' + (p.kind === 'mine' ? '我方印章位' : '对方印章位') + '</span>')
+          : ('＋<span style="margin-top:3px;">' + ES.esc(p.company.length > 6 ? p.company.slice(0, 5) + '…' : p.company) + '</span>')) + '</div>';
+    }).join('');
+    v.innerHTML = ES.stepsHTML(3) +
+      '<div class="es-muted" style="padding:12px 16px 0;line-height:1.7;">已为每一方在签章页默认放置印章/签名位置，点击下方签章页中的标记可取消；请确保<b>每一方至少有 1 处签章位</b>。</div>' +
+      '<div class="es-doc-canvas" style="position:relative;">' +
+        '<div style="text-align:center;font-size:15px;font-weight:700;color:#1d1d1d;">' + ES.esc(d.title) + '</div>' +
+        '<div style="text-align:center;font-size:10.5px;color:#999;margin-bottom:8px;">结构化合同预览 · 发送后生成正式编号</div>' +
+        secs +
+        '<h3>九、签章页（点击放置/取消印章位）</h3>' +
+        '<div style="height:200px;position:relative;border:1px dashed #d8d8d8;border-radius:8px;margin-top:6px;">' + slots + '</div>' +
+        '<div style="display:flex;gap:14px;margin-top:14px;font-size:11px;color:#666;">' +
+          parties.map(function (p) { return '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;background:' + (p.kind === 'mine' ? '#C9A961' : '#4A90D9') + ';"></i>' + ES.esc(p.company) + (d.fieldsPlaced[p.key] ? ' ✓' : '') + '</span>'; }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="es-muted" style="padding:12px 18px 6px;line-height:1.7;">签章位置仅用于确定签署落点；真实印模/手写签名由各方在签署时经实名认证后生成，平台不在发送环节代签。</div>';
+    v.querySelectorAll('.es-stamp').forEach(function (st) {
+      st.onclick = function () {
+        var k = st.getAttribute('data-key');
+        if (d.fieldsPlaced[k]) delete d.fieldsPlaced[k]; else d.fieldsPlaced[k] = true;
+        ES.Draft.set(d); render();
+      };
+    });
+  }
+  ES.$('#bBack').onclick = function () { location.href = 'parties.html'; };
+  ES.$('#bNext').onclick = function () {
+    var missing = parties.filter(function (p) { return !d.fieldsPlaced[p.key]; });
+    if (missing.length) { UI.toast('还有 ' + missing.length + ' 方未放置签章位', 'warn'); return; }
+    ES.Draft.set(d);
+    location.href = 'preview.html';
+  };
+  render();
+});
+</script>
+</body>
+</html>

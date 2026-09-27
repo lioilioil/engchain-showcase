@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>申请退款 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">申请退款</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:120px;"></div>
+      <div class="es-foot-bar" id="foot" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var orderId = ES.qs('orderId');
+  var v = ES.$('#v'), foot = ES.$('#foot');
+  var sub = ES.bundle().sub;
+  var order = (sub.orders || []).filter(function (o) { return o.id === orderId; })[0];
+  var refunds = sub.refunds || [];
+  var existing = refunds.filter(function (r) { return r.orderId === orderId; })[0];
+
+  function emptyState(title, s) {
+    v.innerHTML = '<div class="es-empty">' + ES.ic('receipt') + '<div class="t">' + title + '</div><div class="s">' + s + '</div>' +
+      '<button class="es-btn primary" onclick="location.href=\'records.html\'">返回订单记录</button></div>';
+    foot.innerHTML = '';
+  }
+  if (!order) return emptyState('未找到该订单', '订单可能不属于当前账号');
+
+  var used = order.timesUsed || 0, unit = EsignStore.pricing().refundUnit;
+  var deduct = used * unit;
+  var refundAmount = Math.round((order.price - deduct) * 100) / 100;
+  var remain = Math.max(0, (order.times || 0) - used);
+
+  if (existing && existing.status === 'pending') {
+    v.innerHTML = '<div class="es-result" style="padding-top:60px;"><div class="ri" style="background:var(--es-gold-soft);color:var(--es-gold-deep);">' + ES.ic('clock') + '</div>' +
+      '<h3>退款申请审核中</h3><p>你已就该订单提交退款申请，应退 <b class="es-mono">' + ES.money(existing.refundAmount) + '</b>，预计 1–7 个工作日完成审核，通过后原路退回账户余额。</p>' +
+      '<button class="es-btn primary block" onclick="location.href=\'records.html\'">返回订单记录</button></div>';
+    foot.innerHTML = '';
+    return;
+  }
+  if (existing && existing.status === 'approved') {
+    v.innerHTML = '<div class="es-result" style="padding-top:60px;"><div class="ri">' + ES.ic('check') + '</div>' +
+      '<h3>退款已通过</h3><p>退款 <b class="es-mono">' + ES.money(existing.refundAmount) + '</b> 已退回账户余额。</p>' +
+      '<button class="es-btn primary block" onclick="location.href=\'records.html\'">返回订单记录</button></div>';
+    foot.innerHTML = '';
+    return;
+  }
+  if (order.status === 'refunded') return emptyState('该订单已退款', '退款已处理完成');
+  if (remain <= 0 || refundAmount <= 0) return emptyState('该订单无可退金额', order.times + ' 次签署次数已全部使用，按规则已用次数按 ' + ES.money(unit) + '/次扣除，无可退金额');
+
+  v.innerHTML =
+    '<div class="es-card"><div style="font-size:14px;font-weight:700;color:var(--text-1);margin-bottom:4px;">' + ES.esc(order.pkgName) + ' ×' + order.times + '</div>' +
+      '<div class="es-muted es-mono">订单号 ' + ES.esc(order.id) + ' · 购买于 ' + ES.dtime(order.createdAt) + '</div></div>' +
+    '<div class="es-calc">' +
+      '<div class="es-kv"><span class="k">实付金额</span><span class="v es-mono">' + ES.money(order.price) + '</span></div>' +
+      '<div class="es-kv"><span class="k">已使用次数</span><span class="v es-mono">' + used + ' 次</span></div>' +
+      '<div class="es-kv"><span class="k">已用扣除（' + ES.money(unit) + '/次）</span><span class="v es-mono">− ' + ES.money(deduct) + '</span></div>' +
+      '<div class="result"><span style="font-size:13px;color:var(--text-2);">预计可退金额</span><span class="rv es-mono">' + ES.money(refundAmount) + '</span></div>' +
+    '</div>' +
+    '<div class="es-card"><div class="es-field"><label>退款原因</label>' +
+      '<textarea id="reason" placeholder="请简要说明退款原因（选填）"></textarea></div></div>' +
+    '<div class="es-muted" style="line-height:1.8;padding:0 2px;">提交后订单内 <b>' + remain + '</b> 次未使用次数将被冻结，财务审核通过后退款原路退回账户余额；审核期间该次数不可使用。演示环境由后台财务角色审核。</div>';
+  foot.innerHTML = '<div class="es-actions"><button class="es-btn ghost" id="bCancel">取消</button>' +
+    '<button class="es-btn primary" id="bSubmit">提交退款申请</button></div>';
+  ES.$('#bCancel').onclick = function () { history.back(); };
+  ES.$('#bSubmit').onclick = function () {
+    var reason = ES.$('#reason').value.trim();
+    var r = EsignStore.applyRefund(order.id, reason);
+    if (!r.ok) { UI.toast(r.error || '提交失败', 'warn'); return; }
+    v.innerHTML = '<div class="es-result" style="padding-top:60px;"><div class="ri" style="background:var(--es-gold-soft);color:var(--es-gold-deep);">' + ES.ic('check') + '</div>' +
+      '<h3>退款申请已提交</h3><p>申请已进入财务审核，预计 <b>1–7 个工作日</b>完成。审核通过后 <b class="es-mono">' + ES.money(refundAmount) + '</b> 将原路退回账户余额，到账前不会立即增加余额。</p>' +
+      '<button class="es-btn primary block" onclick="location.href=\'records.html\'">查看订单记录</button></div>';
+    foot.innerHTML = '';
+  };
+});
+</script>
+</body>
+</html>

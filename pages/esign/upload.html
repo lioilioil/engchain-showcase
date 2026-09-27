@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>上传合同 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='choose-type.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">上传合同</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:86px;"></div>
+      <div class="es-foot-bar" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var v = ES.$('#v');
+  var d = (ES.Draft.get() && ES.Draft.get().via === 'upload') ? ES.Draft.get() : ES.newDraft();
+  d.via = 'upload'; d.templateId = 't-custom';
+  var file = d.fileName ? { name: d.fileName, size: d.fileSize || 0 } : null;
+
+  function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (Math.max(1, Math.round(n / 1024)) + ' KB'); }
+  function dropzoneHTML() {
+    if (file) {
+      return '<div class="es-card" id="dz" style="text-align:center;cursor:pointer;border-color:var(--primary);">' +
+        '<div style="width:50px;height:50px;border-radius:13px;margin:0 auto 10px;display:grid;place-items:center;background:var(--es-moss-soft);color:var(--es-moss);">' + ES.ic('doc') + '</div>' +
+        '<div style="font-size:14px;font-weight:600;color:var(--text-1);word-break:break-all;">' + ES.esc(file.name) + '</div>' +
+        '<div class="es-muted es-mono" style="margin-top:3px;">' + fmtSize(file.size) + ' · 解析成功，可继续指定签署方</div>' +
+        '<button class="es-linkbtn danger" id="rePick">重新选择文件</button></div>';
+    }
+    return '<label class="es-card" id="dz" for="fileInput" style="display:block;text-align:center;cursor:pointer;border:1.5px dashed var(--line-strong);box-shadow:none;padding:30px 18px;">' +
+      '<div style="width:54px;height:54px;border-radius:15px;margin:0 auto 12px;display:grid;place-items:center;background:var(--es-gold-soft);color:var(--es-gold-deep);">' + ES.ic('upload') + '</div>' +
+      '<div style="font-size:15px;font-weight:600;color:var(--text-1);">点击选择 PDF 合同</div>' +
+      '<div class="es-muted" style="margin-top:6px;">单文件 ≤ 20MB · ≤ 50 页 · 建议文字版 PDF</div>' +
+      '<input id="fileInput" type="file" accept="application/pdf" style="display:none;"></label>';
+  }
+  function render() {
+    v.innerHTML = ES.stepsHTML(1) + dropzoneHTML() +
+      '<div class="es-card" style="margin-top:12px;">' +
+        '<div class="es-field"><label>合同名称 <span class="req">*</span></label>' +
+        '<input id="fTitle" maxlength="40" placeholder="如：2026 年钢材采购合同" value="' + ES.esc(d.title || '') + '"><div class="errmsg">请填写合同名称</div></div>' +
+        '<div class="es-field"><label>合同金额（元，选填）</label>' +
+        '<input id="fAmount" type="number" min="0" step="0.01" placeholder="无金额可不填" value="' + ES.esc(d.amount || '') + '"></div>' +
+      '</div>' +
+      '<button class="es-btn ghost block" id="sample" style="margin-top:12px;">没有文件？使用工程合同样例（演示）</button>' +
+      '<div class="es-muted" style="margin-top:12px;line-height:1.7;">上传后平台会解析合同并在下一步指定签署方与签署位置；原始 PDF 仅签署双方可见。演示环境不会真实上传文件。</div>';
+    var fi = ES.$('#fileInput');
+    if (fi) fi.onchange = function () {
+      var f = fi.files && fi.files[0];
+      if (!f) return;
+      if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { UI.toast('请上传 PDF 格式的合同', 'warn'); return; }
+      if (f.size > 20 * 1048576) { UI.toast('文件超过 20MB 限制', 'warn'); return; }
+      file = { name: f.name, size: f.size };
+      if (!ES.$('#fTitle').value) ES.$('#fTitle').value = f.name.replace(/\.pdf$/i, '');
+      save(true); render(); UI.toast('合同解析成功，可继续下一步', 'ok');
+    };
+    var rp = ES.$('#rePick'); if (rp) rp.onclick = function (e) { e.stopPropagation(); file = null; d.fileName = ''; render(); };
+    ES.$('#sample').onclick = function () {
+      file = { name: '工程合同样例.pdf', size: 186368 };
+      ES.$('#fTitle').value = ES.$('#fTitle').value || '工程合同（样例）';
+      save(true); render(); UI.toast('已载入工程合同样例', 'ok');
+    };
+  }
+  function save() {
+    d.title = (ES.$('#fTitle') ? ES.$('#fTitle').value : d.title || '').trim();
+    var amt = ES.$('#fAmount') ? ES.$('#fAmount').value.trim() : '';
+    d.amount = amt;
+    d.fileName = file ? file.name : '';
+    d.fileSize = file ? file.size : 0;
+    d.id = d.id || ('DR' + Date.now());
+    ES.Draft.set(d);
+  }
+  var foot = ES.$('.es-foot-bar');
+  foot.innerHTML = '<div class="es-actions"><button class="es-btn ghost" id="bBack">上一步</button>' +
+    '<button class="es-btn primary" id="bNext">下一步：签署方</button></div>';
+  ES.$('#bBack').onclick = function () { location.href = 'choose-type.html'; };
+  ES.$('#bNext').onclick = function () {
+    save();
+    if (!file) { UI.toast('请先选择或上传合同文件', 'warn'); return; }
+    if (!d.title) { render(); var f2 = ES.$('#fTitle'); if (f2) f2.closest('.es-field').classList.add('err'); UI.toast('请填写合同名称', 'warn'); return; }
+    location.href = 'parties.html';
+  };
+  render();
+});
+</script>
+</body>
+</html>

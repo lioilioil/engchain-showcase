@@ -2223,6 +2223,611 @@
   window.creditDiscount = creditDiscount;
   window.entryAccess = entryAccess;
   window.publishableCats = publishableCats;
+
+  /* =====================================================================
+     电子签 EsignStore（电子签板块重构新增）
+     - 键 engchain-esign，事件 engchain:esign；Store 内按 uid 隔离，不改 9 个种子用户、不碰 login
+     - 合同统一状态机：draft/pending_mine/signing/completed/rejected/expired/withdrawn/voided
+     - 次数：发送扣1；对方签署前撤回退1；拒签/过期不退；后台作废退1
+     - 资金：购买走 BalanceStore.consume；退款后台审核通过后在所属用户会话内入账（settleMyApprovedRefunds）
+     - 依赖运行时：window.DataBus（current/byId/isGuest/audit）、window.entryAccess、window.BalanceStore、MOCK.business.esign
+     ===================================================================== */
+  var ES_DAY = 864e5;
+  function esPad(n) { return (n < 10 ? '0' : '') + n; }
+  function esMonthKey(d) { d = d || new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1); }
+  function esIso(ts) { var d = new Date(ts); return d.getFullYear() + '-' + esPad(d.getMonth() + 1) + '-' + esPad(d.getDate()); }
+  function esAddYearsIso(years) { var d = new Date(); d.setFullYear(d.getFullYear() + years); return esIso(d.getTime()); }
+  function esHash() { var s = '0123456789abcdef', h = '0x'; for (var i = 0; i < 40; i++) h += s.charAt(Math.floor(Math.random() * 16)); return h; }
+  function esCertNo() { var d = new Date(); return 'EC-' + d.getFullYear() + esPad(d.getMonth() + 1) + esPad(d.getDate()) + '-' + Math.floor(1000 + Math.random() * 9000); }
+
+  function esParty(o) {
+    return {
+      key: o.key, name: o.name, company: o.company || '', mobileMask: o.mobileMask || '',
+      role: o.role, signerType: o.signerType || 'enterprise', order: o.order || 1,
+      ownerUid: o.ownerUid || null,
+      status: o.status || 'pending', signedAt: o.signedAt || 0, signMethod: o.signMethod || '',
+      rejectReason: o.rejectReason || '', rejectedAt: o.rejectedAt || 0
+    };
+  }
+  function esContract(o) {
+    var T = Date.now();
+    return {
+      id: o.id, code: o.code, title: o.title,
+      templateId: o.templateId || '', fileName: o.fileName || '', amount: (typeof o.amount === 'number') ? o.amount : 0,
+      initiatorUid: o.initiatorUid, initiatorName: o.initiatorName, initiatorCompany: o.initiatorCompany || '',
+      parties: (o.parties || []).map(esParty),
+      signOrder: o.signOrder || 'unordered',
+      status: o.status || 'draft',
+      deadline: o.deadline || 0, createdAt: o.createdAt || T, sentAt: o.sentAt || 0,
+      completedAt: o.completedAt || 0, costQuota: 1, orderId: o.orderId || '',
+      remindCount: o.remindCount || 0, lastRemindAt: o.lastRemindAt || 0,
+      rejectReason: o.rejectReason || '',
+      evidence: o.evidence || null
+    };
+  }
+
+  function esBuildSeed() {
+    var T = Date.now();
+    var u1 = 'u1', u8 = 'u8', u9 = 'u9';
+    var c = [];
+
+    /* u1 陈建国（四川省××建设有限公司，乙方/甲方随合同） */
+    c.push(esContract({
+      id: 'c001', code: 'C001-2026', title: '材料采购合同（钢筋）', templateId: 't-material', amount: 86500,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'sequential', status: 'pending_mine',
+      deadline: T + 2 * ES_DAY + 4 * 36e5, createdAt: T - ES_DAY, sentAt: T - ES_DAY,
+      parties: [
+        { key: 'pA', name: '王总', company: '成都恒信建材有限公司', mobileMask: '138****2233', role: '甲方', order: 1, status: 'signed', signedAt: T - 36e5 },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 2, ownerUid: u1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c002', code: 'C002-2026', title: '设备租赁合同（塔吊）', templateId: 't-equipment', amount: 120000,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'signing',
+      deadline: T + 3 * ES_DAY, createdAt: T - 20 * 36e5, sentAt: T - 20 * 36e5,
+      parties: [
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '甲方', order: 1, ownerUid: u1, status: 'signed', signedAt: T - 18 * 36e5, signMethod: '企业公章' },
+        { key: 'pB', name: '李经理', company: '重庆渝工机械设备租赁站', mobileMask: '139****7712', role: '乙方', order: 1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c005', code: 'C005-2026', title: '保密协议（NDA）', amount: 0,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'completed',
+      deadline: T - 6 * ES_DAY, createdAt: T - 8 * ES_DAY, sentAt: T - 8 * ES_DAY, completedAt: T - 6 * ES_DAY,
+      parties: [
+        { key: 'pA', name: '赵工', company: '北京京诚建设集团有限公司', mobileMask: '137****0045', role: '甲方', order: 1, status: 'signed', signedAt: T - 6 * ES_DAY - 2 * 36e5, signMethod: '企业公章' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 1, ownerUid: u1, status: 'signed', signedAt: T - 6 * ES_DAY, signMethod: '企业公章' }
+      ],
+      evidence: { provider: 'e签宝', certNo: 'EC-20260920-7741', hash: '0x8f3ac9e2b41d6f08a7c5e3b9d214f608a1c7e5b3d9', timestamp: T - 6 * ES_DAY }
+    }));
+    c.push(esContract({
+      id: 'c006', code: 'C006-2026', title: '水泥采购合同', templateId: 't-material', amount: 38200,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'rejected',
+      deadline: T - 2 * ES_DAY, createdAt: T - 4 * ES_DAY, sentAt: T - 4 * ES_DAY,
+      rejectReason: '对方认为本批报价偏高，价格未达成一致，暂不签署。',
+      parties: [
+        { key: 'pA', name: '孙销售', company: '北京冀东水泥股份有限公司', mobileMask: '135****6620', role: '甲方', order: 1, status: 'rejected', rejectedAt: T - 2 * ES_DAY, rejectReason: '价格未达成一致，暂不签署' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 1, ownerUid: u1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c007', code: 'C007-2026', title: '劳务分包合同', templateId: 't-labor', amount: 216000,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'expired',
+      deadline: T - ES_DAY, createdAt: T - 9 * ES_DAY, sentAt: T - 9 * ES_DAY,
+      parties: [
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '甲方', order: 1, ownerUid: u1, status: 'pending' },
+        { key: 'pB', name: '周班长', company: '四川恒信建筑劳务有限公司', mobileMask: '136****3088', role: '乙方', order: 1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c008', code: 'C008-2026', title: '战略合作框架协议', amount: 0,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'sequential', status: 'signing',
+      deadline: T + 5 * ES_DAY, createdAt: T - 2 * ES_DAY, sentAt: T - 2 * ES_DAY,
+      parties: [
+        { key: 'pA', name: '吴总', company: '成都天府商砼有限公司', mobileMask: '139****1207', role: '甲方', order: 1, status: 'signed', signedAt: T - 2 * ES_DAY + 3 * 36e5, signMethod: '企业公章' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 2, ownerUid: u1, status: 'signed', signedAt: T - ES_DAY, signMethod: '企业公章' },
+        { key: 'pC', name: '郑总', company: '成都蓉城工程监理有限公司', mobileMask: '138****5566', role: '丙方', order: 3, status: 'pending' }
+      ]
+    }));
+
+    var orders1 = [
+      { id: 'ESO1001', uid: u1, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'paid', timesUsed: 3, createdAt: T - 40 * ES_DAY, paidAt: T - 40 * ES_DAY, expireAt: T + 730 * ES_DAY - 40 * ES_DAY, refundId: '' },
+      { id: 'ESO1002', uid: u1, pkgId: 'single', pkgName: '单次体验', times: 1, price: 10, unitPrice: 10, payMethod: 'balance', status: 'paid', timesUsed: 1, createdAt: T - 44 * ES_DAY, paidAt: T - 44 * ES_DAY, expireAt: T + 730 * ES_DAY - 44 * ES_DAY, refundId: '' }
+    ];
+
+    /* u8 周航（合伙人企业，高频），含一笔退款审核中 */
+    var c8 = [
+      esContract({
+        id: 'c801', code: 'C801-2026', title: '设备采购合同（搅拌站）', templateId: 't-equipment', amount: 458000,
+        initiatorUid: u8, initiatorName: '周航', initiatorCompany: '××合伙企业管理中心',
+        signOrder: 'unordered', status: 'signing', deadline: T + 4 * ES_DAY, createdAt: T - 12 * 36e5, sentAt: T - 12 * 36e5,
+        parties: [
+          { key: 'me', name: '周航', company: '××合伙企业管理中心', role: '甲方', order: 1, ownerUid: u8, status: 'signed', signedAt: T - 10 * 36e5, signMethod: '企业公章' },
+          { key: 'pB', name: '何经理', company: '成都重工装备有限公司', mobileMask: '133****8821', role: '乙方', order: 1, status: 'pending' }
+        ]
+      }),
+      esContract({
+        id: 'c802', code: 'C802-2026', title: '联合投标合作协议', amount: 0,
+        initiatorUid: u8, initiatorName: '周航', initiatorCompany: '××合伙企业管理中心',
+        signOrder: 'unordered', status: 'completed', deadline: T - 15 * ES_DAY, createdAt: T - 17 * ES_DAY, sentAt: T - 17 * ES_DAY, completedAt: T - 15 * ES_DAY,
+        parties: [
+          { key: 'me', name: '周航', company: '××合伙企业管理中心', role: '甲方', order: 1, ownerUid: u8, status: 'signed', signedAt: T - 15 * ES_DAY, signMethod: '企业公章' },
+          { key: 'pB', name: '罗总', company: '四川宏图建设有限公司', mobileMask: '137****0923', role: '乙方', order: 1, status: 'signed', signedAt: T - 15 * ES_DAY + 2 * 36e5, signMethod: '企业公章' }
+        ],
+        evidence: { provider: 'e签宝', certNo: 'EC-20260911-3320', hash: '0x51bf74e9c02a8d63f4b1e7c09a5d2f846b1e93ac70', timestamp: T - 15 * ES_DAY }
+      })
+    ];
+    var orders8 = [
+      { id: 'ESO8001', uid: u8, pkgId: 'p100', pkgName: '100 次签署包', times: 100, price: 600, unitPrice: 6, payMethod: 'balance', status: 'paid', timesUsed: 14, createdAt: T - 60 * ES_DAY, paidAt: T - 60 * ES_DAY, expireAt: T + 730 * ES_DAY - 60 * ES_DAY, refundId: '' },
+      { id: 'ESO8002', uid: u8, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'refunding', timesUsed: 2, createdAt: T - 20 * ES_DAY, paidAt: T - 20 * ES_DAY, expireAt: T + 730 * ES_DAY - 20 * ES_DAY, refundId: 'ESR8001' }
+    ];
+    var refunds8 = [
+      { id: 'ESR8001', orderId: 'ESO8002', uid: u8, amount: 80, usedTimes: 2, deduct: 20, refundAmount: 60, reason: '项目结束，剩余次数短期用不上，申请退回。', status: 'pending', createdAt: T - ES_DAY, handledAt: 0, handlerNote: '', credited: false }
+    ];
+
+    /* u9 孙小美（个人合伙人） */
+    var c9 = [
+      esContract({
+        id: 'c901', code: 'C901-2026', title: '渠道合作保密协议（NDA）', amount: 0,
+        initiatorUid: u9, initiatorName: '孙小美', initiatorCompany: '个人合伙人 · 孙小美',
+        signOrder: 'unordered', status: 'completed', deadline: T - 5 * ES_DAY, createdAt: T - 7 * ES_DAY, sentAt: T - 7 * ES_DAY, completedAt: T - 5 * ES_DAY,
+        parties: [
+          { key: 'me', name: '孙小美', company: '个人合伙人 · 孙小美', role: '甲方', order: 1, ownerUid: u9, signerType: 'personal', status: 'signed', signedAt: T - 6 * ES_DAY, signMethod: '个人签名' },
+          { key: 'pB', name: '刘先生', company: '成都智链科技有限公司', mobileMask: '132****4471', role: '乙方', order: 1, status: 'signed', signedAt: T - 5 * ES_DAY, signMethod: '企业公章' }
+        ],
+        evidence: { provider: 'e签宝', certNo: 'EC-20260921-1188', hash: '0x2c94fa61e0b7d38c56f02a91d4e7b8c3056af2d19e', timestamp: T - 5 * ES_DAY }
+      })
+    ];
+    var orders9 = [
+      { id: 'ESO9001', uid: u9, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'paid', timesUsed: 7, createdAt: T - 30 * ES_DAY, paidAt: T - 30 * ES_DAY, expireAt: T + 730 * ES_DAY - 30 * ES_DAY, refundId: '' }
+    ];
+
+    function emptyQuota() { return { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }; }
+    function sub(quota, contracts, orders, refunds, drafts) {
+      return { quota: quota || emptyQuota(), contracts: contracts || [], orders: orders || [], refunds: refunds || [], drafts: drafts || [] };
+    }
+
+    return {
+      byUid: {
+        u1: sub({ remaining: 12, earliestExpire: '2028-09-26', totalUsed: 12, monthUsed: 3, monthKey: esMonthKey() }, c, orders1, [], []),
+        u8: sub({ remaining: 30, earliestExpire: '2028-06-30', totalUsed: 16, monthUsed: 2, monthKey: esMonthKey() }, c8, orders8, refunds8, []),
+        u9: sub({ remaining: 3, earliestExpire: '2028-03-15', totalUsed: 7, monthUsed: 1, monthKey: esMonthKey() }, c9, orders9, [], [])
+      }
+    };
+  }
+
+  var EsignStore = makeStore('engchain-esign', esBuildSeed(), 'engchain:esign');
+
+  (function () {
+    var GUEST_VIEW = function () {
+      return { guest: true, quota: { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }, contracts: [], orders: [], refunds: [], drafts: [] };
+    };
+    function emptySub() {
+      return { quota: { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }, contracts: [], orders: [], refunds: [], drafts: [] };
+    }
+    function pricing() { return ((MOCK.business && MOCK.business.esign) || { packages: [], validYears: 2, refundUnit: 10, signValidDays: 7 }); }
+    function curUid() {
+      try { var u = window.DataBus && DataBus.current(); return u ? u.id : 'u1'; } catch (e) { return 'u1'; }
+    }
+    function isGuest() { try { return !!(window.DataBus && DataBus.isGuest && DataBus.isGuest()); } catch (e) { return false; } }
+    function canUse() { try { return !!(window.entryAccess && entryAccess().dist); } catch (e) { return false; } }
+    function uname(uid) { try { var u = window.DataBus && DataBus.byId(uid); return u ? { name: u.name, company: u.company || '' } : { name: '', company: '' }; } catch (e) { return { name: '', company: '' }; } }
+    function audit(action, target, extra) { try { if (window.DataBus && DataBus.audit) DataBus.audit(action, '电子签', target, extra); } catch (e) {} }
+    function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+    function ensure(s, uid) {
+      if (!s.byUid) s.byUid = {};
+      if (!s.byUid[uid]) s.byUid[uid] = emptySub();
+      var sub2 = s.byUid[uid];
+      if (!sub2.quota) sub2.quota = { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() };
+      ['contracts', 'orders', 'refunds', 'drafts'].forEach(function (k) { if (!Array.isArray(sub2[k])) sub2[k] = []; });
+      return sub2;
+    }
+    /* 读当前用户子树（不落库） */
+    EsignStore.bundle = function () {
+      if (isGuest()) return GUEST_VIEW();
+      var uid = curUid(), s = this.read();
+      return { guest: false, uid: uid, sub: ensure(s, uid) };
+    };
+    EsignStore.packages = function () { return pricing().packages.slice(); };
+    EsignStore.pricing = pricing;
+    EsignStore.canUse = canUse;
+
+    function mut(uid, fn) {
+      var s = EsignStore.read();
+      var sub2 = ensure(s, uid);
+      var r = fn(sub2);
+      EsignStore.write(s);
+      return r;
+    }
+
+    function rollMonth(q) {
+      var mk = esMonthKey();
+      if (q.monthKey !== mk) { q.monthKey = mk; q.monthUsed = 0; }
+    }
+    /* 消耗 1 次：配额-1，归因到最早一个尚有剩余次数的有效订单 */
+    function consumeOnce(sub2, contractId) {
+      var q = sub2.quota; rollMonth(q);
+      if ((q.remaining || 0) < 1) return false;
+      q.remaining -= 1; q.totalUsed = (q.totalUsed || 0) + 1; q.monthUsed = (q.monthUsed || 0) + 1;
+      var order = null;
+      for (var i = 0; i < sub2.orders.length; i++) {
+        var o = sub2.orders[i];
+        if (o.status === 'paid' && (o.timesUsed || 0) < o.times) { if (!order || o.paidAt < order.paidAt) order = o; }
+      }
+      if (order) { order.timesUsed = (order.timesUsed || 0) + 1; }
+      var cc = sub2.contracts.filter(function (x) { return x.id === contractId; })[0];
+      if (cc && order) cc.orderId = order.id;
+      return true;
+    }
+    function refundOnce(sub2, contractId) {
+      var q = sub2.quota;
+      q.remaining = (q.remaining || 0) + 1;
+      q.totalUsed = Math.max(0, (q.totalUsed || 0) - 1);
+      q.monthUsed = Math.max(0, (q.monthUsed || 0) - 1);
+      var cc = sub2.contracts.filter(function (x) { return x.id === contractId; })[0];
+      if (cc && cc.orderId) {
+        var o = sub2.orders.filter(function (x) { return x.id === cc.orderId; })[0];
+        if (o) o.timesUsed = Math.max(0, (o.timesUsed || 0) - 1);
+      }
+    }
+
+    EsignStore.contractById = function (id) {
+      var b = this.bundle(); if (b.guest) return null;
+      var list = b.sub.contracts.filter(function (x) { return x.id === id || x.code === id; });
+      return list.length ? clone(list[0]) : null;
+    };
+    EsignStore.myPartyKey = function (c, uid) {
+      uid = uid || curUid();
+      for (var i = 0; i < (c.parties || []).length; i++) if (c.parties[i].ownerUid === uid) return c.parties[i].key;
+      return '';
+    };
+    /* 当前用户在该合同的签署态：mine=待我签 other=待对方签 done=已完成 closed=终态 */
+    EsignStore.flowOf = function (c, uid) {
+      uid = uid || curUid();
+      if (c.status === 'pending_mine') return 'mine';
+      if (c.status === 'signing') {
+        var mineKey = EsignStore.myPartyKey(c, uid);
+        var mp = (c.parties || []).filter(function (p) { return p.key === mineKey; })[0];
+        if (mp && mp.status !== 'signed') return 'mine';
+        return 'other';
+      }
+      return 'closed';
+    };
+
+    /* ---- 草稿 ---- */
+    EsignStore.saveDraft = function (draft) {
+      if (isGuest() || !canUse()) return { error: '当前身份未开通电子签' };
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        draft.uid = uid; draft.updatedAt = Date.now();
+        if (!draft.id) draft.id = 'd' + Date.now();
+        var i; for (i = 0; i < sub2.drafts.length; i++) if (sub2.drafts[i].id === draft.id) break;
+        if (i < sub2.drafts.length) sub2.drafts[i] = draft; else sub2.drafts.unshift(draft);
+        return { ok: true, draft: clone(draft) };
+      });
+    };
+    EsignStore.discardDraft = function (id) {
+      if (isGuest()) return { ok: true };
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        sub2.drafts = sub2.drafts.filter(function (d) { return d.id !== id; });
+        return { ok: true };
+      });
+    };
+
+    /* ---- 发送合同（扣 1 次） ---- */
+    EsignStore.sendContract = function (input) {
+      if (isGuest()) return { code: 'GUEST', error: '请先登录后再使用电子签' };
+      if (!canUse()) return { code: 'NEED_DIST', error: '完成企业入驻或个人合伙人认证后开通电子签' };
+      var uid = curUid();
+      var b = this.bundle(), q = b.sub.quota;
+      if ((q.remaining || 0) < 1) return { code: 'NO_QUOTA', error: '签署次数不足，请先购买次数包' };
+      if (!input || !input.title) return { error: '缺少合同标题' };
+      if (!input.parties || !input.parties.length) return { error: '请至少添加一个签署方' };
+      var me = uname(uid);
+      var T = Date.now();
+      var days = pricing().signValidDays || 7;
+      var id = 'c' + String(T).slice(-9);
+      var contract = esContract({
+        id: id, code: 'EC' + esIso(T).replace(/-/g, '').slice(2) + Math.floor(100 + Math.random() * 900),
+        title: input.title, templateId: input.templateId || '', fileName: input.fileName || '',
+        amount: Number(input.amount) || 0,
+        initiatorUid: uid, initiatorName: me.name, initiatorCompany: me.company,
+        parties: input.parties, signOrder: input.signOrder || 'unordered',
+        status: 'pending_mine', deadline: T + days * ES_DAY, createdAt: T, sentAt: T
+      });
+      var r = mut(uid, function (sub2) {
+        if (!consumeOnce(sub2, id)) return { code: 'NO_QUOTA', error: '签署次数不足，请先购买次数包' };
+        sub2.contracts.unshift(contract);
+        sub2.drafts = sub2.drafts.filter(function (d) { return d.id !== (input.draftId || ''); });
+        return { ok: true, contract: clone(contract) };
+      });
+      if (r && r.ok) audit('发起电子合同', contract.code, contract.title + '（消耗 1 次签署次数）');
+      return r;
+    };
+
+    function withOwnerContract(id, fn) {
+      var s = EsignStore.read(); var hit = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        for (var i = 0; i < list.length; i++) if (list[i].id === id || list[i].code === id) { hit = { uid: uid, c: list[i] }; }
+      });
+      if (!hit) return { error: '合同不存在' };
+      var r = fn(hit.uid, hit.c, s);
+      EsignStore.write(s);
+      return r;
+    }
+
+    /* ---- 签署（App 本人 / H5 对方均可） ---- */
+    EsignStore.signContract = function (id, opts) {
+      opts = opts || {};
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前合同状态不可签署' };
+        var key = opts.partyKey;
+        if (!key) key = EsignStore.myPartyKey(c, ownerUid);
+        var party = (c.parties || []).filter(function (p) { return p.key === key; })[0];
+        if (!party) return { error: '签署方不存在' };
+        if (party.status === 'signed') return { error: '该方已完成签署' };
+        /* 顺序签：只能签当前轮到的一方 */
+        if (c.signOrder === 'sequential') {
+          var pend = (c.parties || []).filter(function (p) { return p.status !== 'signed'; }).sort(function (a, b2) { return a.order - b2.order; })[0];
+          if (pend && pend.key !== key) return { error: '当前为顺序签署，请等待前序方完成后再签' };
+        }
+        party.status = 'signed'; party.signedAt = Date.now();
+        party.signMethod = opts.method || (party.signerType === 'personal' ? '个人签名' : '企业公章');
+        if (c.status === 'pending_mine') c.status = 'signing';
+        var allSigned = c.parties.every(function (p) { return p.status === 'signed'; });
+        if (allSigned) {
+          c.status = 'completed'; c.completedAt = Date.now();
+          c.evidence = { provider: pricing().provider || 'e签宝', certNo: esCertNo(), hash: esHash(), timestamp: c.completedAt };
+        }
+        audit('电子合同签署', c.code, c.title + ' · ' + (party.company || party.name) + ' 已' + party.signMethod);
+        if (allSigned) audit('电子合同存证生成', c.code, '存证号 ' + c.evidence.certNo);
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    EsignStore.rejectContract = function (id, reason, opts) {
+      opts = opts || {};
+      return withOwnerContract(id, function (ownerUid, c) {
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前合同状态不可拒签' };
+        var key = opts.partyKey;
+        if (!key) {
+          key = (c.parties || []).filter(function (p) { return p.status !== 'signed' && p.ownerUid !== ownerUid; })[0];
+          key = key ? key.key : (c.parties[0] && c.parties[0].key);
+        }
+        var party = (c.parties || []).filter(function (p) { return p.key === key; })[0];
+        if (!party) return { error: '签署方不存在' };
+        party.status = 'rejected'; party.rejectedAt = Date.now(); party.rejectReason = reason || '暂不同意签署';
+        c.status = 'rejected'; c.rejectReason = party.rejectReason;
+        audit('电子合同拒签', c.code, c.title + ' · ' + (party.company || party.name) + '：' + party.rejectReason);
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    EsignStore.remindContract = function (id) {
+      return withOwnerContract(id, function (ownerUid, c) {
+        if (c.status !== 'signing' && c.status !== 'pending_mine') return { error: '当前状态无需催签' };
+        var gap = Date.now() - (c.lastRemindAt || 0);
+        if (c.lastRemindAt && gap < 60000) return { error: '催签过于频繁，请稍后再试' };
+        c.remindCount = (c.remindCount || 0) + 1; c.lastRemindAt = Date.now();
+        audit('电子合同催签', c.code, c.title + '（第 ' + c.remindCount + ' 次提醒对方）');
+        return { ok: true, remindCount: c.remindCount };
+      });
+    };
+
+    EsignStore.withdrawContract = function (id) {
+      var uid = curUid();
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (ownerUid !== uid) return { error: '仅发起方可撤回合同' };
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前状态不可撤回' };
+        var otherSigned = (c.parties || []).some(function (p) { return p.ownerUid !== ownerUid && p.status === 'signed'; });
+        if (otherSigned) return { error: '对方已签署，无法撤回' };
+        c.status = 'withdrawn';
+        var sub2 = ensure(s, ownerUid);
+        refundOnce(sub2, c.id);
+        audit('撤回电子合同', c.code, c.title + '（对方签署前撤回，退回 1 次签署次数）');
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    /* ---- 购买次数包（真实扣余额） ---- */
+    EsignStore.buyPackage = function (pkgId, payMethod) {
+      if (isGuest()) return { code: 'GUEST', error: '请先登录后再购买' };
+      if (!canUse()) return { code: 'NEED_DIST', error: '完成企业入驻或个人合伙人认证后开通电子签' };
+      if (payMethod && payMethod !== 'balance') return { code: 'DEMO_METHOD', error: '演示环境仅支持余额支付，请选择余额' };
+      var pkg = pricing().packages.filter(function (p) { return p.id === pkgId; })[0];
+      if (!pkg) return { error: '套餐不存在' };
+      if (!window.BalanceStore || BalanceStore.available() < pkg.price) return { code: 'NO_BALANCE', error: '可用余额不足，请先充值' };
+      var uid = curUid();
+      var T = Date.now();
+      var order = {
+        id: 'ESO' + String(T).slice(-10), uid: uid, pkgId: pkg.id, pkgName: pkg.name,
+        times: pkg.times, price: pkg.price, unitPrice: Math.round(pkg.price / pkg.times * 100) / 100,
+        payMethod: 'balance', status: 'paid', timesUsed: 0,
+        createdAt: T, paidAt: T, expireAt: T + (pricing().validYears || 2) * 365 * ES_DAY, refundId: ''
+      };
+      var consumeR = window.BalanceStore.consume(pkg.price, 'esign', { method: 'balance', remark: '购买电子签' + pkg.name });
+      if (!consumeR) return { code: 'NO_BALANCE', error: '可用余额不足，请先充值' };
+      var r = mut(uid, function (sub2) {
+        var q = sub2.quota; rollMonth(q);
+        q.remaining = (q.remaining || 0) + pkg.times;
+        var expIso = esIso(order.expireAt);
+        if (!q.earliestExpire || expIso < q.earliestExpire) q.earliestExpire = expIso;
+        sub2.orders.unshift(order);
+        return { ok: true, order: clone(order) };
+      });
+      if (r && r.ok) audit('购买电子签次数包', order.id, pkg.name + ' ×' + pkg.times + '，实付 ¥' + pkg.price);
+      return r;
+    };
+
+    /* ---- 退款申请 ---- */
+    EsignStore.applyRefund = function (orderId, reason) {
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        var o = sub2.orders.filter(function (x) { return x.id === orderId; })[0];
+        if (!o) return { error: '订单不存在' };
+        if (o.status !== 'paid') return { error: '该订单当前状态不可申请退款' };
+        var busy = sub2.refunds.some(function (r2) { return r2.orderId === orderId && r2.status === 'pending'; });
+        if (busy) return { error: '该订单已有退款申请正在审核' };
+        var used = o.timesUsed || 0;
+        var deduct = used * (pricing().refundUnit || 10);
+        var amount = Math.round((o.price - deduct) * 100) / 100;
+        if (amount <= 0) return { error: '该次数包已用次数对应金额已超过实付金额，无可退金额' };
+        var r2 = {
+          id: 'ESR' + String(Date.now()).slice(-9), orderId: o.id, uid: uid,
+          amount: o.price, usedTimes: used, deduct: deduct, refundAmount: amount,
+          reason: reason || '', status: 'pending', createdAt: Date.now(), handledAt: 0, handlerNote: '', credited: false
+        };
+        o.status = 'refunding'; o.refundId = r2.id;
+        sub2.refunds.unshift(r2);
+        audit('申请电子签退款', o.id, o.pkgName + '，应退 ¥' + amount + '（已用 ' + used + ' 次扣除 ¥' + deduct + '）');
+        return { ok: true, refund: clone(r2) };
+      });
+    };
+
+    /* 所属用户会话内，把已通过退款入账（跨窗口审核后切回该用户时调用），幂等 */
+    EsignStore.settleMyApprovedRefunds = function () {
+      if (isGuest() || !window.BalanceStore) return 0;
+      var uid = curUid(); var n = 0;
+      mut(uid, function (sub2) {
+        sub2.refunds.forEach(function (r2) {
+          if (r2.status === 'approved' && !r2.credited) {
+            window.BalanceStore.refund(r2.refundAmount, '电子签' + '次数包退款', { method: 'balance' });
+            r2.credited = true; n++;
+          }
+        });
+        return n;
+      });
+      if (n) audit('电子签退款到账', '电子签', n + ' 笔退款已原路退回余额');
+      return n;
+    };
+
+    /* ---- 后台 ---- */
+    function flatten(key) {
+      var s = EsignStore.read(); var out = [];
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var sub2 = s.byUid[uid]; var arr = sub2[key] || [];
+        var info = uname(uid);
+        arr.forEach(function (it) {
+          var row = clone(it); row.uid = uid; row.ownerName = info.name; row.ownerCompany = info.company; out.push(row);
+        });
+      });
+      return out;
+    }
+    EsignStore.adminListContracts = function () {
+      return flatten('contracts').sort(function (a, b) { return (b.sentAt || b.createdAt) - (a.sentAt || a.createdAt); });
+    };
+    EsignStore.adminListOrders = function () {
+      return flatten('orders').sort(function (a, b) { return (b.paidAt || b.createdAt) - (a.paidAt || a.createdAt); });
+    };
+    EsignStore.adminListRefunds = function () {
+      return flatten('refunds').sort(function (a, b) { return b.createdAt - a.createdAt; });
+    };
+    EsignStore.stats = function () {
+      var cs = this.adminListContracts(), os = this.adminListOrders(), rs = this.adminListRefunds();
+      var T = Date.now();
+      return {
+        contractTotal: cs.length,
+        signing: cs.filter(function (c) { return c.status === 'pending_mine' || c.status === 'signing'; }).length,
+        completed: cs.filter(function (c) { return c.status === 'completed'; }).length,
+        pendingRefund: rs.filter(function (r2) { return r2.status === 'pending'; }).length,
+        orderAmount: os.filter(function (o) { return o.status === 'paid' || o.status === 'refunding' || o.status === 'refunded'; }).reduce(function (a, o) { return a + (o.price || 0); }, 0)
+      };
+    };
+
+    EsignStore.approveRefund = function (refundId, note) {
+      var s = this.read(); var target = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var r2 = (s.byUid[uid].refunds || []).filter(function (x) { return x.id === refundId; })[0];
+        if (r2) target = { uid: uid, r: r2 };
+      });
+      if (!target) return { error: '退款单不存在' };
+      var r2 = target.r;
+      if (r2.status !== 'pending') return { error: '该退款单已处理' };
+      var sub2 = ensure(s, target.uid);
+      var o = sub2.orders.filter(function (x) { return x.id === r2.orderId; })[0];
+      r2.status = 'approved'; r2.handledAt = Date.now(); r2.handlerNote = note || '审核通过';
+      if (o) {
+        o.status = 'refunded';
+        /* 核销该订单未使用次数（从总剩余中扣减，下限 0） */
+        var unused = Math.max(0, (o.times || 0) - (o.timesUsed || 0));
+        sub2.quota.remaining = Math.max(0, (sub2.quota.remaining || 0) - unused);
+      }
+      this.write(s);
+      /* 若审核人会话即所属用户（少见），立即入账；否则等该用户会话 settleMyApprovedRefunds 入账 */
+      var cur = curUid();
+      if (cur === target.uid && window.BalanceStore) {
+        window.BalanceStore.refund(r2.refundAmount, '电子签次数包退款', { method: 'balance' });
+        r2.credited = true; this.write(s);
+      }
+      audit('通过电子签退款审核', r2.id, '退款 ¥' + r2.refundAmount + '，核销未使用 ' + (o ? Math.max(0, o.times - (o.timesUsed || 0)) : 0) + ' 次');
+      return { ok: true, refund: clone(r2) };
+    };
+
+    EsignStore.rejectRefund = function (refundId, note) {
+      var s = this.read(); var target = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var r2 = (s.byUid[uid].refunds || []).filter(function (x) { return x.id === refundId; })[0];
+        if (r2) target = { uid: uid, r: r2 };
+      });
+      if (!target) return { error: '退款单不存在' };
+      if (target.r.status !== 'pending') return { error: '该退款单已处理' };
+      var sub2 = ensure(s, target.uid);
+      target.r.status = 'rejected'; target.r.handledAt = Date.now(); target.r.handlerNote = note || '审核驳回';
+      var o = sub2.orders.filter(function (x) { return x.id === target.r.orderId; })[0];
+      if (o) o.status = 'paid';
+      this.write(s);
+      audit('驳回电子签退款审核', target.r.id, '原因：' + (note || '未通过审核'));
+      return { ok: true, refund: clone(target.r) };
+    };
+
+    /* 后台作废（平台原因，退 1 次，留痕） */
+    EsignStore.voidContract = function (id, note) {
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (c.status === 'completed' || c.status === 'voided') return { error: '已完成或已作废合同不可作废' };
+        var charged = (c.status === 'pending_mine' || c.status === 'signing' || c.status === 'rejected' || c.status === 'expired' || c.status === 'withdrawn');
+        c.status = 'voided'; c.rejectReason = note || '平台风控作废';
+        if (charged) { var sub2 = ensure(s, ownerUid); refundOnce(sub2, c.id); }
+        audit('后台作废电子合同', c.code, c.title + '（' + (note || '平台风控作废') + '，退回 1 次签署次数）');
+        return { ok: true, contract: clone(c) };
+      });
+    };
+    /* H5 对方免登：跨 uid 查找合同（只读视图），找到返回 {uid, contract(副本)} */
+    EsignStore.findAnyContract = function (id) {
+      var s = this.read(), hit = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        for (var i = 0; i < list.length; i++) if (list[i].id === id || list[i].code === id) hit = { uid: uid, contract: clone(list[i]) };
+      });
+      return hit;
+    };
+
+    /* 逾期清扫：pending_mine/signing 且超过截止时间 → expired（次数不退），幂等，可审计 */
+    EsignStore.expireDue = function () {
+      var s = this.read(); var now = Date.now(); var n = 0;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        list.forEach(function (c) {
+          if ((c.status === 'pending_mine' || c.status === 'signing') && c.deadline && c.deadline < now) {
+            c.status = 'expired'; n++;
+            audit('电子合同逾期失效', c.code, c.title + '（超过 ' + esIso(c.deadline) + ' 签署截止，次数不退）');
+          }
+        });
+      });
+      if (n) this.write(s);
+      return n;
+    };
+  })();
+
+  window.EsignStore = EsignStore;
   window.svcCreditOf = svcCreditOf;
 })();
 

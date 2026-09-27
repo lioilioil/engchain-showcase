@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>添加签署方 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">添加签署方</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:86px;"></div>
+      <div class="es-foot-bar" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var u = ctx.user;
+  var d = ES.Draft.get();
+  if (!d) { d = ES.newDraft(); ES.Draft.set(d); }
+  d.meRole = d.meRole || '甲方';
+  d.signOrder = d.signOrder || 'unordered';
+  d.parties = d.parties || [];
+  var personal = ES.isPersonal();
+  var v = ES.$('#v');
+
+  function meCard() {
+    var ent = personal ? '个人合伙人 · 个人签名' : '企业 · 法定代表人/授权人 + 公章';
+    return '<div class="es-party">' +
+      '<div class="ph"><span class="pa">我方</span>' +
+        '<div style="flex:1;min-width:0;"><div class="pn">' + ES.esc(u.name || '当前用户') + '</div>' +
+        '<div class="pi">' + ES.esc(u.company || '个人合伙人') + ' · ' + ES.esc(ent) + '</div></div>' +
+        '<span class="tag">自动带出</span></div>' +
+      '<div style="margin-top:12px;"><label style="font-size:12px;color:var(--text-3);margin-right:10px;">我方在本合同中的身份</label>' +
+        '<div class="es-segctrl" style="margin-top:7px;"><button data-role="甲方"' + (d.meRole === '甲方' ? ' class="on"' : '') + '>甲方（发包方/采购方）</button>' +
+        '<button data-role="乙方"' + (d.meRole === '乙方' ? ' class="on"' : '') + '>乙方（承包/供应方）</button></div></div></div>';
+  }
+  function oppositeRole() { return d.meRole === '甲方' ? '乙方' : '甲方'; }
+  function otherCard(cp, idx) {
+    return '<div class="es-party other" data-idx="' + idx + '">' +
+      '<div class="ph"><span class="pa">' + (idx + 2) + '</span>' +
+        '<div style="flex:1;"><div class="pn">' + ES.esc(cp.company || '对方 ' + (idx + 1)) + '</div>' +
+        '<div class="pi">' + ES.esc(cp.name || '待填写联系人') + '</div></div>' +
+        '<span class="tag">' + ES.esc(cp.role || oppositeRole()) + '</span></div>' +
+      '<div style="display:flex;gap:9px;margin-top:11px;">' +
+        '<div class="es-field" style="flex:1.4;margin:0;"><label>主体名称 <span class="req">*</span></label>' +
+          '<input class="i-company" placeholder="企业全称 / 个人姓名" value="' + ES.esc(cp.company || '') + '"></div>' +
+        '<div class="es-field" style="flex:1;margin:0;"><label>签署主体</label>' +
+          '<select class="i-type"><option value="enterprise"' + (cp.signerType !== 'personal' ? ' selected' : '') + '>企业</option>' +
+          '<option value="personal"' + (cp.signerType === 'personal' ? ' selected' : '') + '>个人</option></select></div></div>' +
+      '<div style="display:flex;gap:9px;margin-top:11px;">' +
+        '<div class="es-field" style="flex:1;margin:0;"><label>联系人 <span class="req">*</span></label>' +
+          '<input class="i-name" placeholder="经办人姓名" value="' + ES.esc(cp.name || '') + '"></div>' +
+        '<div class="es-field" style="flex:1;margin:0;"><label>手机后 4 位 <span class="req">*</span></label>' +
+          '<input class="i-mobile" inputmode="numeric" maxlength="4" placeholder="验证身份用" value="' + ES.esc(cp.mobileMask || '') + '"></div></div>' +
+      '<div class="ops">' +
+        (d.signOrder === 'sequential' ? '<button class="up" ' + (idx === 0 ? 'style="opacity:.35;pointer-events:none;"' : '') + '>上移</button>' +
+          '<button class="down" ' + (idx === d.parties.length - 1 ? 'style="opacity:.35;pointer-events:none;"' : '') + '>下移</button>' : '') +
+        '<button class="del">删除</button></div></div>';
+  }
+  function render() {
+    v.innerHTML = ES.stepsHTML(2) +
+      '<div class="es-sec" style="margin-top:8px;"><h2>我方信息</h2></div>' + meCard() +
+      '<div class="es-sec"><h2>对方签署方</h2><span class="es-badge b-gray">' + d.parties.length + ' 方</span></div>' +
+      d.parties.map(otherCard).join('') +
+      '<button class="es-addparty" id="add" style="width:100%;">' + ES.ic('plus') + ' 添加签署方（多方合同）</button>' +
+      '<div class="es-sec"><h2>签署顺序</h2></div>' +
+      '<div class="es-segctrl"><button data-order="unordered"' + (d.signOrder === 'unordered' ? ' class="on"' : '') + '>无序签署（同时收到）</button>' +
+        '<button data-order="sequential"' + (d.signOrder === 'sequential' ? ' class="on"' : '') + '>顺序签署</button></div>' +
+      '<div class="es-muted" style="margin-top:9px;line-height:1.7;">' + (d.signOrder === 'sequential'
+        ? '将按「我方 → 对方①→对方②」依次签署，前一方完成后后一方才会收到签署链接，可通过上移/下移调整对方顺序。'
+        : '所有签署方同时收到签署链接，任一方完成后自动流转，全部签署后合同成立。') +
+        '<br>签署前请核对对方主体与手机号，链接发出后可在对方签署前撤回（次数退回）。</div>';
+    bind();
+  }
+  function collect() {
+    d.meRole = (v.querySelector('[data-role].on') || { getAttribute: function () { return '甲方'; } }).getAttribute('data-role') || '甲方';
+    d.signOrder = (v.querySelector('[data-order].on') || { getAttribute: function () { return 'unordered'; } }).getAttribute('data-order') || 'unordered';
+    d.parties = [];
+    v.querySelectorAll('.es-party.other').forEach(function (card) {
+      d.parties.push({
+        company: card.querySelector('.i-company').value.trim(),
+        signerType: card.querySelector('.i-type').value,
+        name: card.querySelector('.i-name').value.trim(),
+        mobileMask: card.querySelector('.i-mobile').value.trim(),
+        role: oppositeRole()
+      });
+    });
+    ES.Draft.set(d);
+  }
+  function validate() {
+    var bad = false, badMobile = false;
+    v.querySelectorAll('.es-party.other').forEach(function (card) {
+      ['.i-company', '.i-name'].forEach(function (sel) {
+        var el = card.querySelector(sel); if (!el.value.trim()) { el.style.borderColor = 'var(--danger)'; bad = true; } else { el.style.borderColor = ''; }
+      });
+      var mo = card.querySelector('.i-mobile');
+      if (!/^\d{4}$/.test(mo.value.trim())) { mo.style.borderColor = 'var(--danger)'; bad = badMobile = true; } else { mo.style.borderColor = ''; }
+    });
+    if (!d.parties.length) { UI.toast('请至少添加一位对方签署方', 'warn'); return false; }
+    if (bad) { UI.toast('请补全对方主体名称与联系人', 'warn'); return false; }
+    if (badMobile) { UI.toast('请填写对方手机后 4 位（用于签署身份验证）', 'warn'); return false; }
+    return true;
+  }
+  function bind() {
+    v.querySelectorAll('[data-role]').forEach(function (b) { b.onclick = function () { d.meRole = b.getAttribute('data-role'); collect(); render(); }; });
+    v.querySelectorAll('[data-order]').forEach(function (b) { b.onclick = function () { d.signOrder = b.getAttribute('data-order'); collect(); render(); }; });
+    ES.$('#add').onclick = function () {
+      collect();
+      d.parties.push({ company: '', name: '', mobileMask: '', signerType: 'enterprise', role: oppositeRole() });
+      ES.Draft.set(d); render();
+    };
+    v.querySelectorAll('.es-party.other').forEach(function (card) {
+      var idx = Number(card.getAttribute('data-idx'));
+      card.querySelector('.del').onclick = function () {
+        UI.dialog({ title: '删除该签署方？', text: '删除后需重新填写该方信息', ok: '删除', danger: true, onOk: function () { collect(); d.parties.splice(idx, 1); ES.Draft.set(d); render(); } });
+      };
+      var up = card.querySelector('.up'); if (up) up.onclick = function () { if (idx > 0) { collect(); var t = d.parties[idx - 1]; d.parties[idx - 1] = d.parties[idx]; d.parties[idx] = t; ES.Draft.set(d); render(); } };
+      var dn = card.querySelector('.down'); if (dn) dn.onclick = function () { if (idx < d.parties.length - 1) { collect(); var t = d.parties[idx + 1]; d.parties[idx + 1] = d.parties[idx]; d.parties[idx] = t; ES.Draft.set(d); render(); } };
+    });
+  }
+  var foot = ES.$('.es-foot-bar');
+  foot.innerHTML = '<div class="es-actions"><button class="es-btn ghost" id="bBack">上一步</button>' +
+    '<button class="es-btn primary" id="bNext">下一步：签章位</button></div>';
+  ES.$('#bBack').onclick = function () { collect(); history.back(); };
+  ES.$('#bNext').onclick = function () {
+    collect();
+    if (!validate()) return;
+    // 重置签章位（签署方变化后）
+    d.fieldsOk = {};
+    ES.Draft.set(d);
+    location.href = 'fields.html';
+  };
+  render();
+});
+</script>
+</body>
+</html>
