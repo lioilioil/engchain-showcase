@@ -170,24 +170,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function(){window.__ROOT__='../../';
 function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:2});}
 var acc=window.entryAccess?entryAccess():{agency:false,isResident:false,statusId:'registered'};
-/* 以服务商视角预览：须写入入驻记录 entry.types（身份派生读取的是 entry，而非 identity），否则预览不生效 */
-window.previewAsSeller=function(){
-  try{
-    var cur=DataBus.current();
-    if(cur){
-      if(!cur.entry)cur.entry={};
-      if(!cur.entry.types)cur.entry.types=[];
-      if(cur.entry.types.indexOf('agency')<0)cur.entry.types.push('agency');
-      cur.entry.active=true;cur.entry.status='active';
-      if(!cur.entry.expireAt)cur.entry.expireAt=Date.now()+365*86400000;
-      if(window.EntryStore)EntryStore.write(JSON.parse(JSON.stringify(cur.entry)));
-      DataBus.syncUser(cur.id);
-    }
-    location.reload();
-  }catch(e){if(window.UI)UI.toast('预览启动失败','err');}
-};
+/* v2：服务商视角预览改为【会话级】标记（sessionStorage）。
+   不写 EntryStore、不 DataBus.syncUser、不落 L1 用户表；仅在本会话内以虚拟 agency 身份渲染，
+   关闭/退出标签页或点“退出预览”即失效，本人资质与入驻状态零变更。 */
+var SELLER_PREVIEW_KEY='engchain-seller-preview';
+function sellerPreviewOn(){ try{return sessionStorage.getItem(SELLER_PREVIEW_KEY)==='1';}catch(e){return false;} }
+var _isGuestNow=(acc.statusId==='guest')||(window.DataBus&&DataBus.isGuest&&DataBus.isGuest());
+var SELLER_PREVIEW=false;
+if(!acc.agency && !_isGuestNow && sellerPreviewOn()){
+  SELLER_PREVIEW=true;
+  acc=Object.assign({},acc,{agency:true,isResident:true,agencyBadge:'预览'});
+}
+window.__SELLER_PREVIEW__=SELLER_PREVIEW;
+/* 仅进入只读预览（会话级），绝不写入任何身份数据 */
+window.previewAsSeller=function(){ try{ sessionStorage.setItem(SELLER_PREVIEW_KEY,'1'); }catch(e){} location.reload(); };
+window.exitSellerPreview=function(){ try{ sessionStorage.removeItem(SELLER_PREVIEW_KEY); }catch(e){} location.reload(); };
 if(!acc.agency){
-  var isGuest=(acc.statusId==='guest');
+  var isGuest=_isGuestNow;
   if (window.GuestGate) GuestGate.open({
     mode:'replace', icon:'user', badge:'游客模式',
     title:'登录后进入服务商工作台',
@@ -240,14 +239,18 @@ function renderHead(){
   if(!el)return;
   var name=(me&&(me.company||me.name))||'中介服务企业';
   var short=name.replace(/(^四川省|^四川|^成都|^重庆市|^重庆)|(有限公司$|公司$|事务所$)/g,'').charAt(0)||'介';
-  var badge=acc.agencyBadge||'金V';
+  var badge=SELLER_PREVIEW?'预览':(acc.agencyBadge||'金V');
   var expTxt='';
-  try{var e=window.EntryStore?EntryStore.read():null;if(e&&e.expireAt){var d=new Date(e.expireAt);expTxt='入驻至 '+d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate();}}catch(err){}
+  if(!SELLER_PREVIEW){
+    try{var e=window.EntryStore?EntryStore.read():null;if(e&&e.expireAt){var d=new Date(e.expireAt);expTxt='入驻至 '+d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate();}}catch(err){}
+  }
+  var subTxt=SELLER_PREVIEW?'中介服务企业 · 只读预览（未真实入驻，不改变你的身份）':'中介服务企业 · 已入驻'+(expTxt?' · '+expTxt:'');
+  var previewChip=SELLER_PREVIEW?'<span onclick="exitSellerPreview()" style="margin-left:8px;font-size:11px;color:#B89968;border:1px solid rgba(184,153,104,.5);border-radius:999px;padding:2px 9px;cursor:pointer;white-space:nowrap;">退出预览</span>':'<span class="sb-arrow">›</span>';
   el.innerHTML=
     '<div class="sb-top"><div class="sb-logo">'+short+'</div>'+
     '<div class="sb-id"><div class="sb-name">'+name+'<span class="sb-vip">'+badge+'</span></div>'+
-    '<div class="sb-sub">中介服务企业 · 已入驻'+(expTxt?' · '+expTxt:'')+'</div></div>'+
-    '<span class="sb-arrow">›</span></div>'+
+    '<div class="sb-sub">'+subTxt+'</div></div>'+
+    previewChip+'</div>'+
     '<div class="sb-tags"><span>金V核验</span><span>平台资金托管</span><span>意向金可退</span></div>';
 }
 

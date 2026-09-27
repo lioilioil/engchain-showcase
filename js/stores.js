@@ -1225,13 +1225,23 @@
      entryTypes: 入驻类型数组（支持并行）
      primary 优先级：企业入驻>企业认证>个人合伙人>个人入驻>个人认证>游客
      这是全局唯一的身份推导函数，所有页面应调用此函数 */
+  var GUEST_IDENTITY = { personal: 'none', partner: false, enterprise: 'none', identities: [], entryTypes: [], isGuest: true, primary: 'guest',
+        personalEntryUserType: 'jobseeker', personalEntryResumeComplete: false };
   function deriveIdentity() {
     var a = AuthStore.read();
     var e = EntryStore.read();
     /* [S5] 统一游客判断口径（DataBus.isGuest：loggedIn===false 或 status==='guest'） */
     if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) {
-      return { personal: 'none', partner: false, enterprise: 'none', identities: [], entryTypes: [], isGuest: true, primary: 'guest',
-        personalEntryUserType: 'jobseeker', personalEntryResumeComplete: false };
+      return GUEST_IDENTITY;
+    }
+    /* v2 兜底：个别页面未引 databus.js（如 home/monitor/all-functions），DataBus 不存在。
+       回退读 UI.state 的【显式负信号】loggedIn===false / status==='guest' 判定游客，
+       避免空 Store 被默认推导成 registered。全新默认态（无该字段）不视为游客，保持原行为。 */
+    if (!window.DataBus || typeof DataBus.isGuest !== 'function') {
+      var _st = (window.UI && UI.state) ? UI.state.get() : null;
+      if (_st && (_st.loggedIn === false || _st.status === 'guest')) {
+        return GUEST_IDENTITY;
+      }
     }
     /* 个人线推导 */
     var realnameOk = !!(a.realname && a.realname.ok);

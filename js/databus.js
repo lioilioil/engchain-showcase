@@ -198,6 +198,8 @@ window.DataBus = (function () {
         user: u.name, company: u.company || '', account: u.account || '',
         loggedIn: u.status !== 'guest', status: u.status === 'guest' ? 'guest' : u.status,
         member: (u.status === 'pro' || u.status === 'enterprise' || u.status === 'resident'),
+        /* v2：切换账号/演示场景，外显署名一律回到“个人”，不自动代表任何企业；清旧投影残留 */
+        displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '',
         demoOverride: undefined /* 真实登录：清除 preview 演示状态覆盖标记（JSON 序列化后键被移除） */
       });
     }
@@ -225,7 +227,7 @@ window.DataBus = (function () {
     try { if (window.EntryStore && EntryStore.reset) EntryStore.reset(); } catch (e) {}
     try { if (window.BalanceStore && BalanceStore.reset) BalanceStore.reset(); } catch (e) {}
     try { if (window.CreditStore && CreditStore.reset) CreditStore.reset(); } catch (e) {}
-    if (window.UI && UI.state) UI.state.set({ loggedIn: false, status: 'guest', member: false, demoOverride: null, currentOrgId: null });
+    if (window.UI && UI.state) UI.state.set({ loggedIn: false, status: 'guest', member: false, demoOverride: null, displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '', company: '' });
     try { LS.removeItem('engchain-unlocked'); } catch (e) {}
     window.dispatchEvent(new CustomEvent('engchain:login', { detail: { id: 'u7' } }));
     audit('退出登录', '账号', '', '当前账号已登出');
@@ -269,7 +271,7 @@ window.DataBus = (function () {
     /* 电子签：重置回 byUid 种子（次数/合同/订单/退款/草稿），保证演示可重复 */
     try { if (window.EsignStore && EsignStore.reset) EsignStore.reset(); } catch (e) {}
     if (window.UI && UI.state) {
-      UI.state.set({ user: '', company: '', account: '', status: 'guest', loggedIn: false, member: false, demoOverride: null, currentOrgId: null });
+      UI.state.set({ user: '', company: '', account: '', status: 'guest', loggedIn: false, member: false, demoOverride: null, displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '' });
     }
     /* 清除付费墙解锁记录 */
     try { LS.removeItem('engchain-unlocked'); LS.removeItem('engchain-personal-unlocks'); } catch (e) {}
@@ -1714,6 +1716,9 @@ window.DataBus = (function () {
     var uid = sc.base;
     /* 1. 还原干净基线（幂等、不串状态，余额回种子）；确保以该账号登录 */
     resetUserToSeed(uid);
+    /* v2：无论是否切换账号，应用预设场景都把“外显署名”无条件重置回个人，
+       防止同账号重复应用场景时沿用上一次手动选择的企业外显。 */
+    try { if (window.UI && UI.state) UI.state.set({ displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '' }); } catch (e) {}
     var cu0 = current();
     if (!cu0 || cu0.id !== uid) login(uid);
     var balBefore = window.BalanceStore ? { balance: BalanceStore.read().balance, frozen: BalanceStore.read().frozen } : null;
