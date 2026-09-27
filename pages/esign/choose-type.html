@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>发起合同 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='index.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">发起合同</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view"><div class="es-scroll" id="v"></div></div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var v = ES.$('#v');
+  function quota() { return ES.bundle().sub.quota || { remaining: 0 }; }
+  function go(href) {
+    if ((quota().remaining || 0) < 1) { UI.toast('签署次数不足，请先购买次数', 'warn'); location.href = 'packages.html'; return; }
+    location.href = href;
+  }
+  function card(opt) {
+    var d = ES.Draft.get();
+    var draftHtml = (d && d.title) ?
+      '<button class="es-card" id="continue" style="width:100%;text-align:left;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;gap:12px;">' +
+        '<span style="width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:var(--es-moss-soft);color:var(--es-moss);">' + ES.ic('doc') + '</span>' +
+        '<span style="flex:1;min-width:0;"><div style="font-size:13.5px;font-weight:600;color:var(--text-1);">继续填写：' + ES.esc(d.title) + '</div>' +
+        '<div class="es-muted">草稿已自动保存，可接着完成发起</div></span>' +
+        '<span style="color:var(--text-3)">' + ES.ic('chevron') + '</span></button>' : '';
+    var low = (quota().remaining || 0) < 1;
+    v.innerHTML = ES.stepsHTML(0) +
+      '<div class="es-quota' + (low ? ' low' : '') + '" style="margin:12px 0 18px;"><span class="qi">' + ES.ic('package') + '</span>' +
+        '<div class="ql"><div>当前剩余 <b class="es-mono">' + (quota().remaining || 0) + '</b> 次签署次数</div>' +
+        '<div class="dim">每次发起消耗 1 次 · 对方签署前撤回可退回</div></div>' +
+        '<button class="es-btn sm gold" onclick="location.href=\'packages.html\'">购买次数</button></div>' +
+      draftHtml +
+      '<button class="es-card" id="goTpl" style="width:100%;text-align:left;cursor:pointer;border-color:var(--primary);">' +
+        '<div style="display:flex;align-items:center;gap:12px;"><span style="width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--es-gold-soft);color:var(--es-gold-deep);">' + ES.ic('doc') + '</span>' +
+        '<span style="flex:1;"><div style="font-size:16px;font-weight:700;color:var(--text-1);">从模板发起 <span class="es-tag" style="position:static;margin-left:6px;">推荐</span></div>' +
+        '<div class="es-muted" style="margin-top:3px;">材料采购 / 设备租赁 / 劳务分包等 6 类工程范本，填空即可生成</div></span>' +
+        '<span style="color:var(--text-3)">' + ES.ic('chevron') + '</span></div></button>' +
+      '<button class="es-card" id="goUp" style="width:100%;text-align:left;cursor:pointer;margin-top:12px;display:flex;align-items:center;gap:12px;">' +
+        '<span style="width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--es-moss-soft);color:var(--es-moss);">' + ES.ic('upload') + '</span>' +
+        '<span style="flex:1;"><div style="font-size:16px;font-weight:700;color:var(--text-1);">上传 PDF 发起</div>' +
+        '<div class="es-muted" style="margin-top:3px;">上传已准备好的合同（演示以样例文件模拟，≤20MB / ≤50 页）</div></span>' +
+        '<span style="color:var(--text-3)">' + ES.ic('chevron') + '</span></button>' +
+      '<div class="es-card" style="margin-top:16px;font-size:11px;color:var(--text-3);line-height:1.8;">' +
+        '<b style="color:var(--text-2);">说明：</b><br>· 合同范本仅为通用参考，不构成法律意见，使用前请自行审核；<br>· 平台仅提供电子签约技术服务，不是合同当事人；<br>· 签署数据由 ' + ES.esc((MOCK.business.esign || {}).provider || 'e签宝') + ' 处理，合同内容仅签署双方可见。</div>';
+    var ct = ES.$('#continue'); if (ct) ct.onclick = function () {
+      var d2 = ES.Draft.get(); if (!d2) return;
+      location.href = (d2.via === 'upload' ? 'upload.html' : 'template-fill.html') + (d2.templateId ? '?id=' + encodeURIComponent(d2.templateId) : '');
+    };
+    ES.$('#goTpl').onclick = function () { go('template-list.html'); };
+    ES.$('#goUp').onclick = function () { go('upload.html'); };
+  }
+  ES.subscribe(function () { try { render2(); } catch (e) {} });
+  function render2() { /* 次数变化时刷新提示（保留当前页） */ }
+  card();
+});
+</script>
+</body>
+</html>

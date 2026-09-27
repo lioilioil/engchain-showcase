@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>签署合同 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" id="navBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">签署合同</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view" id="view"><div class="es-scroll" id="v" style="padding-bottom:180px;"></div>
+      <div class="es-foot-bar" id="foot" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+    <div class="es-verify-mask" id="mask">
+      <div class="es-verify-card">
+        <div class="es-face"><svg class="ic" style="width:40px;height:40px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+        <div class="vt" id="maskTitle">正在进行实名认证</div>
+        <div class="vs" id="maskSub">人脸识别中，请正对屏幕…</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var id = ES.qs('id');
+  var v = ES.$('#v'), foot = ES.$('#foot'), mask = ES.$('#mask');
+  var readAll = false, agreed = false, busy = false;
+
+  function contract() { return EsignStore.contractById(id); }
+  function myParty(c) { return c.parties.filter(function (p) { return p.ownerUid === ctx.user.id; })[0]; }
+  function sequentialTurn(c, key) {
+    var pend = c.parties.filter(function (p) { return p.status !== 'signed'; }).sort(function (a, b) { return a.order - b.order; })[0];
+    return !pend || pend.key === key;
+  }
+  function docWrap(c, mineSealed) {
+    var boxes = c.parties.map(function (p) {
+      var sealed = p.status === 'signed' || (mineSealed && p.ownerUid === ctx.user.id);
+      return '<div class="signbox ' + (sealed ? 'sealed' : '') + '"><b>' + ES.esc(p.company || p.name) + '</b><br>' + ES.esc(p.role) +
+        (sealed ? '<div class="seal-stamp">' + ES.esc((p.company || p.name).length > 7 ? (p.company || p.name).slice(0, 7) : (p.company || p.name)) + '<br>电子签</div>' : '<br>（待签署）') + '</div>';
+    }).join('');
+    return '<div class="es-doc-wrap" style="margin:12px 0 0;">' +
+      '<h2>' + ES.esc(c.title) + '</h2><div class="sub es-mono">' + ES.esc(c.code) + '</div>' +
+      '<h4>一、合同主体</h4>' + c.parties.map(function (p) {
+        return '<p style="text-indent:0;">' + ES.esc(p.role) + '：' + ES.esc(p.company || p.name) + '（' + ES.esc(p.name) + '）</p>'; }).join('') +
+      '<h4>二、标的与金额</h4><p>合同总金额（含税）：' + ES.amountText(c) + '；标的、数量、履行期限及验收标准以本合同正文及附件为准。</p>' +
+      '<h4>三、双方权利义务</h4><p>各方应按约全面履行义务，保证所提供资料真实、合法、有效；任何一方违约，应依法承担继续履行、赔偿损失等违约责任。</p>' +
+      '<h4>四、电子签署效力</h4><p>各方确认：通过本平台经实名认证后完成的电子签名/电子印章，与手写签名或加盖实体印章具有同等法律效力；签署完成的电子合同由存证机构出具存证证明。</p>' +
+      '<h4>五、签章页</h4><div class="signarea">' + boxes + '</div></div>';
+  }
+
+  function showBlocked(c, kind) {
+    var map = {
+      notfound: ['未找到该合同', '合同可能已失效，或不属于当前账号'],
+      done: ['你已完成签署', '该合同已记录你的电子签名，可在详情页查看存证进度'],
+      turn: ['还没轮到你签署', '该合同为顺序签署，请等待前序方完成后再签'],
+      closed: ['当前合同不可签署', '该合同已结束（完成 / 撤回 / 逾期 / 拒签 / 作废）']
+    }[kind];
+    v.innerHTML = '<div class="es-empty">' + ES.ic(kind === 'turn' ? 'clock' : 'doc') +
+      '<div class="t">' + map[0] + '</div><div class="s">' + map[1] + '</div>' +
+      '<button class="es-btn primary" style="margin-top:16px;" onclick="location.href=\'detail.html?id=' + encodeURIComponent(id) + '\'">查看合同详情</button></div>';
+    foot.innerHTML = '';
+  }
+
+  function render() {
+    var c = contract();
+    if (!c) return showBlocked(null, 'notfound');
+    var mp = myParty(c);
+    if (!mp) return showBlocked(c, 'notfound');
+    if (c.status === 'completed' || mp.status === 'signed') return showBlocked(c, 'done');
+    if (c.status !== 'pending_mine' && c.status !== 'signing') return showBlocked(c, 'closed');
+    if (c.signOrder === 'sequential' && !sequentialTurn(c, mp.key)) return showBlocked(c, 'turn');
+
+    v.innerHTML =
+      '<div class="es-card" style="margin:12px 14px 0;display:flex;gap:10px;align-items:center;">' +
+        '<span style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--es-seal-soft);color:var(--es-seal);flex:none;">' + ES.ic('sign') + '</span>' +
+        '<div style="flex:1;"><div style="font-size:14px;font-weight:700;color:var(--text-1);">' + ES.esc(c.title) + '</div>' +
+        '<div class="es-muted es-mono" style="margin-top:2px;">' + ES.esc(c.code) + ' · 你作为' + ES.esc(mp.role) + '签署 · ' + ES.amountText(c) + '</div></div></div>' +
+      docWrap(c, false) +
+      '<div style="padding:16px 16px 0;">' +
+        '<div class="es-agree" id="agRead"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+        '<span>我已完整阅读并知悉合同全部条款</span></div>' +
+        '<div class="es-agree" id="agTerm" style="margin-top:12px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+        '<span>我同意 <a href="agreement.html">《电子签名服务协议》</a>，确认使用本人/本企业实名认证的电子签名签署，认可其法律效力</span></div>' +
+        '<div class="es-muted" style="margin-top:12px;line-height:1.7;display:flex;gap:7px;"><span style="color:var(--primary-dim);flex:none;">' + ES.ic('shield') + '</span>' +
+        '<span>签署前将进行实名认证（演示为人脸识别模拟）；签署数据由 ' + ES.esc(EsignStore.pricing().provider) + ' 加密存证。</span></div>' +
+      '</div>';
+    foot.innerHTML = '<div style="padding:0 2px;"><button class="es-btn primary block" id="bSign" disabled>实名认证并签署</button>' +
+      '<div class="h5-note" style="padding-top:9px;">点击即表示对合同内容确认无误 · 签署后不可单方撤销</div></div>';
+    ES.$('#agRead').onclick = function () { readAll = !readAll; ES.$('#agRead').classList.toggle('on', readAll); refreshBtn(); };
+    ES.$('#agTerm').onclick = function () { agreed = !agreed; ES.$('#agTerm').classList.toggle('on', agreed); refreshBtn(); };
+    ES.$('#bSign').onclick = doSign;
+    refreshBtn();
+  }
+  function refreshBtn() { var b = ES.$('#bSign'); if (b) b.disabled = !(readAll && agreed) || busy; }
+
+  function doSign() {
+    if (busy) return; busy = true; refreshBtn();
+    mask.classList.add('on');
+    ES.$('#maskTitle').textContent = '正在进行实名认证'; ES.$('#maskSub').textContent = '人脸识别中，请正对屏幕…';
+    setTimeout(function () {
+      ES.$('#maskTitle').textContent = '核验通过，正在落章'; ES.$('#maskSub').textContent = '生成电子签名与时间戳…';
+    }, 1300);
+    setTimeout(function () {
+      var c2 = contract();
+      var mp2 = c2 && myParty(c2);
+      var r = EsignStore.signContract(c2.id, { partyKey: mp2.key, method: mp2.signerType === 'personal' ? '个人签名' : '企业公章' });
+      mask.classList.remove('on'); busy = false;
+      if (!r.ok) { refreshBtn(); UI.toast(r.error || '签署失败，请重试', 'err'); return; }
+      showResult(r.contract);
+    }, 2400);
+  }
+
+  function showResult(c) {
+    var completed = c.status === 'completed';
+    document.querySelector('#view').innerHTML = '<div class="es-scroll"><div class="es-result">' +
+      '<div class="ri" style="' + (completed ? '' : 'background:var(--es-gold-soft);color:var(--es-gold-deep);') + '">' + ES.ic(completed ? 'shield' : 'check') + '</div>' +
+      '<h3>' + (completed ? '合同已全部签署完成' : '你已签署成功') + '</h3>' +
+      '<p>' + (completed
+        ? '全部 ' + c.parties.length + ' 方均已完成签署，合同即时生效，司法存证已生成。'
+        : '你的电子签名已提交，正在等待其余签署方完成；全部签署后合同生效并生成存证。') + '</p>' +
+      (completed && c.evidence ? '<div class="es-card" style="text-align:left;">' + ES.evidenceHTML(c.evidence) + '</div>' : '') +
+      '<button class="es-btn primary block" id="rDetail">查看合同详情</button>' +
+      '<button class="es-btn ghost block" id="rHome" style="margin-top:10px;">返回电子签首页</button></div></div>';
+    ES.$('#rDetail').onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(c.id); };
+    ES.$('#rHome').onclick = function () { location.href = 'index.html'; };
+  }
+
+  ES.$('#navBack').onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(id); };
+  render();
+});
+</script>
+</body>
+</html>

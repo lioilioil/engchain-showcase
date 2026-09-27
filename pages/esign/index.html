@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>电子签 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">电子签</div>
+      <div class="nav-right" onclick="location.href='records.html'" style="font-size:12px;color:var(--text-2);cursor:pointer;display:flex;align-items:center;gap:3px;">
+        <svg class="ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 2v20l2.5-1.5L9 22l3-1.5L15 22l2.5-1.5L20 22V2l-2.5 1.5L15 2l-3 1.5L9 2 6.5 3.5z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>记录
+      </div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="esScroll"></div>
+      <button class="es-fab" id="esFab">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        发起签署
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var scrollEl = ES.$('#esScroll');
+  var filter = 'all';
+
+  function contracts() { return (ES.bundle().sub.contracts || []).slice().sort(function (a, b) {
+    var ra = (a.status === 'pending_mine' || a.status === 'signing') ? 0 : 1;
+    var rb = (b.status === 'pending_mine' || b.status === 'signing') ? 0 : 1;
+    if (ra !== rb) return ra - rb;
+    return (b.sentAt || b.createdAt) - (a.sentAt || a.createdAt);
+  }); }
+  function list() {
+    var all = contracts();
+    return {
+      all: all,
+      mine: all.filter(function (c) { return ES.meta(c).key === 'mine'; }),
+      other: all.filter(function (c) { return ES.meta(c).key === 'other'; }),
+      done: all.filter(function (c) { return c.status === 'completed'; })
+    };
+  }
+
+  function heroHTML(c, moreCount) {
+    var cd = ES.countdown(c.deadline);
+    var pg = ES.progress(c);
+    var nodes = c.parties.map(function (p, i) {
+      var cls = p.status === 'signed' ? 'done' : (p.ownerUid === ctx.user.id ? 'cur' : '');
+      return '<div class="node ' + cls + '"><div class="dot"></div><div class="lb">' + ES.esc(p.role + (p.company || p.name)) + (p.status === 'signed' ? '·已签' : (p.ownerUid === ctx.user.id ? '·待签' : '')) + '</div></div>';
+    }).join('') + '<div class="node"><div class="dot"></div><div class="lb">平台存证</div></div>';
+    return '<section class="es-hero" data-sign="' + ES.esc(c.id) + '">' +
+      '<div class="kicker"><span>待我签署 · <b class="es-mono">1</b> 份</span><span class="seal">待<br>签</span></div>' +
+      '<h3>' + ES.esc(c.title) + '</h3>' +
+      '<div class="party">' + ES.esc(ES.counterpartyText(c)) + ' · 合同号 ' + ES.esc(c.code) + '</div>' +
+      '<div class="amount"><span class="v es-mono">' + ES.amountText(c) + '</span><span class="u">合同金额</span>' +
+        '<span class="role">' + ES.esc(ES.roleText(c).replace(' · 发起', '')) + '</span></div>' +
+      '<div class="due">' + ES.ic('clock') + '<span>距签署截止 <span class="es-mono">' + ES.esc(cd.text.replace('剩 ', '')) + '</span></span>' +
+        '<span class="normal">· 逾期自动失效</span></div>' +
+      '<div class="es-flowline">' + nodes + '</div>' +
+      (moreCount > 0 ? '<div style="margin-top:10px;font-size:11.5px;color:var(--es-on-world-gold);">另有 ' + moreCount + ' 份合同待你签署，可在下方"待我签"中查看</div>' : '') +
+      '<div class="acts"><button class="go" data-sign="' + ES.esc(c.id) + '">' + ES.ic('sign') + '立即签署</button>' +
+        '<button class="ghost" data-detail="' + ES.esc(c.id) + '">查看合同</button></div>' +
+    '</section>';
+  }
+  function emptyHero() {
+    return '<section class="es-hero mini"><span class="mi">' + ES.ic('check') + '</span>' +
+      '<div><div class="mt">当前没有待你签署的合同</div><div class="ms">轮到你签署或合同临近截止时，会在这里提醒</div></div></section>';
+  }
+
+  function quickHTML() {
+    var scenes = [['t-material', '材料采购', '2 步套模板', 'truck'], ['t-equipment', '设备租赁', '塔吊·挖机', 'wrench'], ['t-labor', '劳务分包', '班组·用工', 'users']];
+    return '<div class="es-sec"><h2>快捷发起</h2><div class="rule"></div>' +
+        '<button class="more" id="btnAllWay">全部方式 ' + ES.ic('chevron') + '</button></div>' +
+      '<div class="es-qgrid">' + scenes.map(function (s) {
+        return '<button class="es-qtile" data-tpl="' + s[0] + '"><span class="qi">' + ES.ic(s[3]) + '</span>' +
+          '<div class="qt">' + s[1] + '</div><div class="qs">' + s[2] + '</div></button>';
+      }).join('') + '</div>' +
+      '<button class="es-qup" id="btnUpload">' + ES.ic('upload') + '上传 PDF 合同 · 自由发起签署' +
+        '<span class="arrow">' + ES.ic('chevron') + '</span></button>';
+  }
+  function quotaHTML(q) {
+    var low = (q.remaining || 0) <= 2;
+    return '<div class="es-sec"><h2>我的签署次数</h2></div>' +
+      '<div class="es-quota' + (low ? ' low' : '') + '"><span class="qi">' + ES.ic('package') + '</span>' +
+      '<div class="ql"><div>剩余 <b class="es-mono">' + (q.remaining || 0) + '</b> 次　<span class="dim">本月已用 ' + (q.monthUsed || 0) + ' · 累计 ' + (q.totalUsed || 0) + ' 次</span></div>' +
+        '<div class="dim">' + (q.earliestExpire ? '最早 ' + ES.esc(q.earliestExpire) + ' 到期' : '购买后 2 年有效') + '</div></div>' +
+      '<button class="es-btn sm gold" id="btnBuy">购买次数</button></div>';
+  }
+
+  function render() {
+    var g = list(), q = ES.bundle().sub.quota || {};
+    var shown = filter === 'all' ? g.all : g[filter];
+    var html = '';
+    html += g.mine.length ? heroHTML(g.mine[0], g.mine.length - 1) : emptyHero();
+    html += quickHTML();
+    html += quotaHTML(q);
+    html += '<div class="es-sec"><h2>我的合同</h2></div>';
+    html += '<div class="es-chips">' +
+      [['all', '全部', g.all.length], ['mine', '待我签', g.mine.length], ['other', '待对方签', g.other.length], ['done', '已完成', g.done.length]]
+        .map(function (x) { return '<button class="es-chip' + (filter === x[0] ? ' on' : '') + '" data-f="' + x[0] + '">' + x[1] + ' <span class="n">' + x[2] + '</span></button>'; }).join('') +
+      '</div>';
+    if (shown.length) {
+      html += '<div style="margin-top:12px;">' + shown.map(ES.cardHTML).join('') + '</div>';
+      html += '<div class="es-muted" style="text-align:center;margin-top:8px;">由 ' + ES.esc((MOCK.business.esign || {}).provider || 'e签宝') + ' 提供司法存证 · 全流程加密可验真</div>';
+    } else {
+      html += '<div class="es-empty">' + ES.ic('doc') + '<div class="t">当前状态下暂无合同</div>' +
+        '<div class="s">' + (filter === 'mine' ? '没有待你签署的合同，到期合同会在顶部提醒' : '点击右下角「发起签署」创建第一份电子合同') + '</div>' +
+        (filter !== 'mine' ? '<button class="es-btn primary" id="btnEmptyNew">' + ES.ic('plus') + '发起签署</button>' : '') + '</div>';
+    }
+    scrollEl.innerHTML = html;
+    bind();
+  }
+
+  function bind() {
+    scrollEl.querySelectorAll('[data-sign]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); location.href = 'sign.html?id=' + encodeURIComponent(b.getAttribute('data-sign')); };
+    });
+    scrollEl.querySelectorAll('[data-detail]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); location.href = 'detail.html?id=' + encodeURIComponent(b.getAttribute('data-detail')); };
+    });
+    scrollEl.querySelectorAll('[data-tpl]').forEach(function (b) {
+      b.onclick = function () {
+        if ((ES.bundle().sub.quota.remaining || 0) < 1) { UI.toast('签署次数不足，请先购买次数', 'warn'); location.href = 'packages.html'; return; }
+        location.href = 'template-fill.html?id=' + b.getAttribute('data-tpl');
+      };
+    });
+    var up = ES.$('#btnUpload'); if (up) up.onclick = function () {
+      if ((ES.bundle().sub.quota.remaining || 0) < 1) { UI.toast('签署次数不足，请先购买次数', 'warn'); location.href = 'packages.html'; return; }
+      location.href = 'upload.html';
+    };
+    var aw = ES.$('#btnAllWay'); if (aw) aw.onclick = openSheet;
+    var buy = ES.$('#btnBuy'); if (buy) buy.onclick = function () { location.href = 'packages.html'; };
+    var en = ES.$('#btnEmptyNew'); if (en) en.onclick = openSheet;
+    scrollEl.querySelectorAll('.es-chip').forEach(function (ch) {
+      ch.onclick = function () { filter = ch.getAttribute('data-f'); render(); };
+    });
+    scrollEl.querySelectorAll('.es-cc .body').forEach(function (bd) {
+      bd.onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(bd.parentNode.getAttribute('data-id')); };
+    });
+    scrollEl.querySelectorAll('.es-cc .caret').forEach(function (ca) {
+      ca.onclick = function (e) { e.stopPropagation(); ca.closest('.es-cc').classList.toggle('open'); };
+    });
+  }
+
+  function openSheet() {
+    if ((ES.bundle().sub.quota.remaining || 0) < 1) { UI.toast('签署次数不足，请先购买次数', 'warn'); location.href = 'packages.html'; return; }
+    var sh = UI.sheet();
+    sh.setText('发起一份合同');
+    sh.html(
+      '<div style="padding:2px 2px 4px;"><div class="es-muted" style="text-align:center;margin-bottom:14px;">按工程模板填空最快，也可直接上传 PDF</div>' +
+      '<button class="es-card" id="shTpl" style="width:100%;text-align:left;display:flex;align-items:center;gap:13px;cursor:pointer;margin-bottom:10px;">' +
+        '<span class="qi" style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--es-gold-soft);color:var(--es-gold-deep);">' + ES.ic('doc') + '</span>' +
+        '<span style="flex:1;"><div style="font-size:14.5px;font-weight:600;color:var(--text-1);">模板发起</div><div class="es-muted">材料采购 / 设备租赁 / 劳务分包等 6 类工程模板</div></span>' +
+        '<span style="color:var(--text-3)">' + ES.ic('chevron') + '</span></button>' +
+      '<button class="es-card" id="shUp" style="width:100%;text-align:left;display:flex;align-items:center;gap:13px;cursor:pointer;">' +
+        '<span style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--es-moss-soft);color:var(--es-moss);">' + ES.ic('upload') + '</span>' +
+        '<span style="flex:1;"><div style="font-size:14.5px;font-weight:600;color:var(--text-1);">上传 PDF 合同</div><div class="es-muted">自由指定签署方与签署顺序</div></span>' +
+        '<span style="color:var(--text-3)">' + ES.ic('chevron') + '</span></button>' +
+      '<div class="es-muted" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;">' + ES.ic('shield') + '发起冻结 1 次，对方签署前撤回可退回</div></div>'
+    );
+    sh.show();
+    ES.$('#shTpl').onclick = function () { sh.close(); location.href = 'template-list.html'; };
+    ES.$('#shUp').onclick = function () { sh.close(); location.href = 'upload.html'; };
+  }
+
+  ES.$('#esFab').onclick = openSheet;
+  var sc = ES.$('#esScroll');
+  sc.addEventListener('scroll', function () {
+    ES.$('#esFab').classList.toggle('show', sc.scrollTop > 320);
+  });
+
+  ES.subscribe(render);
+  render();
+});
+</script>
+</body>
+</html>

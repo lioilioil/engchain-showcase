@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>签署订单 · 工程链管理后台</title>
+<link rel="stylesheet" href="../css/admin.css">
+<script src="../js/admin.js" defer></script>
+</head>
+<body data-page="esign/orders.html">
+<header class="topbar"></header>
+<div class="layout">
+  <aside class="sidenav"></aside>
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>签署订单</h1>
+        <div class="sub">电子签 · 次数包购买订单台账（支付方式 / 次数消耗进度 / 退款关联）· 财务对账与导出</div>
+      </div>
+      <button class="btn btn-outline" id="btn-refresh">刷新</button>
+      <button class="btn btn-outline" id="btn-export" title="导出订单 CSV">导出 CSV</button>
+    </div>
+    <div class="kpis" id="kpi"></div>
+    <div class="card card-pad">
+      <div class="card-h"><span class="card-t">购买订单</span><span class="card-s" id="c-count"></span></div>
+      <div id="c-filter"></div>
+      <div id="c-table"></div>
+      <div id="c-pager"></div>
+    </div>
+  </main>
+</div>
+<script>window.__ROOT__ = "../../";</script>
+<script src="../../js/data.js" defer></script>
+<script src="../../js/common.js" defer></script>
+<script src="../../js/stores.js" defer></script>
+<script src="../../js/databus.js" defer></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function dts(ts) { if (!ts) return '—'; var d = new Date(ts); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2) + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2); }
+
+  var ALLOWED = ['finance', 'super'];
+  function role() { try { return localStorage.getItem('engchain-role') || 'super'; } catch (e) { return 'super'; } }
+  if (ALLOWED.indexOf(role()) < 0) {
+    document.addEventListener('DOMContentLoaded', function () {
+      var m = document.querySelector('.main'); if (m) m.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;text-align:center;"><div style="font-size:18px;font-weight:700;margin-bottom:8px;">当前角色无权访问「签署订单」</div><div class="sub">订单与资金台账仅对财务 / 超管开放，请在右上角切换身份。</div></div>';
+    });
+    return;
+  }
+
+  var OS = { paid:['badge-success','已支付'], refunding:['badge-warning','退款审核中'], refunded:['badge-outline','已退款'], voided:['badge-danger','已作废'] };
+  var state = { filters:{ kw:'', status:'' }, page:1, pageSize:12, paginator:null };
+  function rows() { try { return EsignStore.adminListOrders(); } catch (e) { return []; } }
+  function filtered() {
+    var f = state.filters;
+    return rows().filter(function (r) {
+      if (f.status && r.status !== f.status) return false;
+      if (f.kw) { var k=f.kw.toLowerCase(); if ((r.id+(r.ownerName||'')+(r.ownerCompany||'')+(r.pkgName||'')).toLowerCase().indexOf(k)<0) return false; }
+      return true;
+    });
+  }
+  function badge(s){ var m=OS[s]||['badge-outline',s||'—']; return '<span class="badge '+m[0]+'">'+m[1]+'</span>'; }
+
+  function renderKPI() {
+    var all = rows(), paid = all.filter(function(r){return r.status==='paid';});
+    var total = paid.reduce(function(a,r){return a + Number(r.price||0);},0);
+    var times = paid.reduce(function(a,r){return a + Number(r.times||0);},0);
+    var k = [
+      ['订单总数', all.length+' 笔', 'info','全部订单'],
+      ['实收金额（已支付）', money(total), 'gold', paid.length+' 笔已支付'],
+      ['售出签署次数', times+' 次', 'up','已支付订单合计'],
+      ['退款处理中', all.filter(function(r){return r.status==='refunding';}).length+' 笔', 'down','前往退款审核处理']
+    ];
+    $('#kpi').innerHTML = k.map(function(x){ return '<div class="kpi"><div class="k">'+x[0]+'</div><div class="v num">'+x[1]+'</div><div class="d '+x[2]+'">'+x[3]+'</div></div>'; }).join('');
+  }
+
+  function renderTable() {
+    var list = filtered();
+    $('#c-count').textContent = list.length + ' 笔订单';
+    var start = (state.page-1)*state.pageSize;
+    Admin.TableRenderer.render({ container:'#c-table',
+      columns: [
+        { key:'id', label:'订单号', width:'140px', render:function(r){ return '<span class="mono">'+esc(r.id)+'</span>'; } },
+        { key:'user', label:'购买用户', render:function(r){ return '<b>'+esc(r.ownerName||r.uid)+'</b><div class="sub" style="font-size:11px;">'+esc(r.ownerCompany||'')+'</div>'; } },
+        { key:'pkgName', label:'次数包', width:'150px', render:function(r){ return esc(r.pkgName||r.pkgId)+' <span class="sub">×'+r.times+'次</span>'; } },
+        { key:'price', label:'实付金额', width:'100px', render:function(r){ return '<b class="mono">'+money(r.price)+'</b>'; } },
+        { key:'payMethod', label:'支付方式', width:'90px', render:function(r){ return r.payMethod==='balance'?'钱包余额':(r.payMethod==='offline'?'对公转账':esc(r.payMethod||'—')); } },
+        { key:'used', label:'使用进度', width:'130px', render:function(r){ var u=Number(r.timesUsed||0), t=Number(r.times||0); var pct=t?Math.round(u/t*100):0; return '<div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:6px;border-radius:3px;background:var(--muted);overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:var(--primary);"></div></div><span class="sub" style="white-space:nowrap;">'+u+'/'+t+'</span></div>'; } },
+        { key:'status', label:'状态', width:'100px', render:function(r){ return badge(r.status) + (r.refundId?'<div class="sub mono" style="font-size:10px;">'+esc(r.refundId)+'</div>':''); } },
+        { key:'createdAt', label:'下单时间', width:'140px', render:function(r){ return dts(r.createdAt); } },
+        { key:'ops', label:'操作', width:'80px', render:function(){ return '<button class="btn btn-sm btn-outline" data-act="detail">详情</button>'; } }
+      ],
+      data: list.slice(start,start+state.pageSize),
+      options:{ rowClick:openDetail, emptyText:'暂无签署订单' }
+    });
+    if (!state.paginator) {
+      state.paginator = new Admin.Paginator({ container:'#c-pager', total:list.length, pageSize:state.pageSize,
+        onChange:function(p,ps){ state.page=p; state.pageSize=ps; renderTable(); } });
+    } else { state.paginator.pageSize=state.pageSize; state.paginator.setTotal(list.length); }
+  }
+
+  function openDetail(r) {
+    var remain = Number(r.times||0)-Number(r.timesUsed||0);
+    var html = '<div class="drawer-section"><div class="ds-grid">' +
+      '<div class="ds-item"><span class="ds-k">订单号</span><span class="ds-v mono">'+esc(r.id)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">状态</span><span class="ds-v">'+badge(r.status)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">用户</span><span class="ds-v">'+esc(r.ownerName)+'（'+esc(r.uid)+'）'+esc(r.ownerCompany||'')+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">次数包</span><span class="ds-v">'+esc(r.pkgName)+' × '+r.times+' 次</span></div>' +
+      '<div class="ds-item"><span class="ds-k">实付金额</span><span class="ds-v"><b>'+money(r.price)+'</b>（单价 '+money(r.unitPrice)+'/次）</span></div>' +
+      '<div class="ds-item"><span class="ds-k">支付方式</span><span class="ds-v">'+(r.payMethod==='balance'?'钱包余额':r.payMethod==='offline'?'对公转账':esc(r.payMethod))+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">已用 / 剩余</span><span class="ds-v">'+r.timesUsed+' / '+remain+' 次</span></div>' +
+      '<div class="ds-item"><span class="ds-k">下单 / 支付</span><span class="ds-v">'+dts(r.createdAt)+'<br>'+dts(r.paidAt)+'</span></div>' +
+      '<div class="ds-item"><span class="ds-k">有效期至</span><span class="ds-v">'+dts(r.expireAt)+'</span></div>' +
+      (r.refundId ? '<div class="ds-item"><span class="ds-k">关联退款单</span><span class="ds-v mono">'+esc(r.refundId)+'</span></div>' : '') +
+      '</div></div>';
+    Admin.Drawer.open({ title:'签署订单 · '+r.id, content:html, footer:'', width:'520px' });
+  }
+
+  function renderFilter() {
+    Admin.FilterBar.render({ container:'#c-filter',
+      fields: [
+        { key:'kw', label:'搜索', type:'text', placeholder:'订单号/用户/次数包' },
+        { key:'status', label:'状态', type:'select', options:[
+          { value:'', label:'全部状态' }, { value:'paid', label:'已支付' },
+          { value:'refunding', label:'退款审核中' }, { value:'refunded', label:'已退款' }, { value:'voided', label:'已作废' } ] }
+      ],
+      onFilter:function(v){ state.filters={ kw:v.kw||'', status:v.status||'' }; state.page=1; renderTable(); },
+      onReset:function(){ state.filters={ kw:'', status:'' }; state.page=1; renderTable(); }
+    });
+  }
+  function render(){ renderKPI(); renderTable(); }
+  function init() {
+    renderFilter();
+    $('#btn-refresh').onclick = function(){ render(); Admin.toast('已刷新'); };
+    $('#btn-export').onclick = function(){
+      var list = filtered();
+      var rs = list.map(function(r){ return [r.id, r.ownerName||'', r.ownerCompany||'', r.pkgName||r.pkgId, String(r.times), r.price.toFixed(2), r.payMethod||'', String(r.timesUsed||0), (OS[r.status]||['',r.status])[1], dts(r.createdAt)]; });
+      var ok = Admin.exportCSV('电子签签署订单.csv', ['订单号','用户','主体','次数包','次数','实付','支付方式','已用','状态','下单时间'], rs);
+      Admin.toast(ok?'已导出 '+rs.length+' 条':'导出失败', ok?'success':'error');
+      Admin.log('数据导出','签署订单','','电子签签署订单.csv · '+rs.length+' 条');
+    };
+    render();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('engchain:esign', render);
+})();
+</script>
+</body>
+</html>

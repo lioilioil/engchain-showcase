@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>购买签署次数 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">购买签署次数</div>
+      <div class="nav-right" onclick="location.href='records.html'" style="font-size:12px;color:var(--text-2);cursor:pointer;">订单记录</div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:210px;"></div>
+      <div class="es-foot-bar" id="foot" style="position:absolute;left:0;right:0;bottom:0;margin:0;"></div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var v = ES.$('#v'), foot = ES.$('#foot');
+  var pkgs = EsignStore.packages();
+  var sel = pkgs.filter(function (p) { return p.id === 'p10'; })[0] ? 'p10' : pkgs[0].id;
+  var agreed = false, paying = false;
+
+  function cur() { return pkgs.filter(function (p) { return p.id === sel; })[0]; }
+  function available() { return window.BalanceStore ? BalanceStore.available() : 0; }
+
+  function tagClass(t) { return t === '最划算' ? 'best' : ''; }
+  function render() {
+    var q = ES.bundle().sub.quota || {};
+    v.innerHTML =
+      '<div class="es-quota" style="margin:12px 0 16px;"><span class="qi">' + ES.ic('package') + '</span>' +
+        '<div class="ql"><div>当前剩余 <b class="es-mono">' + (q.remaining || 0) + '</b> 次</div>' +
+        '<div class="dim">发起 1 份合同消耗 1 次 · 对方签署前撤回可退回 · 购买后 ' + EsignStore.pricing().validYears + ' 年有效</div></div></div>' +
+      pkgs.map(function (p) {
+        var unit = Math.round(p.price / p.times * 100) / 100;
+        return '<div class="es-pkg' + (sel === p.id ? ' selected' : '') + '" data-id="' + p.id + '">' +
+          (p.tag ? '<span class="es-tag ' + tagClass(p.tag) + '">' + ES.esc(p.tag) + '</span>' : '') +
+          '<div class="pn">' + ES.esc(p.name) + '</div>' +
+          '<div class="pp es-mono">' + ES.money(p.price) + (p.orig ? '<span class="po">' + ES.money(p.orig) + '</span>' : '') + '</div>' +
+          '<div class="pd">含 ' + p.times + ' 次签署 · 折合 ' + ES.money(unit) + '/次' + (p.id === 'single' ? ' · 适合偶尔使用' : (p.id === 'p100' ? ' · 长期项目最省' : '')) + '</div>' +
+        '</div>';
+      }).join('') +
+      '<div class="es-card" style="font-size:11.5px;color:var(--text-3);line-height:1.8;">' +
+        '<b style="color:var(--text-2);">购买与退款说明</b><br>' +
+        '· 次数仅用于本平台电子签发起，不提现、不转赠；<br>' +
+        '· 未使用次数支持退款：退款金额 = 实付金额 − 已用次数 × ' + ES.money(EsignStore.pricing().refundUnit) + '，提交后 1–7 个工作日审核；<br>' +
+        '· 演示环境使用账户余额支付，不接入真实支付。</div>';
+    v.querySelectorAll('.es-pkg').forEach(function (el) {
+      el.onclick = function () { sel = el.getAttribute('data-id'); agreed = false; render(); };
+    });
+    renderFoot();
+  }
+  function renderFoot() {
+    var p = cur(), bal = available(), enough = bal >= p.price;
+    foot.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;padding:0 4px;">' +
+        '<span style="font-size:12.5px;color:var(--text-3);">可用余额 <b class="es-mono" style="color:var(--text-1);">' + ES.money(bal) + '</b></span>' +
+        '<span style="font-size:12.5px;color:var(--text-3);">实付 <b class="es-mono" style="font-size:20px;color:var(--primary-dim);">' + ES.money(p.price) + '</b></span></div>' +
+      '<div class="es-agree" id="agree" style="padding:0 4px 10px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+        '<span>我已阅读并同意 <a href="agreement.html">《电子签名服务协议》</a> 与次数包购买及退款规则</span></div>' +
+      (enough
+        ? '<button class="es-btn primary block" id="bPay" ' + (agreed ? '' : 'disabled') + '>余额支付 ' + ES.money(p.price) + '</button>'
+        : '<button class="es-btn primary block" id="bRecharge">余额不足，去充值</button>') +
+      '<div class="h5-note" style="padding-top:9px;">支付成功后次数实时到账，可在「订单记录」查看与申请退款</div>';
+    var ag = ES.$('#agree', foot); if (ag) ag.onclick = function () { agreed = !agreed; ag.classList.toggle('on', agreed); var b2 = ES.$('#bPay', foot); if (b2) b2.disabled = !agreed; };
+    var pay = ES.$('#bPay', foot);
+    if (pay) pay.onclick = function () {
+      if (!agreed || paying) return; paying = true;
+      var r = EsignStore.buyPackage(p.id, 'balance');
+      paying = false;
+      if (r && r.ok) {
+        UI.toast('支付成功，' + p.times + ' 次签署已到账', 'ok');
+        setTimeout(function () { render(); }, 300);
+        setTimeout(function () { location.href = 'index.html'; }, 900);
+      } else if (r && r.code === 'NO_BALANCE') {
+        render(); UI.toast('可用余额不足，请先充值', 'warn');
+      } else if (r && r.code === 'DEMO_METHOD') {
+        UI.toast('演示环境仅支持余额支付', 'warn');
+      } else if (r && r.code === 'NEED_DIST') {
+        UI.dialog({ title: '暂未开通电子签', text: '完成企业入驻或个人合伙人认证后可购买签署次数。', ok: '去认证', onOk: function () { location.href = '../profile/auth.html'; } });
+      } else {
+        UI.toast((r && r.error) || '支付失败，请稍后重试', 'err');
+      }
+    };
+    var rc = ES.$('#bRecharge', foot); if (rc) rc.onclick = function () { UI.toast('演示环境暂未开放充值入口，可在 preview 切换高余额身份体验', 'warn'); };
+  }
+  ES.subscribe(render);
+  render();
+});
+</script>
+</body>
+</html>

@@ -43,6 +43,10 @@
       { t: '托管订单', f: 'mediation/orders.html' },
       { t: '服务商管理', f: 'mediation/sellers.html' },
       { t: '托管资金台账', f: 'mediation/escrow.html' } ] },
+    { sec: '电子签', items: [
+      { t: '电子合同', f: 'esign/contracts.html', roles: ['ops','risk','super'] },
+      { t: '签署订单', f: 'esign/orders.html', roles: ['finance','super'] },
+      { t: '退款审核', f: 'esign/refunds.html', roles: ['finance','super'] } ] },
     { sec: '风控合规', items: [
       { t: '合规审计', f: 'risk/audit.html' },
       { t: '合规管理', f: 'risk/compliance.html' },
@@ -312,6 +316,9 @@
     'risk/logs.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>',
     'system/pricing.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
     'system/phase.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>',
+    'esign/contracts.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 13 2 2 4-4"/><path d="M8 17h8"/></svg>',
+    'esign/orders.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>',
+    'esign/refunds.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>',
     'system/roles.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 7.5a2.5 2.5 0 0 0 0 5 2.5 2.5 0 0 0 0-5Z"/><path d="M6.6 4.6 6 8l-3.4 1.6 1.2 3.2-1.4 2.6 3.8 1.6 1.4 2.4 3.6-.2 1.6 3.2 3.2-1.4 3.6.4 1-3.4 3.4-1.4-1-3.2 1.4-3.4-3.8-1.2-1.2-3.6Z"/><path d="M22 2 2 22"/></svg>'
   };
 
@@ -399,9 +406,9 @@
   /* ---- 部门角色权限（Phase 7）：超管/运营/财务/风控 → 侧边导航可见性过滤 ---- */
   var ROLES = {
     super: null,
-    ops: { secs: ['总览', '运营中心', '分销中心', '中介服务', '系统设置'] },
-    finance: { secs: ['总览', '资金中心', '分销中心', '中介服务', '系统设置'] },
-    risk: { secs: ['总览', '风控合规', '系统设置'] }
+    ops: { secs: ['总览', '运营中心', '分销中心', '中介服务', '电子签', '系统设置'] },
+    finance: { secs: ['总览', '资金中心', '分销中心', '中介服务', '电子签', '系统设置'] },
+    risk: { secs: ['总览', '风控合规', '电子签', '系统设置'] }
   };
   function currentRole() {
     try { return localStorage.getItem('engchain-role') || 'super'; } catch (e) { return 'super'; }
@@ -442,7 +449,8 @@
     'distribution/overview.html': '分销中心', 'distribution/team.html': '分销中心', 'distribution/payout.html': '分销中心',
     'mediation/orders.html': '中介服务', 'mediation/sellers.html': '中介服务', 'mediation/escrow.html': '中介服务',
     'risk/audit.html': '风控合规', 'risk/monitor.html': '风控合规', 'risk/compliance.html': '风控合规', 'risk/logs.html': '风控合规',
-    'system/pricing.html': '系统设置', 'system/phase.html': '系统设置', 'system/roles.html': '系统设置'
+    'esign/contracts.html': '电子签', 'esign/orders.html': '电子签', 'esign/refunds.html': '电子签',
+        'system/pricing.html': '系统设置', 'system/phase.html': '系统设置', 'system/roles.html': '系统设置'
   };
   function guardPage() {
     var cur = document.body.getAttribute('data-page') || '';
@@ -481,6 +489,7 @@
       if (!roleAllowed(g.sec)) return;
       html += '<div class="sn-sec">' + g.sec + '</div>';
       g.items.forEach(function (it) {
+        if (it.roles && it.roles.indexOf(currentRole()) < 0) return;
         var on = it.f === current ? ' on' : '';
         var svhic = ICONS[it.f] || '';
         html += '<a class="sn-item' + on + '" href="' + BASE + it.f + '">' + (svhic ? '<span class="sn-ic">' + svhic + '</span>' : '') + '<span class="sn-t">' + it.t + '</span></a>';

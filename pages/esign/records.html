@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>购买记录 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='index.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">次数订单</div>
+      <div class="nav-right" onclick="location.href='packages.html'" style="font-size:12px;color:var(--primary-dim);cursor:pointer;">购买次数</div>
+    </div>
+    <div class="es-view"><div class="es-scroll" id="v"></div></div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function () {
+  var v = ES.$('#v');
+  var ORDER_STATUS = { paid: '使用中', refunding: '退款审核中', refunded: '已退款' };
+  function refundMap() {
+    var m = {};
+    (ES.bundle().sub.refunds || []).forEach(function (r) { m[r.orderId] = r; });
+    return m;
+  }
+  function render() {
+    var orders = ES.bundle().sub.orders || [];
+    var rmap = refundMap();
+    if (!orders.length) {
+      v.innerHTML = '<div class="es-empty">' + ES.ic('receipt') + '<div class="t">暂无次数订单</div>' +
+        '<div class="s">购买的签署次数包会在这里展示用量与退款入口</div>' +
+        '<button class="es-btn primary" onclick="location.href=\'packages.html\'">去购买次数</button></div>';
+      return;
+    }
+    v.innerHTML = '<div style="padding-top:4px;">' + orders.map(function (o) {
+      var used = o.timesUsed || 0, total = o.times || 1, remain = Math.max(0, total - used);
+      var pct = Math.min(100, Math.round(used / total * 100));
+      var r = rmap[o.id];
+      var stBadge = o.status === 'paid' ? 'b-done' : (o.status === 'refunding' ? 'b-other' : 'b-gray');
+      var action = '';
+      if (o.status === 'paid' && remain > 0) action = '<button class="es-linkbtn" data-refund="' + o.id + '">申请退剩余次数</button>';
+      else if (o.status === 'refunding' && r) action = '<span class="es-muted" style="display:inline-block;margin-top:10px;">退款审核中 · 预计 1–7 个工作日</span>';
+      else if (o.status === 'refunded' && r) action = '<span class="es-muted" style="display:inline-block;margin-top:10px;">已退款 ' + ES.money(r.refundAmount) + '（退回余额）</span>';
+      return '<div class="es-order">' +
+        '<div class="ot"><span class="on2">' + ES.esc(o.pkgName) + ' ×' + total + '</span>' +
+          '<span><span class="es-badge ' + stBadge + '">' + ORDER_STATUS[o.status] + '</span></span></div>' +
+        '<div class="op es-mono" style="margin-top:8px;">' + ES.money(o.price) + '</div>' +
+        '<div class="es-bar"><i style="width:' + pct + '%;"></i></div>' +
+        '<div class="oi es-mono">订单号 ' + ES.esc(o.id) + '<br>已用 ' + used + ' 次 · 剩余 ' + remain + ' 次 · 购买于 ' + ES.ddate(o.createdAt) +
+          (o.expireAt ? ' · ' + ES.ddate(o.expireAt) + ' 到期' : '') + '</div>' + action +
+      '</div>';
+    }).join('') + '</div>';
+    v.querySelectorAll('[data-refund]').forEach(function (b) {
+      b.onclick = function () { location.href = 'refund.html?orderId=' + encodeURIComponent(b.getAttribute('data-refund')); };
+    });
+  }
+  ES.subscribe(render);
+  render();
+});
+</script>
+</body>
+</html>
