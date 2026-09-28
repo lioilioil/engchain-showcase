@@ -1,0 +1,363 @@
+/* ============================================================================
+   liquid-cta.css — 液态玻璃 CTA 体系（v2：逐按钮玻璃，无容器背景）
+   玻璃渲染由 js/liquid-cta.js + js/liquid-glass.iife.js（WebGL2）逐按钮挂载；
+   本文件职责：
+   - 浮动悬浮栏容器：透明、无背景无模糊（玻璃只在按钮上，不再有"整块玻璃垫底"）
+   - 按钮：保留半透明品牌底色，仅在降级（data-liquid-glass="fallback"）时
+     启用自身 backdrop-filter 毛玻璃兜底，视觉不塌
+   - 明暗双态、降级与无障碍
+
+   视觉规则（主次色彩，引导用户）：
+   - 主行动 = 品牌金玻璃（玻璃 tintColor #B89968 + 金色内辉光 + 深字 --text-inv）
+   - 次行动 = 中性玻璃（低 tint 乳白/深灰渐变 + 发丝边 + 墨色文字）
+   - 解锁/已提交 = 成功绿玻璃（tintColor #2B6B4F）
+   - 每页浮动栏只有一个主行动；次行动永远弱于主行动
+   ========================================================================== */
+
+/* ==================== 浮动悬浮栏容器（透明，仅布局与显隐动效） ==================== */
+.lg-cta{
+  position: absolute;
+  left: 16px; right: 16px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px;
+  border-radius: 26px;
+  opacity: 0; transform: translateY(16px); pointer-events: none;
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,1.15,.4,1);
+}
+.lg-cta.show{ opacity: 1; transform: none; pointer-events: auto; }
+
+/* ==================== 玻璃按钮 ==================== */
+.lg-btn{
+  flex: 1; height: 46px; min-width: 0;
+  border: 0; border-radius: 21px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: var(--font-display); font-size: 14.5px; font-weight: 600;
+  letter-spacing: .01em; -webkit-user-select: none; user-select: none;
+  text-decoration: none; outline: none;
+  transition: transform .15s ease, filter .2s ease, box-shadow .2s ease;
+}
+.lg-btn:active{ transform: scale(.97); }
+.lg-btn svg{ width: 16px; height: 16px; stroke-width: 2; flex: none; }
+
+/* 主行动 · 品牌金玻璃
+   WebGL 正常时：底色接近透明（仅极淡金晕），玻璃折射按钮背后的页面内容，
+   彩色由玻璃 tintColor 承担——液态质感来自折射内容 + 边缘高光，而非色块。
+   降级（data-liquid-glass="fallback"）时：半透明金底 + backdrop-filter 毛玻璃兜底。 */
+.lg-btn-primary{
+  color: #101010;
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.40) 0%,
+    rgba(184,153,104,.32) 48%,
+    rgba(169,138,71,.26) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.48),
+    inset 0 -1px 2px rgba(122,92,44,.16),
+    inset 0 0 0 1px rgba(255,255,255,.30),
+    0 8px 24px -8px rgba(184,153,104,.40);
+}
+.lg-btn-primary[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.52) 0%,
+    rgba(184,153,104,.46) 46%,
+    rgba(169,138,71,.44) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(1.04);
+  backdrop-filter: blur(18px) saturate(170%) brightness(1.04);
+}
+.lg-btn-primary:active{
+  filter: brightness(.96);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.40), 0 2px 8px -4px rgba(184,153,104,.50);
+}
+[data-theme="dark"] .lg-btn-primary{
+  color: #FFFFFF;
+  background: linear-gradient(180deg,
+    rgba(236,210,150,.36) 0%,
+    rgba(219,192,126,.28) 48%,
+    rgba(201,176,112,.22) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.32),
+    inset 0 -1px 2px rgba(70,50,20,.22),
+    inset 0 0 0 1px rgba(255,255,255,.20),
+    0 8px 24px -8px rgba(201,176,112,.36);
+}
+[data-theme="dark"] .lg-btn-primary[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(219,192,126,.50) 0%,
+    rgba(201,176,112,.44) 46%,
+    rgba(184,153,104,.42) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(.9);
+  backdrop-filter: blur(18px) saturate(170%) brightness(.9);
+}
+
+/* 次行动 · 中性玻璃（WebGL 时底色透明，折射内容+白色 tint；降级时毛玻璃白） */
+.lg-btn-secondary{
+  color: var(--text-1);
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.16) 0%,
+    rgba(255,255,255,.08) 48%,
+    rgba(255,255,255,.12) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.60),
+    inset 0 0 0 1px rgba(255,255,255,.28),
+    0 2px 10px -4px rgba(22,22,22,.14);
+}
+.lg-btn-secondary[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.52) 0%,
+    rgba(255,255,255,.22) 48%,
+    rgba(255,255,255,.34) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+}
+.lg-btn-secondary:active{ filter: brightness(.97); }
+[data-theme="dark"] .lg-btn-secondary{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.10) 0%,
+    rgba(255,255,255,.05) 48%,
+    rgba(255,255,255,.08) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.18),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    0 2px 10px -4px rgba(0,0,0,.40);
+}
+[data-theme="dark"] .lg-btn-secondary[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(72,72,80,.50) 0%,
+    rgba(46,46,54,.26) 48%,
+    rgba(54,54,62,.38) 100%);
+}
+
+/* 次行动 · 已提交态（franchise 提交委托）：成功色玻璃 + 勾 */
+.lg-btn-secondary.lg-btn-submitted{
+  color: #F0DCA8;
+  background: linear-gradient(180deg,
+    rgba(50,128,92,.38) 0%,
+    rgba(26,77,54,.32) 48%,
+    rgba(22,64,45,.28) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.35),
+    inset 0 0 0 1px rgba(43,107,79,.30),
+    0 2px 10px -4px rgba(43,107,79,.28);
+}
+[data-theme="dark"] .lg-btn-secondary.lg-btn-submitted{
+  color: #8FD6B2;
+  background: linear-gradient(180deg,
+    rgba(111,191,151,.12) 0%,
+    rgba(43,107,79,.09) 48%,
+    rgba(43,107,79,.11) 100%);
+}
+
+/* ==================== 详情页/企业页/个人主页 底部固定栏 ====================
+   玻璃逐按钮挂载（.dab-icon 中性 / .dab-cta 金 / 解锁绿），容器无背景。
+   作用域限定 [data-lg-cta="bar"]，不污染全站 .dab-* 样式 */
+[data-lg-cta="bar"] .dab-icon{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.16) 0%,
+    rgba(255,255,255,.08) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 0 0 1px rgba(255,255,255,.26),
+    0 2px 12px -4px rgba(22,22,22,.12);
+}
+[data-lg-cta="bar"] .dab-icon[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.60) 0%,
+    rgba(255,255,255,.28) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+}
+[data-lg-cta="bar"] .dab-icon:active{
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.50), 0 1px 6px -3px rgba(22,22,22,.12);
+}
+[data-lg-cta="bar"] .dab-icon.active{
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.16) 0%,
+    rgba(184,153,104,.10) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.45),
+    inset 0 0 0 1px rgba(201,169,97,.40),
+    0 2px 12px -4px rgba(201,169,97,.26);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .dab-icon{
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.09) 0%,
+    rgba(255,255,255,.05) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    0 2px 12px -4px rgba(0,0,0,.40);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .dab-icon[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(72,72,80,.52) 0%,
+    rgba(40,40,48,.30) 100%);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .dab-icon.active{
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.15) 0%,
+    rgba(184,153,104,.09) 100%);
+}
+
+/* 主 CTA · 金玻璃（保持 .dab-cta 的 flex:1 金色引导，玻璃 tintColor #B89968） */
+[data-lg-cta="bar"] .dab-cta{
+  color: #101010;
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.40) 0%,
+    rgba(184,153,104,.32) 48%,
+    rgba(169,138,71,.26) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.34),
+    inset 0 -1px 2px rgba(122,92,44,.16),
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 6px 18px -6px rgba(184,153,104,.34);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .dab-cta{
+  color: #FFFFFF;
+  background: linear-gradient(180deg,
+    rgba(236,210,150,.36) 0%,
+    rgba(219,192,126,.28) 48%,
+    rgba(201,176,112,.22) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.34),
+    inset 0 -1px 2px rgba(122,92,44,.16),
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 6px 18px -6px rgba(184,153,104,.34);
+}[data-lg-cta="bar"] .dab-cta[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(201,176,112,.50) 0%,
+    rgba(184,153,104,.44) 48%,
+    rgba(169,138,71,.42) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%) brightness(1.04);
+  backdrop-filter: blur(18px) saturate(170%) brightness(1.04);
+}
+[data-lg-cta="bar"] .dab-cta:active{
+  filter: brightness(.96);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.38), 0 2px 8px -4px rgba(184,153,104,.45);
+}
+/* 解锁态（成功绿）也玻璃化 */
+[data-lg-cta="bar"] .dab-cta.is-unlocked{
+  color: #F0DCA8;
+  background: linear-gradient(180deg,
+    rgba(56,133,98,.15) 0%,
+    rgba(43,107,79,.11) 48%,
+    rgba(31,90,65,.09) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.26),
+    inset 0 -1px 2px rgba(16,50,36,.18),
+    inset 0 0 0 1px rgba(255,255,255,.12),
+    0 6px 18px -6px rgba(43,107,79,.32);
+}
+[data-lg-cta="bar"] .dab-cta.is-unlocked[data-liquid-glass="fallback"]{
+  background: linear-gradient(180deg,
+    rgba(56,133,98,.50) 0%,
+    rgba(43,107,79,.44) 48%,
+    rgba(31,90,65,.42) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+}
+
+/* ==================== 降级与无障碍 ==================== */
+@media (prefers-reduced-motion: reduce){
+  .lg-cta{ transition: none; }
+  .lg-btn{ transition: none; }
+}
+@media (prefers-reduced-transparency: reduce){
+  .lg-cta{ background: var(--bg-elevated); }
+  .lg-btn-primary,
+  .lg-btn-secondary{ background: var(--bg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  [data-lg-cta="bar"] .dab-icon,
+  [data-lg-cta="bar"] .dab-cta{ background: var(--bg-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ==================== 全站底部固定操作栏通用按钮玻璃 ====================
+   适用：fixed-cta / ap-bottom-bar / share-bottom-bar / at-dock / radar-bottom-bar
+   / fixed-actionbar 等 [data-lg-cta="bar"] 容器内的通用 .btn 体系按钮。
+   原则：不给容器加背景，只改按钮本身；金（主行动）深金/亮金、中性（次行动）薄玻璃。
+   文字色与已接入玻璃按钮一致：金按钮明亮黑字、暗色白字（保留原按钮布局与圆角）。 */
+[data-lg-cta="bar"] .btn.btn-primary,
+[data-lg-cta="bar"] .btn.btn-submit,
+[data-lg-cta="bar"] .btn.btn-next,
+[data-lg-cta="bar"] .at-cta,
+[data-lg-cta="bar"] .radar-bar-btn.primary{
+  color:#101010;
+  background:linear-gradient(180deg,
+    rgba(201,176,112,.40) 0%,
+    rgba(184,153,104,.32) 48%,
+    rgba(169,138,71,.26) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.34),
+    inset 0 -1px 2px rgba(122,92,44,.16),
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 6px 18px -6px rgba(184,153,104,.34);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-primary,
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-submit,
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-next,
+[data-theme="dark"] [data-lg-cta="bar"] .at-cta,
+[data-theme="dark"] [data-lg-cta="bar"] .radar-bar-btn.primary{
+  color:#FFFFFF;
+  background:linear-gradient(180deg,
+    rgba(236,210,150,.36) 0%,
+    rgba(219,192,126,.28) 48%,
+    rgba(201,176,112,.22) 100%);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,.34),
+    inset 0 -1px 2px rgba(122,92,44,.16),
+    inset 0 0 0 1px rgba(255,255,255,.18),
+    0 6px 18px -6px rgba(184,153,104,.34);
+}
+/* 中性（次行动/ghost）：薄玻璃，保留原文字色 */
+[data-lg-cta="bar"] .btn.btn-ghost,
+[data-lg-cta="bar"] .btn.btn-secondary,
+[data-lg-cta="bar"] .btn.btn-prev,
+[data-lg-cta="bar"] .btn.btn-draft,
+[data-lg-cta="bar"] .radar-bar-btn.secondary{
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.46) 0%,
+    rgba(255,255,255,.34) 48%,
+    rgba(255,255,255,.38) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 0 0 1px rgba(255,255,255,.38),
+    0 4px 14px -6px rgba(0,0,0,.10);
+}
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-ghost,
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-secondary,
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-prev,
+[data-theme="dark"] [data-lg-cta="bar"] .btn.btn-draft,
+[data-theme="dark"] [data-lg-cta="bar"] .radar-bar-btn.secondary{
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.10) 0%,
+    rgba(255,255,255,.06) 48%,
+    rgba(255,255,255,.08) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    inset 0 0 0 1px rgba(255,255,255,.10),
+    0 4px 14px -6px rgba(0,0,0,.30);
+}
+/* WebGL 不可用时的 fallback 兜底（半透明底 + backdrop blur，视觉不塌） */
+[data-lg-cta="bar"] .btn.btn-primary[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .btn.btn-submit[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .btn.btn-next[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .at-cta[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .radar-bar-btn.primary[data-liquid-glass="fallback"]{
+  background:linear-gradient(180deg,
+    rgba(201,176,112,.50) 0%,
+    rgba(184,153,104,.44) 48%,
+    rgba(169,138,71,.42) 100%);
+  -webkit-backdrop-filter:blur(18px) saturate(170%) brightness(1.04);
+  backdrop-filter:blur(18px) saturate(170%) brightness(1.04);
+}
+[data-lg-cta="bar"] .btn.btn-ghost[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .btn.btn-secondary[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .btn.btn-prev[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .btn.btn-draft[data-liquid-glass="fallback"],
+[data-lg-cta="bar"] .radar-bar-btn.secondary[data-liquid-glass="fallback"]{
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.72) 0%,
+    rgba(255,255,255,.60) 48%,
+    rgba(255,255,255,.64) 100%);
+  -webkit-backdrop-filter:blur(18px) saturate(170%);
+  backdrop-filter:blur(18px) saturate(170%);
+}

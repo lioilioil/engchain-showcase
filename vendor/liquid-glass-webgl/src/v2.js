@@ -59,6 +59,26 @@ function normalizeElement(input, index) {
   if (!['auto', 'light', 'dark'].includes(tintTone)) {
     throw new TypeError(`Unknown liquid glass V2 tint tone: ${tintTone}`);
   }
+  // Optional per-element tint color: '#rrggbb' or [r, g, b] in 0-1.
+  let tintColor;
+  if (input.tintColor != null) {
+    if (typeof input.tintColor === 'string') {
+      const hex = input.tintColor.replace(/^#/, '');
+      const n = parseInt(hex, 16);
+      if (hex.length === 6 && Number.isFinite(n)) {
+        tintColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+      } else {
+        throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+      }
+    } else if (Array.isArray(input.tintColor) && input.tintColor.length === 3) {
+      tintColor = input.tintColor.map(Number);
+      if (!tintColor.every(Number.isFinite)) {
+        throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+      }
+    } else {
+      throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+    }
+  }
   return {
     ...input,
     id: input.id ?? `glass-v2-${index + 1}`,
@@ -70,6 +90,7 @@ function normalizeElement(input, index) {
     ...(tint === undefined ? {} : { tint }),
     ...(frost === undefined ? {} : { frost }),
     ...(opacity === undefined ? {} : { opacity }),
+    ...(tintColor === undefined ? {} : { tintColor }),
     tintTone,
     pressure: Math.max(0, Math.min(1, pressure)),
     pressureAxes: pressureAxes.map((v) => Math.max(0, Math.min(1, v))),

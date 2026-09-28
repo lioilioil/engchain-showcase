@@ -18,6 +18,7 @@ uniform vec2 uShapeHalves[MAX_SHAPES];
 uniform int uShapeTypes[MAX_SHAPES];
 uniform float uShapeRadii[MAX_SHAPES];
 uniform float uShapeTints[MAX_SHAPES];
+uniform vec3 uShapeTintColors[MAX_SHAPES];
 uniform float uShapeTintLights[MAX_SHAPES];
 uniform float uShapeFrosts[MAX_SHAPES];
 uniform float uShapeOpacities[MAX_SHAPES];
@@ -318,6 +319,15 @@ void main() {
   // veil used by notifications and other legibility-first controls.
   vec3 tintTarget = mix(vec3(0.055, 0.057, 0.066), vec3(0.975, 0.970, 0.955),
                         clamp(uShapeTintLights[chosen], 0.0, 1.0));
+  // Colored tint: keep the light/dark base luminance, replace its hue with
+  // tintColor, so colored glass stays vivid instead of darkening through
+  // multiplication. White tintColor (neutral) changes nothing (tabbar-safe).
+  vec3 tc = uShapeTintColors[chosen];
+  float colorful = smoothstep(0.02, 0.08, length(tc - vec3(1.0)));
+  vec3 lumVec = vec3(0.299, 0.587, 0.114);
+  float tintLum = dot(tintTarget, lumVec);
+  vec3 colored = tc * min((tintLum * 0.72) / max(dot(tc, lumVec), 1e-4), 0.85);
+  tintTarget = mix(tintTarget, colored, colorful);
   float tintOpacity = smoothstep(0.0, 1.5, uShapeTints[chosen]) * 0.78;
   transmitted = mix(transmitted, tintTarget, tintOpacity * (0.88 + depth * 0.12));
 

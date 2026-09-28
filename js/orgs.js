@@ -85,7 +85,16 @@ window.OrgsStore = (function () {
         members: [
           { uid: 'u4', role: 'member', status: 'active', joinedAt: now - DAY * 10 }
         ],
-        invites: [], joins: []
+        invites: [], joins: [],
+        /* 演示：u4 张敏已提交企业主认领（实际控制人声明通道），等待后台审核。
+           登录 u4 可在企业成员管理页看到「认领审核中」卡片；后台通过后 u4 自动成为 owner。 */
+        ownerClaims: [
+          { id: 'cl-org3-demo', uid: 'u4', name: '张敏', idNo: '510***********0022',
+            mode: 'controller', declaration: true, materials: [],
+            contactPhoneMatched: false,
+            status: 'pending', createdAt: now - DAY * 0.5,
+            reviewedAt: 0, reviewedBy: '', reviewNote: '' }
+        ]
       }
     ];
   }
@@ -93,8 +102,18 @@ window.OrgsStore = (function () {
   function load() {
     var raw = LS.getItem(KEY);
     if (raw === null) { var s = seedOrgs(); save(s); return s; }
-    try { var a = JSON.parse(raw); if (Array.isArray(a) && a.length) return a; } catch (e) {}
+    try { var a = JSON.parse(raw); if (Array.isArray(a) && a.length) { migrate(a); return a; } } catch (e) {}
     s = seedOrgs(); save(s); return s;
+  }
+  /* 轻量迁移：旧数据补齐新字段（ownerClaims），不破坏用户已有演示操作。
+     注意：只补"字段缺失"，不自动塞演示记录——演示 claim 仅在 seedOrgs() 里出现，
+     老用户升级时不应凭空多出一条待审核单。 */
+  function migrate(a) {
+    var changed = false;
+    a.forEach(function (org) {
+      if (!Array.isArray(org.ownerClaims)) { org.ownerClaims = []; changed = true; }
+    });
+    if (changed) save(a);
   }
   function save(a) { try { LS.setItem(KEY, JSON.stringify(a)); } catch (e) {} return a; }
   function get(orgId) { var a = load(); for (var i = 0; i < a.length; i++) if (a[i].orgId === orgId) return a[i]; return null; }
@@ -906,6 +925,151 @@ window.OrgsStore = (function () {
     return { ok: true };
   }
 
+  /* ============ 企业主自认领（实际控制人本人） + 真实性校验（v1.4） ============
+     场景：企业刚入驻、ownerUid 为空，但入驻人本人就是实际控制人。此时没人能"邀请他"——
+     要么没管理权限，要么他自己就是那个有权限的人。本路径补这个缺口：
+       当前已是本企业成员 → 本人提交认领 → 双通道校验 → 后台审核通过 → 自动成为 owner。
+     双通道真实性：
+       - legal（法人认证）：本人实名姓名 == org.legal（营业执照法人）→ 工商信息+个人实名双重强事实，
+         后台可一键通过（现实中大量中小企业法人=实控人，是主流场景，不卡人工）。
+       - controller（实际控制人声明）：姓名 ≠ 法人但自称实控人 → 身份证号+法律声明+材料占位，
+         必须后台人工审核（"实控人"是法律推定概念，无单一权威数据源）。
+     防滥用：仅企业主空缺时可发起；每人每企业同时仅一条 pending；24h 内最多提交 3 次。 */
+  function ownerClaimsOf(orgId) { var org = get(orgId); return (org && org.ownerClaims) || []; }
+  /* 当前企业的 pending 认领（每企业最多一条 pending；多人同时认领先到先得） */
+  function pendingOwnerClaimOf(orgId) {
+    var list = ownerClaimsOf(orgId);
+    for (var i = 0; i < list.length; i++) if (list[i].status === 'pending') return list[i];
+    return null;
+  }
+  /* 当前登录用户在该企业的 pending 认领（用于页面显示"认领审核中"卡片） */
+  function myPendingClaim(orgId) {
+    var u = me(); if (!u) return null;
+    var list = ownerClaimsOf(orgId);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].uid === u.id && list[i].status === 'pending') return list[i];
+    }
+    return null;
+  }
+  /* 跨企业 pending 认领汇总（后台审核工作台） */
+  function pendingOwnerClaimsAll() {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      (org.ownerClaims || []).forEach(function (c) {
+        if (c.status === 'pending') out.push({ org: org, claim: c });
+      });
+    });
+    return out;
+  }
+
+  /* 提交企业主认领 */
+  function submitOwnerClaim(orgId, mode, payload) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    /* 前置：必须是本企业成员（入驻人理应已是 member；外人不能认老板） */
+    var cm = membershipOf(u.id, orgId);
+    if (!cm) return { error: '你需先加入本企业成为成员，才能认领企业主身份' };
+    /* 前置：必须已实名（认领本质是把工商/实控人身份绑到账号上，实名是底座） */
+    if (!(u.auth && u.auth.realname && u.auth.realname.ok)) return { error: '需先完成个人实名认证，才能认领企业主身份' };
+    /* 前置：企业当前不能已有 active owner */
+    if (hasOwner(orgId)) return { error: '该企业已有企业主，无需认领' };
+    /* 前置：不能与邀请/变更流程并行（避免两套审批单同时生效） */
+    if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理邀请' };
+    if (pendingOwnerChangeOf(orgId)) return { error: '已有企业主变更在后台审批中，请先等待结果' };
+    /* 前置：本人不能已有 pending 认领 */
+    if (myPendingClaim(orgId)) return { error: '你的认领申请已在审核中，请等待结果' };
+    /* 防刷：24h 内最多提交 3 次 */
+    var t0 = Date.now(), cnt = 0;
+    (org.ownerClaims || []).forEach(function (c) {
+      if (c.uid === u.id && (t0 - c.createdAt < DAY)) cnt++;
+    });
+    if (cnt >= 3) return { error: '24 小时内最多提交 3 次认领，请明天再试' };
+
+    var name = String((payload && payload.name) || u.name || '').trim();
+    var idNo = String((payload && payload.idNo) || '').trim();
+    if (!name) return { error: '请填写真实姓名' };
+    if (!/^\d{6}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(idNo)) return { error: '请填写正确的 18 位身份证号' };
+    if (mode === 'legal') {
+      /* 法人通道：姓名必须与营业执照法人完全一致（强事实匹配，后台可自动通过） */
+      if (name !== (org.legal || '')) return { error: '法人认证：姓名须与营业执照法定代表人「' + (org.legal || '') + '」一致' };
+    } else if (mode === 'controller') {
+      if (!payload || !payload.declaration) return { error: '实际控制人验证：需勾选实际控制人声明' };
+    } else {
+      return { error: '请选择验证方式' };
+    }
+    /* 弱信号：当前账号手机号是否与企业法人/入驻联系人手机号一致（供审核员加权参考，不自动通过） */
+    var contactPhoneMatched = !!(u.mobile && org.legalPhone && u.mobile === org.legalPhone);
+    var rec = {
+      id: 'cl-' + Date.now(), uid: u.id, name: name, idNo: idNo,
+      mode: mode, declaration: !!(payload && payload.declaration),
+      materials: (payload && payload.materials) || [],
+      contactPhoneMatched: contactPhoneMatched,
+      /* 预填审核提示：法人通道+姓名一致 → 建议自动通过；实控人通道 → 必须人工看材料 */
+      autoSuggest: (mode === 'legal') ? 'approve' : 'manual',
+      status: 'pending', createdAt: Date.now(),
+      reviewedAt: 0, reviewedBy: '', reviewNote: ''
+    };
+    (org.ownerClaims = org.ownerClaims || []).push(rec);
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('提交企业主自认领', '企业', name,
+      (mode === 'legal' ? '法人认证' : '实际控制人声明') + ' · ' + (org.shortName || org.co) +
+      (contactPhoneMatched ? ' · 手机号与入驻联系人一致' : ''));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, claimId: rec.id, autoSuggest: rec.autoSuggest };
+  }
+
+  /* 后台审核企业主认领：通过 → 当前用户直接成为 owner（企业主空缺场景，无原 owner 需降级） */
+  function reviewOwnerClaim(claimId, approve, note) {
+    var a = load();
+    var org = null, c = null;
+    for (var i = 0; i < a.length && !c; i++) {
+      var list = a[i].ownerClaims || [];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === claimId) { org = a[i]; c = list[j]; break; }
+      }
+    }
+    if (!org || !c) return { error: '认领单不存在' };
+    if (c.status !== 'pending') return { error: '该认领单已处理' };
+    if (approve) {
+      /* 二次校验：审核期间企业可能已被他人设 owner（邀请/变更通过），以最新状态为准 */
+      if (hasOwner(org.orgId)) {
+        c.status = 'rejected'; c.reviewedAt = Date.now();
+        c.reviewNote = '企业主已由其他渠道确认，本认领自动失效';
+        save(a); return { ok: true, note: '企业主已被其他渠道占用，认领失效' };
+      }
+      /* 把认领人写为 owner：已是 member 则改 role，否则新增 */
+      var tm = null;
+      for (var k = 0; k < (org.members || []).length; k++) {
+        if (org.members[k].uid === c.uid) { tm = org.members[k]; break; }
+      }
+      if (tm) { tm.role = 'owner'; tm.status = 'active'; }
+      else { (org.members = org.members || []).push({ uid: c.uid, role: 'owner', status: 'active', joinedAt: Date.now() }); }
+      org.ownerUid = c.uid;
+      c.status = 'approved'; c.reviewedAt = Date.now(); c.reviewNote = note || '';
+      save(a);
+      try {
+        if (window.DataBus && DataBus.pushDirectMessage) {
+          DataBus.pushDirectMessage(c.uid, '企业主认领通过', '恭喜，您已通过 ' + (org.shortName || org.co) + ' 的企业主（实际控制人）认领，已获得企业最高权限。');
+        }
+      } catch (e) {}
+      if (window.DataBus && DataBus.audit) DataBus.audit('审核通过企业主认领', '企业', c.name,
+        (org.shortName || org.co) + ' 企业主认领生效（' + (c.mode === 'legal' ? '法人认证' : '实际控制人声明') + '）');
+      window.dispatchEvent(new CustomEvent('engchain:org', {}));
+      return { ok: true };
+    }
+    c.status = 'rejected'; c.reviewedAt = Date.now(); c.reviewNote = note || '';
+    save(a);
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) {
+        DataBus.pushDirectMessage(c.uid, '企业主认领未通过', '您提交的 ' + (org.shortName || org.co) + ' 企业主认领未通过。' +
+          (note ? '原因：' + note : '请核对信息后重新提交。'));
+      }
+    } catch (e) {}
+    if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主认领', '企业', c.name, (org.shortName || org.co) + ' 企业主认领被驳回：' + (note || '未通过'));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+
   /* ============ 登录 / 重置联动 ============ */
   function onLogin() {
     var u = me(); if (!u) return;
@@ -956,6 +1120,9 @@ window.OrgsStore = (function () {
     ownerChangeById: ownerChangeById, pendingOwnerChangesAll: pendingOwnerChangesAll,
     requestOwnerChange: requestOwnerChange, sendOwnerChangeSms: sendOwnerChangeSms,
     reviewOwnerChange: reviewOwnerChange,
+    ownerClaimsOf: ownerClaimsOf, pendingOwnerClaimOf: pendingOwnerClaimOf,
+    myPendingClaim: myPendingClaim, pendingOwnerClaimsAll: pendingOwnerClaimsAll,
+    submitOwnerClaim: submitOwnerClaim, reviewOwnerClaim: reviewOwnerClaim,
     switchOrg: switchOrg,
     currentDisplayOrgId: currentDisplayOrgId, displaySubject: displaySubject,
     actingContext: actingContext, canActFor: canActFor,

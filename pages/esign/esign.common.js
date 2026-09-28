@@ -291,6 +291,281 @@
       body + '<h4>九、签章页</h4><div class="signarea">' + signBoxes + '</div>';
   }
 
+  /* ==========================================================================
+     完整合同正文（详情 / 签署 / 对方 H5 共用）
+     依据模板生成符合签署规范的结构化条款：合同双方 → 鉴于 → 标的 → 质量/交付
+     → 价款 → 包装/运输 → 权利义务 → 违约责任 → 保密 → 变更解除 → 争议解决
+     → 生效与效力（电子签署声明）→ 附件 → 签章页。
+     数字一律取自已落库合同（c.amount / c.parties / c.sentAt / c.deadline），
+     缺失信息用规范占位（＿＿）或按条款说明，不编造具体数值。
+     ========================================================================== */
+  var CN_D = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+  var CN_U = ['', '拾', '佰', '仟'], CN_B = ['', '万', '亿'];
+  function amountCN(n) {
+    n = Math.round(Number(n || 0));
+    if (n === 0) return '人民币零元整';
+    var s = String(n), groups = [], out = '';
+    while (s.length > 4) { groups.unshift(s.slice(-4)); s = s.slice(0, -4); }
+    groups.unshift(s);
+    for (var i = 0; i < groups.length; i++) {
+      var g = groups[i], gi = groups.length - i - 1, txt = '', pending = false;
+      for (var j = 0; j < g.length; j++) {
+        var d = +g[j], pos = g.length - j - 1;
+        if (d === 0) { if (txt && pos > 0 && +g[j + 1] !== 0 && !pending) txt += '零'; }
+        else { txt += CN_D[d] + (pos > 0 ? CN_U[pos] : ''); pending = false; }
+      }
+      if (txt) { if (gi > 0) txt += CN_B[gi]; out += txt; }
+    }
+    return '人民币' + out + '元整';
+  }
+
+  /* 已知演示主体的工商信息（其余主体仅展示企业名/联系人，不编造证照号） */
+  var COMPANY_REG = {
+    '成都恒信建材有限公司': { code: '91510100MA62QX8X3K', legal: '王强', addr: '成都市金牛区金府路 668 号', contact: '王强' },
+    '四川省××建设有限公司': { code: '91510700MA67Y2C4P9', legal: '陈建国', addr: '成都市锦江区东大街 99 号', contact: '陈建国' }
+  };
+  function partyInfoLines(p) {
+    var reg = COMPANY_REG[p.company] || null;
+    var out = [];
+    if (reg) {
+      out.push('统一社会信用代码：' + reg.code + '　法定代表人：' + reg.legal);
+      out.push('注册地址：' + reg.addr);
+      out.push('联系人：' + (reg.contact || p.name || '') + (p.mobileMask ? '　联系电话：' + p.mobileMask : ''));
+    } else {
+      out.push((p.name ? '联系人：' + p.name : '企业名称：' + (p.company || '＿＿＿＿＿＿')));
+      if (p.mobileMask) out.push('联系电话：' + p.mobileMask);
+      out.push('统一社会信用代码 / 注册地址：以企业实名认证信息为准');
+    }
+    return out;
+  }
+
+  /* 页号标记：按正文长度自动分页（2~3 页） */
+  function pageMarkers(count) {
+    var pages = count > 9 ? 3 : 2;
+    var size = Math.max(3, Math.ceil(count / pages));
+    var out = [];
+    for (var i = size; i < count; i += size) out.push(i);
+    return out;
+  }
+
+  /* 每份合同的完整条款。返回 [{a,t,html}]，a 为目录锚点。 */
+  function contractArticles(c) {
+    var parties = (c.parties || []).length ? c.parties : [];
+    var amt = c.amount > 0 ? money(c.amount) : '＿＿＿＿';
+    var amtCN = c.amount > 0 ? amountCN(c.amount) : '＿＿＿＿';
+    var sdate = ddate(c.sentAt || c.createdAt) || '____年__月__日';
+    var ddate2 = c.deadline ? ddate(c.deadline) : '____年__月__日';
+    var items = (c.detail && c.detail.items && c.detail.items.length) ? c.detail.items : null;
+    var nItems = items ? items.length : 0;
+    var qtyTotal = items ? items.reduce(function (s, it) { return s + (Number(it.qty) || 0); }, 0) : 0;
+    var unit = (c.detail && c.detail.unit) || '（见附件清单）';
+    function partyBlock() {
+      return parties.map(function (p) {
+        var lines = partyInfoLines(p);
+        return '<div class="es-partyblock"><div class="pn">' + esc(p.role) + '（' +
+          (p.signerType === 'personal' ? '签字' : '盖章') + '）：' + esc(p.company || p.name) + '</div>' +
+          '<div class="pi">' + lines.map(esc).join('<br>') + '</div></div>';
+      }).join('');
+    }
+    function tbl() {
+      if (!items) return '';
+      var rows = items.map(function (it, i) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(it.spec || it.name || '') + '</td>' +
+          '<td class="num">' + (it.qty != null ? it.qty : '') + '</td><td class="num">' + (it.unit || '') + '</td>' +
+          '<td class="num">' + (it.price != null ? money(it.price) : '') + '</td>' +
+          '<td class="num">' + (it.amount != null ? money(it.amount) : '') + '</td></tr>';
+      }).join('');
+      return '<table><tr><th>序号</th><th>品名 / 规格</th><th class="num">数量</th><th class="num">单位</th>' +
+        '<th class="num">单价</th><th class="num">金额</th></tr>' + rows +
+        '<tr><td colspan="5" style="text-align:right">合计（含税）</td><td class="tamt es-mono">' + money(c.amount) + '</td></tr></table>';
+    }
+
+    var arts = [
+      { a: 'a0', t: '合同双方', html: partyBlock() },
+      { a: 'a1', t: '鉴于条款', html: '<p>鉴于' + esc(c.initiatorCompany || c.initiatorName || '发起方') + '与' +
+        parties.map(function (p) { return esc(p.company || p.name); }).join('、') +
+        '（以下合称"双方"，单称"一方"）拟就《' + esc(c.title) + '》事项达成合作，双方依据《中华人民共和国民法典》及相关法律法规，本着平等自愿、诚实信用原则，经协商一致订立本合同，以资共同遵守。</p>' }
+    ];
+
+    var core = [];
+    if (c.templateId === 't-material') {
+      core = [
+        { t: '第一条　合同标的与数量', html:
+          '<p>1.1　甲方向乙方采购的货物品种、规格、数量及单价如下（含税）：</p>' + (tbl() ||
+            '<p class="noind">标的名称、规格、型号、数量与单价详见附件一《货物明细清单》，本合同签订时已由双方确认并随本合同同步生效。</p>') +
+          (items ? '<p>1.2　上述合计数量 ' + qtyTotal + unit + '，合计金额（含税）' + amt + '；除双方书面确认外，合同期内单价不作调整。</p>'
+            : '<p>1.2　除双方书面确认外，合同期内单价不作调整。</p>') },
+        { t: '第二条　质量标准', html: '<p>2.1　货物应符合国家现行质量标准及双方约定标准，随货附出厂质量证明书、产品合格证等资料。</p>' +
+          '<p>2.2　一方对质量有异议的，应在收货后 7 日内书面提出，双方共同委托具备资质的第三方机构检测；检测合格的，费用由异议方承担，不合格的由供货方承担。</p>' },
+        { t: '第三条　交货与验收', html: '<p>3.1　交货地点：' + esc(c.location || '合同约定的工程现场指定地点') + '。</p>' +
+          '<p>3.2　交货期限：' + (c.finishDate ? esc(c.finishDate) : '以甲方书面通知为准') + '，可分批交付。</p>' +
+          '<p>3.3　验收：收货方在货到当日清点数量、核对规格与质量证明资料，验收合格后签署收货单，作为结算依据。</p>' },
+        { t: '第四条　合同价款与支付', html: '<p>4.1　合同总金额（含税）为' + amt + '（大写：' + amtCN + '）。</p>' +
+          '<p>4.2　支付方式：' + esc(c.payMethod || '货到验收合格后按约定账期支付') + '；付款方凭对方开具的合规增值税发票付款。</p>' +
+          '<p>4.3　逾期付款的，按逾期金额的日万分之三向对方支付违约金。</p>' },
+        { t: '第五条　包装与运输', html: '<p>5.1　运输与包装由供货方负责并承担费用；货物捆扎、标识应符合运输与卸货安全要求。</p>' +
+          '<p>5.2　运输途中损耗与安全责任由供货方承担；因不可抗力导致延迟交货的，双方协商顺延。</p>' },
+        { t: '第六条　双方权利义务', html: '<p>6.1　收货方应按约收货并支付货款，提供必要的堆场、卸货条件与现场配合。</p>' +
+          '<p>6.2　供货方应按约保质保量、按期交货，并提供合规票据、质量证明及必要的技术资料。</p>' +
+          '<p>6.3　未经对方书面同意，任何一方不得将本合同项下权利义务转让给第三方。</p>' },
+        { t: '第七条　违约责任', html: '<p>7.1　供货方逾期交货的，每逾期一日按该批货款金额的 0.3% 支付违约金；逾期超过 15 日的，收货方有权解除合同并要求赔偿损失。</p>' +
+          '<p>7.2　收货方逾期付款的，按逾期金额的日万分之三支付违约金。</p>' +
+          '<p>7.3　违约金不足以弥补实际损失的部分，违约方应继续承担赔偿责任。</p>' },
+        { t: '第八条　保密', html: '<p>8.1　双方对本合同内容及履行中知悉的对方商业秘密负有保密义务，未经对方书面同意不得向第三方披露，法律法规另有规定的除外。</p>' +
+          '<p>8.2　保密义务自本合同签订之日起持续 2 年，不因本合同终止而失效。</p>' },
+        { t: '第九条　合同变更与解除', html: '<p>9.1　本合同变更须经双方书面一致同意并签署补充协议；因项目取消或不可抗力致使合同无法履行的，双方协商解除，已履行部分据实结算。</p>' },
+        { t: '第十条　争议解决', html: '<p>10.1　因本合同发生的争议，双方应友好协商解决；协商不成的，向' + esc(c.location ? '工程所在地' : '合同签订地') + '人民法院提起诉讼。</p>' +
+          '<p>10.2　本合同的订立、效力、解释与履行均适用中华人民共和国法律。</p>' },
+        { t: '第十一条　合同生效与效力', html: '<p>11.1　本合同采用电子方式签署，双方经实名认证后以电子签名 / 电子印章完成签署，自双方均完成签署之日起生效，与手写签名或加盖实体印章的纸质合同具有同等法律效力。</p>' +
+          '<p>11.2　本合同为电子文本，签署完成后由存证机构出具存证证明，可作为司法证据核验。</p>' }
+      ];
+    } else if (c.templateId === 't-equipment') {
+      core = [
+        { t: '第一条　租赁标的', html: '<p>1.1　甲方将设备出租给乙方使用，设备名称、型号、数量及新旧程度详见附件一《设备清单》。</p>' +
+          '<p>1.2　租赁设备用于' + esc(c.project || '合同约定的工程项目') + '，未经甲方书面同意不得转租或用于其他用途。</p>' },
+        { t: '第二条　租期与租金', html: '<p>2.1　租赁期限自设备交付之日起至' + (c.finishDate ? esc(c.finishDate) : '双方约定的归还之日') + '止。</p>' +
+          '<p>2.2　租金合计（含税）' + amt + '（大写：' + amtCN + '），结算方式：' + esc(c.payMethod || '按合同约定结算') + '。</p>' },
+        { t: '第三条　交付与验收', html: '<p>3.1　甲方按约将设备交付至' + esc(c.location || '合同约定地点') + '，双方共同验收并签署交接单。</p>' +
+          '<p>3.2　设备交付后至归还前的保管、操作安全责任由乙方承担；乙方应按操作规程使用并妥善保管。</p>' },
+        { t: '第四条　维修与费用', html: '<p>4.1　租赁期内设备日常保养由乙方负责，正常损耗外的维修由甲方负责；因乙方操作不当造成的损坏由乙方承担修复费用。</p>' },
+        { t: '第五条　双方权利义务', html: '<p>5.1　甲方保证设备权属清晰、可正常使用；乙方应按约支付租金并按时归还设备。</p>' +
+          '<p>5.2　未经对方书面同意，任何一方不得转让本合同项下权利义务。</p>' },
+        { t: '第六条　违约责任', html: '<p>6.1　任一方逾期履行义务的，按合同金额的日万分之三向对方支付违约金；逾期超过 15 日的，守约方有权解除合同。</p>' +
+          '<p>6.2　违约金不足以弥补实际损失的部分，违约方应继续承担赔偿责任。</p>' },
+        { t: '第七条　保密', html: '<p>7.1　双方对合同内容及履约中知悉的商业秘密负有保密义务，保密期限自签订之日起 2 年。</p>' },
+        { t: '第八条　变更与解除', html: '<p>8.1　合同变更须双方书面一致同意；因不可抗力致使合同无法履行的，双方协商解除，已履行部分据实结算。</p>' },
+        { t: '第九条　争议解决', html: '<p>9.1　争议协商不成的，向' + esc(c.location ? '工程所在地' : '合同签订地') + '人民法院提起诉讼。</p>' },
+        { t: '第十条　合同生效与效力', html: '<p>10.1　本合同采用电子方式签署，经实名认证后以电子签名 / 电子印章签署，自双方均完成签署之日起生效，与纸质合同具有同等法律效力。</p>' +
+          '<p>10.2　本合同为电子文本，签署完成后由存证机构出具存证证明，可作为司法证据核验。</p>' }
+      ];
+    } else if (c.templateId === 't-labor') {
+      core = [
+        { t: '第一条　分包范围与内容', html: '<p>1.1　甲方将' + esc(c.project || '合同约定的工程') + '中的劳务作业分包给乙方，分包范围与工作内容以双方确认的' + (c.detail && c.detail.text ? esc(c.detail.text) : '工程量清单 / 分包范围说明') + '为准。</p>' },
+        { t: '第二条　工期与进度', html: '<p>2.1　开工与完工日期：' + (c.finishDate ? '至 ' + esc(c.finishDate) : '以甲方开工通知为准') + '；乙方应按进度计划组织作业。</p>' },
+        { t: '第三条　价款与支付', html: '<p>3.1　合同价款（含税）' + amt + '（大写：' + amtCN + '），计价方式：' + esc(c.payMethod || '按约定计价') + '。</p>' +
+          '<p>3.2　甲方按已完成并验收合格的工作量及约定节点支付，凭合规发票付款。</p>' },
+        { t: '第四条　质量与安全', html: '<p>4.1　乙方作业应符合国家及行业施工质量、安全标准，遵守现场管理制度，对作业安全承担责任。</p>' },
+        { t: '第五条　双方权利义务', html: '<p>5.1　甲方提供必要的作业条件与技术交底，按约支付价款；乙方应保证人员资质合规、服从现场管理、按约保质保量完成作业。</p>' },
+        { t: '第六条　违约责任', html: '<p>6.1　任一方违约的，应承担继续履行、赔偿损失等责任；逾期履行的按日万分之三计违约金。</p>' },
+        { t: '第七条　保密与廉洁', html: '<p>7.1　双方对合同内容及履约中知悉的信息承担保密义务；合作中不得从事商业贿赂等违法违规行为。</p>' },
+        { t: '第八条　变更与解除', html: '<p>8.1　合同变更须双方书面一致同意；因不可抗力致使合同无法履行的，双方协商解除，已履行部分据实结算。</p>' },
+        { t: '第九条　争议解决与生效', html: '<p>9.1　争议协商不成的，向工程所在地人民法院提起诉讼。</p>' +
+          '<p>9.2　本合同采用电子方式签署，经实名认证后以电子签名 / 电子印章签署，自双方均完成签署之日起生效，与纸质合同具有同等法律效力；签署完成后由存证机构出具存证证明。</p>' }
+      ];
+    } else if (c.templateId === 't-nda') {
+      core = [
+        { t: '第一条　保密信息', html: '<p>1.1　保密信息指一方（披露方）向另一方（接收方）披露的与' + esc(c.project || '合作事项') + '相关的技术、商务、经营信息，包括但不限于图纸、数据、价格、客户与商业计划。</p>' },
+        { t: '第二条　保密义务', html: '<p>2.1　接收方应仅为约定目的使用保密信息，不得向任何第三方披露，并采取与保护自身商业秘密同等的保护措施。</p>' +
+          '<p>2.2　保密义务自本合同签订之日起持续 ' + (c.detail && c.detail.years ? esc(c.detail.years) : '2') + ' 年，不因本合同终止而失效。</p>' },
+        { t: '第三条　例外情形', html: '<p>3.1　下列信息不属于保密信息：已公开的信息；接收方独立开发的信息；法律法规或监管机关要求披露的信息（披露范围以法定为准）。</p>' },
+        { t: '第四条　违约责任', html: '<p>4.1　接收方违反保密义务的，应赔偿披露方因此遭受的直接损失，并承担相应法律责任。</p>' },
+        { t: '第五条　争议解决与生效', html: '<p>5.1　争议协商不成的，向合同签订地人民法院提起诉讼。</p>' +
+          '<p>5.2　本合同采用电子方式签署，经实名认证后以电子签名签署，自双方均完成签署之日起生效，与纸质合同具有同等法律效力。</p>' }
+      ];
+    } else if (c.templateId === 't-frame') {
+      core = [
+        { t: '第一条　合作宗旨', html: '<p>1.1　双方本着优势互补、长期共赢的原则，就' + esc(c.project || '约定合作领域') + '建立战略合作关系。</p>' },
+        { t: '第二条　合作范围', html: '<p>2.1　合作范围包括：' + (c.detail && c.detail.text ? esc(c.detail.text) : '由双方在单笔合同中另行约定的具体事项') + '。</p>' },
+        { t: '第三条　单笔合同', html: '<p>3.1　本协议为框架性约定；具体项目、数量、价格、交付及验收等以双方签署的单笔合同为准，单笔合同与本协议不一致的，以单笔合同为准。</p>' },
+        { t: '第四条　合作期限', html: '<p>4.1　合作期限自本协议签署之日起至 ' + (c.finishDate ? esc(c.finishDate) : '约定终止之日') + '；期满双方可协商续签。</p>' },
+        { t: '第五条　保密与诚信', html: '<p>5.1　双方对合作中知悉的商业秘密承担保密义务；合作中应遵守法律法规与商业道德。</p>' },
+        { t: '第六条　解除与终止', html: '<p>6.1　任一方严重违约或出现重大信用风险时，另一方有权书面通知解除本协议；已履行部分据实结算。</p>' },
+        { t: '第七条　争议解决与生效', html: '<p>7.1　争议协商不成的，向合同签订地人民法院提起诉讼。</p>' +
+          '<p>7.2　本协议采用电子方式签署，经实名认证后以电子签名 / 电子印章签署，自各方均完成签署之日起生效，与纸质协议具有同等法律效力。</p>' }
+      ];
+    } else if (c.templateId === 't-service') {
+      core = [
+        { t: '第一条　服务内容', html: '<p>1.1　乙方向甲方提供' + esc(c.project || '约定的专业服务') + '，具体服务内容、交付成果以' + (c.detail && c.detail.text ? esc(c.detail.text) : '双方确认的服务方案') + '为准。</p>' },
+        { t: '第二条　交付与验收', html: '<p>2.1　服务完成期限：' + (c.finishDate ? esc(c.finishDate) : '以约定为准') + '；交付成果由甲方按约定标准验收。</p>' },
+        { t: '第三条　费用与支付', html: '<p>3.1　服务费用（含税）' + amt + '（大写：' + amtCN + '），支付方式：' + esc(c.payMethod || '按约定节点支付') + '。</p>' },
+        { t: '第四条　双方义务', html: '<p>4.1　甲方应及时提供必要资料与配合；乙方应按约保质保量完成服务，并对其交付成果负责。</p>' },
+        { t: '第五条　知识产权与保密', html: '<p>5.1　服务成果的知识产权归属及使用范围按双方书面约定执行；双方对合作中知悉的商业秘密承担保密义务。</p>' },
+        { t: '第六条　违约责任', html: '<p>6.1　任一方违约的，应承担继续履行、赔偿损失等责任；逾期履行的按日万分之三计违约金。</p>' },
+        { t: '第七条　争议解决与生效', html: '<p>7.1　争议协商不成的，向合同签订地人民法院提起诉讼。</p>' +
+          '<p>7.2　本合同采用电子方式签署，经实名认证后以电子签名 / 电子印章签署，自双方均完成签署之日起生效，与纸质合同具有同等法律效力；签署完成后由存证机构出具存证证明。</p>' }
+      ];
+    } else {
+      core = [
+        { t: '第一条　合同标的', html: '<p>1.1　双方就《' + esc(c.title) + '》项下事项达成一致，具体标的、数量及内容以双方确认的约定为准。</p>' },
+        { t: '第二条　价款与支付', html: '<p>2.1　合同金额（含税）' + amt + '（大写：' + amtCN + '），支付方式：' + esc(c.payMethod || '由双方协商确定') + '。</p>' },
+        { t: '第三条　履行与验收', html: '<p>3.1　双方应按约履行义务并按国家及行业标准验收；' + (c.finishDate ? '履行/完成期限：' + esc(c.finishDate) + '。' : '') + '</p>' },
+        { t: '第四条　双方权利义务', html: '<p>4.1　一方应提供必要的条件与配合，另一方应按约保质保量履行并提供合规票据与资料。</p>' },
+        { t: '第五条　违约责任', html: '<p>5.1　任一方违约的，按合同金额及实际损失承担违约责任；逾期履行按日万分之三计违约金。</p>' },
+        { t: '第六条　保密', html: '<p>6.1　双方对合同内容及履约中知悉的商业秘密承担保密义务，未经书面同意不得向第三方披露。</p>' },
+        { t: '第七条　变更与解除', html: '<p>7.1　合同变更须双方书面一致同意；因不可抗力致使合同无法履行的，双方协商解除。</p>' },
+        { t: '第八条　争议解决', html: '<p>8.1　争议协商不成的，向合同签订地人民法院提起诉讼。</p>' },
+        { t: '第九条　生效与效力', html: '<p>9.1　本合同采用电子方式签署，经实名认证后以电子签名 / 电子印章签署，自双方均完成签署之日起生效，与纸质合同具有同等法律效力。</p>' }
+      ];
+    }
+
+    arts = arts.concat(core.map(function (x, i) { return { a: 'a' + (i + 2), t: x.t, html: x.html }; }));
+
+    /* 附件一（材料/设备/劳务带明细附件节；其余模板无附件或并入正文） */
+    if (c.templateId === 't-material' || c.templateId === 't-equipment' || c.templateId === 't-labor') {
+      arts.push({
+        a: 'att', t: '附件一　' + (c.templateId === 't-material' ? '货物明细清单' : (c.templateId === 't-equipment' ? '设备清单' : '分包范围清单')),
+        html: items ? tbl() + '<p class="noind">本附件与合同正文同步生效，共 ' + nItems + ' 项，合计金额（含税）' + amt + '。</p>'
+          : '<p class="noind">本附件与合同正文同步生效；具体明细以发起方在签署前确认并上传的清单为准（共 ＿＿ 项，合计金额（含税）' + amt + '）。</p>'
+      });
+    }
+
+    /* 签章页 */
+    arts.push({
+      a: 'sig', t: '签章页',
+      html: '<div class="es-sigline">' + (parties.length ? parties.map(function (p) {
+        var sealed = p.status === 'signed';
+        var nm = p.company || p.name || '';
+        var short = nm.length > 7 ? nm.slice(0, 7) : nm;
+        return '<div class="es-sbox ' + (sealed ? 'sealed' : '') + '"><b>' + esc(p.role) + '（' +
+          (p.signerType === 'personal' ? '签字' : '盖章') + '）</b>' +
+          '<div class="es-sname">' + esc(nm) + '</div>' +
+          (sealed ? '<div class="es-seal">' + esc(short) + '<br>电子签</div>' : '<div class="es-wa">待<br>签<br>署</div>') +
+          (sealed && p.signedAt ? '<div class="es-sdate">' + esc(ddate(p.signedAt)) + ' · ' + esc(p.signMethod || '电子签名') + '</div>'
+            : '<div class="es-sdate">日期：____年__月__日</div>') +
+          '</div>';
+      }).join('') : '<p class="noind">（签署方信息待确认）</p>') + '</div>'
+    });
+    return arts;
+  }
+
+  /* 目录（详情 / 签署共用，随正文锚点跳转） */
+  function contractTOC(c) {
+    return contractArticles(c).map(function (x, i) { return { a: x.a, t: x.t, no: i + 1 }; });
+  }
+
+  /* 完整合同文档 HTML。opts.sealMine：签署中把我方视作已签（落章后的即时反馈） */
+  function contractDocHTML(c, opts) {
+    opts = opts || {};
+    var arts = contractArticles(c);
+    var markers = pageMarkers(arts.length);
+    var provider = (window.EsignStore && EsignStore.pricing && EsignStore.pricing().provider) || 'e签宝';
+    var body = '<div class="es-doc" id="esDoc" style="--es-dfs:13px">' +
+      '<div class="es-doc-meta"><span>合同编号：' + esc(c.code) + '</span><span>签订日期：' + esc(ddate(c.sentAt || c.createdAt) || '＿＿＿＿') + '</span>' +
+      '<span>签订地点：' + esc(c.place || '成都市') + '</span></div>' +
+      '<h2>' + esc(c.title) + '</h2><div class="dno es-mono">合同编号 ' + esc(c.code) + ' · 电子文本</div>' +
+      '<svg class="es-docwm" viewBox="0 0 320 240" preserveAspectRatio="none" aria-hidden="true"><g fill="none">' +
+      '<path d="M24 40h272M24 64h272M24 88h272M24 112h272M24 136h272M24 160h272M24 184h272" stroke="#8A6A30" stroke-width="1" opacity=".05"/>' +
+      '<text x="160" y="150" text-anchor="middle" font-size="15" font-family="serif" fill="#B2442E" opacity=".10" transform="rotate(-12 160 150)">工程链 · 电子签 · 合同正文</text></g></svg>';
+    arts.forEach(function (a, i) {
+      body += '<div class="es-clause" data-a="' + a.a + '">' + (a.t ? '<h4>' + esc(a.t) + '</h4>' : '') + a.html + '</div>';
+      if (markers.indexOf(i) >= 0) body += '<div class="es-pg">— 第 ' + (markers.indexOf(i) + 1) + ' 页 · 共 ' + (markers.length + 1) + ' 页 —</div>';
+    });
+    body += '<div class="es-doc-foot">本合同经电子方式签署，签署记录、签署时间与文件哈希由 ' + esc(provider) +
+      ' 存证。全文共 ' + (arts.length - 1) + ' 条' + (c.templateId === 't-material' || c.templateId === 't-equipment' || c.templateId === 't-labor' ? ' 1 附件' : '') +
+      '，签署前请完整阅读。</div></div>';
+    return body;
+  }
+
+  /* 阅读进度：0~1，按文档在本滚动容器中的位置计算 */
+  function docReadPct(scrollEl, docEl) {
+    if (!scrollEl || !docEl) return 0;
+    var sr = scrollEl.getBoundingClientRect(), dr = docEl.getBoundingClientRect();
+    var docTop = dr.top - sr.top + scrollEl.scrollTop;
+    var read = scrollEl.scrollTop + scrollEl.clientHeight - docTop;
+    var h = docEl.offsetHeight || 1;
+    return Math.max(0, Math.min(1, read / h));
+  }
+
   /* ---- 对方 H5：检索跨用户"等待外部方签署"的合同（演示免登选择器） ---- */
   function externalPending() {
     var out = [];
@@ -322,6 +597,9 @@
     timeline: timeline, timelineHTML: timelineHTML, evidenceHTML: evidenceHTML, cardHTML: cardHTML,
     subscribe: subscribe, init: init,
     Draft: Draft, newDraft: newDraft, sendFromDraft: sendFromDraft,
-    stepsHTML: stepsHTML, docHTML: docHTML, docSections: docSections, externalPending: externalPending
+    stepsHTML: stepsHTML, docHTML: docHTML, docSections: docSections, externalPending: externalPending,
+    amountCN: amountCN, COMPANY_REG: COMPANY_REG,
+    contractArticles: contractArticles, contractTOC: contractTOC, contractDocHTML: contractDocHTML,
+    docReadPct: docReadPct
   };
 })();

@@ -161,6 +161,34 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .om-change-lock { flex:none; font-size:10px; font-weight:600; color:var(--text-3);
   background:var(--bg-subtle); border:1px solid var(--line); padding:3px 9px; border-radius:var(--r-full); }
 
+/* 空态：主邀请按钮 + 「或」分隔 + 自认领次级入口 */
+.oe-or { display:flex; align-items:center; gap:10px; margin:14px 0 10px; }
+.oe-or::before, .oe-or::after { content:""; flex:1; height:1px; background:var(--line); }
+.oe-or span { font-size:10px; color:var(--text-3); letter-spacing:.1em; }
+.oe-claim-btn { display:flex; align-items:center; justify-content:center; gap:6px;
+  width:100%; height:42px; border-radius:var(--r-full); border:1.5px dashed var(--accent-line);
+  background:var(--primary-soft); color:var(--primary-dim); font-size:12.5px; font-weight:700;
+  cursor:pointer; transition:transform .15s var(--e-out), background .15s; }
+.oe-claim-btn svg { width:14px; height:14px; }
+.oe-claim-btn:active { transform:scale(.98); background:rgba(184,153,104,.18); }
+.oe-claim-tip { font-size:10px; color:var(--text-3); text-align:center; margin-top:8px; line-height:1.6; }
+.oe-claim-tip b { color:var(--primary-dim); font-weight:600; }
+
+/* 认领审核中卡片（替代空态展示） */
+.oclaim-card { position:relative; border-radius:var(--r-xl); border:1.5px solid var(--accent-line);
+  background:linear-gradient(180deg,var(--primary-soft),transparent 82%), var(--bg-card);
+  overflow:hidden; box-shadow:var(--shadow-card); margin-bottom:10px; }
+.oclaim-inner { display:flex; align-items:center; gap:12px; padding:15px 14px; }
+.oclaim-ic { flex:none; width:40px; height:40px; border-radius:12px; background:var(--primary-soft);
+  color:var(--primary-dim); display:flex; align-items:center; justify-content:center; }
+.oclaim-ic svg { width:20px; height:20px; }
+.oclaim-main { flex:1; min-width:0; }
+.oclaim-t { font-size:13.5px; font-weight:800; color:var(--text-1); }
+.oclaim-s { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.6; }
+.oclaim-s b { color:var(--primary-dim); font-weight:700; }
+.oclaim-mode { flex:none; font-size:9.5px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:3px 9px; border-radius:var(--r-full); }
+
 /* 企业主空缺空态 */
 .om-owner-empty { padding:20px 16px 22px; }
 .oe-t { font-size:13.5px; font-weight:800; color:var(--text-1); }
@@ -538,6 +566,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var ownerMember = null, ownerInv = null;
     members.forEach(function (m) { if (m.role === 'owner') ownerMember = m; });
     try { ownerInv = OrgsStore.ownerInviteOf(org.orgId); } catch (e) {}
+    /* 当前登录用户是否有待审核的企业主自认领（u4 登录 org3 时命中） */
+    var myClaim = null;
+    try { myClaim = OrgsStore.myPendingClaim ? OrgsStore.myPendingClaim(org.orgId) : null; } catch (e) {}
 
     html += '<div class="om-sec om-rise"><b>企业主 · 实际控制人</b><span>企业最高权限身份</span></div>';
 
@@ -574,12 +605,31 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           '</div>' +
           '<div class="oi-acts">' + sendBtnHtml + '<button class="oi-btn ghost" onclick="omOpenEditInvite(\'' + ownerInv.inviteId + '\')">修改</button></div>' +
         '</div></div>';
+    } else if (myClaim) {
+      /* 当前登录用户已提交企业主自认领，等待后台审核 */
+      var claimModeLabel = myClaim.mode === 'legal' ? '法人认证' : '实际控制人声明';
+      html +=
+        '<div class="oclaim-card om-rise"><div class="oclaim-inner">' +
+          '<div class="oclaim-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+          '<div class="oclaim-main">' +
+            '<div class="oclaim-t">企业主认领审核中</div>' +
+            '<div class="oclaim-s">你已提交<b>' + esc(claimModeLabel) + '</b>认领申请，等待后台审核。<br>通过后自动成为「' + esc(org.shortName || org.co) + '」的企业主。</div>' +
+          '</div>' +
+          '<span class="oclaim-mode">' + esc(claimModeLabel) + '</span>' +
+        '</div></div>';
     } else {
+      /* 空态：主按钮「邀请企业主」+ 次级入口「我就是实际控制人，立即认领」 */
       html +=
         '<div class="om-owner-card om-rise"><div class="om-owner-empty">' +
           '<div class="oe-t">企业主空缺</div>' +
           '<div class="oe-s">企业主指企业<b>实际控制人</b>（非工商登记的法定代表人）。<br>邀请公司实际控制人担任企业主，行使企业认证、成员管理与签约权限。</div>' +
-          '<button class="pc-btn ok" style="max-width:210px;margin:0 auto;" onclick="openInvite(true)">邀请企业主</button>' +
+          '<button class="pc-btn ok" style="max-width:240px;margin:0 auto;" onclick="openInvite(true)">邀请企业主</button>' +
+          '<div class="oe-or"><span>或</span></div>' +
+          '<button class="oe-claim-btn" onclick="omOpenClaim()">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+            '我就是实际控制人，立即认领' +
+          '</button>' +
+          '<div class="oe-claim-tip">法人即本人可走<b>法人认证</b>快速通道；非法人但实际控股请走<b>实控人声明</b>，需后台审核。</div>' +
         '</div></div>';
     }
 
@@ -1187,6 +1237,111 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var w = document.getElementById('vf-decl-wrap');
     if (w) w.style.display = verifyMode === 'controller' ? '' : 'none';
   };
+
+  /* ============ 企业主自认领（实际控制人本人） ============
+     与 omOpenVerify 的区别：这是企业主空缺时，当前登录人本人认领自己。
+     - 自动预填当前用户实名姓名（来自 DataBus.auth.realname）
+     - 法人模式实时校验姓名 == org.legal，匹配则提示"工商信息一致，可快速通过"
+     - 实控人模式要求勾选法律声明 */
+  var claimMode = 'legal';
+  window.omOpenClaim = function () {
+    var org = resolveOrg(); if (!org) return;
+    var u = me(); if (!u) { UI.toast.warn('请先登录'); return; }
+    /* 前置校验（与后端一致，提前拦截给即时反馈） */
+    if (OrgsStore.hasOwner(org.orgId)) { UI.toast.warn('该企业已有企业主'); return; }
+    if (OrgsStore.myPendingClaim && OrgsStore.myPendingClaim(org.orgId)) { UI.toast.warn('你的认领申请已在审核中'); return; }
+    if (!(u.auth && u.auth.realname && u.auth.realname.ok)) {
+      UI.dialog({ title: '需先实名认证', text: '认领企业主身份需先完成个人实名认证（姓名+身份证+人脸）。是否前往？', ok: '去认证', cancel: '取消', onOk: function () { location.href = 'auth-personal.html'; } });
+      return;
+    }
+    var realName = (u.auth && u.auth.realname && u.auth.realname.name) || u.name || '';
+    var legalName = org.legal || '';
+    /* 智能默认：实名姓名 == 营业执照法人 → 默认选法人通道（快速通过）；否则默认实控人通道 */
+    claimMode = (realName && legalName && realName === legalName) ? 'legal' : 'controller';
+
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('认领企业主 · ' + (org.shortName || org.co));
+    sh.html(
+      '<div class="oc-wrap">' +
+        '<div class="oc-note">企业主指企业<b>实际控制人</b>。认领即由你本人行使企业认证、成员管理与签约权限。<br>提交后由后台审核；法人通道姓名与营业执照一致时<b>可快速通过</b>。</div>' +
+
+        /* 预填提示条 */
+        '<div class="om-detect ok" style="margin:0 2px 10px;">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          '<span>已根据你的实名认证预填姓名 <b>' + esc(realName) + '</b>，请补充身份证号</span>' +
+        '</div>' +
+
+        /* 双通道选项 */
+        '<div class="vf-opt" data-mode="legal" onclick="omPickClaimMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">法人认证（快速通道）</div>' +
+          '<div class="vf-opt-s">本人即营业执照法定代表人「' + esc(legalName || '—') + '」，工商+实名双重佐证，可快速通过</div></div>' +
+        '</div>' +
+        '<div class="vf-opt" data-mode="controller" onclick="omPickClaimMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">实际控制人声明</div>' +
+          '<div class="vf-opt-s">本人非法人但实际控股/经营本企业，需上传佐证材料并经后台人工审核</div></div>' +
+        '</div>' +
+
+        /* 实时法人匹配提示 */
+        '<div id="oc-legal-hint" class="om-detect" style="margin:2px 2px 6px;"></div>' +
+
+        '<div class="vf-field"><label>姓名<span class="req">*</span></label><input id="oclaim-name" class="mob-input" placeholder="请输入真实姓名" value="' + esc(realName) + '"></div>' +
+        '<div class="vf-field"><label>身份证号<span class="req">*</span></label><input id="oclaim-idno" maxlength="18" placeholder="18 位身份证号"></div>' +
+        '<div class="vf-field" id="oclaim-decl-wrap" style="display:none;">' +
+          '<label class="vf-check"><input type="checkbox" id="oclaim-decl"><span>本人为「' + esc(org.shortName || org.co) + '」的实际控制人，所填信息与材料真实有效，自愿接受平台核验与法律责任追究</span></label>' +
+        '</div>' +
+
+        '<button type="button" id="oclaim-submit" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">提交认领，等待后台审核</button>' +
+      '</div>'
+    );
+    sh.show();
+    /* 初始化选中态与提示 */
+    function refreshClaimUI() {
+      document.querySelectorAll('.vf-opt').forEach(function (o) {
+        o.classList.toggle('sel', o.getAttribute('data-mode') === claimMode);
+      });
+      var declWrap = document.getElementById('oclaim-decl-wrap');
+      if (declWrap) declWrap.style.display = claimMode === 'controller' ? '' : 'none';
+      var hint = document.getElementById('oc-legal-hint');
+      if (hint) {
+        if (claimMode === 'legal') {
+          var nm = (document.getElementById('oclaim-name') || {}).value || '';
+          if (nm && legalName && nm === legalName) {
+            hint.className = 'om-detect ok';
+            hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>✓ 姓名与营业执照法定代表人一致，工商信息+实名认证双重佐证，后台将快速通过</span>';
+          } else {
+            hint.className = 'om-detect err';
+            hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>✗ 姓名「' + esc(nm) + '」与营业执照法人「' + esc(legalName || '—') + '」不一致，请改走实际控制人声明</span>';
+          }
+        } else {
+          hint.className = 'om-detect warn';
+          hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>实控人声明需后台人工审核，请准备股权结构/代持协议等材料</span>';
+        }
+      }
+    }
+    window.omPickClaimMode = function (el) {
+      claimMode = el.getAttribute('data-mode');
+      refreshClaimUI();
+    };
+    var nameEl = document.getElementById('oclaim-name');
+    if (nameEl) nameEl.addEventListener('input', refreshClaimUI);
+    refreshClaimUI();
+
+    document.getElementById('oclaim-submit').onclick = function () {
+      var name = (document.getElementById('oclaim-name').value || '').trim();
+      var idNo = (document.getElementById('oclaim-idno').value || '').trim();
+      var decl = document.getElementById('oclaim-decl') ? document.getElementById('oclaim-decl').checked : false;
+      var r = OrgsStore.submitOwnerClaim(org.orgId, claimMode, { name: name, idNo: idNo, declaration: decl });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      if (r.autoSuggest === 'approve') {
+        UI.toast.ok('已提交法人认证认领，后台将快速审核通过');
+      } else {
+        UI.toast.ok('已提交实际控制人认领，等待后台审核');
+      }
+      render();
+    };
+  }
 
   document.getElementById('om-invite-btn').addEventListener('click', function () { openInvite(false); });
 

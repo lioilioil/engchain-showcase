@@ -13,6 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>人员招聘 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928182312">
 <style>
   /* ===== 双端 Tab ===== */
   .tab-bar { display:flex; background:var(--bg-card); border-bottom:1px solid var(--line); padding:0 16px; }
@@ -61,20 +62,32 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .so-find-text { font-size:12.5px; color:var(--text-2); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   /* ===== 证书分类栏 ===== */
-  .cat-bar { display:flex; gap:8px; overflow-x:auto; padding:10px 16px 14px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
-  .cat-bar::-webkit-scrollbar { display:none; }
+  /* 每行固定 5 个、两行自适应展示全部，不再横滑；隐藏原横滑渐隐遮罩 */
+  .cat-bar { display:flex; flex-wrap:wrap; column-gap:6px; row-gap:12px; padding:12px 12px 14px; }
   .cat-bar-zone { position:relative; }
-  .cat-bar-zone .cat-bar { padding-right:40px; }
-  .cat-bar-fade { position:absolute; top:10px; bottom:14px; right:0; width:28px; background:linear-gradient(90deg,transparent,var(--bg) 92%); pointer-events:none; }
+  .cat-bar-zone .cat-bar { padding-right:12px; }
+  .cat-bar-fade { display:none; }
   /* 卡片标题过长时两行截断，避免括号孤悬换行 */
   .job-card .jc-title, .jc-head .jc-title { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; word-break:break-word; }
-  .cat-item { flex:none; display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; min-width:58px; padding:4px 2px; border-radius:var(--r-m); transition:background var(--d-fast); }
+  .cat-item { flex:0 0 calc((100% - 24px) / 5); max-width:calc((100% - 24px) / 5); display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; padding:4px 0; border-radius:var(--r-m); transition:background var(--d-fast); }
   .cat-item:active { background:var(--bg-card-2); }
   .cat-item .cat-icon { width:44px; height:44px; border-radius:13px; background:var(--bg-card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--text-2); transition:all var(--d-fast); }
   .cat-item .cat-icon svg { width:20px; height:20px; }
   .cat-item .cat-label { font-size:10.5px; color:var(--text-2); white-space:nowrap; font-weight:500; line-height:1.2; text-align:center; }
   .cat-item.active .cat-icon { background:var(--primary-soft); border-color:var(--accent-line); color:var(--primary-dim); box-shadow:0 4px 12px -6px var(--primary-dim); }
   .cat-item.active .cat-label { color:var(--primary-dim); font-weight:600; }
+  /* 分类 3D 图标（仅证书分类栏图片项） */
+  .cat-icon.is-img { padding:0; background:transparent; border-color:transparent; box-shadow:0 1px 4px rgba(120,92,40,.10); }
+  .cat-icon.is-img img { width:100%; height:100%; display:block; object-fit:cover; border-radius:inherit; }
+  .cat-icon.is-img .ci-d { display:none; }
+  .cat-item.active .cat-icon.is-img { background:transparent; border-color:transparent; transform:translateY(-1px); box-shadow:0 0 0 2px var(--primary),0 7px 16px -6px var(--primary-dim); }
+  .cat-item:active .cat-icon.is-img { background:transparent; }
+  [data-theme="dark"] .cat-icon.is-img { box-shadow:0 2px 10px rgba(0,0,0,.45); }
+  [data-theme="dark"] .cat-icon.is-img .ci-l { display:none; }
+  [data-theme="dark"] .cat-icon.is-img .ci-d { display:block; }
+  [data-theme="dark"] .cat-item.active .cat-icon.is-img { box-shadow:0 0 0 2px var(--primary),0 7px 18px -6px rgba(0,0,0,.6); }
+  /* “全部证书”合集入口：复用 3D 圆徽章透明图标，标签用古铜色，与另两页 more 入口一致 */
+  .cat-item.more .cat-label { color:var(--primary-dim); font-weight:600; }
 
   /* ===== 核验提示条 ===== */
   .verify-notice { margin:0 16px 10px; padding:10px 12px; background:rgba(43,107,79,.06); border:1px solid rgba(43,107,79,.15); border-radius:var(--r-m); display:flex; align-items:flex-start; gap:8px; }
@@ -264,7 +277,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 
-  <div class="scroll no-pad" style="padding-bottom:20px;">
+  <div class="scroll no-pad" style="padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px));">
     <!-- 双端 Tab -->
     <div class="tab-bar" id="tabBar">
       <div class="tab-item active" data-tab="enterprise">企业招聘</div>
@@ -387,6 +400,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
     <button class="dm-btn" id="dmSubmit">提交需求</button>
   </div>
+
+  <!-- 液态玻璃悬浮 CTA：双端 tab 区滚出视口时于底部浮现；按分页切换「我要招聘 / 我要投递」 -->
+  <div class="lg-cta" id="lgCtaBar" data-lg-cta="floating" data-lg-trigger="#tabBar" data-lg-scroller=".scroll"
+       data-lg-labels='{"enterprise":"我要招聘","talent":"我要投递"}'
+       data-lg-hrefs='{"enterprise":"../publish/editor.html?role=demand&cat=%E6%8B%9B%E8%81%98","talent":"../profile/resume-edit.html"}'>
+    <button type="button" class="lg-btn lg-btn-primary" id="lgAction">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <span class="lg-btn-label">我要招聘</span>
+    </button>
+  </div>
 </div>
 
 <!-- v3.1: 投递权限引导弹窗 -->
@@ -420,6 +443,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/delegates.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>
+<script src="../../js/liquid-cta.js?v=20260928184535"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -510,15 +535,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   /* ===== 证书分类（用于分类图标栏，与筛选弹窗 certType 维度联动） ===== */
   var CATS = [
-    { key: '建造师', label: '建造师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20h20"/><path d="M4 20v-8a8 8 0 0 1 16 0v8"/><path d="M9 20v-4h6v4"/></svg>' },
-    { key: '造价工程师', label: '造价工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="16" y2="18"/></svg>' },
-    { key: '监理工程师', label: '监理工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>' },
-    { key: '安全工程师', label: '安全工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>' },
-    { key: '消防工程师', label: '消防工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>' },
-    { key: '结构工程师', label: '结构工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3h18"/><path d="M3 3v18"/><path d="M3 3l18 18"/><circle cx="12" cy="12" r="2"/></svg>' },
-    { key: '建筑师', label: '建筑师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>' },
-    { key: '电气工程师', label: '电气工程师', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v6"/><path d="M5 12h14"/><path d="M7 12v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-8"/><circle cx="12" cy="8" r="2"/></svg>' }
+    { key: '建造师', label: '建造师', img: 'cert-builder' },
+    { key: '造价工程师', label: '造价工程师', img: 'cert-cost' },
+    { key: '监理工程师', label: '监理工程师', img: 'cert-supervision' },
+    { key: '安全工程师', label: '安全工程师', img: 'cert-safety' },
+    { key: '消防工程师', label: '消防工程师', img: 'cert-fire' },
+    { key: '结构工程师', label: '结构工程师', img: 'cert-structure' },
+    { key: '建筑师', label: '建筑师', img: 'cert-architect' },
+    { key: '电气工程师', label: '电气工程师', img: 'cert-electric' }
   ];
+
+  /* 分类 3D 图标：亮/暗双图，按 [data-theme="dark"] 切换（路径相对 pages/personnel/） */
+  function catImg(name) { return '<img class="ci-l" src="../../assets/icons/' + name + '.png" alt="" decoding="async">' +
+    '<img class="ci-d" src="../../assets/icons/' + name + '-dark.png" alt="" decoding="async">'; }
 
   /* ===== 排序定义 ===== */
   var SORTS = {
@@ -626,14 +655,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     catBar.innerHTML = CATS.map(function (c) {
       var active = activeFilters.certType === c.key;
       return '<div class="cat-item' + (active ? ' active' : '') + '" data-cat="' + c.key + '">' +
-        '<div class="cat-icon">' + c.icon + '</div>' +
+        '<div class="cat-icon is-img">' + catImg(c.img) + '</div>' +
         '<span class="cat-label">' + c.label + '</span>' +
       '</div>';
-    }).join('');
+    }).join('') +
+      '<div class="cat-item more" data-cat="all">' +
+        '<div class="cat-icon is-img">' + catImg('cert-all') + '</div>' +
+        '<span class="cat-label">全部证书</span>' +
+      '</div>';
     catBar.querySelectorAll('.cat-item').forEach(function (el) {
       el.addEventListener('click', function () {
         var key = el.dataset.cat;
-        if (activeFilters.certType === key) {
+        if (key === 'all') {
+          delete activeFilters.certType;
+        } else if (activeFilters.certType === key) {
           delete activeFilters.certType;
         } else {
           activeFilters.certType = key;
@@ -1048,6 +1083,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       renderSortTabs();
       renderHot();
       renderList();
+      /* 悬浮 CTA 随分页切换：「我要招聘 / 我要投递」 */
+      if (window.LGCTA) window.LGCTA.setDynamic(document.getElementById('lgCtaBar'), tab);
     });
   });
 
@@ -1254,6 +1291,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSortTabs();
   renderHot();
   renderList();
+  /* 悬浮 CTA 初始态：随 ?tab= 落地页同步（企业招聘→我要招聘 / 持证人才→我要投递） */
+  if (window.LGCTA) window.LGCTA.setDynamic(document.getElementById('lgCtaBar'), currentTab);
   /* v2 我的招聘入口：企业认证及以上（叠加身份企业侧）显示；中介入驻不发招聘 */
   function applyMyJobsNav() {
     var btn = document.getElementById('navMyJobs');

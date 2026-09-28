@@ -16,6 +16,9 @@ export const DEFAULT_MATERIAL_V2 = Object.freeze({
   body: 0.72,
   absorption: 0.58,
   tint: 0,
+  // RGB tint layer color, 0-1 per channel. Default white = neutral milk glass;
+  // set e.g. [0.72, 0.60, 0.41] for a gold glass, [0.17, 0.42, 0.31] green.
+  tintColor: [1.0, 1.0, 1.0],
   rim: 0.24,
   reflection: 0.31,
   highlight: 0.34,

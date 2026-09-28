@@ -1245,6 +1245,13 @@ window.ViewHistory = ViewHistory;
     window.addEventListener('message', function (e) {
       const d = e.data;
       if (d && d.type === 'engchain:theme') UI.theme.set(d.theme === 'dark' ? 'dark' : 'light');
+      // 通知预览精简模式：消息页预览弹窗在跨源 iframe（如 file://）无法直写样式时，
+      // 由父页 postMessage 触发本类；仅作用于被嵌入的预览文档，正常浏览不受影响
+      else if (d && d.type === 'engchain:preview-mode') {
+        document.documentElement.classList.add('engchain-preview');
+        // 回信告知父页已进入精简模式（仅被嵌入预览时可达，正常浏览不影响）
+        try { window.parent.postMessage({ type: 'engchain:preview-mode-ok' }, '*'); } catch (e) {}
+      }
     });
 
     // 向 preview.html 宿主上报当前页 URL：file:// 下 iframe 是跨源，父页读不到 location，

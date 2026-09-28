@@ -560,6 +560,7 @@ export class GlassRenderer {
     const types = new Int32Array(MAX_GLASS_SHAPES);
     const lights = new Float32Array(MAX_GLASS_SHAPES * 2);
     const tints = new Float32Array(MAX_GLASS_SHAPES);
+    const tintColors = new Float32Array(MAX_GLASS_SHAPES * 3);
     const tintTones = new Float32Array(MAX_GLASS_SHAPES);
     const frosts = new Float32Array(MAX_GLASS_SHAPES);
     const opacities = new Float32Array(MAX_GLASS_SHAPES);
@@ -584,6 +585,8 @@ export class GlassRenderer {
       lights[i * 2] = direction[0];
       lights[i * 2 + 1] = direction[1];
       tints[i] = element.tint ?? m.tint;
+      const tc = element.tintColor ?? m.tintColor ?? [1, 1, 1];
+      tintColors[i * 3] = tc[0]; tintColors[i * 3 + 1] = tc[1]; tintColors[i * 3 + 2] = tc[2];
       tintTones[i] = tintLights[i] ?? 1;
       // V2 frost is a dimensionless ratio resolved in the shader against the
       // component short side. V1 keeps its authored CSS-pixel blur lengths.
@@ -618,6 +621,7 @@ export class GlassRenderer {
     gl.uniform1iv(loc.uShapeTypes, types);
     gl.uniform1fv(loc.uShapeRadii, radii);
     gl.uniform1fv(loc.uShapeTints, tints);
+    gl.uniform3fv(loc.uShapeTintColors, tintColors);
     gl.uniform1fv(loc.uShapeTintLights, tintTones);
     gl.uniform1fv(loc.uShapeFrosts, frosts);
     gl.uniform1fv(loc.uShapeOpacities, opacities);

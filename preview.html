@@ -411,6 +411,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label class="g-item-dark"><span>暗 tint</span><input type="range" id="g-tintD" min="0" max="0.9" step="0.05"><em id="g-tintD-v">0.50</em></label>
             <label class="g-item-dark"><span>暗 frost</span><input type="range" id="g-frostD" min="0" max="1" step="0.05"><em id="g-frostD-v">0.48</em></label>
           </span>
+        </div>
+        <div class="pv-row"><span class="k">按钮玻璃</span>
+          <span class="glass-params" id="btn-glass-params" data-show="light">
+            <span class="g-reset-row"><button id="bg-reset" type="button" class="btn-xs">重置默认</button></span>
+            <label class="g-item-light"><span>亮金 tint</span><input type="range" id="bg-goldL" min="0" max="1.5" step="0.05"><em id="bg-goldL-v">1.40</em></label>
+            <label class="g-item-light"><span>亮绿 tint</span><input type="range" id="bg-greenL" min="0" max="1.5" step="0.05"><em id="bg-greenL-v">1.25</em></label>
+            <label class="g-item-light"><span>亮中性 tint</span><input type="range" id="bg-neutralL" min="0" max="1.5" step="0.05"><em id="bg-neutralL-v">0.45</em></label>
+            <label class="g-item-light"><span>亮 frost</span><input type="range" id="bg-frostL" min="0" max="1" step="0.05"><em id="bg-frostL-v">0.15</em></label>
+            <label class="g-item-dark"><span>暗金 tint</span><input type="range" id="bg-goldD" min="0" max="1.5" step="0.05"><em id="bg-goldD-v">1.40</em></label>
+            <label class="g-item-dark"><span>暗绿 tint</span><input type="range" id="bg-greenD" min="0" max="1.5" step="0.05"><em id="bg-greenD-v">1.20</em></label>
+            <label class="g-item-dark"><span>暗中性 tint</span><input type="range" id="bg-neutralD" min="0" max="1.5" step="0.05"><em id="bg-neutralD-v">0.45</em></label>
+            <label class="g-item-dark"><span>暗 frost</span><input type="range" id="bg-frostD" min="0" max="1" step="0.05"><em id="bg-frostD-v">0.15</em></label>
+          </span>
         </div>        <div class="pv-row"><span class="k">运营周期</span>
           <span class="seg" id="seg-mode">
             <button data-v="breakin">破冰期</button>
@@ -1279,6 +1292,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     /* 主题只切换风格：经 postMessage 实时下发到演示 iframe，不再整页重载（避免重载导致页面状态/滚动回退）。iframe 跨源时静默，下次加载自取 localStorage */
     try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:theme', theme: b.dataset.v }, '*'); } catch (e3) {}
     var _gp = document.getElementById('glass-params'); if (_gp) _gp.dataset.show = b.dataset.v;
+    var _bgp = document.getElementById('btn-glass-params'); if (_bgp) _bgp.dataset.show = b.dataset.v;
 
 
   });
@@ -1315,6 +1329,49 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var gResetBtn = document.getElementById('g-reset');
   if (gResetBtn) gResetBtn.addEventListener('click', function () { glassCfg = Object.assign({}, glassDefault); gPush(); gRender(); });
   gRender();
+  /* ---- 按钮玻璃参数面板（非 Tabbar，独立一套）：localStorage + postMessage 联动 iframe ---- */
+  var BTN_GLASS_KEY = 'engchain-btn-glass-cfg-v2';
+  var btnGlassDefault = { goldLight: 1.40, goldDark: 1.40, greenLight: 1.25, greenDark: 1.20, neutralLight: 0.45, neutralDark: 0.45, frostLight: 0.15, frostDark: 0.15 };
+  var btnGlassCfg = Object.assign({}, btnGlassDefault);
+  try { var bgRaw = localStorage.getItem(BTN_GLASS_KEY); if (bgRaw) Object.assign(btnGlassCfg, JSON.parse(bgRaw)); } catch (e8) {}
+  var _bgpInit = document.getElementById('btn-glass-params'); if (_bgpInit) _bgpInit.dataset.show = document.documentElement.dataset.theme ? 'dark' : 'light';
+  var bgEls = {
+    goldL: document.getElementById('bg-goldL'), goldD: document.getElementById('bg-goldD'),
+    greenL: document.getElementById('bg-greenL'), greenD: document.getElementById('bg-greenD'),
+    neutralL: document.getElementById('bg-neutralL'), neutralD: document.getElementById('bg-neutralD'),
+    frostL: document.getElementById('bg-frostL'), frostD: document.getElementById('bg-frostD')
+  };
+  var bgVs = {
+    goldL: document.getElementById('bg-goldL-v'), goldD: document.getElementById('bg-goldD-v'),
+    greenL: document.getElementById('bg-greenL-v'), greenD: document.getElementById('bg-greenD-v'),
+    neutralL: document.getElementById('bg-neutralL-v'), neutralD: document.getElementById('bg-neutralD-v'),
+    frostL: document.getElementById('bg-frostL-v'), frostD: document.getElementById('bg-frostD-v')
+  };
+  var bgMap = {
+    goldL: 'goldLight', goldD: 'goldDark',
+    greenL: 'greenLight', greenD: 'greenDark',
+    neutralL: 'neutralLight', neutralD: 'neutralDark',
+    frostL: 'frostLight', frostD: 'frostDark'
+  };
+  function bgRender() {
+    ['goldL','goldD','greenL','greenD','neutralL','neutralD','frostL','frostD'].forEach(function (id) {
+      var key = bgMap[id];
+      bgEls[id].value = btnGlassCfg[key];
+      bgVs[id].textContent = btnGlassCfg[key].toFixed(2);
+    });
+  }
+  function bgPush() {
+    try { localStorage.setItem(BTN_GLASS_KEY, JSON.stringify(btnGlassCfg)); } catch (e9) {}
+    try { if (frame && frame.contentWindow) frame.contentWindow.postMessage(Object.assign({ type: 'engchain:btn-glass-cfg' }, btnGlassCfg), '*'); } catch (e10) {}
+    try { clearTimeout(bgToastT); bgToastT = setTimeout(function () { if (window.UI && UI.toast) UI.toast('按钮玻璃已更新：金 ' + btnGlassCfg.goldLight.toFixed(2) + '｜绿 ' + btnGlassCfg.greenLight.toFixed(2) + '｜中性 ' + btnGlassCfg.neutralLight.toFixed(2) + '｜frost ' + btnGlassCfg.frostLight.toFixed(2), 'ok'); }, 350); } catch (e11) {}
+  }
+  var bgToastT = null;
+  ['goldL','goldD','greenL','greenD','neutralL','neutralD','frostL','frostD'].forEach(function (id) {
+    if (bgEls[id]) bgEls[id].addEventListener('input', function () { btnGlassCfg[bgMap[id]] = Number(this.value); bgRender(); bgPush(); });
+  });
+  var bgResetBtn = document.getElementById('bg-reset');
+  if (bgResetBtn) bgResetBtn.addEventListener('click', function () { btnGlassCfg = Object.assign({}, btnGlassDefault); bgPush(); bgRender(); });
+  bgRender();
   /* browser-stage 内明暗按钮：与左侧 seg-theme 共用同一套状态（点击对应 seg 按钮触发完整联动） */
   var btnBwTheme = document.getElementById('btn-bw-theme');
   if (btnBwTheme) btnBwTheme.addEventListener('click', function () {

@@ -1072,6 +1072,39 @@ window.MOCK = (function () {
         ]
       }
     },
+    /* ============================================================================
+       惊喜时刻 Wonder Moment（2026-09-28 新增）
+       长时间浏览无有效动作时，主动推送"必中但档位随机"的最小单元价值奖励。
+       阈值/权重/预算后台可调；详见 docs/惊喜时刻-不确定性价值弹窗-执行方案-20260928.md
+       ============================================================================ */
+    wonder: {
+      enabled: true,
+      idleTriggerSec: 90,          /* 活跃浏览累计多久无有效动作才触发 */
+      activeHeartbeatSec: 30,      /* 超过该秒数无滚动/触摸/点击视为挂机，暂停计时 */
+      newUserQuietHours: 24,       /* 新注册用户保护期（注册礼已覆盖，避免双轰） */
+      freq: {
+        dailyCap: 1,               /* 每自然日最多触发次数 */
+        weeklyCap: 3,              /* 滚动 7 日最多触发次数 */
+        weeklyWindowDays: 7,
+        minGapHours: 20,           /* 两次触发最小间隔 */
+        sessionCap: 1              /* 单会话最多触发次数 */
+      },
+      budget: {
+        dailyCredits: 50000,       /* 全局每日积分预算（P0 灰度建议先调小到 5000） */
+        warnRatio: 0.8,            /* 消耗达 80% 移除大奖、权重并入小奖 */
+        jackpotDailyCap: 20,       /* 大奖每日全局配额 */
+        jackpotPerUserWindowDays: 30,
+        jackpotPerUserCap: 1       /* 单用户 30 天内最多中大奖次数 */
+      },
+      tiers: [
+        { id: 'glow',  label: '微光补给', weight: 70, values: [6, 8, 10] },
+        { id: 'star',  label: '星意补给', weight: 25, values: [18, 28, 38] },
+        { id: 'lucky', label: '锦鲤补给', weight: 5,  values: [68, 88, 98] }
+      ],
+      grantTtlDays: 7,              /* 奖励积分有效期（游客预挂账保留时长同此） */
+      softSignalCooldownRatio: 0.5, /* 触碰付费墙未支付等软信号：沉默阈值缩短比例 */
+      scenarios: ['home', 'list', 'detail']  /* 允许主动触发的场景白名单 */
+    },
     /* 入驻费（R2，按次；取代旧 entry ¥2000 专业版） */
     entryTypes: {
       construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V',

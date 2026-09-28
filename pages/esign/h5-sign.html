@@ -23,6 +23,13 @@
     </div>
   </div>
 </div>
+<div class="es-scrim" id="scrim"></div>
+<div class="es-sheet" id="sheet">
+  <div class="grab"></div>
+  <h5>合同目录</h5>
+  <div class="sub">点击条款直接跳转 · 完整正文 + 附件 + 签章页</div>
+  <div class="es-toc-list" id="tocList"></div>
+</div>
 <script src="../../js/common.js"></script>
 <script src="../../js/data.js"></script>
 <script src="../../js/stores.js"></script>
@@ -33,7 +40,7 @@
   var id = ES.qs('id');
   var v = document.getElementById('v');
   var mask = document.getElementById('mask');
-  var pickedKey = '', readAll = false, agreed = false, busy = false;
+  var pickedKey = '', readAll = false, agreed = false, busy = false, dZoom = 1, dCur = 'a0';
 
   function find() { return window.EsignStore ? EsignStore.findAnyContract(id) : null; }
   function extParties(c) {
@@ -64,20 +71,13 @@
     });
   }
 
-  function docWrap(c) {
-    var boxes = c.parties.map(function (p) {
-      var sealed = p.status === 'signed';
-      return '<div class="signbox ' + (sealed ? 'sealed' : '') + '"><b>' + ES.esc(p.company || p.name) + '</b><br>' + ES.esc(p.role) +
-        (sealed ? '<div class="seal-stamp">' + ES.esc((p.company || p.name).length > 7 ? (p.company || p.name).slice(0, 7) : (p.company || p.name)) + '<br>电子签</div>' : '<br>（待签署）') + '</div>';
-    }).join('');
-    return '<div class="es-doc-wrap" style="margin:0 0 14px;">' +
-      '<h2>' + ES.esc(c.title) + '</h2><div class="sub es-mono">' + ES.esc(c.code) + '</div>' +
-      '<h4>一、合同主体</h4>' + c.parties.map(function (p) {
-        return '<p style="text-indent:0;">' + ES.esc(p.role) + '：' + ES.esc(p.company || p.name) + '（' + ES.esc(p.name) + '）</p>'; }).join('') +
-      '<h4>二、标的与金额</h4><p>合同总金额（含税）：' + ES.amountText(c) + '；标的、数量、履行期限及验收标准以本合同正文及附件为准。</p>' +
-      '<h4>三、双方权利义务</h4><p>各方应按约全面履行义务，保证所提供资料真实、合法、有效；任何一方违约，应依法承担违约责任。</p>' +
-      '<h4>四、电子签署效力</h4><p>各方确认经实名认证完成的电子签名/电子印章与手写签名或实体盖章具有同等法律效力，签署完成由存证机构出具存证证明。</p>' +
-      '<h4>五、签章页</h4><div class="signarea">' + boxes + '</div></div>';
+  function toc(c) { return ES.contractTOC(c); }
+  function docbarHTML(c) {
+    return '<div class="es-docbar">' +
+      '<button class="es-toc" id="sToc">' + ES.ic('receipt') + '目录</button>' +
+      '<div class="es-zoom"><button id="zM" aria-label="缩小字号">A−</button><span class="zv" id="zV">100%</span><button id="zP" aria-label="放大字号">A+</button></div>' +
+      '<div class="es-rd" id="sRd"><span id="sRdTxt">已读 0% · 共 ' + toc(c).length + ' 节</span><div class="bar"><i id="sRdBar" style="width:0%"></i></div></div>' +
+    '</div>';
   }
 
   function renderSign(c, party) {
@@ -89,31 +89,103 @@
       '<div class="es-card" style="display:flex;align-items:center;gap:9px;margin-bottom:12px;">' +
         ES.ic('clock') + '<div style="font-size:12.5px;color:var(--text-2);">签署有效期至 <b class="es-mono">' + ES.ddate(c.deadline) + '</b>' +
         (!cd.overdue ? ' · <span style="color:var(--es-seal);">' + ES.esc(cd.text) + '</span>' : ' · <span style="color:var(--es-seal);">已逾期</span>') + '</div></div>' +
-      docWrap(c) +
-      '<div class="es-card"><div class="es-field"><label>签署身份核验：请输入该联系人手机后 4 位</label>' +
+      '<div class="es-sec" style="margin:0 2px 11px;"><h2>合同正文</h2><div class="rule"></div><div class="more">签署前请完整阅读</div></div>' +
+      docbarHTML(c) +
+      ES.contractDocHTML(c) +
+      '<div class="es-card" style="margin-top:14px;"><div class="es-field"><label>签署身份核验：请输入该联系人手机后 4 位</label>' +
         '<input id="m4" inputmode="numeric" maxlength="4" placeholder="手机后四位" style="letter-spacing:4px;text-align:center;font-size:18px;"></div>' +
         '<div class="tip">用于确认你是被邀请的签署人 ' + ES.esc(party.name) + '（' + ES.esc(party.company) + '）</div>' +
         '<div class="tip" style="color:var(--primary-dim);">演示提示：该受邀联系人手机后四位为 <b class="es-mono">' + ES.esc(last4 || '----') + '</b>（真实环境通过本人短信验证，不展示此提示）</div></div>' +
       '<div class="es-agree" id="agRead" style="padding:0 4px 12px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
-        '<span>我已完整阅读并认可合同全部内容</span></div>' +
+        '<span>我已完整阅读并认可合同全部内容<span class="es-readhint" id="readHint">阅读至文末后可确认</span></span></div>' +
       '<div class="es-agree" id="agTerm" style="padding:0 4px 4px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
         '<span>我同意《电子签名服务协议》，确认以实名认证的电子签名签署，认可其法律效力</span></div>';
-    v.innerHTML = '<div style="flex:1;overflow-y:auto;padding:18px 16px 12px;">' + inner + '</div>' +
+    v.innerHTML = '<div id="sc" style="flex:1;overflow-y:auto;padding:18px 16px 12px;">' + inner + '</div>' +
       '<div class="h5-bottom"><button class="es-btn primary block" id="bSign" disabled>实名认证并签署（约 30 秒）</button>' +
         '<button class="es-linkbtn danger" id="bReject" style="display:block;margin:10px auto 0;">不同意，拒签该合同</button>' +
         '<div class="h5-note">' + ES.esc(EsignStore.pricing().provider) + ' 提供实名认证与存证 · 全程加密，合同内容仅签署方可见</div></div>';
 
+    var sc = ES.$('#sc', v);
     var m4 = ES.$('#m4', v);
+    function readPct() { var doc = ES.$('#esDoc', v); return doc ? Math.round(ES.docReadPct(sc, doc) * 100) : 0; }
     function refresh() { ES.$('#bSign', v).disabled = !(readAll && agreed && /^\d{4}$/.test(m4.value) && !busy); }
-    ES.$('#agRead', v).onclick = function () { readAll = !readAll; ES.$('#agRead', v).classList.toggle('on', readAll); refresh(); };
+    function setReadUI() {
+      ES.$('#agRead', v).classList.toggle('on', readAll);
+      var h = ES.$('#readHint', v);
+      h.textContent = readAll ? '· 已读至文末，可确认' : '阅读至文末后可确认';
+      h.classList.toggle('ok', readAll);
+    }
+    ES.$('#agRead', v).onclick = function () {
+      var pct = readPct();
+      if (pct < 99) { UI.toast('请先滚动阅读至合同文末（当前 ' + pct + '%）', 'warn'); return; }
+      readAll = !readAll; setReadUI(); refresh();
+    };
     ES.$('#agTerm', v).onclick = function () { agreed = !agreed; ES.$('#agTerm', v).classList.toggle('on', agreed); refresh(); };
     m4.oninput = refresh;
+
+    /* 文档浏览：目录 / 缩放 / 阅读进度 */
+    var zV = ES.$('#zV', v), doc = ES.$('#esDoc', v);
+    function applyZoom(silent) {
+      if (!doc) return;
+      doc.style.setProperty('--es-dfs', (13 * dZoom).toFixed(1) + 'px');
+      doc.style.setProperty('--es-dhs', (13.5 * dZoom).toFixed(1) + 'px');
+      if (zV) zV.textContent = Math.round(dZoom * 100) + '%';
+      if (!silent) UI.toast('正文已缩放至 ' + Math.round(dZoom * 100) + '%');
+    }
+    ES.$('#zM', v).onclick = function () { dZoom = Math.max(0.85, +(dZoom - 0.15).toFixed(2)); applyZoom(); };
+    ES.$('#zP', v).onclick = function () { dZoom = Math.min(1.3, +(dZoom + 0.15).toFixed(2)); applyZoom(); };
+    applyZoom(true);
+    function onScroll() {
+      var pct2 = readPct(), p = pct2;
+      var bar = ES.$('#sRdBar', v), txt = ES.$('#sRdTxt', v);
+      if (bar) bar.style.width = p + '%';
+      if (txt) {
+        var arts = ES.$$('.es-clause[data-a]', v);
+        var cur2 = arts[0] || null;
+        for (var i = 0; i < arts.length; i++) {
+          var r = arts[i].getBoundingClientRect();
+          if (r.top < sc.getBoundingClientRect().top + 130) cur2 = arts[i];
+        }
+        if (cur2) dCur = cur2.getAttribute('data-a');
+        var left = arts.length - (arts.indexOf(cur2) + 1);
+        txt.textContent = p >= 100 ? '已读完全部条款 · 可确认' : '已读 ' + p + '% · 剩 ' + left + ' 节';
+        if (p >= 99) {
+          var h2 = ES.$('#readHint', v);
+          if (h2 && !h2.classList.contains('ok')) h2.innerHTML = '· 已读至文末，可确认';
+        }
+      }
+    }
+    sc.removeEventListener('scroll', onScroll);
+    sc.addEventListener('scroll', onScroll);
+    onScroll();
+    ES.$('#sToc', v).onclick = function () { openSheet(c); };
+
     ES.$('#bSign', v).onclick = function () {
       if (m4.value !== last4) { UI.toast('手机后四位与受邀联系人不符', 'warn'); return; }
       doSign(c, party);
     };
     ES.$('#bReject', v).onclick = function () { openReject(c, party); };
+    setReadUI(); refresh();
   }
+
+  function openSheet(c) {
+    ES.$('#sheet').classList.add('on'); ES.$('#scrim').classList.add('on');
+    var list = ES.$('#tocList');
+    list.innerHTML = toc(c).map(function (it) {
+      return '<div class="es-toc-item' + (it.a === dCur ? ' cur' : '') + '" data-a="' + it.a + '" data-t="' + ES.esc(it.t) + '">' +
+        '<span class="dot2"></span><span class="no">' + String(it.no).padStart(2, '0') + '</span><span>' + ES.esc(it.t) + '</span></div>';
+    }).join('');
+    ES.$$('.es-toc-item', list).forEach(function (it) {
+      it.onclick = function () {
+        var sc = ES.$('#sc', v);
+        var el = ES.$('[data-a="' + it.getAttribute('data-a') + '"]', v);
+        if (sc && el) sc.scrollTo({ top: el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 120, behavior: 'smooth' });
+        closeSheet(); UI.toast('已跳转至「' + it.getAttribute('data-t') + '」');
+      };
+    });
+  }
+  function closeSheet() { ES.$('#sheet').classList.remove('on'); ES.$('#scrim').classList.remove('on'); }
+  ES.$('#scrim').onclick = closeSheet;
 
   function openReject(c, party) {
     var sh = UI.sheet();
