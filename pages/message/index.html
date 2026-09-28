@@ -76,6 +76,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/orgs.js"></script>
+<script src="../../js/preview-sheet.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -302,7 +303,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!it) return;
     /* 有明确业务落点：直接进入主操作 */
     if (it.actions && it.actions.length && it.actions[0].href && it.actions[0].href !== '#') {
-      location.href = it.actions[0].href;
+      openNoticePreview(it.actions[0].href, it.actions[0].label || '页面预览');
       return;
     }
     showNoticeDetail(it);
@@ -792,6 +793,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function refreshAll() { renderConvs(); renderNoticeBadge(); renderNoticeList(); }
   window.addEventListener('engchain:auth', refreshAll);
   window.addEventListener('engchain:entry', refreshAll);
+  /* 通知分页内其余站内跳转（智能推荐卡片 / 推荐区链接 / 列表与详情操作按钮）统一走预览弹窗。
+     用捕获阶段拦截：列表操作按钮的 onclick 含 stopPropagation，冒泡阶段监听收不到；
+     会话入口链接（chat.html）保持整页跳转，不预览。 */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || href === '#' || /^(https?:|javascript?:|mailto:|tel:)/i.test(href)) return;
+    if (href.indexOf('chat.html') > -1) return;
+    var scope = a.closest('.mf-card, .mf-foot, .n-acts, .nd-acts');
+    if (!scope) return;
+    e.preventDefault();
+    openNoticePreview(href, (a.textContent || '').trim() || '页面预览');
+  }, true);
   window.addEventListener('engchain:org', refreshAll);
   window.addEventListener('storage', function (e) {
     if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages' || e.key === 'engchain-orgs') refreshAll();
@@ -924,6 +939,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   @keyframes n-jump-bg{0%{background:rgba(184,153,104,.26);}100%{background:transparent;}}
   .n-jump{animation:n-jump-bg 1.6s ease 1;}
 </style>
-<script src="../../js/liquid-glass.iife.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>
 </body>
 </html>

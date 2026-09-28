@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>惊喜时刻 Wonder Moment · 高保真演示与调试台</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/wonder-popup.css">
+<style>
+  :root { --phone-w: 390px; --phone-h: 780px; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background:
+      radial-gradient(1200px 500px at 20% -10%, rgba(201,169,97,.10), transparent 60%),
+      linear-gradient(180deg, #EDEAE3, #E3DFD6);
+    color: #2A2620;
+    min-height: 100vh;
+  }
+  .lab-wrap { max-width: 1180px; margin: 0 auto; padding: 26px 28px 60px; }
+  .lab-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .lab-head h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: .01em; }
+  .lab-head .sub { margin-top: 6px; font-size: 13px; color: #6f675a; }
+  .lab-head .tag { font-size: 11px; font-weight: 700; letter-spacing: .14em; color: var(--primary-dim); background: rgba(184,153,104,.14); border: 1px solid rgba(184,153,104,.3); padding: 5px 11px; border-radius: 999px; }
+  .lab-grid { display: grid; grid-template-columns: 390px 1fr; gap: 28px; align-items: start; }
+  @media (max-width: 960px) { .lab-grid { grid-template-columns: 1fr; } }
+
+  /* ---- 手机内的模拟浏览流 ---- */
+  .phone { border-radius: 34px; }
+  .sim-top { padding: 16px 18px 10px; flex: none; }
+  .sim-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .18em; color: var(--primary-dim); }
+  .sim-title { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .sim-progress { margin-top: 10px; height: 5px; border-radius: 3px; background: var(--bg-inset); overflow: hidden; }
+  .sim-progress i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, var(--primary-strong), var(--primary-dim)); transition: width .5s ease; }
+  .sim-progress-text { margin-top: 6px; font-size: 11px; color: var(--text-4); display: flex; justify-content: space-between; }
+  .sim-scroll { flex: 1; overflow-y: auto; padding: 4px 14px 24px; }
+  .sim-card {
+    background: var(--bg-card); border-radius: 16px; padding: 14px; margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(60,45,20,.06); cursor: pointer; border: 1px solid var(--line);
+  }
+  .sim-card:active { transform: scale(.985); }
+  .sim-cat { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: var(--primary-dim); }
+  .sim-card h4 { margin: 6px 0 4px; font-size: 14.5px; color: var(--text-1); }
+  .sim-card p { margin: 0; font-size: 12px; color: var(--text-3); line-height: 1.6; }
+  .sim-meta { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .sim-price { font-family: var(--font-num); font-weight: 800; color: var(--text-1); font-size: 14px; }
+  .sim-lock { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--primary-dim); background: rgba(184,153,104,.12); border-radius: 999px; padding: 6px 10px; }
+  .sim-hint { text-align: center; font-size: 11px; color: var(--text-4); padding: 8px 0 4px; line-height: 1.7; }
+
+  /* ---- 右侧控制台 ---- */
+  .deck { display: flex; flex-direction: column; gap: 14px; }
+  .panel { background: rgba(255,255,255,.72); border: 1px solid rgba(120,100,60,.14); border-radius: 18px; padding: 16px 18px; backdrop-filter: blur(6px); }
+  .panel h3 { margin: 0 0 12px; font-size: 13px; font-weight: 800; letter-spacing: .06em; color: #4a4133; display: flex; align-items: center; gap: 8px; }
+  .panel h3::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 9px; }
+  .btn {
+    appearance: none; border: 1px solid rgba(120,100,60,.25); background: #fff; color: #3d362a;
+    font-size: 12.5px; font-weight: 600; padding: 8px 13px; border-radius: 10px; cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+    font-family: var(--font);
+  }
+  .btn:active { transform: translateY(1px) scale(.98); }
+  .btn.primary { background: linear-gradient(180deg,#D4C09A,#B89968 50%,#9A8050); border-color: transparent; color: #33260f; font-weight: 700; box-shadow: 0 5px 14px -5px rgba(184,153,104,.6); }
+  .btn.danger { color: #9c3d3d; border-color: rgba(156,61,61,.3); }
+  .btn.ghost { background: transparent; }
+  select.btn { padding: 8px 10px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 5px 12px; font-size: 12px; line-height: 1.6; }
+  .kv dt { color: #8a8070; } .kv dd { margin: 0; color: #2f2a22; font-family: var(--font-num); }
+  .pill { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .pill.ok { background: rgba(91,154,111,.16); color: #3c7a54; }
+  .pill.warn { background: rgba(201,169,97,.2); color: #8a6a2a; }
+  .pill.bad { background: rgba(156,61,61,.14); color: #9c3d3d; }
+  pre.state {
+    margin: 0; max-height: 240px; overflow: auto; background: #26221b; color: #e8ddc6;
+    border-radius: 12px; padding: 12px 14px; font-size: 11px; line-height: 1.55;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .log { max-height: 170px; overflow-y: auto; font-size: 11.5px; line-height: 1.7; font-family: ui-monospace, Menlo, Consolas, monospace; color: #4a4336; }
+  .log .empty { color: #a79d8b; }
+  .log b { color: #7a5f22; }
+  .note-line { font-size: 11.5px; color: #8a8070; line-height: 1.7; margin: 0 0 10px; }
+  .stat-inline { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; }
+  .stat-inline b { font-family: var(--font-num); font-size: 16px; color: #3a2f17; display:block; }
+  .stat-inline span { color:#8a8070; font-size:11px; }
+</style>
+</head>
+<body data-wonder-scenario="list">
+<div class="lab-wrap">
+  <div class="lab-head">
+    <div>
+      <h1>惊喜时刻 Wonder Moment</h1>
+      <div class="sub">长时间无有效动作浏览 → 画像匹配 → 必中但档位随机的最小单元奖励 → 个性化下一步引导</div>
+    </div>
+    <span class="tag">ENGCHAIN · WONDER LAB v1.0</span>
+  </div>
+
+  <div class="lab-grid">
+    <!-- 左：模拟手机浏览流 -->
+    <div class="phone">
+      <div class="sim-top">
+        <div class="sim-eyebrow">模拟场景 · 搜索结果流</div>
+        <div class="sim-title">成都 · 建材商机</div>
+        <div class="sim-progress"><i id="silence-bar"></i></div>
+        <div class="sim-progress-text">
+          <span id="silence-label">沉默活跃 0s / 90s</span>
+          <span id="silence-state">监测中</span>
+        </div>
+      </div>
+      <div class="sim-scroll" id="list">
+        <div class="sim-card" data-cat="material" onclick="labDetail('material','m001')">
+          <div class="sim-cat">建材 · 成华区</div>
+          <h4>中铁某局项目 · HRB400 螺纹钢长期采购</h4>
+          <p>月需求 800 吨，现款现货，寻成都及周边合格供应商长期合作。</p>
+          <div class="sim-meta"><span class="sim-price">¥3,820/吨</span><span class="sim-lock" data-pw-unlock>解锁联系方式 · 98积分</span></div>
+        </div>
+        <div class="sim-card" data-cat="equipment" onclick="labDetail('equipment','e007')">
+          <div class="sim-cat">设备租赁 · 天府新区</div>
+          <h4>塔吊 QTZ80 两台长租 · 含操作工</h4>
+          <p>超高层项目工期 14 个月，设备已年检，带安拆与运输报价。</p>
+          <div class="sim-meta"><span class="sim-price">¥2.6万/月</span><span class="sim-lock" data-pw-unlock>解锁联系方式 · 98积分</span></div>
+        </div>
+        <div class="sim-card" data-cat="labor" onclick="labDetail('labor','l021')">
+          <div class="sim-cat">劳务班组 · 高新区</div>
+          <h4>钢筋班组 32 人找活 · 持证齐全</h4>
+          <p>带班 12 年，三个在建项目业绩，可立即进场，计件/日工均可。</p>
+          <div class="sim-meta"><span class="sim-price">32人</span><span class="sim-lock" data-pw-unlock>解锁联系方式 · 98积分</span></div>
+        </div>
+        <div class="sim-card" data-cat="material" onclick="labDetail('material','m014')">
+          <div class="sim-cat">建材 · 龙泉驿</div>
+          <h4>商砼 C30 站点直供 · 日供 300m³</h4>
+          <p>自有搅拌站两座，泵车齐全，主打高新区-龙泉驿沿线项目。</p>
+          <div class="sim-meta"><span class="sim-price">¥415/m³</span><span class="sim-lock" data-pw-unlock>解锁联系方式 · 98积分</span></div>
+        </div>
+        <div class="sim-card" data-cat="franchise" onclick="labDetail('franchise','f003')">
+          <div class="sim-cat">资质招商 · 锦江区</div>
+          <h4>特级总包资质开放区域联营合作</h4>
+          <p>总部直签，费用透明，提供投标全套支持与一对一加盟方案。</p>
+          <div class="sim-meta"><span class="sim-price">联营</span><span class="sim-lock" data-pw-unlock>免费咨询</span></div>
+        </div>
+        <div class="sim-hint">上下滑动、点开卡片都算活跃浏览；<br>点「解锁」未支付会形成强意图软信号。</div>
+      </div>
+    </div>
+
+    <!-- 右：控制台 -->
+    <div class="deck">
+      <div class="panel">
+        <h3>触发</h3>
+        <p class="note-line">自动触发需沉默活跃达阈值（默认 90s）。调试可直接触发，或把阈值降到 8s 体验自动链路。</p>
+        <div class="row">
+          <button class="btn primary" onclick="labFire(false)">立即触发（走完整门禁）</button>
+          <button class="btn" onclick="labFire(true)">强制触发（绕过频控/避让）</button>
+        </div>
+        <div class="row">
+          <button class="btn ghost" id="btn-fast" onclick="labToggleFast()">自动模式：阈值切到 8s</button>
+          <button class="btn ghost" onclick="labRefresh()">刷新状态</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>画像模拟</h3>
+        <div class="row">
+          <select class="btn" id="identity-sel" onchange="labIdentity(this.value)">
+            <option value="guest">游客（未登录）</option>
+            <option value="unverified">已注册未实名</option>
+            <option value="verified">已实名认证</option>
+            <option value="resident">已企业入驻</option>
+          </select>
+          <button class="btn" onclick="labBrowse(3)">模拟浏览建材详情 ×3</button>
+          <button class="btn" onclick="labPaywall()">模拟点击付费墙</button>
+          <button class="btn" onclick="labEffective()">模拟有效动作（解锁成功）</button>
+        </div>
+        <div class="row">
+          <select class="btn" id="tier-sel" onchange="labTier(this.value)">
+            <option value="">档位：真实加权随机</option>
+            <option value="glow">强制微光 6/8/10</option>
+            <option value="star">强制星意 18/28/38</option>
+            <option value="lucky">强制锦鲤 68/88/98</option>
+          </select>
+          <span class="note-line" style="margin:0">单次期望成本 <b id="exp-cost" style="color:#7a5f22">–</b> 积分</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>预算 / 熔断 / 预挂账</h3>
+        <div class="stat-inline" style="margin-bottom:10px">
+          <div><b id="st-spent">0</b><span>今日已发积分</span></div>
+          <div><b id="st-ratio">0%</b><span>预算占用</span></div>
+          <div><b id="st-jackpot">0</b><span>今日大奖数</span></div>
+          <div><b id="st-balance">0</b><span>当前账号余额</span></div>
+        </div>
+        <div class="row">
+          <button class="btn" onclick="labSpend(0.85)">模拟预算消耗 85%</button>
+          <button class="btn danger" onclick="labSpend(1.05)">模拟预算超支 105%</button>
+          <button class="btn" onclick="labSpend(0)">预算重置</button>
+          <button class="btn primary" onclick="labClaim()">注册认领游客预挂账</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>频控 / 数据</h3>
+        <div class="row">
+          <button class="btn" onclick="labResetFreq()">重置频控（当日可再弹）</button>
+          <button class="btn danger" onclick="labResetAll()">清空全部本地数据</button>
+        </div>
+        <div id="freq-line" style="margin-top:10px;font-size:12px;color:#5f574a"></div>
+      </div>
+
+      <div class="panel">
+        <h3>引擎实时状态</h3>
+        <pre class="state" id="state-view">（加载中）</pre>
+      </div>
+
+      <div class="panel">
+        <h3>事件日志</h3>
+        <div class="log" id="event-log"><span class="empty">尚无事件。触发弹窗、揭晓、点击 CTA 会记录在此。</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/common.js"></script>
+<script src="js/stores.js"></script>
+<script src="js/wonder-engine.js"></script>
+<script src="js/wonder-popup.js"></script>
+<script>
+(function () {
+  'use strict';
+  var fast = false;
+
+  function log(msg) {
+    var box = document.getElementById('event-log');
+    if (box.querySelector('.empty')) box.innerHTML = '';
+    var t = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    var div = document.createElement('div');
+    div.innerHTML = '<b>' + t + '</b> ' + msg;
+    box.insertBefore(div, box.firstChild);
+  }
+
+  ['boot', 'show', 'grant', 'cta', 'dismiss', 'effective', 'softsignal', 'claim'].forEach(function (ev) {
+    WonderEngine.on(ev, function (p) {
+      var txt = ev;
+      try {
+        if (ev === 'grant' || ev === 'cta') txt += ' · ' + (p.kind || '') + ' ' + (p.tierLabel || p.tier || '') + ' ' + (p.amount != null ? p.amount + '积分' : '');
+        else if (ev === 'dismiss') txt += ' · 阶段=' + p.phase;
+        else if (ev === 'effective') txt += ' · ' + p.type;
+        else if (ev === 'softsignal') txt += ' · ' + p.type;
+        else if (ev === 'show') txt += ' · persona=' + p.persona + ' budget=' + p.budgetState;
+        else if (ev === 'claim') txt += p.ok ? ' · 认领成功 ' + p.amount + '积分' : ' · 未认领(' + p.reason + ')';
+      } catch (e) {}
+      log(txt);
+      setTimeout(refresh, 50);
+    });
+  });
+
+  WonderEngine.boot();
+
+  window.labFire = function (bypass) {
+    var r = WonderEngine.fire({ bypassGate: !!bypass });
+    if (!r.fired) log('未触发 · 原因=' + r.reason);
+    refresh();
+  };
+  window.labDetail = function (cat, id) {
+    WonderEngine.track({ type: 'detail', cat: cat, id: id });
+  };
+  window.labBrowse = function (n) {
+    for (var i = 0; i < n; i++) WonderEngine.track({ type: 'detail', cat: 'material', id: 'mb' + i + Date.now() });
+    log('已注入 ' + n + ' 次建材详情浏览');
+    refresh();
+  };
+  window.labPaywall = function () {
+    WonderEngine.track({ type: 'paywall', cat: 'material' });
+    refresh();
+  };
+  window.labEffective = function () {
+    window.dispatchEvent(new CustomEvent('engchain-unlock-changed', { detail: { id: 'm001' } }));
+    refresh();
+  };
+  window.labIdentity = function (v) {
+    if (v === 'guest') WonderEngine._debugIdentity = null;
+    else if (v === 'unverified') WonderEngine._debugIdentity = { loggedIn: true, segment: 'unverified', uid: 'u_demo_unv' };
+    else if (v === 'verified') WonderEngine._debugIdentity = { loggedIn: true, segment: 'verified', uid: 'u_demo_v' };
+    else if (v === 'resident') WonderEngine._debugIdentity = { loggedIn: true, segment: 'resident', uid: 'u_demo_r' };
+    WonderEngine.debugResetFreq();
+    log('画像切换为 ' + v + '，已重置频控');
+    refresh();
+  };
+  window.labTier = function (v) { WonderEngine._debugTier = v || null; };
+  window.labSpend = function (ratio) {
+    var s = WonderEngine.debugSpendBudget(ratio);
+    log('预算状态=' + s.state + ' 已消耗=' + s.spent);
+    refresh();
+  };
+  window.labClaim = function () {
+    var r = WonderEngine.claimPending();
+    log(r.ok ? '预挂账已认领入账 ' + r.amount + '积分' : '认领失败：' + r.reason);
+    refresh();
+  };
+  window.labResetFreq = function () { WonderEngine.debugResetFreq(); log('频控已重置'); refresh(); };
+  window.labResetAll = function () {
+    WonderEngine.resetAll();
+    try { localStorage.removeItem('engchain-credits'); } catch (e) {}
+    log('全部本地数据已清空，2s 后刷新…');
+    setTimeout(function () { location.reload(); }, 900);
+  };
+  window.labToggleFast = function () {
+    fast = !fast;
+    MOCK.business.wonder.idleTriggerSec = fast ? 8 : 90;
+    var btn = document.getElementById('btn-fast');
+    btn.textContent = fast ? '自动模式：8s（生效中，点此恢复 90s）' : '自动模式：阈值切到 8s';
+    log('沉默阈值=' + MOCK.business.wonder.idleTriggerSec + 's（在手机内滑动保持活跃）');
+  };
+  window.labRefresh = refresh;
+
+  function budgetPill(st) {
+    if (st === 'normal') return '<span class="pill ok">正常</span>';
+    if (st === 'warn') return '<span class="pill warn">预警降档</span>';
+    return '<span class="pill bad">硬熔断</span>';
+  }
+
+  function refresh() {
+    var s;
+    try { s = WonderEngine.state(); } catch (e) { return; }
+    document.getElementById('exp-cost').textContent = (Math.round(s.expectedCost * 10) / 10);
+    var bs = s.budget.status, b = s.budget.raw;
+    document.getElementById('st-spent').textContent = b.spent;
+    document.getElementById('st-ratio').textContent = Math.round(bs.ratio * 100) + '% ';
+    document.getElementById('st-jackpot').textContent = b.jackpotCount;
+    document.getElementById('st-balance').textContent = s.profile.balance;
+
+    var f = s.frequency;
+    document.getElementById('freq-line').innerHTML =
+      '当日已弹 <b>' + f.dayCount + '</b> / 7日 ' + f.weekCount + ' 次 · 上次展现 ' +
+      (f.lastShowTs ? new Date(f.lastShowTs).toLocaleTimeString('zh-CN', { hour12: false }) : '—') +
+      ' · 当日关闭：' + (f.dismissDay === f.day ? '是' : '否') + ' &nbsp;' + budgetPill(bs.state);
+
+    var view = {
+      persona: s.profile.persona,
+      segment: s.profile.segment,
+      guest: s.profile.guest,
+      topCats: s.profile.topCats,
+      nba: s.profile.nba && { ctaText: s.profile.nba.ctaText, ctaHref: s.profile.nba.ctaHref },
+      budget: bs,
+      frequency: f,
+      pending: s.pending,
+      session: {
+        activeSec: Math.round(s.session.activeMs / 1000),
+        thresholdSec: Math.round(WonderEngine._internal.Tracker.idleThresholdMs() / 1000),
+        shown: s.session.shown,
+        paywall: !!s.session.paywall
+      }
+    };
+    document.getElementById('state-view').textContent = JSON.stringify(view, null, 2);
+  }
+
+  /* 沉默进度条每秒刷新 */
+  setInterval(function () {
+    try {
+      var s = WonderEngine.state();
+      var cur = s.session.activeMs / 1000;
+      var threshold = WonderEngine._internal.Tracker.idleThresholdMs() / 1000;
+      var pct = Math.min(100, Math.round(cur / threshold * 100));
+      document.getElementById('silence-bar').style.width = pct + '%';
+      document.getElementById('silence-label').textContent =
+        '沉默活跃 ' + Math.round(cur) + 's / ' + Math.round(threshold) + 's';
+      document.getElementById('silence-state').textContent =
+        s.session.shown ? '本会话已触达' : (pct >= 100 ? '满足沉默条件' : '监测中');
+    } catch (e) {}
+  }, 1000);
+
+  refresh();
+})();
+</script>
+</body>
+</html>

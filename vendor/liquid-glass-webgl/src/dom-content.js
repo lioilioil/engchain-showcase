@@ -185,9 +185,6 @@ function build() {
   function visit(element, path, alpha, fixed, paintSelf = true) {
     if (element.namespaceURI !== XHTML) return;
     const tag = element.tagName.toUpperCase();
-    // Glass layer canvases are not skipped: a surface above another glass
-    // element refracts that element's rendered glass like any other canvas.
-    if (SKIP_TAGS.has(tag)) return;
     const style = getComputedStyle(element);
     if (style.display === 'none' || style.display === 'contents' && !element.childNodes.length) return;
     const positioned = style.position !== 'static';
@@ -201,10 +198,14 @@ function build() {
     // A glass element is recorded and then walked like anything else, so a
     // control nested in a glass card sees the card's glass and its text.
     // Its own CSS background is under that glass, so it is not painted.
+    // Glass hosts are recorded even when their tag is in SKIP_TAGS (e.g. a
+    // <button> CTA), so itemsBelow() can locate the host and paint the page
+    // content under it — otherwise the glass would transmit nothing.
     if (element.matches(HOST_SELECTOR)) {
       hosts.set(element, key);
       if (element.getAttribute('data-liquid-glass') !== 'fallback') paintSelf = false;
     }
+    if (SKIP_TAGS.has(tag)) return;
     const opacity = Number(style.opacity);
     const childAlpha = alpha * (Number.isFinite(opacity) ? opacity : 1);
     const visible = style.visibility === 'visible' && childAlpha > 0.004;

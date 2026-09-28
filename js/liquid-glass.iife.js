@@ -1213,6 +1213,9 @@ __reg('./v2-material.js', function (__m) {
     body: 0.72,
     absorption: 0.58,
     tint: 0,
+    // RGB tint layer color, 0-1 per channel. Default white = neutral milk glass;
+    // set e.g. [0.72, 0.60, 0.41] for a gold glass, [0.17, 0.42, 0.31] green.
+    tintColor: [1.0, 1.0, 1.0],
     rim: 0.24,
     reflection: 0.31,
     highlight: 0.34,
@@ -1304,6 +1307,7 @@ __reg('./v2-shaders.js', function (__m) {
   uniform int uShapeTypes[MAX_SHAPES];
   uniform float uShapeRadii[MAX_SHAPES];
   uniform float uShapeTints[MAX_SHAPES];
+  uniform vec3 uShapeTintColors[MAX_SHAPES];
   uniform float uShapeTintLights[MAX_SHAPES];
   uniform float uShapeFrosts[MAX_SHAPES];
   uniform float uShapeOpacities[MAX_SHAPES];
@@ -1604,6 +1608,15 @@ __reg('./v2-shaders.js', function (__m) {
     // veil used by notifications and other legibility-first controls.
     vec3 tintTarget = mix(vec3(0.055, 0.057, 0.066), vec3(0.975, 0.970, 0.955),
                           clamp(uShapeTintLights[chosen], 0.0, 1.0));
+    // Colored tint: keep the light/dark base luminance, replace its hue with
+    // tintColor, so colored glass stays vivid instead of darkening through
+    // multiplication. White tintColor (neutral) changes nothing (tabbar-safe).
+    vec3 tc = uShapeTintColors[chosen];
+    float colorful = smoothstep(0.02, 0.08, length(tc - vec3(1.0)));
+    vec3 lumVec = vec3(0.299, 0.587, 0.114);
+    float tintLum = dot(tintTarget, lumVec);
+    vec3 colored = tc * min((tintLum * 0.72) / max(dot(tc, lumVec), 1e-4), 0.85);
+    tintTarget = mix(tintTarget, colored, colorful);
     float tintOpacity = smoothstep(0.0, 1.5, uShapeTints[chosen]) * 0.78;
     transmitted = mix(transmitted, tintTarget, tintOpacity * (0.88 + depth * 0.12));
   
@@ -2431,6 +2444,7 @@ __reg('./renderer.js', function (__m) {
       const types = new Int32Array(MAX_GLASS_SHAPES);
       const lights = new Float32Array(MAX_GLASS_SHAPES * 2);
       const tints = new Float32Array(MAX_GLASS_SHAPES);
+      const tintColors = new Float32Array(MAX_GLASS_SHAPES * 3);
       const tintTones = new Float32Array(MAX_GLASS_SHAPES);
       const frosts = new Float32Array(MAX_GLASS_SHAPES);
       const opacities = new Float32Array(MAX_GLASS_SHAPES);
@@ -2455,6 +2469,8 @@ __reg('./renderer.js', function (__m) {
         lights[i * 2] = direction[0];
         lights[i * 2 + 1] = direction[1];
         tints[i] = element.tint ?? m.tint;
+        const tc = element.tintColor ?? m.tintColor ?? [1, 1, 1];
+        tintColors[i * 3] = tc[0]; tintColors[i * 3 + 1] = tc[1]; tintColors[i * 3 + 2] = tc[2];
         tintTones[i] = tintLights[i] ?? 1;
         // V2 frost is a dimensionless ratio resolved in the shader against the
         // component short side. V1 keeps its authored CSS-pixel blur lengths.
@@ -2489,6 +2505,7 @@ __reg('./renderer.js', function (__m) {
       gl.uniform1iv(loc.uShapeTypes, types);
       gl.uniform1fv(loc.uShapeRadii, radii);
       gl.uniform1fv(loc.uShapeTints, tints);
+      gl.uniform3fv(loc.uShapeTintColors, tintColors);
       gl.uniform1fv(loc.uShapeTintLights, tintTones);
       gl.uniform1fv(loc.uShapeFrosts, frosts);
       gl.uniform1fv(loc.uShapeOpacities, opacities);
@@ -3511,9 +3528,6 @@ __reg('./dom-content.js', function (__m) {
     function visit(element, path, alpha, fixed, paintSelf = true) {
       if (element.namespaceURI !== XHTML) return;
       const tag = element.tagName.toUpperCase();
-      // Glass layer canvases are not skipped: a surface above another glass
-      // element refracts that element's rendered glass like any other canvas.
-      if (SKIP_TAGS.has(tag)) return;
       const style = getComputedStyle(element);
       if (style.display === 'none' || style.display === 'contents' && !element.childNodes.length) return;
       const positioned = style.position !== 'static';
@@ -3527,10 +3541,14 @@ __reg('./dom-content.js', function (__m) {
       // A glass element is recorded and then walked like anything else, so a
       // control nested in a glass card sees the card's glass and its text.
       // Its own CSS background is under that glass, so it is not painted.
+      // Glass hosts are recorded even when their tag is in SKIP_TAGS (e.g. a
+      // <button> CTA), so itemsBelow() can locate the host and paint the page
+      // content under it — otherwise the glass would transmit nothing.
       if (element.matches(HOST_SELECTOR)) {
         hosts.set(element, key);
         if (element.getAttribute('data-liquid-glass') !== 'fallback') paintSelf = false;
       }
+      if (SKIP_TAGS.has(tag)) return;
       const opacity = Number(style.opacity);
       const childAlpha = alpha * (Number.isFinite(opacity) ? opacity : 1);
       const visible = style.visibility === 'visible' && childAlpha > 0.004;
@@ -3828,6 +3846,26 @@ __reg('./v2.js', function (__m) {
     if (!['auto', 'light', 'dark'].includes(tintTone)) {
       throw new TypeError(`Unknown liquid glass V2 tint tone: ${tintTone}`);
     }
+    // Optional per-element tint color: '#rrggbb' or [r, g, b] in 0-1.
+    let tintColor;
+    if (input.tintColor != null) {
+      if (typeof input.tintColor === 'string') {
+        const hex = input.tintColor.replace(/^#/, '');
+        const n = parseInt(hex, 16);
+        if (hex.length === 6 && Number.isFinite(n)) {
+          tintColor = [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        } else {
+          throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+        }
+      } else if (Array.isArray(input.tintColor) && input.tintColor.length === 3) {
+        tintColor = input.tintColor.map(Number);
+        if (!tintColor.every(Number.isFinite)) {
+          throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+        }
+      } else {
+        throw new TypeError('Liquid glass V2 element tintColor must be #rrggbb or [r,g,b] 0-1.');
+      }
+    }
     return {
       ...input,
       id: input.id ?? `glass-v2-${index + 1}`,
@@ -3839,6 +3877,7 @@ __reg('./v2.js', function (__m) {
       ...(tint === undefined ? {} : { tint }),
       ...(frost === undefined ? {} : { frost }),
       ...(opacity === undefined ? {} : { opacity }),
+      ...(tintColor === undefined ? {} : { tintColor }),
       tintTone,
       pressure: Math.max(0, Math.min(1, pressure)),
       pressureAxes: pressureAxes.map((v) => Math.max(0, Math.min(1, v))),

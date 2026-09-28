@@ -2272,7 +2272,8 @@
       completedAt: o.completedAt || 0, costQuota: 1, orderId: o.orderId || '',
       remindCount: o.remindCount || 0, lastRemindAt: o.lastRemindAt || 0,
       rejectReason: o.rejectReason || '',
-      evidence: o.evidence || null
+      evidence: o.evidence || null,
+      detail: o.detail || null
     };
   }
 
@@ -2287,6 +2288,14 @@
       initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
       signOrder: 'sequential', status: 'pending_mine',
       deadline: T + 2 * ES_DAY + 4 * 36e5, createdAt: T - ES_DAY, sentAt: T - ES_DAY,
+      detail: {
+        unit: '吨',
+        items: [
+          { spec: '螺纹钢 HRB400E Φ12', qty: 15, unit: '吨', price: 2433, amount: 36495 },
+          { spec: '螺纹钢 HRB400E Φ16', qty: 12, unit: '吨', price: 2410, amount: 28920 },
+          { spec: '螺纹钢 HRB400E Φ20', qty: 9, unit: '吨', price: 2342, amount: 21085 }
+        ]
+      },
       parties: [
         { key: 'pA', name: '王总', company: '成都恒信建材有限公司', mobileMask: '138****2233', role: '甲方', order: 1, status: 'signed', signedAt: T - 36e5 },
         { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 2, ownerUid: u1, status: 'pending' }
