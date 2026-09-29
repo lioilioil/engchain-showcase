@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>信息工作台 · Bento Grid</title>
+<style>
+:root{
+  --bg:#ECEEF2; --paper:#FFFFFF; --ink:#16181D; --ink2:#5B6270; --ink3:#9AA0AC;
+  --line:#E7E9EE; --blue:#2F6BFF; --blue-soft:#EAF0FF; --blue-ink:#1E4FD6;
+  --red:#F0524A; --green:#1FA971; --amber:#E8902B;
+  --r-lg:22px; --r-md:16px; --r-sm:12px;
+  --sh:0 10px 30px -16px rgba(22,24,29,.18),0 2px 6px -2px rgba(22,24,29,.06);
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --num:"SF Pro Display",-apple-system,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#D9DCE2;font-family:var(--sans);min-height:100vh;display:flex;justify-content:center;}
+.phone{position:relative;width:390px;min-height:100vh;background:var(--bg);overflow:hidden;
+  display:flex;flex-direction:column;}
+@media(min-width:760px){body{padding:28px 0}.phone{min-height:0;height:844px;border-radius:42px;
+  box-shadow:0 0 0 11px #15171C,0 0 0 13px #33373F,0 40px 90px rgba(0,0,0,.28)}}
+.statusbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 26px;
+  font-size:14px;font-weight:600;color:var(--ink);flex:none}
+.sb-r{display:flex;gap:6px;align-items:center}
+.sb-r i{width:18px;height:11px;background:var(--ink);-webkit-mask:linear-gradient(#000,#000);
+  border-radius:2px;opacity:.85}
+.scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:6px 16px calc(86px + env(safe-area-inset-bottom))}
+.scroll::-webkit-scrollbar{display:none}
+
+/* header */
+.hd{display:flex;align-items:center;gap:12px;padding:6px 4px 16px}
+.hd .hello{flex:1}
+.hd .hello .k{font-size:12px;color:var(--ink3);font-weight:500;letter-spacing:.02em}
+.hd .hello h1{font-size:23px;font-weight:800;letter-spacing:-.01em;color:var(--ink);margin-top:2px}
+.avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#2F6BFF,#7AA0FF);
+  color:#fff;display:grid;place-items:center;font-size:15px;font-weight:700;flex:none}
+.search{display:flex;align-items:center;gap:8px;height:44px;background:var(--paper);
+  border:1px solid var(--line);border-radius:var(--r-md);padding:0 14px;color:var(--ink3);
+  font-size:13.5px;box-shadow:var(--sh)}
+.search svg{width:17px;height:17px;flex:none}
+
+/* bento grid */
+.bento{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.tile{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:14px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.tile .lab{font-size:11px;color:var(--ink3);font-weight:600;letter-spacing:.02em;display:flex;
+  align-items:center;gap:5px}
+.tile .val{font-family:var(--num);font-weight:800;font-size:30px;letter-spacing:-.02em;
+  color:var(--ink);margin-top:8px;line-height:1}
+.tile .sub{font-size:10.5px;color:var(--ink3);margin-top:6px}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.t-hero{grid-column:span 2;background:linear-gradient(150deg,#2F6BFF,#5B86FF);border:0;color:#fff;
+  display:flex;flex-direction:column;min-height:128px}
+.t-hero .lab,.t-hero .sub{color:rgba(255,255,255,.78)}
+.t-hero .val{color:#fff;font-size:44px;margin-top:auto}
+.t-hero .spark{display:flex;align-items:flex-end;gap:4px;position:absolute;right:14px;bottom:14px;height:42px}
+.t-hero .spark i{width:6px;border-radius:3px;background:rgba(255,255,255,.32)}
+.t-hero .spark i.on{background:#fff}
+.t-badge{align-items:flex-start}
+.t-badge .val{color:var(--red)}
+.t-badge .ping{position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;
+  background:var(--red);box-shadow:0 0 0 4px rgba(240,82,74,.16)}
+.t-week{grid-column:span 3;display:flex;align-items:center;gap:14px}
+.t-week .wk-l{flex:none}
+.t-week .bars{flex:1;display:flex;align-items:flex-end;gap:6px;height:48px;width:100%}
+.t-week>div:not(.wk-l){flex:1;min-width:0}
+.t-week .bars i{flex:1;background:var(--blue-soft);border-radius:4px 4px 0 0;position:relative}
+.t-week .bars i.hi{background:var(--blue)}
+.t-week .wk-cap{font-size:10.5px;color:var(--ink3);text-align:center;margin-top:5px}
+.t-week .wk-total{font-family:var(--num);font-weight:800;font-size:26px;color:var(--ink);line-height:1}
+.t-quick{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:7px;
+  padding:14px 6px;text-align:center}
+.t-quick .qi{width:34px;height:34px;border-radius:11px;display:grid;place-items:center}
+.t-quick .qi svg{width:18px;height:18px}
+.t-quick span{font-size:11px;color:var(--ink2);font-weight:600}
+.qi.b{background:var(--blue-soft);color:var(--blue)}
+.qi.g{background:#E7F7F0;color:var(--green)}
+.qi.a{background:#FDF1E2;color:var(--amber)}
+
+/* section header */
+.sh{display:flex;align-items:baseline;justify-content:space-between;margin:22px 4px 11px}
+.sh h2{font-size:16px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+.sh a{font-size:12px;color:var(--blue);font-weight:600;text-decoration:none}
+.chips{display:flex;gap:8px;margin:0 0 4px}
+.chip{font-size:12.5px;font-weight:600;padding:8px 15px;border-radius:999px;background:var(--paper);
+  border:1px solid var(--line);color:var(--ink2)}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip .n{font-size:11px;opacity:.6;margin-left:3px}
+.task{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh);padding:14px;margin-top:10px;display:flex;gap:12px}
+.task .bar{width:4px;border-radius:4px;flex:none}
+.task .bar.ask{background:var(--red)}.task .bar.rev{background:var(--amber)}
+.task .tx{flex:1;min-width:0}
+.task .tt{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.task .cat{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink3)}
+.task .st{margin-left:auto;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+.st.ask{background:#FEECEB;color:var(--red)}
+.st.rev{background:#FDF1E2;color:var(--amber)}
+.task b{display:block;font-size:14px;font-weight:700;color:var(--ink);line-height:1.45}
+.task .meta{font-size:11.5px;color:var(--ink3);margin-top:8px;display:flex;gap:6px;align-items:center}
+.task .meta svg{width:12px;height:12px}
+
+/* tabbar */
+.tabbar{position:absolute;left:12px;right:12px;bottom:14px;height:66px;background:rgba(255,255,255,.86);
+  backdrop-filter:blur(18px);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 36px -14px rgba(22,24,29,.28);
+  display:flex;align-items:center;padding:0 10px;z-index:20}
+.tabbar button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+  font-size:10.5px;font-weight:600;color:var(--ink3)}
+.tabbar button svg{width:22px;height:22px}
+.tabbar button.on{color:var(--blue)}
+.tabbar .pub{flex:0 0 auto;width:52px}
+.tabbar .pub .pd{width:50px;height:50px;border-radius:17px;background:var(--blue);color:#fff;
+  display:grid;place-items:center;margin-bottom:16px;box-shadow:0 10px 22px -8px rgba(47,107,255,.7)}
+.tabbar .pub .pd svg{width:24px;height:24px}
+.tabbar .pub span{display:none}
+</style></head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>9:44</span><span class="sb-r"><i></i><i></i><i></i></span></div>
+  <div class="scroll">
+    <div class="hd">
+      <div class="hello">
+        <div class="k">9月29日 周二 · 锦城建设</div>
+        <h1>信息工作台</h1>
+      </div>
+      <div class="avatar">王</div>
+    </div>
+    <div class="search"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></svg>搜索需求 / 供应 / 线索</div>
+
+    <div class="bento">
+      <div class="tile t-hero">
+        <div class="lab"><span class="dot" style="background:#fff"></span>在架信息</div>
+        <div class="val">12</div>
+        <div class="sub">较上周 +3，新匹配 6 条</div>
+        <div class="spark"><i style="height:40%"></i><i style="height:62%"></i><i style="height:48%"></i><i class="on" style="height:80%"></i><i class="on" style="height:100%"></i></div>
+      </div>
+      <div class="tile t-badge">
+        <div class="ping"></div>
+        <div class="lab">待咨询</div>
+        <div class="val">4</div>
+        <div class="sub">需尽快回复</div>
+      </div>
+      <div class="tile">
+        <div class="lab">草稿</div>
+        <div class="val">2</div>
+        <div class="sub">未完成</div>
+      </div>
+      <div class="tile">
+        <div class="lab">新匹配</div>
+        <div class="val" style="color:var(--blue-ink)">6</div>
+        <div class="sub">今日</div>
+      </div>
+      <div class="tile t-week">
+        <div class="wk-l">
+          <div class="lab">本周对接</div>
+          <div class="wk-total" style="margin-top:8px">28</div>
+          <div class="wk-cap">有效对接</div>
+        </div>
+        <div>
+          <div class="bars"><i style="height:42%"></i><i style="height:60%"></i><i class="hi" style="height:82%"></i><i style="height:52%"></i><i style="height:70%"></i><i class="hi" style="height:96%"></i><i style="height:64%"></i></div>
+        </div>
+      </div>
+      <div class="tile t-quick"><span class="qi b"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160Z"/></svg></span><span>发布</span></div>
+      <div class="tile t-quick"><span class="qi g"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80Z"/></svg></span><span>线索</span></div>
+      <div class="tile t-quick"><span class="qi a"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Z"/></svg></span><span>收藏</span></div>
+    </div>
+
+    <div class="sh"><h2>待处理</h2><a href="javascript:void(0)">全部</a></div>
+    <div class="chips">
+      <span class="chip on">全部<span class="n">4</span></span>
+      <span class="chip">审核中<span class="n">2</span></span>
+      <span class="chip">待咨询<span class="n">2</span></span>
+    </div>
+
+    <div class="task"><span class="bar ask"></span><div class="tx">
+      <div class="tt"><span class="cat">工程需求</span><span class="st ask">3 条咨询</span></div>
+      <b>天府三街 5 万㎡ 商业综合体寻找一级总包单位</b>
+      <div class="meta"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,112c-35,0-72,24.6-72,40v8H200v-8C200,200.6,163,176,128,176Z"/></svg>成都·高新区 · 09-28 14:20</div>
+    </div></div>
+    <div class="task"><span class="bar rev"></span><div class="tx">
+      <div class="tt"><span class="cat">建材供应</span><span class="st rev">审核中</span></div>
+      <b>常年供应 C30 商品混凝土，自有搅拌站日产 3000 方</b>
+      <div class="meta"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,112c-35,0-72,24.6-72,40v8H200v-8C200,200.6,163,176,128,176Z"/></svg>成都·双流 · 09-28 11:05</div>
+    </div></div>
+    <div class="task"><span class="bar ask"></span><div class="tx">
+      <div class="tt"><span class="cat">招聘</span><span class="st ask">5 条咨询</span></div>
+      <b>招聘市政公用注册建造师若干名，长期项目稳定</b>
+      <div class="meta"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,112c-35,0-72,24.6-72,40v8H200v-8C200,200.6,163,176,128,176Z"/></svg>成都·锦江 · 09-27 18:40</div>
+    </div></div>
+  </div>
+
+  <nav class="tabbar">
+    <button class="on"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68Z"/></svg><span>工作台</span></button>
+    <button class="pub"><span class="pd"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg></span><span>发布</span></button>
+    <button><svg viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"/></svg><span>我的</span></button>
+  </nav>
+</div>
+</body></html>

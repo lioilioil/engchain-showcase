@@ -987,7 +987,7 @@ window.MOCK = (function () {
       iol: '川B2-20260000',          /* 增值电信业务经营许可证 */
       securityClass: '等保三级',
       license: '91510100MA1FL8X23K',
-      escrow: '中国建设银行资金托管',
+      escrow: '平台不参与交易资金，不提供资金托管/放款服务',
       stats: [
         { k: '入驻企业', v: '12580+' },
         { k: '供需信息', v: '45200+' },
@@ -999,7 +999,7 @@ window.MOCK = (function () {
        待 M3/M5 页面迁移后收敛删除，避免阶段0破坏现有页面。 */
     /* 认证费（R1，按年） */
     /* [FEAT 9.2-3] 企业认证多维度资质核验：5项逐项提交/审核 */
-    certification: { personal: 0, enterprise: 999, qual: 0, enterpriseCycle: 'year',
+    certification: { personal: 0, enterprise: 0, qual: 0, enterpriseCycle: 'year',
       dimensions: [
         { id: 'business', label: '营业执照', required: true },
         { id: 'legal', label: '法人身份', required: true },
@@ -1037,6 +1037,8 @@ window.MOCK = (function () {
         { id: 'pack30', price: 1280, credits: 3000 }
       ],
       consume: { material: 98, equipment: 98, labor: 98, cooperation: 98,
+        /* [PHASE 0] 中介服务积分解锁：比价免费、解锁联系方式消耗 98 积分（与主板块一致） */
+        agency: 98,
         /* 资质招商分级积分（后台可调；t1 一级总包/特级/电力一级，t2 二级总包/设计·监理甲级，t3 专业承包/其他） */
         franchise: {
           t1: { price: 49, original: 99, label: '一级总包/特级/电力一级' },
@@ -1109,8 +1111,9 @@ window.MOCK = (function () {
     entryTypes: {
       construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V',
         yearly: { price: 3599, cycle: 'yearly', discount: 0.9 } },
-      agency: { fee: 29999, cycle: 'once', label: '中介服务企业', badge: '金V',
-        yearly: { price: 26999, cycle: 'yearly', discount: 0.9 } },
+      agency: { fee: 2999, cycle: 'once', label: '中介服务企业', badge: '金V',
+        /* [PHASE 0] 入驻费重构为「深度认证年审费」：含人工能力评估+征信评估+案例核验+年度复审清退；建议参数（可调） */
+        yearly: { price: 2699, cycle: 'yearly', discount: 0.9 } },
       partner: { fee: 0, cycle: 'once', label: '合伙人企业', badge: '专属', audit: true,
         yearly: { price: 0, cycle: 'yearly', discount: 0.9 } }
     },
@@ -1133,7 +1136,11 @@ window.MOCK = (function () {
       }
     },
     /* 中介佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
+    /* [PHASE 0] 已下线：平台不做资金托管/放款/交易抽成，不介入服务过程与交易资金。
+       tier/intent/escrow/warranty 仅保留结构供历史数据兼容，新业务不再产生佣金/意向金/托管流水。
+       平台只做：信息发布与解锁、认证评估（基础免费+深度年审）、双向撮合。 */
     commission: {
+      _phase0: { tradingEnabled: false, note: '纯信息撮合模式：平台不参与交易资金，不抽佣' },
       tier: [ { min: 0, rate: 0.08 }, { min: 50000, rate: 0.06 }, { min: 200000, rate: 0.05 }, { min: 500000, rate: 0.04 }, { min: 1000000, rate: 0.03 } ],
       minCommission: 100, /* [FIX BM-028] 佣金下限改为"最低单笔佣金 ¥100"（小额保护，全部订单生效） */
       milestone: { enable: true, minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], autoConfirmDays: 14, labels: ['合同签订', '服务进度50%', '验收', '质保期满'] },
@@ -1143,8 +1150,8 @@ window.MOCK = (function () {
       refundNote: '未成交全额退款',
       /* WP5 毛利保护/最低售价：按服务品类配置最低可售服务费，0=不启用（首期默认不启用） */
       minServiceFee: { '资质代办': 0, '工商注册': 0, '税务筹划': 0, '工程担保': 0, '造价咨询': 0, '企业服务': 0, '_default': 0 },
-      /* WP7 意向金解锁深度对接：超时提醒与自动退款配置 */
-      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30 },
+      /* WP7 意向金（[PHASE 0] 已下线：不设交易资金节点，联系方式解锁不再依赖意向金；仅保留结构供历史数据兼容） */
+      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30, _phase0: true },
       /* [FEAT 9.2-1] R6 B端增值道具：激活架构预留（topListing/leadPack/saasTools） */
       /* [FEAT 9.2-4] 入驻类型差异：entryTypes 限制不同入驻类型可购买的道具 */
       /* [FEAT 9.2-1+] 服务商升级页增量：effectAnchor 效果锚点（说服层）；marketing 营销层（新客礼/限时特惠/组合包，非独立SKU）。
@@ -1164,10 +1171,10 @@ window.MOCK = (function () {
           combo: { enabled: true, label: '流量组合包', desc: '2 次服务置顶（名额 7 天） + 50 条精准线索', original: 497, price: 398, items: [ { type: 'topListing', qty: 2 }, { type: 'leadPack', qty: 1 } ] }
         }
       },
-      /* [FEAT 9.2-5] 质保金预留机制：交易金额5%预留，验收30天后释放 */
-      warranty: { rate: 0.05, releaseDays: 30, label: '质保金', desc: '交易金额5%预留，验收30天后释放' },
-      /* v4.0 托管单超时接单与需求广场有效期配置 */
-      escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '服务商7天未接单提醒买方，15天未接单系统自动全额退款' },
+      /* [FEAT 9.2-5][PHASE 0] 质保金改造为「认证保证金」：不挂钩交易赔付，仅作违规扣罚/虚假信息罚没/年审清退约束 */
+      warranty: { rate: 0.05, releaseDays: 30, label: '认证保证金', desc: '违规扣罚：虚假信息/跳单/年审不合格，从认证保证金扣罚；不挂钩交易赔付', _phase0: true },
+      /* v4.0 托管单超时接单（[PHASE 0] 已下线：资金托管服务移除，仅保留结构供历史数据兼容） */
+      escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '[PHASE 0] 已下线：平台不提供资金托管', _phase0: true },
       demandExpireDays: 7
     },
     /* 企业关注/监控（P0-7.1） */
@@ -1190,7 +1197,7 @@ window.MOCK = (function () {
     /* 破冰期模式（v1.2 §10.4；preview 开关读写 engchain-mode） */
     breakin: {
       enabled: true,
-      entry: { construction: 0, agency: 14999 },
+      entry: { construction: 0, agency: 1499 },
       commissionFirstTier: 0.05,
       registerBonus: 2,
       monitorTrialDays: 7,

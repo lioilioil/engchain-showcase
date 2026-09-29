@@ -15,6 +15,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   .list-scroll { padding:0 16px calc(var(--sp-6) + 14px); }
   .list-head { display:flex; align-items:center; justify-content:space-between; padding:8px 0 12px; }
+  /* 右上角发布入口：原加号 icon 替换为「发布供需信息」文字按钮（品牌金 CTA） */
+  .nav-publish { flex:none; display:inline-flex; align-items:center; height:30px; padding:0 11px;
+    border-radius:var(--r-full); font-size:12px; font-weight:600; letter-spacing:.02em; white-space:nowrap;
+    color:#1A1408; background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+    box-shadow:0 4px 10px -4px rgba(160,125,59,.6), inset 0 1px 0 rgba(255,255,255,.4);
+    text-decoration:none; transition:transform .16s ease; }
+  .nav-publish:active { transform:scale(.95); }
   .list-sub { color:var(--text-3); font-size:12px; line-height:1.5; }
   .draft-entry { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--primary-dim); text-decoration:none; }
   .draft-entry .n { min-width:16px; height:16px; padding:0 5px; border-radius:var(--r-full); background:var(--primary); color:#fff; font-size:10px; line-height:16px; text-align:center; }
@@ -28,22 +35,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .seg .seg-item { display:flex; align-items:center; justify-content:center; gap:6px; }
   .seg-n { min-width:17px; height:17px; padding:0 5px; border-radius:var(--r-full); background:rgba(22,22,22,.06); color:var(--text-3); font-size:10px; font-weight:700; line-height:17px; text-align:center; }
   .seg-item.is-on .seg-n { background:var(--primary); color:#fff; }
-  .status-row { display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-  .status-row::-webkit-scrollbar { display:none; }
-  .status-chip { flex:none; display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 12px; border-radius:var(--r-full); border:1px solid var(--line); background:var(--bg-card); color:var(--text-3); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all var(--d-fast); }
-  .status-chip .dot { width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.55; }
-  .status-chip.is-on { border-color:var(--primary-dim); background:var(--primary-soft); color:var(--primary-dim); }
-  .status-chip.is-on .dot { opacity:1; }
-  .status-chip .badge { min-width:15px; height:15px; padding:0 4px; border-radius:var(--r-full); background:rgba(22,22,22,.08); color:var(--text-3); font-size:9px; font-weight:700; line-height:15px; text-align:center; }
-  .status-chip.is-on .badge { background:var(--primary); color:#fff; }
-  .status-chip.is-rej.is-on { border-color:var(--error); background:var(--error-soft); color:var(--error); }
-  .status-chip.is-rej.is-on .badge { background:var(--error); color:#fff; }
 
   .record { position:relative; padding:14px 14px 13px 16px; margin-bottom:11px; border:1px solid var(--line); border-radius:var(--r-m); background:var(--bg-card); box-shadow:var(--shadow-xs); overflow:hidden; transition:border-color var(--d-fast), transform var(--d-fast); }
   .record::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3.5px; }
   .record.is-demand::before { background:linear-gradient(180deg,var(--primary),var(--primary-dim)); }
   .record.is-supply::before { background:linear-gradient(180deg,#3f9d6e,var(--success)); }
   .record.is-rejected { border-color:color-mix(in srgb, var(--error) 32%, var(--line)); background:color-mix(in srgb, var(--error-soft) 30%, var(--bg-card)); }
+  .record.is-active { border-color:color-mix(in srgb, var(--success) 26%, var(--line)); }
+  .record.is-review { border-color:color-mix(in srgb, var(--primary) 26%, var(--line)); }
+  .record.is-closed { border-color:color-mix(in srgb, var(--text-3) 22%, var(--line)); }
   .record:active { transform:scale(.993); }
 
   .record-hd { display:flex; align-items:flex-start; gap:10px; }
@@ -66,6 +66,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .status-rejected { background:var(--error-soft); color:var(--error); }
   .record-status.is-pending .sd { animation:sdPulse 1.2s ease-in-out infinite; }
   @keyframes sdPulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* ══ 时间轴：按发布时间倒序，左侧竖线 + 状态色节点 + 时间戳 ══ */
+  .tl { position:relative; margin-top:14px; }
+  .tl-item { display:flex; gap:12px; position:relative; margin-bottom:12px; }
+  .tl-item:last-child { margin-bottom:0; }
+  .tl-axis { flex:none; width:52px; display:flex; flex-direction:column; align-items:center; position:relative; }
+  .tl-dot { width:9px; height:9px; border-radius:50%; margin-top:6px; background:var(--line-strong); box-shadow:0 0 0 2px var(--bg-card); }
+  .tl-time { font-size:9.5px; color:var(--text-3); margin-top:6px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tl-item.is-active .tl-dot { background:var(--success); box-shadow:0 0 0 2px color-mix(in srgb, var(--success) 32%, transparent); }
+  .tl-item.is-review .tl-dot { background:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 32%, transparent); }
+  .tl-item.is-rejected .tl-dot { background:var(--error); box-shadow:0 0 0 2px color-mix(in srgb, var(--error) 32%, transparent); }
+  .tl-item.is-closed .tl-dot { background:var(--text-3); box-shadow:0 0 0 2px color-mix(in srgb, var(--text-3) 30%, transparent); }
+  .tl-item::before { content:''; position:absolute; left:25.5px; top:46px; bottom:-12px; width:1.5px; background:color-mix(in srgb, var(--text-3) 55%, transparent); }
+  .tl-item:last-child::before { display:none; }
+  .tl-item .record { margin-bottom:0; }
 
   .record-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:9px; color:var(--text-3); font-size:var(--fs-xs); }
   .meta-item { display:inline-flex; align-items:center; gap:4px; }
@@ -131,23 +146,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <a href="../supply/list.html" class="gate-link">了解发布流程 · 看看平台示例 ›</a>
   </div>
   <div id="pub-content">
-    <div class="navbar"><button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button><div class="nav-title">我的发布</div><div class="nav-right"><a href="editor.html?role=demand" class="icon-btn" id="plus-new" aria-label="新建信息"><svg class="ic" style="width:16px;height:16px"><path d="M12 5v14M5 12h14"/></svg></a></div></div>
+    <div class="navbar"><button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button><div class="nav-title">我的发布</div><div class="nav-right"><a href="editor.html?role=demand" class="nav-publish" id="plus-new" aria-label="发布供需信息">发布供需信息</a></div></div>
     <main class="scroll list-scroll">
       <header class="list-head">
         <div class="list-sub">管理发布状态与对接反馈</div>
         <a class="draft-entry" href="drafts.html">草稿箱<span class="n zero" id="draft-n">0</span></a>
       </header>
-      <div class="list-summary"><span>共 <b id="sum-all">0</b> 条</span><span class="sum-sep"></span><span>上架中 <b id="sum-active">0</b></span><span class="sum-sep"></span><span>待审核 <b id="sum-review">0</b></span><span class="sum-sep"></span><span style="color:var(--error);">待处理驳回 <b id="sum-reject">0</b></span></div>
       <div class="filter-bar">
         <div class="seg" id="filters"><span class="seg-item is-on" data-filter="all">全部<b class="seg-n">0</b></span><span class="seg-item" data-filter="demand">需求<b class="seg-n">0</b></span><span class="seg-item" data-filter="supply">供应<b class="seg-n">0</b></span></div>
-        <div class="status-row" id="status-row">
-          <span class="status-chip is-on" data-status="all">全部状态</span>
-          <span class="status-chip" data-status="active"><i class="dot"></i>上架中<span class="badge" data-sn="active">0</span></span>
-          <span class="status-chip" data-status="review"><i class="dot"></i>审核中<span class="badge" data-sn="review">0</span></span>
-          <span class="status-chip is-rej" data-status="rejected"><i class="dot"></i>已驳回<span class="badge" data-sn="rejected">0</span></span>
-          <span class="status-chip" data-status="closed"><i class="dot"></i>已下架<span class="badge" data-sn="closed">0</span></span>
-        </div>
       </div>
+      <div class="list-summary"><span>共 <b id="sum-all">0</b> 条</span><span class="sum-sep"></span><span>上架中 <b id="sum-active">0</b></span><span class="sum-sep"></span><span>待审核 <b id="sum-review">0</b></span><span class="sum-sep"></span><span style="color:var(--error);">待处理驳回 <b id="sum-reject">0</b></span></div>
       <div id="record-list" style="margin-top:12px"></div>
     </main>
   </div>
@@ -185,7 +193,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function catIcon(cat){ var k = CAT_KEY[cat] || ''; var body = I[k] || I.material; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+body+'</svg>'; }
 
   var list=document.getElementById('record-list');
-  var dirFilter='all', statusFilter='all';
+  var dirFilter='all';
   var STATUS_LABEL = { pending_review:'审核中', active:'已上架', rejected:'已驳回', off:'已下架', review:'审核中', paused:'已暂停', expired:'已过期' };
   var DIR_LABEL = { demand:'需求', supply:'供应' };
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -264,9 +272,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var all = myPublishes();
     var rows = all.filter(function(r){
       if (dirFilter!=='all' && r.dir!==dirFilter) return false;
-      if (statusFilter!=='all' && statusGroup(r.status)!==statusFilter) return false;
       return true;
-    });
+    }).sort(function(a,b){ return (b.ts||b.updatedAt||0) - (a.ts||a.updatedAt||0); });
     var dirC={all:all.length,demand:0,supply:0};
     var stC={active:0,review:0,rejected:0,closed:0};
     all.forEach(function(r){ if(r.dir==='supply')dirC.supply++;else dirC.demand++; stC[statusGroup(r.status)]++; });
@@ -275,15 +282,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     document.getElementById('sum-review').textContent=stC.review;
     document.getElementById('sum-reject').textContent=stC.rejected;
     document.querySelectorAll('#filters .seg-item').forEach(function(el){ var n=el.querySelector('.seg-n'); if(n)n.textContent=dirC[el.dataset.filter]||0; });
-    document.querySelectorAll('#status-row .badge').forEach(function(b){ b.textContent=stC[b.dataset.sn]||0; });
-    list.innerHTML = rows.length ? rows.map(cardHtml).join('') : emptyHtml();
+    list.innerHTML = rows.length
+      ? '<div class="tl">' + rows.map(function (r) {
+          var g = statusGroup(r.status);
+          return '<div class="tl-item is-' + g + '">' +
+            '<div class="tl-axis"><span class="tl-dot"></span><span class="tl-time">' + esc(fmtTime(r.ts || r.updatedAt)) + '</span></div>' +
+            cardHtml(r) +
+          '</div>';
+        }).join('') + '</div>'
+      : emptyHtml();
   }
 
   document.querySelectorAll('#filters .seg-item').forEach(function(el){
     el.onclick=function(){ dirFilter=el.dataset.filter; document.querySelectorAll('#filters .seg-item').forEach(function(x){x.classList.remove('is-on');}); el.classList.add('is-on'); render(); };
-  });
-  document.querySelectorAll('#status-row .status-chip').forEach(function(el){
-    el.onclick=function(){ statusFilter=el.dataset.status; document.querySelectorAll('#status-row .status-chip').forEach(function(x){x.classList.remove('is-on');}); el.classList.add('is-on'); render(); };
   });
 
   list.onclick=function(e){

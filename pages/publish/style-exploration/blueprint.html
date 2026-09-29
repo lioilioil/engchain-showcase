@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>信息工作台 · Engineering Blueprint</title>
+<style>
+:root{
+  --bg:#0A1A2F; --bg2:#0C2038; --panel:rgba(13,32,56,.55);
+  --cyan:#5BD6E6; --cyan-dim:rgba(91,214,230,.5); --cyan-faint:rgba(91,214,230,.14);
+  --ink:#DCEFF5; --ink2:#8FB4C4; --ink3:#5E8099;
+  --amber:#F2C14E; --red:#FF7A6B; --green:#54E0A6;
+  --line:rgba(91,214,230,.28); --line-faint:rgba(91,214,230,.14);
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  --sans:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;display:flex;justify-content:center;background:#050E1C;font-family:var(--sans)}
+.phone{position:relative;width:390px;min-height:100vh;overflow:hidden;display:flex;flex-direction:column;
+  color:var(--ink);background:
+    linear-gradient(rgba(91,214,230,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(91,214,230,.05) 1px,transparent 1px),
+    radial-gradient(120% 50% at 50% -10%,#10304F,#0A1A2F 60%);
+  background-size:26px 26px,26px 26px,100% 100%}
+@media(min-width:760px){body{padding:28px 0}.phone{min-height:0;height:844px;border-radius:0;
+  box-shadow:0 0 0 11px #0C2038,0 0 0 13px #16365C,0 44px 100px rgba(0,0,0,.6)}}
+.statusbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;flex:none;
+  font-family:var(--mono);font-size:12px;color:var(--cyan)}
+.sb-r{display:flex;gap:6px}.sb-r i{width:17px;height:11px;border:1.4px solid var(--cyan);border-radius:2px;
+  position:relative}.sb-r i:last-child{background:var(--cyan)}
+.scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding:2px 16px calc(88px + env(safe-area-inset-bottom))}
+.scroll::-webkit-scrollbar{display:none}
+
+/* corner ticks wrapper */
+.frame{position:relative;border:1px solid var(--line-faint);border-radius:2px}
+.tick::before,.tick::after,.tick>a::before,.tick>a::after{content:"+";position:absolute;font-family:var(--mono);
+  color:var(--cyan);font-size:13px;line-height:1;opacity:.8}
+.tick::before{top:-9px;left:-7px}.tick::after{top:-9px;right:-7px}
+.tick>a::before{bottom:-9px;left:-7px}.tick>a::after{bottom:-9px;right:-7px}
+
+/* header — coords bar */
+.coords{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  color:var(--ink3);padding:8px 4px 10px;text-transform:uppercase}
+.hd{padding:6px 6px 0}
+.hd .tagline{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--cyan);text-transform:uppercase}
+.hd .row1{display:flex;align-items:flex-end;gap:12px;margin-top:9px}
+.hd h1{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.01em;line-height:1}
+.hd h1 span{color:var(--cyan)}
+.hd .live{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--green);display:flex;
+  align-items:center;gap:6px;padding-bottom:5px}
+.hd .live i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.hd .sub{font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:10px;line-height:1.5}
+.hd .rule{height:1px;background:linear-gradient(90deg,var(--cyan),transparent);margin-top:13px}
+
+/* instrument panels */
+.gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:15px}
+.gauge{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:12px 11px}
+.gauge .gk{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase}
+.gauge .gn{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;margin-top:9px;color:var(--ink)}
+.gauge .gn.c{color:var(--cyan)}.gauge .gn.a{color:var(--amber)}
+.gauge .gu{font-family:var(--mono);font-size:9.5px;color:var(--ink3);margin-top:6px}
+.gauge .corner{position:absolute;width:7px;height:7px;border-color:var(--cyan)}
+
+/* timeline / dispatch */
+.sec-h{display:flex;align-items:baseline;gap:10px;margin:24px 4px 0;font-family:var(--mono)}
+.sec-h .id{color:var(--cyan);font-size:11px;font-weight:700}
+.sec-h h2{font-size:15px;font-weight:700;letter-spacing:.04em;flex:1}
+.sec-h .ct{font-size:10px;color:var(--ink3);letter-spacing:.1em}
+.filters{display:flex;gap:8px;margin:13px 2px 0;font-family:var(--mono);font-size:11px}
+.filters span{padding:6px 12px;border:1px solid var(--line-faint);border-radius:2px;color:var(--ink2)}
+.filters span.on{border-color:var(--cyan);color:var(--bg);background:var(--cyan);font-weight:700}
+
+.tl{position:relative;margin:8px 0 0;padding-left:26px}
+.tl::before{content:"";position:absolute;left:7px;top:8px;bottom:8px;width:1px;
+  background:repeating-linear-gradient(var(--line) 0 4px,transparent 4px 8px)}
+.node{position:relative;padding:13px 14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:2px;margin-bottom:11px}
+.node::before{content:"";position:absolute;left:-25px;top:18px;width:11px;height:11px;border-radius:50%;
+  background:var(--bg);border:2px solid var(--cyan);box-shadow:0 0 0 3px var(--bg)}
+.node.ask::before{border-color:var(--red);box-shadow:0 0 0 3px var(--bg),0 0 9px rgba(255,122,107,.7)}
+.node .nl{display:flex;align-items:center;gap:9px}
+.node .nid{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--cyan)}
+.node .nst{margin-left:auto;font-family:var(--mono);font-size:9.5px;padding:3px 8px;border-radius:2px;letter-spacing:.06em}
+.nst.r{color:var(--red);border:1px solid rgba(255,122,107,.5);background:rgba(255,122,107,.1)}
+.nst.y{color:var(--amber);border:1px solid rgba(242,193,78,.5);background:rgba(242,193,78,.1)}
+.node b{display:block;font-size:13.5px;font-weight:600;line-height:1.5;margin-top:8px;color:var(--ink)}
+.node .nm{display:flex;flex-wrap:wrap;gap:5px 14px;margin-top:9px;font-family:var(--mono);font-size:10px;color:var(--ink2)}
+.node .nm span::before{content:"▸ ";color:var(--cyan-dim)}
+.node .nm .pct{color:var(--green)}
+
+/* spec strip */
+.spec{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:2px;margin-top:6px}
+.spec .sh-top{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.16em;color:var(--cyan);padding:9px 13px;border-bottom:1px solid var(--line-faint);text-transform:uppercase}
+.spec .sb{display:grid;grid-template-columns:repeat(3,1fr)}
+.spec .sc{padding:13px;text-align:center}
+.spec .sc+.sc{border-left:1px solid var(--line-faint)}
+.spec .sc b{font-family:var(--mono);font-size:23px;font-weight:600;display:block;color:var(--ink)}
+.spec .sc i{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.1em;
+  text-transform:uppercase;margin-top:5px;display:block}
+
+/* schematic index */
+.schematic{margin-top:14px;border:1px solid var(--line-faint);border-radius:2px}
+.sline{display:flex;align-items:center;gap:11px;padding:12px 13px;border-bottom:1px solid var(--line-faint)}
+.sline:last-child{border-bottom:0}
+.sline .si{font-family:var(--mono);font-size:10px;color:var(--cyan);width:20px}
+.sline b{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
+.sline .n{font-family:var(--mono);font-size:11px;color:var(--ink2);border:1px solid var(--line);
+  padding:2px 8px;border-radius:2px}
+.sline .n.hot{color:var(--amber);border-color:var(--amber)}
+.sline .ar{font-family:var(--mono);color:var(--cyan-dim);font-size:13px}
+.legend{display:flex;gap:16px;justify-content:center;margin:22px 0 4px;font-family:var(--mono);
+  font-size:9px;letter-spacing:.12em;color:var(--ink3);text-transform:uppercase}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.legend .lc{border:2px solid var(--cyan);background:var(--bg)}
+.legend .lr{border:2px solid var(--red);background:var(--bg)}
+
+/* tabbar blueprint */
+.tabbar{position:absolute;left:0;right:0;bottom:0;z-index:20;height:calc(72px + env(safe-area-inset-bottom));
+  padding:0 24px env(safe-area-inset-bottom);display:flex;align-items:center;
+  background:linear-gradient(180deg,rgba(10,26,47,.6),rgba(8,20,38,.96));
+  border-top:1px solid var(--line);backdrop-filter:blur(10px)}
+.tabbar button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink3)}
+.tabbar button i{font-style:normal;font-size:18px;line-height:1}
+.tabbar button.on{color:var(--cyan)}
+.tabbar .pub span{display:none}
+.tabbar .pub i{width:48px;height:48px;margin-bottom:13px;border-radius:2px;border:1.6px solid var(--cyan);
+  color:var(--cyan);display:grid;place-items:center;font-size:24px;background:rgba(91,214,230,.08);
+  box-shadow:0 0 18px -4px rgba(91,214,230,.6)}
+</style></head>
+<body>
+<div class="phone">
+  <div class="statusbar"><span>09:44:26</span><span class="sb-r"><i></i><i></i><i></i></span></div>
+  <div class="scroll">
+    <div class="coords"><span>N30.57° E104.07°</span><span>GRID · CD-GX-07</span><span>SYNC ●</span></div>
+
+    <header class="hd">
+      <div class="tagline">// ENGCHAIN · DISPATCH TERMINAL</div>
+      <div class="row1">
+        <h1>信息<span>工作台</span></h1>
+        <span class="live"><i></i>ONLINE</span>
+      </div>
+      <div class="sub">实时供需调度 · 监控在架信息与每一次对接状态</div>
+      <div class="rule"></div>
+    </header>
+
+    <div class="gauges">
+      <div class="gauge"><div class="gk">在架 / LIVE</div><div class="gn">12</div><div class="gu">UNITS</div></div>
+      <div class="gauge"><div class="gk">新匹配 / NEW</div><div class="gn c">6</div><div class="gu">TODAY</div></div>
+      <div class="gauge"><div class="gk">待咨询 / WAIT</div><div class="gn a">4</div><div class="gu">PRIORITY</div></div>
+    </div>
+
+    <div class="sec-h"><span class="id">[ 01 ]</span><h2>待处理调度队列</h2><span class="ct">04 NODES</span></div>
+    <div class="filters"><span class="on">ALL · 4</span><span>REVIEW · 2</span><span>ASK · 2</span><span>DONE</span></div>
+
+    <div class="tl">
+      <div class="node ask">
+        <div class="nl"><span class="nid">JOB-0928-A</span><span class="nst r">● 3 咨询</span></div>
+        <b>天府三街 5 万㎡商业综合体寻找一级总包单位</b>
+        <div class="nm"><span>工程需求</span><span>成都·高新区</span><span>09-28 14:20</span><span class="pct">匹配 96%</span></div>
+      </div>
+      <div class="node">
+        <div class="nl"><span class="nid">MAT-0928-B</span><span class="nst y">● 审核中</span></div>
+        <b>常年供应 C30 商品混凝土，自有搅拌站日产 3000 方</b>
+        <div class="nm"><span>建材供应</span><span>成都·双流</span><span>ETA 2H</span></div>
+      </div>
+      <div class="node ask">
+        <div class="nl"><span class="nid">HR-0927-C</span><span class="nst r">● 5 咨询</span></div>
+        <b>招聘市政公用注册建造师若干名，长期项目稳定</b>
+        <div class="nm"><span>招聘</span><span>成都·锦江</span><span>2 人已验真</span></div>
+      </div>
+      <div class="node">
+        <div class="nl"><span class="nid">EQP-0927-D</span><span class="nst y">● 审核中</span></div>
+        <b>25 吨汽车吊长期出租，含操作手，可包月</b>
+        <div class="nm"><span>设备租赁</span><span>眉山·东坡</span><span>待核验</span></div>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div class="sh-top"><span>WEEKLY LOG · 本周对接</span><span>TOTAL 28</span></div>
+      <div class="sb">
+        <div class="sc"><b>12</b><i>新线索</i></div>
+        <div class="sc"><b>09</b><i>已回复</i></div>
+        <div class="sc"><b>03</b><i>达成意向</i></div>
+      </div>
+    </div>
+
+    <div class="sec-h"><span class="id">[ 02 ]</span><h2>功能模块图</h2><span class="ct">05 UNITS</span></div>
+    <div class="schematic">
+      <div class="sline"><span class="si">M1</span><b>我的招聘</b><span class="n hot">02</span><span class="ar">→</span></div>
+      <div class="sline"><span class="si">M2</span><b>我的发布</b><span class="n">08</span><span class="ar">→</span></div>
+      <div class="sline"><span class="si">M3</span><b>草稿箱</b><span class="n hot">02</span><span class="ar">→</span></div>
+      <div class="sline"><span class="si">M4</span><b>已解锁线索</b><span class="n">03</span><span class="ar">→</span></div>
+      <div class="sline"><span class="si">M5</span><b>我的收藏</b><span class="n">02</span><span class="ar">→</span></div>
+    </div>
+
+    <div class="legend"><span><i class="lc"></i>常规节点</span><span><i class="lr"></i>待咨询优先</span></div>
+  </div>
+
+  <nav class="tabbar">
+    <button class="on"><i>▦</i>工作台</button>
+    <button class="pub"><i>＋</i><span>发布</span></button>
+    <button><i>◎</i>我的</button>
+  </nav>
+</div>
+</body></html>
