@@ -15,163 +15,283 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="../../css/app.css">
 <link rel="stylesheet" href="../../css/guest-gate.css">
 <style>
-  /* ================= 信息工作台 v3 · 主次分明的单页工作台 ================= */
-  /* ---- 入场动效（stagger） ---- */
-  @keyframes wb-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-  .wb-hero, .wb-sec { animation: wb-in .5s var(--e-standard) both; }
-  .wb-sec:nth-of-type(2) { animation-delay: .07s; }
-  .wb-sec:nth-of-type(3) { animation-delay: .13s; }
-  .wb-sec:nth-of-type(4) { animation-delay: .19s; }
-  @keyframes wb-pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
-  .wb-primary { animation: wb-pop .55s var(--e-spring) .12s both; }
+/* ════════════════════════════════════════════════════════════════════
+   信息工作台 v7 · DISPATCH LEDGER（工地调度单）
+   对 v6「古铜暖砂 / 拟物金属 / 大圆角 Bento」的彻底重构：
+     冷灰混凝土纸 × 墨黑刊头 × 安全网荧光柠（唯一强调）
+     直角硬边 · 2px 黑框 + 硬投影 · 等宽数字台账 · 印章状态
+   仅作用于本页（scope .wb-v7）；所有 id / 跳转 / 数据 / 身份门控不变。
+   ════════════════════════════════════════════════════════════════════ */
+.wb-v7{
+  --nv-canvas:#E6EAEC; --nv-paper:#F5F7F7; --nv-ink:#15181C; --nv-ink-2:#3A4149;
+  --nv-dim:#69727B; --nv-world:#191E24;
+  --nv-on-dark:#EEF1F1; --nv-dim-dark:#98A2AB;
+  --nv-line:rgba(21,24,28,.14); --nv-line-dark:rgba(245,247,247,.16);
+  --nv-volt:#C6F036; --nv-volt-deep:#9DC21E; --nv-amber:#B06A12; --nv-bad:#D2443B;
+  --nv-shadow:4px 4px 0 var(--nv-ink); --nv-shadow-sm:3px 3px 0 var(--nv-ink);
+  --nv-mono:"SFMono-Regular",ui-monospace,"Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+html[data-theme="dark"] .wb-v7{
+  --nv-canvas:#101418; --nv-paper:#1C2229; --nv-ink:#E9EDEE; --nv-ink-2:#C3CAD1;
+  --nv-dim:#8A949D; --nv-world:#12161B;
+  --nv-line:rgba(233,237,238,.14);
+  --nv-shadow:4px 4px 0 #000; --nv-shadow-sm:3px 3px 0 #000;
+}
+.wb-v7 .nv-mono,.wb-v7 .nv-k,.wb-v7 .nv-no,.wb-v7 .nv-lab,.wb-v7 .nv-big-n,
+.wb-v7 .nv-mini .nv-v,.wb-v7 .nv-tool-count,.wb-v7 .nv-item-meta,
+.wb-v7 .nv-sec-hd .code,.wb-v7 .nv-end,.wb-v7 .nv-chip .c{font-family:var(--nv-mono);font-variant-numeric:tabular-nums;}
+.wb-v7 .rv{opacity:0;transform:translateY(14px);animation:nv-in .55s cubic-bezier(.2,.8,.25,1) both;}
+@keyframes nv-in{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wb-v7 .rv{animation:none!important;opacity:1;transform:none}}
 
-  /* ---- Hero：主行动 + 轻量次入口 ---- */
-  .wb-hero { position: relative; padding: 22px 16px 20px; background: linear-gradient(165deg, var(--primary-soft) 0%, var(--bg-elev) 52%, var(--bg-page) 100%); border-bottom: 1px solid var(--line); overflow: hidden; }
-  .wb-hero::before { content: ''; position: absolute; top: -46px; right: -26px; width: 168px; height: 168px; border-radius: 50%; background: radial-gradient(circle, var(--primary) 0%, transparent 70%); opacity: .13; pointer-events: none; }
-  .wb-hero::after { content: ''; position: absolute; bottom: -54px; left: -24px; width: 124px; height: 124px; border-radius: 50%; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: .08; pointer-events: none; }
-  .wb-kicker { position: relative; z-index: 1; color: var(--primary-dim); font: 600 10px var(--font-num); letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-  .wb-kicker::before { content: ''; width: 16px; height: 1.5px; background: var(--primary-dim); border-radius: 1px; opacity: .55; }
-  .wb-title { position: relative; z-index: 1; margin-top: 8px; font-size: 24px; font-weight: 800; letter-spacing: -.01em; background: linear-gradient(135deg, var(--text-1) 0%, var(--primary-dim) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-  .wb-sub { position: relative; z-index: 1; margin-top: 5px; color: var(--text-2); font-size: 12px; line-height: 1.5; }
+/* 整页进入调度台底色，盖住 .phone 默认暖底 */
+.phone.wb-v7{background:var(--nv-canvas);}
+/* 全局状态栏（common.js 注入）纳入深色刊头 */
+.wb-v7 .status-bar{background:var(--nv-world);color:var(--nv-on-dark);position:relative;z-index:12;}
 
-  /* 主行动按钮：唯一的大 CTA */
-  .wb-primary { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; margin-top: 16px; height: 52px; padding: 0 18px; border-radius: 15px; text-decoration: none; background: linear-gradient(180deg, var(--primary-strong) 0%, var(--primary) 45%, var(--primary-dim) 100%); color: var(--text-inv); box-shadow: 0 8px 22px -6px rgba(184,153,104,.55), 0 1px 0 rgba(255,255,255,.35) inset, 0 0 0 1px rgba(184,153,104,.4); transition: transform var(--d-fast) var(--e-standard), box-shadow var(--d-fast), filter var(--d-fast); }
-  .wb-primary:active { transform: scale(.975); box-shadow: 0 3px 10px -3px rgba(184,153,104,.5), 0 1px 0 rgba(255,255,255,.2) inset, 0 0 0 1px rgba(184,153,104,.5); }
-  .wb-primary:hover { filter: brightness(1.04); box-shadow: 0 10px 26px -6px rgba(184,153,104,.62), 0 1px 0 rgba(255,255,255,.4) inset, 0 0 0 1px rgba(184,153,104,.5); }
-  .wb-primary-ic { width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; flex: none; }
-  .wb-primary-ic svg { width: 16px; height: 16px; color: #fff; }
-  .wb-primary b { flex: 1; font-size: 15.5px; font-weight: 700; letter-spacing: .01em; }
-  .wb-primary-go { font-size: 19px; font-weight: 400; opacity: .85; }
+/* 滚动区：浅区工程网格纸底 */
+#pub-content{background:var(--nv-canvas);position:relative;z-index:1;}
+#pub-content::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:url("../../assets/publish/grid-paper.jpg") center top/520px auto repeat;
+  opacity:.06;mix-blend-mode:multiply;}
+html[data-theme="dark"] #pub-content::before{opacity:.06;mix-blend-mode:screen;}
 
-  /* 次入口 chips：轻量、扁平，不与主 CTA 抢层级 */
-  .wb-chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .wb-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px; border-radius: var(--r-full); background: var(--bg-card); border: 1px solid var(--line); color: var(--text-1); text-decoration: none; font-size: 12px; font-weight: 600; transition: all var(--d-fast); box-shadow: var(--shadow-xs); }
-  .wb-chip svg { width: 13px; height: 13px; color: var(--primary-dim); }
-  .wb-chip:active { transform: scale(.95); }
-  .wb-chip:hover { border-color: var(--primary); color: var(--primary-dim); }
+/* ══ 深色调度刊头（恒深）══ */
+.nv-head{position:relative;z-index:2;background:var(--nv-world);color:var(--nv-on-dark);
+  padding:16px 20px 0;overflow:hidden;}
+.nv-head::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--nv-volt);}
+.nv-meta{display:flex;align-items:center;gap:8px;font-family:var(--nv-mono);
+  font-size:10.5px;letter-spacing:.08em;color:var(--nv-dim-dark);text-transform:uppercase;}
+.nv-meta .dot{width:6px;height:6px;background:var(--nv-volt);flex:none;animation:nv-blink 1.8s steps(1) infinite;}
+@keyframes nv-blink{0%,55%{opacity:1}56%,100%{opacity:.25}}
+.nv-meta .right{margin-left:auto;color:var(--nv-dim-dark);}
+.nv-mast{display:flex;align-items:flex-end;gap:12px;margin-top:12px;}
+.nv-title{font-size:31px;font-weight:900;line-height:1.04;letter-spacing:.01em;color:var(--nv-on-dark);}
+.nv-seal{flex:none;margin-bottom:3px;border:1.5px solid var(--nv-volt);color:var(--nv-volt);
+  font-family:var(--nv-mono);font-size:9px;font-weight:700;letter-spacing:.22em;
+  padding:4px 5px 4px 7px;writing-mode:vertical-rl;line-height:1;}
+.nv-sub{margin-top:9px;font-size:12.5px;color:var(--nv-dim-dark);line-height:1.5;}
+.nv-sub b{color:var(--nv-on-dark);font-weight:600;}
 
-  /* ---- 区块骨架 ---- */
-  .wb-sec { margin: 18px 16px 0; }
-  .wb-sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .wb-sec-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
-  .wb-sec-title::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: linear-gradient(180deg, var(--primary), var(--accent)); }
-  .wb-more { color: var(--text-3); font-size: 11.5px; text-decoration: none; display: flex; align-items: center; gap: 2px; font-weight: 500; transition: color var(--d-fast); }
-  .wb-more::after { content: '›'; font-size: 14px; }
-  .wb-more:hover { color: var(--primary-dim); }
+/* 发布按钮组（头部，身份化，沿用 .btn/.wb-act 钩子供 liquid-cta 接管） */
+.wb-v7 .wb-actions{display:flex;gap:10px;margin-top:16px;grid-template-columns:none;position:relative;z-index:2;}
+.wb-v7 .wb-act{flex:1;min-width:0;height:48px;border-radius:0!important;
+  display:inline-flex!important;align-items:center;justify-content:center;gap:7px;padding:0 12px;
+  font-size:14px!important;font-weight:800;white-space:nowrap;border:2px solid var(--nv-ink);
+  transition:transform .1s,box-shadow .1s;}
+.wb-v7 .wb-act svg{width:16px;height:16px;flex:none;}
+.wb-v7 .wb-actions .wb-act.btn-primary{flex:1.5;background:var(--nv-volt);color:#10130A;
+  border:2px solid #0E0F0A!important;box-shadow:4px 4px 0 var(--nv-volt-deep)!important;}
+.wb-v7 .wb-actions .wb-act.btn-ghost{flex:1;background:transparent;color:var(--nv-on-dark);
+  border:2px solid var(--nv-line-dark)!important;box-shadow:none!important;}
+.wb-v7 .wb-act:active{transform:translate(3px,3px);}
 
-  /* ---- 当前进展：一张大卡，主数据 + 迷你指标 ---- */
-  .wb-advance { display: flex; align-items: stretch; border-radius: var(--r-l); overflow: hidden; background: var(--bg-card); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
-  .wb-adv-main { flex: 1.15; min-width: 0; padding: 16px 16px 14px; background: linear-gradient(150deg, var(--primary-soft) 0%, var(--bg-card) 78%); position: relative; overflow: hidden; }
-  .wb-adv-main::after { content: ''; position: absolute; top: -22px; right: -22px; width: 74px; height: 74px; border-radius: 50%; background: radial-gradient(circle, var(--primary) 0%, transparent 72%); opacity: .16; pointer-events: none; }
-  .wb-adv-label { font-size: 11px; font-weight: 600; color: var(--primary-dim); letter-spacing: .05em; }
-  .wb-adv-num { margin-top: 6px; font: 800 30px var(--font-num); line-height: 1; color: var(--text-1); letter-spacing: -.01em; font-feature-settings: "tnum" 1; }
-  .wb-adv-tip { margin-top: 7px; font-size: 10.5px; color: var(--text-3); }
-  .wb-adv-mini { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 4px; }
-  .wb-adv-mini div { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 12px; min-width: 0; }
-  .wb-adv-mini div + div { border-top: 1px solid var(--line-hairline); }
-  .wb-adv-mini b { font: 700 17px var(--font-num); color: var(--text-1); font-feature-settings: "tnum" 1; }
-  .wb-adv-mini span { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 调度总览（塔吊雾景压底）*/
+.nv-dispatch{position:relative;margin:16px -20px 0;padding:16px 20px 14px;min-height:150px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(25,30,36,.72),rgba(25,30,36,.95)),
+             url("../../assets/publish/crane-fog.jpg") center 30%/cover no-repeat;}
+.nv-lab{display:flex;align-items:center;gap:8px;font-family:var(--nv-mono);
+  font-size:10.5px;letter-spacing:.18em;color:var(--nv-dim-dark);text-transform:uppercase;}
+.nv-lab .live{margin-left:auto;color:var(--nv-volt);letter-spacing:.1em;}
+.nv-big{display:flex;align-items:baseline;gap:9px;margin-top:8px;}
+.nv-big-n{font-size:60px;font-weight:700;line-height:.9;letter-spacing:-.03em;color:var(--nv-on-dark);}
+.nv-big-u{font-size:13px;color:var(--nv-dim-dark);}
+.nv-rule{height:4px;width:72px;background:var(--nv-volt);margin-top:8px;}
+.nv-mini{display:grid;grid-template-columns:repeat(3,1fr);margin-top:13px;border-top:1px solid var(--nv-line-dark);}
+.nv-mini .nv-m{padding:10px 4px 2px;}
+.nv-mini .nv-m + .nv-m{border-left:1px solid var(--nv-line-dark);padding-left:12px;}
+.nv-mini .nv-k{font-size:9.5px;letter-spacing:.14em;color:var(--nv-dim-dark);text-transform:uppercase;}
+.nv-mini .nv-v{font-size:23px;font-weight:700;color:var(--nv-on-dark);line-height:1.2;margin-top:2px;}
+.nv-mini .nv-v.volt{color:var(--nv-volt);}
 
-  /* ---- 管理工具：功能入口列表（一行一体，明确"去页面"） ---- */
-  .wb-tools { background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; box-shadow: var(--shadow-xs); }
-  .wb-tool { display: flex; align-items: center; gap: 12px; padding: 13px 14px; text-decoration: none; color: var(--text-1); transition: background var(--d-fast); position: relative; }
-  .wb-tool + .wb-tool { border-top: 1px solid var(--line-hairline); }
-  .wb-tool:active { background: var(--bg-card-2); }
-  .wb-tool-ic { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: none; background: var(--primary-soft); color: var(--primary-dim); }
-  .wb-tool:nth-child(2) .wb-tool-ic { background: var(--accent-soft); color: var(--accent); }
-  .wb-tool:nth-child(3) .wb-tool-ic { background: var(--success-soft); color: var(--success); }
-  .wb-tool:nth-child(4) .wb-tool-ic { background: var(--warning-soft); color: var(--warning); }
-  .wb-tool:nth-child(5) .wb-tool-ic { background: rgba(139,92,246,.1); color: #8B5CF6; }
-  .wb-tool-ic svg { width: 18px; height: 18px; }
-  .wb-tool-main { flex: 1; min-width: 0; }
-  .wb-tool-main b { display: block; font-size: 13.5px; font-weight: 600; }
-  .wb-tool-main i { display: block; margin-top: 2px; color: var(--text-3); font-size: 11px; font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wb-tool-count { flex: none; min-width: 26px; text-align: center; padding: 3px 8px; border-radius: var(--r-full); background: var(--bg-card-2); color: var(--text-2); font: 700 13px var(--font-num); }
-  .wb-tool-count.has { background: var(--primary-soft); color: var(--primary-dim); }
-  .wb-tool-arrow { flex: none; width: 13px; height: 13px; color: var(--text-4); transition: transform var(--d-fast); }
-  .wb-tool:hover .wb-tool-arrow { transform: translateX(3px); color: var(--primary-dim); }
+/* 安全网警示带（跑马灯）*/
+.nv-netband{position:relative;z-index:2;height:52px;overflow:hidden;
+  border-bottom:2px solid var(--nv-ink);display:flex;align-items:center;
+  background:url("../../assets/publish/safety-net.jpg") center 32%/cover no-repeat;}
+.nv-netband::before{content:"";position:absolute;inset:0;background:rgba(21,24,28,.62);}
+.nv-netband .track{position:relative;display:flex;width:max-content;white-space:nowrap;animation:nv-move 20s linear infinite;}
+.nv-netband:hover .track{animation-play-state:paused;}
+.nv-netband span{font-family:var(--nv-mono);font-size:10.5px;font-weight:700;letter-spacing:.26em;
+  color:#F6FBE3;padding:0 26px;text-transform:uppercase;}
+@keyframes nv-move{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-  /* ---- 待处理：内容富卡（与导航明确区分） ---- */
-  .wb-item { display: block; padding: 13px 14px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); text-decoration: none; color: var(--text-1); box-shadow: var(--shadow-xs); transition: transform var(--d-fast) var(--e-standard), border-color var(--d-fast), box-shadow var(--d-fast); }
-  .wb-item + .wb-item { margin-top: 8px; }
-  .wb-item:hover { transform: translateY(-1px); border-color: var(--primary); box-shadow: var(--shadow-sm); }
-  .wb-item:active { transform: scale(.985); }
-  .wb-item-top { display: flex; align-items: flex-start; gap: 8px; }
-  .wb-item-top b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .wb-item-badge { flex: none; padding: 3px 8px; border-radius: var(--r-full); font-size: 10px; font-weight: 600; white-space: nowrap; }
-  .wb-item-badge.review { background: rgba(217,119,6,.1); color: var(--accent); }
-  .wb-item-badge.ask { background: rgba(179,38,30,.1); color: var(--error); }
-  .wb-item-sub { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--text-3); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wb-item-sub svg { width: 11px; height: 11px; flex: none; opacity: .6; }
+/* 章节（台账式）*/
+.nv-sec{position:relative;z-index:1;margin:22px 20px 0;}
+.nv-sec-hd{display:flex;align-items:baseline;gap:10px;margin-bottom:11px;}
+.nv-sec-hd h2{font-size:17px;font-weight:900;letter-spacing:.01em;color:var(--nv-ink);}
+.nv-sec-hd .code{font-size:10px;letter-spacing:.16em;color:var(--nv-dim);}
+.nv-sec-hd .more{margin-left:auto;font-family:var(--nv-mono);font-size:11px;font-weight:700;color:var(--nv-ink);
+  display:flex;align-items:center;gap:4px;border-bottom:1.5px solid var(--nv-ink);padding-bottom:1px;text-decoration:none;}
 
-  .wb-empty { padding: 26px 17px; border: 1px dashed var(--line-strong); border-radius: var(--r-m); color: var(--text-3); font-size: 12px; text-align: center; background: var(--bg-card-2); }
-  .wb-empty-ic { width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 50%; background: var(--bg-card); display: flex; align-items: center; justify-content: center; }
-  .wb-empty-ic svg { width: 20px; height: 20px; color: var(--text-4); }
+/* 筛选 chips（全页唯一胶囊）*/
+.nv-chips{display:flex;gap:7px;margin:14px 20px 0;position:relative;z-index:1;overflow-x:auto;scrollbar-width:none;}
+.nv-chips::-webkit-scrollbar{display:none}
+.nv-chip{flex:none;border:1.5px solid var(--nv-ink);border-radius:999px;padding:6px 14px;
+  background:var(--nv-paper);font-size:12px;font-weight:700;color:var(--nv-ink-2);
+  transition:background .15s,color .15s,box-shadow .15s,transform .1s;}
+.nv-chip .c{font-size:10.5px;margin-left:5px;color:var(--nv-dim);}
+.nv-chip.on{background:var(--nv-ink);color:var(--nv-paper);box-shadow:var(--nv-shadow-sm);}
+.nv-chip.on .c{color:var(--nv-volt);}
+.nv-chip:active{transform:translate(2px,2px);box-shadow:none;}
 
-  @media (prefers-reduced-motion: reduce) {
-    .wb-hero, .wb-sec, .wb-primary, .wb-tool, .wb-item, .wb-chip { animation: none !important; transition: none !important; }
-  }
+/* 台账行 */
+.nv-list{margin:12px 20px 0;display:flex;flex-direction:column;gap:11px;position:relative;z-index:1;}
+.nv-item{position:relative;display:block;background:var(--nv-paper);border:2px solid var(--nv-ink);
+  box-shadow:var(--nv-shadow);padding:13px 14px 12px;text-decoration:none;color:var(--nv-ink);
+  transition:transform .12s,box-shadow .12s;}
+.nv-item:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--nv-ink);}
+.nv-line1{display:flex;align-items:center;gap:9px;}
+.nv-no{font-size:11px;font-weight:700;color:var(--nv-dim);border-bottom:1.5px solid var(--nv-dim);
+  line-height:1.2;padding-bottom:1px;flex:none;}
+.nv-cat{font-family:var(--nv-mono);font-size:10px;font-weight:700;color:var(--nv-dim);
+  letter-spacing:.08em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nv-badge{flex:none;font-family:var(--nv-mono);font-size:10px;font-weight:700;letter-spacing:.1em;
+  padding:4px 8px;white-space:nowrap;border:1.5px solid var(--nv-ink);}
+.nv-badge.review{color:var(--nv-amber);border-color:var(--nv-amber);}
+.nv-badge.ask{background:var(--nv-volt);color:#11140A;border-color:var(--nv-ink);}
+.nv-item-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  margin-top:8px;font-size:14.5px;font-weight:800;line-height:1.45;color:var(--nv-ink);}
+.nv-item-meta{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--nv-dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nv-item-meta svg{width:13px;height:13px;flex:none;}
+.nv-item-meta .sep{opacity:.45;margin:0 2px;}
+.nv-item-meta .go{margin-left:auto;display:flex;align-items:center;gap:3px;color:var(--nv-ink);font-weight:700;}
+.nv-item-meta .go svg{width:11px;height:11px;}
+
+/* 空态：印章式 */
+.nv-empty{margin:12px 20px 0;border:2px dashed var(--nv-ink);
+  background:color-mix(in srgb,var(--nv-paper) 70%,transparent);
+  padding:38px 20px 34px;text-align:center;position:relative;z-index:1;}
+.nv-empty .seal{width:52px;height:52px;margin:0 auto 12px;border:2px solid var(--nv-ink);
+  display:grid;place-items:center;background:var(--nv-paper);box-shadow:var(--nv-shadow-sm);}
+.nv-empty .seal svg{width:26px;height:26px;}
+.nv-empty b{display:block;font-size:14.5px;font-weight:900;color:var(--nv-ink);}
+.nv-empty i{display:block;margin-top:5px;font-style:normal;font-family:var(--nv-mono);
+  font-size:10.5px;letter-spacing:.12em;color:var(--nv-dim);}
+
+/* 工具索引：黑框表 */
+.nv-tools{margin:12px 20px 0;border:2px solid var(--nv-ink);background:var(--nv-paper);
+  box-shadow:var(--nv-shadow);position:relative;z-index:1;}
+.nv-tool{display:flex;align-items:center;gap:12px;padding:12px 13px;min-height:64px;
+  text-decoration:none;color:var(--nv-ink);transition:background .13s;}
+.nv-tool:active{background:var(--nv-volt);}
+.nv-tool + .nv-tool{border-top:1.5px solid var(--nv-ink);}
+.nv-tool-ic{width:36px;height:36px;flex:none;background:var(--nv-ink);color:var(--nv-paper);
+  display:grid;place-items:center;padding:8px;transition:background .13s,color .13s;}
+.nv-tool-ic svg{width:100%;height:100%;}
+.nv-tool:active .nv-tool-ic{background:var(--nv-paper);color:var(--nv-ink);}
+.nv-tool-main{flex:1;min-width:0;}
+.nv-tool-main b{display:block;font-size:14px;font-weight:800;line-height:1.3;}
+.nv-tool-main i{display:block;margin-top:2px;font-style:normal;font-size:11px;color:var(--nv-dim);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nv-tool-count{flex:none;font-size:12px;font-weight:700;color:var(--nv-dim);min-width:26px;text-align:center;}
+.nv-tool-count.has{background:var(--nv-volt);color:#11140A;border:1.5px solid var(--nv-ink);padding:2px 7px;align-self:center;}
+.nv-tool-arrow{flex:none;width:13px;height:13px;color:var(--nv-ink);}
+.nv-end{margin:22px 20px 0;text-align:center;font-family:var(--nv-mono);font-size:10px;
+  letter-spacing:.3em;color:var(--nv-dim);position:relative;z-index:1;}
+.nv-end::before,.nv-end::after{content:"";display:inline-block;width:26px;height:1.5px;
+  background:var(--nv-dim);vertical-align:middle;margin:0 10px;}
+
+/* 门控未登录/未实名（保留原结构，纳入本页底色） */
+.wb-v7 #pub-gate-login,.wb-v7 #pub-gate-realname{position:relative;z-index:2;background:var(--nv-canvas);min-height:60vh;}
 </style>
 <link rel="stylesheet" href="../../css/liquid-dock.css">
+<link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928213953">
 </head>
 <body data-tab="workbench">
-<div class="phone">
+<div class="phone wb-v7">
   <!-- 身份门控：未登录 -->
   <div id="pub-gate-login" style="display:none;text-align:center;padding:60px 24px;">
-    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">
-      <svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-user"/></svg>
+    <div style="width:72px;height:72px;margin:0 auto;border:2px solid var(--nv-ink);background:var(--nv-paper);display:flex;align-items:center;justify-content:center;box-shadow:var(--nv-shadow-sm);">
+      <svg class="ic" style="width:32px;height:32px;color:var(--nv-ink);"><use href="#i-user"/></svg>
     </div>
-    <div class="fw-700" style="font-size:17px;margin-top:16px;">登录后使用信息工作台</div>
-    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">登录后可发布供需信息、管理草稿与发布记录、查看对接进展。</div>
-    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">立即登录</a>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;color:var(--nv-ink);">登录后使用信息工作台</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;color:var(--nv-dim);">登录后可发布供需信息、管理草稿与发布记录、查看对接进展。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;border-radius:0;">立即登录</a>
   </div>
   <!-- 身份门控：未实名 -->
   <div id="pub-gate-realname" style="display:none;text-align:center;padding:60px 24px;">
-    <div style="width:72px;height:72px;margin:0 auto;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;">
-      <svg class="ic" style="width:32px;height:32px;color:var(--primary-dim);"><use href="#i-shield"/></svg>
+    <div style="width:72px;height:72px;margin:0 auto;border:2px solid var(--nv-ink);background:var(--nv-paper);display:flex;align-items:center;justify-content:center;box-shadow:var(--nv-shadow-sm);">
+      <svg class="ic" style="width:32px;height:32px;color:var(--nv-ink);"><use href="#i-shield"/></svg>
     </div>
-    <div class="fw-700" style="font-size:17px;margin-top:16px;">实名认证后可发布信息</div>
-    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;">完成实名认证后，即可发布供需信息并参与平台对接。</div>
-    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;">前往实名认证</a>
-    <a href="../supply/list.html" style="display:block;margin-top:12px;text-align:center;color:var(--primary-dim);font-size:12px;text-decoration:none;">先看看平台发布示例 ›</a>
+    <div class="fw-700" style="font-size:17px;margin-top:16px;color:var(--nv-ink);">实名认证后可发布信息</div>
+    <div class="text-3" style="font-size:12px;margin-top:8px;line-height:1.7;color:var(--nv-dim);">完成实名认证后，即可发布供需信息并参与平台对接。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg" style="margin-top:20px;border-radius:0;">前往实名认证</a>
+    <a href="../supply/list.html" style="display:block;margin-top:12px;text-align:center;color:var(--nv-ink);font-size:12px;text-decoration:none;">先看看平台发布示例 ›</a>
   </div>
-  <div class="scroll no-pad" id="pub-content" style="padding-bottom:96px;">
-    <!-- Hero：主行动 + 次入口 -->
-    <section class="wb-hero" aria-labelledby="wb-title">
-      <div class="wb-kicker">Information desk · ENGCHAIN</div>
-      <h1 class="wb-title" id="wb-title">信息工作台</h1>
-      <p class="wb-sub">管理发布、草稿与正在发生的对接机会</p>
-      <a class="wb-primary" id="wb-primary-btn" href="editor.html?role=demand">
-        <span class="wb-primary-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
-        <b>发布信息</b>
-        <span class="wb-primary-go">›</span>
-      </a>
-      <div class="wb-chips" id="wb-chips"></div>
-    </section>
 
-    <!-- 当前进展：大卡 -->
-    <section class="wb-sec" aria-labelledby="wb-advance-title">
-      <div class="wb-sec-head"><h2 class="wb-sec-title" id="wb-advance-title">当前进展</h2><a class="wb-more" href="records.html">查看发布</a></div>
-      <div class="wb-advance" id="wb-advance"></div>
-    </section>
+  <div class="scroll no-pad" id="pub-content" style="padding-bottom:108px;position:relative;z-index:1;">
+    <!-- ══ 深色调度刊头 ══ -->
+    <header class="nv-head rv" aria-labelledby="wb-title" style="animation-delay:.02s">
+      <div class="nv-meta"><span class="dot"></span><span>PUBLISH DISPATCH · LIVE</span><span class="right">ENGCHAIN</span></div>
+      <div class="nv-mast">
+        <h1 class="nv-title" id="wb-title">信息工作台</h1>
+        <span class="nv-seal">DISPATCH</span>
+      </div>
+      <p class="nv-sub"><b>管理发布、草稿与对接进展</b></p>
+      <div class="wb-actions" id="wb-actions" role="group" aria-label="发布操作" data-lg-cta="actions"></div>
 
-    <!-- 管理工具：功能入口列表 -->
-    <section class="wb-sec" aria-labelledby="wb-tools-title">
-      <div class="wb-sec-head"><h2 class="wb-sec-title" id="wb-tools-title">管理工具</h2></div>
-      <div class="wb-tools">
-        <a class="wb-tool" id="my-jobs-task" href="../profile/my-jobs.html" style="display:none;"><span class="wb-tool-ic"><svg class="ic"><use href="#i-company"/></svg></span><span class="wb-tool-main"><b>我的招聘</b><i>收简历、处理投递与岗位管理</i></span><span class="wb-tool-count" id="my-jobs-count">0</span><svg class="wb-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
-        <a class="wb-tool" href="records.html"><span class="wb-tool-ic"><svg class="ic"><use href="#i-doc"/></svg></span><span class="wb-tool-main"><b>我的发布</b><i>查看状态、匹配进展和咨询反馈</i></span><span class="wb-tool-count" id="record-count">0</span><svg class="wb-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
-        <a class="wb-tool" href="drafts.html"><span class="wb-tool-ic"><svg class="ic"><use href="#i-edit"/></svg></span><span class="wb-tool-main"><b>草稿箱</b><i>继续完成尚未发布的信息</i></span><span class="wb-tool-count" id="draft-count">0</span><svg class="wb-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
-        <a class="wb-tool" href="unlocked.html"><span class="wb-tool-ic"><svg class="ic"><use href="#i-lock"/></svg></span><span class="wb-tool-main"><b>已解锁线索</b><i>查看有效期、详情与关联订单</i></span><span class="wb-tool-count" id="unlock-count">0</span><svg class="wb-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
-        <a class="wb-tool" href="../favorite/index.html"><span class="wb-tool-ic"><svg class="ic"><use href="#i-star"/></svg></span><span class="wb-tool-main"><b>我的收藏</b><i>收藏的职位 / 项目 / 供应</i></span><span class="wb-tool-count" id="favorite-count">0</span><svg class="wb-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
+      <!-- 调度总览 -->
+      <div class="nv-dispatch">
+        <div class="nv-lab"><span>已发布信息 · ACTIVE</span><span class="live">▲ 实时</span></div>
+        <div id="wb-advance"></div>
+      </div>
+    </header>
+
+    <!-- 安全网警示带 -->
+    <div class="nv-netband rv" style="animation-delay:.08s" aria-hidden="true">
+      <div class="track"><span>SUPPLY × DEMAND — 安全对接 · 全程留痕 — KEEP MATCHING — </span><span>SUPPLY × DEMAND — 安全对接 · 全程留痕 — KEEP MATCHING — </span></div>
+    </div>
+
+    <!-- ══ 待处理台账 ══ -->
+    <section class="nv-sec rv" style="animation-delay:.14s" aria-labelledby="wb-pending-title">
+      <div class="nv-sec-hd">
+        <h2 id="wb-pending-title">待处理</h2><span class="code">/ PENDING LEDGER</span>
+        <a class="more" href="records.html">查看全部
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
       </div>
     </section>
+    <div class="nv-chips rv" id="wb-chips" style="animation-delay:.18s" role="tablist" aria-label="待处理筛选"></div>
+    <div id="wb-pending"></div>
 
-    <!-- 待处理：内容富卡 -->
-    <section class="wb-sec" aria-labelledby="wb-pending-title">
-      <div class="wb-sec-head"><h2 class="wb-sec-title" id="wb-pending-title">待处理</h2><a class="wb-more" href="records.html">查看全部</a></div>
-      <div id="wb-pending"></div>
+    <!-- ══ 工具索引 ══ -->
+    <section class="nv-sec rv" style="animation-delay:.22s" aria-labelledby="wb-tools-title">
+      <div class="nv-sec-hd"><h2 id="wb-tools-title">工具索引</h2><span class="code">/ INDEX</span></div>
     </section>
+    <nav class="nv-tools rv" style="animation-delay:.26s">
+      <a class="nv-tool" id="my-jobs-task" href="../profile/my-jobs.html" style="display:none;">
+        <span class="nv-tool-ic"><svg class="ic"><use href="#i-company"/></svg></span>
+        <span class="nv-tool-main"><b>我的招聘</b><i>收简历、处理投递与岗位管理</i></span>
+        <span class="nv-tool-count" id="my-jobs-count">0</span>
+        <svg class="nv-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+      <a class="nv-tool" href="records.html">
+        <span class="nv-tool-ic"><svg class="ic"><use href="#i-doc"/></svg></span>
+        <span class="nv-tool-main"><b>我的发布</b><i>查看状态、匹配进展和咨询反馈</i></span>
+        <span class="nv-tool-count" id="record-count">0</span>
+        <svg class="nv-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+      <a class="nv-tool" href="drafts.html">
+        <span class="nv-tool-ic"><svg class="ic"><use href="#i-edit"/></svg></span>
+        <span class="nv-tool-main"><b>草稿箱</b><i>继续完成尚未发布的信息</i></span>
+        <span class="nv-tool-count" id="draft-count">0</span>
+        <svg class="nv-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+      <a class="nv-tool" href="unlocked.html">
+        <span class="nv-tool-ic"><svg class="ic"><use href="#i-lock"/></svg></span>
+        <span class="nv-tool-main"><b>已解锁线索</b><i>查看有效期、详情与关联订单</i></span>
+        <span class="nv-tool-count" id="unlock-count">0</span>
+        <svg class="nv-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+      <a class="nv-tool" href="../favorite/index.html">
+        <span class="nv-tool-ic"><svg class="ic"><use href="#i-star"/></svg></span>
+        <span class="nv-tool-main"><b>我的收藏</b><i>收藏的职位 / 项目 / 供应</i></span>
+        <span class="nv-tool-count" id="favorite-count">0</span>
+        <svg class="nv-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+    </nav>
+    <div class="nv-end">DISPATCH END</div>
   </div>
 </div>
 
@@ -179,12 +299,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/liquid-cta.js?v=20260928213953"></script>
 <script src="../../js/publish-workbench.js"></script>
 <script src="../../js/guest-gate.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
-  /* ---- 身份门控 ---- */
+  /* ---- 身份门控（逻辑不变） ---- */
   function checkPublishAuth() {
     var st = (window.UI && UI.state) ? UI.state.get() : {};
     var content = document.getElementById('pub-content');
@@ -208,12 +329,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function unlockCount() { try { return Object.keys(JSON.parse(localStorage.getItem('engchain-unlocked') || '{}')).length; } catch (e) { return 0; } }
   function favoriteCount() { try { return (window.FavoriteStore && FavoriteStore.list) ? FavoriteStore.list().length : 0; } catch (e) { return 0; } }
 
-  /* 数字滚动动效（reduced-motion 时直接落值） */
+  /* 数字滚动动效 */
   function countUp(el, target) {
     if (!el) return;
     target = Number(target) || 0;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = target; return; }
-    var dur = 480, t0 = null;
+    var dur = 600, t0 = null;
     function frame(ts) {
       if (!t0) t0 = ts;
       var p = Math.min((ts - t0) / dur, 1);
@@ -224,10 +345,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     requestAnimationFrame(frame);
   }
 
-  /* 发布入口身份化：主 CTA + 轻量 chips */
+  /* 发布入口身份化按钮组（逻辑不变；.btn 类保留以便 liquid-cta 接管） */
   (function renderActions() {
-    var box = document.getElementById('wb-chips');
-    var primary = document.getElementById('wb-primary-btn');
+    var box = document.getElementById('wb-actions');
     if (!box) return;
     var acc = null;
     try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
@@ -236,18 +356,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var isEnt = ent === 'verified' || ent === 'resident';
     var isPro = per === 'professional';
     var isAgency = !!(acc && acc.agency);
-    var chips = [];
-    if (isEnt && !isAgency) chips.push({ href: 'editor.html?role=demand&cat=' + encodeURIComponent('招聘'), ic: 'i-user', t: '发布招聘' });
-    if (isPro) chips.push({ href: 'editor.html?role=supply&cat=' + encodeURIComponent('求职'), ic: 'i-doc', t: '发布求职' });
-    if (isAgency) chips.push({ href: '../agency/seller-board.html', ic: 'i-briefcase', t: '发布中介服务' });
-    chips.push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应' });
-    box.innerHTML = chips.map(function (c) {
-      return '<a class="wb-chip" href="' + c.href + '"><svg class="ic"><use href="#' + c.ic + '"/></svg>' + c.t + '</a>';
+    var acts = [];
+    function push(a) { acts.push(a); }
+    if (isAgency) {
+      push({ href: '../agency/seller-board.html', ic: 'i-briefcase', t: '发布中介服务', kind: 'primary' });
+      push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应', kind: 'ghost' });
+    } else if (isEnt) {
+      push({ href: 'editor.html?role=demand', ic: 'i-doc', t: '发布需求', kind: 'primary' });
+      push({ href: 'editor.html?role=demand&cat=' + encodeURIComponent('招聘'), ic: 'i-user', t: '发布招聘', kind: 'ghost' });
+      if (isPro) push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应', kind: 'ghost' });
+    } else if (isPro) {
+      push({ href: 'editor.html?role=supply&cat=' + encodeURIComponent('求职'), ic: 'i-doc', t: '发布求职', kind: 'primary' });
+      push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应', kind: 'ghost' });
+    } else {
+      push({ href: 'editor.html?role=demand', ic: 'i-doc', t: '发布需求', kind: 'primary' });
+      push({ href: 'editor.html?role=supply', ic: 'i-upload', t: '发布供应', kind: 'ghost' });
+    }
+    box.innerHTML = acts.map(function (a) {
+      var tint = a.kind === 'primary' ? ' data-lg-tint-color="#C6F036"' : '';
+      return '<a class="wb-act btn ' + (a.kind === 'primary' ? 'btn-primary' : 'btn-ghost') + '"' + tint + ' href="' + a.href + '">'
+        + '<svg class="ic"><use href="#' + a.ic + '"/></svg>' + a.t + '</a>';
     }).join('');
-    if (isAgency && primary) { primary.href = '../agency/seller-board.html'; primary.querySelector('b').textContent = '发布中介服务'; }
   })();
 
-  /* 我的招聘任务卡：企业认证及以上显示（中介不发招聘），count=待处理投递 */
+  /* 我的招聘任务卡（身份门控不变） */
   (function () {
     var acc = null;
     try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
@@ -292,41 +424,79 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   setCount('unlock-count', unlockCount(), unlockCount() > 0);
   setCount('favorite-count', favoriteCount(), favoriteCount() > 0);
 
-  /* 当前进展：大卡（主数据 + 迷你指标） */
+  /* 调度总览：主数字 + 三栏台账（ids 全部保留） */
   document.getElementById('wb-advance').innerHTML =
-    '<div class="wb-adv-main">' +
-      '<div class="wb-adv-label">已发布</div>' +
-      '<div class="wb-adv-num" id="adv-num">0</div>' +
-      '<div class="wb-adv-tip">' + (s.active > 0 ? '持续对接中，关注新的匹配与咨询' : '还没有已发布的信息，去发布第一条') + '</div>' +
-    '</div>' +
-    '<div class="wb-adv-mini">' +
-      '<div><b id="mini-draft">0</b><span>草稿</span></div>' +
-      '<div><b id="mini-match">0</b><span>新匹配</span></div>' +
-      '<div><b id="mini-ask">0</b><span>待咨询</span></div>' +
+    '<div class="nv-big"><span class="nv-big-n" id="adv-num">0</span><span class="nv-big-u">条在架</span></div>' +
+    '<div class="nv-rule"></div>' +
+    '<div class="nv-mini">' +
+      '<div class="nv-m"><div class="nv-k">草稿 DRAFT</div><div class="nv-v" id="mini-draft">0</div></div>' +
+      '<div class="nv-m"><div class="nv-k">新匹配 MATCH</div><div class="nv-v" id="mini-match">0</div></div>' +
+      '<div class="nv-m"><div class="nv-k">待咨询 ASK</div><div class="nv-v volt" id="mini-ask">0</div></div>' +
     '</div>';
   countUp(document.getElementById('adv-num'), s.active);
   countUp(document.getElementById('mini-draft'), s.drafts.length);
   countUp(document.getElementById('mini-match'), s.matches);
   countUp(document.getElementById('mini-ask'), s.inquiries);
 
-  /* 待处理：内容富卡（状态徽标 + 地点·时间） */
+  /* 待处理：筛选 chips（纯前端显示切换，数据仍取 s.pending） */
   var box = document.getElementById('wb-pending');
-  if (s.pending.length) {
-    box.innerHTML = s.pending.slice(0, 4).map(function (r) {
+  var chipsBox = document.getElementById('wb-chips');
+  var nAsk = 0, nReview = 0;
+  s.pending.forEach(function (r) { if ((r.inquiries || 0) > 0) nAsk++; else nReview++; });
+
+  function chipsHTML() {
+    var F = [['all', '全部', s.pending.length], ['review', '审核中', nReview], ['ask', '待咨询', nAsk], ['done', '已处理', 0]];
+    return F.map(function (f, i) {
+      return '<button class="nv-chip' + (i === 0 ? ' on' : '') + '" data-f="' + f[0] + '" role="tab" aria-selected="' + (i === 0) + '">'
+        + f[1] + '<span class="c">' + f[2] + '</span></button>';
+    }).join('');
+  }
+  function listHTML() {
+    if (!s.pending.length) return '';
+    return '<div class="nv-list">' + s.pending.slice(0, 4).map(function (r, idx) {
       var ask = (r.inquiries || 0) > 0;
       var badge = ask
-        ? '<span class="wb-item-badge ask">' + r.inquiries + ' 条咨询</span>'
-        : '<span class="wb-item-badge review">审核中</span>';
-      var loc = r.location || '';
-      var time = r.updatedAt || '';
-      return '<a class="wb-item" href="../supply/detail.html?id=' + encodeURIComponent(r.id || '') + '">' +
-        '<div class="wb-item-top"><b>' + esc(r.title) + '</b>' + badge + '</div>' +
-        '<div class="wb-item-sub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' + esc(loc) + '<span style="opacity:.5;flex:none;">·</span>' + esc(time) + '</div>' +
-      '</a>';
-    }).join('');
-  } else {
-    box.innerHTML = '<div class="wb-empty"><div class="wb-empty-ic"><svg class="ic"><use href="#i-check"/></svg></div>暂无新的待处理事项<br><span style="font-size:10px;color:var(--text-4);">所有事项均已处理完毕</span></div>';
+        ? '<span class="nv-badge ask">' + r.inquiries + ' 条咨询</span>'
+        : '<span class="nv-badge review">审核中</span>';
+      var cat = (r.category || r.cat || (r.role === 'supply' ? '供应' : '需求'));
+      return '<a class="nv-item" data-f="' + (ask ? 'ask' : 'review') + '" href="../supply/detail.html?id=' + encodeURIComponent(r.id || '') + '">' +
+        '<div class="nv-line1"><span class="nv-no">№ ' + String(idx + 1).padStart(2, '0') + '</span><span class="nv-cat">' + esc(cat) + '</span>' + badge + '</div>' +
+        '<b class="nv-item-title">' + esc(r.title) + '</b>' +
+        '<div class="nv-item-meta">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' +
+          esc(r.location || '') + '<span class="sep">·</span>' + esc(r.updatedAt || '') +
+          '<span class="go">处理<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>' +
+        '</div></a>';
+    }).join('') + '</div>';
   }
+  function emptyHTML() {
+    return '<div class="nv-empty" id="wb-empty">' +
+      '<div class="seal"><svg viewBox="0 0 256 256" fill="currentColor"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></div>' +
+      '<b>本类事项已全部处理完毕</b><i>CLEARED — NO PENDING ITEMS</i></div>';
+  }
+  chipsBox.innerHTML = chipsHTML();
+  box.innerHTML = listHTML() || emptyHTML();
+
+  function applyFilter(f) {
+    var items = box.querySelectorAll('.nv-item');
+    var vis = 0;
+    Array.prototype.forEach.call(items, function (it) {
+      var show = f === 'all' ? true : (f === 'done' ? false : it.getAttribute('data-f') === f);
+      it.style.display = show ? '' : 'none';
+      if (show) vis++;
+    });
+    var oldEmpty = document.getElementById('wb-empty');
+    if (oldEmpty) oldEmpty.remove();
+    if (vis === 0) box.insertAdjacentHTML('beforeend', emptyHTML());
+  }
+  chipsBox.addEventListener('click', function (e) {
+    var chip = e.target.closest('.nv-chip');
+    if (!chip) return;
+    Array.prototype.forEach.call(chipsBox.querySelectorAll('.nv-chip'), function (c) {
+      var on = c === chip; c.classList.toggle('on', on); c.setAttribute('aria-selected', String(on));
+    });
+    applyFilter(chip.getAttribute('data-f'));
+  });
 })();
 </script>
 <script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>

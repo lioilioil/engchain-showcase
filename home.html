@@ -70,22 +70,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="app-top">
     <div class="app-eyebrow">ENGCHAIN <span style="background:var(--primary-soft-2);color:var(--primary-dim);border-radius:5px;padding:1px 6px;letter-spacing:.06em;">AI</span></div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <div class="app-location" id="app-location" role="button" tabindex="0" aria-label="切换城市">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
-        <span id="app-location-text">成都市 · 高新区</span>
+      <div class="app-location loc-empty" id="app-location" role="button" tabindex="0" aria-label="设置城市">
+        <svg class="loc-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>
+        <span id="app-location-text">设置城市</span>
+        <svg class="loc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
       </div>
-      <!-- E1-01 登录/注册入口（游客态胶囊；已登录显示头像/昵称） -->
+      <!-- E1-01 登录入口（游客态胶囊；已登录显示头像/昵称） -->
       <div id="home-auth-entry"></div>
+      <!-- 搜索入口（定位右侧；游客态位于登录胶囊右侧） -->
+      <a href="pages/search/index.html" class="app-top-search" aria-label="搜索" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;color:var(--text-2);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      </a>
     </div>
   </div>
 
   <div class="scroll no-pad" style="padding-bottom:96px;">
-    <!-- 搜索 -->
-    <a href="pages/search/index.html" class="app-search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
-      <input placeholder="AI 搜索工程、材料、劳务、设备…" readonly>
-      <span class="pulse" style="flex:none;display:flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12px;font-weight:700;">AI</span>
-    </a>
 
     <!-- 常驻福利条（常驻通知类，长期显示，不可关闭） -->
     <div id="home-welfare-bar" style="margin:0 var(--page-pad) 10px;padding:9px 14px;border-radius:10px;background:var(--bg-card);border:1px solid var(--line);font-size:11.5px;color:var(--text-2);line-height:1.6;">
@@ -300,32 +299,78 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     hgo(0); hplay();
   })();
 
-  /* ---- 定位：点击弹出城市选择（80% 底部弹层，选择后持久化） ---- */
+  /* ---- 定位：仅显示城市名（不显示区县）；未获取城市时显示「设置城市」文字链接 ---- */
   (function () {
     var loc = document.getElementById('app-location');
     var locText = document.getElementById('app-location-text');
-    var saved = localStorage.getItem('engchain-city');
-    if (saved) { locText.textContent = saved; }
-    else {
-      /* [Auth 连通] 首次进入未设置城市时，默认用已认证地域兜底 */
+    if (!loc || !locText) return;
+
+    /* 把任意地域字符串规整为「城市名」：去分隔符 / 省市后缀 / 区县，无法识别则返回空 */
+    function cityOnly(raw) {
+      if (!raw) return '';
+      var s = String(raw).trim();
+      if (!s) return '';
+      var lookup = (window.UI && UI.cityLookup) ? UI.cityLookup : null;
+      if (lookup) {
+        /* 取命中最长的已知城市（如「成都市 · 高新区 / 四川省成都市 / 成都高新区」→ 成都） */
+        var best = '', bl = 0;
+        Object.keys(lookup).forEach(function (c) {
+          if (c.length > bl && s.indexOf(c) > -1) { best = c; bl = c.length; }
+        });
+        if (best) return best;
+        /* 直辖市：北京 / 上海 / 天津 / 重庆（含或不含「市」） */
+        var k = s.replace(/\s+/g, '');
+        if (k === '北京市' || k === '北京') return '北京';
+        if (k === '上海市' || k === '上海') return '上海';
+        if (k === '天津市' || k === '天津') return '天津';
+        if (k === '重庆市' || k === '重庆') return '重庆';
+      }
+      return '';
+    }
+
+    /* 城市来源优先级：本地保存 → 已认证地域兜底；两者都取城市名 */
+    function resolveCity() {
+      try { var s = localStorage.getItem('engchain-city') || ''; if (s) return cityOnly(s); } catch (e) {}
       try {
         var au = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
         var en = au.enterprise || {};
         var basic = (au.personalEntry && au.personalEntry.profile && au.personalEntry.profile.basic) || {};
         var region = en.region || basic.location || '';
-        if (region) locText.textContent = region;
+        if (region) return cityOnly(region);
       } catch (e) {}
+      return '';
     }
+
+    function renderLocation() {
+      var city = resolveCity();
+      if (city) {
+        /* 旧数据迁移：把可能含区县的旧值规整为城市名后写回，保持存储口径统一 */
+        try { localStorage.setItem('engchain-city', city); } catch (e) {}
+        locText.textContent = city;
+        loc.classList.add('set');
+        loc.classList.remove('loc-empty');
+        loc.setAttribute('aria-label', '切换城市，当前：' + city);
+      } else {
+        locText.textContent = '设置城市';
+        loc.classList.remove('set');
+        loc.classList.add('loc-empty');
+        loc.setAttribute('aria-label', '设置城市');
+      }
+    }
+
     function openCity() {
       UI.cityPicker({
         current: locText.textContent,
         onSelect: function (city) {
-          locText.textContent = city;
-          localStorage.setItem('engchain-city', city);
-          UI.toast('已切换至 ' + city, 'ok');
+          var c = cityOnly(city);
+          if (!c) return;
+          try { localStorage.setItem('engchain-city', c); } catch (e) {}
+          renderLocation();
+          UI.toast('已切换至 ' + c, 'ok');
         }
       });
     }
+    renderLocation();
     loc.addEventListener('click', openCity);
     loc.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCity(); } });
   })();
@@ -343,7 +388,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       try { return UI.state.get(); } catch (e) { return {}; }
     }
 
-    /* E1-01 顶栏右侧：游客=登录/注册胶囊；已登录=隐藏（用户入口由侧边栏/个人中心承担，避免重复） */
+    /* E1-01 顶栏右侧：游客=登录胶囊；已登录=隐藏（用户入口由侧边栏/个人中心承担，避免重复） */
     function renderAuthEntry() {
       var box = document.getElementById('home-auth-entry');
       if (!box) return;
@@ -351,7 +396,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (!st.loggedIn) {
         box.style.display = '';
         box.innerHTML =
-          '<a href="' + AUTH_LOGIN + '" style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(37,99,235,.28);white-space:nowrap;">登录/注册</a>';
+          '<a href="' + AUTH_LOGIN + '" style="display:inline-flex;align-items:center;height:30px;padding:0 13px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:12px;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(37,99,235,.28);white-space:nowrap;">登录</a>';
       } else {
         box.style.display = 'none';
       }
