@@ -1471,6 +1471,8 @@
     }
     if (per === 'professional') s.push('求职');
     if (isAgency) s.push('中介服务');
+    /* 中介需求侧（找中介服务）本期开放：已实名个人/企业均可发代办/担保等需求 */
+    if (isPer || isEnt) d.push('中介服务');
     return role === 'demand' ? d : s;
   }
 

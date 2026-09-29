@@ -21,6 +21,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">服务广场</div>
     <div class="nav-right">
+      <button type="button" class="nav-search-btn" id="nav-search-btn" aria-label="搜索服务广场" title="搜索" onclick="location.href='search.html'">
+        <svg class="ic" style="width:20px;height:20px;"><use href="#i-search"/></svg>
+      </button>
       <a id="nav-agency-entry" href="seller-board.html" style="display:none;margin-right:8px;color:var(--text-2);text-decoration:none;">
         <svg class="ic" style="width:19px;height:19px;"><use href="#i-sparkle"/></svg>
       </a>
@@ -29,8 +32,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
 
   <div class="scroll">
-        <!-- P1-9: 服务市场搜索栏（移到顶部） -->
-    <div class="mkt-search" id="mktSearch" style="margin-bottom:16px;"><svg class="ic"><use href="#i-search"/></svg><input id="mkt-q" class="input" placeholder="搜索服务、机构或关键词"></div>
     <!-- P1-4: 进行中订单卡片 -->
     <div id="active-orders-card" style="display:none;margin-bottom:12px;"></div>
     <!-- 双路径分流——紧凑转化版 -->
@@ -50,14 +51,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
         <div class="dp-body">
           <div class="dp-title">浏览市场</div>
-          <div class="dp-desc">自己挑选服务下单</div>
+          <div class="dp-desc">自己挑选服务，解锁联系</div>
         </div>
       </button>
     </div>
     <!-- P0-2: 一句话信任背书（原担保横幅精简版） -->
     <div class="trust-bar">
       <svg class="ic" style="width:14px;height:14px;color:var(--primary-dim);flex:none;"><use href="#i-shield"/></svg>
-      <span>已核验机构 · 资金托管保障 · 未成交全额退款</span>
+      <span>已核验机构 · 认证分层 · 解锁后联系</span>
       <span class="trust-badge">金V认证</span>
     </div>
     <!-- P2-14: 首次访问引导气泡 -->
@@ -225,8 +226,9 @@ function normAgency(s){
     isOrg: !!s.serveType,
     company: companyOf(cid) || s.company || '',
     cycle: cycleOf(s.handleCycle),
+    quote: s.quote||null,
     caseCount: (s.cases&&s.cases.length)?s.cases.length:0,
-    keyword: [s.title||'', s.sub||'', s.subType||'', s.category||'', s.cat||'', s.company||'', s.desc||'', s.serveType||'', s.targetQualLevel||'', (s.tags||[]).join(' ')].join(' ')
+    keyword: [s.title||'', s.sub||'', s.subType||'', s.category||'', s.cat||'', s.company||'', s.desc||'', s.serveType||'', s.targetQualLevel||'', (s.tags||[]).join(' '), (s.cats||[]).join(' ')].join(' ')
   };
 }
 function agencySource(){
@@ -461,6 +463,11 @@ function updateFilterCount(){
   }
 }
 
+/* ---- [PHASE 0] 锁定服务：跳服务详情页积分解锁联系方式（在线下单已下线，平台不参与交易资金） ---- */
+window.lockService=function(id){
+  location.href='../supply/detail.html?id='+encodeURIComponent(id);
+};
+
 /* P1-7: 服务卡片信息精简 */
 window.renderList=function(){
   var list=SVCS.filter(function(s){
@@ -526,8 +533,8 @@ window.renderList=function(){
         '</div>'+
       '</div>'+
       '<div class="svc-foot">'+
-        '<span class="svc-dep"><svg class="ic"><use href="#i-shield"/></svg>'+(s.isOrg?'资金托管 · 未成交退款':'平台对接 · 免费咨询')+'</span>'+
-        '<span class="svc-cta'+(s.isOrg?' cta-org':'')+'">'+(s.isOrg?'在线下单':'免费咨询·10分钟响应')+'<svg class="ic"><use href="#i-chev-r"/></svg></span>'+
+        '<span class="svc-dep"><svg class="ic"><use href="#i-shield"/></svg>'+(s.isOrg?'深度认证 · 金V核验':'基础认证 · 免费比价')+'</span>'+
+        '<span class="svc-cta'+(s.isOrg?' cta-org':'')+'"'+(s.isOrg?(' onclick="event.stopPropagation();window.lockService(\''+s.id+'\','+orderAmountOf(s)+')"'):'')+'>'+(s.isOrg?'解锁联系方式':'免费比价')+(s.isOrg?'<svg class="ic" style="width:11px;height:11px;"><use href="#i-lock"/></svg>':'<svg class="ic"><use href="#i-chev-r"/></svg>')+'</span>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -546,19 +553,6 @@ function checkMktSticky(){
 if(mktScroll){mktScroll.addEventListener('scroll',checkMktSticky);window.addEventListener('resize',checkMktSticky);}
 setInterval(checkMktSticky,150);
 setTimeout(checkMktSticky,100);
-
-function bindSearch(){
-  var q=document.getElementById('mkt-q');
-  if(!q)return;
-  var debounceTimer;
-  q.addEventListener('input',function(){
-    clearTimeout(debounceTimer);
-    debounceTimer=setTimeout(function(){
-      curQ=q.value.trim();renderList();
-    },300);
-  });
-  q.addEventListener('keydown',function(e){if(e.key==='Enter'){renderList();}});
-}
 
 /* 顺手办轻工具：目标感知材料核验 / 多事项到期提醒 / 政策速查 */
 var QT_MATERIAL_MAP={
@@ -603,7 +597,7 @@ function qtMaterialRender(){
   }).join('');
   if(miss.length){
     h+='<div class="qt-miss">还缺 <b>'+miss.length+'</b> 项：'+miss.slice(0,3).join('、')+(miss.length>3?' 等':'')+'</div>';
-    h+='<button class="btn btn-primary btn-block qt-btn" onclick="qtMaterialGo()">去下单代办 · 补齐材料 ›</button>';
+    h+='<button class="btn btn-primary btn-block qt-btn" onclick="qtMaterialGo()">解锁联系方式 · 补齐材料 ›</button>';
   }else{
     h+='<div class="qt-ok">材料齐全，可随时委托办理</div>';
   }
@@ -661,7 +655,7 @@ window.toggleMaterial=function(item){
   saved[item]=!saved[item];localStorage.setItem('engchain-qt-material',JSON.stringify(saved));
   document.getElementById('qt-sheet-body').innerHTML=qtMaterialRender();
 };
-window.qtMaterialGo=function(){closeQuickTool();searchJump('资质代办','已为你搜索「资质代办」服务');};
+window.qtMaterialGo=function(){closeQuickTool();searchJump('资质代办');};
 window.addRemind=function(){
   var name=document.getElementById('qt-remind-name').value,date=document.getElementById('qt-remind-date').value;
   if(!name||!date){if(window.UI)UI.toast('请选择类型并填写到期日');return;}
@@ -686,30 +680,23 @@ window.renewRemind=function(){
     else if(/建造师|证书/.test(first.name))kw='人员';
     else kw='资质延续';
   }
-  closeQuickTool();searchJump(kw,'已为你搜索「'+kw+'」服务');
+  closeQuickTool();searchJump(kw);
 };
 window.filterPolicy=function(){
   var kw=(document.getElementById('qt-policy-search').value||'').toLowerCase();
   var list=QT_POLICIES.filter(function(p){return (p.k+' '+p.v+' '+p.t).toLowerCase().indexOf(kw)>=0;});
   document.getElementById('qt-policy-list').innerHTML=policyRows(list);
 };
-function searchJump(kw,msg){
-  var q=document.getElementById('mkt-q');
-  if(q)q.value=kw;
-  renderList();
-  var s=document.querySelector('.scroll');
-  var anchor=document.getElementById('svc-list');
-  if(s&&anchor)s.scrollTop=anchor.offsetTop-70;
-  if(window.UI&&msg)UI.toast(msg,'ok');
+/* 工具入口跳转到服务广场搜索页（自动填入关键词并搜索） */
+function searchJump(kw){
+  location.href='search.html?q='+encodeURIComponent(kw);
 }
 
-/* 下滑到服务市场并高亮搜索框，直接滚到服务列表 */
+/* 下滑到服务市场，直接滚到服务列表 */
 window.scrollToMarket=function(){
   var s=document.querySelector('.scroll');
   var anchor=document.getElementById('svc-list');
   if(s&&anchor){try{s.scrollTo({top:anchor.offsetTop-72,behavior:'smooth'});}catch(e){s.scrollTop=anchor.offsetTop-72;}}
-  var q=document.getElementById('mkt-q');
-  if(q){q.classList.add('mkt-flash');setTimeout(function(){q.classList.remove('mkt-flash');},1500);}
 };
 
 /* P1-4 + P1-5: 用户分层——渲染进行中订单卡片 + 导航栏角标 */
@@ -791,7 +778,6 @@ function render(){
 
 fillGoalOptions();
 render();
-bindSearch();
 window.addEventListener('engchain:mode', render);
 window.addEventListener('engchain:store-change', render);
 window.addEventListener('engchain:lead', function(){if(window.Mediation)render();});
@@ -955,13 +941,11 @@ window.confirmFilter=function(){
 .mb-cta{font-size:12px;font-weight:700;color:var(--primary-dim);cursor:pointer;}
 
 
-/* ===== 市场搜索 + 分类 chips ===== */
-.mkt-search{display:flex;align-items:center;gap:8px;height:40px;background:var(--bg-card-2);border:1.5px solid var(--line);border-radius:12px;padding:0 6px 0 12px;margin-bottom:10px;transition:border-color var(--d-fast),box-shadow var(--d-fast),background var(--d-fast);}
-.mkt-search.mkt-flash{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
-.mkt-search:focus-within{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);background:var(--bg-card);}
-.mkt-search .ic{width:16px;height:16px;color:var(--text-3);flex:none;}
-.mkt-search .input{flex:1;min-width:0;height:100%;border:none;background:transparent;padding:0;font-size:var(--fs-md);color:var(--text-1);box-shadow:none;}
-.sub-chip{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+/* ===== 导航栏右上角搜索 icon（与 demo 其他页面上图标按钮一致） ===== */
+.nav-search-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease;flex:none;}
+.nav-search-btn:active{transform:scale(.94);}
+
+/* ===== 分类 chips ===== */
 .sub-chip::-webkit-scrollbar{display:none;}
 .sub-chip .chip{flex:none;padding:9px 14px;border-radius:99px;font-size:11.5px;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:all var(--d-fast);}
 .sub-chip .chip:active{transform:scale(.95);}

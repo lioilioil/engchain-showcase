@@ -26,24 +26,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="scroll" style="padding-top:8px;padding-bottom:40px;">
     <!-- 双视图：我的订单 / 我发布的需求 -->
     <div class="mo-seg">
-      <button class="seg on" id="seg-orders" onclick="window.switchView('orders')">我的订单</button>
+      <button class="seg on" id="seg-orders" onclick="window.switchView('orders')">解锁记录</button>
       <button class="seg" id="seg-demands" onclick="window.switchView('demands')">我发布的需求</button>
     </div>
 
     <!-- 状态筛选（订单视图） -->
     <div class="mo-filters" id="mo-filters">
       <span class="chip on" data-f="all">全部</span>
-      <span class="chip" data-f="intent">待启动</span>
-      <span class="chip" data-f="active">进行中</span>
-      <span class="chip" data-f="settled">已完成</span>
-      <span class="chip" data-f="refunded">已退款</span>
+      <span class="chip" data-f="7d">近7天</span>
+      <span class="chip" data-f="30d">近30天</span>
     </div>
 
     <!-- 列表（订单 / 需求共用容器） -->
     <div id="mo-list"><div class="card"><div class="text-3 fs-12">加载中…</div></div></div>
 
     <!-- 说明条 -->
-    <div class="mo-note">在线下单的资金由持牌机构托管，按里程碑验收后释放给服务商；未成交全额退款。</div>
+    <div class="mo-note">平台仅提供信息发布与联系方式解锁，不参与服务过程与交易资金；沟通、成交与结算由你和服务商自行完成。</div>
   </div>
 </div>
 
@@ -65,16 +63,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:2});}
 function ftime(ts){if(!ts)return '—';var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
 var me=DataBus.current(),uid=me?me.id:'';
-var ST_COLOR={draft:'var(--text-3)',intent:'var(--primary-dim)',escrowed:'var(--blue)',serving:'var(--blue)',await_confirm:'var(--primary-dim)',settled:'var(--success)',partial_refund:'var(--text-3)',refunded:'var(--text-3)',disputed:'var(--danger)',cancelled:'var(--text-3)'};
+var ST_COLOR={unlocked:'var(--success)'};
 var GROUPS=[
   {f:'all',label:'全部',test:function(){return true;}},
-  {f:'intent',label:'待启动',test:function(o){return o.state==='intent';}},
-  {f:'active',label:'进行中',test:function(o){return ['draft','escrowed','serving','await_confirm','disputed'].indexOf(o.state)>=0;}},
-  {f:'settled',label:'已完成',test:function(o){return o.state==='settled';}},
-  {f:'refunded',label:'已退款',test:function(o){return ['refunded','partial_refund','cancelled'].indexOf(o.state)>=0;}}
+  {f:'7d',label:'近7天',test:function(u){return (u.t||0)>=(Date.now()-7*864e5);}},
+  {f:'30d',label:'近30天',test:function(u){return (u.t||0)>=(Date.now()-30*864e5);}}
 ];
 var curF='all',curView='orders';
-var DEM_ST={open:{t:'开放报价',c:'var(--success)'},quoted:{t:'已有报价',c:'var(--primary-dim)'},matched:{t:'已匹配·待下单',c:'var(--blue)'},closed:{t:'已成交',c:'var(--text-3)'},expired:{t:'已过期',c:'var(--text-3)'},cancelled:{t:'已取消',c:'var(--text-3)'}};
+var DEM_ST={open:{t:'开放报价',c:'var(--success)'},quoted:{t:'已有报价',c:'var(--primary-dim)'},matched:{t:'已匹配·待解锁',c:'var(--blue)'},closed:{t:'已联系',c:'var(--text-3)'},expired:{t:'已过期',c:'var(--text-3)'},cancelled:{t:'已取消',c:'var(--text-3)'}};
 window.switchView=function(v){
   curView=v;
   var so=document.getElementById('seg-orders'),sd=document.getElementById('seg-demands');
@@ -88,41 +84,33 @@ function renderFilters(){
   var el=document.getElementById('mo-filters');if(!el)return;
   el.querySelectorAll('.chip').forEach(function(c){c.classList.toggle('on',c.getAttribute('data-f')===curF);});
 }
-function subOf(o,mm){
-  if(o.state==='draft')return '草稿 · 未支付';
-  if(o.state==='intent'){
-    var s='意向金 '+fmt(o.intentAmount)+' · 待启动服务';
-    try{
-      var ist=Mediation.intentStatus(o.id);
-      if(ist){if(ist.willAutoCancel)s+=' · 即将自动退款';else if(ist.nearAutoCancel)s+=' · 超期'+ist.days+'天';}
-    }catch(e){}
-    return s;
-  }
-  if(o.state==='settled')return '已结算 · 合同额 '+fmt(o.amount);
-  if(o.state==='refunded'||o.state==='partial_refund'||o.state==='cancelled')return '退款 '+fmt((o.refund&&o.refund.amount)||o.intentAmount||0);
-  if(o.state==='disputed')return '平台介入中 · 合同额 '+fmt(o.amount);
-  var s='托管 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released);
-  if(o.state==='escrowed'){
-    try{ var est=Mediation.escrowStatus(o.id); if(est&&est.nearAutoCancel)s+=' · 超时未接单'; }catch(e){}
-  }
-  return s;
+function svcById(id){
+  var all=[];
+  try{
+    all=(window.MOCK&&MOCK.agencyServices)||[];
+    if(!all.length&&window.MOCK&&MOCK.supplies)all=MOCK.supplies.filter(function(s){return (s.bizKey==='agency'||s.cat==='中介服务'||s.cat==='中介');});
+  }catch(e){}
+  for(var i=0;i<all.length;i++){if(String(all[i].id)===String(id))return all[i];}
+  return null;
 }
+/* [PHASE 0] 解锁记录：读取 engchain-unlocked 中 agency 类记录（积分解锁联系方式） */
 function renderOrders(){
-  try{ if(window.Mediation&&Mediation.checkIntentTimeout)Mediation.checkIntentTimeout(); }catch(e){}
-  var all=Mediation.list({uid:uid,role:'buyer'});
-  var g=GROUPS.filter(function(x){return x.f===curF;})[0]||GROUPS[0];
-  var list=all.filter(g.test);
   var el=document.getElementById('mo-list');if(!el)return;
-  if(!all.length){el.innerHTML=emptyHtml(false);return;}
+  var recs={};try{recs=JSON.parse(localStorage.getItem('engchain-unlocked')||'{}');}catch(e){}
+  var keys=Object.keys(recs).filter(function(k){return k.indexOf('agency_')===0;}).sort(function(a,b){return (recs[b].t||0)-(recs[a].t||0);});
+  var g=GROUPS.filter(function(x){return x.f===curF;})[0]||GROUPS[0];
+  var list=keys.map(function(k){return {k:k,t:recs[k].t||0};}).filter(g.test);
+  if(!keys.length){el.innerHTML=emptyHtml(false);return;}
   if(!list.length){el.innerHTML=emptyHtml(true);return;}
-  el.innerHTML=list.map(function(o){
-    var mm=Mediation.money(o);
-    var col=ST_COLOR[o.state]||'var(--text-2)';
-    return '<div class="mo-card" onclick="location.href=\'order-detail.html?id='+o.id+'\'">'+
-      '<div class="mo-top"><div class="mo-name">'+o.svcName+'</div>'+
-      '<span class="mo-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">'+Mediation.stateLabel(o.state)+'</span></div>'+
-      '<div class="mo-sub">'+subOf(o,mm)+'</div>'+
-      '<div class="mo-foot"><span class="mo-time">'+ftime(o.createdAt)+'</span><span class="mo-id">单号 '+o.id+'</span><span class="mo-go">›</span></div>'+
+  el.innerHTML=list.map(function(u){
+    var id=u.k.slice('agency_'.length);
+    var svc=svcById(id);
+    var col='var(--success)';
+    return '<div class="mo-card" onclick="location.href=\'../supply/detail.html?id='+id+'\'">'+
+      '<div class="mo-top"><div class="mo-name">'+(svc?(svc.name||svc.title||'中介服务'):'中介服务')+'</div>'+
+      '<span class="mo-st" style="color:'+col+';background:color-mix(in srgb,'+col+' 10%,transparent);border-color:color-mix(in srgb,'+col+' 26%,transparent);">已解锁</span></div>'+
+      '<div class="mo-sub">联系方式已解锁 · 可直接与服务商沟通（平台不参与交易）</div>'+
+      '<div class="mo-foot"><span class="mo-time">'+ftime(u.t)+'</span><span class="mo-id">解锁记录</span><span class="mo-go">›</span></div>'+
       '</div>';
   }).join('');
 }
@@ -136,8 +124,8 @@ function demExpire(d){
 function demAction(d){
   if(d.status==='open')return '<span class="dm-btn" onclick="event.stopPropagation();window.cancelDemand(\''+d.id+'\')">取消需求</span>';
   if(d.status==='quoted')return '<span class="dm-btn gold" onclick="event.stopPropagation();window.openDemandQuotes(\''+d.id+'\')">查看 '+d.quotes.length+' 家报价</span>';
-  if(d.status==='matched')return '<span class="dm-btn gold" onclick="event.stopPropagation();location.href=\'order.html?demandId='+d.id+'\'">去下单 ›</span>';
-  if(d.status==='closed'&&d.orderId)return '<span class="dm-btn" onclick="event.stopPropagation();location.href=\'order-detail.html?id='+d.orderId+'\'">查看订单</span>';
+  if(d.status==='matched')return '<span class="dm-btn gold" onclick="event.stopPropagation();location.href=\'../supply/detail.html?id='+(d.svcId||'')+'\'">去解锁联系 ›</span>';
+  if(d.status==='closed'&&d.svcId)return '<span class="dm-btn" onclick="event.stopPropagation();location.href=\'../supply/detail.html?id='+d.svcId+'\'">查看服务</span>';
   return '';
 }
 function renderDemands(){
@@ -216,14 +204,15 @@ window.acceptQuote=function(id,qid){
   var r=DemandStore.acceptQuote(id,qid,uid);
   if(r&&r.error){window.UI&&UI.toast(r.error,'warn');return;}
   window.closeDemandQuotes();
-  window.UI&&UI.toast('已接受报价，请完成意向金支付生成托管单','ok');
-  setTimeout(function(){location.href='order.html?demandId='+id;},600);
+  window.UI&&UI.toast('已接受报价，去服务详情解锁联系方式后直接沟通','ok');
+  var d2=DemandStore.byId(id);
+  setTimeout(function(){location.href='../supply/detail.html?id='+((d2&&d2.svcId)||'')+''';},600);
 };
 function emptyHtml(filtered){
   return '<div class="mo-empty">'+
     '<div class="me-ic2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>'+
-    '<div class="fw-700 fs-14" style="color:var(--text-1);">'+(filtered?'该状态下暂无订单':'还没有订单')+'</div>'+
-    '<div class="text-3 fs-12" style="margin-top:5px;line-height:1.7;">'+(filtered?'切换其他状态查看':'去服务广场挑选服务，在线下单后订单会出现在这里')+'</div>'+
+    '<div class="fw-700 fs-14" style="color:var(--text-1);">'+(filtered?'该时间范围内暂无解锁记录':'还没有解锁记录')+'</div>'+
+    '<div class="text-3 fs-12" style="margin-top:5px;line-height:1.7;">'+(filtered?'切换时间范围查看':'去服务广场挑选服务，积分解锁联系方式后记录会出现在这里')+'</div>'+
     '<a class="mo-cta" href="index.html">去服务广场逛逛 ›</a>'+
     '</div>';
 }
@@ -234,7 +223,7 @@ if(filtersEl)filtersEl.addEventListener('click',function(e){
   curF=c.getAttribute('data-f');
   renderFilters();render();
 });
-/* URL 直达：?view=orders|demands&f=all|intent|active|settled|refunded（服务广场引导条入口③） */
+/* URL 直达：?view=orders|demands&f=all|7d|30d（服务广场引导条入口③；orders 视图=解锁记录） */
 (function(){
   try{
     var p=new URLSearchParams(location.search);

@@ -175,6 +175,31 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .pl-state:hover { color: var(--text-2); background: var(--bg-card-2); }
   .pl-state .ic { display: none; }
 
+  /* 搜索 + 折叠工具条 */
+  .pv-nav-tools { padding: 6px 16px 10px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .nav-search { position: relative; display: flex; align-items: center; gap: 7px; padding: 7px 10px; background: var(--bg-card-2); border: 1px solid var(--line); border-radius: var(--r-s); transition: border-color var(--d-fast); }
+  .nav-search:focus-within { border-color: var(--primary); }
+  .nav-search svg { width: 14px; height: 14px; color: var(--text-3); flex: none; }
+  .nav-search input { flex: 1; border: 0; background: transparent; outline: 0; font-size: 12.5px; color: var(--text-1); min-width: 0; }
+  .nav-search input::placeholder { color: var(--text-3); }
+  .nav-search-clear, #nav-search-clear { flex: none; width: 18px; height: 18px; border: 0; background: var(--bg-card); color: var(--text-3); border-radius: 50%; cursor: pointer; font-size: 11px; line-height: 1; }
+  .nav-tools-btns { display: flex; gap: 6px; }
+  .nav-tools-btns button { flex: 1; padding: 5px 0; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); font-size: 11.5px; border-radius: var(--r-s); cursor: pointer; transition: all var(--d-fast); }
+  .nav-tools-btns button:hover { border-color: var(--primary); color: var(--primary-dim); }
+
+  /* 组数量角标 */
+  .g-name .g-count { margin-left: auto; font-size: 10px; font-weight: 500; color: var(--text-3); background: var(--bg-card-2); padding: 1px 7px; border-radius: 999px; letter-spacing: 0; }
+
+  /* 路径默认弱化，悬停行时才显出来 */
+  .pl .pl-path { opacity: .35; }
+  .pl:hover .pl-path, .pl.on .pl-path { opacity: .8; }
+
+  /* 搜索态：命中高亮，未命中隐藏 */
+  .pv-nav.filtering .pv-group, .pv-nav.filtering .pl-parent, .pv-nav.filtering .pl-kids { transition: none; }
+  .pv-nav .pl.search-hide, .pv-nav .pv-group.search-hide { display: none !important; }
+  .pv-nav .pl.mark .pl-name { color: var(--primary-dim); font-weight: 700; }
+  .nav-empty { padding: 24px 16px; text-align: center; color: var(--text-3); font-size: 12px; }
+
   /* ---- 右侧设备 ---- */
   .pv-stage { flex: 1; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 44px; padding: 40px 40px 120px; background: radial-gradient(1100px 720px at 50% -18%, rgba(201, 169, 97, .12), transparent 55%), radial-gradient(900px 600px at 88% 110%, rgba(201, 169, 97, .06), transparent 60%), var(--bg-alp); }
   .device { transform: scale(.82); transform-origin: top center; margin-bottom: -96px; }
@@ -447,6 +472,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="nh-badge nh-admin" id="nh-admin">后台 0</span>
         </div>
       </div>
+      <!-- 搜索 + 折叠控制 -->
+      <div class="pv-nav-tools">
+        <div class="nav-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="nav-search" placeholder="搜索页面名 / 路径…" autocomplete="off">
+          <button type="button" id="nav-search-clear" title="清空" hidden>✕</button>
+        </div>
+        <div class="nav-tools-btns">
+          <button type="button" id="nav-expand-all" title="全部展开">展开</button>
+          <button type="button" id="nav-collapse-all" title="全部收起">收起</button>
+        </div>
+      </div>
 
       <nav class="pv-nav" id="pv-nav"></nav>
     </div>
@@ -607,8 +644,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     ]},
     { name:'发布', pages:[
       { name:'信息工作台', src:'pages/publish/index.html', children:[
-        ['pages/publish/editor.html?role=demand','发布需求·编辑'],
-        ['pages/publish/editor.html?role=supply','发布供应·编辑'],
+        ['pages/publish/choose.html','① 选择发布类型（新入口）'],
+        ['pages/publish/editor.html?role=demand','发布需求·编辑（旧·无类型）'],
+        ['pages/publish/editor.html?role=supply','发布供应·编辑（旧·无类型）'],
         ['pages/publish/records.html','我的发布'],
         ['pages/publish/drafts.html','草稿箱'],
         ['pages/publish/unlocked.html','已解锁线索'],
@@ -627,7 +665,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     ]},
     { name:'消息', pages:[
       { name:'会话列表', src:'pages/message/index.html', children:[
-        ['pages/message/chat.html','聊天窗口']
+        ['pages/message/chat.html','聊天窗口'],
+        ['pages/message/complaint.html','投诉与举报'],
+        ['pages/message/phrases.html','常用话术']
       ]},
       ['pages/message/system.html','系统消息']
     ]},
@@ -915,6 +955,117 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (collapsed.indexOf(p.dataset.src) > -1) p.classList.add('collapsed');
     });
   })();
+
+  /* ---- 组数量角标 ---- */
+  (function addGroupCounts(){
+    nav.querySelectorAll('.pv-group').forEach(function(g){
+      var cnt = g.querySelectorAll('.pl:not(.pl-state)').length;
+      var gn = g.querySelector('.g-name');
+      if (gn && cnt > 0) {
+        var b = document.createElement('span');
+        b.className = 'g-count';
+        b.textContent = cnt;
+        gn.appendChild(b);
+      }
+    });
+  })();
+
+  /* ---- 搜索过滤 ---- */
+  (function navSearch(){
+    var box = document.getElementById('nav-search');
+    var clear = document.getElementById('nav-search-clear');
+    if (!box) return;
+    function apply(q){
+      q = (q||'').trim().toLowerCase();
+      if (clear) clear.hidden = !q;
+      if (!q) {
+        nav.classList.remove('filtering');
+        nav.querySelectorAll('.search-hide,.mark,.nav-empty').forEach(function(n){n.classList.remove('search-hide','mark');});
+        var e = nav.querySelector('.nav-empty'); if (e) e.remove();
+        return;
+      }
+      nav.classList.add('filtering');
+      /* 先清状态 */
+      nav.querySelectorAll('.search-hide,.mark,.nav-empty').forEach(function(n){n.classList.remove('search-hide','mark');});
+      /* 第一遍：所有 .pl 先标记 search-hide */
+      nav.querySelectorAll('.pl').forEach(function(pl){ pl.classList.add('search-hide'); });
+      /* 第二遍：命中项移除 search-hide、加 mark，并把祖先链全部显示 + 展开 */
+      var hitCount = 0;
+      nav.querySelectorAll('.pv-group').forEach(function(g){
+        var groupHit = false;
+        g.querySelectorAll('.pl').forEach(function(pl){
+          var name = (pl.dataset.name||'').toLowerCase();
+          var path = (pl.dataset.src||'').toLowerCase();
+          if (name.indexOf(q)>-1 || path.indexOf(q)>-1) {
+            pl.classList.remove('search-hide');
+            pl.classList.add('mark');
+            groupHit = true; hitCount++;
+            var p = pl.parentElement;
+            while (p && p !== g) {
+              if (p.classList) {
+                if (p.classList.contains('pl-kids')) {
+                  var parent = p.previousElementSibling;
+                  if (parent && parent.classList.contains('pl-parent')) {
+                    parent.classList.remove('collapsed');
+                    parent.classList.remove('search-hide');
+                  }
+                }
+              }
+              p = p.parentElement;
+            }
+          }
+        });
+        if (!groupHit) g.classList.add('search-hide');
+      });
+      var old = nav.querySelector('.nav-empty'); if (old) old.remove();
+      if (!hitCount) {
+        var d = document.createElement('div');
+        d.className = 'nav-empty';
+        d.textContent = '没有匹配「' + q + '」的页面';
+        nav.appendChild(d);
+      }
+    }
+    box.addEventListener('input', function(){ apply(this.value); });
+    if (clear) clear.addEventListener('click', function(){ box.value=''; apply(''); box.focus(); });
+  })();
+
+  /* ---- 全部展开 / 收起 ---- */
+  (function navTools(){
+    var ex = document.getElementById('nav-expand-all');
+    var co = document.getElementById('nav-collapse-all');
+    function persist(){
+      var arr = [];
+      document.querySelectorAll('.pl-parent.collapsed').forEach(function(p){ arr.push(p.dataset.src); });
+      try { localStorage.setItem('engchain-nav-collapse', JSON.stringify(arr)); } catch(e){}
+    }
+    if (ex) ex.addEventListener('click', function(){
+      document.querySelectorAll('.pl-parent').forEach(function(p){ p.classList.remove('collapsed'); });
+      persist();
+    });
+    if (co) co.addEventListener('click', function(){
+      document.querySelectorAll('.pl-parent').forEach(function(p){ p.classList.add('collapsed'); });
+      persist();
+    });
+  })();
+
+  /* ---- 自动展开并滚动到当前选中项 ---- */
+  (function revealActive(){
+    setTimeout(function(){
+      var on = nav.querySelector('.pl.on');
+      if (!on) return;
+      /* 展开父链 */
+      var p = on.parentElement;
+      while (p && !p.classList.contains('pv-nav')) {
+        if (p.classList && p.classList.contains('pl-kids')) {
+          var parent = p.previousElementSibling;
+          if (parent && parent.classList.contains('pl-parent')) parent.classList.remove('collapsed');
+        }
+        p = p.parentElement;
+      }
+      on.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }, 60);
+  })();
+
   /* 复制页面地址：命名（地址） */
   function copyText(text) {
     function fallback() {

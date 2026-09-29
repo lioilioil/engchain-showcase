@@ -57,7 +57,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="seg" style="margin:12px 14px 8px;">
     <span class="seg-item is-on" data-tab="all">全部</span>
     <span class="seg-item" data-tab="normal">普通订单</span>
-    <span class="seg-item" data-tab="mediation">中介托管</span>
   </div>
 
   <!-- 状态筛选 chips（E3-15） -->
@@ -150,24 +149,8 @@ function currentUser() {
     });
   }
 
-  /* 读取中介托管订单（engchain-mediation-orders via Mediation.list），过滤当前用户 */
-  function getMediationOrders() {
-    if (!window.Mediation) return [];
-    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-    var uid = me ? me.id : '';
-    var list = Mediation.list({ uid: uid });
-    return list.map(function (o) {
-      var sellerName = '';
-      try { var su = DataBus.byId(o.sellerId); if (su) sellerName = su.name || su.company || o.sellerId; } catch (e) {}
-      return {
-        kind: 'mediation', id: o.id, title: o.title || o.svcName || '中介服务订单',
-        type: '中介托管', rawType: 'agency', counterparty: sellerName || o.svcName || '',
-        amount: o.amount, status: o.state,
-        ts: o.createdAt || o.updatedAt || 0,
-        detailUrl: '../agency/order-detail.html?id=' + o.id
-      };
-    });
-  }
+  /* [PHASE 0] 中介托管已下线：平台不再承接中介交易资金，订单中心不展示托管单 */
+  function getMediationOrders() { return []; }
 
   /* [PERF] 防抖工具 */
   function debounce(fn, wait) {
@@ -199,7 +182,6 @@ function currentUser() {
       var _all = [];
       try {
         if (currentTab === 'all' || currentTab === 'normal') _all = _all.concat(getNormalOrders());
-        if (currentTab === 'all' || currentTab === 'mediation') _all = _all.concat(getMediationOrders());
       } catch (e) { console.warn('订单数据读取失败:', e); }
       _orderCache = _all;
     }
@@ -214,7 +196,7 @@ function currentUser() {
     if (!all.length) {
       list.innerHTML = '';
       empty.style.display = 'block';
-      var tip = currentTab === 'mediation' ? '暂无中介托管订单' : (currentTab === 'normal' ? '暂无普通订单' : '暂无订单');
+      var tip = currentTab === 'normal' ? '暂无普通订单' : '暂无订单';
       empty.innerHTML = emptyIcon() +
         '<div style="font-weight:600;color:var(--text-1);">' + tip + '</div>' +
         '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;align-items:center;">' +

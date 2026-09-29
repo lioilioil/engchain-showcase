@@ -108,12 +108,13 @@ window.DETAIL = (function () {
       if (bizKey === 'trade') return 30;
       return -1;
     },
-    /* 免费/不设锁类别：企业招聘 personnel（投递流程替代付费墙）、publish；
-       中介服务 agency（免费留资咨询）— 不需付费但需留资后才能查看联系方式，故不直接归入isFree免解锁 */
+    /* 免费/不设锁类别：企业招聘 personnel（投递流程替代付费墙）、publish。
+       [PHASE 0] 中介服务 agency 由「免费留资咨询」改为「积分解锁联系方式」（与其他供需板块一致），
+       解锁消耗积分并记录于 UnlockStore，判定逻辑与主板块相同。 */
     isFree: function (bizKey) { return bizKey === 'personnel' || bizKey === 'publish'; },
     isUnlocked: function (rec) {
       if (!rec) return false;
-      /* personnel/publish完全免费，直接解锁；agency需留资后才能解锁，走UnlockStore记录判定 */
+      /* personnel/publish完全免费，直接解锁；agency 积分解锁后按记录判定（与主板块一致） */
       if (this.isFree(rec.bizKey)) return true;
       var rec0 = this._read()[this._key(rec)];
       if (!rec0) return false;
@@ -937,18 +938,18 @@ window.DETAIL = (function () {
         '</div></div>';
     }).join('') + '</div>';
   }
-  /* 机构联系卡：信息全免费，仅联系方式在「免费提交咨询需求」后原地开放 */
+  /* 机构联系卡：比价信息免费，联系方式积分解锁后原地开放（[PHASE 0] 纯信息撮合） */
   function agencyContact(r, c, locked) {
     var ac = r.contact || {};
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
     return '<div class="contact-card">' +
       '<div class="cc-list">' +
         row('服务顾问', cfgText(ac.name || '专属顾问'), ccAction('contact', ac.name || '', locked)) +
-        row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">免费咨询后可见完整号码</span>') : ac.phone, ccAction('phone', ac.phone || '', locked)) +
-        row('微信号', locked ? '<span style="color:var(--text-3)">扫码或免费咨询后获取</span>' : ac.wechat, ccAction('copy', ac.wechat || '', locked)) +
-        row('机构地址', locked ? (cfgText(r.location) + ' · <span style="font-size:10px;color:var(--text-4)">免费咨询后可见详细地址</span>') : (ac.addr || r.location), ccAction('nav', ac.addr || r.location || '', locked)) +
+        row('咨询电话', locked ? (Lock.partialPhone(ac.phone || '') + ' <span style="font-size:10px;color:var(--text-4)">解锁后可见完整号码</span>') : ac.phone, ccAction('phone', ac.phone || '', locked)) +
+        row('微信号', locked ? '<span style="color:var(--text-3)">解锁后获取</span>' : ac.wechat, ccAction('copy', ac.wechat || '', locked)) +
+        row('机构地址', locked ? (cfgText(r.location) + ' · <span style="font-size:10px;color:var(--text-4)">解锁后可见详细地址</span>') : (ac.addr || r.location), ccAction('nav', ac.addr || r.location || '', locked)) +
       '</div>' +
-      '<div class="pw-inline" data-pw-unlock style="background:var(--success-soft);border:1px solid rgba(43,107,79,.2);"><div class="pw-inline-l"><div class="pw-inline-ic" style="background:rgba(43,107,79,.12);color:var(--success);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div><div class="pw-inline-t" style="color:var(--success);">免费提交咨询需求后查看联系方式</div><div class="pw-inline-s">专属顾问 1 对 1 · 电话 / 微信 · 全程不收取信息费</div></div></div><div class="pw-inline-price" style="color:var(--success);">免费咨询</div></div>' +
+      Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 详细地址 · 办理方案与报价单', unlockCreditText(r)) + /* [PHASE 0] 积分解锁联系方式（与主板块一致） */
       '</div>';
   }
   function agencyBody(r, c) {
@@ -1726,7 +1727,7 @@ window.DETAIL = (function () {
     return v >= 10000 ? (' ¥' + (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万') : (' ¥' + v.toLocaleString());
   }
   byType.agency = {
-    label: '中介服务', cta: '立即咨询', ctaLocked: '立即咨询', consultMode: true, inlineLock: true, verified: '机构已认证',
+    label: '中介服务', cta: '解锁联系方式', ctaLocked: '解锁联系方式', inlineLock: true, verified: '机构已认证',
     hero: function (r, c) {
       var d = dirTag(r.dir);
       var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '机构已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: oppMeta(r) });
@@ -1740,12 +1741,13 @@ window.DETAIL = (function () {
       } catch (e) {}
       if (r.successRate != null) chips.push('成功率 ' + r.successRate + '%');
       if (r.rating != null) chips.push('评分 ' + Number(r.rating).toFixed(1));
-      chips.push('不过退款');
+      chips.push('解锁后联系');
       return base + '<div class="hero-grade"><span class="hg-label">服务速览</span><div class="hg-list">' +
         chips.map(function (x) { return '<span class="tag tag-gold">' + x + '</span>'; }).join('') + '</div></div>';
     },
     sections: function (r, c) { return agencyBody(r, c); },
-    ctaText: function (r, unlocked) { if (window.__AGENCY_MARKET__) return '在线下单' + agencyOrderAmountText(r); return unlocked ? '电话咨询服务顾问' : '立即咨询'; },
+    /* [PHASE 0] 在线下单下线：统一积分解锁联系方式（比价免费，解锁微支付；平台不参与交易） */
+    ctaText: function (r, unlocked) { return unlocked ? '联系服务商 · 信息已解锁' : '解锁联系方式 · 查看报价单'; },
     unlockItems: function () { return ['服务顾问完整电话与微信', '机构详细地址', '一对一办理方案与报价单', '材料模板与合同范本']; },
     lockRows: function () { return []; }
   };
@@ -2108,7 +2110,7 @@ window.DETAIL = (function () {
     lockRows: function () { return []; }
   };
   /* ---- 联系方式锁定区 (统一 · 单次价格解锁) ---- */
-  /* M3：积分体系单条成本（R3/R4）。trade=保证金不走积分；agency/personnel=免费留资/投递；
+  /* M3：积分体系单条成本（R3/R4）。trade=保证金不走积分；[PHASE 0] agency=积分解锁；personnel=免费投递；
      franchise=资质招商分级积分（t1 49/t2 39/t3 29，按招商子类映射）；其余按 credits.consume 扣积分 */
   function franchiseTier(rec) {
     var sub = (rec && (rec.sub || rec.cat)) || '';
@@ -2121,7 +2123,9 @@ window.DETAIL = (function () {
     var key = rec && rec.bizKey;
     if (key === 'talent') return { price: cons.talent || 29, original: null, tiered: false, mode: 'credit' };
     if (key === 'trade') return { price: (MOCK.business.credits || {}).tradeDeposit || 5000, original: null, tiered: false, mode: 'deposit' };
-    if (key === 'agency' || key === 'personnel') return { price: 0, original: null, tiered: false, mode: 'free' };
+    /* [PHASE 0] agency 由免费留资改为积分解锁（98 积分，与主板块一致）；personnel 保持免费投递 */
+    if (key === 'personnel') return { price: 0, original: null, tiered: false, mode: 'free' };
+    if (key === 'agency') return { price: cons.agency || 98, original: null, tiered: false, mode: 'credit' };
     if (key === 'franchise') {
       var ft = cons.franchise || { t1: { price: 49, original: 99 }, t2: { price: 39, original: 79 }, t3: { price: 29, original: 59 } };
       var tk = franchiseTier(rec); var tier = ft[tk] || ft.t1;

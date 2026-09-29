@@ -5172,7 +5172,11 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   }
 
   var cfg = loadCfg();
-  var dockGlass = null;
+
+  /* 挂载目标：主 tabbar（.app-tabbar）+ 其他声明 data-lg-glass 的容器（如信息工作台发布栏）。
+     全部共用同一份 cfg 与 <html data-theme> 联动 → 各实例参数完全同源一致，
+     任一处调参（preview 面板 / LG_TABBAR.setCfg / localStorage）全部同步。 */
+  var TARGETS = ['.app-tabbar', '[data-lg-glass]'];
 
   function isDark() {
     return document.documentElement.getAttribute('data-theme') === 'dark';
@@ -5188,28 +5192,37 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   }
 
   function mount() {
-    var tabbar = document.querySelector('.app-tabbar');
-    if (!tabbar || dockGlass) return false;
-    try {
-      dockGlass = new LiquidGlass(tabbar, {
-        tint: params().tint,
-        tintTone: params().tintTone,
-        frost: params().frost,
-        live: 'auto'
+    var added = false;
+    TARGETS.forEach(function (sel) {
+      var els = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(els, function (el) {
+        if (LiquidGlass.from(el)) return;
+        try {
+          new LiquidGlass(el, {
+            tint: params().tint,
+            tintTone: params().tintTone,
+            frost: params().frost,
+            live: 'auto'
+          });
+          added = true;
+        } catch (e) {
+          console.warn('[glass-tabbar] init failed on ' + sel + ':', e);
+        }
       });
-      return true;
-    } catch (e) {
-      console.warn('[glass-tabbar] init failed:', e);
-      return false;
-    }
+    });
+    return added;
   }
 
   function apply() {
-    if (!dockGlass) return;
-    try {
-      dockGlass.update(params());
-      LiquidGlass.refreshAll();
-    } catch (e) {}
+    TARGETS.forEach(function (sel) {
+      var els = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(els, function (el) {
+        var g = LiquidGlass.from(el);
+        if (!g) return;
+        try { g.update(params()); } catch (e) {}
+      });
+    });
+    try { LiquidGlass.refreshAll(); } catch (e) {}
   }
 
   function boot() {
