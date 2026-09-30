@@ -139,12 +139,38 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   .pv-group { margin-bottom: 14px; }
   .pv-group .g-name { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin: 4px 2px 6px; }
-  .pv-group .g-name::before { content: ""; width: 3px; height: 10px; background: var(--primary); border-radius: 1px; }
+  .pv-group .g-name > svg { width: 14px; height: 14px; flex: none; color: var(--primary); opacity: .92; display: block; }
   .pv-group .links { display: flex; flex-direction: column; gap: 2px; }
   .pl { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-s); color: var(--text-2); font-size: 13px; cursor: pointer; transition: background var(--d-fast), color var(--d-fast); }
   .pl:hover { background: var(--bg-card-2); color: var(--text-1); }
   .pl.on { background: var(--primary-soft); color: var(--primary-dim); font-weight: 600; }
-  .pl .ic { opacity: .75; }
+  /* 目录树条目图标：主页面(金色层级) / 子页面(中性文档) / 状态页(成功色旗帜) / 普通叶子(中性单页) */
+  .pl .ic { width: 15px; height: 15px; flex: none; display: inline-flex; align-items: center; justify-content: center; color: var(--text-3); opacity: .9; transition: color var(--d-fast), transform var(--d-fast); }
+  .pl .ic svg { width: 15px; height: 15px; display: block; }
+  .pl-parent .ic { color: var(--primary-dim); }
+  .pl-sub .ic { width: 13px; height: 13px; margin-left: 2px; }
+  .pl-sub .ic svg { width: 13px; height: 13px; }
+  .pl-stateicon .ic { color: var(--success); }
+  .pl .ic.flash { animation: plIcoFlash .65s ease; color: var(--primary); }
+  @keyframes plIcoFlash { 0%, 100% { transform: scale(1); } 35% { transform: scale(1.4); } }
+
+  /* 悬停简介 tooltip：position:fixed 由 JS 定位，避开侧栏 overflow 裁剪；仅 CSS 呈现，不依赖原生 title */
+  .pl-tip {
+    position: fixed; z-index: 30000; pointer-events: none;
+    min-width: 190px; max-width: 330px;
+    padding: 9px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-l);
+    box-shadow: var(--shadow-xl);
+    font-size: 11.5px; line-height: 1.6; color: var(--text-2);
+    opacity: 0; visibility: hidden; transform: translateY(-4px);
+    transition: opacity var(--d-fast), transform var(--d-fast), visibility var(--d-fast);
+  }
+  .pl-tip.show { opacity: 1; visibility: visible; transform: translateY(0); }
+  .pl-tip .tt-name { font-size: 12px; font-weight: 700; color: var(--text-1); }
+  .pl-tip .tt-desc { margin-top: 2px; }
+  .pl-tip .tt-path { margin-top: 4px; font-family: var(--font-num); font-size: 10px; color: var(--text-3); word-break: break-all; }
   .pl .pl-name { flex: none; min-width: 0; white-space: nowrap; }
   .pl .pl-right { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
   .pl .pl-path { flex: 0 1 auto; min-width: 0; max-width: 100%; font-family: var(--font-num); font-size: 10.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .78; transition: color var(--d-fast); }
@@ -604,289 +630,289 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var THEME_KEY = 'engchain-theme';
 
   /* ---- 页面分组（支持父子二级，父节点可折叠；页数由 countPages() 动态统计） ---- */
-  var MODULES = [
+    var MODULES = [
     { name:'工作台', pages:[
-      ['home.html','App首页'],
-      ['index.html','App首页·认证引导']
+      ['home.html', 'App首页', 'App 首页 · 工作台总览'],
+      ['index.html', '认证引导', '认证引导 · App 首页的游客认证引导态'],
     ]},
     { name:'共创计划', pages:[
-      ['pages/co-create/index.html','共创者计划·破冰期']
+      ['pages/co-create/index.html', '共创者计划', '共创者计划 · 破冰期演示页'],
     ]},
     { name:'供需·匹配', pages:[
-      { name:'发现·首页', src:'pages/supply/list.html', children:[
-        ['pages/supply/detail.html?id=1001','详情·材料采购'],
-        ['pages/supply/detail.html?id=1009','详情·材料供应'],
-        ['pages/supply/detail.html?id=1004','详情·劳务用工'],
-        ['pages/supply/detail.html?id=1005','详情·设备租赁'],
-        ['pages/supply/detail.html?id=cp1','详情·建筑合作'],
-        ['pages/supply/detail.html?id=a1','详情·中介服务']
-      ]}
+      { name:'发现·首页', src:'pages/supply/list.html', desc:'发现 · 供需列表首页', children:[
+        ['pages/supply/detail.html?id=1001', '详情·材料采购', '供需详情 · 材料采购（id=1001）'],
+        ['pages/supply/detail.html?id=1009', '详情·材料供应', '供需详情 · 材料供应（id=1009）'],
+        ['pages/supply/detail.html?id=1004', '详情·劳务用工', '供需详情 · 劳务用工（id=1004）'],
+        ['pages/supply/detail.html?id=1005', '详情·设备租赁', '供需详情 · 设备租赁（id=1005）'],
+        ['pages/supply/detail.html?id=cp1', '详情·建筑合作', '供需详情 · 建筑合作（id=cp1）'],
+        ['pages/supply/detail.html?id=a1', '详情·中介服务', '供需详情 · 中介服务（id=a1）'],
+      ]},
     ]},
     { name:'资源·机会', pages:[
-      { name:'资质招商·首页', src:'pages/franchise/index.html', children:[
-        ['pages/supply/detail.html?id=fc1','资质招商·企业详情'],
-        ['pages/franchise/delegate-edit.html','委托编辑'],
+      { name:'资质招商·首页', src:'pages/franchise/index.html', desc:'资质招商', children:[
+        ['pages/supply/detail.html?id=fc1', '资质招商·企业详情', '供需详情 · 企业详情（id=fc1）'],
+        ['pages/franchise/delegate-edit.html', '修改委托', '修改委托 · 资质招商'],
       ]},
-      { name:'建企买卖·首页', src:'pages/trade/index.html', children:[
-        ['pages/supply/detail.html?id=t1','企业买卖·M&A']
+      { name:'建企买卖·首页', src:'pages/trade/index.html', desc:'建企买卖', children:[
+        ['pages/supply/detail.html?id=t1', '企业买卖·M&A', '供需详情 · M&A（id=t1）'],
       ]},
-      { name:'人员招聘·首页', src:'pages/personnel/index.html', children:[
-        ['pages/supply/detail.html?id=p1','企业招聘·需求详情'],
-        ['pages/supply/detail.html?id=talent1','人才详情·一级建造师']
-      ]}
+      { name:'人员招聘·首页', src:'pages/personnel/index.html', desc:'人员招聘', children:[
+        ['pages/supply/detail.html?id=p1', '企业招聘·需求详情', '供需详情 · 需求详情（id=p1）'],
+        ['pages/supply/detail.html?id=talent1', '人才详情·一级建造师', '供需详情 · 一级建造师（id=talent1）'],
+      ]},
     ]},
     { name:'认证卡', pages:[
-      ['pages/company/index.html?id=c-znzjs','企业认证主页'],
-      ['pages/personal/index.html?id=p-jzs1','个人认证主页']
+      ['pages/company/index.html?id=c-znzjs', '企业认证主页', '企业主页（id=c-znzjs）'],
+      ['pages/personal/index.html?id=p-jzs1', '个人认证主页', '个人主页（id=p-jzs1）'],
     ]},
     { name:'行业', pages:[
-      ['pages/industry/index.html','行业总览']
+      ['pages/industry/index.html', '行业总览', '行业总览'],
     ]},
     { name:'发布', pages:[
-      { name:'信息工作台', src:'pages/publish/index.html', children:[
-        ['pages/publish/choose.html','① 选择发布类型（新入口）'],
-        ['pages/publish/editor.html?role=demand','发布需求·编辑（旧·无类型）'],
-        ['pages/publish/editor.html?role=supply','发布供应·编辑（旧·无类型）'],
-        ['pages/publish/records.html','我的发布'],
-        ['pages/publish/drafts.html','草稿箱'],
-        ['pages/publish/unlocked.html','已解锁线索'],
-        ['pages/publish/success.html','发布成功']
-      ]}
+      { name:'信息工作台', src:'pages/publish/index.html', desc:'信息工作台', children:[
+        ['pages/publish/choose.html', '选择发布类型', '发布什么 · 新入口，先选择发布类型'],
+        ['pages/publish/editor.html?role=demand', '发布需求·编辑', '发布信息 · 需求发布编辑页（旧版无类型）'],
+        ['pages/publish/editor.html?role=supply', '发布供应·编辑', '发布信息 · 供应发布编辑页（旧版无类型）'],
+        ['pages/publish/records.html', '我的发布', '我的发布'],
+        ['pages/publish/drafts.html', '草稿箱', '草稿箱'],
+        ['pages/publish/unlocked.html', '已解锁线索', '已解锁线索'],
+        { name:'发布成功', src:'pages/publish/success.html', stateIcon:true, desc:'发布成功' },
+      ]},
     ]},
     { name:'搜索中心', pages:[
-      { name:'全局搜索', src:'pages/search/index.html?v=global', children:[
-        ['pages/search/index.html?v=global&q=混凝土','搜索结果·分类展示']
+      { name:'全局搜索', src:'pages/search/index.html?v=global', desc:'搜索中心（v=global）', children:[
+        ['pages/search/index.html?v=global&q=混凝土', '搜索结果·分类展示', '搜索中心 · 分类展示（v=global&q=混凝土）'],
       ]},
-      { name:'业务搜索', src:'pages/search/index.html?v=business&b=franchise', children:[
-        ['pages/search/index.html?v=business&b=trade','建企买卖搜索'],
-        ['pages/search/index.html?v=business&b=personnel','人员招聘搜索']
+      { name:'业务搜索', src:'pages/search/index.html?v=business&b=franchise', desc:'搜索中心（v=business&b=franchise）', children:[
+        ['pages/search/index.html?v=business&b=trade', '建企买卖搜索', '搜索中心（v=business&b=trade）'],
+        ['pages/search/index.html?v=business&b=personnel', '人员招聘搜索', '搜索中心（v=business&b=personnel）'],
       ]},
-      ['pages/search/index.html?v=enterprise','企业查询·双模式'],
-      ['pages/search/index.html?v=agency','服务广场搜索']
+      ['pages/search/index.html?v=enterprise', '企业查询·双模式', '搜索中心 · 双模式（v=enterprise）'],
+      ['pages/search/index.html?v=agency', '服务广场搜索', '搜索中心（v=agency）'],
     ]},
     { name:'匹配', pages:[
-      ['pages/match/preferences.html','匹配偏好设置']
+      ['pages/match/preferences.html', '匹配偏好设置', '匹配偏好 · 供需匹配偏好设置'],
     ]},
     { name:'消息', pages:[
-      { name:'会话列表', src:'pages/message/index.html', children:[
-        ['pages/message/chat.html','聊天窗口'],
-        ['pages/message/complaint.html','投诉与举报'],
-        ['pages/message/phrases.html','常用话术']
+      { name:'会话列表', src:'pages/message/index.html', desc:'消息', children:[
+        ['pages/message/chat.html', '聊天窗口', '聊天'],
+        ['pages/message/complaint.html', '投诉与举报', '投诉 / 举报'],
+        ['pages/message/phrases.html', '常用话术', '常用语'],
       ]},
-      ['pages/message/system.html','系统消息']
+      ['pages/message/system.html', '系统消息', '系统消息'],
     ]},
     { name:'钱包', pages:[
-      ['pages/wallet/index.html','钱包·首页'],
-      ['pages/wallet/credits.html','积分账户·充值解锁'],
-      ['pages/wallet/credits-mall.html','积分商城'],
-      ['pages/wallet/credits-rules.html','积分规则'],
-      ['pages/wallet/membership.html','会员中心'],
-      ['pages/wallet/recharge.html','余额充值'],
-      ['pages/wallet/withdraw.html','提现'],
-      ['pages/wallet/bank-cards.html','银行卡'],
-      ['pages/wallet/payment-method.html','支付方式'],
-      ['pages/wallet/escrow.html','托管资金'],
-      ['pages/wallet/free-quota.html','免费额度'],
-      ['pages/wallet/unlock-records.html','解锁记录'],
-      { name:'发票管理', src:'pages/wallet/invoice.html', children:[
-        ['pages/wallet/invoice-record.html','发票详情'],
-        ['pages/wallet/invoice-info.html','开票信息管理'],
-        ['pages/wallet/invoice-info-edit.html','编辑开票信息'],
-        ['pages/wallet/invoice-title-new.html','新增抬头']
+      ['pages/wallet/index.html', '钱包·首页', '我的钱包'],
+      ['pages/wallet/credits.html', '积分账户·充值解锁', '积分充值 · 充值解锁'],
+      ['pages/wallet/credits-mall.html', '积分商城', '积分商城'],
+      ['pages/wallet/credits-rules.html', '积分规则', '积分规则'],
+      ['pages/wallet/membership.html', '会员中心', '年度会员'],
+      ['pages/wallet/recharge.html', '余额充值', '账户充值'],
+      ['pages/wallet/withdraw.html', '提现', '余额提现'],
+      ['pages/wallet/bank-cards.html', '银行卡', '银行卡管理'],
+      ['pages/wallet/payment-method.html', '支付方式', '支付方式'],
+      ['pages/wallet/escrow.html', '托管资金', '资金托管'],
+      ['pages/wallet/free-quota.html', '免费额度', '免费额度'],
+      ['pages/wallet/unlock-records.html', '解锁记录', '解锁记录'],
+      { name:'发票管理', src:'pages/wallet/invoice.html', desc:'发票管理', children:[
+        ['pages/wallet/invoice-record.html', '发票记录', '发票记录'],
+        ['pages/wallet/invoice-info.html', '开票信息管理', '开票信息管理'],
+        ['pages/wallet/invoice-info-edit.html', '编辑开票信息', '编辑开票信息'],
+        ['pages/wallet/invoice-title-new.html', '新增抬头', '新增抬头'],
       ]},
-      { name:'对公转账', src:'pages/wallet/corp-pay.html', children:[]}
+      { name:'对公转账', src:'pages/wallet/corp-pay.html', desc:'对公转账确认', children:[
+      ]},
     ]},
     { name:'个人中心', pages:[
-      { name:'我的·个人中心', src:'pages/profile/index.html', children:[
-        ['pages/profile/my-applies.html','我的投递'],
-        ['pages/profile/resume-edit.html','简历编辑'],
-        ['pages/profile/privacy.html','隐私设置'],
-        ['pages/profile/edit-profile.html','编辑资料'],
-        ['pages/profile/contact.html','联系方式'],
-        ['pages/profile/history.html','浏览历史'],
-        ['pages/profile/delegates.html','我的委托'],
-        ['pages/profile/my-jobs.html','我的职位'],
-        ['pages/profile/edit.html','编辑主页'],
-        ['pages/profile/delegate-detail.html','委托详情'],
-        ['pages/profile/delegate-new.html','新建委托'],
-        ['pages/profile/delegate-edit.html','委托编辑'],
-        ['pages/profile/share.html','分享'],
-        ['pages/profile/all-functions.html','全部功能'],
-        ['pages/profile/org-members.html','企业成员管理'],
-        ['pages/profile/history-files.html','历史文件']
+      { name:'我的·个人中心', src:'pages/profile/index.html', desc:'我的 · 个人中心总览', children:[
+        ['pages/profile/my-applies.html', '我的投递', '我的投递'],
+        ['pages/profile/resume-edit.html', '简历编辑', '编辑简历'],
+        ['pages/profile/privacy.html', '隐私设置', '隐私设置'],
+        ['pages/profile/edit-profile.html', '编辑资料', '编辑资料'],
+        ['pages/profile/contact.html', '联系方式', '联系方式'],
+        ['pages/profile/history.html', '浏览历史', '浏览历史'],
+        ['pages/profile/delegates.html', '我的委托', '我的委托'],
+        ['pages/profile/my-jobs.html', '我的招聘', '我的招聘 · 企业侧招聘与岗位管理'],
+        ['pages/profile/edit.html', '个人资料', '个人资料 · 编辑个人主页资料'],
+        ['pages/profile/delegate-detail.html', '委托详情', '委托详情'],
+        ['pages/profile/delegate-new.html', '新建委托', '新增委托'],
+        ['pages/profile/delegate-edit.html', '修改委托', '修改委托 · 委托单编辑页'],
+        ['pages/profile/share.html', '分享', '我的分享'],
+        ['pages/profile/all-functions.html', '全部功能', '全部功能'],
+        ['pages/profile/org-members.html', '企业成员管理', '企业成员管理'],
+        ['pages/profile/history-files.html', '历史文件', '历史文件'],
       ]},
-      { name:'认证中心', src:'pages/profile/auth.html', children:[
-        ['pages/profile/auth-enterprise.html','企业工商认证'],
-        ['pages/profile/auth-personal.html','个人实名认证'],
-        ['pages/profile/auth-payment.html','资金账户认证'],
-        ['pages/profile/auth-qualification.html','资质认证'],
-        ['pages/profile/auth-result.html','认证结果·成功'],
-        ['pages/profile/auth-result.html?state=reviewing','认证结果·审核中'],
-        ['pages/profile/auth-partner.html','个人合伙人申请'],
-        ['pages/profile/auth-prep.html','认证资料准备'],
-        ['pages/profile/entry.html','企业入驻·三类'],
-        ['pages/profile/entry-form.html?type=construction','入驻申请·建筑'],
-        ['pages/profile/entry-review.html','入驻审核·合伙人'],
-        ['pages/profile/entry-result.html','入驻成功'],
-        ['pages/profile/entry-personal-result.html','个人入驻·结果']
+      { name:'认证中心', src:'pages/profile/auth.html', desc:'认证中心', children:[
+        ['pages/profile/auth-enterprise.html', '企业工商认证', '企业工商认证'],
+        ['pages/profile/auth-personal.html', '个人实名认证', '个人认证'],
+        ['pages/profile/auth-payment.html', '资金账户认证·已迁移', '该功能已迁移 · 资金账户认证已并入入驻付费'],
+        ['pages/profile/auth-qualification.html', '个人入驻·申请', '个人入驻 · 5 步分步简历申请表单'],
+        { name:'认证结果·成功', src:'pages/profile/auth-result.html', stateIcon:true, desc:'认证结果 · 成功' },
+        { name:'认证结果·审核中', src:'pages/profile/auth-result.html?state=reviewing', stateIcon:true, desc:'认证结果 · 审核中（state=reviewing）' },
+        ['pages/profile/auth-partner.html', '个人合伙人申请', '个人合伙人申请'],
+        ['pages/profile/auth-prep.html', '认证资料准备', '资料准备'],
+        ['pages/profile/entry.html', '企业入驻·三类', '企业入驻 · 三类'],
+        ['pages/profile/entry-form.html?type=construction', '入驻申请·建筑', '入驻资料 · 建筑（type=construction）'],
+        { name:'入驻审核·合伙人', src:'pages/profile/entry-review.html', stateIcon:true, desc:'入驻审核 · 审核进度与轨迹（合伙人）' },
+        { name:'入驻成功', src:'pages/profile/entry-result.html', stateIcon:true, desc:'入驻成功' },
+        { name:'个人入驻·结果', src:'pages/profile/entry-personal-result.html', stateIcon:true, desc:'个人入驻 · 结果页' },
       ]},
-      { name:'设置', src:'pages/profile/settings.html', children:[
-        ['pages/profile/general-setting.html','通用设置'],
-        ['pages/profile/security.html','账号与安全'],
-        ['pages/profile/notify.html','送达方式']
+      { name:'设置', src:'pages/profile/settings.html', desc:'设置', children:[
+        ['pages/profile/general-setting.html', '通用设置', '通用设置'],
+        ['pages/profile/security.html', '账号与安全', '账号与安全'],
+        ['pages/profile/notify.html', '送达方式', '送达方式'],
       ]},
-      ['pages/profile/about.html','关于我们·合规资质']
+      ['pages/profile/about.html', '关于我们·合规资质', '关于工程链 · 关于我们与合规资质'],
     ]},
     { name:'分销', pages:[
-      { name:'分销中心', src:'pages/distribution/index.html', children:[
-        ['pages/distribution/earnings.html','收益'],
-        ['pages/distribution/team.html','我的团队'],
-        ['pages/distribution/poster.html','推广海报'],
-        ['pages/distribution/rules.html','分销规则'],
-        ['pages/distribution/withdraw.html','提现'],
-      ]}
+      { name:'分销中心', src:'pages/distribution/index.html', desc:'分销中心', children:[
+        ['pages/distribution/earnings.html', '收益', '收益明细'],
+        ['pages/distribution/team.html', '我的团队', '我的团队'],
+        ['pages/distribution/poster.html', '推广海报', '推广海报'],
+        ['pages/distribution/rules.html', '分销规则', '分销规则'],
+        ['pages/distribution/withdraw.html', '提现', '佣金提现'],
+      ]},
     ]},
     { name:'订单', pages:[
-      { name:'我的订单', src:'pages/order/index.html', children:[
-        ['pages/order/detail.html','订单详情']
-      ]}
+      { name:'我的订单', src:'pages/order/index.html', desc:'我的订单', children:[
+        ['pages/order/detail.html', '订单详情', '订单详情'],
+      ]},
     ]},
     { name:'电子签', pages:[
-      ['pages/esign/index.html','电子签·首页'],
-      { name:'发起签署', src:'pages/esign/choose-type.html', children:[
-        ['pages/esign/template-list.html','合同模板'],
-        ['pages/esign/template-fill.html','填写合同信息'],
-        ['pages/esign/upload.html','上传 PDF 发起'],
-        ['pages/esign/parties.html','添加签署方'],
-        ['pages/esign/fields.html','设置签章位置'],
-        ['pages/esign/preview.html','预览发送']
+      ['pages/esign/index.html', '电子签·首页', '电子签'],
+      { name:'发起签署', src:'pages/esign/choose-type.html', desc:'发起合同 · 选择签署发起方式', children:[
+        ['pages/esign/template-list.html', '合同模板', '合同模板'],
+        ['pages/esign/template-fill.html', '填写合同信息', '填写合同内容'],
+        ['pages/esign/upload.html', '上传 PDF 发起', '上传合同'],
+        ['pages/esign/parties.html', '添加签署方', '添加签署方'],
+        ['pages/esign/fields.html', '设置签章位置', '确认盖章位置'],
+        ['pages/esign/preview.html', '预览发送', '确认并发送'],
       ]},
-      ['pages/esign/detail.html','合同详情'],
-      ['pages/esign/sign.html','我要签署'],
-      ['pages/esign/h5-sign.html','H5 签署·对方端'],
-      ['pages/esign/records.html','购买记录'],
-      ['pages/esign/packages.html','购买次数'],
-      ['pages/esign/agreement.html','服务协议与免责声明'],
-      ['pages/esign/refund.html','申请退款']
+      ['pages/esign/detail.html', '合同详情', '合同详情'],
+      ['pages/esign/sign.html', '我要签署', '签署合同'],
+      ['pages/esign/h5-sign.html', 'H5 签署·对方端', '合同签署 · 电子签 · 对方端'],
+      ['pages/esign/records.html', '购买记录', '购买记录'],
+      ['pages/esign/packages.html', '购买次数', '购买签署次数'],
+      ['pages/esign/agreement.html', '服务协议与免责声明', '服务协议与免责声明'],
+      ['pages/esign/refund.html', '申请退款', '申请退款'],
     ]},
     { name:'中介服务', pages:[
-      { name:'服务广场', src:'pages/agency/index.html', children:[
-        ['pages/agency/order.html?svcId=a1','在线下单·资质升级'],
-        ['pages/agency/order.html?svcId=a2','在线下单·工商注册'],
-        ['pages/agency/order.html?svcId=a3','在线下单·安许代办'],
-        ['pages/agency/order.html?svcId=a4','在线下单·资质分立'],
-        ['pages/agency/order.html?svcId=a5','在线下单·工程担保'],
-        ['pages/agency/order.html?svcId=a6','在线下单·造价咨询'],
-        ['pages/agency/order.html?svcId=a7','在线下单·劳务派遣'],
-        ['pages/agency/my-orders.html','我的单（买方订单）'],
-        ['pages/agency/order-detail.html','订单详情'],
-        ['pages/agency/seller-board.html','服务商工作台'],
-        ['pages/agency/demo-reset.html','演示重置'],
-        /* ↓ 以下为服务广场单页内状态/弹层，列项展示但不计入页面统计 */
-      ]}
+      { name:'服务广场', src:'pages/agency/index.html', desc:'服务广场', children:[
+        ['pages/agency/order.html?svcId=a1', '在线下单·资质升级', '联系服务商 · 资质升级（svcId=a1）'],
+        ['pages/agency/order.html?svcId=a2', '在线下单·工商注册', '联系服务商 · 工商注册（svcId=a2）'],
+        ['pages/agency/order.html?svcId=a3', '在线下单·安许代办', '联系服务商 · 安许代办（svcId=a3）'],
+        ['pages/agency/order.html?svcId=a4', '在线下单·资质分立', '联系服务商 · 资质分立（svcId=a4）'],
+        ['pages/agency/order.html?svcId=a5', '在线下单·工程担保', '联系服务商 · 工程担保（svcId=a5）'],
+        ['pages/agency/order.html?svcId=a6', '在线下单·造价咨询', '联系服务商 · 造价咨询（svcId=a6）'],
+        ['pages/agency/order.html?svcId=a7', '在线下单·劳务派遣', '联系服务商 · 劳务派遣（svcId=a7）'],
+        ['pages/agency/my-orders.html', '我的单（买方订单）', '我的单'],
+        ['pages/agency/order-detail.html', '订单详情', '中介服务 · 买方订单详情'],
+        ['pages/agency/seller-board.html', '服务商工作台', '服务商工作台'],
+        ['pages/agency/demo-reset.html', '演示重置', '演示重置'],
+      ]},
     ]},
     { name:'企业监控', pages:[
-      ['pages/monitor/index.html','企业监控·风险雷达']
+      ['pages/monitor/index.html', '企业监控·风险雷达', '企业监控 · 风险雷达'],
     ]},
     { name:'GEO 品牌雷达', pages:[
-      ['pages/geo/index.html','驾驶舱'],
-      ['pages/geo/brands.html','品牌管理'],
-      ['pages/geo/monitor.html','引擎监控'],
-      ['pages/geo/knowledge.html','品牌知识库'],
-      ['pages/geo/keywords.html','关键词管理'],
-      ['pages/geo/audit.html','内容审计'],
-      ['pages/geo/report.html','GEO 报告·¥500/次'],
-      ['pages/geo/optimize.html','优化工作台'],
-      ['pages/geo/pricing.html','权益说明']
+      ['pages/geo/index.html', '驾驶舱', 'GEO 品牌雷达 · 驾驶舱'],
+      ['pages/geo/brands.html', '品牌管理', '品牌管理 · GEO 品牌雷达'],
+      ['pages/geo/monitor.html', '引擎监控', '引擎监控 · GEO 品牌雷达'],
+      ['pages/geo/knowledge.html', '品牌知识库', '品牌知识库 · GEO 品牌雷达'],
+      ['pages/geo/keywords.html', '关键词管理', '关键词管理 · GEO 品牌雷达'],
+      ['pages/geo/audit.html', '内容审计', '内容审计 · GEO 品牌雷达'],
+      ['pages/geo/report.html', 'GEO 报告·¥500/次', '品牌 GEO 报告 · ¥500/次'],
+      ['pages/geo/optimize.html', '优化工作台', '优化工作台 · GEO 品牌雷达'],
+      ['pages/geo/pricing.html', '权益说明', '权益说明 · GEO 品牌雷达'],
     ]},
     { name:'平台运营', pages:[
-      ['pages/platform/dashboard.html','平台运营台']
+      ['pages/platform/dashboard.html', '平台运营台', '平台运营台'],
     ]},
     { name:'服务商', pages:[
-      ['pages/vendor/dashboard.html','服务商工作台'],
-      ['pages/vendor/upgrades.html','服务商升级']
+      ['pages/vendor/dashboard.html', '经营数据看板', '经营数据看板 · 服务商经营总览'],
+      ['pages/vendor/upgrades.html', '服务商升级', '服务商升级 · 增长中心'],
     ]},
     { name:'收藏', pages:[
-      ['pages/favorite/index.html','我的收藏']
+      ['pages/favorite/index.html', '我的收藏', '我的收藏'],
     ]},
     { name:'协议中心', pages:[
-      ['pages/agreement/user.html','📂 协议中心（目录）'],
-      ['pages/agreement/user.html#service','用户服务协议'],
-      ['pages/agreement/user.html#privacy','隐私政策'],
-      ['pages/agreement/user.html#auth','认证与授权服务协议'],
-      ['pages/agreement/user.html#recharge','余额充值与提现协议'],
-      ['pages/agreement/user.html#credits','积分与会员服务协议'],
-      ['pages/agreement/user.html#trade','交易与资金托管协议'],
-      ['pages/agreement/user.html#franchise','加盟与分销协议'],
-      ['pages/agreement/user.html#publish','信息发布规范'],
-      ['pages/agreement/user.html#communication','沟通与交易秩序规则'],
-      ['pages/agreement/user.html#activity','平台活动规则'],
-      ['pages/agreement/user.html#credit','失信主体公示规则'],
-      ['pages/agreement/user.html#disclaimer','免责声明']
+      ['pages/agreement/user.html', '协议中心（目录）', '协议中心 · 全部协议条款目录页'],
+      ['pages/agreement/user.html#service', '用户服务协议', '用户服务协议（#service）'],
+      ['pages/agreement/user.html#privacy', '隐私政策', '隐私政策（#privacy）'],
+      ['pages/agreement/user.html#auth', '认证与授权服务协议', '认证与授权服务协议（#auth）'],
+      ['pages/agreement/user.html#recharge', '余额充值与提现协议', '余额充值与提现协议（#recharge）'],
+      ['pages/agreement/user.html#credits', '积分与会员服务协议', '积分与会员服务协议（#credits）'],
+      ['pages/agreement/user.html#trade', '交易与资金托管协议', '交易与资金托管协议（#trade）'],
+      ['pages/agreement/user.html#franchise', '加盟与分销协议', '加盟与分销协议（#franchise）'],
+      ['pages/agreement/user.html#publish', '信息发布规范', '信息发布规范（#publish）'],
+      ['pages/agreement/user.html#communication', '沟通与交易秩序规则', '沟通与交易秩序规则（#communication）'],
+      ['pages/agreement/user.html#activity', '平台活动规则', '平台活动规则（#activity）'],
+      ['pages/agreement/user.html#credit', '失信主体公示规则', '失信主体公示规则（#credit）'],
+      ['pages/agreement/user.html#disclaimer', '免责声明', '免责声明（#disclaimer）'],
     ]},
     { name:'注册登录', pages:[
-      ['pages/auth/login.html','登录'],
-      ['pages/auth/register.html','注册'],
-      ['pages/auth/banned.html','账号封禁']
+      ['pages/auth/login.html', '登录', '登录'],
+      ['pages/auth/register.html', '注册', '注册'],
+      { name:'账号已封禁', src:'pages/auth/banned.html', stateIcon:true, desc:'账号已封禁 · 违规封禁状态页' },
     ]},
     { name:'其他', pages:[
-      { name:'帮助中心', src:'pages/help/index.html', children:[
-        ['pages/help/feedback.html','意见反馈']
+      { name:'帮助中心', src:'pages/help/index.html', desc:'帮助中心', children:[
+        ['pages/help/feedback.html', '意见反馈', '意见反馈'],
       ]},
-      { name:'退款规则', src:'pages/refund/index.html', children:[
-        ['pages/refund/appeal.html','申请退款']
+      { name:'退款规则', src:'pages/refund/index.html', desc:'退款规则', children:[
+        ['pages/refund/appeal.html', '申请退款', '申请退款'],
       ]},
-      ['pages/guide/index.html','新手指引'],
-      ['pages/api/index.html','数据服务 API'],
+      ['pages/guide/index.html', '破冰期引导', '破冰期引导 · 新手指引页（破冰期）'],
+      ['pages/api/index.html', '数据服务 API', '数据服务 API · 接口文档'],
     ]},
     { name:'样式预览', pages:[
-      ['docs/cards/index.html','9类卡片·样式总览'],
-      ['visual-system.html','视觉系统·参考']
+      ['docs/cards/index.html', '9类卡片·样式总览', '卡片设计规范 · 9 类卡片样式总览'],
+      ['visual-system.html', '视觉系统·参考', 'App 视觉系统 V3.3 · 现网基线 2026-09-29'],
     ]},
     { name:'后台', pages:[
-      ['admin/index.html','后台 · 数据总览'],
-      { name:'运营中心', src:'admin/operations/supply.html', children:[
-        ['admin/operations/orders.html','订单管理'],
-        ['admin/operations/messages.html','消息中心']
+      ['admin/index.html', '后台 · 数据总览', '数据总览 · 管理后台首页'],
+      { name:'运营中心', src:'admin/operations/supply.html', desc:'供需管理', children:[
+        ['admin/operations/orders.html', '订单管理', '订单管理'],
+        ['admin/operations/messages.html', '消息中心', '消息中心'],
       ]},
-      { name:'用户中心', src:'admin/users/users.html', children:[
-        ['admin/users/auth-review.html','认证审核'],
-        ['admin/users/entry-review.html','入驻审核'],
-        ['admin/users/owner-review.html','企业主验证审核']
+      { name:'用户中心', src:'admin/users/users.html', desc:'用户管理', children:[
+        ['admin/users/auth-review.html', '认证审核', '认证审核'],
+        ['admin/users/entry-review.html', '入驻审核', '入驻审核'],
+        ['admin/users/owner-review.html', '企业主验证审核', '企业主验证审核'],
       ]},
-      { name:'资金中心', src:'admin/finance/wallet.html', children:[
-        ['admin/finance/revenue.html','收入看板'],
-        ['admin/finance/recharge.html','充值 / 对公审批'],
-        ['admin/finance/withdraw.html','提现审批'],
-        ['admin/finance/credits.html','积分管理'],
-        ['admin/finance/commission.html','佣金结算'],
-        ['admin/finance/invoice.html','发票管理']
+      { name:'资金中心', src:'admin/finance/wallet.html', desc:'钱包总览', children:[
+        ['admin/finance/revenue.html', '收入看板', '收入看板'],
+        ['admin/finance/recharge.html', '充值 / 对公审批', '充值 / 对公审批'],
+        ['admin/finance/withdraw.html', '提现审批', '提现审批'],
+        ['admin/finance/credits.html', '积分管理', '积分管理'],
+        ['admin/finance/commission.html', '佣金结算', '佣金结算'],
+        ['admin/finance/invoice.html', '发票管理', '发票管理'],
       ]},
-      { name:'分销中心', src:'admin/distribution/overview.html', children:[
-        ['admin/distribution/team.html','团队管理'],
-        ['admin/distribution/payout.html','佣金发放']
+      { name:'分销中心', src:'admin/distribution/overview.html', desc:'分销总览', children:[
+        ['admin/distribution/team.html', '团队管理', '团队关系树'],
+        ['admin/distribution/payout.html', '佣金发放', '返佣批次发放'],
       ]},
-      { name:'中介服务', src:'admin/mediation/orders.html', children:[
-        ['admin/mediation/sellers.html','服务商管理'],
-        ['admin/mediation/escrow.html','托管资金台账']
+      { name:'中介服务', src:'admin/mediation/orders.html', desc:'托管订单', children:[
+        ['admin/mediation/sellers.html', '服务商管理', '服务商管理'],
+        ['admin/mediation/escrow.html', '托管资金台账', '托管资金台账'],
       ]},
-      { name:'电子签', src:'admin/esign/contracts.html', children:[
-        ['admin/esign/contracts.html','电子合同'],
-        ['admin/esign/orders.html','签署订单'],
-        ['admin/esign/refunds.html','退款审核']
+      { name:'电子签', src:'admin/esign/contracts.html', desc:'电子合同', children:[
+        ['admin/esign/contracts.html', '电子合同', '电子合同'],
+        ['admin/esign/orders.html', '签署订单', '签署订单'],
+        ['admin/esign/refunds.html', '退款审核', '退款审核'],
       ]},
-      { name:'风控合规', src:'admin/risk/audit.html', children:[
-        ['admin/risk/monitor.html','企业监控'],
-        ['admin/risk/compliance.html','合规管理'],
-        ['admin/risk/logs.html','操作日志']
+      { name:'风控合规', src:'admin/risk/audit.html', desc:'合规审计', children:[
+        ['admin/risk/monitor.html', '企业监控', '企业监控'],
+        ['admin/risk/compliance.html', '合规管理', '合规管理'],
+        ['admin/risk/logs.html', '操作日志', '操作日志'],
       ]},
-      { name:'系统设置', src:'admin/system/pricing.html', children:[
-        ['admin/system/phase.html','运营周期'],
-        ['admin/system/roles.html','角色权限']
+      { name:'系统设置', src:'admin/system/pricing.html', desc:'定价配置', children:[
+        ['admin/system/phase.html', '运营周期', '运营周期'],
+        ['admin/system/roles.html', '角色权限', '角色权限'],
       ]},
-      ['admin/design-system.html','设计系统·参考'],
-      ['folder-cards/index.html','文件夹卡片·组件演示']
-    ]}
+      ['admin/design-system.html', '设计系统·参考', '设计系统'],
+      ['folder-cards/index.html', '文件夹卡片·组件演示', '文件夹卡片 · Liquid Glass 组件演示'],
+    ]},
   ];
 
   /* ---- 导航渲染（支持叶子节点 / 父节点可折叠） ---- */
@@ -902,11 +928,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return root;
   })();
 
-  function leafHtml(src, name, extraCls, isParent) {
+  /* 目录树四类图标（内联 SVG，stroke=currentColor，契合金/中性配色，明暗主题经 CSS 变量自适应）：
+     分类=金文件夹；主页面=金色层级；子页面=中性文档；状态页=成功色旗帜；普通叶子=中性单页 */
+  var NAV_ICONS = {
+    cat:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
+    parent: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5-8 4.5-8-4.5L12 3Z"/><path d="m4 13 8 4.5 8-4.5"/></svg>',
+    sub:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>',
+    leaf:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6Z"/></svg>',
+    state:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2.2 4L16 12H5"/></svg>'
+  };
+  function iconFor(cls) {
+    if (cls.indexOf('pl-state') > -1) return NAV_ICONS.state;
+    if (cls.indexOf('pl-parent') > -1) return NAV_ICONS.parent;
+    if (cls.indexOf('pl-sub') > -1) return NAV_ICONS.sub;
+    return NAV_ICONS.leaf;
+  }
+  function leafHtml(src, name, extraCls, isParent, desc) {
     var abs = ABS_ROOT + src;
     var caret = isParent ? '<span class="pl-caret" role="button" title="展开/收起">▾</span>' : '';
-    return '<a class="pl ' + extraCls + '" data-src="' + src + '" data-name="' + name + '" data-abs="' + abs + '">' +
-      '<span class="ic">›</span>' +
+    return '<a class="pl ' + extraCls + '" data-src="' + src + '" data-name="' + escAttr(name) + '" data-abs="' + abs + '" data-desc="' + escAttr(desc) + '">' +
+      '<span class="ic">' + iconFor(extraCls) + '</span>' +
       '<span class="pl-name">' + name + '</span>' +
       '<span class="pl-right">' +
         '<span class="pl-path" title="绝对路径：' + abs + '">' + src + '</span>' +
@@ -919,14 +960,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     '</a>';
   }
   function itemHtml(it) {
-    if (Array.isArray(it)) return leafHtml(it[0], it[1], '', false);
-    if (it && it.isState) return leafHtml(it.src, it.name, 'pl-state', false);
+    if (Array.isArray(it)) return leafHtml(it[0], it[1], '', false, it[2]);
+    if (it && it.isState) return leafHtml(it.src, it.name, 'pl-state', false, it.desc);
+    /* 状态页归类：仅图标/样式呈现，仍计入页面统计（区别于 isState，统计语义不变） */
+    if (it && it.stateIcon) return leafHtml(it.src, it.name, 'pl-stateicon', false, it.desc);
     var kids = it.children.map(function (c) {
-      if (Array.isArray(c)) return leafHtml(c[0], c[1], 'pl-sub', false);
-      if (c && c.isState) return leafHtml(c.src, c.name, 'pl-state', false);
-      return leafHtml(c.src, c.name, 'pl-sub', false);
+      if (Array.isArray(c)) return leafHtml(c[0], c[1], 'pl-sub', false, c[2]);
+      if (c && c.isState) return leafHtml(c.src, c.name, 'pl-state', false, c.desc);
+      if (c && c.stateIcon) return leafHtml(c.src, c.name, 'pl-stateicon', false, c.desc);
+      return leafHtml(c.src, c.name, 'pl-sub', false, c.desc);
     }).join('');
-    return leafHtml(it.src, it.name, 'pl-parent', true) + '<div class="pl-kids">' + kids + '</div>';
+    return leafHtml(it.src, it.name, 'pl-parent', true, it.desc) + '<div class="pl-kids">' + kids + '</div>';
   }
 
   /* ---- 统计目录树页面总数（App / 后台分类） ---- */
@@ -959,7 +1003,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   nav.innerHTML = MODULES.map(function (m) {
     var links = m.pages.map(itemHtml).join('');
-    return '<div class="pv-group"><div class="g-name">' + m.name + '</div><div class="links">' + links + '</div></div>';
+    return '<div class="pv-group"><div class="g-name">' + NAV_ICONS.cat + '<span>' + escAttr(m.name) + '</span></div><div class="links">' + links + '</div></div>';
   }).join('');
 
   /* 折叠状态恢复（localStorage 记忆） */
@@ -1126,6 +1170,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!a) return;
     nav.querySelectorAll('.pl').forEach(function (x) { x.classList.remove('on'); });
     a.classList.add('on');
+    /* 点击页面条目 → 自动执行信息复制「名称（绝对路径）」+ 图标闪动 + toast 反馈 */
+    var _nm = a.dataset.name, _src2 = a.dataset.src;
+    copyText('"' + _nm + '（' + a.dataset.abs + '）"').then(function () {
+      var _ic = a.querySelector('.ic');
+      if (_ic) { _ic.classList.remove('flash'); void _ic.offsetWidth; _ic.classList.add('flash'); setTimeout(function () { _ic.classList.remove('flash'); }, 700); }
+      if (window.UI && UI.toast) UI.toast('已复制：' + _nm + '（' + _src2 + '）', 'ok');
+    });
     /* 双模型框切换：后台类页面（admin/）→ Web 浏览器模型（browser-window 组件，舞台一部分）；其余 → iPhone 模型 */
     var isAdmin = a.dataset.src.indexOf('admin/') === 0 || a.dataset.src.indexOf('folder-cards/') === 0;
     var dev = document.querySelector('.device');
@@ -1150,6 +1201,53 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     }
   });
+
+  /* ---- 悬停简介 tooltip：自建轻量 CSS 卡片（position:fixed，避开侧栏 overflow 裁剪），
+     每条目 data-desc 一行事实性简介；悬停 120ms 后显示，移出即隐藏 ---- */
+  (function navTip() {
+    var tip = document.createElement('div');
+    tip.className = 'pl-tip';
+    tip.innerHTML = '<div class="tt-name"></div><div class="tt-desc"></div><div class="tt-path"></div>';
+    document.body.appendChild(tip);
+    var nEl = tip.querySelector('.tt-name');
+    var dEl = tip.querySelector('.tt-desc');
+    var pEl = tip.querySelector('.tt-path');
+    var side = document.querySelector('.pv-side');
+    var showTimer = null, hideTimer = null;
+    function place(el) {
+      var r = el.getBoundingClientRect();
+      var w = tip.offsetWidth, h = tip.offsetHeight;
+      var x = (side ? side.getBoundingClientRect().right : r.right) + 12;
+      if (x + w > window.innerWidth - 12) x = r.left - w - 12;   /* 右侧放不下则放左侧 */
+      var y = r.top + r.height / 2 - h / 2;
+      y = Math.max(8, Math.min(window.innerHeight - h - 8, y));
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    }
+    function show(el) {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (showTimer) return;
+      showTimer = setTimeout(function () {
+        showTimer = null;
+        if (!document.body.contains(el)) { tip.classList.remove('show'); return; }
+        nEl.textContent = el.dataset.name || '';
+        dEl.textContent = el.dataset.desc || '';
+        pEl.textContent = el.dataset.src || '';
+        tip.classList.add('show');
+        place(el);
+      }, 120);
+    }
+    function hide() {
+      if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+      if (hideTimer) return;
+      hideTimer = setTimeout(function () { hideTimer = null; tip.classList.remove('show'); }, 60);
+    }
+    nav.querySelectorAll('.pl').forEach(function (a) {
+      a.addEventListener('mouseenter', function () { show(a); });
+      a.addEventListener('mouseleave', hide);
+    });
+    window.addEventListener('resize', hide);
+  })();
 
   /* ---- 随内嵌页加载/跳转自动高亮目录树并垂直居中 ----
      跨源下父页读不到 iframe 的 URL（file:// 为 opaque origin），由内嵌页经 postMessage 上报 engchain:nav 携带自身 href，
