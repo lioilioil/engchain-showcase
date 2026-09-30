@@ -2579,7 +2579,7 @@ window.DETAIL = (function () {
         add('一对一办理方案', 'core', _IC.briefcase);
         add('材料模板与合同', 'core', _IC.fileText);
         add('服务顾问联系方式', 'core', _IC.phone);
-        add('平台担保交易', 'trust', _IC.shield);
+        add('认证信息已核验', 'trust', _IC.shield);
       } else if (bk === 'material') {
         add('完整联系方式', 'core', _IC.phone);
         add('精确成交价', 'core', _IC.wallet);
@@ -2614,10 +2614,10 @@ window.DETAIL = (function () {
         items.push({ icon: _IC.clock, text: '30天未成交全额退还' });
       } else if (up.mode === 'free') {
         items.push({ icon: _IC.check, text: '免费咨询' });
-        items.push({ icon: _IC.shield, text: '平台担保' });
+        items.push({ icon: _IC.shield, text: '信息已核验' });
         items.push({ icon: _IC.phone, text: '留资即开放联系方式' });
       } else {
-        items.push({ icon: _IC.shield, text: '平台担保交易' });
+        items.push({ icon: _IC.shield, text: '信息已核验' });
         items.push({ icon: _IC.wallet, text: '未对接可退' });
         items.push({ icon: _IC.clock, text: '即时解锁' });
       }
@@ -2797,7 +2797,7 @@ window.DETAIL = (function () {
           '<div class="us-footer">' +
             '<label class="pay-agree" id="unlockAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html#credits">《信息解锁服务协议》</a></span></label>' +
             '<button class="btn btn-primary btn-block btn-lg" id="pay-go">' + (isFree ? '免费解锁' : (isDeposit ? '确认支付 ¥' + Number(up.price).toLocaleString() : '确认解锁')) + '</button>' +
-            '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>安全支付 · 平台担保 · 未对接可退</div>' +
+            '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>信息已核验 · 未对接可退 · 即时解锁</div>' +
           '</div>' +
         '</div>';
       /* 支付方式切换 */

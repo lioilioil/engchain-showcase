@@ -21,8 +21,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function infeedCarouselHTML() {
     return '<div class="app-carousel" id="carousel"><div class="ac-track" id="ac-track">' +
       INFEED_SLIDES.map(function (s) {
-        /* E3-15 轮播 slide 可点击 → AI 搜索页 */
-        return '<div class="ac-slide" style="background:' + s.bg + ';cursor:pointer;" onclick="location.href=\'pages/search/index.html?mode=ai\'"><span class="ac-tag">' + s.tag + '</span><div><div class="ac-title">' + s.title + '</div><div class="ac-sub">' + s.sub + '</div></div></div>';
+        /* 轮播 slide 可点击 → 搜索页 */
+        return '<div class="ac-slide" style="background:' + s.bg + ';cursor:pointer;" onclick="location.href=\'pages/search/index.html?v=global\'"><span class="ac-tag">' + s.tag + '</span><div><div class="ac-title">' + s.title + '</div><div class="ac-sub">' + s.sub + '</div></div></div>';
       }).join('') +
       '</div><div class="ac-dots" id="ac-dots"></div></div>';
   }

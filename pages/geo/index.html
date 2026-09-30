@@ -74,6 +74,34 @@ body { background: var(--bg); }
 .gd-sec-more{font-size:11px;font-weight:600;color:var(--text-3);cursor:pointer;}
 .gd-sec-more:active{opacity:.6;}
 
+/* 首屏渐进披露（P1-1）：区块默认折叠为预览行 */
+.gd-onboard{background:linear-gradient(135deg,var(--bg-card),#faf6ee);border:1px solid var(--accent-line);border-radius:var(--r-l);padding:13px 14px;margin-top:14px;box-shadow:var(--shadow-card);}
+.gd-onboard-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.gd-onboard-title{font-size:13px;font-weight:800;color:var(--text-1);}
+.gd-onboard-progress{font-family:var(--font-num);font-size:10.5px;font-weight:800;color:var(--primary-dim);}
+.gd-onboard-bar{height:4px;border-radius:2px;background:var(--bg-card-2);overflow:hidden;margin-bottom:10px;}
+.gd-onboard-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--primary),var(--primary-dim));transition:width .3s;}
+.gd-onboard-step{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--r-m);cursor:pointer;transition:background var(--d-fast);}
+.gd-onboard-step:hover{background:var(--bg-card-2);}
+.gd-onboard-step.done{opacity:.55;}
+.gd-onboard-num{flex:none;width:22px;height:22px;border-radius:50%;background:var(--primary-soft);color:var(--primary-dim);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.gd-onboard-step.done .gd-onboard-num{background:var(--success-soft);color:var(--success);}
+.gd-onboard-info{flex:1;min-width:0;}
+.gd-onboard-name{font-size:11.5px;font-weight:700;color:var(--text-1);}
+.gd-onboard-desc{font-size:9.5px;color:var(--text-3);margin-top:1px;}
+.gd-onboard-go{flex:none;color:var(--text-3);font-size:12px;}
+.gd-fold-prev{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:10px 12px;box-shadow:var(--shadow-xs);}
+.gd-fold-prev-row{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--text-2);line-height:1.5;}
+.gd-fold-prev-row b{color:var(--text-1);}
+.gd-fold-prev-row .spark{flex:none;width:76px;height:22px;}
+.gd-fold-prev-meta{margin-left:auto;flex:none;font-size:9.5px;color:var(--text-3);}
+.gd-fold-btn{margin-top:8px;width:100%;height:32px;border:1px dashed var(--line-strong);border-radius:var(--r-m);background:var(--bg-card);color:var(--text-2);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:border-color var(--d-fast),color var(--d-fast);}
+.gd-fold-btn:hover{border-color:var(--accent-line);color:var(--primary-dim);}
+.gd-fold-body{display:none;margin-top:0;}
+.gd-fold.open .gd-fold-body{display:block;}
+.gd-fold.open .gd-fold-prev{display:none;}
+.gd-fold.open .gd-fold-btn{display:none;}
+
 /* 引擎矩阵 */
 .gd-eng-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
 .gd-eng{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:10px 11px;cursor:pointer;transition:transform var(--d-fast) var(--e-standard),box-shadow var(--d-fast),border-color var(--d-fast);box-shadow:var(--shadow-xs);}
@@ -161,6 +189,8 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
@@ -207,6 +237,27 @@ body { background: var(--bg); }
     });
     var cites = D.CITES_TPL.map(function(c){ return { name: c.name.replace('{brand}', b.short), n: c.n }; });
 
+    /* 新手任务卡（P2-3）：3 步引导，完成打勾，全完成自动收起 */
+    var ON_KEY = 'engchain-geo-onboard';
+    var onb = {};
+    try { onb = JSON.parse(localStorage.getItem(ON_KEY) || '{}'); } catch (e) {}
+    var onbDone = ['1','2','3'].filter(function(s){ return onb[s]; }).length;
+    var ONB_STEPS = [
+      { id:'1', name:'添加你的关键词', desc:'从行业词库挑要检测的词', href:'keywords.html?focus=my' },
+      { id:'2', name:'看 AI 怎么回答', desc:'查看 7 大引擎的提及与引用', href:'monitor.html' },
+      { id:'3', name:'生成品牌 GEO 报告', desc:'¥500 一次性交付完整方案', href:'report.html' }
+    ];
+    var onboardHtml = onbDone < 3 ? '<div class="gd-onboard" id="gd-onboard">'+
+      '<div class="gd-onboard-head"><div class="gd-onboard-title">3 步开始用 GEO</div><div class="gd-onboard-progress">'+onbDone+'/3</div></div>'+
+      '<div class="gd-onboard-bar"><i style="width:'+(onbDone/3*100)+'%"></i></div>'+
+      ONB_STEPS.map(function(s){
+        var done = !!onb[s.id];
+        return '<div class="gd-onboard-step'+(done?' done':'')+'" onclick="window.geoStep(\''+s.id+'\',\''+s.href+'\')">'+
+          '<div class="gd-onboard-num">'+(done?'✓':s.id)+'</div>'+
+          '<div class="gd-onboard-info"><div class="gd-onboard-name">'+s.name+'</div><div class="gd-onboard-desc">'+s.desc+'</div></div>'+
+          '<span class="gd-onboard-go">›</span></div>';
+      }).join('')+'</div>' : '';
+
     main.innerHTML =
       /* Hero */
       '<div class="gd-hero">'+
@@ -240,37 +291,64 @@ body { background: var(--bg); }
         '</div>'+
       '</div>'+
 
+      onboardHtml +
+
       '<div class="gd-tabs">'+
-        '<div class="gd-tab active" data-view="brand">品牌视角</div>'+
-        '<div class="gd-tab" data-view="industry">行业视角</div>'+
+        '<div class="gd-tab active" data-view="brand">看我的</div>'+
+        '<div class="gd-tab" data-view="industry">看同行</div>'+
       '</div>'+
 
       '<div id="view-brand">'+
         '<div class="gd-sec"><div class="gd-sec-title">引擎矩阵 <span class="gd-sec-more" onclick="location.href=\'monitor.html\'">引擎监控 ›</span></div>'+
-          '<div class="gd-eng-grid">'+b.engines.map(function(e){
-            var eng = D.ENGINES.filter(function(x){return x.id===e.engineId;})[0];
-            return '<div class="gd-eng" onclick="location.href=\'monitor.html\'">'+
-              '<div class="gd-eng-head"><div class="gd-eng-ico">'+eng.name.charAt(0)+'</div><div class="gd-eng-name">'+eng.name+'</div>'+
-              '<div class="gd-eng-rate">'+e.rate+'<span class="unit">%</span></div></div>'+
-              '<div class="gd-eng-bar"><i style="width:'+e.rate+'%"></i></div>'+
-              '<div class="gd-eng-meta"><span>推荐位 #'+e.rank+'</span><span>引用 '+e.citations+' 次</span></div>'+
-            '</div>';
-          }).join('')+'</div></div>'+
+          '<div class="gd-fold" id="fold-eng">'+
+            '<div class="gd-fold-prev" id="prev-eng"></div>'+
+            '<div class="gd-fold-body"><div class="gd-eng-grid">'+b.engines.map(function(e){
+              var eng = D.ENGINES.filter(function(x){return x.id===e.engineId;})[0];
+              var kw0 = (activeKws[0]||{term:'行业服务'}).term;
+              return '<div class="gd-eng" onclick="location.href=\'monitor.html?engine='+e.engineId+'&kw='+encodeURIComponent(kw0)+'\'">'+
+                '<div class="gd-eng-head"><div class="gd-eng-ico">'+eng.name.charAt(0)+'</div><div class="gd-eng-name">'+eng.name+'</div>'+
+                '<div class="gd-eng-rate">'+e.rate+'<span class="unit">%</span></div></div>'+
+                '<div class="gd-eng-bar"><i style="width:'+e.rate+'%"></i></div>'+
+                '<div class="gd-eng-meta"><span>推荐位 #'+e.rank+'</span><span>引用 '+e.citations+' 次</span></div>'+
+              '</div>';
+            }).join('')+'</div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-eng\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
 
-        '<div class="gd-sec"><div class="gd-sec-title">品牌声量对比（SOV）<span class="gd-sec-more" onclick="location.href=\'report.html\'">报告详情 ›</span></div>'+
-          '<div class="gd-sov" id="sov-box"></div></div>'+
+        '<div class="gd-sec"><div class="gd-sec-title">品牌声量对比（SOV）<span class="gd-sec-more" onclick="location.href=\'report.html?tab=1&focus=sov\'">报告详情 ›</span></div>'+
+          '<div class="gd-fold" id="fold-sov">'+
+            '<div class="gd-fold-prev" id="prev-sov"></div>'+
+            '<div class="gd-fold-body"><div class="gd-sov" id="sov-box"></div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-sov\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
 
-        '<div class="gd-sec"><div class="gd-sec-title">预警与待办 <span class="gd-sec-more" onclick="location.href=\'monitor.html\'">全部 ›</span></div>'+
-          '<div id="alert-box"></div></div>'+
+        '<div class="gd-sec"><div class="gd-sec-title">预警与待办 <span class="gd-sec-more" onclick="location.href=\'audit.html?focus=alerts\'">全部 ›</span></div>'+
+          '<div class="gd-fold" id="fold-alert">'+
+            '<div class="gd-fold-prev" id="prev-alert"></div>'+
+            '<div class="gd-fold-body"><div id="alert-box"></div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-alert\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
       '</div>'+
 
       '<div id="view-industry" style="display:none;">'+
-        '<div class="gd-sec"><div class="gd-sec-title">AI 意图热度（'+b.short+' 关键词）<span class="gd-sec-more" onclick="location.href=\'keywords.html\'">管理 ›</span></div>'+
-          '<div class="gd-sov" id="heat-box"></div></div>'+
-        '<div class="gd-sec"><div class="gd-sec-title">引用来源 Top<span class="gd-sec-more" onclick="location.href=\'report.html\'">报告 ›</span></div>'+
-          '<div class="gd-sov" id="cite-box" style="padding-top:4px;"></div></div>'+
-        '<div class="gd-sec"><div class="gd-sec-title">知识库健康度<span class="gd-sec-more" onclick="location.href=\'knowledge.html\'">查看 ›</span></div>'+
-          '<div class="gd-sov" id="kb-box"></div></div>'+
+        '<div class="gd-sec"><div class="gd-sec-title">AI 意图热度（'+b.short+' 关键词）<span class="gd-sec-more" onclick="location.href=\'keywords.html?focus=my\'">管理 ›</span></div>'+
+          '<div class="gd-fold" id="fold-heat">'+
+            '<div class="gd-fold-prev" id="prev-heat"></div>'+
+            '<div class="gd-fold-body"><div class="gd-sov" id="heat-box"></div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-heat\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
+        '<div class="gd-sec"><div class="gd-sec-title">引用来源 Top<span class="gd-sec-more" onclick="location.href=\'report.html?tab=1&focus=cites\'">报告 ›</span></div>'+
+          '<div class="gd-fold" id="fold-cites">'+
+            '<div class="gd-fold-prev" id="prev-cites"></div>'+
+            '<div class="gd-fold-body"><div class="gd-sov" id="cite-box" style="padding-top:4px;"></div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-cites\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
+        '<div class="gd-sec"><div class="gd-sec-title">知识库健康度<span class="gd-sec-more" onclick="location.href=\'knowledge.html?section=health\'">查看 ›</span></div>'+
+          '<div class="gd-fold" id="fold-kb">'+
+            '<div class="gd-fold-prev" id="prev-kb"></div>'+
+            '<div class="gd-fold-body"><div class="gd-sov" id="kb-box"></div></div>'+
+            '<button class="gd-fold-btn" onclick="window.toggleFold(\'fold-kb\')">展开完整视图 <span>▾</span></button>'+
+          '</div></div>'+
       '</div>';
 
     /* 环形动画 */
@@ -293,7 +371,11 @@ body { background: var(--bg); }
       var ico = a.severity==='high' ? '<path d="M12 8v5M12 16h.01"/><circle cx="12" cy="12" r="10"/>'
         : a.severity==='mid' ? '<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17h.01"/>'
         : '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>';
-      var href = a.action==='content'||a.action==='audit' ? 'audit.html' : a.action==='knowledge' ? 'knowledge.html' : 'monitor.html';
+      var ENG_NAME2ID = {'豆包':'doubao','DeepSeek':'deepseek','Kimi':'kimi','文心一言':'wenxin','通义千问':'tongyi','ChatGPT':'chatgpt','Perplexity':'perplexity'};
+      var href = a.action==='content' ? 'audit.html?focus=negative'
+        : a.action==='audit' ? 'audit.html?focus=rank'
+        : a.action==='knowledge' ? 'knowledge.html?section=dims'
+        : 'monitor.html?engine='+(ENG_NAME2ID[a.engine]||'doubao')+'&kw='+encodeURIComponent(a.keyword||'行业服务');
       return '<div class="gd-alert" onclick="location.href=\''+href+'\'">'+
         '<div class="gd-alert-ico '+a.severity+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+ico+'</svg></div>'+
         '<div class="gd-alert-body"><div class="gd-alert-head">'+a.type+' <span class="gd-alert-tag '+a.severity+'">'+sevMap[a.severity]+'</span></div>'+
@@ -322,6 +404,61 @@ body { background: var(--bg); }
         '<span class="gd-sov-val">'+d.v+'</span></div>';
     }).join('');
 
+    /* 首屏渐进披露：各区块预览行（P1-1） */
+    function spark(arr){
+      var w=76,h=22,min=Math.min.apply(null,arr),max=Math.max.apply(null,arr);
+      var r=(max-min)||1;
+      var pts=arr.map(function(v,i){return (i/(arr.length-1)*w).toFixed(1)+','+(h-((v-min)/r*(h-4)+2)).toFixed(1);}).join(' ');
+      return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline fill="none" stroke="var(--primary-dim)" stroke-width="1.5" points="'+pts+'"/></svg>';
+    }
+    /* 引擎矩阵预览：7 引擎平均趋势 + 领先引擎 */
+    (function(){
+      var box = document.getElementById('prev-eng');
+      if (!box || !b) return;
+      var avg = D.ENGINES[0].trend.map(function(_,i){
+        return Math.round(D.ENGINES.reduce(function(s,e){return s+e.trend[i];},0)/D.ENGINES.length);
+      });
+      var best = b.engines.slice().sort(function(x,y){return y.rate-x.rate;})[0];
+      var bestName = D.ENGINES.filter(function(x){return x.id===best.engineId;})[0].name;
+      box.innerHTML = '<div class="gd-fold-prev-row"><span>7 引擎平均<b> '+avg[avg.length-1]+'%</b></span><span class="spark">'+spark(avg)+'</span><span class="gd-fold-prev-meta">'+bestName+' 领先 · '+best.rate+'%</span></div>';
+    })();
+    /* SOV 预览 */
+    (function(){
+      var box = document.getElementById('prev-sov');
+      if (!box || !b) return;
+      var me = sovAll[0];
+      var gap = Math.round((me.v - sovAll[1].v) * 100);
+      box.innerHTML = '<div class="gd-fold-prev-row"><span>你<b> '+(me.v*100).toFixed(0)+'%</b>，'+(gap>=0?'领先':'落后')+'第 2 名 '+Math.abs(gap)+' 个百分点</span><span class="gd-fold-prev-meta">'+sovAll.length+' 个对象对比</span></div>';
+    })();
+    /* 预警预览：只露最严重 1 条（P1-3） */
+    (function(){
+      var box = document.getElementById('prev-alert');
+      if (!box || !b) return;
+      var order = {high:0, mid:1, low:2};
+      var top = alerts.slice().sort(function(x,y){return (order[x.severity]||3)-(order[y.severity]||3);})[0];
+      if (top) box.innerHTML = '<div class="gd-fold-prev-row"><span class="gd-alert-tag '+top.severity+'">'+(sevMap[top.severity])+'</span><b>'+top.type+'</b><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+top.text.replace('{brand}',b.short).replace('{kw}',top.keyword)+'</span></div>';
+    })();
+    /* 意图热度预览 */
+    (function(){
+      var box = document.getElementById('prev-heat');
+      if (!box || !b || !b.keywords.length) return;
+      var top = b.keywords.slice().sort(function(x,y){return y.heat-x.heat;})[0];
+      box.innerHTML = '<div class="gd-fold-prev-row"><span>最热词<b>「'+top.term+'」</b> · 热度 '+top.heat+'</span><span class="gd-fold-prev-meta">'+b.keywords.length+' 词追踪中</span></div>';
+    })();
+    /* 引用来源预览 */
+    (function(){
+      var box = document.getElementById('prev-cites');
+      if (!box || !cites.length) return;
+      box.innerHTML = '<div class="gd-fold-prev-row"><span>Top1 来源<b> '+cites[0].name+'</b> · '+cites[0].n+' 次</span><span class="gd-fold-prev-meta">共 '+cites.length+' 个来源</span></div>';
+    })();
+    /* 知识库预览 */
+    (function(){
+      var box = document.getElementById('prev-kb');
+      if (!box || !b) return;
+      var top = kbDims.slice().sort(function(x,y){return y.v-x.v;})[0];
+      box.innerHTML = '<div class="gd-fold-prev-row"><span>健康度<b> '+b.kbHealth+'</b>/100 · 最优维度「'+top.name+'」'+top.v+'</span><span class="gd-fold-prev-meta">较上周 ↑'+Math.abs(b.kbHealthDelta)+'</span></div>';
+    })();
+
     /* Tab */
     document.querySelectorAll('.gd-tab').forEach(function(tab){
       tab.onclick = null;
@@ -335,8 +472,24 @@ body { background: var(--bg); }
     });
   }
 
+  /* 折叠展开（P1-1） */
+  window.toggleFold = function(id){
+    var f = document.getElementById(id);
+    if (f) f.classList.toggle('open');
+  };
+
+  /* 新手任务卡点击：标记完成并跳转（P2-3） */
+  window.geoStep = function(id, href){
+    var st = {};
+    try { st = JSON.parse(localStorage.getItem(ON_KEY) || '{}'); } catch (e) {}
+    st[id] = 1;
+    try { localStorage.setItem(ON_KEY, JSON.stringify(st)); } catch (e) {}
+    location.href = href;
+  };
+
   render();
 })();
 </script>
+<script>GEO_NAV.mount('index');</script>
 </body>
 </html>

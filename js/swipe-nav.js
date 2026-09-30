@@ -83,8 +83,7 @@
   var USE_HISTORY = {
     'pages/supply/detail.html': 1,
     'pages/auth/login.html': 1,
-    'pages/company/index.html': 1,
-    'pages/search/business.html': 1
+    'pages/company/index.html': 1
   };
 
   /* ===================== 配置 ===================== */

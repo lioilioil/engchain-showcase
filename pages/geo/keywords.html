@@ -72,6 +72,7 @@ body { background: var(--bg); }
 .kw-bank-add.added{background:var(--bg-card-2);color:var(--text-3);}
 .kw-bank-add:active{transform:scale(.9);}
 .kw-empty{text-align:center;padding:24px 12px;font-size:12px;color:var(--text-3);}
+.kw-bank-group{font-size:10.5px;font-weight:700;color:var(--text-3);margin:12px 0 6px;padding-left:2px;}
 </style>
 </head>
 <body>
@@ -85,7 +86,7 @@ body { background: var(--bg); }
   <div class="scroll">
     <!-- 品牌上下文 -->
     <div class="kw-context">
-      <div class="kw-context-chip" onclick="location.href='brands.html'">
+      <div class="kw-context-chip" onclick="window.GEO_NAV.openBrands()">
         <div class="kw-ctx-ico" id="ctx-ico">—</div>
         <div class="kw-ctx-info"><div class="kw-ctx-name" id="ctx-name"></div><div class="kw-ctx-meta" id="ctx-meta"></div></div>
       </div>
@@ -121,11 +122,19 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
   var brand = D.currentBrand();
   var myKeywords = brand ? brand.keywords.slice() : [];
+  /* F7 修复：改动写回 brand.keywords 并落盘，刷新不丢失 */
+  function persist(){
+    if (!brand) return;
+    brand.keywords = myKeywords;
+    D.saveUserBrands();
+  }
 
   function renderContext(){
     if(!brand){ return; }
@@ -167,22 +176,26 @@ body { background: var(--bg); }
     var bankBox = document.getElementById('bank-list');
     var added = myKeywords.map(function(k){return k.term;});
     var list = D.KEYWORD_BANK.slice();
-    list.sort(function(a,b){
-      var ar = a.industry.indexOf(brand.industry)>=0 ? 0 : 1;
-      var br = b.industry.indexOf(brand.industry)>=0 ? 0 : 1;
-      return ar-br;
+    var recs = [], others = [];
+    list.forEach(function(k){
+      (k.industry.indexOf(brand.industry)>=0 ? recs : others).push(k);
     });
-    bankBox.innerHTML = list.map(function(k){
-      var isAdded = added.indexOf(k.term)>=0;
-      var rec = k.industry.indexOf(brand.industry)>=0;
-      return '<div class="kw-bank-row">'+
-        '<span class="kw-bank-cat">'+k.category+'</span>'+
-        (rec?'<span class="kw-bank-rec">推荐</span>':'')+
-        '<div class="kw-bank-info"><div class="kw-bank-term">'+k.term+'</div><div class="kw-bank-note">'+k.note+'</div></div>'+
-        '<span class="kw-bank-heat">'+k.heat+'</span>'+
-        '<button class="kw-bank-add'+(isAdded?' added':'')+'" data-term="'+k.term+'" data-type="'+k.type+'" data-heat="'+k.heat+'">'+(isAdded?'✓':'+')+'</button>'+
-      '</div>';
-    }).join('');
+    function bankRows(arr){
+      return arr.map(function(k){
+        var isAdded = added.indexOf(k.term)>=0;
+        var rec = k.industry.indexOf(brand.industry)>=0;
+        return '<div class="kw-bank-row">'+
+          '<span class="kw-bank-cat">'+k.category+'</span>'+
+          (rec?'<span class="kw-bank-rec">推荐</span>':'')+
+          '<div class="kw-bank-info"><div class="kw-bank-term">'+k.term+'</div><div class="kw-bank-note">'+k.note+'</div></div>'+
+          '<span class="kw-bank-heat">'+k.heat+'</span>'+
+          '<button class="kw-bank-add'+(isAdded?' added':'')+'" data-term="'+k.term+'" data-type="'+k.type+'" data-heat="'+k.heat+'">'+(isAdded?'✓':'+')+'</button>'+
+        '</div>';
+      }).join('');
+    }
+    bankBox.innerHTML =
+      (recs.length ? '<div class="kw-bank-group">本行业词库（'+brand.industry+'）</div>'+bankRows(recs) : '') +
+      (others.length ? '<div class="kw-bank-group">其他行业</div>'+bankRows(others) : '');
   }
 
   document.getElementById('my-list').addEventListener('click', function(e){
@@ -191,6 +204,7 @@ body { background: var(--bg); }
     var i = +sw.dataset.i;
     myKeywords[i].enabled = !myKeywords[i].enabled;
     UI.toast((myKeywords[i].enabled?'已启用':'已停用')+'「'+myKeywords[i].term+'」', myKeywords[i].enabled?'ok':'warn');
+    persist();
     render();
   });
 
@@ -207,12 +221,22 @@ body { background: var(--bg); }
       myKeywords.push({ id:'bk'+Date.now(), term:term, type:type, heat:heat, hitRate:0.5, enabled:true, trend:[48,49,49,50,50,50,50] });
       UI.toast('已添加「'+term+'」','ok');
     }
+    persist();
     render();
   });
 
   renderContext();
   render();
+  /* 深链定位：?focus=my 滚到我的词列表 */
+  (function () {
+    var q = D.parseQuery();
+    if (q.focus === 'my') {
+      var el = document.getElementById('my-list');
+      if (el) D.highlight(el);
+    }
+  })();
 })();
 </script>
+<script>GEO_NAV.mount('index');</script>
 </body>
 </html>

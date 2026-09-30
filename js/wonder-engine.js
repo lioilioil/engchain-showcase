@@ -339,7 +339,7 @@
       default:
         return {
           ctaText: '看看为你挑选的' + (ctx.topLabel || '') + '新商机',
-          ctaHref: r + 'pages/search/index.html' + (ctx.topCat ? '?cat=' + ctx.topCat : ''),
+          ctaHref: r + 'pages/search/index.html?v=global',
           altText: '先收下，随便逛逛', altHref: r + 'home.html',
           postTitle: '根据你最近的浏览，为你留意了几条新线索'
         };

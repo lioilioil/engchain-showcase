@@ -130,7 +130,7 @@ body { background: var(--bg); }
           <div class="pr-card-item">分阶段发布方案 + 内容发布清单</div>
           <div class="pr-card-item">AI 回答证据库（模拟截图）</div>
         </div>
-        <div class="pr-card-limit">企业入驻赠送 1 次体验券</div>
+        <div class="pr-card-limit" id="pr-voucher">新品牌赠送 1 次体验券</div>
       </div>
 
       <div class="pr-card">
@@ -169,22 +169,42 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
   var b = D.currentBrand();
+  var voucher = false;
+  try { voucher = localStorage.getItem('engchain-geo-voucher') === '1'; } catch (e) {}
+  function renderVoucher(){
+    var vBox = document.getElementById('pr-voucher');
+    if (!vBox) return;
+    vBox.innerHTML = voucher
+      ? '已领取体验券（1/1）· 生成报告 ¥0'
+      : '新品牌赠送 1 次体验券 · <span style="color:var(--primary-dim);font-weight:700;cursor:pointer;" onclick="window.claimVoucher()">立即领取 ›</span>';
+    var ctaBtn = document.querySelector('.pr-cta .primary');
+    if (ctaBtn) ctaBtn.innerHTML = '<span class="bt-txt">' + (voucher ? '使用体验券生成报告（0 元）' : '生成报告 ¥500') + '</span>';
+  }
+  window.claimVoucher = function(){
+    try { localStorage.setItem('engchain-geo-voucher', '1'); } catch (e) {}
+    voucher = true;
+    UI.toast('体验券已到账，可 0 元生成 1 次报告', 'ok');
+    renderVoucher();
+  };
   if(b){
     var enabled = b.keywords.filter(function(k){return k.enabled;}).length;
     var pct = Math.min(100, Math.round(enabled/5*100));
     document.getElementById('pr-brand').textContent = '· ' + b.short;
     document.getElementById('pr-usage-name').textContent = b.name + ' · 免费档用量';
-    document.getElementById('pr-usage-meta').textContent = '关键词 ' + enabled + ' / 5 · 品牌 1 / 1 · 引擎 7 / 7（演示全量开放）';
+    document.getElementById('pr-usage-meta').textContent = '关键词 ' + enabled + ' / 5 · 引擎 3 / 3（演示期）· 体验券 ' + (voucher ? 1 : 0) + ' / 1';
     document.getElementById('pr-usage-bar').style.width = pct + '%';
     document.getElementById('pr-usage-pct').textContent = enabled + '/5';
   }else{
     document.getElementById('pr-usage-name').textContent = '未添加品牌';
     document.getElementById('pr-usage-meta').textContent = '添加品牌后展示免费档用量';
   }
+  renderVoucher();
   window.applyCustom = function(){
     var sh = UI.sheet();
     sh.setText('申请企业定制');
@@ -200,5 +220,6 @@ body { background: var(--bg); }
   };
 })();
 </script>
+<script>GEO_NAV.mount('mine');</script>
 </body>
 </html>

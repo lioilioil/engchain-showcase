@@ -119,7 +119,7 @@ body { background: var(--bg); }
 
   <div class="scroll">
     <div class="op-context">
-      <div class="op-context-chip" onclick="location.href='brands.html'">
+      <div class="op-context-chip" onclick="window.GEO_NAV.openBrands()">
         <div class="op-ctx-ico" id="ctx-ico">—</div>
         <div class="op-ctx-info"><div class="op-ctx-name" id="ctx-name"></div><div class="op-ctx-meta" id="ctx-meta"></div></div>
       </div>
@@ -135,10 +135,24 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
+  var DONE_KEY = 'engchain-geo-tickets-';
   var doneSet = {};
+  (function(){
+    var b0 = D.currentBrand();
+    if (b0) {
+      try { doneSet = JSON.parse(localStorage.getItem(DONE_KEY + b0.id) || '{}') || {}; } catch (e) {}
+    }
+  })();
+  function saveDone(){
+    var b0 = D.currentBrand();
+    if (!b0) return;
+    try { localStorage.setItem(DONE_KEY + b0.id, JSON.stringify(doneSet)); } catch (e) {}
+  }
 
   function render(){
     var b = D.currentBrand();
@@ -188,7 +202,7 @@ body { background: var(--bg); }
     };
     var ticketsHtml = tickets.map(function(t){
       var done = doneSet[t.id] ? ' done' : '';
-      var open = doneSet[t.id] ? '' : ' open';
+      var open = doneSet[t.id] ? '' : (t.pri === 'P0' ? ' open' : '');
       return '<div class="op-ticket'+done+open+'" data-id="'+t.id+'">'+
         '<div class="op-ticket-head" onclick="toggleTicket(\''+t.id+'\')">'+
           '<div class="op-check">'+(done?'✓':'')+'</div>'+
@@ -225,7 +239,7 @@ body { background: var(--bg); }
         '<div class="op-actions">'+actionsHtml+'</div>'+
       '</div>'+
 
-      '<div class="op-sec"><div class="op-sec-title">执行工单 <span class="op-sec-more" onclick="UI.toast(\'演示版进度不持久化\',\'warn\')">6 项</span></div>'+
+      '<div class="op-sec"><div class="op-sec-title">执行工单 <span class="op-sec-more" onclick="UI.toast(\'已完成 '+doneCount+' 项，进度已自动保存\',\'ok\')">'+doneCount+'/'+total+' 项</span></div>'+
         ticketsHtml+
       '</div>'+
 
@@ -238,11 +252,21 @@ body { background: var(--bg); }
     var el = document.querySelector('.op-ticket[data-id="'+id+'"]');
     if(el.classList.contains('done')){ el.classList.remove('done'); delete doneSet[id]; }
     else { el.classList.add('done'); el.classList.remove('open'); doneSet[id]=1; UI.toast('已标记完成','ok'); }
+    saveDone();
     render();
   };
 
   render();
+  /* 深链定位：?focus=tX 展开对应工单并高亮滚动 */
+  (function () {
+    var q = D.parseQuery();
+    if (q.focus && /^t[1-6]$/.test(q.focus)) {
+      var el = document.querySelector('.op-ticket[data-id="' + q.focus + '"]');
+      if (el) { el.classList.add('open'); D.highlight(el); }
+    }
+  })();
 })();
 </script>
+<script>GEO_NAV.mount('optimize');</script>
 </body>
 </html>

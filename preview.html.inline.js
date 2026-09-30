@@ -63,12 +63,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/publish/success.html','发布成功']
       ]}
     ]},
-    { name:'搜索', pages:[
-      { name:'AI自然语言搜索', src:'pages/search/index.html', children:[
-        ['pages/search/result.html','搜索结果·匹配%'],
-        ['pages/search/business.html','企业搜索'],
-        ['pages/search/enterprise.html','企业信息搜索·双模式'],
-      ]}
+    { name:'搜索中心', pages:[
+      { name:'全局搜索', src:'pages/search/index.html?v=global', children:[
+        ['pages/search/index.html?v=global&q=混凝土','搜索结果·分类展示']
+      ]},
+      { name:'业务搜索', src:'pages/search/index.html?v=business&b=franchise', children:[
+        ['pages/search/index.html?v=business&b=trade','建企买卖搜索'],
+        ['pages/search/index.html?v=business&b=personnel','人员招聘搜索']
+      ]},
+      ['pages/search/index.html?v=enterprise','企业查询·双模式'],
+      ['pages/search/index.html?v=agency','服务广场搜索']
     ]},
     { name:'匹配', pages:[
       ['pages/match/preferences.html','匹配偏好设置']

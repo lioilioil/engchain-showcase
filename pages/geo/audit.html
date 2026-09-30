@@ -60,6 +60,7 @@ body { background: var(--bg); }
 
 /* 内容清单 */
 .ad-content{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:0 13px;}
+.ad-more-btn{margin:10px 0 12px;width:100%;height:32px;border:1px dashed var(--line-strong);border-radius:var(--r-m);background:var(--bg-card);color:var(--text-2);font-size:11px;font-weight:600;cursor:pointer;}
 .ad-row{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);}
 .ad-row:last-child{border-bottom:none;}
 .ad-score{flex:none;width:44px;text-align:center;}
@@ -101,7 +102,7 @@ body { background: var(--bg); }
 
   <div class="scroll">
     <div class="ad-context">
-      <div class="ad-context-chip" onclick="location.href='brands.html'">
+      <div class="ad-context-chip" onclick="window.GEO_NAV.openBrands()">
         <div class="ad-ctx-ico" id="ctx-ico">—</div>
         <div class="ad-ctx-info"><div class="ad-ctx-name" id="ctx-name"></div><div class="ad-ctx-meta" id="ctx-meta"></div></div>
       </div>
@@ -110,13 +111,14 @@ body { background: var(--bg); }
   <div class="audit-wrap" id="ad-main"></div>
   </div>
 
-  <div class="ad-cta" id="ad-cta"><button onclick="location.href='optimize.html'">查看优化方案 →</button></div>
-</div>
+  <div class="ad-cta" id="ad-cta"><button onclick="location.href='optimize.html'">查看优化方案 →</button></div></div>
 
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
@@ -140,6 +142,14 @@ body { background: var(--bg); }
     var contents = D.contentsFor(b);
     var avg = Math.round(contents.reduce(function(s,c){return s+c.score;},0)/contents.length*10)/10;
     var lowCount = contents.filter(function(c){return c.score<70;}).length;
+    var CRISIS = [
+      { key:'negative', name:'负面覆盖', count:1, sev:'high', desc:'资金托管争议描述', focus:'t5' },
+      { key:'nobody',   name:'查无此人', count:1, sev:'high', desc:'部分词下品牌未被提及', focus:'t1' },
+      { key:'stale',    name:'信息过期', count:1, sev:'mid',  desc:'百科/官网信息滞后', focus:'t3' },
+      { key:'rank',     name:'排名靠后', count:1, sev:'mid',  desc:'推荐位 < #3', focus:'t4' },
+      { key:'rival',    name:'竞品更优', count:1, sev:'mid',  desc:'核心词被反超', focus:'t4' },
+      { key:'wrong',    name:'信息错误', count:0, sev:'low',  desc:'暂无发现', focus:'' }
+    ];
 
     main.innerHTML =
       '<div class="ad-hero">'+
@@ -152,26 +162,20 @@ body { background: var(--bg); }
         '</div>'+
       '</div>'+
 
-      '<div class="ad-sec"><div class="ad-sec-title">问题定位 · 六大失语危机</div>'+
-        '<div class="ad-grid">'+[
-          {name:'查无此人',count:1,sev:'high',desc:'部分词下品牌未被提及'},
-          {name:'信息过期',count:1,sev:'mid',desc:'百科/官网信息滞后'},
-          {name:'排名靠后',count:1,sev:'mid',desc:'推荐位 < #3'},
-          {name:'信息错误',count:0,sev:'low',desc:'暂无发现'},
-          {name:'竞品更优',count:1,sev:'mid',desc:'核心词被反超'},
-          {name:'负面覆盖',count:1,sev:'high',desc:'资金托管争议描述'}
-        ].map(function(c){
+      '<div class="ad-sec"><div class="ad-sec-title">问题定位 · 六大失语危机<span data-tip="就是用户在 AI 里搜这些词时，AI 没替你说好话" style="cursor:help;">?</span></div>'+
+        '<div class="ad-grid">'+CRISIS.filter(function(c){ return c.count > 0; }).map(function(c){
           var sev = c.sev==='high'?'紧急':(c.sev==='mid'?'关注':'正常');
-          return '<div class="ad-crisis sev-'+c.sev+'"><div class="ad-crisis-name">'+c.name+'<span class="ad-crisis-count">'+c.count+'</span></div>'+
+          return '<div class="ad-crisis sev-'+c.sev+'" data-key="'+c.key+'" onclick="location.href=\'optimize.html?focus='+c.focus+'\'">'+
+            '<div class="ad-crisis-name">'+c.name+'<span class="ad-crisis-count">'+c.count+'</span></div>'+
             '<div class="ad-crisis-sev '+c.sev+'">'+sev+' · '+c.desc+'</div></div>';
         }).join('')+'</div>'+
       '</div>'+
 
       '<div class="ad-sec"><div class="ad-sec-title">内容载体审计（'+b.short+'）</div>'+
-        '<div class="ad-content">'+contents.map(function(c){
+        '<div class="ad-content">'+contents.map(function(c, i){
           var circ = 2*Math.PI*18;
           var off = circ*(1-c.score/100);
-          return '<div class="ad-row">'+
+          return '<div class="ad-row'+(i>0?' ad-row-hide':'')+'"'+(i>0?' style="display:none;"':'')+'>'+
             '<div class="ad-score"><div class="ad-score-ring"><svg width="44" height="44" viewBox="0 0 44 44">'+
               '<circle class="track" cx="22" cy="22" r="18" fill="none" stroke-width="4"/>'+
               '<circle class="bar" cx="22" cy="22" r="18" fill="none" stroke-width="4" stroke-dasharray="'+circ+'" stroke-dashoffset="'+off+'"/>'+
@@ -186,12 +190,37 @@ body { background: var(--bg); }
               '<div class="ad-issues">'+c.issues.map(function(i){return '<div class="ad-issue">'+i+'</div>';}).join('')+'</div>'+
             '</div>'+
           '</div>';
-        }).join('')+'</div>'+
+        }).join('')+
+        (contents.length>1 ? '<button class="ad-more-btn" id="ad-more-btn" onclick="window.adShowMore()">展开其余 '+ (contents.length-1) +' 个载体 ▾</button>' : '')+
+        '</div>'+
       '</div>';
+
+    /* CTA 按最严重危机拼深链（L17） */
+    var worst = CRISIS.filter(function(c){ return c.count > 0 && c.focus; })[0] || null;
+    document.getElementById('ad-cta').innerHTML = '<button onclick="location.href=\'optimize.html'+(worst ? '?focus='+worst.focus : '')+'\'">'+(worst ? '先处理「'+worst.name+'」→' : '查看优化方案 →')+'</button>';
   }
 
+  /* 内容载体行内折叠（P1-4） */
+  window.adShowMore = function(){
+    document.querySelectorAll('.ad-row-hide').forEach(function(r){ r.style.display=''; });
+    var btn = document.getElementById('ad-more-btn');
+    if (btn) btn.style.display = 'none';
+  };
+
   render();
+  /* 深链定位：?focus=alerts 滚到危机区；?focus=negative/rank 等高亮对应危机卡 */
+  (function () {
+    var q = D.parseQuery();
+    if (q.focus === 'alerts') {
+      var sec = document.querySelector('.ad-sec');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (q.focus) {
+      var card = document.querySelector('.ad-crisis[data-key="' + q.focus + '"]');
+      if (card) D.highlight(card);
+    }
+  })();
 })();
 </script>
+<script>GEO_NAV.mount('index');</script>
 </body>
 </html>

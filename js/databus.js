@@ -98,7 +98,23 @@ window.DataBus = (function () {
           qual:{ok:false,list:[]}, payment:{ok:false,ts:0} },
         entry:{ type:null, types:[], orderId:null, status:null, active:false, paidAt:0, expireAt:0, note:'' },
         balance:{ balance:2680, frozen:0, totalIn:5680 },
-        credits:{ balance:1200, quota:{ month:'', used:0 } } }
+        credits:{ balance:1200, quota:{ month:'', used:0 } } },
+      /* u10：平台内部运营账号（与 C/B 端用户正交，五轨道全点亮，拥有全部功能权限） */
+      { id:'u10', name:'周平台', company:'工程链·平台运营组', account:'platform@engchain.cn', pwd:'demo8888',
+        mobile:'13000000000', avatar:'周', tag:'平台内部 · 运营', status:'resident',
+        isPlatformStaff:true,
+        identity:{ personal:'verified', enterprise:'resident', entryTypes:['construction','agency','partner'], identities:['realname','personal-entry','partner','enterprise','entry'] },
+        auth:{ realname:{ok:true,ts:now-DAY*365,name:'周平台',idNo:'',mobile:'130****0000',idMask:''},
+          enterprise:{ok:true,expireAt:now+YEAR,co:'工程链·平台运营组',code:'91510100PLATFORM001',legal:'周平台',shortName:'工程链运营'},
+          personalQual:{ok:true,list:['平台运营管理员资质']},
+          personalEntry:{ok:true,status:'approved',list:[{name:'平台运营管理员',no:'PLAT-0001',image:''}],certs:[],profile:{basic:{},education:[],work:[],project:[],skills:[],jobIntent:{},intro:'',resumeFile:''}},
+          partner:{ok:true,status:'approved',channel:['内部'],intent:'运营管理',intro:'平台内部运营账号',experience:'负责平台入驻/发布/需求/认证全量审核与治理',profitConfig:{}},
+          enterpriseQual:{ok:true,list:['平台运营资质']},
+          qual:{ok:true,list:['平台运营管理员资质']},
+          payment:{ok:true,ts:now-DAY*365} },
+        entry:{ type:'construction', types:['construction','agency','partner'], orderId:'PLAT-0001', status:'active', active:true, paidAt:now-DAY*365, expireAt:now+YEAR, depositType:'basic', depositPaid:0, fee:0, contact:'周平台', tel:'13000000000', scope:'平台运营治理', qualifications:[], intro:{founded:'2026',capital:'-',staffSize:'平台方',desc:'工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。'}, cases:[], address:{province:'四川省',city:'成都市',district:'高新区',detail:'平台路1号'}, website:'', attachments:[] },
+        balance:{ balance:0, frozen:0, totalIn:0 },
+        credits:{ balance:0, quota:{ month:'', used:0 } } }
     ];
   }
 
@@ -114,7 +130,7 @@ window.DataBus = (function () {
        导致后台入驻待办长期挂 4 条、且 u5/u6 连入驻门槛都不满足）。seedUsers 已给每个用户完整 entry，
        入驻待审只能来自真实 entryApply 或演示场景工厂。此处仅保留 mobile/payment/空 entry 兜底。 */
     /* 演示手机号（明文，供"手机号搜索邀请"匹配；auth.realname.mobile 保留脱敏展示） */
-    var mobileMap = { u1: '13800001234', u2: '13700002345', u3: '13600003456', u4: '13900005678', u5: '13500004567', u6: '13400005678', u8: '13300008901', u9: '13200009012' };
+    var mobileMap = { u1: '13800001234', u2: '13700002345', u3: '13600003456', u4: '13900005678', u5: '13500004567', u6: '13400005678', u8: '13300008901', u9: '13200009012', u10: '13000000000' };
     a.forEach(function (u) {
       if (!u.auth) u.auth = {};
       if (!u.mobile && mobileMap[u.id] && u.status !== 'guest') { u.mobile = mobileMap[u.id]; dirty = true; }
@@ -1707,7 +1723,9 @@ window.DataBus = (function () {
       authReject(uid, 'enterprise', '营业执照信息与登记不一致，请核对后重新提交'); } },
     rej_entry: { label: '企业入驻·建筑 · 已驳回', group: 'reject', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'construction', 'pending');
-      entryReject(uid, 'construction', '企业资质材料不齐全，请补充建筑业企业资质证书', 'first'); } }
+      entryReject(uid, 'construction', '企业资质材料不齐全，请补充建筑业企业资质证书', 'first'); } },
+    /* D 平台内部（与 C/B 端用户正交：五轨道全点亮 + isPlatformStaff 标记） */
+    staff_internal: { label: '平台内部人员（运营）', group: 'staff', base: 'u10' }
   };
 
   function applyDemoScenario(key) {
@@ -1738,6 +1756,12 @@ window.DataBus = (function () {
     return Object.keys(DEMO_SCENARIOS).map(function (k) {
       return { key: k, label: DEMO_SCENARIOS[k].label, group: DEMO_SCENARIOS[k].group, base: DEMO_SCENARIOS[k].base };
     });
+  }
+
+  /* 平台内部人员判定：当前登录账号带 isPlatformStaff 标记即为运营方（与 C/B 端身份正交）。
+     纯只读判定，不写任何数据；供 IdentityPolicy / 运营台门控 / 全部功能页统一调用。 */
+  function isPlatformStaff() {
+    try { var cu = current(); return !!(cu && cu.isPlatformStaff); } catch (e) { return false; }
   }
 
   /* ---- 启动一致性：业务 Store 与用户表对齐（修复"我的"等页身份误降级为注册会员） ----
@@ -1827,6 +1851,7 @@ window.DataBus = (function () {
     resetUserToSeed: resetUserToSeed,
     applyDemoScenario: applyDemoScenario,
     demoScenarioList: demoScenarioList,
+    isPlatformStaff: isPlatformStaff,
     /* v2.0：内存缓存管理 */
     invalidateCache: function (key) { _cacheClear(key); }
   };
