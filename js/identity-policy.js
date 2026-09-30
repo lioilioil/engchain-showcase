@@ -38,7 +38,8 @@ window.IdentityPolicy = (function () {
     team: '团队管理仅向合伙人类型的企业入驻账号开放',
     esign: '电子签面向企业入驻用户或个人合伙人开放',
     publish: '当前身份暂不支持发布该品类',
-    actFor: '需在该企业任职且本人具备对应企业资质，才能以该企业名义操作'
+    actFor: '需在该企业任职且本人具备对应企业资质，才能以该企业名义操作',
+    platform: '该入口仅限平台内部运营人员使用'
   };
 
   /* 功能 -> 本人资质要求。判定全部基于 entryAccess 的只读字段，不读外显、不读任职。 */
@@ -65,6 +66,12 @@ window.IdentityPolicy = (function () {
       if (g) return R.login;
       var ent = a.identity && a.identity.enterprise;
       return (ent === 'verified' || ent === 'resident') ? '' : R.qualify;
+    },
+    /* 平台运营台：仅平台内部人员（DataBus.isPlatformStaff），与 C/B 端身份正交 */
+    'platform:dashboard': function (a, g) {
+      if (g) return R.login;
+      try { if (window.DataBus && DataBus.isPlatformStaff && DataBus.isPlatformStaff()) return ''; } catch (e) {}
+      return R.platform;
     }
   };
 

@@ -95,6 +95,8 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
@@ -131,7 +133,7 @@ body { background: var(--bg); }
         '</div>'+
       '</div>'+
 
-      '<div class="kb-sec"><div class="kb-sec-title">知识库健康度 <span class="kb-sec-more" onclick="location.href=\'brands.html\'">切换品牌 ›</span></div>'+
+      '<div class="kb-sec"><div class="kb-sec-title">知识库健康度 <span class="kb-sec-more" onclick="window.GEO_NAV.openBrands()">切换品牌 ›</span></div>'+
         '<div class="kb-health">'+
           '<div class="kb-health-card"><div class="kb-health-num up">'+b.kbHealth+'</div><div class="kb-health-label">健康度</div><div class="kb-health-sub">↑ +'+Math.abs(b.kbHealthDelta)+' 较上周</div></div>'+
           '<div class="kb-health-card"><div class="kb-health-num">'+facts.length+'</div><div class="kb-health-label">事实条目</div><div class="kb-health-sub">'+facts.filter(function(f){return f.status==='收录';}).length+' 已收录</div></div>'+
@@ -149,13 +151,17 @@ body { background: var(--bg); }
         '<span>知识库由你提交的品牌资料自动生成：业务描述 → 品牌介绍，核心优势 → 差异化信息，官网 → 主信源。知识库越完整，AI 越可能引用「'+b.short+'」。</span>'+
       '</div>'+
 
-      '<div class="kb-sec"><div class="kb-sec-title">事实库（'+b.short+'） <span class="kb-sec-more" onclick="UI.toast(\'演示版暂不支持编辑\',\'warn\')">编辑</span></div>'+
+      '<div class="kb-sec"><div class="kb-sec-title">事实库（'+b.short+'） <span class="kb-sec-more" onclick="location.href=\'optimize.html?focus=t1\'">去补全 ›</span></div>'+
         '<div class="kb-facts">'+facts.map(function(f){
           return '<div class="kb-fact">'+
             '<div class="kb-fact-type '+(typeCls[f.type]||'')+'">'+f.type+'</div>'+
             '<div class="kb-fact-body">'+
               '<div class="kb-fact-text">'+f.text+'</div>'+
-              '<div class="kb-fact-meta"><span>来源：'+f.source+'</span><span class="kb-fact-status '+(f.status==='收录'?'in':'pending')+'">'+(f.status==='收录'?'已收录':'待完善')+'</span></div>'+
+              '<div class="kb-fact-meta"><span>来源：'+f.source+'</span>'+
+              (f.status==='收录'
+                ? '<span class="kb-fact-status in">已收录</span>'
+                : '<span class="kb-fact-status pending" style="cursor:pointer;" onclick="location.href=\'optimize.html?focus=t1\'">待完善 · 去完善 ›</span>')+
+              '</div>'+
             '</div>'+
           '</div>';
         }).join('')+'</div>'+
@@ -163,7 +169,16 @@ body { background: var(--bg); }
   }
 
   render();
+  /* 深链定位：?section=dims 滚到五维条；?section=health 滚到健康度 */
+  (function () {
+    var q = D.parseQuery();
+    var el = null;
+    if (q.section === 'dims') el = document.querySelector('.kb-dims');
+    else if (q.section === 'health') el = document.querySelector('.kb-health');
+    if (el) D.highlight(el);
+  })();
 })();
 </script>
+<script>GEO_NAV.mount('index');</script>
 </body>
 </html>

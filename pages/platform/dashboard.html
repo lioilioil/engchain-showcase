@@ -20,7 +20,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="navbar">
     <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">平台运营台</div>
-    <div class="nav-right"><span class="mo-link" onclick="location.href='../home.html'">首页</span></div>
+    <div class="nav-right"><span class="staff-badge" id="staff-badge" style="display:none;">内部视角</span></div>
   </div>
 
   <div class="scroll" style="padding-top:8px;padding-bottom:40px;">
@@ -33,8 +33,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <!-- 内容区 -->
     <div id="pf-body"><div class="card"><div class="text-3 fs-12">加载中…</div></div></div>
 
+    <!-- 最近操作（审计留痕） -->
+    <div id="pf-audit"></div>
+
     <!-- 平台角色说明 -->
-    <div class="pf-note">平台运营台为演示视图：入驻审核 / 发布审核 / 需求管理 / 纠纷仲裁 / 佣金报表 / 资金监管，均调用与 App 同一数据层与规则函数。</div>
+    <div class="pf-note">平台运营台为演示视图：入驻审核 / 发布审核 / 需求管理 / 认证年审，均调用与 App 同一数据层与规则函数；平台不参与交易资金，不提供资金监管与佣金结算。</div>
   </div>
 </div>
 
@@ -45,6 +48,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/domain.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
+/* ===== 门控：仅平台内部人员（DataBus.isPlatformStaff）；其他人整页渲染无权限占位 ===== */
+var isStaff=false;
+try{isStaff=!!(window.DataBus&&DataBus.isPlatformStaff&&DataBus.isPlatformStaff());}catch(e){}
+if(!isStaff){
+  ['pf-stats','pf-tabs','pf-audit'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+  document.getElementById('pf-body').innerHTML=
+    '<div class="pf-noperm">'+
+    '<div class="pf-noperm-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.5v5.2c4.6 3 7 7 7 11.8-4 1.9-7 4.7-9.3 7-2.3-1.8-4.6-4.6-4.6-7.5V5.5L12 3z"/><path d="M9.3 12l2 2 3.4-3.6"/></svg></div>'+
+    '<div class="pf-noperm-t">平台运营台</div>'+
+    '<div class="pf-noperm-d">该入口仅限平台内部运营人员使用。<br>演示时请在左侧「演示场景」切换至 <b>④ 平台内部</b> 身份后进入。</div>'+
+    '<a class="pf-noperm-btn" href="../profile/index.html">返回我的</a>'+
+    '</div>';
+  return;
+}
+var _staffBadge=document.getElementById('staff-badge'); if(_staffBadge)_staffBadge.style.display='';
 function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{maximumFractionDigits:2});}
 function fmtW(n){return n>=10000?((n/10000).toFixed(n%10000===0?0:1))+' 万':fmt(n);}
 function ftime(ts){if(!ts)return '—';var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
@@ -54,7 +72,7 @@ function enStatus(s){return s==='pending'?'待初审':(s==='first_ok'?'待终审
 function bname(x){var u=DataBus.byId(x);return u?(u.name||x):x;}
 var TABS=[
   {k:'entry',label:'入驻审核'},{k:'supply',label:'发布审核'},{k:'demand',label:'需求管理'},
-  {k:'dispute',label:'纠纷仲裁'},{k:'commission',label:'佣金报表'},{k:'fund',label:'资金监管'}
+  {k:'cert',label:'认证年审'}
 ];
 var cur='entry';
 function renderStats(){
@@ -64,18 +82,23 @@ function renderStats(){
   var pendEntry=users.filter(function(u){return u.entry&&(u.entry.status==='pending'||u.entry.status==='first_ok');}).length;
   var pendSupply=window.SupplyStore?SupplyStore.listPending().length:0;
   var openDemand=window.DemandStore?DemandStore.list({openOnly:true}).length:0;
-  var disputes=0;
-  try{if(window.Mediation)disputes=Mediation.list({}).filter(function(o){return o.state==='disputed';}).length;}catch(e){}
-  var inFlight=0;try{if(window.Mediation)inFlight=Mediation.escrowInFlight();}catch(e){}
-  var feeTotal=0;
-  try{if(window.CommissionStore){var cs=CommissionStore.read();(cs.items||[]).forEach(function(f){feeTotal+=Number(f.fee)||0;});}}catch(e){}
+  var certSellers={},renewPending=0;
+  try{
+    var sitems=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items:[];
+    sitems.forEach(function(s){if((s.bizKey||'')==='agency'&&s.publisher)certSellers[s.publisher]=1;});
+    var renews={};try{renews=JSON.parse(localStorage.getItem('engchain-cert-renew')||'{}');}catch(e){}
+    Object.keys(certSellers).forEach(function(sid){if(renews[sid]!=='passed')renewPending++;});
+  }catch(e){}
+  var certTotal=Object.keys(certSellers).length;
+  var unlocks=0;
+  try{var urec=JSON.parse(localStorage.getItem('engchain-unlocked')||'{}');Object.keys(urec).forEach(function(k){if(k.indexOf('agency_')===0)unlocks++;});}catch(e){}
   var cells=[
     {k:'入驻待审',v:String(pendEntry),c:'var(--warning)'},
     {k:'发布待审',v:String(pendSupply),c:'var(--primary-dim)'},
     {k:'开放需求',v:String(openDemand),c:'var(--success)'},
-    {k:'纠纷中',v:String(disputes),c:'var(--danger)'},
-    {k:'托管在途',v:fmtW(inFlight),c:'var(--blue)'},
-    {k:'佣金累计',v:fmtW(feeTotal),c:'var(--primary-dim)'}
+    {k:'认证服务商',v:String(certTotal),c:'var(--blue)'},
+    {k:'待年审',v:String(renewPending),c:'var(--warning)'},
+    {k:'撮合解锁',v:String(unlocks),c:'var(--primary-dim)'}
   ];
   el.innerHTML='<div class="ps-grid">'+cells.map(function(c){
     return '<div class="ps-cell"><span class="ps-k">'+c.k+'</span><b class="ps-v" style="color:'+c.c+';">'+c.v+'</b></div>';
@@ -102,12 +125,12 @@ function renderEntry(){
     var isFirst=e.status==='pending',isFinal=e.status==='first_ok';
     var stc=e.status==='rejected'?'var(--danger)':(isFinal?'var(--warning)':'var(--primary-dim)');
     var acts='';
-    if(isFirst)acts='<button class="pf-btn" onclick="window.entryAct(\''+u.id+'\',\'first\')">初审通过</button><button class="pf-btn gold" onclick="window.entryAct(\''+u.id+'\',\'final\')">终审通过</button><button class="pf-btn ghost" onclick="window.entryAct(\''+u.id+'\',\'reject\')">驳回</button>';
+    if(isFirst)acts='<button class="pf-btn" onclick="window.entryAct(\''+u.id+'\',\'first\')">初审通过</button><button class="pf-btn ghost" onclick="window.entryAct(\''+u.id+'\',\'reject\')">驳回</button>';
     else if(isFinal)acts='<button class="pf-btn gold" onclick="window.entryAct(\''+u.id+'\',\'final\')">终审通过</button><button class="pf-btn ghost" onclick="window.entryAct(\''+u.id+'\',\'reject\')">驳回</button>';
     else acts='<button class="pf-btn ghost" onclick="window.entryAct(\''+u.id+'\',\'reopen\')">重新提交</button>';
     return '<div class="pf-card">'+
       '<div class="pf-top"><b>'+u.name+'</b><span class="pf-st" style="color:'+stc+';">'+enStatus(e.status)+'</span></div>'+
-      '<div class="pf-meta">申请：'+entryLabel(type)+' · 入驻费 '+fmt(e.fee||0)+' · 保证金 '+fmt(e.depositAmount||0)+'</div>'+
+      '<div class="pf-meta">申请：'+entryLabel(type)+' · 入驻费 '+fmt(e.fee||0)+' · 认证保证金 '+fmt(e.depositAmount||0)+'</div>'+
       '<div class="pf-meta">提交于 '+ftime(e.submittedAt||e.paidAt)+' · 联系人 '+(e.contact||u.name)+' · '+(e.tel||'—')+'</div>'+
       (e.note?'<div class="pf-meta" style="color:var(--danger);">驳回原因：'+e.note+'</div>':'')+
       '<div class="pf-acts">'+acts+'</div></div>';
@@ -143,29 +166,59 @@ window.pfPromptCancel=function(){
   var p=window._pfPrompt;if(!p)return;
   p.sh.close(); window._pfPrompt=null;
 };
+/* 二次确认（无输入框，用于高危动作：终审通过/清退/上架） */
+window.pfConfirm=function(title,desc,cb){
+  var sh=UI.sheet(); sh.setText(title);
+  sh.html('<div style="padding:2px 2px 6px;">'+
+    '<div style="font-size:12px;color:var(--text-2);margin-bottom:16px;line-height:1.7;">'+desc+'</div>'+
+    '<div style="display:flex;gap:10px;">'+
+    '<button class="pf-btn" style="flex:1;text-align:center;justify-content:center;" onclick="window.pfConfirmCancel()">取消</button>'+
+    '<button class="pf-btn gold" style="flex:1;text-align:center;justify-content:center;" onclick="window.pfConfirmOk()">确认</button>'+
+    '</div></div>');
+  sh.show();
+  window._pfConfirm={cb:cb,sh:sh};
+};
+window.pfConfirmOk=function(){var p=window._pfConfirm;if(!p)return;p.sh.close();window._pfConfirm=null;if(p.cb)p.cb();};
+window.pfConfirmCancel=function(){var p=window._pfConfirm;if(!p)return;p.sh.close();window._pfConfirm=null;};
 window.entryAct=function(id,act){
   var u=DataBus.byId(id);if(!u)return;
   var type=u.entry&&(u.entry.type||(u.entry.types&&u.entry.types[0])||'');
-  if(act==='first'){DataBus.entryFirstApprove(id,type,'');UI.toast('初审通过 → 待终审','ok');}
+  if(act==='first'){
+    DataBus.entryFirstApprove(id,type,'资料初审通过');
+    try{DataBus.pushDirectMessage(id,'入驻初审已通过','您的入驻申请已通过初审，等待平台终审。');}catch(e){}
+    try{DataBus.audit('入驻初审通过','平台运营台',u.name||id,'');}catch(e){}
+    UI.toast('初审通过 → 待终审','ok');
+  }
   else if(act==='final'){
-    if(u.entry&&u.entry.status==='pending'){DataBus.entryFirstApprove(id,type,'');}
-    DataBus.entryFinalApprove(id,type,'');
-    UI.toast('终审通过，已生效','ok');
+    /* 高危动作：二次确认；按钮分级后不会从 pending 直达，但代码仍防御性补 first */
+    pfConfirm('终审通过入驻申请','确认该企业入驻材料无误并开通账号？通过后入驻正式生效。',function(){
+      if(u.entry&&u.entry.status==='pending'){DataBus.entryFirstApprove(id,type,'资料初审通过');}
+      DataBus.entryFinalApprove(id,type,'');
+      try{DataBus.pushDirectMessage(id,'入驻审核已通过','您的企业入驻申请已通过终审，现已生效。');}catch(e){}
+      try{DataBus.audit('入驻终审通过','平台运营台',u.name||id,'');}catch(e){}
+      UI.toast('终审通过，已生效','ok');
+      renderStats();renderBody();renderAudit();
+    });
+    return;
   }
   else if(act==='reject'){
     pfPrompt('驳回入驻申请',{hint:'驳回原因将展示给申请人，驳回后可重新提交审核。',value:'资料不齐，请补充后重新提交'},function(res){
       var note=(res&&res.note!==undefined)?res.note:res;
       if(!note)return;
       DataBus.entryReject(id,type,note,'first');
+      try{DataBus.pushDirectMessage(id,'入驻申请被驳回','驳回原因：'+note+'。请补充材料后重新提交。');}catch(e){}
+      try{DataBus.audit('入驻驳回','平台运营台',u.name||id,note);}catch(e){}
       UI.toast('已驳回','ok');
-      renderStats();renderBody();
+      renderStats();renderBody();renderAudit();
     });
+    return;
   }
   else if(act==='reopen'){
     var u2=DataBus.byId(id);if(u2&&u2.entry){u2.entry.status='pending';u2.entry.note='';try{DataBus.syncUser(id);}catch(e){}}
+    try{DataBus.audit('入驻重新提交','平台运营台',u.name||id,'退回待初审');}catch(e){}
     UI.toast('已退回重新审核','ok');
   }
-  renderStats();renderBody();
+  renderStats();renderBody();renderAudit();
 };
 
 /* ========== 发布审核 ========== */
@@ -183,16 +236,25 @@ function renderSupply(){
   }).join('');
 }
 window.supplyAct=function(id,ok){
-  if(ok){SupplyStore.approve(id);UI.toast('已上架至市场','ok');renderStats();renderBody();}
-  else{
-    pfPrompt('驳回服务发布',{hint:'驳回原因将展示给发布方，服务需重新编辑提交。',value:'内容或资质信息不完整'},function(res){
-      var note=(res&&res.note!==undefined)?res.note:res;
-      if(!note)return;
-      SupplyStore.reject(id,note);
-      UI.toast('已驳回','ok');
-      renderStats();renderBody();
+  var s=null;try{s=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items.find(function(x){return x.id===id;}):null;}catch(e){}
+  if(ok){
+    pfConfirm('上架服务发布','确认将该服务/招聘上架至市场？上架后所有用户可见。',function(){
+      SupplyStore.approve(id);
+      if(s){try{DataBus.pushDirectMessage(s.publisher||s.sellerId,'发布已通过审核','您发布的「'+(s.title||s.name||'该服务')+'」已通过审核，现已上架。');}catch(e){}
+        try{DataBus.audit('发布上架','平台运营台',s.title||id,'');}catch(e){}}
+      UI.toast('已上架至市场','ok');renderStats();renderBody();renderAudit();
     });
+    return;
   }
+  pfPrompt('驳回服务发布',{hint:'驳回原因将展示给发布方，服务需重新编辑提交。',value:'内容或资质信息不完整'},function(res){
+    var note=(res&&res.note!==undefined)?res.note:res;
+    if(!note)return;
+    SupplyStore.reject(id,note);
+    if(s){try{DataBus.pushDirectMessage(s.publisher||s.sellerId,'发布被驳回','驳回原因：'+note+'。请修改后重新提交。');}catch(e){}
+      try{DataBus.audit('发布驳回','平台运营台',s.title||id,note);}catch(e){}}
+    UI.toast('已驳回','ok');
+    renderStats();renderBody();renderAudit();
+  });
 };
 
 /* ========== 需求管理 ========== */
@@ -201,9 +263,10 @@ function renderDemand(){
   var body=document.getElementById('pf-body');if(!body)return;
   if(!list.length){body.innerHTML='<div class="pf-empty">暂无需求发布</div>';return;}
   body.innerHTML=list.map(function(d){
-    var st={open:['开放报价','var(--success)'],quoted:['已有报价','var(--primary-dim)'],matched:['已匹配','var(--blue)'],closed:['已成交','var(--text-3)'],expired:['已过期','var(--text-3)'],cancelled:['已关闭','var(--text-3)']}[d.status]||['—','var(--text-3)'];
+    var st={open:['开放报价','var(--success)'],quoted:['已有报价','var(--primary-dim)'],matched:['已匹配','var(--blue)'],closed:['已成交','var(--text-3)'],expired:['已过期','var(--text-3)'],cancelled:['已下架','var(--text-3)']}[d.status]||['—','var(--text-3)'];
     var acts='';
     if(d.status==='open'||d.status==='quoted')acts='<button class="pf-btn ghost" onclick="window.demandClose(\''+d.id+'\')">下架</button>';
+    else if(d.status==='cancelled'&&d.platformClosed)acts='<button class="pf-btn" onclick="window.demandRestore(\''+d.id+'\')">恢复上架</button>';
     return '<div class="pf-card">'+
       '<div class="pf-top"><b>'+d.title+'</b><span class="pf-st" style="color:'+st[1]+';">'+st[0]+'</span></div>'+
       '<div class="pf-meta">发布方：'+bname(d.buyerId)+' · 期望 '+(d.time||'面议')+' · 预算 '+(d.budgetWan?d.budgetWan+' 万':'面议')+'</div>'+
@@ -213,107 +276,110 @@ function renderDemand(){
   }).join('');
 }
 window.demandClose=function(id){
+  var list=window.DemandStore?DemandStore.list({}):[];var d=null;for(var i=0;i<list.length;i++)if(list[i].id===id){d=list[i];break;}
   pfPrompt('下架需求',{hint:'下架原因将展示给发布方，下架后需求立即停止报价。',value:'内容需补充核实'},function(res){
     var note=(res&&res.note!==undefined)?res.note:res;
     if(!note)return;
     DemandStore.platformClose(id,note);
+    if(d){try{DataBus.pushDirectMessage(d.buyerId,'需求已被平台下架','下架原因：'+note);}catch(e){}
+      try{DataBus.audit('需求下架','平台运营台',d.title||id,note);}catch(e){}}
     UI.toast('已下架','ok');
-    renderStats();renderBody();
+    renderStats();renderBody();renderAudit();
   });
 };
-
-/* ========== 纠纷仲裁 ========== */
-function renderDispute(){
-  var all=[];try{if(window.Mediation)all=Mediation.list({});}catch(e){}
-  var list=all.filter(function(o){return o.state==='disputed';});
-  var body=document.getElementById('pf-body');if(!body)return;
-  if(!list.length){body.innerHTML='<div class="pf-empty">当前无纠纷订单</div>';return;}
-  body.innerHTML=list.map(function(o){
-    var mm=Mediation.money(o);
-    var dsc=o.dispute||{};
-    return '<div class="pf-card">'+
-      '<div class="pf-top"><b>'+(o.svcName||'中介服务')+'</b><span class="pf-st" style="color:var(--danger);">纠纷中</span></div>'+
-      '<div class="pf-meta">单号 '+o.id+' · 合同额 '+fmt(o.amount)+' · 已释放 '+fmt(mm.released)+'</div>'+
-      '<div class="pf-meta">买方 '+bname(o.buyerId)+' → 服务商 '+bname(o.sellerId)+'</div>'+
-      '<div class="pf-meta" style="color:var(--danger);">纠纷：'+(dsc.reason||dsc.note||'双方对履约存在争议')+'</div>'+
-      '<div class="pf-acts">'+
-      '<button class="pf-btn gold" onclick="window.arbitrate(\''+o.id+'\',\'release\')">放款结算</button>'+
-      '<button class="pf-btn" onclick="window.arbitrate(\''+o.id+'\',\'split\')">按比例分账</button>'+
-      '<button class="pf-btn ghost" onclick="window.arbitrate(\''+o.id+'\',\'refund\')">全额退款</button></div></div>';
-  }).join('');
-}
-window.arbitrate=function(id,decision){
-  var def=decision==='release'?'经核验，服务商已完成交付义务，托管余额放款结算':(decision==='refund'?'经核验，服务商未完成约定交付，剩余托管全额退还买方':'按履约比例分账，未履约部分退还买方');
-  var extra=decision==='split'?('<div style="font-size:12px;color:var(--text-2);margin-top:12px;">退款比例（0~1，0=全放款 1=全退款）</div>'+
-    '<input id="pf-prompt-num" type="number" step="0.1" min="0" max="1" value="0.5" style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg-card-2);color:var(--text-1);outline:none;margin-top:6px;">'):'';
-  pfPrompt(decision==='release'?'仲裁 · 放款结算':(decision==='refund'?'仲裁 · 全额退款':'仲裁 · 按比例分账'),{hint:'仲裁说明将写入订单时间线，买卖双方可见。',value:def,extra:extra},function(res){
-    var res2=Mediation.arbitrate(id,decision,(res.note||'平台仲裁'),res.ratio);
-    if(res2&&res2.error){UI.toast(res2.error,'warn');return;}
-    UI.toast(decision==='release'?'已放款结算':(decision==='refund'?'已全额退款':'已按比例分账'),'ok');
-    renderStats();renderBody();
-  });
+window.demandRestore=function(id){
+  var list=window.DemandStore?DemandStore.list({}):[];var d=null;for(var i=0;i<list.length;i++)if(list[i].id===id){d=list[i];break;}
+  if(d){d.status='open';d.platformClosed=false;d.platformNote='';d.updatedAt=Date.now();try{DemandStore.write&&DemandStore.write(DemandStore.read());}catch(e){}}
+  if(d){try{DataBus.pushDirectMessage(d.buyerId,'需求已恢复上架','您发布的需求已恢复开放报价。');}catch(e){}
+    try{DataBus.audit('需求恢复上架','平台运营台',d.title||id,'');}catch(e){}}
+  UI.toast('已恢复上架','ok');
+  renderStats();renderBody();renderAudit();
 };
 
-/* ========== 佣金报表 ========== */
-function renderCommission(){
-  var body=document.getElementById('pf-body');if(!body)return;
-  var items=[],violations=[];
-  try{if(window.CommissionStore){var cs=CommissionStore.read();items=cs.items||[];violations=cs.violations||[];}}catch(e){}
-  var totalFee=0,pending=0;
-  items.forEach(function(f){totalFee+=Number(f.fee)||0;if(f.status==='pending')pending+=Number(f.fee)||0;});
-  var html='<div class="pf-sum"><span>累计佣金 <b style="color:var(--primary-dim);">'+fmt(totalFee)+'</b></span><span>待结算 <b style="color:var(--warning);">'+fmt(pending)+'</b></span></div>';
-  if(!items.length){body.innerHTML=html+'<div class="pf-empty">暂无佣金流水（订单结算后生成）</div>';return;}
-  html+=items.map(function(f){
-    return '<div class="pf-card">'+
-      '<div class="pf-top"><b>'+(f.title||'订单')+'</b><span class="pf-st" style="color:var(--primary-dim);">'+fmt(f.fee)+'</span></div>'+
-      '<div class="pf-meta">服务商 '+bname(f.sellerId)+' · 成交 '+fmt(f.amount)+' · 费率 '+Math.round((Number(f.rate)||0)*1000)/10+'%</div>'+
-      '<div class="pf-meta">'+ftime(f.ts)+' · '+(f.status==='settled'?'已结算':'待结算')+(f.orderId?(' · '+f.orderId):'')+'</div></div>';
-  }).join('');
-  if(violations.length){
-    html+='<div class="pf-sec">违规记录 '+violations.length+' 条</div>'+violations.slice(0,5).map(function(v){
-      return '<div class="pf-card"><div class="pf-top"><b>'+bname(v.uid)+'</b><span class="pf-st" style="color:var(--danger);">'+fmt(v.amount)+'</span></div><div class="pf-meta">'+ftime(v.ts)+' · '+(v.reason||'违规扣罚')+'</div></div>';
-    }).join('');
-  }
-  body.innerHTML=html;
-}
+/* [PHASE 0] 纠纷仲裁 / 佣金报表 / 资金监管已下线：平台不参与交易资金，不提供资金监管与佣金结算。 */
 
-/* ========== 资金监管 ========== */
-function renderFund(){
+/* ========== 认证年审（Phase 0 新增）：深度认证服务商年审管理 ========== */
+function renderCert(){
   var body=document.getElementById('pf-body');if(!body)return;
-  var acct={intent:0,escrow:0,warranty:0,platform_income:0,available:0};
+  var et={};
+  try{et=(window.MOCK&&MOCK.business&&MOCK.business.entryTypes&&MOCK.business.entryTypes.agency)||{};}catch(e){}
+  var deepFee=Number(et.fee)||0, yearlyFee=Number(et.yearly&&et.yearly.price)||0;
+  var html='<div class="pf-card" style="border-color:rgba(184,153,104,.35);">'+
+    '<div class="pf-top"><b>认证分层</b><span class="pf-st" style="color:var(--primary-dim);">平台信任规则</span></div>'+
+    '<div class="pf-meta">基础认证：免费（实名与资质核验）· 深度认证：'+fmt(deepFee)+'/年 · 年审 '+fmt(yearlyFee)+'/年</div>'+
+    '<div class="pf-meta">年审内容：人工能力评估 / 征信评估 / 案例核验；年审不合格清退，违规扣认证保证金。</div></div>';
+  var sellers=[],seen={};
   try{
-    if(window.Ledger&&Ledger.accounts){var a=Ledger.accounts(Ledger.PLATFORM)||{};acct.intent=a.intent||0;acct.escrow=a.escrow||0;acct.warranty=a.warranty||0;acct.platform_income=a.platform_income||0;acct.available=a.available||0;}
+    var items=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items:[];
+    items.forEach(function(s){
+      if((s.bizKey||'')==='agency'&&s.publisher&&!seen[s.publisher]){seen[s.publisher]=1;sellers.push(s.publisher);}
+    });
   }catch(e){}
-  var inFlight=0;try{if(window.Mediation)inFlight=Mediation.escrowInFlight();}catch(e){}
-  var txns=[];try{if(window.Ledger)txns=Ledger.txns().slice(0,12);}catch(e){}
-  var cells=[
-    {k:'意向金账户',v:fmt(acct.intent),c:'var(--warning)'},
-    {k:'escrow 托管账户',v:fmt(acct.escrow),c:'var(--blue)'},
-    {k:'质保金账户',v:fmt(acct.warranty),c:'var(--primary-dim)'},
-    {k:'平台佣金收入',v:fmt(acct.platform_income),c:'var(--success)'}
-  ];
-  var html='<div class="ps-grid">'+cells.map(function(c){return '<div class="ps-cell"><span class="ps-k">'+c.k+'</span><b class="ps-v" style="color:'+c.c+';">'+c.v+'</b></div>';}).join('')+'</div>'+
-    '<div class="pf-note" style="margin:10px 0;">托管在途（未释放）合计 '+fmt(inFlight)+'：按里程碑验收后自动释放，退款走复式记账可对账。</div>';
-  if(txns.length){
-    html+='<div class="pf-sec">最近资金流水</div>'+txns.map(function(t){
-      return '<div class="pf-card"><div class="pf-top"><b>'+(t.remark||t.bizType||'资金划转')+'</b><span class="pf-st mono" style="color:var(--primary-dim);">'+fmt(t.amount)+'</span></div>'+
-        '<div class="pf-meta">'+(t.fromUid===Ledger.PLATFORM?'平台':bname(t.fromUid))+'['+(t.fromAcct||'available')+'] → '+(t.toUid===Ledger.PLATFORM?'平台':bname(t.toUid))+'['+(t.toAcct||'available')+']</div>'+
-        '<div class="pf-meta">'+ftime(t.ts)+' · '+(t.bizId||'')+'</div></div>';
-    }).join('');
-  }
-  body.innerHTML=html;
+  if(!sellers.length){body.innerHTML=html+'<div class="pf-empty">暂无深度认证服务商，入驻并发布中介服务后展示</div>';return;}
+  var renews={};try{renews=JSON.parse(localStorage.getItem('engchain-cert-renew')||'{}');}catch(e){}
+  body.innerHTML=html+sellers.map(function(sid){
+    var st=renews[sid];
+    var stc=st==='passed'?'var(--success)':(st==='removed'?'var(--danger)':'var(--warning)');
+    var stt=st==='passed'?'年审通过':(st==='removed'?'已清退':'待年审');
+    var acts=st==='passed'
+      ?'<button class="pf-btn" onclick="window.certAct(\''+sid+'\',\'renew\')">标记待年审</button><button class="pf-btn ghost" onclick="window.certAct(\''+sid+'\',\'remove\')">清退</button>'
+      :'<button class="pf-btn gold" onclick="window.certAct(\''+sid+'\',\'pass\')">通过年审</button>'+(st!=='removed'?'<button class="pf-btn ghost" onclick="window.certAct(\''+sid+'\',\'remove\')">清退</button>':'<button class="pf-btn" onclick="window.certAct(\''+sid+'\',\'renew\')">恢复</button>');
+    return '<div class="pf-card">'+
+      '<div class="pf-top"><b>'+bname(sid)+'</b><span class="pf-st" style="color:'+stc+';">'+stt+'</span></div>'+
+      '<div class="pf-meta">深度认证服务商 · 年审 '+fmt(yearlyFee)+'/年</div>'+
+      '<div class="pf-acts">'+acts+'</div></div>';
+  }).join('');
 }
+window.certAct=function(sid,act){
+  var doAct=function(){
+    try{
+      var o=JSON.parse(localStorage.getItem('engchain-cert-renew')||'{}');
+      if(act==='pass')o[sid]='passed';
+      else if(act==='remove')o[sid]='removed';
+      else delete o[sid];
+      localStorage.setItem('engchain-cert-renew',JSON.stringify(o));
+    }catch(e){}
+    var nm=bname(sid);
+    if(act==='pass'){
+      try{DataBus.pushDirectMessage(sid,'年审已通过','您的深度认证年审已通过，认证继续有效。');}catch(e){}
+      try{DataBus.audit('年审通过','平台运营台',nm,'');}catch(e){}
+      if(window.UI)UI.toast('年审已通过','ok');
+    }else if(act==='remove'){
+      try{DataBus.pushDirectMessage(sid,'认证已被清退','您的深度认证未通过年审，已被清退，认证保证金按规则扣罚。');}catch(e){}
+      try{DataBus.audit('年审清退','平台运营台',nm,'扣划认证保证金');}catch(e){}
+      if(window.UI)UI.toast('已清退，认证保证金按规则扣罚','ok');
+    }else{
+      try{DataBus.audit('年审恢复','平台运营台',nm,'恢复待年审');}catch(e){}
+      if(window.UI)UI.toast('已恢复为待年审','ok');
+    }
+    renderStats();renderCert();renderAudit();
+  };
+  if(act==='remove'){
+    pfConfirm('清退该认证服务商','清退后该服务商深度认证失效，已发布的中介服务将下架，并按规则扣划认证保证金。确认清退？',doAct);
+    return;
+  }
+  doAct();
+};
 
 function renderBody(){
-  var fns={entry:renderEntry,supply:renderSupply,demand:renderDemand,dispute:renderDispute,commission:renderCommission,fund:renderFund};
+  var fns={entry:renderEntry,supply:renderSupply,demand:renderDemand,cert:renderCert};
   if(fns[cur])fns[cur]();
 }
-renderStats();renderTabs();renderBody();
-window.addEventListener('engchain:mediation',function(){renderStats();if(cur==='dispute')renderBody();});
+/* 最近操作：读全局审计 engchain-audit，筛出平台运营台动作，倒序展示 8 条 */
+function renderAudit(){
+  var el=document.getElementById('pf-audit');if(!el)return;
+  var logs=[];try{logs=JSON.parse(localStorage.getItem('engchain-audit')||'[]');}catch(e){}
+  var mine=logs.filter(function(l){return l.module==='平台运营台';}).slice(0,8);
+  if(!mine.length){el.innerHTML='';return;}
+  el.innerHTML='<div class="pf-sec" onclick="var b=document.getElementById(\'pf-audit-body\');b.style.display=(b.style.display==\'none\'?\'\':\'none\')">最近操作 · '+mine.length+' 条</div>'+
+    '<div id="pf-audit-body">'+mine.map(function(l){
+      return '<div class="pf-audit-row"><span class="pf-audit-a">'+(l.action||'')+'</span><span class="pf-audit-tg">'+(l.target||'')+'</span><span class="pf-audit-tm">'+ftime(l.ts)+'</span>'+(l.extra?'<div class="pf-audit-ex">'+l.extra+'</div>':'')+'</div>';
+    }).join('')+'</div>';
+}
+renderStats();renderTabs();renderBody();renderAudit();
 window.addEventListener('engchain:entry',function(){renderStats();if(cur==='entry')renderBody();});
 window.addEventListener('engchain:supply',function(){renderStats();if(cur==='supply')renderBody();});
 window.addEventListener('engchain:demand',function(){renderStats();if(cur==='demand')renderBody();});
-window.addEventListener('engchain:ledger',function(){renderStats();if(cur==='fund')renderBody();});
 })();
 </script>
 <style>
@@ -347,7 +413,21 @@ window.addEventListener('engchain:ledger',function(){renderStats();if(cur==='fun
 .pf-sec{font-size:12px;font-weight:700;color:var(--text-1);margin:12px 0 8px;}
 .pf-empty{text-align:center;padding:40px 18px;color:var(--text-3);font-size:12.5px;background:var(--bg-card);border:1px dashed var(--line);border-radius:16px;}
 .pf-note{font-size:10.5px;color:var(--text-3);line-height:1.7;margin-top:14px;padding:0 4px;}
-.mo-link{font-size:12px;font-weight:600;color:var(--primary-dim);cursor:pointer;}
+.staff-badge{font-size:10px;font-weight:700;color:var(--primary-dim);background:var(--primary-soft);border:1px solid var(--accent-line);padding:3px 9px;border-radius:99px;}
+/* 无权限占位 */
+.pf-noperm{text-align:center;padding:60px 24px;}
+.pf-noperm-ic{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;background:var(--bg-card-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text-3);}
+.pf-noperm-ic svg{width:30px;height:30px;}
+.pf-noperm-t{font-size:17px;font-weight:800;color:var(--text-1);margin-bottom:8px;}
+.pf-noperm-d{font-size:12px;color:var(--text-2);line-height:1.8;margin-bottom:24px;}
+.pf-noperm-btn{display:inline-block;padding:10px 28px;border-radius:99px;background:var(--primary-dim);color:#fff;font-size:13px;font-weight:600;text-decoration:none;}
+/* 审计日志 */
+.pf-audit-row{font-size:11px;color:var(--text-2);padding:8px 12px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;}
+.pf-audit-row:last-child{border-bottom:none;}
+.pf-audit-a{font-weight:700;color:var(--text-1);}
+.pf-audit-tg{color:var(--text-2);}
+.pf-audit-tm{margin-left:auto;color:var(--text-3);font-size:10px;font-family:var(--font-num);}
+.pf-audit-ex{width:100%;color:var(--text-3);font-size:10.5px;line-height:1.5;}
 @media (prefers-reduced-motion: reduce){.pf-card{animation:none;}}
 </style>
 </body>

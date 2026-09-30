@@ -6,6 +6,13 @@
    ============================================================================ */
 window.GEO_DATA = (function () {
 
+  /* 深链高亮样式：所有 GEO 页共用（geo-data.js 已全局引用） */
+  (function () {
+    var s = document.createElement('style');
+    s.textContent = '.geo-deep-highlight{outline:2px solid var(--primary,#b89968);outline-offset:2px;border-radius:10px;}';
+    document.head.appendChild(s);
+  })();
+
   /* ---- 7 大 AI 引擎（固定） ---- */
   var ENGINES = [
     { id: 'doubao',     name: '豆包',     provider: '字节跳动', trend: [74, 76, 78, 80, 82, 84, 86] },
@@ -144,6 +151,28 @@ window.GEO_DATA = (function () {
     });
   }
 
+  /* ---- 深链读参基建（v4.0：入口带参跳转 + 目标页自动定位） ---- */
+  function parseQuery() {
+    var q = {};
+    try {
+      var sp = new URLSearchParams(location.search);
+      ['engine', 'kw', 'tab', 'focus', 'section'].forEach(function (k) {
+        var v = sp.get(k);
+        if (v) q[k] = v;
+      });
+    } catch (e) {}
+    return q;
+  }
+  /* 目标条目高亮：1.5s 金色描边后自动移除 */
+  function highlight(el) {
+    if (!el) return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('geo-deep-highlight');
+      setTimeout(function () { el.classList.remove('geo-deep-highlight'); }, 1600);
+    } catch (e) {}
+  }
+
   /* ---- 品牌数据 ---- */
   var brands = [];
   var USER_BRANDS_KEY = 'engchain-geo-brands';
@@ -241,6 +270,17 @@ window.GEO_DATA = (function () {
     switchBrand(b.id);
     return b;
   }
+  /* 删除品牌：预置示例品牌 b1 不可删；删除用户品牌后落盘并清理当前品牌指向 */
+  function deleteBrand(id) {
+    if (id === 'b1') return { ok: false, reason: 'example' };
+    var idx = -1;
+    for (var i = 0; i < brands.length; i++) { if (brands[i].id === id) { idx = i; break; } }
+    if (idx < 0) return { ok: false, reason: 'notfound' };
+    brands.splice(idx, 1);
+    saveUserBrands();
+    try { if (localStorage.getItem('engchain-geo-brand') === id) localStorage.removeItem('engchain-geo-brand'); } catch (e) {}
+    return { ok: true };
+  }
 
   /* ---- 渠道矩阵（优化发布渠道建议，报告第③段） ---- */
   var CHANNELS = [
@@ -324,9 +364,12 @@ window.GEO_DATA = (function () {
     switchBrand: switchBrand,
     resetBrand: resetBrand,
     addBrand: addBrand,
+    deleteBrand: deleteBrand,
     engineProfile: engineProfile,
     evidencesFor: evidencesFor,
     contentsFor: contentsFor,
-    factsFor: factsFor
+    factsFor: factsFor,
+    parseQuery: parseQuery,
+    highlight: highlight
   };
 })();

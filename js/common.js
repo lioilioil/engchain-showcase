@@ -776,7 +776,7 @@ window.UI = (function () {
     return '<div class="cert-tags">' + tags.map(t => '<span class="cert-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-' + (t.ic || 'check') + '"/></svg>' + t.t + '</span>').join('') +
       (c.reviewCount ? '<span class="cert-tag review">' + c.reviewCount + '条企业评价</span>' : '') + '</div>';
   }
-  // V4.0 状态摘要行：一行传达核心信任信号（已认证项数/最高资质/信用等级）
+  // V4.0 状态摘要行：一行传达核心信任信号（已认证项数/最高资质/信用档位）
   function certSummary(c) {
     const certs = c.certs || [];
     const dims = c.dims || [];
@@ -1976,8 +1976,8 @@ window.ListFooter = (function () {
   window.IdBadge = { render: render, html: html, ICONS: ICONS, TYPE_MAP: TYPE_MAP };
 })();
 /* ============================================================================
-   入驻等级系统 EntryTier
-   系统根据企业信息自动判断等级，非用户选择
+   入驻档位系统 EntryTier
+   系统根据企业信息自动判断档位，非用户选择
    建筑企业：标准建企/成长建企/规模建企/龙头建企
    中介服务：基础服务/专业服务/深度服务/尊享服务
    合伙人：初级合伙/中级合伙/高级合伙/战略合伙
@@ -2028,7 +2028,7 @@ window.ListFooter = (function () {
     return null;
   }
 
-  /* 系统自动判断等级（非用户选择） */
+  /* 系统自动判断档位（非用户选择） */
   function evaluate(type) {
     var stats = getStats(type);
     if (type === 'construction') {
@@ -2058,7 +2058,7 @@ window.ListFooter = (function () {
     return 1;
   }
 
-  /* 获取当前用户入驻类型+等级（系统自动判定） */
+  /* 获取当前用户入驻类型+档位（系统自动判定） */
   function current() {
     try {
       var acc = (typeof entryAccess === 'function') ? entryAccess() : null;
@@ -2077,26 +2077,26 @@ window.ListFooter = (function () {
     return tiers[Math.max(0, Math.min(3, level - 1))];
   }
 
-  /* 渲染等级徽章 */
+  /* 渲染档位徽章 */
   function render(type, level) {
     var t = getTier(type, level);
     if (!t) return '';
     return '<span class="et-tier-badge et-tier-l' + t.level + '" data-type="' + type + '">' +
-      '<span class="et-tier-lv">L' + t.level + '</span>' +
+      '<span class="et-tier-lv">档' + t.level + '</span>' +
       '<span class="et-tier-name">' + t.name + '</span>' +
     '</span>';
   }
 
-  /* 渲染等级进度条（含距下一等级提示） */
+  /* 渲染档位进度条（含距下一档提示） */
   function renderProgress(type, level) {
     var t = getTier(type, level);
     var next = getTier(type, level + 1);
     if (!t) return '';
     var pct = Math.round((level / 4) * 100);
-    var hint = next ? getNextHint(type, level) : '已达最高等级';
+    var hint = next ? getNextHint(type, level) : '已达最高档位';
     return '<div class="et-tier-progress">' +
       '<div class="etp-track"><div class="etp-fill" style="width:' + pct + '%;background:' + t.color + '"></div>' +
-      '<span class="etp-labels"><span>L1</span><span>L2</span><span>L3</span><span>L4</span></span></div>' +
+      '<span class="etp-labels"><span>档1</span><span>档2</span><span>档3</span><span>档4</span></span></div>' +
       '<div class="etp-info"><span class="etp-cur" style="color:' + t.color + '">' + t.name + '</span>' +
       '<span class="etp-hint">' + hint + '</span></div>' +
     '</div>';
@@ -2104,9 +2104,9 @@ window.ListFooter = (function () {
 
   function getNextHint(type, level) {
     var h = {
-      construction: ['年项目≥20 或 二级资质','年项目≥50 或 一级资质','特级资质 或 年项目≥100','已达最高等级'],
-      agency: ['成交订单≥10','成交订单≥20 或 好评率≥90%','成交订单≥50 且 好评率≥95%','已达最高等级'],
-      partner: ['累计佣金≥5000 或 邀请≥5人','累计佣金≥20000 或 团队≥10人','累计佣金≥50000 或 团队≥20人','已达最高等级']
+      construction: ['年项目≥20 或 二级资质','年项目≥50 或 一级资质','特级资质 或 年项目≥100','已达最高档位'],
+      agency: ['成交订单≥10','成交订单≥20 或 好评率≥90%','成交订单≥50 且 好评率≥95%','已达最高档位'],
+      partner: ['累计佣金≥5000 或 邀请≥5人','累计佣金≥20000 或 团队≥10人','累计佣金≥50000 或 团队≥20人','已达最高档位']
     };
     return (h[type] && h[type][level-1]) ? h[type][level-1] : '继续提升';
   }

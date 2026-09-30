@@ -361,6 +361,9 @@ body, .phone { background: var(--af-bg); }
       { id:'free-quota', label:'免费额度', href:'../wallet/free-quota.html',     icon:'i-download', cls:'ic-green',  need:'login' },
       { id:'pay-method', label:'支付方式', href:'../wallet/payment-method.html', icon:'i-card',     cls:'ic-blue',   need:'login' }
     ]},
+    { name:'平台治理', items:[
+      { id:'platform-dash', label:'平台运营台', href:'../platform/dashboard.html', icon:'i-shield', cls:'ic-blue', need:'staff' }
+    ]},
     { name:'系统设置', items:[
       { id:'guide',    label:'新手指引', href:'../guide/index.html',            icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4"/><path d="M4 4h13l-3 4 3 4H4"/></svg>', cls:'ic-purple', need:'open' },
       { id:'general',  label:'通用设置', href:'general-setting.html',            icon:'i-gear',     cls:'ic-muted',  need:'open' },
@@ -415,6 +418,12 @@ body, .phone { background: var(--af-bg); }
         if (!loggedIn()) return 'login';
         return acc.agency ? 'open' : 'agency';
       }
+      case 'staff': {
+        /* 平台运营台：运营身份开放；其他人可点（决策 A：入口可见），点入后由 dashboard 自身门控渲染无权限占位 */
+        if (!loggedIn()) return 'login';
+        try { if (window.DataBus && DataBus.isPlatformStaff && DataBus.isPlatformStaff()) return 'open'; } catch (e) {}
+        return 'staff';
+      }
       default: return 'open';
     }
   }
@@ -444,7 +453,8 @@ body, .phone { background: var(--af-bg); }
   }
 
   function itemHtml(en, st) {
-    var locked = (st !== 'open');
+    /* staff 状态视为可点（决策 A：入口对所有人可见，无权限在 dashboard 内部拦截） */
+    var locked = (st !== 'open') && (st !== 'staff');
     var badge = '';
     if (!locked) {
       if (en.pay) badge = '<span class="af-badge af-badge-pay">¥</span>';

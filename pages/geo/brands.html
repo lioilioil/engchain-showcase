@@ -36,14 +36,16 @@ body { background: var(--bg); }
 .br-card{display:flex;align-items:center;gap:11px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:13px;margin-bottom:10px;cursor:pointer;transition:transform var(--d-fast) var(--e-standard),box-shadow var(--d-fast),border-color var(--d-fast);box-shadow:var(--shadow-xs);position:relative;}
 .br-card:hover{border-color:var(--accent-line);box-shadow:var(--shadow-card);transform:translateY(-1px);} .br-card:active{transform:scale(.985);}
 .br-card.active{border-color:var(--accent-line);box-shadow:var(--shadow-card),0 0 0 1px var(--accent-line) inset;}
+.br-del{position:absolute;top:9px;right:9px;width:22px;height:22px;border:none;border-radius:50%;background:var(--bg-card-2);color:var(--text-3);font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--d-fast) var(--e-standard);z-index:2;}
+.br-del:hover{background:var(--error-soft);color:var(--error);}
 .br-logo{flex:none;width:42px;height:42px;border-radius:var(--r-m);background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(184,153,104,.35),inset 0 1px 0 rgba(255,255,255,.25);}
 .br-info{flex:1;min-width:0;}
-.br-name{font-size:13.5px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.br-name{font-size:13.5px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px;}
 .br-meta{font-size:10px;color:var(--text-3);margin-top:3px;}
 .br-score{text-align:center;flex:none;}
 .br-score-num{font-family:var(--font-num);font-size:19px;font-weight:800;color:var(--primary-dim);}
 .br-score-label{font-size:8.5px;color:var(--text-3);margin-top:1px;}
-.br-current{position:absolute;top:-7px;right:10px;font-size:8.5px;font-weight:800;color:var(--text-inv);background:linear-gradient(180deg,var(--primary-strong) 0%,var(--primary) 45%,var(--primary-dim) 100%);padding:2px 8px;border-radius:var(--r-full);box-shadow:0 2px 6px rgba(184,153,104,.4),inset 0 1px 0 rgba(255,255,255,.3);}
+.br-current{display:inline-block;vertical-align:1px;margin-left:6px;font-size:8.5px;font-weight:800;color:var(--text-inv);background:linear-gradient(180deg,var(--primary-strong) 0%,var(--primary) 45%,var(--primary-dim) 100%);padding:2px 8px;border-radius:var(--r-full);box-shadow:0 2px 6px rgba(184,153,104,.4),inset 0 1px 0 rgba(255,255,255,.3);}
 
 /* 空态 */
 .br-empty{text-align:center;padding:36px 20px;background:var(--bg-card);border:1px dashed var(--line-strong);border-radius:var(--r-l);}
@@ -158,6 +160,8 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
@@ -169,18 +173,41 @@ body { background: var(--bg); }
     document.getElementById('br-empty-sec').style.display = list.length ? 'none' : '';
     document.getElementById('br-list').innerHTML = list.map(function(b){
       return '<div class="br-card'+(cur && cur.id===b.id?' active':'')+'" data-id="'+b.id+'">'+
-        (cur && cur.id===b.id ? '<span class="br-current">检测中</span>' : '')+
         '<div class="br-logo">'+b.short.charAt(0)+'</div>'+
         '<div class="br-info">'+
-          '<div class="br-name">'+b.name+'</div>'+
+          '<div class="br-name">'+b.name+(cur && cur.id===b.id ? '<span class="br-current">检测中</span>' : '')+'</div>'+
           '<div class="br-meta">'+b.industry+' · 关键词 '+b.keywords.length+' 词 · 创建 '+b.createdAt+'</div>'+
         '</div>'+
         '<div class="br-score"><div class="br-score-num">'+b.geoScore+'</div><div class="br-score-label">GEO 分</div></div>'+
+        (b.id!=='b1' ? '<button class="br-del" data-del="'+b.id+'" title="删除品牌">×</button>' : '')+
       '</div>';
     }).join('');
   }
 
   document.getElementById('br-list').addEventListener('click', function(e){
+    var del = e.target.closest('.br-del');
+    if(del){
+      e.stopPropagation();
+      var bid = del.dataset.del;
+      var b = D.getBrands().filter(function(x){ return x.id===bid; })[0];
+      if(!b) return;
+      UI.dialog({
+        title: '删除品牌',
+        text: '确定删除「' + b.short + '」吗？删除后将清空该品牌的检测数据，且不可恢复。',
+        ok: '删除',
+        cancel: '取消',
+        onOk: function(){
+          var r = D.deleteBrand(bid);
+          if(r && r.ok){
+            render();
+            UI.toast('已删除「' + b.short + '」','ok');
+          } else {
+            UI.toast('示例品牌不可删除','warn');
+          }
+        }
+      });
+      return;
+    }
     var card = e.target.closest('.br-card');
     if(!card) return;
     D.switchBrand(card.dataset.id);
@@ -311,6 +338,12 @@ body { background: var(--bg); }
           W.industry = this.dataset.v;
         });
       });
+      /* 智能预填（P2-4）：官网失焦自动补 www. 前缀 */
+      var webIn = document.getElementById('w-in-web');
+      if (webIn) webIn.addEventListener('blur', function(){
+        var v = webIn.value.trim();
+        if (v && v.indexOf('://') < 0 && v.indexOf('www.') !== 0) webIn.value = 'www.' + v;
+      });
     }
     else if(W.step === 2){
       body.innerHTML =
@@ -326,6 +359,12 @@ body { background: var(--bg); }
     }
     else if(W.step === 3){
       var rec = recommended(W.industry);
+      /* 智能预填（P2-4）：首次进入自动预选本行业热度 Top1 词 */
+      if (!W.kws.length) {
+        var topRec = D.KEYWORD_BANK.filter(function(k){ return k.industry.indexOf(W.industry) >= 0; })
+          .slice().sort(function(a,b){ return b.heat - a.heat; })[0];
+        if (topRec) W.kws.push(topRec.term);
+      }
       body.innerHTML =
         '<div class="wz-step show">'+
           '<div class="wz-label">检测关键词 <span class="wz-required">*</span>（已选 <span id="w-kw-count">'+W.kws.length+'</span>/5）</div>'+
@@ -430,5 +469,6 @@ body { background: var(--bg); }
   render();
 })();
 </script>
+<script>GEO_NAV.mount('mine');</script>
 </body>
 </html>

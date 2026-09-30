@@ -41,8 +41,14 @@ body { background: var(--bg); }
 .rp-tab.active{background:var(--bg);color:var(--text-1);box-shadow:0 1px 3px rgba(0,0,0,.06);}
 
 /* 报告区块 */
-.rp-panel{display:none;margin-top:14px;}
+.rp-panel{display:none;margin-top:14px;position:relative;}
 .rp-panel.active{display:block;}
+.rp-lock{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(255,255,255,.55);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);border-radius:var(--r-m);z-index:5;}
+.rp-lock-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--shadow-card);padding:18px 16px;max-width:320px;width:100%;}
+.rp-lock-title{font-size:13.5px;font-weight:800;color:var(--text-1);}
+.rp-lock-desc{font-size:11px;color:var(--text-2);margin:6px 0 4px;}
+.rp-lock-list{font-size:11px;line-height:1.8;color:var(--text-2);margin-bottom:14px;}
+.rp-lock-note{font-size:10px;color:var(--text-3);text-align:center;margin-top:9px;}
 .rp-sec{margin-bottom:14px;}
 .rp-sec-card{background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-l);padding:14px;}
 .rp-sec-title{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:700;color:var(--text-1);margin-bottom:11px;}
@@ -127,7 +133,8 @@ body { background: var(--bg); }
 .rp-ev-head{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--text-1);}
 .rp-ev-ico{width:22px;height:22px;border-radius:var(--r-s);background:var(--primary-soft);color:var(--primary-dim);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;}
 .rp-ev-kw{font-size:9.5px;color:var(--text-3);margin-left:auto;}
-.rp-ev-text{font-size:11.5px;line-height:1.7;color:var(--text-2);margin-top:8px;background:var(--bg-card-2);border-radius:var(--r-m);padding:9px 11px;}
+.rp-ev-text{font-size:11.5px;line-height:1.7;color:var(--text-2);margin-top:8px;background:var(--bg-card-2);border-radius:var(--r-m);padding:9px 11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}
+.rp-ev-text.open{-webkit-line-clamp:unset;display:block;}
 .rp-ev-text b{color:var(--primary);}
 .rp-ev-time{font-size:9px;color:var(--text-3);margin-top:6px;}
 
@@ -198,6 +205,8 @@ body { background: var(--bg); }
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="geo-data.js"></script>
+<script src="geo-tip.js"></script>
+<script src="geo-nav.js"></script>
 <script>
 (function(){
   var D = window.GEO_DATA;
@@ -241,11 +250,11 @@ body { background: var(--bg); }
       '</div>'+
 
       '<div class="rp-tabs" id="rp-tabs">'+
-        '<div class="rp-tab active" data-tab="1">现状诊断</div>'+
-        '<div class="rp-tab" data-tab="2">问题定位</div>'+
-        '<div class="rp-tab" data-tab="3">渠道建议</div>'+
-        '<div class="rp-tab" data-tab="4">发布方案</div>'+
-        '<div class="rp-tab" data-tab="5">证据库</div>'+
+        '<div class="rp-tab active" data-tab="1">你现在怎么样</div>'+
+        '<div class="rp-tab" data-tab="2">问题在哪</div>'+
+        '<div class="rp-tab" data-tab="3">去哪发内容</div>'+
+        '<div class="rp-tab" data-tab="4">接下来怎么做</div>'+
+        '<div class="rp-tab" data-tab="5">AI 真的这么说</div>'+
       '</div>'+
 
       '<div class="rp-panel active" id="tab-1">'+
@@ -280,14 +289,18 @@ body { background: var(--bg); }
         '<div class="rp-sec"><div class="rp-sec-card"><div class="rp-sec-title">AI 回答证据（模拟）</div><div id="rp-evidences"></div></div></div>'+
       '</div>';
 
-    /* Tab */
+    /* Tab 切换（抽成 activateTab 供深链复用） */
+    window.activateTab = function(n){
+      var tabs = document.querySelectorAll('.rp-tab');
+      var panels = document.querySelectorAll('.rp-panel');
+      if(!tabs.length || !panels.length) return;
+      for(var i=0;i<tabs.length;i++){ tabs[i].classList.toggle('active', i+1===n); }
+      for(var j=0;j<panels.length;j++){ panels[j].classList.toggle('active', j+1===n); }
+    };
     document.getElementById('rp-tabs').addEventListener('click', function(e){
       var t = e.target.closest('.rp-tab');
       if(!t) return;
-      document.querySelectorAll('.rp-tab').forEach(function(x){x.classList.remove('active');});
-      document.querySelectorAll('.rp-panel').forEach(function(x){x.classList.remove('active');});
-      t.classList.add('active');
-      document.getElementById('tab-'+t.dataset.tab).classList.add('active');
+      activateTab(parseInt(t.dataset.tab, 10));
     });
 
     /* SOV */
@@ -357,19 +370,54 @@ body { background: var(--bg); }
     }).join('');
   }
 
+  /* 付费墙分层（P0-7）：Tab1 免费预览，Tab2-5 毛玻璃锁 */
+  var paid = false;
+  function applyPaywall(){
+    if (paid) return;
+    [2,3,4,5].forEach(function(n){
+      var panel = document.getElementById('tab-'+n);
+      if (!panel || panel.querySelector('.rp-lock')) return;
+      var ov = document.createElement('div');
+      ov.className = 'rp-lock';
+      ov.innerHTML =
+        '<div class="rp-lock-card">'+
+          '<div class="rp-lock-title">报告后半段已加锁</div>'+
+          '<div class="rp-lock-desc">解锁后可看到：</div>'+
+          '<div class="rp-lock-list">'+
+            '<div>② 问题在哪 —— 六大失语危机逐项定位</div>'+
+            '<div>③ 去哪发内容 —— 8 大发布渠道优先级矩阵</div>'+
+            '<div>④ 接下来怎么做 —— 分阶段发布方案 + 内容清单</div>'+
+            '<div>⑤ AI 真的这么说 —— 7 引擎原始回答证据</div>'+
+          '</div>'+
+          '<button class="btn btn-primary btn-block" style="height:44px;" onclick="window.openGen()">生成完整报告 · ¥500</button>'+
+          '<div class="rp-lock-note">按次付费 · 新品牌可先领 1 次体验券</div>'+
+        '</div>';
+      panel.appendChild(ov);
+    });
+  }
+  function unlockPaywall(){
+    paid = true;
+    document.querySelectorAll('.rp-lock').forEach(function(x){
+      x.style.transition='opacity .3s'; x.style.opacity='0';
+      setTimeout(function(){ x.remove(); }, 320);
+    });
+  }
+
   /* 生成流程 */
   window.openGen = function(){
     var b = D.currentBrand();
     if(!b){ location.href='brands.html'; return; }
+    var voucher = false;
+    try { voucher = localStorage.getItem('engchain-geo-voucher') === '1'; } catch (e) {}
     var sh = UI.sheet();
     sh.setText('生成「' + b.short + '」GEO 报告');
     sh.html(
       '<div style="padding:2px 4px 6px;">'+
-        '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;"><span style="font-family:var(--font-num);font-size:26px;font-weight:800;color:var(--primary);">¥500</span><span style="font-size:11px;color:var(--text-3);">/ 次 · 基于「'+b.name+'」检测数据生成</span></div>'+
+        '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;"><span style="font-family:var(--font-num);font-size:26px;font-weight:800;color:var(--primary);">'+(voucher ? '¥0' : '¥500')+'</span><span style="font-size:11px;color:var(--text-3);">'+(voucher ? '/ 次 · 体验券抵扣中' : '/ 次 · 基于「'+b.name+'」检测数据生成')+'</span></div>'+
         '<div style="font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:7px;">报告包含：</div>'+
-        '<div style="font-size:11.5px;color:var(--text-2);line-height:1.9;">① 现状诊断（SOV / 引擎收录 / 引用来源 / 竞品差距）<br>② 问题定位（六大失语危机）<br>③ 优化发布渠道建议<br>④ 分阶段发布方案（优化意见）+ 内容清单<br>⑤ AI 回答证据库</div>'+
+        '<div style="font-size:11.5px;color:var(--text-2);line-height:1.9;">① 你现在怎么样（SOV / 引擎收录 / 引用来源 / 竞品差距）<br>② 问题在哪（六大失语危机）<br>③ 去哪发内容（优化发布渠道建议）<br>④ 接下来怎么做（分阶段发布方案 + 内容清单）<br>⑤ AI 真的这么说（回答证据库）</div>'+
         '<div style="margin-top:12px;font-size:10px;color:var(--text-3);">演示环境：点击「确认生成」模拟支付与生成流程，不产生真实扣费。</div>'+
-        '<button class="btn btn-primary btn-block" style="margin-top:18px;height:46px;" onclick="window.confirmGen()">确认生成</button>'+
+        '<button class="btn btn-primary btn-block" style="margin-top:18px;height:46px;" onclick="window.confirmGen()">'+(voucher ? '使用体验券生成（0 元）' : '确认生成')+'</button>'+
       '</div>'
     );
     sh.show();
@@ -401,9 +449,30 @@ body { background: var(--bg); }
       if(i>=GEN_STEPS.length){
         clearInterval(timer);
         sub.textContent = '生成完成';
+        try {
+          if (window.FileStore) {
+            var b = D.currentBrand();
+            FileStore.add({
+              name: '「' + b.short + '」GEO 品牌报告.pdf',
+              ext: 'PDF',
+              size: (1.8 + Math.round(Math.random() * 14) / 10) + ' MB',
+              source: 'GEO 品牌雷达',
+              sourceKey: 'geo',
+              time: Date.now(),
+              timeText: '刚刚',
+              href: '../geo/report.html',
+              note: b.name + ' · GEO 综合分 ' + b.geoScore + ' · 覆盖 7 引擎 ' + b.keywords.length + ' 关键词',
+              event: 'GEO 报告生成'
+            });
+          }
+        } catch (e) {}
         setTimeout(function(){
           mask.classList.remove('show');
           UI.toast('报告已生成，可查看并分享','ok');
+          unlockPaywall();
+          activateTab(1);
+          var head = document.querySelector('.rp-head');
+          if (head) D.highlight(head);
         }, 500);
         return;
       }
@@ -412,7 +481,27 @@ body { background: var(--bg); }
   }
 
   render();
+  /* 证据原文点击展开（P1-4） */
+  document.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('.rp-ev-text') : null;
+    if (t) t.classList.toggle('open');
+  });
+  /* 深链定位（P0-4）：?tab=n 切 Tab；?focus=sov/cites 切 Tab1 滚到对应区块 */
+  (function () {
+    var q = D.parseQuery();
+    if (q.tab) {
+      var n = parseInt(q.tab, 10);
+      if (n >= 1 && n <= 5) activateTab(n);
+    }
+    if (q.focus === 'sov' || q.focus === 'cites') {
+      activateTab(1);
+      var el = document.getElementById(q.focus === 'sov' ? 'rp-sov' : 'rp-cites');
+      if (el) D.highlight(el);
+    }
+  })();
+  applyPaywall();
 })();
 </script>
+<script>GEO_NAV.mount(null);</script>
 </body>
 </html>
