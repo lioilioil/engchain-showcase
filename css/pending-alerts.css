@@ -1,0 +1,183 @@
+/* ═══════════════════════════════════════════════════════════════
+   pending-alerts.css — 用户待执行信息提醒模式（iOS 27 顶部下拉 · 液态玻璃）
+   ────────────────────────────────────────────────────────────────
+   · 视觉：明亮/暗色两套液态玻璃横幅（WebGL 真实折射由 js/liquid-glass.iife.js
+     提供；无 WebGL2 时库自动回退 backdrop-filter 并标记 data-liquid-glass="fallback"，
+     本表内 fallback 规则负责回退下的模糊与底色）。
+   · 交互：点击展开（.pa-open，grid-template-rows 0fr→1fr 高度向下延展）、
+     再点收回；左右滑动（.pa-dragging 跟随，越过阈值 → .pa-leave 向上收回关闭）；
+     点击横幅外区域 → 全部 .pa-leave 依次收回。
+   · 堆叠：绝对定位 + STACK_STEP(38px) 步进（见 js/pending-alerts.js），
+     展开态 z-index 100 覆盖下方横幅；边缘由下层横幅下缘露出可辨识。
+   · 全部颜色基于 app.css CSS 变量，明暗自动适配。
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ---------- 明暗变量（横幅自身） ---------- */
+:root {
+  --pa-tint: rgba(255, 255, 255, .5);
+  --pa-line: rgba(255, 255, 255, .58);
+  --pa-shadow: 0 12px 32px -10px rgba(24, 28, 46, .28), 0 3px 10px -4px rgba(24, 28, 46, .12);
+  --pa-hairline: rgba(120, 130, 150, .10);
+}
+[data-theme="dark"] {
+  --pa-tint: rgba(38, 40, 45, .58);
+  --pa-line: rgba(255, 255, 255, .10);
+  --pa-shadow: 0 14px 36px -10px rgba(0, 0, 0, .6), 0 4px 12px -4px rgba(0, 0, 0, .35);
+  --pa-hairline: rgba(255, 255, 255, .06);
+}
+
+/* ---------- 容器 ---------- */
+#pendingAlerts.pa-wrap {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0;
+  z-index: 420;                 /* 高于页面弹层，低于 toast */
+  height: 0;
+  pointer-events: none;         /* 容器不拦截，横幅自身接收事件 */
+}
+
+/* ---------- 单条横幅 ---------- */
+.pa-banner {
+  position: absolute;
+  left: 12px; right: 12px; margin: 0 auto;
+  max-width: 380px;
+  display: grid;
+  grid-template-rows: 1fr;      /* 收回时 1fr→0fr 整体塌缩 */
+  box-sizing: border-box;
+  border-radius: 22px;
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--text-1);
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;          /* 纵向滚动交还页面；横向滑动归横幅 */
+  background: var(--pa-tint);   /* fallback 底色（WebGL 玻璃画布会覆盖其上） */
+  border: 1px solid var(--pa-line);
+  box-shadow: var(--pa-shadow);
+  transition:
+    top .38s cubic-bezier(.32, .72, 0, 1),
+    grid-template-rows .36s cubic-bezier(.32, .72, 0, 1),
+    transform .36s cubic-bezier(.32, .72, 0, 1),
+    opacity .3s ease,
+    box-shadow .3s ease;
+}
+/* WebGL 玻璃生效时：底色交给玻璃画布 */
+.pa-banner[data-liquid-glass="webgl"] { background: transparent; }
+/* 回退（无 WebGL2 / 未挂玻璃）：真实模糊 + 半透明底 */
+.pa-banner:not([data-liquid-glass]), .pa-banner[data-liquid-glass="fallback"] {
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+}
+/* 进入：从顶部向下滑入 */
+.pa-banner.pa-enter {
+  animation: paDropIn .42s cubic-bezier(.32, .72, 0, 1) both;
+}
+@keyframes paDropIn {
+  from { transform: translateY(-130%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+/* 滑动跟手：关闭过渡，直接跟随位移 */
+.pa-banner.pa-dragging { transition: none; }
+/* 收回关闭：上移 + 塌缩 + 淡出 */
+.pa-banner.pa-leave {
+  grid-template-rows: 0fr;
+  transform: translateY(-26px);
+  opacity: 0;
+}
+
+/* ---------- 主体结构 ---------- */
+.pa-main { overflow: hidden; min-height: 0; }
+.pa-main-inner { padding: 12px 14px 12px 12px; }
+.pa-row { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+
+/* 类型图标 */
+.pa-ic {
+  flex: none; width: 40px; height: 40px;
+  border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 8px -2px rgba(0, 0, 0, .22);
+}
+.pa-ic svg { width: 20px; height: 20px; }
+.pa-ac-gold    { background: linear-gradient(135deg, var(--primary), var(--primary-dim)); }
+.pa-ac-blue    { background: linear-gradient(135deg, #4a7cf7, #2f5fe0); }
+.pa-ac-green   { background: linear-gradient(135deg, #34a86c, #1f8a52); }
+.pa-ac-teal    { background: linear-gradient(135deg, #2bb3a3, #17847a); }
+.pa-ac-neutral { background: var(--bg-card); color: var(--text-2); border: 1px solid var(--line); box-shadow: none; }
+
+/* 文案 */
+.pa-copy { flex: 1; min-width: 0; }
+.pa-title {
+  font-size: 14px; font-weight: 700; color: var(--text-1);
+  line-height: 1.35; letter-spacing: .01em;
+}
+.pa-subtitle {
+  font-size: 12px; color: var(--text-3);
+  margin-top: 2px; line-height: 1.4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 右列：金额 / 角标 / 箭头 */
+.pa-side { flex: none; display: flex; align-items: center; gap: 8px; }
+.pa-amount {
+  font-size: 15px; font-weight: 800; color: var(--primary-dim);
+  font-family: var(--font-num, inherit);
+}
+.pa-badge {
+  padding: 1px 8px; border-radius: 999px;
+  background: var(--warning-soft); color: var(--warning);
+  font-size: 10px; font-weight: 700;
+}
+.pa-chev {
+  width: 16px; height: 16px; color: var(--text-3); flex: none;
+  transition: transform .32s cubic-bezier(.32, .72, 0, 1);
+}
+.pa-banner.pa-open .pa-chev { transform: rotate(180deg); }
+
+/* ---------- 展开区（点击后从横幅底部向下延展） ---------- */
+.pa-detail {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .52s cubic-bezier(.32, .72, 0, 1);
+}
+.pa-banner.pa-open .pa-detail { grid-template-rows: 1fr; }
+.pa-detail-inner { overflow: hidden; min-height: 0; }
+.pa-banner.pa-open .pa-detail-inner > * { animation: paFadeIn .3s ease both; }
+@keyframes paFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pa-desc { font-size: 13px; color: var(--text-2); line-height: 1.65; margin-top: 12px; }
+.pa-meta { font-size: 11px; color: var(--text-3); margin-top: 8px; line-height: 1.5; word-break: break-all; }
+
+/* 操作行 */
+.pa-acts { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-bottom: 2px; }
+.pa-act {
+  height: 40px; border-radius: 20px; border: none;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.pa-act.primary {
+  flex: 1;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+  color: var(--text-inv);
+  box-shadow: 0 6px 16px -6px var(--primary-dim);
+}
+.pa-act.ghost {
+  flex: none; padding: 0 18px;
+  background: transparent; color: var(--text-3);
+  border: 1px solid var(--line);
+}
+.pa-act.primary:active { transform: scale(.97); }
+.pa-act.ghost:active { opacity: .6; }
+
+/* ---------- 无障碍：减弱动效 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .pa-banner, .pa-detail, .pa-chev, .pa-banner.pa-enter {
+    transition: none !important;
+    animation: none !important;
+  }
+  .pa-banner.pa-leave { transform: translateY(-26px); opacity: 0; }
+}

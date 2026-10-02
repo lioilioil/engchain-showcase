@@ -31,30 +31,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 
-  <div class="scroll">
+  <div class="scroll" style="padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px));">
     <!-- P1-4: 进行中订单卡片 -->
     <div id="active-orders-card" style="display:none;margin-bottom:12px;"></div>
-    <!-- 双路径分流——紧凑转化版 -->
-    <div class="dual-path">
-      <button class="dp-card dp-primary" onclick="window.openNeedSheet()">
-        <div class="dp-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </div>
-        <div class="dp-body">
-          <div class="dp-title">发布需求</div>
-          <div class="dp-desc">机构主动为你报价</div>
-        </div>
-      </button>
-      <button class="dp-card dp-secondary" onclick="window.scrollToMarket()">
-        <div class="dp-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        </div>
-        <div class="dp-body">
-          <div class="dp-title">浏览市场</div>
-          <div class="dp-desc">自己挑选服务，解锁联系</div>
-        </div>
-      </button>
-    </div>
     <!-- P0-2: 一句话信任背书（原担保横幅精简版） -->
     <div class="trust-bar">
       <svg class="ic" style="width:14px;height:14px;color:var(--primary-dim);flex:none;"><use href="#i-shield"/></svg>
@@ -113,6 +92,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
       </div>
     </div>
+  </div>
+  <!-- 底部固定悬浮按钮组：参考主 tabbar 液态玻璃容器（data-lg-glass 挂载），图标+短文案，竖线分隔 -->
+  <div class="app-float-cta" data-lg-glass>
+    <button type="button" class="afc-item" id="afcNeed">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      <span class="afc-label">发布需求</span>
+    </button>
+    <span class="afc-sep" aria-hidden="true">|</span>
+    <button type="button" class="afc-item" id="afcMarket">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <span class="afc-label">浏览市场</span>
+    </button>
   </div>
 </div>
 
@@ -193,6 +184,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/domain.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100209"></script>
 <script>
 (function(){window.__ROOT__='../../';
 function money(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN');}
@@ -699,6 +691,22 @@ window.scrollToMarket=function(){
   if(s&&anchor){try{s.scrollTo({top:anchor.offsetTop-72,behavior:'smooth'});}catch(e){s.scrollTop=anchor.offsetTop-72;}}
 };
 
+/* 底部固定悬浮按钮组（原顶部双路径卡片迁移）：绑定功能 + 点击过渡高亮 */
+(function(){
+  var afcNeed=document.getElementById('afcNeed');
+  if(afcNeed)afcNeed.addEventListener('click',function(){ window.openNeedSheet(); });
+  var afcMarket=document.getElementById('afcMarket');
+  if(afcMarket)afcMarket.addEventListener('click',function(){ window.scrollToMarket(); });
+  document.querySelectorAll('.app-float-cta .afc-item').forEach(function(b){
+    b.addEventListener('click',function(){
+      b.classList.remove('flash');
+      void b.offsetWidth;
+      b.classList.add('flash');
+      setTimeout(function(){ b.classList.remove('flash'); },320);
+    });
+  });
+})();
+
 /* P1-4 + P1-5: 用户分层——渲染进行中订单卡片 + 导航栏角标 */
 function renderActiveOrders(){
   var me=window.DataBus?DataBus.current():null;
@@ -806,6 +814,10 @@ var FILTER_RATE=[
   {id:'high',label:'高分服务 · 4.5分以上'},
   {id:'hot',label:'热门服务 · 10单以上'}
 ];
+/* 服务分类 → 服务方 联动：资质代办/工程担保/劳务派遣需机构资质承接，个人服务不适用 */
+var CAT_SELLER_LINK={'qual':['org'],'guarantee':['org'],'labor':['org'],'cost':['org','personal'],'corp':['org','personal']};
+/* 服务分类 → 价格区间 联动：依据市场公开行情（资质代办费数万起、保函费数百至数千、工商注册/代账数百至数千等） */
+var CAT_PRICE_LINK={'qual':['over5000','quote'],'guarantee':['500-2000','2000-5000','over5000','quote'],'cost':['under500','500-2000','2000-5000','quote'],'labor':['under500','500-2000','2000-5000','quote'],'corp':['under500','500-2000','2000-5000']};
 var tempFilterSeller='all',tempFilterPrice='all',tempFilterRate='all';
 function rateMatch(s,type){
   if(type==='all')return true;
@@ -814,30 +826,44 @@ function rateMatch(s,type){
   return true;
 }
 
+/* 联动禁用：分类选中后，不匹配的服务方/价格选项置灰；「全部」始终可选 */
+function optDisabled(mode, id){
+  if(id==='all'||curCat==='all')return '';
+  var map=mode==='seller'?CAT_SELLER_LINK:CAT_PRICE_LINK;
+  var allow=(map&&map[curCat])||null;
+  if(allow&&allow.indexOf(id)===-1)return ' disabled';
+  return '';
+}
 /* 筛选面板：分类选项与子bar保持一致 */
 function renderFilterBody(){
   var body=document.getElementById('filterBody');
   if(!body)return;
   var catHtml='<div class="filter-group"><div class="filter-group-label">服务分类</div><div class="filter-options">'+
-    CATS.map(function(c){return '<span class="filter-opt'+(c.id===curCat?' active':'')+'" data-fcat="'+c.id+'">'+c.label+'</span>';}).join('')+
+    CATS.map(function(c){return '<span class="fs-tag'+(c.id===curCat?' selected':'')+'" data-fcat="'+c.id+'">'+c.label+'</span>';}).join('')+
   '</div></div>';
   var sellerHtml='<div class="filter-group"><div class="filter-group-label">服务方</div><div class="filter-options">'+
-    FILTER_SELLER.map(function(s){return '<span class="filter-opt'+(s.id===tempFilterSeller?' active':'')+'" data-fseller="'+s.id+'">'+s.label+'</span>';}).join('')+
+    FILTER_SELLER.map(function(s){return '<span class="fs-tag'+(s.id===tempFilterSeller?' selected':'')+optDisabled('seller',s.id)+'" data-fseller="'+s.id+'">'+s.label+'</span>';}).join('')+
   '</div></div>';
   var priceHtml='<div class="filter-group"><div class="filter-group-label">价格区间</div><div class="filter-options">'+
-    FILTER_PRICE.map(function(p){return '<span class="filter-opt'+(p.id===tempFilterPrice?' active':'')+'" data-fprice="'+p.id+'">'+p.label+'</span>';}).join('')+
+    FILTER_PRICE.map(function(p){return '<span class="fs-tag'+(p.id===tempFilterPrice?' selected':'')+optDisabled('price',p.id)+'" data-fprice="'+p.id+'">'+p.label+'</span>';}).join('')+
   '</div></div>';
   var rateHtml='<div class="filter-group"><div class="filter-group-label">服务口碑</div><div class="filter-options">'+
-    FILTER_RATE.map(function(r){return '<span class="filter-opt'+(r.id===tempFilterRate?' active':'')+'" data-frate="'+r.id+'">'+r.label+'</span>';}).join('')+
+    FILTER_RATE.map(function(r){return '<span class="fs-tag'+(r.id===tempFilterRate?' selected':'')+'" data-frate="'+r.id+'">'+r.label+'</span>';}).join('')+
   '</div></div>';
   body.innerHTML=catHtml+sellerHtml+priceHtml+rateHtml;
-  body.querySelectorAll('.filter-opt').forEach(function(el){
+  body.querySelectorAll('.fs-tag').forEach(function(el){
     el.onclick=function(){
+      if(el.classList.contains('disabled'))return;
       var cat=el.getAttribute('data-fcat');
       var seller=el.getAttribute('data-fseller');
       var price=el.getAttribute('data-fprice');
       var rate=el.getAttribute('data-frate');
-      if(cat){curCat=cat;renderCats();renderList();}
+      if(cat){
+        curCat=cat;renderCats();renderList();
+        /* 切换分类时自动清理不适用该分类的服务方/价格草稿 */
+        if(CAT_SELLER_LINK[curCat]&&CAT_SELLER_LINK[curCat].indexOf(tempFilterSeller)===-1)tempFilterSeller='all';
+        if(CAT_PRICE_LINK[curCat]&&CAT_PRICE_LINK[curCat].indexOf(tempFilterPrice)===-1)tempFilterPrice='all';
+      }
       if(seller){tempFilterSeller=seller;}
       if(price){tempFilterPrice=price;}
       if(rate){tempFilterRate=rate;}
@@ -849,6 +875,9 @@ window.openFilterSheet=function(){
   tempFilterSeller=curFilterSeller;
   tempFilterPrice=curFilterPrice;
   tempFilterRate=curFilterRate;
+  /* 打开弹窗时清理不适用当前分类的服务方/价格筛选 */
+  if(CAT_SELLER_LINK[curCat]&&CAT_SELLER_LINK[curCat].indexOf(tempFilterSeller)===-1)tempFilterSeller='all';
+  if(CAT_PRICE_LINK[curCat]&&CAT_PRICE_LINK[curCat].indexOf(tempFilterPrice)===-1)tempFilterPrice='all';
   renderFilterBody();
   document.getElementById('filterMask').classList.add('show');
   document.getElementById('filterSheet').classList.add('show');
@@ -874,28 +903,6 @@ window.confirmFilter=function(){
 /* ===== P0-2: 信任背书条（降权为浅灰弱提示） ===== */
 .trust-bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg-card-2);border-radius:10px;margin-bottom:16px;font-size:11px;color:var(--text-3);font-weight:500;}
 .trust-badge{margin-left:auto;font-size:10px;font-weight:600;color:var(--text-2);background:transparent;border:none;padding:0 2px;flex:none;}
-
-/* ===== P0-1: 双路径分流卡片（HIG标准最终版） ===== */
-.dual-path{display:flex;flex-direction:row;gap:10px;margin-bottom:12px;animation:eb-in .45s var(--e-out) both;animation-delay:60ms;}
-.dp-card{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:14px;cursor:pointer;text-align:left;transition:all .2s ease-out;font:inherit;min-height:72px;border:none;outline:none;}
-.dp-card:active{transform:scale(0.97);transition:all .1s ease-in;}
-/* 主行动卡片：深金渐变+柔和阴影 */
-.dp-primary{background:linear-gradient(145deg,#b89868 0%,#9a7c4c 100%);color:#fff;box-shadow:0 4px 12px rgba(184,152,104,.25);position:relative;overflow:hidden;}
-.dp-primary::after{content:'';position:absolute;top:-20px;right:-20px;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none;}
-.dp-primary .dp-icon{color:#fff;}
-.dp-primary .dp-title{color:#fff;font-size:14px;font-weight:700;line-height:1.3;}
-.dp-primary .dp-desc{color:rgba(255,255,255,.82);font-size:11px;line-height:1.4;margin-top:2px;}
-/* 次行动卡片：白底轻边框 */
-.dp-secondary{background:var(--bg-card);border:1px solid var(--line);}
-.dp-secondary:active{background:var(--bg-card-2);border-color:color-mix(in srgb,var(--primary) 20%,var(--line));}
-.dp-secondary .dp-icon{color:var(--primary-dim);}
-.dp-secondary .dp-title{font-size:14px;font-weight:600;line-height:1.3;color:var(--text-1);}
-.dp-secondary .dp-desc{font-size:11px;line-height:1.4;color:var(--text-3);margin-top:2px;}
-/* 通用元素：小图标，不占大块空间 */
-.dp-icon{width:22px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;}
-.dp-icon svg{width:20px;height:20px;stroke-width:1.8;}
-.dp-body{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;z-index:1;}
-.dp-arrow{display:none;}
 
 /* ===== P1-4: 进行中订单卡片（横向滚动紧凑版） ===== */
 .active-orders-header{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;}
@@ -1002,15 +1009,9 @@ window.confirmFilter=function(){
 
 
 @media(max-width:375px){
-  .dp-icon{width:40px;height:40px;border-radius:11px;}
-  .dp-icon svg{width:19px;height:19px;}
-  .dp-card{padding:14px 10px;gap:8px;min-height:96px;}
-  .dp-title{font-size:14.5px;}
-  .dp-desc{font-size:10.5px;}
-  .dp-tag{font-size:9.5px;padding:2px 8px;}
   .cr-s{display:none;}
 }
-@media (prefers-reduced-motion: reduce){.svc-card,.dp-card{animation:none;}}
+@media (prefers-reduced-motion: reduce){.svc-card{animation:none;}}
 
 /* P2-11: 交叉导流弱化样式 */
 .cross-resource-row{display:flex;gap:10px;margin:0 0 16px;}
@@ -1089,9 +1090,10 @@ window.confirmFilter=function(){
 .filter-group{margin-bottom:18px;}
 .filter-group-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:10px;letter-spacing:.3px;}
 .filter-options{display:flex;flex-wrap:wrap;gap:8px;}
-.filter-opt{padding:7px 14px;border-radius:999px;font-size:12px;color:var(--text-2);background:var(--bg-card-2);border:1px solid transparent;cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:500;}
-.filter-opt:active{transform:scale(.95);}
-.filter-opt.active{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(184,153,104,.3);}
+.fs-tag{padding:7px 14px;border-radius:var(--r-full);font-size:12px;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:all var(--d-fast);white-space:nowrap;}
+.fs-tag:active{transform:scale(.96);}
+.fs-tag.selected{background:var(--primary-soft);border-color:var(--primary);color:var(--primary-dim);font-weight:600;}
+.fs-tag.disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
 .filter-foot{display:flex;gap:10px;padding:12px 18px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);flex:none;background:var(--bg);}
 .filter-reset{flex:1;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:14px;font-weight:600;cursor:pointer;}
 .filter-confirm{flex:2;height:44px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(31,78,153,.3);}
@@ -1102,6 +1104,77 @@ window.confirmFilter=function(){
 .match-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-48%) scale(.95);width:calc(100vw - 48px);max-width:360px;background:var(--bg-card);border-radius:18px;z-index:301;padding:20px 18px 16px;opacity:0;pointer-events:none;transition:all .25s cubic-bezier(.34,1.56,.64,1);box-shadow:0 12px 40px rgba(0,0,0,.18);}
 .match-modal.show{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
 .match-close-btn{width:100%;height:44px;margin-top:16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#fff;font-size:14px;font-weight:600;cursor:pointer;}
+/* ===== 底部固定悬浮按钮组（参考主 tabbar 液态玻璃：容器 data-lg-glass 挂载 WebGL 玻璃） ===== */
+.app-float-cta{
+  position:absolute !important; left:50%; right:auto; transform:translateX(-50%);
+  width:max-content; max-width:calc(100% - 32px);
+  bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index:55; height:52px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center; padding:0 12px;
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+      rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+      rgba(255,255,255,.78) 100%),
+    linear-gradient(180deg,
+      rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+      rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+  -webkit-backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  border:1px solid rgba(255,255,255,.88);
+  box-shadow:
+    0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+    inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+    inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+    inset 0 0 0 1px rgba(255,255,255,.40);
+  user-select:none; -webkit-user-select:none;
+}
+.app-float-cta::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; z-index:1; pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+    rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+}
+.app-float-cta .afc-item{
+  flex:none; height:100%; min-width:0; border:0; background:transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  color:var(--text-1); font-size:13px; font-weight:500; letter-spacing:.02em;
+  transition:color .25s, font-weight .25s, transform .15s;
+  font-family:var(--font-display);
+  position:relative; z-index:2;
+  text-shadow:0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+  padding:0 9px;
+}
+.app-float-cta .afc-item svg{
+  width:18px; height:18px; stroke-width:2; flex:none;
+  transition:stroke-width .2s, color .25s;
+}
+.app-float-cta .afc-item:active{ transform:scale(.94); }
+.app-float-cta .afc-item.flash{ color:var(--primary-dim); font-weight:700; }
+.app-float-cta .afc-item.flash svg{ stroke-width:2.4; }
+.app-float-cta .afc-sep{ flex:none; color:rgba(22,22,22,.28); font-size:12px; padding:0 2px; position:relative; z-index:2; }
+/* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+[data-theme="dark"] .app-float-cta{
+  background:linear-gradient(180deg,
+    rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+    rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+  border-color:rgba(255,255,255,.16);
+  box-shadow:
+    0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+    inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+    inset 0 0 0 1px rgba(255,255,255,.06);
+}
+[data-theme="dark"] .app-float-cta::before{
+  background:linear-gradient(180deg,
+    rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+    rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+}
+[data-theme="dark"] .app-float-cta .afc-item{
+  color:var(--text-1);
+  text-shadow:0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+}
+[data-theme="dark"] .app-float-cta .afc-item.flash{ color:var(--primary-dim); font-weight:700; }
+[data-theme="dark"] .app-float-cta .afc-sep{ color:rgba(242,240,236,.30); }
 </style>
 </body>
 </html>

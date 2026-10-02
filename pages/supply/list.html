@@ -58,8 +58,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 /* 筛选选项 */
 .filter-group { margin-bottom: 18px; }
 .filter-group-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 10px; }
-.filter-opt { display: inline-block; padding: 6px 14px; border-radius: 999px; font-size: 12px; cursor: pointer; margin: 0 8px 8px 0; border: 1px solid var(--line); color: var(--text-2); background: var(--bg-card); transition: all .15s; }
-.filter-opt.active { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.fs-tag { display: inline-block; padding: 7px 14px; border-radius: 999px; font-size: 12px; cursor: pointer; margin: 0 8px 8px 0; border: 1px solid var(--line); color: var(--text-2); background: var(--bg-card); transition: all var(--d-fast); white-space: nowrap; }
+.fs-tag:active { transform: scale(.96); }
+.fs-tag.selected { border-color: var(--primary); color: var(--primary-dim); background: var(--primary-soft); font-weight: 600; }
+.fs-tag.disabled { opacity: .35; cursor: not-allowed; pointer-events: none; }
 </style>
 <link rel="stylesheet" href="../../css/liquid-dock.css">
 </head>
@@ -148,6 +150,46 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
   /* 供需类通用筛选 */
   var MATCH_FILTERS = { category: ['全部'].concat(Object.keys(BIZ_MAP)), city: ['全部', '成都', '北京', '上海', '广州', '深圳', '重庆', '昆明', '贵阳'], budget: ['全部', '面议', '1万以下', '1-5万', '5-20万', '20-100万', '100万以上'], verified: ['全部', '已认证', '未认证'] };
+  /* 分类 → 预算/薪资 联动（依据市场公开行情：资质加盟费、建企转让价、建造师/技术工人薪资、供需类费用区间） */
+  var BUDGET_LINK = {
+    franchise: {
+      '施工总承包': ['10万以下','10-50万','50万以上'],
+      '专业承包': ['面议','10万以下','10-50万'],
+      '劳务分包': ['面议','10万以下'],
+      '设计资质': ['面议','10万以下','10-50万'],
+      '监理资质': ['面议','10万以下','10-50万'],
+      '造价咨询': ['面议','10万以下']
+    },
+    trade: {
+      '建筑公司': ['50-200万','200-500万','500万以上'],
+      '装饰公司': ['50万以下','50-200万'],
+      '劳务公司': ['50万以下','50-200万'],
+      '设计公司': ['50-200万','200-500万'],
+      '监理公司': ['50-200万','200-500万'],
+      '其他': ['面议','50万以下','50-200万']
+    },
+    talent: {
+      '一级建造师': ['1-2万','2万以上'],
+      '二级建造师': ['5千-1万','1-2万'],
+      '注册工程师': ['1-2万','2万以上'],
+      '技术工人': ['面议','5千以下','5千-1万'],
+      '项目经理': ['1-2万','2万以上'],
+      '其他': ['面议','5千以下','5千-1万','1-2万']
+    },
+    match: {
+      '材料': ['面议','1万以下','1-5万'],
+      '设备': ['1-5万','5-20万','20-100万'],
+      '劳务': ['面议','1万以下','1-5万'],
+      '项目合作': ['5-20万','20-100万','100万以上'],
+      '合作': ['5-20万','20-100万','100万以上'],
+      '中介服务': ['1-5万','5-20万'],
+      '中介': ['1-5万','5-20万'],
+      '资质招商': ['5-20万','20-100万'],
+      '建企买卖': ['20-100万','100万以上'],
+      '招聘': ['面议','1万以下','1-5万'],
+      '求职': ['面议','1万以下','1-5万']
+    }
+  };
   /* 一级 tab 的二级分类（资源/供应/需求/服务） */
   var SUBTABS = {
     resource: [{ key: 'all', label: '全部' }, { key: 'franchise', label: '资质招商' }, { key: 'trade', label: '建企买卖' }, { key: 'personnel', label: '企业招聘' }, { key: 'talent', label: '人才求职' }],
@@ -290,6 +332,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   function renderFilterGroups() {
     var cfg = getFilterConfig();
+    var linkKey = (type === 'resource' && sub !== 'all' && RESOURCE_FILTERS[sub]) ? sub : 'match';
+    var link = BUDGET_LINK[linkKey] || null;
     var groups = [
       { key: 'category', label: '分类', options: cfg.category },
       { key: 'city', label: '地区', options: cfg.city },
@@ -299,14 +343,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var html = groups.map(function (g) {
       var opts = g.options.map(function (o) {
         var active = filterDraft[g.key] === o;
-        return '<span class="filter-opt' + (active ? ' active' : '') + '" data-g="' + g.key + '" data-v="' + o + '">' + o + '</span>';
+        var disabled = '';
+        if (g.key === 'budget' && o !== '全部' && link && filterDraft.category !== '全部' && link[filterDraft.category] && link[filterDraft.category].indexOf(o) === -1) disabled = ' disabled';
+        return '<span class="fs-tag' + (active ? ' selected' : '') + disabled + '" data-g="' + g.key + '" data-v="' + o + '">' + o + '</span>';
       }).join('');
       return '<div class="filter-group"><div class="filter-group-label">' + g.label + '</div><div>' + opts + '</div></div>';
     }).join('');
     document.getElementById('filter-groups').innerHTML = html;
-    document.querySelectorAll('.filter-opt').forEach(function (el) {
+    document.querySelectorAll('.fs-tag').forEach(function (el) {
       el.addEventListener('click', function () {
+        if (el.classList.contains('disabled')) return;
         filterDraft[el.dataset.g] = el.dataset.v;
+        /* 切换分类时自动清理不适用该分类的预算/薪资筛选 */
+        if (el.dataset.g === 'category' && link && filterDraft.category !== '全部' && link[filterDraft.category] && link[filterDraft.category].indexOf(filterDraft.budget) === -1) filterDraft.budget = '全部';
         renderFilterGroups();
       });
     });
@@ -314,6 +363,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   window.openFilter = function () {
     filterDraft = { category: filterState.category, city: filterState.city, budget: filterState.budget, verified: filterState.verified };
+    /* 打开弹窗时清理不适用当前分类的预算/薪资筛选 */
+    var cfg0 = getFilterConfig();
+    var linkKey0 = (type === 'resource' && sub !== 'all' && RESOURCE_FILTERS[sub]) ? sub : 'match';
+    var link0 = BUDGET_LINK[linkKey0] || null;
+    if (link0 && filterDraft.category !== '全部' && link0[filterDraft.category] && link0[filterDraft.category].indexOf(filterDraft.budget) === -1) filterDraft.budget = '全部';
     renderFilterGroups();
     var ov = document.getElementById('filter-overlay');
     ov.style.display = 'block';
@@ -481,7 +535,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
 })();
 </script>
-<script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100209"></script>
 </body>
 </html>
 

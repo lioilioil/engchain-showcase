@@ -14,6 +14,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <title>人员招聘 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928182312">
+<link rel="stylesheet" href="../../css/delegates.css">
 <style>
   /* ===== 双端 Tab ===== */
   .tab-bar { display:flex; background:var(--bg-card); border-bottom:1px solid var(--line); padding:0 16px; }
@@ -129,6 +130,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ===== 排序 tabs ===== */
   .sort-row { display:flex; align-items:center; padding:0 16px; }
   .sort-tabs { display:flex; gap:18px; margin:0 16px 2px; }
+  .subbar-row { display:flex; align-items:center; gap:10px; margin:0 16px 2px; }
+  .subbar-row .sort-tabs { flex:1; min-width:0; margin:0; }
   .st-item { flex:none; padding:0 0 6px; font-size:13px; font-weight:500; font-family:var(--font-display); color:var(--text-2); cursor:pointer; position:relative; transition:color var(--d-fast); white-space:nowrap; }
   .st-item:active { opacity:.6; }
   .st-item.active { color:var(--text-1); font-weight:600; }
@@ -163,15 +166,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .fs-btn.cancel { background:var(--bg-card-2); color:var(--text-2); }
   .fs-btn.confirm { background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); box-shadow:0 4px 12px -3px var(--primary-dim); }
 
-  /* ===== 委托居中弹窗 ===== */
+  /* ===== 委托自下而上弹窗（bottom sheet：grab 手柄拖拽展开/关闭 + 遮罩关闭，规则与筛选底部面板一致） ===== */
   .delegate-mask { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; opacity:0; pointer-events:none; transition:opacity .3s ease; }
   .delegate-mask.show { opacity:1; pointer-events:auto; }
-  .delegate-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.9); z-index:101; width:86%; max-width:340px; background:var(--bg); border-radius:16px; padding:20px; opacity:0; pointer-events:none; transition:all .3s cubic-bezier(.34,1.56,.64,1); }
-  .delegate-modal.show { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
-  .dm-close { position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%; background:var(--bg-card-2); border:none; color:var(--text-2); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-  .dm-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; box-shadow:0 4px 14px -3px var(--primary-dim); }
+  .delegate-modal { position:fixed; left:0; right:0; bottom:0; z-index:101; width:100%; max-height:85vh; display:flex; flex-direction:column; background:var(--bg); border-radius:16px 16px 0 0; padding:0; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .35s cubic-bezier(.4,0,.2,1), opacity .3s ease; box-shadow:0 -8px 32px rgba(0,0,0,.14); }
+  .delegate-modal.show { transform:translateY(0); opacity:1; pointer-events:auto; }
+  .dm-sheet-grab { flex:none; padding:10px 0 8px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .dm-sheet-grab .grab { width:40px; height:5px; border-radius:var(--r-full); background:var(--line-strong,var(--line)); margin:0 auto; }
+  .dm-head { display:flex; align-items:center; justify-content:space-between; padding:0 20px 4px; flex:none; }
+  .dm-sheet-body { flex:1; min-height:0; overflow-y:auto; padding:0 20px 8px; -webkit-overflow-scrolling:touch; }
+  .dm-sheet-body .dm-form { max-height:none; overflow:visible; }
+  .dm-sheet-foot { flex:none; padding:12px 20px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); }
+  .dm-close { width:28px; height:28px; border-radius:50%; background:var(--bg-card-2); border:none; color:var(--text-2); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; transition:transform var(--d-fast); }
+  .dm-close:active { transform:scale(.9); }
+  .dm-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); display:flex; align-items:center; justify-content:center; margin:10px auto 12px; box-shadow:0 4px 14px -3px var(--primary-dim); }
   .dm-icon svg { width:22px; height:22px; }
-  .dm-title { font-size:16px; font-weight:700; color:var(--text-1); text-align:center; margin-bottom:6px; }
+  .dm-title { font-size:16px; font-weight:700; color:var(--text-1); margin-bottom:0; }
   .dm-desc { font-size:12px; color:var(--text-3); text-align:center; line-height:1.6; margin-bottom:14px; }
   .dm-input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px; color:var(--text-1); background:var(--bg-card); margin-bottom:10px; outline:none; transition:border-color var(--d-fast); box-sizing:border-box; }
   .dm-input:focus { border-color:var(--primary); }
@@ -179,11 +189,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .dm-btn { width:100%; padding:12px 0; border-radius:var(--r-full); background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); font-size:14px; font-weight:600; border:none; cursor:pointer; box-shadow:0 4px 12px -3px var(--primary-dim); transition:transform var(--d-fast); }
   .dm-btn:active { transform:scale(.97); }
 
-  /* ===== 提交专享委托确认弹窗 ===== */
+  /* ===== 提交专享委托确认弹窗（自下而上） ===== */
   .exclusive-mask { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; opacity:0; pointer-events:none; transition:opacity .3s ease; }
   .exclusive-mask.show { opacity:1; pointer-events:auto; }
-  .exclusive-modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.9); z-index:101; width:86%; max-width:320px; background:var(--bg); border-radius:16px; padding:24px 20px 20px; opacity:0; pointer-events:none; transition:all .3s cubic-bezier(.34,1.56,.64,1); }
-  .exclusive-modal.show { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+  .exclusive-modal { position:fixed; left:0; right:0; bottom:0; z-index:101; width:100%; background:var(--bg); border-radius:16px 16px 0 0; padding:0 20px calc(20px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; align-items:center; transform:translateY(100%); opacity:0; pointer-events:none; transition:transform .35s cubic-bezier(.4,0,.2,1), opacity .3s ease; box-shadow:0 -8px 32px rgba(0,0,0,.14); }
+  .exclusive-modal.show { transform:translateY(0); opacity:1; pointer-events:auto; }
+  .exclusive-modal .dm-sheet-grab { align-self:stretch; }
   .em-icon { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,var(--primary),var(--primary-dim)); color:var(--text-inv); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; box-shadow:0 4px 14px -3px var(--primary-dim); }
   .em-icon svg { width:24px; height:24px; }
   .em-title { font-size:16px; font-weight:700; color:var(--text-1); text-align:center; margin-bottom:8px; }
@@ -263,6 +274,79 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .cs-sub { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.5; }
   .cs-arrow { flex:none; color:var(--text-4); }
   .cs-arrow svg { width:18px; height:18px; }
+
+  /* ===== 底部固定悬浮按钮组（参考主 tabbar 液态玻璃：容器 data-lg-glass 挂载 WebGL 玻璃） ===== */
+  .app-float-cta {
+    position: absolute !important; left: 50%; right: auto; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 32px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 55; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 12px;
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+        rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+        rgba(255,255,255,.78) 100%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+        rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    border: 1px solid rgba(255,255,255,.88);
+    box-shadow:
+      0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+      inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+      inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.40);
+    user-select: none; -webkit-user-select: none;
+  }
+  .app-float-cta::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+      rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+  }
+  .app-float-cta .afc-item {
+    flex: none; height: 100%; min-width: 0; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    color: var(--text-1); font-size: 13px; font-weight: 500; letter-spacing: .02em;
+    transition: color .25s, font-weight .25s, transform .15s;
+    font-family: var(--font-display);
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+    padding: 0 9px;
+  }
+  .app-float-cta .afc-item svg {
+    width: 18px; height: 18px; stroke-width: 2; flex: none;
+    transition: stroke-width .2s, color .25s;
+  }
+  .app-float-cta .afc-item:active { transform: scale(.94); }
+  .app-float-cta .afc-item.flash, .app-float-cta .afc-item.is-submitted { color: var(--primary-dim); font-weight: 700; }
+  .app-float-cta .afc-item.flash svg, .app-float-cta .afc-item.is-submitted svg { stroke-width: 2.4; }
+  .app-float-cta .afc-sep { flex: none; color: rgba(22,22,22,.28); font-size: 12px; padding: 0 2px; position: relative; z-index: 2; }
+  /* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+  [data-theme="dark"] .app-float-cta {
+    background: linear-gradient(180deg,
+      rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+      rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+      inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  [data-theme="dark"] .app-float-cta::before {
+    background: linear-gradient(180deg,
+      rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+      rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+  }
+  [data-theme="dark"] .app-float-cta .afc-item {
+    color: var(--text-1);
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] .app-float-cta .afc-item.flash,
+  [data-theme="dark"] .app-float-cta .afc-item.is-submitted { color: var(--primary-dim); font-weight: 700; }
+  [data-theme="dark"] .app-float-cta .afc-sep { color: rgba(242,240,236,.30); }
 </style>
 </head>
 <body>
@@ -309,13 +393,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="sticky-filter-bar" id="stickyFilterBar">
       <div class="sec-head" style="margin-bottom:2px;">
         <div class="sh-title" id="listTitle">全部招聘岗位</div>
+      </div>
+      <div class="subbar-row">
+        <div class="sort-tabs" id="sortTabs"></div>
         <button type="button" class="filter-btn" id="filterBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
           <span class="fb-label">筛选</span>
           <span class="fb-count" style="display:none">0</span>
         </button>
       </div>
-      <div class="sort-tabs" id="sortTabs"></div>
     </div>
 
     <!-- 统计条 -->
@@ -359,55 +445,83 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 
-  <!-- 委托居中弹窗 -->
+  <!-- 委托自下而上弹窗（bottom sheet） -->
   <div class="delegate-mask" id="delegateMask"></div>
-  <div class="delegate-modal" id="delegateModal">
-    <button class="dm-close" id="dmClose">×</button>
-    <div class="dm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
-    <div class="dm-title" id="dmTitle">发布招聘需求</div>
-    <div class="dm-desc" id="dmDesc">填写您的需求，平台专属顾问将在2小时内为您精准匹配</div>
-    <div class="dm-form" id="dmForm">
-      <div class="dm-field">
-        <label class="dm-label">联系人 <span class="dm-required">*</span></label>
-        <input type="text" class="dm-input" id="dmName" placeholder="请输入您的姓名">
-      </div>
-      <div class="dm-field">
-        <label class="dm-label">联系电话 <span class="dm-required">*</span></label>
-        <input type="tel" class="dm-input" id="dmPhone" placeholder="请输入您的手机号">
-      </div>
-      <div class="dm-field">
-        <label class="dm-label" id="dmCertLabel">所需证书类型（可多选）</label>
-        <div class="dm-tag-group" id="dmCertTags"></div>
-      </div>
-      <div class="dm-field">
-        <label class="dm-label" id="dmSalaryLabel">薪资范围</label>
-        <div class="dm-tag-group" id="dmSalaryTags"></div>
-      </div>
-      <div class="dm-field">
-        <label class="dm-label">到岗时间要求</label>
-        <div class="dm-tag-group" id="dmArrivalTags">
-          <span class="dm-tag" data-val="随时到岗">随时到岗</span>
-          <span class="dm-tag" data-val="1周内">1周内</span>
-          <span class="dm-tag" data-val="2周内">2周内</span>
-          <span class="dm-tag" data-val="1个月内">1个月内</span>
-          <span class="dm-tag" data-val="面议">面议</span>
+  <div class="delegate-modal" id="delegateModal" data-sheet-box data-sheet-mask="#delegateMask">
+    <div class="dm-sheet-grab" data-sheet-drag><span class="grab"></span></div>
+    <div class="dm-head">
+      <div class="dm-title" id="dmTitle">发布招聘需求</div>
+      <button class="dm-close" id="dmClose">×</button>
+    </div>
+    <div class="dm-sheet-body">
+      <div class="dm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+      <div class="dm-desc" id="dmDesc">填写您的需求，平台专属顾问将在2小时内为您精准匹配</div>
+      <div class="dm-form" id="dmForm">
+        <div class="dm-field">
+          <label class="dm-label">联系人 <span class="dm-required">*</span> <span class="dg-auth-tag">实名认证信息</span></label>
+          <div class="dg-locked">
+            <svg class="dg-lock-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="15.5" r="1.1"/></svg>
+            <input type="text" class="dm-input" id="dmName" readonly placeholder="实名认证姓名">
+          </div>
+          <div class="dg-lock-note">默认使用实名认证信息，仅可补充下方备用手机号</div>
+        </div>
+        <div class="dm-field">
+          <label class="dm-label">联系电话 <span class="dm-required">*</span> <span class="dg-auth-tag">实名认证信息</span></label>
+          <div class="dg-locked">
+            <svg class="dg-lock-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="15.5" r="1.1"/></svg>
+            <input type="tel" class="dm-input" id="dmPhone" readonly placeholder="实名认证手机号">
+          </div>
+          <div class="dg-lock-note">默认使用实名认证信息，仅可补充下方备用手机号</div>
+        </div>
+        <div class="dm-field">
+          <label class="dm-label">备用手机号 <span style="color:var(--text-3);font-weight:500;font-size:11px;padding:0 6px;border:1px solid var(--line);border-radius:20px;">选填</span> <span style="color:var(--text-3);font-weight:400;font-size:11px;margin-left:auto;">便于顾问多渠道联系您</span></label>
+          <input type="tel" class="dm-input" id="dmBackPhone" placeholder="备用手机号（选填）" maxlength="11">
+        </div>
+        <div class="dm-field">
+          <label class="dm-label" id="dmCertLabel">所需证书类型（可多选）</label>
+          <div class="dm-tag-group" id="dmCertTags"></div>
+        </div>
+        <div class="dm-field">
+          <label class="dm-label" id="dmSalaryLabel">薪资范围</label>
+          <div class="dm-tag-group" id="dmSalaryTags"></div>
+        </div>
+        <div class="dm-field">
+          <label class="dm-label">到岗时间要求</label>
+          <div class="dm-tag-group" id="dmArrivalTags">
+            <span class="dm-tag" data-val="随时到岗">随时到岗</span>
+            <span class="dm-tag" data-val="1周内">1周内</span>
+            <span class="dm-tag" data-val="2周内">2周内</span>
+            <span class="dm-tag" data-val="1个月内">1个月内</span>
+            <span class="dm-tag" data-val="面议">面议</span>
+          </div>
+        </div>
+        <div class="dm-field">
+          <label class="dm-label" id="dmDescLabel">需求描述（选填）</label>
+          <textarea class="dm-textarea" id="dmRemark" rows="2" placeholder="请简要描述您的具体需求，如项目情况、特殊要求等"></textarea>
         </div>
       </div>
-      <div class="dm-field">
-        <label class="dm-label" id="dmDescLabel">需求描述（选填）</label>
-        <textarea class="dm-textarea" id="dmRemark" rows="2" placeholder="请简要描述您的具体需求，如项目情况、特殊要求等"></textarea>
-      </div>
     </div>
-    <button class="dm-btn" id="dmSubmit">提交需求</button>
+    <div class="dm-sheet-foot">
+      <button class="dm-btn" id="dmSubmit">提交需求</button>
+    </div>
   </div>
 
-  <!-- 液态玻璃悬浮 CTA：双端 tab 区滚出视口时于底部浮现；按分页切换「我要招聘 / 我要投递」 -->
-  <div class="lg-cta" id="lgCtaBar" data-lg-cta="floating" data-lg-trigger="#tabBar" data-lg-scroller=".scroll"
-       data-lg-labels='{"enterprise":"我要招聘","talent":"我要投递"}'
-       data-lg-hrefs='{"enterprise":"../publish/editor.html?role=demand&cat=%E6%8B%9B%E8%81%98","talent":"../profile/resume-edit.html"}'>
-    <button type="button" class="lg-btn lg-btn-primary" id="lgAction">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      <span class="lg-btn-label">我要招聘</span>
+  <!-- 底部固定悬浮按钮组：参考主 tabbar 液态玻璃容器（data-lg-glass 挂载），图标+短文案，竖线分隔；
+       保留顶部双端 Tab，此处为固定功能入口：招聘 / 应聘 / 委托 -->
+  <div class="app-float-cta" data-lg-glass>
+    <button type="button" class="afc-item" id="afcHire" data-href="../publish/editor.html?role=demand&cat=%E6%8B%9B%E8%81%98">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M2 13h20"/></svg>
+      <span class="afc-label">招聘</span>
+    </button>
+    <span class="afc-sep" aria-hidden="true">|</span>
+    <button type="button" class="afc-item" id="afcDeliver" data-href="../profile/resume-edit.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+      <span class="afc-label">应聘</span>
+    </button>
+    <span class="afc-sep" aria-hidden="true">|</span>
+    <button type="button" class="afc-item" id="afcDelegate">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2h6v2"/><path d="m9 14 2 2 4-4"/></svg>
+      <span class="afc-label">委托</span>
     </button>
   </div>
 </div>
@@ -426,12 +540,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
 </div>
 
-<!-- 提交专享委托确认弹窗 -->
+<!-- 提交专享委托确认弹窗（自下而上） -->
 <div class="exclusive-mask" id="exclusiveMask"></div>
-<div class="exclusive-modal" id="exclusiveModal">
+<div class="exclusive-modal" id="exclusiveModal" data-sheet-box data-sheet-mask="#exclusiveMask">
+  <div class="dm-sheet-grab" data-sheet-drag><span class="grab"></span></div>
   <div class="em-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></div>
   <div class="em-title">提交专享委托</div>
-  <div class="em-desc">确认提交专享委托？平台专属顾问将在2小时内与您联系，为您提供1对1精准匹配服务。</div>
+  <div class="em-desc">确认提交专享委托？平台专属顾问将在2小时内与您联系，为您提供1对1精准匹配服务。<br>默认联系人与电话将使用您的实名认证信息。</div>
+  <div class="em-back">
+    <label class="em-back-label">备用手机号 <span class="em-back-opt">选填</span></label>
+    <input type="tel" class="em-back-input" id="exclusiveBackPhone" placeholder="便于顾问多渠道联系您" maxlength="11" autocomplete="off">
+  </div>
   <div class="em-buttons">
     <button class="em-btn em-btn-cancel" id="exclusiveCancel">取消</button>
     <button class="em-btn em-btn-confirm" id="exclusiveOk">确认提交</button>
@@ -443,7 +562,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/delegates.js"></script>
-<script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100209"></script>
 <script src="../../js/liquid-cta.js?v=20260928184535"></script>
 <script>
 (function () {
@@ -708,10 +827,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var urgent = list.filter(function (r) { return r.urgent; }).length;
     var isEnt = currentTab === 'enterprise';
     var unit = isEnt ? '家' : '位';
-    var noun = isEnt ? '招聘岗位' : '持证人才';
+    var noun = isEnt ? '岗位' : '持证人才';
     var label3 = isEnt ? '急聘' : '急寻';
     stats.innerHTML =
-      '当前筛选出 <b class="rs-c1">' + total + '</b> ' + unit + noun + '，其中已核验 <b class="rs-c2">' + verified + '</b> ' + unit + '，' + label3 + ' <b class="rs-c3">' + urgent + '</b> ' + unit;
+      '共筛选出 <b class="rs-c1">' + total + '</b> ' + unit + noun + '，其中已核验 <b class="rs-c2">' + verified + '</b> ' + unit + '，' + label3 + ' <b class="rs-c3">' + urgent + '</b> ' + unit;
   }
 
   /* ===== 渲染列表（带过渡动效） ===== */
@@ -764,7 +883,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (isEnt) { location.href = '../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘'); }
         else { UI.toast('委托顾问功能开发中', 'info'); }
       });
-      document.getElementById('emptyExclusive').addEventListener('click', openExclusiveConfirm);
+      document.getElementById('emptyExclusive').addEventListener('click', openExclusiveGated);
     } else {
       if (shownCount <= 0) shownCount = Math.min(pageSize, list.length);
       if (shownCount > list.length) shownCount = list.length;
@@ -783,7 +902,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           desc: isEntLf ? '没有更多岗位或存在私密招聘需求，发布需求或提交专享委托获取精准匹配' : '没有更多人才或存在私信人才信息，委托顾问或提交专享委托获取精准匹配',
           buttons: [
             { text: isEntLf ? '发布招聘需求' : '委托顾问匹配', style: 'outline', onClick: function () { if (isEntLf) { location.href = '../publish/editor.html?role=demand&cat=' + encodeURIComponent('招聘'); } else UI.toast('委托顾问功能开发中', 'info'); } },
-            { text: '提交专享委托', style: 'outline', onClick: openExclusiveConfirm }
+            { text: '提交专享委托', style: 'outline', onClick: openExclusiveGated }
           ]
         });
       }
@@ -956,6 +1075,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function resetDmForm() {
     document.getElementById('dmName').value = '';
     document.getElementById('dmPhone').value = '';
+    document.getElementById('dmBackPhone').value = '';
     document.getElementById('dmRemark').value = '';
     document.querySelectorAll('#dmForm .dm-tag.selected').forEach(function (t) { t.classList.remove('selected'); });
   }
@@ -971,6 +1091,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     renderDmTags('dmCertTags', DM_CERT_OPTIONS, true);
     renderDmTags('dmSalaryTags', isEnt ? DM_SALARY_OPTIONS_ENT : DM_SALARY_OPTIONS_TALENT, false);
     resetDmForm();
+    /* v2.0 实名锁定：联系人/电话自动回填实名认证信息（只读） */
+    try {
+      var acv = Delegates.authContact();
+      document.getElementById('dmName').value = acv.name;
+      document.getElementById('dmPhone').value = acv.phone;
+    } catch (e) {}
     document.getElementById('delegateMask').classList.add('show');
     document.getElementById('delegateModal').classList.add('show');
   }
@@ -980,6 +1106,45 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   document.getElementById('delegateMask').addEventListener('click', closeDelegate);
   document.getElementById('dmClose').addEventListener('click', closeDelegate);
+
+  /* 底部悬浮「委托/已委托」状态：已提交人才委托（含专享委托）→ label 切换为"已委托"（金色高亮，图标保留） */
+  function renderPersonnelDelegateBtn() {
+    var btn = document.getElementById('afcDelegate');
+    if (!btn) return;
+    var lab = btn.querySelector('.afc-label');
+    if (!lab) return;
+    var has = !!(window.Delegates && Delegates.byBiz('personnel').length);
+    if (has) {
+      btn.classList.add('is-submitted');
+      lab.textContent = '已委托';
+    } else {
+      btn.classList.remove('is-submitted');
+      lab.textContent = '委托';
+    }
+  }
+  /* v2.0 实名门控：委托服务仅面向实名用户，未实名 → 实名认证引导 bottom sheet */
+  function openDelegateGated() {
+    Delegates.gateRealname({ onPass: openDelegate, authHref: '../profile/auth-personal.html' });
+  }
+  var afcDelegateBtn = document.getElementById('afcDelegate');
+  if (afcDelegateBtn) afcDelegateBtn.addEventListener('click', openDelegateGated);
+  /* 底部悬浮固定功能入口（原动态 CTA 迁移为固定 3 按钮） */
+  var afcHireBtn = document.getElementById('afcHire');
+  if (afcHireBtn) afcHireBtn.addEventListener('click', function () {
+    location.href = '../publish/editor.html?role=demand&cat=%E6%8B%9B%E8%81%98';
+  });
+  var afcDeliverBtn = document.getElementById('afcDeliver');
+  if (afcDeliverBtn) afcDeliverBtn.addEventListener('click', function () {
+    location.href = '../profile/resume-edit.html';
+  });
+  document.querySelectorAll('.app-float-cta .afc-item').forEach(function (b) {
+    b.addEventListener('click', function () {
+      b.classList.remove('flash');
+      void b.offsetWidth;
+      b.classList.add('flash');
+      setTimeout(function () { b.classList.remove('flash'); }, 320);
+    });
+  });
 
   /* ===== 加载更多 ===== */
   document.getElementById('loadMore').addEventListener('click', function () {
@@ -997,74 +1162,65 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     document.getElementById('exclusiveMask').classList.remove('show');
     document.getElementById('exclusiveModal').classList.remove('show');
   }
+  /* v2.0 实名门控：专享委托入口仅对实名用户开放（函数声明提升，空态/页脚/内联入口共用） */
+  function openExclusiveGated() {
+    Delegates.gateRealname({ onPass: openExclusiveConfirm, authHref: '../profile/auth-personal.html' });
+  }
   document.getElementById('exclusiveMask').addEventListener('click', closeExclusiveConfirm);
   document.getElementById('exclusiveCancel').addEventListener('click', closeExclusiveConfirm);
   document.getElementById('exclusiveOk').addEventListener('click', function () {
+    /* v2.0：备用手机号选填校验；默认联系人与电话使用实名认证信息 */
+    var backPhone = document.getElementById('exclusiveBackPhone') ? document.getElementById('exclusiveBackPhone').value.trim() : '';
+    if (backPhone && !/^1[3-9]\d{9}$/.test(backPhone)) { UI.toast('备用手机号格式不正确', 'warn'); return; }
     closeExclusiveConfirm();
     try {
       var ac = Delegates.authContact();
-      Delegates.add({
+      var rec = {
         biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
         type: '专享委托', qualLevel: '', mode: '', budget: '',
         region: { province: '', city: '', text: '全国' },
-        contact: ac.name, phone: ac.phone, backup: '', note: '',
-        status: '等待承接'
-      });
+        contact: ac.name, phone: ac.phone,
+        backup: backPhone ? { name: '', phone: backPhone } : '',
+        note: '', status: '等待承接'
+      };
+      Delegates.add(rec);
+      /* v2.0：提交成功 → 模拟后台推送「信息详情解锁浏览」待付款订单 → 展示对接信息页 */
+      Delegates.pushUnlockOrder(rec);
+      renderPersonnelDelegateBtn();
+      setTimeout(function () { Delegates.openHandoffSheet(rec); }, 300);
     } catch (e) {}
-    UI.toast('已提交专享委托，顾问将在2小时内联系您', 'ok');
   });
-  /* 暴露给页面内联入口（空态/页脚按钮使用） */
-  window.openDelegate = openDelegate;
-  window.openExclusiveConfirm = openExclusiveConfirm;
+  /* 暴露给页面内联入口（空态/页脚按钮使用）；v2.0 起统一走实名门控 */
+  window.openDelegate = openDelegateGated;
+  window.openExclusiveConfirm = openExclusiveGated;
   document.getElementById('dmSubmit').addEventListener('click', function () {
-    var name = document.getElementById('dmName').value.trim();
-    var phone = document.getElementById('dmPhone').value.trim();
-    if (!name) { UI.toast('请输入您的姓名', 'warn'); return; }
-    if (!phone) { UI.toast('请输入您的手机号', 'warn'); return; }
-    if (!/^1\d{10}$/.test(phone)) { UI.toast('请输入正确的手机号', 'warn'); return; }
-    /* 归属统一委托库：记录本次委托（招聘需求 / 委托顾问） */
+    /* v2.0 实名锁定表单：联系人/电话来自实名认证（只读），仅校验可选备用手机号 */
+    var backPhone = document.getElementById('dmBackPhone') ? document.getElementById('dmBackPhone').value.trim() : '';
+    if (backPhone && !/^1[3-9]\d{9}$/.test(backPhone)) { UI.toast('备用手机号格式不正确', 'warn'); return; }
     try {
+      var ac = Delegates.authContact();
       var certs = Array.prototype.map.call(document.querySelectorAll('#dmCertTags .dm-tag.selected'), function (t) { return t.dataset.val; });
       var salaryEl = document.querySelector('#dmSalaryTags .dm-tag.selected');
       var remark = document.getElementById('dmRemark') ? document.getElementById('dmRemark').value.trim() : '';
-      Delegates.add({
+      var rec = {
         biz: 'personnel', bizLabel: '人才服务', source: 'personnel',
         type: currentTab === 'enterprise' ? '招聘需求' : '委托顾问',
         qualLevel: '', mode: '', budget: '',
         region: { province: '', city: '', text: '全国' },
-        contact: name, phone: phone, backup: '',
+        contact: ac.name || document.getElementById('dmName').value.trim(),
+        phone: ac.phone || document.getElementById('dmPhone').value.trim(),
+        backup: backPhone ? { name: '', phone: backPhone } : '',
         certTypes: certs, salary: salaryEl ? salaryEl.dataset.val : '',
         note: remark || (certs.length ? '证书/资质：' + certs.join('、') : ''),
         status: '等待承接'
-      });
+      };
+      Delegates.add(rec);
+      /* v2.0：提交成功 → 模拟后台推送「信息详情解锁浏览」待付款订单 → 展示对接信息页 */
+      Delegates.pushUnlockOrder(rec);
+      renderPersonnelDelegateBtn();
+      closeDelegate();
+      setTimeout(function () { Delegates.openHandoffSheet(rec); }, 300);
     } catch (e) {}
-    /* 提交成功动画 */
-    var modal = document.getElementById('delegateModal');
-    var form = document.getElementById('dmForm');
-    var submitBtn = document.getElementById('dmSubmit');
-    submitBtn.textContent = '提交中...';
-    submitBtn.style.opacity = '.7';
-    setTimeout(function () {
-      form.style.display = 'none';
-      var successHtml = '<div style="text-align:center;padding:30px 20px 20px;">' +
-        '<div style="width:64px;height:64px;border-radius:50%;background:var(--success-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:successPop .4s ease;">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5" style="width:32px;height:32px;animation:checkDraw .5s ease .2s both;"><polyline points="20 6 9 17 4 12"/></svg>' +
-        '</div>' +
-        '<div style="font-size:17px;font-weight:700;color:var(--text-1);margin-bottom:6px;">提交成功</div>' +
-        '<div style="font-size:12.5px;color:var(--text-2);line-height:1.6;">平台专属顾问将在 <b style="color:var(--primary-dim);">2小时内</b> 与您联系<br>请保持电话畅通</div>' +
-        '</div>';
-      modal.insertAdjacentHTML('afterbegin', '<div id="dmSuccess">' + successHtml + '</div>');
-      setTimeout(function () {
-        closeDelegate();
-        setTimeout(function () {
-          var successEl = document.getElementById('dmSuccess');
-          if (successEl) successEl.remove();
-          form.style.display = '';
-          submitBtn.textContent = '提交需求';
-          submitBtn.style.opacity = '1';
-        }, 300);
-      }, 1200);
-    }, 500);
   });
 
   /* ===== 双端切换 ===== */
@@ -1083,8 +1239,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       renderSortTabs();
       renderHot();
       renderList();
-      /* 悬浮 CTA 随分页切换：「我要招聘 / 我要投递」 */
-      if (window.LGCTA) window.LGCTA.setDynamic(document.getElementById('lgCtaBar'), tab);
+      /* 底部悬浮按钮为固定 3 项（招聘/应聘/委托），不再随分页动态切换 */
+      renderPersonnelDelegateBtn();
     });
   });
 
@@ -1291,8 +1447,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSortTabs();
   renderHot();
   renderList();
-  /* 悬浮 CTA 初始态：随 ?tab= 落地页同步（企业招聘→我要招聘 / 持证人才→我要投递） */
-  if (window.LGCTA) window.LGCTA.setDynamic(document.getElementById('lgCtaBar'), currentTab);
+  /* 底部悬浮按钮为固定 3 项，初始态无需动态切换 */
+  renderPersonnelDelegateBtn();
   /* v2 我的招聘入口：企业认证及以上（叠加身份企业侧）显示；中介入驻不发招聘 */
   function applyMyJobsNav() {
     var btn = document.getElementById('navMyJobs');
@@ -1305,8 +1461,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   applyMyJobsNav();
   /* E2-12：完成实名/入驻后，投递按钮状态即时刷新 */
-  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); applyMyJobsNav(); });
-  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); applyMyJobsNav(); });
+  window.addEventListener('engchain:auth', function(){ injectDeliverButtons(); applyMyJobsNav(); renderPersonnelDelegateBtn(); });
+  window.addEventListener('engchain:entry', function(){ injectDeliverButtons(); applyMyJobsNav(); renderPersonnelDelegateBtn(); });
 })();
 </script>
 <script>window.__SWIPE_ZONES__=window.__SWIPE_ZONES__||[];window.__SWIPE_ZONES__.push({trigger:'.scroll.no-pad',consumers:[{type:'scroll',el:'#catBar'},{type:'scroll',el:'#hotScroll'}]});</script>

@@ -1512,7 +1512,7 @@ __reg('./v2-shaders.js', function (__m) {
     float dy = shapeField(chosen, point + vec2(0.0, e)) - shapeField(chosen, point - vec2(0.0, e));
     vec2 normal = normalize(vec2(dx, dy) + vec2(0.0001));
     float depth = clamp(-chosenD / max(12.0, minHalf * 0.62), 0.0, 1.0);
-    float refractionSupport = max(14.0, minHalf * 0.50);
+    float refractionSupport = max(14.0, minHalf * 1.5); // Engchain fix: widen refraction band so a 46px icon in a 56px glass bends visibly (was 0.50 = 14px, icon centre had zero refraction)
     float edgeCurve = pow(1.0 - smoothstep(0.0, refractionSupport, -chosenD), 2.2);
     vec2 local = (point - center) / max(halfSize, vec2(1.0));
   
@@ -5144,12 +5144,17 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
 
 (function () {
   var CFG_KEY = 'engchain-glass-cfg';
+  var CFG_VERSION = 7;   // 配置版本：版本不符的 localStorage 残留一律忽略，防止旧调参覆盖本版
 
   var DEFAULTS = {
-    tintLight: 0.45,   /* 明亮模式乳白层 */
-    tintDark: 0.5,     /* 暗色模式乳白层 */
-    frostLight: 0.5,   /* 明亮模式模糊强度 */
-    frostDark: 0.48    /* 暗色模式模糊强度 */
+    /* 库原生"清晰光学玻璃"语义（V2 材质默认值：frost 0 / tint 0 / backdropBlur 0）：
+       液态玻璃的质感不来自磨砂模糊，而来自 折射变形（refraction 84）+ 色散（dispersion 2.0）
+       + 边缘高光（rim/highlight/hairline）→ 玻璃下的功能图标【清晰透视】且带折射光效。
+       实测 frost/tint 任何正值都会把图标抹糊（0.3 磨砂态用户仍不可辨图标），故归零。 */
+    tintLight: 0,   /* 明亮模式乳白层：0 = 无乳白，图标清晰透视 */
+    tintDark: 0,    /* 暗色模式乳白层 */
+    frostLight: 0,  /* 明亮模式预模糊：0 = 不磨砂，折射区内容锐利 */
+    frostDark: 0    /* 暗色模式预模糊 */
   };
 
   function clamp(v, lo, hi) { v = Number(v); if (isNaN(v)) return lo; return Math.min(hi, Math.max(lo, v)); }
@@ -5160,6 +5165,9 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
       var raw = localStorage.getItem(CFG_KEY);
       if (raw) cfg = JSON.parse(raw);
     } catch (e) {}
+    /* 版本化：仅接受与当前 CFG_VERSION 一致的配置；旧残留（历史上 0.15/0.3 磨砂调参）
+       直接忽略，避免覆盖本版的清晰透视光学语义。 */
+    if (cfg.__v !== CFG_VERSION) return Object.assign({}, DEFAULTS);
     var out = {};
     Object.keys(DEFAULTS).forEach(function (k) {
       out[k] = (cfg[k] !== undefined && cfg[k] !== null) ? clamp(cfg[k], 0, 1.5) : DEFAULTS[k];
@@ -5168,10 +5176,28 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   }
 
   function saveCfg(cfg) {
+    cfg.__v = CFG_VERSION;
     try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
   }
 
   var cfg = loadCfg();
+
+  /* Tabbar 折射/光学材质参数（preview「Tabbar 折射」面板下发，与 CSS 采样变量同 key）：
+     CSS 采样字段（bleed/lensBleed/lensInset/lensR/pressBoost）由 common.js 写 CSS 变量；
+     材质字段（refraction/dispersion/edgeReach/edgeWidth/absorption）供 WebGL 渲染
+     （LiquidGlass material），此处接收并应用到已挂载实例。 */
+  var MAT_KEY = 'engchain-tabbar-refract';
+  var MAT_DEFAULTS = { refraction: 110, dispersion: 3.0, edgeReach: 0.45, edgeWidth: 0.42, absorption: 0.15 };
+  function loadMat() {
+    var m = {};
+    try { var raw = localStorage.getItem(MAT_KEY); if (raw) m = JSON.parse(raw); } catch (e) {}
+    var out = {};
+    Object.keys(MAT_DEFAULTS).forEach(function (k) {
+      out[k] = (m[k] !== undefined && m[k] !== null) ? clamp(m[k], 0, 300) : MAT_DEFAULTS[k];
+    });
+    return out;
+  }
+  var tabMat = loadMat();
 
   /* 挂载目标：主 tabbar（.app-tabbar）+ 其他声明 data-lg-glass 的容器（如信息工作台发布栏）。
      全部共用同一份 cfg 与 <html data-theme> 联动 → 各实例参数完全同源一致，
@@ -5202,7 +5228,21 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
             tint: params().tint,
             tintTone: params().tintTone,
             frost: params().frost,
-            live: 'auto'
+            // live 用库的 'auto' 语义：玻璃下有播放中 video / 动画 canvas 时自动逐帧实时；
+            // 静态内容页（本项目的个人中心等）由滚动/DOM/字体加载事件驱动重绘，效果等同
+            // 实时且零空转开销。实测强制 live:true 并不改善折射（白雾源是材质 frost/tint）。
+            live: 'auto',
+            // V2 光学材质：库原生"清晰光学玻璃"语义 + 折射强化——
+            //   用户验收标准是"图形本身的透视"：图标透过玻璃要有【可见的折射变形】，
+            //   而非透明直看（透明片）或磨砂白雾。已查明的机制根因（2026100209）：
+            //   ① 图标"图形"= .tool-icon 的 background-image 外部 PNG，已确认进入 backdrop buffer
+            //      并被玻璃完整渲染（buffer/render 采样 alpha 100%、colored 23.8%/33.3%）；
+            //   ② 但库 shader 的折射支持半径 refractionSupport = max(14, minHalf*0.5) = 14px，
+            //      46px 图形主体（距玻璃边缘 >14px）的 refractionProfile 衰减到 0 → 平直采样直透；
+            //   ③ dispersion 5.0 又使图形边缘 RGB 分离达 6px → 图形"模糊不可辨"。
+            //   修复：shader refractionSupport 0.50→1.50（42px，图形主体折射 ≥17%、位移 ≈12px 可见），
+            //   dispersion 5.0→3.0（图形清晰 + 保留色散质感）。
+            material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat)
           });
           added = true;
         } catch (e) {
@@ -5210,6 +5250,14 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
         }
       });
     });
+    // 首次挂载后延迟强制重建一次 display list + backdrop：
+    // 页面内容（功能图标等）在 JS 渲染完成前的首帧采样可能为空/错位，
+    // refreshAll 的 invalidatePageContent 会强制重建，确定性兜底该竞态。
+    if (added) {
+      setTimeout(function () {
+        try { LiquidGlass.refreshAll(); } catch (e) {}
+      }, 200);
+    }
     return added;
   }
 
@@ -5220,6 +5268,21 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
         var g = LiquidGlass.from(el);
         if (!g) return;
         try { g.update(params()); } catch (e) {}
+      });
+    });
+    try { LiquidGlass.refreshAll(); } catch (e) {}
+  }
+
+  /* 材质更新：把 tabMat 应用到全部已挂载实例的 WebGL material（折射/色散/边缘/吸收） */
+  function applyMat() {
+    TARGETS.forEach(function (sel) {
+      var els = document.querySelectorAll(sel);
+      Array.prototype.forEach.call(els, function (el) {
+        var g = LiquidGlass.from(el);
+        if (!g) return;
+        try {
+          g.update(Object.assign({}, params(), { material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat) }));
+        } catch (e) {}
       });
     });
     try { LiquidGlass.refreshAll(); } catch (e) {}
@@ -5260,6 +5323,18 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
         saveCfg(cfg);
         apply();
       });
+      /* Tabbar 折射/光学材质：preview「Tabbar 折射」面板实时下发 */
+      window.addEventListener('message', function (e) {
+        var d = e && e.data;
+        if (!d || d.type !== 'engchain:tabbar-refract') return;
+        var next = {};
+        Object.keys(MAT_DEFAULTS).forEach(function (k) {
+          next[k] = d[k] !== undefined && d[k] !== null ? clamp(d[k], 0, 300) : tabMat[k];
+        });
+        tabMat = next;
+        try { localStorage.setItem(MAT_KEY, JSON.stringify(tabMat)); } catch (err) {}
+        applyMat();
+      });
     } catch (e) {}
   }
 
@@ -5267,9 +5342,13 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   function watchStorage() {
     try {
       window.addEventListener('storage', function (e) {
-        if (e.key !== CFG_KEY) return;
-        cfg = loadCfg();
-        apply();
+        if (e.key === CFG_KEY) {
+          cfg = loadCfg();
+          apply();
+        } else if (e.key === MAT_KEY) {
+          tabMat = loadMat();
+          applyMat();
+        }
       });
     } catch (e) {}
   }

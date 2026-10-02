@@ -56,6 +56,7 @@
     if (badge) html += '  <div class="gg-badge">' + esc(badge) + '</div>';
     html += '  <h1 class="gg-title">' + esc(o.title || '登录后查看') + '</h1>';
     if (o.note) html += '  <p class="gg-note">' + esc(o.note) + '</p>';
+    if (o.perk) html += '  <div class="gg-perk"><span class="gg-perk-ic">🎁</span><span>' + esc(o.perk) + '</span></div>';
     html += '  <a class="gg-btn" href="' + esc(btnHref) + '">' + esc(btnText) + ARROW + '</a>';
     if (o.altText) html += '  <a class="gg-alt" href="' + esc(o.altHref || '#') + '">' + esc(o.altText) + '</a>';
     html += '</div>';

@@ -86,6 +86,12 @@
     echo: 0.40,
     hairline: 0.95
   };
+  /* 按钮材质参数（preview.html「按钮材质」面板下发，独立于 tint/frost）：
+     与 GLASS_MATERIAL 同字段，仅面板可调的关键项；加载时合并覆盖，
+     持久化 key 'engchain-btn-glass-material'，postMessage 'engchain:btn-glass-material'。 */
+  var MAT_KEY = 'engchain-btn-glass-material';
+  var MAT_DEFAULTS = { refraction: 84, dispersion: 3.0, reflection: 0.55, highlight: 0.60, hairline: 0.95, edgeWidth: 0.24 };
+  try { var mRaw = localStorage.getItem(MAT_KEY); if (mRaw) Object.assign(GLASS_MATERIAL, JSON.parse(mRaw)); } catch (e) {}
   var mounted = [];
 
   function isDark() {
@@ -320,16 +326,32 @@
       try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(rec.el) }) })); } catch (e) {}
     });
   }
+  /* ---- preview.html「按钮材质」面板联动：postMessage + localStorage 双通道（更新 GLASS_MATERIAL） ---- */
+  var MAT_RANGE = { refraction: [0, 150], dispersion: [0, 6], reflection: [0, 1], highlight: [0, 1], hairline: [0, 1], edgeWidth: [0, 0.6] };
+  function applyMatCfg(next) {
+    if (!next) return;
+    Object.keys(MAT_RANGE).forEach(function (k) {
+      if (next[k] !== undefined && next[k] !== null) GLASS_MATERIAL[k] = clampNum(next[k], MAT_RANGE[k][0], MAT_RANGE[k][1]);
+    });
+    try { localStorage.setItem(MAT_KEY, JSON.stringify(GLASS_MATERIAL)); } catch (e) {}
+    mounted.forEach(function (rec) {
+      try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(rec.el) }) })); } catch (e) {}
+    });
+  }
   try {
     window.addEventListener('storage', function (e) {
       if (e.key === BTN_CFG_KEY && e.newValue) {
         try { applyBtnCfg(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === MAT_KEY && e.newValue) {
+        try { applyMatCfg(JSON.parse(e.newValue)); } catch (err) {}
       }
     });
     window.addEventListener('message', function (e) {
       var d = e.data;
       if (d && d.type === 'engchain:btn-glass-cfg') {
         applyBtnCfg(d);
+      } else if (d && d.type === 'engchain:btn-glass-material') {
+        applyMatCfg(d);
       }
     });
   } catch (e) {}

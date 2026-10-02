@@ -229,7 +229,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* 通知未读角标 = 运营 + 系统 + 邀请 + 推荐 */
   function renderNoticeBadge() {
     var n = sysUnreadCount() + sysMsgUnreadCount() + inviteUnreadCount();
-    try { n += (MatchStore.listUnread ? MatchStore.listUnread().length : 0); } catch (e) {}
+    try { if (matchNotifyOn()) n += (MatchStore.listUnread ? MatchStore.listUnread().length : 0); } catch (e) {}
     var bn = document.getElementById('badge-notice');
     if (!bn) return;
     bn.textContent = n; bn.style.display = n ? '' : 'none';
@@ -643,9 +643,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   /* [FEAT 9.2-3] 进入消息中心时生成/更新智能推荐 */
   try { MatchStore.generate(); } catch(e) {}
+  /* 智能推荐通知开关：偏好页关闭「接收智能推荐」后，未读角标不再累计（列表仍可见） */
+  function matchNotifyOn() {
+    try {
+      var p = MatchStore.read().preferences || {};
+      return p.notify !== false;
+    } catch (e) { return true; }
+  }
   function renderMatchUnread() {
     var unread = 0;
-    try { unread = MatchStore.listUnread().length; } catch(e) {}
+    try { if (matchNotifyOn()) unread = MatchStore.listUnread().length; } catch(e) {}
     var badge = document.getElementById("match-unread");
     if (badge) { badge.textContent = unread; badge.style.display = unread ? "" : "none"; }
   }
@@ -707,7 +714,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var convUnread = convs.reduce(function (a, c) { return a + (c.unread || 0); }, 0);
     var sysUnread = sysUnreadCount();
     var matchUnread = 0;
-    try { matchUnread = MatchStore.listUnread().length; } catch (e) {}
+    try { if (matchNotifyOn()) matchUnread = MatchStore.listUnread().length; } catch (e) {}
     var sysMsgUnread = sysMsgUnreadCount();
     var inviteUnread = inviteUnreadCount();
     var bc = document.getElementById('badge-conv');
@@ -939,6 +946,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   @keyframes n-jump-bg{0%{background:rgba(184,153,104,.26);}100%{background:transparent;}}
   .n-jump{animation:n-jump-bg 1.6s ease 1;}
 </style>
-<script src="../../js/liquid-glass.iife.js?v=20260928180107"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100209"></script>
 </body>
 </html>

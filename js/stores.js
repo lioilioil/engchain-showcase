@@ -1691,41 +1691,103 @@
   };
 
   /* ---- [FEAT 9.2-3] 供需匹配智能推送 Store ----
-     键 engchain-matches，结构 { feed: [...], preferences: {cats, dir, location} } */
+     键 engchain-matches，结构 { feed: [...], preferences: {cats, subs, dir, location, notify, updatedAt} }
+     v2：匹配池与发现页 mergedList 同源（MOCK.catalog + SupplyStore 活跃条目），
+         评分升级为 一级品类/二级细分/方向/地区/认证/热门/新发布 七维；
+         preferences 结构向后兼容（旧数据缺字段时按默认值补齐）。 */
   var MatchStore = makeStore('engchain-matches',
-    { feed: [], preferences: { cats: [], dir: '', location: '' } }, 'engchain:matches');
-  MatchStore.setPreferences = function (prefs) {
-    return this.set({ preferences: Object.assign({}, this.read().preferences, prefs || {}) });
+    { feed: [], preferences: { cats: [], subs: [], dir: '', location: '', notify: true, updatedAt: 0 } }, 'engchain:matches');
+
+  /* 品类归一：目录内部口径（合作/中介/加盟/买卖/资质/人才）→ 用户可见标准 9 类 */
+  MatchStore.normCat = function (cat) {
+    var m = { '材料':'材料', '设备':'设备', '劳务':'劳务', '合作':'项目合作', '项目合作':'项目合作',
+      '中介':'中介服务', '中介服务':'中介服务', '加盟':'资质招商', '资质招商':'资质招商',
+      '买卖':'建企买卖', '建企买卖':'建企买卖', '资质':'招聘', '人才':'求职',
+      '招聘':'招聘', '求职':'求职' };
+    return m[cat] || cat || '';
   };
+
+  /* 有效方向：机会类（资质招商/建企买卖/招商加盟）按业务语义判定供需侧 */
+  MatchStore.effDir = function (item) {
+    var d = item.dir || item.type || '';
+    if (d === 'supply' || d === 'demand') return d;
+    var t = String(item.title || '');
+    if (item.bizKey === 'personnel') return 'demand';
+    if (item.bizKey === 'talent') return 'supply';
+    if (item.bizKey === 'franchise') return 'supply';
+    if (item.bizKey === 'trade') return /收购|求购|购买/.test(t) ? 'demand' : 'supply';
+    if (d === 'opportunity') return /收购|求购|购买|招聘|急需|需要|发包|采购|急租/.test(t) ? 'demand' : 'supply';
+    return 'supply';
+  };
+
+  /* 城市归一：city 字段优先，缺失时取 location「·」前段 */
+  MatchStore.cityOf = function (item) {
+    if (item.city) return String(item.city).split('·')[0];
+    if (item.location) return String(item.location).split('·')[0];
+    return '';
+  };
+
+  /* 匹配池：与发现页 mergedList 同源（MOCK.catalog + SupplyStore 活跃条目），按 id 去重 */
+  MatchStore.pool = function () {
+    var out = [], seen = {};
+    function push(x) {
+      if (!x) return;
+      var k = String(x.id || '');
+      if (k && seen[k]) return;
+      if (k) seen[k] = 1;
+      out.push(x);
+    }
+    try { ((window.MOCK && MOCK.catalog) || []).forEach(push); } catch (e) {}
+    try { ((window.SupplyStore ? SupplyStore.listActive() : []) || []).forEach(push); } catch (e) {}
+    return out;
+  };
+
+  /* 七维评分：页面实时预览与 generate 共用同一逻辑 */
+  MatchStore.score = function (item, prefs) {
+    var p = prefs || {};
+    var cats = p.cats || [], subs = p.subs || [], dir = p.dir || '', loc = p.location || '';
+    if (!cats.length && !subs.length && !dir && !loc) {
+      return { score: 30, hints: [] };
+    }
+    var s = 0, hints = [];
+    var ncat = MatchStore.normCat(item.cat || item.category || '');
+    if (cats.length && cats.indexOf(ncat) >= 0) { s += 35; hints.push('品类'); }
+    var sub = item.sub || item.subType || '';
+    if (subs.length && sub && subs.indexOf(sub) >= 0) { s += 20; hints.push('细分'); }
+    var ed = MatchStore.effDir(item);
+    if (dir && ed === dir) { s += 15; hints.push('方向'); }
+    var c = MatchStore.cityOf(item);
+    if (loc && c && (c === loc || String(item.location || '').indexOf(loc) >= 0)) { s += 20; hints.push('地区'); }
+    if (item.verified) { s += 5; hints.push('认证'); }
+    if (item.hot) { s += 5; hints.push('热门'); }
+    if (item.ts) {
+      try { if ((Date.now() - Date.parse(item.ts)) / 864e5 <= 7) { s += 5; hints.push('新发布'); } } catch (e) {}
+    }
+    return { score: Math.min(100, s), hints: hints };
+  };
+
+  MatchStore.setPreferences = function (prefs) {
+    var merged = Object.assign({}, this.read().preferences, prefs || {});
+    merged.updatedAt = Date.now();
+    return this.set({ preferences: merged });
+  };
+
   MatchStore.generate = function () {
     var s = this.read();
-    var prefs = s.preferences || { cats: [], dir: '', location: '' };
-    var list = [];
-    try { list = (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) {}
+    var prefs = Object.assign({ cats: [], subs: [], dir: '', location: '', notify: true, updatedAt: 0 }, s.preferences || {});
+    var list = MatchStore.pool();
     var scored = list.map(function (item) {
-      var score = 0;
-      /* 品类匹配 */
-      if (prefs.cats && prefs.cats.length) {
-        var cat = item.cat || item.category || '';
-        if (prefs.cats.indexOf(cat) >= 0) score += 40;
-      }
-      /* 方向匹配 */
-      if (prefs.dir) {
-        var dir = item.dir || item.type || '';
-        if (dir === prefs.dir) score += 30;
-      }
-      /* 地区匹配 */
-      if (prefs.location) {
-        var loc = item.city || item.location || '';
-        if (loc === prefs.location || loc.indexOf(prefs.location) >= 0) score += 30;
-      }
-      /* 无偏好时给基础分 */
-      if (!prefs.cats.length && !prefs.dir && !prefs.location) score = 50;
-      return { item: item, score: Math.min(100, score) };
+      var r = MatchStore.score(item, prefs);
+      return { item: item, score: r.score, hints: r.hints };
     });
-    scored.sort(function (a, b) { return b.score - a.score; });
+    scored.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      var ta = a.item.ts ? (Date.parse(a.item.ts) || 0) : 0;
+      var tb = b.item.ts ? (Date.parse(b.item.ts) || 0) : 0;
+      return tb - ta;
+    });
     var top = scored.slice(0, 10);
-    /* 生成 feed（保留已读状态） */
+    /* 生成 feed（保留已读状态与旧时间戳） */
     var existing = {};
     (s.feed || []).forEach(function (f) { existing[f.sourceId] = f; });
     var now = Date.now();
@@ -1733,15 +1795,21 @@
       var src = x.item;
       var eid = src.id || ('M' + idx);
       var old = existing[eid];
+      var ed = MatchStore.effDir(src);
       return {
         id: eid,
-        type: src.dir === 'supply' ? 'supply' : 'demand',
+        type: ed,
         title: src.title || src.cat || '供需信息',
         desc: src.desc || src.sub || '',
         matchScore: x.score,
         sourceId: src.id,
-        cat: src.cat || '',
-        location: src.city || src.location || '',
+        cat: MatchStore.normCat(src.cat || ''),
+        sub: src.sub || '',
+        location: src.location || src.city || '',
+        effDir: ed,
+        hints: x.hints || [],
+        verified: !!src.verified,
+        hot: !!src.hot,
         ts: old ? old.ts : now,
         read: old ? old.read : false
       };
