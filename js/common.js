@@ -313,7 +313,7 @@ window.UI = (function () {
     const ov = document.createElement('div');
     ov.className = 'modal-overlay show';
     ov.innerHTML = `<div class="dialog">
-      <div class="d-title"></div>
+      <div class="d-head"><div class="d-title"></div><button class="icon-btn d-close" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button></div>
       <div class="d-text"></div>
       <div class="d-agree" style="display:none;"></div>
       <div class="d-actions">
@@ -327,6 +327,7 @@ window.UI = (function () {
     ov.querySelector('.d-ok').className = 'btn ' + (o.danger ? 'btn-danger' : 'btn-primary') + ' d-ok';
     ov.querySelector('.d-cancel').textContent = o.cancel;
     function close() { ov.remove(); document.body.style.overflow = ''; }
+    ov.querySelector('.d-close').addEventListener('click', () => close());
     var agreed = false;
     if (o.agree) {
       var ag = ov.querySelector('.d-agree'); ag.style.display = '';
@@ -727,7 +728,10 @@ window.UI = (function () {
     'wrench':   '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     'compass':  '<circle cx="12" cy="12" r="9"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/>',
     /* 全部功能/更多：九宫格 */
-    'grid':     '<rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/>'
+    'grid':     '<rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/>',
+    /* 投诉 / 举报场景 */
+    'alert':    '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    'flag':     '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'
   };
   function injectSprite() {
     if (document.getElementById('engchain-sprite')) return;
@@ -1273,6 +1277,24 @@ window.ViewHistory = ViewHistory;
     if (phone && !phone.querySelector('.status-bar')) {
       phone.insertAdjacentHTML('afterbegin', UI.statusBar() + UI.dynamicIsland());
     }
+    // 顶部「返回 | 首页」组合：在每个含 .nav-back 的二级全屏页，于返回按钮右侧自动注入竖线分隔符 + 首页icon。
+    // 主 Tab 页（home/message/profile/publish）本身无 .nav-back，自动跳过；弹窗/sheet 为动态浮层不经过此处。
+    try {
+      var _navBack = document.querySelector('.navbar .nav-back, .editor-navbar .nav-back, .wb-top .nav-back');
+      if (_navBack && !document.querySelector('.nav-home')) {
+        var _divider = document.createElement('span');
+        _divider.className = 'nav-divider';
+        _divider.setAttribute('aria-hidden', 'true');
+        var _homeBtn = document.createElement('button');
+        _homeBtn.type = 'button';
+        _homeBtn.className = 'nav-back nav-home';
+        _homeBtn.setAttribute('aria-label', '返回首页');
+        _homeBtn.addEventListener('click', function () { location.href = (window.__ROOT__ || '') + 'home.html'; });
+        _homeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>';
+        _navBack.parentNode.insertBefore(_divider, _navBack.nextSibling);
+        _navBack.parentNode.insertBefore(_homeBtn, _divider.nextSibling);
+      }
+    } catch (e) {}
     // 底部悬浮导航栏：页面 <body data-tab="home|discover|publish|message|me"> 时统一注入
     const tab = document.body.dataset.tab;
     if (tab && phone && !phone.querySelector('.app-tabbar')) {
@@ -2212,4 +2234,54 @@ window.ListFooter = (function () {
 
   // 暴露给外部手动调用
   window.SheetDrag = { init: initDrag, initAll: initAll };
+
+/* ============================================================================
+   [Tabbar 参数联动] preview.html 侧边栏「Tabbar 几何 / Tabbar 折射」面板
+   通道：postMessage（跨源实时）+ localStorage（持久化 / storage 事件同源同步）
+   作用：把参数写入 :root 的 --lg-* CSS 变量（liquid-dock.css 变量，
+         Dock 高度/圆角/宽度/内边距/球间距/按压缩放 + 折射外扩/透镜折射/
+         透镜内缩/透镜圆角/按下不透 即时生效）
+   注意：只动 CSS 变量，不触碰 .app-nav-shell / .ai-orb-entry / .tab-glass
+        位置逻辑（透镜位置由 initTabbarGlass 管理，交互时自会重算）。
+   ============================================================================ */
+(function () {
+  var GROUPS = [
+    { key: 'engchain-tabbar-cfg', type: 'engchain:tabbar-cfg',
+      vars: { h: '--lg-h', r: '--lg-r', w: '--lg-w', padX: '--lg-pad-x', orbGap: '--lg-orb-gap', pressScale: '--lg-press-scale' } },
+    { key: 'engchain-tabbar-refract', type: 'engchain:tabbar-refract',
+      vars: { bleed: '--lg-bleed', lensBleed: '--lg-lens-bleed', lensInset: '--lg-lens-inset', lensR: '--lg-lens-r', pressBoost: '--lg-press-boost' } }
+  ];
+  function apply(cfg, vars) {
+    if (!cfg) return;
+    var root = document.documentElement;
+    Object.keys(vars).forEach(function (k) {
+      var v = Number(cfg[k]);
+      if (isNaN(v)) return;
+      root.style.setProperty(vars[k], k === 'pressScale' || k === 'pressBoost' ? String(v) : v + 'px');
+    });
+  }
+  function load() {
+    GROUPS.forEach(function (g) {
+      try {
+        var raw = localStorage.getItem(g.key);
+        if (raw) apply(JSON.parse(raw), g.vars);
+      } catch (e) {}
+    });
+  }
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d) return;
+    GROUPS.forEach(function (g) { if (d.type === g.type) apply(d, g.vars); });
+  });
+  window.addEventListener('storage', function (e) {
+    if (!e.key) return;
+    GROUPS.forEach(function (g) {
+      if (e.key === g.key) {
+        try { apply(e.newValue ? JSON.parse(e.newValue) : null, g.vars); } catch (err) {}
+      }
+    });
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load);
+  else load();
+})();
 })();

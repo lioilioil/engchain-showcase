@@ -223,6 +223,8 @@
   function formHtml(opts) {
     opts = opts || {};
     var tpl = FORM_TEMPLATES[opts.mode] || FORM_TEMPLATES.general;
+    /* v2.0：默认锁定实名认证信息（联系人/电话只读，仅可补充备用手机号）；编辑页可传 authLocked:false 保持可编辑 */
+    var locked = opts.authLocked !== false;
     var h = '';
     h += '<div class="df-field">' +
       '<label class="df-label">' + tpl.typeLabel + '<span class="req">*</span></label>' +
@@ -238,14 +240,33 @@
       '</div>' +
       '<div class="dg-region-hint" id="dfRegionHint">支持文字填写，自动识别并修正为「省 · 市」</div>' +
     '</div>';
-    h += '<div class="df-field">' +
-      '<label class="df-label">联系人<span class="req">*</span><span class="df-tip">已自动填入认证账号信息，可修改</span></label>' +
-      '<input class="df-control" id="dfContact" placeholder="认证账号姓名" maxlength="20" autocomplete="off">' +
-    '</div>';
-    h += '<div class="df-field">' +
-      '<label class="df-label">联系电话<span class="req">*</span></label>' +
-      '<input class="df-control" id="dfPhone" type="tel" placeholder="认证账号手机号" maxlength="11" autocomplete="off">' +
-    '</div>';
+    if (locked) {
+      h += '<div class="df-field">' +
+        '<label class="df-label">联系人<span class="req">*</span><span class="dg-auth-tag">实名认证信息</span></label>' +
+        '<div class="dg-locked">' +
+          '<svg class="dg-lock-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="15.5" r="1.1"/></svg>' +
+          '<input class="df-control" id="dfContact" readonly placeholder="实名认证姓名" maxlength="20" autocomplete="off">' +
+        '</div>' +
+        '<div class="dg-lock-note">默认使用实名认证信息，仅可补充下方备用手机号</div>' +
+      '</div>';
+      h += '<div class="df-field">' +
+        '<label class="df-label">联系电话<span class="req">*</span><span class="dg-auth-tag">实名认证信息</span></label>' +
+        '<div class="dg-locked">' +
+          '<svg class="dg-lock-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4.5" y="11" width="15" height="9.5" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/><circle cx="12" cy="15.5" r="1.1"/></svg>' +
+          '<input class="df-control" id="dfPhone" type="tel" readonly placeholder="实名认证手机号" maxlength="11" autocomplete="off">' +
+        '</div>' +
+        '<div class="dg-lock-note">默认使用实名认证信息，仅可补充下方备用手机号</div>' +
+      '</div>';
+    } else {
+      h += '<div class="df-field">' +
+        '<label class="df-label">联系人<span class="req">*</span><span class="df-tip">已自动填入认证账号信息，可修改</span></label>' +
+        '<input class="df-control" id="dfContact" placeholder="认证账号姓名" maxlength="20" autocomplete="off">' +
+      '</div>';
+      h += '<div class="df-field">' +
+        '<label class="df-label">联系电话<span class="req">*</span></label>' +
+        '<input class="df-control" id="dfPhone" type="tel" placeholder="认证账号手机号" maxlength="11" autocomplete="off">' +
+      '</div>';
+    }
     h += '<div class="df-field">' +
       '<label class="df-label">备用联系人<span class="opt">选填</span><span class="df-tip">便于顾问多渠道联系您</span></label>' +
       '<div class="dg-row2">' +
@@ -351,11 +372,11 @@
     }
   }
 
-  /* ---------- 共享表单：认证信息回填（仅填空） ---------- */
+  /* ---------- 共享表单：认证信息回填（v2.0：锁定态无条件回填实名信息；可编辑态仅填空） ---------- */
   function prefillAuth(root) {
     var ac = authContact();
-    if (!ac.name) { setInput(root, 'dfContact', ''); } else { var n = root.querySelector('#dfContact'); if (n && !n.value.trim()) n.value = ac.name; }
-    var p = root.querySelector('#dfPhone'); if (p && !p.value.trim()) p.value = ac.phone;
+    var n = root.querySelector('#dfContact'); if (n && (n.readOnly || !n.value.trim())) n.value = ac.name;
+    var p = root.querySelector('#dfPhone'); if (p && (p.readOnly || !p.value.trim())) p.value = ac.phone;
     return ac;
   }
 
@@ -381,11 +402,24 @@
     var regionRaw = inputVal(root, 'dfRegion');
     var r = parseRegion(regionRaw);
     if (!r.ok) { if (window.UI && UI.toast) UI.toast('请选择或填写正确的省/市（如：四川省 成都）', 'warn'); return null; }
-    var contact = inputVal(root, 'dfContact');
-    if (!contact) { if (window.UI && UI.toast) UI.toast('请填写联系人', 'warn'); return null; }
-    var phone = inputVal(root, 'dfPhone');
-    if (!phone) { if (window.UI && UI.toast) UI.toast('请填写联系电话', 'warn'); return null; }
-    if (!/^1[3-9]\d{9}$/.test(phone)) { if (window.UI && UI.toast) UI.toast('请输入正确的 11 位手机号', 'warn'); return null; }
+    /* v2.0：锁定态（实名认证信息只读）直接取认证姓名/电话；可编辑态（编辑页）走原输入校验 */
+    var contactInput = root.querySelector('#dfContact');
+    var phoneInput = root.querySelector('#dfPhone');
+    var locked = !!(contactInput && contactInput.readOnly);
+    var ac = authContact();
+    var contact, phone;
+    if (locked) {
+      contact = ac.name || (contactInput ? contactInput.value.trim() : '');
+      phone = ac.phone || (phoneInput ? phoneInput.value.trim() : '');
+      if (!contact) { if (window.UI && UI.toast) UI.toast('实名认证缺少联系人，请先前往完善实名信息', 'warn'); return null; }
+      if (!phone) { if (window.UI && UI.toast) UI.toast('实名认证缺少手机号，请先前往完善实名信息', 'warn'); return null; }
+    } else {
+      contact = inputVal(root, 'dfContact');
+      if (!contact) { if (window.UI && UI.toast) UI.toast('请填写联系人', 'warn'); return null; }
+      phone = inputVal(root, 'dfPhone');
+      if (!phone) { if (window.UI && UI.toast) UI.toast('请填写联系电话', 'warn'); return null; }
+      if (!/^1[3-9]\d{9}$/.test(phone)) { if (window.UI && UI.toast) UI.toast('请输入正确的 11 位手机号', 'warn'); return null; }
+    }
     var backName = inputVal(root, 'dfBackName');
     var backPhone = inputVal(root, 'dfBackPhone');
     var backup = '';
@@ -430,8 +464,389 @@
     });
   }
 
+  /* ═══════════════════════════════════════════════════════════════
+     v2.0 委托服务 · 商业化与服务流程增强
+     ────────────────────────────────────────────────────────────────
+     · 实名门控：委托入口统一 gateRealname()，未实名 → 实名引导 bottom sheet
+     · 认证信息锁定：表单联系人/电话只读取自实名认证，仅可补充备用手机号
+     · 提交成功 → 对接信息页（顾问热线电话 + 企业微信二维码）
+     · 付费渠道：提交委托后【模拟后台推送】「信息详情页解锁浏览」待付款订单；
+       用户进入首页时弹窗提醒 → 收银台支付 → 支付成功解锁浏览顾问匹配信息
+     全部"后台"行为均为纯前端 localStorage 模拟（无真实后端），
+     真实接口实现见各函数内 [模拟] 占位注释，交付说明见 docs/委托服务-方案交付说明.html。
+     ═══════════════════════════════════════════════════════════════ */
+  var ORDER_KEY = 'engchain_delegate_orders';
+  var UNLOCK_KEY = 'engchain_delegate_unlocks';
+  var UNLOCK_AMOUNT = 29.9;              /* 演示定价：信息详情解锁浏览 ¥29.90 */
+  var SERVICE_HOTLINE = '400-888-6688';
+  var WECOM_LINK = 'https://work.weixin.qq.com/kf/0000-demo-delegate'; /* [模拟] 企业微信加好友链接占位 */
+
+  /* ---------- 实名 / 游客判定（口径与 stores.js deriveIdentity 一致） ---------- */
+  function realnameOk() {
+    try {
+      var a = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+      return !!(a.realname && a.realname.ok);
+    } catch (e) { return false; }
+  }
+  function guestState() {
+    try { if (window.DataBus && typeof DataBus.isGuest === 'function') return !!DataBus.isGuest(); } catch (e) {}
+    try {
+      var st = window.UI ? UI.state.get() : {};
+      return !!(st.loggedIn === false || st.status === 'guest');
+    } catch (e) { return false; }
+  }
+
+  /* ---------- 实名认证引导（未实名 → bottom sheet） ---------- */
+  function showRealnameGuide(opts) {
+    var guest = guestState();
+    var authHref = (opts && opts.authHref) || '../profile/auth-personal.html';
+    var loginHref = (opts && opts.loginHref) || '../auth/login.html';
+    var s = UI.sheet();
+    s.setText('实名认证');
+    s.setClosable(false);
+    s.html(
+      '<div class="dg-guide">' +
+        '<div class="dg-guide-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 2.5v5.2c0 4.6-3 7.4-7 9.3-4-1.9-7-4.7-7-9.3V5.5L12 3z"/><path d="M9.3 12l2 2 3.4-3.6"/></svg></div>' +
+        '<div class="dg-guide-title">委托服务仅面向实名用户</div>' +
+        '<div class="dg-guide-desc">' + (guest
+          ? '请先登录并完成实名认证，即可提交委托，享受平台专属顾问 1 对 1 服务。'
+          : '完成实名认证后即可提交委托，平台将通过<b>电话联系</b>与<b>企业微信私聊</b>为您提供专属顾问服务。') + '</div>' +
+        '<div class="dg-guide-note"><b>为什么需要实名？</b><br>核实您的真实身份，保护企业信息隐私，确保对接过程可追溯。</div>' +
+        '<div class="dg-guide-btns">' +
+          '<button type="button" class="btn btn-primary btn-block" style="height:46px;" onclick="location.href=\'' + (guest ? loginHref : authHref) + '\'">' + (guest ? '去登录' : '去实名认证') + '</button>' +
+          '<button type="button" class="btn btn-ghost btn-block" style="height:46px;margin-top:10px;" onclick="UI.closeSheet()">暂不</button>' +
+        '</div>' +
+        '<div class="dg-guide-foot">完成认证后返回本页，即可继续提交委托</div>' +
+      '</div>'
+    );
+    s.show();
+  }
+  function gateRealname(opts) {
+    if (realnameOk()) { if (opts && opts.onPass) opts.onPass(); return true; }
+    showRealnameGuide(opts);
+    return false;
+  }
+
+  /* ---------- 企业微信演示二维码（canvas 伪 QR，无外部依赖） ---------- */
+  function paintDemoQr(canvas, seed) {
+    if (!canvas || !canvas.getContext) return;
+    var ctx = canvas.getContext('2d');
+    var size = canvas.width || 120;
+    var n = 25, cell = size / n;
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+    var h = 0; seed = String(seed == null ? 'delegate' : seed);
+    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    function rnd() { h = (h * 1103515245 + 12345) >>> 0; return h / 4294967296; }
+    ctx.fillStyle = '#20232a';
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        var inFinder = (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+        if (inFinder) continue;
+        if (rnd() > 0.52) ctx.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
+      }
+    }
+    function finder(x, y) {
+      ctx.fillStyle = '#20232a';
+      ctx.fillRect(x * cell, y * cell, cell * 7, cell * 7);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x * cell + cell, y * cell + cell, cell * 5, cell * 5);
+      ctx.fillStyle = '#20232a';
+      ctx.fillRect(x * cell + cell * 2, y * cell + cell * 2, cell * 3, cell * 3);
+    }
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+  }
+
+  /* ---------- 提交成功 · 对接信息页（电话 + 企业微信） ---------- */
+  function openHandoffSheet(rec) {
+    var s = UI.sheet();
+    s.setText('委托提交成功');
+    s.html(
+      '<div class="dg-handoff">' +
+        '<div class="dg-handoff-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '<div class="dg-handoff-title">委托已提交</div>' +
+        '<div class="dg-handoff-desc">平台专属顾问将在 <b>2 小时内</b> 电话联系您，请保持电话畅通。<br>默认对接方式：<b>电话联系 + 企业微信私聊</b>，您也可主动联系我们：</div>' +
+        '<div class="dg-handoff-card">' +
+          '<div class="dg-handoff-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></div>' +
+          '<div class="dg-handoff-card-body">' +
+            '<div class="dg-handoff-card-label">专属顾问热线</div>' +
+            '<div class="dg-handoff-card-val">' + SERVICE_HOTLINE + '</div>' +
+          '</div>' +
+          '<button type="button" class="dg-handoff-btn" onclick="Delegates.dialService()">点击拨打</button>' +
+        '</div>' +
+        '<div class="dg-handoff-card dg-handoff-wecom">' +
+          '<div class="dg-handoff-card-head">' +
+            '<div class="dg-handoff-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.2 0-2.4-.25-3.4-.7L4 20l1-4.2A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.5 10.5h.01M12.5 10.5h.01M16.5 10.5h.01"/></svg></div>' +
+            '<div class="dg-handoff-card-body">' +
+              '<div class="dg-handoff-card-label">企业微信顾问</div>' +
+              '<div class="dg-handoff-card-val">添加顾问好友 · 微信私聊对接</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="dg-wecom-main">' +
+            '<div class="dg-qr-box"><canvas id="dgWecomQr" width="120" height="120"></canvas><div class="dg-qr-tip">长按识别二维码添加好友</div></div>' +
+            '<div class="dg-wecom-side">' +
+              '<div class="dg-wecom-tip">扫码添加企业微信顾问，随时私聊沟通委托进展与匹配结果</div>' +
+              '<button type="button" class="dg-handoff-btn" onclick="Delegates.addWecom()">添加企业微信好友</button>' +
+              '<button type="button" class="dg-handoff-btn ghost" onclick="Delegates.copyWecomLink()">复制链接</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="dg-handoff-note">如不便接听电话，请添加企业微信留言，顾问将优先处理。</div>' +
+        '<button type="button" class="btn btn-primary btn-block" style="height:46px;" onclick="UI.closeSheet()">完成</button>' +
+      '</div>'
+    );
+    s.show();
+    var qr = document.getElementById('dgWecomQr');
+    if (qr) paintDemoQr(qr, rec ? rec.id : 'delegate');
+  }
+  function dialService() { /* [模拟] 真实环境跳转系统拨号：location.href = 'tel:' + SERVICE_HOTLINE */ UI.toast('正在拨打 ' + SERVICE_HOTLINE, 'ok'); }
+  function addWecom() { /* [模拟] 真实环境唤起企业微信加好友页（WECOM_LINK / 长按识别） */ UI.toast('已唤起企业微信添加好友（演示）', 'ok'); }
+  function copyWecomLink() { /* [模拟] 真实环境为企业微信加好友链接，可复制分享 */ try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(WECOM_LINK); } catch (e) {} UI.toast('企业微信链接已复制', 'ok'); }
+
+  /* ---------- 待付款订单（信息详情页解锁浏览）· 模拟后台推送 ---------- */
+  function readOrders() { try { var a = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function writeOrders(list) { try { localStorage.setItem(ORDER_KEY, JSON.stringify(list)); } catch (e) {} }
+  function readUnlocks() { try { var a = JSON.parse(localStorage.getItem(UNLOCK_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function writeUnlocks(list) { try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(list)); } catch (e) {} }
+
+  function pushUnlockOrder(rec) {
+    /* [模拟] 真实环境由后台在顾问承接/匹配完成后，向指定用户推送待付款订单：
+       1) 后台生成「信息详情页解锁浏览」订单（type:'unlock-browse'）；
+       2) 接口：POST /api/delegate/orders { delegateId, biz, bizLabel, amount, type }
+       3) 前端进入首页时经 GET /api/orders/pending 拉取并弹窗提醒。
+       纯前端演示：提交委托后本地写入订单，home.html 进入时检查弹窗。 */
+    if (!rec || !rec.id) return null;
+    var list = readOrders();
+    var dup = list.some(function (o) { return o.delegateId === rec.id && o.status === 'pending'; });
+    if (dup) return null;
+    var order = {
+      orderNo: 'UL' + Date.now().toString().slice(-10),
+      delegateId: rec.id,
+      biz: rec.biz || '',
+      bizLabel: rec.bizLabel || '委托服务',
+      type: 'unlock-browse',
+      title: '委托信息详情 · 解锁浏览',
+      desc: '顾问为您匹配的信息详情解锁浏览费用（含联系方式与完整资料）',
+      amount: UNLOCK_AMOUNT,
+      status: 'pending',
+      createdAt: fmtNow(),
+      paidAt: ''
+    };
+    list.unshift(order);
+    writeOrders(list);
+    return order;
+  }
+  function pendingOrders() { return readOrders().filter(function (o) { return o.status === 'pending'; }); }
+  function getOrder(orderNo) {
+    var list = readOrders();
+    for (var i = 0; i < list.length; i++) if (list[i].orderNo === orderNo) return list[i];
+    return null;
+  }
+  function markPaid(orderNo) {
+    /* [模拟] 真实环境 → POST /api/orders/{id}/pay，支付网关回调确认后置 paid，并写入解锁权益 */
+    var list = readOrders(), hit = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].orderNo === orderNo) {
+        list[i].status = 'paid'; list[i].paidAt = fmtNow();
+        hit = list[i]; break;
+      }
+    }
+    writeOrders(list);
+    if (hit) {
+      var ul = readUnlocks();
+      ul.unshift({ id: hit.orderNo, title: hit.title, biz: hit.biz, bizLabel: hit.bizLabel, amount: hit.amount, time: hit.paidAt });
+      writeUnlocks(ul);
+      try { window.dispatchEvent(new CustomEvent('engchain:delegate-order', { detail: hit })); } catch (e) {}
+    }
+    return hit;
+  }
+
+  /* ---------- 首页进入：待付款订单弹窗提醒 ---------- */
+  var _remindShown = '';  /* 页面级标记：同一次进入仅提醒一次；刷新/重新进入（内存重置）仍会提醒 */
+  function maybeShowOrderPopup() {
+    if (!realnameOk()) return;           /* 仅实名用户享受委托服务与订单推送 */
+    var pend = pendingOrders();
+    if (!pend.length) return;
+    var order = pend[0];
+    if (_remindShown === order.orderNo) return;
+    _remindShown = order.orderNo;
+    showOrderRemind(order);
+  }
+  function showOrderRemind(order) {
+    /* v2.1：升级为「用户待执行信息提醒」顶部下拉液态玻璃横幅（PendingAlerts 组件）；
+       组件不可用时回退为原底部弹窗（UI.sheet），保证任何页面形态下提醒可用。 */
+    if (window.PendingAlerts && typeof PendingAlerts.add === 'function') {
+      var aid = 'pay-' + order.orderNo;
+      PendingAlerts.add({
+        id: aid,
+        type: 'pay-order',
+        icon: 'pay',
+        title: '待付款订单',
+        subtitle: order.title,
+        desc: '该订单为委托服务 · 信息详情页解锁浏览费用，支付后即可查看顾问为您匹配的信息详情。',
+        meta: order.bizLabel + ' · 订单号 ' + order.orderNo + ' · ' + order.createdAt,
+        amount: '¥' + Number(order.amount).toFixed(2),
+        primary: {
+          label: '立即支付',
+          onClick: function () { if (window.PendingAlerts) PendingAlerts.remove(aid); openCheckout(order); }
+        },
+        secondary: {
+          label: '稍后再说',
+          onClick: function () { if (window.PendingAlerts) PendingAlerts.remove(aid); }
+        }
+      });
+      return;
+    }
+    var s = UI.sheet();
+    s.setText('待付款订单');
+    s.html(
+      '<div class="dg-order">' +
+        '<div class="dg-order-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M3 10h18"/><path d="M8 15h8"/></svg></div>' +
+        '<div class="dg-order-title">您有 1 笔待付款订单</div>' +
+        '<div class="dg-order-desc">该订单为委托服务 · 信息详情页解锁浏览费用，支付后即可查看顾问为您匹配的信息详情。</div>' +
+        '<div class="dg-order-card">' +
+          '<div class="dg-order-card-top"><span class="dl-biz">' + UI.esc(order.bizLabel) + '</span><span class="dg-order-type">解锁浏览</span></div>' +
+          '<div class="dg-order-card-title">' + UI.esc(order.title) + '</div>' +
+          '<div class="dg-order-card-meta">订单号 ' + UI.esc(order.orderNo) + ' · ' + UI.esc(order.createdAt) + '</div>' +
+          '<div class="dg-order-card-foot"><span class="dg-order-amt">¥' + Number(order.amount).toFixed(2) + '</span></div>' +
+        '</div>' +
+        '<button type="button" class="btn btn-primary btn-block" style="height:46px;" data-order-no="' + order.orderNo + '" onclick="Delegates.goPay(event)">立即支付</button>' +
+        '<button type="button" class="btn btn-ghost btn-block" style="height:46px;" onclick="UI.closeSheet()">稍后再说</button>' +
+        '<div class="dg-order-foot">支付后即可解锁浏览「委托信息详情」，查看顾问为您匹配的完整信息</div>' +
+      '</div>'
+    );
+    s.show();
+  }
+  function goPay(ev) {
+    var btn = ev && ev.currentTarget;
+    var no = btn && btn.getAttribute('data-order-no');
+    var o = getOrder(no); if (!o) return;
+    UI.closeSheet();
+    setTimeout(function () { openCheckout(o); }, 260);
+  }
+
+  /* ---------- 收银台（模拟支付） ---------- */
+  function openCheckout(order) {
+    var s = UI.sheet();
+    s.setText('确认支付');
+    s.html(
+      '<div class="dg-pay">' +
+        '<div class="dg-pay-goods">' +
+          '<div class="dg-pay-goods-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>' +
+          '<div class="dg-pay-goods-body"><div class="dg-pay-goods-title">' + UI.esc(order.title) + '</div><div class="dg-pay-goods-desc">' + UI.esc(order.desc) + '</div></div>' +
+          '<div class="dg-pay-amt">¥' + Number(order.amount).toFixed(2) + '</div>' +
+        '</div>' +
+        '<div class="dg-pay-row"><span class="dg-pay-row-label">订单号</span><span class="dg-pay-row-val">' + UI.esc(order.orderNo) + '</span></div>' +
+        '<div class="dg-pay-row"><span class="dg-pay-row-label">服务来源</span><span class="dg-pay-row-val">' + UI.esc(order.bizLabel) + ' · 委托服务</span></div>' +
+        '<div class="dg-pay-methods-label">支付方式</div>' +
+        '<div class="dg-chips dg-pay-methods">' +
+          '<button type="button" class="dg-chip active" data-val="微信支付">微信支付</button>' +
+          '<button type="button" class="dg-chip" data-val="支付宝">支付宝</button>' +
+          '<button type="button" class="dg-chip" data-val="银联">银联</button>' +
+        '</div>' +
+        '<div class="dg-pay-agree">支付即视为同意《委托服务协议》与《退款规则》</div>' +
+        '<button type="button" class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;" data-order-no="' + order.orderNo + '" onclick="Delegates.confirmPay(event)">确认支付 ¥' + Number(order.amount).toFixed(2) + '</button>' +
+        '<div class="dg-pay-foot">支付由平台资金托管保障 · 未对接成功可申请退款</div>' +
+      '</div>'
+    );
+    s.show();
+    var body = s.body();
+    var m = body ? body.querySelector('.dg-pay-methods') : null;
+    if (m) m.addEventListener('click', function (e) {
+      var chip = e.target.closest('.dg-chip'); if (!chip) return;
+      m.querySelectorAll('.dg-chip').forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+    });
+  }
+  function confirmPay(ev) {
+    var btn = ev && ev.currentTarget;
+    var no = btn && btn.getAttribute('data-order-no');
+    var o = getOrder(no); if (!o) return;
+    if (btn._paying) return;
+    btn._paying = true;
+    btn.textContent = '支付中…'; btn.style.opacity = '.7';
+    /* [模拟] 真实环境调用收银台 SDK，支付网关异步回调后确认订单 */
+    setTimeout(function () {
+      markPaid(o.orderNo);
+      btn._paying = false;
+      var s = document.querySelector('.sheet.show');
+      if (!s) return;
+      var head = s.querySelector('.sheet-head .fs-17'); if (head) head.textContent = '支付成功';
+      var body = s.querySelector('.sheet-body'); if (body) body.innerHTML = paySuccessHtml(o);
+    }, 1000);
+  }
+  function paySuccessHtml(order) {
+    return '<div class="dg-pay-ok">' +
+      '<div class="dg-pay-ok-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+      '<div class="dg-pay-ok-title">支付成功 · 信息已解锁</div>' +
+      '<div class="dg-pay-ok-desc">「' + UI.esc(order.title) + '」已解锁，顾问为您匹配的信息详情现已可见</div>' +
+      '<button type="button" class="btn btn-primary btn-block" style="height:46px;" data-order-no="' + order.orderNo + '" onclick="Delegates.viewUnlock(event)">查看解锁信息</button>' +
+      '<button type="button" class="btn btn-ghost btn-block" style="height:46px;" onclick="UI.closeSheet()">完成</button>' +
+      '<div class="dg-pay-ok-foot">如需更多匹配信息，可在企业微信中继续与顾问沟通</div>' +
+    '</div>';
+  }
+  function viewUnlock(ev) {
+    var btn = ev && ev.currentTarget;
+    var no = btn && btn.getAttribute('data-order-no');
+    var o = getOrder(no); if (!o) return;
+    UI.closeSheet();
+    setTimeout(function () { openUnlockInfoSheet(o); }, 260);
+  }
+
+  /* ---------- 解锁信息详情（顾问匹配结果 · 信息详情页演示） ---------- */
+  function openUnlockInfoSheet(order) {
+    var s = UI.sheet();
+    s.setText('解锁信息详情');
+    s.html(
+      '<div class="dg-unlock">' +
+        '<div class="dg-unlock-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>已解锁</div>' +
+        '<div class="dg-unlock-title">' + UI.esc(order.bizLabel || '委托服务') + ' · 顾问匹配信息</div>' +
+        '<div class="dg-unlock-desc">以下为顾问为您筛选的信息详情，可点击电话直接对接。</div>' +
+        '<div class="dg-unlock-list">' + unlockItemsHTML(order) + '</div>' +
+        '<div class="dg-unlock-note">信息已解锁，可通过上方联系方式对接；如需更多信息，请在企业微信中联系顾问。</div>' +
+        '<button type="button" class="btn btn-primary btn-block" style="height:46px;" onclick="UI.closeSheet()">完成</button>' +
+      '</div>'
+    );
+    s.show();
+  }
+  function unlockItemsHTML(order) {
+    /* [模拟] 真实环境 → GET /api/delegate/unlock-info?delegateId=xxx，返回顾问匹配结果（含联系方式） */
+    var biz = order.biz || '';
+    var items;
+    if (biz === 'franchise') {
+      items = [
+        { name: '四川××建设工程有限公司', tags: ['建筑工程施工总承包 二级', '市政公用工程施工总承包 二级'], region: '四川省 · 成都', contact: '刘经理 138****2211' },
+        { name: '成都××建筑劳务有限公司', tags: ['施工劳务资质', '安全生产许可证 有效'], region: '四川省 · 成都', contact: '王经理 139****3322' }
+      ];
+    } else if (biz === 'trade') {
+      items = [
+        { name: '成都××建筑工程有限公司 · 整体转让', tags: ['建筑工程施工总承包 二级', '含在建项目 2 个'], region: '四川省 · 成都', contact: '张总 137****8899', price: '报价 ¥128 万' },
+        { name: '四川××市政工程有限公司 · 股权转让', tags: ['市政公用 二级', '无负债 账目干净'], region: '四川省 · 绵阳', contact: '李总 136****7788', price: '报价 ¥86 万' }
+      ];
+    } else if (biz === 'personnel') {
+      items = [
+        { name: '张敏', tags: ['一级建造师（建筑工程）', '注册安全工程师'], region: '四川省 · 成都 · 求职：工程项目经理', contact: '139****5678' },
+        { name: '某大型施工企业 · 项目经理岗', tags: ['建筑工程总包 一级', '月薪 25-35K'], region: '四川省 · 成都', contact: 'HR 138****1234' }
+      ];
+    } else {
+      items = [
+        { name: '匹配信息一', tags: ['平台核验', '真实有效'], region: '四川省 · 成都', contact: '顾问 400-888-6688' },
+        { name: '匹配信息二', tags: ['平台核验', '真实有效'], region: '全国', contact: '顾问 400-888-6688' }
+      ];
+    }
+    return items.map(function (it) {
+      return '<div class="dg-unlock-item">' +
+        '<div class="dg-unlock-item-name">' + UI.esc(it.name) + (it.price ? '<span class="dg-unlock-item-price">' + UI.esc(it.price) + '</span>' : '') + '</div>' +
+        '<div class="dg-unlock-item-tags">' + (it.tags || []).map(function (t) { return '<span>' + UI.esc(t) + '</span>'; }).join('') + '</div>' +
+        '<div class="dg-unlock-item-meta"><span class="dg-unlock-item-region">' + UI.esc(it.region || '') + '</span>' +
+        '<button type="button" class="dg-unlock-item-call" onclick="Delegates.dialContact(\'' + String(it.contact).replace(/'/g, '') + '\')">' + UI.esc(it.contact || '') + '</button></div>' +
+      '</div>';
+    }).join('');
+  }
+  function dialContact(phone) { /* [模拟] 真实环境 location.href = 'tel:' + phone */ UI.toast('正在拨打 ' + phone, 'ok'); }
+
   window.Delegates = {
-    KEY: KEY, LEGACY_KEY: LEGACY_KEY,
+    KEY: KEY, LEGACY_KEY: LEGACY_KEY, ORDER_KEY: ORDER_KEY, UNLOCK_KEY: UNLOCK_KEY,
     list: list, get: get, byBiz: byBiz, franchiseCurrent: franchiseCurrent,
     add: add, upsert: upsert, remove: remove, counts: counts,
     normStatus: normStatus, statusMeta: statusMeta,
@@ -440,6 +855,16 @@
     formHtml: formHtml, bindForm: bindForm, fillForm: fillForm,
     prefillAuth: prefillAuth, collectForm: collectForm,
     openServiceSheet: openServiceSheet, openCallDialog: openCallDialog,
+    /* v2.0 商业化增强 */
+    realnameOk: realnameOk, guestState: guestState, gateRealname: gateRealname,
+    openHandoffSheet: openHandoffSheet, dialService: dialService,
+    addWecom: addWecom, copyWecomLink: copyWecomLink,
+    pushUnlockOrder: pushUnlockOrder, pendingOrders: pendingOrders,
+    getOrder: getOrder, markPaid: markPaid,
+    maybeShowOrderPopup: maybeShowOrderPopup, goPay: goPay,
+    openCheckout: openCheckout, confirmPay: confirmPay,
+    viewUnlock: viewUnlock, openUnlockInfoSheet: openUnlockInfoSheet,
+    dialContact: dialContact,
     FORM_TEMPLATES: FORM_TEMPLATES
   };
 })();

@@ -13,6 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>工程链 ENGCHAIN · App首页</title>
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/pending-alerts.css?v=2026100301">
 <style>
 /* ===== 首页金刚区：五大频道（工地微缩沙盘 3D 图标 + 文字） ===== */
 .home-kk {
@@ -85,11 +86,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
 
   <div class="scroll no-pad" style="padding-bottom:96px;">
-
-    <!-- 常驻福利条（常驻通知类，长期显示，不可关闭） -->
-    <div id="home-welfare-bar" style="margin:0 var(--page-pad) 10px;padding:9px 14px;border-radius:10px;background:var(--bg-card);border:1px solid var(--line);font-size:11.5px;color:var(--text-2);line-height:1.6;">
-      <span style="color:var(--primary-dim);font-weight:700;">平台福利</span> · 新用户注册送 50 积分 · 实名认证免费解锁 5 条供需 · 建筑入驻限时 0 元
-    </div>
 
     <!-- 活动卡片轮播区（营销活动类，可关闭，4秒自动切换） -->
     <div id="home-promo-carousel" style="margin:0 var(--page-pad) 12px;"></div>
@@ -206,6 +202,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="js/common.js"></script>
 <script src="js/promo-cards.js"></script>
 <script src="js/stores.js"></script>
+<script src="js/delegates.js"></script>
+<script src="js/liquid-glass.iife.js?v=2026100209"></script>
+<script src="js/pending-alerts.js?v=2026100301"></script>
+<script>
+/* 委托服务 v2.1：进入首页时检查待付款订单（信息详情页解锁浏览），存在则弹出
+   「用户待执行信息提醒」顶部下拉横幅（iOS 27 风格 · 液态玻璃，PendingAlerts 组件）；
+   后台推送语义（模拟）：委托提交后由 Delegates.pushUnlockOrder 写入本地订单存储，
+   真实环境为 GET /api/orders/pending 拉取后台推送的待付款订单后调用组件展示。 */
+(function () {
+  try {
+    if (window.Delegates && typeof Delegates.maybeShowOrderPopup === 'function') {
+      setTimeout(function () { Delegates.maybeShowOrderPopup(); }, 350);
+    }
+  } catch (e) {}
+})();
+</script>
 <script>
 (function () {
   window.__ROOT__ = '';
@@ -442,9 +454,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (!b) return;
       var on = !!(window.ModeStore && ModeStore.isBreakIn());
       b.style.display = on ? 'flex' : 'none';
-      /* [FIX] 常驻福利条：破冰期显示新用户福利，正式期隐藏或显示实名认证权益 */
-      var wb = document.getElementById('home-welfare-bar');
-      if (wb) wb.style.display = on ? 'block' : 'none';
     }
 
     function renderAll() { renderAuthEntry(); }
@@ -501,8 +510,35 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var subMore = document.getElementById('sub-more');
   var currentFlow = 'match', currentSub = 'all';
 
+  function renderEmptyState() {
+    var idy = { primary: 'guest', isGuest: true, enterprise: 'none', personal: 'none' };
+    try { if (window.deriveIdentity) idy = deriveIdentity(); } catch (e) {}
+    var root = window.__ROOT__ || '';
+    var hook, perk;
+    if (idy.isGuest || idy.primary === 'guest') {
+      hook = '<a href="' + root + 'pages/auth/login.html" style="display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 6px 16px rgba(201,169,97,.32);">注册即送 50 积分</a>';
+      perk = '注册送 50 积分 · 实名认证免费解锁 5 条供需';
+    } else if (idy.primary === 'registered') {
+      hook = '<a href="' + root + 'pages/profile/auth-prep.html" style="display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 6px 16px rgba(201,169,97,.32);">实名认证免费解锁 5 条供需</a>';
+      perk = '认证后即可发布供需、联系洽谈';
+    } else {
+      hook = '<a href="' + root + 'pages/publish/index.html" style="display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:999px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 6px 16px rgba(201,169,97,.32);">发布第一条供需</a>';
+      perk = '发布供需，平台智能匹配采购与供应资源';
+    }
+    return '<div style="padding:44px 20px;text-align:center;">' +
+      '<div style="width:56px;height:56px;border-radius:18px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--primary-soft);">🗂️</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--text-1);">该分类下暂无供需信息</div>' +
+      '<div style="font-size:12px;color:var(--text-3);margin-top:6px;line-height:1.6;">换个分类看看，或发布一条供需让需求方找到你</div>' +
+      '<div style="margin-top:18px;">' + hook + '</div>' +
+      '<div style="font-size:11px;color:var(--text-3);margin-top:10px;">' + perk + '</div>' +
+    '</div>';
+  }
+
   function renderList() {
-    tabList.innerHTML = window.Cards.render(listFor(currentFlow, currentSub));
+    var items = listFor(currentFlow, currentSub);
+    var html = window.Cards.render(items);
+    if (!html) html = renderEmptyState();
+    tabList.innerHTML = html;
     injectInfeedCarousel();
   }
   /* 查看全部：供需→发现页；资源→对应专门页（资质招商/建企买卖/人员招聘/持证人才） */
@@ -579,7 +615,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   renderSubs('resource');
 })();
 </script>
-<script src="js/liquid-glass.iife.js?v=20260928180107"></script>
 <script src="js/wonder-engine.js"></script>
 <script src="js/wonder-popup.js"></script>
 <script src="js/wonder-bootstrap.js"></script>

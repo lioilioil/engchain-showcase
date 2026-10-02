@@ -1,0 +1,590 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   dynamic-island.css — 待执行信息提醒 · 双机型灵动岛（Dynamic Island × Punch-hole）
+   ────────────────────────────────────────────────────────────────────────────
+   一套提醒语义，两种硬件语言：
+
+   · iPhone 16 Pro（真灵动岛药丸 122×34）
+       idle 黑药丸 → compact「实时活动」(图标+标题+金额/+N) → expanded 黑色连续体大卡
+       通知「成为岛本身」：纯黑 surface 形变（morph），白字 + 古铜金 CTA。
+       平台机箱语言：岛体恒黑，不随明暗主题变色（与系统 Dynamic Island 一致）。
+
+   · HUAWEI Pura X View（居中单孔 Φ10，无岛硬件）
+       idle 裸孔 → 打孔两侧玻璃「翼片」(wings) → 翼片向孔收拢、在孔下方融成
+       带挂扣缺口的玻璃卡。前置摄像头永不被遮挡，金环呼吸提示「有事项挂在孔上」。
+       玻璃为 WebGL 真实折射（js/liquid-glass.iife.js），无 WebGL2 自动回退模糊。
+
+   挂载：每个「设备屏」容器一个 .di-root 实例；机型由根元素 .di-ip / .di-pura 决定。
+   颜色全部继承 app.css 令牌，[data-theme="dark"] 挂在任意祖先元素即可暗色适配。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ---------------------------------------------------------------------------
+   1. 根容器与遮罩
+--------------------------------------------------------------------------- */
+.di-root {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  font-family: var(--font, "PingFang SC", -apple-system, "Microsoft YaHei", sans-serif);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.di-root * { box-sizing: border-box; }
+
+/* 展开态顶部聚焦遮罩：仅压暗上部内容，点击 → 收回展开（不关闭事项） */
+.di-veil {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 300px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .16) 0%, rgba(0, 0, 0, .06) 55%, transparent 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease;
+  z-index: 1;
+}
+.di-root.is-open .di-veil { opacity: 1; pointer-events: auto; }
+
+/* ---------------------------------------------------------------------------
+   2. 公共内容件
+--------------------------------------------------------------------------- */
+
+/* 类型图标（与 pending-alerts 同语义：金/蓝/绿/青/中性） */
+.di-ic {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 2px 6px -1px rgba(0, 0, 0, .30);
+}
+.di-ic svg { display: block; }
+.di-ic-gold    { background: linear-gradient(135deg, var(--primary, #B89968), var(--primary-dim, #9A8050)); }
+.di-ic-blue    { background: linear-gradient(135deg, #4a7cf7, #2f5fe0); }
+.di-ic-green   { background: linear-gradient(135deg, #34a86c, #1f8a52); }
+.di-ic-teal    { background: linear-gradient(135deg, #2bb3a3, #17847a); }
+.di-ic-neutral { background: rgba(128, 130, 138, .28); color: inherit; box-shadow: none; }
+
+.di-amount {
+  font-weight: 800;
+  font-family: var(--font-num, "Barlow", "PingFang SC", sans-serif);
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.di-count {
+  flex: none;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: var(--font-num, "Barlow", sans-serif);
+  letter-spacing: .01em;
+}
+
+/* 展开卡正文 */
+.di-desc {
+  font-size: 12.5px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.di-meta {
+  font-size: 10.5px;
+  line-height: 1.5;
+  word-break: break-all;
+  margin-top: 7px;
+}
+.di-acts { display: flex; align-items: center; gap: 9px; margin-top: 12px; }
+.di-act {
+  height: 38px;
+  border: none;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .18s ease, opacity .18s ease;
+  pointer-events: auto;
+}
+.di-act:active { transform: scale(.96); }
+.di-act-primary {
+  flex: 1;
+  background: linear-gradient(135deg, var(--primary-strong, #D4C09A), var(--primary, #B89968));
+  color: #221C0C;
+  box-shadow: 0 6px 16px -6px rgba(184, 153, 104, .65), inset 0 1px 0 rgba(255, 255, 255, .4);
+}
+.di-act-ghost {
+  flex: none;
+  padding: 0 17px;
+  background: transparent;
+}
+
+/* pager（多条事项） */
+.di-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 9px;
+}
+.di-pager i {
+  width: 5px; height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .28;
+  transition: opacity .25s ease, transform .25s ease, width .25s ease;
+}
+.di-pager i.on { opacity: 1; transform: scale(1.15); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   3. iPhone 16 Pro — 纯黑灵动岛 morph
+   ═══════════════════════════════════════════════════════════════════════ */
+/* ── morph 容器：深色液态玻璃卡；idle 透明，仅露出固定黑岛核 ── */
+.di-ip {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 122px;
+  height: 34px;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: auto;
+  z-index: 10;
+  background: transparent;
+  transition:
+    width .52s cubic-bezier(.32, .72, 0, 1),
+    height .52s cubic-bezier(.32, .72, 0, 1),
+    border-radius .52s cubic-bezier(.32, .72, 0, 1),
+    top .52s cubic-bezier(.32, .72, 0, 1),
+    box-shadow .4s ease;
+}
+.di-ip[data-liquid-glass="webgl"] { background: transparent; }
+/* 无 WebGL2 回退：恒按暗色深色玻璃（idle 保持纯药丸，仅有事项时才上玻璃） */
+.di-root.di-model-iphone.is-active .di-ip[data-liquid-glass="fallback"] {
+  background: rgba(15, 15, 19, .82);
+  -webkit-backdrop-filter: blur(26px) saturate(1.5) brightness(.58);
+  backdrop-filter: blur(26px) saturate(1.5) brightness(.58);
+}
+
+/* 黑色扩散层：自顶部固定黑岛向四周扩散为深黑玻璃（在玻璃之上、文字之下） */
+.di-ip-glow {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(125% 92% at 50% -12%,
+    rgba(0, 0, 0, .97) 0%,
+    rgba(0, 0, 0, .90) 40%,
+    rgba(7, 7, 11, .80) 68%,
+    rgba(10, 10, 14, .70) 100%);
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 固定纯黑灵动岛层（第一行背景）：始终纯黑，三态连续 morph；
+   大柔度黑影自岛边缘羽化，融入外层深色玻璃，形成「由岛向外扩散」 */
+.di-ip-core {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translateX(-50%);
+  width: 122px; height: 34px;
+  background: #000;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .05),
+    0 0 22px 8px rgba(0, 0, 0, .78),
+    0 10px 24px -10px rgba(0, 0, 0, .62);
+  transition:
+    width .52s cubic-bezier(.32, .72, 0, 1),
+    height .52s cubic-bezier(.32, .72, 0, 1),
+    top .52s cubic-bezier(.32, .72, 0, 1),
+    border-radius .52s cubic-bezier(.32, .72, 0, 1);
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ================= compact：两行实时活动 ================= */
+.di-live {
+  position: absolute; inset: 0; z-index: 2;
+  color: #fff; cursor: pointer;
+  opacity: 0; pointer-events: none;
+  transition: opacity .26s ease;
+}
+.di-lv1 {
+  position: absolute; top: 8px; left: 12px; right: 12px; height: 36px;
+  display: flex; align-items: center; gap: 9px; padding: 0 13px;
+}
+.di-lv1 .di-ic { width: 23px; height: 23px; border-radius: 7px; }
+.di-lv1 .di-ic svg { width: 13px; height: 13px; }
+.di-lv-cat {
+  flex: 1; min-width: 0;
+  font-size: 13.5px; font-weight: 700; letter-spacing: .01em; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.di-lv-key { flex: none; display: flex; align-items: center; gap: 7px; }
+.di-lv-keyv {
+  font-size: 13px; font-weight: 800; color: #E4D0A2; white-space: nowrap;
+  font-family: var(--font-num, "Barlow", "PingFang SC", sans-serif);
+}
+.di-lv-key .di-count { background: rgba(255, 255, 255, .16); color: #fff; }
+.di-lv2 { position: absolute; top: 48px; left: 19px; right: 19px; }
+.di-lv-sub {
+  display: block; font-size: 12px; line-height: 1.3; color: rgba(255, 255, 255, .68);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.di-lv1 > *, .di-lv2 { transition: opacity .2s ease; }
+.di-live.di-swap .di-lv1 > *, .di-live.di-swap .di-lv2 { opacity: 0; }
+
+/* ================= expanded：多行深色玻璃卡 ================= */
+.di-ip-body {
+  position: absolute; inset: 0; z-index: 2;
+  padding: 0 18px 15px;
+  color: #fff;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease .04s;
+}
+/* 第一行：绝对贴顶黑带，图标+分类名（左）｜关键信息+关闭（右） */
+.di-x1 {
+  position: absolute; top: 0; left: 0; right: 0;
+  flex: none; height: 58px;
+  padding: 0 18px;
+  display: flex; align-items: center; gap: 11px;
+}
+.di-x1 .di-ic { width: 34px; height: 34px; border-radius: 11px; }
+.di-x1 .di-ic svg { width: 18px; height: 18px; }
+.di-x-cat {
+  flex: 1; min-width: 0;
+  font-size: 16px; font-weight: 800; letter-spacing: -.005em; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.di-x-side { flex: none; display: flex; align-items: center; gap: 10px; }
+.di-x-keyv {
+  font-size: 15px; font-weight: 800; color: #E4D0A2; white-space: nowrap;
+  font-family: var(--font-num, "Barlow", "PingFang SC", sans-serif);
+}
+.di-b-close {
+  width: 21px; height: 21px; flex: none;
+  border: none; border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  color: rgba(255, 255, 255, .85);
+  font-size: 11px; line-height: 21px; text-align: center;
+  cursor: pointer; padding: 0;
+  pointer-events: auto;
+}
+/* 第二行：简要描述（随展开加宽、字号放大） */
+.di-x2 {
+  flex: none; margin-top: 13px;
+  font-size: 15.5px; font-weight: 600; line-height: 1.42; color: rgba(255, 255, 255, .92);
+}
+.di-ip-body .di-desc { color: rgba(255, 255, 255, .78); margin-top: 11px; font-size: 13.5px; }
+.di-ip-body .di-meta { color: rgba(255, 255, 255, .46); }
+.di-ip-body .di-act-ghost { color: rgba(255, 255, 255, .72); border: 1px solid rgba(255, 255, 255, .20); }
+.di-ip-body .di-pager { color: #fff; }
+
+/* ---- 三态驱动 ---- */
+/* compact：深色玻璃小卡（两行），固定黑岛为内嵌药丸 */
+.di-root.di-model-iphone.is-active .di-ip {
+  width: 300px;
+  height: 74px;
+  top: 10px;
+  border-radius: 28px;
+  box-shadow:
+    0 18px 44px -16px rgba(0, 0, 0, .55),
+    0 6px 16px rgba(0, 0, 0, .30);
+}
+.di-root.di-model-iphone.is-active .di-ip-glow { opacity: 1; }
+.di-root.di-model-iphone.is-active .di-ip-core {
+  width: 276px; height: 36px; top: 8px;
+  border-radius: 999px;
+}
+.di-root.di-model-iphone.is-active:not(.is-open) .di-live { opacity: 1; pointer-events: auto; }
+
+/* expanded：大玻璃卡，黑岛向两侧拉宽成贴顶黑带，第二行放大，其下长出详情/按钮 */
+.di-root.di-model-iphone.is-open .di-ip {
+  width: 366px;
+  height: 248px;   /* 兜底值；JS 按当前事项内容精确设置，随切换平滑形变 */
+  top: 10px;
+  border-radius: 34px 34px 24px 24px;
+  box-shadow:
+    0 26px 64px -18px rgba(0, 0, 0, .68),
+    0 10px 22px rgba(0, 0, 0, .40);
+}
+.di-root.di-model-iphone.is-open .di-ip-core {
+  width: 366px; height: 58px; top: 0;
+  border-radius: 34px 34px 20px 20px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), 0 10px 26px -12px rgba(0, 0, 0, .62);
+}
+.di-root.di-model-iphone.is-open .di-live { opacity: 0; pointer-events: none; }
+.di-root.di-model-iphone.is-open .di-ip-body { padding-top: 58px; opacity: 1; pointer-events: auto; }
+
+/* 事项到达：岛弹性一次（仅缩放，形变交给 core/容器 transition） */
+@keyframes diIpArrive {
+  0%   { transform: translateX(-50%) scale(.86); }
+  55%  { transform: translateX(-50%) scale(1.04); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+.di-root.di-model-iphone.di-arrive .di-ip { animation: diIpArrive .5s cubic-bezier(.34, 1.35, .5, 1); }
+@keyframes diIpContentIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.di-root.di-model-iphone.di-arrive .di-live .di-lv1,
+.di-root.di-model-iphone.di-arrive .di-live .di-lv2 { animation: diIpContentIn .32s ease .16s both; }
+/* 展开内容逐行入场 */
+@keyframes diIpBodyIn {
+  from { opacity: 0; transform: translateY(7px) scale(.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.di-root.di-model-iphone.is-open .di-ip-body > * { animation: diIpBodyIn .30s cubic-bezier(.32, .72, 0, 1) both; }
+.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(2) { animation-delay: .04s; }
+.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(3) { animation-delay: .07s; }
+.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(4) { animation-delay: .10s; }
+.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(5) { animation-delay: .13s; }
+.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(6) { animation-delay: .15s; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   4. HUAWEI Pura X View — 打孔 · 玻璃翼片 · 挂扣玻璃卡
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ---- 前置打孔（模拟硬件；真实设备由外壳层提供，组件仅避让） ---- */
+.di-hole {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 10px; height: 10px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  z-index: 9;
+  background: radial-gradient(circle at 36% 32%, #232936, #04060b 72%);
+  box-shadow: inset 0 0 0 1.5px #0a0d14, inset 0 0 2px #000, 0 0 0 .5px rgba(255, 255, 255, .16);
+  pointer-events: none;
+}
+.di-hole::after {
+  content: "";
+  position: absolute; inset: 2.6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 36%, #6f92c4, #223354 78%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .4);
+}
+/* 金呼吸环：有事项时「挂」在孔上 */
+.di-hole-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 17px; height: 17px;
+  margin: -8.5px 0 0 -8.5px;
+  border-radius: 50%;
+  border: 1.4px solid var(--primary, #B89968);
+  opacity: 0;
+  transition: opacity .3s ease;
+  pointer-events: none;
+}
+.di-root.di-model-pura.is-active .di-hole-ring {
+  opacity: .9;
+  animation: diRingPulse 2.4s ease-in-out infinite;
+}
+@keyframes diRingPulse {
+  0%, 100% { transform: scale(1);    opacity: .85; }
+  50%      { transform: scale(1.22); opacity: .35; }
+}
+
+/* ---- 玻璃翼片 ---- */
+.di-pw {
+  position: absolute;
+  top: 2px;
+  height: 22px;
+  border-radius: 999px;
+  pointer-events: auto;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  color: var(--text-1, #161616);
+  background: rgba(255, 255, 255, .62);
+  border: 1px solid rgba(22, 22, 22, .12);
+  box-shadow:
+    0 4px 14px -5px rgba(24, 28, 46, .22),
+    0 1px 3px rgba(24, 28, 46, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .72),
+    inset 0 0 0 .5px rgba(255, 255, 255, .35);
+  opacity: 0;
+  transition:
+    transform .46s cubic-bezier(.32, .72, 0, 1),
+    opacity .32s ease;
+  -webkit-backdrop-filter: blur(20px) saturate(1.7);
+  backdrop-filter: blur(20px) saturate(1.7);
+}
+[data-liquid-glass="webgl"] { background: transparent; }
+.di-pw-l {
+  left: 82px;
+  right: calc(50% - 12px);
+  gap: 6px;
+  padding: 0 10px 0 5px;
+  transform-origin: right center;
+  transform: scaleX(.12);
+  justify-content: flex-start;
+}
+.di-pw-r {
+  left: calc(50% + 12px);
+  right: auto;
+  width: -webkit-max-content;
+  width: max-content;
+  max-width: 118px;
+  gap: 6px;
+  padding: 0 10px;
+  transform-origin: left center;
+  transform: scaleX(.12);
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+.di-pw .di-ic { width: 19px; height: 19px; border-radius: 6px; }
+.di-pw .di-ic svg { width: 11px; height: 11px; }
+.di-pw-title {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.di-pw-r .di-amount { font-size: 12px; color: var(--primary-dim, #9A8050); }
+.di-pw .di-count { background: rgba(22, 22, 22, .10); color: var(--text-1, #161616); }
+
+/* 翼片展开到位 */
+.di-root.di-model-pura.is-active:not(.is-open) .di-pw {
+  opacity: 1;
+  transform: scaleX(1);
+}
+/* 展开大卡时：翼片向孔收拢消失 */
+.di-root.di-model-pura.is-open .di-pw { opacity: 0; transform: scaleX(.1); pointer-events: none; }
+/* 内容交换防闪烁 */
+.di-root.di-model-pura.di-swap .di-pw-title { opacity: 0; }
+
+/* ---- 挂扣玻璃卡 ---- */
+.di-pura-card {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  right: 14px;
+  border-radius: 26px 26px 13px 13px;
+  z-index: 10;
+  pointer-events: auto;
+  color: var(--text-1, #161616);
+  background: rgba(255, 255, 255, .66);
+  border: .5px solid var(--glass-border, rgba(22, 22, 22, .10));
+  box-shadow:
+    0 18px 44px -14px rgba(24, 28, 46, .32),
+    0 4px 12px -4px rgba(24, 28, 46, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .7);
+  -webkit-backdrop-filter: blur(26px) saturate(1.8);
+  backdrop-filter: blur(26px) saturate(1.8);
+  padding: 24px 15px 14px;
+  opacity: 0;
+  transform: translateY(-10px) scaleY(.92);
+  transform-origin: 50% 0;
+  pointer-events: none;
+  transition:
+    opacity .34s ease,
+    transform .46s cubic-bezier(.32, .72, 0, 1);
+  /* 顶部中央挂扣缺口：r8 圆心对齐 Φ10 前置孔中心(屏内 y≈11)，孔穿过卡片、四周留 ~2px 气隙 */
+  -webkit-mask: radial-gradient(circle 8px at 50% 2px, transparent 7px, #000 8px);
+  mask: radial-gradient(circle 8px at 50% 2px, transparent 7px, #000 8px);
+}
+.di-pura-card[data-liquid-glass="webgl"] { background: transparent; }
+.di-root.di-model-pura.is-open .di-pura-card {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+  pointer-events: auto;
+}
+/* 缺口两侧的金色挂点（视觉上把卡片挂到金环上） */
+.di-pura-card::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  width: 22px; height: 7px;
+  transform: translateX(-50%);
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(180deg, rgba(184, 153, 104, .55), rgba(184, 153, 104, 0));
+  pointer-events: none;
+}
+.di-pura-card .di-b-title { display: block; font-size: 15px; color: var(--text-1, #161616); }
+.di-pura-card .di-b-sub { color: var(--text-3, #7A7A7A); }
+.di-pura-card .di-b-side .di-amount { color: var(--primary-dim, #9A8050); }
+.di-pura-card .di-b-close { background: var(--glass-bg-2, rgba(22, 22, 22, .06)); color: var(--text-2, #4A4A4A); }
+.di-pura-card .di-desc { color: var(--text-2, #4A4A4A); margin-top: 9px; }
+.di-pura-card .di-meta { color: var(--text-3, #7A7A7A); }
+.di-pura-card .di-act-ghost { color: var(--text-3, #7A7A7A); border: 1px solid var(--line, rgba(22, 22, 22, .10)); }
+.di-pura-card .di-pager { color: var(--text-2, #4A4A4A); }
+.di-pura-card .di-b-head { display: flex; align-items: flex-start; gap: 10px; }
+.di-pura-card .di-b-copy { flex: 1; min-width: 0; }
+.di-pura-card .di-ic { width: 33px; height: 33px; border-radius: 10px; margin-top: 1px; }
+.di-pura-card .di-ic svg { width: 17px; height: 17px; }
+.di-pura-card .di-b-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+
+/* Pura 卡内容入场 */
+.di-root.di-model-pura.is-open .di-pura-card .di-b-head,
+.di-root.di-model-pura.is-open .di-pura-card .di-desc,
+.di-root.di-model-pura.is-open .di-pura-card .di-meta,
+.di-root.di-model-pura.is-open .di-pura-card .di-acts,
+.di-root.di-model-pura.is-open .di-pura-card .di-pager {
+  animation: diPuraBodyIn .36s cubic-bezier(.32, .72, 0, 1) both;
+}
+.di-root.di-model-pura.is-open .di-pura-card .di-desc { animation-delay: .05s; }
+.di-root.di-model-pura.is-open .di-pura-card .di-meta { animation-delay: .09s; }
+.di-root.di-model-pura.is-open .di-pura-card .di-acts { animation-delay: .13s; }
+.di-root.di-model-pura.is-open .di-pura-card .di-pager { animation-delay: .17s; }
+@keyframes diPuraBodyIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pura 暗色：玻璃翼片/卡反相 */
+[data-theme="dark"] .di-pw {
+  background: rgba(38, 40, 45, .60);
+  border-color: rgba(255, 255, 255, .14);
+  box-shadow:
+    0 4px 14px -5px rgba(0, 0, 0, .55),
+    0 1px 3px rgba(0, 0, 0, .3),
+    inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+[data-theme="dark"] .di-pura-card {
+  background: rgba(34, 36, 41, .66);
+  border-color: rgba(255, 255, 255, .10);
+  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+[data-theme="dark"] .di-pw .di-count { background: rgba(255, 255, 255, .14); color: #fff; }
+
+/* ---------------------------------------------------------------------------
+   5. 手势跟手 / 关闭 / 无障碍
+--------------------------------------------------------------------------- */
+.di-dragging { transition: none !important; }
+.di-leaving {
+  animation: diLeave .34s cubic-bezier(.4, 0, 1, 1) forwards !important;
+}
+@keyframes diLeave {
+  to { opacity: 0; transform: var(--di-leave-transform, translateY(-14px) scale(.94)); }
+}
+.di-root.di-model-iphone .di-ip.di-leaving {
+  animation: diIpLeave .34s cubic-bezier(.4, 0, 1, 1) forwards;
+}
+@keyframes diIpLeave {
+  to { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(.9); }
+}
+.di-root.di-model-pura .di-pw.di-leave-left {
+  transform: scaleX(.1) !important; opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .di-ip, .di-ip-core, .di-ip-glow, .di-live, .di-ip-body, .di-pw, .di-pura-card, .di-hole-ring { transition: none !important; animation: none !important; }
+  .di-root.di-model-iphone.is-active .di-ip { transition: none; }
+}
