@@ -17,9 +17,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* —— 聊天页专用样式（不影响 app.css 全局） —— */
   /* 头部触达 */
   .nav-back{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;padding:10px;margin:-10px 0;font-size:22px;line-height:1;}
-  .nav-title{display:flex;flex-direction:column;align-items:center;line-height:1.25;}
-  .cert-mini{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:999px;background:var(--primary-soft);color:var(--primary-dim);font-size:9px;font-weight:600;letter-spacing:.03em;}
-  .cert-mini svg{width:9px;height:9px;}
+  /* 标题行：单行「用户名称 + 企业简称」，禁止换行/多行。
+     右簇仅一个「更多」44 图标钮，左簇为 返回|竖线|首页(约106px)，标题盒收窄到两侧簇之间，
+     避免长名称视觉压到/拦截右簇点击；标题仅展示，不参与命中。 */
+  .navbar .nav-title{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;line-height:1.2;
+    max-width:min(68%,calc(100% - 168px));pointer-events:none;}
+  .ct-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ct-co{flex:none;max-width:44%;display:none;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ct-co.on{display:inline-flex;}
+  .ct-co::before{content:"";flex:none;width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.65;}
+
+  /* 设置备注弹层（沿用 app demo bottom-sheet：标签 + 输入框 + 主次按钮） */
+  .rm-box{padding:2px 2px 4px;}
+  .rm-lab{display:block;font-size:12px;color:var(--text-2);margin-bottom:8px;}
+  .rm-input{width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg-card);font-size:15px;color:var(--text-1);box-shadow:var(--shadow-xs);}
+  .rm-input:focus{outline:none;border-color:var(--primary-dim);}
+  .rm-hint{margin-top:9px;font-size:11px;color:var(--text-3);line-height:1.6;}
+  .rm-actions{display:flex;gap:10px;margin-top:18px;}
+  .rm-actions .btn{flex:1;}
 
   /* 会话上下文条：当前对接业务 */
   .ctx-bar{margin:0 16px 10px;padding:10px 12px;border-radius:14px;background:var(--bg-card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;cursor:pointer;box-shadow:var(--shadow-xs);}
@@ -141,6 +156,75 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .mc-file-go{flex:none;color:var(--text-3);display:flex;align-items:center;}
   .mc-file-go svg{width:13px;height:13px;}
 
+  /* ============ 对方用户信息卡（点头像弹出） ============ */
+  @keyframes ucRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  .uc-wrap{padding:2px 16px calc(16px + env(safe-area-inset-bottom,0px));}
+  .uc-wrap>*{animation:ucRise .42s cubic-bezier(.22,.61,.36,1) both;}
+  .uc-wrap>*:nth-child(2){animation-delay:.05s;}.uc-wrap>*:nth-child(3){animation-delay:.1s;}.uc-wrap>*:nth-child(4){animation-delay:.15s;}.uc-wrap>*:nth-child(5){animation-delay:.2s;}
+  /* 头部：一张承载真实背书的浅色身份卡（去掉无信息的空 banner 与头像负 margin 叠加） */
+  .uc-head{position:relative;margin:2px 0 12px;text-align:center;padding:20px 16px 15px;border-radius:18px;border:1px solid color-mix(in srgb,var(--primary) 20%,transparent);
+    background:linear-gradient(160deg,color-mix(in srgb,var(--primary) 15%,var(--bg-card)),color-mix(in srgb,var(--primary-dim) 6%,var(--bg-card)) 58%,var(--bg-card));}
+  .uc-avatar{position:relative;margin:0 auto;width:66px;height:66px;border-radius:21px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:27px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px -10px var(--primary-dim);}
+  .uc-avatar .uc-v{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;color:var(--success);}
+  .uc-avatar .uc-v svg{width:22px;height:22px;}
+  .uc-name{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;font-size:19px;font-weight:700;color:var(--text-1);}
+  .uc-name .uc-ver{flex:none;width:18px;height:18px;color:var(--success);}
+  .uc-sub{margin-top:4px;font-size:12.5px;color:var(--text-3);line-height:1.6;}
+  .uc-biz{margin-top:3px;font-size:11.5px;color:var(--text-3);line-height:1.55;}
+  /* 信任指标条（详情页公开信息：信用/评价/从业/发布） */
+  .uc-stats{display:flex;margin:13px -2px 0;padding:11px 0 0;border-top:1px solid color-mix(in srgb,var(--primary) 16%,transparent);}
+  .uc-stat{flex:1;min-width:0;text-align:center;}
+  .uc-stat + .uc-stat{border-left:1px solid var(--line);}
+  .uc-stat .n{font-size:16px;font-weight:700;color:var(--primary);font-family:var(--font-num);line-height:1.1;}
+  .uc-stat .n small{font-size:10.5px;font-weight:600;color:var(--primary-dim);margin-left:1px;}
+  .uc-stat .l{font-size:10.5px;color:var(--text-3);margin-top:3px;}
+  .uc-tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
+  .uc-tags span{font-size:10.5px;font-weight:600;color:var(--primary-dim);background:var(--bg-card);border:1px solid color-mix(in srgb,var(--primary) 22%,transparent);padding:3px 10px;border-radius:var(--r-full);}
+  /* 卡 */
+  .uc-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-xs);overflow:hidden;}
+  .uc-card + .uc-card{margin-top:12px;}
+  .uc-row{display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;}
+  .uc-card .uc-row + .uc-row{border-top:1px solid var(--line);}
+  .uc-row.is-static{cursor:default;}
+  .uc-ic{flex:none;width:36px;height:36px;border-radius:10px;background:var(--primary-soft);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;}
+  .uc-ic svg{width:17px;height:17px;stroke-width:1.8;}
+  .uc-ic.green{background:var(--success-soft);color:var(--success);}
+  .uc-rb{flex:1;min-width:0;}
+  .uc-rl{font-size:11px;color:var(--text-3);}
+  .uc-rv{font-size:14.5px;font-weight:600;color:var(--text-1);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .uc-rv.num{font-family:var(--font-num);letter-spacing:.02em;}
+  .uc-rv.placeholder{font-weight:500;color:var(--text-4);}
+  .uc-rt{flex:none;display:flex;align-items:center;gap:5px;color:var(--text-3);font-size:12px;}
+  .uc-rt svg{width:15px;height:15px;}
+  .uc-act{flex:none;width:34px;height:34px;border-radius:9px;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;}
+  .uc-act svg{width:16px;height:16px;}
+  /* 锁定态行内小锁（脱敏值清晰可读，仅以小锁标识不可操作） */
+  .uc-rlock{flex:none;width:30px;height:30px;border-radius:9px;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;}
+  .uc-rlock svg{width:14px;height:14px;}
+  /* 小节标题 */
+  .uc-sec{font-size:12px;font-weight:600;color:var(--text-3);margin:16px 2px 0;display:flex;align-items:center;gap:8px;}
+  .uc-sec::before{content:'';flex:none;width:3px;height:12px;border-radius:2px;background:var(--primary);}
+  .uc-locknote{display:flex;align-items:flex-start;gap:6px;font-size:11px;color:var(--text-4);line-height:1.6;margin:7px 2px 8px;}
+  .uc-locknote svg{flex:none;width:13px;height:13px;margin-top:1px;color:var(--primary-dim);}
+  /* 供需小卡 */
+  .uc-supply{padding:11px 14px;}
+  .uc-sup-top{display:flex;align-items:center;gap:8px;}
+  .uc-tag{flex:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+  .uc-tag.demand{background:color-mix(in srgb,#3b82f6 12%,transparent);color:#3b82f6;}
+  .uc-tag.supply{background:var(--primary-soft);color:var(--primary-dim);}
+  .uc-sup-title{font-size:13px;font-weight:600;color:var(--text-1);margin-top:6px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .uc-sup-meta{font-size:11px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .uc-sup-meta .loc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;}
+  .uc-sup-meta .price{flex:none;color:var(--primary-dim);font-weight:600;font-family:var(--font-num);}
+  .uc-sup-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--text-3);}
+  .uc-empty{padding:18px;text-align:center;font-size:12px;color:var(--text-4);}
+  .uc-unlocked-tip{display:none;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:600;color:var(--success);background:var(--success-soft);padding:4px 12px;border-radius:var(--r-full);}
+  .uc-unlocked-tip.show{display:inline-flex;}
+  .uc-unlocked-tip svg{width:12px;height:12px;stroke-width:2.4;}
+  /* 底部操作 */
+  .uc-foot{margin-top:16px;display:flex;gap:10px;}
+  .uc-foot .btn{flex:1;}
+
   /* 输入区 */
   .mc-input{flex:0 0 auto;position:relative;z-index:2;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--bg);background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line);}
   .mc-quick{display:flex;align-items:center;gap:8px;padding:0 0 10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
@@ -260,10 +344,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="navbar">
     <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">
-      <span style="display:flex;align-items:center;gap:6px;"><span id="c-name">李工</span><span class="cert-mini" id="c-cert"><svg class="ic"><use href="#i-shield"/></svg>个人认证</span></span>
-      <div style="font-size:10px;color:var(--text-3);font-weight:400;" id="c-role">四川中建××建设</div>
+      <span id="c-name" class="ct-name"></span><span id="c-co" class="ct-co"></span>
     </div>
-    <div class="nav-right"><button class="icon-btn" onclick="openMore()" aria-label="更多"><svg class="ic"><use href="#i-more"/></svg></button></div>
+    <div class="nav-right">
+      <button type="button" class="icon-btn" onclick="openMore()" aria-label="更多"><svg class="ic"><use href="#i-more"/></svg></button>
+    </div>
   </div>
 
   <!-- 会话上下文条：当前对接业务 -->
@@ -312,24 +397,65 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var id = new URLSearchParams(location.search).get('id') || 'c1';
   var conv = MOCK.conversations.find(function (c) { return c.id === id; }) || MOCK.conversations[0];
 
-  /* —— 会话元信息：认证标识 / 主页链接 / 当前对接业务 —— */
+  /* —— 会话元信息：对方个人认证档案 / 关联企业 / 对话来源企业 / 当前对接业务 ——
+     personId         对方个人认证档案 id（决定「?」弹「个人认证主页」；无则企业认证会话回退企业主页）
+     companyIds       对方关联的全部企业 id；多个时须靠 sourceCompanyId 才能确定标题显示哪家
+     sourceCompanyId  本对话窗口来源对应的企业 id；多关联但无来源时，标题不显示企业简称
+     service          官方客服等非自然人会话：不显示企业简称 */
   var META = {
-    c1: { cert: '个人认证', certIcon: 'shield', href: '../personal/index.html?id=p-jzs1',
+    c1: { personId: 'p-jzs1', companyIds: ['c-znzjs'], sourceCompanyId: 'c-znzjs',
+      profileHref: '../personal/index.html?id=p-jzs1',
       ctx: { title: '正在对接 · 商品混凝土采购', sub: '成都天府新区商业综合体 · C30/C40 · ¥135万', href: '../supply/detail.html?id=1001', icon: 'box' } },
-    c2: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+    c2: { personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
       ctx: { title: '正在对接 · 盘扣脚手架租赁', sub: '双排盘扣脚手架 · 3000㎡ · 含运输', href: '../supply/detail.html?id=1005', icon: 'box' } },
-    c3: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+    c3: { personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
       ctx: { title: '正在对接 · 劳务班组进场', sub: '钢筋工班组 12 人 · 预计进场 9-20', href: '../supply/detail.html?id=1004', icon: 'users' } },
-    c4: { cert: '企业认证', certIcon: 'shield', href: '../company/index.html?id=c-znzjs',
+    c4: { personId: null, companyIds: ['c-znzjs', 'c-cdrj'], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
       ctx: { title: '正在对接 · 项目合作洽谈', sub: '重庆×建设集团 · 市政项目联合体', href: '../supply/detail.html?id=cp1', icon: 'share' } },
-    c5: { cert: '官方客服', certIcon: 'bell', href: '../message/system.html',
+    c5: { service: true, personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../message/system.html',
       ctx: { title: '平台客服 · 服务中', sub: '回复时间 09:00-18:00 · 紧急请致电 400-xxx', href: null, icon: 'bell' } }
   };
-  var meta = META[id] || { cert: '平台认证', certIcon: 'shield', href: null, ctx: null };
+  var meta = META[id] || { personId: null, companyIds: [], sourceCompanyId: null, profileHref: null, service: false, ctx: null };
 
-  document.getElementById('c-name').textContent = conv.name;
-  document.getElementById('c-role').textContent = conv.role;
-  document.getElementById('c-cert').innerHTML = '<svg class="ic"><use href="#i-' + meta.certIcon + '"/></svg>' + meta.cert;
+  /* —— 标题行解析：用户名称（备注优先，否则认证姓名） + 企业简称（按对话来源；多企业无来源不显示） —— */
+  function peerKey() { return meta.personId ? ('person:' + meta.personId) : ('conv:' + id); }
+  function certifiedName() {
+    if (meta.personId && window.MOCK) { var p = MOCK.personById(meta.personId); if (p && p.name) return p.name; }
+    return conv.name || '';
+  }
+  function companyShort() {
+    if (meta.service) return '';                       // 官方客服等非自然人不显示企业简称
+    var ids = meta.companyIds || [], co = null;
+    if (window.MOCK) {
+      if (meta.sourceCompanyId) co = MOCK.companyById(meta.sourceCompanyId);
+      if (!co && ids.length === 1) co = MOCK.companyById(ids[0]);   // 仅关联一家时无需来源即可确定
+    }
+    if (co) return co.short || co.name || '';
+    /* 关联多家企业但无对话来源 → 不显示；演示数据无企业档案（ids 为空）时回退会话自带企业文案 */
+    return ids.length === 0 ? (conv.role || '') : '';
+  }
+  function remarkName() { return (window.ContactRemarkStore && ContactRemarkStore.get(peerKey())) || ''; }
+  function displayName() { return remarkName() || certifiedName(); }
+  function peerProfileUrl() {
+    if (meta.personId) return '../personal/index.html?id=' + encodeURIComponent(meta.personId);
+    return meta.profileHref || null;
+  }
+  function renderTitle() {
+    var rk = remarkName(), cert = certifiedName();
+    var nameEl = document.getElementById('c-name');
+    nameEl.textContent = rk || cert;
+    nameEl.title = rk ? ('备注：' + rk + '｜认证姓名：' + cert) : '';
+    var co = companyShort(), coEl = document.getElementById('c-co');
+    coEl.textContent = co || '';
+    coEl.classList.toggle('on', !!co);
+    coEl.title = co || '';
+  }
+  renderTitle();
+
   if (meta.ctx) {
     document.getElementById('ctx-title').textContent = meta.ctx.title;
     document.getElementById('ctx-sub').textContent = meta.ctx.sub;
@@ -343,11 +469,345 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       openPagePreview(meta.ctx.href, (meta.ctx.title || '').replace(/^正在对接\s*[·•]\s*/, '') || '页面预览');
     }
   };
+
+  /* ============ 点击对方头像 → 用户信息卡（敏感信息复用信息详情页付费墙规则） ============ */
+  var UC_UNLOCK_KEY = 'engchain-personal-unlocks';
+  function cardCompany() {
+    if (meta.service) return null;
+    var co = null;
+    if (window.MOCK) {
+      if (meta.sourceCompanyId) co = MOCK.companyById(meta.sourceCompanyId);
+      if (!co && (meta.companyIds || []).length === 1) co = MOCK.companyById(meta.companyIds[0]);
+    }
+    return co || null;
+  }
+  function cardPerson() { return (meta.personId && window.MOCK && MOCK.personById(meta.personId)) || null; }
+  function cardUnlockId() { var p = cardPerson(); if (p) return p.id || meta.personId; var co = cardCompany(); return co ? co.id : ''; }
+  function ucMaskPhone(f) { return (!f || f.length < 7) ? (f || '') : (f.slice(0, 3) + '****' + f.slice(-4)); }
+  function ucMaskWx(w) { return w ? (w.slice(0, 2) + '***' + w.slice(-2)) : ''; }
+  function cardUnlocked() {
+    var uid = cardUnlockId();
+    if (!uid) return true;
+    if (new URLSearchParams(location.search).get('unlock') === '1') return true;
+    try { var list = JSON.parse(localStorage.getItem(UC_UNLOCK_KEY) || '[]'); if (list.indexOf(uid) !== -1) return true; } catch (e) {}
+    try {
+      if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return false;
+      var st = JSON.parse(localStorage.getItem('engchain-state') || '{}');
+      if (st.loggedIn === false) return false;
+      if (st.member || (st.status && ['pro', 'enterprise', 'resident'].indexOf(st.status) !== -1)) return true;
+    } catch (e) {}
+    return false;
+  }
+  function saveCardUnlock() {
+    var uid = cardUnlockId(); if (!uid) return;
+    try { var list = JSON.parse(localStorage.getItem(UC_UNLOCK_KEY) || '[]'); if (list.indexOf(uid) === -1) { list.push(uid); localStorage.setItem(UC_UNLOCK_KEY, JSON.stringify(list)); } } catch (e) {}
+  }
+
+  var SVG_PHONE = '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>';
+  var SVG_WX = '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>';
+  var SVG_COPY = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+  var SVG_V = '<circle cx="12" cy="12" r="9"/><path d="M8.4 12.1l2.3 2.3 4.9-5.2"/>';
+  var SVG_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
+
+  function openUserCard() {
+    var person = cardPerson(), co = cardCompany(), uid = cardUnlockId();
+    var cert = certifiedName(), rk = remarkName();
+    var isSvc = !!meta.service;
+    var fullPhone = person ? (person.phone || '') : ((co && co.contact && co.contact.phone) || '');
+    var fullWx = person ? (person.wechat || '') : '';
+    var titleLine = person
+      ? [person.title, person.location].filter(Boolean).join(' · ')
+      : (conv.role || (isSvc ? '官方客服 · 工作时间 09:00-18:00' : ''));
+    /* 认证状态标签：完整展示（不再截断丢失"在职"等） */
+    var tagList = [];
+    if (person && person.tags) tagList = person.tags.map(function (x) { return typeof x === 'string' ? x : (x.t || x.name || ''); }).filter(Boolean);
+    /* 公开信任背书（与信息详情页一致，不属付费墙范围）：信用等级 / 评价 / 从业年限 / 发布数 + 行业·主营 */
+    var pubCount = person ? (person.published || []).length : 0;
+    var statGrade = person && person.score ? (person.score.grade || ((person.score.value != null ? person.score.value : '') + '分')) : '';
+    var statReview = person ? (person.reviewCount || 0) : 0;
+    var statExp = person ? (person.experience || '') : '';
+    var bizLine = person ? [person.industry, person.mainBusiness].filter(Boolean).join(' · ') : '';
+
+    var supHtml = '';
+    if (person && (person.published || []).length) {
+      supHtml = (person.published).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean).map(function (s) {
+        var d = s.dir || s.type, isD = d === 'demand';
+        var price = (isD ? (s.budget || '') : (s.price || '')) || '';
+        var metaLine = (s.location ? '<span class="loc">' + esc(s.location) + '</span>' : '') +
+          (price ? ((s.location ? '<span class="dot"></span>' : '') + '<span class="price">' + esc(price) + '</span>') : '');
+        return '<div class="uc-row uc-supply" data-uc="supply" data-url="../supply/detail.html?id=' + s.id + '">' +
+          '<div class="uc-rb"><div class="uc-sup-top"><span class="uc-tag ' + (isD ? 'demand' : 'supply') + '">' + (isD ? '需求' : '供应') + '</span></div>' +
+          '<div class="uc-sup-title">' + esc(s.title || '') + '</div>' +
+          (metaLine ? '<div class="uc-sup-meta">' + metaLine + '</div>' : '') + '</div>' +
+          '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div>';
+      }).join('');
+    }
+
+    /* 核心信息：锁定态只渲染脱敏/占位（真实值不进入 DOM，与信息详情页一致）；
+       占位行清晰可读、仅以行内小锁标识不可操作——不再叠加 blur / 整页遮罩，让用户看清"解锁能得到什么"。 */
+    function lockTail() { return '<span class="uc-rlock" aria-hidden="true">' + SVG_LOCK + '</span>'; }
+    function buildCore(open) {
+      var b = '';
+      /* 联系电话 */
+      if (fullPhone) b +=
+        '<div class="uc-row is-static"><div class="uc-ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_PHONE + '</svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">联系电话</div><div class="uc-rv num">' + esc(open ? fullPhone : ucMaskPhone(fullPhone)) + '</div></div>' +
+        (open
+          ? '<span class="uc-act" data-uc="phone" data-val="' + esc(fullPhone) + '" role="button" aria-label="拨打"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_PHONE + '</svg></span>'
+          : lockTail()) + '</div>';
+      /* 微信号 */
+      if (fullWx) b +=
+        '<div class="uc-row is-static"><div class="uc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_WX + '</svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">微信号</div><div class="uc-rv num">' + esc(open ? fullWx : ucMaskWx(fullWx)) + '</div></div>' +
+        (open
+          ? '<span class="uc-act" data-uc="copy" data-val="' + esc(fullWx) + '" role="button" aria-label="复制微信号"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_COPY + '</svg></span>'
+          : lockTail()) + '</div>';
+      /* 企业全称（可进企业认证主页） */
+      if (co) b += open
+        ? '<div class="uc-row" data-uc="company" data-url="../company/index.html?id=' + encodeURIComponent(co.id) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">所在企业 · 点击查看企业认证主页</div><div class="uc-rv">' + esc(co.name || '') + '</div></div>' +
+          '<span class="uc-rt">认证 <svg class="ic"><use href="#i-chev-r"/></svg></span></div>'
+        : '<div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">所在企业</div><div class="uc-rv placeholder">认证企业 · 解锁后查看</div></div>' + lockTail() + '</div>';
+
+      var cards = b ? ('<div class="uc-card">' + b + '</div>') : '';
+      /* 该用户发布的供需 */
+      if (person) {
+        cards += open
+          ? '<div class="uc-sec">TA 发布的供需<small style="font-weight:500;color:var(--text-4);">（' + pubCount + ' 条）</small></div><div class="uc-card">' +
+            (supHtml || '<div class="uc-empty">该用户暂未发布供需信息</div>') + '</div>'
+          : '<div class="uc-card"><div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-box"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">TA 发布的供需</div><div class="uc-rv placeholder">共 ' + pubCount + ' 条 · 解锁后查看</div></div>' + lockTail() + '</div></div>';
+        /* 个人认证主页入口 */
+        cards += '<div class="uc-card">' + (open
+          ? '<div class="uc-row" data-uc="home" data-url="' + esc(peerProfileUrl()) + '">' +
+            '<div class="uc-ic"><svg class="ic"><use href="#i-shield"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">个人认证主页</div><div class="uc-rv">查看完整认证档案与评价</div></div>' +
+            '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div>'
+          : '<div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-shield"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">个人认证主页</div><div class="uc-rv placeholder">完整认证档案与评价 · 解锁后进入</div></div>' + lockTail() + '</div>') + '</div>';
+      }
+      return cards;
+    }
+
+
+    var avatarChar = person ? (cert || '?').slice(0, 1) : (conv.avatar || (cert || '?').slice(0, 1));
+    var statsHtml = person ? (
+      '<div class="uc-stats">' +
+        '<div class="uc-stat"><div class="n">' + esc(statGrade || '—') + '</div><div class="l">信用等级</div></div>' +
+        '<div class="uc-stat"><div class="n">' + statReview + '</div><div class="l">个人评价</div></div>' +
+        '<div class="uc-stat"><div class="n">' + esc(statExp || '—') + '</div><div class="l">从业年限</div></div>' +
+        '<div class="uc-stat"><div class="n">' + pubCount + '</div><div class="l">发布供需</div></div>' +
+      '</div>') : '';
+
+    /* 正在对接 · 会话来源业务（聊天页顶部本就公开显示，非敏感信息；客服会话不展示） */
+    var ctxCard = '';
+    if (!isSvc && meta.ctx && meta.ctx.href) {
+      ctxCard =
+        '<div class="uc-card"><div class="uc-row" data-uc="ctx" data-url="' + esc(meta.ctx.href) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-' + (meta.ctx.icon || 'box') + '"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">正在对接 · 会话来源</div>' +
+          '<div class="uc-rv" style="font-size:13.5px;">' + esc((meta.ctx.title || '').replace(/^正在对接\s*[·•]\s*/, '')) + '</div>' +
+          (meta.ctx.sub ? '<div class="uc-rl" style="margin-top:3px;white-space:normal;line-height:1.55;">' + esc(meta.ctx.sub) + '</div>' : '') + '</div>' +
+          '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span>' +
+        '</div></div>';
+    }
+
+    var html =
+      '<div class="uc-wrap">' +
+        '<div class="uc-head">' +
+          '<div class="uc-avatar">' + esc(avatarChar) + (person || co ? '<span class="uc-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">' + SVG_V + '</svg></span>' : '') + '</div>' +
+          '<div class="uc-name">' + esc(cert || '对方') + (person ? '<svg class="uc-ver" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' : '') + '</div>' +
+          (titleLine ? '<div class="uc-sub">' + esc(titleLine) + '</div>' : '') +
+          (bizLine ? '<div class="uc-biz">' + esc(bizLine) + '</div>' : '') +
+          statsHtml +
+          (tagList.length ? '<div class="uc-tags">' + tagList.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+        '</div>' +
+
+        '<div class="uc-card">' +
+          '<div class="uc-row" id="uc-rm-row">' +
+            '<div class="uc-ic"><svg class="ic"><use href="#i-edit"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">备注昵称（仅自己可见）</div><div class="uc-rv ' + (rk ? '' : 'placeholder') + '" id="uc-rm-val">' + esc(rk || '未设置') + '</div></div>' +
+            '<span class="uc-rt">' + (rk ? '修改' : '添加') + '</span>' +
+          '</div>' +
+          '<div id="uc-rm-editbox" style="display:none;padding:12px 14px;border-top:1px solid var(--line);">' +
+            '<input id="uc-rm-input" class="rm-input" maxlength="20" autocomplete="off" placeholder="' + esc(cert || '对方姓名') + '">' +
+            '<div class="rm-actions" style="margin-top:10px;"><button type="button" class="btn btn-ghost" id="uc-rm-cancel">取消</button><button type="button" class="btn btn-primary" id="uc-rm-ok">保存</button></div>' +
+          '</div>' +
+        '</div>' +
+        ctxCard;
+
+    var initUnlocked = cardUnlocked();
+    var hasCore = !!(fullPhone || fullWx || co || person);
+    if (isSvc) {
+      /* 官方客服：无付费墙，仅提供入口 */
+      html += '<div class="uc-card"><div class="uc-row" data-uc="service" data-url="' + esc(meta.profileHref || '') + '">' +
+        '<div class="uc-ic"><svg class="ic"><use href="#i-bell"/></svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">平台官方客服</div><div class="uc-rv">服务时间 09:00-18:00</div></div>' +
+        '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div></div>';
+    } else if (uid && hasCore) {
+      html +=
+        '<div class="uc-sec">联系与身份 <span class="uc-unlocked-tip" id="uc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>已解锁</span></div>' +
+        '<div class="uc-locknote" id="uc-locknote">' + SVG_LOCK + '<span>解锁后可查看完整<b style="color:var(--text-2);font-weight:600;">联系方式与企业身份</b>，解锁即获沟通权，平台不售卖联系方式</span></div>' +
+        '<div id="uc-core-body">' + buildCore(initUnlocked) + '</div>' +
+        '<div class="uc-foot"><button type="button" class="btn btn-primary btn-block btn-lg" id="uc-foot-locked" data-uc="unlock">解锁查看完整资料</button>' +
+        '<button type="button" class="btn btn-primary btn-block btn-lg" id="uc-foot-open" style="display:none;">查看完整认证主页</button></div>';
+    } else {
+      /* 企业认证会话（无个人档案/联系方式）：给企业认证主页入口，不设置假付费墙、不走"待完善"死路 */
+      if (meta.profileHref) {
+        html += '<div class="uc-card"><div class="uc-row" data-uc="cohome" data-url="' + esc(meta.profileHref) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">企业认证主页</div><div class="uc-rv">' + esc(conv.role || '查看企业认证档案与资质') + '</div></div>' +
+          '<span class="uc-rt">认证 <svg class="ic"><use href="#i-chev-r"/></svg></span></div></div>';
+      } else {
+        html += '<div class="uc-card"><div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-info"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rv" style="font-size:13px;">该联系人暂未关联可查看的认证档案</div></div></div></div>';
+      }
+    }
+    html += '</div>';
+
+    var sh = UI.sheet();
+    sh.setText('');
+    sh.html(html);
+    sh.show();
+    var body = sh.body();
+
+    /* 付费墙状态应用（锁定=清晰脱敏占位，解锁=渲染真实内容；完整值解锁前不进入 DOM）。
+       UI.sheet.show() 的 boostStickyFoot 会把 .btn-block 从 sheet-body 提升到 sheet-foot，
+       故两个置底按钮一律在弹层根节点 sh（含 foot）上查询/绑定，不用 body 委托。 */
+    var coreBodyEl = body.querySelector('#uc-core-body');
+    var locknoteEl = body.querySelector('#uc-locknote');
+    var footLockedBtn = sh.querySelector('#uc-foot-locked');
+    var footOpenBtn = sh.querySelector('#uc-foot-open');
+    function applyState(unlocked) {
+      if (!coreBodyEl) return;
+      coreBodyEl.innerHTML = buildCore(unlocked);
+      if (locknoteEl) locknoteEl.style.display = unlocked ? 'none' : '';
+      var badge = body.querySelector('#uc-badge');
+      if (badge) badge.classList.toggle('show', unlocked);
+      if (footLockedBtn) footLockedBtn.style.display = unlocked ? 'none' : '';
+      if (footOpenBtn) footOpenBtn.style.display = unlocked ? '' : 'none';
+    }
+    applyState(initUnlocked);
+
+    /* 置底按钮：锁定态→解锁；解锁态→查看完整认证主页（直接绑定，规避 btn-block 被提升出 body） */
+    if (footLockedBtn) footLockedBtn.addEventListener('click', function () { openUnlock(); });
+    if (footOpenBtn) footOpenBtn.addEventListener('click', function () {
+      var person2 = cardPerson();
+      if (person2 && peerProfileUrl()) openPagePreview(peerProfileUrl(), person2.name || '个人认证主页');
+      else { var co2 = cardCompany(); if (co2) openPagePreview('../company/index.html?id=' + encodeURIComponent(co2.id), co2.name || '企业认证主页'); }
+    });
+
+    /* 解锁付费弹层（规则对齐 personal/index.html：免费额度 / 积分扣费 / 会员折扣） */
+    function openUnlock() {
+      var sub = UI.sheet();
+      sub.setText('解锁查看对方资料');
+      var cost = (MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.material) || 98;
+      var disc = window.creditDiscount ? creditDiscount() : 1;
+      var costP = Math.round(cost * disc);
+      var st0 = window.deriveStatus ? deriveStatus() : 'registered';
+      var allow = (st0 === 'realname' || st0 === 'pro' || st0 === 'enterprise' || st0 === 'resident');
+      var monthly = (window.RULE ? RULE('credits.freeQuota.monthly', 5) : ((MOCK.business.credits && MOCK.business.credits.freeQuota) ? MOCK.business.credits.freeQuota.monthly : 5));
+      if (window.ModeStore && ModeStore.isBreakIn && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
+      var used = window.CreditStore ? CreditStore.freeUsed() : 0;
+      var remain = allow ? Math.max(monthly - used, 0) : 0;
+      var bal = window.CreditStore ? CreditStore.read().balance : 0;
+      var freeBtn = allow && remain > 0;
+      var btnText = freeBtn ? ('免费解锁（本月剩 ' + remain + ' 条）') : (bal >= costP ? ('扣 ' + costP + ' 积分解锁（余额 ' + bal + '）') : '积分不足 · 去充值');
+      var priceHtml = freeBtn
+        ? '<div style="font-size:16px;font-weight:600;color:var(--success);margin-top:6px;">本月免费额度可用</div>'
+        : '<div style="font-size:22px;font-weight:700;color:var(--primary);font-family:var(--font-num);margin-top:6px;">' + costP + ' 积分' + (disc < 1 ? '<small>会员' + Math.round(disc * 10) + '折</small>' : '') + '</div>';
+      sub.html('<div style="padding:4px 4px 16px;">' +
+        '<div style="font-size:12.5px;color:var(--text-2);line-height:1.65;margin-bottom:14px;">解锁后可查看该联系人的<b style="color:var(--text-1);">完整联系方式、企业及发布信息</b>，解锁即获沟通权，平台不售卖联系方式。</div>' +
+        '<div style="text-align:center;">' + priceHtml +
+          '<div style="font-size:11px;color:var(--text-3);margin-top:8px;">账户余额 ' + bal + ' 积分 · 实名用户每月免费额度 ' + monthly + ' 条</div></div>' +
+        '<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:10px;line-height:1.6;">积分用于解锁核心信息，可在「钱包 · 积分」充值<br>' + (window.RULE ? RULE('refund.days', 7) : 7) + '天无理由退款保障 · 客服 400-888-6688</div>' +
+        '<button class="btn btn-primary btn-block btn-lg" id="uc-confirm" style="margin-top:14px;">' + btnText + '</button></div>');
+      sub.show();
+      /* #uc-confirm 为 btn-block，会被 boostStickyFoot 提升到 sheet-foot，故在弹层根 sub 上查询绑定 */
+      sub.querySelector('#uc-confirm').addEventListener('click', function () {
+        sub.close();
+        if (freeBtn) { CreditStore.freeSpend(1); saveCardUnlock(); applyState(true); UI.toast('已使用免费解锁额度 1 条', 'ok'); return; }
+        if (bal >= costP) { CreditStore.consume(costP, '解锁' + (cert || '联系人')); saveCardUnlock(); applyState(true); UI.toast('已扣 ' + costP + ' 积分解锁', 'ok'); return; }
+        UI.toast('积分不足，请先充值', 'warn');
+        setTimeout(function () { location.href = '../wallet/credits.html'; }, 700);
+      });
+    }
+
+    /* 行内事件委托 */
+    body.addEventListener('click', function (e) {
+      var el = e.target.closest && e.target.closest('[data-uc]');
+      if (!el) return;
+      var act = el.dataset.uc;
+      if (act === 'unlock') { openUnlock(); return; }
+      if (act === 'phone') { var ph = el.dataset.val; if (ph) window.location.href = 'tel:' + ph; else UI.toast('解锁后可查看完整联系方式', 'warn'); return; }
+      if (act === 'copy') { var v = el.dataset.val; if (!v) { UI.toast('解锁后可查看微信号', 'warn'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function () { UI.toast('已复制：' + v, 'ok'); }); else UI.toast('复制失败', 'warn'); return; }
+      if (act === 'company' || act === 'supply' || act === 'home' || act === 'service' || act === 'ctx' || act === 'cohome') { var u = el.dataset.url; if (u) openPagePreview(u, '详情'); return; }
+    });
+
+    /* 备注昵称行内编辑 */
+    var rmRow = body.querySelector('#uc-rm-row'), rmBox = body.querySelector('#uc-rm-editbox'),
+        rmVal = body.querySelector('#uc-rm-val'), rmInput = body.querySelector('#uc-rm-input');
+    function syncRemark() {
+      var v = remarkName();
+      rmVal.textContent = v || '未设置';
+      rmVal.classList.toggle('placeholder', !v);
+      rmRow.querySelector('.uc-rt').textContent = v ? '修改' : '添加';
+    }
+    rmRow.addEventListener('click', function () { rmInput.value = remarkName(); rmRow.style.display = 'none'; rmBox.style.display = ''; setTimeout(function () { rmInput.focus(); }, 60); });
+    body.querySelector('#uc-rm-cancel').addEventListener('click', function () { rmBox.style.display = 'none'; rmRow.style.display = ''; });
+    body.querySelector('#uc-rm-ok').addEventListener('click', function () {
+      var v = (rmInput.value || '').trim();
+      ContactRemarkStore.set(peerKey(), v);
+      renderTitle(); syncRemark();
+      rmBox.style.display = 'none'; rmRow.style.display = '';
+      UI.toast(v ? '已设置备注' : '已恢复认证姓名');
+    });
+    rmInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') body.querySelector('#uc-rm-ok').click(); });
+  }
+  window.openUserCard = openUserCard;
+
+  /* 「…」→ 备注：编辑本机备注昵称，保存后标题即时切换（备注仅本机可见，不改对方档案） */
+  window.editRemark = function () {
+    UI.closeSheet();
+    var cur = remarkName(), cert = certifiedName();
+    var sh = UI.sheet();
+    sh.setText('设置备注');
+    sh.html(
+      '<div class="rm-box">' +
+        '<label class="rm-lab" for="rm-input">备注昵称（仅自己可见）</label>' +
+        '<input id="rm-input" class="rm-input" maxlength="20" autocomplete="off" placeholder="' + esc(cert || '对方姓名') + '">' +
+        '<div class="rm-hint">留空时标题默认显示对方认证姓名' + (cert ? '「' + esc(cert) + '」' : '') + '；设置备注后标题按备注显示。</div>' +
+        '<div class="rm-actions">' +
+          (cur ? '<button type="button" class="btn btn-ghost" id="rm-clear">清除备注</button>' : '') +
+          '<button type="button" class="btn btn-primary" id="rm-save">保存</button>' +
+        '</div>' +
+      '</div>');
+    sh.show();
+    var body = sh.body(), inp = body.querySelector('#rm-input');
+    inp.value = cur;
+    setTimeout(function () { inp.focus(); }, 300);
+    function applySave() {
+      var v = (inp.value || '').trim();
+      ContactRemarkStore.set(peerKey(), v);
+      UI.closeSheet(); renderTitle();
+      UI.toast(v ? '已设置备注' : '已恢复认证姓名');
+    }
+    body.querySelector('#rm-save').addEventListener('click', applySave);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') applySave(); });
+    var clr = body.querySelector('#rm-clear');
+    if (clr) clr.addEventListener('click', function () {
+      ContactRemarkStore.set(peerKey(), ''); UI.closeSheet(); renderTitle(); UI.toast('已清除备注');
+    });
+  };
+
   window.openMore = function () {
     var sh = UI.sheet();
-    sh.setText(conv.name);
+    sh.setText(displayName());
     var rows = [
-      meta.href ? { label: '查看对方主页', icon: 'shield', act: function () { location.href = meta.href; } } : null,
+      { label: remarkName() ? '修改备注' : '备注', icon: 'edit', act: function () { editRemark(); } },
+      peerProfileUrl() || meta.service ? { label: meta.service ? '联系官方客服' : '查看TA的资料', icon: meta.service ? 'bell' : 'user', act: function () { openUserCard(); } } : null,
       { label: '清除聊天记录', icon: 'trash', act: function () { clearChat(); } },
       { label: '投诉 / 举报', icon: 'alert', act: function () { var cid = new URLSearchParams(location.search).get('id') || 'c1'; var cv = MOCK.conversations.find(function (x) { return x.id === cid; }); location.href = 'complaint.html?from=chat&target=' + encodeURIComponent(cv ? cv.name : ''); } }
     ].filter(Boolean);
@@ -440,6 +900,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* —— 消息渲染 —— */
   var scroller = document.getElementById('scroller');
   var timeline = document.getElementById('timeline');
+  /* 点击对方头像 → 自下而上弹出对方用户信息卡（事件委托，timeline 重渲染不丢失） */
+  timeline.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.js-peer-avatar')) { e.preventDefault(); openUserCard(); }
+  });
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
 
   var AVATAR_TINT = [
@@ -449,7 +913,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     'linear-gradient(135deg,#5d7a6b,#456052)',
     'linear-gradient(135deg,#7a6b5d,#5e5246)'
   ];
-  function avatarFor(name, idx) { return '<div class="mc-avatar" style="background:' + AVATAR_TINT[idx % AVATAR_TINT.length] + ';">' + esc((name || '?').slice(0, 1)) + '</div>'; }
+  function avatarFor(name, idx, peer) { return '<div class="mc-avatar' + (peer ? ' js-peer-avatar' : '') + '"' + (peer ? ' role="button" aria-label="查看对方资料"' : '') + ' style="background:' + AVATAR_TINT[idx % AVATAR_TINT.length] + ';">' + esc((name || '?').slice(0, 1)) + '</div>'; }
 
   function cardHTML(m) {
     var card = m.card || {};
@@ -596,7 +1060,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var meta = m.me
       ? '<div class="mc-meta"><span class="' + (m.status === 'sending' ? 'mc-sending' : 'mc-tick') + '">' + (m.status === 'sending' ? '发送中' : '已读') + '</span><span>' + esc(m.t || '') + '</span></div>'
       : '<div class="mc-meta"><span>' + esc(m.t || '') + '</span></div>';
-    return '<div class="' + cls + '">' + avatarFor(m.me ? '我' : senderName, m._ai || 0) +
+    return '<div class="' + cls + '">' + avatarFor(m.me ? '我' : senderName, m._ai || 0, !m.me) +
       '<div class="mc-body">' + body + meta + '</div></div>';
   }
 

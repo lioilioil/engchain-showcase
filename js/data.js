@@ -4871,7 +4871,7 @@ window.MOCK = (function () {
       ],
       reviewCount: 86, certId: 'CERT-2026-PR-001234', emphasis: '一级建造师 · 建筑工程',
       contact: { name: '张建国', title: '项目经理', phone: '138****6666' }, published: [1001, 1003],
-      phone: '13812346666',
+      phone: '13812346666', wechat: 'zhangjianguo_gc',
       bio: `## 职业概述
 
 注册**一级建造师（建筑工程）**，工程师职称，**15年**建筑行业从业经验。历任施工员、技术负责人、项目经理，主导完成多个大型房建及市政项目，具备丰富的现场管理、技术协调与成本控制经验。

@@ -1,416 +1,558 @@
 /* ============================================================================
-   工程链 ENGCHAIN — 惊喜时刻弹窗 WonderPopup
-   视觉沿用 V3.3：暖米白纸面 × 古铜金（app.css 变量自动适配暗色主题）
-   Editorial × Industrial，克制留白；不做红包/转盘/爆炸红
-   阶段：omen 预兆微光 → gather 光点汇聚 → reveal 揭晓（粒子+数字）→ result 落定
+   工程链 ENGCHAIN — 惊喜时刻弹窗 WonderPopup（v3.0 无容器异形重做 · 2026-10-03）
+   ----------------------------------------------------------------------------
+   形态：异形弹窗（无任何矩形/圆角卡片容器）。
+     · .wp-stage 只是透明定位骨架：无背景、无边框、无圆角、无投影；
+     · 主视觉为透明底游戏化能量空投箱 PNG（闭合→开启→锦鲤爆发）漂浮在毛玻璃遮罩上；
+     · 文案靠字号/字重/描边投影分层，非必要不加底；唯一底板是独立胶囊控件
+       （CTA / 标签 / 关闭钮）与 7px 细进度条，均非内容容器。
+   色板：深色遮罩 + 香槟金（唯一利益强调色）+ 冷青（工程科技点缀），不做红包大红。
+   阶段：omen 预兆胶囊 → gather 闭合箱+轻触开启 → reveal 开箱/金光/粒子/数字 → result 落定
+   视觉资源：../assets/wonder/crate-sealed.png / crate-open.png / crate-lucky.png
+   业务逻辑在 js/wonder-engine.js；本文件只负责呈现。
    ============================================================================ */
 
 .wp-root {
-  --wp-glow-rgb: 184, 153, 104;
+  --wp-gold: #d9ad63;
+  --wp-gold-bright: #f7dd9f;
+  --wp-gold-light: #fff1cd;
+  --wp-gold-deep: #b08644;
+  --wp-gold-rgb: 217, 173, 99;
+  --wp-cyan: #74c4d6;
+  --wp-cyan-rgb: 116, 196, 214;
+  --wp-ink: #f4ecd8;            /* 主文字（奶白） */
+  --wp-ink-2: #d7deec;          /* 次文字 */
+  --wp-ink-3: #aab6ca;          /* 弱文字 */
   position: absolute;
   inset: 0;
   z-index: 1200;
   overflow: hidden;
   font-family: var(--font);
   -webkit-tap-highlight-color: transparent;
+  /* 骨架本身永远透明：不允许出现任何矩形面板 */
+  background: transparent !important;
 }
 .wp-root.wp-fixed { position: fixed; }
-[data-theme="dark"] .wp-root { --wp-glow-rgb: 201, 176, 112; }
 
-/* ---------- scrim ---------- */
+/* ---------- 毛玻璃深色遮罩（异形弹窗的“底”，非卡片） ---------- */
 .wp-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(20, 17, 12, .46);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background:
+    radial-gradient(120% 80% at 50% 30%, rgba(20, 30, 54, .58), rgba(5, 8, 17, .84) 78%);
+  backdrop-filter: blur(7px) saturate(1.08);
+  -webkit-backdrop-filter: blur(7px) saturate(1.08);
   opacity: 0;
-  animation: wp-fade-in .42s ease forwards;
+  animation: wp-fade .42s ease forwards;
 }
 
-/* ---------- 预兆胶囊 ---------- */
+/* ---------- 预兆胶囊（底部独立胶囊，无卡片） ---------- */
 .wp-omen {
   position: absolute;
   left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%) translateY(18px);
+  bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(16px);
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 11px 17px;
+  padding: 11px 18px;
   border-radius: 999px;
-  background: var(--bg-elev);
-  border: 1px solid rgba(var(--wp-glow-rgb), .34);
-  box-shadow: 0 10px 30px -8px rgba(var(--wp-glow-rgb), .42), inset 0 1px 0 rgba(255, 255, 255, .55);
+  background: rgba(14, 20, 36, .72);
+  border: 1px solid rgba(var(--wp-gold-rgb), .42);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .7), 0 0 20px -8px rgba(var(--wp-gold-rgb), .55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   white-space: nowrap;
   opacity: 0;
-  animation: wp-omen-in .55s cubic-bezier(.16, 1, .3, 1) forwards, wp-omen-breathe 2.4s ease-in-out .55s infinite;
+  animation: wp-omen-in .55s cubic-bezier(.16, 1, .3, 1) forwards,
+             wp-omen-breathe 2.6s ease-in-out .55s infinite;
+  z-index: 8;
 }
 .wp-omen .wp-omen-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 0 0 rgba(var(--wp-glow-rgb), .55);
-  animation: wp-dot-pulse 1.6s ease-out infinite;
+  background: var(--wp-gold-bright);
+  animation: wp-dot 1.6s ease-out infinite;
 }
-.wp-omen-text { font-size: 12.5px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; }
+.wp-omen-text { font-size: 12.5px; font-weight: 600; color: var(--wp-ink-2); letter-spacing: .02em; }
 .wp-omen-x {
-  margin-left: 3px; width: 20px; height: 20px; border-radius: 50%;
+  margin-left: 2px; width: 20px; height: 20px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text-4); cursor: pointer;
+  color: var(--wp-ink-3); cursor: pointer;
 }
-.wp-omen-x:active { background: var(--bg-inset); }
+.wp-omen-x:active { background: rgba(255, 255, 255, .08); }
+.wp-omen-x svg { width: 13px; height: 13px; }
 
-/* ---------- dialog ---------- */
-.wp-dialog {
-  position: absolute;
-  left: 50%; top: 50%;
-  width: min(316px, 84vw);
-  padding: 0 26px calc(26px + env(safe-area-inset-bottom, 0px));
-  border-radius: 26px;
-  background: linear-gradient(180deg, var(--bg-elev) 0%, var(--bg-alp) 100%);
-  border: 1px solid rgba(var(--wp-glow-rgb), .26);
-  box-shadow: 0 30px 70px -20px rgba(30, 22, 10, .38), 0 0 0 1px rgba(255, 255, 255, .35) inset;
-  transform: translate(-50%, -46%) scale(.9);
-  opacity: 0;
-  animation: wp-dialog-in .6s cubic-bezier(.16, 1, .3, 1) .35s forwards;
-  text-align: center;
-  overflow: hidden;
-}
-.wp-dialog::before {
-  /* 顶部极细金线 */
-  content: '';
-  position: absolute;
-  top: 0; left: 20%; right: 20%;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary-strong), var(--primary-dim), transparent);
-  opacity: .8;
-}
-.wp-dialog.lucky {
-  border-color: rgba(var(--wp-glow-rgb), .55);
-  box-shadow: 0 30px 80px -16px rgba(var(--wp-glow-rgb), .5), 0 0 0 1px rgba(255, 255, 255, .4) inset;
-}
-
-/* ---------- 舞台与徽印 ---------- */
+/* ---------- 透明舞台（关键：零矩形） ---------- */
 .wp-stage {
-  position: relative;
-  height: 188px;
-  margin-top: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.wp-emblem {
-  position: relative;
-  width: 118px; height: 118px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  outline: none;
-  animation: wp-emblem-pop .65s cubic-bezier(.16, 1, .3, 1) .7s both;
-}
-.wp-emblem::before {
-  /* 呼吸光环 */
-  content: '';
-  position: absolute;
-  inset: -13px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(var(--wp-glow-rgb), .45);
-  animation: wp-ring-breathe 3.2s ease-in-out 1.3s infinite;
-}
-.wp-emblem::after {
-  content: '';
-  position: absolute;
-  inset: -26px;
-  border-radius: 50%;
-  border: 1px solid rgba(var(--wp-glow-rgb), .22);
-  animation: wp-ring-breathe 3.2s ease-in-out 1.3s .5s infinite;
-}
-.wp-emblem-disc {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 250, 238, .95), rgba(var(--wp-glow-rgb), .28) 58%, rgba(var(--wp-glow-rgb), .16) 100%),
-    linear-gradient(180deg, #EBDCBE, #C9A96E 52%, #A5854C);
-  box-shadow: 0 12px 28px -8px rgba(var(--wp-glow-rgb), .65), inset 0 2px 3px rgba(255, 255, 255, .7);
-}
-.wp-emblem-mark {
-  position: relative;
-  width: 46px; height: 46px;
-  color: #5C4726;
-}
-.wp-emblem-hint {
-  position: absolute;
-  bottom: -30px; left: 0; right: 0;
-  font-size: 11px; font-weight: 600;
-  color: var(--primary-dim);
-  letter-spacing: .16em;
-  opacity: 0;
-  animation: wp-hint .5s ease 1.5s forwards, wp-hint-breathe 1.8s ease-in-out 2s infinite;
-}
-
-/* 揭晓爆开的光环 */
-.wp-burst-ring {
-  position: absolute;
-  width: 118px; height: 118px;
-  border-radius: 50%;
-  border: 2px solid rgba(var(--wp-glow-rgb), .7);
-  opacity: 0;
-  pointer-events: none;
-}
-.wp-revealed .wp-burst-ring { animation: wp-burst-ring .8s cubic-bezier(.16, 1, .3, 1) forwards; }
-.wp-revealed .wp-emblem::before,
-.wp-revealed .wp-emblem::after { animation: none; opacity: 0; }
-.wp-revealed .wp-emblem { cursor: default; animation: none; }
-.wp-revealed .wp-emblem-hint { display: none; }
-
-.wp-particles { position: absolute; inset: 0; pointer-events: none; }
-.wp-mote {
   position: absolute;
   left: 50%; top: 50%;
-  width: var(--size, 6px); height: var(--size, 6px);
-  margin-left: calc(var(--size, 6px) / -2);
-  margin-top: calc(var(--size, 6px) / -2);
-  border-radius: 50%;
-  background: radial-gradient(circle, #F6E7C6, var(--primary));
-  box-shadow: 0 0 8px rgba(var(--wp-glow-rgb), .8);
+  transform: translate(-50%, -50%);
+  max-height: 96%;
+  width: min(360px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: none; border: 0; border-radius: 0; box-shadow: none;
   opacity: 0;
-}
-.wp-revealed .wp-mote {
-  animation: wp-mote-fly var(--dur, .9s) cubic-bezier(.16, 1, .3, 1) var(--delay, 0s) forwards;
-  transform: translate(var(--tx), var(--ty)) rotate(var(--rot));
-}
-.wp-mote.wp-spark {
-  border-radius: 2px;
-  background: linear-gradient(135deg, #FFFDF6, #E3C98E);
+  animation: wp-stage-in .62s cubic-bezier(.16, 1, .3, 1) .28s forwards;
 }
 
-/* 扫光 */
-.wp-sheen {
+/* 独立圆形关闭钮，悬浮在遮罩右上（非容器） */
+.wp-close {
   position: absolute;
-  top: -40%; left: -80%;
-  width: 46%; height: 180%;
-  background: linear-gradient(105deg, transparent, rgba(255, 248, 228, .75), transparent);
-  transform: rotate(12deg);
+  top: -34px; right: 6px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #eef2fa;
+  background: rgba(12, 18, 32, .42);
+  border: 1px solid rgba(255, 255, 255, .18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  z-index: 9;
+  transition: transform .15s ease, background .15s ease;
+}
+.wp-close:active { transform: scale(.9); background: rgba(12, 18, 32, .7); }
+.wp-close svg { width: 15px; height: 15px; }
+
+/* ---------- 主视觉：透明 PNG 三态 ---------- */
+.wp-hero {
+  position: relative;
+  width: 100%;
+  height: 224px;
+  flex: none;
+  z-index: 1;
+  transition: height .45s cubic-bezier(.2,.9,.3,1);
+}
+.wp-himg {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  height: 100%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: contain;
+  -webkit-user-select: none; user-select: none;
+  will-change: transform, opacity;
+}
+.wp-himg.is-sealed { width: 66%; bottom: 0; opacity: 1; background-image: url('../assets/wonder/crate-sealed.png'); }
+.wp-himg.is-open   { width: 62%; bottom: -3%; opacity: 0; background-image: url('../assets/wonder/crate-open.png'); }
+.wp-himg.is-lucky  { width: 108%; bottom: -8%; opacity: 0; background-image: url('../assets/wonder/crate-lucky.png'); }
+
+/* 闭合态待启：轻呼吸 + 底部金色辉光 */
+.wp-hero::before {
+  content: '';
+  position: absolute;
+  left: 50%; bottom: 6%;
+  width: 190px; height: 56px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(var(--wp-gold-rgb), .5), transparent 72%);
+  filter: blur(6px);
+  opacity: .8;
+  animation: wp-idle-glow 2.6s ease-in-out infinite;
+  z-index: 0;
+}
+.wp-phase-gather .is-sealed { animation: wp-crate-breathe 3.2s ease-in-out infinite; }
+
+/* 开箱态 / 锦鲤态显隐（由 .wp-revealed / .lucky 切换） */
+.wp-revealed .is-sealed { opacity: 0 !important; animation: none; transform: translateX(-50%) scale(.9); transition: opacity .28s ease, transform .4s cubic-bezier(.2,.9,.3,1.2); }
+.wp-revealed .is-open { opacity: 1; animation: wp-crate-pop .6s cubic-bezier(.16,1,.3,1.2) .06s both; }
+.wp-revealed.lucky .is-open { opacity: 0; }
+.wp-revealed.lucky .is-lucky { opacity: 1; animation: wp-crate-pop .7s cubic-bezier(.16,1,.3,1.2) .04s both; }
+
+/* 锦鲤：放射金光（锥形渐变，非矩形） */
+.wp-rays {
+  position: absolute;
+  left: 50%; bottom: 42%;
+  width: 420px; height: 420px;
+  margin-left: -210px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg,
+    rgba(var(--wp-gold-rgb), .0) 0deg, rgba(var(--wp-gold-rgb), .0) 9deg,
+    rgba(var(--wp-gold-rgb), .20) 12deg, rgba(var(--wp-gold-rgb), .0) 16deg);
+  -webkit-mask: radial-gradient(circle, transparent 26%, #000 30%, #000 60%, transparent 72%);
+  mask: radial-gradient(circle, transparent 26%, #000 30%, #000 60%, transparent 72%);
   opacity: 0;
   pointer-events: none;
+  z-index: 0;
 }
-.wp-revealed .wp-sheen { animation: wp-sheen .95s ease .12s forwards; }
+.wp-revealed.lucky .wp-rays { opacity: 1; animation: wp-rays-spin 14s linear infinite; }
+/* 锦鲤中心能量晕（圆形光晕） */
+.wp-hero::after {
+  content: '';
+  position: absolute;
+  left: 50%; bottom: 30%;
+  width: 220px; height: 220px;
+  margin-left: -110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--wp-gold-rgb), .42), transparent 64%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.wp-revealed.lucky .wp-hero::after { opacity: 1; animation: wp-core-pulse 2s ease-in-out infinite; }
 
-/* ---------- 文案区 ---------- */
-.wp-badge {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: rgba(var(--wp-glow-rgb), .12);
-  color: var(--primary-dim);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: .16em;
+/* 点击开箱：扩散光环（圆） */
+.wp-burst {
+  position: absolute;
+  left: 50%; bottom: 26%;
+  width: 132px; height: 132px;
+  margin: 0 0 -66px -66px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--wp-gold-rgb), .8);
+  opacity: 0; pointer-events: none;
+  z-index: 2;
 }
+.wp-revealed .wp-burst { animation: wp-burst .8s cubic-bezier(.16, 1, .3, 1) forwards; }
+/* 开箱白金光闪（圆径向） */
+.wp-flash {
+  position: absolute;
+  left: 50%; bottom: 24%;
+  width: 120px; height: 120px;
+  margin: 0 0 -60px -60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 246, 220, .95), rgba(var(--wp-gold-rgb), .35) 42%, transparent 70%);
+  opacity: 0; pointer-events: none;
+  z-index: 2;
+}
+.wp-revealed .wp-flash { animation: wp-flash .55s ease-out .04s forwards; }
+
+/* 粒子层（金币 / 星屑，代码喷射） */
+.wp-particles { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.wp-coin {
+  position: absolute;
+  left: 50%; bottom: 30%;
+  width: var(--s, 12px); height: calc(var(--s, 12px) * .72);
+  margin-left: calc(var(--s, 12px) / -2);
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--wp-gold-light), var(--wp-gold) 55%, var(--wp-gold-deep));
+  box-shadow: 0 0 8px rgba(var(--wp-gold-rgb), .85), inset 0 -1px 1px rgba(120, 70, 10, .5);
+  opacity: 0;
+}
+.wp-coin::after {
+  content: '';
+  position: absolute; inset: 18%;
+  border-radius: 50%;
+  border: 1px solid rgba(150, 96, 20, .55);
+}
+.wp-spark {
+  position: absolute;
+  left: 50%; bottom: 30%;
+  width: var(--s, 8px); height: var(--s, 8px);
+  margin-left: calc(var(--s, 8px) / -2);
+  background: linear-gradient(135deg, #fffdf2, #ecd08a);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  opacity: 0;
+}
+.wp-revealed .wp-coin,
+.wp-revealed .wp-spark { animation: wp-fly var(--dur, 1s) cubic-bezier(.14,.8,.3,1) var(--delay, 0s) forwards; }
+
+/* ---------- 轻触开启（箱子下方独立胶囊，不再叠压箱子） ---------- */
+.wp-tap {
+  position: relative;
+  margin-top: 2px;
+  z-index: 5;
+  border: 0; background: transparent; padding: 0;
+  cursor: pointer; outline: none;
+  font-family: var(--font);
+}
+.wp-tap-ring { position: relative; display: block; width: 138px; height: 48px; }
+.wp-tap-ring::before, .wp-tap-ring::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: 999px;
+  border: 1.4px solid rgba(var(--wp-gold-rgb), .6);
+  animation: wp-tap-pulse 2.1s ease-out infinite;
+}
+.wp-tap-ring::after { animation-delay: 1.05s; }
+.wp-tap-pill {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  border-radius: 999px;
+  background: rgba(14, 20, 36, .66);
+  border: 1px solid rgba(var(--wp-gold-rgb), .66);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .7), 0 0 18px -6px rgba(var(--wp-gold-rgb), .7);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: var(--wp-gold-bright);
+  font-size: 14.5px; font-weight: 800; letter-spacing: .2em; text-indent: .2em;
+}
+.wp-tap-pill svg { width: 15px; height: 15px; }
+.wp-revealed .wp-tap { display: none; }
+
+/* ---------- 漂浮文案组（无底、描边投影分层） ---------- */
+.wp-copy {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  margin-top: 10px;
+}
+/* 徽章：gather 态位于箱子正上方（文档流第一子项）；结果态文案仍置顶，层级高过锦鲤光柱 */
+.wp-badge {
+  position: relative;
+  z-index: 6;
+  margin-bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(var(--wp-gold-rgb), .14);
+  border: 1px solid rgba(var(--wp-gold-rgb), .4);
+  color: var(--wp-gold-bright);
+  font-size: 10.5px; font-weight: 800; letter-spacing: .18em;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .5);
+}
+.wp-badge::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--wp-gold-bright); box-shadow: 0 0 8px rgba(var(--wp-gold-rgb), .95);
+}
+.wp-stage.lucky .wp-badge {
+  background: linear-gradient(180deg, var(--wp-gold-light), var(--wp-gold));
+  border-color: transparent; color: #3a2a0c; text-shadow: none;
+}
+.wp-stage.lucky .wp-badge::before { background: #3a2a0c; box-shadow: none; }
+
 .wp-title {
-  margin: 14px 0 0;
-  font-size: 21px;
-  font-weight: 700;
-  color: var(--text-1);
+  margin: 13px auto 0;
+  max-width: 320px;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.32;
   letter-spacing: .01em;
+  color: var(--wp-ink);
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, .65),
+    0 6px 22px rgba(0, 0, 0, .55),
+    0 0 26px rgba(var(--wp-gold-rgb), .22);
 }
 .wp-desc {
   margin: 9px auto 0;
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--text-3);
-  max-width: 250px;
+  max-width: 276px;
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--wp-ink-2);
+  text-shadow: 0 1px 5px rgba(0, 0, 0, .7), 0 4px 16px rgba(0, 0, 0, .5);
 }
+
+/* ---------- 金额（金色渐变字，无底） ---------- */
 .wp-amount {
-  margin-top: 2px;
+  margin-top: 12px;
+  display: flex; align-items: baseline; justify-content: center; gap: 5px;
   font-family: var(--font-num);
-  font-size: 46px;
-  font-weight: 800;
-  line-height: 1.1;
-  background: linear-gradient(180deg, var(--primary-strong), var(--primary-dim));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  opacity: 0;
-  transform: translateY(8px) scale(.92);
+  font-size: 54px; font-weight: 800; line-height: 1;
+  opacity: 0; transform: translateY(10px) scale(.86);
 }
-.wp-amount .wp-amount-unit { font-size: 15px; font-weight: 700; margin-left: 3px; color: var(--primary-dim); -webkit-text-fill-color: var(--primary-dim); }
-.wp-revealed .wp-amount { animation: wp-amount-in .55s cubic-bezier(.16, 1, .3, 1) .35s forwards; }
-.wp-dialog.lucky .wp-amount { filter: drop-shadow(0 4px 14px rgba(var(--wp-glow-rgb), .5)); }
+/* 渐变必须直接落在含文字的元素上；flex 父容器做 background-clip:text 在 Chrome 不裁剪子 span */
+.wp-amount .wp-amount-num,
+.wp-amount .wp-amount-unit {
+  background: linear-gradient(180deg, #fff5d4 0%, var(--wp-gold-light) 34%, var(--wp-gold) 70%, var(--wp-gold-deep) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.wp-amount .wp-amount-unit { font-size: 15px; font-weight: 800; }
+.wp-stage.lucky .wp-amount-num { background: linear-gradient(180deg, #fffdf2 0%, #ffe9a8 40%, var(--wp-gold-light) 72%, var(--wp-gold) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.wp-revealed .wp-amount { animation: wp-amount-in .55s cubic-bezier(.16,1,.3,1.3) .3s forwards; }
 
 .wp-tierline {
-  margin-top: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary-dim);
-  letter-spacing: .04em;
+  margin-top: 8px;
+  font-size: 12.5px; font-weight: 800; letter-spacing: .06em;
+  color: var(--wp-gold-bright);
+  text-shadow: 0 0 12px rgba(var(--wp-gold-rgb), .7), 0 2px 6px rgba(0,0,0,.6);
   opacity: 0;
 }
-.wp-revealed .wp-tierline { animation: wp-fade-in .5s ease .7s forwards; }
+.wp-revealed .wp-tierline { animation: wp-fade .5s ease .7s forwards; }
+
+/* ---------- 价值锚定：细胶囊进度条（非卡片），文字无底 ---------- */
+.wp-anchor { margin: 14px auto 0; max-width: 278px; opacity: 0; }
+.wp-revealed .wp-anchor { animation: wp-fade .5s ease .78s forwards; }
+.wp-anchor-track {
+  height: 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(var(--wp-gold-rgb), .2);
+  overflow: hidden;
+}
+.wp-anchor-fill {
+  display: block; height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, var(--wp-gold-deep), var(--wp-gold-light));
+  box-shadow: 0 0 12px rgba(var(--wp-gold-rgb), .75);
+  transition: width .9s cubic-bezier(.16, 1, .3, 1);
+}
+.wp-anchor-txt {
+  margin-top: 9px; font-size: 11.5px; line-height: 1.55; color: var(--wp-ink-2);
+  text-shadow: 0 1px 5px rgba(0,0,0,.7);
+}
+.wp-anchor-txt b { color: var(--wp-gold-bright); font-weight: 800; }
+.wp-anchor-goal { margin-top: 3px; font-size: 10.5px; color: var(--wp-ink-3); text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+
+/* ---------- 有效期小胶囊 ---------- */
 .wp-note {
-  margin: 8px auto 0;
-  font-size: 12px;
-  color: var(--text-4);
-  line-height: 1.6;
-  opacity: 0;
-}
-.wp-revealed .wp-note { animation: wp-fade-in .5s ease .8s forwards; }
-
-/* ---------- 行动区 ---------- */
-.wp-actions { margin-top: 22px; opacity: 0; }
-.wp-revealed .wp-actions { animation: wp-fade-in .5s ease .9s forwards; }
-.wp-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  height: 50px;
+  margin: 13px auto 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 13px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #D4C09A, #B89968 48%, #9A8050);
-  color: #3A2C14;
-  font-size: 15px;
-  font-weight: 700;
-  text-decoration: none;
-  box-shadow: 0 8px 22px -6px rgba(var(--wp-glow-rgb), .55), inset 0 1px 0 rgba(255, 255, 255, .55);
-  transition: transform .15s ease, box-shadow .15s ease;
+  background: rgba(var(--wp-cyan-rgb), .1);
+  border: 1px solid rgba(var(--wp-cyan-rgb), .28);
+  color: #b7d6e0; font-size: 11px; line-height: 1.4;
 }
-.wp-btn:active { transform: translateY(1.5px) scale(.985); box-shadow: 0 4px 12px -4px rgba(var(--wp-glow-rgb), .5); }
-.wp-btn svg { width: 16px; height: 16px; }
-.wp-alt {
-  display: block;
-  margin-top: 14px;
-  font-size: 12.5px;
-  color: var(--text-3);
-  text-decoration: none;
+.wp-note::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--wp-cyan); box-shadow: 0 0 7px rgba(var(--wp-cyan-rgb), .85);
 }
-.wp-alt:active { color: var(--primary-dim); }
+.wp-revealed .wp-note { animation: wp-fade .5s ease .86s forwards; }
 
-/* ---------- 关闭钮 ---------- */
-.wp-close {
-  position: absolute;
-  top: 12px; right: 12px;
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-4);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  z-index: 3;
+/* ---------- 行动区：金色胶囊 CTA + 文字次按钮 ---------- */
+.wp-actions { margin: 18px auto 0; width: min(300px, 84vw); opacity: 0; }
+.wp-revealed .wp-actions, .wp-no-reward .wp-actions { animation: wp-fade .5s ease .9s forwards; }
+.wp-btn {
+  position: relative;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; height: 52px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8e2a6 0%, #e6c176 46%, #c69c50 100%);
+  color: #33240a; font-size: 16px; font-weight: 800; letter-spacing: .02em;
+  text-decoration: none;
+  box-shadow: 0 12px 30px -8px rgba(var(--wp-gold-rgb), .7), inset 0 1px 0 rgba(255, 255, 255, .7);
+  transition: transform .15s ease, box-shadow .15s ease;
+  animation: wp-cta-glow 2.4s ease-in-out 1.4s infinite;
 }
-.wp-close:active { background: var(--bg-inset); }
-.wp-close svg { width: 16px; height: 16px; }
+.wp-btn:active { transform: translateY(1.5px) scale(.985); }
+.wp-btn:focus { outline: none; }
+.wp-btn:focus-visible { box-shadow: 0 0 0 3px rgba(8, 12, 22, .9), 0 0 0 6px rgba(var(--wp-gold-rgb), .8); }
+.wp-btn svg { width: 16px; height: 16px; }
+/* 高光扫过 */
+.wp-btn::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; width: 46%;
+  left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .65), transparent);
+  transform: skewX(-18deg);
+  animation: wp-sheen 3.4s ease-in-out 2s infinite;
+}
+.wp-alt {
+  display: block; margin-top: 13px;
+  font-size: 12.5px; color: var(--wp-ink-3); text-decoration: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, .7);
+}
+.wp-alt:active { color: var(--wp-gold-bright); }
 
 /* ---------- 阶段可见性 ---------- */
-.wp-phase-gather:not(.wp-no-reward) .wp-amount,
-.wp-phase-gather:not(.wp-no-reward) .wp-tierline,
-.wp-phase-gather:not(.wp-no-reward) .wp-note,
-.wp-phase-gather:not(.wp-no-reward) .wp-actions { display: none; }
-/* 预算熔断的纯引导态：无积分动画，但行动按钮必须可见可点 */
-.wp-no-reward .wp-actions { opacity: 1; }
-.wp-no-reward .wp-emblem { cursor: default; }
-.wp-no-reward .wp-emblem-hint { display: none; }
-.wp-phase-result .wp-emblem { margin-bottom: 0; }
-.wp-phase-result .wp-stage { height: 132px; margin-top: 26px; }
-.wp-phase-result .wp-emblem { transform: scale(.72); }
-.wp-phase-result .wp-emblem-disc {
-  background: linear-gradient(180deg, #EBDCBE, #C9A96E 52%, #A5854C);
-}
-.wp-phase-result .wp-sheen { display: none; }
-.wp-leave { animation: wp-leave .32s ease forwards !important; }
-.wp-root.wp-leave { opacity: 1; animation: wp-root-out .3s ease forwards !important; }
+/* 未揭晓才隐藏结果元素；一旦加 .wp-revealed 立即恢复 display，
+   保证入场动画从揭晓时刻正确计时（避免 display:none 期间动画空转）。 */
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-amount,
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-tierline,
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-anchor,
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-note,
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-actions { display: none; }
+
+/* gather 态：箱子与文案整块都是开启热区（按钮自身已有 pointer） */
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-hero,
+.wp-stage:not(.wp-revealed):not(.wp-no-reward) .wp-copy { cursor: pointer; }
+/* 揭晓后压缩主视觉，为金额/进度/CTA 腾垂直空间（hero 不裁切，光效仍可外溢） */
+.wp-revealed:not(.lucky) .wp-hero { height: 250px; }
+.wp-revealed.lucky .wp-hero { height: 292px; }
+.wp-revealed.lucky .is-lucky { height: 350px; }
+/* 熔断纯引导态：无积分/锚定，行动按钮必须可见可点 */
+.wp-no-reward .wp-amount,
+.wp-no-reward .wp-tierline,
+.wp-no-reward .wp-anchor,
+.wp-no-reward .wp-note { display: none; }
+.wp-no-reward .wp-tap { display: none; }
+.wp-no-reward .is-sealed { filter: saturate(.55) brightness(.62); animation: none; }
+.wp-no-reward .wp-hero::before { opacity: .25; animation: none; }
+.wp-no-reward .wp-rays, .wp-no-reward .wp-hero::after,
+.wp-no-reward .wp-particles { display: none; }
+.wp-no-reward .wp-actions { margin-top: 16px; }
+
+/* 离场 */
+.wp-leave .wp-stage { animation: wp-stage-out .3s ease forwards !important; }
+.wp-root.wp-leave .wp-scrim { animation: wp-fade-out .3s ease forwards !important; }
 
 /* ---------- keyframes ---------- */
-@keyframes wp-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wp-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes wp-stage-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.94); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes wp-stage-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -52%) scale(.97); }
+}
 @keyframes wp-omen-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(18px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 @keyframes wp-omen-breathe {
-  0%, 100% { box-shadow: 0 10px 30px -8px rgba(var(--wp-glow-rgb), .42), inset 0 1px 0 rgba(255, 255, 255, .55); }
-  50% { box-shadow: 0 10px 40px -6px rgba(var(--wp-glow-rgb), .68), inset 0 1px 0 rgba(255, 255, 255, .55); }
+  0%, 100% { box-shadow: 0 10px 30px -12px rgba(0,0,0,.7), 0 0 18px -8px rgba(var(--wp-gold-rgb),.45); }
+  50%      { box-shadow: 0 10px 38px -10px rgba(0,0,0,.7), 0 0 28px -6px rgba(var(--wp-gold-rgb),.72); }
 }
-@keyframes wp-dot-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(var(--wp-glow-rgb), .5); }
-  70% { box-shadow: 0 0 0 10px rgba(var(--wp-glow-rgb), 0); }
-  100% { box-shadow: 0 0 0 0 rgba(var(--wp-glow-rgb), 0); }
+@keyframes wp-dot {
+  0% { box-shadow: 0 0 0 0 rgba(var(--wp-gold-rgb), .55); }
+  70% { box-shadow: 0 0 0 10px rgba(var(--wp-gold-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--wp-gold-rgb), 0); }
 }
-@keyframes wp-dialog-in {
-  from { opacity: 0; transform: translate(-50%, -46%) scale(.9); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@keyframes wp-idle-glow { 0%, 100% { opacity: .6; transform: translateX(-50%) scale(1); } 50% { opacity: .95; transform: translateX(-50%) scale(1.08); } }
+@keyframes wp-crate-breathe {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50%      { transform: translateX(-50%) translateY(-5px) scale(1.018); }
 }
-@keyframes wp-emblem-pop {
-  0% { opacity: 0; transform: scale(.4); }
-  60% { opacity: 1; transform: scale(1.12); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes wp-crate-pop {
+  0%   { opacity: 0; transform: translateX(-50%) scale(.7) translateY(14px); }
+  60%  { opacity: 1; transform: translateX(-50%) scale(1.05) translateY(-4px); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
 }
-@keyframes wp-ring-breathe {
-  0%, 100% { opacity: .25; transform: scale(.94); }
-  50% { opacity: .8; transform: scale(1.05); }
-}
-@keyframes wp-hint { from { opacity: 0; } to { opacity: 1; } }
-@keyframes wp-hint-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-@keyframes wp-burst-ring {
-  0% { opacity: .9; transform: scale(.6); }
+@keyframes wp-rays-spin { to { transform: rotate(360deg); } }
+@keyframes wp-core-pulse { 0%, 100% { opacity: .55; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes wp-burst {
+  0% { opacity: .95; transform: scale(.5); }
   100% { opacity: 0; transform: scale(2.6); }
 }
-@keyframes wp-mote-fly {
-  0% { opacity: 0; transform: translate(0, 0) scale(.4); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(.15); }
+@keyframes wp-flash {
+  0% { opacity: 0; transform: scale(.5); }
+  28% { opacity: .9; }
+  100% { opacity: 0; transform: scale(2.1); }
 }
-@keyframes wp-sheen {
-  0% { left: -80%; opacity: 0; }
-  20% { opacity: 1; }
-  100% { left: 130%; opacity: 0; }
+@keyframes wp-tap-pulse {
+  0% { opacity: .85; transform: scale(.92); }
+  70% { opacity: 0; transform: scale(1.2); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+@keyframes wp-fly {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(.4); }
+  14% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(.5); }
 }
 @keyframes wp-amount-in {
-  from { opacity: 0; transform: translateY(10px) scale(.85); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(12px) scale(.8); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes wp-root-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes wp-cta-glow {
+  0%, 100% { box-shadow: 0 12px 30px -8px rgba(var(--wp-gold-rgb), .6), inset 0 1px 0 rgba(255,255,255,.7); }
+  50%      { box-shadow: 0 14px 40px -6px rgba(var(--wp-gold-rgb), .85), inset 0 1px 0 rgba(255,255,255,.7); }
 }
-@keyframes wp-leave {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-8px); }
-}
-
-/* 汇聚光点（态一） */
-.wp-seed {
-  position: absolute;
-  left: 50%; top: 50%;
-  width: 7px; height: 7px;
-  margin: -3.5px 0 0 -3.5px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #F6E7C6, var(--primary));
-  box-shadow: 0 0 10px rgba(var(--wp-glow-rgb), .9);
-  opacity: 0;
-}
-.wp-phase-gather .wp-seed {
-  animation: wp-seed-gather var(--dur, .7s) cubic-bezier(.16, 1, .3, 1) var(--delay, 0s) forwards;
-}
-@keyframes wp-seed-gather {
-  0% { opacity: 0; transform: translate(var(--fx), var(--fy)) scale(.5); }
-  25% { opacity: 1; }
-  100% { opacity: 0; transform: translate(0, 0) scale(.3); }
+@keyframes wp-sheen {
+  0%, 55% { left: -60%; }
+  78%, 100% { left: 124%; }
 }
 
-/* ---------- 减弱动画：结果直出 ---------- */
+/* ---------- 减弱动画：直出，无粒子/光环/呼吸 ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .wp-scrim, .wp-dialog, .wp-omen, .wp-emblem, .wp-emblem-hint,
-  .wp-amount, .wp-tierline, .wp-note, .wp-actions { animation: none !important; opacity: 1 !important; }
-  .wp-dialog { transform: translate(-50%, -50%) !important; }
-  .wp-emblem { transform: none !important; }
-  .wp-emblem::before, .wp-emblem::after, .wp-mote, .wp-seed, .wp-sheen, .wp-burst-ring { display: none !important; }
+  .wp-scrim, .wp-stage, .wp-amount, .wp-tierline,
+  .wp-anchor, .wp-note, .wp-actions, .wp-omen { animation: none !important; opacity: 1 !important; }
+  .wp-stage { transform: translate(-50%, -50%) !important; }
+  .wp-coin, .wp-spark, .wp-burst, .wp-flash, .wp-rays,
+  .wp-tap-ring::before, .wp-tap-ring::after,
+  .wp-hero::before, .wp-hero::after { display: none !important; animation: none !important; }
+  .is-sealed { animation: none !important; }
+  .wp-revealed .is-sealed { opacity: 0 !important; }
+  .wp-revealed .is-open { opacity: 1 !important; animation: none !important; }
+  .wp-revealed.lucky .is-open { opacity: 0 !important; }
+  .wp-revealed.lucky .is-lucky { opacity: 1 !important; animation: none !important; }
   .wp-omen { display: none; }
+  .wp-btn::after { display: none; }
+  .wp-anchor-fill { transition: none; }
 }

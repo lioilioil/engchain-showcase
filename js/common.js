@@ -105,11 +105,15 @@ window.UI = (function () {
       if (blocks.length) {
         last = blocks[blocks.length - 1];
       } else {
-        /* 兜底：sheet-body 最后一个直接子节点若含块级按钮，视为置底操作区 */
+        /* 兜底：sheet-body 最后一个直接子节点若含【可见的】块级按钮，视为置底操作区。
+           必须排除 display:none / offsetParent 为空的按钮——否则内容包裹层里隐藏的
+           编辑态按钮（如信息卡备注行的"取消/保存"）会让整张内容卡被误抬进 foot、正文塌缩。 */
         const kids = body.children;
         if (kids.length) {
           const lastKid = kids[kids.length - 1];
-          if (lastKid.querySelector && lastKid.querySelector('.btn')) last = lastKid;
+          if (lastKid.querySelectorAll && Array.prototype.some.call(lastKid.querySelectorAll('.btn'), function (b) {
+            return !!(b.offsetParent || b.getClientRects().length);
+          })) last = lastKid;
         }
       }
       if (!last) { foot.style.display = 'none'; return; }

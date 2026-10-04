@@ -791,6 +791,28 @@
     this.add(item); return true;
   };
 
+  /* ---- 联系人备注昵称（engchain-contact-remarks）----
+     map = { [peerKey]: { name, ts } }。peerKey 用对方稳定身份：
+     有个人认证档案用 'person:<id>'，否则降级 'conv:<会话id>'（同一人多端会话共用同一备注）。
+     备注仅影响本机展示名，不改动对方认证姓名等任何档案数据。 */
+  var ContactRemarkStore = makeStore('engchain-contact-remarks', { map: {} }, 'engchain:contact-remark');
+  ContactRemarkStore.get = function (key) {
+    var m = this.read().map || {};
+    return (m[key] && m[key].name) || '';
+  };
+  ContactRemarkStore.set = function (key, name) {
+    var s = this.read(); s.map = s.map || {};
+    name = String(name == null ? '' : name).trim().slice(0, 20);
+    if (name) s.map[key] = { name: name, ts: Date.now() }; else delete s.map[key];
+    this.write(s);
+    return name;
+  };
+  ContactRemarkStore.remove = function (key) {
+    var s = this.read();
+    if (s.map && s.map[key]) { delete s.map[key]; this.write(s); }
+    return true;
+  };
+
   /* ---- 统一供需 Store（L1：发布→审核→上架→App 可见 主供需体系） ----
      数据结构：{ items: [...] }，状态机：pending_review(待审核)→active(已上架) / rejected(已驳回)；active↔off(已下架)
      迁移：旧 engchain-supply 数组格式（状态 pending/on/off/rejected）→ 对象格式 + 状态统一
@@ -2279,6 +2301,7 @@
   window.CommissionStore = CommissionStore;
   window.MonitorStore = MonitorStore;
   window.FavoriteStore = FavoriteStore;
+  window.ContactRemarkStore = ContactRemarkStore;
   window.SupplyStore = SupplyStore;
   window.ApplyStore = ApplyStore;
   window.LeadStore = LeadStore;

@@ -1,25 +1,25 @@
 /* ============================================================================
-   工程链 ENGCHAIN — 惊喜时刻弹窗 WonderPopup（渲染 + 动效编排）
+   工程链 ENGCHAIN — 惊喜时刻弹窗 WonderPopup（渲染 + 动效编排）v3.0
    ----------------------------------------------------------------------------
-   v1.0（2026-09-28）。配合 js/wonder-engine.js 使用，本身不做任何业务决策。
+   2026-10-03 无容器异形重做：透明底游戏化能量空投箱三态 PNG（闭合/开启/锦鲤）
+   漂浮在毛玻璃遮罩上，无任何矩形卡片；文案描边分层、胶囊控件、代码粒子。
+   配合 js/wonder-engine.js 使用，本身不做任何业务决策；对外 API 与 v1/v2 完全兼容。
    WonderPopup.show({
-     decisionId, persona, guest, budgetState, nba:{ctaText,ctaHref,altText,altHref,postTitle},
+     decisionId, persona, guest, budgetState,
+     unlockPrice?, balance?, topLabel?,
+     nba:{ctaText,ctaHref,altText,altHref,postTitle},
      onReveal() -> {kind:'credits'|'pending'|'none', amount, tier, tierLabel, expireAt},
      onCta(result), onDismiss(phase)
    })
-   时间轴：omen(.6s) → gather(.7s) → 轻触揭晓 → burst+countup(≤1.6s) → result
+   时间轴：omen(.6s) → gather(闭合箱+轻触开启) → 轻触开箱 burst+粒子+countup(≤1.6s) → result
    ============================================================================ */
 (function (w, d) {
   'use strict';
 
   var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
   var CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
-  /* 徽印：等高线圆环 + 定位星点（工程蓝图里一处发光坐标） */
-  var MARK = '<svg class="wp-emblem-mark" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
-    '<circle cx="24" cy="24" r="15.5" opacity=".55"/><circle cx="24" cy="24" r="9.5" opacity=".7"/>' +
-    '<path d="M24 8.5v4M24 35.5v4M8.5 24h4M35.5 24h4" opacity=".6"/>' +
-    '<circle cx="24" cy="24" r="3.2" fill="currentColor" stroke="none"/>' +
-    '</svg>';
+  /* 四角星：补给能量的轻量符号 */
+  var SPARK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.4 4.9 2.6 7.1 7.5 7.5-4.9.4-7.1 2.6-7.5 7.5-.4-4.9-2.6-7.1-7.5-7.5C9.4 9.1 11.6 6.9 12 2z"/></svg>';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -40,35 +40,23 @@
     return root;
   }
 
-  /* 从屏外汇聚的光点初始坐标（相对中心） */
-  function seedSpans(n) {
-    var html = '', R = 150;
+  /* 开箱粒子：金币 + 四角星屑，自箱口向上扇形喷射 */
+  function particleSpans(lucky) {
+    var n = lucky ? 26 : 15;
+    var html = '';
     for (var i = 0; i < n; i++) {
-      var ang = (Math.PI * 2 * i) / n + (i % 2) * 0.35;
-      var fx = Math.round(Math.cos(ang) * R * (0.75 + (i % 3) * 0.18));
-      var fy = Math.round(Math.sin(ang) * R * (0.75 + (i % 3) * 0.18));
-      var dur = 560 + (i % 4) * 90;
-      var delay = (i % 5) * 55;
-      html += '<span class="wp-seed" style="--fx:' + fx + 'px;--fy:' + fy + 'px;--dur:' + dur + 'ms;--delay:' + delay + 'ms"></span>';
-    }
-    return html;
-  }
-
-  /* 揭晓粒子 */
-  function moteSpans(lucky) {
-    var n = lucky ? 22 : 14;
-    var html = '', R = 168;
-    for (var i = 0; i < n; i++) {
-      var ang = (Math.PI * 2 * i) / n + (i % 3) * 0.22;
-      var dist = R * (0.7 + (i % 4) * 0.16);
+      var isCoin = (i % 5 === 0) || (lucky && i % 3 === 0);
+      /* 角度集中在上半扇形（约 -150° ~ -30°），即向上并向两侧散开 */
+      var ang = -Math.PI / 2 + ((i * 37 % 100) / 100 - 0.5) * (lucky ? 2.5 : 1.9);
+      var dist = (lucky ? 120 : 88) + (i % 5) * 26 + (isCoin ? 10 : 0);
       var tx = Math.round(Math.cos(ang) * dist);
-      var ty = Math.round(Math.sin(ang) * dist - 12);
-      var size = 4 + (i % 3) * 2 + (lucky ? 1 : 0);
-      var dur = 780 + (i % 5) * 90;
-      var delay = (i % 4) * 40;
-      var rot = (i * 47) % 360;
-      var spark = i % 4 === 0 ? ' wp-spark' : '';
-      html += '<span class="wp-mote' + spark + '" style="--tx:' + tx + 'px;--ty:' + ty + 'px;--rot:' + rot + 'deg;--size:' + size + 'px;--dur:' + dur + 'ms;--delay:' + delay + 'ms"></span>';
+      var ty = Math.round(Math.sin(ang) * dist);           /* 负值=向上 */
+      var size = isCoin ? (9 + (i % 3) * 3) : (6 + (i % 3) * 3);
+      var dur = 820 + (i % 5) * 95;
+      var delay = (i % 4) * 45;
+      var rot = (i * 53) % 360;
+      var cls = isCoin ? 'wp-coin' : 'wp-spark';
+      html += '<span class="' + cls + '" style="--tx:' + tx + 'px;--ty:' + ty + 'px;--rot:' + rot + 'deg;--s:' + size + 'px;--dur:' + dur + 'ms;--delay:' + delay + 'ms"></span>';
     }
     return html;
   }
@@ -98,45 +86,80 @@
     setTimeout(function () { if (c.root && c.root.parentNode) c.root.parentNode.removeChild(c.root); }, reduced() ? 0 : 300);
   }
 
+  /* 真实价值锚定：用引擎传入的“解锁一条线索所需积分”，不编造数字 */
+  function renderAnchor(root, ctx, result) {
+    var box = root.querySelector('.wp-anchor');
+    if (!box || !result || (result.kind !== 'credits' && result.kind !== 'pending')) return;
+    var goal = ctx.unlockPrice || 98;
+    var base = result.kind === 'credits' ? (ctx.balance || 0) : 0;
+    var total = base + (result.amount || 0);
+    var pct = Math.max(4, Math.min(100, Math.round(total / goal * 100)));
+    var cat = ctx.topLabel || '';
+    var leadTxt;
+    if (total >= goal) {
+      leadTxt = '本次补给已可解锁 <b>1 条</b>' + (cat ? cat : '商机') + '线索';
+    } else {
+      var n = goal - total;
+      var what = cat ? '一条' + cat + '线索' : '一条商机线索';
+      leadTxt = (result.kind === 'pending' ? '注册到账后，' : '') + '再攒 <b>' + n + '</b> 积分，即可解锁' + what;
+    }
+    root.querySelector('.wp-anchor-txt').innerHTML = leadTxt;
+    root.querySelector('.wp-anchor-goal').textContent = '解锁一条线索需 ' + goal + ' 积分';
+    var fill = root.querySelector('.wp-anchor-fill');
+    fill.style.width = '0%';
+    setTimeout(function () { fill.style.width = pct + '%'; }, reduced() ? 0 : 480);
+  }
+
   function show(ctx) {
     if (current) return null;
     var rm = reduced();
     var root = mountRoot();
     var ctrl = { root: root, ctx: ctx, timers: [], onDismiss: ctx.onDismiss, revealed: false };
     current = ctrl;
-    function later(fn, ms) { var id = setTimeout(fn, rm ? Math.min(ms, 30) : ms); ctrl.timers.push(id); }
+    function later(fn, ms) { var id = setTimeout(fn, rm ? Math.min(ms, 30) : ms); ctrl.timers.push(id); return id; }
 
     root.innerHTML =
       '<div class="wp-scrim"></div>' +
       (rm ? '' :
         '<div class="wp-omen"><span class="wp-omen-dot"></span><span class="wp-omen-text">等等，有份补给正在靠近…</span>' +
         '<span class="wp-omen-x" role="button" aria-label="放弃本次补给">' + CLOSE + '</span></div>') +
-      '<div class="wp-dialog wp-phase-gather" role="dialog" aria-modal="true" aria-label="浏览补给">' +
+      '<div class="wp-stage wp-phase-gather" role="dialog" aria-modal="true" aria-label="浏览补给">' +
         '<button class="wp-close" type="button" aria-label="关闭">' + CLOSE + '</button>' +
-        '<div class="wp-stage">' +
-          '<div class="wp-particles">' + seedSpans(10) + moteSpans(false) + '<span class="wp-sheen"></span></div>' +
-          '<span class="wp-burst-ring"></span>' +
-          '<div class="wp-emblem" role="button" tabindex="0" aria-label="轻触揭晓补给">' +
-            '<span class="wp-emblem-disc"></span>' + MARK +
-            '<span class="wp-emblem-hint">轻 触 揭 晓</span>' +
-          '</div>' +
+        '<span class="wp-badge">ENGCHAIN · 浏览补给</span>' +
+        '<div class="wp-hero">' +
+          '<span class="wp-rays" aria-hidden="true"></span>' +
+          '<span class="wp-himg is-sealed" role="img" aria-label="待开启的补给箱"></span>' +
+          '<span class="wp-himg is-open" role="img" aria-label="开启的补给箱"></span>' +
+          '<span class="wp-himg is-lucky" role="img" aria-label="锦鲤大奖补给箱"></span>' +
+          '<span class="wp-burst" aria-hidden="true"></span>' +
+          '<span class="wp-flash" aria-hidden="true"></span>' +
+          '<div class="wp-particles" aria-hidden="true"></div>' +
         '</div>' +
-        '<div class="wp-badge">ENGCHAIN · 浏览补给</div>' +
-        '<h3 class="wp-title">逛了这么久，这份补给给你</h3>' +
-        '<p class="wp-desc">在工程蓝图里发现了一处发光的坐标，轻触徽印，查收今天的小奇迹。</p>' +
-        '<div class="wp-amount"><span class="wp-amount-num">0</span><span class="wp-amount-unit">积分</span></div>' +
-        '<div class="wp-tierline"></div>' +
-        '<p class="wp-note"></p>' +
-        '<div class="wp-actions">' +
-          '<a class="wp-btn" href="' + esc(ctx.nba.ctaHref) + '">' + esc(ctx.nba.ctaText) + ARROW + '</a>' +
-          (ctx.nba.altText ? '<a class="wp-alt" href="' + esc(ctx.nba.altHref || '#') + '">' + esc(ctx.nba.altText) + '</a>' : '') +
+        '<button class="wp-tap" type="button" aria-label="轻触开启补给">' +
+          '<span class="wp-tap-ring"><span class="wp-tap-pill">' + SPARK + '轻触开启</span></span>' +
+        '</button>' +
+        '<div class="wp-copy">' +
+          '<h3 class="wp-title">逛了这么久，这份补给给你</h3>' +
+          '<p class="wp-desc">为你留意的商机配了一份补给，轻触开启查收。</p>' +
+          '<div class="wp-amount"><span class="wp-amount-num">0</span><span class="wp-amount-unit">积分</span></div>' +
+          '<div class="wp-tierline"></div>' +
+          '<div class="wp-anchor"><div class="wp-anchor-track"><span class="wp-anchor-fill"></span></div>' +
+            '<div class="wp-anchor-txt"></div><div class="wp-anchor-goal"></div></div>' +
+          '<p class="wp-note"></p>' +
+          '<div class="wp-actions">' +
+            '<a class="wp-btn" href="' + esc(ctx.nba.ctaHref) + '">' + esc(ctx.nba.ctaText) + ARROW + '</a>' +
+            (ctx.nba.altText ? '<a class="wp-alt" href="' + esc(ctx.nba.altHref || '#') + '">' + esc(ctx.nba.altText) + '</a>' : '') +
+          '</div>' +
         '</div>' +
       '</div>';
 
-    var dialog = root.querySelector('.wp-dialog');
-    var emblem = root.querySelector('.wp-emblem');
+    var stage = root.querySelector('.wp-stage');
+    var tap = root.querySelector('.wp-tap');
+    var heroEl = root.querySelector('.wp-hero');
+    var copyEl = root.querySelector('.wp-copy');
     var particles = root.querySelector('.wp-particles');
     var omen = root.querySelector('.wp-omen');
+    var badgeEl = root.querySelector('.wp-badge');
 
     /* omen 关闭 = 放弃（不结算、不发奖） */
     var omenX = root.querySelector('.wp-omen-x');
@@ -149,9 +172,9 @@
       /* 揭晓前点遮罩可放弃；落定后避免误触，只能用按钮/关闭 */
       if (!ctrl.revealed) closeAll('gather');
     });
+    function escHandler(e) { if (e.key === 'Escape' && current === ctrl) closeAll(ctrl.revealed ? 'result' : 'gather'); }
     d.addEventListener('keydown', escHandler);
     ctrl.escHandler = escHandler;
-    function escHandler(e) { if (e.key === 'Escape' && current === ctrl) closeAll(ctrl.revealed ? 'result' : 'gather'); }
 
     function reveal() {
       if (ctrl.revealed) return;
@@ -159,72 +182,69 @@
       var result = { kind: 'none' };
       try { result = ctx.onReveal() || { kind: 'none' }; } catch (e) { result = { kind: 'error' }; }
 
-      var tierline = root.querySelector('.wp-tierline');
       var note = root.querySelector('.wp-note');
       var numEl = root.querySelector('.wp-amount-num');
-      var unitEl = root.querySelector('.wp-amount-unit');
       var titleEl = root.querySelector('.wp-title');
       var descEl = root.querySelector('.wp-desc');
       var btn = root.querySelector('.wp-btn');
       var alt = root.querySelector('.wp-alt');
 
+      /* 预算熔断 / 异常：零成本纯商机引导。引擎已下发与“无奖励”一致的 nba，
+         标题—描述—CTA 三者统一，不再出现“没有奖励却让去领奖励”的矛盾。 */
       if (result.kind === 'none' || result.kind === 'error' || result.kind === 'exhausted') {
-        /* 预算熔断：无奖励纯引导，零成本保留触达 */
-        dialog.classList.add('wp-no-reward');
+        stage.classList.add('wp-no-reward');
         particles.style.display = 'none';
-        root.querySelector('.wp-badge').textContent = 'ENGCHAIN · 商机提醒';
+        badgeEl.textContent = 'ENGCHAIN · 商机提醒';
         titleEl.textContent = '今日补给已发完';
-        descEl.textContent = ctx.nba.postTitle || '不过我们为你留意了几条新商机，先去看看？';
-        root.querySelector('.wp-amount').style.display = 'none';
-        tierline.style.display = 'none';
+        descEl.textContent = ctx.nba.postTitle || '为你留意了几条今日新上架的商机，先去看看有没有合适的';
+        if (alt) alt.style.display = 'none';
         toResult(0);
         return;
       }
 
       var lucky = result.tier === 'lucky';
-      if (lucky) dialog.classList.add('lucky');
-      /* 重绘粒子数量（lucky 22 粒） */
-      particles.innerHTML = moteSpans(lucky) + '<span class="wp-sheen"></span>';
-      dialog.classList.add('wp-revealed');
-
-      countUp(numEl, result.amount, 820, function () {
-        toResult(140);
-      });
-      tierline.textContent = result.tierLabel ? (result.tierLabel + (lucky ? ' · 今日锦鲤' : '')) : '';
-      if (result.kind === 'pending') {
-        note.textContent = '已为你预留 7 天，注册领取后到账';
-        unitEl.textContent = '积分';
-      } else {
-        note.textContent = '已到账，可在钱包查看 · 7 天有效';
+      if (lucky) {
+        stage.classList.add('lucky');
+        badgeEl.textContent = '今日锦鲤';
       }
+      particles.innerHTML = particleSpans(lucky);
+      stage.classList.add('wp-revealed');
+
+      countUp(numEl, result.amount, 820, function () { toResult(140); });
+      root.querySelector('.wp-tierline').textContent = result.tierLabel || '';
+      note.textContent = result.kind === 'pending'
+        ? '已为你预留 7 天，注册领取后到账'
+        : '已到账 · 7 天内有效，可在钱包查看';
+
+      renderAnchor(root, ctx, result);
       ctrl.result = result;
     }
 
     function toResult(delay) {
       later(function () {
-        dialog.classList.remove('wp-phase-gather');
-        dialog.classList.add('wp-phase-result');
+        stage.classList.remove('wp-phase-gather');
+        stage.classList.add('wp-phase-result');
         var titleEl = root.querySelector('.wp-title');
         var descEl = root.querySelector('.wp-desc');
-        if (!dialog.classList.contains('wp-no-reward')) {
+        if (!stage.classList.contains('wp-no-reward')) {
           titleEl.textContent = '补给已就位';
           descEl.textContent = ctx.nba.postTitle || '';
         }
-        /* 焦点入主按钮 */
         var btnEl = root.querySelector('.wp-btn');
         if (btnEl) btnEl.focus({ preventScroll: true });
       }, delay == null ? 500 : delay);
     }
 
-    emblem.addEventListener('click', reveal);
-    emblem.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); }
-    });
+    /* 开启热区：轻触胶囊 + 整个箱子主视觉 + 下方文案均可点（gather 期）。
+       reveal 幂等，结果态再点不会重复结算；CTA/次级链接的点击不被拦截，正常跳转。 */
+    tap.addEventListener('click', reveal);
+    heroEl.addEventListener('click', reveal);
+    copyEl.addEventListener('click', reveal);
 
-    /* 预算已熔断：本次是零成本纯引导，不让用户点开一个"空盒子"，徽印落定后自动揭晓 */
+    /* 预算已熔断：零成本纯引导，不让用户点开“空盒子”，主视觉落定后自动揭晓 */
     if (ctx.budgetState === 'exhausted') {
-      var hintEl = root.querySelector('.wp-emblem-hint');
-      if (hintEl) hintEl.textContent = '查 收 商 机 提 醒';
+      var pill = root.querySelector('.wp-tap-pill');
+      if (pill) pill.innerHTML = SPARK + '查收新商机';
       later(reveal, 780);
     }
     root.querySelector('.wp-btn').addEventListener('click', function () {
@@ -237,7 +257,7 @@
       });
     }
 
-    /* 阶段推进：omen 600ms 后 dialog 已随 CSS 入场；汇聚结束即可揭晓（hint 由 CSS 1.5s 出现） */
+    /* omen 退场（.6s 后 stage 已随 CSS 入场） */
     if (omen) {
       later(function () { if (omen && omen.parentNode) omen.style.transition = 'opacity .3s'; if (omen) omen.style.opacity = '0'; }, 900);
       later(function () { if (omen && omen.parentNode) omen.parentNode.removeChild(omen); }, 1250);

@@ -26,7 +26,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="topbar">
       <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
       <div class="topbar-title">消息</div>
-      <div class="topbar-right"><button type="button" class="msg-search-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic" style="width:20px;height:20px;"><use href="#i-search"/></svg></button><button type="button" class="msg-search-btn" id="msg-settings-btn" aria-label="会话设置" title="设置"><svg class="ic" style="width:20px;height:20px;"><use href="#i-gear"/></svg></button></div>
+      <div class="topbar-right"><button type="button" class="icon-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic"><use href="#i-search"/></svg></button><button type="button" class="icon-btn" id="msg-settings-btn" aria-label="会话设置" title="设置"><svg class="ic"><use href="#i-gear"/></svg></button></div>
     </div>
     <div class="msg-tabs" id="msg-tabs">
       <button class="msg-tab active" data-tab="conv">会话<span class="mt-badge" id="badge-conv" style="display:none;">0</span></button>
@@ -146,6 +146,53 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   function tsNum(t) { if (!t) return 0; var d = new Date(String(t).length === 10 ? t + 'T00:00:00' : t); return isNaN(d) ? 0 : d.getTime(); }
+
+  /* 会话行的 time 多为展示串（HH:MM / 昨天 / 周X / x月x日），用于"最新未读"排序时解析为时间戳。
+     优先读会话对象上的真实数值字段（ts/updatedAt/lastTs），演示串按相对当天折算。 */
+  var CONV_WEEK = { '周日': 0, '周天': 0, '星期日': 0, '星期天': 0, '周一': 1, '星期二': 2, '周二': 2, '星期三': 3, '周三': 3, '星期四': 4, '周四': 4, '星期五': 5, '周五': 5, '星期六': 6, '周六': 6 };
+  function parseConvTime(s) {
+    if (s == null) return 0;
+    if (typeof s === 'number') return s;
+    s = String(s).trim();
+    if (!s) return 0;
+    var now = new Date(), p, m, d;
+    if (/^\d{1,2}:\d{2}$/.test(s)) { p = s.split(':'); return new Date(now.getFullYear(), now.getMonth(), now.getDate(), +p[0], +p[1], 0, 0).getTime(); }
+    if (s.indexOf('昨天') === 0) return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0).getTime();
+    if (CONV_WEEK[s] !== undefined) {
+      var target = CONV_WEEK[s], cur = now.getDay(), diff = (cur - target + 7) % 7;
+      if (diff === 0) diff = 7; /* 文案"周X"指最近一个已过去的该星期日，当天不重复计 */
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff, 12, 0, 0).getTime();
+    }
+    if ((m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/))) return new Date(now.getFullYear(), +m[1] - 1, +m[2], 12, 0, 0).getTime();
+    d = Date.parse(s); return isNaN(d) ? 0 : d;
+  }
+  /* 会话子页"最新一条未读"时间戳（无未读返回 0）；真实数值字段优先，其次解析展示时间串 */
+  function latestUnreadConvTs() {
+    var t = 0;
+    try {
+      (readConvs().list || []).forEach(function (c) {
+        if (!(c.unread > 0)) return;
+        var raw = (c.ts != null) ? c.ts : (c.updatedAt != null ? c.updatedAt : c.lastTs);
+        var ms = (typeof raw === 'number') ? raw : (tsNum(raw) || parseConvTime(c.time));
+        if (ms > t) t = ms;
+      });
+    } catch (e) {}
+    return t;
+  }
+  /* 通知子页"最新一条未读"时间戳（无未读返回 0） */
+  function latestUnreadNoticeTs() {
+    var t = 0;
+    try { buildNoticeItems().forEach(function (x) { if (x.unread && x.ts > t) t = x.ts; }); } catch (e) {}
+    return t;
+  }
+  /* 初始进入哪个子页：进入"最新一条未读消息时间更晚"的子页；两边都无未读时默认"会话"；时间相等保持"会话" */
+  function pickInitialTab() {
+    var ct = latestUnreadConvTs(), nt = latestUnreadNoticeTs();
+    if (nt > ct) return 'notice';
+    return 'conv';
+  }
+  window.__pickInitialMsgTab = pickInitialTab; /* 只读暴露，便于联调/回归 */
+  window.__parseConvTime = parseConvTime;     /* 只读暴露，便于联调/回归 */
 
   /* 类型标签配色（沿用 TYPE_STYLE 视觉语言） */
   function catStyle(cat) {
@@ -778,10 +825,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         scrollToUnread(t.dataset.tab);
       });
     });
-    try {
-      var noticeU = sysUnreadCount() + sysMsgUnreadCount() + (MatchStore.listUnread().length||0) + inviteUnreadCount();
-      if (noticeU > 0) activate('notice');
-    } catch(e){}
+    /* 初始子页：进入「最新一条未读消息」时间更晚的子页（会话 vs 通知）；无未读默认会话 */
+    try { activate(pickInitialTab()); } catch (e) {}
   })();
   /* [FIX] 点击会话跳转 chat.html 前清除该会话未读数 */
   document.getElementById('list').addEventListener('click', function (e) {
@@ -844,8 +889,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .mf-set{display:block;text-align:center;margin-top:10px;font-size:12px;color:var(--primary-dim);}
 
   /* ---- 消息页 v2：搜索 + 通知分页合并 ---- */
-  .msg-search-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease;}
-  .msg-search-btn:active{transform:scale(.94);}
   .msg-search{display:flex;align-items:center;gap:8px;margin-top:10px;}
   .msg-search-box{flex:1;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:999px;}
   .msg-search-ic{width:16px;height:16px;color:var(--text-3);flex:none;}
@@ -946,6 +989,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   @keyframes n-jump-bg{0%{background:rgba(184,153,104,.26);}100%{background:transparent;}}
   .n-jump{animation:n-jump-bg 1.6s ease 1;}
 </style>
-<script src="../../js/liquid-glass.iife.js?v=2026100209"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
 </body>
 </html>

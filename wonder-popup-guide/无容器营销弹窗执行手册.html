@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无容器异形营销弹窗 · 设计 / 开发 / 运营执行手册</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c1322'/%3E%3Cpath d='M13 42 L24 21 L32 33 L40 21 L51 42' stroke='%23d9ad63' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='17' r='4' fill='%23f7dd9f'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --ink-bg:#0c1322; --ink-bg2:#111b30; --ink-bg3:#16223c;
+    --gold:#d9ad63; --gold-bright:#f7dd9f; --gold-light:#fff1cd; --gold-deep:#b08644;
+    --gold-rgb:217,173,99; --cyan:#74c4d6;
+    --text:#e9eef8; --text-dim:#a9b5ca; --text-faint:#7886a0;
+    --line:rgba(255,255,255,.10); --line-strong:rgba(255,255,255,.18);
+    --ok:#7fd0a8; --bad:#e78d8d;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --num:"Bahnschrift","DIN Alternate","Roboto Condensed",var(--font);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;background:#090f1d}
+  body{
+    font-family:var(--font); color:var(--text); line-height:1.75;
+    /* 静态深色铺底：随文档高度自然铺满，不依赖 fixed（兼容 iOS Safari 与全长截图/打印） */
+    background:linear-gradient(180deg,#0a1020 0%, var(--ink-bg) 28%, #090f1d 100%);
+    background-color:#090f1d;
+    position:relative; -webkit-font-smoothing:antialiased;
+  }
+  /* 光斑氛围用固定伪元素承担：即便其在全长截图中只覆盖视口，底色仍深、文字始终可读 */
+  body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(900px 520px at 82% -8%, rgba(var(--gold-rgb),.14), transparent 60%),
+      radial-gradient(760px 500px at -10% 18%, rgba(116,196,214,.10), transparent 55%);}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+  ::selection{background:rgba(var(--gold-rgb),.32)}
+
+  /* ---------- 封面 ---------- */
+  header.hero{padding:88px 0 56px;border-bottom:1px solid var(--line)}
+  .kicker{display:inline-flex;align-items:center;gap:9px;font-size:13px;letter-spacing:.22em;color:var(--gold-bright);
+    border:1px solid rgba(var(--gold-rgb),.4);padding:7px 15px;border-radius:999px;background:rgba(var(--gold-rgb),.07)}
+  .kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+  .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:54px;align-items:center;margin-top:34px}
+  h1{font-size:clamp(30px,4.4vw,48px);line-height:1.22;font-weight:800;letter-spacing:.01em}
+  h1 em{font-style:normal;background:linear-gradient(180deg,var(--gold-light),var(--gold) 62%,var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .hero p.lead{margin-top:20px;font-size:16.5px;color:var(--text-dim);max-width:34em}
+  .hero .quote{margin-top:26px;display:inline-block;font-size:19px;font-weight:700;color:var(--gold-light);
+    text-shadow:0 2px 18px rgba(var(--gold-rgb),.35)}
+  .hero .meta{margin-top:30px;display:flex;flex-wrap:wrap;gap:10px}
+  .meta span{font-size:12.5px;color:var(--text-dim);border:1px solid var(--line);border-radius:999px;padding:6px 13px;background:rgba(255,255,255,.03)}
+  .hero-shot{position:relative;border-radius:26px;overflow:hidden;
+    background:radial-gradient(120% 120% at 50% 0%,#2a3550 0%,#141d31 55%,#0e1626 100%);
+    border:1px solid var(--line-strong);box-shadow:0 40px 90px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(var(--gold-rgb),.08)}
+  .hero-shot img{display:block;width:100%;height:auto}
+  .hero-shot .cap{position:absolute;left:0;right:0;bottom:0;padding:11px 16px;font-size:12px;color:var(--text-dim);
+    background:linear-gradient(180deg,transparent,rgba(8,12,22,.85));display:flex;justify-content:space-between;gap:10px}
+
+  /* ---------- 目录 ---------- */
+  nav.toc{padding:34px 0 8px}
+  .toc ol{list-style:none;display:grid;grid-template-columns:repeat(2,1fr);gap:10px 26px;counter-reset:toc;margin-top:14px}
+  .toc a{display:flex;gap:12px;align-items:baseline;color:var(--text-dim);text-decoration:none;font-size:14.5px;
+    padding:9px 4px;border-bottom:1px solid var(--line);transition:.2s}
+  .toc a::before{counter-increment:toc;content:"0" counter(toc);font-family:var(--num);color:var(--gold);font-size:13px;min-width:24px}
+  .toc a:hover{color:var(--gold-light);border-color:rgba(var(--gold-rgb),.4)}
+
+  /* ---------- 章节 ---------- */
+  section{padding:58px 0 8px}
+  .sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px}
+  .sec-no{font-family:var(--num);font-size:15px;color:var(--gold);letter-spacing:.1em}
+  h2{font-size:clamp(23px,3vw,30px);font-weight:800;letter-spacing:.01em}
+  .sec-sub{color:var(--text-dim);font-size:15px;margin:6px 0 30px;max-width:46em}
+  h3{font-size:18px;font-weight:700;margin:34px 0 12px;color:var(--gold-light);display:flex;align-items:center;gap:9px}
+  h3::before{content:"";width:4px;height:16px;border-radius:2px;background:linear-gradient(var(--gold-bright),var(--gold-deep))}
+  p{margin:12px 0;color:#d6deec}
+  strong{color:var(--text);font-weight:700}
+  em{color:var(--gold-bright);font-style:normal;font-weight:600}
+  a.src{color:var(--cyan);text-decoration:none;border-bottom:1px dotted rgba(116,196,214,.5)}
+  a.src:hover{border-bottom-style:solid}
+  ul,ol.body{margin:12px 0 12px 4px;padding-left:22px}
+  li{margin:7px 0;color:#d6deec}
+  code{font-family:"SFMono-Regular",Consolas,"Courier New",monospace;font-size:.88em;
+    background:rgba(var(--gold-rgb),.12);color:var(--gold-light);padding:2px 6px;border-radius:5px}
+  pre{background:#080d19;border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow-x:auto;margin:16px 0}
+  pre code{background:none;color:#cdd8ec;padding:0;font-size:13px;line-height:1.7}
+
+  .lead-card{border:1px solid rgba(var(--gold-rgb),.28);border-radius:16px;padding:24px 26px;margin:24px 0;
+    background:linear-gradient(180deg,rgba(var(--gold-rgb),.09),rgba(var(--gold-rgb),.02))}
+  .lead-card h4{color:var(--gold-light);font-size:15px;letter-spacing:.05em;margin-bottom:6px}
+  .lead-card p{margin:4px 0;color:var(--text-dim)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:20px 0}
+  .panel{border:1px solid var(--line);border-radius:14px;padding:20px 22px;background:rgba(255,255,255,.025)}
+  .panel h5{font-size:14.5px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .panel.ok{border-color:rgba(127,208,168,.34);background:rgba(127,208,168,.06)}
+  .panel.bad{border-color:rgba(231,141,141,.34);background:rgba(231,141,141,.06)}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:999px}
+  .tag.g{color:#0c1a12;background:var(--ok)} .tag.b{color:#2a1010;background:var(--bad)}
+  .panel ul{margin:8px 0 0;padding-left:18px} .panel li{font-size:14px;margin:6px 0;color:var(--text-dim)}
+
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.8px;overflow:hidden;border-radius:12px}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:rgba(var(--gold-rgb),.1);color:var(--gold-light);font-weight:700;font-size:13px;letter-spacing:.02em}
+  td{color:var(--text-dim)} td b{color:var(--text)}
+  tr:last-child td{border-bottom:none} tr:hover td{background:rgba(255,255,255,.02)}
+
+  /* 宝箱三态 */
+  .crates{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:22px 0}
+  .crate{border-radius:16px;padding:18px 14px 14px;text-align:center;position:relative;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 12%,#27324d,#131d33 70%);border:1px solid var(--line)}
+  .crate img{width:100%;height:180px;object-fit:contain;filter:drop-shadow(0 18px 26px rgba(0,0,0,.5))}
+  .crate .st{font-size:13.5px;font-weight:700;color:var(--gold-light);margin-top:6px}
+  .crate .ds{font-size:12px;color:var(--text-faint);margin-top:3px}
+
+  .steps{counter-reset:st;list-style:none;margin:18px 0;padding:0}
+  .steps li{position:relative;padding:0 0 18px 46px;border-left:1px solid var(--line);margin-left:14px}
+  .steps li:last-child{border-left-color:transparent;padding-bottom:0}
+  .steps li::before{counter-increment:st;content:counter(st);position:absolute;left:-17px;top:0;width:34px;height:34px;
+    border-radius:50%;background:linear-gradient(160deg,var(--gold-bright),var(--gold-deep));color:#241806;
+    font-family:var(--num);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px;
+    box-shadow:0 6px 18px -4px rgba(var(--gold-rgb),.6)}
+  .steps b{color:var(--text)} .steps small{display:block;color:var(--text-faint);font-size:12.5px;margin-top:2px}
+
+  .note{border-left:3px solid var(--gold);background:rgba(var(--gold-rgb),.07);padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0;font-size:14px;color:var(--text-dim)}
+  .note.warn{border-color:var(--bad);background:rgba(231,141,141,.08)}
+  footer{margin-top:70px;padding:36px 0 60px;border-top:1px solid var(--line);color:var(--text-faint);font-size:13px}
+  footer .refs a{display:inline-block;margin:4px 18px 4px 0}
+
+  @media(max-width:860px){
+    .hero-grid{grid-template-columns:1fr;gap:30px}
+    .toc ol,.grid2,.grid3,.crates{grid-template-columns:1fr}
+    .wrap{padding:0 18px} header.hero{padding:56px 0 40px}
+    table{font-size:12.8px} th,td{padding:9px 10px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 封面 ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker"><span class="dot"></span>ENGCHAIN · WONDER MOMENT v3.0</span>
+    <div class="hero-grid">
+      <div>
+        <h1>无容器<em>异形营销弹窗</em><br>设计 / 开发 / 运营执行手册</h1>
+        <p class="lead">面向工程链 App「长时间无有效动作浏览」场景的最小单元惊喜激励。本手册统一设计语言、动效素材、前端契约与运营配置，供三方照此执行与回归。</p>
+        <span class="quote">「逛了这么久，这份补给给你」</span>
+        <div class="meta">
+          <span>形态：异形 · 零矩形容器</span>
+          <span>动效：透明 PNG + CSS/JS 混合分层</span>
+          <span>主视觉：游戏化金色能量空投箱</span>
+          <span>三态：微光 / 星意 / 锦鲤</span>
+        </div>
+      </div>
+      <div class="hero-shot">
+        <img src="assets/shot-gather.png" alt="弹窗 gather 态真机效果">
+        <div class="cap"><span>真机渲染 · gather 态</span><span>390 × 780</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<!-- ============ 目录 ============ -->
+<nav class="toc">
+  <div class="sec-no" style="color:var(--text-faint)">CONTENTS</div>
+  <ol>
+    <li><a href="#s1">一页结论与设计三决策</a></li>
+    <li><a href="#s2">竞品范式依据（可追溯，不编造）</a></li>
+    <li><a href="#s3">营销策略：为什么这样设计</a></li>
+    <li><a href="#s4">视觉规范：零矩形硬规则与设计令牌</a></li>
+    <li><a href="#s5">四态文案与信息层级</a></li>
+    <li><a href="#s6">动效与素材：混合分层方案</a></li>
+    <li><a href="#s7">前端实现契约与已踩坑记录</a></li>
+    <li><a href="#s8">运营配置：触发 / 预算 / 奖励 / 分群</a></li>
+    <li><a href="#s9">A/B 实验与指标口径</a></li>
+    <li><a href="#s10">三方验收清单</a></li>
+  </ol>
+</nav>
+<!-- ===== 01 一页结论 ===== -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-no">01</span><h2>一页结论与设计三决策</h2></div>
+  <p class="sec-sub">这不是"换皮红包弹窗"，而是一套在深色遮罩上由光效与漂浮物自行组织的<em>异形（shapeless）惊喜时刻</em>。所有执行围绕以下三条已拍板的决策展开，任何迭代不得回退。</p>
+
+  <div class="grid3">
+    <div class="panel">
+      <h5><span class="tag g">决策一</span> 动效</h5>
+      <p style="margin-top:10px"><b>混合分层</b>：高清透明 PNG 做主视觉，金币/星屑/光环用代码（CSS/JS）实时生成；锦鲤等重特效未来可用<em>黑底 MP4 + mix-blend-mode:screen</em> 增强，深遮罩下与透明等效。</p>
+    </div>
+    <div class="panel">
+      <h5><span class="tag g">决策二</span> 主视觉</h5>
+      <p style="margin-top:10px"><b>游戏化金色能量空投箱</b>：同一科幻箱体贯穿闭合 / 开启 / 锦鲤三态，香槟金面板 + 深空灰装甲 + 冷青点缀，区别于市面大红红包，契合工程链 ToB 专业调性。</p>
+    </div>
+    <div class="panel">
+      <h5><span class="tag g">决策三</span> 容器</h5>
+      <p style="margin-top:10px"><b>零矩形</b>：禁止任何完整矩形（含圆角卡片）。允许胶囊按钮、圆形关闭钮、非矩形光晕/丝带托底、文字描边与投影。</p>
+    </div>
+  </div>
+
+  <div class="lead-card">
+    <h4>一句话边界</h4>
+    <p>弹窗"骨架"（.wp-root / .wp-stage）永远透明——不承担背景、边框、圆角、投影；"底"只有毛玻璃深色遮罩。主视觉、文案、控件全部以漂浮元素分层落在遮罩上。</p>
+  </div>
+  <div class="note warn">硬红线：页面里不允许出现任何用于"框住整组内容"的矩形面板，哪怕半透明、哪怕圆角 26px。控件本身的胶囊形与圆形不属于矩形卡片，是允许且推荐的。</div>
+</section>
+
+<!-- ===== 02 竞品依据 ===== -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-no">02</span><h2>竞品范式依据（可追溯，不编造）</h2></div>
+  <p class="sec-sub">结论全部来自公开行业资料与成熟产品实测，不凭空发明。原文链接见页脚。</p>
+
+  <h3>2.1 弹窗分两类：面形与异形，我们选异形</h3>
+  <p>人人都是产品经理《运营弹窗设计技巧》把弹窗外在表现概括为<strong>面形</strong>与<strong>异形</strong>两类：面形"通过背景色将内容圈定在一个比较规整的区域中"，常见红包、宝箱、礼盒；异形则摆脱规整背景，元素分散排布在遮罩层上。同刊《运营弹窗的设计要点拆解》与优设网文章都强调：弹窗是阻断感极强的模态视图，<strong>半透明蒙版负责隔绝内容层与浮出层</strong>——这恰好为异形特效提供了天然舞台。</p>
+  <ul class="body">
+    <li><b>面形的代价</b>：背景卡本身会抢占视觉重量，处理不当"反而增加信息量，影响核心信息传达"。拼多多签到/红包等成熟活动页实测即大量使用红色圆角矩形卡——转化直接但高度同质化，且与用户"禁止矩形、要高级感"的要求冲突，故仅作反面参照。</li>
+    <li><b>异形的纪律</b>：资料同时提醒异形需<strong>控制元素数量、防止散碎</strong>。因此本方案只用一个绝对主角（宝箱）+ 一条阅读动线，文案与控件沿中轴成组，光晕只做托底不做装饰堆砌。</li>
+  </ul>
+
+  <h3>2.2 最高级范式来自游戏开箱，而非电商红包</h3>
+  <p>无卡异形最成熟的落地是游戏化开箱（如《和平精英》军需、《原神》祈愿）：统一语言为<strong>暗色全屏遮罩 + 发光宝箱 + 金色光柱 + 放射光芒 + 旋转能量环 + 飞出金币/卡面</strong>，标题与数值直接浮于画面，底部仅放一个胶囊主按钮。它满足三点：仪式感（用户主动开启）、视觉焦点唯一、CTA 不被容器干扰。本方案的三态视觉、放射光、能量环与金币喷射均沿用这套被亿级用户验证过的语法。</p>
+
+  <h3>2.3 降低突兀感：用"中间层"与融合动效过渡</h3>
+  <p>拼多多在红包链路中用<strong>礼包中间层</strong>作为过渡，配合融合动效降低弹窗直接砸脸的打断感。本方案对应做法：① 触发前可先出现 <code>.wp-omen</code> 预兆胶囊（呼吸微光）做预告；② 宝箱带轻微悬浮与光环入场，而非整块卡面淡入；③ 揭晓后才逐次浮出数值与 CTA，用时间编排分散注意力冲击。</p>
+
+  <h3>2.4 主动曝光弹窗只留一个强 CTA、弱化关闭</h3>
+  <p>运营弹窗通用转化原则（woshipm、Appcues 等多篇一致)：给明确利益的主动弹窗应<strong>聚焦单一主动作</strong>，关闭入口保留但不与主按钮争抢。本方案结果态只有一个金色胶囊 CTA，次级"先逛逛"降级为文字链接；圆形关闭钮保持可达但弱对比。</p>
+</section>
+
+<!-- ===== 03 营销策略 ===== -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-no">03</span><h2>营销策略：为什么这样设计</h2></div>
+  <p class="sec-sub">视觉是手段，转化与成本可控才是目的。每个设计决定背后对应一条可被运营验证的心理或风控机制。</p>
+  <table>
+    <colgroup><col style="width:22%"><col style="width:40%"><col style="width:38%"></colgroup>
+    <thead><tr><th>机制</th><th>在弹窗里的落点</th><th>运营意图</th></tr></thead>
+    <tbody>
+      <tr><td><b>沉没成本补偿</b></td><td>触发条件是"长时间无有效动作浏览"，文案"逛了这么久"先共情，再给"补给"</td><td>把用户的无效停留重估为"应得回馈"，降低流失、制造惊喜而非打扰</td></tr>
+      <tr><td><b>仪式感与掌控感</b></td><td>用户必须主动点"轻触开启"才揭晓，宝箱开合 + 金币喷射</td><td>主动参与提升禀赋效应与中奖体感，比直接发券记忆更深</td></tr>
+      <tr><td><b>变比率奖励</b></td><td>三档加权随机：微光 70% / 星意 25% / 锦鲤 5%</td><td>不确定大奖（68/88/98）制造期待，小奖保底保证不挫败</td></tr>
+      <tr><td><b>价值锚定</b></td><td>结果态进度条："再攒 N 积分即可解锁一条商机线索（解锁需 98）"</td><td>把奖励接入真实消费场景，让积分有去处，驱动下一步动作而非领完即走</td></tr>
+      <tr><td><b>损失厌恶 / 预挂账</b></td><td>游客不发实分，显示"已为你预留 7 天，注册领取后到账"</td><td>用"到期失效"把注册动机具体化，是游客转注册的核心钩子</td></tr>
+      <tr><td><b>身份差异化</b></td><td>游客→注册领取；实名→"已到账·7天内有效，可在钱包查看"</td><td>对已登录用户不重复索权，奖励即时落袋，减少体验摩擦</td></tr>
+      <tr><td><b>预算熔断保护</b></td><td>预算占用超 105% 时进入"今日补给已发完"，只引导看商机、不发分</td><td>营销成本硬上限；熔断态仍保留转化出口（新商机 CTA），不空放流量</td></tr>
+      <tr><td><b>单一主动作</b></td><td>结果态仅一个金色 CTA + 一条弱次级链接</td><td>聚焦转化，避免多按钮分流；关闭弱化为圆形小钮</td></tr>
+    </tbody>
+  </table>
+  <div class="note">成本基线（可追溯）：按 data.js 当前权重与奖池，<b>实名用户单次期望成本 = 16.8 积分</b>；游客因排除锦鲤档（合规与反薅考虑），单次期望约 <b>13.3 积分</b>。运营调权重/奖值后须重算此值并评估日预算。</div>
+</section>
+<!-- ===== 04 视觉规范 ===== -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-no">04</span><h2>视觉规范：零矩形硬规则与设计令牌</h2></div>
+  <p class="sec-sub">设计与走查时以本节为唯一裁判。任何新增元素先过"它是不是一个框住内容的矩形"这一问。</p>
+
+  <h3>4.1 允许 / 禁止清单</h3>
+  <div class="grid2">
+    <div class="panel ok">
+      <h5><span class="tag g">允许</span> 非矩形托底与控件</h5>
+      <ul>
+        <li>胶囊形（border-radius:999px）按钮与标签</li>
+        <li>正圆形关闭钮、能量环、光环</li>
+        <li>非矩形光晕、放射光、光柱、丝带、气辉作为文字/主体的托底</li>
+        <li>文字描边、多层投影、渐变字建立可读性</li>
+        <li>透明主视觉 PNG 自带的不规则外形</li>
+        <li>发丝级水平分隔线（不闭合、不成框）</li>
+      </ul>
+    </div>
+    <div class="panel bad">
+      <h5><span class="tag b">禁止</span> 任何矩形容器</h5>
+      <ul>
+        <li>整块圆角卡片（含 26px 大圆角矩形）作为内容底板</li>
+        <li>给标题/正文/成组文字统一套半透明矩形或"便签"底板</li>
+        <li>满幅矩形场景图直接贴进矩形区块（旧 v2.0 做法）</li>
+        <li>描边 + 渐变底 + 投影拼出的对话框式面板</li>
+        <li>给每段小字机械套同款等尺寸气泡框</li>
+        <li>大面积纯色矩形色块当背景分区</li>
+      </ul>
+    </div>
+  </div>
+  <p class="note">文字可读性不靠"加底板"，而靠<em>描边 + 深色投影 + 背后局部光晕</em>。仅徽章、有效期、CTA 这三类需要被点击或强识别的元素使用独立胶囊，且形态、大小要有层级差异，不批量复制。</p>
+
+  <h3>4.2 主视觉三态（同一箱体，禁止换形象）</h3>
+  <div class="crates">
+    <div class="crate"><img src="assets/crate-sealed.png" alt="闭合态空投箱"><div class="st">闭合态 sealed</div><div class="ds">gather · 悬浮 + 呼吸光环 + 轻触胶囊</div></div>
+    <div class="crate"><img src="assets/crate-open.png" alt="开启态空投箱"><div class="st">开启态 open</div><div class="ds">微光 / 星意 · 金光柱 + 金币喷射</div></div>
+    <div class="crate"><img src="assets/crate-lucky.png" alt="锦鲤爆发态"><div class="st">锦鲤态 lucky</div><div class="ds">粗光柱 + 放射光 + 金青能量环 + 金币雨</div></div>
+  </div>
+  <ul class="body">
+    <li>三态必须是<strong>同一个科幻空投箱</strong>（装甲分件、香槟金面板、深空灰包角、圆形能量锁扣、信标灯、冷青点缀），仅在开合与光效强度上递进，避免用户认知跳戏。</li>
+    <li>资产为<strong>透明底 PNG</strong>（由黑底母版本地泛洪去背得到），深遮罩下边缘干净；禁止再回退成满幅场景大图。</li>
+    <li>揭晓后压缩主视觉高度（普通 250px / 锦鲤 292–350px），为金额、进度条、CTA 让出垂直空间，光效允许溢出但主体不被裁。</li>
+  </ul>
+
+  <h3>4.3 设计令牌（与 wonder-popup.css 变量一一对应）</h3>
+  <table>
+    <colgroup><col style="width:24%"><col style="width:22%"><col style="width:54%"></colgroup>
+    <thead><tr><th>令牌</th><th>值</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td>遮罩底色</td><td>深色墨蓝 + 毛玻璃</td><td>隔绝内容层，是唯一的"底"；不使用纯黑，保留冷调层次</td></tr>
+      <tr><td><code>--wp-gold</code></td><td>#d9ad63</td><td>主金色：宝箱、CTA、强调</td></tr>
+      <tr><td><code>--wp-gold-bright</code></td><td>#f7dd9f</td><td>亮金：高光、金额渐变上段</td></tr>
+      <tr><td><code>--wp-gold-light</code></td><td>#fff1cd</td><td>浅金：标题辉光、锦鲤渐变</td></tr>
+      <tr><td><code>--wp-gold-deep</code></td><td>#b08644</td><td>深金：渐变收束、金属暗部</td></tr>
+      <tr><td><code>--wp-cyan</code></td><td>#74c4d6</td><td>冷青点缀：信标、能量环、有效期胶囊（全画面对比色不超过这一个）</td></tr>
+      <tr><td>正文 / 弱文字</td><td>#e9eef8 / #a9b5ca</td><td>深底上保证对比度达到 WCAG AA</td></tr>
+    </tbody>
+  </table>
+  <p>字体层级：主标题最大且加描边投影；副标题约为主标题 35%–55%；金额使用数字字体（DIN/Bahnschrift 栈）并做香槟金竖向渐变；同屏字体家族不超过两套。</p>
+</section>
+
+<!-- ===== 05 四态文案 ===== -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-no">05</span><h2>四态文案与信息层级</h2></div>
+  <p class="sec-sub">文案由引擎上下文与奖励结果下发，弹窗只负责按态渲染。事实数字（积分数、98 解锁价、7 天有效期）不得手填，必须取数据。</p>
+  <table>
+    <colgroup><col style="width:15%"><col style="width:25%"><col style="width:32%"><col style="width:28%"></colgroup>
+    <thead><tr><th>状态</th><th>主标题 / 副标题</th><th>结果信息</th><th>主 CTA（按身份）</th></tr></thead>
+    <tbody>
+      <tr><td><b>gather 待开启</b></td><td>逛了这么久，这份补给给你 / 为你留意的商机配了一份补给，轻触开启查收</td><td>徽章"ENGCHAIN · 浏览补给"；轻触开启胶囊</td><td>—（主动作=点宝箱）</td></tr>
+      <tr><td><b>微光 / 星意</b></td><td>补给已就位 / 注册后奖励立即到账，还能解锁供需联系方式</td><td>6·8·10 或 18·28·38 积分；档位名；锚定进度条</td><td>游客：注册领取为你预留的奖励<br>实名：查看 / 使用</td></tr>
+      <tr><td><b>锦鲤 lucky</b></td><td>补给已就位（带"今日锦鲤"徽章）</td><td>68·88·98 积分；更强光柱/金环/金币雨；金额白金渐变</td><td>同上，视觉权重最高</td></tr>
+      <tr><td><b>熔断 exhausted</b></td><td>今日补给已发完 / 为你留意了几条今日新上架的商机</td><td>无积分、无锚定；闭合箱降饱和；自动揭晓，不让用户开空盒</td><td>看看今日新商机（唯一出口）</td></tr>
+    </tbody>
+  </table>
+  <ul class="body">
+    <li><b>有效期提示</b>：游客为"已为你预留 7 天，注册领取后到账"（青调胶囊）；实名 credits 为"已到账 · 7 天内有效，可在钱包查看"。</li>
+    <li><b>价值锚定</b>："注册到账后，再攒 N 积分，即可解锁一条商机线索 / 解锁一条线索需 98 积分"，N = 98 − 本次积分，最小钳到合理正值。</li>
+    <li><b>次级链接</b>："先逛逛热门商机"，点击记 onDismiss('alt')，是低成本退路而非第二主按钮。</li>
+    <li>措辞保持 ToB 专业、克制，不用夸张促销词、不用 emoji、不承诺数据之外的收益。</li>
+  </ul>
+</section>
+<!-- ===== 06 动效与素材 ===== -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-no">06</span><h2>动效与素材：混合分层方案</h2></div>
+  <p class="sec-sub">原则：高清位图交给图片，矢量/粒子/光效交给代码，重特效在需要时才上视频。全部资源本地可离线运行，适配中国内地网络，不依赖境外地址。</p>
+
+  <h3>6.1 为什么是混合分层</h3>
+  <ol class="body">
+    <li><b>主视觉用透明 PNG</b>：金属质感、复杂光影用位图最稳，三态各一张，切换即开合，无解码兼容问题。</li>
+    <li><b>金币 / 星屑 / 光环用代码生成</b>：数量、方向、落点可按档位动态变化（普通金币少、锦鲤金币雨），体积零增量、可随 prefers-reduced-motion 一键关闭。</li>
+    <li><b>未来增强（lucky）用黑底 MP4 + screen</b>：如需电影级光柱/粒子视频，导出黑底 MP4，容器加 <code>mix-blend-mode:screen</code>（滤色）——黑色被滤掉、光效保留，在本就深色的遮罩下与透明等效，是国内 H5 成熟兜底方案。</li>
+  </ol>
+
+  <h3>6.2 透明动效格式选型（结论先行）</h3>
+  <table>
+    <colgroup><col style="width:16%"><col style="width:26%"><col style="width:24%"><col style="width:34%"></colgroup>
+    <thead><tr><th>格式</th><th>透明能力 / 兼容</th><th>体量</th><th>本项目结论</th></tr></thead>
+    <tbody>
+      <tr><td><b>Lottie</b></td><td>矢量小动画、可全透明；复杂位图特效还原弱</td><td>很小</td><td>适合简单矢量图标/加载，不适合写实金属宝箱</td></tr>
+      <tr><td><b>APNG / 动图 WebP</b></td><td>全 alpha、边缘光滑；浏览器支持好</td><td>大（逐帧位图）</td><td>短循环可用，长特效体积失控，非首选</td></tr>
+      <tr><td><b>WebM VP9 alpha</b></td><td>唯一广泛支持 alpha 的网页视频；<b>Safari/iOS 支持差</b></td><td>小</td><td>安卓/Chromium 可作增强，不能作唯一方案</td></tr>
+      <tr><td><b>黑底 MP4 + screen</b></td><td>无 alpha 通道，靠滤色去黑；全端可播</td><td>中</td><td><b>推荐兜底</b>：仅在深色遮罩下成立，正好匹配本弹窗</td></tr>
+      <tr><td><b>透明 PNG + CSS/JS</b></td><td>全兼容、全透明、完全可控</td><td>中等（已压缩去背）</td><td><b>当前采用</b>：三张主视觉 + 代码粒子</td></tr>
+    </tbody>
+  </table>
+  <p class="note">兼容性依据：WebM(VP9) 是唯一广泛支持 alpha 通道的网页视频，但 iOS/Safari 不支持或不稳定（SegmentFault 有跨浏览器实测）；因此跨端主路径不押注 VP9，而用 PNG+代码，视频仅作安卓端增强且必须 screen 去黑。</p>
+
+  <h3>6.3 动效编排与性能</h3>
+  <ul class="body">
+    <li><b>时序</b>：遮罩淡入 → 宝箱缩放上浮 + 光环 → 用户点击 → 切开启图 + 金币扇形喷射 + 光柱 → 金额 countUp（约 820ms）→ 档位/锚定/有效期依次浮入（delay .3s / .78s / .9s）→ CTA 最后到位并带呼吸光晕与扫光。</li>
+    <li>金币 <code>.wp-coin</code> 与星屑 <code>.wp-spark</code> 由 JS 按扇形随机生成 transform/延迟；锦鲤档追加锥形放射光 <code>.wp-rays</code>、核心圆晕与白金光闪。</li>
+    <li>只动画 <code>transform / opacity</code>，避免触发 layout；光效图层数克制，防止安卓中低端机合成器过载（实测连续重动画会显著抬高截图/渲染成本）。</li>
+    <li>资源全部相对路径引用（CSS 内 <code>../assets/wonder/crate-*.png</code>），规避全站 base 标签影响；三张图均需返回 200。</li>
+  </ul>
+
+  <h3>6.4 无障碍：减弱动效</h3>
+  <p>在 <code>@media (prefers-reduced-motion: reduce)</code> 下：关闭粒子、光环、呼吸、扫光与入场动画，结果态直出；宝箱直接呈现对应态静态图。CTA 仍保留键盘焦点（揭晓后 <code>btn.focus()</code>），Esc / 点遮罩 / 关闭钮 / 预兆× 均可退出。</p>
+</section>
+
+<!-- ===== 07 前端契约 ===== -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-no">07</span><h2>前端实现契约与已踩坑记录</h2></div>
+  <p class="sec-sub">业务时序在 js/wonder-engine.js（omen→gather→reveal→result），引擎只依赖全局 WonderPopup 的三个方法，DOM 结构与 class 可自由重构，但对外签名不得改。</p>
+
+  <h3>7.1 文件与挂载</h3>
+  <ul class="body">
+    <li><code>css/wonder-popup.css</code>、<code>js/wonder-popup.js</code>：v3.0 无容器异形版；资产 <code>assets/wonder/crate-{sealed,open,lucky}.png</code>。</li>
+    <li>挂载自适应：页面存在 <code>.phone</code>（实验室壳）时挂其内部并 absolute；真实 App 页面无 .phone，挂 <code>document.body</code> 并加 <code>.wp-fixed</code>，fixed 全屏、z-index 1200。</li>
+    <li>底部留 <code>calc(92px + env(safe-area-inset-bottom))</code>，适配全面屏安全区。</li>
+  </ul>
+
+  <h3>7.2 对外 API（唯一契约，勿改签名）</h3>
+  <pre><code>window.WonderPopup.show(ctx)   // 打开；ctx 由引擎组装
+window.WonderPopup.close()     // 关闭（含 0.3s 离场后移除节点）
+window.WonderPopup.isOpen()    // boolean
+
+// ctx 关键字段
+{
+  decisionId, persona, guest, budgetState,      // 'normal' | 'warning' | 'exhausted'
+  unlockPrice, balance, topLabel,
+  nba: { ctaText, ctaHref, altText, altHref, postTitle },
+  onReveal(),                 // -> {kind:'credits'|'pending'|'none', amount, tier, tierLabel, expireAt}
+  onCta(result),              // 主按钮
+  onDismiss(phase)            // 'close' | 'scrim' | 'esc' | 'alt' ...
+}</code></pre>
+
+  <h3>7.3 状态机</h3>
+  <ol class="steps">
+    <li><b>omen 预兆</b>（可选）<small>呼吸胶囊预告，降低突兀感，可被 × 关闭</small></li>
+    <li><b>gather 待开启</b><small>闭合箱 + 轻触胶囊；熔断态在此 780ms 后自动揭晓，不让开空盒</small></li>
+    <li><b>reveal 揭晓</b><small>切开启图、粒子、光柱、金额滚动；class 切到 .wp-revealed</small></li>
+    <li><b>result 收口</b><small>补全标题/档位/锚定/有效期，CTA 聚焦；class 加 .wp-phase-result</small></li>
+  </ol>
+
+  <h3>7.4 已踩过的坑（务必规避）</h3>
+  <div class="grid2">
+    <div class="panel bad"><h5>坑 1 · 渐变字在 flex 父级失效</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">把 <code>background-clip:text</code> 写在 display:flex 的容器上，Chrome 不会把背景裁剪到子 span，结果文字透明、只剩灰色 text-shadow。<b>渐变必须直接写在含文字的 .wp-amount-num / -unit 上</b>，父级只做布局。</p></div>
+    <div class="panel bad"><h5>坑 2 · display:none 期间动画空转</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">待揭晓元素若在 gather 期 display:none，其入场动画在隐藏期就开始计时，揭晓后表现为"迟迟不出现"。改为<em>未揭晓才 none、一旦 .wp-revealed 立即恢复 display</em>，动画从揭晓时刻起算。</p></div>
+    <div class="panel bad"><h5>坑 3 · span 默认 inline 尺寸失效</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px"><code>.wp-tap-ring</code> 是 span，漏写 display:block 时 138×48 不生效、轻触胶囊不可见。自定义尺寸的 span 必须显式 block / flex。</p></div>
+    <div class="panel bad"><h5>坑 4 · 强缓存拿旧 CSS</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">新 DOM 类名配旧样式会出现"仍是闭合箱/元素缺失"的假象。发版需给 CSS 加版本号或让缓存策略失效后再回归。</p></div>
+  </div>
+  <div class="note warn">不要在金额元素上加 <code>filter:drop-shadow</code>：它与 background-clip:text 叠加会让渐变字透明。金额辉光改用文字自身渐变与父级光晕实现。</div>
+</section>
+<!-- ===== 08 运营配置 ===== -->
+<section id="s8">
+  <div class="sec-head"><span class="sec-no">08</span><h2>运营配置：触发 / 预算 / 奖励 / 分群</h2></div>
+  <p class="sec-sub">所有可调项集中在 data.js 与引擎配置，改配置即可调策略，不需改版。改动后同步更新期望成本与日预算。</p>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:30%"><col style="width:50%"></colgroup>
+    <thead><tr><th>配置项</th><th>当前值</th><th>说明 / 调整注意</th></tr></thead>
+    <tbody>
+      <tr><td><b>触发阈值</b></td><td>沉默活跃 90s（实验室可切 8s 体验）</td><td>无有效动作浏览达阈值才触发；过长触达不足，过短变骚扰。需配合频控</td></tr>
+      <tr><td><b>频控</b></td><td>当日弹 1 次（实验室 7 次仅调试）</td><td>按日去重；用户主动关闭后当日不再弹，保护体验</td></tr>
+      <tr><td><b>档位权重</b></td><td>微光 70 / 星意 25 / 锦鲤 5</td><td>调权重直接改变期望成本与大奖体感；锦鲤是稀缺锚点，不建议 &gt;5%</td></tr>
+      <tr><td><b>奖值区间</b></td><td>微光 6·8·10；星意 18·28·38；锦鲤 68·88·98</td><td>保证"小奖不挫败、大奖有感"；与 98 解锁价形成锚定关系</td></tr>
+      <tr><td><b>解锁价</b></td><td>98 积分 / 条线索</td><td>锚定基准；锦鲤 88/98 可一步或接近一步解锁，强化大奖价值</td></tr>
+      <tr><td><b>预算闸门</b></td><td>占用 ≥85% 预警，≥105% 熔断</td><td>预警降档/收紧，熔断进入"已发完"纯商机引导，不发积分</td></tr>
+      <tr><td><b>游客预挂账</b></td><td>grantTtlDays = 7</td><td>游客发 pending 不实扣，7 天内注册转 credits 落账，逾期作废（反薅 + 召回）</td></tr>
+      <tr><td><b>身份分群</b></td><td>guest / 注册 / 实名等</td><td>游客排除锦鲤档；CTA 与到账文案按身份下发，已登录不索权</td></tr>
+    </tbody>
+  </table>
+  <div class="note">风控：游客仅预挂账、不参与锦鲤、不产生可提现价值，避免黑产刷奖；熔断是成本硬熔断，任何前端实验都不得绕过。</div>
+</section>
+
+<!-- ===== 09 AB 与指标 ===== -->
+<section id="s9">
+  <div class="sec-head"><span class="sec-no">09</span><h2>A/B 实验与指标口径</h2></div>
+  <p class="sec-sub">一次只动一个变量，按漏斗统一口径，先小流量后放量。建议实验与北极星如下。</p>
+  <div class="grid3">
+    <div class="panel"><h5>实验 A · 触发时机</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">沉默阈值 75s / 90s / 120s；看开启率与当日关闭率、后续有效动作率，避免单看曝光。</p></div>
+    <div class="panel"><h5>实验 B · 大奖概率</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">锦鲤权重 3% / 5% / 8%；看注册转化与单注册积分成本，控住期望成本红线。</p></div>
+    <div class="panel"><h5>实验 C · CTA 文案</h5><p style="font-size:13.5px;color:var(--text-dim);margin-top:8px">"注册领取为你预留的奖励" vs 利益直述版；主看游客→注册 CTR，次看 7 日领取率。</p></div>
+  </div>
+  <table>
+    <colgroup><col style="width:26%"><col style="width:30%"><col style="width:44%"></colgroup>
+    <thead><tr><th>漏斗环节</th><th>指标</th><th>口径</th></tr></thead>
+    <tbody>
+      <tr><td>曝光 → 开启</td><td>开启率</td><td>点击轻触/宝箱的去重 UV ÷ 弹窗曝光 UV；熔断态自动揭晓不计入主动开启</td></tr>
+      <tr><td>开启 → 点主 CTA</td><td>CTA 点击率</td><td>主按钮点击 ÷ 揭晓 UV；分游客 / 实名分别统计</td></tr>
+      <tr><td>游客 → 注册</td><td>预挂账转化率</td><td>7 天内由 pending 转 credits 的用户 ÷ 游客预挂账用户</td></tr>
+      <tr><td>奖励 → 消费</td><td>积分核销率</td><td>用于解锁线索的积分 ÷ 发放积分；验证价值锚定是否成立</td></tr>
+      <tr><td>成本</td><td>单次期望 / 实际成本</td><td>期望按权重奖值核算（实名 16.8 / 游客约 13.3）；实际取当日 commit 均值</td></tr>
+      <tr><td>体验健康</td><td>关闭率 / 投诉率</td><td>主动关闭、当日再弹投诉；显著升高立即降频或停实验</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===== 10 验收清单 ===== -->
+<section id="s10">
+  <div class="sec-head"><span class="sec-no">10</span><h2>三方验收清单</h2></div>
+  <p class="sec-sub">上线前逐项打勾，任一不通过不得发布。本轮 v3.0 已在 wonder-lab 全档回归通过（见各项"已验"）。</p>
+  <div class="grid3">
+    <div class="panel">
+      <h5>设计走查</h5>
+      <ul>
+        <li>全屏无任何矩形/圆角卡片，骨架透明</li>
+        <li>三态为同一空投箱，透明底无杂边</li>
+        <li>文字靠描边/投影/光晕可读，对比度达 AA</li>
+        <li>仅一个强 CTA，关闭弱化但可达</li>
+        <li>金 + 一冷青，配色克制、层级清晰</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h5>开发自测</h5>
+      <ul>
+        <li>gather / 微光 / 星意 / 锦鲤 / 熔断 全态正常</li>
+        <li>游客 pending 与实名 credits 文案正确</li>
+        <li>关闭钮 / 遮罩 / Esc / 预兆× 均可退出</li>
+        <li>三张 PNG 均 200，console 零报错</li>
+        <li>390 移动端安全区正常；reduced-motion 直出</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h5>运营确认</h5>
+      <ul>
+        <li>权重/奖值/98 锚定/7 天有效期配置正确</li>
+        <li>期望成本与日预算已复核</li>
+        <li>85% 预警、105% 熔断实际生效</li>
+        <li>频控 1 次/日，关闭后当日不再弹</li>
+        <li>实验只改单变量，监控指标与回滚方案就位</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">回归记录：本轮已验证 gather、微光(10)、星意(18/38)、锦鲤(88/98 终态)、熔断"今日补给已发完"、游客 7 天预挂账、三种退出路径、资源 200、控制台零报错、fixed 挂载与安全区、reduced-motion 降级；金额 countUp 中途显示的中间数（如 47）属滚动动画正常帧，非数据错误。</div>
+</section>
+<!-- sections-anchor -->
+<footer>
+  <div class="wrap">
+    <strong style="color:var(--text-dim)">参考来源（公开资料）</strong>
+    <div class="refs" style="margin-top:10px">
+      <a class="src" href="https://www.woshipm.com/pd/4471709.html" target="_blank" rel="noopener">人人都是产品经理 · 你必须要知道的运营弹窗设计技巧（面形 / 异形）</a>
+      <a class="src" href="https://www.woshipm.com/pd/4504261.html" target="_blank" rel="noopener">人人都是产品经理 · 运营弹窗的设计要点拆解（模态 / 蒙版）</a>
+      <a class="src" href="https://www.uisdc.com/run-popover-design" target="_blank" rel="noopener">优设 · 从 6 个方面拆解运营弹窗设计要点</a>
+      <a class="src" href="https://www.uisdc.com/motion-design" target="_blank" rel="noopener">优设 · 5 种动效格式优缺点（GIF / APNG / Lottie 等）</a>
+      <a class="src" href="https://segmentfault.com/a/1190000048295598" target="_blank" rel="noopener">SegmentFault · 透明 WebM(VP9 alpha) 跨浏览器兼容实测</a>
+      <a class="src" href="https://lottieto.com/lottie-to-transparent-webm" target="_blank" rel="noopener">Lottie→透明 WebM（VP9 是唯一广泛支持 alpha 的网页视频）</a>
+      <a class="src" href="https://www.w3tweaks.com/css/css-mix-blend-mode-explained/" target="_blank" rel="noopener">mix-blend-mode: screen 去黑留白原理</a>
+    </div>
+    <p style="margin-top:18px">工程链 · Wonder Moment 执行手册 v3.0　|　配套文件：css/wonder-popup.css · js/wonder-popup.js · assets/wonder/crate-*.png</p>
+  </div>
+</footer>
+</div>
+</body>
+</html>

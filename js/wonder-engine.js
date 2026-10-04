@@ -119,6 +119,21 @@
     return 29;
   }
 
+  /* 主流“解锁一条商机线索联系方式”的真实积分解锁价，按当前主浏览品类取值（供弹窗价值锚定，不编造） */
+  function unlockPriceFor(prof) {
+    try {
+      var consume = MOCK.business.credits.consume;
+      var cat = prof.topCats && prof.topCats[0] && prof.topCats[0].cat;
+      var v = cat ? consume[cat] : 98;
+      if (typeof v === 'number' && v > 0) return v;
+      if (v && typeof v === 'object') {
+        var prices = Object.keys(v).map(function (k) { return v[k] && v[k].price; }).filter(function (x) { return typeof x === 'number'; });
+        if (prices.length) return Math.max.apply(null, prices); /* 分级品类取最高档作为锚定，避免高估可得性 */
+      }
+    } catch (e) {}
+    return 98;
+  }
+
   /* ======================================================================
      Tracker —— 活跃计时 + 行为信号
      会话态（sessionStorage）：activeMs 累计、软信号、是否已有效动作/已展现
@@ -700,6 +715,18 @@
         prof.nba.ctaText = '注册领取为你预留的奖励';
       }
 
+      /* 预算硬熔断：零成本纯商机引导。此时没有任何奖励可发，
+         必须下发与“无奖励”一致的引导语与去向，禁止再出现“注册领奖励/立即到账”等承诺。 */
+      if (bst.state === 'exhausted') {
+        prof.nba = {
+          ctaText: '看看今日新商机',
+          ctaHref: root() + 'pages/search/index.html',
+          altText: '',
+          altHref: '',
+          postTitle: '为你留意了几条今日新上架的商机，先去看看有没有合适的'
+        };
+      }
+
       var decisionId = 'd_' + shortId();
       var decision = {
         id: decisionId,
@@ -726,6 +753,9 @@
         guest: prof.guest,
         nba: prof.nba,
         budgetState: bst.state,
+        unlockPrice: unlockPriceFor(prof),
+        balance: prof.balance,
+        topLabel: prof.topCats && prof.topCats[0] ? prof.topCats[0].label : '',
         onReveal: function () { return self.settle(decisionId); },
         onCta: function (result) { emit('cta', { decision: decision, result: result }); self._lastResult = result; },
         onDismiss: function (phase) { Frequency.markDismiss(); emit('dismiss', { phase: phase || 'result' }); }

@@ -14,24 +14,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <title>我的收藏 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
 <style>
-/* 管理按钮空态灰度 */
-#manage-btn { transition: opacity .2s, color .2s; cursor: pointer; }
-#manage-btn.disabled { opacity: .35; cursor: not-allowed; }
-/* 文字气泡 */
-.manage-tip {
-  position: absolute; top: 42px; right: 14px;
-  background: var(--text-1, #333); color: #fff;
-  font-size: 11px; padding: 6px 10px; border-radius: 8px;
-  white-space: nowrap; z-index: 100; opacity: 0;
-  transform: translateY(-4px); transition: opacity .2s, transform .2s;
-  pointer-events: none;
-}
-.manage-tip.show { opacity: 1; transform: translateY(0); }
-.manage-tip::after {
-  content: ''; position: absolute; top: -5px; right: 16px;
-  border-left: 5px solid transparent; border-right: 5px solid transparent;
-  border-bottom: 5px solid var(--text-1, #333);
-}
+/* 右上角「编辑」默认隐藏，仅当当前分类下有收藏时由 render 显示；视觉走统一 .nav-text-btn */
+#manage-btn { display: none; }
 </style>
 </head>
 <body>
@@ -39,7 +23,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <div class="navbar">
     <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">我的收藏</div>
-    <div class="nav-right" style="position:relative;"><button id="manage-btn" onclick="edit()" style="display:none;color:var(--text-2);font-size:13px;">编辑</button><div class="manage-tip" id="manage-tip">暂无收藏，去供需列表看看</div></div>
+    <div class="nav-right"><button type="button" class="nav-text-btn" id="manage-btn" onclick="edit()">编辑</button></div>
   </div>
 
   <div class="seg" style="margin:10px 14px;">
@@ -89,11 +73,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if(!filtered.length){
       box.innerHTML = '';
       empty.style.display = '';
-      if(manageBtn) manageBtn.classList.add('disabled');
+      if(manageBtn) manageBtn.style.display = 'none';
       return;
     }
     empty.style.display = 'none';
-    if(manageBtn) manageBtn.classList.remove('disabled');
+    if(manageBtn) manageBtn.style.display = 'flex';
     box.innerHTML = filtered.map(function(it){
       return '<div class="supply-card" data-id="'+esc(it.id)+'" style="position:relative;">' +
         '<div class="sc-top"><span class="tag '+dirTag(it.dir)+'">'+dirLabel(it.dir)+'</span>' +
@@ -147,14 +131,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if(currentFilter==='all') return true;
       return it.dir === currentFilter;
     });
-    if(!filtered.length){
-      var tip = document.getElementById('manage-tip');
-      if(tip){
-        tip.classList.add('show');
-        setTimeout(function(){ tip.classList.remove('show'); }, 2000);
-      }
-      return;
-    }
+    if(!filtered.length){ return; }
     UI.toast('批量管理功能即将上线','ok');
   };
 

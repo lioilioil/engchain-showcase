@@ -147,7 +147,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    3. iPhone 16 Pro — 纯黑灵动岛 morph
    ═══════════════════════════════════════════════════════════════════════ */
-/* ── morph 容器：深色液态玻璃卡；idle 透明，仅露出固定黑岛核 ── */
+/* ── morph 容器：深色液态玻璃卡。
+   island 机型 idle 露出固定黑岛核；punch / pill 机型 idle 整条卡隐藏（只留裸打孔），见第 4 节 ── */
 .di-ip {
   position: absolute;
   top: 11px;
@@ -158,6 +159,10 @@
   border-radius: 999px;
   overflow: hidden;
   pointer-events: auto;
+  /* 卡片区域的横滑切条 / 上滑收起由组件指针手势接管：禁止浏览器把触摸识别成页面滚动
+     而发出 pointercancel 吞掉手势（真机横滑失效的根因）。compact 仅顶部 76px 小条、
+     open 时遮罩已盖住页面，故不影响正常信息流滚动；按钮的 tap→click 不受影响。 */
+  touch-action: none;
   z-index: 10;
   background: transparent;
   transition:
@@ -165,33 +170,28 @@
     height .52s cubic-bezier(.32, .72, 0, 1),
     border-radius .52s cubic-bezier(.32, .72, 0, 1),
     top .52s cubic-bezier(.32, .72, 0, 1),
+    opacity .30s ease,
     box-shadow .4s ease;
 }
-.di-ip[data-liquid-glass="webgl"] { background: transparent; }
-/* 无 WebGL2 回退：恒按暗色深色玻璃（idle 保持纯药丸，仅有事项时才上玻璃） */
-.di-root.di-model-iphone.is-active .di-ip[data-liquid-glass="fallback"] {
-  background: rgba(15, 15, 19, .82);
-  -webkit-backdrop-filter: blur(26px) saturate(1.5) brightness(.58);
-  backdrop-filter: blur(26px) saturate(1.5) brightness(.58);
-}
+/* iPhone 恒用纯 CSS 深色液态玻璃：idle 全透（只露纯黑岛核），有事项时在三态段上深色磨砂底 */
 
-/* 黑色扩散层：自顶部固定黑岛向四周扩散为深黑玻璃（在玻璃之上、文字之下） */
+/* 黑色弥散层（消息态）：纯黑矩形 + mask 塑形。
+   mask 在灵动岛位置为不透明（岛内 100% 黑），向四周（下/左/右）以连续灰度渐变到 0；
+   mask 半透明处把下方液态玻璃均匀压暗，0 处完全露出玻璃 —— 黑与玻璃是同一条连续 alpha，
+   因此整张卡内不存在任何黑色/玻璃分界线。横向、纵向羽化用两层 mask 求交，独立控制。 */
 .di-ip-glow {
   position: absolute; inset: 0;
   border-radius: inherit;
-  background: radial-gradient(125% 92% at 50% -12%,
-    rgba(0, 0, 0, .97) 0%,
-    rgba(0, 0, 0, .90) 40%,
-    rgba(7, 7, 11, .80) 68%,
-    rgba(10, 10, 14, .70) 100%);
+  background: #000;
   opacity: 0;
-  transition: opacity .35s ease;
+  visibility: hidden;
+  transition: opacity .3s ease;
   pointer-events: none;
   z-index: 0;
 }
 
-/* 固定纯黑灵动岛层（第一行背景）：始终纯黑，三态连续 morph；
-   大柔度黑影自岛边缘羽化，融入外层深色玻璃，形成「由岛向外扩散」 */
+/* 固定纯黑灵动岛层：仅 idle 态作为「硬件灵动岛」清晰显示；
+   消息态（compact/open）淡出，黑色改由 .di-ip-glow 的连续弥散层承担（无边界）。 */
 .di-ip-core {
   position: absolute;
   left: 50%; top: 0;
@@ -201,13 +201,14 @@
   border-radius: 999px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, .05),
-    0 0 22px 8px rgba(0, 0, 0, .78),
-    0 10px 24px -10px rgba(0, 0, 0, .62);
+    0 0 14px 2px rgba(0, 0, 0, .60),
+    0 8px 18px -8px rgba(0, 0, 0, .50);
   transition:
     width .52s cubic-bezier(.32, .72, 0, 1),
     height .52s cubic-bezier(.32, .72, 0, 1),
     top .52s cubic-bezier(.32, .72, 0, 1),
-    border-radius .52s cubic-bezier(.32, .72, 0, 1);
+    border-radius .52s cubic-bezier(.32, .72, 0, 1),
+    opacity .22s ease;
   z-index: 1;
   pointer-events: none;
 }
@@ -227,23 +228,21 @@
 .di-lv1 .di-ic svg { width: 13px; height: 13px; }
 .di-lv-cat {
   flex: 1; min-width: 0;
-  font-size: 13.5px; font-weight: 700; letter-spacing: .01em; color: #fff;
+  font-size: 13.5px; font-weight: 400; letter-spacing: .01em; color: rgba(255, 255, 255, .96);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .di-lv-key { flex: none; display: flex; align-items: center; gap: 7px; }
 .di-lv-keyv {
-  font-size: 13px; font-weight: 800; color: #E4D0A2; white-space: nowrap;
+  font-size: 13px; font-weight: 500; color: #E4D0A2; white-space: nowrap;
   font-family: var(--font-num, "Barlow", "PingFang SC", sans-serif);
 }
 .di-lv-key .di-count { background: rgba(255, 255, 255, .16); color: #fff; }
-.di-lv2 { position: absolute; top: 48px; left: 19px; right: 19px; }
+/* 第二行左缘 25px 与第一行 icon 左缘(12+13)对齐 */
+.di-lv2 { position: absolute; top: 48px; left: 25px; right: 19px; }
 .di-lv-sub {
-  display: block; font-size: 12px; line-height: 1.3; color: rgba(255, 255, 255, .68);
+  display: block; font-size: 13.5px; font-weight: 700; line-height: 1.3; color: rgba(255, 255, 255, .90);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.di-lv1 > *, .di-lv2 { transition: opacity .2s ease; }
-.di-live.di-swap .di-lv1 > *, .di-live.di-swap .di-lv2 { opacity: 0; }
-
 /* ================= expanded：多行深色玻璃卡 ================= */
 .di-ip-body {
   position: absolute; inset: 0; z-index: 2;
@@ -286,46 +285,166 @@
   flex: none; margin-top: 13px;
   font-size: 15.5px; font-weight: 600; line-height: 1.42; color: rgba(255, 255, 255, .92);
 }
+/* 简要描述下的补充说明（subtitle） */
+.di-x-note {
+  flex: none; margin-top: 8px;
+  font-size: 13px; font-weight: 400; line-height: 1.45; color: rgba(255, 255, 255, .66);
+}
 .di-ip-body .di-desc { color: rgba(255, 255, 255, .78); margin-top: 11px; font-size: 13.5px; }
 .di-ip-body .di-meta { color: rgba(255, 255, 255, .46); }
 .di-ip-body .di-act-ghost { color: rgba(255, 255, 255, .72); border: 1px solid rgba(255, 255, 255, .20); }
 .di-ip-body .di-pager { color: #fff; }
 
-/* ---- 三态驱动 ---- */
-/* compact：深色玻璃小卡（两行），固定黑岛为内嵌药丸 */
-.di-root.di-model-iphone.is-active .di-ip {
+/* ---- 三态驱动 ----
+   iPhone 通知卡暗色液态玻璃：WebGL2 真折射（与主 tabbar 同库，但参数独立、不联动、不随主题）。
+   玻璃挂在「无 transform 的内层」.di-ip-glass 上（库用着色器画圆角 SDF，方画布只渲染圆角玻璃，
+   不依赖 CSS 裁剪，故任何合成器都保持干净圆角）；父盒 .di-ip 只负责 morph 几何/阴影，卡身透明。
+   无 WebGL2 时库给内层打 data-liquid-glass="fallback"，改用 CSS 磨砂 + 静态炭玻璃兜底。 */
+
+/* 玻璃内层：铺满父盒、继承圆角，位于文字/黑岛之下；玻璃 canvas 由库注入其中。
+   占位即「成品深色炭玻璃」：WebGL 在其上层折射，未就绪/弱机/瞬态坏帧时也绝不闪浅色块。 */
+.di-ip-glass {
+  position: absolute; inset: 0;
+  border-radius: inherit; overflow: hidden;
+  z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(150% 62% at 50% -22%, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 56%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 36%, rgba(255, 255, 255, .05) 47%, rgba(255, 255, 255, 0) 58%),
+    radial-gradient(130% 120% at 50% 128%, rgba(120, 132, 158, .14), rgba(120, 132, 158, 0) 56%),
+    linear-gradient(168deg, #20202a 0%, #14141c 48%, #0d0d13 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+}
+
+/* compact：暗色液态玻璃小卡（两行），固定黑岛为内嵌药丸；明暗主题一致 */
+.di-root.is-active .di-ip {
   width: 300px;
-  height: 74px;
+  height: 76px;
   top: 10px;
   border-radius: 28px;
+  background: transparent;   /* 玻璃由内层 WebGL 承担 */
   box-shadow:
-    0 18px 44px -16px rgba(0, 0, 0, .55),
-    0 6px 16px rgba(0, 0, 0, .30);
+    inset 0 0 0 1px rgba(255, 255, 255, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .20),
+    inset 0 -1px 0 rgba(255, 255, 255, .06),
+    0 20px 48px -18px rgba(0, 0, 0, .62),
+    0 8px 20px rgba(0, 0, 0, .36);
 }
-.di-root.di-model-iphone.is-active .di-ip-glow { opacity: 1; }
-.di-root.di-model-iphone.is-active .di-ip-core {
-  width: 276px; height: 36px; top: 8px;
-  border-radius: 999px;
+/* 无 WebGL2 兜底：内层 CSS 磨砂 + 静态炭玻璃光学层 */
+.di-root.is-active .di-ip-glass[data-liquid-glass="fallback"] {
+  background:
+    radial-gradient(140% 60% at 50% -26%, rgba(255, 255, 255, .26), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .10) 44%, rgba(255, 255, 255, 0) 56%),
+    linear-gradient(0deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 26%),
+    radial-gradient(120% 96% at 92% -38%, rgba(212, 192, 154, .30), rgba(212, 192, 154, 0) 50%),
+    radial-gradient(88% 86% at 4% -28%, rgba(196, 205, 224, .18), rgba(196, 205, 224, 0) 48%),
+    radial-gradient(150% 132% at 50% 136%, rgba(120, 132, 158, .16), rgba(120, 132, 158, 0) 58%),
+    linear-gradient(166deg, #2b2b36 0%, #1b1b24 46%, #12121a 100%);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(.82);
+  backdrop-filter: blur(28px) saturate(1.8) brightness(.82);
 }
-.di-root.di-model-iphone.is-active:not(.is-open) .di-live { opacity: 1; pointer-events: auto; }
+/* compact：黑以灵动岛为锚，向四周连续弥散（无任何硬边）。
+   纵向 mask——岛内 100% 黑，过岛下沿后平滑化入玻璃；
+   横向 mask——中部满黑覆盖岛宽，两端各约 14px 柔和收进玻璃，保留胶囊意象。 */
+.di-root.is-active .di-ip-glow {
+  opacity: 1;
+  visibility: visible;
+  -webkit-mask-image:
+    linear-gradient(180deg,
+      #000 0, #000 22px,
+      rgba(0, 0, 0, .94) 34px,
+      rgba(0, 0, 0, .72) 46px,
+      rgba(0, 0, 0, .42) 58px,
+      rgba(0, 0, 0, .14) 69px,
+      rgba(0, 0, 0, 0) 76px),
+    linear-gradient(90deg,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, .55) 6px,
+      #000 15px,
+      #000 calc(100% - 15px),
+      rgba(0, 0, 0, .55) calc(100% - 6px),
+      rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg,
+      #000 0, #000 22px,
+      rgba(0, 0, 0, .94) 34px,
+      rgba(0, 0, 0, .72) 46px,
+      rgba(0, 0, 0, .42) 58px,
+      rgba(0, 0, 0, .14) 69px,
+      rgba(0, 0, 0, 0) 76px),
+    linear-gradient(90deg,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, .55) 6px,
+      #000 15px,
+      #000 calc(100% - 15px),
+      rgba(0, 0, 0, .55) calc(100% - 6px),
+      rgba(0, 0, 0, 0) 100%);
+  mask-composite: intersect;
+}
+.di-root.is-active .di-ip-core { opacity: 0; }
+.di-root.is-active:not(.is-open) .di-live { opacity: 1; pointer-events: auto; }
 
 /* expanded：大玻璃卡，黑岛向两侧拉宽成贴顶黑带，第二行放大，其下长出详情/按钮 */
-.di-root.di-model-iphone.is-open .di-ip {
+.di-root.is-open .di-ip {
   width: 366px;
   height: 248px;   /* 兜底值；JS 按当前事项内容精确设置，随切换平滑形变 */
   top: 10px;
   border-radius: 34px 34px 24px 24px;
+  background:
+    radial-gradient(150% 46% at 50% -18%, rgba(255, 255, 255, .18), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, .06) 47%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(0deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 16%),
+    radial-gradient(128% 70% at 94% -22%, rgba(212, 192, 154, .22), rgba(212, 192, 154, 0) 44%),
+    radial-gradient(76% 52% at 0% -6%, rgba(196, 205, 224, .12), rgba(196, 205, 224, 0) 42%),
+    radial-gradient(150% 120% at 50% 126%, rgba(120, 132, 158, .13), rgba(120, 132, 158, 0) 56%),
+    rgba(15, 15, 21, 0);   /* 卡身透明，玻璃由内层 WebGL 承担 */
   box-shadow:
-    0 26px 64px -18px rgba(0, 0, 0, .68),
-    0 10px 22px rgba(0, 0, 0, .40);
+    inset 0 0 0 1px rgba(255, 255, 255, .11),
+    inset 0 1px 0 rgba(255, 255, 255, .20),
+    inset 0 -1px 0 rgba(255, 255, 255, .07),
+    0 28px 66px -20px rgba(0, 0, 0, .72),
+    0 12px 26px rgba(0, 0, 0, .44);
 }
-.di-root.di-model-iphone.is-open .di-ip-core {
-  width: 366px; height: 58px; top: 0;
-  border-radius: 34px 34px 20px 20px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05), 0 10px 26px -12px rgba(0, 0, 0, .62);
+/* 弱合成器降级：展开卡不透明静态炭玻璃 */
+.di-root.is-open .di-ip-glass[data-liquid-glass="fallback"] {
+  -webkit-backdrop-filter: blur(34px) saturate(1.85) brightness(.8);
+  backdrop-filter: blur(34px) saturate(1.85) brightness(.8);
+  background:
+    radial-gradient(150% 46% at 50% -18%, rgba(255, 255, 255, .20), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, .07) 47%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(0deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0) 16%),
+    radial-gradient(128% 70% at 94% -22%, rgba(212, 192, 154, .26), rgba(212, 192, 154, 0) 44%),
+    radial-gradient(76% 52% at 0% -6%, rgba(196, 205, 224, .15), rgba(196, 205, 224, 0) 42%),
+    radial-gradient(150% 120% at 50% 126%, rgba(120, 132, 158, .17), rgba(120, 132, 158, 0) 56%),
+    linear-gradient(167deg, #2a2a35 0%, #1a1a23 44%, #111119 100%);
 }
-.di-root.di-model-iphone.is-open .di-live { opacity: 0; pointer-events: none; }
-.di-root.di-model-iphone.is-open .di-ip-body { padding-top: 58px; opacity: 1; pointer-events: auto; }
+/* expanded：黑以贴顶灵动岛为锚，岛宽内 100% 黑，越过岛下沿后用长尾连续化入玻璃，
+   一直到约 175px 才全透，彻底消除原 58px 处的横向硬分界。横向满宽（岛即卡宽），顶圆角由卡身裁剪。 */
+.di-root.is-open .di-ip-glow {
+  opacity: 1;
+  visibility: visible;
+  -webkit-mask-image: linear-gradient(180deg,
+    #000 0,
+    #000 42px,
+    rgba(0, 0, 0, .93) 60px,
+    rgba(0, 0, 0, .70) 86px,
+    rgba(0, 0, 0, .42) 116px,
+    rgba(0, 0, 0, .18) 146px,
+    rgba(0, 0, 0, .05) 166px,
+    rgba(0, 0, 0, 0) 180px);
+  mask-image: linear-gradient(180deg,
+    #000 0,
+    #000 42px,
+    rgba(0, 0, 0, .93) 60px,
+    rgba(0, 0, 0, .70) 86px,
+    rgba(0, 0, 0, .42) 116px,
+    rgba(0, 0, 0, .18) 146px,
+    rgba(0, 0, 0, .05) 166px,
+    rgba(0, 0, 0, 0) 180px);
+}
+.di-root.is-open .di-ip-core { opacity: 0; }
+.di-root.is-open .di-live { opacity: 0; pointer-events: none; }
+.di-root.is-open .di-ip-body { padding-top: 58px; opacity: 1; pointer-events: auto; }
 
 /* 事项到达：岛弹性一次（仅缩放，形变交给 core/容器 transition） */
 @keyframes diIpArrive {
@@ -333,51 +452,77 @@
   55%  { transform: translateX(-50%) scale(1.04); }
   100% { transform: translateX(-50%) scale(1); }
 }
-.di-root.di-model-iphone.di-arrive .di-ip { animation: diIpArrive .5s cubic-bezier(.34, 1.35, .5, 1); }
+.di-root.di-arrive .di-ip { animation: diIpArrive .5s cubic-bezier(.34, 1.35, .5, 1); }
 @keyframes diIpContentIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.di-root.di-model-iphone.di-arrive .di-live .di-lv1,
-.di-root.di-model-iphone.di-arrive .di-live .di-lv2 { animation: diIpContentIn .32s ease .16s both; }
+.di-root.di-arrive .di-live .di-lv1,
+.di-root.di-arrive .di-live .di-lv2 { animation: diIpContentIn .32s ease .16s both; }
 /* 展开内容逐行入场 */
 @keyframes diIpBodyIn {
   from { opacity: 0; transform: translateY(7px) scale(.985); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.di-root.di-model-iphone.is-open .di-ip-body > * { animation: diIpBodyIn .30s cubic-bezier(.32, .72, 0, 1) both; }
-.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(2) { animation-delay: .04s; }
-.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(3) { animation-delay: .07s; }
-.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(4) { animation-delay: .10s; }
-.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(5) { animation-delay: .13s; }
-.di-root.di-model-iphone.is-open .di-ip-body > *:nth-child(6) { animation-delay: .15s; }
+.di-root.is-open .di-ip-body > * { animation: diIpBodyIn .30s cubic-bezier(.32, .72, 0, 1) both; }
+.di-root.is-open .di-ip-body > *:nth-child(2) { animation-delay: .04s; }
+.di-root.is-open .di-ip-body > *:nth-child(3) { animation-delay: .07s; }
+.di-root.is-open .di-ip-body > *:nth-child(4) { animation-delay: .10s; }
+.di-root.is-open .di-ip-body > *:nth-child(5) { animation-delay: .13s; }
+.di-root.is-open .di-ip-body > *:nth-child(6) { animation-delay: .15s; }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   4. HUAWEI Pura X View — 打孔 · 玻璃翼片 · 挂扣玻璃卡
-   ═══════════════════════════════════════════════════════════════════════ */
+   4. 非灵动岛机型（di-hw-punch 圆打孔 / di-hw-pill 胶囊挖孔）· 打孔锚点连续卡
+   ═══════════════════════════════════════════════════════════════════════
+   这类机型「没有灵动岛」：无消息(idle)时屏幕顶部只应看到自带的前置打孔，
+   绝不能出现 iPhone 那种黑色/玻璃药丸——故 idle 把整条通知卡 .di-ip 隐藏，仅留裸孔。
+   有消息(compact/open)时，与 iPhone 共用同一张连续卡（.di-ip 几何 / .di-ip-glass 恒暗玻璃 /
+   .di-live 两行 / .di-ip-body），卡到窗口左右边缘距离与 iPhone 完全一致（compact 各 45 / open 各 12）；
+   黑色共用同一套 .di-ip-glow mask（第 3 节），顶部满黑带的中心由这枚常驻打孔（纯黑硬件点）占据。 */
 
-/* ---- 前置打孔（模拟硬件；真实设备由外壳层提供，组件仅避让） ---- */
-.di-hole {
+/* idle（无消息）：非灵动岛机型整条通知卡隐藏，只剩裸打孔；有消息时随 .is-active/.is-open 淡入 */
+.di-root.di-hw-punch:not(.is-active):not(.is-open) .di-ip,
+.di-root.di-hw-pill:not(.is-active):not(.is-open) .di-ip {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 前置打孔镜头（圆）：root 直接子层（不随卡 morph、不被卡 overflow 裁剪），位置固定、永不遮挡 */
+.di-ip-hole {
   position: absolute;
   top: 6px;
   left: 50%;
   width: 10px; height: 10px;
   transform: translateX(-50%);
   border-radius: 50%;
-  z-index: 9;
+  z-index: 12;
   background: radial-gradient(circle at 36% 32%, #232936, #04060b 72%);
   box-shadow: inset 0 0 0 1.5px #0a0d14, inset 0 0 2px #000, 0 0 0 .5px rgba(255, 255, 255, .16);
   pointer-events: none;
 }
-.di-hole::after {
+.di-ip-hole::after {
   content: "";
   position: absolute; inset: 2.6px;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 36%, #6f92c4, #223354 78%);
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, .4);
 }
-/* 金呼吸环：有事项时「挂」在孔上 */
-.di-hole-ring {
+/* 胶囊（跑道）挖孔：横向小胶囊，内置一颗偏置小圆镜头（很多安卓曲面/旗舰的前置形态） */
+.di-ip-hole-pill {
+  width: 17px; height: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 40%, #161a24, #04060b 74%);
+}
+.di-ip-hole-pill::after {
+  inset: 0;
+  width: 5px; height: 5px;
+  top: 50%; right: 2.4px; left: auto;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #7797c8, #223354 80%);
+}
+/* 金呼吸环：有事项时「挂」在打孔上；展开成大卡后隐藏（无需再呼吸提示） */
+.di-ip-hole-ring {
   position: absolute;
   top: 50%; left: 50%;
   width: 17px; height: 17px;
@@ -388,181 +533,30 @@
   transition: opacity .3s ease;
   pointer-events: none;
 }
-.di-root.di-model-pura.is-active .di-hole-ring {
-  opacity: .9;
-  animation: diRingPulse 2.4s ease-in-out infinite;
+.di-ip-hole-pill .di-ip-hole-ring {
+  width: 23px; height: 14px;
+  margin: -7px 0 0 -11.5px;
+  border-radius: 999px;
 }
-@keyframes diRingPulse {
+.di-root.di-hw-punch.is-active:not(.is-open) .di-ip-hole-ring,
+.di-root.di-hw-pill.is-active:not(.is-open) .di-ip-hole-ring {
+  opacity: .9;
+  animation: diHoleRingPulse 2.4s ease-in-out infinite;
+}
+.di-root.di-hw-punch.is-open .di-ip-hole-ring,
+.di-root.di-hw-pill.is-open .di-ip-hole-ring { opacity: 0; animation: none; }
+@keyframes diHoleRingPulse {
   0%, 100% { transform: scale(1);    opacity: .85; }
   50%      { transform: scale(1.22); opacity: .35; }
 }
 
-/* ---- 玻璃翼片 ---- */
-.di-pw {
-  position: absolute;
-  top: 2px;
-  height: 22px;
-  border-radius: 999px;
-  pointer-events: auto;
-  z-index: 8;
-  display: flex;
-  align-items: center;
-  color: var(--text-1, #161616);
-  background: rgba(255, 255, 255, .62);
-  border: 1px solid rgba(22, 22, 22, .12);
-  box-shadow:
-    0 4px 14px -5px rgba(24, 28, 46, .22),
-    0 1px 3px rgba(24, 28, 46, .10),
-    inset 0 1px 0 rgba(255, 255, 255, .72),
-    inset 0 0 0 .5px rgba(255, 255, 255, .35);
-  opacity: 0;
-  transition:
-    transform .46s cubic-bezier(.32, .72, 0, 1),
-    opacity .32s ease;
-  -webkit-backdrop-filter: blur(20px) saturate(1.7);
-  backdrop-filter: blur(20px) saturate(1.7);
-}
-[data-liquid-glass="webgl"] { background: transparent; }
-.di-pw-l {
-  left: 82px;
-  right: calc(50% - 12px);
-  gap: 6px;
-  padding: 0 10px 0 5px;
-  transform-origin: right center;
-  transform: scaleX(.12);
-  justify-content: flex-start;
-}
-.di-pw-r {
-  left: calc(50% + 12px);
-  right: auto;
-  width: -webkit-max-content;
-  width: max-content;
-  max-width: 118px;
-  gap: 6px;
-  padding: 0 10px;
-  transform-origin: left center;
-  transform: scaleX(.12);
-  justify-content: flex-end;
-  white-space: nowrap;
-}
-.di-pw .di-ic { width: 19px; height: 19px; border-radius: 6px; }
-.di-pw .di-ic svg { width: 11px; height: 11px; }
-.di-pw-title {
-  min-width: 0;
-  flex: 1;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.di-pw-r .di-amount { font-size: 12px; color: var(--primary-dim, #9A8050); }
-.di-pw .di-count { background: rgba(22, 22, 22, .10); color: var(--text-1, #161616); }
+/* 黑色弥散：打孔机型与 iPhone 完全共用同一套 .di-ip-glow mask（第 3 节 compact / open 规则），
+   保证各机型「顶部锚点 100% 黑 → 向四周连续弥散 → 化入恒暗液态玻璃、卡内无颜色分界」一致。
+   唯一不同：顶部满黑带的中心被这枚常驻打孔（纯黑硬件点）占据，黑即从打孔处漫开。 */
 
-/* 翼片展开到位 */
-.di-root.di-model-pura.is-active:not(.is-open) .di-pw {
-  opacity: 1;
-  transform: scaleX(1);
-}
-/* 展开大卡时：翼片向孔收拢消失 */
-.di-root.di-model-pura.is-open .di-pw { opacity: 0; transform: scaleX(.1); pointer-events: none; }
-/* 内容交换防闪烁 */
-.di-root.di-model-pura.di-swap .di-pw-title { opacity: 0; }
+/* 非灵动岛机型与 iPhone 共用同一套连续 morph 卡（见第 3 节）与上方打孔锚点/黑弥散；
+   不使用分离玻璃翼片/挂扣卡，也不随亮暗主题切换——弹窗恒为暗色液态玻璃。 */
 
-/* ---- 挂扣玻璃卡 ---- */
-.di-pura-card {
-  position: absolute;
-  top: 10px;
-  left: 14px;
-  right: 14px;
-  border-radius: 26px 26px 13px 13px;
-  z-index: 10;
-  pointer-events: auto;
-  color: var(--text-1, #161616);
-  background: rgba(255, 255, 255, .66);
-  border: .5px solid var(--glass-border, rgba(22, 22, 22, .10));
-  box-shadow:
-    0 18px 44px -14px rgba(24, 28, 46, .32),
-    0 4px 12px -4px rgba(24, 28, 46, .14),
-    inset 0 1px 0 rgba(255, 255, 255, .7);
-  -webkit-backdrop-filter: blur(26px) saturate(1.8);
-  backdrop-filter: blur(26px) saturate(1.8);
-  padding: 24px 15px 14px;
-  opacity: 0;
-  transform: translateY(-10px) scaleY(.92);
-  transform-origin: 50% 0;
-  pointer-events: none;
-  transition:
-    opacity .34s ease,
-    transform .46s cubic-bezier(.32, .72, 0, 1);
-  /* 顶部中央挂扣缺口：r8 圆心对齐 Φ10 前置孔中心(屏内 y≈11)，孔穿过卡片、四周留 ~2px 气隙 */
-  -webkit-mask: radial-gradient(circle 8px at 50% 2px, transparent 7px, #000 8px);
-  mask: radial-gradient(circle 8px at 50% 2px, transparent 7px, #000 8px);
-}
-.di-pura-card[data-liquid-glass="webgl"] { background: transparent; }
-.di-root.di-model-pura.is-open .di-pura-card {
-  opacity: 1;
-  transform: translateY(0) scaleY(1);
-  pointer-events: auto;
-}
-/* 缺口两侧的金色挂点（视觉上把卡片挂到金环上） */
-.di-pura-card::before {
-  content: "";
-  position: absolute;
-  top: 1px;
-  left: 50%;
-  width: 22px; height: 7px;
-  transform: translateX(-50%);
-  border-radius: 0 0 999px 999px;
-  background: linear-gradient(180deg, rgba(184, 153, 104, .55), rgba(184, 153, 104, 0));
-  pointer-events: none;
-}
-.di-pura-card .di-b-title { display: block; font-size: 15px; color: var(--text-1, #161616); }
-.di-pura-card .di-b-sub { color: var(--text-3, #7A7A7A); }
-.di-pura-card .di-b-side .di-amount { color: var(--primary-dim, #9A8050); }
-.di-pura-card .di-b-close { background: var(--glass-bg-2, rgba(22, 22, 22, .06)); color: var(--text-2, #4A4A4A); }
-.di-pura-card .di-desc { color: var(--text-2, #4A4A4A); margin-top: 9px; }
-.di-pura-card .di-meta { color: var(--text-3, #7A7A7A); }
-.di-pura-card .di-act-ghost { color: var(--text-3, #7A7A7A); border: 1px solid var(--line, rgba(22, 22, 22, .10)); }
-.di-pura-card .di-pager { color: var(--text-2, #4A4A4A); }
-.di-pura-card .di-b-head { display: flex; align-items: flex-start; gap: 10px; }
-.di-pura-card .di-b-copy { flex: 1; min-width: 0; }
-.di-pura-card .di-ic { width: 33px; height: 33px; border-radius: 10px; margin-top: 1px; }
-.di-pura-card .di-ic svg { width: 17px; height: 17px; }
-.di-pura-card .di-b-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
-
-/* Pura 卡内容入场 */
-.di-root.di-model-pura.is-open .di-pura-card .di-b-head,
-.di-root.di-model-pura.is-open .di-pura-card .di-desc,
-.di-root.di-model-pura.is-open .di-pura-card .di-meta,
-.di-root.di-model-pura.is-open .di-pura-card .di-acts,
-.di-root.di-model-pura.is-open .di-pura-card .di-pager {
-  animation: diPuraBodyIn .36s cubic-bezier(.32, .72, 0, 1) both;
-}
-.di-root.di-model-pura.is-open .di-pura-card .di-desc { animation-delay: .05s; }
-.di-root.di-model-pura.is-open .di-pura-card .di-meta { animation-delay: .09s; }
-.di-root.di-model-pura.is-open .di-pura-card .di-acts { animation-delay: .13s; }
-.di-root.di-model-pura.is-open .di-pura-card .di-pager { animation-delay: .17s; }
-@keyframes diPuraBodyIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* Pura 暗色：玻璃翼片/卡反相 */
-[data-theme="dark"] .di-pw {
-  background: rgba(38, 40, 45, .60);
-  border-color: rgba(255, 255, 255, .14);
-  box-shadow:
-    0 4px 14px -5px rgba(0, 0, 0, .55),
-    0 1px 3px rgba(0, 0, 0, .3),
-    inset 0 1px 0 rgba(255, 255, 255, .10);
-}
-[data-theme="dark"] .di-pura-card {
-  background: rgba(34, 36, 41, .66);
-  border-color: rgba(255, 255, 255, .10);
-  box-shadow: 0 18px 44px -14px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .07);
-}
-[data-theme="dark"] .di-pw .di-count { background: rgba(255, 255, 255, .14); color: #fff; }
 
 /* ---------------------------------------------------------------------------
    5. 手势跟手 / 关闭 / 无障碍
@@ -574,17 +568,151 @@
 @keyframes diLeave {
   to { opacity: 0; transform: var(--di-leave-transform, translateY(-14px) scale(.94)); }
 }
-.di-root.di-model-iphone .di-ip.di-leaving {
+.di-root .di-ip.di-leaving {
   animation: diIpLeave .34s cubic-bezier(.4, 0, 1, 1) forwards;
 }
 @keyframes diIpLeave {
   to { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(.9); }
 }
-.di-root.di-model-pura .di-pw.di-leave-left {
-  transform: scaleX(.1) !important; opacity: 0;
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .di-ip, .di-ip-core, .di-ip-glow, .di-live, .di-ip-body, .di-pw, .di-pura-card, .di-hole-ring { transition: none !important; animation: none !important; }
-  .di-root.di-model-iphone.is-active .di-ip { transition: none; }
+  .di-ip, .di-ip-core, .di-ip-glow, .di-live, .di-ip-body, .di-ip-hole, .di-ip-hole-ring,
+  .di-scrim, .di-deck, .di-card, .di-card-glow { transition: none !important; animation: none !important; }
+  .di-root.is-active .di-ip { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   6. 多卡堆叠（stack） × 扇形展开列表（list）
+   ───────────────────────────────────────────────────────────────────────────
+   · 多条按触发时间倒序：最上一张仍是主 morph 卡 .di-ip（WebGL 恒暗玻璃，显示最新条，
+     视觉与单条完全一致、零回归）；其下由 .di-deck 渲染最多 2 层「露边背板」，逐层下移、
+     两侧收窄、圆角略增，明确表达「后面还压着多条」。
+   · 点击堆叠：.is-list —— 全页蒙版淡入（顶部让出 44px 状态栏，时间/信号/电量不被压暗），
+     同一批 .di-card 以 width/transform 平滑扇形展开为 300×76 等宽等高、垂直均分的列表；
+     点某张进该条详情，每张右上 ✕ 可单独关闭，点蒙版空白扇形收回。
+   · 多层卡统一用「纯 CSS 恒暗炭玻璃」，不为每一张单开 WebGL 折射上下文（规避 ~16 上下文上限，
+     且保证多张质感完全一致）；仅最上主卡与详情大卡使用 WebGL 真折射。
+   · 前置镜头 .di-ip-hole 常驻 z-index:12，高于 deck/卡/蒙版，任何状态都不被遮挡。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* 全页蒙版：0–44px 状态栏完全不压暗，44–72px 羽化后再均匀压暗页面（无硬线） */
+.di-scrim {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  z-index: 6; pointer-events: none; opacity: 0;
+  background: linear-gradient(180deg,
+    rgba(5, 6, 11, 0) 0,
+    rgba(5, 6, 11, 0) 44px,
+    rgba(5, 6, 11, .34) 62px,
+    rgba(5, 6, 11, .56) 84px,
+    rgba(5, 6, 11, .60) 108px,
+    rgba(5, 6, 11, .60) 100%);
+  transition: opacity .40s ease;
+}
+.di-root.is-list .di-scrim { opacity: 1; pointer-events: auto; }
+/* list 时停用原顶部轻压暗 veil（由全页 scrim 接管） */
+.di-root.is-list .di-veil { opacity: 0 !important; pointer-events: none; }
+/* 打孔机型进入列表：金呼吸环停止（镜头本体保持常显） */
+.di-root.di-hw-punch.is-list .di-ip-hole-ring,
+.di-root.di-hw-pill.is-list .di-ip-hole-ring { opacity: 0; animation: none; }
+
+/* 卡堆层：恒在镜头(12)之下、蒙版(6)之上；open 大卡出现时整体淡出 */
+.di-deck {
+  position: absolute; inset: 0; z-index: 9;
+  pointer-events: none;
+  transition: opacity .28s ease;
+}
+.di-root.is-open .di-deck { opacity: 0; pointer-events: none; }
+
+/* 单张通知卡（恒暗炭玻璃）。基态为「藏在第 2 层之后」：仅 is-stack 的第 1/2 层与 is-list 全卡可见 */
+.di-card {
+  position: absolute; left: 50%; top: 10px;
+  width: 300px; height: 76px;
+  border-radius: 28px; overflow: hidden;
+  opacity: 0; pointer-events: none;
+  touch-action: manipulation;   /* 列表卡只做点击，消除移动端 tap 延迟/误判双击缩放 */
+  transform: translate(-50%, 36px) scale(.985);
+  transform-origin: 50% 0;
+  background:
+    radial-gradient(140% 60% at 50% -26%, rgba(255, 255, 255, .24), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(118deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .09) 44%, rgba(255, 255, 255, 0) 56%),
+    linear-gradient(0deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 26%),
+    radial-gradient(120% 96% at 92% -38%, rgba(212, 192, 154, .26), rgba(212, 192, 154, 0) 50%),
+    radial-gradient(88% 86% at 4% -28%, rgba(196, 205, 224, .15), rgba(196, 205, 224, 0) 48%),
+    linear-gradient(166deg, #2b2b36 0%, #1b1b24 46%, #12121a 100%);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7) brightness(.84);
+  backdrop-filter: blur(24px) saturate(1.7) brightness(.84);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .10),
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    inset 0 -1px 0 rgba(255, 255, 255, .06),
+    0 20px 48px -18px rgba(0, 0, 0, .60),
+    0 8px 20px rgba(0, 0, 0, .34);
+  transition:
+    transform .52s cubic-bezier(.32, .72, 0, 1),
+    width .52s cubic-bezier(.32, .72, 0, 1),
+    border-radius .52s cubic-bezier(.32, .72, 0, 1),
+    opacity .34s ease,
+    box-shadow .4s ease;
+  transition-delay: calc(var(--di-i, 0) * 8ms);
+}
+/* 卡顶黑色锚带：从顶部硬件锚点向下化入玻璃（与主卡 glow 同向，卡内无黑/玻璃硬边界） */
+.di-card-glow {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: #000;
+  -webkit-mask-image: linear-gradient(180deg,
+    #000 0, #000 18px, rgba(0, 0, 0, .92) 30px,
+    rgba(0, 0, 0, .62) 44px, rgba(0, 0, 0, .24) 60px, rgba(0, 0, 0, 0) 76px);
+  mask-image: linear-gradient(180deg,
+    #000 0, #000 18px, rgba(0, 0, 0, .92) 30px,
+    rgba(0, 0, 0, .62) 44px, rgba(0, 0, 0, .24) 60px, rgba(0, 0, 0, 0) 76px);
+}
+/* 卡内容容器：复用 .di-lv1 / .di-lv2 两行排版（与主卡 compact 完全一致）。
+   堆叠态下层卡只露玻璃边缘，不显示文字（避免多层文字重叠显脏）；扇形列表展开后才显字 */
+.di-cbody { position: absolute; inset: 0; z-index: 2; color: #fff; opacity: 0; transition: opacity .3s ease; }
+.di-card .di-cx {
+  flex: none; width: 22px; height: 22px; margin-left: 2px;
+  display: none; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .80);
+  font-size: 11px; line-height: 1; padding: 0;
+  transition: background .18s ease;
+}
+.di-card .di-cx:active { background: rgba(255, 255, 255, .28); }
+
+/* —— 堆叠态：仅露出第 1、2 层背板（第 0 层即主卡 .di-ip，本身不显示以免重复） —— */
+.di-root.is-stack.is-active:not(.is-list):not(.is-open) .di-deck { opacity: 1; }
+.di-root.is-stack.is-active:not(.is-list):not(.is-open) .di-card[data-i="1"] {
+  opacity: 1; width: 284px; z-index: 8;
+  transform: translate(-50%, 18px) scale(1);
+}
+.di-root.is-stack.is-active:not(.is-list):not(.is-open) .di-card[data-i="2"] {
+  opacity: 1; width: 268px; z-index: 7; border-radius: 30px;
+  transform: translate(-50%, 36px) scale(1);
+}
+
+/* —— 列表态：主卡隐藏（同位由 deck 第 0 张无缝接管），全部卡扇形展开为等宽列表 —— */
+.di-root.is-list .di-ip { opacity: 0 !important; pointer-events: none; }
+.di-root.is-list .di-deck { opacity: 1; }
+.di-root.is-list .di-card {
+  opacity: 1; pointer-events: auto;
+  width: 300px; border-radius: 28px;
+  touch-action: pan-y;                  /* 纵向交给页面滚动，横向手势交组件做「滑除关闭」，真机不被 pointercancel 吞掉 */
+  transform: translate(-50%, calc(var(--di-i, 0) * 86px)) scale(1);
+  transition-delay: calc(var(--di-i, 0) * 16ms);   /* 自上而下依次落下，形成扇形展开 */
+}
+/* 横向拖除跟手：该卡浮起、实时跟手（transform/transition 由 JS inline 接管），不参与扇形延迟 */
+.di-root.is-list .di-card.is-dragging {
+  z-index: 20; cursor: grabbing;
+  transition: none !important; transition-delay: 0ms !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .12),
+    0 26px 56px -16px rgba(0, 0, 0, .66),
+    0 10px 24px rgba(0, 0, 0, .40);
+}
+.di-root.is-list .di-card .di-cx { display: flex; }
+.di-root.is-list .di-card .di-cbody { opacity: 1; }
+/* 列表态第 0 张接棒主卡时极短交叉淡入，避免 WebGL→CSS 玻璃同帧跳变 */
+.di-root.is-list .di-card[data-i="0"] { transition:
+    transform .52s cubic-bezier(.32, .72, 0, 1), width .52s cubic-bezier(.32, .72, 0, 1),
+    border-radius .52s cubic-bezier(.32, .72, 0, 1), opacity .18s ease .02s, box-shadow .4s ease; }
+

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
@@ -13,7 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>工程链 ENGCHAIN · App首页</title>
 <link rel="stylesheet" href="css/app.css">
-<link rel="stylesheet" href="css/pending-alerts.css?v=2026100301">
+<link rel="stylesheet" href="css/dynamic-island.css?v=2026100341">
 <style>
 /* ===== 首页金刚区：五大频道（工地微缩沙盘 3D 图标 + 文字） ===== */
 .home-kk {
@@ -79,7 +79,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <!-- E1-01 登录入口（游客态胶囊；已登录显示头像/昵称） -->
       <div id="home-auth-entry"></div>
       <!-- 搜索入口（定位右侧；游客态位于登录胶囊右侧） -->
-      <a href="pages/search/index.html?v=global" class="app-top-search" aria-label="搜索" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;color:var(--text-2);">
+      <a href="pages/search/index.html?v=global" class="app-top-search" aria-label="搜索">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
       </a>
     </div>
@@ -203,11 +203,77 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="js/promo-cards.js"></script>
 <script src="js/stores.js"></script>
 <script src="js/delegates.js"></script>
-<script src="js/liquid-glass.iife.js?v=2026100209"></script>
-<script src="js/pending-alerts.js?v=2026100301"></script>
+<script src="js/liquid-glass.iife.js?v=2026100310"></script>
+<script src="js/dynamic-island.js?v=2026100341"></script>
+<style>
+/* 灵动岛「待执行信息提醒」live 组件接管顶部硬件后，隐藏 common.js 注入的静态占位灵动岛：
+   iPhone 由组件自绘可 morph 的黑岛；Pura 等打孔机型 idle 只透出设备外壳自带的前置打孔。
+   标记类用独立名 di-alert-on，避免与组件内部 .di-live 内容层类名冲突。 */
+body.di-alert-on .dynamic-island { display: none !important; }
+</style>
+<script>
+/* 正版接入：以「灵动岛 / 打孔」待执行信息提醒，替换原 PendingAlerts 顶部下拉横幅。
+   · 机型：优先读 preview 外壳持久化 engchain-shell；缺省按视口高度判定（与 common.js Pura 布局同口径 <=720）。
+   · Pura 等打孔机型：前置镜头由 preview 设备外壳 .pura-cam 提供，组件用 externalAnchor 不自绘镜头，
+     idle 整条提醒卡隐藏、只透出外壳打孔，避免「双镜头」。
+   · 对既有业务暴露 window.PendingAlerts（add/remove/clear/dismissAll/getActive），Delegates 等调用方零改动。
+   · 外壳在 iPhone/Pura 间移动同一 iframe（不重载、只 resize），故跨 720 阈值时销毁重建并自动重放未处理事项。 */
+(function () {
+  function currentModel() {
+    var shell = '';
+    try { shell = localStorage.getItem('engchain-shell') || ''; } catch (e) {}
+    if (shell === 'pura' || shell === 'iphone') return shell;
+    return window.innerHeight <= 720 ? 'pura' : 'iphone';
+  }
+  var holder = { island: null, items: [] };   /* 尚未处理的提醒原始对象（含按钮回调），按 id 去重 */
+  function upsert(a) {
+    if (!a || a.id == null) { holder.items.push(a); return; }
+    for (var i = 0; i < holder.items.length; i++) {
+      if (holder.items[i] && holder.items[i].id === a.id) { holder.items[i] = a; return; }
+    }
+    holder.items.push(a);
+  }
+  function drop(id) { holder.items = holder.items.filter(function (a) { return a && a.id !== id; }); }
+  function mount() {
+    if (!window.DynamicIsland) return;
+    if (holder.island) { try { holder.island.destroy(); } catch (e) {} holder.island = null; }
+    var model = currentModel();
+    holder.island = window.DynamicIsland.create(document.body, {
+      model: model,
+      externalAnchor: model === 'pura',
+      /* ✕ 关闭等组件内部移除路径也同步清掉 holder 缓存，杜绝切机型重建后已处理事项复活 */
+      onRemove: function (id) { drop(id); },
+      onClear: function () { holder.items = []; }
+    });
+    document.body.classList.add('di-alert-on');
+    holder.items.forEach(function (a) { holder.island.add(a); });
+  }
+  /* 兼容旧组件契约：业务侧（Delegates.maybeShowOrderPopup 等）无需改动 */
+  window.PendingAlerts = {
+    add: function (a) { upsert(a); if (holder.island) return holder.island.add(a); },
+    remove: function (id) { drop(id); if (holder.island) return holder.island.remove(id); },
+    clear: function () { holder.items = []; if (holder.island) return holder.island.clear(); },
+    dismissAll: function () { holder.items = []; if (holder.island) return holder.island.clear(); },
+    getActive: function () {
+      return holder.island ? holder.island.getActive()
+                           : holder.items.map(function (a) { return a && a.id; });
+    }
+  };
+  if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+  /* 跨 720 阈值（外壳切换）才重建；普通尺寸波动不触发 */
+  var rzTimer = null, lastModel = currentModel();
+  window.addEventListener('resize', function () {
+    if (rzTimer) clearTimeout(rzTimer);
+    rzTimer = setTimeout(function () {
+      var m = currentModel();
+      if (m !== lastModel) { lastModel = m; mount(); }
+    }, 180);
+  });
+})();
+</script>
 <script>
 /* 委托服务 v2.1：进入首页时检查待付款订单（信息详情页解锁浏览），存在则弹出
-   「用户待执行信息提醒」顶部下拉横幅（iOS 27 风格 · 液态玻璃，PendingAlerts 组件）；
+   「用户待执行信息提醒」灵动岛 / 打孔实时活动（Dynamic Island 组件，经 PendingAlerts 兼容层调用）；
    后台推送语义（模拟）：委托提交后由 Delegates.pushUnlockOrder 写入本地订单存储，
    真实环境为 GET /api/orders/pending 拉取后台推送的待付款订单后调用组件展示。 */
 (function () {

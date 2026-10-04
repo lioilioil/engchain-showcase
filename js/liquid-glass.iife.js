@@ -5199,10 +5199,13 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   }
   var tabMat = loadMat();
 
-  /* 挂载目标：主 tabbar（.app-tabbar）+ 其他声明 data-lg-glass 的容器（如信息工作台发布栏）。
+  /* 挂载目标：主 tabbar（.app-tabbar）+ 其他声明 data-lg-glass 的容器（如信息工作台发布栏、
+     返回顶部按钮 .engchain-backtop）。
      全部共用同一份 cfg 与 <html data-theme> 联动 → 各实例参数完全同源一致，
-     任一处调参（preview 面板 / LG_TABBAR.setCfg / localStorage）全部同步。 */
-  var TARGETS = ['.app-tabbar', '[data-lg-glass]'];
+     任一处调参（preview 面板 / LG_TABBAR.setCfg / localStorage）全部同步。
+     返回顶部按钮（js/back-to-top.js 动态创建，带 data-lg-glass）因此与主 tabbar
+     共享同一套 tint/frost 与 tabbar 折射材质参数，效果完全一致。 */
+  var TARGETS = ['.app-tabbar', '[data-lg-glass]', '.engchain-backtop'];
 
   function isDark() {
     return document.documentElement.getAttribute('data-theme') === 'dark';
@@ -5224,7 +5227,7 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
       Array.prototype.forEach.call(els, function (el) {
         if (LiquidGlass.from(el)) return;
         try {
-          new LiquidGlass(el, {
+          var inst = new LiquidGlass(el, {
             tint: params().tint,
             tintTone: params().tintTone,
             frost: params().frost,
@@ -5244,6 +5247,10 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
             //   dispersion 5.0→3.0（图形清晰 + 保留色散质感）。
             material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat)
           });
+          /* 挂载标记：仅 WebGL 玻璃真正激活（非 fallback）时打标。
+             .engchain-backtop 据此中性化自带 CSS 玻璃（见 back-to-top.js 样式），
+             与 liquid-cta.js 的 data-lg-mounted 约定一致。 */
+          if (inst && inst.supported) el.setAttribute('data-lg-mounted', '1');
           added = true;
         } catch (e) {
           console.warn('[glass-tabbar] init failed on ' + sel + ':', e);
@@ -5299,6 +5306,12 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
     });
     mo.observe(document.body, { childList: true, subtree: true });
     setTimeout(function () { mo.disconnect(); }, 9000);
+    /* 返回顶部按钮（js/back-to-top.js）为异步加载创建，可能晚于 9s observer 断开：
+       它追加按钮后派发 engchain:backtop-ready，这里兜底重挂载（幂等），
+       保证 .engchain-backtop 与主 tabbar 共享同参数玻璃。 */
+    try {
+      window.addEventListener('engchain:backtop-ready', function () { mount(); apply(); });
+    } catch (e) {}
   }
 
   /* 明暗联动：跟随 <html data-theme>（common.js / preview postMessage 均落到该属性） */

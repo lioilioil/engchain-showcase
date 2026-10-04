@@ -1,9 +1,13 @@
 /* ============================================================================
    ENGCHAIN 全局「回到顶部」玻璃按钮（BackToTop）
    视觉规则：
-   - 页面下滑超过 2 个窗口高度时，窗口下方居中渐显圆形玻璃按钮（中心为 SVG 上箭头）
+   - 页面下滑超过 1.5 个窗口高度时，窗口下方居中渐显圆形玻璃按钮（中心为 SVG 上箭头）
    - 点击按钮 → 页面平滑滚动置顶
-   - 页面回到 2 个窗口高度以内时，按钮下滑渐变消失
+   - 页面回到 1.5 个窗口高度以内时，按钮下滑渐变消失
+   玻璃效果：与主 tabbar 完全一致 —— 按钮带 data-lg-glass，由 js/liquid-glass.iife.js
+   的 loader（TARGETS 含 .engchain-backtop）挂载同一套 WebGL2 液态玻璃，
+   参数共享（engchain-glass-cfg 的 tint/frost + engchain-tabbar-refract 材质 + 明暗联动）；
+   挂载成功后按钮自带玻璃样式被 [data-lg-mounted] 中性化（同 .app-tabbar 清空自绘玻璃）。
    兼容：
    - 手机壳 demo（.phone 内滚动容器）：按钮挂载到 .phone 内，fixed 相对 .phone（transform 创建包含块），
      随手机壳等比缩放，位于窗口底部居中，自动避开底部 tabbar / fixed-cta / 操作栏
@@ -60,6 +64,24 @@
     '}',
     '[data-theme="dark"] .engchain-backtop:hover {',
     '  background: linear-gradient(135deg, rgba(72,72,82,.82), rgba(50,50,60,.42));',
+    '}',
+    /* 已由主 tabbar 液态玻璃引擎挂载（data-lg-mounted = WebGL 玻璃激活）：
+       清掉按钮自带的 CSS 玻璃（渐变底 / 发丝边 / 阴影 / backdrop），
+       与 .app-tabbar 在 liquid-dock.css 中的清空方式一致 —— 玻璃效果完全交由
+       与主 tabbar 共享参数（tint/frost/材质/明暗）的 WebGL 层渲染。 */
+    '.engchain-backtop[data-lg-mounted],',
+    '.engchain-backtop[data-lg-mounted]:hover,',
+    '[data-theme="dark"] .engchain-backtop[data-lg-mounted],',
+    '[data-theme="dark"] .engchain-backtop[data-lg-mounted]:hover {',
+    '  background: none;',
+    '  border: 0;',
+    '  box-shadow: none;',
+    '  -webkit-backdrop-filter: none;',
+    '  backdrop-filter: none;',
+    '}',
+    '.engchain-backtop[data-lg-mounted]:focus-visible,',
+    '[data-theme="dark"] .engchain-backtop[data-lg-mounted]:focus-visible {',
+    '  box-shadow: 0 0 0 3px rgba(37,99,235,.35);',
     '}',
     '@media (prefers-reduced-motion: reduce) {',
     '  .engchain-backtop { transition: opacity .15s linear, transform .15s linear; }',
@@ -122,8 +144,16 @@
     btn.className = 'engchain-backtop';
     btn.setAttribute('aria-label', '回到顶部');
     btn.setAttribute('tabindex', '0');
+    /* 主 tabbar 液态玻璃挂载点：js/liquid-glass.iife.js 的 loader 按
+       TARGETS = ['.app-tabbar', '[data-lg-glass]', '.engchain-backtop'] 挂载，
+       本按钮与主 tabbar 共享同一份 cfg / 材质 / 明暗联动参数。 */
+    btn.setAttribute('data-lg-glass', '');
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="m5.5 12.5 6.5-6.5 6.5 6.5"/></svg>';
     host.appendChild(btn);
+
+    /* 通知液态玻璃 loader 重挂载（幂等）：按钮为异步创建，loader 的 9s
+       MutationObserver 可能已断开，此事件兜底保证玻璃与主 tabbar 同参数挂载。 */
+    try { window.dispatchEvent(new CustomEvent('engchain:backtop-ready')); } catch (e) {}
 
     /* 底部位置：自动避开底部固定栏（tabbar / fixed-cta / detail-actionbar / 输入条） */
     function measureBottom() {
@@ -171,7 +201,7 @@
     var raf = null;
     function update() {
       raf = null;
-      var show = getTop() > getViewH() * 2;   /* 下滑超过 2 个窗口高度才显示 */
+      var show = getTop() > getViewH() * 1.5;   /* 下滑超过 1.5 个窗口高度才显示 */
       btn.classList.toggle('is-show', show);
     }
     function onScroll() {
