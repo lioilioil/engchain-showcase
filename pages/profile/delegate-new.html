@@ -60,28 +60,39 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
 
   var root = document.getElementById('dnFormRoot');
-  root.innerHTML = Delegates.formHtml({ mode: 'general', authLocked: false });
-  Delegates.bindForm(root);
-  Delegates.prefillAuth(root);
+
+  /* biz 映射：通用委托按所选方向归档到对应业务线，解锁结果才能精准匹配 */
+  function bizOf(type) {
+    if (type === '资质招商') return { biz: 'franchise', bizLabel: '资质招商' };
+    if (type === '建企买卖') return { biz: 'trade', bizLabel: '建企买卖' };
+    if (type === '人才招聘') return { biz: 'personnel', bizLabel: '人才服务' };
+    return { biz: 'general', bizLabel: type || '通用委托' };
+  }
+
+  function initForm() {
+    /* 与 franchise/trade/personnel 入口一致：实名信息锁定只读，仅可补充备用手机号 */
+    root.innerHTML = Delegates.formHtml({ mode: 'general' });
+    Delegates.bindForm(root);
+    Delegates.prefillAuth(root);
+  }
+
+  /* v2.0 实名门控：委托服务仅面向实名用户（与其他三个业务首页入口保持一致） */
+  Delegates.gateRealname({ onPass: initForm, authHref: 'auth-personal.html' });
 
   document.getElementById('dnSubmitBtn').addEventListener('click', function () {
     var data = Delegates.collectForm(root);
     if (!data) return;
-    var isFranchise = data.type === '资质招商';
-    var rec = {
-      biz: isFranchise ? 'franchise' : 'general',
-      bizLabel: isFranchise ? '资质招商' : data.type,
-      source: 'profile',
+    var b = bizOf(data.type);
+    var rec = Delegates.add({
+      biz: b.biz, bizLabel: b.bizLabel, source: 'profile',
       type: data.type, qualLevel: '', mode: data.mode, budget: data.budget,
       region: data.region, contact: data.contact, phone: data.phone,
       backup: data.backup, note: data.note,
       status: '等待承接'
-    };
-    var saved = Delegates.add(rec);
-    UI.toast('委托已提交，顾问将在2小时内联系您', 'ok');
-    setTimeout(function () {
-      location.href = 'delegate-detail.html?id=' + encodeURIComponent(saved.id);
-    }, 700);
+    });
+    /* 与其他入口一致：提交后推送「信息解锁」待付款订单 → 展示顾问对接信息页（电话+企业微信） */
+    Delegates.pushUnlockOrder(rec);
+    Delegates.openHandoffSheet(rec);
   });
 })();
 </script>

@@ -2289,3 +2289,32 @@ window.ListFooter = (function () {
   else load();
 })();
 })();
+
+/* ============================================================================
+   图片加载全局兜底（P0-03）
+   捕获阶段监听 <img> 的 error 事件（资源错误不冒泡，但会经过捕获阶段），
+   统一替换为内联 SVG 占位图：弱网/断链/设备性能问题导致加载失败时，
+   页面不再出现破图图标或空白，保持演示观感完整。
+   - data-fb 防重复替换；data-origin-src 保留原地址供诊断。
+   ============================================================================ */
+(function () {
+  'use strict';
+  var FB_SVG = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">' +
+    '<rect width="200" height="120" rx="12" fill="#f0ead9"/>' +
+    '<g fill="none" stroke="#b3a381" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="58" y="34" width="84" height="56" rx="6"/>' +
+    '<path d="M58 76l20-18 15 12 17-16 32 24"/>' +
+    '<circle cx="86" cy="52" r="5.5"/>' +
+    '</g></svg>');
+  function onImgError(e) {
+    var t = e && e.target;
+    if (!t || t.tagName !== 'IMG') return;
+    if (t.getAttribute('data-fb') === '1') return;
+    if (t.src === FB_SVG) return;
+    try { t.setAttribute('data-origin-src', t.currentSrc || t.src); } catch (err) {}
+    t.setAttribute('data-fb', '1');
+    t.src = FB_SVG;
+  }
+  document.addEventListener('error', onImgError, true);
+})();

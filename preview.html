@@ -15,6 +15,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/iphone-frame.css">
 <link rel="stylesheet" href="css/pura-frame.css">
+<link rel="stylesheet" href="css/wonder-popup.css">
 <script src="vendor/browser-window.js"></script>
 <style>
   * { box-sizing: border-box; }
@@ -402,6 +403,86 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .glass-params[data-show="dark"] .g-item-light{ display:none; }
   .pv-side-hd-row{ display:flex; align-items:center; gap:8px; }
   .pv-side-hd-row #reset-state{ margin-left:auto; flex:0 0 auto; }
+
+  /* ============================================================
+     侧边栏深度优化 V2 —— 演示控制台折叠 · 目录导航强化 · 视觉精修
+     目标：给第三方软件开发公司评审时，目录树立即可见；
+           调试参数收敛为可折叠控制台，按需展开。
+     ============================================================ */
+  /* ---- 品牌头：金色链式徽标 + 轻量操作行 ---- */
+  .brand { display:flex; align-items:center; gap:8px; }
+  .brand-ic { width:24px; height:24px; flex:none; color:var(--primary); opacity:.95; }
+  .pv-side-hd .sub { font-size:11.5px; color:var(--text-3); margin-top:4px; letter-spacing:.02em; }
+  #reset-state.btn-xs { background:transparent; border-color:var(--line); color:var(--text-3); transition:all var(--d-fast); }
+  #reset-state.btn-xs:hover { border-color:var(--primary-dim); color:var(--primary-dim); background:var(--primary-soft); }
+  .pv-ops { display:flex; gap:8px; margin-top:12px; }
+  .pv-ops .pv-showcase-btn { flex:1 1 auto; justify-content:center; margin-top:0; padding:7px 10px; font-size:11.5px; }
+  #btn-wonder-demo.pv-showcase-btn { flex:0 0 auto; padding:7px 12px; font-size:11px; background:linear-gradient(135deg,#d9ad63,#b08644); box-shadow:0 2px 10px rgba(217,173,99,.4); }
+  /* ---- 演示场景卡：标题行规整 ---- */
+  .pv-quick { margin-top:14px; }
+  .pv-quick .pv-row .k { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); }
+  /* ---- 演示控制台：整块折叠面板 ---- */
+  .pv-state { margin:14px 16px 6px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l); box-shadow:var(--shadow-card); padding:0; overflow:hidden; flex:0 0 auto; }
+  .pv-state-hd { display:flex; align-items:center; gap:8px; width:100%; padding:11px 12px; border:0; border-bottom:1px solid var(--line); background:linear-gradient(180deg,var(--bg-card),var(--bg-elev)); cursor:pointer; text-align:left; transition:background var(--d-fast); }
+  .pv-state-hd:hover { background:var(--bg-card-2); }
+  .pv-state.collapsed .pv-state-hd { border-bottom:0; border-radius:var(--r-l); }
+  .pv-state-hd .hd-ic { width:15px; height:15px; flex:none; color:var(--primary); }
+  .pv-state-hd .hd-title { font-size:12px; font-weight:800; letter-spacing:.06em; color:var(--text-1); white-space:nowrap; }
+  .pv-state-hd .hd-summary { margin-left:auto; min-width:0; font-size:10.5px; font-weight:500; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--bg-card-2); border:1px solid var(--line); padding:2px 9px; border-radius:999px; letter-spacing:.01em; }
+  .pv-state-hd .hd-caret { flex:none; width:15px; height:15px; color:var(--text-3); transition:transform var(--d-fast); }
+  .pv-state.collapsed .hd-caret { transform:rotate(-90deg); }
+  .pv-state.collapsed .pv-state-body { display:none; }
+  .pv-state-body { padding:2px 12px 8px; }
+  .pv-state-body .pv-row { padding:8px 0; }
+  /* 控制台内小节标题（金色细线分隔） */
+  .pv-subhd { display:flex; align-items:center; gap:8px; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); padding:11px 2px 3px; }
+  .pv-subhd::after { content:""; flex:1; height:1px; background:var(--line); }
+  /* ---- 控制台内子折叠（Tabbar / 按钮 液态玻璃） ---- */
+  .pv-sec { border:1px solid var(--line); border-radius:var(--r-m); background:var(--bg-elev); overflow:hidden; margin-top:10px; }
+  .pv-sec-hd { display:flex; align-items:center; gap:7px; width:100%; padding:8px 10px; border:0; background:transparent; cursor:pointer; text-align:left; transition:background var(--d-fast); }
+  .pv-sec-hd:hover { background:var(--bg-card-2); }
+  .pv-sec-hd .sec-ic { width:13px; height:13px; flex:none; color:var(--primary-dim); }
+  .pv-sec-hd .sec-title { flex:1; min-width:0; font-size:11.5px; font-weight:700; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pv-sec-hd .sec-count { flex:none; font-size:9.5px; font-weight:500; color:var(--text-3); background:var(--bg-card-2); border:1px solid var(--line); padding:1px 7px; border-radius:999px; font-variant-numeric:tabular-nums; }
+  .pv-sec-hd .sec-caret { flex:none; width:13px; height:13px; color:var(--text-3); transition:transform var(--d-fast); }
+  .pv-sec.collapsed .sec-caret { transform:rotate(-90deg); }
+  .pv-sec.collapsed .pv-sec-bd { display:none; }
+  .pv-sec-bd { padding:0 10px 8px; }
+  .pv-sec-bd .pv-row .k { font-size:11.5px; }
+  /* ---- 目录树工具条：App/后台 过滤 Tabs ---- */
+  .pv-nav-tools { gap:7px; }
+  .nav-filter { display:flex; gap:3px; padding:3px; background:var(--bg-card-2); border:1px solid var(--line); border-radius:var(--r-s); }
+  .nav-filter button { flex:1; border:0; background:transparent; color:var(--text-2); font-size:11px; font-weight:600; padding:4px 0; border-radius:6px; cursor:pointer; transition:background var(--d-fast), color var(--d-fast), box-shadow var(--d-fast); }
+  .nav-filter button.on { background:var(--bg-card); color:var(--primary-dim); box-shadow:var(--shadow-xs); }
+  .nav-filter button .n { font-variant-numeric:tabular-nums; font-size:10px; opacity:.7; margin-left:3px; }
+  /* ---- 目录树条目：active 金色指示条 + 悬停精修 ---- */
+  .pl { position:relative; }
+  .pl.on::before { content:""; position:absolute; left:1px; top:22%; bottom:22%; width:3px; border-radius:2px; background:var(--primary); box-shadow:0 0 6px rgba(184,153,104,.45); }
+  .pl:hover { background:var(--bg-card-2); }
+  .pl.on:hover { background:var(--primary-soft); }
+  .pl .pl-path { opacity:.24; }
+  .pl:hover .pl-path, .pl.on .pl-path { opacity:.85; }
+  /* 复制按钮：悬停行/激活行才浮现，减噪 */
+  .pl .pl-copy { opacity:0; transform:translateX(-2px); transition:opacity var(--d-fast), transform var(--d-fast), color var(--d-fast), background var(--d-fast); }
+  .pl:hover .pl-copy, .pl.on .pl-copy, .pl-copy:focus-visible { opacity:1; transform:none; }
+  /* 过滤隐藏态 */
+  .pl.area-hide, .pv-group.group-empty { display:none !important; }
+  .pl-parent.area-hide + .pl-kids { display:none !important; }
+  /* ---- 目录树分组：点击整组折叠/展开 ---- */
+  .pv-group .g-name { cursor:pointer; user-select:none; -webkit-user-select:none; width:100%; border:0; background:transparent; text-align:left; padding:4px 2px; border-radius:var(--r-s); transition:background var(--d-fast); }
+  .pv-group .g-name:hover { background:var(--bg-card-2); }
+  .pv-group .g-name .g-label { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pv-group .g-caret { flex:none; width:13px; height:13px; color:var(--text-3); opacity:.85; transition:transform var(--d-fast); }
+  .pv-group.collapsed .g-caret { transform:rotate(-90deg); }
+  .pv-group.collapsed .links { display:none; }
+  .g-name .g-count { margin-left:auto; }
+  /* ---- 悬停简介 tooltip：带指示箭头 ---- */
+  .pl-tip::before { content:""; position:absolute; left:-6px; top:50%; transform:translateY(-50%); border:6px solid transparent; border-right-color:var(--line-strong); }
+  .pl-tip[data-side="left"]::before { left:auto; right:-6px; border-right-color:transparent; border-left-color:var(--line-strong); }
+  /* 搜索命中计数态 */
+  #nh-total.searching { color:var(--primary-dim); font-weight:800; }
+  .nav-search .nav-search-hit { margin-left:auto; flex:none; font-size:10px; font-weight:700; color:var(--primary-dim); background:var(--primary-soft); padding:1px 7px; border-radius:999px; display:none; }
+  .nav-search .nav-search-hit.show { display:block; }
 </style>
 </head>
 <body>
@@ -409,13 +490,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <aside class="pv-side">
     <div class="pv-side-hd">
       <div class="pv-side-hd-row">
-        <div class="brand">工程链 <span>ENGCHAIN</span></div>
-        <button class="btn-xs" id="reset-state" type="button">重置演示</button>
+        <div class="brand">
+          <svg class="brand-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          工程链 <span>ENGCHAIN</span>
+        </div>
+        <button class="btn-xs" id="reset-state" type="button" title="重置全部演示数据（恢复 9 个种子账号初始状态）">重置演示</button>
       </div>
       <div class="sub">建筑供需匹配 · AI 全链路 · 高保真交互原型</div>
-      <div style="display:flex;gap:8px;">
+      <div class="pv-ops">
         <button type="button" id="btn-showcase" class="pv-showcase-btn" title="无外壳纯应用展示，根据窗口自动适配">全局展示</button>
         <button type="button" id="btn-model" class="pv-showcase-btn" style="background:var(--bg-card);border:1px solid var(--line);color:var(--text-2);" title="切换手机外壳模型">模型展示</button>
+        <button type="button" id="btn-wonder-demo" class="pv-showcase-btn" title="跳过频控，直接弹出「长时间无有效动作浏览」惊喜时刻营销弹窗，可反复体验（预算与幂等结算仍生效）">惊喜时刻</button>
       </div>
 
       <!-- 固定展示：五轨道身份 × 状态场景选择器（起点/审核中/驳回，与认证中心"身份成长路径"同构） -->
@@ -432,9 +517,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <!-- 可滚动区：演示状态控制台 + 走查提示 + 目录树整体上下滚动，为目录树让出纵向空间 -->
     <div class="pv-scroll">
-      <!-- 演示状态控制台 (localStorage 持久化) -->
-      <div class="pv-state">
-        <div class="ss-title">演示状态 · 模拟账号与应用切换</div>
+      <!-- 演示状态控制台（折叠面板：默认收起，展开可调校设备/主题/液态玻璃参数；折叠状态经 localStorage 持久化） -->
+      <div class="pv-state" id="pv-state">
+        <button type="button" class="pv-state-hd" id="pv-state-hd" aria-expanded="true" title="展开 / 收起演示控制台">
+          <svg class="hd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2"/><circle cx="15" cy="16" r="2"/></svg>
+          <span class="hd-title">演示控制台</span>
+          <span class="hd-summary" id="pv-state-summary">82% · 明亮 · 破冰期</span>
+          <svg class="hd-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="pv-state-body">
+          <div class="pv-subhd">设备与主题</div>
         <div class="pv-row"><span class="k">设备比例</span>
           <span class="zoom-ctl">
             <button id="zoom-out" title="缩小">−</button>
@@ -457,7 +549,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <button data-v="dark">暗色</button>
           </span>
         </div>
-        <div class="pv-row"><span class="k">Tabbar 玻璃</span>
+        <div class="pv-sec" id="sec-tabbar">
+          <button type="button" class="pv-sec-hd" aria-expanded="true">
+            <svg class="sec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 4v16"/></svg>
+            <span class="sec-title">Tabbar 液态玻璃</span>
+            <span class="sec-count">16 项</span>
+            <svg class="sec-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="pv-sec-bd">
+            <div class="pv-subhd">玻璃着色</div>
+            <div class="pv-row"><span class="k">Tabbar 玻璃</span>
           <span class="glass-params" id="glass-params" data-show="light">
             <span class="g-reset-row"><button id="g-reset" type="button" class="btn-xs">重置默认</button><button id="g-default" type="button" class="btn-xs btn-set-def">设置默认</button></span>
             <label class="g-item-light"><span>亮 tint</span><input type="range" id="g-tintL" min="0" max="0.9" step="0.05"><em id="g-tintL-v">0.45</em></label>
@@ -466,7 +567,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label class="g-item-dark"><span>暗 frost</span><input type="range" id="g-frostD" min="0" max="1" step="0.05"><em id="g-frostD-v">0.48</em></label>
           </span>
         </div>
-        <div class="pv-row"><span class="k">Tabbar 几何</span>
+            <div class="pv-subhd">几何结构</div>
+            <div class="pv-row"><span class="k">Tabbar 几何</span>
           <span class="glass-params" id="geom-params">
             <span class="g-reset-row"><button id="gg-reset" type="button" class="btn-xs">重置默认</button><button id="gg-default" type="button" class="btn-xs btn-set-def">设置默认</button></span>
             <label><span>高度</span><input type="range" id="gg-h" min="36" max="72" step="1"><em id="gg-h-v">56</em></label>
@@ -477,7 +579,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label><span>按压缩放</span><input type="range" id="gg-pressScale" min="100" max="110" step="1"><em id="gg-pressScale-v">1.02</em></label>
           </span>
         </div>
-        <div class="pv-row"><span class="k">Tabbar 折射</span>
+            <div class="pv-subhd">折射采样</div>
+            <div class="pv-row"><span class="k">Tabbar 折射</span>
           <span class="glass-params" id="refract-params">
             <span class="g-reset-row"><button id="gr-reset" type="button" class="btn-xs">重置默认</button><button id="gr-default" type="button" class="btn-xs btn-set-def">设置默认</button></span>
             <label><span>折射外扩</span><input type="range" id="gr-bleed" min="0" max="30" step="1"><em id="gr-bleed-v">10</em></label>
@@ -492,8 +595,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label><span>边缘宽度</span><input type="range" id="gr-edgeWidth" min="0" max="100" step="5"><em id="gr-edgeWidth-v">0.42</em></label>
             <label><span>吸收</span><input type="range" id="gr-absorption" min="0" max="100" step="5"><em id="gr-absorption-v">0.15</em></label>
           </span>
+          </div>
         </div>
-        <div class="pv-row"><span class="k">按钮玻璃</span>
+        </div>
+        <div class="pv-sec" id="sec-btn">
+          <button type="button" class="pv-sec-hd" aria-expanded="true">
+            <svg class="sec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M9 7V5h6v2"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+            <span class="sec-title">按钮液态玻璃</span>
+            <span class="sec-count">14 项</span>
+            <svg class="sec-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="pv-sec-bd">
+            <div class="pv-subhd">玻璃着色</div>
+            <div class="pv-row"><span class="k">按钮玻璃</span>
           <span class="glass-params" id="btn-glass-params" data-show="light">
             <span class="g-reset-row"><button id="bg-reset" type="button" class="btn-xs">重置默认</button><button id="bg-default" type="button" class="btn-xs btn-set-def">设置默认</button></span>
             <label class="g-item-light"><span>亮金 tint</span><input type="range" id="bg-goldL" min="0" max="1.5" step="0.05"><em id="bg-goldL-v">1.40</em></label>
@@ -506,7 +620,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label class="g-item-dark"><span>暗 frost</span><input type="range" id="bg-frostD" min="0" max="1" step="0.05"><em id="bg-frostD-v">0.15</em></label>
           </span>
         </div>
-        <div class="pv-row"><span class="k">按钮材质</span>
+            <div class="pv-subhd">材质参数</div>
+            <div class="pv-row"><span class="k">按钮材质</span>
           <span class="glass-params" id="btn-mat-params">
             <span class="g-reset-row"><button id="bm-reset" type="button" class="btn-xs">重置默认</button><button id="bm-default" type="button" class="btn-xs btn-set-def">设置默认</button></span>
             <label><span>折射</span><input type="range" id="bm-refraction" min="0" max="150" step="1"><em id="bm-refraction-v">84</em></label>
@@ -516,7 +631,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <label><span>发丝</span><input type="range" id="bm-hairline" min="0" max="100" step="5"><em id="bm-hairline-v">0.95</em></label>
             <label><span>边缘</span><input type="range" id="bm-edge" min="0" max="60" step="2"><em id="bm-edge-v">0.24</em></label>
           </span>
-        </div>        <div class="pv-row"><span class="k">运营周期</span>
+        </div>
+        </div>
+        </div>
+        <div class="pv-subhd">运营与指标</div>
+        <div class="pv-row"><span class="k">运营周期</span>
           <span class="seg" id="seg-mode">
             <button data-v="breakin">破冰期</button>
             <button data-v="normal">成熟期</button>
@@ -524,10 +643,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
         <div class="pv-note" id="mode-note" style="background:var(--bg-subtle);"></div>
         <div class="pv-note" id="kpi-note" style="background:var(--bg-subtle);"></div>
+        </div>
       </div>
 
       <div class="pv-tip">
-        点击右侧任一页面，加载到唯一 iPhone 真机外壳中。主题 / 账号经 localStorage 持久化。用户是供需综合体，同一账号可同时发布供应与需求，无需切换身份。设备比例可放大 / 缩小。
+        点击右侧任一页面，加载到对应真机外壳 / Web 浏览器模型；主题、账号与设备比例经 localStorage 持久化。用户是供需综合体，同一账号可同时发布供应与需求。
       </div>
 
       <!-- 目录树统计行 -->
@@ -539,11 +659,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="nh-badge nh-admin" id="nh-admin">后台 0</span>
         </div>
       </div>
-      <!-- 搜索 + 折叠控制 -->
+      <!-- 搜索 + 过滤 + 折叠控制 -->
       <div class="pv-nav-tools">
+        <div class="nav-filter" id="nav-filter" role="tablist" aria-label="页面范围过滤">
+          <button type="button" data-f="all" class="on" role="tab" aria-selected="true">全部 <span class="n" id="nf-all">0</span></button>
+          <button type="button" data-f="app" role="tab" aria-selected="false">App <span class="n" id="nf-app">0</span></button>
+          <button type="button" data-f="admin" role="tab" aria-selected="false">后台 <span class="n" id="nf-admin">0</span></button>
+        </div>
         <div class="nav-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="nav-search" placeholder="搜索页面名 / 路径…" autocomplete="off">
+          <input type="text" id="nav-search" placeholder="搜索页面名 / 路径 / 描述…" autocomplete="off">
+          <span class="nav-search-hit" id="nav-search-hit"></span>
           <button type="button" id="nav-search-clear" title="清空" hidden>✕</button>
         </div>
         <div class="nav-tools-btns">
@@ -665,6 +791,73 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="js/common.js"></script>
 <script src="js/stores.js"></script>
 <script src="js/databus.js"></script>
+<script src="js/wonder-engine.js"></script>
+<script src="js/wonder-popup.js"></script>
+<script>
+/* preview 专属：左侧边栏「惊喜时刻 · 主动触发」按钮 —— 跳过频控，在手机模型窗口（iframe 内 home.html）弹出
+   「长时间无有效动作浏览」营销弹窗，便于演示台反复查看与体验（预算与幂等结算仍生效）。
+   弹窗挂载在 iframe 文档内，以手机屏（390×844，overflow:hidden + 圆角）为显示边界，不再溢出到浏览器视口。
+   若 iframe 内引擎未就绪（首次加载中），短暂轮询等待 ≤3s；file:// 直开可能被跨源拦截，提示改用本地服务器访问。 */
+(function () {
+  function ready(fn) { if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  ready(function () {
+    var btn = document.getElementById('btn-wonder-demo');
+    if (!btn) return;
+
+    /* 读取手机模型 iframe（id=frame，src=home.html）内的 wonder 引擎。
+       同源（本地服务器）可直接访问；file:// 直开可能被跨源拦截 → 返回 { error:'cross-origin' }；
+       iframe 尚未加载完成时返回 null（not-ready）。 */
+    function frameEngine() {
+      var fr = document.getElementById('frame');
+      if (!fr || !fr.contentWindow) return null;
+      try {
+        var iw = fr.contentWindow;
+        if (!iw.WonderEngine) return null;
+        return { eng: iw.WonderEngine, pop: iw.WonderPopup || null };
+      } catch (e) { return { error: 'cross-origin' }; }
+    }
+
+    /* 在 iframe 内触发：若弹窗已开先关闭（点击开关语义），重置频控后主动弹出 */
+    function fireInFrame(fe) {
+      if (fe.pop && fe.pop.isOpen()) { try { fe.pop.close(); } catch (e) {} return { fired: false, reason: 'closed-existing' }; }
+      try { fe.eng.debugResetFreq(); } catch (e) {}
+      return fe.eng.fire({ bypassGate: true }) || { fired: false, reason: 'no-result' };
+    }
+
+    function report(r) {
+      if (!r || !r.fired) {
+        if (r && r.reason === 'blocked-queued') { console.warn('[wonder-demo] 手机预览页有弹窗在场，已排队，关闭后自动补弹'); }
+        else console.warn('[wonder-demo] 主动触发被拦截:', r && r.reason);
+      }
+    }
+
+    btn.addEventListener('click', function () {
+      var fe = frameEngine();
+      /* 跨源（file:// 直开）：无法访问 iframe 内引擎，提示改用本地服务器 */
+      if (fe && fe.error) {
+        console.warn('[wonder-demo] 跨源无法访问手机预览页引擎，请通过本地服务器访问 preview.html（如 http://127.0.0.1:8766/preview.html）');
+        return;
+      }
+      /* 引擎未就绪：轮询等待 iframe 加载（≤3s，每 200ms 一次） */
+      if (!fe) {
+        var waited = 0;
+        var timer = setInterval(function () {
+          waited += 200;
+          fe = frameEngine();
+          if (fe || waited >= 3000) {
+            clearInterval(timer);
+            if (!fe) { console.warn('[wonder-demo] 手机预览页（home.html）引擎尚未就绪，请稍候再试'); return; }
+            if (fe.error) { console.warn('[wonder-demo] 跨源无法访问手机预览页引擎，请通过本地服务器访问 preview.html（如 http://127.0.0.1:8766/preview.html）'); return; }
+            report(fireInFrame(fe));
+          }
+        }, 200);
+        return;
+      }
+      report(fireInFrame(fe));
+    });
+  });
+})();
+</script>
 <script>
 (function () {
   var STATE_KEY = 'engchain-state';
@@ -692,7 +885,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     { name:'资源·机会', pages:[
       { name:'资质招商·首页', src:'pages/franchise/index.html', desc:'资质招商', children:[
         ['pages/supply/detail.html?id=fc1', '资质招商·企业详情', '供需详情 · 企业详情（id=fc1）'],
-        ['pages/franchise/delegate-edit.html', '修改委托', '修改委托 · 资质招商'],
       ]},
       { name:'建企买卖·首页', src:'pages/trade/index.html', desc:'建企买卖', children:[
         ['pages/supply/detail.html?id=t1', '企业买卖·M&A', '供需详情 · M&A（id=t1）'],
@@ -996,7 +1188,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function leafHtml(src, name, extraCls, isParent, desc) {
     var abs = ABS_ROOT + src;
     var caret = isParent ? '<span class="pl-caret" role="button" title="展开/收起">▾</span>' : '';
-    return '<a class="pl ' + extraCls + '" data-src="' + src + '" data-name="' + escAttr(name) + '" data-abs="' + abs + '" data-desc="' + escAttr(desc) + '">' +
+    var area = (src.indexOf('admin/') === 0 || src.indexOf('folder-cards/') === 0) ? 'admin' : 'app';
+    return '<a class="pl ' + extraCls + '" data-src="' + src + '" data-name="' + escAttr(name) + '" data-abs="' + abs + '" data-desc="' + escAttr(desc) + '" data-area="' + area + '" tabindex="-1">' +
       '<span class="ic">' + iconFor(extraCls) + '</span>' +
       '<span class="pl-name">' + name + '</span>' +
       '<span class="pl-right">' +
@@ -1047,13 +1240,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (elTotal) elTotal.textContent = '共 ' + total + ' 页';
     if (elApp) elApp.textContent = 'App ' + appCount;
     if (elAdmin) elAdmin.textContent = '后台 ' + adminCount;
+    ['nf-all', 'nf-app', 'nf-admin'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = (id === 'nf-all' ? total : (id === 'nf-app' ? appCount : adminCount));
+    });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', countPages);
   else countPages();
 
   nav.innerHTML = MODULES.map(function (m) {
     var links = m.pages.map(itemHtml).join('');
-    return '<div class="pv-group"><div class="g-name">' + NAV_ICONS.cat + '<span>' + escAttr(m.name) + '</span></div><div class="links">' + links + '</div></div>';
+    return '<div class="pv-group" data-group="' + escAttr(m.name) + '"><button type="button" class="g-name" data-group="' + escAttr(m.name) + '" title="点击折叠 / 展开整组">' + NAV_ICONS.cat + '<span class="g-label">' + escAttr(m.name) + '</span><span class="g-count"></span><svg class="g-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="links">' + links + '</div></div>';
   }).join('');
 
   /* 折叠状态恢复（localStorage 记忆） */
@@ -1069,28 +1266,28 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   (function addGroupCounts(){
     nav.querySelectorAll('.pv-group').forEach(function(g){
       var cnt = g.querySelectorAll('.pl:not(.pl-state)').length;
-      var gn = g.querySelector('.g-name');
-      if (gn && cnt > 0) {
-        var b = document.createElement('span');
-        b.className = 'g-count';
-        b.textContent = cnt;
-        gn.appendChild(b);
-      }
+      var b = g.querySelector('.g-name .g-count');
+      if (b) b.textContent = cnt > 0 ? cnt : '';
     });
   })();
 
-  /* ---- 搜索过滤 ---- */
+  /* ---- 搜索过滤（页面名 / 路径 / 描述；命中计数；自动展开折叠组） ---- */
   (function navSearch(){
     var box = document.getElementById('nav-search');
     var clear = document.getElementById('nav-search-clear');
+    var hitEl = document.getElementById('nav-search-hit');
+    var totalEl = document.getElementById('nh-total');
     if (!box) return;
     function apply(q){
       q = (q||'').trim().toLowerCase();
       if (clear) clear.hidden = !q;
+      if (hitEl) hitEl.classList.remove('show');
       if (!q) {
         nav.classList.remove('filtering');
         nav.querySelectorAll('.search-hide,.mark,.nav-empty').forEach(function(n){n.classList.remove('search-hide','mark');});
         var e = nav.querySelector('.nav-empty'); if (e) e.remove();
+        if (totalEl) totalEl.classList.remove('searching');
+        if (typeof countPages === 'function') countPages();   /* 恢复真实统计 */
         return;
       }
       nav.classList.add('filtering');
@@ -1105,7 +1302,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         g.querySelectorAll('.pl').forEach(function(pl){
           var name = (pl.dataset.name||'').toLowerCase();
           var path = (pl.dataset.src||'').toLowerCase();
-          if (name.indexOf(q)>-1 || path.indexOf(q)>-1) {
+          var desc = (pl.dataset.desc||'').toLowerCase();
+          if (name.indexOf(q)>-1 || path.indexOf(q)>-1 || desc.indexOf(q)>-1) {
             pl.classList.remove('search-hide');
             pl.classList.add('mark');
             groupHit = true; hitCount++;
@@ -1124,8 +1322,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             }
           }
         });
-        if (!groupHit) g.classList.add('search-hide');
+        if (groupHit) g.classList.remove('collapsed');   /* 命中组自动展开（不写回折叠记忆） */
+        else g.classList.add('search-hide');
       });
+      if (totalEl) { totalEl.classList.add('searching'); totalEl.textContent = '命中 ' + hitCount + ' 页'; }
+      if (hitEl) { hitEl.textContent = hitCount; hitEl.classList.add('show'); }
       var old = nav.querySelector('.nav-empty'); if (old) old.remove();
       if (!hitCount) {
         var d = document.createElement('div');
@@ -1162,6 +1363,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     setTimeout(function(){
       var on = nav.querySelector('.pl.on');
       if (!on) return;
+      /* 展开所在分组（若此前被折叠）并同步折叠记忆 */
+      var _g = on.closest('.pv-group');
+      if (_g && _g.classList.contains('collapsed')) {
+        _g.classList.remove('collapsed');
+        var _gn = _g.dataset.group || '';
+        if (_gn) { navGroupFolded = navGroupFolded.filter(function (n) { return n !== _gn; }); persistNavGroups(); }
+      }
       /* 展开父链 */
       var p = on.parentElement;
       while (p && !p.classList.contains('pv-nav')) {
@@ -1268,7 +1476,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var r = el.getBoundingClientRect();
       var w = tip.offsetWidth, h = tip.offsetHeight;
       var x = (side ? side.getBoundingClientRect().right : r.right) + 12;
-      if (x + w > window.innerWidth - 12) x = r.left - w - 12;   /* 右侧放不下则放左侧 */
+      if (x + w > window.innerWidth - 12) { x = r.left - w - 12; tip.setAttribute('data-side', 'left'); }   /* 右侧放不下则放左侧 */
+      else tip.setAttribute('data-side', 'right');
       var y = r.top + r.height / 2 - h / 2;
       y = Math.max(8, Math.min(window.innerHeight - h - 8, y));
       tip.style.left = x + 'px';
@@ -1574,6 +1783,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       zn.textContent = Math.round(shown * 100) + '%';
       zn.title = '展示比例 ' + Math.round(shown * 100) + '%';
     }
+    updateStateSummary();
   }  document.getElementById('zoom-in').addEventListener('click', function () { scale = clampScale(scale + 0.05); applyScale(); saveScale(); });
   document.getElementById('zoom-out').addEventListener('click', function () { scale = clampScale(scale - 0.05); applyScale(); saveScale(); });
   document.getElementById('zoom-reset').addEventListener('click', function () { scale = 0.82; applyScale(); saveScale(); });
@@ -1607,7 +1817,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:theme', theme: b.dataset.v }, '*'); } catch (e3) {}
     var _gp = document.getElementById('glass-params'); if (_gp) _gp.dataset.show = b.dataset.v;
     var _bgp = document.getElementById('btn-glass-params'); if (_bgp) _bgp.dataset.show = b.dataset.v;
-
+    updateStateSummary();
 
   });
   /* ---- 「设置默认」系统默认值：持久化于 pv-* 键（避开 DataBus.resetAll 清理的 engchain-* 命名空间）。
@@ -1919,6 +2129,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (note) note.innerHTML = isB
       ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>¥0</b> / 中介 <b>¥14,999</b>（5折） / 合伙人 <b>¥0</b>（审核制）<br>首档佣金 <b>5%</b>｜实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
       : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>¥3,999</b> / 中介 <b>¥29,999</b> / 合伙人 <b>¥0</b>（审核制）<br>首档佣金 <b>8%</b>｜实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
+    updateStateSummary();
   }
   document.getElementById('seg-mode').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
@@ -2161,6 +2372,123 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   if (currentShell === 'pura') switchShell('pura');
 
   renderMode(); renderKPI();
+
+  /* ============ 侧边栏深度优化 V2 · 交互层 ============ */
+
+  /* ---- 演示控制台整块折叠（localStorage 持久化；默认收起，目录树立即可见） ---- */
+  (function statePanel(){
+    var panel = document.getElementById('pv-state');
+    var hd = document.getElementById('pv-state-hd');
+    if (!panel || !hd) return;
+    var KEY = 'engchain-pv-state-collapsed';
+    var collapsed = true;   /* 默认收起：目录树立即可见；用户展开一次后持久化 */
+    try { var _v = localStorage.getItem(KEY); if (_v !== null) collapsed = _v === '1'; } catch (e) {}
+    function apply(){
+      panel.classList.toggle('collapsed', collapsed);
+      if (hd) hd.setAttribute('aria-expanded', String(!collapsed));
+      try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e2) {}
+    }
+    apply();
+    hd.addEventListener('click', function (e) { e.preventDefault(); collapsed = !collapsed; apply(); });
+  })();
+
+  /* ---- 控制台内子折叠（Tabbar / 按钮 液态玻璃） ---- */
+  (function secCollapse(){
+    document.querySelectorAll('.pv-sec-hd').forEach(function (hd2) {
+      hd2.addEventListener('click', function () {
+        var sec = hd2.closest('.pv-sec');
+        if (!sec) return;
+        var collapsedSec = sec.classList.toggle('collapsed');
+        hd2.setAttribute('aria-expanded', String(!collapsedSec));
+      });
+    });
+  })();
+
+  /* ---- 目录树分组折叠（点击分组标题；localStorage 持久化） ---- */
+  var navGroupFolded = [];
+  try { navGroupFolded = JSON.parse(localStorage.getItem('engchain-nav-groups') || '[]'); } catch (e) {}
+  function persistNavGroups() {
+    try { localStorage.setItem('engchain-nav-groups', JSON.stringify(navGroupFolded)); } catch (e) {}
+  }
+  (function groupCollapse(){
+    nav.querySelectorAll('.g-name').forEach(function (gn) {
+      var g = gn.closest('.pv-group');
+      if (!g) return;
+      var name = g.dataset.group || '';
+      if (name && navGroupFolded.indexOf(name) > -1) g.classList.add('collapsed');
+      gn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var isCollapsed = g.classList.toggle('collapsed');
+        var idx = navGroupFolded.indexOf(name);
+        if (isCollapsed) { if (idx < 0) navGroupFolded.push(name); }
+        else { if (idx > -1) navGroupFolded.splice(idx, 1); }
+        persistNavGroups();
+      });
+    });
+  })();
+
+  /* ---- App / 后台 范围过滤 ---- */
+  (function navFilter(){
+    var fbar = document.getElementById('nav-filter');
+    if (!fbar) return;
+    function applyFilter(f){
+      fbar.querySelectorAll('button').forEach(function (b) {
+        var on = b.dataset.f === f;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-selected', String(on));
+      });
+      nav.querySelectorAll('.pl').forEach(function (pl) {
+        var area = (pl.dataset.src.indexOf('admin/') === 0 || pl.dataset.src.indexOf('folder-cards/') === 0) ? 'admin' : 'app';
+        pl.classList.toggle('area-hide', f !== 'all' && f !== area);
+      });
+      nav.querySelectorAll('.pv-group').forEach(function (g) {
+        var any = g.querySelector('.pl:not(.area-hide)');
+        g.classList.toggle('group-empty', !any);
+      });
+    }
+    fbar.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      applyFilter(b.dataset.f);
+    });
+  })();
+
+  /* ---- 键盘导航：↑↓ 移动条目焦点，Enter 打开 ---- */
+  (function kbNav(){
+    function items() {
+      return Array.prototype.slice.call(nav.querySelectorAll('.pl:not(.search-hide):not(.area-hide)'));
+    }
+    document.addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      var list = items(); if (!list.length) return;
+      var idx = list.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (idx === -1) idx = (e.key === 'ArrowDown') ? -1 : 0;
+        var n = (e.key === 'ArrowDown') ? idx + 1 : idx - 1;
+        if (n >= list.length) n = 0;
+        if (n < 0) n = list.length - 1;
+        e.preventDefault();
+        list[n].focus();
+        try { list[n].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (err) { list[n].scrollIntoView(); }
+      } else if (e.key === 'Enter' && idx > -1) {
+        e.preventDefault();
+        document.activeElement.click();
+      }
+    });
+  })();
+
+  /* ---- 控制台标题栏摘要（缩放 · 主题 · 运营周期） ---- */
+  function updateStateSummary(){
+    var el = document.getElementById('pv-state-summary');
+    if (!el) return;
+    var zn = document.getElementById('zoom-num');
+    var zt = zn ? zn.textContent : '82%';
+    var dark = !!document.documentElement.dataset.theme;
+    var m = window.ModeStore ? ModeStore.read() : {};
+    var ph = m.phase === 'breakin' ? '破冰期' : '成熟期';
+    el.textContent = zt + ' · ' + (dark ? '暗色' : '明亮') + ' · ' + ph;
+  }
+  updateStateSummary();
 
   /* 初始化后强制 iframe 带时间戳加载（绕过旧版 HTML 缓存，确保玻璃脚本生效） */
   reloadFrame();

@@ -625,16 +625,43 @@
   };
 
   /* ======================================================================
-     Gate —— 触发前避让态检查
+     Gate —— 触发前避让态检查（排队避让，保证不与其他弹窗重叠/覆盖）
      ====================================================================== */
+  /* 元素是否真实可见：过滤 aria-hidden 链与 display/visibility/opacity 隐藏的常驻容器，
+     避免把 preview 等页面的隐藏框架弹层（如 fs-dialog）误判为在场弹窗 */
+  function isVisible(el) {
+    try {
+      if (!el) return false;
+      if (el.closest && el.closest('[aria-hidden="true"]')) return false;
+      var st = el.ownerDocument && el.ownerDocument.defaultView ? el.ownerDocument.defaultView.getComputedStyle(el) : null;
+      if (!st) return false;
+      if (st.display === 'none' || st.visibility === 'hidden' || st.visibility === 'collapse') return false;
+      if (st.opacity !== '' && parseFloat(st.opacity) === 0) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+  /* 已打开/正在展示中的其他弹窗、模态、底部抽屉（状态驱动 + 可见性过滤） */
+  function hasActivePopup() {
+    try {
+      var sel = '.gg--overlay,.gg--screen,' +
+        '[role="dialog"][aria-modal="true"],' +
+        '.modal-show,.sheet-show,' +
+        '.sheet.show,.sheet-overlay.show,.modal-overlay.show,.report-modal.show,.filter-modal.show,' +
+        '[data-sheet-mask].show,[data-sheet-box].show';
+      var nodes = document.querySelectorAll(sel);
+      for (var i = 0; i < nodes.length; i++) {
+        if (isVisible(nodes[i])) return true;
+      }
+      return false;
+    } catch (e) { return false; }
+  }
   function isBlocked() {
     try {
-      /* 已有 GuestGate 或其他模态/动作面板在场 */
-      if (document.querySelector('.gg--overlay,.gg--screen,[role="dialog"][aria-modal="true"],.modal-show,.sheet-show')) return true;
+      if (hasActivePopup()) return true;
       var ae = document.activeElement;
       if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '')) return true;
       if (ae && ae.isContentEditable) return true;
-      /* 支付进行中（页面自定义标记） */
+      /* 支付进行中（页面自定义标记，存在即视为忙碌） */
       if (document.querySelector('[data-wonder-busy="pay"]')) return true;
     } catch (e) {}
     return false;
@@ -648,6 +675,9 @@
     booted: false,
     scenario: 'home',
     timer: null,
+    _pending: null,        /* 排队中的触发请求 {reason, forceOpts} */
+    _pendingSince: 0,      /* 排队开始时间戳（超时放弃用） */
+    _waitTimer: null,      /* 避让轮询定时器 */
 
     detectScenario: function () {
       var forced = document.body && document.body.getAttribute('data-wonder-scenario');
@@ -694,12 +724,17 @@
       this.fire('auto');
     },
 
-    /* 组装决策并弹窗。force=true 时跳过频控/沉默检查（演示/运营），预算与幂等仍生效 */
+    /* 组装决策并弹窗。force=true 时跳过频控/沉默检查（演示/运营），预算与幂等仍生效。
+       避让检查（不与其他弹窗重叠）无论是否 bypassGate 都执行：有冲突则排队等待。 */
     fire: function (reason, forceOpts) {
       var c = cfg();
       forceOpts = forceOpts || {};
+      /* 第一道：检测其他弹窗正在加载/已打开 → 排队等待其关闭后自动补弹，绝不重叠或覆盖 */
+      if (isBlocked()) {
+        this._queueFire(reason, forceOpts);
+        return { fired: false, reason: 'blocked-queued' };
+      }
       if (!forceOpts.bypassGate) {
-        if (isBlocked()) return { fired: false, reason: 'blocked' };
         var gate = Frequency.check();
         if (!gate.ok) return { fired: false, reason: gate.reason };
       }
@@ -763,6 +798,39 @@
       return { fired: true, decisionId: decisionId, decision: decision };
     },
 
+    /* 避让排队：检测到其他弹窗在场时挂起触发请求，轮询等待冲突消失后自动补弹。
+       等待超时（queueWaitMaxMs，默认 60s）后放弃，避免永久挂起。 */
+    _queueFire: function (reason, forceOpts) {
+      var self = this, c = cfg();
+      if (this._waitTimer) {
+        /* 已排队：刷新参数，不重置等待起点（防止自动 tick 反复延长超时） */
+        this._pending = { reason: reason, forceOpts: forceOpts || {} };
+        return;
+      }
+      this._pending = { reason: reason, forceOpts: forceOpts || {} };
+      this._pendingSince = Date.now();
+      var maxWait = (c && c.queueWaitMaxMs) || 60000;
+      this._waitTimer = setInterval(function () {
+        if (!self._pending) { self._clearWait(); return; }
+        if (Date.now() - self._pendingSince > maxWait) {
+          emit('queue-timeout', { reason: self._pending.reason });
+          self._clearWait();
+          return;
+        }
+        if (!isBlocked()) {
+          var p = self._pending;
+          self._clearWait();
+          emit('queue-resume', { reason: p.reason });
+          self.fire(p.reason, p.forceOpts);
+        }
+      }, 500);
+    },
+    _clearWait: function () {
+      if (this._waitTimer) { clearInterval(this._waitTimer); this._waitTimer = null; }
+      this._pending = null;
+      this._pendingSince = 0;
+    },
+
     settle: function (decisionId) {
       var d = decisions[decisionId];
       if (!d) return { kind: 'none' };
@@ -781,7 +849,8 @@
       frequency: Frequency.state(),
       budget: { raw: Budget.raw(), status: Budget.status() },
       pending: Granter.pending(),
-      expectedCost: Granter.expectedCost()
+      expectedCost: Granter.expectedCost(),
+      queue: { pending: !!Director._pending, since: Director._pendingSince, maxWaitMs: (cfg() || {}).queueWaitMaxMs || 60000 }
     };
   }
 
@@ -801,6 +870,7 @@
     expectedCost: function () { return Granter.expectedCost(); },
     state: debugState,
     resetAll: function () {
+      Director._clearWait();
       ['signals', 'freq', 'budget', 'grants', 'pending'].forEach(function (k) {
         try { localStorage.removeItem(LS_PREFIX + k); } catch (e) {}
       });

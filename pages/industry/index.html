@@ -634,6 +634,39 @@ body { background: var(--bg); }
   color:var(--primary-dim);
 }
 
+/* ─── 订阅卡片悬浮条（浏览超5秒后自动移动至浏览窗口底部） ─── */
+.subscribe-float{
+  position:absolute;left:0;right:0;bottom:0;
+  z-index:100;
+  display:flex;align-items:stretch;gap:8px;
+  padding:0 var(--page-pad,16px) calc(10px + env(safe-area-inset-bottom,0px));
+  box-sizing:border-box;
+  transform:translateY(112%);
+  transition:transform .45s cubic-bezier(.16,1,.3,1);
+  pointer-events:none;
+}
+.subscribe-float.show{
+  transform:translateY(0);
+  pointer-events:auto;
+}
+.subscribe-float .subscribe-float-card{
+  flex:1;min-width:0;
+  margin:0 !important;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-card) !important;
+}
+.subscribe-float-close{
+  flex:none;width:36px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;border-radius:var(--r-m);
+  background:var(--bg-card);color:var(--text-3);
+  box-shadow:var(--shadow-sm);
+  cursor:pointer;
+  transition:color .2s ease;
+}
+.subscribe-float-close:active{color:var(--text-1);}
+.subscribe-float-close svg{width:15px;height:15px;}
+
 /* ─── 空状态（升级：更精致） ─── */
 .empty-state{
   display:flex;flex-direction:column;align-items:center;
@@ -1446,6 +1479,8 @@ body { background: var(--bg); }
     var subbed = ReportStore.isSubscribed();
     var slot = document.getElementById('subscribe-slot');
     if (subbed) {
+      // 已订阅：若卡片已悬浮至窗口底部，立即回收（槽位随后渲染已订阅卡）
+      if (subscribeFloated) unfloatSubscribeCard(true);
       var s = ReportStore.read();
       var d = new Date(s.expireAt);
       slot.innerHTML = '<div class="subscribe-card">'+
@@ -1455,6 +1490,11 @@ body { background: var(--bg); }
         '</div>'+
         '<div class="sub-desc">全部行业报告已解锁，新报告自动更新</div>'+
       '</div>';
+      return;
+    }
+    // 卡片已悬浮至窗口底部时，槽位仅保留等高校位，避免切换Tab后重复渲染
+    if (subscribeFloated) {
+      slot.innerHTML = '<div style="height:'+subscribeFloatHolderH+'px;"></div>';
       return;
     }
     slot.innerHTML = '<div onclick="openSubscribeSheet()" style="margin:12px 0 0;padding:12px 14px;border-radius:12px;background:var(--bg-card);box-shadow:var(--shadow-xs);cursor:pointer;display:flex;align-items:center;gap:12px;">'+
@@ -1467,6 +1507,145 @@ body { background: var(--bg); }
       '</div>'+
       '<div style="font-size:11px;color:var(--primary-dim);font-weight:600;flex:none;">了解 ›</div>'+
     '</div>';
+  }
+
+  /* ═══ 订阅卡片悬浮：浏览超过5秒后自动移动至浏览窗口底部 ═══ */
+  var SUBSCRIBE_FLOAT_DELAY = 5000;
+  var subscribeFloated = false;
+  var subscribeFloatHolderH = 0;
+  var subscribeFloatHost = null;
+  var subscribeFloatLeft = SUBSCRIBE_FLOAT_DELAY;
+  var subscribeFloatTimer = null;
+
+  function ensureSubscribeFloatHost(){
+    if (subscribeFloatHost) return subscribeFloatHost;
+    subscribeFloatHost = document.createElement('div');
+    subscribeFloatHost.id = 'subscribe-float-host';
+    subscribeFloatHost.className = 'subscribe-float';
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'subscribe-float-close';
+    closeBtn.setAttribute('aria-label','收起行业数据订阅卡片');
+    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    closeBtn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      unfloatSubscribeCard();
+    });
+    subscribeFloatHost.appendChild(closeBtn);
+    var phone = document.querySelector('.phone');
+    if (phone) phone.appendChild(subscribeFloatHost);
+    else document.body.appendChild(subscribeFloatHost);
+    return subscribeFloatHost;
+  }
+
+  function floatSubscribeCard(){
+    if (subscribeFloated) return;
+    if (ReportStore.isSubscribed()) return;
+    var slot = document.getElementById('subscribe-slot');
+    var card = slot && slot.firstElementChild;
+    // 仅悬浮真正的“行业数据订阅”卡片（带打开订阅弹窗的事件）
+    if (!card || !card.getAttribute('onclick')) return;
+    // 原位置保留等高校位，避免页面布局跳动
+    subscribeFloatHolderH = card.offsetHeight;
+    slot.innerHTML = '<div style="height:'+subscribeFloatHolderH+'px;"></div>';
+    card.classList.add('subscribe-float-card');
+    ensureSubscribeFloatHost().appendChild(card);
+    subscribeFloated = true;
+    subscribeLastOuterInteract = 0;
+    requestAnimationFrame(function(){
+      subscribeFloatHost.classList.add('show');
+    });
+  }
+
+  function unfloatSubscribeCard(immediate){
+    if (!subscribeFloated) return;
+    cancelSubscribeFloatDismiss();
+    var host = subscribeFloatHost;
+    var slot = document.getElementById('subscribe-slot');
+    var card = host ? host.querySelector('.subscribe-float-card') : null;
+    if (host) host.classList.remove('show');
+    subscribeFloated = false;
+    if (!card || !slot) return;
+    if (immediate) {
+      // 订阅成功等场景：立即回收，槽位随后由 renderSubscribe 重新渲染
+      host.removeChild(card);
+      card.classList.remove('subscribe-float-card');
+      return;
+    }
+    // 常规收回：先播放下滑动画，动画结束后将卡片移回槽位原位
+    setTimeout(function(){
+      if (card.parentNode === host) host.removeChild(card);
+      card.classList.remove('subscribe-float-card');
+      slot.innerHTML = '';
+      slot.appendChild(card);
+    }, 460);
+  }
+
+  function startSubscribeFloatCountdown(){
+    if (subscribeFloated || subscribeFloatTimer) return;
+    if (ReportStore.isSubscribed()) return;
+    var last = Date.now();
+    subscribeFloatTimer = setInterval(function(){
+      var now = Date.now();
+      // 页面隐藏（切走/最小化）期间不计入浏览时长
+      if (!document.hidden) subscribeFloatLeft -= (now - last);
+      last = now;
+      if (subscribeFloatLeft <= 0) {
+        clearInterval(subscribeFloatTimer);
+        subscribeFloatTimer = null;
+        floatSubscribeCard();
+      }
+    }, 200);
+  }
+
+  /* ═══ 悬浮卡片自动收回：未点击卡片、点击卡片外区域或上下滑动后5秒自动移回 ═══ */
+  var SUBSCRIBE_FLOAT_DISMISS_DELAY = 5000;
+  var subscribeDismissTimer = null;
+  var subscribeLastOuterInteract = 0;
+
+  function armSubscribeFloatDismiss(){
+    if (!subscribeFloated) return;
+    subscribeLastOuterInteract = Date.now();
+    if (subscribeDismissTimer) return;
+    subscribeDismissTimer = setInterval(function(){
+      if (!subscribeFloated) {
+        clearInterval(subscribeDismissTimer);
+        subscribeDismissTimer = null;
+        return;
+      }
+      // 距最后一次外部交互（点击卡片外区域 / 上下滑动）满5秒后自动移回原位
+      if (Date.now() - subscribeLastOuterInteract >= SUBSCRIBE_FLOAT_DISMISS_DELAY) {
+        unfloatSubscribeCard();
+      }
+    }, 250);
+  }
+
+  function cancelSubscribeFloatDismiss(){
+    if (subscribeDismissTimer) {
+      clearInterval(subscribeDismissTimer);
+      subscribeDismissTimer = null;
+    }
+  }
+
+  // 点击卡片外区域（订阅弹窗内除外）：视为暂无订阅意向，5秒后自动收回悬浮卡
+  document.addEventListener('click', function(e){
+    if (!subscribeFloated) return;
+    var t = e.target;
+    if (t && t.closest) {
+      // 点击卡片本身：有订阅意向，取消收回倒计时（卡片随后打开订阅弹窗）
+      if (t.closest('#subscribe-float-host')) { cancelSubscribeFloatDismiss(); return; }
+      // 订阅弹窗（含遮罩）内的点击不算卡片外交互
+      if (t.closest('#subscribe-sheet') || t.closest('#ss-overlay')) return;
+    }
+    armSubscribeFloatDismiss();
+  });
+
+  // 上下滑动页面：视为暂无订阅意向，5秒后自动收回悬浮卡
+  var subscribeScrollEl = document.querySelector('.scroll');
+  if (subscribeScrollEl) {
+    subscribeScrollEl.addEventListener('scroll', function(){
+      armSubscribeFloatDismiss();
+    }, { passive: true });
   }
 
   /* ═══ Tab 切换 ═══ */
@@ -1646,6 +1825,8 @@ body { background: var(--bg); }
   renderService();
   renderPolicy();
   renderSubscribe();
+  // 浏览超过5秒后，自动将“行业数据订阅”卡片移动至浏览窗口底部（未订阅时生效）
+  startSubscribeFloatCountdown();
 })();
 </script>
 <script>window.__SWIPE_ZONES__=window.__SWIPE_ZONES__||[];window.__SWIPE_ZONES__.push({trigger:'.scroll',consumers:[{type:'scroll',el:'.industry-tabs'}]});</script>

@@ -1105,6 +1105,7 @@ window.MOCK = (function () {
       ],
       grantTtlDays: 7,              /* 奖励积分有效期（游客预挂账保留时长同此） */
       softSignalCooldownRatio: 0.5, /* 触碰付费墙未支付等软信号：沉默阈值缩短比例 */
+      queueWaitMaxMs: 60000,        /* 避让排队：检测到其他弹窗在场时，等待其关闭后自动补弹的最大时长（ms），超时放弃本次触发 */
       scenarios: ['home', 'list', 'detail']  /* 允许主动触发的场景白名单 */
     },
     /* 入驻费（R2，按次；取代旧 entry ¥2000 专业版） */
