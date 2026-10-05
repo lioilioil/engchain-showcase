@@ -13,6 +13,84 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>发票管理 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css">
+<style>
+  /* ===== 底部固定悬浮按钮组（样式同「资质招商·首页」.app-float-cta：白毛玻璃多层渐变 + backdrop-filter + 发丝边 + 内分隔竖线；data-lg-glass 容器挂载 WebGL 玻璃） ===== */
+  .app-float-cta {
+    position: absolute !important; left: 50%; right: auto; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 32px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 55; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 12px;
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+        rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+        rgba(255,255,255,.78) 100%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+        rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    border: 1px solid rgba(255,255,255,.88);
+    box-shadow:
+      0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+      inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+      inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.40);
+    user-select: none; -webkit-user-select: none;
+  }
+  .app-float-cta::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+      rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+  }
+  .app-float-cta .afc-item {
+    flex: none; height: 100%; min-width: 0; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    color: var(--text-1); font-size: 13px; font-weight: 500; letter-spacing: .02em;
+    transition: color .25s, font-weight .25s, transform .15s;
+    font-family: var(--font-display);
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+    padding: 0 9px;
+  }
+  .app-float-cta .afc-item svg {
+    width: 18px; height: 18px; stroke-width: 2; flex: none;
+    transition: stroke-width .2s, color .25s;
+  }
+  .app-float-cta .afc-item:active { transform: scale(.94); }
+  .app-float-cta .afc-sep { flex: none; color: rgba(22,22,22,.28); font-size: 12px; padding: 0 2px; position: relative; z-index: 2; }
+  /* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+  [data-theme="dark"] .app-float-cta {
+    background: linear-gradient(180deg,
+      rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+      rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+      inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  [data-theme="dark"] .app-float-cta::before {
+    background: linear-gradient(180deg,
+      rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+      rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+  }
+  [data-theme="dark"] .app-float-cta .afc-item {
+    color: var(--text-1);
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] .app-float-cta .afc-sep { color: rgba(242,240,236,.30); }
+  /* 待审核卡片右下角「催开票」按钮 */
+  .urge-btn {
+    font-size: 11px; padding: 4px 11px; border-radius: var(--r-full);
+    border: 1px solid var(--primary); color: var(--primary-dim);
+    background: var(--primary-soft); cursor: pointer; flex: none;
+    transition: opacity .15s;
+  }
+  .urge-btn:active { opacity: .7; }
+</style>
 </head>
 <body>
 <div class="phone">
@@ -22,16 +100,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="nav-right"></div>
   </div>
 
-  <div class="scroll" style="padding-top:8px;">
-    <div class="group">
-      <div class="row" id="btn-apply"><span class="row-icon" style="background:var(--primary-soft);color:var(--primary)">＋</span><span class="label">申请开票</span><span class="arrow">›</span></div>
-      <div class="row" onclick="urgeInvoice()"><span class="row-icon" style="background:rgba(255,214,10,.16)"><svg class="ic"><use href="#i-clock"/></svg></span><span class="label">催开票</span><span class="arrow">›</span></div>
-      <div class="row" onclick="location.href='invoice-info.html'"><span class="row-icon" style="background:var(--primary-soft);color:var(--primary)"><svg class="ic"><use href="#i-edit"/></svg></span><span class="label">开票信息管理</span><span class="value" id="title-count">0 个抬头</span><span class="arrow">›</span></div>
-    </div>
-
-    <!-- 申请开票表单（默认隐藏，点击展开） -->
+  <div class="scroll" style="padding-top:8px;padding-bottom:104px;">
+    <!-- 申请开票表单（默认隐藏，点击底部「申请开票」展开） -->
     <div class="card" id="apply-form" style="display:none;margin:10px 14px;">
-      <div class="fw-600 fs-14" style="margin-bottom:10px;">申请开票</div>
+      <div class="fw-600 fs-14" style="margin-bottom:10px;">申请开票 <span class="text-3 fs-11" id="title-count" style="font-weight:400;">0 个抬头</span></div>
       <div class="field"><label class="field-label">发票抬头 <span class="req">*</span></label>
         <select class="input" id="f-title"></select>
       </div>
@@ -66,6 +138,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <button class="btn btn-primary btn-sm" onclick="document.getElementById('btn-apply').click()">去开票</button>
     </div>
   </div>
+
+  <!-- 底部主操作：液态玻璃胶囊条，样式同「资质招商·首页」.app-float-cta（data-lg-glass 挂载 WebGL 玻璃） -->
+  <div class="app-float-cta" data-lg-glass>
+    <button type="button" class="afc-item" id="btn-apply" aria-label="申请开票">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      <span class="afc-label">申请开票</span>
+    </button>
+    <span class="afc-sep" aria-hidden="true">|</span>
+    <button type="button" class="afc-item" onclick="location.href='invoice-info.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <span class="afc-label">信息管理</span>
+    </button>
+  </div>
 </div>
 
 <script src="../../js/data.js"></script>
@@ -73,6 +158,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/domain.js"></script><script src="../../js/guest-gate.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -217,6 +303,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="text-2 fs-12 mt-1">' + money(x.amount) + (x.orderId ? ' · 订单 ' + x.orderId : '') + '</div>' +
         (x.status === 'rejected' && x.rejectNote ? '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote) + '</div>' : '') +
         (x.status === 'issued' ? '<div class="mt-2 fb-between"><span class="text-3 fs-11">发票号 ' + esc(x.invoiceNo || '') + '</span><span class="link-green fs-12">查看/下载 ›</span></div>' : '') +
+        (x.status === 'pending' ? '<div class="mt-2" style="display:flex;justify-content:flex-end;"><button type="button" class="urge-btn" onclick="event.stopPropagation();urgeInvoice()">催开票</button></div>' : '') +
         '</div>';
     }).join('');
   }
