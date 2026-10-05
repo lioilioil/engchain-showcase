@@ -115,4 +115,4 @@ PUBLISH_TYPE_LAYOUTS.STATIC_FIELD_MAP = {
   unit: 'f-unit', qty: 'f-qty', spec: 'f-spec', delivery: 'f-delivery', qualification: 'f-qual'
 };
 
-global.PUBLISH_TYPE_LAYOUTS = PUBLISH_TYPE_LAYOUTS;
+window.PUBLISH_TYPE_LAYOUTS = PUBLISH_TYPE_LAYOUTS;

@@ -234,9 +234,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }});
       return;
     }
-    v = parseFloat(document.getElementById('amount').value) || 0;
+    var rawAmt = (document.getElementById('amount').value || '').trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(rawAmt)) { UI.toast('请输入正确的充值金额（最多两位小数）', 'warn'); return; }
+    v = parseFloat(rawAmt) || 0;
     var minRecharge = (MOCK.business.recharge && MOCK.business.recharge.min) || 10;
     if (v < minRecharge) { UI.toast('最低充值金额为 ¥' + minRecharge, 'warn'); return; }
+    var maxRecharge = (MOCK.business.recharge && MOCK.business.recharge.max) || 500000;
+    if (v > maxRecharge) { UI.toast('单笔充值上限为 ' + UI.money(maxRecharge), 'warn'); return; }
     if (pm === 'corp') {
       // 生成对公转账记录（待上传凭证），并打开对公弹窗
       currentRecord = CorpPay.create({ amount: v, account: CorpPay.BANK, remark: '工程链充值・尾号 4638' });

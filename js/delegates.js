@@ -35,16 +35,22 @@
     migrated = true;
     try {
       var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
-      if (!legacy || !legacy.id) return;
+      if (!legacy) return;
+      /* 兼容历史单对象与数组两种形态：统一为数组逐条按 id 去重迁入 */
+      var list = Array.isArray(legacy) ? legacy : [legacy];
       var all = read();
-      var hit = all.some(function (x) { return x.id === legacy.id; });
-      if (!hit) {
-        legacy.biz = legacy.biz || 'franchise';
-        legacy.bizLabel = legacy.bizLabel || '资质招商';
-        legacy.status = normStatus(legacy.status);
-        all.unshift(legacy);
-        write(all);
-      }
+      list.forEach(function (item) {
+        /* 非法项（非对象 / 无 id）跳过，不抛错 */
+        if (!item || typeof item !== 'object' || !item.id) return;
+        var dup = all.some(function (x) { return x.id === item.id; });
+        if (dup) return;
+        item.biz = item.biz || 'franchise';
+        item.bizLabel = item.bizLabel || '资质招商';
+        item.status = normStatus(item.status);
+        all.unshift(item);
+      });
+      write(all);
+      /* 旧 key 在循环后无条件清除（无论是否实际迁入） */
       try { localStorage.removeItem(LEGACY_KEY); } catch (e2) {}
     } catch (e) {}
   }

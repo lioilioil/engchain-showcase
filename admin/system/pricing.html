@@ -231,6 +231,7 @@
       var input = modal.dialog.querySelector('#edit-val');
       var v = parseFloat(input.value);
       if (isNaN(v)) { Admin.toast('请输入有效数字', 'err'); return; }
+      if (item.pct && (v < 0 || v > 1)) { Admin.toast('费率/比例须为 0-1 小数（如 0.05=5%）', 'err'); return; }
       var patch = {};
       setObj(patch, item.key, v);
       var r = ConfigAPI.save(patch, '修改定价配置：' + item.label + ' → ' + v);
@@ -289,6 +290,11 @@
     modal.dialog.querySelector('#tier-cancel').onclick = function () { modal.close(); };
     modal.dialog.querySelector('#tier-confirm').onclick = function () {
       tiers.sort(function (a, b) { return a.min - b.min; });
+      for (var ti = 0; ti < tiers.length; ti++) {
+        var tr = tiers[ti];
+        if (isNaN(tr.min) || tr.min < 0) { Admin.toast('第' + (ti + 1) + '档金额下限不能为负数', 'err'); return; }
+        if (isNaN(tr.rate) || tr.rate < 0 || tr.rate > 1) { Admin.toast('第' + (ti + 1) + '档费率须为 0-1 小数（当前=' + tr.rate + '）', 'err'); return; }
+      }
       var patch = { commission: { tier: tiers } };
       var r = ConfigAPI.save(patch, '修改佣金阶梯：' + tiers.length + ' 档');
       if (!r.ok) { Admin.toast('保存失败：' + (r.error || ''), 'err'); return; }
