@@ -1,0 +1,73 @@
+{
+  "schema_version": 2,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "委托状态机 · 三态流转与解锁延伸",
+    "subtitle": "等待承接 → 已承接 / 已驳回 → 解锁 → 成交（状态与迁移基于 js/delegates.js 真实实现，解锁/成交为延伸状态）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "engchain-delegate-states.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "lanes": [
+    { "id": "main", "label": "委托主状态 · js/delegates.js" },
+    { "id": "review", "label": "审核驳回通道" },
+    { "id": "support", "label": "客服介入 · 编辑锁定" }
+  ],
+  "states": [
+    { "id": "submitted", "type": "start", "label": "提交委托", "sublabel": "collectForm → add/upsert", "lane": "main", "col": 0, "step": "01", "sources": [{ "path": "js/delegates.js", "line": 63, "end_line": 95 }, { "path": "js/delegates.js", "line": 397, "end_line": 442 }] },
+    { "id": "waiting", "type": "active", "label": "等待承接", "sublabel": "委托排队 · 可被驳回", "lane": "main", "col": 1, "step": "02", "tag": "等待承接", "sources": [{ "path": "js/delegates.js", "line": 15, "end_line": 16 }] },
+    { "id": "accepted", "type": "active", "label": "已承接", "sublabel": "编辑锁定 · 2h SLA", "lane": "main", "col": 2, "step": "03", "tag": "已承接", "sources": [{ "path": "js/delegates.js", "line": 33, "end_line": 56 }] },
+    { "id": "unlocked", "type": "success", "label": "已解锁", "sublabel": "¥29.9 支付后展示信息", "lane": "main", "col": 3, "step": "04", "tag": "已解锁", "sources": [{ "path": "js/delegates.js", "line": 651, "end_line": 668 }, { "path": "js/delegates.js", "line": 767, "end_line": 783 }] },
+    { "id": "dealt", "type": "success", "label": "大额成交", "sublabel": "居间抽佣 1%–3%（规划）", "lane": "main", "col": 4, "step": "05", "tag": "L3 规划" },
+    { "id": "rejected", "type": "failure", "label": "已驳回", "sublabel": "可修改后重新提交", "lane": "review", "col": 2, "tag": "已驳回" },
+    { "id": "cs", "type": "waiting", "label": "客服介入", "sublabel": "已承接后仅走客服调整", "lane": "support", "col": 3, "tag": "在线/400-888-6688" }
+  ],
+  "transitions": [
+    { "from": "submitted", "to": "waiting", "label": "提交成功入队", "variant": "emphasis" },
+    { "from": "waiting", "to": "accepted", "label": "顾问 2h 内承接", "variant": "emphasis" },
+    { "from": "waiting", "to": "rejected", "label": "审核驳回", "variant": "security" },
+    { "from": "rejected", "to": "waiting", "label": "修改重提 · 重新排队", "variant": "emphasis" },
+    { "from": "accepted", "to": "unlocked", "label": "¥29.9 解锁支付成功", "variant": "emphasis" },
+    { "from": "accepted", "to": "cs", "label": "详情需调整 → 客服", "variant": "dashed" },
+    { "from": "unlocked", "to": "dealt", "label": "成交后按效果抽佣（规划）", "variant": "dashed" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "三态状态机（真实实现）",
+      "items": [
+        "委托字段 status 三态：等待承接 / 已承接 / 已驳回，统一存储 engchain_delegates",
+        "upsert() 强制保留「已承接」：已承接委托不可被普通提交覆盖",
+        "已驳回可修改后重新提交，提交后自动回落「等待承接」重新排队",
+        "已承接后详情编辑锁定，调整仅能走在线客服 / 电话客服 400-888-6688",
+        "委托编号 W+时间戳后 8 位，全程留痕可追溯"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "解锁与成交（延伸状态）",
+      "items": [
+        "已承接 → 已解锁：支付 ¥29.9 后写解锁权益 engchain_delegate_unlocks，广播 engchain:delegate-order",
+        "已解锁为 L2 变现落地状态；大额成交 + 居间抽佣 1%–3% 为 L3 规划状态（虚线）",
+        "订单数据存 engchain_delegate_orders（订单号 UL+时间戳后 10 位）",
+        "首页待付款提醒仅对实名用户生效，同一次进入仅提醒一次"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "口径边界",
+      "items": [
+        "承接/驳回/支付回调均为纯前端 localStorage 模拟，无真实后端（代码内 [模拟] 注释）",
+        "¥29.9 为演示定价（UNLOCK_AMOUNT=29.9）",
+        "L3 成交抽佣 1%–3% 为规划中，非已上线收入（见 docs/委托服务-产品策略方案书.html）",
+        "实名门控/信息可追溯/资金托管话术为信任风控机制，约束见门控流程图"
+      ]
+    }
+  ]
+}

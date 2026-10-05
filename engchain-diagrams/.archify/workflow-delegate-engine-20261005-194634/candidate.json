@@ -1,0 +1,88 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "委托引擎 · 端到端执行逻辑",
+    "subtitle": "入口 → 实名门控 → 表单校验 → 提交落库 → 顾问承接 → 解锁订单 → 收银台支付 → 信息解锁 → 大额成交（基于 js/delegates.js 真实实现）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "engchain-delegate-engine.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "lanes": [
+    { "id": "demander", "label": "需求方 · 前端页面" },
+    { "id": "engine", "label": "委托引擎 · js/delegates.js" },
+    { "id": "backoffice", "label": "平台后台 · 顾问/收银台/存储（模拟）" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "触达与实名门控", "fromCol": 0, "toCol": 1 },
+    { "id": "p2", "label": "表单填写与提交", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "p3", "label": "顾问承接与订单推送", "fromCol": 4, "toCol": 4 },
+    { "id": "p4", "label": "解锁与成交", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["entry", "gate", "form", "submit", "handoff", "accept", "push", "checkout", "pay", "unlock"],
+  "nodes": [
+    { "id": "entry", "lane": "demander", "col": 0, "type": "frontend", "label": "委托入口", "sublabel": "资质招商首页 / 我的委托", "width": 132 },
+    { "id": "gate", "lane": "engine", "col": 1, "type": "security", "label": "实名门控", "sublabel": "未实名 → bottom sheet 引导", "tag": "gateRealname()", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 530, "end_line": 534 }, { "path": "js/delegates.js", "line": 506, "end_line": 529 }] },
+    { "id": "form", "lane": "demander", "col": 2, "type": "frontend", "label": "轻量表单填写", "sublabel": "chips 点选 · 地区识别", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 229, "end_line": 288 }, { "path": "js/delegates.js", "line": 382, "end_line": 387 }] },
+    { "id": "submit", "lane": "engine", "col": 3, "type": "backend", "label": "提交 · 校验 · 落库", "sublabel": "collectForm() · add/upsert", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 63, "end_line": 95 }, { "path": "js/delegates.js", "line": 397, "end_line": 442 }] },
+    { "id": "handoff", "lane": "demander", "col": 3, "type": "frontend", "label": "对接信息页", "sublabel": "热线 400-888-6688 · 企微", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 567, "end_line": 607 }] },
+    { "id": "accept", "lane": "backoffice", "col": 4, "type": "backend", "label": "顾问承接 · 匹配", "sublabel": "2 小时 SLA · 筛 2-N 条", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 573, "end_line": 575 }] },
+    { "id": "push", "lane": "engine", "col": 4, "type": "backend", "label": "推送待付款订单", "sublabel": "pushUnlockOrder() · ¥29.90", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 618, "end_line": 644 }] },
+    { "id": "deal", "lane": "backoffice", "col": 3, "type": "backend", "label": "大额成交 · 居间抽佣", "sublabel": "L3 规划中 · 1%–3%", "width": 132 },
+    { "id": "checkout", "lane": "backoffice", "col": 4, "type": "frontend", "label": "收银台", "sublabel": "三渠道 · 资金托管话术", "tag": "微信/支付宝/银联", "width": 132, "yOffset": 90, "sources": [{ "path": "js/delegates.js", "line": 735, "end_line": 766 }] },
+    { "id": "pay", "lane": "backoffice", "col": 5, "type": "security", "label": "支付成功", "sublabel": "confirmPay 模拟 → markPaid", "width": 132, "yOffset": 90, "sources": [{ "path": "js/delegates.js", "line": 767, "end_line": 783 }, { "path": "js/delegates.js", "line": 651, "end_line": 668 }] },
+    { "id": "unlock", "lane": "demander", "col": 5, "type": "frontend", "label": "解锁信息页", "sublabel": "按业务线展示 · 一键拨打", "width": 132, "sources": [{ "path": "js/delegates.js", "line": 803, "end_line": 851 }] }
+  ],
+  "edges": [
+    { "id": "entry-gate", "from": "entry", "to": "gate", "label": "进入委托流程", "variant": "emphasis" },
+    { "id": "gate-form", "from": "gate", "to": "form", "label": "实名通过 → 继续提交", "variant": "emphasis" },
+    { "id": "form-submit", "from": "form", "to": "submit", "label": "提交校验", "variant": "emphasis" },
+    { "id": "submit-form", "from": "submit", "to": "form", "label": "校验不通过 · toast", "role": "error", "variant": "security" },
+    { "id": "submit-handoff", "from": "submit", "to": "handoff", "label": "弹出对接页" },
+    { "id": "handoff-accept", "from": "handoff", "to": "accept", "label": "顾问 2 小时内联系", "variant": "emphasis" },
+    { "id": "accept-push", "from": "accept", "to": "push", "label": "匹配完成", "variant": "emphasis" },
+    { "id": "push-checkout", "from": "push", "to": "checkout", "label": "首页待付款提醒 → 收银台", "variant": "emphasis" },
+    { "id": "checkout-pay", "from": "checkout", "to": "pay", "label": "确认支付 · 1 秒回调", "variant": "emphasis" },
+    { "id": "pay-unlock", "from": "pay", "to": "unlock", "label": "查看解锁信息", "variant": "emphasis", "toSide": "bottom" },
+    { "id": "accept-deal", "from": "accept", "to": "deal", "label": "成交后按效果抽佣（规划）", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "执行逻辑要点（真实代码）",
+      "items": [
+        "统一存储 engchain_delegates，旧 franchise_delegate_v1 按 id 去重自动迁移、迁移后清除",
+        "委托编号 W+时间戳后 8 位；解锁订单号 UL+时间戳后 10 位（engchain_delegate_orders），全程留痕",
+        "upsert() 强制保留「已承接」状态：已承接委托不可被普通提交覆盖",
+        "支付成功写解锁权益 engchain_delegate_unlocks，广播 engchain:delegate-order 事件",
+        "实名判定口径 realnameOk() 与 stores.js deriveIdentity 一致"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "状态分支与保护",
+      "items": [
+        "未实名被 bottom sheet 拦截：游客→去登录，已登录未实名→去实名认证",
+        "已驳回可修改后重新提交，修改后自动回落「等待承接」重新排队",
+        "已承接后详情编辑锁定，需调整仅能走在线客服 / 电话客服 400-888-6688",
+        "首页待付款提醒仅对实名用户生效，同一次进入仅提醒一次（PendingAlerts 液态玻璃横幅）"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "口径边界",
+      "items": [
+        "¥29.9 为演示定价（UNLOCK_AMOUNT=29.9，收银台明示资金托管与退款规则）",
+        "全部「后台」行为（承接/推送订单/支付回调）为纯前端 localStorage 模拟，无真实后端",
+        "L3 成交居间 1%–3% 为规划中，非已上线收入（见 docs/委托服务-产品策略方案书.html）",
+        "真实接口规划见代码内 [模拟] 注释：POST /api/delegate/orders、GET /api/orders/pending 等"
+      ]
+    }
+  ]
+}

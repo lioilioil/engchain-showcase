@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "佣金结算 · 财务后台资金链路",
+    "subtitle": "settled 订单 → orderCalc 同源试算 → T+1 结算单（CommissionStore）→ 发放与审计 · 附中介托管已实现佣金与防跳单处罚（基于 admin/finance/commission.html + js/databus.js 真实实现）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "g7-commission.html",
+    "viewBox": [1075, 600],
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "stages": [
+    { "label": "订单来源" },
+    { "label": "佣金试算" },
+    { "label": "T+1 结算单" },
+    { "label": "发放与审计" },
+    { "label": "合规处罚" }
+  ],
+  "nodes": [
+    { "id": "orders", "type": "backend", "label": "settled 订单池", "sublabel": "已成交且未入结算单", "stage": 0, "row": 0, "tag": "待结算订单", "sources": [{ "path": "js/databus.js", "line": 1387, "end_line": 1392 }] },
+    { "id": "escrow", "type": "backend", "label": "中介托管订单", "sublabel": "已结算等托管 4 态", "stage": 0, "row": 2, "width": 150, "tag": "资金托管", "sources": [{ "path": "admin/finance/commission.html", "line": 307, "end_line": 310 }] },
+    { "id": "ordercalc", "type": "backend", "label": "佣金试算 orderCalc", "sublabel": "金额 × 费率 = 佣金", "stage": 1, "row": 0, "width": 150, "tag": "8/6/5/4/3% 阶梯", "sources": [{ "path": "js/databus.js", "line": 1033, "end_line": 1042 }, { "path": "js/stores.js", "line": 1410, "end_line": 1424 }, { "path": "js/data.js", "line": 1145, "end_line": 1147 }] },
+    { "id": "moneym", "type": "backend", "label": "Mediation.money", "sublabel": "已释放 × 费率", "stage": 1, "row": 2, "tag": "feeReleased 已实现", "sources": [{ "path": "js/domain.js", "line": 785, "end_line": 789 }, { "path": "admin/finance/commission.html", "line": 328, "end_line": 328 }] },
+    { "id": "settle", "type": "backend", "label": "生成 T+1 结算单", "sublabel": "commissionSettle(orderId)", "stage": 2, "row": 0, "width": 150, "tag": "需 payout 权限", "sources": [{ "path": "js/databus.js", "line": 1393, "end_line": 1408 }, { "path": "admin/finance/commission.html", "line": 187, "end_line": 202 }] },
+    { "id": "store", "type": "database", "label": "CommissionStore", "sublabel": "engchain-commission", "stage": 2, "row": 1, "tag": "flows / violations", "sources": [{ "path": "js/stores.js", "line": 660, "end_line": 666 }, { "path": "js/stores.js", "line": 658, "end_line": 659 }] },
+    { "id": "pay", "type": "backend", "label": "佣金发放", "sublabel": "待结算→已结算→已发放", "stage": 3, "row": 0, "width": 150, "tag": "payout: finance/super", "sources": [{ "path": "admin/js/admin.js", "line": 426, "end_line": 426 }, { "path": "admin/finance/commission.html", "line": 289, "end_line": 289 }] },
+    { "id": "audit", "type": "security", "label": "操作审计 Admin.log", "sublabel": "engchain-audit 留痕", "stage": 3, "row": 2, "width": 150, "tag": "全量写操作", "sources": [{ "path": "js/databus.js", "line": 301, "end_line": 310 }, { "path": "admin/finance/commission.html", "line": 197, "end_line": 197 }] },
+    { "id": "vio", "type": "security", "label": "防跳单违规处罚", "sublabel": "violationPunish", "stage": 4, "row": 2, "width": 150, "tag": "ban: risk/super", "sources": [{ "path": "js/databus.js", "line": 1424, "end_line": 1440 }, { "path": "admin/finance/commission.html", "line": 86, "end_line": 86 }] }
+  ],
+  "flows": [
+    { "id": "orders-calc", "from": "orders", "to": "ordercalc", "label": "settled 且未入结算单", "classification": "逐单实时试算", "variant": "emphasis", "labelDy": 54 },
+    { "id": "calc-settle", "from": "ordercalc", "to": "settle", "label": "金额 × 费率 = 佣金", "classification": "生成结算单", "variant": "emphasis", "labelDy": 54 },
+    { "id": "settle-pay", "from": "settle", "to": "pay", "label": "已结算 → 发放", "classification": "paid 已发放", "variant": "emphasis", "labelDy": 54 },
+    { "id": "settle-store", "from": "settle", "to": "store", "label": "addFlow 写结算单", "classification": "status=done · settledAt", "variant": "dashed", "labelDy": -68 },
+    { "id": "pay-audit", "from": "pay", "to": "audit", "label": "发放与结算留痕", "classification": "Admin.log", "variant": "security", "labelDy": 25 },
+    { "id": "vio-audit", "from": "vio", "to": "audit", "label": "处罚执行留痕", "classification": "violationPunish", "variant": "security", "labelDy": 54 },
+    { "id": "escrow-moneym", "from": "escrow", "to": "moneym", "label": "已达成里程碑释放", "classification": "托管分账", "variant": "default", "labelDy": 54 }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "试算口径（真实代码）",
+      "items": [
+        "orderCalc 与全站结算同源：commissionRate 阶梯 ≥0→8% / ≥5万→6% / ≥20万→5% / ≥50万→4% / ≥100万→3%（js/data.js）",
+        "最低单笔佣金 ¥100（minCommission，小额保护，全部订单生效）",
+        "结算方式：订单 ≥5 万按里程碑分账 30/30/30/10（合同签订/进度50%/验收/质保期满），<5 万整单结算",
+        "T+1：addFlow 默认 frozenUntil = 创建+1 天，到期 pending 惰性转 settled"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "状态机与权限",
+      "items": [
+        "结算单 flow 生命周期：待结算 pending → 已结算 settled → 可提现 withdrawable → 已发放/已提现 paid",
+        "后台「已结算佣金」tab 口径：已结算 done / 已发放 paid 两态筛选",
+        "生成结算单与发放按钮带 data-perm=payout（仅 finance/super）；违规处罚带 data-perm=ban（仅 risk/super）",
+        "结算/处罚/导出均写 Admin.log → engchain-audit，全量可追溯"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "口径与边界",
+      "items": [
+        "费率档位、佣金金额为前端 MOCK 演示配置（js/data.js MOCK.business.commission），非真实经营数据",
+        "中介托管 feeReleased = 已释放额 × ruleSnapshot.rate（默认 8%），为托管分账已实现口径",
+        "防跳单处罚档位（禁聊7/30天、罚款¥5,000、停号15天、二次清退）由 jumpContract 配置驱动",
+        "全部为纯前端 localStorage 模拟（engchain-commission / engchain-audit），无真实资金打款"
+      ]
+    }
+  ]
+}

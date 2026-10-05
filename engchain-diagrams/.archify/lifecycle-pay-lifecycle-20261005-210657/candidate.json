@@ -1,0 +1,96 @@
+{
+  "schema_version": 2,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "G9 解锁订单 · 支付生命周期",
+    "subtitle": "技术 / 经营视角：待解锁 → 收银台三渠道 → 模拟支付 → markPaid 写解锁权益并广播 → 按业务线展示结果；未对接成功可申请退款（基于 js/delegates.js 真实实现）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "pay-lifecycle.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "lanes": [
+    { "id": "main", "label": "订单主流程 · 委托信息详情" },
+    { "id": "remind", "label": "首页待付款提醒（仅实名）" },
+    { "id": "benefit", "label": "解锁权益落库与广播" },
+    { "id": "terminal", "label": "终态 · 退款" }
+  ],
+  "states": [
+    { "id": "pending", "type": "start", "label": "待解锁 · 未支付", "sublabel": "订单号 UL+时间戳后10位", "lane": "main", "col": 0, "step": "01", "tag": "pending", "sources": [
+      { "path": "js/delegates.js", "line": 618, "end_line": 644 },
+      { "path": "js/delegates.js", "line": 629, "end_line": 629 }
+    ] },
+    { "id": "checkout", "type": "decision", "label": "收银台", "sublabel": "微信/支付宝/银联三选一 · ¥29.90", "lane": "main", "col": 1, "step": "02", "tag": "选择渠道", "sources": [
+      { "path": "js/delegates.js", "line": 735, "end_line": 766 }
+    ] },
+    { "id": "paying", "type": "active", "label": "模拟支付中", "sublabel": "confirmPay 1 秒回调", "lane": "main", "col": 2, "step": "03", "tag": "processing", "sources": [
+      { "path": "js/delegates.js", "line": 767, "end_line": 783 }
+    ] },
+    { "id": "paid", "type": "success", "label": "已支付 markPaid", "sublabel": "订单 status→paid · 写解锁权益", "lane": "main", "col": 3, "step": "04", "tag": "paid", "sources": [
+      { "path": "js/delegates.js", "line": 651, "end_line": 668 }
+    ] },
+    { "id": "unlocked", "type": "success", "label": "解锁信息可见", "sublabel": "查看顾问匹配结果", "lane": "main", "col": 4, "step": "05", "tag": "unlocked", "sources": [
+      { "path": "js/delegates.js", "line": 803, "end_line": 817 }
+    ] },
+    { "id": "remind", "type": "waiting", "label": "首页待付款提醒", "sublabel": "仅实名 · 横幅提醒", "lane": "remind", "col": 0, "tag": "提醒", "sources": [
+      { "path": "js/delegates.js", "line": 672, "end_line": 705 },
+      { "path": "home.html", "line": 281, "end_line": 282 }
+    ] },
+    { "id": "benefit", "type": "active", "label": "写权益 + 广播", "sublabel": "写解锁权益 · 广播事件", "lane": "benefit", "col": 3, "tag": "落库", "sources": [
+      { "path": "js/delegates.js", "line": 661, "end_line": 666 }
+    ] },
+    { "id": "bizresult", "type": "neutral", "label": "按业务线展示结果", "sublabel": "四业务线匹配结果", "lane": "benefit", "col": 4, "tag": "匹配结果", "sources": [
+      { "path": "js/delegates.js", "line": 818, "end_line": 851 }
+    ] },
+    { "id": "refunded", "type": "failure", "label": "已退款", "sublabel": "未对接成功可申请退款 · 原路退回", "lane": "terminal", "col": 4, "tag": "terminal", "sources": [
+      { "path": "js/delegates.js", "line": 753, "end_line": 755 },
+      { "path": "pages/refund/index.html", "line": 548, "end_line": 548 }
+    ] }
+  ],
+  "transitions": [
+    { "id": "t-pending-checkout", "from": "pending", "to": "checkout", "label": "打开收银台", "variant": "emphasis" },
+    { "id": "t-remind-checkout", "from": "remind", "to": "checkout", "label": "立即支付", "variant": "emphasis" },
+    { "id": "t-checkout-paying", "from": "checkout", "to": "paying", "label": "选渠道·同意规则", "labelDy": 60 },
+    { "id": "t-paying-paid", "from": "paying", "to": "paid", "label": "1s 后 markPaid", "variant": "emphasis", "labelDy": 60 },
+    { "id": "t-paid-benefit", "from": "paid", "to": "benefit", "label": "写权益+广播", "variant": "dashed" },
+    { "id": "t-paid-unlocked", "from": "paid", "to": "unlocked", "label": "查看解锁信息", "variant": "emphasis", "labelDy": 60 },
+    { "id": "t-unlocked-biz", "from": "unlocked", "to": "bizresult", "label": "按 biz 展示", "variant": "dashed" },
+    { "id": "t-paid-refund", "from": "paid", "to": "refunded", "label": "未对接成功申请退款", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "支付生命周期要点（真实代码）",
+      "items": [
+        "订单存 engchain_delegate_orders，编号 = UL + 时间戳后 10 位，type = unlock-browse",
+        "confirmPay 模拟 1 秒后 markPaid：订单 status→paid 并写入 paidAt",
+        "支付成功写解锁权益 engchain_delegate_unlocks，并 dispatch engchain:delegate-order 事件",
+        "收银台支付方式：微信支付 / 支付宝 / 银联三选一"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "提醒与解锁结果",
+      "items": [
+        "首页 maybeShowOrderPopup() 仅对实名用户；同一次进入仅提醒一次",
+        "v2.1 优先 PendingAlerts 液态玻璃横幅，组件不可用回退底部弹窗",
+        "franchise→2 家持证企业；trade→带报价标的 ¥128 万 / ¥86 万",
+        "personnel→人才+岗位；general→匹配信息一 / 二"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "口径边界",
+      "items": [
+        "¥29.90 为演示定价（UNLOCK_AMOUNT=29.9），非真实交易金额",
+        "支付为前端模拟：[模拟] POST /api/orders/{id}/pay，无真实支付网关",
+        "退款：收银台明示「资金托管保障 · 未对接成功可申请退款」，原路退回至支付账户"
+      ]
+    }
+  ]
+}

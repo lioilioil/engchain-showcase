@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "电子签 · 合同签署全流程",
+    "subtitle": "首页 → 发起五步（方式/内容/签署方/签章位/确认发送）→ 对方 H5 免登签署 → 全部签署生成 e签宝存证 · 附次数包购买与退款（基于 pages/esign/** + js/stores.js EsignStore 真实实现）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "g10-esign.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "lanes": [
+    { "id": "demand", "label": "发起方 · App 端" },
+    { "id": "platform", "label": "平台 · EsignStore / e签宝" },
+    { "id": "partner", "label": "对方 · H5 签署端" },
+    { "id": "ops", "label": "购买与退款审核" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "发起与配置（五步）", "fromCol": 0, "toCol": 4, "variant": "emphasis" },
+    { "id": "p2", "label": "发送与对方签署", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["home", "choose", "content", "parties", "fields", "preview", "send", "h5", "done"],
+  "nodes": [
+    { "id": "home", "lane": "demand", "col": 0, "type": "frontend", "label": "电子签首页", "sublabel": "合同列表·待我签/待对方签", "width": 132, "sources": [{ "path": "pages/esign/index.html", "line": 23, "end_line": 33 }] },
+    { "id": "choose", "lane": "demand", "col": 1, "type": "frontend", "label": "选择发起方式", "sublabel": "步骤① 方式", "width": 132, "sources": [{ "path": "pages/esign/choose-type.html", "line": 51, "end_line": 51 }, { "path": "pages/esign/esign.common.js", "line": 252, "end_line": 252 }] },
+    { "id": "content", "lane": "demand", "col": 2, "type": "frontend", "label": "合同内容", "sublabel": "选模板 / 上传 PDF", "width": 132, "sources": [{ "path": "pages/esign/template-list.html", "line": 23, "end_line": 23 }, { "path": "pages/esign/upload.html", "line": 60, "end_line": 68 }] },
+    { "id": "parties", "lane": "demand", "col": 3, "type": "frontend", "label": "填写签署方", "sublabel": "步骤③ 多方·顺/无序", "width": 132, "sources": [{ "path": "pages/esign/parties.html", "line": 83, "end_line": 93 }] },
+    { "id": "fields", "lane": "demand", "col": 4, "type": "frontend", "label": "确认签章位置", "sublabel": "步骤④ 每方≥1签章位", "width": 132, "sources": [{ "path": "pages/esign/fields.html", "line": 61, "end_line": 73 }] },
+    { "id": "preview", "lane": "demand", "col": 5, "type": "frontend", "label": "确认并发送", "sublabel": "勾选同意服务协议", "width": 132, "tag": "扣1次", "sources": [{ "path": "pages/esign/preview.html", "line": 29, "end_line": 30 }, { "path": "pages/esign/preview.html", "line": 83, "end_line": 104 }] },
+    { "id": "pkg", "lane": "platform", "col": 0, "type": "backend", "label": "次数包购买与配额", "sublabel": "engchain-esign · remaining", "width": 132, "tag": "余额支付", "sources": [{ "path": "js/data.js", "line": 1019, "end_line": 1028 }, { "path": "js/stores.js", "line": 2754, "end_line": 2781 }] },
+    { "id": "send", "lane": "platform", "col": 5, "type": "backend", "label": "sendContract 发送", "sublabel": "扣1次 · pending_mine", "width": 132, "sources": [{ "path": "js/stores.js", "line": 2638, "end_line": 2666 }] },
+    { "id": "done", "lane": "platform", "col": 5, "type": "backend", "label": "完成存证", "sublabel": "e签宝 certNo + hash", "width": 132, "yOffset": 90, "sources": [{ "path": "js/stores.js", "line": 2698, "end_line": 2704 }] },
+    { "id": "h5", "lane": "partner", "col": 5, "type": "frontend", "label": "H5 对方签署", "sublabel": "免登·实名·落章", "width": 132, "sources": [{ "path": "pages/esign/h5-sign.html", "line": 45, "end_line": 45 }, { "path": "pages/esign/h5-sign.html", "line": 212, "end_line": 228 }] },
+    { "id": "refund", "lane": "ops", "col": 1, "type": "security", "label": "退款申请与审核", "sublabel": "applyRefund → 后台审", "width": 132, "sources": [{ "path": "js/stores.js", "line": 2784, "end_line": 2806 }, { "path": "js/stores.js", "line": 2858, "end_line": 2902 }] }
+  ],
+  "edges": [
+    { "id": "home-choose", "from": "home", "to": "choose", "label": "发起签署", "variant": "emphasis" },
+    { "id": "choose-content", "from": "choose", "to": "content", "label": "选模板或上传", "variant": "emphasis" },
+    { "id": "content-parties", "from": "content", "to": "parties", "label": "下一步", "variant": "emphasis" },
+    { "id": "parties-fields", "from": "parties", "to": "fields", "label": "下一步", "variant": "emphasis" },
+    { "id": "fields-preview", "from": "fields", "to": "preview", "label": "下一步", "variant": "emphasis" },
+    { "id": "preview-send", "from": "preview", "to": "send", "label": "确认发送·扣1次", "variant": "emphasis" },
+    { "id": "send-h5", "from": "send", "to": "h5", "label": "生成签署链接", "variant": "emphasis" },
+    { "id": "h5-done", "from": "h5", "to": "done", "label": "全部签署·存证", "variant": "emphasis" },
+    { "id": "preview-pkg", "from": "preview", "to": "pkg", "label": "次数不足→购买", "variant": "dashed", "role": "branch" },
+    { "id": "pkg-refund", "from": "pkg", "to": "refund", "label": "申请退款", "variant": "dashed", "role": "branch" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "签署流程要点（真实代码）",
+      "items": [
+        "发起五步：方式 → 内容（模板/上传）→ 签署方 → 签章位 → 确认发送（STEP_LABELS 真实标签）",
+        "发送 sendContract 扣 1 次；对方签署前发起方撤回退 1 次，拒签/逾期不退",
+        "H5 对方免登：findAnyContract 跨 uid 只读查找，实名认证后落章（企业公章/个人签名）",
+        "全部签署方完成 → status=completed，生成 e签宝存证（certNo + hash + 时间戳）",
+        "顺序签按 order 轮到当前方；无序签任一方完成即流转"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "次数包与口径",
+      "items": [
+        "次数包：单次体验 1次¥10 / 10次包¥80 / 100次包¥600，余额支付，有效期 2 年",
+        "单笔合同对方签署链接有效期 7 天（signValidDays）",
+        "退款：按已用次数 × ¥10/次扣除，后台审核通过后原路退回余额并核销未用次数",
+        "合同状态机：draft / pending_mine / signing / completed / rejected / expired / withdrawn / voided"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "服务协议与边界",
+      "items": [
+        "发送前须勾选同意《电子签名服务协议》《电子签用户告知书》，知晓与纸质签名同等效力",
+        "仅企业入驻/个人合伙人身份可发起（canUse），游客与未开通身份被拦截",
+        "演示环境不真实上传 PDF、不真实调用 e签宝，存证与落章均为本地模拟",
+        "H5 页明示「e签宝提供实名认证与存证 · 合同内容仅签署方可见」"
+      ]
+    }
+  ]
+}

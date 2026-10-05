@@ -1,0 +1,86 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "分销返佣 · 两级合规机制",
+    "subtitle": "L1 直邀 / L2 伙伴再邀请（硬上限两级）· T+1 冻结结算 · 提现审批 · 退款追回与违规处罚（流程与数值来自 pages/distribution/** 与 js/domain.js）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": "engchain-distribution.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "lanes": [
+    { "id": "inviter", "label": "分销员（企业档 / 个人合伙人）" },
+    { "id": "consumer", "label": "被邀伙伴（客户）" },
+    { "id": "platform", "label": "平台返佣引擎 / 审批 / 风控（js/domain.js）" }
+  ],
+  "phases": [
+    { "id": "p1", "label": "邀请绑定", "fromCol": 0, "toCol": 1 },
+    { "id": "p2", "label": "消费计佣", "fromCol": 2, "toCol": 3 },
+    { "id": "p3", "label": "T+N 冻结结算", "fromCol": 4, "toCol": 4 },
+    { "id": "p4", "label": "发放与提现", "fromCol": 5, "toCol": 5 }
+  ],
+  "mainPath": ["poster", "invitee", "bind", "consume", "gen", "freeze", "settle", "pay", "apply", "approve"],
+  "nodes": [
+    { "id": "poster", "lane": "inviter", "col": 0, "type": "frontend", "label": "专属海报/邀请链接", "sublabel": "72h 窗口 · 防重防环", "tag": "分享渠道", "width": 120, "sources": [{ "path": "pages/distribution/rules.html", "line": 248, "end_line": 248 }, { "path": "pages/distribution/poster.html", "line": 1, "end_line": 5 }] },
+    { "id": "invitee", "lane": "consumer", "col": 1, "type": "frontend", "label": "伙伴注册", "sublabel": "注册时填邀请码", "sources": [{ "path": "pages/distribution/rules.html", "line": 81, "end_line": 86 }] },
+    { "id": "bind", "lane": "platform", "col": 2, "type": "backend", "label": "建立两级关系", "sublabel": "L1 直邀 · L2 仅合伙人企业档", "tag": "RF 关系", "width": 130, "sources": [{ "path": "js/domain.js", "line": 296, "end_line": 312 }, { "path": "pages/distribution/rules.html", "line": 107, "end_line": 107 }] },
+    { "id": "consume", "lane": "consumer", "col": 3, "type": "frontend", "label": "伙伴消费", "sublabel": "充值/订单/入驻", "sources": [{ "path": "pages/distribution/rules.html", "line": 89, "end_line": 95 }] },
+    { "id": "gen", "lane": "platform", "col": 3, "type": "backend", "label": "生成返佣单", "sublabel": "企业档 L1 12% / L2 3%", "tag": "RB · frozen", "width": 130, "sources": [{ "path": "js/domain.js", "line": 379, "end_line": 408 }, { "path": "js/data.js", "line": 972, "end_line": 974 }] },
+    { "id": "clawback", "lane": "consumer", "col": 4, "type": "security", "label": "退款追回", "sublabel": "已冻结取消 · 后续抵扣", "width": 120, "sources": [{ "path": "js/domain.js", "line": 438, "end_line": 455 }, { "path": "pages/distribution/rules.html", "line": 161, "end_line": 161 }] },
+    { "id": "freeze", "lane": "platform", "col": 4, "type": "security", "label": "T+1 冻结保护", "sublabel": "frozenUntil = 创建+1天", "width": 125, "sources": [{ "path": "js/domain.js", "line": 399, "end_line": 399 }, { "path": "pages/distribution/rules.html", "line": 226, "end_line": 226 }] },
+    { "id": "settle", "lane": "platform", "col": 4, "type": "backend", "label": "到期结算", "sublabel": "frozen → settled", "width": 120, "yOffset": -90, "sources": [{ "path": "js/domain.js", "line": 410, "end_line": 416 }] },
+    { "id": "pay", "lane": "platform", "col": 5, "type": "backend", "label": "发放入钱包", "sublabel": "→ available · 计入 totalRebate", "width": 140, "yOffset": -90, "sources": [{ "path": "js/domain.js", "line": 424, "end_line": 437 }] },
+    { "id": "apply", "lane": "inviter", "col": 5, "type": "frontend", "label": "佣金提现", "sublabel": "¥100/¥50 起 · ≤¥1000 · 日2次", "width": 140, "sources": [{ "path": "pages/distribution/withdraw.html", "line": 169, "end_line": 169 }, { "path": "pages/distribution/withdraw.html", "line": 316, "end_line": 319 }, { "path": "pages/distribution/rules.html", "line": 232, "end_line": 233 }] },
+    { "id": "approve", "lane": "platform", "col": 5, "type": "security", "label": "平台审批打款", "sublabel": "待审→初审→到账 · 2h", "width": 120, "sources": [{ "path": "pages/distribution/withdraw.html", "line": 128, "end_line": 129 }, { "path": "pages/distribution/withdraw.html", "line": 325, "end_line": 330 }] }
+  ],
+  "edges": [
+    { "id": "e1", "from": "poster", "to": "invitee", "label": "分享链接/海报", "variant": "emphasis" },
+    { "id": "e2", "from": "invitee", "to": "bind", "label": "填码注册", "variant": "emphasis" },
+    { "id": "e2b", "from": "bind", "to": "consume", "label": "绑定后伙伴消费" },
+    { "id": "e3", "from": "consume", "to": "gen", "label": "消费事件", "variant": "emphasis" },
+    { "id": "e4", "from": "gen", "to": "freeze", "label": "冻结拨付", "variant": "emphasis" },
+    { "id": "e5", "from": "freeze", "to": "settle", "label": "T+1 到期" },
+    { "id": "e6", "from": "settle", "to": "pay", "label": "结算发放", "variant": "emphasis" },
+    { "id": "e7", "from": "pay", "to": "apply", "label": "佣金入钱包余额" },
+    { "id": "e8", "from": "apply", "to": "approve", "label": "提交申请", "variant": "emphasis" },
+    { "id": "e9", "from": "consume", "to": "clawback", "label": "伙伴退款/售后", "role": "error" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "机制要点 · 合规两级",
+      "items": [
+        "层级硬上限 maxLevel=2：一级=直接邀请，二级=伙伴再邀请，超两级不参与返佣（js/domain.js:296-312）",
+        "费率分档：建筑/合伙人企业 L1 12% / L2 3%；中介企业 L1 6% / L2 不开放；个人合伙人 L1 8% / L2 2%",
+        "返佣单 RB：status frozen → settled → paid；frozenUntil = 创建 + freezeDays(默认 1 天)",
+        "受益人须为有效分销员（入驻企业或个人合伙人），幂等校验防重复计佣"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "提现与结算口径（演示参数）",
+      "items": [
+        "起提门槛：企业档满 ¥100 / 个人合伙人满 ¥50；单笔 ≤¥1000、每日 ≤2 次",
+        "手续费 ¥0，审批后 2 小时内到账；到账方式银行卡（规则页另列支付宝）",
+        "状态机：pending 待审核 → first_ok 初审通过 → paid 已到账 / rejected 驳回 / cancelled 撤销",
+        "工作日 T+1 结算；返佣计入钱包 totalRebate，不污染累计充值 totalIn"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "追回与违规处罚",
+      "items": [
+        "伙伴退款：对应返佣追回——已冻结直接取消；已结算从后续佣金中等额抵扣",
+        "违规四类：自买自刷/虚假交易/恶意注册套佣；批量注册与机器模拟；群发骚扰；返利承诺诱导",
+        "处罚阶梯：佣金全部追回 + 警告 / 冻结提现 / 封禁账号直至清退，并保留法律追责权利",
+        "全部为纯前端高保真原型（PHASE0 信息撮合阶段，平台暂不抽佣）"
+      ]
+    }
+  ]
+}

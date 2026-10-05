@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "G8 委托表单 · 门控与校验执行逻辑",
+    "subtitle": "技术视角：入口点选提需求 → gateRealname() 实名门控 → 表单模板渲染 → parseRegion 地区修正 → collectForm 校验分支 → upsert 三态保护落库（基于 js/delegates.js 真实实现）",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [1080, 690],
+    "output": "delegate-gate.html",
+    "repository": {
+      "url": "https://github.com/lioilioil/engchain-showcase.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "a9433c37d0a1c1b14728570c7c351c97abbf9cb1"
+    }
+  },
+  "participants": [
+    { "id": "demander", "type": "external", "label": "需求方", "sublabel": "点选提需求" },
+    { "id": "formpage", "type": "frontend", "label": "委托表单页", "sublabel": "delegate-new / delegate-edit.html", "sources": [
+      { "path": "pages/profile/delegate-new.html", "line": 81, "end_line": 81 },
+      { "path": "pages/profile/delegate-edit.html", "line": 106, "end_line": 106 }
+    ] },
+    { "id": "engine", "type": "backend", "label": "委托引擎", "sublabel": "js/delegates.js", "sources": [
+      { "path": "js/delegates.js", "line": 530, "end_line": 534 },
+      { "path": "js/delegates.js", "line": 397, "end_line": 442 }
+    ] },
+    { "id": "auth", "type": "security", "label": "认证卡", "sublabel": "AuthStore 实名信息", "sources": [
+      { "path": "js/delegates.js", "line": 491, "end_line": 496 },
+      { "path": "js/delegates.js", "line": 117, "end_line": 130 }
+    ] },
+    { "id": "store", "type": "database", "label": "本地存储", "sublabel": "engchain_delegates", "sources": [
+      { "path": "js/delegates.js", "line": 15, "end_line": 16 },
+      { "path": "js/delegates.js", "line": 33, "end_line": 56 }
+    ] }
+  ],
+  "segments": [
+    { "from": 156, "to": 310, "label": "实名门控 gateRealname()" },
+    { "from": 322, "to": 422, "label": "表单渲染与实名回填" },
+    { "from": 432, "to": 478, "label": "parseRegion 地区自动修正" },
+    { "from": 490, "to": 588, "label": "collectForm 校验 + upsert 落库" }
+  ],
+  "messages": [
+    { "id": "m-entry", "from": "demander", "to": "formpage", "y": 162, "label": "点选「提需求 / 新增委托」", "variant": "default" },
+    { "id": "m-gate", "from": "formpage", "to": "engine", "y": 190, "label": "gateRealname({ onPass })", "variant": "emphasis" },
+    { "id": "m-realname", "from": "engine", "to": "auth", "y": 218, "label": "realnameOk() 读 AuthStore", "variant": "security" },
+    { "id": "m-claims", "from": "auth", "to": "engine", "y": 246, "label": "realname.ok 是否已实名", "variant": "return" },
+    { "id": "m-block", "from": "engine", "to": "formpage", "y": 274, "label": "未实名 → showRealnameGuide() 拦截", "variant": "security" },
+    { "id": "m-guide", "from": "formpage", "to": "demander", "y": 302, "label": "bottom sheet：游客→去登录 / 未实名→去实名认证", "variant": "return" },
+    { "id": "m-render", "from": "engine", "to": "formpage", "y": 330, "label": "onPass → formHtml(mode) 渲染模板", "variant": "emphasis" },
+    { "id": "m-bind", "from": "formpage", "to": "engine", "y": 358, "label": "bindForm() chips 单选 · 地区联动", "variant": "default" },
+    { "id": "m-contact", "from": "engine", "to": "auth", "y": 386, "label": "authContact() 取实名姓名 / 电话", "variant": "security" },
+    { "id": "m-fill", "from": "auth", "to": "engine", "y": 414, "label": "联系人 / 电话只读回填（locked）", "variant": "return" },
+    { "id": "m-parse", "from": "formpage", "to": "engine", "y": 442, "label": "填写地区 → parseRegion(text)", "variant": "default" },
+    { "id": "m-region", "from": "engine", "to": "formpage", "y": 470, "label": "修正为「省 · 市」/ 直辖市直中 / 未识别提示", "variant": "return" },
+    { "id": "m-collect", "from": "formpage", "to": "engine", "y": 498, "label": "提交 → collectForm(root)", "variant": "emphasis" },
+    { "id": "m-invalid", "from": "engine", "to": "formpage", "y": 526, "label": "校验失败 toast：类型缺漏 / 地区 / 手机号", "variant": "security" },
+    { "id": "m-upsert", "from": "engine", "to": "store", "y": 554, "label": "upsert()：已承接强制保留 · 写 engchain_delegates", "variant": "emphasis" },
+    { "id": "m-handoff", "from": "engine", "to": "formpage", "y": 582, "label": "校验通过 → openHandoffSheet 对接信息页", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "formpage", "from": 158, "to": 306, "type": "frontend" },
+    { "participant": "formpage", "from": 328, "to": 474, "type": "frontend" },
+    { "participant": "formpage", "from": 496, "to": 584, "type": "frontend" },
+    { "participant": "engine", "from": 188, "to": 586, "type": "backend" },
+    { "participant": "auth", "from": 216, "to": 248, "type": "security" },
+    { "participant": "auth", "from": 384, "to": 416, "type": "security" },
+    { "participant": "store", "from": 552, "to": 559, "type": "database" },
+    { "participant": "demander", "from": 160, "to": 304, "type": "external" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "执行逻辑要点（真实代码）",
+      "items": [
+        "gateRealname()：realnameOk() 为真即 onPass 放行；否则 showRealnameGuide() 拦截",
+        "三模板 FORM_TEMPLATES：franchise / trade / general；personnel 无独立模板，回退 general",
+        "upsert()：prev 状态为「已承接」时 rec.status 强制保留，不被普通提交覆盖",
+        "提交成功写 engchain_delegates；旧 franchise_delegate_v1 按 id 去重迁移后清除",
+        "委托编号 = W + 时间戳后 8 位（add() 内生成）"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "校验分支（collectForm）",
+      "items": [
+        "需求类型 chip 未选 → toast「请选择…」并 return null，阻断提交",
+        "地区 parseRegion 未 ok → toast 提示正确省/市（如：四川省 成都）",
+        "锁定态联系人/电话只读取自实名认证；手机号须匹配 ^1[3-9]\\d{9}$",
+        "编辑页 authLocked:false 可改联系信息；新增页默认锁定只读"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "口径边界",
+      "items": [
+        "纯前端 localStorage 模拟，无真实后端；[模拟] 接口为规划占位",
+        "联系人 / 电话 v2.0 锁定只读，仅可补充备用手机号",
+        "事实来源 js/delegates.js、pages/profile/delegate-new|delegate-edit.html；docs/ 不挂 sources"
+      ]
+    }
+  ]
+}
