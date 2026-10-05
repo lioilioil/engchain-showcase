@@ -161,7 +161,7 @@
   var BG_MAP = {
     blue: 'linear-gradient(135deg,rgba(37,99,235,.10),rgba(37,99,235,.03));border:1px solid rgba(37,99,235,.18)',
     green: 'linear-gradient(135deg,rgba(91,154,111,.12),rgba(91,154,111,.04));border:1px solid rgba(91,154,111,.22)',
-    gold: 'linear-gradient(135deg,rgba(201,169,97,.14),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.28)'
+    gold: 'linear-gradient(135deg,rgba(201,164,92,.14),rgba(201,164,92,.04));border:1px solid rgba(201,164,92,.28)'
   };
 
   /* ---------- 大卡片渲染 ---------- */
@@ -174,7 +174,7 @@
         '<div style="font-size:13px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + card.title + '</div>' +
         '<div style="font-size:11px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + card.subtitle + '</div>' +
       '</span>' +
-      '<span style="flex:none;height:30px;padding:0 13px;border-radius:999px;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;">' + card.cta + '</span>' +
+      '<span style="flex:none;height:30px;padding:0 13px;border-radius:999px;background:linear-gradient(180deg,var(--action),var(--action-deep));color:var(--on-action);font-size:12px;font-weight:700;display:inline-flex;align-items:center;">' + card.cta + '</span>' +
       '<span class="promo-close" data-id="' + card.id + '" style="flex:none;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.3;border-radius:50%;" onclick="event.stopPropagation();PromoCards.close(\'' + card.id + '\')">' +
         '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
       '</span>' +
@@ -188,10 +188,10 @@
      - 文字单行省略，保证任何宽度下不换行、不撑高卡片。 */
   function renderSmallFlag(card) {
     var root = window.__ROOT__ || '';
-    return '<div class="promo-card promo-flag" data-id="' + card.id + '" style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 6px;border-radius:10px;background:linear-gradient(90deg,rgba(201,169,97,.14),rgba(201,169,97,.04));border:1px solid rgba(201,169,97,.26);font-size:11px;color:var(--text-2);cursor:pointer;box-sizing:border-box;overflow:hidden;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
+    return '<div class="promo-card promo-flag" data-id="' + card.id + '" style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 6px;border-radius:10px;background:linear-gradient(90deg,rgba(201,164,92,.14),rgba(201,164,92,.04));border:1px solid rgba(201,164,92,.26);font-size:11px;color:var(--text-2);cursor:pointer;box-sizing:border-box;overflow:hidden;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
       '<span style="flex:none;width:3px;height:20px;border-radius:2px;background:linear-gradient(180deg,var(--primary-strong),var(--primary-dim));"></span>' +
       '<span style="flex:none;font-size:14px;">' + card.icon + '</span>' +
-      '<span style="flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:#FBF8F1;font-size:9px;font-weight:700;letter-spacing:.05em;">限时</span>' +
+      '<span style="flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:9px;font-weight:700;letter-spacing:.05em;">限时</span>' +
       '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;">' + card.shortText + '</span>' +
       '<span style="flex:none;color:var(--primary-dim);font-size:11px;font-weight:700;white-space:nowrap;">去查看 ›</span>' +
       '<span class="promo-close" data-id="' + card.id + '" style="flex:none;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;opacity:.35;border-radius:50%;" onclick="event.stopPropagation();PromoCards.close(\'' + card.id + '\')">' +

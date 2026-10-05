@@ -2017,10 +2017,10 @@ window.ListFooter = (function () {
       { level:4, name:'龙头建企', desc:'行业龙头，领军企业', color:'#0d4a96' }
     ],
     agency: [
-      { level:1, name:'基础服务', desc:'基础发布，标准服务', color:'#d4b876' },
+      { level:1, name:'基础服务', desc:'基础发布，标准服务', color:'#E0C083' },
       { level:2, name:'专业服务', desc:'专业运营，稳定成交', color:'#c4a45c' },
-      { level:3, name:'深度服务', desc:'深度服务，优先匹配', color:'#a8894f' },
-      { level:4, name:'尊享服务', desc:'专属顾问，定制方案', color:'#8a6d2f' }
+      { level:3, name:'深度服务', desc:'深度服务，优先匹配', color:'#8A6A28' },
+      { level:4, name:'尊享服务', desc:'专属顾问，定制方案', color:'#7A5C1E' }
     ],
     partner: [
       { level:1, name:'初级合伙', desc:'入门分销，基础权益', color:'#a78bfa' },

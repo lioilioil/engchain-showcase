@@ -1074,7 +1074,7 @@ window.DETAIL = (function () {
   }
   function reportCard(exam) {
     return '<div style="margin:0 0 14px;padding:14px;border-radius:12px;background:linear-gradient(135deg,var(--ink-primary),var(--ink-primary));position:relative;overflow:hidden;margin-top:2px;">' +
-      '<div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(201,169,97,0.2),transparent);"></div>' +
+      '<div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,rgba(201,164,92,0.2),transparent);"></div>' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;position:relative;z-index:1;">' + icon('doc') + '<span style="font-size:13px;font-weight:700;color:var(--accent-light);">深度尽调报告</span></div>' +
       '<div style="font-size:10px;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:12px;position:relative;z-index:1;">工商信息、司法风险、经营风险、知识产权、财务数据全维度分析，AI+人工双重审核</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1;">' +
@@ -2476,7 +2476,7 @@ window.DETAIL = (function () {
           '<div style="position:relative;overflow:hidden;border-radius:12px;">' +
             '<div style="filter:blur(7px);-webkit-filter:blur(7px);pointer-events:none;user-select:none;-webkit-user-select:none;opacity:.5;transform:scale(1.02);">' + __mgOrig + '</div>' +
             '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:36px 24px;text-align:center;background:linear-gradient(180deg,rgba(20,24,30,.35) 0%,rgba(20,24,30,.55) 100%);border-radius:12px;">' +
-              '<div style="width:54px;height:54px;border-radius:15px;background:rgba(201,169,97,.15);border:1px solid rgba(201,169,97,.3);display:flex;align-items:center;justify-content:center;">' +
+              '<div style="width:54px;height:54px;border-radius:15px;background:rgba(201,164,92,.15);border:1px solid rgba(201,164,92,.3);display:flex;align-items:center;justify-content:center;">' +
                 '<svg class="ic" style="width:24px;height:24px;color:var(--primary);"><use href="#i-lock"/></svg>' +
               '</div>' +
               '<div class="fw-700 fs-16" style="color:#F5F1E8;">登录后查看完整信息</div>' +
@@ -2763,7 +2763,7 @@ window.DETAIL = (function () {
       if (!isFree) {
         var methods = isDeposit
           ? [{ id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160' }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF' }]
-          : [{ id:'credit', name:'积分支付', icon:'i-star', color:'#D4AF37', desc:'余额 ' + balM3 + ' 积分' }, { id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }];
+          : [{ id:'credit', name:'积分支付', icon:'i-star', color:'#D2B169', desc:'余额 ' + balM3 + ' 积分' }, { id:'wechat', name:'微信支付', icon:'i-chat', color:'#07C160', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }, { id:'alipay', name:'支付宝', icon:'i-box', color:'#1677FF', desc:'单次 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */ }];
         payMethodHtml = '<div class="unlock-paymethods"><div class="pm-label">选择支付方式</div>' +
           methods.map(function (pm, i) {
             return '<div class="pm-item' + (i === 0 ? ' selected' : '') + '" data-pay="' + pm.id + '">' +
@@ -3450,8 +3450,8 @@ window.DETAIL = (function () {
       '<div style="text-align:center;margin-bottom:12px;"><div style="font-size:14px;font-weight:700;color:var(--text-1);">' + name + '</div>' +
       '<div style="font-size:11px;color:var(--text-3);margin-top:4px;">证书编号：' + no + ' · 发证：' + date + ' · 有效期至：' + expire + '</div></div>' +
       '<div style="position:relative;width:100%;aspect-ratio:4/3;background:linear-gradient(135deg,var(--bg-card),var(--bg-alp));border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
-      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-30deg);font-size:20px;font-weight:700;color:rgba(201,169,97,.15);letter-spacing:.15em;white-space:nowrap;pointer-events:none;">ENGCHAIN · 工程链 · 仅供核验</div>' +
-      '<div style="width:66px;height:66px;border-radius:50%;border:3px solid rgba(201,169,97,.4);display:flex;align-items:center;justify-content:center;color:rgba(201,169,97,.6);font-size:13px;font-weight:700;text-align:center;line-height:1.3;margin-bottom:10px;z-index:1;">资质<br>证书</div>' +
+      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transform:rotate(-30deg);font-size:20px;font-weight:700;color:rgba(201,164,92,.15);letter-spacing:.15em;white-space:nowrap;pointer-events:none;">ENGCHAIN · 工程链 · 仅供核验</div>' +
+      '<div style="width:66px;height:66px;border-radius:50%;border:3px solid rgba(201,164,92,.4);display:flex;align-items:center;justify-content:center;color:rgba(201,164,92,.6);font-size:13px;font-weight:700;text-align:center;line-height:1.3;margin-bottom:10px;z-index:1;">资质<br>证书</div>' +
       '<div style="font-size:14px;font-weight:700;color:var(--text-1);z-index:1;padding:0 20px;text-align:center;">' + name + '</div>' +
       '<div style="font-size:10.5px;color:var(--text-3);margin-top:6px;z-index:1;">证书编号：' + no + '</div>' +
       '</div>' +

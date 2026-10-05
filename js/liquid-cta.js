@@ -6,7 +6,7 @@
    1. 玻璃不再挂在 [data-lg-cta] 容器上（不再有"整块玻璃背景"），
       改为对容器内每个按钮（.lg-btn / .dab-icon / .dab-cta）单独挂载。
    2. 彩色玻璃：material.tintColor 按按钮语义取值——
-      主行动(金) #B89968 · 解锁/已提交(绿) #2B6B4F · 中性(白)
+      主行动(金) #B08A3C · 解锁/已提交(绿) #2B6B4F · 中性(白)
       可用 data-lg-tint-color="#hex" 覆盖；.dab-icon.active 收藏激活 → 金。
    3. 解锁态/已提交态/收藏激活态 的 class 变化 → 实时 update tintColor。
    能力：

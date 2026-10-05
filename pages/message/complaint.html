@@ -49,7 +49,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .cp-type{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px 10px;border-radius:var(--r-m);background:var(--bg-card-2);border:1.5px solid transparent;cursor:pointer;transition:border-color var(--d-fast),background var(--d-fast),transform var(--d-fast);-webkit-tap-highlight-color:transparent;}
 .cp-type svg{width:20px;height:20px;color:var(--text-3);transition:color var(--d-fast);}
 .cp-type span{font-size:var(--fs-xs);color:var(--text-2);font-weight:500;text-align:center;line-height:1.3;transition:color var(--d-fast);}
-.cp-type.active{background:var(--primary-soft);border-color:rgba(184,153,104,.45);}
+.cp-type.active{background:var(--primary-soft);border-color:rgba(176, 138, 60, .45);}
 .cp-type.active svg{color:var(--primary-dim);}
 .cp-type.active span{color:var(--primary-dim);font-weight:700;}
 .cp-type:active{transform:scale(.96);}
@@ -89,6 +89,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 /* 底部固定区（V3.3）：确认声明随提交按钮固定底部，纵向排列 + 渐变遮罩与滚动内容分隔 */
 #cp-cta-bar{display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,var(--bg) 28%);padding-top:12px;}
 #cp-cta-bar .cp-agree{margin:0 2px 12px;align-items:flex-start;}
+
+/* 详情页底部固定操作栏（V3.4）：主行动按钮上浮固定，次级操作为安静链接，
+   复用 .fixed-cta 定位与 [data-lg-cta="bar"] 玻璃体系（金主按钮 + 无背景链接），
+   按状态由 renderDetailBar 动态渲染 */
+#cp-cta-detail{display:flex;flex-direction:column;gap:6px;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,var(--bg) 26%);padding-top:12px;}
+#cp-cta-detail .cp-dbar-link{display:flex;justify-content:center;padding:0 2px;}
+#cp-cta-detail .cp-btn-danger,
+#cp-cta-detail .cp-btn-link{border:none;background:none;width:auto;height:32px;padding:0 16px;border-radius:var(--r-full);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;-webkit-tap-highlight-color:transparent;transition:opacity var(--d-fast);}
+#cp-cta-detail .cp-btn-danger{color:var(--error);}
+#cp-cta-detail .cp-btn-link{color:var(--primary-dim);}
+#cp-cta-detail .cp-btn-danger:active,
+#cp-cta-detail .cp-btn-link:active{opacity:.6;}
+/* 详情正文滚动预留：主按钮 54 + 次级链接 32 + 遮罩/间距 ≈116px，补足避免末行被固定栏遮挡 */
+#view-detail{padding-bottom:calc(var(--actionbar-reserve) + 48px);}
 
 /* ---- 列表 ---- */
 .cp-filter{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding:1px;}
@@ -169,16 +183,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .cp-rate-stars button:active{transform:scale(.88);}
 .cp-rate-tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 .cp-rate-tag{height:30px;padding:0 13px;border-radius:var(--r-full);border:1px solid var(--line);background:var(--bg-card-2);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--d-fast);}
-.cp-rate-tag.active{background:var(--primary-soft);border-color:rgba(184,153,104,.45);color:var(--primary-dim);}
+.cp-rate-tag.active{background:var(--primary-soft);border-color:rgba(176, 138, 60, .45);color:var(--primary-dim);}
 .cp-rate-sum{font-size:12px;font-weight:700;color:var(--primary-dim);margin:-2px 0 10px;}
 .cp-rated{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);}
 .cp-rated .stars{color:var(--primary);display:flex;gap:2px;}
 .cp-rated .stars svg{width:14px;height:14px;fill:currentColor;}
 
-/* 操作区 */
-.cp-actions{margin-top:14px;display:flex;flex-direction:column;gap:9px;}
-.cp-btn-danger{width:100%;height:42px;border-radius:var(--r-m);border:none;background:none;color:var(--error);font-size:13px;font-weight:600;cursor:pointer;}
-.cp-btn-danger:active{opacity:.7;}
+/* 操作区：详情页操作已上浮至底部固定栏 #cp-cta-detail（见上方 V3.4 样式） */
 .cp-dev{text-align:center;margin-top:10px;}
 .cp-dev button{border:none;background:none;font-size:10.5px;color:var(--text-4);padding:6px 10px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
 
@@ -270,6 +281,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </label>
     <button type="button" class="btn btn-primary btn-block btn-lg" id="cp-submit">提交举报</button>
   </div>
+
+  <!-- 详情页底部固定操作栏（V3.4）：状态页主行动 + 次级链接，内容由 renderDetailBar 动态注入 -->
+  <div class="fixed-cta" data-lg-cta="bar" id="cp-cta-detail" style="display:none;"></div>
 </div>
 
 <script src="../../js/common.js"></script>
@@ -507,10 +521,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var title = document.getElementById('cp-title');
     var right = document.getElementById('cp-nav-right');
     var cta = document.getElementById('cp-cta-bar');
+    var ctaDetail = document.getElementById('cp-cta-detail');
     right.innerHTML = '';
     if (name === 'new') {
       title.textContent = '投诉 / 举报';
       cta.style.display = '';
+      ctaDetail.style.display = 'none';
       var b = document.createElement('button');
       b.type = 'button'; b.className = 'nav-text-btn';
       b.innerHTML = '我的记录<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chev-r"/></svg>';
@@ -519,10 +535,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     } else if (name === 'list') {
       title.textContent = '我的投诉记录';
       cta.style.display = 'none';
+      ctaDetail.style.display = 'none';
       renderList();
     } else {
       title.textContent = '投诉详情';
       cta.style.display = 'none';
+      ctaDetail.style.display = '';
       renderDetail(id);
     }
     views[name].scrollTop = 0;
@@ -740,7 +758,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function renderDetail(id) {
     var r = getById(id);
     var box = document.getElementById('cp-detail-view');
-    if (!r) { box.innerHTML = ''; return; }
+    if (!r) {
+      box.innerHTML = '';
+      var bar0 = document.getElementById('cp-cta-detail');
+      if (bar0) { bar0.innerHTML = ''; bar0.style.display = 'none'; }
+      return;
+    }
     var st = STAGE[r.stage];
     var heroIcon = r.stage === 'closed' ? 'check' : r.stage === 'revoked' ? 'x' : r.stage === 'replied' ? 'bell' : r.stage === 'processing' ? 'clock' : 'shield';
     var heroSub = {
@@ -821,27 +844,34 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     h += '</div></div>';
 
-    /* 操作区 */
-    h += '<div class="cp-actions">';
-    if (r.stage === 'received' || r.stage === 'processing') {
-      h += '<button type="button" class="btn btn-primary btn-block btn-lg" id="cp-btn-supplement">补充材料 / 证据</button>';
-      h += '<button type="button" class="cp-btn-danger" id="cp-btn-revoke">撤销本次' + KIND_LABEL[r.kind] + '</button>';
-    }
-    if (r.stage === 'replied' && !r.rating) {
-      h += '<button type="button" class="btn btn-ghost btn-block btn-sm" id="cp-btn-review">对结果有异议 · 申请复查</button>';
-    }
-    if (r.stage === 'revoked') {
-      h += '<button type="button" class="btn btn-primary btn-block btn-lg" id="cp-btn-resubmit">重新提交</button>';
-    }
-    h += '</div>';
-
     /* 原型演示推进 */
     if (r.stage !== 'closed' && r.stage !== 'revoked') {
       h += '<div class="cp-dev"><button type="button" id="cp-dev-step" title="原型演示：模拟平台推进处理流程">原型演示 · 模拟平台下一步</button></div>';
     }
 
     box.innerHTML = h;
+    renderDetailBar(r);
     bindDetailActions(r);
+  }
+
+  /* 详情页底部固定操作栏：按状态渲染主行动按钮 + 次级链接，与内容区解耦、始终悬浮可见 */
+  function renderDetailBar(r) {
+    var bar = document.getElementById('cp-cta-detail');
+    if (!bar) return;
+    var h = '';
+    if (r.stage === 'received' || r.stage === 'processing') {
+      /* 主行动：补充材料；次级：撤销（危险操作降级为安静链接，避免误触） */
+      h += '<button type="button" class="btn btn-primary btn-lg btn-block" id="cp-btn-supplement">补充材料 / 证据</button>' +
+        '<div class="cp-dbar-link"><button type="button" class="cp-btn-danger" id="cp-btn-revoke">撤销本次' + KIND_LABEL[r.kind] + '</button></div>';
+    } else if (r.stage === 'replied' && !r.rating) {
+      /* 主行动：提交评价（按钮随表单上浮固定）；次级：申请复查 */
+      h += '<button type="button" class="btn btn-primary btn-lg btn-block" id="cp-btn-rate">提交评价并关闭</button>' +
+        '<div class="cp-dbar-link"><button type="button" class="cp-btn-link" id="cp-btn-review">对结果有异议 · 申请复查</button></div>';
+    } else if (r.stage === 'revoked') {
+      h += '<button type="button" class="btn btn-primary btn-lg btn-block" id="cp-btn-resubmit">重新提交</button>';
+    }
+    bar.innerHTML = h;
+    bar.style.display = h ? '' : 'none';
   }
 
   function rateFormHTML(r) {
@@ -856,8 +886,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }).join('') + '</div>' +
       '<div class="cp-rate-sum" id="cp-rate-sum" style="display:none;"></div>' +
       '<div class="cp-rate-tags" id="cp-rate-tags">' + tags + '</div>' +
-      '<textarea class="cp-textarea" id="cp-rate-comment" maxlength="200" rows="2" placeholder="补充评价（选填）" style="margin-bottom:12px;"></textarea>' +
-      '<button type="button" class="btn btn-primary btn-block btn-lg" id="cp-btn-rate">提交评价并关闭</button></div>';
+      '<textarea class="cp-textarea" id="cp-rate-comment" maxlength="200" rows="2" placeholder="补充评价（选填）"></textarea>' +
+      '</div>';
   }
 
   var RATE_SUMS = ['很不满意', '不太满意', '一般', '比较满意', '非常满意'];
