@@ -119,22 +119,6 @@ function memberRow(link,idx){
     '<div class="m-tags"><span class="'+lvCls+'">'+lvTxt+'</span><span class="'+stCls+'">'+stTxt+'</span>'+(act?'':'<span class="m-hint">邀请其完成首笔消费</span>')+'</div></div>'+
     '<span class="m-amt '+amtCls+'">+¥'+money(c)+'</span></div>';
 }
-/* 树形视图：节点卡片（信息与列表一致，但做成树节点）；cls 决定层级标签（l2 链接自身 level=1，需按所在层级标注） */
-function trNodeHtml(link,idx,cls){
-  var u=uName(link.inviteeId),c=contrib(link.inviteeId),act=isActive(link.inviteeId);
-  var isL2=cls==='tr-l2';
-  var lvTxt=isL2?'二级':'一级';
-  var lvCls=isL2?'mlv mlv-green':'mlv mlv-gold';
-  var stCls=act?'mst mst-ok':'mst mst-idle';
-  var stTxt=act?'有效伙伴':'待激活';
-  var amtCls=act?'m-amt-on':'m-amt-off';
-  var avCls=act?'m-av m-av-on':'m-av m-av-off';
-  return '<div class="tr-node '+cls+'" style="animation-delay:'+(idx*45)+'ms;">'+
-    '<span class="'+avCls+'">'+u.avatar+'</span>'+
-    '<div class="m-main"><div class="m-name">'+u.name+(u.company?' <span class="m-company">'+u.company+'</span>':'')+'</div>'+
-    '<div class="m-tags"><span class="'+lvCls+'">'+lvTxt+'</span><span class="'+stCls+'">'+stTxt+'</span>'+(act?'':'<span class="m-hint">邀请其完成首笔消费</span>')+'</div></div>'+
-    '<span class="m-amt '+amtCls+'">+¥'+money(c)+'</span></div>';
-}
 function render(){
   /* downline 已按档位过滤：非 full 仅返回一级 */
   var links=Referral.downline(uid).sort(function(a,b){return a.level-b.level||b.boundAt-a.boundAt;});
@@ -150,29 +134,102 @@ function render(){
     if(tier==='full'&&l2.length)html+='<div class="group-label" style="margin-top:18px;"><span>间推伙伴（二级 · '+l2.length+'）</span><span class="gl-note">仅合伙人可见</span></div><div class="m-card">'+l2.map(memberRow).join('')+'</div>';
     box.innerHTML=html;
   }else{
-    /* 树形视图：根节点（我）+ 层级连线 */
+    /* 树形视图：根节点（我）+ 一级/二级网格 + SVG 连线（archify 风格组织树） */
     var tree=Referral.tree(uid);
     var meInfo=uName(uid);
     var l1n=tree.length,l2n=tree.reduce(function(s,n){return s+n.l2.length;},0);
+    var nodes='';
+    tree.forEach(function(node,i){
+      var n1=node.l1,u=uName(n1.inviteeId),c1=contrib(n1.inviteeId),a1=isActive(n1.inviteeId);
+      var av1=a1?'on':'off';
+      nodes+='<div class="org-node n-l1" data-orgid="'+n1.inviteeId+'" style="animation-delay:'+(60+i*70)+'ms;">'+
+        '<span class="org-av av-'+av1+'">'+u.avatar+'</span>'+
+        '<div class="org-main"><div class="org-name">'+u.name+'</div>'+
+        '<div class="org-tags"><span class="ot ot-lv">直推 · 一级</span><span class="ot '+(a1?'ot-ok':'ot-idle')+'">'+(a1?'有效伙伴':'待激活')+'</span></div></div>'+
+        '<b class="org-amt '+(a1?'on':'off')+'">+¥'+money(c1)+'</b></div>';
+    });
+    var l2n=0;
+    tree.forEach(function(node){
+      node.l2.forEach(function(k){
+        var uk=uName(k.inviteeId),ck=contrib(k.inviteeId),ak=isActive(k.inviteeId);
+        var n=node.l1.inviteeId;
+        nodes+='<div class="org-node n-l2" data-orgid="'+k.inviteeId+'" data-parent="'+n+'" style="animation-delay:'+(120+l2n*70)+'ms;">'+
+          '<span class="org-av av-'+(ak?'on':'off')+'">'+uk.avatar+'</span>'+
+          '<div class="org-main"><div class="org-name">'+uk.name+'</div>'+
+          '<div class="org-tags"><span class="ot ot-lv2">间推 · 二级</span><span class="ot '+(ak?'ot-ok':'ot-idle')+'">'+(ak?'有效伙伴':'待激活')+'</span></div></div>'+
+          '<b class="org-amt '+(ak?'on':'off')+'">+¥'+money(ck)+'</b></div>';
+        l2n++;
+      });
+    });
     var rootHtml=
-      '<div class="tree-me">'+
-        '<span class="tr-av tr-av-me">'+(meInfo.avatar||meInfo.name.charAt(0))+'</span>'+
-        '<div class="m-main"><div class="m-name">'+meInfo.name+'<span class="mlv mlv-gold" style="margin-left:6px;">团队发起人</span></div>'+
-        '<div class="m-tags"><span class="mst mst-ok">直推 '+l1n+' 人</span><span class="mst mst-idle">间推 '+l2n+' 人</span><span class="mst mst-ok">有效 '+lv.active+' 人</span></div></div>'+
-        '<span class="m-amt m-amt-on">¥'+money(Rebate.stat(uid).total)+'</span>'+
+      '<div class="org-root">'+
+        '<span class="org-av-root">'+(meInfo.avatar||meInfo.name.charAt(0))+'</span>'+
+        '<div class="org-main"><div class="org-name">'+meInfo.name+'<span class="org-root-tag">团队发起人</span></div>'+
+        '<div class="org-tags"><span class="ot ot-ok">直推 '+l1n+' 人</span><span class="ot ot-lv2">间推 '+l2n+' 人</span><span class="ot ot-ok">有效 '+lv.active+' 人</span></div></div>'+
+        '<b class="org-amt on">¥'+money(Rebate.stat(uid).total)+'</b>'+
       '</div>';
-    var html=rootHtml;
-    if(tree.length){
-      html+='<div class="tree-lv">'+tree.map(function(node,i){
-        var l1='<div class="tree-branch"><div class="tree-kink-row"><span class="tree-kink"></span>'+trNodeHtml(node.l1,i*2,'tr-l1')+'</div>';
-        var kids=node.l2.length?'<div class="tree-lv tree-lv2">'+node.l2.map(function(k,j){return '<div class="tree-branch"><div class="tree-kink-row"><span class="tree-kink"></span>'+trNodeHtml(k,i*2+j+1,'tr-l2')+'</div></div>';}).join('')+'</div>':'';
-        return l1+kids+'</div>';
-      }).join('')+'</div>';
-    }
+    html='<div class="org-canvas" id="org-canvas"><svg class="org-lines" id="org-lines" width="100%" height="100%"></svg>'+
+      rootHtml+'<div class="org-grid">'+nodes+'</div></div>'+
+      '<div class="org-legend"><span class="lg lg-solid">直推关系</span><span class="lg lg-dash">间推关系</span><span class="lg lg-dot on">有效伙伴</span><span class="lg lg-dot">待激活</span></div>';
     box.innerHTML='<div class="group-label"><span>邀请关系树（合规上限二级）</span></div>'+html;
+    /* SVG 连线：节点渲染完成后测量并绘制 */
+    requestAnimationFrame(function(){drawOrgLines();});
   }
 }
 window.toggleView=function(){view=(view==='list'?'tree':'list');var b=document.getElementById('view-toggle');b.innerHTML=view==='list'?'<svg class="ic"><use href="#i-company"/></svg><span>关系树</span>':'<svg class="ic"><use href="#i-doc"/></svg><span>列表</span>';render();};
+/* SVG 连线：根→一级（总线分叉实线）、一级→二级（虚线） */
+function drawOrgLines(){
+  var canvas=document.getElementById('org-canvas'),svg=document.getElementById('org-lines');
+  if(!canvas||!svg)return;
+  var root=canvas.querySelector('.org-root'),l1s=canvas.querySelectorAll('.n-l1'),l2s=canvas.querySelectorAll('.n-l2');
+  var cRect=canvas.getBoundingClientRect();
+  if(!cRect.width||!cRect.height)return;
+  var W=cRect.width,H=cRect.height;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.innerHTML='';
+  var NS='http://www.w3.org/2000/svg';
+  function rel(el){var r=el.getBoundingClientRect();return {x:r.left-cRect.left,y:r.top-cRect.top,w:r.width,h:r.height};}
+  function path(d,cls){var p=document.createElementNS(NS,'path');p.setAttribute('d',d);p.setAttribute('class',cls);svg.appendChild(p);}
+  if(!root)return;
+  var rr=rel(root),sx=rr.x+rr.w/2,sy=rr.y+rr.h;
+  if(l1s.length){
+    /* 按行聚合（2 列网格 → 每行一组节点） */
+    var rows={};
+    l1s.forEach(function(el){var r=rel(el);var key=Math.round(r.y);(rows[key]=rows[key]||[]).push({el:el,r:r});});
+    var keys=Object.keys(rows).map(Number).sort(function(a,b){return a-b;});
+    var busY=keys[0]-16;
+    /* 根 → 第一总线 */
+    path('M '+sx+' '+sy+' L '+sx+' '+busY,'ol ol-main');
+    var prevBus=busY;
+    keys.forEach(function(ky,i){
+      var row=rows[ky],rowTop=row[0].r.y;
+      var busY1=i===0?busY:(Math.min(prevBus,rowTop-16));
+      if(i>0){
+        /* 上一总线垂线延伸到本行总线 */
+        path('M '+sx+' '+prevBus+' L '+sx+' '+busY1,'ol ol-bus');
+      }
+      var xs=row.map(function(n){return n.r.x+n.r.w/2;});
+      var xMin=Math.min.apply(null,xs),xMax=Math.max.apply(null,xs);
+      path('M '+xMin+' '+busY1+' L '+xMax+' '+busY1,'ol ol-bus');
+      row.forEach(function(n){
+        var tx=n.r.x+n.r.w/2;
+        path('M '+tx+' '+busY1+' L '+tx+' '+rowTop,'ol ol-drop');
+      });
+      prevBus=busY1;
+    });
+  }
+  /* 一级 → 二级（虚线贝塞尔） */
+  l2s.forEach(function(el){
+    var pid=el.getAttribute('data-parent');
+    if(!pid)return;
+    var pEl=canvas.querySelector('.n-l1[data-orgid="'+pid+'"]');
+    if(!pEl)return;
+    var pr=rel(pEl),lr=rel(el);
+    var px=pr.x+pr.w/2,py=pr.y+pr.h,tx=lr.x+lr.w/2,ty=lr.y;
+    var my=py+(ty-py)/2;
+    path('M '+px+' '+py+' C '+px+' '+my+' '+tx+' '+my+' '+tx+' '+ty,'ol ol-l2');
+  });
+}
 render();
 window.addEventListener('engchain:referral',render);
 window.addEventListener('engchain:rebate',render);
@@ -220,29 +277,45 @@ window.addEventListener('engchain:rebate',render);
 .m-amt{font-size:14px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums;flex:none;}
 .m-amt-on{color:var(--primary-dim);}
 .m-amt-off{color:var(--text-3);}
-/* ===== 邀请关系树 ===== */
-.tree-me{display:flex;align-items:center;gap:12px;padding:14px;background:linear-gradient(135deg,rgba(238,214,151,.16),rgba(176, 138, 60, .05) 62%);border:1px solid var(--accent-line);border-radius:var(--r-l);box-shadow:var(--shadow-xs);position:relative;animation:tr-in .4s var(--e-out) both;}
-.tr-av-me{width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;background:linear-gradient(135deg,#F0E2BE,#B08A3C);color:#2A1810;box-shadow:0 0 0 3px rgba(176, 138, 60, .22),0 4px 10px rgba(176, 138, 60, .3);}
-/* 走廊容器：一级内容缩进 40px，竖线由各分支自行绘制 */
-.tree-lv{margin-left:20px;padding-left:40px;}
-.tree-lv2{margin-left:0;padding-left:40px;padding-top:10px;}
-/* 分支：竖线段从上方衔接点（-10px 覆盖分支间距）画到本行拐角，行间自然衔接、无悬空线 */
-.tree-branch{position:relative;padding-bottom:10px;}
-.tree-branch:last-child{padding-bottom:0;}
-.tree-branch::before{content:"";position:absolute;left:-40px;top:-10px;height:34px;width:1.5px;background:var(--accent-line);}
-.tree-lv > .tree-branch:first-child::before,.tree-lv2 > .tree-branch:first-child::before{top:0;height:24px;}
-.tree-lv2 .tree-branch::before{background:var(--line);}
-/* 拐角横线：从竖线到节点左缘 */
-.tree-kink-row{position:relative;}
-.tree-kink{position:absolute;left:-40px;top:24px;width:40px;height:1.5px;background:var(--accent-line);}
-.tree-lv2 .tree-kink{background:var(--line);}
-/* 树节点卡片 */
-.tr-node{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--shadow-xs);animation:tr-in .4s var(--e-out) both;}
-.tr-l2{background:var(--bg-card-2);box-shadow:none;}
-@keyframes tr-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
-.gl-note{font-size:10px;color:var(--text-3);font-weight:400;}
+/* ===== 邀请关系树（archify 风格组织树）===== */
+.org-root{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(135deg,#f6ead2,rgba(176,138,60,.05) 70%);border:1px solid var(--accent-line);border-radius:var(--r-l);box-shadow:0 6px 18px -8px rgba(176,138,60,.38);overflow:hidden;animation:tr-in .45s var(--e-out) both;}
+.org-root::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(120% 100% at 0% -30%,rgba(238,214,151,.4) 0%,transparent 55%);}
+.org-av-root{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;background:linear-gradient(135deg,#F0E2BE,#B08A3C);color:#2A1810;box-shadow:0 0 0 3px rgba(176,138,60,.25),0 6px 14px -4px rgba(176,138,60,.45);}
+.org-root-tag{font-size:9.5px;font-weight:700;color:var(--primary-dim);background:var(--primary-soft);border:1px solid var(--accent-line);padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:1px;white-space:nowrap;}
+.org-canvas{position:relative;margin-top:12px;}
+.org-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;}
+.org-lines path{fill:none;stroke-linecap:round;}
+.ol-main{stroke:var(--primary-dim);stroke-width:1.6;opacity:.5;}
+.ol-bus{stroke:var(--primary-dim);stroke-width:1.6;opacity:.5;}
+.ol-drop{stroke:var(--primary-dim);stroke-width:1.6;opacity:.5;}
+.ol-l2{stroke:var(--text-3);stroke-width:1.3;stroke-dasharray:4 4;opacity:.8;}
+.org-grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 2px;}
+.org-node{display:flex;align-items:center;gap:9px;padding:11px 12px;background:var(--bg-card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-xs);animation:tr-in .45s var(--e-out) both;min-width:0;}
+.n-l1{border-color:var(--accent-line);}
+.n-l2{background:var(--bg-card-2);border:1px dashed var(--line-strong,var(--line));box-shadow:none;}
+.org-av{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+.av-on{background:linear-gradient(135deg,#F0E2BE,#B08A3C);color:#2A1810;}
+.av-off{background:var(--bg-card-2);color:var(--text-3);border:1px dashed var(--line);}
+.org-main{flex:1;min-width:0;}
+.org-name{font-size:13px;font-weight:600;color:var(--text-1);}
+.org-tags{display:flex;align-items:center;gap:5px;margin-top:4px;flex-wrap:wrap;}
+.ot{font-size:9px;font-weight:600;padding:2px 6px;border-radius:5px;border:1px solid;line-height:1.5;white-space:nowrap;}
+.ot-lv{color:var(--primary-dim);background:var(--primary-soft);border-color:var(--accent-line);}
+.ot-lv2{color:var(--text-3);background:var(--bg-card);border-color:var(--line);}
+.ot-ok{color:var(--success);background:rgba(43,107,79,.08);border-color:rgba(43,107,79,.2);}
+.ot-idle{color:var(--text-3);background:var(--bg-card-2);border-color:var(--line);}
+.org-amt{font-size:13.5px;font-weight:800;font-family:var(--font-num);font-variant-numeric:tabular-nums;flex:none;}
+.org-amt.on{color:var(--primary-dim);}
+.org-amt.off{color:var(--text-3);}
+.org-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;padding:10px 14px;background:var(--bg-card);border:1px solid var(--line);border-radius:12px;animation:tr-in .45s var(--e-out) both;}
+.lg{font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:6px;}
+.lg::before{content:"";width:18px;height:0;border-top:2px solid;}
+.lg-solid::before{border-color:var(--primary-dim);}
+.lg-dash::before{border-top-style:dashed;border-color:var(--text-3);}
+.lg-dot::before{content:"";width:9px;height:9px;border-radius:50%;border:2px solid var(--text-3);background:transparent;flex:none;}
+.lg-dot.on::before{background:linear-gradient(135deg,#F0E2BE,#B08A3C);border-color:var(--primary-dim);}
 
-@media (prefers-reduced-motion: reduce){.m-row,.tr-node,.tree-me{animation:none;}}
+@media (prefers-reduced-motion: reduce){.m-row,.tr-node,.org-root,.org-node,.org-legend{animation:none;}}
 </style>
 </body>
 </html>

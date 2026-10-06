@@ -129,7 +129,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
     </div>
 
-    <div class="section-title" style="margin-top:18px;"><div class="st-left">开票记录</div><span class="more" onclick="location.href='invoice-record.html'">全部 ›</span></div>
+    <div class="section-title" style="margin-top:18px;"><div class="st-left">开票记录</div><span class="more" id="inv-count"></span></div>
+    <div class="seg" id="inv-filter" style="margin:0 14px 10px;">
+      <span class="seg-item is-on" data-filter="all">全部</span>
+      <span class="seg-item" data-filter="pending">待审核</span>
+      <span class="seg-item" data-filter="issued">已开票</span>
+      <span class="seg-item" data-filter="rejected">已驳回</span>
+    </div>
     <div id="inv-list"></div>
     <div id="inv-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-3);">
       <svg class="ic" style="width:44px;height:44px;color:var(--text-3);opacity:.5;margin-bottom:10px;"><use href="#i-doc"/></svg>
@@ -278,6 +284,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     refreshAmountHint();
   }
 
+  var currentFilter = 'all';
   function renderList() {
     var list = [];
     try { list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []); } catch (e) {}
@@ -285,28 +292,51 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var uid = me ? me.id : '';
     /* 过滤当前用户的发票（如有 uid 字段） */
     var mine = list.filter(function (x) { return !x.uid || x.uid === uid; });
-    var recent = mine.slice(0, 5);
+    if (currentFilter !== 'all') mine = mine.filter(function (x) { return x.status === currentFilter; });
     var el = document.getElementById('inv-list');
     var empty = document.getElementById('inv-empty');
-    if (!recent.length) {
+    var cnt = document.getElementById('inv-count');
+    if (cnt) cnt.textContent = mine.length + ' 条';
+    if (!mine.length) {
       el.innerHTML = '';
       empty.style.display = 'block';
       return;
     }
     empty.style.display = 'none';
-    el.innerHTML = recent.map(function (x) {
+    el.innerHTML = mine.map(function (x) {
       var st = ST_MAP[x.status] || ST_MAP.pending;
       var date = x.ts ? fmtDate(x.ts) : (x.applyAt || '');
-      return '<div class="card" onclick="location.href=\'invoice-record.html\'">' +
+      var issuedDate = x.issuedAt ? fmtDate(x.issuedAt) : '';
+      var html = '<div class="card" style="margin-bottom:10px;">' +
         '<div class="fb-between" style="margin-bottom:8px;"><span class="text-3 fs-11">' + date + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
         '<div class="fw-600 fs-14">' + esc(x.title || '') + ' · ' + esc(x.type || '增值税普通发票') + '</div>' +
         '<div class="text-2 fs-12 mt-1">' + money(x.amount) + (x.orderId ? ' · 订单 ' + x.orderId : '') + '</div>' +
-        (x.status === 'rejected' && x.rejectNote ? '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote) + '</div>' : '') +
-        (x.status === 'issued' ? '<div class="mt-2 fb-between"><span class="text-3 fs-11">发票号 ' + esc(x.invoiceNo || '') + '</span><span class="link-green fs-12">查看/下载 ›</span></div>' : '') +
-        (x.status === 'pending' ? '<div class="mt-2" style="display:flex;justify-content:flex-end;"><button type="button" class="urge-btn" onclick="event.stopPropagation();urgeInvoice()">催开票</button></div>' : '') +
-        '</div>';
+        (x.email ? '<div class="text-3 fs-11 mt-1">接收邮箱：' + esc(x.email) + '</div>' : '');
+      if (x.status === 'issued') {
+        html += '<div class="text-3 fs-11 mt-1">发票号 ' + esc(x.invoiceNo || '') + (issuedDate ? ' · 开票日期 ' + issuedDate : '') + '</div>';
+        html += '<div class="mt-2 fb-between"><button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'发票已下载\',\'ok\')">下载发票</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'已重新发送至邮箱\',\'ok\')">重新发送</button></div>';
+      } else if (x.status === 'rejected') {
+        html += '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote || '资料不完整') + '</div>';
+      } else if (x.status === 'pending') {
+        html += '<div class="mt-2 fb-between"><span class="text-3 fs-11">财务审核中，预计 1-2 个工作日</span>' +
+          '<button type="button" class="urge-btn" onclick="urgeInvoice()">催开票</button></div>';
+      }
+      html += '</div>';
+      return html;
     }).join('');
   }
+
+  /* 记录筛选 */
+  var filterEl = document.getElementById('inv-filter');
+  if (filterEl) filterEl.querySelectorAll('.seg-item').forEach(function (el) {
+    el.onclick = function () {
+      filterEl.querySelectorAll('.seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+      el.classList.add('is-on');
+      currentFilter = el.getAttribute('data-filter');
+      renderList();
+    };
+  });
 
   function render() { if (!isLoggedIn()) return;/* P2-7 游客不渲染发票数据 */
     renderTitleSelect();
