@@ -662,9 +662,18 @@
       var ul = readUnlocks();
       ul.unshift({ id: hit.orderNo, title: hit.title, biz: hit.biz, bizLabel: hit.bizLabel, amount: hit.amount, time: hit.paidAt });
       writeUnlocks(ul);
+      /* 支付完成即视为顾问已承接并交付匹配信息：委托状态推进为「已承接」（详情页随之展示已承接态与解锁信息） */
+      if (hit.delegateId) upsert({ id: hit.delegateId, status: '已承接' });
       try { window.dispatchEvent(new CustomEvent('engchain:delegate-order', { detail: hit })); } catch (e) {}
     }
     return hit;
+  }
+  /* 按委托 id 查最近一笔订单（委托详情页展示解锁信息用） */
+  function orderByDelegate(delegateId) {
+    if (!delegateId) return null;
+    var list = readOrders();
+    for (var i = 0; i < list.length; i++) { if (list[i].delegateId === delegateId) return list[i]; }
+    return null;
   }
 
   /* ---------- 首页进入：待付款订单弹窗提醒 ---------- */
@@ -731,65 +740,213 @@
     setTimeout(function () { openCheckout(o); }, 260);
   }
 
-  /* ---------- 收银台（模拟支付） ---------- */
+  /* ---------- 收银台 v3（模拟支付）----------
+     对齐详情页解锁弹窗（detail.js）既有视觉/交互：
+     · 商品卡可点击下滑展开「顾问匹配信息概览」，付款前按详情页规则遮蔽关键信息（掩码+锁标）
+     · 支付方式：积分支付 / 微信支付 / 支付宝（.unlock-paymethods + .pm-item 组件）
+     · 底部置底支付区：协议勾选 + 支付按钮（按方式切换文案）+ 托管保障
+     · 支付成功自动进入「委托信息详情」详情页 */
+  /* 积分价口径：¥1 = 1 积分（与钱包积分充值 1:1 一致），四舍五入取整 */
+  function creditCostOf(order) { return Math.max(1, Math.round(Number(order && order.amount) || 0)); }
+  /* 遮蔽工具（对齐详情页 Lock.partial / Lock.price：掩码文本 + 小锁标，类名复用 app.css .pw-*） */
+  var _dgLockIc = '<span class="pw-lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></span>';
+  function dgMaskContact(s) {
+    return String(s == null ? '' : s).replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+  }
   function openCheckout(order) {
     var s = UI.sheet();
     s.setText('确认支付');
+    var bal = (window.CreditStore && CreditStore.read()) ? CreditStore.read().balance : 0;
+    var creditCost = creditCostOf(order);
+    var rmb = Number(order.amount) || 0;
+    var creditEnough = bal >= creditCost;
+    /* 积分不足 → 选购套餐（复用详情页 .unlock-pkg / .up-card 组件） */
+    var pkgs = (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.packages) || [];
+    var pkgHtml = creditEnough || !pkgs.length ? '' : '<div class="unlock-pkg"><div class="up-label">积分不足？选购套餐更优惠</div><div class="up-grid">' +
+      pkgs.map(function (p, i) {
+        var gain = p.price >= 580 ? '多送' + Math.round((p.credits - p.price) / p.price * 100) + '%' : '';
+        return '<div class="up-card' + (i === 1 ? ' selected' : '') + '" data-pkg="' + i + '">' +
+          '<div class="up-price">¥' + p.price + '</div>' +
+          '<div class="up-credits">' + p.credits + ' 积分</div>' +
+          (gain ? '<div class="up-gain">' + gain + '</div>' : '<div class="up-gain empty"></div>') +
+          '<div class="up-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '</div>';
+      }).join('') + '</div></div>';
+    /* 支付方式（对齐详情页解锁弹窗三方式） */
+    var methods = [
+      { id: 'credit', name: '积分支付', icon: 'i-star', color: '#D2B169', desc: '余额 ' + bal + ' 积分' + (creditEnough ? '' : '，积分不足') },
+      { id: 'wechat', name: '微信支付', icon: 'i-chat', color: '#07C160', desc: '单次 ¥' + rmb.toFixed(2) },
+      { id: 'alipay', name: '支付宝', icon: 'i-box', color: '#1677FF', desc: '单次 ¥' + rmb.toFixed(2) }
+    ];
+    var payMethodHtml = '<div class="unlock-paymethods"><div class="pm-label">选择支付方式</div>' +
+      methods.map(function (pm, i) {
+        return '<div class="pm-item' + (i === 0 ? ' selected' : '') + '" data-pay="' + pm.id + '">' +
+          '<div class="pm-icon" style="background:' + pm.color + '15;color:' + pm.color + ';"><svg class="ic"><use href="#' + pm.icon + '"/></svg></div>' +
+          '<div class="pm-body"><div class="pm-name">' + pm.name + '</div>' + (pm.desc ? '<div class="pm-desc">' + pm.desc + '</div>' : '') + '</div>' +
+          '<div class="pm-radio"></div>' +
+        '</div>';
+      }).join('') + '</div>';
     s.html(
       '<div class="dg-pay">' +
-        '<div class="dg-pay-goods">' +
+        /* ① 商品卡：点击下滑展开「顾问匹配信息概览」 */
+        '<div class="dg-pay-goods" id="dgPayGoods" role="button" aria-expanded="false">' +
           '<div class="dg-pay-goods-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>' +
           '<div class="dg-pay-goods-body"><div class="dg-pay-goods-title">' + UI.esc(order.title) + '</div><div class="dg-pay-goods-desc">' + UI.esc(order.desc) + '</div></div>' +
-          '<div class="dg-pay-amt">¥' + Number(order.amount).toFixed(2) + '</div>' +
+          '<div class="dg-pay-goods-right"><div class="dg-pay-amt">¥' + rmb.toFixed(2) + '</div><span class="dg-pay-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></span></div>' +
         '</div>' +
+        '<div class="dg-pay-overview" id="dgPayOverview">' +
+          '<div class="dg-ov-inner">' +
+            '<div class="dg-ov-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>顾问匹配信息 · 概览<span class="dg-ov-hint">付款后解锁完整信息</span></div>' +
+            overviewItemsHTML(order) +
+            '<div class="dg-ov-note"><svg class="ic"><use href="#i-lock"/></svg>关键信息已按平台规则遮蔽，付款后自动解锁完整联系方式与价格明细</div>' +
+          '</div>' +
+        '</div>' +
+        /* ② 订单信息 */
         '<div class="dg-pay-row"><span class="dg-pay-row-label">订单号</span><span class="dg-pay-row-val">' + UI.esc(order.orderNo) + '</span></div>' +
         '<div class="dg-pay-row"><span class="dg-pay-row-label">服务来源</span><span class="dg-pay-row-val">' + UI.esc(order.bizLabel) + ' · 委托服务</span></div>' +
-        '<div class="dg-pay-methods-label">支付方式</div>' +
-        '<div class="dg-chips dg-pay-methods">' +
-          '<button type="button" class="dg-chip active" data-val="微信支付">微信支付</button>' +
-          '<button type="button" class="dg-chip" data-val="支付宝">支付宝</button>' +
-          '<button type="button" class="dg-chip" data-val="银联">银联</button>' +
+        /* ③ 支付方式 */
+        payMethodHtml +
+        pkgHtml +
+        /* ④ 底部置底支付区（协议 + 支付按钮 + 托管保障） */
+        '<div class="dg-pay-footer">' +
+          '<label class="pay-agree" id="dgPayAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>支付即视为同意《委托服务协议》与《退款规则》</span></label>' +
+          '<button type="button" class="btn btn-primary btn-block btn-lg" id="dgPayGo" data-order-no="' + order.orderNo + '" data-method="credit">确认支付 · ' + creditCost + '积分</button>' +
+          '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>支付由平台资金托管保障 · 未对接成功可申请退款</div>' +
         '</div>' +
-        '<div class="dg-pay-agree">支付即视为同意《委托服务协议》与《退款规则》</div>' +
-        '<button type="button" class="btn btn-primary btn-block" style="height:48px;font-size:15px;font-weight:700;" data-order-no="' + order.orderNo + '" onclick="Delegates.confirmPay(event)">确认支付 ¥' + Number(order.amount).toFixed(2) + '</button>' +
-        '<div class="dg-pay-foot">支付由平台资金托管保障 · 未对接成功可申请退款</div>' +
       '</div>'
     );
     s.show();
     var body = s.body();
-    var m = body ? body.querySelector('.dg-pay-methods') : null;
-    if (m) m.addEventListener('click', function (e) {
-      var chip = e.target.closest('.dg-chip'); if (!chip) return;
-      m.querySelectorAll('.dg-chip').forEach(function (c) { c.classList.remove('active'); });
-      chip.classList.add('active');
+    if (!body) return;
+    /* 对齐详情页解锁弹窗：协议行 + 托管保障移入底部 foot 区，与支付按钮同处吸底栏（.sheet-foot-inner 纵向排列） */
+    setTimeout(function () {
+      var footInner = document.querySelector('.sheet.show .sheet-foot-inner');
+      var agree = document.getElementById('dgPayAgree');
+      var secure = document.querySelector('.sheet.show .us-secure');
+      if (footInner) {
+        if (agree) footInner.insertBefore(agree, footInner.firstChild);
+        if (secure) footInner.appendChild(secure);
+      }
+      var uf = document.querySelector('.sheet.show .dg-pay-footer');
+      if (uf) uf.style.display = 'none';
+    }, 60);
+    /* 商品卡展开/收起（下滑展开概览） */
+    var goods = body.querySelector('#dgPayGoods');
+    if (goods) goods.addEventListener('click', function () {
+      var open = goods.classList.toggle('open');
+      goods.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    /* 支付方式切换（联动按钮文案） */
+    var btn = body.querySelector('#dgPayGo');
+    body.querySelectorAll('.pm-item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        body.querySelectorAll('.pm-item').forEach(function (i) { i.classList.remove('selected'); });
+        item.classList.add('selected');
+        var pay = item.getAttribute('data-pay');
+        if (btn) {
+          btn.setAttribute('data-method', pay);
+          btn.textContent = pay === 'credit' ? '确认支付 · ' + creditCost + '积分' : (pay === 'wechat' ? '微信支付 ¥' + rmb.toFixed(2) : '支付宝 ¥' + rmb.toFixed(2));
+        }
+      });
+    });
+    /* 积分套餐选中态（视觉反馈） */
+    body.querySelectorAll('.up-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        body.querySelectorAll('.up-card').forEach(function (c) { c.classList.remove('selected'); });
+        card.classList.add('selected');
+      });
+    });
+    /* 协议勾选 */
+    var agreeRow = body.querySelector('#dgPayAgree');
+    if (agreeRow) agreeRow.addEventListener('click', function (e) { e.preventDefault(); agreeRow.classList.toggle('on'); });
+    if (btn) btn.addEventListener('click', confirmPay);
   }
   function confirmPay(ev) {
     var btn = ev && ev.currentTarget;
-    var no = btn && btn.getAttribute('data-order-no');
+    if (!btn) return;
+    var agree = document.getElementById('dgPayAgree');
+    if (agree && !agree.classList.contains('on')) {
+      UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意《委托服务协议》与《退款规则》', ok: '确认并继续支付', cancel: '取消', onOk: function () { agree.classList.add('on'); doPay(btn); } });
+      return;
+    }
+    doPay(btn);
+  }
+  function doPay(btn) {
+    var no = btn.getAttribute('data-order-no');
+    var method = btn.getAttribute('data-method') || 'credit';
     var o = getOrder(no); if (!o) return;
     if (btn._paying) return;
     btn._paying = true;
+    var orig = btn.textContent;
     btn.textContent = '支付中…'; btn.style.opacity = '.7';
     /* [模拟] 真实环境调用收银台 SDK，支付网关异步回调后确认订单 */
     setTimeout(function () {
+      var res = executePay(o, method);
+      if (!res || !res.ok) {
+        btn._paying = false; btn.textContent = orig; btn.style.opacity = '';
+        if (res && res.recharge) {
+          /* 余额/积分不足：以充值引导对话框为唯一提示（对齐详情页解锁弹窗交互，避免 toast+弹窗双重提示） */
+          UI.dialog({
+            title: res.recharge === 'credits' ? '积分不足' : '余额不足',
+            text: (res.msg || '') + '，是否前往充值？',
+            ok: '去充值', cancel: '取消',
+            onOk: function () { location.href = res.recharge === 'credits' ? 'pages/wallet/credits.html' : 'pages/wallet/recharge.html'; }
+          });
+        } else {
+          UI.toast(res && res.msg ? res.msg : '支付失败，请重试', 'warn');
+        }
+        return;
+      }
       markPaid(o.orderNo);
       btn._paying = false;
       var s = document.querySelector('.sheet.show');
-      if (!s) return;
-      var head = s.querySelector('.sheet-head .fs-17'); if (head) head.textContent = '支付成功';
-      var body = s.querySelector('.sheet-body'); if (body) body.innerHTML = paySuccessHtml(o);
-    }, 1000);
+      if (s) {
+        var head = s.querySelector('.sheet-head .fs-17'); if (head) head.textContent = '支付成功';
+        var body = s.querySelector('.sheet-body'); if (body) body.innerHTML = paySuccessHtml(o);
+        /* 成功面板自带「查看委托信息详情 / 留在当前页」操作，隐藏吸底栏的「支付中…」残留按钮 */
+        var foot = s.querySelector('.sheet-foot'); if (foot) foot.style.display = 'none';
+      }
+      /* 支付完成 → 自动进入「委托信息详情」详情页 */
+      setTimeout(function () { location.href = 'pages/profile/delegate-detail.html?id=' + encodeURIComponent(o.delegateId || ''); }, 1600);
+    }, 700);
+  }
+  /* 按支付方式执行扣款：积分支付只扣积分；微信/支付宝只走人民币流水（严禁双扣），对齐详情页 simulatePayUnlock */
+  function executePay(order, method) {
+    var cost = creditCostOf(order);
+    var rmb = Number(order.amount) || 0;
+    var payName = method === 'alipay' ? '支付宝' : (method === 'credit' ? '积分支付' : '微信支付');
+    if (method === 'credit') {
+      if (!window.CreditStore) return { ok: false, msg: '积分账户暂不可用' };
+      var r = CreditStore.consume(cost, '委托信息详情解锁浏览 · ' + String(order.title || '').slice(0, 12), { method: method, ref: order.orderNo });
+      if (r === null) return { ok: false, msg: '积分不足，需 ' + cost + ' 积分，请先充值积分', recharge: 'credits' };
+      return { ok: true };
+    }
+    if (!window.BalanceStore) return { ok: false, msg: '支付账户暂不可用' };
+    if (BalanceStore.available() < rmb) return { ok: false, msg: '余额不足，需 ¥' + rmb.toFixed(2) + '，请先充值', recharge: 'wallet' };
+    var s = BalanceStore.read();
+    s.balance = Math.round((s.balance - rmb) * 100) / 100;
+    s.logs.unshift({ type: 'unlock_sim_pay', amount: -rmb, method: method, reason: payName + ' · 委托信息解锁模拟支付', ts: Date.now(), ref: order.orderNo });
+    s.logs.unshift({ type: 'unlock_cny_pay', amount: -rmb, method: method, reason: payName + '扣款 · 委托信息解锁', ts: Date.now(), ref: order.orderNo });
+    s.logs.unshift({ type: 'platform_income', amount: rmb, method: method, reason: '委托信息解锁平台收入（模拟）', ts: Date.now(), ref: order.orderNo });
+    BalanceStore.write(s);
+    return { ok: true };
   }
   function paySuccessHtml(order) {
     return '<div class="dg-pay-ok">' +
       '<div class="dg-pay-ok-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>' +
       '<div class="dg-pay-ok-title">支付成功 · 信息已解锁</div>' +
-      '<div class="dg-pay-ok-desc">「' + UI.esc(order.title) + '」已解锁，顾问为您匹配的信息详情现已可见</div>' +
-      '<button type="button" class="btn btn-primary btn-block" style="height:46px;" data-order-no="' + order.orderNo + '" onclick="Delegates.viewUnlock(event)">查看解锁信息</button>' +
-      '<button type="button" class="btn btn-ghost btn-block" style="height:46px;" onclick="UI.closeSheet()">完成</button>' +
+      '<div class="dg-pay-ok-desc">「' + UI.esc(order.title) + '」已解锁，即将进入委托信息详情页查看顾问匹配信息</div>' +
+      '<button type="button" class="btn btn-primary btn-block" style="height:46px;" data-order-no="' + order.orderNo + '" onclick="Delegates.viewDelegateDetail(event)">查看委托信息详情</button>' +
+      '<button type="button" class="btn btn-ghost btn-block" style="height:46px;" onclick="UI.closeSheet()">留在当前页</button>' +
       '<div class="dg-pay-ok-foot">如需更多匹配信息，可在企业微信中继续与顾问沟通</div>' +
     '</div>';
+  }
+  function viewDelegateDetail(ev) {
+    var btn = ev && ev.currentTarget;
+    var no = btn && btn.getAttribute('data-order-no');
+    var o = getOrder(no); if (!o) return;
+    UI.closeSheet();
+    setTimeout(function () { location.href = 'pages/profile/delegate-detail.html?id=' + encodeURIComponent(o.delegateId || ''); }, 260);
   }
   function viewUnlock(ev) {
     var btn = ev && ev.currentTarget;
@@ -815,31 +972,69 @@
     );
     s.show();
   }
+  /* 顾问匹配信息数据源（模拟后台运营账号推送 · 9 类信息产品，含真实联系方式与报价） */
+  function matchedInfoItems(order) {
+    var biz = order && order.biz || '';
+    var map = {
+      material: [
+        { name: '四川××建材有限公司 · 钢材供应', tags: ['HRB400E 螺纹钢', '含税含运 支持检测'], region: '四川省 · 成都', contact: '陈经理 13822118800' },
+        { name: '成都××混凝土有限公司 · 商砼供应', tags: ['C30-C60 标号齐全', '24 小时连续供应'], region: '四川省 · 成都', contact: '周经理 13933229911' }
+      ],
+      equipment: [
+        { name: '成都××机械租赁 · 塔吊/施工电梯', tags: ['QTZ63-QTZ125 塔吊', '含司机 按月租赁'], region: '四川省 · 成都', contact: '李经理 13655887700' },
+        { name: '四川××设备租赁 · 挖掘机/装载机', tags: ['20T-50T 挖机', '进退场费全包'], region: '四川省 · 绵阳', contact: '赵经理 13566778811' }
+      ],
+      labor: [
+        { name: '××建筑劳务 · 木工班组', tags: ['木工班组 35 人', '持证上岗 可开票'], region: '四川省 · 成都', contact: '王工 13777889900' },
+        { name: '××劳务分包 · 钢筋班组', tags: ['钢筋班组 28 人', '长期驻场 结算快'], region: '四川省 · 德阳', contact: '刘工 13888990011' }
+      ],
+      cooperation: [
+        { name: '成都××综合体项目 · 联合体合作', tags: ['房建二级 总投资 3.2 亿', '寻找土建/机电合作方'], region: '四川省 · 成都', contact: '吴总 13900112233' },
+        { name: '××市政道路项目 · 专业分包', tags: ['市政二级 工期 14 个月', '接受专业分包'], region: '四川省 · 眉山', contact: '郑总 13722334455' }
+      ],
+      agency: [
+        { name: '××工程服务 · 资质代办/维护', tags: ['建筑资质新办/增项', '承诺不过退款'], region: '四川省 · 成都', contact: '孙经理 13644556677' },
+        { name: '××信息咨询 · 招投标代理', tags: ['招标代理甲级', '免费评估 全流程服务'], region: '四川省 · 成都', contact: '钱经理 13566778899' }
+      ],
+      franchise: [
+        { name: '四川××建设工程有限公司', tags: ['建筑工程施工总承包 二级', '市政公用工程施工总承包 二级'], region: '四川省 · 成都', contact: '刘经理 13822118866' },
+        { name: '成都××建筑劳务有限公司', tags: ['施工劳务资质', '安全生产许可证 有效'], region: '四川省 · 成都', contact: '王经理 13933229977' }
+      ],
+      trade: [
+        { name: '成都××建筑工程有限公司 · 整体转让', tags: ['建筑工程施工总承包 二级', '含在建项目 2 个'], region: '四川省 · 成都', contact: '张总 13788990011', price: '报价 ¥128 万' },
+        { name: '四川××市政工程有限公司 · 股权转让', tags: ['市政公用 二级', '无负债 账目干净'], region: '四川省 · 绵阳', contact: '李总 13677880022', price: '报价 ¥86 万' }
+      ],
+      personnel: [
+        { name: '某大型施工企业 · 项目经理岗', tags: ['建筑工程总包 一级', '月薪 25-35K'], region: '四川省 · 成都', contact: 'HR 13812340001' },
+        { name: '××设计院 · 结构工程师岗', tags: ['甲级设计院', '年薪 30-45W'], region: '四川省 · 成都', contact: 'HR 13923450002' }
+      ],
+      talent: [
+        { name: '张敏', tags: ['一级建造师（建筑工程）', '注册安全工程师'], region: '四川省 · 成都 · 求职：工程项目经理', contact: '13900005678' },
+        { name: '李强', tags: ['高级工程师（市政）', '15 年项目管理经验'], region: '四川省 · 绵阳 · 求职：技术负责人', contact: '13711112222' }
+      ]
+    };
+    return map[biz] || [
+      { name: '匹配信息一', tags: ['平台核验', '真实有效'], region: '四川省 · 成都', contact: '顾问 4008886688' },
+      { name: '匹配信息二', tags: ['平台核验', '真实有效'], region: '全国', contact: '顾问 4008886688' }
+    ];
+  }
+  /* 付款前概览（锁定态）：按详情页规则遮蔽关键信息 —— 联系方式部分掩码 + 小锁标，报价显示占位 + 小锁标 */
+  function overviewItemsHTML(order) {
+    var items = matchedInfoItems(order);
+    return items.map(function (it) {
+      return '<div class="dg-ov-item">' +
+        '<div class="dg-ov-name">' + UI.esc(it.name) + (it.price ? '<span class="dg-ov-tag">报价</span>' : '') + '</div>' +
+        '<div class="dg-ov-tags">' + (it.tags || []).map(function (t) { return '<span>' + UI.esc(t) + '</span>'; }).join('') + '</div>' +
+        '<div class="dg-ov-meta"><span class="dg-ov-region">' + UI.esc(it.region || '') + '</span>' +
+        '<span class="dg-ov-call pwp"><span class="pw-val pwp-mask">' + UI.esc(dgMaskContact(it.contact || '')) + _dgLockIc + '</span><span class="pwp-real">' + UI.esc(it.contact || '') + '</span></span></div>' +
+        (it.price ? '<div class="dg-ov-price pwp"><span class="pw-val pwp-mask">报价待解锁' + _dgLockIc + '</span><span class="pwp-real">' + UI.esc(it.price) + '</span></div>' : '') +
+      '</div>';
+    }).join('');
+  }
+  /* 解锁后完整信息（详情页 / 解锁信息弹窗共用）：联系方式与报价明文展示 */
   function unlockItemsHTML(order) {
     /* [模拟] 真实环境 → GET /api/delegate/unlock-info?delegateId=xxx，返回顾问匹配结果（含联系方式） */
-    var biz = order.biz || '';
-    var items;
-    if (biz === 'franchise') {
-      items = [
-        { name: '四川××建设工程有限公司', tags: ['建筑工程施工总承包 二级', '市政公用工程施工总承包 二级'], region: '四川省 · 成都', contact: '刘经理 138****2211' },
-        { name: '成都××建筑劳务有限公司', tags: ['施工劳务资质', '安全生产许可证 有效'], region: '四川省 · 成都', contact: '王经理 139****3322' }
-      ];
-    } else if (biz === 'trade') {
-      items = [
-        { name: '成都××建筑工程有限公司 · 整体转让', tags: ['建筑工程施工总承包 二级', '含在建项目 2 个'], region: '四川省 · 成都', contact: '张总 137****8899', price: '报价 ¥128 万' },
-        { name: '四川××市政工程有限公司 · 股权转让', tags: ['市政公用 二级', '无负债 账目干净'], region: '四川省 · 绵阳', contact: '李总 136****7788', price: '报价 ¥86 万' }
-      ];
-    } else if (biz === 'personnel') {
-      items = [
-        { name: '张敏', tags: ['一级建造师（建筑工程）', '注册安全工程师'], region: '四川省 · 成都 · 求职：工程项目经理', contact: '139****5678' },
-        { name: '某大型施工企业 · 项目经理岗', tags: ['建筑工程总包 一级', '月薪 25-35K'], region: '四川省 · 成都', contact: 'HR 138****1234' }
-      ];
-    } else {
-      items = [
-        { name: '匹配信息一', tags: ['平台核验', '真实有效'], region: '四川省 · 成都', contact: '顾问 400-888-6688' },
-        { name: '匹配信息二', tags: ['平台核验', '真实有效'], region: '全国', contact: '顾问 400-888-6688' }
-      ];
-    }
+    var items = matchedInfoItems(order);
     return items.map(function (it) {
       return '<div class="dg-unlock-item">' +
         '<div class="dg-unlock-item-name">' + UI.esc(it.name) + (it.price ? '<span class="dg-unlock-item-price">' + UI.esc(it.price) + '</span>' : '') + '</div>' +
@@ -866,10 +1061,11 @@
     openHandoffSheet: openHandoffSheet, dialService: dialService,
     addWecom: addWecom, copyWecomLink: copyWecomLink,
     pushUnlockOrder: pushUnlockOrder, pendingOrders: pendingOrders,
-    getOrder: getOrder, markPaid: markPaid,
+    getOrder: getOrder, orderByDelegate: orderByDelegate, markPaid: markPaid,
     maybeShowOrderPopup: maybeShowOrderPopup, goPay: goPay,
     openCheckout: openCheckout, confirmPay: confirmPay,
-    viewUnlock: viewUnlock, openUnlockInfoSheet: openUnlockInfoSheet,
+    viewUnlock: viewUnlock, viewDelegateDetail: viewDelegateDetail,
+    openUnlockInfoSheet: openUnlockInfoSheet, unlockItemsHTML: unlockItemsHTML,
     dialContact: dialContact,
     FORM_TEMPLATES: FORM_TEMPLATES
   };

@@ -402,17 +402,49 @@ window.OrgsStore = (function () {
     var m = membershipOf(u.id, orgId);
     return m ? m.role : '';
   }
-  /* 移除成员：仅 owner；不可移除自己（owner 不可被踢） */
+  /* 移除成员：仅 owner；不可移除企业主。
+     联动失效：被移出成员名下的待接受邀请 / 加入申请 / 移交申请 / 自认领 / 企业主变更目标一并作废，
+     避免「人已不在企业，单据仍在流转」造成状态不一致；同时通知被移出成员。 */
   function removeMember(orgId, uid) {
     var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org) return { error: '企业不存在' };
     var cm = membershipOf(u.id, orgId);
     if (!cm || cm.role !== 'owner') return { error: '仅企业主可移除成员' };
     if (uid === org.ownerUid) return { error: '企业主不可被移除' };
+    var target = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null;
+    var tName = target ? target.name : uid;
+    var found = false;
     for (var i = 0; i < org.members.length; i++) {
-      if (org.members[i].uid === uid) { org.members.splice(i, 1); break; }
+      if (org.members[i].uid === uid) { org.members.splice(i, 1); found = true; break; }
     }
+    if (!found) return { error: '该成员不在企业内' };
+    /* 关联数据一次性失效，杜绝悬空单据 */
+    var t0 = Date.now();
+    (org.invites || []).forEach(function (iv) {
+      if (iv.targetUid === uid && iv.status === 'pending') { iv.status = 'revoked'; iv.updatedAt = t0; }
+    });
+    (org.joins || []).forEach(function (j) {
+      if (j.uid === uid && j.status === 'pending') { j.status = 'rejected'; j.updatedAt = t0; }
+    });
+    (org.transfers || []).forEach(function (t) {
+      if ((t.toUid === uid || t.fromUid === uid) && (t.status === 'owner-confirm' || t.status === 'verify-pending')) {
+        t.status = 'rejected'; t.updatedAt = t0;
+        if (t.verify && t.verify.status === 'pending') { t.verify.status = 'rejected'; t.verify.reviewedAt = t0; }
+      }
+    });
+    (org.ownerClaims || []).forEach(function (c) {
+      if (c.uid === uid && c.status === 'pending') { c.status = 'rejected'; c.reviewedAt = t0; c.reviewNote = '成员已被移出企业，认领申请失效'; }
+    });
+    (org.ownerChanges || []).forEach(function (c) {
+      if (c.targetUid === uid && c.status === 'pending') { c.status = 'rejected'; c.reviewedAt = t0; c.reviewNote = '变更目标已被移出企业，变更申请失效'; }
+    });
     save(a);
-    if (window.DataBus && DataBus.audit) DataBus.audit('移除成员', '企业', uid, '移出 ' + (org.shortName || org.co));
+    if (window.DataBus && DataBus.audit) DataBus.audit('移除成员', '企业', tName, '移出 ' + (org.shortName || org.co) + '，其待处理邀请/申请/移交已一并失效');
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) {
+        DataBus.pushDirectMessage(uid, '已被移出企业', '您已被移出 ' + (org.shortName || org.co) + '，已失去该企业身份与发布/招聘权限。');
+      }
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
     return { ok: true };
   }
 
@@ -715,6 +747,35 @@ window.OrgsStore = (function () {
       }
     }
     return { error: '待确认的移交不存在' };
+  }
+  /* 撤回移交申请：仅发起人可撤回；待确认(owner-confirm) / 待验证(verify-pending)阶段均可撤回，
+     已生效(done)后不可撤回。撤回后接收人验证入口立即失效，相关方收到通知。 */
+  function cancelTransfer(transferId) {
+    var a = load(); var u = me(); if (!u) return { error: '未登录' };
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      var ts = org.transfers || [];
+      for (var j = 0; j < ts.length; j++) {
+        var t = ts[j];
+        if (t.id === transferId && (t.status === 'owner-confirm' || t.status === 'verify-pending')) {
+          if (t.fromUid !== u.id) return { error: '仅发起人可撤回该移交申请' };
+          t.status = 'cancelled'; t.updatedAt = Date.now();
+          save(a);
+          try {
+            if (window.DataBus && DataBus.pushDirectMessage) {
+              DataBus.pushDirectMessage(t.toUid, '企业主移交已撤回', (org.shortName || org.co) + ' 的企业主移交申请已被发起人撤回，无需再进行身份验证。');
+              if (org.ownerUid && org.ownerUid !== t.fromUid && org.ownerUid !== t.toUid) {
+                DataBus.pushDirectMessage(org.ownerUid, '企业主移交已撤回', (org.shortName || org.co) + ' 的企业主移交申请已被撤回。');
+              }
+            }
+          } catch (e) {}
+          if (window.DataBus && DataBus.audit) DataBus.audit('撤回企业主移交', '企业', t.toUid, '撤回 ' + (org.shortName || org.co) + ' 的企业主移交申请');
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '待处理的移交申请不存在' };
   }
   /* 接收人提交企业主身份验证：mode='legal' 法人认证 | 'controller' 实际控制人验证 */
   function submitOwnerVerify(orgId, mode, payload) {
@@ -1114,6 +1175,7 @@ window.OrgsStore = (function () {
     transfersOf: transfersOf, pendingTransferForUser: pendingTransferForUser,
     ownerConfirmingTransfers: ownerConfirmingTransfers,
     requestTransfer: requestTransfer, confirmTransfer: confirmTransfer, rejectTransfer: rejectTransfer,
+    cancelTransfer: cancelTransfer,
     submitOwnerVerify: submitOwnerVerify, reviewOwnerVerify: reviewOwnerVerify,
     pendingOwnerReviews: pendingOwnerReviews, transferById: transferById,
     ownerChangesOf: ownerChangesOf, pendingOwnerChangeOf: pendingOwnerChangeOf,

@@ -13,7 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   #pub-content { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
   #pub-content > .scroll { min-height:0; }
 
-  .list-scroll { padding:0 16px calc(var(--sp-6) + 14px); }
+  .list-scroll { padding:0 16px calc(var(--sp-6) + 80px); }
   .list-head { display:flex; align-items:center; justify-content:space-between; padding:8px 0 12px; }
   /* 右上角发布入口已统一为共享 .nav-pill-primary（修复原 --gold-hi 缺失导致的透明背景；保留 id=plus-new） */
   .list-sub { color:var(--text-3); font-size:12px; line-height:1.5; }
@@ -30,10 +30,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .seg-n { min-width:17px; height:17px; padding:0 5px; border-radius:var(--r-full); background:rgba(22,22,22,.06); color:var(--text-3); font-size:10px; font-weight:700; line-height:17px; text-align:center; }
   .seg-item.is-on .seg-n { background:var(--primary); color:#fff; }
 
-  .record { position:relative; padding:14px 14px 13px 16px; margin-bottom:11px; border:1px solid var(--line); border-radius:var(--r-m); background:var(--bg-card); box-shadow:var(--shadow-xs); overflow:hidden; transition:border-color var(--d-fast), transform var(--d-fast); }
-  .record::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3.5px; }
-  .record.is-demand::before { background:linear-gradient(180deg,var(--primary),var(--primary-dim)); }
-  .record.is-supply::before { background:linear-gradient(180deg,#3f9d6e,var(--success)); }
+  .record { position:relative; padding:15px 14px 13px; margin-bottom:0; border:1px solid var(--line); border-radius:var(--r-m); background:var(--bg-card); box-shadow:0 1px 2px rgba(22,22,22,.04), 0 8px 22px -12px rgba(22,22,22,.20); overflow:hidden; transition:border-color var(--d-fast), transform var(--d-fast), box-shadow var(--d-fast); }
+  /* 顶部状态色渐变细线（遵循先进卡片视觉，替代原左侧竖条） */
+  .record::before { content:''; position:absolute; left:0; right:0; top:0; height:2.5px; }
+  .record.is-demand::before { background:linear-gradient(90deg,var(--primary),color-mix(in srgb, var(--primary) 55%, transparent)); }
+  .record.is-supply::before { background:linear-gradient(90deg,#3f9d6e,color-mix(in srgb, var(--success) 55%, transparent)); }
   .record.is-rejected { border-color:color-mix(in srgb, var(--error) 32%, var(--line)); background:color-mix(in srgb, var(--error-soft) 30%, var(--bg-card)); }
   .record.is-active { border-color:color-mix(in srgb, var(--success) 26%, var(--line)); }
   .record.is-review { border-color:color-mix(in srgb, var(--primary) 26%, var(--line)); }
@@ -61,19 +62,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .record-status.is-pending .sd { animation:sdPulse 1.2s ease-in-out infinite; }
   @keyframes sdPulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
 
-  /* ══ 时间轴：按发布时间倒序，左侧竖线 + 状态色节点 + 时间戳 ══ */
+  /* ══ 时间轴：状态节点 + 渐变连接线。节点列仅承载状态轴，时间统一在卡片内展示（避免重复） ══ */
   .tl { position:relative; margin-top:14px; }
-  .tl-item { display:flex; gap:12px; position:relative; margin-bottom:12px; }
+  .tl-item { display:flex; gap:14px; position:relative; margin-bottom:14px; }
   .tl-item:last-child { margin-bottom:0; }
-  .tl-axis { flex:none; width:52px; display:flex; flex-direction:column; align-items:center; position:relative; }
-  .tl-dot { width:9px; height:9px; border-radius:50%; margin-top:6px; background:var(--line-strong); box-shadow:0 0 0 2px var(--bg-card); }
-  .tl-time { font-size:9.5px; color:var(--text-3); margin-top:6px; white-space:nowrap; font-variant-numeric:tabular-nums; }
-  .tl-item.is-active .tl-dot { background:var(--success); box-shadow:0 0 0 2px color-mix(in srgb, var(--success) 32%, transparent); }
-  .tl-item.is-review .tl-dot { background:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 32%, transparent); }
-  .tl-item.is-rejected .tl-dot { background:var(--error); box-shadow:0 0 0 2px color-mix(in srgb, var(--error) 32%, transparent); }
-  .tl-item.is-closed .tl-dot { background:var(--text-3); box-shadow:0 0 0 2px color-mix(in srgb, var(--text-3) 30%, transparent); }
-  .tl-item::before { content:''; position:absolute; left:25.5px; top:46px; bottom:-12px; width:1.5px; background:color-mix(in srgb, var(--text-3) 55%, transparent); }
+  .tl-axis { flex:none; width:24px; display:flex; justify-content:center; position:relative; }
+  /* 渐变连接线：从本节点中心向下贯穿到下一节点，下淡出 */
+  .tl-item::before { content:''; position:absolute; left:11px; top:22px; bottom:-14px; width:2px; border-radius:2px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--line-strong) 60%, transparent), color-mix(in srgb, var(--line-strong) 28%, transparent)); }
   .tl-item:last-child::before { display:none; }
+  /* 状态节点：实心点 + 柔和光晕 + 外描边环，由状态色驱动 */
+  .tl-dot { position:relative; width:13px; height:13px; margin-top:15px; color:var(--text-3); }
+  .tl-dot::before { content:''; position:absolute; inset:0; border-radius:50%; background:currentColor; }
+  .tl-dot::after { content:''; position:absolute; inset:-4.5px; border-radius:50%; border:1.5px solid color-mix(in srgb, currentColor 40%, transparent); }
+  .tl-item.is-active   .tl-dot { color:var(--success); }
+  .tl-item.is-review   .tl-dot { color:var(--primary); }
+  .tl-item.is-rejected .tl-dot { color:var(--error); }
+  .tl-item.is-closed   .tl-dot { color:var(--text-3); }
+  .tl-item.is-active   .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--success) 40%, transparent); }
+  .tl-item.is-review   .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--primary) 38%, transparent); }
+  .tl-item.is-rejected .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--error) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--error) 38%, transparent); }
   .tl-item .record { margin-bottom:0; }
 
   .record-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:9px; color:var(--text-3); font-size:var(--fs-xs); }
@@ -111,12 +119,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .empty-plus svg { width:12px; height:12px; color:#fff; }
   .empty-title { font-size:16px; font-weight:700; color:var(--text-1); margin-bottom:8px; }
   .empty-desc { font-size:var(--fs-sm); color:var(--text-3); line-height:1.7; margin:0 auto 26px; max-width:250px; }
-  .empty-actions { display:flex; gap:10px; justify-content:center; }
-  .empty-btn { display:inline-flex; align-items:center; gap:6px; padding:11px 20px; border-radius:var(--r-m); font-size:13px; font-weight:600; text-decoration:none; cursor:pointer; transition:all var(--d-fast); border:none; }
-  .empty-btn.primary { background:linear-gradient(180deg,var(--primary),var(--primary-dim)); color:#fff; box-shadow:0 4px 12px -2px var(--primary-dim); }
-  .empty-btn.primary:active { transform:translateY(1px); box-shadow:0 2px 6px -2px var(--primary-dim); }
-  .empty-btn.ghost { background:var(--bg-card); color:var(--text-2); border:1px solid var(--line); }
-  .empty-btn .ic { width:14px; height:14px; }
 
   .pub-gate { display:none; padding:64px 28px; text-align:center; }
   .gate-ic { width:76px; height:76px; margin:0 auto 18px; border-radius:50%; background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft)); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-xs); }
@@ -125,6 +127,73 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .gate-note { font-size:var(--fs-sm); color:var(--text-3); line-height:1.7; margin-top:8px; }
   .pub-gate .btn { margin-top:22px; }
   .gate-link { display:block; margin-top:14px; text-align:center; color:var(--primary-dim); font-size:var(--fs-sm); text-decoration:none; }
+
+  /* ══ 底部固定悬浮发布条：样式同「钱包·首页」.app-float-cta（液态玻璃胶囊条，双主题自适应）══ */
+  #pub-content .app-float-cta {
+    position: absolute !important; left: 50%; right: auto; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 32px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 55; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 12px;
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+        rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+        rgba(255,255,255,.78) 100%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+        rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    border: 1px solid rgba(255,255,255,.88);
+    box-shadow:
+      0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+      inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+      inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.40);
+    user-select: none; -webkit-user-select: none;
+  }
+  #pub-content .app-float-cta::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+      rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+  }
+  #pub-content .app-float-cta .afc-item {
+    flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--text-1); font-size: 14px; font-weight: 600; letter-spacing: .02em;
+    transition: color .25s, font-weight .25s, transform .15s;
+    font-family: var(--font-display);
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+    text-decoration: none; padding: 0 9px;
+    white-space: nowrap;
+  }
+  #pub-content .app-float-cta .afc-item svg { width: 18px; height: 18px; stroke-width: 2; flex: none; transition: stroke-width .2s, color .25s; }
+  #pub-content .app-float-cta .afc-item:active { transform: scale(.94); }
+  #pub-content .app-float-cta .afc-sep { flex: none; color: rgba(22,22,22,.28); font-size: 12px; padding: 0 2px; position: relative; z-index: 2; }
+  /* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+  [data-theme="dark"] #pub-content .app-float-cta {
+    background: linear-gradient(180deg,
+      rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+      rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+      inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta::before {
+    background: linear-gradient(180deg,
+      rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+      rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta .afc-item {
+    color: var(--text-1);
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta .afc-sep { color: rgba(242,240,236,.30); }
 </style></head><body><div class="phone">
   <div id="pub-gate-login" class="pub-gate">
     <div class="gate-ic"><svg class="ic"><use href="#i-user"/></svg></div>
@@ -152,6 +221,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="list-summary"><span>共 <b id="sum-all">0</b> 条</span><span class="sum-sep"></span><span>上架中 <b id="sum-active">0</b></span><span class="sum-sep"></span><span>待审核 <b id="sum-review">0</b></span><span class="sum-sep"></span><span style="color:var(--error);">待处理驳回 <b id="sum-reject">0</b></span></div>
       <div id="record-list" style="margin-top:12px"></div>
     </main>
+    <!-- 底部固定悬浮发布条：发布需求 / 发布供应（样式同「钱包·首页」.app-float-cta） -->
+    <div class="app-float-cta" id="pub-cta">
+      <a class="afc-item" href="editor.html?role=demand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-search"/></svg>
+        <span class="afc-label">发布需求</span>
+      </a>
+      <span class="afc-sep" aria-hidden="true">|</span>
+      <a class="afc-item" href="editor.html?role=supply">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-upload"/></svg>
+        <span class="afc-label">发布供应</span>
+      </a>
+    </div>
   </div>
 </div><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/guest-gate.js"></script><script>
 (function(){
@@ -250,7 +331,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     '</article>';
   }
   function emptyHtml(){
-    return '<div class="empty-state"><div class="empty-ic"><svg class="ic"><use href="#i-doc"/></svg><span class="empty-plus"><svg class="ic" style="width:12px;height:12px"><path d="M12 5v14M5 12h14"/></svg></span></div><div class="empty-title">还没有发布信息</div><div class="empty-desc">发布供需信息，让更多建筑企业与建筑人看到你的需求与资源</div><div class="empty-actions"><a class="empty-btn primary" href="editor.html?role=demand"><svg class="ic"><use href="#i-search"/></svg>发布需求</a><a class="empty-btn ghost" href="editor.html?role=supply"><svg class="ic"><use href="#i-upload"/></svg>发布供应</a></div></div>';
+    return '<div class="empty-state"><div class="empty-ic"><svg class="ic"><use href="#i-doc"/></svg><span class="empty-plus"><svg class="ic" style="width:12px;height:12px"><path d="M12 5v14M5 12h14"/></svg></span></div><div class="empty-title">还没有发布信息</div><div class="empty-desc">发布供需信息，让更多建筑企业与建筑人看到你的需求与资源</div></div>';
   }
 
   function update(id, patch){
@@ -280,7 +361,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       ? '<div class="tl">' + rows.map(function (r) {
           var g = statusGroup(r.status);
           return '<div class="tl-item is-' + g + '">' +
-            '<div class="tl-axis"><span class="tl-dot"></span><span class="tl-time">' + esc(fmtTime(r.ts || r.updatedAt)) + '</span></div>' +
+            '<div class="tl-axis"><span class="tl-dot"></span></div>' +
             cardHtml(r) +
           '</div>';
         }).join('') + '</div>'

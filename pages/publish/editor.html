@@ -104,11 +104,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .editor-scroll::-webkit-scrollbar { width:0; }
 
 /* ===== 导航栏 ===== */
-.editor-navbar { display:flex; align-items:center; height:50px; padding:0 8px; flex:none; position:relative; z-index:10; border-bottom:1px solid var(--line); background:var(--bg); }
-.editor-navbar .nav-back { width:36px; height:36px; border:none; background:transparent; font-size:22px; color:var(--text-1); cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; }
-.editor-navbar .nav-back:active { background:var(--bg-card-2); }
-.editor-navbar .nav-title { flex:1; text-align:center; font-size:15px; font-weight:700; color:var(--text-1); }
-.editor-navbar .nav-right { display:flex; align-items:center; gap:4px; }
+.editor-navbar { display:flex; align-items:center; height:50px; padding:0 8px; gap:var(--sp-3); flex:none; position:relative; z-index:10; border-bottom:1px solid var(--line); background:var(--bg); }
+/* 「返回 | 首页」组合：遵循全局 .nav-back/.nav-home/.nav-divider 视觉规则
+   （返回44px触区/24px图标，首页20px次级，1px竖线分隔），由 common.js 注入；
+   此处不再覆写尺寸，交由全局规则生效（gap 与 .navbar 一致，保证竖线分隔距正确） */
+.editor-navbar .nav-title { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); max-width:60%; text-align:center; font-size:15px; font-weight:700; color:var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.editor-navbar .nav-right { margin-left:auto; display:flex; align-items:center; gap:4px; }
 .editor-navbar .nav-btn { width:36px; height:36px; border:none; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:50%; color:var(--text-2); position:relative; }
 .editor-navbar .nav-btn:active { background:var(--bg-card-2); }
 .editor-navbar .nav-btn svg { width:19px; height:19px; }
@@ -1252,8 +1253,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   </div>
 
-  </div>
-
   <!-- 填写案例参考弹窗 -->
   <div class="ref-pop-mask" id="ref-pop-mask"></div>
   <div class="ref-pop" id="ref-pop">
@@ -1266,7 +1265,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <!-- 预览面板 -->
   <div class="preview-mask" id="preview-mask"></div>
-  <div class="preview-panel" id="preview-panel" data-sheet-box>
+  <div class="preview-panel" id="preview-panel" data-sheet-box data-sheet-mask="#preview-mask">
     <div style="height:22px;display:flex;align-items:center;justify-content:center;cursor:grab;" data-sheet-drag><div style="width:40px;height:4px;border-radius:2px;background:#ddd;"></div></div>
     <div class="preview-head">
       <div class="ph-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>发布预览</div>
@@ -1303,7 +1302,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <!-- 城市选择器 -->
   <div class="city-mask" id="city-mask"></div>
-  <div class="city-panel" id="city-panel">
+  <div class="city-panel" id="city-panel" data-sheet-mask="#city-mask">
     <div class="city-head">
       <button class="ch-btn ch-cancel" type="button" id="city-cancel">取消</button>
       <span class="ch-title">选择城市</span>
@@ -3086,6 +3085,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     $('preview-panel').classList.add('show');
   }
   function closePreview() {
+    /* [FIX] 关闭预览前复位解锁态：避免用户在预览里切到「已解锁」后关闭，
+       .phone.is-unlocked 残留导致编辑器页被误判为已解锁（打码内容泄露/状态脏） */
+    pvSetUnlock(false);
     $('preview-mask').classList.remove('show');
     $('preview-panel').classList.remove('show');
   }

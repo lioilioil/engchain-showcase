@@ -232,7 +232,16 @@ window.UI = (function () {
       const maskSel = box.getAttribute('data-sheet-mask');
       let mask = maskSel ? document.querySelector(maskSel) : null;
       if (!mask && box.id) {
-        const cand = document.getElementById(box.id.replace(/[Ss]heet$/, 'Mask'));
+        /* [FIX] 遮罩名推断兼容「panel / sheet / box / modal」结尾：
+           之前只处理 xxxSheet→xxxMask，preview-panel / city-panel 会 getElementById 到面板自身，
+           导致拖动收起后遮罩残留（黑幕挡住页面）。
+           命名约定：fooSheet→fooMask（历史）、foo-panel/fooPanel/foo-box→foo-mask */
+        const _m = box.id
+          .replace(/Sheet$/i, 'Mask')
+          .replace(/[-]?Panel$/i, '-mask')
+          .replace(/[-]?Box$/i, '-mask')
+          .replace(/[-]?Modal$/i, '-mask');
+        const cand = document.getElementById(_m);
         if (cand) mask = cand;
       }
       if (mask) mask.classList.remove('show');

@@ -2518,11 +2518,18 @@ window.DETAIL = (function () {
                   ? gate.label
                   : (t.inlineLock ? (t.ctaLocked || payGoLabel(up)) : t.cta)))));
     if ($('actionbar')) $('actionbar').innerHTML = actionbarHtml(ctaText);
-    /* [FIX BM-043] 已解锁（含刷新恢复）时 CTA 立即变绿；并监听解锁事件实时切换底色 */
+    /* [FIX BM-043] 已解锁（含刷新恢复）时 CTA 立即变绿；并监听解锁事件实时切换底色
+       [FIX] 只注册一次全局监听（读取 DETAIL._currentRec 当前记录）：
+       预览复用 attach 反复调用，此前每次新增匿名监听会累积泄漏 */
     var __ctaEl = $('cta'); if (__ctaEl && unlocked) __ctaEl.classList.add('is-unlocked');
-    window.addEventListener('engchain-unlock-changed', function () {
-      var c = $('cta'); if (c) c.classList.toggle('is-unlocked', UnlockStore.isUnlocked(rec));
-    });
+    if (!window.__ENGCHAIN_UNLOCK_CHANGED_BOUND) {
+      window.__ENGCHAIN_UNLOCK_CHANGED_BOUND = true;
+      window.addEventListener('engchain-unlock-changed', function () {
+        var c = document.getElementById('cta');
+        var cr = window.DETAIL && DETAIL._currentRec;
+        if (c && cr) c.classList.toggle('is-unlocked', UnlockStore.isUnlocked(cr));
+      });
+    }
     /* [FIX BM-016] 向 FileDownload 注入解锁态校验：未解锁的打码文件禁止直接下载，唤起付费 Sheet */
     if (window.FileDownload) {
       window.FileDownload.checkUnlock = function () { return UnlockStore.isFree(rec.bizKey) || UnlockStore.isUnlocked(rec); };

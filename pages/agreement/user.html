@@ -190,14 +190,9 @@ body.ag-reading .ag-catalog, body.ag-reading .ag-hero{display:none;}
 body:not(.ag-reading) .ag-panels{display:none;}
 body.ag-reading .ag-panel{display:none;}
 body.ag-reading .ag-panel.on{display:block;}
-.read-back{display:none;}
-body.ag-reading .read-back{display:flex;}
-body.ag-reading .nav-back{display:none;}
-/* [FIX] 阅读态返回按钮改为通用返回 icon（与 nav-back 一致：无文字、44px 热区） */
-.read-back{position:absolute;left:0;top:0;width:44px;height:50px;align-items:center;justify-content:center;
-  padding:0;border:0;background:none;color:var(--text-1);cursor:pointer;z-index:22;}
-.read-back svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
-.read-back:active{opacity:.6;}
+/* 阅读态左上角沿用全局规范按钮组「返回 | 主页」（app.css .nav-back + common.js 自动注入的
+   .nav-divider 竖线与 .nav-home 主页icon），阅读态不再隐藏 nav-back；返回行为由 JS 在
+   目录态(history.back)/阅读态(返回目录)之间切换。 */
 
 /* -- reading ap-head fix v2 -- */
 body.ag-reading .ap-head{display:block !important;align-items:stretch !important;gap:0 !important;}
@@ -210,8 +205,7 @@ body.ag-reading .ap-head .ap-chips{display:flex;width:100% !important;}
 <body>
 <div class="phone">
   <div class="navbar">
-    <button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <button class="read-back" id="readBack" type="button" aria-label="返回目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <button class="nav-back" id="navBack" type="button" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title" id="navTitle">协议中心</div>
     <div class="nav-right"></div>
   </div>
@@ -1661,6 +1655,7 @@ body.ag-reading .ap-head .ap-chips{display:flex;width:100% !important;}
     panel.classList.add('on');
     var nt = document.getElementById('navTitle');
     if(nt) nt.textContent = panelTitles[name] || '协议中心';
+    syncNavBack();
     scroller.scrollTop = 0;
     refreshReveal();
     updateProgress();
@@ -1671,8 +1666,19 @@ body.ag-reading .ap-head .ap-chips{display:flex;width:100% !important;}
     panels.forEach(function(p){ p.classList.remove('on'); });
     var nt = document.getElementById('navTitle');
     if(nt) nt.textContent = '协议中心';
+    syncNavBack();
     scroller.scrollTop = 0;
     try { if(history.replaceState){ history.replaceState(null,'',location.href.split('#')[0]); } } catch(e) {}
+  }
+
+  /* 顶部「返回 | 主页」按钮组的返回键行为随态切换：
+     目录态 = 离开协议中心（history.back）；阅读态 = 返回本页目录。主页icon由 common.js 注入，恒跳 home.html。 */
+  var navBack = document.getElementById('navBack');
+  function syncNavBack(){
+    if(!navBack) return;
+    var reading = document.body.classList.contains('ag-reading');
+    navBack.onclick = reading ? exitReading : function(){ history.back(); };
+    navBack.setAttribute('aria-label', reading ? '返回目录' : '返回');
   }
 
   function routeFromHash(){
@@ -1694,8 +1700,7 @@ body.ag-reading .ap-head .ap-chips{display:flex;width:100% !important;}
     });
   });
 
-  var rb = document.getElementById('readBack');
-  if(rb) rb.addEventListener('click', exitReading);
+  syncNavBack();
 
   window.addEventListener('hashchange', routeFromHash);
 

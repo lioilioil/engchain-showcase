@@ -126,6 +126,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .tr-btn:active { transform:scale(.97); }
 .tr-btn.ok { background:linear-gradient(180deg,var(--primary-strong),var(--primary)); color:#fff; }
 .tr-btn.no { background:var(--bg-subtle); color:var(--text-2); border:1px solid var(--line); }
+.tr-btn.ghost { background:transparent; color:var(--text-3); border:1px dashed var(--line-strong); }
 
 /* ── 企业主（实际控制人）身份栏：当页第二主角 ── */
 .om-owner-card { position:relative; margin-bottom:10px; border-radius:var(--r-xl);
@@ -258,6 +259,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .mc-btn.ghost { color:var(--text-2); background:var(--bg-subtle); border:1px solid var(--line); }
 .mc-btn.gold { color:var(--primary-dim); background:var(--primary-soft); border:1px solid var(--accent-line); }
 .mc-btn.danger { color:var(--error); background:transparent; border:1px solid rgba(179,38,30,.3); }
+.mc-btn.off { opacity:.5; cursor:default; }
+/* 成员卡移交状态签：有活动移交时替代「移交」按钮 */
+.mc-chip { flex:none; font-size:10px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:4px 9px;
+  border-radius:var(--r-full); white-space:nowrap; }
+.mc-chip.wait { color:var(--text-3); background:var(--bg-subtle); border-color:var(--line); }
 
 .om-empty { text-align:center; color:var(--text-3); font-size:12px; padding:26px 20px;
   background:var(--bg-card); border:1px dashed var(--line); border-radius:var(--r-l);
@@ -451,8 +458,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var cap = org.memberLimit || OrgsStore.MEMBER_LIMIT;
     var used = OrgsStore.memberCount(org);
     var joins = OrgsStore.pendingJoins(org.orgId);
-    var confirms = OrgsStore.ownerConfirmingTransfers(org.orgId);
-    var myTransfer = OrgsStore.pendingTransferForUser(org, u.id);
+    var activeTr = null;
+    (OrgsStore.transfersOf(org.orgId) || []).forEach(function (t) {
+      if (t.status === 'verify-pending' || t.status === 'owner-confirm') activeTr = t;
+    });
     var ocPending = OrgsStore.pendingOwnerChangeOf ? OrgsStore.pendingOwnerChangeOf(org.orgId) : null;
     var typeLabel = (org.entryTypes && org.entryTypes[0] === 'construction') ? '建筑入驻' : (org.entStatus === 'resident' ? '企业入驻' : '企业认证');
 
@@ -513,46 +522,90 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '</div>';
     }
 
-    /* ── 待办区：企业主移交待确认 ── */
-    confirms.forEach(function (t) {
-      var fromU = (window.DataBus && DataBus.byId) ? DataBus.byId(t.fromUid) : null;
-      var toU = (window.DataBus && DataBus.byId) ? DataBus.byId(t.toUid) : null;
-      html +=
-        '<div class="tr-card gold om-rise">' +
-          '<div class="tr-head">' +
-            '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>' +
-            '<div class="tr-info"><div class="tr-title">企业主移交待确认</div>' +
-            '<div class="tr-sub">' + esc(fromU ? fromU.name : t.fromUid) + ' 申请将企业主身份移交给 ' + esc(toU ? toU.name : t.toUid) + '，确认后对方需完成法人认证或实际控制人验证，并由后台审核。</div></div>' +
-          '</div>' +
-          '<div class="tr-acts">' +
-            '<button class="tr-btn ok" onclick="omConfirmTransfer(\'' + t.id + '\')">确认移交</button>' +
-            '<button class="tr-btn no" onclick="omRejectTransfer(\'' + t.id + '\')">驳回</button>' +
-          '</div>' +
-        '</div>';
-    });
+    /* ── 待办区：企业主移交（待确认 / 待验证 / 进行中） ──
+       同一时间仅一条活动移交（store 已约束）。按「当前用户身份」分流：
+         - 企业主：owner-confirm 单 → 确认/驳回（其余身份只读或看到自己的跟踪卡）
+         - 发起人（owner/admin）：待企业主确认 / 已确认待接收人验证 → 可撤回
+         - 接收人：待企业主确认（只读）→ 验证入口 → 已提交待审核 */
+    if (activeTr) {
+      var trFrom = (window.DataBus && DataBus.byId) ? DataBus.byId(activeTr.fromUid) : null;
+      var trTo = (window.DataBus && DataBus.byId) ? DataBus.byId(activeTr.toUid) : null;
+      var trFromName = trFrom ? trFrom.name : activeTr.fromUid;
+      var trToName = trTo ? trTo.name : activeTr.toUid;
+      var isTrFrom = activeTr.fromUid === (u && u.id);
+      var isTrTo = activeTr.toUid === (u && u.id);
 
-    /* ── 待办区：当前用户为移交接收人 ── */
-    if (myTransfer && myTransfer.status === 'verify-pending') {
-      var v = myTransfer.verify || { status: 'none', mode: '' };
-      if (v.status === 'none') {
-        html +=
-          '<div class="tr-card om-rise">' +
-            '<div class="tr-head">' +
-              '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
-              '<div class="tr-info"><div class="tr-title">请完成企业主身份验证</div>' +
-              '<div class="tr-sub">企业主身份将移交给您。需通过<b>法人认证</b>（姓名须与营业执照法定代表人一致）或<b>实际控制人验证</b>，提交后由后台审核。</div></div>' +
-            '</div>' +
-            '<div class="tr-acts"><button class="tr-btn ok" onclick="omOpenVerify(\'' + org.orgId + '\')">去验证</button></div>' +
-          '</div>';
-      } else if (v.status === 'pending') {
-        html +=
-          '<div class="tr-card om-rise">' +
-            '<div class="tr-head">' +
-              '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
-              '<div class="tr-info"><div class="tr-title">企业主验证已提交</div>' +
-              '<div class="tr-sub">已提交' + (v.mode === 'legal' ? '法人认证' : '实际控制人验证') + '，等待后台审核。通过后企业主身份正式生效。</div></div>' +
-            '</div>' +
-          '</div>';
+      if (activeTr.status === 'owner-confirm') {
+        /* 管理员发起，等待企业主确认 */
+        if (isOwner) {
+          html +=
+            '<div class="tr-card gold om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">企业主移交待确认</div>' +
+                '<div class="tr-sub">' + esc(trFromName) + ' 申请将企业主身份移交给 ' + esc(trToName) + '，确认后对方需完成法人认证或实际控制人验证，并由后台审核。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts">' +
+                '<button class="tr-btn ok" onclick="omConfirmTransfer(\'' + activeTr.id + '\')">确认移交</button>' +
+                '<button class="tr-btn no" onclick="omRejectTransfer(\'' + activeTr.id + '\')">驳回</button>' +
+              '</div>' +
+            '</div>';
+        } else if (isTrFrom) {
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">移交申请待企业主确认</div>' +
+                '<div class="tr-sub">您已申请将企业主身份移交给 <b>' + esc(trToName) + '</b>，等待企业主确认后，对方需完成身份验证并经后台审核。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts"><button class="tr-btn no" onclick="omCancelTransfer(\'' + activeTr.id + '\')">撤回申请</button></div>' +
+            '</div>';
+        } else if (isTrTo) {
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">企业主移交待确认</div>' +
+                '<div class="tr-sub"><b>' + esc(trFromName) + '</b> 申请将企业主身份移交给您。待企业主确认后，您将收到验证通知并需完成身份验证。</div></div>' +
+              '</div>' +
+            '</div>';
+        }
+      } else if (activeTr.status === 'verify-pending') {
+        /* 已进入接收人验证阶段 */
+        if (isTrTo) {
+          var v = activeTr.verify || { status: 'none', mode: '' };
+          if (v.status === 'none') {
+            html +=
+              '<div class="tr-card om-rise">' +
+                '<div class="tr-head">' +
+                  '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
+                  '<div class="tr-info"><div class="tr-title">请完成企业主身份验证</div>' +
+                  '<div class="tr-sub">企业主身份将移交给您。需通过<b>法人认证</b>（姓名须与营业执照法定代表人一致）或<b>实际控制人验证</b>，提交后由后台审核。</div></div>' +
+                '</div>' +
+                '<div class="tr-acts"><button class="tr-btn ok" onclick="omOpenVerify(\'' + org.orgId + '\')">去验证</button></div>' +
+              '</div>';
+          } else if (v.status === 'pending') {
+            html +=
+              '<div class="tr-card om-rise">' +
+                '<div class="tr-head">' +
+                  '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
+                  '<div class="tr-info"><div class="tr-title">企业主验证已提交</div>' +
+                  '<div class="tr-sub">已提交' + (v.mode === 'legal' ? '法人认证' : '实际控制人验证') + '，等待后台审核。通过后企业主身份正式生效。</div></div>' +
+                '</div>' +
+              '</div>';
+          }
+        } else if (isTrFrom) {
+          var vv = activeTr.verify || { status: 'none', mode: '' };
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">移交进行中</div>' +
+                '<div class="tr-sub">已将企业主身份移交给 <b>' + esc(trToName) + '</b>' + (vv.status === 'pending' ? '，对方已提交' + (vv.mode === 'legal' ? '法人认证' : '实际控制人验证') + '，等待后台审核' : '，等待对方完成企业主身份验证') + '。后台审核通过后正式生效。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts"><button class="tr-btn no" onclick="omCancelTransfer(\'' + activeTr.id + '\')">撤回申请</button></div>' +
+            '</div>';
+        }
       }
     }
 
@@ -640,6 +693,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           '<div class="om-tip-t">成员管理说明</div>' +
           '<div class="om-tip-row"><span class="ot-dot" style="background:var(--primary);"></span><span><b>邀请</b>：手机号邀请（已注册自动识别 + 短信 1 天 1 次）或从已认证用户搜索选择；企业主空缺时可邀请企业主。</span></div>' +
           '<div class="om-tip-row"><span class="ot-dot" style="background:var(--primary-dim);"></span><span><b>退出</b>：成员可自助退出本企业；企业主退出前需先移交企业主身份。</span></div>' +
+          '<div class="om-tip-row"><span class="ot-dot" style="background:var(--error);"></span><span><b>移交 / 移出</b>：企业主可向成员申请移交企业主身份（接收人验证 + 后台审核）；移出成员后其待处理邀请/申请/移交自动失效。</span></div>' +
           '<div class="om-tip-row"><span class="ot-dot" style="background:var(--warning);"></span><span><b>企业主</b>：指企业实际控制人。变更需后台审批；目标未注册/未实名时可先发送邀请与实名认证提醒。</span></div>' +
         '</div>';
     }
@@ -1051,6 +1105,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var myRole = OrgsStore.myRole(org.orgId);
     var isOwner = myRole === 'owner';
     var isManager = isOwner || myRole === 'admin';
+    var activeTr = null;
+    (OrgsStore.transfersOf(org.orgId) || []).forEach(function (t) {
+      if (t.status === 'verify-pending' || t.status === 'owner-confirm') activeTr = t;
+    });
     var sortList = members.filter(function (m) { return m.role !== 'owner'; }); /* 企业主已在身份栏 */
     var kw = (omSearchKw || '').toLowerCase();
     if (kw) {
@@ -1076,7 +1134,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (m.uid === (u && u.id)) {
         if (m.role !== 'owner') actBtns += '<button class="mc-btn ghost" onclick="omLeave(\'' + org.orgId + '\')">退出</button>';
       } else if (isManager && m.role !== 'owner') {
-        actBtns += '<button class="mc-btn gold" onclick="omRequestTransfer(\'' + org.orgId + '\',\'' + m.uid + '\')">移交</button>';
+        /* 移交：有活动移交时，接收人卡片显示状态签；其余成员按钮置灰防重复发起 */
+        if (activeTr && activeTr.toUid === m.uid) {
+          actBtns += '<span class="mc-chip' + (activeTr.status === 'owner-confirm' ? ' wait' : '') + '">移交中 · ' + (activeTr.status === 'owner-confirm' ? '待企业主确认' : '待对方验证') + '</span>';
+        } else if (activeTr) {
+          actBtns += '<button class="mc-btn gold off" onclick="UI.toast.warn(\'已有移交申请在处理中，请先完成或撤回后再发起\')">移交</button>';
+        } else {
+          actBtns += '<button class="mc-btn gold" onclick="omRequestTransfer(\'' + org.orgId + '\',\'' + m.uid + '\')">移交</button>';
+        }
         if (isOwner) actBtns += '<button class="mc-btn danger" onclick="omRemove(\'' + m.uid + '\')">移除</button>';
       }
       groups +=
@@ -1142,11 +1207,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }});
   };
   window.omRemove = function (uid) {
-    var org = resolveOrg();
-    UI.dialog({ title: '移除成员', text: '移除后该成员将失去本企业身份与发布/招聘权限。', ok: '移除', cancel: '取消', danger: true, onOk: function () {
+    var org = resolveOrg(); if (!org) return;
+    var m = null;
+    (OrgsStore.members(org.orgId) || []).forEach(function (x) { if (x.uid === uid) m = x; });
+    var name = m ? m.name : uid;
+    var rl = m ? (ROLE_LABEL[m.role] || '成员') : '成员';
+    UI.dialog({ title: '移出成员', text: '确定将 <b>' + esc(name) + '</b>（' + rl + '）移出本企业吗？<br><br>移出后该成员将失去本企业身份与发布/招聘权限，其待处理的邀请、申请与移交将一并失效。', ok: '确认移出', cancel: '取消', danger: true, onOk: function () {
       var r = OrgsStore.removeMember(org.orgId, uid);
       if (r && r.error) { UI.toast.warn(r.error); return; }
-      UI.toast.ok('已移除'); render();
+      UI.toast.ok('已移出'); render();
     }});
   };
 
@@ -1164,7 +1233,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var u = me(); var toU = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null;
     var fromName = u ? u.name : '';
     var toName = toU ? toU.name : uid;
-    UI.dialog({ title: '申请移交企业主身份', text: fromName + ' 申请将企业主身份移交给 <b>' + toName + '</b>。接收人需完成<b>法人认证</b>或<b>实际控制人验证</b>，提交后由平台后台审核，通过后正式生效。', ok: '发起申请', cancel: '取消', onOk: function () {
+    var myRole = OrgsStore.myRole(orgId);
+    var real = !!(toU && toU.auth && toU.auth.realname && toU.auth.realname.ok);
+    var flowNote = myRole === 'owner'
+      ? '接收人需完成<b>法人认证</b>或<b>实际控制人验证</b>，提交后由平台后台审核，通过后正式生效。'
+      : '需先经企业主确认，再由接收人完成<b>法人认证</b>或<b>实际控制人验证</b>，后台审核通过后正式生效。';
+    var realNote = real
+      ? '该成员已通过实名认证，可继续移交流程。'
+      : '该成员尚未完成实名认证，接收验证前需先完成实名认证。';
+    UI.dialog({ title: '申请移交企业主身份', text: fromName + ' 申请将企业主身份移交给 <b>' + esc(toName) + '</b>。' + flowNote + '<br><br><span style="font-size:11px;color:var(--text-3);">' + realNote + '</span>', ok: '发起申请', cancel: '取消', onOk: function () {
       var r = OrgsStore.requestTransfer(orgId, uid);
       if (r && r.error) { UI.toast.err(r.error); return; }
       UI.toast.ok('已发起移交申请，已通知接收人完成验证');
@@ -1179,8 +1256,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }});
   };
   window.omRejectTransfer = function (transferId) {
-    OrgsStore.rejectTransfer(transferId);
-    UI.toast('已驳回该移交申请'); render();
+    UI.dialog({ title: '驳回移交申请', text: '确定驳回该企业主移交申请吗？驳回后申请作废，发起人将收到通知。', ok: '驳回', cancel: '再想想', danger: true, onOk: function () {
+      var r = OrgsStore.rejectTransfer(transferId);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast('已驳回该移交申请'); render();
+    }});
+  };
+  window.omCancelTransfer = function (transferId) {
+    UI.dialog({ title: '撤回移交申请', text: '撤回后该移交申请将作废，接收人不会再收到验证通知。', ok: '撤回申请', cancel: '取消', danger: true, onOk: function () {
+      var r = OrgsStore.cancelTransfer(transferId);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast('已撤回移交申请'); render();
+    }});
   };
 
   /* ============ 企业主身份验证（法人认证 / 实际控制人验证） ============ */

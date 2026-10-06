@@ -961,8 +961,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     { name:'发布', pages:[
       { name:'信息工作台', src:'pages/publish/index.html', desc:'信息工作台', children:[
         ['pages/publish/choose.html', '选择发布类型', '发布什么 · 新入口，先选择发布类型'],
-        ['pages/publish/editor.html?role=demand', '发布需求·编辑', '发布信息 · 需求发布编辑页（旧版无类型）'],
-        ['pages/publish/editor.html?role=supply', '发布供应·编辑', '发布信息 · 供应发布编辑页（旧版无类型）'],
+        ['pages/publish/editor.html?role=demand', '发布需求·编辑', '发布信息 · 需求发布编辑（role=demand）'],
+        ['pages/publish/editor.html?role=supply', '发布供应·编辑', '发布信息 · 供应发布编辑（role=supply）'],
         ['pages/publish/records.html', '我的发布', '我的发布'],
         ['pages/publish/drafts.html', '草稿箱', '草稿箱'],
         ['pages/publish/unlocked.html', '已解锁线索', '已解锁线索'],
@@ -1009,7 +1009,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/wallet/withdraw.html', '提现', '余额提现'],
         ['pages/wallet/bank-cards.html', '银行卡', '银行卡管理'],
         ['pages/wallet/payment-method.html', '支付方式', '支付方式'],
-        ['pages/wallet/escrow.html', '托管资金', '资金托管'],
         ['pages/wallet/free-quota.html', '免费额度', '免费额度'],
         ['pages/wallet/unlock-records.html', '解锁记录', '解锁记录'],
       ]},
@@ -1047,10 +1046,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/profile/auth-qualification.html', '个人入驻·申请', '个人入驻 · 5 步分步简历申请表单'],
         { name:'认证结果·成功', src:'pages/profile/auth-result.html', stateIcon:true, desc:'认证结果 · 成功' },
         { name:'认证结果·审核中', src:'pages/profile/auth-result.html?state=reviewing', stateIcon:true, desc:'认证结果 · 审核中（state=reviewing）' },
+        { name:'认证结果·未通过', src:'pages/profile/auth-result.html?state=reject', stateIcon:true, desc:'认证结果 · 未通过（state=reject）' },
+        { name:'认证结果·已过期', src:'pages/profile/auth-result.html?state=expired', stateIcon:true, desc:'认证结果 · 已过期（state=expired）' },
         ['pages/profile/auth-partner.html', '个人合伙人申请', '个人合伙人申请'],
         ['pages/profile/auth-prep.html', '认证资料准备', '资料准备'],
         ['pages/profile/entry.html', '企业入驻·三类', '企业入驻 · 三类'],
         ['pages/profile/entry-form.html?type=construction', '入驻申请·建筑', '入驻资料 · 建筑（type=construction）'],
+        ['pages/profile/entry-form.html?type=agency', '入驻申请·中介', '入驻资料 · 中介服务（type=agency）'],
+        ['pages/profile/entry-form.html?type=partner', '入驻申请·合伙人', '入驻资料 · 合伙人（type=partner）'],
         { name:'入驻审核·合伙人', src:'pages/profile/entry-review.html', stateIcon:true, desc:'入驻审核 · 审核进度与轨迹（合伙人）' },
         { name:'入驻成功', src:'pages/profile/entry-result.html', stateIcon:true, desc:'入驻成功' },
         { name:'个人入驻·结果', src:'pages/profile/entry-personal-result.html', stateIcon:true, desc:'个人入驻 · 结果页' },
@@ -1527,6 +1530,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     var a = e.target.closest('.pl');
     if (!a) return;
+    /* 记录最近点击的条目元素：父子同 src（如 admin/esign/contracts.html 同时是「电子签」父节点与「电子合同」子项）时，
+       若rame上报的 href 与多个条目相同，selectNavByHref 按 DOM 顺序命中父节点，点击的子项永远不高亮。
+       记录后 selectNavByHref 在相同 rel 下优先命中最近点击的条目。 */
+    lastClickedEl = a;
     nav.querySelectorAll('.pl').forEach(function (x) { x.classList.remove('on'); });
     a.classList.add('on');
     /* 点击页面条目 → 自动执行信息复制「名称（绝对路径）」+ 图标闪动 + toast 反馈 */
@@ -1544,12 +1551,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       dev.style.display = 'none';
       bstage.hidden = false;
       var bw = document.getElementById('bw-admin');
-      if (bw) bw.setAttribute('src', a.dataset.src);
+      if (bw) bw.setAttribute('src', a.dataset.src + '?t=' + Date.now());
       document.getElementById('browser-label').innerHTML = 'Web 浏览器 · <em>' + a.dataset.name + '</em>';
     } else {
       bstage.hidden = true;
       dev.style.display = '';
-      frame.src = a.dataset.src + (a.dataset.src.indexOf('?') > -1 ? '&' : '?') + 't=' + Date.now();
+      /* 缓存破坏时间戳必须拼在 query 位置（?t= / &t=），绝不能拼在 hash 之后。
+         file:// 下 hash 内出现裸 ?（如 user.html#trade?t=x）会被浏览器整体丢弃 hash，
+         导致锚点/状态页（#trade、#/detail?id=seed4）上报无 hash、侧栏无法精确高亮。 */
+      var _src = a.dataset.src, _hash = '';
+      var _hi = _src.indexOf('#');
+      if (_hi > -1) { _hash = _src.slice(_hi); _src = _src.slice(0, _hi); }
+      frame.src = _src + (_src.indexOf('?') > -1 ? '&' : '?') + 't=' + Date.now() + _hash;
       var _pura = document.getElementById('shell-pura');
       if (_pura && !_pura.hidden) {
         var _lp = document.getElementById('label-pura');
@@ -1620,14 +1633,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (r.toLowerCase().indexOf(ABS_ROOT.toLowerCase()) === 0) return r.slice(ABS_ROOT.length);
     return r.replace(/^[a-z]:[\\/]*/i, '');
   }
+  var lastClickedEl = null;   /* 最近点击的目录条目元素（父子同 src 时优先命中点击项） */
   function selectNavByHref(href) {
     var rel = relFromHref(href);
     if (!rel) return null;
+    /* 剥离 preview 加载 iframe 时附加的缓存破坏时间戳（?t= / &t=，含 hash 内 #/xxx?t= 或 &t=）。
+       不剥离则上报 href 与目录条目 src 永远差一个 t 参数，带查询/锚点/状态页条目无法精确命中，
+       会错误回退到父节点或同路径无查询条目（如 detail?id=1009 → 高亮父节点、#trade → 高亮协议目录）。 */
+    rel = rel.replace(/[?&]t=\d+/g, '');
+    /* ① 最近点击优先：父子条目 src 相同时（如 admin/esign/contracts.html），
+          DOM 顺序会让上报总是命中父节点；此处按元素引用还原点击项的精确高亮 */
+    if (lastClickedEl && lastClickedEl.dataset && lastClickedEl.dataset.src === rel && nav.contains(lastClickedEl)) {
+      return lastClickedEl;
+    }
+    var els = Array.prototype.slice.call(nav.querySelectorAll('.pl'));
     var qi = rel.indexOf('?');
     var path = qi > -1 ? rel.slice(0, qi) : rel;
     var q = qi > -1 ? rel.slice(qi) : '';
     function baseOf(s) { var i = s.indexOf('?'); return i > -1 ? s.slice(0, i) : s; }
-    var els = Array.prototype.slice.call(nav.querySelectorAll('.pl'));
     var i;
     /* ① 精确命中（含查询串，如 detail.html?id=1009 区分不同参数页） */
     for (i = 0; i < els.length; i++) if (els[i].dataset.src === rel) return els[i];
@@ -1852,7 +1875,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
   renderScenarioOptions();
 
-  function reloadFrame() { var _b = String(frame.src).split('?')[0]; frame.src = _b + '?t=' + Date.now(); }
+  function reloadFrame() {
+    var _s = String(frame.src), _h = '';
+    var _i = _s.indexOf('#');
+    if (_i > -1) { _h = _s.slice(_i); _s = _s.slice(0, _i); }
+    var _b = _s.split('?')[0];
+    frame.src = _b + '?t=' + Date.now() + _h;   /* 时间戳拼 query 位、hash 保留（同点击加载逻辑） */
+  }
 
   /* ---- 设备比例缩放 ---- */
   var SCALE_KEY = 'engchain-scale';
