@@ -197,8 +197,10 @@ window.DETAIL = (function () {
     if (!found) return { ok: false, reason: 'deposit_not_found' };
     var depAmount = amount || found.amount;
     var s = BalanceStore.read();
-    /* 冻结金额转为平台收入：frozen -= amount，同时写 trade_deposit_committed 流水（支出端）和 platform_income 流水（收入端） */
+    /* 冻结金额转为平台收入：frozen -= amount，同时 balance -= amount（成交没收，钱归平台不再退回用户），
+       与 BalanceStore.commitDeposit 对齐；30 天未成交退款路径仍只解 frozen。 */
     s.frozen = Math.max(0, Math.round((s.frozen - depAmount) * 100) / 100);
+    s.balance = Math.max(0, Math.round((s.balance - depAmount) * 100) / 100);
     s.logs.unshift({ type: 'trade_deposit_committed', amount: -depAmount, method: 'deposit', reason: '建企买卖成交保证金扣除', ts: now, ref: ref, buyerId: buyerId || '', sellerId: sellerId || '' });
     s.logs.unshift({ type: 'platform_income', amount: depAmount, method: 'deposit', reason: '建企买卖成交平台收入', ts: now, ref: ref });
     BalanceStore.write(s);
@@ -2576,7 +2578,7 @@ window.DETAIL = (function () {
         add('一对一加盟方案', 'core', _IC.briefcase);
         add('加盟手册与合同', 'core', _IC.fileText);
         add('招商顾问联系方式', 'core', _IC.phone);
-        add('平台担保交易', 'trust', _IC.shield);
+        add('认证信息已核验', 'trust', _IC.shield);
       } else if (bk === 'talent') {
         add('完整联系方式', 'core', _IC.phone);
         add('注册单位全称', 'core', _IC.building);
@@ -2617,7 +2619,7 @@ window.DETAIL = (function () {
       var items = [];
       if (isDeposit) {
         items.push({ icon: _IC.wallet, text: '可退保证金' });
-        items.push({ icon: _IC.shield, text: '平台担保' });
+        items.push({ icon: _IC.shield, text: '冻结保障' });
         items.push({ icon: _IC.clock, text: '30天未成交全额退还' });
       } else if (up.mode === 'free') {
         items.push({ icon: _IC.check, text: '免费咨询' });

@@ -1030,7 +1030,8 @@
               Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: me, toAcct: 'available',
                 amount: r2(amount), bizType: 'wallet_recharge', allowNegative: true, idemKey: 'rc_' + me + '_' + r2(amount) + '_' + Date.now(), remark: '钱包充值入账' });
             }
-            Rebate.createFromEvent({ sourceType: 'recharge', sourceUserId: me, baseAmount: amount, sourceOrderId: 'RC' + Date.now() });
+            /* [P0 修复] 充值不触发返佣：返佣基数改为真实消费（解锁/入驻/增值实付），
+               否则充值即返 12% + 提现零手续费 = 拉人头套现通道。 */
           }
         } catch (e) {}
         return r;

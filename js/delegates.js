@@ -811,7 +811,7 @@
         '<div class="dg-pay-footer">' +
           '<label class="pay-agree" id="dgPayAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>支付即视为同意《委托服务协议》与《退款规则》</span></label>' +
           '<button type="button" class="btn btn-primary btn-block btn-lg" id="dgPayGo" data-order-no="' + order.orderNo + '" data-method="credit">确认支付 · ' + creditCost + '积分</button>' +
-          '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>支付由平台资金托管保障 · 未对接成功可申请退款</div>' +
+          '<div class="us-secure"><svg class="ic"><use href="#i-shield"/></svg>支付由平台担保 · 未对接成功可申请退款</div>' +
         '</div>' +
       '</div>'
     );

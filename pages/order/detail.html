@@ -248,9 +248,10 @@ function render() {
   var type = TYPE_MAP[o.type] || o.type;
   /* 金额统一走 UI.money */
   var amt = o.amount ? UI.money(o.amount) : '面议';
-  /* 佣金：费率从 commissionRate 取，feeVal 为计算后佣金 */
-  var crInfo = (window.commissionRate && o.amount) ? commissionRate(Number(o.amount)) : null;
-  var feeVal = crInfo ? Number(crInfo.fee) : (Number(o.fee) || 0);
+  /* 佣金：费率从 commissionRate 取，feeVal 为计算后佣金；Phase 0 纯信息撮合不抽佣时 feeVal=0，不渲染服务费行 */
+  var _phase0Trading = (window.MOCK && MOCK.business.commission && MOCK.business.commission._phase0 && MOCK.business.commission._phase0.tradingEnabled === false);
+  var crInfo = (!_phase0Trading && window.commissionRate && o.amount) ? commissionRate(Number(o.amount)) : null;
+  var feeVal = crInfo ? Number(crInfo.fee) : 0;
   var ratePct = crInfo ? (Math.round(crInfo.rate * 1000) / 10) : '';
   /* 联系方式：仅已验收(settled)后展示明文；其余状态打码并引导站内联系 */
   var isFree = !o.amount || Number(o.amount) === 0;
@@ -341,12 +342,12 @@ function render() {
       }
     } catch (e) {}
 
-    /* E2-05 托管说明 + 争议/客服入口（CTA 上方） */
+    /* E2-05 信息撮合说明 + 争议/客服入口（CTA 上方） */
     var safeHtml =
       '<div style="margin:18px 14px 0;padding:12px 14px;background:var(--primary-soft);border-radius:12px;display:flex;align-items:center;gap:10px;">' +
         '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--primary-dim)" stroke-width="1.8" style="flex:none;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' +
-        '<div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--text-1);">资金由平台托管 · 未确认前不打款</div>' +
-        '<div style="font-size:11px;color:var(--text-3);margin-top:2px;">如遇纠纷，可随时申请平台介入处理</div></div>' +
+        '<div style="flex:1;"><div style="font-size:12px;font-weight:600;color:var(--text-1);">平台仅提供信息撮合服务，交易双方自行结算</div>' +
+        '<div style="font-size:11px;color:var(--text-3);margin-top:2px;">如遇纠纷，可随时申请平台介入协调</div></div>' +
       '</div>' +
       '<div style="margin:10px 14px 0;display:flex;gap:8px;">' +
         '<a href="../refund/appeal.html?orderId=' + encodeURIComponent(o.id) + '" style="flex:1;text-align:center;padding:10px 0;border:1px solid var(--line);border-radius:var(--r-full);font-size:12px;color:var(--text-2);text-decoration:none;">申请争议 / 平台介入</a>' +

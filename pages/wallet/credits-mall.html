@@ -432,6 +432,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           goodsId: g.id, goodsName: g.name, status: 'success'
         });
         if(res === null){ UI.toast('积分不足，兑换失败','err'); return; }
+        /* 真发权益：根据商品 id 写入对应 Store，不再是空兑换 */
+        try { applyBenefit(g); } catch(e){ console.warn('benefit apply failed', e); }
         RECORDS.unshift({
           id:'R'+Date.now(), name:g.name, time:new Date().toLocaleString('zh-CN'),
           cost:g.price, status:'已发放', icon:g.icon,
@@ -443,6 +445,39 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     });
   };
+
+  /* 根据商品 ID 把权益写进对应 Store（demo 闭环：积分扣了，权益真到账） */
+  function applyBenefit(g){
+    var now = Date.now();
+    var D = 86400000;
+    if (g.id === 'G001' || g.id === 'G002') {
+      /* 解锁包：往 UpgradeStore 追加 unlock 次数 */
+      var cnt = g.id === 'G001' ? 10 : 30;
+      if (window.UpgradeStore) {
+        var us = UpgradeStore.read();
+        us.items.unshift({ id:'UG'+now, type:'unlock', targetId:'', startedAt:now, expireAt: now + (g.id==='G001'?30:90)*D, count: cnt, used:0, status:'active', purchasedAt:now });
+        UpgradeStore.write(us);
+      }
+    } else if (g.id === 'G003') {
+      /* 高级会员月卡：置会员状态 30 天 */
+      if (window.MemberStore) {
+        var ms = MemberStore.read();
+        var base = (ms.active && ms.expireAt > now) ? ms.expireAt : now;
+        ms.active = true; ms.type = 'monthly';
+        if (!ms.startedAt) ms.startedAt = now;
+        ms.expireAt = base + 30 * D;
+        MemberStore.write(ms);
+      }
+    } else if (g.id === 'G005') {
+      /* 优先展示 7 天：往 UpgradeStore 追加 topListing 次数 */
+      if (window.UpgradeStore) {
+        var us2 = UpgradeStore.read();
+        us2.items.unshift({ id:'UG'+now, type:'topListing', targetId:'', startedAt:now, expireAt: now + 7*D, count:1, used:0, status:'active', purchasedAt:now });
+        UpgradeStore.write(us2);
+      }
+    }
+    /* G004/G006/G007/G008 为服务类（发票额度/专属客服/资料包/认证加急），demo 阶段仅记 RECORDS */
+  }
 
   /* 兑换成功动画 */
   function showSuccess(g){

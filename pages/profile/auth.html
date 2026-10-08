@@ -280,9 +280,7 @@
       </a>
     </div>
     <div class="nav-title">认证中心</div>
-    <div class="nav-right">
-      <a id="nav-faq" class="nav-back" style="font-size:12px;min-width:auto;padding:0 6px;color:var(--text-2)">说明</a>
-    </div>
+    <div class="nav-right"></div>
   </header>
 
   <main class="scroll au-scroll">
@@ -431,7 +429,11 @@
   };
 
   function prep(type){ return 'auth-prep.html?type='+type; }
-  window.go = function(u){ location.href = u; };
+  /* go：跳转前强制复位半屏弹窗，避免跳转/返回（含 bfcache）时 sheet/scrim 状态残留 */
+  window.go = function(u){
+    if (typeof closeSheet === 'function') closeSheet();
+    location.href = u;
+  };
 
   var $ = function(id){ return document.getElementById(id); };
   var current = { states:{}, notes:{}, doneN:0, priority:null, idy:null };
@@ -644,6 +646,21 @@
   /* —— 底部主 CTA（已移除：状态页入口统一收敛至顶部卡片右上角 .at-hero-cta） —— */
 
   /* —— 身份详情半屏卡 —— */
+  var atScrollLock = null;
+  function lockAtScroll(){
+    var sc = document.querySelector('.au-scroll');
+    if (sc){ sc.style.overflow = 'hidden'; atScrollLock = sc; }
+  }
+  function unlockAtScroll(){
+    if (atScrollLock){ atScrollLock.style.overflow = ''; atScrollLock = null; }
+  }
+  /* 半屏弹窗状态复位：关闭 class、恢复 aria-hidden、解锁滚动 */
+  function resetSheetState(){
+    $('at-scrim').classList.remove('show');
+    $('at-sheet').classList.remove('show');
+    $('at-sheet').setAttribute('aria-hidden','true');
+    unlockAtScroll();
+  }
   function openIdentity(key){
     var d=DEF_BY_KEY[key]; if(!d) return;
     var st=current.states[key];
@@ -657,6 +674,10 @@
     var ben=d.benefits.map(function(b){
       return '<div class="at-sb-ben"><svg class="ic"><use href="#i-check"/></svg><span>'+b+'</span></div>';
     }).join('');
+
+    /* 前置复位：连续/快速点击或残留动画时，先回到干净的关闭态再打开 */
+    resetSheetState();
+    void $('at-sheet').offsetWidth;
 
     $('at-sheet').innerHTML =
       '<div class="at-grab"></div>'
@@ -673,12 +694,12 @@
     $('at-sheet').setAttribute('aria-hidden','false');
     $('at-scrim').classList.add('show');
     $('at-sheet').classList.add('show');
-    $('at-sb-cta').addEventListener('click', function(){ go(ctaHref); });
+    lockAtScroll();
+    var cta = $('at-sb-cta');
+    if (cta) cta.addEventListener('click', function(){ go(ctaHref); });
   }
   function closeSheet(){
-    $('at-scrim').classList.remove('show');
-    $('at-sheet').classList.remove('show');
-    $('at-sheet').setAttribute('aria-hidden','true');
+    resetSheetState();
   }
 
   /* —— Toast —— */
@@ -691,6 +712,8 @@
   /* ============ 事件 ============ */
   function scrollToId(id, flashSel){
     var el=$(id); if(!el) return;
+    /* 防御：滚动定位前先复位半屏弹窗，避免残留遮罩/弹层与滚动并存 */
+    resetSheetState();
     el.scrollIntoView({behavior:'smooth', block:'start'});
     if (flashSel){ var f=$(flashSel); if(f){ f.classList.remove('flash'); void f.offsetWidth; f.classList.add('flash'); } }
   }
@@ -707,10 +730,6 @@
     if (idEl){ openIdentity(idEl.getAttribute('data-id')); return; }
   });
   $('at-scrim').addEventListener('click', closeSheet);
-  $('nav-faq').addEventListener('click', function(){
-    var sec=$('at-faq-sec'); sec.scrollIntoView({behavior:'smooth', block:'start'});
-    var first=document.querySelector('.at-faq-item'); if(first && !first.classList.contains('open')) first.classList.add('open');
-  });
   document.querySelectorAll('.at-faq-q').forEach(function(btn){
     btn.addEventListener('click', function(){ btn.closest('.at-faq-item').classList.toggle('open'); });
   });
@@ -724,6 +743,11 @@
   window.addEventListener('engchain:auth', render);
   window.addEventListener('engchain:entry', render);
   window.addEventListener('engchain:store-change', render);
+
+  /* bfcache 恢复（前进/后退返回本页）时强制复位弹窗与动画残留状态 */
+  window.addEventListener('pageshow', function(e){
+    if (e.persisted) resetSheetState();
+  });
 
   document.addEventListener('DOMContentLoaded', render);
   if (document.readyState !== 'loading') render();

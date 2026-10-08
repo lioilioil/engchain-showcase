@@ -39,10 +39,6 @@
       { t: '分销总览', f: 'distribution/overview.html' },
       { t: '团队关系树', f: 'distribution/team.html' },
       { t: '返佣批次发放', f: 'distribution/payout.html' } ] },
-    { sec: '中介服务', items: [
-      { t: '托管订单', f: 'mediation/orders.html' },
-      { t: '服务商管理', f: 'mediation/sellers.html' },
-      { t: '托管资金台账', f: 'mediation/escrow.html' } ] },
     { sec: '电子签', items: [
       { t: '电子合同', f: 'esign/contracts.html', roles: ['ops','risk','super'] },
       { t: '签署订单', f: 'esign/orders.html', roles: ['finance','super'] },
@@ -80,7 +76,7 @@
       on: ['badge-success', '上架'], off: ['badge-outline', '已下架'],
       warned: ['badge-warning', '已警告'],
       serving: ['badge-info', '履约中'], await_accept: ['badge-warning', '待验收'],
-      escrowed: ['badge-info', '已托管'], await_confirm: ['badge-warning', '待验收'],
+      escrowed: ['badge-info', '待结算'], await_confirm: ['badge-warning', '待验收'],
       draft: ['badge-outline', '草稿'], disputed: ['badge-danger', '平台介入中'],
       refunded: ['badge-outline', '已退款'], partial_refund: ['badge-warning', '部分退款'],
       frozen: ['badge-warning', '冻结中'], clawback: ['badge-danger', '已追回'],
@@ -308,9 +304,6 @@
     'distribution/overview.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M9 2v2"/><path d="M15 20v2"/><path d="M9 20v2"/></svg>',
     'distribution/team.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     'distribution/payout.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>',
-    'mediation/orders.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
-    'mediation/sellers.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    'mediation/escrow.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
     'risk/audit.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
     'risk/monitor.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>',
     'risk/logs.html': '<svg class="sn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>',
@@ -358,14 +351,12 @@
     var cur = 'light';
     try { cur = LS.getItem('engchain-theme') || 'light'; } catch (e) {}
     bar.innerHTML =
-      '<div class="brand"><span class="logo">链</span><span>工程链 <span style="font-weight:400;font-size:12px;color:var(--muted-foreground);">管理后台</span></span></div>' +
-      '<div class="crumb"><b>总览</b><span class="crumb-sep">' + ic('chev') + '</span><span>' + t + '</span></div>' +
+      '<div class="brand"><span class="logo">链</span><span class="sn-name">工程链</span></div>' +
       '<span class="sp"></span>' +
-      '<a class="top-search" id="cmd-open" href="javascript:void 0"><span class="ts-ic">' + ic('search') + '</span><span>搜索页面 / 功能…</span><span class="ts-kbd">⌘K</span></a>' +
+      '<a class="top-search" id="cmd-open" href="javascript:void 0"><span class="ts-ic">' + ic('search') + '</span><span>搜索 / 跳转…</span><span class="ts-kbd">⌘K</span></a>' +
       '<a class="tb-ic-btn" id="tb-bell" title="消息中心" href="' + BASE + 'operations/messages.html" data-plain><span>' + ic('bell') + '</span></a>' +
       '<button class="btn-theme" id="btn-theme" title="切换明暗主题">' + themeBtnHtml(cur) + '</button>' +
-      '<button class="tb-ic-btn" id="tb-cfg" title="外观设置"><span>' + ic('slider') + '</span></button>' +
-      '<div class="u-drop"><button class="u-drop-btn" id="ud-btn"><span class="u-av">' + av + '</span><span class="u-name">' + an + '<span class="u-sub">平台管理员 · ' + ac + '</span></span><span class="u-carets">' + ic('chev') + '</span></button></div>';
+      '<div class="u-drop"><button class="u-drop-btn" id="ud-btn"><span class="u-av">' + av + '</span><span class="u-name">' + an + '<span class="u-sub">管理员</span></span></button></div>';
     bar.querySelector('#btn-theme').onclick = function () {
       var cur = 'light';
       try { cur = LS.getItem('engchain-theme') || 'light'; } catch (e) {}
@@ -447,7 +438,6 @@
     'finance/wallet.html': '资金中心', 'finance/recharge.html': '资金中心', 'finance/withdraw.html': '资金中心',
     'finance/credits.html': '资金中心', 'finance/commission.html': '资金中心', 'finance/invoice.html': '资金中心',
     'distribution/overview.html': '分销中心', 'distribution/team.html': '分销中心', 'distribution/payout.html': '分销中心',
-    'mediation/orders.html': '中介服务', 'mediation/sellers.html': '中介服务', 'mediation/escrow.html': '中介服务',
     'risk/audit.html': '风控合规', 'risk/monitor.html': '风控合规', 'risk/compliance.html': '风控合规', 'risk/logs.html': '风控合规',
     'esign/contracts.html': '电子签', 'esign/orders.html': '电子签', 'esign/refunds.html': '电子签',
         'system/pricing.html': '系统设置', 'system/phase.html': '系统设置', 'system/roles.html': '系统设置'
@@ -479,12 +469,7 @@
   function renderSidenav(current) {
     var nav = document.querySelector('.sidenav');
     if (!nav) return;
-    var collapsed = false;
-    try { collapsed = LS.getItem('engchain-sidenav') === '1'; } catch (e) {}
-    nav.classList.toggle('collapsed', collapsed);
-    var html =
-      '<div class="sn-brand"><span class="logo">链</span><span><span class="sn-name">工程链</span><span class="sn-sub">管理后台</span></span></div>' +
-      '<div class="sn-toggle"><button id="sn-collapse" title="折叠 / 展开侧栏">' + (collapsed ? ic('panelL') : ic('panelR')) + '</button></div>';
+    var html = '';
     NAV.forEach(function (g) {
       if (!roleAllowed(g.sec)) return;
       html += '<div class="sn-sec">' + g.sec + '</div>';
@@ -496,13 +481,6 @@
       });
     });
     nav.innerHTML = html;
-    var tb = nav.querySelector('#sn-collapse');
-    if (tb) tb.onclick = function () {
-      var n = '0';
-      try { n = LS.getItem('engchain-sidenav') === '1' ? '0' : '1'; } catch (e) {}
-      try { LS.setItem('engchain-sidenav', n); } catch (e) {}
-      nav.classList.toggle('collapsed', n === '1');
-    };
   }
 
   /* ---- 主题（外观抽屉 / 顶栏按钮共用） ---- */

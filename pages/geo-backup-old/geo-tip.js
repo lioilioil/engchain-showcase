@@ -147,9 +147,8 @@ window.GEO_TIP = (function () {
       return;
     }
     injectCss();
-    // v2: 禁用自动扫描和自动弹窗，避免多余问号icon
-    // scanTerms(document.body);
-    // setTimeout(autoFirstTip, 600);
+    scanTerms(document.body);
+    setTimeout(autoFirstTip, 600);
   }
   init();
 

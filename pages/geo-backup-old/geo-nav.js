@@ -20,30 +20,35 @@ window.GEO_NAV = (function () {
   ];
 
   var css = '' +
-    '.geo-navbar{position:fixed;left:0;right:0;bottom:0;z-index:100;height:'+BAR_H+'px;display:flex;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(0,0,0,.05);}' +
-    '.geo-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-3);text-decoration:none;font-size:9.5px;font-weight:600;-webkit-tap-highlight-color:transparent;}' +
+    '.geo-navbar{position:fixed;left:0;right:0;bottom:0;z-index:100;height:'+BAR_H+'px;display:flex;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(0,0,0,.05);}' +
+    '.geo-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--text-3);text-decoration:none;font-size:9.5px;font-weight:600;-webkit-tap-highlight-color:transparent;transition:color .2s ease,transform .16s ease;}' +
+    '.geo-nav-item:active{transform:scale(.92);}' +
     '.geo-nav-item svg{width:20px;height:20px;}' +
     '.geo-nav-item.active{color:var(--primary-dim);}' +
     '.geo-nav-item.active svg{stroke-width:2.4;}' +
     '.geo-nav-tip{position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--error);}' +
     /* 品牌上下文条（统一组件） */
     '.geo-brandbar{display:flex;align-items:center;gap:8px;margin:8px 0 0;padding:0;}' +
-    '.geo-brandbar-chip{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:9px 11px;cursor:pointer;box-shadow:var(--shadow-xs);}' +
+    '.geo-brandbar-chip{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--r-m);padding:9px 11px;cursor:pointer;box-shadow:var(--shadow-xs);transition:transform .16s ease,box-shadow .2s ease;}' +
+    '.geo-brandbar-chip:active{transform:scale(.985);}' +
     '.geo-brandbar-ico{flex:none;width:26px;height:26px;border-radius:var(--r-s);background:var(--primary-soft);color:var(--primary-dim);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;}' +
     '.geo-brandbar-name{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
     '.geo-brandbar-meta{font-size:9.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
     '.geo-brandbar-sw{flex:none;font-size:10.5px;font-weight:700;color:var(--primary-dim);display:flex;align-items:center;gap:2px;}' +
     /* 品牌切换浮层 */
-    '.geo-bs-mask{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.4);backdrop-filter:blur(3px);display:none;align-items:flex-end;justify-content:center;}' +
-    '.geo-bs-mask.show{display:flex;}' +
-    '.geo-bs-sheet{width:100%;max-width:460px;background:var(--bg);border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.12);}' +
+    '.geo-bs-mask{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,0);backdrop-filter:blur(0px);display:flex;align-items:flex-end;justify-content:center;visibility:hidden;opacity:0;transition:opacity .28s ease,visibility .28s,background-color .28s ease,backdrop-filter .28s ease;}' +
+    '.geo-bs-mask.show{visibility:visible;opacity:1;background:rgba(0,0,0,.4);backdrop-filter:blur(3px);}' +
+    '.geo-bs-sheet{width:100%;max-width:460px;background:var(--bg);border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.12);transform:translateY(100%);transition:transform .32s cubic-bezier(.32,.72,.28,1);}' +
+    '.geo-bs-mask.show .geo-bs-sheet{transform:translateY(0);}' +
     '.geo-bs-title{font-size:13.5px;font-weight:800;color:var(--text-1);margin-bottom:12px;}' +
-    '.geo-bs-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--r-m);cursor:pointer;margin-bottom:6px;background:var(--bg-card);border:1px solid var(--line);}' +
+    '.geo-bs-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:var(--r-m);cursor:pointer;margin-bottom:6px;background:var(--bg-card);border:1px solid var(--line);transition:transform .15s ease,border-color .2s ease;}' +
+    '.geo-bs-row:active{transform:scale(.985);}' +
     '.geo-bs-row.active{border-color:var(--accent-line);box-shadow:0 0 0 1px var(--accent-line) inset;}' +
     '.geo-bs-row .gbi{flex:none;width:30px;height:30px;border-radius:var(--r-s);background:var(--primary-soft);color:var(--primary-dim);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;}' +
     '.geo-bs-row .gbn{flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
     '.geo-bs-row .gbm{font-size:9.5px;color:var(--text-3);}' +
-    '.geo-bs-add{width:100%;height:40px;margin-top:6px;border:none;border-radius:var(--r-m);background:var(--primary-soft);color:var(--primary-dim);font-size:12px;font-weight:700;cursor:pointer;}' +
+    '.geo-bs-add{width:100%;height:40px;margin-top:6px;border:none;border-radius:var(--r-m);background:var(--primary-soft);color:var(--primary-dim);font-size:12px;font-weight:700;cursor:pointer;transition:transform .15s ease,background .2s ease;}' +
+    '.geo-bs-add:active{transform:scale(.985);}' +
     '.geo-bs-del{flex:none;font-size:10px;color:var(--error);cursor:pointer;padding:4px;}';
 
   var sheet = null;

@@ -2072,17 +2072,20 @@
         else if (log.type === 'membership') streams.R6_upgrade += amt;
         else if (log.type === 'upgrade') streams.R6_upgrade += amt;
         else if (log.type === 'report_subscribe') streams.R6_upgrade += amt;
+        else if (log.type === 'esign') streams.R6_upgrade += amt;
         else if (log.type === 'api_recharge') streams.R7_api += amt;
+        else if (log.type === 'unlock_cny_pay') streams.R3_unlock += amt;
         else if (log.type === 'consume' || log.type === 'recharge') { /* skip */ }
       });
     } catch (e) {}
-    /* R3/R4：从 CreditStore.logs 聚合（积分兑换金额） */
+    /* R3/R4：从 CreditStore.logs 聚合（积分充值额；积分消耗不再重复计收入——充值时已确认） */
     try {
       var creditLogs = (window.CreditStore ? CreditStore.read().logs : []) || [];
       creditLogs.forEach(function (log) {
         var amt = Math.abs(Number(log.credits) || 0);
-        if (log.type === 'unlock') streams.R3_unlock += Math.round(amt);
-        else if (log.type === 'recharge') streams.R4_credits += Math.round(amt);
+        if (log.type === 'recharge') streams.R4_credits += Math.round(amt);
+        /* [P2 修复] type='unlock' 是消耗已充值积分，钱在充值时已计入 R4，不再重复计 R3。
+           现金直付解锁（unlock_cny_pay）在上面 BalanceStore.logs 里已归入 R3。 */
       });
     } catch (e) {}
     /* R5：从 CommissionStore.flows 聚合 */
