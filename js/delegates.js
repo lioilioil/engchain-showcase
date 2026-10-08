@@ -925,7 +925,6 @@
     if (BalanceStore.available() < rmb) return { ok: false, msg: '余额不足，需 ¥' + rmb.toFixed(2) + '，请先充值', recharge: 'wallet' };
     var s = BalanceStore.read();
     s.balance = Math.round((s.balance - rmb) * 100) / 100;
-    s.logs.unshift({ type: 'unlock_sim_pay', amount: -rmb, method: method, reason: payName + ' · 委托信息解锁模拟支付', ts: Date.now(), ref: order.orderNo });
     s.logs.unshift({ type: 'unlock_cny_pay', amount: -rmb, method: method, reason: payName + '扣款 · 委托信息解锁', ts: Date.now(), ref: order.orderNo });
     s.logs.unshift({ type: 'platform_income', amount: rmb, method: method, reason: '委托信息解锁平台收入（模拟）', ts: Date.now(), ref: order.orderNo });
     BalanceStore.write(s);

@@ -999,7 +999,8 @@ window.DataBus = (function () {
         fee = c.fee; rate = c.rate;
       }
       return { id:id, type:type, title:title, amount:amount, owner:owner, counterparty:counterparty, counterpartyId:counterpartyId || '',
-               status:status, ts:t(day), milestones:milestones, fee:fee, rate:rate, note:'' };
+               status:status, ts:t(day), milestones:milestones, fee:fee, rate:rate, note:'',
+               contactPhone: '13' + String(80000000 + (id.charCodeAt(id.length-2) * 137 + id.charCodeAt(id.length-1) * 911) % 90000000).slice(0,9) };
     }
     return [
       mk('EN20260904001','supply','商品混凝土供应承接 · 天府新区综合体', 320000, 'u1', '四川中建××建设有限公司', 'u2', 'settled', 1, true),
