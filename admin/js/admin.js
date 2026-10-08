@@ -11,10 +11,11 @@
   window.AdminShell = true;
 
   var LS = window.localStorage;
-  /* 相对基准：index.html → ''；子目录页 → '../' */
+  /* 相对基准：admin 根目录（/admin/ 或 /admin/index.html）→ ''；子目录页 → '../' */
   var p = location.pathname;
-  var m = /\/admin\/([^/]*\.html).*/.exec(p);
-  var BASE = (m && m[1]) ? '' : '../';
+  /* 在 admin 根目录下（路径是 /admin/ 结尾，或 /admin/xxx.html） */
+  var isRoot = /\/admin\/?$/.test(p) || /\/admin\/[^/]+\.html$/.test(p);
+  var BASE = isRoot ? '' : '../';
 
   /* ---- 部门导航树（页面归属 Phase 见计划 §五） ---- */
   var NAV = [
@@ -80,14 +81,20 @@
       draft: ['badge-outline', '草稿'], disputed: ['badge-danger', '平台介入中'],
       refunded: ['badge-outline', '已退款'], partial_refund: ['badge-warning', '部分退款'],
       frozen: ['badge-warning', '冻结中'], clawback: ['badge-danger', '已追回'],
-      published: ['badge-success', '已发布']
+      published: ['badge-success', '已发布'],
+      first_ok: ['badge-info', '待终审'], invoicing: ['badge-info', '开票中'],
+      issued: ['badge-success', '已开票'], done: ['badge-success', '已完成']
     };
-    var k = status in map ? status : 'pending';
-    return '<span class="badge ' + map[k][0] + '">' + map[k][1] + '</span>';
+    if (status in map) return '<span class="badge ' + map[status][0] + '">' + map[status][1] + '</span>';
+    /* 未知状态：不静默兜底成"待审核"，用 outline 原文显示 */
+    return '<span class="badge badge-outline">' + String(status || '未知') + '</span>';
   }
 
   /* ---- toast — 增强：类型样式 / 手动关闭按钮 / 堆叠 ---- */
   function toast(msg, type) {
+    /* 兼容旧调用：success→ok / danger,error→err */
+    if (type === 'success') type = 'ok';
+    else if (type === 'danger' || type === 'error') type = 'err';
     var w = document.querySelector('.ab-toast-wrap');
     if (!w) { w = document.createElement('div'); w.className = 'ab-toast-wrap'; document.body.appendChild(w); }
     var t = document.createElement('div');
@@ -481,6 +488,7 @@
       });
     });
     nav.innerHTML = html;
+    nav.scrollTop = 0;
   }
 
   /* ---- 主题（外观抽屉 / 顶栏按钮共用） ---- */
@@ -959,6 +967,9 @@
           sortCls = ' sortable';
           if (sortKey === col.key) sortCls += ' ' + sortDir;
         }
+        /* 列对齐：right→金额列右对齐，center→状态列居中 */
+        if (col.align === 'right') sortCls += ' r-t';
+        else if (col.align === 'center') sortCls += ' ta-c';
         var style = col.width ? ' style="width:' + col.width + ';"' : '';
         html += '<th class="' + sortCls + '" data-key="' + escHtml(col.key) + '"' + style + '>';
         html += escHtml(col.label || col.key);
@@ -995,7 +1006,11 @@
         for (var c = 0; c < columns.length; c++) {
           var cl = columns[c];
           var cellVal = cl.render ? cl.render(row, r) : (row[cl.key] != null ? row[cl.key] : '');
-          html += '<td>' + cellVal + '</td>';
+          /* 列对齐：right→金额列右对齐+amt类，center→状态列居中 */
+          var tdCls = '';
+          if (cl.align === 'right') tdCls = ' class="r-t amt"';
+          else if (cl.align === 'center') tdCls = ' class="ta-c"';
+          html += '<td' + tdCls + '>' + cellVal + '</td>';
         }
         html += '</tr>';
       }
@@ -1004,7 +1019,8 @@
       if (rowClick) {
         container.querySelectorAll('tbody tr.clickable').forEach(function (tr) {
           tr.onclick = function (e) {
-            if (e.target.classList.contains('checkbox') || e.target.closest('.checkbox')) return;
+            /* 排除行内交互元素：checkbox / button / a / label / input */
+            if (e.target.closest('button, a, label, input, .checkbox')) return;
             var idx = tr.getAttribute('data-row-id');
             var rowData = null;
             for (var k = 0; k < data.length; k++) {
@@ -1301,4 +1317,11 @@
   } else {
     boot();
   }
+  /* bfcache 恢复时，重置侧边栏滚动位置（避免返回首页时前面的链接被顶出视口） */
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      var nav = document.querySelector('.sidenav');
+      if (nav) nav.scrollTop = 0;
+    }
+  });
 })();

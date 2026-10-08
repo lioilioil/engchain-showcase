@@ -105,22 +105,22 @@ function bootOwnerReview(){ (function () {
 
   function renderTable() {
     var list = pendingReviews();
-    $('#count').textContent = '待审核 ' + list.length + ' 单';
+    $('#count').textContent = '待审核 ' + list.length + ' 条';
     if (!list.length) {
       $('#table-wrap').innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted);">暂无待审核的企业主验证单</div>';
       return;
     }
     $('#table-wrap').innerHTML =
-      '<table class="table">' +
+      '<div class="table-wrap"><table class="table">' +
       '<thead><tr>' +
-        '<th>企业</th><th>发起人 → 接收人</th><th>验证方式</th><th>申请人 / 证件</th><th>材料核验</th><th>提交时间</th><th>操作</th>' +
+        '<th>企业</th><th>发起人 / 接收方</th><th>验证方式</th><th>申请人 / 证件</th><th>材料核验</th><th>提交时间</th><th>操作</th>' +
       '</tr></thead><tbody>' +
       list.map(function (x) {
         var t = x.transfer, org = x.org;
         var v = t.verify || {};
         var material;
         if (v.mode === 'legal') {
-          material = '姓名须与法定代表人「' + esc(org.legal || '—') + '」一致' + (v.name === org.legal ? '<span class="tx-success"> · 一致</span>' : '<span class="tx-danger"> · 不一致</span>');
+          material = '姓名须与法定代表人' + esc(org.legal || '') + '」一致' + (v.name === org.legal ? '<span class="tx-success"> · 一致</span>' : '<span class="tx-danger"> · 不一致</span>');
         } else {
           material = '实际控制人声明' + (v.payload && v.payload.declaration ? '<span class="tx-success"> · 已勾选</span>' : '<span class="tx-danger"> · 未勾选</span>');
         }
@@ -128,19 +128,19 @@ function bootOwnerReview(){ (function () {
           '<td><div class="tx-semibold">' + esc(org.shortName || org.co) + '</div><div class="tx-muted-sm">' + esc(org.co || '') + '</div></td>' +
           '<td>' + esc(userName(t.fromUid)) + ' → <b>' + esc(userName(t.toUid)) + '</b></td>' +
           '<td>' + modeLabel(v.mode) + '</td>' +
-          '<td><div class="tx-semibold">' + esc(v.name || '—') + '</div><div class="tx-mono tx-muted-sm">' + maskIdNo(v.idNo) + '</div></td>' +
+          '<td><div class="tx-semibold">' + esc(v.name || '') + '</div><div class="tx-mono tx-muted-sm">' + maskIdNo(v.idNo) + '</div></td>' +
           '<td>' + material + '</td>' +
           '<td class="tx-muted-sm">' + fmtTime(v.submittedAt) + '</td>' +
           '<td style="white-space:nowrap;">' +
             '<button class="btn btn-sm btn-primary" onclick="ownerReview(\'' + t.id + '\', true)">通过并移交</button>' +
-            '<button class="btn btn-sm btn-ghost" onclick="ownerReview(\'' + t.id + '\', false)">驳回</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="ownerReview(\'' + t.id + '\', false)">驳回</button>' +
           '</td>' +
         '</tr>';
       }).join('') +
-      '</tbody></table>';
+      '</tbody></table></div>';
   }
 
-  /* 企业主变更（实际控制人）审核表 */
+  /* 企业主变更（实际控制人）审核 */
   function ownerRegBadge(c) {
     if (c.targetUid) {
       return c.targetVerified
@@ -151,13 +151,13 @@ function bootOwnerReview(){ (function () {
   }
   function renderOwnerChangeTable() {
     var list = pendingOwnerChanges();
-    $('#oc-count').textContent = '待审核 ' + list.length + ' 单';
+    $('#oc-count').textContent = '待审核 ' + list.length + ' 条';
     if (!list.length) {
       $('#oc-table-wrap').innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted);">暂无待审核的企业主变更</div>';
       return;
     }
     $('#oc-table-wrap').innerHTML =
-      '<table class="table">' +
+      '<div class="table-wrap"><table class="table">' +
       '<thead><tr>' +
         '<th>企业</th><th>现任企业主 → 变更目标</th><th>变更原因</th><th>注册状态</th><th>提交人</th><th>提交时间</th><th>操作</th>' +
       '</tr></thead><tbody>' +
@@ -171,34 +171,60 @@ function bootOwnerReview(){ (function () {
         return '<tr>' +
           '<td><div class="tx-semibold">' + esc(org.shortName || org.co) + '</div><div class="tx-muted-sm">' + esc(org.co || '') + '</div></td>' +
           '<td>' + esc(curOwner || '空缺') + ' → <b>' + esc(c.name) + '</b><div class="tx-mono tx-muted-sm">' + esc(c.mobile || '') + '</div></td>' +
-          '<td><div class="tx-muted-sm" style="max-width:220px;">' + esc(c.reason || '—') + '</div></td>' +
+          '<td><div class="tx-muted-sm" style="max-width:220px;">' + esc(c.reason || '') + '</div></td>' +
           '<td>' + ownerRegBadge(c) + '</td>' +
-          '<td class="tx-muted-sm">' + esc(c.createdByName || '—') + '</td>' +
+          '<td class="tx-muted-sm">' + esc(c.createdByName || '') + '</td>' +
           '<td class="tx-muted-sm">' + fmtTime(c.createdAt) + '</td>' +
           '<td style="white-space:nowrap;">' +
             approveBtn +
-            '<button class="btn btn-sm btn-ghost" onclick="ownerChangeReview(\'' + c.id + '\', false)">驳回</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="ownerChangeReview(\'' + c.id + '\', false)">驳回</button>' +
           '</td>' +
         '</tr>';
       }).join('') +
-      '</tbody></table>';
+      '</tbody></table></div>';
   }
 
   window.ownerChangeReview = function (changeId, approve) {
-    var r = OrgsStore.reviewOwnerChange(changeId, approve);
-    if (r && r.error) { if (window.Admin && Admin.toast) Admin.toast(r.error, 'error'); else alert(r.error); return; }
-    if (window.Admin && Admin.toast) Admin.toast(approve ? '已通过，企业主变更已生效' : '已驳回该企业主变更', approve ? 'success' : '');
-    renderKPI(); renderOwnerChangeTable(); renderTable();
+    if (approve) {
+      Admin.confirm({
+        title: '确认通过企业主变更？',
+        body: '通过后企业实际控制人将立即变更，此操作不可逆。',
+        ok: '确认通过',
+        danger: true,
+        onYes: function () { doOwnerChangeReview(changeId, true); }
+      });
+    } else {
+      doOwnerChangeReview(changeId, false);
+    }
   };
+  function doOwnerChangeReview(changeId, approve) {
+    var r = OrgsStore.reviewOwnerChange(changeId, approve);
+    if (r && r.error) { Admin.toast(r.error, 'err'); return; }
+    Admin.toast(approve ? '已通过，企业主变更已生效' : '已驳回该企业主变更', 'ok');
+    renderKPI(); renderOwnerChangeTable(); renderTable();
+  }
 
   window.ownerReview = function (transferId, approve) {
-    var r = OrgsStore.reviewOwnerVerify(transferId, approve);
-    if (r && r.error) { if (window.Admin && Admin.toast) Admin.toast(r.error, 'error'); else alert(r.error); return; }
-    if (window.Admin && Admin.toast) Admin.toast(approve ? '已通过，企业主移交已生效' : '已驳回该验证单', approve ? 'success' : '');
-    renderKPI(); renderTable();
+    if (approve) {
+      Admin.confirm({
+        title: '确认通过企业主移交？',
+        body: '通过后企业归属权将转移，此操作不可逆。',
+        ok: '确认移交',
+        danger: true,
+        onYes: function () { doOwnerReview(transferId, true); }
+      });
+    } else {
+      doOwnerReview(transferId, false);
+    }
   };
+  function doOwnerReview(transferId, approve) {
+    var r = OrgsStore.reviewOwnerVerify(transferId, approve);
+    if (r && r.error) { Admin.toast(r.error, 'err'); return; }
+    Admin.toast(approve ? '已通过，企业主移交已生效' : '已驳回该验证单', 'ok');
+    renderKPI(); renderTable();
+  }
 
-  $('#btn-refresh').addEventListener('click', function () { renderKPI(); renderTable(); renderOwnerChangeTable(); if (window.Admin && Admin.toast) Admin.toast('已刷新'); });
+  $('#btn-refresh').addEventListener('click', function () { renderKPI(); renderTable(); renderOwnerChangeTable(); if (window.Admin && Admin.toast) Admin.toast('已刷�?); });
   renderKPI();
   renderTable();
   renderOwnerChangeTable();
@@ -208,3 +234,4 @@ function bootOwnerReview(){ (function () {
 </script>
 </body>
 </html>
+

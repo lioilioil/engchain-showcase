@@ -195,14 +195,16 @@
         '<span class="badge badge-primary">一级</span>' +
         (m.active ? Admin.badge('active') : Admin.badge('disabled')) +
         '<span class="tx-right-muted">累计 ' + money(m.credit) + '</span></div></div>';
-    });
-    t2.forEach(function (m) {
-      html += '<div class="tree-node tree-lvl2"><div class="fl-row-sm">' +
-        '<span class="u-av av-xs av-gold">2</span>' +
-        '<span class="tx-medium">' + esc(m.name) + '</span>' +
-        '<span class="badge badge-gold">二级</span>' +
-        (m.active ? Admin.badge('active') : Admin.badge('disabled')) +
-        '<span class="tx-right-muted">累计 ' + money(m.credit) + '</span></div></div>';
+      /* 挂载属于该一级的二级成员 */
+      var kids = t2.filter(function (x) { return x.uplineId === m.id; });
+      kids.forEach(function (k) {
+        html += '<div class="tree-node tree-lvl2"><div class="fl-row-sm">' +
+          '<span class="u-av av-xs av-gold">2</span>' +
+          '<span class="tx-medium">' + esc(k.name) + '</span>' +
+          '<span class="badge badge-gold">二级</span>' +
+          (k.active ? Admin.badge('active') : Admin.badge('disabled')) +
+          '<span class="tx-right-muted">累计 ' + money(k.credit) + '</span></div></div>';
+      });
     });
     html += '</div>';
     return html;
@@ -265,7 +267,7 @@
       danger: !active,
       onYes: function () {
         var r = toggleMember(id, active);
-        Admin.toast('已' + label + ' ' + (r ? r.name : id), 'success');
+        Admin.toast('已' + label + ' ' + (r ? r.name : id), 'ok');
         Admin.log('分销成员' + label, '分销中心', (r ? r.name : id) + ' · ' + (r ? r.company : ''), label);
         if (drawer) drawer.close();
         renderKPI();
@@ -298,50 +300,10 @@
     window.addEventListener('engchain:dist-team', function () { renderKPI(); renderList(); });
   }
 
-
-  /* 交互审计修复：测试框架 closeAll 不移除 .u-menu，导致按钮索引偏移后点击"切换身份"跳走。
-     当 closeAll 移除遮罩/抽屉时，联动移除用户菜单，保证后续按钮索引正确。 */
-  (function () {
-    if (window.__umenuFix) return;
-    window.__umenuFix = true;
-    /* 测试框架（puppeteer headless）点击用户按钮后不关闭 .u-menu，导致后续按钮索引偏移。
-       仅在 webdriver 环境下自动关闭用户菜单，不影响真实用户。 */
-    if (navigator.webdriver !== true) return;
-    var obs = new MutationObserver(function () {
-      var m = document.querySelector('.u-menu');
-      if (m) m.remove();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  })();
-
-
-  /* 交互审计修复：Admin.exportCSV 在 headless Chrome 中 a.click() 触发 blob 导航导致页面跳走。
-     覆盖为 iframe 加载方式，避免当前页导航。 */
-  (function () {
-    if (window.__exportFix) return;
-    window.__exportFix = true;
-    function applyExportFix() {
-    Admin.exportCSV = function (filename, headers, rows) {
-      try {
-        var esc = function (v) { v = String(v == null ? '' : v); return '"' + v.replace(/"/g, '""') + '"'; };
-        var csv = '\ufeff' + headers.map(esc).join(',') + '\n' + rows.map(function (r) { return r.map(esc).join(','); }).join('\n');
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
-        setTimeout(function () { iframe.remove(); URL.revokeObjectURL(url); }, 1500);
-        return true;
-      } catch (e) { return false; }
-    };
-    }
-    document.addEventListener('DOMContentLoaded', applyExportFix);
-  })();
-
   function init() { renderFilter(); renderKPI(); renderList(); bind(); }
   document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
 </body>
 </html>
+

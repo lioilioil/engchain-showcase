@@ -184,7 +184,7 @@
         { key: 'ts', label: '时间', width: '130px', render: function (r) { return ftime(r.ts); }},
         { key: 'ops', label: '操作', width: '120px', render: function (r) {
           if (r.status === 'pending') return '<button class="btn btn-sm btn-primary" data-act="settle" data-id="' + esc(r.id) + '" data-perm="payout">结算</button>';
-          if (r.status === 'settled') return '<button class="btn btn-sm btn-success" data-act="pay" data-id="' + esc(r.id) + '" data-perm="payout">发放</button>';
+          if (r.status === 'settled') return '<button class="btn btn-sm btn-primary" data-act="pay" data-id="' + esc(r.id) + '" data-perm="payout">发放</button>';
           if (r.status === 'paid') return '<span class="tx-muted-xs">已发放 · ' + ftime(r.paidAt) + '</span>';
           return '—';
         }}
@@ -237,7 +237,7 @@
     if (row.status === 'pending') {
       footer = '<button class="btn btn-primary" id="d-settle" data-perm="payout">确认结算</button>';
     } else if (row.status === 'settled') {
-      footer = '<button class="btn btn-success" id="d-pay" data-perm="payout">确认发放</button>';
+      footer = '<button class="btn btn-primary" id="d-pay" data-perm="payout">确认发放</button>';
     }
 
     var drawer = Admin.Drawer.open({ title: '佣金流水详情 · ' + row.id, content: content, footer: footer, width: '480px' });
@@ -257,13 +257,13 @@
       onYes: function () {
         var r = DataBus.distSettle(id);
         if (r) {
-          Admin.toast('已结算 ' + money(r.fee), 'success');
+          Admin.toast('已结算 ' + money(r.fee), 'ok');
           Admin.log('返佣结算', '分销中心', r.member + ' · ' + r.note, '¥' + r.fee);
           if (drawer) drawer.close();
           renderKPI();
           renderList();
         } else {
-          Admin.toast('结算失败：状态不匹配', 'error');
+          Admin.toast('结算失败：状态不匹配', 'err');
         }
       }
     });
@@ -278,13 +278,13 @@
       onYes: function () {
         var r = DataBus.distPay(id);
         if (r) {
-          Admin.toast('已发放 ' + money(r.fee), 'success');
+          Admin.toast('已发放 ' + money(r.fee), 'ok');
           Admin.log('返佣发放', '分销中心', r.member + ' · ' + r.note, '¥' + r.fee);
           if (drawer) drawer.close();
           renderKPI();
           renderList();
         } else {
-          Admin.toast('发放失败：状态不匹配', 'error');
+          Admin.toast('发放失败：状态不匹配', 'err');
         }
       }
     });
@@ -314,46 +314,6 @@
   }
 
 
-  /* 交互审计修复：测试框架 closeAll 不移除 .u-menu，导致按钮索引偏移后点击"切换身份"跳走。
-     当 closeAll 移除遮罩/抽屉时，联动移除用户菜单，保证后续按钮索引正确。 */
-  (function () {
-    if (window.__umenuFix) return;
-    window.__umenuFix = true;
-    /* 测试框架（puppeteer headless）点击用户按钮后不关闭 .u-menu，导致后续按钮索引偏移。
-       仅在 webdriver 环境下自动关闭用户菜单，不影响真实用户。 */
-    if (navigator.webdriver !== true) return;
-    var obs = new MutationObserver(function () {
-      var m = document.querySelector('.u-menu');
-      if (m) m.remove();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  })();
-
-
-  /* 交互审计修复：Admin.exportCSV 在 headless Chrome 中 a.click() 触发 blob 导航导致页面跳走。
-     覆盖为 iframe 加载方式，避免当前页导航。 */
-  (function () {
-    if (window.__exportFix) return;
-    window.__exportFix = true;
-    function applyExportFix() {
-    Admin.exportCSV = function (filename, headers, rows) {
-      try {
-        var esc = function (v) { v = String(v == null ? '' : v); return '"' + v.replace(/"/g, '""') + '"'; };
-        var csv = '\ufeff' + headers.map(esc).join(',') + '\n' + rows.map(function (r) { return r.map(esc).join(','); }).join('\n');
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
-        setTimeout(function () { iframe.remove(); URL.revokeObjectURL(url); }, 1500);
-        return true;
-      } catch (e) { return false; }
-    };
-    }
-    document.addEventListener('DOMContentLoaded', applyExportFix);
-  })();
-
   function init() {
     renderFilter();
     renderKPI();
@@ -365,3 +325,4 @@
 </script>
 </body>
 </html>
+

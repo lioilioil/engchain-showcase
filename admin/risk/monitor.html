@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
@@ -163,16 +163,16 @@
         }},
         { key: 'kind', label: '风险等级', width: '100px', render: function (row) { return kindBadge(row.kind); } },
         { key: 'text', label: '动态详情', render: function (row) { return '<span class="tx-base">' + esc(row.text) + '</span>'; } },
-        { key: 'ops', label: '操作', width: '200px', render: function (row, idx) {
+        { key: 'ops', label: '操作', width: '200px', render: function (row) {
           var followed = isFollowed(row.company);
           var ops = '';
           if (!followed) {
-            ops += '<button class="btn btn-sm btn-outline" data-act="follow" data-idx="' + idx + '">关注</button>';
+            ops += '<button class="btn btn-sm btn-outline" data-act="follow" data-company="' + esc(row.company) + '">关注</button>';
           } else {
-            ops += '<button class="btn btn-sm btn-ghost" data-act="unfollow" data-idx="' + idx + '">取消关注</button>';
+            ops += '<button class="btn btn-sm btn-outline" data-act="unfollow" data-company="' + esc(row.company) + '">取消关注</button>';
           }
           if (row.kind === 'warn') {
-            ops += '<button class="btn btn-sm btn-primary" data-perm="ban" data-act="alert" data-idx="' + idx + '">生成预警</button>';
+            ops += '<button class="btn btn-sm btn-primary" data-perm="ban" data-act="alert" data-company="' + esc(row.company) + '">生成预警</button>';
           }
           return ops;
         }}
@@ -240,7 +240,7 @@
     if (!followed) {
       footer = '<button class="btn btn-primary" id="d-follow">关注企业</button>';
     } else {
-      footer = '<button class="btn btn-ghost" id="d-unfollow">取消关注</button>';
+      footer = '<button class="btn btn-outline" id="d-unfollow">取消关注</button>';
     }
     if (f.kind === 'warn') {
       footer += '<button class="btn btn-primary" data-perm="ban" id="d-alert">生成预警</button>';
@@ -279,7 +279,7 @@
   function generateAlert(f) {
     Admin.confirm({
       title: '生成预警 · ' + f.company,
-      body: '针对「' + esc(f.company) + '」的风险事件生成预警？\n\n' + esc(f.text) + '\n\n预警将通知风控团队并记录在案。',
+      body: '针对「' + esc(f.company) + '」的风险事件生成预警？<br><br>' + esc(f.text) + '<br><br>预警将通知风控团队并记录在案。',
       ok: '确认生成预警', danger: true,
       onYes: function () {
         Admin.toast('已生成预警：' + f.company);
@@ -308,9 +308,9 @@
     document.addEventListener('click', function (e) {
       var b = e.target.closest('button[data-act]');
       if (!b) return;
-      var idx = parseInt(b.getAttribute('data-idx'), 10);
+      var company = b.getAttribute('data-company');
       var list = filteredList();
-      var f = list[idx];
+      var f = list.find(function(x){ return x.company === company; });
       if (!f) return;
       var act = b.getAttribute('data-act');
       if (act === 'follow') followCompany(f.company);

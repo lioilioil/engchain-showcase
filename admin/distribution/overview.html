@@ -264,46 +264,6 @@
   }
 
 
-  /* 交互审计修复：测试框架 closeAll 不移除 .u-menu，导致按钮索引偏移后点击"切换身份"跳走。
-     当 closeAll 移除遮罩/抽屉时，联动移除用户菜单，保证后续按钮索引正确。 */
-  (function () {
-    if (window.__umenuFix) return;
-    window.__umenuFix = true;
-    /* 测试框架（puppeteer headless）点击用户按钮后不关闭 .u-menu，导致后续按钮索引偏移。
-       仅在 webdriver 环境下自动关闭用户菜单，不影响真实用户。 */
-    if (navigator.webdriver !== true) return;
-    var obs = new MutationObserver(function () {
-      var m = document.querySelector('.u-menu');
-      if (m) m.remove();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-  })();
-
-
-  /* 交互审计修复：Admin.exportCSV 在 headless Chrome 中 a.click() 触发 blob 导航导致页面跳走。
-     覆盖为 iframe 加载方式，避免当前页导航。 */
-  (function () {
-    if (window.__exportFix) return;
-    window.__exportFix = true;
-    function applyExportFix() {
-    Admin.exportCSV = function (filename, headers, rows) {
-      try {
-        var esc = function (v) { v = String(v == null ? '' : v); return '"' + v.replace(/"/g, '""') + '"'; };
-        var csv = '\ufeff' + headers.map(esc).join(',') + '\n' + rows.map(function (r) { return r.map(esc).join(','); }).join('\n');
-        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
-        setTimeout(function () { iframe.remove(); URL.revokeObjectURL(url); }, 1500);
-        return true;
-      } catch (e) { return false; }
-    };
-    }
-    document.addEventListener('DOMContentLoaded', applyExportFix);
-  })();
-
   function init() { render(); bind(); }
   document.addEventListener('DOMContentLoaded', init);
 })();

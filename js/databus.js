@@ -1531,8 +1531,8 @@ window.DataBus = (function () {
       { id: 'T2', uid: 'u5', name: '张涛', company: '××劳务有限公司', level: 1, active: true, joinedAt: t(30), orders: 4, credit: 8600, note: '' },
       { id: 'T3', uid: 'u3', name: '王芳', company: '××建设有限公司', level: 1, active: true, joinedAt: t(21), orders: 3, credit: 5200, note: '' },
       { id: 'T4', uid: 'u6', name: '刘洋', company: '××装饰工程有限公司', level: 1, active: false, joinedAt: t(15), orders: 1, credit: 1200, note: '30 天未活跃' },
-      { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' },
-      { id: 'T6', uid: 'u7', name: '赵磊', company: '××机械租赁有限公司', level: 2, active: true, joinedAt: t(8), orders: 1, credit: 1800, note: '' }
+      { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, uplineId: 'T1', active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' },
+      { id: 'T6', uid: 'u7', name: '赵磊', company: '××机械租赁有限公司', level: 2, uplineId: 'T2', active: true, joinedAt: t(8), orders: 1, credit: 1800, note: '' }
     ];
   }
   function saveDistTeam(a) { try { LS.setItem(DIST_TEAM_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('distTeam', a); return a; }
