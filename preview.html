@@ -580,7 +580,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </div>
 
       <!-- 新后台入口 -->
-      <a href="http://127.0.0.1:5174/" target="_blank" class="pv-admin-btn" id="pv-admin-link" title="进入 Vue3 新版管理后台">
+      <a href="https://lioilioil.github.io/engchain-showcase/admin/" target="_blank" class="pv-admin-btn" id="pv-admin-link" title="进入 Vue3 新版管理后台">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
         进入新版管理后台
       </a>
@@ -2689,6 +2689,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var adminLink = document.getElementById('pv-admin-link');
     var ctlOk = false, frontRunning = false, backRunning = false, busy = false;
     var POLL_MS = 4000;
+    var ONLINE_ADMIN_URL = 'https://lioilioil.github.io/engchain-showcase/admin/';
+    var isLocal = location.protocol === 'file:' || /^(127\.0\.0\.1|localhost)$/i.test(location.hostname || '');
+    function adminTarget() { return (isLocal && backRunning) ? 'http://127.0.0.1:5174/' : ONLINE_ADMIN_URL; }
 
     function setCtl(ok) {
       ctlOk = ok;
@@ -2724,7 +2727,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       backBtn.textContent = backRunning ? '停止' : '启动';
       backBtn.className = 'svc-btn ' + (backRunning ? 'stop' : 'go');
       if (adminLink) {
-        adminLink.title = backRunning ? '进入 Vue3 新版管理后台（运行中）' : '管理后台未启动，请先在左侧「本地服务」中启动后端';
+        adminLink.href = adminTarget();
+        if (isLocal && backRunning) {
+          adminLink.title = '进入 Vue3 新版管理后台（本地运行中 127.0.0.1:5174）';
+        } else if (isLocal) {
+          adminLink.title = '本地后端未启动，已切换为 GitHub Pages 线上演示后台';
+        } else {
+          adminLink.title = '进入 Vue3 新版管理后台（GitHub Pages 线上版）';
+        }
       }
       renderNote();
     }
@@ -2776,9 +2786,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     if (adminLink) {
       adminLink.addEventListener('click', function (e) {
-        if (!backRunning) {
-          e.preventDefault();
-          if (window.UI && UI.toast) UI.toast('管理后台未启动：请先点击「后端 · 启动」', 'warn');
+        if (isLocal && !backRunning) {
+          if (window.UI && UI.toast) UI.toast('本地后端未启动，正在打开 GitHub Pages 线上演示后台', 'warn');
         }
       });
     }
