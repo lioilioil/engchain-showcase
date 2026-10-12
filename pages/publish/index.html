@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>信息工作台 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/guest-gate.css">
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   信息工作台 · WARM PAPER WORKBENCH（暖纸工作台）
+   暖米纸光场 × 古铜金单点强调 × 工地图大图 + 标语 × 紧凑克制卡片
+   明/暗双主题（跟随全局 data-theme）；底部固定悬浮液态玻璃发布栏（LGCTA）。
+   仅作用于本页（scope .wb-dl）；所有 id / 跳转 / 数据 / 身份门控不变。
+   ════════════════════════════════════════════════════════════════════ */
+.wb-dl{
+  --canvas:#F4F2EE;            /* 暖米纸主底 */
+  --world:#EFECE3;             /* 世界色：再压一档的纸 */
+  --panel:#FFFFFF;             /* 卡片：白纸 */
+  --panel-soft:rgba(255,255,255,.66);
+  --line:rgba(38,30,18,.10);
+  --line-strong:rgba(38,30,18,.16);
+  --ink:#26201A;               /* 墨褐正文 */
+  --ink-2:rgba(38,30,18,.66);
+  --ink-3:rgba(38,30,18,.44);
+  --on-photo:#FBF8F1;
+  --gold:#B08A3C;              /* 古铜金：唯一强调色 */
+  --gold-hi:#B08A3C;
+  --gold-deep:#7A5C1E;
+  --gold-soft:rgba(138, 106, 40, .12);
+  --success:#2B6B4F;
+  /* 字体：全站无衬线体系（对齐 app.css --font/--font-display）。
+     Windows 下中文回退 Microsoft YaHei UI——比宋体回退锐利、现代。
+     Barlow（拉丁/数字）由 app.css @import 全局加载，数字栈直接复用。 */
+  --display:"Barlow","PingFang SC","Microsoft YaHei UI","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  --num:"Barlow","Bahnschrift","DIN Alternate","Arial Narrow",sans-serif;
+  --sans:"PingFang SC","Microsoft YaHei UI","Microsoft YaHei","Hiragino Sans GB","Segoe UI",system-ui,sans-serif;
+  --r-shell:26px;
+  --r-card:14px;
+  --r-ctrl:9px;
+  --r-pill:999px;
+  --sh-card:0 10px 26px -18px rgba(80,60,30,.28);
+  --sh-float:0 18px 40px -20px rgba(80,60,30,.34);
+  --sh-gold:0 10px 24px -12px rgba(138, 106, 40, .5);
+  --bar-glass:rgba(255,255,255,.72);
+}
+html[data-theme="dark"] .wb-dl{
+  --canvas:#14120F; --world:#1A1713;
+  --panel:#211D18; --panel-soft:rgba(33,29,24,.72);
+  --line:rgba(244,240,233,.12); --line-strong:rgba(244,240,233,.22);
+  --ink:#F4F0E9; --ink-2:rgba(244,240,233,.72); --ink-3:rgba(244,240,233,.48);
+  --gold-hi:#C9A45C; --gold:#C9A45C; --gold-deep:#8A6A28;
+  --gold-soft: rgba(201, 164, 92, .16);
+  --sh-card:0 14px 30px -18px rgba(0,0,0,.6);
+  --sh-float:0 20px 44px -20px rgba(0,0,0,.68);
+  --bar-glass:rgba(20,18,15,.72);
+}
+html[data-theme="dark"] .wb-dl .status-bar{background:var(--canvas);color:var(--ink);}
+html[data-theme="dark"] .wb-dl .status-bar .dynamic-island,.wb-dl .status-bar .dynamic-island{}
+
+/* ── 基底：整页暖纸工作台 ── */
+.phone.wb-dl{background:var(--canvas);color:var(--ink);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.wb-dl #pub-content{
+  background:
+    radial-gradient(120% 42% at 50% -6%,var(--gold-soft),transparent 58%),
+    linear-gradient(180deg,var(--world) 0%,var(--canvas) 46%,var(--canvas) 100%);
+  position:relative;z-index:1;}
+/* 全局状态栏（common.js 注入）：跟随主题的实底 */
+.wb-dl .status-bar{background:var(--canvas);color:var(--ink);position:relative;z-index:12;}
+
+/* ── 动效：克制入场（尊重 reduced-motion） ── */
+@keyframes wb-in{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+.wb-dl .rv{opacity:0;transform:translateY(14px);animation:wb-in .6s cubic-bezier(.22,.8,.26,1) both;}
+@media (prefers-reduced-motion:reduce){
+  .wb-dl .rv{animation:none!important;opacity:1;transform:none;}
+  .wb-dl .dl-hero-bg{animation:none!important;}
+}
+
+/* ══ 顶栏：返回 icon + 标识 + 明暗切换（圆形玻璃按钮浮于 hero 图之上） ══ */
+.wb-top{position:absolute;top:0;left:0;right:0;z-index:9;display:flex;align-items:center;
+  padding:calc(26px + env(safe-area-inset-top)) 18px 0;pointer-events:none;}
+/* 返回按钮：复用全站 nav-back 标准（44×44 圆钮 + 24px 描边箭头、透明底）；
+   浮于 hero 图上时用白色保证可读，与 app demo 其余页面完全同款 */
+.wb-top .nav-back{pointer-events:auto;}
+.wb-back{color:#FDFBF6;text-shadow:0 1px 10px rgba(25,18,8,.55);}
+html[data-theme="dark"] .wb-back{color:#F5F1E8;}
+.wb-back svg{width:24px;height:24px;}
+.wb-back:active{background:rgba(255,255,255,.18);}
+html[data-theme="dark"] .wb-back:active{background:rgba(255,255,255,.10);}
+/* 顶栏「返回 | 首页」组合：竖线与首页icon复用全站规格（20px svg / 1.8 描边 / 1.5px 竖线），
+   颜色随浮层白色，按压反馈同 wb-back。负 margin 压紧三元素间距 */
+.wb-top .nav-home svg{width:20px;height:20px;}
+.wb-top .nav-divider{background:#FDFBF6;width:2px;height:16px;margin:0 -5px;box-shadow:0 1px 6px rgba(25,18,8,.4);}
+html[data-theme="dark"] .wb-top .nav-divider{background:#F5F1E8;}
+/* 品牌文字：左侧因多了首页icon而变宽，整体右移约28px补偿，保持视觉居中且不与icon重叠 */
+.wb-brand{position:absolute;left:calc(50% + 28px);top:calc(26px + env(safe-area-inset-top) + 11px);
+  transform:translateX(-50%);font-size:12px;font-weight:600;letter-spacing:.22em;
+  color:rgba(251,248,241,.96);white-space:nowrap;text-shadow:0 1px 10px rgba(30,22,10,.5),
+  0 1px 2px rgba(30,22,10,.4);pointer-events:none;}
+html[data-theme="dark"] .wb-brand{color:rgba(244,240,233,.94);}
+
+/* ══ HERO：满版工地大图 + 标语（明暗各一张，顶部供顶栏玻璃按钮悬浮）。
+   无卡片边框——图片四周经 mask 径向渐隐至透明，逐渐融入窗口底。 ══ */
+.dl-hero{position:relative;margin:14px 16px 0;}
+/* 图块：无边框无衬底；--hero-fade 供图与压暗层共用——顶部/左右薄渐隐、底部渐隐收窄
+   （标题文字区 7%~72% 保持实底），四边最终透明为 0，融入窗口底 */
+.dl-hero-media{position:relative;height:224px;border-radius:18px;overflow:hidden;
+  --hero-fade:
+    linear-gradient(180deg,transparent 0,#000 7%,#000 72%,transparent 100%),
+    linear-gradient(90deg,transparent 0,#000 6%,#000 94%,transparent 100%);}
+.dl-hero-bg{position:absolute;inset:0;z-index:0;
+  background:url("../../assets/publish/hero-light.jpg") center 24%/cover no-repeat;
+  -webkit-mask-image:var(--hero-fade);-webkit-mask-composite:source-in;
+  mask-image:var(--hero-fade);mask-composite:intersect;}
+html[data-theme="dark"] .dl-hero-bg{
+  background:url("../../assets/publish/dl-hero-night.jpg") center 22%/cover no-repeat;}
+/* 亮色：清晨暖金工地 → 底部渐深保证白字对比；顶部留透让图呼吸。
+   与图共用同一 mask：四周随图片一起渐隐，融入窗口底。 */
+.dl-hero-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(28,22,14,.02) 0%,rgba(28,22,14,.04) 46%,
+             rgba(28,22,14,.58) 80%,rgba(28,22,14,.76) 100%);
+  -webkit-mask-image:var(--hero-fade);-webkit-mask-composite:source-in;
+  mask-image:var(--hero-fade);mask-composite:intersect;}
+/* 暗色：夜色工地 → 顶部略压保证顶栏按钮可读，底部渐深统一 */
+html[data-theme="dark"] .dl-hero-scrim{
+  background:linear-gradient(180deg,rgba(10,8,6,.34) 0%,rgba(10,8,6,.10) 34%,
+             rgba(10,8,6,.20) 58%,rgba(10,8,6,.66) 82%,rgba(10,8,6,.82) 100%);}
+.dl-hero-inner{position:absolute;left:20px;right:20px;bottom:16px;z-index:2;}
+.dl-eyebrow{display:flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:.30em;
+  color:rgba(251,248,241,.78);text-transform:uppercase;}
+.dl-eyebrow::before{content:"";width:22px;height:1px;background:linear-gradient(90deg,var(--gold-hi),transparent);}
+.dl-eyebrow .live{margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  letter-spacing:.18em;color:var(--gold-hi);}
+.dl-eyebrow .live i{width:5px;height:5px;border-radius:50%;background:var(--gold-hi);
+  box-shadow:0 0 10px var(--gold-hi);}
+.dl-hero-title{margin-top:13px;font-family:var(--display);font-weight:700;
+  font-size:32px;line-height:1.18;letter-spacing:.01em;color:var(--on-photo);
+  text-shadow:0 2px 18px rgba(20,14,6,.35);}
+.dl-hero-sub{margin-top:8px;font-size:13px;line-height:1.6;color:rgba(251,248,241,.86);
+  text-shadow:0 1px 10px rgba(20,14,6,.4);}
+
+/* ══ 套件面板：营销引导条 + 数据总览（发布按钮已移至底部悬浮栏） ══ */
+.dl-suite{position:relative;z-index:5;margin:-18px 16px 0;border-radius:var(--r-shell);
+  padding:14px 14px 16px;background:var(--bar-glass);
+  border:1px solid var(--line-strong);
+  -webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);
+  box-shadow:var(--sh-float);}
+
+/* 营销引导条：轻量、单行、不喧宾夺主 */
+.dl-perk{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--r-ctrl);
+  background:var(--gold-soft);border:1px solid rgba(138, 106, 40, .30);}
+.dl-perk-ic{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:#FBF8F1;}
+.dl-perk-ic svg{width:16px;height:16px;}
+.dl-perk-tx{flex:1;min-width:0;font-size:12.5px;line-height:1.5;color:var(--ink);}
+.dl-perk-tx b{font-weight:700;}
+.dl-perk-go{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;
+  color:var(--gold-deep);text-decoration:none;white-space:nowrap;}
+html[data-theme="dark"] .dl-perk-go{color:var(--gold-hi);}
+.dl-perk-go svg{width:12px;height:12px;}
+.dl-perk-go:active{opacity:.7;}
+
+/* 总览：主指标行 + 三栏 mini 卡（紧凑工作台节奏） */
+.dl-overview{margin-top:14px;}
+.dl-ov-lead{display:flex;align-items:baseline;gap:9px;}
+.dl-ov-num{font-family:var(--num);font-weight:600;font-size:34px;line-height:1;
+  color:var(--gold-deep);letter-spacing:.01em;}
+html[data-theme="dark"] .dl-ov-num{color:var(--gold-hi);}
+.dl-ov-unit{font-size:13px;font-weight:600;color:var(--ink-2);letter-spacing:.04em;}
+/* 同步提示：置于"X条在架信息"主指标下方独立一行，避免与数字同行折行 */
+.dl-ov-note{display:block;margin-top:6px;font-size:10.5px;line-height:1.5;
+  color:var(--ink-3);}
+.dl-ov-grid{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+.dl-ov-cell{background:var(--panel-soft);border:1px solid var(--line);
+  border-radius:var(--r-ctrl);padding:9px 12px 10px;}
+.dl-ov-k{display:block;font-size:10px;letter-spacing:.14em;color:var(--ink-3);}
+.dl-ov-v{display:block;margin-top:4px;font-family:var(--num);font-weight:600;font-size:21px;
+  line-height:1;color:var(--ink);}
+.dl-ov-v.is-hot{color:var(--gold-deep);}
+html[data-theme="dark"] .dl-ov-v.is-hot{color:var(--gold-hi);}
+/* 数字排版：等宽数字（Barlow/Bahnschrift）+ 收紧字距，专业报表感 */
+.dl-ov-num,.dl-ov-v,.dl-tool-n,.dl-chip-n{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums;}
+.dl-ov-num{letter-spacing:-.015em;}
+.dl-ov-unit{letter-spacing:.06em;}
+
+/* ══ 章节 ══ */
+.dl-sec{position:relative;z-index:1;margin:30px 18px 0;}
+.dl-sec-hd{display:flex;align-items:center;gap:11px;margin-bottom:14px;}
+.dl-sec-hd h2{position:relative;font-family:var(--display);font-weight:700;font-size:20px;
+  letter-spacing:.01em;color:var(--ink);padding-left:13px;}
+.dl-sec-hd h2::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:17px;border-radius:2px;background:linear-gradient(180deg,var(--gold-hi),var(--gold-deep));}
+.dl-more{margin-left:auto;display:inline-flex;align-items:center;gap:4px;
+  font-size:12.5px;color:var(--ink-3);text-decoration:none;transition:color .15s;}
+.dl-more svg{width:13px;height:13px;}
+.dl-more:active{color:var(--gold-deep);}
+
+/* 筛选胶囊 */
+.dl-chips{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;position:relative;z-index:1;}
+.dl-chips::-webkit-scrollbar{display:none;}
+.dl-chip{flex:none;display:inline-flex;align-items:center;gap:7px;padding:9px 16px 9px 17px;
+  border-radius:var(--r-pill);background:var(--panel-soft);border:1px solid var(--line);
+  color:var(--ink-2);font-family:var(--sans);font-size:13px;font-weight:500;letter-spacing:.02em;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  transition:background .18s,color .18s,border-color .18s,box-shadow .18s,transform .12s;}
+.dl-chip-n{font-family:var(--num);font-size:13px;color:var(--ink-3);}
+.dl-chip.on{color:var(--gold-deep);border-color:rgba(138, 106, 40, .55);
+  background:linear-gradient(180deg,var(--gold-soft),rgba(138, 106, 40, .06));
+  box-shadow:var(--sh-gold);}
+html[data-theme="dark"] .dl-chip.on{color:var(--gold-hi);}
+.dl-chip.on .dl-chip-n{color:var(--gold-deep);}
+html[data-theme="dark"] .dl-chip.on .dl-chip-n{color:var(--gold-hi);}
+.dl-chip:active{transform:scale(.95);}
+
+/* 待办卡片：紧凑单列 */
+.dl-list{margin-top:13px;display:flex;flex-direction:column;gap:11px;position:relative;z-index:1;}
+.dl-item{position:relative;display:flex;align-items:flex-start;gap:13px;padding:15px 16px;
+  border-radius:var(--r-card);background:var(--panel);border:1px solid var(--line);
+  text-decoration:none;color:var(--ink);box-shadow:var(--sh-card);
+  transition:transform .17s ease,border-color .17s ease,box-shadow .17s ease;}
+.dl-item:active{transform:scale(.985);border-color:var(--line-strong);}
+.dl-item-bd{flex:1;min-width:0;}
+.dl-item-top{display:flex;align-items:center;gap:8px;}
+.dl-item-cat{flex:1;min-width:0;font-size:10.5px;letter-spacing:.14em;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dl-tag{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  padding:4px 11px;border-radius:var(--r-pill);white-space:nowrap;}
+.dl-tag.review{color:var(--ink-2);background:var(--world);border:1px solid var(--line);}
+.dl-tag.ask{color:#FBF8F1;font-weight:700;background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+  box-shadow:0 6px 14px -6px rgba(138, 106, 40, .7);}
+.dl-item-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  margin-top:7px;font-size:14.5px;font-weight:600;line-height:1.5;letter-spacing:.01em;color:var(--ink);}
+.dl-item-meta{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;
+  color:var(--ink-2);white-space:nowrap;overflow:hidden;}
+.dl-item-meta>svg{width:13px;height:13px;flex:none;color:var(--ink-3);}
+.dl-item-meta .loc{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.dl-item-meta .sep{opacity:.45;margin:0 1px;}
+.dl-item-go{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:4px;
+  color:var(--gold-deep);font-size:12px;font-weight:600;}
+html[data-theme="dark"] .dl-item-go{color:var(--gold-hi);}
+.dl-item-go svg{width:12px;height:12px;color:var(--gold);}
+
+/* 空态 */
+.dl-empty{margin-top:13px;border:1px dashed var(--line-strong);border-radius:var(--r-card);
+  background:var(--panel-soft);padding:40px 20px 38px;text-align:center;position:relative;z-index:1;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);}
+.dl-empty-ic{width:56px;height:56px;margin:0 auto 13px;border-radius:50%;display:grid;place-items:center;
+  background:var(--gold-soft);border:1px solid rgba(138, 106, 40, .42);box-shadow:var(--sh-gold);color:var(--gold-deep);}
+html[data-theme="dark"] .dl-empty-ic{color:var(--gold-hi);}
+.dl-empty-ic svg{width:26px;height:26px;}
+.dl-empty b{display:block;font-family:var(--display);font-weight:700;font-size:16px;color:var(--ink);letter-spacing:.02em;}
+.dl-empty i{display:block;margin-top:7px;font-style:normal;font-size:12px;color:var(--ink-3);letter-spacing:.04em;}
+
+/* ══ 工具索引：紧凑行 ══ */
+.dl-tools{margin-top:2px;display:flex;flex-direction:column;gap:10px;position:relative;z-index:1;}
+.dl-tool{position:relative;display:flex;align-items:center;gap:13px;padding:13px 15px;
+  border-radius:var(--r-card);background:var(--panel);border:1px solid var(--line);
+  text-decoration:none;color:var(--ink);box-shadow:var(--sh-card);
+  transition:transform .17s ease,border-color .17s ease;}
+.dl-tool:active{transform:scale(.985);border-color:rgba(138, 106, 40, .4);}
+.dl-tool-ic{width:40px;height:40px;flex:none;border-radius:11px;display:grid;place-items:center;padding:10px;
+  background:var(--world);border:1px solid var(--line);color:var(--ink-2);transition:.17s;}
+.dl-tool-ic svg{width:100%;height:100%;}
+.dl-tool:active .dl-tool-ic{color:var(--gold-deep);border-color:rgba(138, 106, 40, .42);background:var(--gold-soft);}
+.dl-tool-tx{flex:1;min-width:0;}
+.dl-tool-tx b{display:block;font-size:14px;font-weight:600;letter-spacing:.02em;}
+.dl-tool-tx i{display:block;margin-top:3px;font-style:normal;font-size:11px;color:var(--ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dl-tool-n{flex:none;min-width:24px;text-align:center;font-family:var(--num);font-weight:600;
+  font-size:17px;color:var(--ink-3);padding:0 4px;}
+.dl-tool-n.has{font-family:var(--sans);font-weight:700;font-size:11.5px;color:#FBF8F1;min-width:auto;
+  padding:4px 10px;border-radius:var(--r-pill);background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+  box-shadow:0 6px 14px -6px rgba(138, 106, 40, .7);}
+.dl-tool-arrow{flex:none;width:14px;height:14px;color:var(--ink-3);transition:transform .17s,color .17s;}
+.dl-tool:active .dl-tool-arrow{color:var(--gold-deep);transform:translateX(3px);}
+
+/* 结尾 */
+.dl-end{margin:38px 20px 6px;display:flex;align-items:center;gap:16px;justify-content:center;
+  font-size:10px;letter-spacing:.28em;color:var(--ink-3);}
+.dl-end::before,.dl-end::after{content:"";height:1px;width:56px;}
+.dl-end::before{background:linear-gradient(90deg,transparent,var(--line-strong));}
+.dl-end::after{background:linear-gradient(90deg,var(--line-strong),transparent);}
+
+/* ══ 底部固定悬浮发布栏：单个「发布供需信息」液态玻璃按钮，以按钮本身为玻璃主体
+    （data-lg-glass 挂载 LiquidGlass，与主 tabbar 同一引擎、同一 engchain-glass-cfg 参数源、
+     同一 data-theme 联动——明亮/暗色各自执行主 tabbar 玻璃效果，参数完全同源一致）。
+     尺寸按文字收缩、水平居中；容器仅承担定位，不渲染任何背景（单层，无双层叠加）。
+     置于 .phone 之外（body 直属），规避手机框 transform 对 fixed 定位的劫持。 ══ */
+.wb-dock{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom, 0px));z-index:40;width:min(390px,100vw);
+  display:flex;justify-content:center;align-items:center;pointer-events:none;
+  transform:translate(-50%,0);will-change:transform;}
+.wb-dock .wb-act{pointer-events:auto;flex:none;min-width:0;height:46px;border-radius:999px!important;
+  display:inline-flex!important;align-items:center;justify-content:center;gap:8px;padding:0 22px;
+  font-family:var(--sans);font-size:15px!important;font-weight:600;letter-spacing:.02em;white-space:nowrap;
+  border:0;transition:transform .16s ease,box-shadow .16s ease;
+  /* CSS 兜底（WebGL 不可用）：对齐主 tabbar 玻璃基线 */
+  background:linear-gradient(180deg,rgba(255,253,248,.88),rgba(247,242,233,.62));
+  -webkit-backdrop-filter:blur(32px) saturate(200%);backdrop-filter:blur(32px) saturate(200%);
+  box-shadow:0 10px 28px -10px rgba(60,45,20,.28),inset 0 1px 0 rgba(255,255,255,.55);}
+.wb-dock .wb-act svg{width:17px;height:17px;flex:none;}
+/* 主行动钮：纯玻璃 + 深色文字（亮）/ 浅金文字（暗）——无金色实底/透镜，单层液态玻璃 */
+.wb-dock .wb-act.btn-primary{color:#33260F!important;}
+html[data-theme="dark"] .wb-dock .wb-act.btn-primary{color:#FFF0CF!important;
+  background:linear-gradient(180deg,rgba(26,23,19,.86),rgba(26,23,19,.56));
+  box-shadow:0 10px 28px -10px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);}
+.wb-dock .wb-act:active{transform:scale(.96);}
+.wb-dock .wb-act:active{transform:scale(.97);}
+
+/* ══ 门控：未登录 / 未实名 ══ */
+.wb-dl #pub-gate-login,.wb-dl #pub-gate-realname{position:relative;z-index:2;min-height:78vh;
+  padding:92px 30px;text-align:center;
+  background:radial-gradient(120% 50% at 50% 0%,var(--gold-soft),transparent 58%),
+             linear-gradient(180deg,var(--world),var(--canvas));}
+.wb-dl .dl-gate-ic{width:76px;height:76px;margin:0 auto;border-radius:50%;display:grid;place-items:center;
+  background:var(--gold-soft);border:1px solid rgba(138, 106, 40, .42);box-shadow:var(--sh-gold);color:var(--gold-deep);}
+html[data-theme="dark"] .wb-dl .dl-gate-ic{color:var(--gold-hi);}
+.wb-dl .dl-gate-ic svg{width:34px;height:34px;}
+.wb-dl .dl-gate-t{margin-top:22px;font-family:var(--display);font-weight:700;font-size:22px;
+  color:var(--ink);letter-spacing:.02em;}
+.wb-dl .dl-gate-n{margin-top:11px;font-size:13px;line-height:1.75;color:var(--ink-2);}
+.wb-dl #pub-gate-login .btn,.wb-dl #pub-gate-realname .btn{margin-top:26px;height:52px;border-radius:var(--r-pill);
+  font-size:15px;font-weight:600;}
+.wb-dl #pub-gate-login .btn-primary,.wb-dl #pub-gate-realname .btn-primary{color:var(--on-action);
+  background:linear-gradient(180deg,var(--action),var(--action-deep));border:none;
+  box-shadow:var(--btn-ring),var(--btn-lift);}
+.wb-dl .dl-gate-alt{display:block;margin-top:16px;text-align:center;font-size:12.5px;
+  color:var(--ink-2);text-decoration:none;}
+.wb-dl .dl-gate-alt:active{color:var(--gold-deep);}
+/* 实名认证权益钩子：发布拦截点上的利益提示行，金色柔和底 + 深金文字 */
+.wb-dl .dl-gate-perk{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:16px;
+  padding:9px 12px;border-radius:11px;background:var(--gold-soft);
+  border:1px solid rgba(138, 106, 40, .26);font-size:12px;font-weight:600;color:var(--gold-deep);}
+.wb-dl .dl-gate-perk .gp-ic{font-size:15px;line-height:1;flex:none;}
+html[data-theme="dark"] .wb-dl .dl-gate-perk{color:var(--gold-hi);}
+</style>
+<link rel="stylesheet" href="../../css/liquid-dock.css">
+<link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928213953">
+</head>
+<body>
+<div class="phone wb-dl">
+  <!-- 身份门控：未登录 -->
+  <div id="pub-gate-login" style="display:none;">
+    <div class="dl-gate-ic">
+      <svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><circle cx="128" cy="86" r="38"/><path d="M52 214c8-40 40-58 76-58s68 18 76 58"/></svg>
+    </div>
+    <div class="dl-gate-t">登录后使用信息工作台</div>
+    <div class="dl-gate-n">登录后可发布供需信息、管理草稿与发布记录、查看对接进展。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg">立即登录</a>
+  </div>
+  <!-- 身份门控：未实名 -->
+  <div id="pub-gate-realname" style="display:none;">
+    <div class="dl-gate-ic">
+      <svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"><path d="M128 30l80 30v58c0 52-34 84-80 108-46-24-80-56-80-108V60z"/><path d="M92 128l24 24 48-52"/></svg>
+    </div>
+    <div class="dl-gate-t">实名认证后可发布信息</div>
+    <div class="dl-gate-n">完成实名认证后，即可发布供需信息并参与平台对接。</div>
+    <!-- 实名认证权益钩子（发布前置拦截点）：未实名用户在发布动作被拦截时看到解锁利益 -->
+    <div class="dl-gate-perk"><span class="gp-ic">🎁</span>完成实名认证 · 免费解锁 5 条供需</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg">前往实名认证</a>
+    <a href="../supply/list.html" class="dl-gate-alt">先看看平台发布示例 ›</a>
+  </div>
+
+  <div class="scroll no-pad" id="pub-content" style="padding-bottom:104px;position:relative;z-index:1;">
+    <!-- ══ 顶栏：返回 + 标识 + 明暗切换（44×44 圆形玻璃按钮，浮于 hero 之上） ══ -->
+    <div class="wb-top rv" style="animation-delay:.02s">
+      <button type="button" class="nav-back wb-back" onclick="window.UI&&UI.back&&UI.back()" aria-label="返回上一页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="nav-divider wb-divider" aria-hidden="true"></span>
+      <button type="button" class="nav-back nav-home wb-back" onclick="location.href='../../home.html'" aria-label="返回首页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      </button>
+      <span class="wb-brand">ENGCHAIN · 信息工作台</span>
+    </div>
+
+    <!-- ══ 满版工地大图 Hero + 标语 ══ -->
+    <header class="dl-hero rv" id="wb-hero" style="animation-delay:.06s" aria-labelledby="wb-title">
+      <div class="dl-hero-media">
+        <div class="dl-hero-bg"></div>
+        <div class="dl-hero-scrim"></div>
+        <div class="dl-hero-inner">
+          <div class="dl-eyebrow"><span>ENGCHAIN · PUBLISH</span><span class="live"><i></i>LIVE</span></div>
+          <h1 class="dl-hero-title" id="wb-title">信息工作台</h1>
+          <p class="dl-hero-sub">让每一条供需，都抵达对的人</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- ══ 上浮玻璃套件：营销引导 + 数据总览 ══ -->
+    <div class="dl-suite rv" style="animation-delay:.12s">
+      <div class="dl-perk">
+        <span class="dl-perk-ic">
+          <svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"><path d="M208 88h-56V32l-104 136h56v56z"/></svg>
+        </span>
+        <span class="dl-perk-tx"><b>发布供需</b>，平台智能匹配采购与供应资源</span>
+        <a class="dl-perk-go" href="../profile/auth-payment.html">查看权益<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
+      </div>
+      <div class="dl-overview" id="wb-advance"></div>
+    </div>
+
+    <!-- ══ 待处理 ══ -->
+    <section class="dl-sec rv" style="animation-delay:.10s" aria-labelledby="wb-pending-title">
+      <div class="dl-sec-hd">
+        <h2 id="wb-pending-title">待处理</h2>
+        <a class="dl-more" href="records.html">查看全部
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+      </div>
+      <div class="dl-chips" id="wb-chips" role="tablist" aria-label="待处理筛选"></div>
+      <div id="wb-pending"></div>
+    </section>
+
+    <!-- ══ 工具索引 ══ -->
+    <section class="dl-sec rv" style="animation-delay:.16s" aria-labelledby="wb-tools-title">
+      <div class="dl-sec-hd"><h2 id="wb-tools-title">工具索引</h2></div>
+      <nav class="dl-tools">
+        <a class="dl-tool" id="my-jobs-task" href="../profile/my-jobs.html" style="display:none;">
+          <span class="dl-tool-ic"><svg class="ic"><use href="#i-company"/></svg></span>
+          <span class="dl-tool-tx"><b>我的招聘</b><i>收简历、处理投递与岗位管理</i></span>
+          <span class="dl-tool-n" id="my-jobs-count">0</span>
+          <svg class="dl-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        <a class="dl-tool" href="records.html">
+          <span class="dl-tool-ic"><svg class="ic"><use href="#i-doc"/></svg></span>
+          <span class="dl-tool-tx"><b>我的发布</b><i>查看状态、匹配进展和咨询反馈</i></span>
+          <span class="dl-tool-n" id="record-count">0</span>
+          <svg class="dl-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        <a class="dl-tool" href="drafts.html">
+          <span class="dl-tool-ic"><svg class="ic"><use href="#i-edit"/></svg></span>
+          <span class="dl-tool-tx"><b>草稿箱</b><i>继续完成尚未发布的信息</i></span>
+          <span class="dl-tool-n" id="draft-count">0</span>
+          <svg class="dl-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        <a class="dl-tool" href="unlocked.html">
+          <span class="dl-tool-ic"><svg class="ic"><use href="#i-lock"/></svg></span>
+          <span class="dl-tool-tx"><b>已解锁线索</b><i>查看有效期、详情与关联订单</i></span>
+          <span class="dl-tool-n" id="unlock-count">0</span>
+          <svg class="dl-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+        <a class="dl-tool" href="../favorite/index.html">
+          <span class="dl-tool-ic"><svg class="ic"><use href="#i-star"/></svg></span>
+          <span class="dl-tool-tx"><b>我的收藏</b><i>收藏的职位 / 项目 / 供应</i></span>
+          <span class="dl-tool-n" id="favorite-count">0</span>
+          <svg class="dl-tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+      </nav>
+    </section>
+
+    <p class="dl-end">ENGCHAIN · 信息工作台</p>
+  </div>
+</div>
+
+<!-- ══ 底部固定悬浮发布栏：液态玻璃（LGCTA 接管；触发区 #wb-hero 滚出后浮现）。
+     置于 .phone 之外（body 直属），fixed 始终贴视口底部，不被手机框 transform 劫持。 ══ -->
+<div class="wb-actions wb-dock" id="wb-actions" role="group" aria-label="发布操作"></div>
+
+<script src="../../js/data.js"></script>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/liquid-cta.js?v=20260928213953"></script>
+<script src="../../js/publish-workbench.js"></script>
+<script src="../../js/guest-gate.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  /* ---- 身份门控（逻辑不变） ---- */
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateLogin = document.getElementById('pub-gate-login');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (!st.loggedIn) {
+      if (window.GuestGate) { GuestGate.open({ mode:'replace', icon:'key', badge:'游客模式', title:'登录后使用信息工作台', note:'登录后可发布供需信息、管理草稿与发布记录、查看对接进展。', perk:'注册即送 50 积分 · 实名认证免费解锁 5 条供需', btnText:'立即登录', btnHref:'../auth/login.html' }); }
+      return false;
+    }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) {
+      if (content) content.style.display = 'none';
+      if (gateReal) gateReal.style.display = '';
+      return false;
+    }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+
+  function esc(value) { return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function unlockCount() { try { return Object.keys(JSON.parse(localStorage.getItem('engchain-unlocked') || '{}')).length; } catch (e) { return 0; } }
+  function favoriteCount() { try { return (window.FavoriteStore && FavoriteStore.list) ? FavoriteStore.list().length : 0; } catch (e) { return 0; } }
+
+  /* 数字滚动动效 */
+  function countUp(el, target) {
+    if (!el) return;
+    target = Number(target) || 0;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = target; return; }
+    var dur = 600, t0 = null;
+    function frame(ts) {
+      if (!t0) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * e);
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* 发布入口身份化按钮组（逻辑不变；.btn 类保留以便 liquid-cta 接管，渲染进底部悬浮栏） */
+  (function renderActions() {
+    var box = document.getElementById('wb-actions');
+    if (!box) return;
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    var per = acc && acc.identity ? acc.identity.personal : 'none';
+    var ent = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var isEnt = ent === 'verified' || ent === 'resident';
+    var isPro = per === 'professional';
+    var isAgency = !!(acc && acc.agency);
+    var acts = [];
+    function push(a) { acts.push(a); }
+    /* N1：所有发布按钮统一进入对话式发布引导（guide.html），由引导按语义直达类型表单（choose.html 保留为引导内兜底） */
+    push({ href: 'guide.html', ic: 'i-doc', t: '发布供需信息', kind: 'primary' });
+    box.innerHTML = acts.map(function (a) {
+      return '<a class="wb-act btn btn-primary" data-lg-glass href="' + a.href + '">'
+        + '<svg class="ic"><use href="#' + a.ic + '"/></svg>' + a.t + '</a>';
+    }).join('');
+  })();
+
+  /* 我的招聘任务卡（身份门控不变） */
+  (function () {
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    var ent = acc && acc.identity ? acc.identity.enterprise : 'none';
+    var isAgency = !!(acc && acc.agency);
+    var t = document.getElementById('my-jobs-task');
+    if (!t) return;
+    if ((ent !== 'verified' && ent !== 'resident') || isAgency) { t.style.display = 'none'; return; }
+    t.style.display = '';
+    try {
+      var m = window.DataBus && DataBus.current();
+      var apps = (window.ApplyStore && m) ? ApplyStore.byPublisher(m.id) : [];
+      var n = 0;
+      apps.forEach(function (a) { if (a.status === 'pending') n++; });
+      var c = document.getElementById('my-jobs-count');
+      if (c) { c.textContent = n || '0'; if (n > 0) c.classList.add('has'); }
+    } catch (e) {}
+  })();
+  window.addEventListener('engchain:apply', function () {
+    var t = document.getElementById('my-jobs-task');
+    if (t && t.style.display !== 'none') {
+      try {
+        var m = window.DataBus && DataBus.current();
+        var apps = (window.ApplyStore && m) ? ApplyStore.byPublisher(m.id) : [];
+        var n = 0;
+        apps.forEach(function (a) { if (a.status === 'pending') n++; });
+        var c = document.getElementById('my-jobs-count');
+        if (c) { c.textContent = n || '0'; c.classList.toggle('has', n > 0); }
+      } catch (e) {}
+    }
+  });
+
+  var s = PublishStore.stats();
+  function setCount(id, n, has) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n;
+    if (has) el.classList.add('has');
+  }
+  setCount('record-count', s.records.length, s.records.length > 0);
+  setCount('draft-count', s.drafts.length, s.drafts.length > 0);
+  setCount('unlock-count', unlockCount(), unlockCount() > 0);
+  setCount('favorite-count', favoriteCount(), favoriteCount() > 0);
+
+  /* 数据总览：细体大数字 + 三栏（ids 全部保留） */
+  document.getElementById('wb-advance').innerHTML =
+    '<div class="dl-ov-lead">' +
+      '<span class="dl-ov-num" id="adv-num">0</span><span class="dl-ov-unit">条在架信息</span>' +
+    '</div>' +
+    '<div class="dl-ov-note">实时同步发布与对接状态</div>' +
+    '<div class="dl-ov-grid">' +
+      '<div class="dl-ov-cell"><span class="dl-ov-k">草稿</span><span class="dl-ov-v" id="mini-draft">0</span></div>' +
+      '<div class="dl-ov-cell"><span class="dl-ov-k">新匹配</span><span class="dl-ov-v" id="mini-match">0</span></div>' +
+      '<div class="dl-ov-cell"><span class="dl-ov-k">待咨询</span><span class="dl-ov-v is-hot" id="mini-ask">0</span></div>' +
+    '</div>';
+  countUp(document.getElementById('adv-num'), s.active);
+  countUp(document.getElementById('mini-draft'), s.drafts.length);
+  countUp(document.getElementById('mini-match'), s.matches);
+  countUp(document.getElementById('mini-ask'), s.inquiries);
+
+  /* 待处理：筛选胶囊（纯前端显示切换，数据仍取 s.pending） */
+  var box = document.getElementById('wb-pending');
+  var chipsBox = document.getElementById('wb-chips');
+  var nAsk = 0, nReview = 0;
+  s.pending.forEach(function (r) { if ((r.inquiries || 0) > 0) nAsk++; else nReview++; });
+
+  function chipsHTML() {
+    var F = [['all', '全部', s.pending.length], ['review', '审核中', nReview], ['ask', '待咨询', nAsk]];
+    return F.map(function (f, i) {
+      return '<button class="dl-chip' + (i === 0 ? ' on' : '') + '" data-f="' + f[0] + '" role="tab" aria-selected="' + (i === 0) + '">'
+        + '<span>' + f[1] + '</span><span class="dl-chip-n">' + f[2] + '</span></button>';
+    }).join('');
+  }
+  function listHTML() {
+    if (!s.pending.length) return '';
+    return '<div class="dl-list">' + s.pending.slice(0, 4).map(function (r) {
+      var ask = (r.inquiries || 0) > 0;
+      var badge = ask
+        ? '<span class="dl-tag ask">' + r.inquiries + ' 条咨询</span>'
+        : '<span class="dl-tag review">审核中</span>';
+      var cat = (r.category || r.cat || ((r.role === 'supply' || r.dir === 'supply') ? '供应' : '需求'));
+      return '<a class="dl-item" data-f="' + (ask ? 'ask' : 'review') + '" href="../supply/detail.html?id=' + encodeURIComponent(r.id || '') + '">' +
+        '<span class="dl-item-bd">' +
+        '<span class="dl-item-top"><span class="dl-item-cat">' + esc(cat) + '</span>' + badge + '</span>' +
+        '<b class="dl-item-title">' + esc(r.title) + '</b>' +
+        '<span class="dl-item-meta">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' +
+          '<span class="loc">' + esc(r.location || '') + '</span><span class="sep">·</span>' + esc(r.updatedAt || '') +
+          '<span class="go dl-item-go">处理<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>' +
+        '</span></span></a>';
+    }).join('') + '</div>';
+  }
+  function emptyHTML() {
+    return '<div class="dl-empty" id="wb-empty">' +
+      '<div class="dl-empty-ic"><svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><circle cx="128" cy="128" r="104"/><path d="M82 132l30 30 62-68"/></svg></div>' +
+      '<b>本类事项已全部处理完毕</b><i>暂无待办，保持当前节奏</i></div>';
+  }
+  chipsBox.innerHTML = chipsHTML();
+  box.innerHTML = listHTML() || emptyHTML();
+
+  function applyFilter(f) {
+    var items = box.querySelectorAll('.dl-item');
+    var vis = 0;
+    Array.prototype.forEach.call(items, function (it) {
+      var show = f === 'all' ? true : it.getAttribute('data-f') === f;
+      it.style.display = show ? '' : 'none';
+      if (show) vis++;
+    });
+    var oldEmpty = document.getElementById('wb-empty');
+    if (oldEmpty) oldEmpty.remove();
+    if (vis === 0) box.insertAdjacentHTML('beforeend', emptyHTML());
+  }
+  chipsBox.addEventListener('click', function (e) {
+    var chip = e.target.closest('.dl-chip');
+    if (!chip) return;
+    Array.prototype.forEach.call(chipsBox.querySelectorAll('.dl-chip'), function (c) {
+      var on = c === chip; c.classList.toggle('on', on); c.setAttribute('aria-selected', String(on));
+    });
+    applyFilter(chip.getAttribute('data-f'));
+  });
+})();
+</script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
+</body>
+</html>

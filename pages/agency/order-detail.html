@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/agency/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>中介服务 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/iphone-frame.css">
+<style>
+  .ph-hero{position:relative;overflow:hidden;border-radius:16px;padding:20px 18px;color:#fff;background:radial-gradient(130% 120% at 86% -12%, rgba(238,214,151,.2) 0%, transparent 55%),linear-gradient(150deg,#252C35 0%,#151A22 46%,#0B0E13 100%);}
+  .ph-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.5px;background:rgba(238,214,151,.14);border:1px solid rgba(238,214,151,.35);color:#F0E2BE;border-radius:99px;padding:3px 10px;}
+  .ph-name{font-size:17px;font-weight:800;margin-top:10px;line-height:1.4;}
+  .ph-meta{font-size:11.5px;color:rgba(244,242,238,.66);margin-top:6px;line-height:1.7;}
+  .ph-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:14px 15px;margin-top:12px;}
+  .ph-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:12px;}
+  .ph-row .k{color:var(--text-3);}
+  .ph-row .v{font-weight:600;color:var(--text-1);font-family:var(--font-num);}
+  .ph-note{margin-top:14px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:11.5px;color:var(--text-2);line-height:1.8;}
+  .ph-note b{color:var(--primary-dim);}
+  .ph-empty{text-align:center;padding:40px 20px;}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">中介服务</div>
+    <div class="nav-right"><button type="button" class="nav-text-btn" onclick="location.href='index.html'">服务广场</button></div>
+  </div>
+  <div class="scroll" style="padding-top:8px;padding-bottom:calc(70px + env(safe-area-inset-bottom));" id="root"><div class="card">加载中…</div></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script>
+(function(){
+  var id=new URLSearchParams(location.search).get('id');
+  var root=document.getElementById('root');
+  if(!root)return;
+  function fmt(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function ftime(ts){if(!ts)return '—';var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return (d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+  /* [PHASE 0] 历史托管单兼容页：中介服务已升级为信息撮合模式，旧托管单仅存档展示 */
+  var o=null;
+  try{ if(window.Mediation&&id)o=Mediation.byId(id); }catch(e){}
+  if(!o){
+    root.innerHTML='<div class="card ph-empty">'+
+      '<div class="fw-700 fs-14" style="color:var(--text-1);">该记录已随服务升级下线</div>'+
+      '<div class="text-3 fs-12" style="margin-top:6px;line-height:1.7;">中介服务已改为信息撮合模式，不再产生托管订单；历史订单记录仅供存档查看。</div>'+
+      '<a class="mo-cta" href="index.html">去服务广场逛逛 ›</a>'+
+      '</div>';
+    return;
+  }
+  var seller='';
+  try{var u=DataBus.byId(o.sellerId);if(u)seller=u.name||o.sellerId;}catch(e){}
+  var stMap={draft:'草稿',intent:'待启动（意向金）',escrowed:'服务启动 · 资金托管',serving:'履约中',await_confirm:'待买方确认',settled:'已结算',partial_refund:'部分退款',refunded:'已退款',disputed:'纠纷处理中',cancelled:'已取消'};
+  var stText=stMap[o.state]||o.state;
+  root.innerHTML=
+    '<div class="ph-hero">'+
+      '<span class="ph-badge">历史托管单 · 仅存档</span>'+
+      '<div class="ph-name">'+ (o.svcName||'中介服务') +'</div>'+
+      '<div class="ph-meta">服务商：'+(seller||'—')+' · 状态：'+stText+'<br>创建于 '+ftime(o.createdAt)+'</div>'+
+    '</div>'+
+    '<div class="ph-card">'+
+      '<div class="ph-row"><span class="k">历史合同额</span><span class="v">'+fmt(o.amount)+'</span></div>'+
+      '<div class="ph-row"><span class="k">意向金</span><span class="v">'+fmt(o.intentAmount)+'</span></div>'+
+      '<div class="ph-row"><span class="k">托管金额</span><span class="v">'+fmt((o.escrow&&o.escrow.amount)||o.amount)+'</span></div>'+
+    '</div>'+
+    '<div class="ph-note"><b>服务已升级为「信息撮合模式」：</b>平台不再承接资金托管与在线交易，只做认证核验、信息发布与联系方式解锁。沟通、成交与结算由你和服务商自行完成。上方为历史托管单的存档信息，不再提供支付与履约操作。</div>'+
+    '<div style="margin-top:16px;"><button class="btn btn-primary btn-block" onclick="location.href=\'../supply/detail.html?id='+ (o.svcId||'') +'\'">去详情页解锁联系方式 ›</button></div>';
+})();
+</script>
+</body>
+</html>

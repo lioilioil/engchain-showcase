@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>委托详情 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/delegates.css">
+<link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928183624">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" id="navBack" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">委托详情</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll no-pad">
+    <div id="detailRoot"></div>
+  </div>
+
+  <!-- 底部固定悬浮操作栏：液态玻璃（LGCTA 自动挂载按钮玻璃，见 liquid-cta.css）
+       .lg-cta 绝对定位悬浮于 .phone 底部，不随 .scroll 滚动；.show 常驻可见 -->
+  <div class="lg-cta show" id="dgBar" data-lg-cta="bar" aria-label="操作区"></div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/delegates.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
+<script src="../../js/liquid-cta.js?v=20260928184535"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var root = document.getElementById('detailRoot');
+
+  function back() {
+    if (history.length > 1) history.back();
+    else location.href = 'delegates.html';
+  }
+  document.getElementById('navBack').addEventListener('click', back);
+
+  var q = {};
+  try { (location.search.slice(1).split('&') || []).forEach(function (s) { var kv = s.split('='); q[kv[0]] = decodeURIComponent(kv[1] || ''); }); } catch (e) {}
+  var d = q.id ? Delegates.get(q.id) : null;
+
+  if (!d) {
+    root.innerHTML =
+      '<div class="de-empty">' +
+        '<div class="de-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>' +
+        '<div class="de-et">未找到委托信息</div>' +
+        '<div class="de-ed">该委托不存在或数据已被清除，可返回委托列表查看。</div>' +
+        '<button type="button" id="deBack">返回委托列表</button>' +
+      '</div>';
+    document.getElementById('deBack').addEventListener('click', back);
+    var emptyBar = document.getElementById('dgBar');
+    if (emptyBar) emptyBar.style.display = 'none';
+    return;
+  }
+
+  var st = Delegates.statusMeta(d.status);
+  var rows = [
+    ['委托编号', d.id || '—'],
+    ['委托方向', (d.bizLabel || (d.biz === 'franchise' ? '资质招商' : '—'))],
+    ['需求类型', d.type || '—'],
+    ['期望资质等级', d.qualLevel || '—'],
+    ['合作模式', d.mode || '—'],
+    ['预算区间', d.budget || '—'],
+    ['期望合作地区', Delegates.regionText(d.region)],
+    ['联系人', d.contact || '—'],
+    ['联系电话', d.phone || '—'],
+    ['备用联系人', d.backup ? ((d.backup.name || '—') + (d.backup.phone ? ' / ' + d.backup.phone : '')) : '—'],
+    ['需求说明', d.note || '—'],
+    ['提交时间', d.submitTime || '—'],
+    ['更新时间', d.updateTime || '—']
+  ];
+
+  var html =
+    '<div class="dg-head">' +
+      '<div class="dg-status-row">' +
+        '<span class="dd-status ' + st.cls + '"><span class="dot"></span>' + st.label + '</span>' +
+        '<span class="dg-id">' + UI.esc(d.id || '') + '</span>' +
+      '</div>' +
+      '<div class="dg-tip">' + st.tip + '</div>' +
+    '</div>' +
+    '<div class="dg-card">' + rows.map(function (r) {
+      return '<div class="dg-row"><span class="k">' + r[0] + '</span><span class="v">' + UI.esc(r[1]) + '</span></div>';
+    }).join('') + '</div>';
+
+  var actions = '';
+  if (st.label === '已承接') {
+    actions =
+      '<button type="button" class="lg-btn lg-btn-primary" id="dgOnline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><use href="#i-chat"/></svg>在线客服</button>' +
+      '<button type="button" class="lg-btn lg-btn-secondary" id="dgCall"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><use href="#i-headset"/></svg>电话客服</button>';
+  } else {
+    actions =
+      '<button type="button" class="lg-btn lg-btn-primary" id="dgEdit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><use href="#i-edit"/></svg>修改委托</button>' +
+      '<button type="button" class="lg-btn lg-btn-secondary" id="dgClose">返回列表</button>';
+  }
+  /* 底部固定悬浮操作栏（液态玻璃由 LGCTA 自动挂载） */
+  var dgBar = document.getElementById('dgBar');
+  if (dgBar) dgBar.innerHTML = actions;
+
+  /* 已支付订单 → 追加「已解锁 · 顾问匹配信息」卡片（收银台支付成功后进入本页展示） */
+  var paidOrder = window.Delegates ? Delegates.orderByDelegate(d.id) : null;
+  if (paidOrder && paidOrder.status === 'paid') {
+    html +=
+      '<div class="dg-unlock dg-unlock-page">' +
+        '<div class="dg-unlock-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>已解锁</div>' +
+        '<div class="dg-unlock-title">' + UI.esc(paidOrder.bizLabel || '委托服务') + ' · 顾问匹配信息</div>' +
+        '<div class="dg-unlock-desc">以下为顾问为您匹配的信息详情，可点击电话直接对接。</div>' +
+        '<div class="dg-unlock-list">' + Delegates.unlockItemsHTML(paidOrder) + '</div>' +
+        '<div class="dg-unlock-note">信息已解锁，可通过上方联系方式对接；如需更多信息，请在企业微信中联系顾问。</div>' +
+      '</div>';
+  }
+
+  /* 内容底部预留固定栏高度，避免末行被遮挡 */
+  html += '<div style="height:calc(96px + env(safe-area-inset-bottom, 0px));flex:none;"></div>';
+  root.innerHTML = html;
+
+  var onlineBtn = document.getElementById('dgOnline');
+  if (onlineBtn) onlineBtn.addEventListener('click', function () { Delegates.openServiceSheet(); });
+  var callBtn = document.getElementById('dgCall');
+  if (callBtn) callBtn.addEventListener('click', function () { Delegates.openCallDialog(); });
+  var editBtn = document.getElementById('dgEdit');
+  if (editBtn) editBtn.addEventListener('click', function () {
+    location.href = 'delegate-edit.html?id=' + encodeURIComponent(d.id);
+  });
+  var closeBtn = document.getElementById('dgClose');
+  if (closeBtn) closeBtn.addEventListener('click', back);
+})();
+</script>
+</body>
+</html>

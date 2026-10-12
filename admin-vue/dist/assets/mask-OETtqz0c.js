@@ -1,0 +1,1 @@
+function r(t){if(!t)return"";const n=String(t);return n.length<7?n:n.slice(0,3)+"****"+n.slice(-4)}function e(t){if(!t)return"";const n=String(t);return n.length<8?n:"*".repeat(n.length-4)+n.slice(-4)}export{e as a,r as m};

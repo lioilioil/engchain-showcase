@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/geo/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>品牌管理 · GEO 品牌雷达</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+body { background: var(--bg); }
+.navbar > *:not(.nav-back):not(.nav-title):not(.nav-right) { display: none !important; }
+.navbar .nav-back ~ *:not(.nav-title):not(.nav-right) { display: none !important; }
+.gv2-wrap { padding: 0 0 24px; }
+
+.gv2-brand-card { display: flex; align-items: center; gap: 12px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow-xs); cursor: pointer; transition: transform .15s ease, border-color .2s ease; }
+.gv2-brand-card:active { transform: scale(.985); }
+.gv2-brand-card.active { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line) inset; }
+.gv2-brand-ico { flex: none; width: 42px; height: 42px; border-radius: var(--r-m); background: var(--primary-soft); color: var(--primary-dim); font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.gv2-brand-info { flex: 1; min-width: 0; }
+.gv2-brand-name { font-size: 14px; font-weight: 700; color: var(--text-1); }
+.gv2-brand-meta { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.gv2-brand-status { flex: none; text-align: right; }
+.gv2-brand-score { font-family: var(--font-num); font-size: 16px; font-weight: 800; color: var(--primary-dim); }
+.gv2-brand-report { font-size: 9.5px; color: var(--text-3); margin-top: 2px; }
+
+.gv2-add-btn { width: 100%; height: 46px; margin-top: 6px; border: 1.5px dashed var(--line-strong); border-radius: var(--r-m); background: transparent; color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s; }
+.gv2-add-btn:active { border-color: var(--accent-line); color: var(--primary-dim); }
+
+.gv2-reports { margin-top: 20px; }
+.gv2-reports-title { font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 10px; }
+.gv2-report-row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-m); margin-bottom: 8px; cursor: pointer; box-shadow: var(--shadow-xs); }
+.gv2-report-row-ico { flex: none; width: 32px; height: 32px; border-radius: var(--r-s); background: var(--primary-soft); color: var(--primary-dim); display: flex; align-items: center; justify-content: center; }
+.gv2-report-row-ico svg { width: 15px; height: 15px; }
+.gv2-report-row-body { flex: 1; min-width: 0; }
+.gv2-report-row-name { font-size: 12.5px; font-weight: 700; color: var(--text-1); }
+.gv2-report-row-meta { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+.gv2-report-row-status { flex: none; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: var(--r-full); }
+.gv2-report-row-status.doing { background: var(--primary-soft); color: var(--primary-dim); }
+
+.gv2-anim { animation: gv2Rise .35s var(--e-emph) both; }
+@keyframes gv2Rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">品牌管理</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="scroll">
+    <div class="gv2-wrap">
+      <div id="brand-list"></div>
+      <button class="gv2-add-btn" onclick="alert('演示环境')">+ 添加新品牌</button>
+      <div class="gv2-reports">
+        <div class="gv2-reports-title">生成式报告跟踪</div>
+        <div id="report-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="geo-data.js"></script>
+<script src="geo-v2-nav.js"></script>
+<script>
+(function(){
+  var D = window.GEO_DATA;
+  var brands = D.getBrands();
+  var cur = D.currentBrand();
+
+  document.getElementById('brand-list').innerHTML = brands.map(function(b,i){
+    return '<div class="gv2-brand-card gv2-anim'+(cur&&cur.id===b.id?' active':'')+'" style="animation-delay:'+(i*0.05)+'s" onclick="window.GEOV2.pick(\''+b.id+'\')">' +
+      '<div class="gv2-brand-ico">'+b.short.charAt(0)+'</div>' +
+      '<div class="gv2-brand-info"><div class="gv2-brand-name">'+b.name+'</div><div class="gv2-brand-meta">'+b.industry+' · '+b.website+'</div></div>' +
+      '<div class="gv2-brand-status"><div class="gv2-brand-score">'+b.geoScore+'</div><div class="gv2-brand-report">GEO 分</div></div>' +
+    '</div>';
+  }).join('');
+
+  var reports = brands.map(function(b){
+    return { name: b.name, meta: '阶段 3/4 · 优化方案生成中', status: 'doing' };
+  });
+  document.getElementById('report-list').innerHTML = reports.map(function(r,i){
+    return '<div class="gv2-report-row gv2-anim" style="animation-delay:'+(0.1+i*0.06)+'s" onclick="location.href=\'report.html?brand='+encodeURIComponent(r.name)+'\'">' +
+      '<div class="gv2-report-row-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>' +
+      '<div class="gv2-report-row-body"><div class="gv2-report-row-name">'+r.name+'</div><div class="gv2-report-row-meta">'+r.meta+'</div></div>' +
+      '<span class="gv2-report-row-status '+r.status+'">生成中</span>' +
+    '</div>';
+  }).join('');
+})();
+</script>
+<script>GEOV2.mount(null, {brandBar:false});</script>
+</body>
+</html>

@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/message/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>聊天 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+  /* —— 聊天页专用样式（不影响 app.css 全局） —— */
+  /* 头部触达 */
+  .nav-back{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;padding:10px;margin:-10px 0;font-size:22px;line-height:1;}
+  /* 标题行：单行「用户名称 + 企业简称」，禁止换行/多行。
+     右簇仅一个「更多」44 图标钮，左簇为 返回|竖线|首页(约106px)，标题盒收窄到两侧簇之间，
+     避免长名称视觉压到/拦截右簇点击；标题仅展示，不参与命中。 */
+  .navbar .nav-title{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;line-height:1.2;
+    max-width:min(68%,calc(100% - 168px));pointer-events:none;}
+  .navbar .nav-right{margin-left:auto;}
+  .ct-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ct-co{flex:none;max-width:44%;display:none;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ct-co.on{display:inline-flex;}
+  .ct-co::before{content:"";flex:none;width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.65;}
+
+  /* 设置备注弹层（沿用 app demo bottom-sheet：标签 + 输入框 + 主次按钮） */
+  .rm-box{padding:2px 2px 4px;}
+  .rm-lab{display:block;font-size:12px;color:var(--text-2);margin-bottom:8px;}
+  .rm-input{width:100%;height:46px;padding:0 14px;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg-card);font-size:15px;color:var(--text-1);box-shadow:var(--shadow-xs);}
+  .rm-input:focus{outline:none;border-color:var(--primary-dim);}
+  .rm-hint{margin-top:9px;font-size:11px;color:var(--text-3);line-height:1.6;}
+  .rm-actions{display:flex;gap:10px;margin-top:18px;}
+  .rm-actions .btn{flex:1;}
+
+  /* 会话上下文条：当前对接业务（顶部金色状态细线，对齐「我的发布」卡片语言） */
+  .ctx-bar{position:relative;margin:0 16px 10px;padding:10px 12px;border-radius:14px;background:var(--bg-card);border:1px solid var(--line);display:flex;align-items:center;gap:10px;cursor:pointer;box-shadow:var(--shadow-xs);}
+  .ctx-bar::before{content:"";position:absolute;top:0;left:14px;right:14px;height:2.5px;border-radius:0 0 3px 3px;background:linear-gradient(90deg,var(--primary),var(--primary-dim));opacity:.9;}
+  .ctx-bar:active{background:var(--bg-card-2);}
+  .ctx-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .ctx-ic svg{width:17px;height:17px;}
+  .ctx-body{flex:1;min-width:0;}
+  .ctx-title{font-size:12px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:6px;}
+  .ctx-sub{font-size:10.5px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ctx-go{flex:none;color:var(--text-3);display:flex;align-items:center;}
+  .ctx-go svg{width:14px;height:14px;}
+
+  /* 消息时间线 */
+  .mc-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #timeline{display:flex;flex-direction:column;gap:14px;padding:12px 16px 18px;min-height:100%;}
+  /* 日分隔条：双侧细线 + 文字居中 */
+  .mc-day{display:flex;align-items:center;gap:12px;}
+  .mc-day::before,.mc-day::after{content:"";flex:1;height:1px;background:var(--line);}
+  .mc-day span{padding:3px 0;background:transparent;color:var(--text-3);font-size:10px;letter-spacing:.08em;font-weight:600;}
+
+  /* 气泡行：头像 + 内容 */
+  .mc-row{display:flex;gap:8px;align-items:flex-start;max-width:100%;}
+  .mc-row.mine{flex-direction:row-reverse;}
+  .mc-avatar{flex:none;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8a7a5c,#6b5d44);}
+  .mc-row.mine .mc-avatar{background:linear-gradient(135deg,var(--primary),var(--accent-pressed));color:var(--text-inv);}
+  .mc-body{max-width:76%;display:flex;flex-direction:column;}
+  .mc-row.mine .mc-body{align-items:flex-end;}
+  .mc-bubble{padding:10px 14px;border-radius:16px;font-size:var(--fs-md);line-height:1.55;word-break:break-word;}
+  /* 气泡质感：发丝边 + 分层阴影；我方金色渐变带轻投影 */
+  .mc-bubble.text{background:linear-gradient(180deg,color-mix(in srgb,var(--bg-card-2) 96%,var(--bg-card)),var(--bg-card-2));color:var(--text-1);border:1px solid color-mix(in srgb,var(--line) 62%,transparent);border-bottom-left-radius:4px;box-shadow:0 1px 1px rgba(22,22,22,.03),0 4px 12px -8px rgba(22,22,22,.14);}
+  .mc-row.mine .mc-bubble.text{background:linear-gradient(180deg,var(--primary),color-mix(in srgb,var(--primary) 84%,var(--accent-pressed)));color:var(--text-inv);border-color:transparent;border-bottom-right-radius:4px;box-shadow:0 2px 6px color-mix(in srgb,var(--primary-dim) 26%,transparent),0 10px 22px -12px color-mix(in srgb,var(--primary-dim) 45%,transparent);}
+  .mc-meta{font-size:10px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:4px;opacity:.92;}
+  .mc-meta .mc-tick{color:var(--accent-pressed);}
+  .mc-meta .mc-sending{color:var(--text-3);}
+
+  /* 系统提示条（居中） */
+  .mc-sys{display:flex;justify-content:center;}
+  .mc-sys span{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:999px;background:var(--primary-soft);color:var(--primary-dim);font-size:10px;line-height:1.5;text-align:center;}
+  .mc-sys.warn span{background:rgba(217,119,6,.1);color:#b45309;}
+  .mc-sys.ok span{background:rgba(22,163,74,.1);color:#15803d;}
+
+  /* —— 富交互卡片 —— */
+  .mc-card{width:min(272px,78vw);background:var(--bg-card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-sm);}
+  .mc-row.mine .mc-card{border-color:rgba(176, 138, 60, .28);}
+  .mc-card-head{display:flex;align-items:center;gap:8px;padding:11px 12px 0;}
+  .mc-card-ic{flex:none;width:30px;height:30px;border-radius:9px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .mc-card-ic svg{width:15px;height:15px;}
+  .mc-card-title{font-size:12.5px;font-weight:700;color:var(--text-1);line-height:1.3;}
+  .mc-card-sub{font-size:9.5px;color:var(--text-3);margin-top:1px;}
+  .mc-card-desc{padding:8px 12px 0;font-size:11px;color:var(--text-2);line-height:1.55;}
+  .mc-card-fields{margin:8px 12px 0;border-top:1px dashed var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px;}
+  .mc-field{display:flex;align-items:baseline;gap:8px;font-size:10.5px;}
+  .mc-field b{flex:none;width:52px;color:var(--text-3);font-weight:500;font-size:10px;}
+  .mc-field span{flex:1;color:var(--text-1);font-weight:600;}
+  .mc-field span.green{color:var(--primary-dim);}
+  .mc-card-actions{display:flex;gap:8px;padding:11px 12px 12px;}
+  .mc-btn{flex:1;height:32px;border-radius:11px;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;transition:all var(--d-fast) var(--e-standard);}
+  .mc-btn.primary{background:linear-gradient(180deg,var(--primary),var(--accent-pressed));color:var(--text-inv);box-shadow:0 2px 8px rgba(176, 138, 60, .3);}
+  .mc-btn.primary:active{transform:scale(.96);}
+  .mc-btn.ghost{background:var(--bg-card-2);color:var(--text-2);border:1px solid var(--line);}
+  .mc-btn.ghost:active{background:var(--bg-card);}
+  .mc-btn:disabled{opacity:.55;pointer-events:none;}
+  .mc-card-state{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;background:rgba(22,163,74,.07);color:#15803d;font-size:10.5px;font-weight:600;}
+  .mc-card-state.rejected{background:rgba(120,120,120,.07);color:var(--text-3);}
+  .mc-card-state svg{width:12px;height:12px;}
+
+  /* —— 企业名片卡（发名片：暗金档案式，数据来自认证档案+入驻档案） —— */
+  .pc-card{width:min(284px,86vw);border-radius:16px;overflow:hidden;background:var(--bg-card);border:1px solid var(--line);box-shadow:0 1px 2px rgba(33,28,18,.05),0 10px 24px -10px rgba(33,28,18,.12),0 26px 54px -26px rgba(33,28,18,.14);}
+  .pc-head{position:relative;height:112px;overflow:hidden;background:#0B1120;}
+  .pc-head img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 60%;}
+  .pc-head::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(8,11,20,.28) 0%,rgba(8,11,20,.46) 62%,rgba(8,11,20,.74) 100%);}
+  .pc-head::before{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;z-index:3;background:linear-gradient(90deg,#E3C184,rgba(227,193,132,.34) 46%,rgba(227,193,132,.06));}
+  .pc-in{position:absolute;inset:0;z-index:4;padding:14px 15px 12px;display:flex;flex-direction:column;justify-content:space-between;}
+  .pc-top{display:flex;align-items:flex-start;gap:10px;}
+  .pc-logo{flex:none;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#E7C98B;background:rgba(253,250,242,.10);border:1px solid rgba(253,250,242,.22);}
+  .pc-logo svg{width:19px;height:19px;}
+  .pc-tit{flex:1;min-width:0;}
+  .pc-name{font-size:15.5px;font-weight:800;color:#FDFAF2;letter-spacing:.01em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pc-badge{display:inline-flex;align-items:center;gap:4px;margin-top:5px;padding:2px 8px;border-radius:999px;background:rgba(227,193,132,.16);border:1px solid rgba(227,193,132,.42);color:#EACB8E;font-size:9.5px;font-weight:700;letter-spacing:.06em;}
+  .pc-badge svg{width:10px;height:10px;}
+  .pc-legal{display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(253,250,242,.8);}
+  .pc-legal svg{width:11px;height:11px;color:#E7C98B;flex:none;}
+  .pc-legal b{color:#FDFAF2;font-weight:600;}
+  .pc-body{padding:12px 14px 13px;}
+  .pc-holder{display:flex;align-items:center;gap:10px;}
+  .pc-ava{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#FDFAF2;font-size:13.5px;font-weight:700;background:linear-gradient(135deg,#8A7A5C,#6B5D44);}
+  .pc-who{flex:1;min-width:0;}
+  .pc-person{font-size:13.5px;font-weight:700;color:var(--text-1);}
+  .pc-person small{font-weight:500;color:var(--text-3);font-size:10.5px;margin-left:6px;}
+  .pc-role{font-size:10.5px;color:var(--text-3);margin-top:1px;display:flex;align-items:center;gap:5px;}
+  .pc-role svg{width:11px;height:11px;color:var(--primary-dim);flex:none;}
+  .pc-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line);}
+  .pc-field{min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .pc-field.full{grid-column:1/-1;}
+  .pc-field .k{display:flex;align-items:center;gap:4px;font-size:9.5px;color:var(--text-3);letter-spacing:.03em;}
+  .pc-field .k svg{width:10px;height:10px;}
+  .pc-field .v{font-size:12px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pc-field .v.wrap{white-space:normal;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;line-height:1.5;}
+  .pc-quals{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;}
+  .pc-qual{display:inline-flex;align-items:center;gap:4px;padding:3.5px 9px;border-radius:7px;font-size:10px;font-weight:600;background:rgba(168,127,53,.11);color:#8A6727;border:1px solid rgba(168,127,53,.22);}
+  .pc-qual svg{width:10px;height:10px;}
+  .pc-foot{display:flex;align-items:center;gap:5px;margin-top:11px;padding-top:9px;border-top:1px dashed var(--line);font-size:9px;color:var(--text-3);}
+  .pc-foot .ok{color:#15803d;font-weight:600;display:inline-flex;align-items:center;gap:3px;}
+  .pc-foot .ok svg{width:9px;height:9px;}
+  .pc-foot .sp{margin-left:auto;display:inline-flex;align-items:center;gap:3px;}
+  .pc-foot .sp svg{width:9px;height:9px;color:var(--primary-dim);}
+  .pc-actions{display:flex;gap:8px;margin-top:12px;}
+  .pc-btn{flex:1;height:40px;border-radius:11px;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:transform var(--d-fast);}
+  .pc-btn:active{transform:scale(.97);}
+  .pc-btn svg{width:14px;height:14px;}
+  .pc-btn.gold{background:linear-gradient(180deg,#B8924A,#96702E);color:#FDFAF2;box-shadow:0 3px 10px rgba(168,127,53,.30);}
+  .pc-btn:disabled{opacity:.55;pointer-events:none;}
+
+  /* 文件消息 */
+  .mc-file{width:min(250px,74vw);background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:11px 12px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-xs);}
+  .mc-file-ic{flex:none;width:34px;height:34px;border-radius:10px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);}
+  .mc-file-ic svg{width:16px;height:16px;}
+  .mc-file-body{flex:1;min-width:0;}
+  .mc-file-name{font-size:11.5px;font-weight:600;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mc-file-meta{font-size:9.5px;color:var(--text-3);margin-top:2px;}
+  .mc-file-go{flex:none;color:var(--text-3);display:flex;align-items:center;}
+  .mc-file-go svg{width:13px;height:13px;}
+
+  /* ============ 对方用户信息卡（点头像弹出） ============ */
+  @keyframes ucRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  .uc-wrap{padding:2px 0 calc(16px + env(safe-area-inset-bottom,0px));}
+  .uc-wrap>*{animation:ucRise .42s cubic-bezier(.22,.61,.36,1) both;}
+  .uc-wrap>*:nth-child(2){animation-delay:.05s;}.uc-wrap>*:nth-child(3){animation-delay:.1s;}.uc-wrap>*:nth-child(4){animation-delay:.15s;}.uc-wrap>*:nth-child(5){animation-delay:.2s;}
+  /* 头部：一张承载真实背书的浅色身份卡（去掉无信息的空 banner 与头像负 margin 叠加） */
+  .uc-head{position:relative;margin:2px 0 12px;text-align:center;padding:20px 16px 15px;border-radius:18px;border:1px solid color-mix(in srgb,var(--primary) 20%,transparent);
+    background:linear-gradient(160deg,color-mix(in srgb,var(--primary) 15%,var(--bg-card)),color-mix(in srgb,var(--primary-dim) 6%,var(--bg-card)) 58%,var(--bg-card));}
+  .uc-avatar{position:relative;margin:0 auto;width:66px;height:66px;border-radius:21px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:27px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px -10px var(--primary-dim);}
+  .uc-avatar .uc-v{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;color:var(--success);}
+  .uc-avatar .uc-v svg{width:22px;height:22px;}
+  .uc-name{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;font-size:19px;font-weight:700;color:var(--text-1);}
+  .uc-name .uc-ver{flex:none;width:18px;height:18px;color:var(--success);}
+  .uc-sub{margin-top:4px;font-size:12.5px;color:var(--text-3);line-height:1.6;}
+  .uc-biz{margin-top:3px;font-size:11.5px;color:var(--text-3);line-height:1.55;}
+  /* 信任指标条（详情页公开信息：信用/评价/从业/发布） */
+  .uc-stats{display:flex;margin:13px -2px 0;padding:11px 0 0;border-top:1px solid color-mix(in srgb,var(--primary) 16%,transparent);}
+  .uc-stat{flex:1;min-width:0;text-align:center;}
+  .uc-stat + .uc-stat{border-left:1px solid var(--line);}
+  .uc-stat .n{font-size:16px;font-weight:700;color:var(--primary);font-family:var(--font-num);line-height:1.1;}
+  .uc-stat .n small{font-size:10.5px;font-weight:600;color:var(--primary-dim);margin-left:1px;}
+  .uc-stat .l{font-size:10.5px;color:var(--text-3);margin-top:3px;}
+  .uc-tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
+  .uc-tags span{font-size:10.5px;font-weight:600;color:var(--primary-dim);background:var(--bg-card);border:1px solid color-mix(in srgb,var(--primary) 22%,transparent);padding:3px 10px;border-radius:var(--r-full);}
+  /* 卡 */
+  .uc-card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-xs);overflow:hidden;}
+  .uc-card + .uc-card{margin-top:12px;}
+  .uc-row{display:flex;align-items:center;gap:11px;padding:13px 14px;cursor:pointer;}
+  .uc-card .uc-row + .uc-row{border-top:1px solid var(--line);}
+  .uc-row.is-static{cursor:default;}
+  .uc-ic{flex:none;width:36px;height:36px;border-radius:10px;background:var(--primary-soft);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;}
+  .uc-ic svg{width:17px;height:17px;stroke-width:1.8;}
+  .uc-ic.green{background:var(--success-soft);color:var(--success);}
+  .uc-rb{flex:1;min-width:0;}
+  .uc-rl{font-size:11px;color:var(--text-3);}
+  .uc-rv{font-size:14.5px;font-weight:600;color:var(--text-1);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .uc-rv.num{font-family:var(--font-num);letter-spacing:.02em;}
+  .uc-rv.placeholder{font-weight:500;color:var(--text-4);}
+  .uc-rt{flex:none;display:flex;align-items:center;gap:5px;color:var(--text-3);font-size:12px;}
+  .uc-rt svg{width:15px;height:15px;}
+  .uc-act{flex:none;width:34px;height:34px;border-radius:9px;background:var(--bg-card-2);color:var(--text-2);display:flex;align-items:center;justify-content:center;}
+  .uc-act svg{width:16px;height:16px;}
+  /* 锁定态行内小锁（脱敏值清晰可读，仅以小锁标识不可操作） */
+  .uc-rlock{flex:none;width:30px;height:30px;border-radius:9px;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;}
+  .uc-rlock svg{width:14px;height:14px;}
+  /* 小节标题 */
+  .uc-sec{font-size:12px;font-weight:600;color:var(--text-3);margin:16px 2px 0;display:flex;align-items:center;gap:8px;}
+  .uc-sec::before{content:'';flex:none;width:3px;height:12px;border-radius:2px;background:var(--primary);}
+  .uc-locknote{display:flex;align-items:flex-start;gap:6px;font-size:11px;color:var(--text-4);line-height:1.6;margin:7px 2px 8px;}
+  .uc-locknote svg{flex:none;width:13px;height:13px;margin-top:1px;color:var(--primary-dim);}
+  /* 供需小卡 */
+  .uc-supply{padding:11px 14px;}
+  .uc-sup-top{display:flex;align-items:center;gap:8px;}
+  .uc-tag{flex:none;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+  .uc-tag.demand{background:color-mix(in srgb,#3b82f6 12%,transparent);color:#3b82f6;}
+  .uc-tag.supply{background:var(--primary-soft);color:var(--primary-dim);}
+  .uc-sup-title{font-size:13px;font-weight:600;color:var(--text-1);margin-top:6px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .uc-sup-meta{font-size:11px;color:var(--text-3);margin-top:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .uc-sup-meta .loc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;}
+  .uc-sup-meta .price{flex:none;color:var(--primary-dim);font-weight:600;font-family:var(--font-num);}
+  .uc-sup-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--text-3);}
+  .uc-empty{padding:18px;text-align:center;font-size:12px;color:var(--text-4);}
+  .uc-unlocked-tip{display:none;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:600;color:var(--success);background:var(--success-soft);padding:4px 12px;border-radius:var(--r-full);}
+  .uc-unlocked-tip.show{display:inline-flex;}
+  .uc-unlocked-tip svg{width:12px;height:12px;stroke-width:2.4;}
+  /* 底部操作 */
+  .uc-foot{margin-top:16px;display:flex;gap:10px;}
+  .uc-foot .btn{flex:1;}
+
+  /* 输入区 */
+  .mc-input{flex:0 0 auto;position:relative;z-index:2;padding:10px 16px calc(14px + env(safe-area-inset-bottom,0px));background:var(--bg);background:color-mix(in srgb,var(--bg) 86%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line);}
+  .mc-quick{display:flex;align-items:center;gap:8px;padding:0 0 10px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
+  .mc-quick::-webkit-scrollbar{display:none;}
+  .cq-label{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--primary-dim);font-family:var(--font-display);}
+  .cq-label svg{width:12px;height:12px;stroke-width:1.7;}
+  .cq-chip{flex:0 0 auto;display:inline-flex;align-items:center;padding:7px 12px;border-radius:var(--r-full);background:var(--bg-card);border:1px solid var(--line);font-size:var(--fs-sm);color:var(--text-2);white-space:nowrap;cursor:pointer;transition:all var(--d-fast) var(--e-standard);box-shadow:var(--shadow-xs);}
+  .cq-chip:active{transform:scale(.96);background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);}
+  .mc-composer{display:flex;align-items:flex-end;gap:8px;}
+  .cc-attach{flex:0 0 auto;width:42px;height:42px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:background var(--d-fast),transform var(--d-fast);}
+  .cc-attach:active{background:var(--bg-card-2);transform:scale(.94);}
+  .cc-attach svg{width:18px;height:18px;stroke-width:1.7;}
+  .cc-attach.open{background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);}
+  .cc-field{flex:1;display:flex;align-items:flex-end;gap:8px;background:var(--bg-card);border:1px solid var(--line);border-radius:21px;padding:4px 4px 4px 16px;transition:border-color var(--d-fast);}
+  .cc-field:focus-within{border-color:var(--accent-line);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent);}
+  .cc-field input{flex:1;height:34px;border:0;outline:0;background:transparent;font-size:var(--fs-md);color:var(--text-1);min-width:0;}
+  .cc-field input::placeholder{color:var(--text-3);}
+  .cc-send{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,var(--primary),var(--accent-pressed));color:var(--text-inv);cursor:pointer;transition:transform var(--d-fast),box-shadow var(--d-fast),opacity var(--d-fast);box-shadow:0 4px 12px rgba(176, 138, 60, .32);}
+  .cc-send:active{transform:scale(.9);}
+  .cc-send svg{width:17px;height:17px;stroke-width:2;}
+  .cc-send.disabled{opacity:.4;pointer-events:none;}
+
+  /* 扩展面板（+ 弹出） */
+  .mc-panel{display:none;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 4px 12px;border-top:1px solid var(--line);margin-top:10px;}
+  .mc-panel.show{display:grid;}
+  .mc-panel-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0;border-radius:12px;cursor:pointer;}
+  .mc-panel-item:active{background:var(--bg-card-2);}
+  .mc-panel-item .mp-ic{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;}
+  .mc-panel-item .mp-ic svg{width:19px;height:19px;}
+  .mc-panel-item span{font-size:9.5px;color:var(--text-2);}
+  .tint-a{background:var(--primary-soft);color:var(--primary-dim);}
+  .tint-b{background:rgba(46,102,255,.1);color:#2e66ff;}
+  .tint-c{background:rgba(139,123,181,.13);color:#8B7BB5;}
+  .tint-d{background:rgba(217,119,6,.1);color:#d97706;}
+
+  /* —— 发送面板二级选择 / 表单（发名片 / 发报价单 / 预约对接 / 发文件） —— */
+  .mc-pick{display:flex;flex-direction:column;margin:2px 0 4px;}
+  .mc-pick-item{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .mc-pick-item:last-child{border-bottom:0;}
+  .mc-pick-item:active{background:var(--bg-card-2);border-radius:10px;}
+  .mc-pick-ic{flex:none;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+  .mc-pick-ic svg{width:18px;height:18px;}
+  .mc-pick-t{font-size:13px;font-weight:600;color:var(--text-1);}
+  .mc-pick-s{font-size:10.5px;color:var(--text-3);margin-top:2px;line-height:1.5;}
+  .mc-form{display:flex;flex-direction:column;gap:11px;padding:2px 0 6px;}
+  .mc-form .mf-row{display:flex;flex-direction:column;gap:5px;}
+  .mc-form .mf-label{font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.02em;}
+  .mc-form .mf-input{height:42px;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg-card);padding:0 13px;font-size:13px;color:var(--text-1);outline:none;box-shadow:var(--shadow-xs);transition:border-color var(--d-fast), box-shadow var(--d-fast);}
+  .mc-form .mf-input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--primary-soft);}
+  .mc-form .mf-input::placeholder{color:var(--text-3);}
+  .mc-seg{display:flex;gap:6px;flex-wrap:wrap;}
+  .mc-seg .seg{flex:1;min-width:70px;height:36px;border:1.5px solid var(--line);border-radius:var(--r-m);background:var(--bg-card);font-size:12px;color:var(--text-2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all var(--d-fast) var(--e-standard);}
+  .mc-seg .seg.on{background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);font-weight:600;}
+  .mc-seg .seg:active{transform:scale(.96);}
+  .mc-prev{background:var(--bg-card-2);border:1px solid var(--line);border-radius:var(--r-l);padding:14px;}
+  .mc-prev-title{font-size:12.5px;font-weight:700;color:var(--text-1);line-height:1.3;}
+  .mc-prev-sub{font-size:9.5px;color:var(--text-3);margin-top:1px;}
+  .mc-prev-fields{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px;display:flex;flex-direction:column;gap:5px;}
+  .mc-prev-field{display:flex;align-items:baseline;gap:8px;font-size:10.5px;}
+  .mc-prev-field b{flex:none;width:52px;color:var(--text-3);font-weight:500;font-size:10px;}
+  .mc-prev-field span{flex:1;color:var(--text-1);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mc-prev-field span.green{color:var(--primary-dim);}
+  /* 媒体消息（图片 / 视频 / 语音） */
+  .mc-media{width:min(250px,74vw);border-radius:var(--r-l);overflow:hidden;background:var(--bg-card);border:1px solid var(--line);box-shadow:var(--shadow-xs);}
+  .mc-media img{display:block;width:100%;max-height:240px;object-fit:cover;}
+  .mc-media video{display:block;width:100%;max-height:260px;background:#000;}
+  .mc-media audio{display:block;width:100%;}
+  .mc-media .mm-meta{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:10px;color:var(--text-3);}
+  .mc-media .mm-meta svg{width:13px;height:13px;flex:none;}
+  .mc-media .mm-meta .mm-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mc-tip{font-size:10.5px;color:var(--text-3);line-height:1.7;background:var(--bg-card-2);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;}
+  .mc-tip b{color:var(--text-2);}
+
+  /* 回到底部 */
+  .mc-back{position:absolute;right:16px;bottom:calc(118px + env(safe-area-inset-bottom,0px));width:34px;height:34px;border-radius:50%;background:var(--bg-card);border:1px solid var(--line);box-shadow:var(--shadow-md);display:none;align-items:center;justify-content:center;color:var(--text-2);z-index:5;cursor:pointer;}
+  .mc-back.show{display:flex;animation:mcBackIn .28s var(--e-out);}
+  @keyframes mcBackIn{from{opacity:0;transform:translateY(10px) scale(.88);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .mc-back svg{width:16px;height:16px;}
+  .mc-back:active{background:var(--bg-card-2);}
+
+  /* —— 动效：新消息弹入 / 扩展面板 stagger / 常用语列表 stagger —— */
+  .mc-pop{animation:mcPop .34s cubic-bezier(.34,1.56,.64,1) both;}
+  @keyframes mcPop{from{opacity:0;transform:translateY(10px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .mc-panel-item{opacity:0;}
+  .mc-panel.show .mc-panel-item{animation:mcRise .26s var(--e-out) forwards;}
+  .mc-panel.show .mc-panel-item:nth-child(2){animation-delay:.04s;}
+  .mc-panel.show .mc-panel-item:nth-child(3){animation-delay:.08s;}
+  .mc-panel.show .mc-panel-item:nth-child(4){animation-delay:.12s;}
+  @keyframes mcRise{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .ps-item{animation:none;}
+  .ps-list > .ps-item{animation:mcRise .22s var(--e-out) both;}
+  .ps-list > .ps-item:nth-child(2){animation-delay:.03s;}
+  .ps-list > .ps-item:nth-child(3){animation-delay:.06s;}
+  .ps-list > .ps-item:nth-child(4){animation-delay:.09s;}
+  .ps-list > .ps-item:nth-child(5){animation-delay:.12s;}
+  .ps-list > .ps-item:nth-child(6){animation-delay:.15s;}
+  @media (prefers-reduced-motion: reduce){
+    .mc-pop,.mc-back.show{animation:none;}
+    .mc-panel-item{opacity:1;animation:none;}
+    .ps-list > .ps-item{animation:none;}
+  }
+
+  /* 空态 */
+  .mc-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:70px 24px;text-align:center;}
+  .mc-empty .e-ic{width:56px;height:56px;border-radius:18px;background:var(--bg-card-2);color:var(--text-3);display:flex;align-items:center;justify-content:center;}
+  .mc-empty .e-ic svg{width:26px;height:26px;}
+  .mc-empty .e-t{font-size:14px;font-weight:600;color:var(--text-2);}
+  .mc-empty .e-s{font-size:11.5px;color:var(--text-3);line-height:1.6;}
+
+  /* 聊天专用：输入框内表情/长度提示 */
+  .mc-count{position:absolute;right:52px;bottom:calc(16px + env(safe-area-inset-bottom,0px));font-size:9px;color:var(--text-3);pointer-events:none;}
+
+  /* 常用语入口（composer 左侧，参考抖音私信「快捷回复」入口） */
+  .cc-phrase{flex:0 0 auto;width:42px;height:42px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;color:var(--text-2);background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:background var(--d-fast),transform var(--d-fast);}
+  .cc-phrase:active{background:var(--bg-card-2);transform:scale(.94);}
+  .cc-phrase svg{width:18px;height:18px;stroke-width:1.7;}
+  .cc-phrase.open{background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary-dim);}
+  /* 常用语面板（sheet 内：分类 chips + 列表） */
+  .ps-cats{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .ps-cats::-webkit-scrollbar{display:none;}
+  .ps-cat{flex:none;height:30px;padding:0 14px;border-radius:999px;border:1px solid transparent;background:var(--bg-card-2);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s ease;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+  .ps-cat.active{background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);}
+  .ps-list{display:flex;flex-direction:column;gap:8px;margin:2px 0 6px;}
+  .ps-item{position:relative;display:block;width:100%;text-align:left;padding:11px 34px 11px 12px;border-radius:12px;background:var(--bg-card);border:1px solid var(--line);cursor:pointer;transition:all .12s ease;}
+  .ps-item:active{background:var(--bg-card-2);transform:scale(.99);}
+  .ps-item .ps-tag{display:inline-block;font-size:9.5px;font-weight:600;color:var(--primary-dim);background:var(--primary-soft);border-radius:6px;padding:2px 7px;margin-bottom:5px;line-height:1.4;}
+  .ps-item .ps-text{font-size:13px;line-height:1.6;color:var(--text-1);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .ps-item .ps-go{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--text-3);}
+  .ps-item .ps-go svg{width:14px;height:14px;}
+  .ps-empty{text-align:center;color:var(--text-3);font-size:12px;padding:44px 20px;line-height:1.8;}
+  .ps-foot{padding:4px 2px 2px;font-size:10.5px;color:var(--text-3);line-height:1.7;}
+  .ps-foot a{color:var(--primary-dim);font-weight:600;text-decoration:none;}
+</style></head>
+<body>
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 2v4M8 2v4M3 10h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M21 15l-5-5L5 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 10l6-3v10l-6-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">
+      <span id="c-name" class="ct-name"></span><span id="c-co" class="ct-co"></span>
+    </div>
+    <div class="nav-right">
+      <button type="button" class="icon-btn" onclick="openMore()" aria-label="更多"><svg class="ic"><use href="#i-more"/></svg></button>
+    </div>
+  </div>
+
+  <!-- 会话上下文条：当前对接业务 -->
+  <div class="ctx-bar" id="ctx-bar" onclick="openContext()">
+    <div class="ctx-ic"><svg class="ic"><use href="#i-box"/></svg></div>
+    <div class="ctx-body">
+      <div class="ctx-title" id="ctx-title">正在对接 · 商品混凝土采购</div>
+      <div class="ctx-sub" id="ctx-sub">成都天府新区商业综合体 · C30/C40 · ¥135万</div>
+    </div>
+    <div class="ctx-go"><svg class="ic"><use href="#i-chev-right"/></svg></div>
+  </div>
+
+  <div class="mc-scroll" id="scroller">
+    <div id="timeline"></div>
+  </div>
+  <button class="mc-back" id="back-btn" onclick="scrollBottom()" aria-label="回到底部"><svg class="ic"><use href="#i-arrow-down"/></svg></button>
+
+  <!-- 输入区 -->
+  <div class="mc-input">
+    <div style="text-align:center;font-size:10px;color:var(--text-3);padding-bottom:6px;">请文明沟通，禁止诱导线下交易 · <a href="../agreement/user.html#communication" style="color:var(--primary-dim);text-decoration:underline;">沟通规则</a></div>
+    <div class="mc-quick" id="quick"></div>
+    <div class="mc-composer">
+      <button type="button" class="cc-phrase" id="btn-phrase" onclick="openPhrases()" aria-label="常用语" title="常用语"><svg class="ic"><use href="#i-chat"/></svg></button>
+      <button type="button" class="cc-attach" id="btn-attach" onclick="togglePanel()" aria-label="更多发送方式"><svg class="ic"><use href="#i-plus"/></svg></button>
+      <div class="cc-field">
+        <input id="msg" placeholder="输入消息…" maxlength="500" onkeydown="if(event.key==='Enter')send()" oninput="onInput()">
+        <button type="button" class="cc-send" id="btn-send" onclick="send()" aria-label="发送"><svg class="ic"><use href="#i-upload"/></svg></button>
+      </div>
+    </div>
+    <div class="mc-panel" id="panel">
+      <div class="mc-panel-item" onclick="sendCard('contact')"><div class="mp-ic tint-a"><svg class="ic"><use href="#i-shield"/></svg></div><span>发名片</span></div>
+      <div class="mc-panel-item" onclick="sendCard('quote')"><div class="mp-ic tint-b"><svg class="ic"><use href="#i-doc"/></svg></div><span>发报价单</span></div>
+      <div class="mc-panel-item" onclick="sendCard('appoint')"><div class="mp-ic tint-c"><svg class="ic"><use href="#i-calendar"/></svg></div><span>预约对接</span></div>
+      <div class="mc-panel-item" onclick="sendFile()"><div class="mp-ic tint-d"><svg class="ic"><use href="#i-clip"/></svg></div><span>发文件</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/preview-sheet.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  var id = new URLSearchParams(location.search).get('id') || 'c1';
+  var conv = MOCK.conversations.find(function (c) { return c.id === id; }) || MOCK.conversations[0];
+
+  /* —— 会话元信息：对方个人认证档案 / 关联企业 / 对话来源企业 / 当前对接业务 ——
+     personId         对方个人认证档案 id（决定「?」弹「个人认证主页」；无则企业认证会话回退企业主页）
+     companyIds       对方关联的全部企业 id；多个时须靠 sourceCompanyId 才能确定标题显示哪家
+     sourceCompanyId  本对话窗口来源对应的企业 id；多关联但无来源时，标题不显示企业简称
+     service          官方客服等非自然人会话：不显示企业简称 */
+  var META = {
+    c1: { personId: 'p-jzs1', companyIds: ['c-znzjs'], sourceCompanyId: 'c-znzjs',
+      profileHref: '../personal/index.html?id=p-jzs1',
+      ctx: { title: '正在对接 · 商品混凝土采购', sub: '成都天府新区商业综合体 · C30/C40 · ¥135万', href: '../supply/detail.html?id=1001', icon: 'box' } },
+    c2: { personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 盘扣脚手架租赁', sub: '双排盘扣脚手架 · 3000㎡ · 含运输', href: '../supply/detail.html?id=1005', icon: 'box' } },
+    c3: { personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 劳务班组进场', sub: '钢筋工班组 12 人 · 预计进场 9-20', href: '../supply/detail.html?id=1004', icon: 'users' } },
+    c4: { personId: null, companyIds: ['c-znzjs', 'c-cdrj'], sourceCompanyId: null,
+      profileHref: '../company/index.html?id=c-znzjs',
+      ctx: { title: '正在对接 · 建企买卖咨询', sub: '公路二级整体转让 · 带安许', href: '../supply/detail.html?id=SU013', icon: 'share' } },
+    c5: { service: true, personId: null, companyIds: [], sourceCompanyId: null,
+      profileHref: '../message/index.html',
+      ctx: { title: '平台客服 · 服务中', sub: '回复时间 周一至周日 9:00-21:00 · 紧急请致电 400-xxx', href: null, icon: 'bell' } }
+  };
+  var meta = META[id] || { personId: null, companyIds: [], sourceCompanyId: null, profileHref: null, service: false, ctx: null };
+
+  /* —— 标题行解析：用户名称（备注优先，否则认证姓名） + 企业简称（按对话来源；多企业无来源不显示） —— */
+  function peerKey() { return meta.personId ? ('person:' + meta.personId) : ('conv:' + id); }
+  function certifiedName() {
+    if (meta.personId && window.MOCK) { var p = MOCK.personById(meta.personId); if (p && p.name) return p.name; }
+    return conv.name || '';
+  }
+  function companyShort() {
+    if (meta.service) return '';                       // 官方客服等非自然人不显示企业简称
+    var ids = meta.companyIds || [], co = null;
+    if (window.MOCK) {
+      if (meta.sourceCompanyId) co = MOCK.companyById(meta.sourceCompanyId);
+      if (!co && ids.length === 1) co = MOCK.companyById(ids[0]);   // 仅关联一家时无需来源即可确定
+    }
+    if (co) return co.short || co.name || '';
+    /* 关联多家企业但无对话来源 → 不显示；演示数据无企业档案（ids 为空）时回退会话自带企业文案 */
+    return ids.length === 0 ? (conv.role || '') : '';
+  }
+  function remarkName() { return (window.ContactRemarkStore && ContactRemarkStore.get(peerKey())) || ''; }
+  function displayName() { return remarkName() || certifiedName(); }
+  function peerProfileUrl() {
+    if (meta.personId) return '../personal/index.html?id=' + encodeURIComponent(meta.personId);
+    return meta.profileHref || null;
+  }
+  function renderTitle() {
+    var rk = remarkName(), cert = certifiedName();
+    var nameEl = document.getElementById('c-name');
+    nameEl.textContent = rk || cert;
+    nameEl.title = rk ? ('备注：' + rk + '｜认证姓名：' + cert) : '';
+    var co = companyShort(), coEl = document.getElementById('c-co');
+    coEl.textContent = co || '';
+    coEl.classList.toggle('on', !!co);
+    coEl.title = co || '';
+  }
+  renderTitle();
+
+  if (meta.ctx) {
+    document.getElementById('ctx-title').textContent = meta.ctx.title;
+    document.getElementById('ctx-sub').textContent = meta.ctx.sub;
+    document.querySelector('.ctx-ic').innerHTML = '<svg class="ic"><use href="#i-' + meta.ctx.icon + '"/></svg>';
+    if (!meta.ctx.href) document.querySelector('.ctx-go').style.display = 'none';
+  } else {
+    document.getElementById('ctx-bar').style.display = 'none';
+  }
+  window.openContext = function () {
+    if (meta.ctx && meta.ctx.href) {
+      openPagePreview(meta.ctx.href, (meta.ctx.title || '').replace(/^正在对接\s*[·•]\s*/, '') || '页面预览');
+    }
+  };
+
+  /* ============ 点击对方头像 → 用户信息卡（敏感信息复用信息详情页付费墙规则） ============ */
+  var UC_UNLOCK_KEY = 'engchain-personal-unlocks';
+  function cardCompany() {
+    if (meta.service) return null;
+    var co = null;
+    if (window.MOCK) {
+      if (meta.sourceCompanyId) co = MOCK.companyById(meta.sourceCompanyId);
+      if (!co && (meta.companyIds || []).length === 1) co = MOCK.companyById(meta.companyIds[0]);
+    }
+    return co || null;
+  }
+  function cardPerson() { return (meta.personId && window.MOCK && MOCK.personById(meta.personId)) || null; }
+  function cardUnlockId() { var p = cardPerson(); if (p) return p.id || meta.personId; var co = cardCompany(); return co ? co.id : ''; }
+  function ucMaskPhone(f) { return (!f || f.length < 7) ? (f || '') : (f.slice(0, 3) + '****' + f.slice(-4)); }
+  function ucMaskWx(w) { return w ? (w.slice(0, 2) + '***' + w.slice(-2)) : ''; }
+  function cardUnlocked() {
+    var uid = cardUnlockId();
+    if (!uid) return true;
+    if (new URLSearchParams(location.search).get('unlock') === '1') return true;
+    try { var list = JSON.parse(localStorage.getItem(UC_UNLOCK_KEY) || '[]'); if (list.indexOf(uid) !== -1) return true; } catch (e) {}
+    try {
+      if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return false;
+      var st = JSON.parse(localStorage.getItem('engchain-state') || '{}');
+      if (st.loggedIn === false) return false;
+      if (st.member || (st.status && ['pro', 'enterprise', 'resident'].indexOf(st.status) !== -1)) return true;
+    } catch (e) {}
+    return false;
+  }
+  function saveCardUnlock() {
+    var uid = cardUnlockId(); if (!uid) return;
+    try { var list = JSON.parse(localStorage.getItem(UC_UNLOCK_KEY) || '[]'); if (list.indexOf(uid) === -1) { list.push(uid); localStorage.setItem(UC_UNLOCK_KEY, JSON.stringify(list)); } } catch (e) {}
+  }
+
+  var SVG_PHONE = '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>';
+  var SVG_WX = '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>';
+  var SVG_COPY = '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+  var SVG_V = '<circle cx="12" cy="12" r="9"/><path d="M8.4 12.1l2.3 2.3 4.9-5.2"/>';
+  var SVG_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
+
+  function openUserCard() {
+    var person = cardPerson(), co = cardCompany(), uid = cardUnlockId();
+    var cert = certifiedName(), rk = remarkName();
+    var isSvc = !!meta.service;
+    var fullPhone = person ? (person.phone || '') : ((co && co.contact && co.contact.phone) || '');
+    var fullWx = person ? (person.wechat || '') : '';
+    var titleLine = person
+      ? [person.title, person.location].filter(Boolean).join(' · ')
+      : (conv.role || (isSvc ? '官方客服 · 工作时间 周一至周日 9:00-21:00' : ''));
+    /* 认证状态标签：完整展示（不再截断丢失"在职"等） */
+    var tagList = [];
+    if (person && person.tags) tagList = person.tags.map(function (x) { return typeof x === 'string' ? x : (x.t || x.name || ''); }).filter(Boolean);
+    /* 公开信任背书（与信息详情页一致，不属付费墙范围）：信用等级 / 评价 / 从业年限 / 发布数 + 行业·主营 */
+    var pubCount = person ? (person.published || []).length : 0;
+    var statGrade = person && person.score ? (person.score.grade || ((person.score.value != null ? person.score.value : '') + '分')) : '';
+    var statReview = person ? (person.reviewCount || 0) : 0;
+    var statExp = person ? (person.experience || '') : '';
+    var bizLine = person ? [person.industry, person.mainBusiness].filter(Boolean).join(' · ') : '';
+
+    var supHtml = '';
+    if (person && (person.published || []).length) {
+      supHtml = (person.published).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean).map(function (s) {
+        var d = s.dir || s.type, isD = d === 'demand';
+        var price = (isD ? (s.budget || '') : (s.price || '')) || '';
+        var metaLine = (s.location ? '<span class="loc">' + esc(s.location) + '</span>' : '') +
+          (price ? ((s.location ? '<span class="dot"></span>' : '') + '<span class="price">' + esc(price) + '</span>') : '');
+        return '<div class="uc-row uc-supply" data-uc="supply" data-url="../supply/detail.html?id=' + s.id + '">' +
+          '<div class="uc-rb"><div class="uc-sup-top"><span class="uc-tag ' + (isD ? 'demand' : 'supply') + '">' + (isD ? '需求' : '供应') + '</span></div>' +
+          '<div class="uc-sup-title">' + esc(s.title || '') + '</div>' +
+          (metaLine ? '<div class="uc-sup-meta">' + metaLine + '</div>' : '') + '</div>' +
+          '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div>';
+      }).join('');
+    }
+
+    /* 核心信息：锁定态只渲染脱敏/占位（真实值不进入 DOM，与信息详情页一致）；
+       占位行清晰可读、仅以行内小锁标识不可操作——不再叠加 blur / 整页遮罩，让用户看清"解锁能得到什么"。 */
+    function lockTail() { return '<span class="uc-rlock" aria-hidden="true">' + SVG_LOCK + '</span>'; }
+    function buildCore(open) {
+      var b = '';
+      /* 联系电话 */
+      if (fullPhone) b +=
+        '<div class="uc-row is-static"><div class="uc-ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_PHONE + '</svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">联系电话</div><div class="uc-rv num">' + esc(open ? fullPhone : ucMaskPhone(fullPhone)) + '</div></div>' +
+        (open
+          ? '<span class="uc-act" data-uc="phone" data-val="' + esc(fullPhone) + '" role="button" aria-label="拨打"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_PHONE + '</svg></span>'
+          : lockTail()) + '</div>';
+      /* 微信号 */
+      if (fullWx) b +=
+        '<div class="uc-row is-static"><div class="uc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_WX + '</svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">微信号</div><div class="uc-rv num">' + esc(open ? fullWx : ucMaskWx(fullWx)) + '</div></div>' +
+        (open
+          ? '<span class="uc-act" data-uc="copy" data-val="' + esc(fullWx) + '" role="button" aria-label="复制微信号"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">' + SVG_COPY + '</svg></span>'
+          : lockTail()) + '</div>';
+      /* 企业全称（可进企业认证主页） */
+      if (co) b += open
+        ? '<div class="uc-row" data-uc="company" data-url="../company/index.html?id=' + encodeURIComponent(co.id) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">所在企业 · 点击查看企业认证主页</div><div class="uc-rv">' + esc(co.name || '') + '</div></div>' +
+          '<span class="uc-rt">认证 <svg class="ic"><use href="#i-chev-r"/></svg></span></div>'
+        : '<div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">所在企业</div><div class="uc-rv placeholder">认证企业 · 解锁后查看</div></div>' + lockTail() + '</div>';
+
+      var cards = b ? ('<div class="uc-card">' + b + '</div>') : '';
+      /* 该用户发布的供需 */
+      if (person) {
+        cards += open
+          ? '<div class="uc-sec">TA 发布的供需<small style="font-weight:500;color:var(--text-4);">（' + pubCount + ' 条）</small></div><div class="uc-card">' +
+            (supHtml || '<div class="uc-empty">该用户暂未发布供需信息</div>') + '</div>'
+          : '<div class="uc-card"><div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-box"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">TA 发布的供需</div><div class="uc-rv placeholder">共 ' + pubCount + ' 条 · 解锁后查看</div></div>' + lockTail() + '</div></div>';
+        /* 个人认证主页入口 */
+        cards += '<div class="uc-card">' + (open
+          ? '<div class="uc-row" data-uc="home" data-url="' + esc(peerProfileUrl()) + '">' +
+            '<div class="uc-ic"><svg class="ic"><use href="#i-shield"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">个人认证主页</div><div class="uc-rv">查看完整认证档案与评价</div></div>' +
+            '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div>'
+          : '<div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-shield"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">个人认证主页</div><div class="uc-rv placeholder">完整认证档案与评价 · 解锁后进入</div></div>' + lockTail() + '</div>') + '</div>';
+      }
+      return cards;
+    }
+
+
+    var avatarChar = person ? (cert || '?').slice(0, 1) : (conv.avatar || (cert || '?').slice(0, 1));
+    var statsHtml = person ? (
+      '<div class="uc-stats">' +
+        '<div class="uc-stat"><div class="n">' + esc(statGrade || '—') + '</div><div class="l">信用等级</div></div>' +
+        '<div class="uc-stat"><div class="n">' + statReview + '</div><div class="l">个人评价</div></div>' +
+        '<div class="uc-stat"><div class="n">' + esc(statExp || '—') + '</div><div class="l">从业年限</div></div>' +
+        '<div class="uc-stat"><div class="n">' + pubCount + '</div><div class="l">发布供需</div></div>' +
+      '</div>') : '';
+
+    /* 正在对接 · 会话来源业务（聊天页顶部本就公开显示，非敏感信息；客服会话不展示） */
+    var ctxCard = '';
+    if (!isSvc && meta.ctx && meta.ctx.href) {
+      ctxCard =
+        '<div class="uc-card"><div class="uc-row" data-uc="ctx" data-url="' + esc(meta.ctx.href) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-' + (meta.ctx.icon || 'box') + '"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">正在对接 · 会话来源</div>' +
+          '<div class="uc-rv" style="font-size:13.5px;">' + esc((meta.ctx.title || '').replace(/^正在对接\s*[·•]\s*/, '')) + '</div>' +
+          (meta.ctx.sub ? '<div class="uc-rl" style="margin-top:3px;white-space:normal;line-height:1.55;">' + esc(meta.ctx.sub) + '</div>' : '') + '</div>' +
+          '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span>' +
+        '</div></div>';
+    }
+
+    var html =
+      '<div class="uc-wrap">' +
+        '<div class="uc-head">' +
+          '<div class="uc-avatar">' + esc(avatarChar) + (person || co ? '<span class="uc-v"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">' + SVG_V + '</svg></span>' : '') + '</div>' +
+          '<div class="uc-name">' + esc(cert || '对方') + (person ? '<svg class="uc-ver" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' : '') + '</div>' +
+          (titleLine ? '<div class="uc-sub">' + esc(titleLine) + '</div>' : '') +
+          (bizLine ? '<div class="uc-biz">' + esc(bizLine) + '</div>' : '') +
+          statsHtml +
+          (tagList.length ? '<div class="uc-tags">' + tagList.map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+        '</div>' +
+
+        '<div class="uc-card">' +
+          '<div class="uc-row" id="uc-rm-row">' +
+            '<div class="uc-ic"><svg class="ic"><use href="#i-edit"/></svg></div>' +
+            '<div class="uc-rb"><div class="uc-rl">备注昵称（仅自己可见）</div><div class="uc-rv ' + (rk ? '' : 'placeholder') + '" id="uc-rm-val">' + esc(rk || '未设置') + '</div></div>' +
+            '<span class="uc-rt">' + (rk ? '修改' : '添加') + '</span>' +
+          '</div>' +
+          '<div id="uc-rm-editbox" style="display:none;padding:12px 14px;border-top:1px solid var(--line);">' +
+            '<input id="uc-rm-input" class="rm-input" maxlength="20" autocomplete="off" placeholder="' + esc(cert || '对方姓名') + '">' +
+            '<div class="rm-actions" style="margin-top:10px;"><button type="button" class="btn btn-ghost" id="uc-rm-cancel">取消</button><button type="button" class="btn btn-primary" id="uc-rm-ok">保存</button></div>' +
+          '</div>' +
+        '</div>' +
+        ctxCard;
+
+    var initUnlocked = cardUnlocked();
+    var hasCore = !!(fullPhone || fullWx || co || person);
+    if (isSvc) {
+      /* 官方客服：无付费墙，仅提供入口 */
+      html += '<div class="uc-card"><div class="uc-row" data-uc="service" data-url="' + esc(meta.profileHref || '') + '">' +
+        '<div class="uc-ic"><svg class="ic"><use href="#i-bell"/></svg></div>' +
+        '<div class="uc-rb"><div class="uc-rl">平台官方客服</div><div class="uc-rv">服务时间 周一至周日 9:00-21:00</div></div>' +
+        '<span class="uc-rt"><svg class="ic"><use href="#i-chev-r"/></svg></span></div></div>';
+    } else if (uid && hasCore) {
+      html +=
+        '<div class="uc-sec">联系与身份 <span class="uc-unlocked-tip" id="uc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6L9 17l-5-5"/></svg>已解锁</span></div>' +
+        '<div class="uc-locknote" id="uc-locknote">' + SVG_LOCK + '<span>解锁后可查看完整<b style="color:var(--text-2);font-weight:600;">联系方式与企业身份</b>，解锁即获沟通权，平台不售卖联系方式</span></div>' +
+        '<div id="uc-core-body">' + buildCore(initUnlocked) + '</div>' +
+        '<div class="uc-foot"><button type="button" class="btn btn-primary btn-block btn-lg" id="uc-foot-locked" data-uc="unlock">解锁查看完整资料</button>' +
+        '<button type="button" class="btn btn-primary btn-block btn-lg" id="uc-foot-open" style="display:none;">查看完整认证主页</button></div>';
+    } else {
+      /* 企业认证会话（无个人档案/联系方式）：给企业认证主页入口，不设置假付费墙、不走"待完善"死路 */
+      if (meta.profileHref) {
+        html += '<div class="uc-card"><div class="uc-row" data-uc="cohome" data-url="' + esc(meta.profileHref) + '">' +
+          '<div class="uc-ic"><svg class="ic"><use href="#i-company"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rl">企业认证主页</div><div class="uc-rv">' + esc(conv.role || '查看企业认证档案与资质') + '</div></div>' +
+          '<span class="uc-rt">认证 <svg class="ic"><use href="#i-chev-r"/></svg></span></div></div>';
+      } else {
+        html += '<div class="uc-card"><div class="uc-row is-static"><div class="uc-ic"><svg class="ic"><use href="#i-info"/></svg></div>' +
+          '<div class="uc-rb"><div class="uc-rv" style="font-size:13px;">该联系人暂未关联可查看的认证档案</div></div></div></div>';
+      }
+    }
+    html += '</div>';
+
+    var sh = UI.sheet();
+    sh.setText('');
+    sh.html(html);
+    sh.show();
+    var body = sh.body();
+
+    /* 付费墙状态应用（锁定=清晰脱敏占位，解锁=渲染真实内容；完整值解锁前不进入 DOM）。
+       UI.sheet.show() 的 boostStickyFoot 会把 .btn-block 从 sheet-body 提升到 sheet-foot，
+       故两个置底按钮一律在弹层根节点 sh（含 foot）上查询/绑定，不用 body 委托。 */
+    var coreBodyEl = body.querySelector('#uc-core-body');
+    var locknoteEl = body.querySelector('#uc-locknote');
+    var footLockedBtn = sh.querySelector('#uc-foot-locked');
+    var footOpenBtn = sh.querySelector('#uc-foot-open');
+    function applyState(unlocked) {
+      if (!coreBodyEl) return;
+      coreBodyEl.innerHTML = buildCore(unlocked);
+      if (locknoteEl) locknoteEl.style.display = unlocked ? 'none' : '';
+      var badge = body.querySelector('#uc-badge');
+      if (badge) badge.classList.toggle('show', unlocked);
+      if (footLockedBtn) footLockedBtn.style.display = unlocked ? 'none' : '';
+      if (footOpenBtn) footOpenBtn.style.display = unlocked ? '' : 'none';
+    }
+    applyState(initUnlocked);
+
+    /* 置底按钮：锁定态→解锁；解锁态→查看完整认证主页（直接绑定，规避 btn-block 被提升出 body） */
+    if (footLockedBtn) footLockedBtn.addEventListener('click', function () { openUnlock(); });
+    if (footOpenBtn) footOpenBtn.addEventListener('click', function () {
+      var person2 = cardPerson();
+      if (person2 && peerProfileUrl()) openPagePreview(peerProfileUrl(), person2.name || '个人认证主页');
+      else { var co2 = cardCompany(); if (co2) openPagePreview('../company/index.html?id=' + encodeURIComponent(co2.id), co2.name || '企业认证主页'); }
+    });
+
+    /* 解锁付费弹层（规则对齐 personal/index.html：免费额度 / 积分扣费 / 会员折扣） */
+    function openUnlock() {
+      var sub = UI.sheet();
+      sub.setText('解锁查看对方资料');
+      var cost = (MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.material) || 98;
+      var disc = window.creditDiscount ? creditDiscount() : 1;
+      var costP = Math.round(cost * disc);
+      var st0 = window.deriveStatus ? deriveStatus() : 'registered';
+      var allow = (st0 === 'realname' || st0 === 'pro' || st0 === 'enterprise' || st0 === 'resident');
+      var monthly = (window.RULE ? RULE('credits.freeQuota.monthly', 5) : ((MOCK.business.credits && MOCK.business.credits.freeQuota) ? MOCK.business.credits.freeQuota.monthly : 5));
+      if (window.ModeStore && ModeStore.isBreakIn && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
+      var used = window.CreditStore ? CreditStore.freeUsed() : 0;
+      var remain = allow ? Math.max(monthly - used, 0) : 0;
+      var bal = window.CreditStore ? CreditStore.read().balance : 0;
+      var freeBtn = allow && remain > 0;
+      var btnText = freeBtn ? ('免费解锁（本月剩 ' + remain + ' 条）') : (bal >= costP ? ('扣 ' + costP + ' 积分解锁（余额 ' + bal + '）') : '积分不足 · 去充值');
+      var priceHtml = freeBtn
+        ? '<div style="font-size:16px;font-weight:600;color:var(--success);margin-top:6px;">本月免费额度可用</div>'
+        : '<div style="font-size:22px;font-weight:700;color:var(--primary);font-family:var(--font-num);margin-top:6px;">' + costP + ' 积分' + (disc < 1 ? '<small>会员' + Math.round(disc * 10) + '折</small>' : '') + '</div>';
+      sub.html('<div style="padding:4px 4px 16px;">' +
+        '<div style="font-size:12.5px;color:var(--text-2);line-height:1.65;margin-bottom:14px;">解锁后可查看该联系人的<b style="color:var(--text-1);">完整联系方式、企业及发布信息</b>，解锁即获沟通权，平台不售卖联系方式。</div>' +
+        '<div style="text-align:center;">' + priceHtml +
+          '<div style="font-size:11px;color:var(--text-3);margin-top:8px;">账户余额 ' + bal + ' 积分 · 实名用户每月免费额度 ' + monthly + ' 条</div></div>' +
+        '<div style="font-size:11px;color:var(--text-3);text-align:center;margin-top:10px;line-height:1.6;">积分用于解锁核心信息，可在「钱包 · 积分」充值<br>' + (window.RULE ? RULE('refund.days', 7) : 7) + '天无理由退款保障 · 客服 400-888-6688</div>' +
+        '<button class="btn btn-primary btn-block btn-lg" id="uc-confirm" style="margin-top:14px;">' + btnText + '</button></div>');
+      sub.show();
+      /* #uc-confirm 为 btn-block，会被 boostStickyFoot 提升到 sheet-foot，故在弹层根 sub 上查询绑定 */
+      sub.querySelector('#uc-confirm').addEventListener('click', function () {
+        sub.close();
+        if (freeBtn) { CreditStore.freeSpend(1); saveCardUnlock(); applyState(true); UI.toast('已使用免费解锁额度 1 条', 'ok'); return; }
+        if (bal >= costP) { CreditStore.consume(costP, '解锁' + (cert || '联系人')); saveCardUnlock(); applyState(true); UI.toast('已扣 ' + costP + ' 积分解锁', 'ok'); return; }
+        UI.toast('积分不足，请先充值', 'warn');
+        setTimeout(function () { location.href = '../wallet/credits.html'; }, 700);
+      });
+    }
+
+    /* 行内事件委托 */
+    body.addEventListener('click', function (e) {
+      var el = e.target.closest && e.target.closest('[data-uc]');
+      if (!el) return;
+      var act = el.dataset.uc;
+      if (act === 'unlock') { openUnlock(); return; }
+      if (act === 'phone') { var ph = el.dataset.val; if (ph) window.location.href = 'tel:' + ph; else UI.toast('解锁后可查看完整联系方式', 'warn'); return; }
+      if (act === 'copy') { var v = el.dataset.val; if (!v) { UI.toast('解锁后可查看微信号', 'warn'); return; } if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function () { UI.toast('已复制：' + v, 'ok'); }); else UI.toast('复制失败', 'warn'); return; }
+      if (act === 'company' || act === 'supply' || act === 'home' || act === 'service' || act === 'ctx' || act === 'cohome') { var u = el.dataset.url; if (u) openPagePreview(u, '详情'); return; }
+    });
+
+    /* 备注昵称行内编辑 */
+    var rmRow = body.querySelector('#uc-rm-row'), rmBox = body.querySelector('#uc-rm-editbox'),
+        rmVal = body.querySelector('#uc-rm-val'), rmInput = body.querySelector('#uc-rm-input');
+    function syncRemark() {
+      var v = remarkName();
+      rmVal.textContent = v || '未设置';
+      rmVal.classList.toggle('placeholder', !v);
+      rmRow.querySelector('.uc-rt').textContent = v ? '修改' : '添加';
+    }
+    rmRow.addEventListener('click', function () { rmInput.value = remarkName(); rmRow.style.display = 'none'; rmBox.style.display = ''; setTimeout(function () { rmInput.focus(); }, 60); });
+    body.querySelector('#uc-rm-cancel').addEventListener('click', function () { rmBox.style.display = 'none'; rmRow.style.display = ''; });
+    body.querySelector('#uc-rm-ok').addEventListener('click', function () {
+      var v = (rmInput.value || '').trim();
+      ContactRemarkStore.set(peerKey(), v);
+      renderTitle(); syncRemark();
+      rmBox.style.display = 'none'; rmRow.style.display = '';
+      UI.toast(v ? '已设置备注' : '已恢复认证姓名');
+    });
+    rmInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') body.querySelector('#uc-rm-ok').click(); });
+  }
+  window.openUserCard = openUserCard;
+
+  /* 「…」→ 备注：编辑本机备注昵称，保存后标题即时切换（备注仅本机可见，不改对方档案） */
+  window.editRemark = function () {
+    UI.closeSheet();
+    var cur = remarkName(), cert = certifiedName();
+    var sh = UI.sheet();
+    sh.setText('设置备注');
+    sh.html(
+      '<div class="rm-box">' +
+        '<label class="rm-lab" for="rm-input">备注昵称（仅自己可见）</label>' +
+        '<input id="rm-input" class="rm-input" maxlength="20" autocomplete="off" placeholder="' + esc(cert || '对方姓名') + '">' +
+        '<div class="rm-hint">留空时标题默认显示对方认证姓名' + (cert ? '「' + esc(cert) + '」' : '') + '；设置备注后标题按备注显示。</div>' +
+        '<div class="rm-actions">' +
+          (cur ? '<button type="button" class="btn btn-ghost" id="rm-clear">清除备注</button>' : '') +
+          '<button type="button" class="btn btn-primary" id="rm-save">保存</button>' +
+        '</div>' +
+      '</div>');
+    sh.show();
+    var body = sh.body(), inp = body.querySelector('#rm-input');
+    inp.value = cur;
+    setTimeout(function () { inp.focus(); }, 300);
+    function applySave() {
+      var v = (inp.value || '').trim();
+      ContactRemarkStore.set(peerKey(), v);
+      UI.closeSheet(); renderTitle();
+      UI.toast(v ? '已设置备注' : '已恢复认证姓名');
+    }
+    body.querySelector('#rm-save').addEventListener('click', applySave);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') applySave(); });
+    var clr = body.querySelector('#rm-clear');
+    if (clr) clr.addEventListener('click', function () {
+      ContactRemarkStore.set(peerKey(), ''); UI.closeSheet(); renderTitle(); UI.toast('已清除备注');
+    });
+  };
+
+  window.openMore = function () {
+    var sh = UI.sheet();
+    sh.setText(displayName());
+    var rows = [
+      { label: remarkName() ? '修改备注' : '备注', icon: 'edit', act: function () { editRemark(); } },
+      peerProfileUrl() || meta.service ? { label: meta.service ? '联系官方客服' : '查看TA的资料', icon: meta.service ? 'bell' : 'user', act: function () { openUserCard(); } } : null,
+      { label: '清除聊天记录', icon: 'trash', act: function () { clearChat(); } },
+      { label: '投诉 / 举报', icon: 'alert', act: function () { var cid = new URLSearchParams(location.search).get('id') || 'c1'; var cv = MOCK.conversations.find(function (x) { return x.id === cid; }); location.href = 'complaint.html?from=chat&target=' + encodeURIComponent(cv ? cv.name : ''); } }
+    ].filter(Boolean);
+    sh.html(rows.map(function (r) {
+      return '<div style="display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;" onclick="UI.closeSheet();(' + r.act.toString() + ')()">' +
+        '<svg class="ic" style="width:18px;height:18px;color:var(--text-2);"><use href="#i-' + r.icon + '"/></svg><span style="font-size:13px;">' + r.label + '</span></div>';
+    }).join(''));
+    sh.show();
+  };
+
+  /* —— 会话演示数据（含富交互卡片） ——
+     type: text 文本 | card 富交互卡片 | system 系统提示条 | file 文件消息
+     card.kind: supply 供需 | quote 报价 | contact 名片 | appoint 预约 | order 订单 */
+  var CHATS = {
+    c1: [
+      { me: false, type: 'text', text: '您好，看到您在找商品混凝土C30/C40，请问型号规格确认了吗？', t: '08:02' },
+      { me: true,  type: 'text', text: '需要C30，单次3000方，大概什么时候能供货？', t: '08:15' },
+      { me: false, type: 'system', text: '对方已查看您的项目需求', t: '08:20' },
+      { me: false, type: 'card', t: '08:21', card: {
+        kind: 'supply', title: '成都天府新区商业综合体', sub: '材料采购 · 需求详情', icon: 'box',
+        desc: '急需商品混凝土 C30/C40，主体结构施工阶段，要求绿色环保认证及预拌混凝土资质。',
+        fields: [['品类', '预拌商品混凝土'], ['数量', '3000 m³/次'], ['预算', '¥1,350,000'], ['地点', '成都市·天府新区']],
+        actions: [{ label: '查看需求详情', primary: true, act: 'supply' }] } },
+      { me: false, type: 'text', text: '我们仓库现货充足，明天即可安排泵送，您项目地址在哪？', t: '09:12' },
+      { me: true,  type: 'text', text: '天府新区核心区，麻烦先发一份报价单，含泵送和税。', t: '09:14' },
+      { me: true,  type: 'card', t: '09:14', card: {
+        kind: 'quote', title: '报价单 · C30 商品混凝土', sub: '四川中建××建设 → 供方', icon: 'doc',
+        desc: '按 C30 预拌混凝土含泵送报价，量大可议，账期按月结算。',
+        fields: [['单价', '¥468/m³'], ['含泵送', '含 37m 汽车泵'], ['税率', '13% 专票'], ['账期', '月结 30 天'], ['有效期', '2026-09-25']],
+        actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '再议', ghost: true, act: 'reject-quote' }],
+        state: 'pending' } },
+      { me: false, type: 'system', text: '提示：请勿线下交易，通过平台订单成交可享资金保障', t: '09:16' }
+    ],
+    c2: [
+      { me: false, type: 'text', text: '您好，这是我们的盘扣脚手架报价单，请查收', t: '08:40' },
+      { me: false, type: 'file', name: '盘扣脚手架报价单.pdf', size: '284 KB', t: '08:40' },
+      { me: true,  type: 'text', text: '收到，请问含运费吗？', t: '08:45' },
+      { me: false, type: 'text', text: '成都市内含运输，专票统一开', t: '08:47' },
+      { me: false, type: 'card', t: '08:48', card: {
+        kind: 'quote', title: '报价单 · 盘扣脚手架', sub: '四川××租赁 → 需方', icon: 'doc',
+        desc: '双排盘扣脚手架租赁报价，含运输与卸货，押金可退。',
+        fields: [['租金', '¥9.8/㎡/月'], ['面积', '3000 ㎡'], ['运输', '成都市内免费'], ['押金', '¥20,000'], ['账期', '月结']],
+        actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '暂不', ghost: true, act: 'reject-quote' }],
+        state: 'pending' } },
+      { me: false, type: 'card', t: '08:50', card: {
+        kind: 'contact', title: '四川××租赁有限公司', sub: '企业认证 · 机械租赁', icon: 'shield',
+        desc: '主营盘扣脚手架、塔吊、施工电梯租赁，注册资金 5000 万。',
+        fields: [['信用', 'AAA 级'], ['存续', '在营'], ['服务', '成都全域']],
+        actions: [{ label: '查看企业主页', primary: true, act: 'company' }] } }
+    ],
+    c3: [
+      { me: false, type: 'text', text: '您好，钢筋工班组 12 人，随时可以进场', t: '昨天' },
+      { me: true,  type: 'text', text: '需要做实名报备吗？进场时间约一下', t: '昨天' },
+      { me: false, type: 'card', t: '昨天 17:40', card: {
+        kind: 'appoint', title: '班组进场预约', sub: '钢筋工班组 · 12 人', icon: 'calendar',
+        desc: '建议进场时间与现场对接安排。',
+        fields: [['班组', '钢筋工 ×12 人'], ['建议时间', '09-20 08:00'], ['地点', '成都天府新区项目现场'], ['备注', '自带小型机具']],
+        actions: [{ label: '确认进场', primary: true, act: 'confirm-appoint' }, { label: '改时间', ghost: true, act: 'reject-appoint' }],
+        state: 'pending' } }
+    ],
+    c4: [
+      { me: false, type: 'card', t: '昨天 14:02', card: {
+        kind: 'contact', title: '重庆×建设集团', sub: '企业认证 · 建筑施工总承包特级', icon: 'shield',
+        desc: '西南区域市政与房建龙头，寻求市政项目联合体合作。',
+        fields: [['信用', 'AAA 级'], ['总承包', '特级'], ['合作', '联合体/分包']],
+        actions: [{ label: '查看企业主页', primary: true, act: 'company' }] } },
+      { me: false, type: 'text', text: '重庆片区市政项目 3 个在建，寻有资质的分包方', t: '昨天 14:03' },
+      { me: true,  type: 'text', text: '我们有房建总承包一级，市政二级，可以聊聊合作模式', t: '昨天 14:10' },
+      { me: false, type: 'text', text: '好的，资料发我看看，改天约个时间细聊', t: '昨天 14:12' }
+    ],
+    c5: [
+      { me: false, type: 'card', t: '周一 09:20', card: {
+        kind: 'order', title: '发票已开具成功', sub: '平台客服 · 财务', icon: 'wallet',
+        desc: '您申请的增值税专用发票已开具，可在线查看或下载。',
+        fields: [['发票号', 'EC2026090xxx'], ['金额', '¥126,000'], ['抬头', '四川省××建设有限公司']],
+        actions: [{ label: '查看发票', primary: true, act: 'order' }] } },
+      { me: false, type: 'text', text: '如需人工服务请在 周一至周日 9:00-21:00 内留言，紧急问题可致电平台热线。', t: '周一 09:21' }
+    ]
+  };
+
+  /* —— 快捷回复（场景化） —— */
+  var QUICK = {
+    c1: ['型号确认 C30，请发报价', '项目地址发您，方便排产', '泵送车辆白天可进场吗？', '合作愉快，请出平台订单'],
+    c2: ['含运输和卸货吗？', '开几个点的专票？', '押金什么时候退？', '可以按季度结算吗？'],
+    c3: ['确认 09-20 进场', '需要提前报备实名', '工人保险买了吗？', '住宿谁安排？'],
+    c4: ['资料整理后发您', '可以约个时间细聊', '合作模式是怎样的？', '资质证书已发，请查收'],
+    c5: ['怎么联系人工客服？', '我的发票什么时候开？', '如何完成更多认证？', '有使用问题要反馈']
+  };
+
+  /* —— 消息渲染 —— */
+  var scroller = document.getElementById('scroller');
+  var timeline = document.getElementById('timeline');
+  /* 点击对方头像 → 自下而上弹出对方用户信息卡（事件委托，timeline 重渲染不丢失） */
+  timeline.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.js-peer-avatar')) { e.preventDefault(); openUserCard(); }
+  });
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+
+  var AVATAR_TINT = [
+    'linear-gradient(135deg,#8a7a5c,#6b5d44)',
+    'linear-gradient(135deg,#5b6770,#3f4a52)',
+    'linear-gradient(135deg,#7c6b8a,#5c4d68)',
+    'linear-gradient(135deg,#5d7a6b,#456052)',
+    'linear-gradient(135deg,#7a6b5d,#5e5246)'
+  ];
+  function avatarFor(name, idx, peer) { return '<div class="mc-avatar' + (peer ? ' js-peer-avatar' : '') + '"' + (peer ? ' role="button" aria-label="查看对方资料"' : '') + ' style="background:' + AVATAR_TINT[idx % AVATAR_TINT.length] + ';">' + esc((name || '?').slice(0, 1)) + '</div>'; }
+
+  function cardHTML(m) {
+    var card = m.card || {};
+    /* 发名片：富字段（企业认证档案）走专属暗金名片渲染，其余卡片保持原渲染 */
+    if (card.kind === 'contact' && (card.company || card.legal || card.code)) return cardContactHTML(m);
+    var acts = '';
+    if ((!card.state || card.state === 'pending') && card.actions) {
+      acts = '<div class="mc-card-actions">' + card.actions.map(function (a) {
+        if (!a.act) return '<button type="button" class="mc-btn ' + (a.primary ? 'primary' : 'ghost') + '" disabled>' + esc(a.label) + '</button>';
+        return '<button type="button" class="mc-btn ' + (a.primary ? 'primary' : 'ghost') + '" onclick="event.stopPropagation();cardAct(\'' + m._id + '\',\'' + a.act + '\')">' + esc(a.label) + '</button>';
+      }).join('') + '</div>';
+    } else if (card.state === 'done') {
+      acts = '<div class="mc-card-state"><svg class="ic"><use href="#i-check"/></svg>已' + esc(card.stateText || '确认') + '</div>';
+    } else if (card.state === 'rejected') {
+      acts = '<div class="mc-card-state rejected"><svg class="ic"><use href="#i-x"/></svg>' + esc(card.stateText || '已拒绝') + '</div>';
+    }
+    var fields = (card.fields || []).map(function (f) {
+      return '<div class="mc-field"><b>' + esc(f[0]) + '</b><span class="' + (/¥|￥|%|元|万/.test(f[1]) ? 'green' : '') + '">' + esc(f[1]) + '</span></div>';
+    }).join('');
+    return '<div class="mc-card">' +
+      '<div class="mc-card-head"><div class="mc-card-ic"><svg class="ic"><use href="#i-' + esc(card.icon || 'doc') + '"/></svg></div>' +
+      '<div style="flex:1;min-width:0;"><div class="mc-card-title">' + esc(card.title) + '</div><div class="mc-card-sub">' + esc(card.sub || '') + '</div></div></div>' +
+      (card.desc ? '<div class="mc-card-desc">' + esc(card.desc) + '</div>' : '') +
+      (fields ? '<div class="mc-card-fields">' + fields + '</div>' : '') +
+      acts + '</div>';
+  }
+  /* —— 名片卡（contact 专属渲染：企业认证档案数据，发送/预览共用） —— */
+  var CARD_BG = '../../assets/chat-card-bg.jpg';
+  var P_IC = {
+    bld: 'M240,208H224V96a16,16,0,0,0-16-16H144V32a16,16,0,0,0-24.88-13.32L39.12,72A16,16,0,0,0,32,85.34V208H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM208,96V208H144V96ZM48,85.34,128,32V208H48ZM112,112v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm-32,0v16a8,8,0,0,1-16,0V112a8,8,0,1,1,16,0Zm0,56v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Zm32,0v16a8,8,0,0,1-16,0V168a8,8,0,0,1,16,0Z',
+    cert: 'M128,136a8,8,0,0,1-8,8H72a8,8,0,0,1,0-16h48A8,8,0,0,1,128,136Zm-8-40H72a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm112,65.47V224A8,8,0,0,1,220,231l-24-13.74L172,231A8,8,0,0,1,160,224V200H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216a16,16,0,0,1,16,16V86.53a51.88,51.88,0,0,1,0,74.94ZM160,184V161.47A52,52,0,0,1,216,76V56H40V184Zm56-12a51.88,51.88,0,0,1-40,0v38.22l16-9.16a8,8,0,0,1,7.94,0l16,9.16Zm16-48a36,36,0,1,0-36,36A36,36,0,0,0,232,124Z',
+    bank: 'M24,104H48v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16H208V104h24a8,8,0,0,0,4.19-14.81l-104-64a8,8,0,0,0-8.38,0l-104,64A8,8,0,0,0,24,104Zm40,0H96v64H64Zm80,0v64H112V104Zm48,64H160V104h32ZM128,41.39,203.74,88H52.26ZM248,208a8,8,0,0,1-8,8H16a8,8,0,0,1,0-16H240A8,8,0,0,1,248,208Z',
+    clock: 'M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm64-88a8,8,0,0,1-8,8H128a8,8,0,0,1-8-8V72a8,8,0,0,1,16,0v48h48A8,8,0,0,1,192,128Z',
+    users: 'M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z',
+    pin: 'M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,128Zm0-112a88.1,88.1,0,0,0-88,88c0,31.4,14.51,64.68,42,96.25a254.19,254.19,0,0,0,41.45,38.3,8,8,0,0,0,9.18,0A254.19,254.19,0,0,0,174,200.25c27.45-31.57,42-64.85,42-96.25A88.1,88.1,0,0,0,128,16Zm0,206c-16.53-13-72-60.75-72-118a72,72,0,0,1,144,0C200,161.23,144.53,209,128,222Z',
+    case: 'M216,56H176V48a24,24,0,0,0-24-24H104A24,24,0,0,0,80,48v8H40A16,16,0,0,0,24,72V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V72A16,16,0,0,0,216,56ZM96,48a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96ZM216,72v41.61A184,184,0,0,1,128,136a184.07,184.07,0,0,1-88-22.38V72Zm0,128H40V131.64A200.19,200.19,0,0,0,128,152a200.25,200.25,0,0,0,88-20.37V200ZM104,112a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,112Z',
+    globe: 'M128,24h0A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm88,104a87.61,87.61,0,0,1-3.33,24H174.16a157.44,157.44,0,0,0,0-48h38.51A87.61,87.61,0,0,1,216,128ZM102,168H154a115.11,115.11,0,0,1-26,45A115.27,115.27,0,0,1,102,168Zm-3.9-16a140.84,140.84,0,0,1,0-48h59.88a140.84,140.84,0,0,1,0,48ZM40,128a87.61,87.61,0,0,1,3.33-24H81.84a157.44,157.44,0,0,0,0,48H43.33A87.61,87.61,0,0,1,40,128ZM154,88H102a115.11,115.11,0,0,1,26-45A115.27,115.27,0,0,1,154,88Zm52.33,0H170.71a135.28,135.28,0,0,0-22.3-45.6A88.29,88.29,0,0,1,206.37,88ZM107.59,42.4A135.28,135.28,0,0,0,85.29,88H49.63A88.29,88.29,0,0,1,107.59,42.4ZM49.63,168H85.29a135.28,135.28,0,0,0,22.3,45.6A88.29,88.29,0,0,1,49.63,168Zm98.78,45.6a135.28,135.28,0,0,0,22.3-45.6h35.66A88.29,88.29,0,0,1,148.41,213.6Z',
+    check: 'M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z',
+    medal: 'M216,96A88,88,0,1,0,72,163.83V240a8,8,0,0,0,11.58,7.16L128,225l44.43,22.21A8.07,8.07,0,0,0,176,248a8,8,0,0,0,8-8V163.83A87.85,87.85,0,0,0,216,96ZM56,96a72,72,0,1,1,72,72A72.08,72.08,0,0,1,56,96ZM168,227.06l-36.43-18.21a8,8,0,0,0-7.16,0L88,227.06V174.37a87.89,87.89,0,0,0,80,0ZM128,152A56,56,0,1,0,72,96,56.06,56.06,0,0,0,128,152Zm0-96A40,40,0,1,1,88,96,40,40,0,0,1,128,56Z'
+  };
+  function pIcon(n, s) {
+    return '<svg class="pc-ic" width="' + s + '" height="' + s + '" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="' + P_IC[n] + '"/></svg>';
+  }
+  function cardContactHTML(m) {
+    var c = m.card || {};
+    var company = c.company || c.title || '企业';
+    var legal = c.legal || c.name || '';
+    var tag = c.tag || c.sub || '企业认证';
+    var code = c.code || '';
+    var capital = c.capital || '';
+    var founded = c.founded || '';
+    var staff = c.staff || '';
+    var region = c.region || '';
+    var scope = c.scope || '';
+    var quals = (c.quals && c.quals.length ? c.quals : [c.qual].filter(Boolean));
+    var name = c.name || legal || company;
+    var role = c.role || (legal && legal === name ? '法定代表人' : '企业认证');
+    var av = name.slice(0, 1);
+    var fields = '';
+    if (capital) fields += '<div class="pc-field"><span class="k">' + pIcon('bank', 10) + '注册资本</span><span class="v">' + esc(capital) + '</span></div>';
+    if (founded) fields += '<div class="pc-field"><span class="k">' + pIcon('clock', 10) + '成立时间</span><span class="v">' + esc(founded) + '</span></div>';
+    if (staff) fields += '<div class="pc-field"><span class="k">' + pIcon('users', 10) + '人员规模</span><span class="v">' + esc(staff) + '</span></div>';
+    if (region) fields += '<div class="pc-field"><span class="k">' + pIcon('pin', 10) + '经营区域</span><span class="v">' + esc(region) + '</span></div>';
+    if (scope) fields += '<div class="pc-field full"><span class="k">' + pIcon('case', 10) + '主营范围</span><span class="v wrap">' + esc(scope) + '</span></div>';
+    var qc = quals.map(function (q) { return '<span class="pc-qual">' + pIcon('medal', 10) + esc(q) + '</span>'; }).join('');
+    var acts = '';
+    if (c.actions && c.actions.length) {
+      acts = '<div class="pc-actions">' + c.actions.map(function (a) {
+        if (!a.act) return '<button type="button" class="pc-btn gold" disabled>' + esc(a.label) + '</button>';
+        return '<button type="button" class="pc-btn gold" onclick="event.stopPropagation();cardAct(\'' + m._id + '\',\'' + a.act + '\')">' + esc(a.label) + '</button>';
+      }).join('') + '</div>';
+    }
+    return '<div class="pc-card">' +
+      '<div class="pc-head"><img src="' + CARD_BG + '" alt="">' +
+        '<div class="pc-in">' +
+          '<div class="pc-top">' +
+            '<div class="pc-logo">' + pIcon('bld', 19) + '</div>' +
+            '<div class="pc-tit">' +
+              '<div class="pc-name">' + esc(company) + '</div>' +
+              '<span class="pc-badge">' + pIcon('check', 10) + '企业认证 · 已核验</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pc-legal">' + pIcon('cert', 11) + '<span>法定代表人 <b>' + esc(legal) + '</b> · ' + esc(tag) + '</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="pc-body">' +
+        '<div class="pc-holder">' +
+          '<div class="pc-ava">' + esc(av) + '</div>' +
+          '<div class="pc-who">' +
+            '<div class="pc-person">' + esc(name) + '<small>' + esc(role) + '</small></div>' +
+            (quals.length ? '<div class="pc-role">' + pIcon('case', 11) + esc(quals[0]) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        (fields ? '<div class="pc-fields">' + fields + '</div>' : '') +
+        (qc ? '<div class="pc-quals">' + qc + '</div>' : '') +
+        (code ? '<div class="pc-foot"><span class="ok">' + pIcon('check', 9) + '工商注册号 ' + esc(code) + ' · 存续</span><span class="sp">' + pIcon('globe', 9) + '平台核验</span></div>' : '') +
+        acts +
+      '</div>' +
+    '</div>';
+  }
+
+  /* 文件 / 媒体消息渲染：file 文档 | image 图片 | video 视频 | audio 语音 */
+  function fileIcon(ext, name) {
+    var e = String(ext || '').toLowerCase();
+    if (e === 'pdf' || e === 'doc' || e === 'docx' || e === 'xls' || e === 'xlsx' || e === 'ppt' || e === 'pptx' || e === 'txt' || e === 'csv' || e === 'dwg' || e === 'xmind') return 'doc';
+    if (e === 'jpg' || e === 'jpeg' || e === 'png' || e === 'gif' || e === 'webp' || e === 'bmp') return 'image';
+    if (e === 'mp4' || e === 'mov' || e === 'avi' || e === 'mkv' || e === 'webm') return 'video';
+    if (e === 'mp3' || e === 'wav' || e === 'm4a' || e === 'aac' || e === 'ogg' || e === 'flac') return 'mic';
+    if (e === 'zip' || e === 'rar' || e === '7z') return 'clip';
+    return 'file';
+  }
+  function fileHTML(m) {
+    var ext = m.ext || (m.name && m.name.indexOf('.') > -1 ? m.name.split('.').pop() : '') || 'PDF';
+    return '<div class="mc-file">' +
+      '<div class="mc-file-ic"><svg class="ic"><use href="#i-' + fileIcon(ext, m.name) + '"/></svg></div>' +
+      '<div class="mc-file-body"><div class="mc-file-name">' + esc(m.name || '文件') + '</div><div class="mc-file-meta">' + esc(m.size || '') + ' · ' + esc(String(ext).toUpperCase()) + '</div></div>' +
+      '<div class="mc-file-go"><svg class="ic"><use href="#i-download"/></svg></div></div>';
+  }
+  function mediaHTML(m) {
+    var inner = '';
+    if (m.type === 'image' && m.url) inner = '<img src="' + m.url + '" alt="' + esc(m.name || '图片') + '">';
+    else if (m.type === 'video' && m.url) inner = '<video src="' + m.url + '" controls preload="metadata"></video>';
+    else if (m.type === 'audio' && m.url) inner = '<audio src="' + m.url + '" controls preload="metadata"></audio>';
+    var ic = m.type === 'image' ? 'image' : m.type === 'video' ? 'video' : 'mic';
+    return '<div class="mc-media">' + inner +
+      '<div class="mm-meta"><svg class="ic"><use href="#i-' + ic + '"/></svg>' +
+      '<span class="mm-name">' + esc(m.name || '') + '</span><span>' + esc(m.size || '') + '</span></div></div>';
+  }
+
+  function msgHTML(m, senderName) {
+    var cls = m.me ? 'mc-row mine' : 'mc-row';
+    var body;
+    if (m.type === 'card') {
+      body = '<div class="mc-bubble" style="background:transparent;box-shadow:none;padding:0;border-radius:0;max-width:100%;">' + cardHTML(m) + '</div>';
+    } else if (m.type === 'file') {
+      body = '<div class="mc-bubble" style="background:transparent;box-shadow:none;padding:0;border-radius:0;">' + fileHTML(m) + '</div>';
+    } else if (m.type === 'image' || m.type === 'video' || m.type === 'audio') {
+      body = '<div class="mc-bubble" style="background:transparent;box-shadow:none;padding:0;border-radius:0;">' + mediaHTML(m) + '</div>';
+    } else if (m.type === 'system') {
+      return '<div class="mc-sys ' + (m.tone || '') + '"><span>' + esc(m.text) + '</span></div>';
+    } else {
+      body = '<div class="mc-bubble text">' + esc(m.text) + '</div>';
+    }
+    var meta = m.me
+      ? '<div class="mc-meta"><span class="' + (m.status === 'sending' ? 'mc-sending' : 'mc-tick') + '">' + (m.status === 'sending' ? '发送中' : '已读') + '</span><span>' + esc(m.t || '') + '</span></div>'
+      : '<div class="mc-meta"><span>' + esc(m.t || '') + '</span></div>';
+    return '<div class="' + cls + '">' + avatarFor(m.me ? '我' : senderName, m._ai || 0, !m.me) +
+      '<div class="mc-body">' + body + meta + '</div></div>';
+  }
+
+  var convId = conv.id;
+  var messages = (CHATS[convId] || []).map(function (m, i) { m._id = convId + '-' + i; m._ai = (conv.name || '?').charCodeAt(0) % 5; return m; });
+  var _seq = 100;
+
+  /* [历史文件] 会话内文件消息（收到/发送）→ 同步进历史文件（来源：会话消息） */
+  (function syncChatFiles() {
+    if (!window.FileStore) return;
+    (CHATS[convId] || []).forEach(function (m) {
+      if (m.type === 'file' && m.name) FileStore.ensureChatFile(convId, m.name, m.size || '', !!m.me);
+    });
+  })();
+
+  /* [历史文件] 转发落地：历史文件页转发 → 本会话消息窗口逐条追加文件消息
+     （fwd 参数支持逗号分隔多个文件 id，逐条发送） */
+  var fwdParam = new URLSearchParams(location.search).get('fwd') || '';
+  var fwdIds = fwdParam.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  var fwdCount = 0;
+  if (fwdIds.length && window.FileStore) {
+    var filesAll = FileStore.list();
+    var fwdNow = new Date();
+    var fwdHM = (fwdNow.getHours() < 10 ? '0' : '') + fwdNow.getHours() + ':' + (fwdNow.getMinutes() < 10 ? '0' : '') + fwdNow.getMinutes();
+    var fwdFirstName = '';
+    fwdIds.forEach(function (fid) {
+      var fwdFile = null;
+      filesAll.forEach(function (f) { if (f.id === fid) fwdFile = f; });
+      if (!fwdFile) return;
+      if (!fwdFirstName) fwdFirstName = fwdFile.name;
+      messages.push({ me: true, type: 'file', name: fwdFile.name, size: fwdFile.size || '—', t: fwdHM, _id: 'fwd-' + (_seq++), _ai: 0 });
+      FileStore.markForwarded(fwdFile.id, conv.name);
+      fwdCount++;
+    });
+    if (fwdCount) {
+      UI.toast(fwdCount > 1 ? '已转发 ' + fwdCount + ' 个文件到会话' : '已转发「' + fwdFirstName + '」到会话', 'ok');
+      setTimeout(function () {
+        messages.push({ me: false, type: 'text', text: '收到您转发的文件，我先看一下再回复您。', t: '刚刚', _id: 'fwd-' + (_seq++) });
+        render();
+      }, 1200);
+    }
+  }
+
+  function dayLabel(t) {
+    if (/^昨天/.test(t)) return '昨天';
+    if (/^刚刚|^\d{2}:\d{2}/.test(t)) return '今天';
+    return '更早';
+  }
+  var _prevCount = 0;
+  function render() {
+    var html = '';
+    if (!messages.length) {
+      html += '<div class="mc-empty"><div class="e-ic"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chat"/></svg></div>' +
+        '<div class="e-t">暂无消息</div><div class="e-s">发起会话，与对方开始对接沟通</div></div>';
+    } else {
+      var lastDay = '';
+      messages.forEach(function (m) {
+        var d = dayLabel(m.t);
+        if (d !== lastDay) { html += '<div class="mc-day"><span>' + d + '</span></div>'; lastDay = d; }
+        html += msgHTML(m, conv.name);
+      });
+    }
+    timeline.innerHTML = html;
+    /* 仅当新增消息时，最后一条弹入（避免「已读」刷新重复触发） */
+    if (messages.length > _prevCount) {
+      var last = timeline.lastElementChild;
+      if (last) last.classList.add('mc-pop');
+    }
+    _prevCount = messages.length;
+    scrollBottom();
+  }
+  function scrollBottom() {
+    scroller.scrollTop = scroller.scrollHeight;
+    document.getElementById('back-btn').classList.remove('show');
+  }
+  scroller.addEventListener('scroll', function () {
+    var nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 60;
+    document.getElementById('back-btn').classList.toggle('show', !nearBottom);
+  });
+  render();
+
+  /* —— 卡片动作 —— */
+  window.cardAct = function (mid, act) {
+    var m = null;
+    messages.forEach(function (x) { if (x._id === mid) m = x; });
+    if (!m || !m.card) return;
+    var c = m.card;
+    if (act === 'supply') { openPagePreview('../supply/detail.html?id=1001', '需求详情'); return; }
+    if (act === 'company') { openPagePreview('../company/index.html?id=c-znzjs', '企业主页'); return; }
+    if (act === 'my-home') { openPagePreview('../profile/index.html', '我的主页'); return; }
+    if (act === 're-quote') { openQuoteSheet(); return; }
+    if (act === 're-appoint') { openAppointSheet(); return; }
+    if (act === 'order') { openPagePreview('../order/index.html', '平台订单'); return; }
+    if (act === 'confirm-quote') {
+      c.state = 'done'; c.stateText = '确认报价';
+      messages.push({ me: false, type: 'system', text: '已确认报价，等待对方生成平台订单', t: '刚刚' });
+      setTimeout(function () {
+        messages.push({ me: false, type: 'card', t: '刚刚', card: {
+          kind: 'order', title: '平台订单已生成', sub: '请在线签署确认', icon: 'box',
+          desc: '对方已按确认报价生成平台订单，签署后即可安排发货/进场。',
+          fields: [['订单号', 'EC2026091' + (_seq++)], ['金额', c.fields && c.fields[0] ? c.fields[0][1] : '—'], ['保障', '平台资金担保']],
+          actions: [{ label: '去处理订单', primary: true, act: 'order' }] } });
+        render();
+      }, 1000);
+    } else if (act === 'reject-quote') {
+      c.state = 'rejected'; c.stateText = '已婉拒';
+      messages.push({ me: false, type: 'system', text: '您已婉拒该报价，可继续与对方协商', t: '刚刚' });
+    } else if (act === 'confirm-appoint') {
+      c.state = 'done'; c.stateText = '确认进场';
+      messages.push({ me: false, type: 'system', text: '进场已确认：09-20 08:00 · 成都天府新区项目现场', t: '刚刚' });
+      setTimeout(function () {
+        messages.push({ me: false, type: 'text', text: '好的，届时现场会有专人对接，实名报备资料我这边准备。', t: '刚刚' });
+        render();
+      }, 900);
+    } else if (act === 'reject-appoint') {
+      c.state = 'rejected'; c.stateText = '已改期';
+      messages.push({ me: false, type: 'system', text: '已通知对方调整时间', t: '刚刚' });
+    }
+    render();
+  };
+
+  /* —— 输入 / 发送 —— */
+  var input = document.getElementById('msg');
+  var btnSend = document.getElementById('btn-send');
+  function onInput() { btnSend.classList.toggle('disabled', !input.value.trim()); }
+  input.addEventListener('input', onInput);
+  onInput();
+
+  window.togglePanel = function () {
+    var panel = document.getElementById('panel');
+    var open = panel.classList.toggle('show');
+    document.getElementById('btn-attach').classList.toggle('open', open);
+  };
+
+  /* ============ 加号面板：发名片 / 发报价单 / 预约对接 / 发文件 ============ */
+
+  /* —— 当前用户名片数据（数据源：DataBus 认证档案+入驻档案 → MOCK 兜底） —— */
+  /* 信息来自 企业认证（工商注册：公司/信用代码/法人）+ 入驻档案（成立/注册资本/规模/
+     资质/主营/区域/简介）+ 实名（联系号码）。平台核验后自动带入，无需手动填写。 */
+  function myProfile() {
+    var u = null;
+    try { u = (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (e) {}
+    var p = (window.MOCK && MOCK.profile) || {};
+    var mf = (window.mockFormData && mockFormData.enterpriseEntry) || {};
+    var en = (u && u.auth && u.auth.enterprise) || {};
+    var et = (u && u.entry) || {};
+    var intro = et.intro || mf.intro || {};
+    var qual = '';
+    if (u && u.auth) {
+      var ql = u.auth.enterpriseQual && u.auth.enterpriseQual.list;
+      if (ql && ql.length) qual = ql[0];
+      else if (u.auth.qual && u.auth.qual.list && u.auth.qual.list.length) qual = u.auth.qual.list[0];
+      else if (u.auth.personalQual && u.auth.personalQual.list && u.auth.personalQual.list.length) qual = u.auth.personalQual.list[0];
+    }
+    var mobile = (u && u.auth && u.auth.realname && u.auth.realname.mobile) || '138****1234';
+    var tag = (u && u.tag) || (p.role ? (p.role === '供方' ? '入驻企业 · 建筑' : p.role) : '企业认证');
+    var name = (u && u.name) || p.name || '我';
+    var co = en.co || p.company || '四川省××建设有限公司';
+    var legal = en.legal || name;
+    var code = en.code || '91510100MA6×××12X';
+    /* 资质：入驻档案 qualifications[]（名称+等级）优先，认证列表兜底 */
+    var quals = [];
+    (et.qualifications || []).forEach(function (q) {
+      if (!q) return;
+      quals.push((q.name || '') + (q.level || ''));
+    });
+    if (!quals.length && qual) quals.push(String(qual).replace(/^建筑业企业资质\s*·\s*/, ''));
+    if (!quals.length) quals = ['建筑工程施工总承包贰级', '市政公用工程施工总承包叁级'];
+    var capital = intro.capital || '';
+    if (capital && !/万|亿/.test(capital)) capital += '万';
+    var founded = intro.founded || '2008';
+    var staff = intro.staffSize || '101-500人';
+    var scope = et.scope || '房屋建筑工程 · 市政公用工程 · 装饰装修 · 机电安装';
+    var addr = et.address || {};
+    var prov = addr.province ? String(addr.province).replace(/省$/, '') : '四川';
+    var city = addr.city ? String(addr.city).replace(/市$/, '') : '成都';
+    var region = prov + ' · ' + city;
+    var desc = (intro.desc || '').slice(0, 60) || '成立于 ' + founded + ' 年，集房屋建筑、市政公用、装饰装修、机电安装于一体的综合性建筑施工企业。';
+    return {
+      name: name, company: co, tag: tag, qual: qual || quals[0] || '建筑工程施工总承包贰级', mobile: mobile,
+      role: (legal === name && en.legal) ? '法定代表人' : '企业认证',
+      legal: legal, code: code, capital: capital || '5000万', founded: founded,
+      staff: staff, region: region, scope: scope, quals: quals, desc: desc
+    };
+  }
+
+  /* —— 会话上下文供需条目（报价单数据源：当前对接业务 → 供需详情） —— */
+  function ctxSupply() {
+    var href = meta && meta.ctx && meta.ctx.href, id = null;
+    if (href) { var mm = /[?&]id=([^&]+)/.exec(href); if (mm) id = decodeURIComponent(mm[1]); }
+    var item = null;
+    if (id && window.MOCK && MOCK.supplies) {
+      var arr = MOCK.supplies.filter(function (s) { return String(s.id) === String(id); });
+      if (arr.length) item = arr[0];
+    }
+    if (!item && id) {
+      try {
+        var all = (window.SupplyStore && SupplyStore.read) ? SupplyStore.read().items : null;
+        if (all) { all.forEach(function (s2) { if (String(s2.id) === String(id)) item = s2; }); }
+      } catch (e) {}
+    }
+    return { id: id, item: item };
+  }
+
+  /* —— 报价单默认值：按会话场景预设，缺省时从供需条目派生 —— */
+  function quoteDefaults() {
+    var byConv = {
+      c1: { name: '商品混凝土 C30', price: '¥485/m³', qty: '单次 3000 m³', tax: '13% 专票', terms: '月结 80%', note: '按 C30 预拌混凝土含泵送报价，量大可议，账期按月结算。' },
+      c2: { name: '盘扣脚手架租赁', price: '¥9.8/㎡/月', qty: '3000 ㎡', tax: '含税', terms: '月结', note: '双排盘扣脚手架租赁报价，含运输与卸货，押金可退。' },
+      c3: { name: '钢筋工班组 · 12人', price: '¥380/工日', qty: '12 人', tax: '3% 普票', terms: '月结', note: '钢筋工班组劳务报价，含社保与安全培训，随时可进场。' },
+      c4: { name: '市政项目联营合作', price: '面议', qty: '—', tax: '—', terms: '按合同', note: '房建总承包一级、市政二级，可承接联合体/分包合作。' }
+    };
+    var d = byConv[convId];
+    if (d) return d;
+    var s = ctxSupply(), it = s && s.item;
+    d = { name: '', price: '面议', qty: '—', tax: '—', terms: '—', note: '' };
+    if (it) {
+      d.name = (it.sub || it.cat || '标的') + (it.title ? ' · ' + it.title.replace(/\s*(急需|诚招).*/g, '').slice(0, 16) : '');
+      var pm = /([¥￥]?\s?\d+(?:\.\d+)?)/.exec((it.mat && it.mat.price && (it.mat.price.exact || it.mat.price.range)) || '');
+      if (pm) d.price = (pm[1].indexOf('¥') > -1 || pm[1].indexOf('￥') > -1 ? '' : '¥') + pm[1].trim();
+      (it.fields || []).forEach(function (f) {
+        if (f.k === '需求方量') d.qty = f.v;
+        if (f.k === '发票要求') d.tax = f.v;
+        if (f.k === '结算方式') d.terms = f.v;
+      });
+      d.note = (it.qual || it.detail || '').slice(0, 42);
+    }
+    return d;
+  }
+
+  function fmtDate(offsetDays) {
+    var d = new Date(Date.now() + (offsetDays || 0) * 864e5);
+    return d.getFullYear() + '-' + ((d.getMonth() + 1) < 10 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate();
+  }
+  function fmtTime(d) {
+    return (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+  }
+  function fmtSize(n) {
+    if (n == null || isNaN(n) || n < 0) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(0) + ' KB';
+    if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+  }
+
+  /* [历史文件] 会话内文件记录：按 会话+文件名 去重（与 ensureChatFile 语义一致，保留真实扩展名/大小/来源） */
+  function chatFileRecord(convId, name, ext, size, me, event) {
+    if (!window.FileStore) return null;
+    var s = FileStore.read();
+    var hit = null;
+    (s.items || []).forEach(function (x) {
+      if (x.name === name && x.note && x.note.indexOf('会话·' + convId) === 0) hit = x;
+    });
+    if (hit) {
+      hit.ext = ext || hit.ext; hit.size = size || hit.size;
+      hit.source = me ? '会话消息·发送' : '会话消息·收到'; hit.sourceKey = 'chat';
+      hit.note = '会话·' + convId; hit.time = Date.now();
+      if (event) hit.event = event;
+      FileStore.write(s);
+      return hit;
+    }
+    return FileStore.add({ name: name, ext: ext || 'PDF', size: size || '', source: me ? '会话消息·发送' : '会话消息·收到', sourceKey: 'chat', note: '会话·' + convId, event: event || '' });
+  }
+
+  /* 追加"我"的卡片消息并重渲染 */
+  function pushMyCard(card) {
+    messages.push({ me: true, type: 'card', t: fmtTime(new Date()), _id: 'mine-' + (_seq++), _ai: 0, card: card });
+    render();
+  }
+
+  /* —— 发名片：预览 → 发送（数据源：企业认证档案 + 入驻档案） —— */
+  function openCardSheet() {
+    var my = myProfile();
+    var sh = UI.sheet();
+    sh.setText('发名片');
+    var card = {
+      kind: 'contact', title: my.company, sub: my.tag, icon: 'shield',
+      company: my.company, legal: my.legal, code: my.code, tag: my.tag, name: my.name,
+      role: my.role, capital: my.capital, founded: my.founded, staff: my.staff,
+      region: my.region, scope: my.scope, quals: my.quals, qual: my.qual,
+      phone: my.mobile, mobile: my.mobile, desc: my.desc,
+      fields: [['认证', my.tag], ['资质', my.qual], ['区域', my.region], ['联系', my.mobile]],
+      actions: [{ label: '查看我的主页', primary: true, act: 'my-home' }]
+    };
+    var previewCard = JSON.parse(JSON.stringify(card));
+    previewCard.actions = [];
+    sh.html(
+      '<div style="padding:2px 0 4px;">' + cardContactHTML({ _id: 'preview-card', card: previewCard }) + '</div>' +
+      '<div style="display:flex;align-items:flex-start;gap:6px;margin:12px 2px;padding:9px 11px;border-radius:10px;background:rgba(168,127,53,.11);font-size:10px;color:#8A6727;line-height:1.6;">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;flex:none;margin-top:1px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' +
+        '<span>名片信息取自企业认证档案：工商注册、资质、注册资本等由平台核验后自动带入，无需手动填写。</span>' +
+      '</div>' +
+      '<button type="button" class="btn btn-block ghost" id="card-cancel">取消</button>' +
+      '<button type="button" class="btn btn-block" id="card-send">发送名片</button>'
+    );
+    sh.show();
+    document.getElementById('card-cancel').addEventListener('click', function () { UI.closeSheet(); });
+    document.getElementById('card-send').addEventListener('click', function () {
+      pushMyCard(card);
+      UI.closeSheet();
+      UI.toast('名片已发送', 'ok');
+      setTimeout(function () {
+        messages.push({ me: false, type: 'text', text: '收到您的名片，信息已留档，稍后联系。', t: '刚刚', _id: 'card-r-' + (_seq++) });
+        render();
+      }, 1100);
+    });
+  }
+
+  /* —— 发报价单：表单（数据源：会话供需条目 + 我的企业） → 卡片 + 历史文件 —— */
+  function openQuoteSheet() {
+    var d = quoteDefaults();
+    var my = myProfile();
+    var sh = UI.sheet();
+    sh.setText('发报价单');
+    sh.html(
+      '<div class="mc-prev" style="margin-bottom:12px;">' +
+        '<div class="mc-prev-title">' + esc(my.company) + '</div>' +
+        '<div class="mc-prev-sub">报价方 · ' + esc(my.qual) + '</div>' +
+      '</div>' +
+      '<div class="mc-form">' +
+        '<div class="mf-row"><div class="mf-label">品名 / 服务</div><input class="mf-input" id="q-name" value="' + esc(d.name) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">单价</div><input class="mf-input" id="q-price" value="' + esc(d.price) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">数量 / 规模</div><input class="mf-input" id="q-qty" value="' + esc(d.qty) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">税率 / 发票</div><input class="mf-input" id="q-tax" value="' + esc(d.tax) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">账期</div><input class="mf-input" id="q-terms" value="' + esc(d.terms) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">备注</div><textarea class="mf-input" id="q-note" rows="2" style="height:auto;padding:9px 12px;resize:none;line-height:1.5;">' + esc(d.note) + '</textarea></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-block ghost" id="q-cancel">取消</button>' +
+      '<button type="button" class="btn btn-block" id="q-send">发送报价单</button>'
+    );
+    sh.show();
+    document.getElementById('q-cancel').addEventListener('click', function () { UI.closeSheet(); });
+    document.getElementById('q-send').addEventListener('click', function () {
+      function v(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+      var name = v('q-name') || '报价单';
+      pushMyCard({
+        kind: 'quote', title: '报价单 · ' + name, sub: my.company + ' → ' + conv.name, icon: 'doc',
+        desc: v('q-note') || d.note,
+        fields: [
+          ['单价', v('q-price') || '面议'],
+          ['数量', v('q-qty') || '—'],
+          ['税率', v('q-tax') || '—'],
+          ['账期', v('q-terms') || '—'],
+          ['有效期', fmtDate(6)]
+        ],
+        actions: [{ label: '等待对方确认', primary: true, act: '' }, { label: '再议', ghost: true, act: 're-quote' }], state: 'pending'
+      });
+      if (window.FileStore) {
+        chatFileRecord(convId, '报价单-' + name + '.pdf', 'PDF', '—', true, '发送报价单');
+      }
+      UI.closeSheet();
+      UI.toast('报价单已发送', 'ok');
+      setTimeout(function () {
+        messages.push({ me: false, type: 'system', text: '对方已查看报价单', t: '刚刚', _id: 'quote-r-' + (_seq++) });
+        render();
+      }, 1000);
+    });
+  }
+
+  /* —— 预约对接：日期 / 时段 / 地点 / 事项 → 预约卡片 —— */
+  function openAppointSheet() {
+    var loc = '';
+    var s = ctxSupply();
+    if (s && s.item && s.item.address) loc = s.item.address;
+    if (!loc && meta && meta.ctx && meta.ctx.sub) loc = meta.ctx.sub;
+    var def = { c1: '洽谈供货 / 进场细节', c2: '租赁合同签订细节', c3: '班组进场对接', c4: '联合体合作洽谈' }[convId] || '双方对接';
+    var sh = UI.sheet();
+    sh.setText('预约对接');
+    var dayOpts = '', i;
+    for (i = 0; i < 3; i++) {
+      var dt = new Date(Date.now() + i * 864e5);
+      var lbl = (i === 0 ? '今天' : i === 1 ? '明天' : '后天') + ' ' + (dt.getMonth() + 1) + '-' + dt.getDate();
+      dayOpts += '<div class="seg' + (i === 0 ? ' on' : '') + '" data-day="' + (i === 0 ? '今天' : i === 1 ? '明天' : '后天') + '">' + lbl + '</div>';
+    }
+    var slotOpts = '';
+    ['09:00', '14:00', '17:00', '19:00'].forEach(function (s2, idx) {
+      slotOpts += '<div class="seg' + (idx === 1 ? ' on' : '') + '" data-slot="' + s2 + '">' + s2 + '</div>';
+    });
+    var day = '今天', slot = '14:00';
+    sh.html(
+      '<div class="mc-form">' +
+        '<div class="mf-row"><div class="mf-label">日期</div><div class="mc-seg">' + dayOpts + '</div></div>' +
+        '<div class="mf-row"><div class="mf-label">时段</div><div class="mc-seg">' + slotOpts + '</div></div>' +
+        '<div class="mf-row"><div class="mf-label">地点</div><input class="mf-input" id="a-loc" value="' + esc(loc) + '"></div>' +
+        '<div class="mf-row"><div class="mf-label">事项</div><input class="mf-input" id="a-note" value="' + esc(def) + '"></div>' +
+      '</div>' +
+      '<button type="button" class="btn btn-block ghost" id="a-cancel">取消</button>' +
+      '<button type="button" class="btn btn-block" id="a-send">发送预约</button>'
+    );
+    sh.show();
+    document.getElementById('a-cancel').addEventListener('click', function () { UI.closeSheet(); });
+    sh.body().addEventListener('click', function (e) {
+      var segEl = e.target.closest('.seg');
+      if (!segEl) return;
+      var grp = segEl.parentNode;
+      Array.prototype.forEach.call(grp.children, function (c) { c.classList.remove('on'); });
+      segEl.classList.add('on');
+      if (segEl.getAttribute('data-day')) day = segEl.getAttribute('data-day');
+      if (segEl.getAttribute('data-slot')) slot = segEl.getAttribute('data-slot');
+    });
+    document.getElementById('a-send').addEventListener('click', function () {
+      var locV = (document.getElementById('a-loc') || {}).value || '';
+      var noteV = (document.getElementById('a-note') || {}).value || '';
+      pushMyCard({
+        kind: 'appoint', title: '预约现场对接', sub: conv.name + ' · 双方确认', icon: 'calendar',
+        desc: '建议时间，待对方确认。',
+        fields: [['时间', day + ' ' + slot], ['地点', locV || '待定'], ['事项', noteV || '洽谈对接细节']],
+        actions: [{ label: '等待对方确认', primary: true, act: '' }, { label: '改时间', ghost: true, act: 're-appoint' }], state: 'pending'
+      });
+      UI.closeSheet();
+      UI.toast('预约已发送', 'ok');
+      setTimeout(function () {
+        messages.push({ me: false, type: 'system', text: '对方暂未回复预约，可稍后提醒', t: '刚刚', _id: 'appt-r-' + (_seq++) });
+        render();
+      }, 1000);
+    });
+  }
+
+  /* ============ 发文件：来源 × 类型拆解 ============
+     来源：本机存储（图片/文档/视频/语音）｜本 App 历史文件｜微信聊天记录（隐私引导）
+     发送后统一落 FileStore（历史文件），消息气泡按类型渲染 */
+  var _fileInput = null;
+  function fileInputEl() {
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.id = 'chat-file-input';
+    inp.multiple = true;
+    inp.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.dwg,.xmind';
+    inp.style.display = 'none';
+    document.body.appendChild(inp);
+    return inp;
+  }
+  function pickLocalFiles() {
+    if (!_fileInput) _fileInput = fileInputEl();
+    _fileInput.onchange = function () {
+      var files = Array.prototype.slice.call(_fileInput.files || []);
+      if (!files.length) return;
+      files.forEach(sendLocalFile);
+      _fileInput.value = '';
+    };
+    _fileInput.click();
+  }
+  function sendLocalFile(file) {
+    var name = file.name || '文件';
+    var ext = (name.indexOf('.') > -1 ? name.split('.').pop() : 'file').toUpperCase();
+    var size = fmtSize(file.size);
+    var type = 'file';
+    var previewable = false;
+    if (/^image\//.test(file.type)) { type = 'image'; previewable = true; }
+    else if (/^video\//.test(file.type)) { type = 'video'; previewable = true; }
+    else if (/^audio\//.test(file.type)) { type = 'audio'; previewable = true; }
+    /* 超大媒体（>12MB）不做内嵌预览，降级为文档卡发送，避免大 dataURL 造成卡顿 */
+    var MEDIA_PREVIEW_LIMIT = 12 * 1024 * 1024;
+    if (previewable && file.size > MEDIA_PREVIEW_LIMIT) {
+      type = 'file';
+      setTimeout(function () { UI.toast('「' + name + '」超过 12MB，已按文件形式发送（不内嵌预览）', 'info'); }, 400);
+    }
+    var msg = { me: true, type: type, name: name, ext: ext, size: size, t: fmtTime(new Date()), status: 'sending', _id: 'file-' + (_seq++), _ai: 0 };
+    if (type === 'image' || type === 'video' || type === 'audio') {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        msg.url = e.target.result;
+        msg.status = 'read';
+        render();
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setTimeout(function () { msg.status = 'read'; render(); }, 400);
+    }
+    messages.push(msg);
+    render();
+    if (window.FileStore) {
+      chatFileRecord(convId, name, ext, size, true);
+    }
+    UI.toast('已发送「' + name + '」', 'ok');
+    setTimeout(function () {
+      messages.push({ me: false, type: 'text', text: '收到您发送的文件，我先看一下再回复您。', t: '刚刚', _id: 'file-r-' + (_seq++) });
+      render();
+    }, 1200);
+  }
+  function sendHistoryFile(f) {
+    var ext = f.ext || (f.name && f.name.indexOf('.') > -1 ? f.name.split('.').pop() : '') || 'PDF';
+    messages.push({ me: true, type: 'file', name: f.name, ext: ext, size: f.size || '—', t: fmtTime(new Date()), status: 'read', _id: 'hf-' + (_seq++), _ai: 0 });
+    render();
+    if (window.FileStore) FileStore.markForwarded(f.id, conv.name);
+    UI.toast('已发送「' + f.name + '」', 'ok');
+    setTimeout(function () {
+      messages.push({ me: false, type: 'text', text: '收到您转发的文件，我先看一下再回复您。', t: '刚刚', _id: 'hf-r-' + (_seq++) });
+      render();
+    }, 1200);
+  }
+  function openHistoryFiles() {
+    var items = [];
+    try { items = window.FileStore ? FileStore.list() : []; } catch (e) {}
+    var sh = UI.sheet();
+    sh.setText('历史文件 · 选择发送');
+    if (!items.length) {
+      sh.html('<div style="padding:20px 2px;text-align:center;color:var(--text-3);font-size:12px;line-height:1.8;">暂无历史文件<br><span style="font-size:10.5px;">可从「本机文件」选择发送，发送过的文件会自动存入历史文件</span></div>');
+      sh.show();
+      return;
+    }
+    sh.html('<div class="mc-pick">' + items.slice(0, 30).map(function (it) {
+      return '<div class="mc-pick-item" data-hf="' + esc(it.id) + '">' +
+        '<div class="mc-pick-ic tint-b"><svg class="ic"><use href="#i-' + fileIcon(it.ext, it.name) + '"/></svg></div>' +
+        '<div style="flex:1;min-width:0;"><div class="mc-pick-t">' + esc(it.name) + '</div>' +
+        '<div class="mc-pick-s">' + esc(it.size || '') + ' · ' + esc(it.source || '') + '</div></div>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;color:var(--text-3);flex:none;"><path d="M9 18l6-6-6-6"/></svg>' +
+      '</div>';
+    }).join('') + '</div>');
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var row = e.target.closest('[data-hf]');
+      if (!row) return;
+      var id = row.getAttribute('data-hf');
+      var f = null;
+      items.forEach(function (x) { if (x.id === id) f = x; });
+      if (!f) return;
+      UI.closeSheet();
+      sendHistoryFile(f);
+    });
+  }
+  function openWechatGuide() {
+    var sh = UI.sheet();
+    sh.setText('微信聊天记录');
+    sh.html(
+      '<div class="mc-tip">出于隐私保护，本平台<b>无法直接读取</b>您的微信聊天记录与其中的文件。请在微信中先将文件/图片保存到本机（长按 → 保存到手机/电脑，或发送到「文件传输助手」），再回到这里从本机文件中选择发送。</div>' +
+      '<div style="height:10px;"></div>' +
+      '<button type="button" class="btn btn-block" id="wx-pick">去选本机文件</button>'
+    );
+    sh.show();
+    document.getElementById('wx-pick').addEventListener('click', function () { UI.closeSheet(); pickLocalFiles(); });
+  }
+  function chevSvg() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;color:var(--text-3);flex:none;"><path d="M9 18l6-6-6-6"/></svg>';
+  }
+
+  window.sendFile = function () {
+    document.getElementById('panel').classList.remove('show');
+    document.getElementById('btn-attach').classList.remove('open');
+    var sh = UI.sheet();
+    sh.setText('发文件');
+    sh.html(
+      '<div class="mc-pick">' +
+        '<div class="mc-pick-item" id="f-local"><div class="mc-pick-ic tint-d"><svg class="ic"><use href="#i-folder"/></svg></div><div style="flex:1;min-width:0;"><div class="mc-pick-t">本机文件</div><div class="mc-pick-s">支持图片 / 文档 / 视频 / 语音</div></div>' + chevSvg() + '</div>' +
+        '<div class="mc-pick-item" id="f-history"><div class="mc-pick-ic tint-a"><svg class="ic"><use href="#i-file"/></svg></div><div style="flex:1;min-width:0;"><div class="mc-pick-t">历史文件</div><div class="mc-pick-s">本 App 中生成 / 上传 / 接收过的文件</div></div>' + chevSvg() + '</div>' +
+        '<div class="mc-pick-item" id="f-wechat"><div class="mc-pick-ic tint-b"><svg class="ic"><use href="#i-chat"/></svg></div><div style="flex:1;min-width:0;"><div class="mc-pick-t">微信聊天记录</div><div class="mc-pick-s">微信会话中的文件与图片</div></div>' + chevSvg() + '</div>' +
+      '</div>'
+    );
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var row = e.target.closest('[id]');
+      if (!row) return;
+      if (row.id === 'f-local') { UI.closeSheet(); pickLocalFiles(); }
+      else if (row.id === 'f-history') { UI.closeSheet(); openHistoryFiles(); }
+      else if (row.id === 'f-wechat') { UI.closeSheet(); openWechatGuide(); }
+    });
+  };
+
+  window.sendCard = function (kind) {
+    document.getElementById('panel').classList.remove('show');
+    document.getElementById('btn-attach').classList.remove('open');
+    if (kind === 'contact') openCardSheet();
+    else if (kind === 'quote') openQuoteSheet();
+    else if (kind === 'appoint') openAppointSheet();
+  };
+
+  /* [FIX BM-039] 聊天内容正则扫描：发送前检测手机号/微信/QQ 等站外联系方式。
+     优先调用领域层 JumpContract.scanMessage（如已就绪）；否则用本地正则兜底。
+     命中时警告"检测到疑似联系方式，为保障交易安全，请通过平台沟通"，不强制拦截，但记录风控日志。 */
+  function scanContact(text) {
+    if (window.JumpContract && typeof JumpContract.scanMessage === 'function') {
+      try { return JumpContract.scanMessage(text); } catch (e) {}
+    }
+    var hits = [];
+    if (/(?:1[3-9]\d{9})/.test(text)) hits.push('手机号');
+    if (/(?:微信|vx|VX|vX|wx|WX|weixin|WeChat|加微)/.test(text)) hits.push('微信号');
+    if (/(?:QQ|qq|ＱＱ)/.test(text)) hits.push('QQ号');
+    return hits.length ? { hit: true, types: hits } : { hit: false };
+  }
+  function riskLog(text, types) {
+    try {
+      var key = 'engchain-risk-logs';
+      var arr = [];
+      try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) {}
+      arr.unshift({ ts: Date.now(), text: text.slice(0, 80), types: types, scene: 'chat' });
+      if (arr.length > 100) arr.length = 100;
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch (e) {}
+  }
+
+  /* 场景化模拟回复 */
+  function autoReply(text) {
+    if (convId === 'c1') {
+      if (/报价/.test(text) && !/收到|确认/.test(text)) {
+        setTimeout(function () {
+          messages.push({ me: false, type: 'card', t: '刚刚', card: {
+            kind: 'quote', title: '报价单 · C30 商品混凝土', sub: '四川中建××建设 → 需方', icon: 'doc',
+            desc: '按 C30 含泵送报价，量大可议。',
+            fields: [['单价', '¥468/m³'], ['含泵送', '含 37m 汽车泵'], ['税率', '13% 专票'], ['账期', '月结 30 天']],
+            actions: [{ label: '确认报价', primary: true, act: 'confirm-quote' }, { label: '再议', ghost: true, act: 'reject-quote' }],
+            state: 'pending' } });
+          render();
+        }, 1300);
+        return;
+      }
+      if (/地址|位置/.test(text)) {
+        setTimeout(function () { messages.push({ me: false, type: 'text', text: '收到，已记录项目地址，明天 9 点前回复排产计划。', t: '刚刚' }); render(); }, 1100);
+        return;
+      }
+    }
+    setTimeout(function () {
+      var replies = [
+        '收到，我这边核实一下尽快回复您。',
+        '好的，相关信息已同步给业务负责人。',
+        '了解，稍后给您详细答复。'
+      ];
+      messages.push({ me: false, type: 'text', text: replies[Math.floor(Math.random() * replies.length)], t: '刚刚' });
+      render();
+    }, 1100);
+  }
+
+  window.send = function (text) {
+    var v = (text || input.value).trim();
+    if (!v) return;
+    /* [FIX BM-039] 发送前扫描站外联系方式 */
+    var scan = scanContact(v);
+    if (scan && scan.hit) {
+      var types = (scan.types || []).join('/') || '联系方式';
+      UI.toast('检测到疑似' + types + '，为保障交易安全，请通过平台沟通', 'warn');
+      riskLog(v, scan.types || []);
+    }
+    var now = new Date();
+    var hm = now.getHours() + ':' + now.getMinutes().toString().padStart(2, '0');
+    var m = { me: true, type: 'text', text: v, t: hm, status: 'sending', _id: 'send-' + (_seq++), _ai: 0 };
+    messages.push(m);
+    input.value = '';
+    onInput();
+    render();
+    setTimeout(function () { m.status = 'read'; render(); }, 600);
+    autoReply(v);
+  };
+
+  /* 清除聊天记录 */
+  window.clearChat = function () {
+    var sh = UI.sheet();
+    sh.setText('清除聊天记录');
+    sh.html('<div style="font-size:12.5px;color:var(--text-2);line-height:1.7;padding:2px 0 14px;">将清空与「' + esc(conv.name) + '」的全部聊天记录，此操作不可恢复。</div>' +
+      '<button type="button" class="btn btn-danger" style="width:100%;" onclick="UI.closeSheet();doClearChat()">确认清除</button>');
+    sh.show();
+  };
+  window.doClearChat = function () {
+    messages = [];
+    _seq = 100;
+    render();
+    UI.toast('聊天记录已清除', 'ok');
+  };
+
+  /* 快捷回复（事件委托，避免内联引号转义问题） */
+  var quickBox = document.getElementById('quick');
+  quickBox.innerHTML = '<span class="cq-label"><svg class="ic"><use href="#i-sparkle"/></svg>智能建议</span>' +
+    (QUICK[convId] || QUICK.c1).map(function (q) {
+      return '<span class="cq-chip" data-q="' + esc(q) + '">' + esc(q) + '</span>';
+    }).join('') +
+    '<span class="cq-chip" id="quick-more"><svg class="ic" style="width:11px;height:11px;"><use href="#i-plus"/></svg>更多</span>';
+  quickBox.addEventListener('click', function (e) {
+    var chip = e.target.closest('.cq-chip');
+    if (!chip) return;
+    if (chip.id === 'quick-more') { togglePanel(); return; }
+    var q = chip.getAttribute('data-q');
+    if (q) send(q);
+  });
+
+  /* ============ 常用语入口（与常用语设置页同源：engchain-phrases） ============ */
+  var PHRASES_KEY = 'engchain-phrases';
+  function readPhrases() {
+    try {
+      var raw = localStorage.getItem(PHRASES_KEY);
+      if (raw) {
+        var d = JSON.parse(raw);
+        if (d && Array.isArray(d.cats) && Array.isArray(d.items)) return d;
+      }
+    } catch (e) {}
+    return null;
+  }
+  window.openPhrases = function () {
+    var sh = UI.sheet();
+    sh.setText('常用语');
+    var cur = '全部';
+    function bindLinks() {
+      sh.body().querySelectorAll('a[data-goto="phrases"]').forEach(function (a) {
+        a.addEventListener('click', function (e) { e.preventDefault(); location.href = 'phrases.html'; });
+      });
+    }
+    function render() {
+      var d = readPhrases();
+      if (!d || !d.cats.length || !d.items.length) {
+        sh.html('<div class="ps-empty">暂无常用语<br>可在「设置常用语」中按 一级分类 · 二级分类 · 内容 配置<br><a data-goto="phrases" style="color:var(--primary-dim);font-weight:700;text-decoration:none;">去设置常用语 ›</a></div>');
+        bindLinks();
+        return;
+      }
+      var cats = ['全部'].concat(d.cats.map(function (c) { return c.c1; }));
+      var items = cur === '全部' ? d.items : d.items.filter(function (x) { return x.cat1 === cur; });
+      sh.html(
+        '<div class="ps-cats">' + cats.map(function (c) {
+          return '<button type="button" class="ps-cat' + (c === cur ? ' active' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>';
+        }).join('') + '</div>' +
+        (items.length
+          ? '<div class="ps-list">' + items.map(function (p) {
+              return '<button type="button" class="ps-item" data-c="' + esc(p.content) + '"><span class="ps-tag">' + esc(p.cat1) + ' · ' + esc(p.cat2) + '</span><span class="ps-text">' + esc(p.content) + '</span><span class="ps-go"><svg class="ic"><use href="#i-chev-right"/></svg></span></button>';
+            }).join('') + '</div>'
+          : '<div class="ps-empty">该分类下暂无常用语</div>') +
+        '<div class="ps-foot">点击常用语插入输入框，可编辑后发送 · <a data-goto="phrases">管理常用语 ›</a></div>'
+      );
+      sh.body().querySelectorAll('.ps-cat').forEach(function (b) {
+        b.addEventListener('click', function () { cur = b.getAttribute('data-c'); render(); });
+      });
+      sh.body().querySelectorAll('.ps-item').forEach(function (it) {
+        it.addEventListener('click', function () { insertPhrase(it.getAttribute('data-c')); });
+      });
+      bindLinks();
+    }
+    render();
+    sh.show();
+  };
+  function insertPhrase(text) {
+    if (!text) return;
+    UI.closeSheet();
+    var inp = document.getElementById('msg');
+    if (!inp) return;
+    var s0 = inp.selectionStart, s1 = inp.selectionEnd;
+    inp.value = inp.value.slice(0, s0) + text + inp.value.slice(s1);
+    inp.focus();
+    var pos = s0 + text.length;
+    try { inp.setSelectionRange(pos, pos); } catch (e) {}
+    onInput();
+    UI.toast('已插入，可编辑后发送', 'ok');
+  }
+})();
+</script>
+</body>
+</html>

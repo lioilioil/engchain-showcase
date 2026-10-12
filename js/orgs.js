@@ -1,0 +1,1195 @@
+/* ============================================================================
+   工程链 ENGCHAIN — 企业组织与成员中心 OrgsStore（v1.0）
+   ----------------------------------------------------------------------------
+   解决：一家企业（已认证/已入驻）如何被多个个人用户绑定叠加企业身份。
+
+   模型（在原有"账号=自然人"之上叠加，不破坏 u1-u8 seed）：
+     User（自然人，实名认证 + 个人专业入驻）
+       └─ membership[] 加入了哪些企业：{ orgId, role, status }
+     Organization（企业实体）
+       ├─ 认证主体：co/code/legal/shortName/entryTypes/enterpriseQual/entStatus/expireAt
+       ├─ ownerUid 企业主；members[] 成员；invites[] 邀请；joins[] 加入申请
+       └─ memberLimit 软上限（默认 10，防一张执照被无限拉人蹭资质）
+
+   身份投影（最小侵入关键）：
+     login / switchOrg 时，以"账号原始 auth 快照 + 当前代表企业投影"重算
+     AuthStore / EntryStore —— 个人线（realname/personalEntry）原样保留，
+     企业线（enterprise/enterpriseQual/entry.types）按当前代表企业覆盖。
+     于是 deriveIdentity / publishableCats / entryAccess / my-jobs 等现有页面
+     零改动即按"当前代表企业"工作；能力 = 个人侧 ∪ 企业侧（并集不互斥）。
+
+   v2（2026-09-27 重构）：单账号·资质挂载·外显分离。企业认证/入驻是挂在个人账号上的资质，
+   仅本人申请+后台审批/登录同步写入；组织成员(owner/admin/member)只是任职，绝不回写个人资质；
+   currentOrgId/displayOrgId 仅为用户手动选择的外显署名主体，不自动、不还原、零权益变化。
+
+   角色三档：owner 企业主 / admin 管理员(HR) / member 普通成员（仅作用于组织数据与可署名范围）。
+   ============================================================================ */
+window.OrgsStore = (function () {
+  'use strict';
+  var LS = window.localStorage;
+  var KEY = 'engchain-orgs';
+  var DAY = 864e5, YEAR = 365 * DAY;
+  var now = Date.now();
+  var MEMBER_LIMIT = 10;
+
+  /* ---- seed：预置三家演示企业实体 ----
+     org1 川×建设（建筑入驻 resident）：owner=u1 陈建国；预置一条给 u5 的待接受邀请(admin)
+     org2 成×工程咨询（建筑入驻 resident）：owner=u3 王强；u5 已是 member
+     org3 ×诚劳务（建筑入驻 resident）：企业主空缺（ownerUid:''），成员 u4 张敏
+     → 登录 u4 可演示「企业主为空」：空态邀请按钮 → 邀请企业主（默认身份=企业主）→ 短信 → 邀请入驻标签
+     → 登录 u5 可完整演示：待接受邀请 + 多企业身份切换 + 员工代表企业发招聘 */
+  function seedOrgs() {
+    return [
+      {
+        orgId: 'org1', co: '四川省××建设有限公司', shortName: '川×建设',
+        code: '91510100MA6×××12X', legal: '陈建国',
+        entryTypes: ['construction'], entStatus: 'resident',
+        enterpriseQual: ['建筑业企业资质 · 建筑工程施工总承包贰级'],
+        expireAt: now + YEAR, ownerUid: 'u1', memberLimit: MEMBER_LIMIT,
+        members: [
+          { uid: 'u1', role: 'owner', status: 'active', joinedAt: now - DAY * 180 }
+        ],
+        invites: [
+          { inviteId: 'inv-o1-u5', targetUid: 'u5', mobile: '139****8866', role: 'admin', status: 'pending', inviterUid: 'u1', createdAt: now - DAY * 2 }
+        ],
+        joins: [
+          { joinId: 'join-org1-u4', uid: 'u4', name: '张敏', note: '申请加入贵司市场部企业号，协助发布招聘', status: 'pending', createdAt: now - DAY * 1 }
+        ],
+        /* 演示：企业主（实际控制人）变更审批单 —— 目标 u3 已注册已实名，后台可审批通过 */
+        ownerChanges: [
+          { id: 'oc-org1-demo', name: '王强', mobile: '136****3456', mobileRaw: '13600003456',
+            reason: '实际控制人调整：股权变更后由王强实际控制企业经营',
+            status: 'pending', targetUid: 'u3', targetVerified: true,
+            createdBy: 'u1', createdByName: '陈建国', createdAt: now - DAY,
+            reviewedAt: 0, reviewedBy: '', reviewNote: '', smsAt: 0, smsCount: 0 }
+        ]
+      },
+      {
+        orgId: 'org2', co: '成都成×工程咨询有限公司', shortName: '成×咨询',
+        code: '91510100MA7×××88Y', legal: '王强',
+        entryTypes: ['construction'], entStatus: 'resident',
+        enterpriseQual: [],
+        expireAt: now + YEAR, ownerUid: 'u3', memberLimit: MEMBER_LIMIT,
+        members: [
+          { uid: 'u3', role: 'owner', status: 'active', joinedAt: now - DAY * 60 },
+          { uid: 'u5', role: 'member', status: 'active', joinedAt: now - DAY * 20 }
+        ],
+        invites: [], joins: []
+      },
+      {
+        orgId: 'org3', co: '成都×诚劳务有限公司', shortName: '×诚劳务',
+        code: '91510100MA9×××33K', legal: '罗×军',
+        entryTypes: ['construction'], entStatus: 'resident',
+        enterpriseQual: ['建筑业企业资质 · 施工劳务不分等级'],
+        expireAt: now + YEAR, ownerUid: '', memberLimit: MEMBER_LIMIT,
+        members: [
+          { uid: 'u4', role: 'member', status: 'active', joinedAt: now - DAY * 10 }
+        ],
+        invites: [], joins: [],
+        /* 演示：u4 张敏已提交企业主认领（实际控制人声明通道），等待后台审核。
+           登录 u4 可在企业成员管理页看到「认领审核中」卡片；后台通过后 u4 自动成为 owner。 */
+        ownerClaims: [
+          { id: 'cl-org3-demo', uid: 'u4', name: '张敏', idNo: '510***********0022',
+            mode: 'controller', declaration: true, materials: [],
+            contactPhoneMatched: false,
+            status: 'pending', createdAt: now - DAY * 0.5,
+            reviewedAt: 0, reviewedBy: '', reviewNote: '' }
+        ]
+      }
+    ];
+  }
+
+  function load() {
+    var raw = LS.getItem(KEY);
+    if (raw === null) { var s = seedOrgs(); save(s); return s; }
+    try { var a = JSON.parse(raw); if (Array.isArray(a) && a.length) { migrate(a); return a; } } catch (e) {}
+    s = seedOrgs(); save(s); return s;
+  }
+  /* 轻量迁移：旧数据补齐新字段（ownerClaims），不破坏用户已有演示操作。
+     注意：只补"字段缺失"，不自动塞演示记录——演示 claim 仅在 seedOrgs() 里出现，
+     老用户升级时不应凭空多出一条待审核单。 */
+  function migrate(a) {
+    var changed = false;
+    a.forEach(function (org) {
+      if (!Array.isArray(org.ownerClaims)) { org.ownerClaims = []; changed = true; }
+    });
+    if (changed) save(a);
+  }
+  function save(a) { try { LS.setItem(KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function get(orgId) { var a = load(); for (var i = 0; i < a.length; i++) if (a[i].orgId === orgId) return a[i]; return null; }
+
+  /* 当前登录用户（DataBus 封装） */
+  function me() { return (window.DataBus && DataBus.current) ? DataBus.current() : null; }
+
+  /* 某用户在某企业的成员记录（active） */
+  function membershipOf(uid, orgId) {
+    var org = get(orgId); if (!org) return null;
+    for (var i = 0; i < org.members.length; i++) {
+      var m = org.members[i];
+      if (m.uid === uid && m.status === 'active') return { org: org, role: m.role, joinedAt: m.joinedAt };
+    }
+    return null;
+  }
+  /* 某用户加入的全部 active 企业 */
+  function orgsOf(uid) {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      for (var i = 0; i < org.members.length; i++) {
+        if (org.members[i].uid === uid && org.members[i].status === 'active') {
+          out.push({ org: org, role: org.members[i].role, joinedAt: org.members[i].joinedAt });
+          break;
+        }
+      }
+    });
+    return out;
+  }
+  function memberCount(org) { return (org.members || []).filter(function (m) { return m.status === 'active'; }).length; }
+
+  /* 当前外显署名企业 orgId：仅用户手动选择；兼容旧键 currentOrgId；成员关系失效则回 null(个人) */
+  function currentDisplayOrgId() {
+    var u = me(); if (!u) return null;
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return null;
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var cur = (st.displayOrgId != null) ? st.displayOrgId : st.currentOrgId;
+    if (cur && cur !== 'personal' && membershipOf(u.id, cur)) return cur;
+    return null;
+  }
+
+  /* 当前外显企业的成员记录（纯展示上下文，不含任何权限语义） */
+  function currentMembership() {
+    var u = me(); if (!u) return null;
+    var id = currentDisplayOrgId(); if (!id) return null;
+    return membershipOf(u.id, id);
+  }
+
+  /* 外显署名主体：{kind:'personal'} 或 {kind:'org', orgId,name,co,role}；只供展示，不授权 */
+  function displaySubject() {
+    var u = me();
+    if (!u) return { kind: 'guest', orgId: null, name: '', co: '', role: '' };
+    var m = currentMembership();
+    if (m) return { kind: 'org', orgId: m.org.orgId, name: m.org.shortName || m.org.co, co: m.org.co, role: m.role };
+    return { kind: 'personal', orgId: null, name: u.name || '', co: '', role: '' };
+  }
+
+  /* 企业经营动作上下文（只读）：在企业页需要“以哪家企业署名”时使用。
+     能否做企业向动作仍须由 identity-policy 按【本人资质】门控，本函数不授予任何权益。 */
+  function actingContext() {
+    var m = currentMembership();
+    if (!m) return null;
+    return {
+      orgId: m.org.orgId, co: m.org.co, shortName: m.org.shortName || m.org.co,
+      legal: m.org.legal, code: m.org.code, role: m.role,
+      entryTypes: (m.org.entryTypes || []).slice(), entStatus: m.org.entStatus
+    };
+  }
+
+  /* 双校验：在该企业有任职 且 本人具备对应企业向资质，仅决定可否“以该企业名义署名/操作”。
+     recruit/publish（招聘/企业发布）：本人企业认证(verified)或入驻(resident)；其余企业动作：须本人入驻。 */
+  function canActFor(orgId, actionKey) {
+    var u = me(); if (!u || !membershipOf(u.id, orgId)) return false;
+    var acc = null;
+    try { acc = window.entryAccess ? entryAccess() : null; } catch (e) { acc = null; }
+    if (!acc || !acc.identity) return false;
+    var ent = acc.identity.enterprise;
+    if (actionKey === 'recruit' || actionKey === 'publish') return ent === 'verified' || ent === 'resident';
+    return !!acc.isResident;
+  }
+
+  /* 手动切换外显署名主体（orgId 传 null/'personal' = 本人）。纯展示：不写任何资质 Store，
+     不派发 auth/entry，仅广播 engchain:display 供展示层刷新；不自动、需用户显式调用。 */
+  function switchOrg(orgId) {
+    var u = me(); if (!u) return false;
+    var id = (orgId && orgId !== 'personal') ? orgId : null;
+    if (id && !membershipOf(u.id, id)) {
+      if (window.UI && UI.toast) UI.toast.err('你未加入该企业');
+      return false;
+    }
+    if (window.UI && UI.state) UI.state.set({ displayOrgId: id, currentOrgId: id });
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: id } }));
+    return true;
+  }
+
+  /* ============ 邀请制（企业侧发起） ============ */
+  /* 角色文案 */
+  function roleLabel(r) { return r === 'owner' ? '企业主' : r === 'admin' ? '管理员' : '成员'; }
+  /* 企业是否已有 active 企业主 */
+  function hasOwner(orgId) {
+    var org = get(orgId); if (!org) return false;
+    return (org.members || []).some(function (m) { return m.role === 'owner' && m.status === 'active'; });
+  }
+  /* 待接受的企业主邀请（每企业最多一条） */
+  function ownerInviteOf(orgId) {
+    var org = get(orgId); if (!org) return null;
+    var list = org.invites || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].role === 'owner' && list[i].status === 'pending') return list[i];
+    }
+    return null;
+  }
+  /* 谁能邀请：owner/admin 可邀任意身份；企业主空缺时，普通成员可邀企业主 */
+  function canInvite(org, cm, role) {
+    if (!org || !cm) return false;
+    if (cm.role === 'owner' || cm.role === 'admin') return true;
+    if (role === 'owner' && !hasOwner(org.orgId) && !ownerInviteOf(org.orgId)) return true;
+    return false;
+  }
+  /* 邀请某已注册实名成员加入企业；role: 'owner' | 'admin' | 'member' */
+  function invite(orgId, targetUid, role) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!canInvite(org, cm, role)) return { error: '仅企业主/管理员可邀请成员' };
+    if (!targetUid) return { error: '请选择被邀请人' };
+    var target = (window.DataBus && DataBus.byId) ? DataBus.byId(targetUid) : null;
+    if (!target) return { error: '用户不存在' };
+    /* 已在成员中 */
+    if (membershipOf(targetUid, orgId)) return { error: '该成员已在企业内' };
+    /* 上限 */
+    if (memberCount(org) >= org.memberLimit) return { error: '成员数已达上限（' + org.memberLimit + '人），如需扩容请联系平台' };
+    /* 企业主邀请唯一性 */
+    if (role === 'owner') {
+      if (hasOwner(orgId)) return { error: '该企业已有企业主，不能再邀请企业主' };
+      if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理' };
+    }
+    /* 重复 pending 邀请 */
+    for (var i = 0; i < org.invites.length; i++) {
+      if (org.invites[i].targetUid === targetUid && org.invites[i].status === 'pending') return { error: '已向该成员发出邀请，等待其接受' };
+    }
+    var rl = roleLabel(role || 'member');
+    var iv = {
+      inviteId: 'inv-' + orgId + '-' + targetUid + '-' + Date.now(), targetUid: targetUid,
+      mobile: maskMobile(target.mobile || ''), mobileRaw: target.mobile || '',
+      name: target.name, role: role || 'member', status: 'pending', inviterUid: u.id,
+      createdAt: Date.now(), via: 'users', sendAt: Date.now(), sendCount: 1
+    };
+    org.invites.push(iv);
+    save(a);
+    /* 已认证用户：短信 + 站内消息双通道提醒 */
+    sendSms(target.mobile || '', '【工程链】' + (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl + '，请登录 App 在企业成员管理中确认。');
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(target.id, '企业邀请通知', (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl + '，请进入「企业成员管理」查看并确认。');
+    } catch (e) {}
+    if (window.DataBus && DataBus.audit) DataBus.audit('邀请成员', '企业', target.name, '邀请加入 ' + (org.shortName || org.co) + ' 担任 ' + rl);
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+  /* 某用户待接受的邀请 */
+  function pendingInvitesFor(uid) {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      org.invites.forEach(function (iv) {
+        if (iv.targetUid === uid && iv.status === 'pending') out.push({ org: org, invite: iv });
+      });
+    });
+    return out;
+  }
+  function acceptInvite(inviteId) {
+    var u = me(); if (!u) return { error: '未登录' };
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      for (var j = 0; j < org.invites.length; j++) {
+        var iv = org.invites[j];
+        if (iv.inviteId === inviteId && iv.status === 'pending') {
+          if (iv.targetUid !== u.id) return { error: '该邀请不属于当前账号' };
+          if (memberCount(org) >= org.memberLimit) { iv.status = 'revoked'; save(a); return { error: '企业成员已满，邀请失效' }; }
+          iv.status = 'accepted'; iv.updatedAt = Date.now();
+          org.members.push({ uid: u.id, role: iv.role, status: 'active', joinedAt: Date.now() });
+          if (iv.role === 'owner') {
+            /* 企业主邀请：原 owner 降为管理员，ownerUid 落到新企业主 */
+            (org.members || []).forEach(function (m) {
+              if (m.uid !== u.id && m.role === 'owner' && m.status === 'active') m.role = 'admin';
+            });
+            org.ownerUid = u.id;
+          }
+          save(a);
+          if (window.DataBus && DataBus.audit) DataBus.audit('接受邀请', '企业', u.name, '加入 ' + (org.shortName || org.co) + ' 担任 ' + roleLabel(iv.role));
+          try {
+            if (window.DataBus && DataBus.pushDirectMessage && iv.inviterUid && iv.inviterUid !== u.id) {
+              DataBus.pushDirectMessage(iv.inviterUid, '成员已加入企业', u.name + ' 已接受邀请，成为 ' + (org.shortName || org.co) + ' 的' + roleLabel(iv.role) + '。');
+            }
+          } catch (e) {}
+          /* v2：接受邀请后不自动切换外显（切换必须用户手动），停留个人身份，不改任何资质 */
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: currentDisplayOrgId() } }));
+          return { ok: true, orgId: org.orgId };
+        }
+      }
+    }
+    return { error: '邀请不存在或已处理' };
+  }
+  function rejectInvite(inviteId) {
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      for (var j = 0; j < org.invites.length; j++) {
+        if (org.invites[j].inviteId === inviteId && org.invites[j].status === 'pending') {
+          org.invites[j].status = 'rejected'; org.invites[j].updatedAt = Date.now(); save(a);
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '邀请不存在' };
+  }
+
+  /* ============ 申请制（员工侧发起） ============ */
+  function requestJoin(orgId, note) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) return { error: '请先登录' };   /* [S5] */
+    if (!(u.auth && u.auth.realname && u.auth.realname.ok)) return { error: '需先完成实名认证，才能代表企业' };
+    if (membershipOf(u.id, orgId)) return { error: '你已在该企业内' };
+    for (var i = 0; i < org.joins.length; i++) {
+      if (org.joins[i].uid === u.id && org.joins[i].status === 'pending') return { error: '已提交申请，等待企业审批' };
+    }
+    org.joins.push({ joinId: 'join-' + orgId + '-' + u.id, uid: u.id, name: u.name, note: note || '', status: 'pending', createdAt: Date.now() });
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('申请加入', '企业', u.name, '申请加入 ' + (org.shortName || org.co));
+    return { ok: true };
+  }
+  function pendingJoins(orgId) {
+    var org = get(orgId); if (!org) return [];
+    return (org.joins || []).filter(function (j) { return j.status === 'pending'; });
+  }
+  function approveJoin(joinId) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === _orgIdOfJoin(joinId); }); var u = me(); if (!org) return { error: '申请不存在' };
+    var cm = membershipOf(u.id, org.orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可审批' };
+    if (memberCount(org) >= org.memberLimit) return { error: '成员数已达上限' };
+    for (var i = 0; i < org.joins.length; i++) {
+      var j = org.joins[i];
+      if (j.joinId === joinId && j.status === 'pending') {
+        j.status = 'approved';
+        org.members.push({ uid: j.uid, role: 'member', status: 'active', joinedAt: Date.now() });
+        save(a);
+        if (window.DataBus && DataBus.audit) DataBus.audit('批准加入', '企业', j.name, '批准加入 ' + (org.shortName || org.co));
+        return { ok: true };
+      }
+    }
+    return { error: '申请不存在' };
+  }
+  function rejectJoin(joinId) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === _orgIdOfJoin(joinId); }); if (!org) return { error: '申请不存在' };
+    for (var i = 0; i < org.joins.length; i++) {
+      if (org.joins[i].joinId === joinId && org.joins[i].status === 'pending') {
+        org.joins[i].status = 'rejected'; save(a); return { ok: true };
+      }
+    }
+    return { error: '申请不存在' };
+  }
+  function _orgIdOfJoin(joinId) { /* joinId 形如 join-<orgId>-<uid> */
+    var parts = String(joinId).split('-');
+    return parts.length >= 2 ? parts[1] : null;
+  }
+
+  /* ============ 成员管理 ============ */
+  function members(orgId) {
+    var org = get(orgId); if (!org) return [];
+    return (org.members || []).map(function (m) {
+      var u = (window.DataBus && DataBus.byId) ? DataBus.byId(m.uid) : null;
+      return { uid: m.uid, role: m.role, status: m.status, joinedAt: m.joinedAt,
+        name: u ? u.name : m.uid, avatar: u ? u.avatar : '?',
+        mobile: u ? maskMobile(u.mobile || '') : '' };
+    }).filter(function (x) { return x.status === 'active'; });
+  }
+  function canManage(orgId) {
+    var u = me(); if (!u) return false;
+    var m = membershipOf(u.id, orgId);
+    return !!(m && (m.role === 'owner' || m.role === 'admin'));
+  }
+  function myRole(orgId) {
+    var u = me(); if (!u) return '';
+    var m = membershipOf(u.id, orgId);
+    return m ? m.role : '';
+  }
+  /* 移除成员：仅 owner；不可移除企业主。
+     联动失效：被移出成员名下的待接受邀请 / 加入申请 / 移交申请 / 自认领 / 企业主变更目标一并作废，
+     避免「人已不在企业，单据仍在流转」造成状态不一致；同时通知被移出成员。 */
+  function removeMember(orgId, uid) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || cm.role !== 'owner') return { error: '仅企业主可移除成员' };
+    if (uid === org.ownerUid) return { error: '企业主不可被移除' };
+    var target = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null;
+    var tName = target ? target.name : uid;
+    var found = false;
+    for (var i = 0; i < org.members.length; i++) {
+      if (org.members[i].uid === uid) { org.members.splice(i, 1); found = true; break; }
+    }
+    if (!found) return { error: '该成员不在企业内' };
+    /* 关联数据一次性失效，杜绝悬空单据 */
+    var t0 = Date.now();
+    (org.invites || []).forEach(function (iv) {
+      if (iv.targetUid === uid && iv.status === 'pending') { iv.status = 'revoked'; iv.updatedAt = t0; }
+    });
+    (org.joins || []).forEach(function (j) {
+      if (j.uid === uid && j.status === 'pending') { j.status = 'rejected'; j.updatedAt = t0; }
+    });
+    (org.transfers || []).forEach(function (t) {
+      if ((t.toUid === uid || t.fromUid === uid) && (t.status === 'owner-confirm' || t.status === 'verify-pending')) {
+        t.status = 'rejected'; t.updatedAt = t0;
+        if (t.verify && t.verify.status === 'pending') { t.verify.status = 'rejected'; t.verify.reviewedAt = t0; }
+      }
+    });
+    (org.ownerClaims || []).forEach(function (c) {
+      if (c.uid === uid && c.status === 'pending') { c.status = 'rejected'; c.reviewedAt = t0; c.reviewNote = '成员已被移出企业，认领申请失效'; }
+    });
+    (org.ownerChanges || []).forEach(function (c) {
+      if (c.targetUid === uid && c.status === 'pending') { c.status = 'rejected'; c.reviewedAt = t0; c.reviewNote = '变更目标已被移出企业，变更申请失效'; }
+    });
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('移除成员', '企业', tName, '移出 ' + (org.shortName || org.co) + '，其待处理邀请/申请/移交已一并失效');
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) {
+        DataBus.pushDirectMessage(uid, '已被移出企业', '您已被移出 ' + (org.shortName || org.co) + '，已失去该企业身份与发布/招聘权限。');
+      }
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+
+  /* ============ 手机号搜索邀请（v1.2） ============
+     输入手机号 → 判定该手机号用户状态：
+       - 已注册且已实名认证 → 生成邀请 + 短信 + 站内消息提醒（case: verified）
+       - 已注册未实名       → 短信邀请引导认证（case: unverified）
+       - 未注册             → 短信邀请引导注册（case: unregistered，姓名取自表单）
+     邀请记录统一写入 org.invites（含 role: owner 企业主邀请）；
+     短信 1 个被邀请账号 1 天 1 次（sendAt / canSendInviteSms / sendInviteSms）。
+     短信为演示模拟：写 engchain-sms 短信箱 + 页面 toast 提示。 */
+  var SMS_KEY = 'engchain-sms';
+  var SMS_DAY = 24 * 3600 * 1000; /* 一个邀请账号 1 天发送 1 次 */
+  function loadSms() {
+    try { var raw = LS.getItem(SMS_KEY); var a = raw ? JSON.parse(raw) : []; if (Array.isArray(a)) return a; } catch (e) {}
+    return [];
+  }
+  function saveSms(a) { try { LS.setItem(SMS_KEY, JSON.stringify(a)); } catch (e) {} return a; }
+  function maskMobile(m) { return String(m || '').replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'); }
+  function sendSms(mobile, text) {
+    var a = loadSms();
+    var rec = { id: 'SMS' + String(Date.now()).slice(-6), mobile: maskMobile(mobile), text: text, ts: Date.now() };
+    a.unshift(rec);
+    saveSms(a);
+    return rec;
+  }
+  function smsInbox() { return loadSms(); }
+  function inviteSmsText(orgName, rl, target, name) {
+    if (target) {
+      var real = !!(target.auth && target.auth.realname && target.auth.realname.ok);
+      if (real) return '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '，请登录 App 在企业成员管理中确认。';
+      return '【工程链】' + orgName + ' 邀请您加入企业团队担任' + rl + '。您的账号尚未完成实名认证，请登录 App 完成实名认证后接受邀请。';
+    }
+    return '【工程链】' + orgName + ' 邀请' + (name || '您') + '加入企业团队担任' + rl + '。请注册工程链账号并完成实名认证后加入。';
+  }
+  /* 短信发送限制检查：pending 且距上次发送 ≥ 24h */
+  function canSendInviteSms(orgId, inviteId) {
+    var org = get(orgId); if (!org) return { ok: false, reason: '企业不存在' };
+    var inv = null;
+    for (var i = 0; i < (org.invites || []).length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { ok: false, reason: '邀请不存在' };
+    if (inv.status !== 'pending') return { ok: false, reason: '邀请已处理' };
+    if (inv.sendAt && (Date.now() - inv.sendAt < SMS_DAY)) {
+      return { ok: false, reason: '今日已发送', remain: SMS_DAY - (Date.now() - inv.sendAt) };
+    }
+    return { ok: true };
+  }
+  /* 补发邀请短信：1 天 1 次，超次数返回 error（按钮置灰由 canSendInviteSms 控制） */
+  /* 邀请发起人可管理自己创建的待接受邀请（企业主空缺时，普通成员发起的企业主邀请） */
+  function canManageInvite(org, cm, inv, uid) {
+    if (canInvite(org, cm, inv ? inv.role : '')) return true;
+    if (!inv || inv.status !== 'pending') return false;
+    return inv.inviterUid === uid;
+  }
+  function sendInviteSms(orgId, inviteId) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    var inv = null;
+    for (var i = 0; i < org.invites.length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { error: '邀请不存在' };
+    if (!canManageInvite(org, cm, inv, u.id)) return { error: '仅企业主/管理员可发送邀请短信' };
+    if (inv.status !== 'pending') return { error: '邀请已处理，无需再发送' };
+    var chk = canSendInviteSms(orgId, inviteId);
+    if (!chk.ok) return { error: chk.reason === '今日已发送' ? '今日已发送过邀请短信，请明天再试' : chk.reason };
+    var mobile = inv.mobileRaw || '';
+    if (!/^1\d{10}$/.test(mobile)) {
+      var target = inv.targetUid ? ((window.DataBus && DataBus.byId) ? DataBus.byId(inv.targetUid) : null) : null;
+      mobile = (target && target.mobile) || '';
+    }
+    if (!/^1\d{10}$/.test(mobile)) return { error: '该邀请缺少可用手机号' };
+    var rl = roleLabel(inv.role);
+    sendSms(mobile, inviteSmsText(org.shortName || org.co, rl, inv.targetUid ? ((window.DataBus && DataBus.byId) ? DataBus.byId(inv.targetUid) : null) : null, inv.name));
+    inv.sendAt = Date.now(); inv.sendCount = (inv.sendCount || 0) + 1; inv.updatedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('补发邀请短信', '企业', inv.name || maskMobile(mobile), '补发 ' + (org.shortName || org.co) + ' 邀请短信（' + roleLabel(inv.role) + '）');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, sms: maskMobile(mobile) };
+  }
+
+  /* 手机号邀请（含企业主角色与姓名）；role: 'member' | 'admin' | 'owner' */
+  function inviteByMobile(orgId, mobile, role, name) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!canInvite(org, cm, role)) return { error: '仅企业主/管理员可邀请成员' };
+    var p = String(mobile || '').replace(/\s+/g, '');
+    if (!/^1\d{10}$/.test(p)) return { error: '请输入正确的 11 位手机号' };
+    if (role === 'owner') {
+      if (hasOwner(orgId)) return { error: '该企业已有企业主，不能再邀请企业主' };
+      if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理' };
+    }
+    if (memberCount(org) >= org.memberLimit) return { error: '成员数已达上限（' + org.memberLimit + '人），如需扩容请联系平台' };
+    var orgName = org.shortName || org.co;
+    var rl = roleLabel(role || 'member');
+    var target = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(p) : null;
+
+    if (target) {
+      if (membershipOf(target.id, orgId)) return { error: '该手机号用户已是本企业成员' };
+      for (var i = 0; i < org.invites.length; i++) {
+        if (org.invites[i].targetUid === target.id && org.invites[i].status === 'pending') return { error: '已向该用户发出邀请，等待其接受' };
+      }
+      var real = !!(target.auth && target.auth.realname && target.auth.realname.ok);
+      var inv = {
+        inviteId: 'inv-' + orgId + '-' + (target.id || 'm') + '-' + Date.now(), targetUid: target.id,
+        mobile: maskMobile(p), mobileRaw: p, name: target.name || name || '',
+        role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now(),
+        via: 'mobile', sendAt: Date.now(), sendCount: 1
+      };
+      org.invites.push(inv);
+      save(a);
+      sendSms(p, inviteSmsText(orgName, rl, target, name));
+      window.dispatchEvent(new CustomEvent('engchain:org', {}));
+      if (real) {
+        try {
+          if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(target.id, '企业邀请通知', orgName + ' 邀请您加入企业团队担任' + rl + '，请进入「企业成员管理」查看并确认。');
+        } catch (e) {}
+        if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（已认证）', '企业', target.name, '短信+站内消息邀请加入 ' + orgName + ' 担任 ' + rl);
+        return { ok: true, case: 'verified', uid: target.id, name: target.name, sms: maskMobile(p) };
+      }
+      if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（未认证）', '企业', target.name, '短信邀请 ' + maskMobile(p) + ' 完成实名认证后加入 ' + orgName);
+      return { ok: true, case: 'unverified', uid: target.id, name: target.name, sms: maskMobile(p) };
+    }
+
+    /* 未注册：短信邀请注册 */
+    var inv2 = {
+      inviteId: 'inv-' + orgId + '-m-' + Date.now(), targetUid: null,
+      mobile: maskMobile(p), mobileRaw: p, name: name || '',
+      role: role || 'member', status: 'pending', inviterUid: u.id, createdAt: Date.now(),
+      via: 'mobile', sendAt: Date.now(), sendCount: 1
+    };
+    org.invites.push(inv2);
+    save(a);
+    sendSms(p, inviteSmsText(orgName, rl, null, name));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    if (window.DataBus && DataBus.audit) DataBus.audit('手机号邀请（未注册）', '企业', maskMobile(p), '短信邀请注册工程链后加入 ' + orgName);
+    return { ok: true, case: 'unregistered', sms: maskMobile(p) };
+  }
+
+  /* ============ 邀请修改（v1.2） ============
+     修改待接受邀请的姓名 / 手机号 / 身份；手机号变更会重新识别注册状态并重置短信频率。 */
+  function updateInvite(orgId, inviteId, patch) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    var inv = null;
+    for (var i = 0; i < org.invites.length; i++) if (org.invites[i].inviteId === inviteId) { inv = org.invites[i]; break; }
+    if (!inv) return { error: '邀请不存在' };
+    if (!canManageInvite(org, cm, inv, u.id)) return { error: '仅企业主/管理员可修改邀请' };
+    if (inv.status !== 'pending') return { error: '邀请已处理，无法修改' };
+    patch = patch || {};
+    var changed = false;
+
+    if (patch.mobile !== undefined && patch.mobile !== null) {
+      var nm = String(patch.mobile).replace(/\s+/g, '');
+      if (!/^1\d{10}$/.test(nm)) return { error: '请输入正确的 11 位手机号' };
+      if (nm !== (inv.mobileRaw || '')) {
+        var t2 = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(nm) : null;
+        if (t2) {
+          if (membershipOf(t2.id, orgId)) return { error: '该手机号用户已是本企业成员' };
+          for (var i = 0; i < org.invites.length; i++) {
+            var oi = org.invites[i];
+            if (oi.inviteId !== inviteId && oi.targetUid === t2.id && oi.status === 'pending') return { error: '已向该用户发出邀请，等待其接受' };
+          }
+          inv.targetUid = t2.id; inv.name = t2.name;
+        } else {
+          inv.targetUid = null;
+        }
+        inv.mobileRaw = nm; inv.mobile = maskMobile(nm);
+        inv.sendAt = 0; inv.sendCount = 0; /* 更换手机号 = 新账号，重置 1 天 1 次频率 */
+        changed = true;
+      }
+    }
+    if (patch.name !== undefined && patch.name !== null && String(patch.name).trim() !== (inv.name || '')) {
+      inv.name = String(patch.name).trim(); changed = true;
+    }
+    if (patch.role !== undefined && patch.role !== inv.role) {
+      if (patch.role === 'owner') {
+        if (hasOwner(orgId)) return { error: '该企业已有企业主，不能改设为企业主' };
+        var curOwnerInv = ownerInviteOf(orgId);
+        if (curOwnerInv && curOwnerInv.inviteId !== inviteId) return { error: '已有待接受的企业主邀请' };
+      }
+      inv.role = patch.role; changed = true;
+    }
+    if (!changed) return { error: '未做任何修改' };
+    inv.updatedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('修改企业邀请', '企业', inv.name || inv.mobile, '修改 ' + (org.shortName || org.co) + ' 的邀请信息');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+
+  /* ============ 邀请通知（消息页「通知」栏目） ============
+     某用户收到的企业邀请（含待处理 / 已接受 / 已拒绝），按最近更新时间倒序。 */
+  function inviteNoticesFor(uid) {
+    var a = load(), out = [];
+    if (!uid) return out;
+    a.forEach(function (org) {
+      (org.invites || []).forEach(function (iv) {
+        if (iv.targetUid === uid && (iv.status === 'pending' || iv.status === 'accepted' || iv.status === 'rejected')) {
+          out.push({ org: org, invite: iv });
+        }
+      });
+    });
+    out.sort(function (x, y) {
+      return ((y.invite.updatedAt || y.invite.createdAt) || 0) - ((x.invite.updatedAt || x.invite.createdAt) || 0);
+    });
+    return out;
+  }
+
+  /* ============ 退出企业 ============ */
+  function leave(orgId) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var m = membershipOf(u.id, orgId);
+    if (!m) return { error: '你不在该企业内' };
+    if (m.role === 'owner') return { error: '企业主不能直接退出，请先申请移交企业主身份' };
+    for (var i = 0; i < org.members.length; i++) {
+      if (org.members[i].uid === u.id) { org.members.splice(i, 1); break; }
+    }
+    save(a);
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    if (st.displayOrgId === orgId || st.currentOrgId === orgId) { UI.state.set({ displayOrgId: null, currentOrgId: null, company: '', orgRole: '', orgName: '' }); }
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: null } }));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    if (window.DataBus && DataBus.audit) DataBus.audit('退出企业', '企业', u.name, '退出 ' + (org.shortName || org.co));
+    return { ok: true };
+  }
+
+  /* ============ 企业主移交 + 身份验证（v1.1） ============
+     owner/admin 均可发起移交；企业主身份要求接收人完成
+     「法人认证」或「实际控制人验证」，后台审核通过后生效。 */
+  function transfersOf(orgId) { var org = get(orgId); return (org && org.transfers) || []; }
+  function pendingTransferForUser(org, uid) {
+    if (!org || !org.transfers) return null;
+    for (var i = 0; i < org.transfers.length; i++) {
+      var t = org.transfers[i];
+      if (t.toUid === uid && (t.status === 'verify-pending' || t.status === 'owner-confirm')) return t;
+    }
+    return null;
+  }
+  function ownerConfirmingTransfers(orgId) {
+    var org = get(orgId); if (!org) return [];
+    return (org.transfers || []).filter(function (t) { return t.status === 'owner-confirm'; });
+  }
+  function requestTransfer(orgId, toUid) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可申请移交' };
+    if (toUid === u.id) return { error: '不能向自己移交企业主身份' };
+    var tm = membershipOf(toUid, orgId);
+    if (!tm) return { error: '接收人需先加入本企业成为成员' };
+    if (tm.role === 'owner') return { error: '接收人已是企业主' };
+    var ts = org.transfers || [];
+    for (var i = 0; i < ts.length; i++) {
+      if (ts[i].status === 'pending' || ts[i].status === 'verify-pending' || ts[i].status === 'owner-confirm') return { error: '已有待处理的移交申请，请先完成后再发起' };
+    }
+    var t = { id: 'tr-' + Date.now(), fromUid: u.id, toUid: toUid, status: cm.role === 'owner' ? 'verify-pending' : 'owner-confirm', verify: { mode: '', status: 'none' }, createdAt: Date.now(), updatedAt: Date.now() };
+    (org.transfers = org.transfers || []).push(t);
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('申请移交企业主', '企业', u.name, '申请将 ' + (org.shortName || org.co) + ' 企业主身份移交给 ' + toUid);
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) {
+        DataBus.pushDirectMessage(toUid, '企业主移交申请', (org.shortName || org.co) + ' 申请将企业主身份移交给您。请完成企业主身份验证（法人认证或实际控制人验证），后台审核通过后正式生效。');
+        if (cm.role === 'admin') DataBus.pushDirectMessage(org.ownerUid, '移交待确认', '管理员申请将企业主身份移交给新成员，请在企业成员管理中确认。');
+      }
+    } catch (e) {}
+    return { ok: true, transferId: t.id };
+  }
+  /* owner 确认管理员发起的移交申请 */
+  function confirmTransfer(transferId) {
+    var a = load(); var u = me(); if (!u) return { error: '未登录' };
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      var ts = org.transfers || [];
+      for (var j = 0; j < ts.length; j++) {
+        var t = ts[j];
+        if (t.id === transferId && t.status === 'owner-confirm') {
+          var cm = membershipOf(u.id, org.orgId);
+          if (!cm || cm.role !== 'owner') return { error: '仅企业主可确认移交' };
+          t.status = 'verify-pending'; t.updatedAt = Date.now(); save(a);
+          try { if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(t.toUid, '企业主移交已确认', '企业主已确认移交申请，请完成企业主身份验证（法人认证或实际控制人验证）。'); } catch (e) {}
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '待确认的移交不存在' };
+  }
+  /* owner 驳回管理员发起的移交申请 */
+  function rejectTransfer(transferId) {
+    var a = load(); var u = me(); if (!u) return { error: '未登录' };
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      var ts = org.transfers || [];
+      for (var j = 0; j < ts.length; j++) {
+        var t = ts[j];
+        if (t.id === transferId && t.status === 'owner-confirm') {
+          var cm = membershipOf(u.id, org.orgId);
+          if (!cm || cm.role !== 'owner') return { error: '仅企业主可驳回移交' };
+          t.status = 'rejected'; t.updatedAt = Date.now(); save(a);
+          if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主移交', '企业', t.toUid, (org.shortName || org.co) + ' 移交申请被企业主驳回');
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '待确认的移交不存在' };
+  }
+  /* 撤回移交申请：仅发起人可撤回；待确认(owner-confirm) / 待验证(verify-pending)阶段均可撤回，
+     已生效(done)后不可撤回。撤回后接收人验证入口立即失效，相关方收到通知。 */
+  function cancelTransfer(transferId) {
+    var a = load(); var u = me(); if (!u) return { error: '未登录' };
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      var ts = org.transfers || [];
+      for (var j = 0; j < ts.length; j++) {
+        var t = ts[j];
+        if (t.id === transferId && (t.status === 'owner-confirm' || t.status === 'verify-pending')) {
+          if (t.fromUid !== u.id) return { error: '仅发起人可撤回该移交申请' };
+          t.status = 'cancelled'; t.updatedAt = Date.now();
+          save(a);
+          try {
+            if (window.DataBus && DataBus.pushDirectMessage) {
+              DataBus.pushDirectMessage(t.toUid, '企业主移交已撤回', (org.shortName || org.co) + ' 的企业主移交申请已被发起人撤回，无需再进行身份验证。');
+              if (org.ownerUid && org.ownerUid !== t.fromUid && org.ownerUid !== t.toUid) {
+                DataBus.pushDirectMessage(org.ownerUid, '企业主移交已撤回', (org.shortName || org.co) + ' 的企业主移交申请已被撤回。');
+              }
+            }
+          } catch (e) {}
+          if (window.DataBus && DataBus.audit) DataBus.audit('撤回企业主移交', '企业', t.toUid, '撤回 ' + (org.shortName || org.co) + ' 的企业主移交申请');
+          window.dispatchEvent(new CustomEvent('engchain:org', {}));
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '待处理的移交申请不存在' };
+  }
+  /* 接收人提交企业主身份验证：mode='legal' 法人认证 | 'controller' 实际控制人验证 */
+  function submitOwnerVerify(orgId, mode, payload) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org || !u) return { error: '企业不存在' };
+    var t = pendingTransferForUser(org, u.id);
+    if (!t || t.status !== 'verify-pending') return { error: '当前没有待处理的移交验证申请' };
+    if (t.verify && t.verify.status === 'pending') return { error: '验证材料已提交，等待后台审核' };
+    var name = (payload && payload.name) || u.name || '';
+    var idNo = (payload && payload.idNo) || '';
+    if (!name) return { error: '请填写姓名' };
+    if (!/^\d{6}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(idNo)) return { error: '请填写正确的 18 位身份证号' };
+    if (mode === 'legal') {
+      if (name !== (org.legal || '')) return { error: '法人认证：姓名须与营业执照法定代表人「' + (org.legal || '') + '」一致' };
+    } else if (mode === 'controller') {
+      if (!payload || !payload.declaration) return { error: '实际控制人验证：需勾选实际控制人声明' };
+    } else {
+      return { error: '请选择验证方式' };
+    }
+    t.verify = { mode: mode, status: 'pending', name: name, idNo: idNo, submittedAt: Date.now(), payload: payload || {} };
+    t.updatedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('提交企业主验证', '企业', name, (mode === 'legal' ? '法人认证' : '实际控制人验证') + ' · ' + (org.shortName || org.co));
+    return { ok: true, transferId: t.id };
+  }
+  /* 后台审核企业主验证：通过 → 移交生效（接收人=owner，原 owner 降为 admin） */
+  function reviewOwnerVerify(transferId, approve) {
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var org = a[i];
+      var ts = org.transfers || [];
+      for (var j = 0; j < ts.length; j++) {
+        var t = ts[j];
+        if (t.id === transferId && t.verify && t.verify.status === 'pending') {
+          if (approve) {
+            var from = null, to = null;
+            org.members.forEach(function (m) {
+              if (m.uid === t.fromUid && m.status === 'active') from = m;
+              if (m.uid === t.toUid && m.status === 'active') to = m;
+            });
+            if (!to) { t.verify.status = 'rejected'; t.status = 'rejected'; save(a); return { error: '接收人已不在企业内，移交自动失效' }; }
+            if (from && from.role === 'owner') from.role = 'admin';
+            to.role = 'owner';
+            org.ownerUid = t.toUid;
+            t.verify.status = 'approved'; t.verify.reviewedAt = Date.now();
+            t.status = 'done'; t.updatedAt = Date.now();
+            save(a);
+            try {
+              if (window.DataBus && DataBus.pushDirectMessage) {
+                DataBus.pushDirectMessage(t.toUid, '企业主移交完成', '恭喜，您已成为 ' + (org.shortName || org.co) + ' 的企业主。');
+                if (t.fromUid !== t.toUid) DataBus.pushDirectMessage(t.fromUid, '企业主移交完成', '您已将 ' + (org.shortName || org.co) + ' 的企业主身份移交给新企业主，您的角色已转为管理员。');
+              }
+            } catch (e) {}
+            if (window.DataBus && DataBus.audit) DataBus.audit('审核通过企业主移交', '企业', t.toUid, (org.shortName || org.co) + ' 企业主移交生效');
+            return { ok: true };
+          }
+          t.verify.status = 'rejected'; t.verify.reviewedAt = Date.now();
+          t.status = 'rejected'; t.updatedAt = Date.now();
+          save(a);
+          if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主移交', '企业', t.toUid, (org.shortName || org.co) + ' 企业主移交被驳回');
+          return { ok: true };
+        }
+      }
+    }
+    return { error: '待审核的验证单不存在' };
+  }
+  /* 待后台审核的企业主验证单（跨企业汇总） */
+  function pendingOwnerReviews() {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      (org.transfers || []).forEach(function (t) {
+        if (t.verify && t.verify.status === 'pending') out.push({ org: org, transfer: t });
+      });
+    });
+    return out;
+  }
+  function transferById(transferId) {
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var ts = a[i].transfers || [];
+      for (var j = 0; j < ts.length; j++) if (ts[j].id === transferId) return { org: a[i], transfer: ts[j] };
+    }
+    return null;
+  }
+
+  /* ============ 企业主变更（实际控制人） + 后台审批（v1.3） ============
+     企业主 = 企业实际控制人（非工商登记的法定代表人）。变更流程：
+       企业主/管理员发起 → 填写姓名/手机号/变更原因 → 后台审批 → 通过后新企业主生效（原企业主转管理员）。
+       变更目标未注册 / 未实名认证时，发起侧可在弹窗内发「邀请」与「提醒实名认证」短信（同手机号同类型 1 天 1 次），
+       引导其注册并完成实名认证后，后台方可审批通过。 */
+  function ownerChangesOf(orgId) { var org = get(orgId); return (org && org.ownerChanges) || []; }
+  /* 当前待审批的企业主变更（每企业最多一条 pending） */
+  function pendingOwnerChangeOf(orgId) {
+    var list = ownerChangesOf(orgId);
+    for (var i = 0; i < list.length; i++) if (list[i].status === 'pending') return list[i];
+    return null;
+  }
+  function ownerChangeById(changeId) {
+    var a = load();
+    for (var i = 0; i < a.length; i++) {
+      var list = a[i].ownerChanges || [];
+      for (var j = 0; j < list.length; j++) if (list[j].id === changeId) return { org: a[i], change: list[j] };
+    }
+    return null;
+  }
+  /* 跨企业汇总：后台审核工作台使用 */
+  function pendingOwnerChangesAll() {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      (org.ownerChanges || []).forEach(function (c) { if (c.status === 'pending') out.push({ org: org, change: c }); });
+    });
+    return out;
+  }
+
+  /* 发起企业主变更（仅企业主/管理员；每企业同时仅一条待审批） */
+  function requestOwnerChange(orgId, payload) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可发起企业主变更' };
+    if (pendingOwnerChangeOf(orgId)) return { error: '已有待审批的企业主变更，请先等待审批结果' };
+    var name = String((payload && payload.name) || '').trim();
+    var mobile = String((payload && payload.mobile) || '').replace(/\s+/g, '');
+    var reason = String((payload && payload.reason) || '').trim();
+    if (!name) return { error: '请填写新企业主姓名' };
+    if (!/^1\d{10}$/.test(mobile)) return { error: '请输入正确的 11 位手机号' };
+    if (!reason) return { error: '请填写变更原因' };
+    var target = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(mobile) : null;
+    var rec = {
+      id: 'oc-' + Date.now(), name: name, mobile: maskMobile(mobile), mobileRaw: mobile,
+      reason: reason, status: 'pending',
+      targetUid: target ? target.id : null,
+      targetVerified: !!(target && target.auth && target.auth.realname && target.auth.realname.ok),
+      createdBy: u.id, createdByName: u.name, createdAt: Date.now(),
+      reviewedAt: 0, reviewedBy: '', reviewNote: '', smsAt: 0, smsCount: 0
+    };
+    (org.ownerChanges = org.ownerChanges || []).push(rec);
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('发起企业主变更', '企业', u.name, '申请将 ' + (org.shortName || org.co) + ' 企业主（实际控制人）变更为 ' + name + '（' + maskMobile(mobile) + '）');
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, changeId: rec.id };
+  }
+
+  /* 变更目标短信：type='invite' 邀请注册并实名 | 'verify' 提醒实名认证；同手机号同类型 1 天 1 次 */
+  function ocSmsCan(org, mobile, type) {
+    var t0 = Date.now();
+    var list = (org.ownerChangeSms || []).filter(function (s) {
+      return s.mobileRaw === mobile && s.type === type && (t0 - s.ts < SMS_DAY);
+    });
+    return list.length === 0;
+  }
+  function sendOwnerChangeSms(orgId, type, name, mobile) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    var cm = membershipOf(u.id, orgId);
+    if (!cm || (cm.role !== 'owner' && cm.role !== 'admin')) return { error: '仅企业主/管理员可操作' };
+    var p = String(mobile || '').replace(/\s+/g, '');
+    if (!/^1\d{10}$/.test(p)) return { error: '请输入正确的 11 位手机号' };
+    if (!ocSmsCan(org, p, type)) return { error: '今日已向该手机号发送过，请明天再试' };
+    var orgName = org.shortName || org.co;
+    var text = type === 'invite'
+      ? '【工程链】' + orgName + ' 正在申请将企业主（实际控制人）变更为您。请注册工程链账号并完成实名认证，以便确认该变更。'
+      : '【工程链】' + orgName + ' 企业主变更需实名认证。请尽快登录工程链完成实名认证，便于后台审批与身份核验。';
+    sendSms(p, text);
+    (org.ownerChangeSms = org.ownerChangeSms || []).push({ mobileRaw: p, type: type, ts: Date.now() });
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit(type === 'invite' ? '企业主变更·邀请' : '企业主变更·实名提醒', '企业', maskMobile(p), (type === 'invite' ? '邀请注册并实名认证' : '提醒实名认证') + ' · ' + orgName);
+    return { ok: true, sms: maskMobile(p) };
+  }
+
+  /* 后台审批企业主变更：通过 → 目标成为企业主（原企业主转管理员）；变更目标须已注册（实名状态供审核参考） */
+  function reviewOwnerChange(changeId, approve) {
+    var a = load();
+    var org = null, c = null;
+    for (var i = 0; i < a.length && !c; i++) {
+      var list = a[i].ownerChanges || [];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === changeId) { org = a[i]; c = list[j]; break; }
+      }
+    }
+    if (!org || !c) return { error: '变更单不存在' };
+    if (c.status !== 'pending') return { error: '该变更单已处理' };
+    if (approve) {
+      if (!c.targetUid) return { error: '变更目标尚未注册，无法通过；请先邀请其注册并完成实名认证' };
+      (org.members || []).forEach(function (m) {
+        if (m.role === 'owner' && m.status === 'active' && m.uid !== c.targetUid) m.role = 'admin';
+      });
+      var tm = null;
+      for (var k = 0; k < (org.members || []).length; k++) {
+        if (org.members[k].uid === c.targetUid) { tm = org.members[k]; break; }
+      }
+      if (tm) { tm.role = 'owner'; tm.status = 'active'; }
+      else { (org.members = org.members || []).push({ uid: c.targetUid, role: 'owner', status: 'active', joinedAt: Date.now() }); }
+      org.ownerUid = c.targetUid;
+      c.status = 'approved'; c.reviewedAt = Date.now();
+      save(a);
+      try {
+        if (window.DataBus && DataBus.pushDirectMessage) {
+          DataBus.pushDirectMessage(c.targetUid, '企业主变更已生效', '您已成为 ' + (org.shortName || org.co) + ' 的企业主（实际控制人）。');
+          if (c.createdBy && c.createdBy !== c.targetUid) DataBus.pushDirectMessage(c.createdBy, '企业主变更已生效', '您申请的 ' + (org.shortName || org.co) + ' 企业主变更已通过，' + c.name + ' 已成为新企业主。');
+        }
+      } catch (e) {}
+      if (window.DataBus && DataBus.audit) DataBus.audit('审核通过企业主变更', '企业', c.name, (org.shortName || org.co) + ' 企业主变更为 ' + c.name);
+      return { ok: true };
+    }
+    c.status = 'rejected'; c.reviewedAt = Date.now();
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主变更', '企业', c.name, (org.shortName || org.co) + ' 企业主变更被驳回');
+    return { ok: true };
+  }
+
+  /* ============ 企业主自认领（实际控制人本人） + 真实性校验（v1.4） ============
+     场景：企业刚入驻、ownerUid 为空，但入驻人本人就是实际控制人。此时没人能"邀请他"——
+     要么没管理权限，要么他自己就是那个有权限的人。本路径补这个缺口：
+       当前已是本企业成员 → 本人提交认领 → 双通道校验 → 后台审核通过 → 自动成为 owner。
+     双通道真实性：
+       - legal（法人认证）：本人实名姓名 == org.legal（营业执照法人）→ 工商信息+个人实名双重强事实，
+         后台可一键通过（现实中大量中小企业法人=实控人，是主流场景，不卡人工）。
+       - controller（实际控制人声明）：姓名 ≠ 法人但自称实控人 → 身份证号+法律声明+材料占位，
+         必须后台人工审核（"实控人"是法律推定概念，无单一权威数据源）。
+     防滥用：仅企业主空缺时可发起；每人每企业同时仅一条 pending；24h 内最多提交 3 次。 */
+  function ownerClaimsOf(orgId) { var org = get(orgId); return (org && org.ownerClaims) || []; }
+  /* 当前企业的 pending 认领（每企业最多一条 pending；多人同时认领先到先得） */
+  function pendingOwnerClaimOf(orgId) {
+    var list = ownerClaimsOf(orgId);
+    for (var i = 0; i < list.length; i++) if (list[i].status === 'pending') return list[i];
+    return null;
+  }
+  /* 当前登录用户在该企业的 pending 认领（用于页面显示"认领审核中"卡片） */
+  function myPendingClaim(orgId) {
+    var u = me(); if (!u) return null;
+    var list = ownerClaimsOf(orgId);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].uid === u.id && list[i].status === 'pending') return list[i];
+    }
+    return null;
+  }
+  /* 跨企业 pending 认领汇总（后台审核工作台） */
+  function pendingOwnerClaimsAll() {
+    var a = load(), out = [];
+    a.forEach(function (org) {
+      (org.ownerClaims || []).forEach(function (c) {
+        if (c.status === 'pending') out.push({ org: org, claim: c });
+      });
+    });
+    return out;
+  }
+
+  /* 提交企业主认领 */
+  function submitOwnerClaim(orgId, mode, payload) {
+    var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me();
+    if (!org || !u) return { error: '企业不存在' };
+    /* 前置：必须是本企业成员（入驻人理应已是 member；外人不能认老板） */
+    var cm = membershipOf(u.id, orgId);
+    if (!cm) return { error: '你需先加入本企业成为成员，才能认领企业主身份' };
+    /* 前置：必须已实名（认领本质是把工商/实控人身份绑到账号上，实名是底座） */
+    if (!(u.auth && u.auth.realname && u.auth.realname.ok)) return { error: '需先完成个人实名认证，才能认领企业主身份' };
+    /* 前置：企业当前不能已有 active owner */
+    if (hasOwner(orgId)) return { error: '该企业已有企业主，无需认领' };
+    /* 前置：不能与邀请/变更流程并行（避免两套审批单同时生效） */
+    if (ownerInviteOf(orgId)) return { error: '已有待接受的企业主邀请，请先处理邀请' };
+    if (pendingOwnerChangeOf(orgId)) return { error: '已有企业主变更在后台审批中，请先等待结果' };
+    /* 前置：本人不能已有 pending 认领 */
+    if (myPendingClaim(orgId)) return { error: '你的认领申请已在审核中，请等待结果' };
+    /* 防刷：24h 内最多提交 3 次 */
+    var t0 = Date.now(), cnt = 0;
+    (org.ownerClaims || []).forEach(function (c) {
+      if (c.uid === u.id && (t0 - c.createdAt < DAY)) cnt++;
+    });
+    if (cnt >= 3) return { error: '24 小时内最多提交 3 次认领，请明天再试' };
+
+    var name = String((payload && payload.name) || u.name || '').trim();
+    var idNo = String((payload && payload.idNo) || '').trim();
+    if (!name) return { error: '请填写真实姓名' };
+    if (!/^\d{6}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(idNo)) return { error: '请填写正确的 18 位身份证号' };
+    if (mode === 'legal') {
+      /* 法人通道：姓名必须与营业执照法人完全一致（强事实匹配，后台可自动通过） */
+      if (name !== (org.legal || '')) return { error: '法人认证：姓名须与营业执照法定代表人「' + (org.legal || '') + '」一致' };
+    } else if (mode === 'controller') {
+      if (!payload || !payload.declaration) return { error: '实际控制人验证：需勾选实际控制人声明' };
+    } else {
+      return { error: '请选择验证方式' };
+    }
+    /* 弱信号：当前账号手机号是否与企业法人/入驻联系人手机号一致（供审核员加权参考，不自动通过） */
+    var contactPhoneMatched = !!(u.mobile && org.legalPhone && u.mobile === org.legalPhone);
+    var rec = {
+      id: 'cl-' + Date.now(), uid: u.id, name: name, idNo: idNo,
+      mode: mode, declaration: !!(payload && payload.declaration),
+      materials: (payload && payload.materials) || [],
+      contactPhoneMatched: contactPhoneMatched,
+      /* 预填审核提示：法人通道+姓名一致 → 建议自动通过；实控人通道 → 必须人工看材料 */
+      autoSuggest: (mode === 'legal') ? 'approve' : 'manual',
+      status: 'pending', createdAt: Date.now(),
+      reviewedAt: 0, reviewedBy: '', reviewNote: ''
+    };
+    (org.ownerClaims = org.ownerClaims || []).push(rec);
+    save(a);
+    if (window.DataBus && DataBus.audit) DataBus.audit('提交企业主自认领', '企业', name,
+      (mode === 'legal' ? '法人认证' : '实际控制人声明') + ' · ' + (org.shortName || org.co) +
+      (contactPhoneMatched ? ' · 手机号与入驻联系人一致' : ''));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true, claimId: rec.id, autoSuggest: rec.autoSuggest };
+  }
+
+  /* 后台审核企业主认领：通过 → 当前用户直接成为 owner（企业主空缺场景，无原 owner 需降级） */
+  function reviewOwnerClaim(claimId, approve, note) {
+    var a = load();
+    var org = null, c = null;
+    for (var i = 0; i < a.length && !c; i++) {
+      var list = a[i].ownerClaims || [];
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].id === claimId) { org = a[i]; c = list[j]; break; }
+      }
+    }
+    if (!org || !c) return { error: '认领单不存在' };
+    if (c.status !== 'pending') return { error: '该认领单已处理' };
+    if (approve) {
+      /* 二次校验：审核期间企业可能已被他人设 owner（邀请/变更通过），以最新状态为准 */
+      if (hasOwner(org.orgId)) {
+        c.status = 'rejected'; c.reviewedAt = Date.now();
+        c.reviewNote = '企业主已由其他渠道确认，本认领自动失效';
+        save(a); return { ok: true, note: '企业主已被其他渠道占用，认领失效' };
+      }
+      /* 把认领人写为 owner：已是 member 则改 role，否则新增 */
+      var tm = null;
+      for (var k = 0; k < (org.members || []).length; k++) {
+        if (org.members[k].uid === c.uid) { tm = org.members[k]; break; }
+      }
+      if (tm) { tm.role = 'owner'; tm.status = 'active'; }
+      else { (org.members = org.members || []).push({ uid: c.uid, role: 'owner', status: 'active', joinedAt: Date.now() }); }
+      org.ownerUid = c.uid;
+      c.status = 'approved'; c.reviewedAt = Date.now(); c.reviewNote = note || '';
+      save(a);
+      try {
+        if (window.DataBus && DataBus.pushDirectMessage) {
+          DataBus.pushDirectMessage(c.uid, '企业主认领通过', '恭喜，您已通过 ' + (org.shortName || org.co) + ' 的企业主（实际控制人）认领，已获得企业最高权限。');
+        }
+      } catch (e) {}
+      if (window.DataBus && DataBus.audit) DataBus.audit('审核通过企业主认领', '企业', c.name,
+        (org.shortName || org.co) + ' 企业主认领生效（' + (c.mode === 'legal' ? '法人认证' : '实际控制人声明') + '）');
+      window.dispatchEvent(new CustomEvent('engchain:org', {}));
+      return { ok: true };
+    }
+    c.status = 'rejected'; c.reviewedAt = Date.now(); c.reviewNote = note || '';
+    save(a);
+    try {
+      if (window.DataBus && DataBus.pushDirectMessage) {
+        DataBus.pushDirectMessage(c.uid, '企业主认领未通过', '您提交的 ' + (org.shortName || org.co) + ' 企业主认领未通过。' +
+          (note ? '原因：' + note : '请核对信息后重新提交。'));
+      }
+    } catch (e) {}
+    if (window.DataBus && DataBus.audit) DataBus.audit('驳回企业主认领', '企业', c.name, (org.shortName || org.co) + ' 企业主认领被驳回：' + (note || '未通过'));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+    return { ok: true };
+  }
+
+  /* ============ 登录 / 重置联动 ============ */
+  function onLogin() {
+    var u = me(); if (!u) return;
+    /* v2：不自动选企业、不投影资质。仅校验已保存的手动外显是否仍有效，失效回个人。 */
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var saved = (st.displayOrgId != null) ? st.displayOrgId : st.currentOrgId;
+    var valid = (saved && saved !== 'personal' && membershipOf(u.id, saved)) ? saved : null;
+    if (window.UI && UI.state) UI.state.set({ displayOrgId: valid, currentOrgId: valid, company: '', orgRole: '', orgName: '' });
+    window.dispatchEvent(new CustomEvent('engchain:display', { detail: { orgId: valid } }));
+    window.dispatchEvent(new CustomEvent('engchain:org', {}));
+  }
+  function onReset() {
+    try { LS.removeItem(KEY); } catch (e) {} load();
+    try { if (window.UI && UI.state) UI.state.set({ displayOrgId: null, currentOrgId: null, company: '', orgRole: '', orgName: '' }); } catch (e) {}
+  }
+
+  /* 启动即绑定事件（脚本加载时执行一次） */
+  function init() {
+    load();
+    window.addEventListener('engchain:login', onLogin);
+    window.addEventListener('engchain:reset', onReset);
+    /* 页面首次进入：仅对齐已保存的手动外显（不自动选企业、不投影资质） */
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { onLogin(); });
+    } else { onLogin(); }
+  }
+
+  return {
+    KEY: KEY, MEMBER_LIMIT: MEMBER_LIMIT,
+    load: load, get: get, list: load,
+    orgsOf: orgsOf, membershipOf: membershipOf, currentMembership: currentMembership,
+    members: members, memberCount: memberCount,
+    canManage: canManage, myRole: myRole,
+    invite: invite, pendingInvitesFor: pendingInvitesFor, acceptInvite: acceptInvite, rejectInvite: rejectInvite,
+    requestJoin: requestJoin, pendingJoins: pendingJoins, approveJoin: approveJoin, rejectJoin: rejectJoin,
+    removeMember: removeMember,
+    inviteByMobile: inviteByMobile, smsInbox: smsInbox, sendSms: sendSms,
+    hasOwner: hasOwner, ownerInviteOf: ownerInviteOf,
+    canSendInviteSms: canSendInviteSms, sendInviteSms: sendInviteSms,
+    updateInvite: updateInvite, inviteNoticesFor: inviteNoticesFor,
+    leave: leave,
+    transfersOf: transfersOf, pendingTransferForUser: pendingTransferForUser,
+    ownerConfirmingTransfers: ownerConfirmingTransfers,
+    requestTransfer: requestTransfer, confirmTransfer: confirmTransfer, rejectTransfer: rejectTransfer,
+    cancelTransfer: cancelTransfer,
+    submitOwnerVerify: submitOwnerVerify, reviewOwnerVerify: reviewOwnerVerify,
+    pendingOwnerReviews: pendingOwnerReviews, transferById: transferById,
+    ownerChangesOf: ownerChangesOf, pendingOwnerChangeOf: pendingOwnerChangeOf,
+    ownerChangeById: ownerChangeById, pendingOwnerChangesAll: pendingOwnerChangesAll,
+    requestOwnerChange: requestOwnerChange, sendOwnerChangeSms: sendOwnerChangeSms,
+    reviewOwnerChange: reviewOwnerChange,
+    ownerClaimsOf: ownerClaimsOf, pendingOwnerClaimOf: pendingOwnerClaimOf,
+    myPendingClaim: myPendingClaim, pendingOwnerClaimsAll: pendingOwnerClaimsAll,
+    submitOwnerClaim: submitOwnerClaim, reviewOwnerClaim: reviewOwnerClaim,
+    switchOrg: switchOrg,
+    currentDisplayOrgId: currentDisplayOrgId, displaySubject: displaySubject,
+    actingContext: actingContext, canActFor: canActFor,
+    init: init
+  };
+})();
+/* 立即自启动（依赖 stores/databus 已就绪；本文件在它们之后加载） */
+if (window.OrgsStore) window.OrgsStore.init();

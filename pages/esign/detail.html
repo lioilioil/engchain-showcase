@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>合同详情 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" onclick="location.href='index.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">合同详情</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view">
+      <div class="es-scroll" id="v" style="padding-bottom:110px;"></div>
+      <div class="es-foot-bar" id="foot"></div>
+    </div>
+  </div>
+</div>
+<div class="es-scrim" id="scrim"></div>
+<div class="es-sheet" id="sheet">
+  <div class="grab"></div>
+  <h5>合同目录</h5>
+  <div class="sub">点击条款直接跳转 · 完整正文 + 附件 + 签章页</div>
+  <div class="es-toc-list" id="tocList"></div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var id = ES.qs('id');
+  var v = ES.$('#v'), foot = ES.$('#foot');
+  var dZoom = 1, dCur = 'a0';
+
+  function stateBanner(c, m, mp) {
+    var pg = ES.progress(c);
+    if (m.key === 'mine') {
+      var cd = ES.countdown(c.deadline);
+      return '<section class="es-hero">' +
+        '<div class="kicker"><span>这份合同需要你签署</span><span class="seal">待<br>签</span></div>' +
+        '<h3 style="margin-top:10px;">' + ES.esc(c.title) + '</h3>' +
+        '<div class="amount"><span class="v es-mono">' + ES.amountText(c) + '</span><span class="u">合同金额</span>' +
+          '<span class="role">' + ES.esc((mp && mp.role) || '签署方') + '</span></div>' +
+        '<div class="due"><span style="color:var(--es-on-world-dim);display:flex;align-items:center;gap:6px;">' + ES.ic('clock') +
+          '<span class="' + (cd.urgent ? '' : 'normal') + '">' + (cd.overdue ? '签署已截止' : '距签署截止 ' + ES.esc(cd.text.replace('剩 ',''))) + '</span></span></div>' +
+        '<div class="es-flowline">' + flowNodes(c) + '</div></section>';
+    }
+    if (m.key === 'other') {
+      var waiters = c.parties.filter(function (p) { return p.status !== 'signed'; }).map(function (p) { return p.company || p.name; });
+      var firstUnsigned = c.parties.findIndex(function (x) { return x.status !== 'signed'; });
+      return '<div class="es-card" style="border-color:var(--primary);">' +
+        '<div style="display:flex;gap:11px;align-items:flex-start;">' +
+        '<span style="width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:var(--es-gold-soft);color:var(--es-gold-deep);flex:none;">' + ES.ic('clock') + '</span>' +
+        '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--text-1);">你已签署，等待对方完成</div>' +
+        '<div class="es-muted" style="margin-top:3px;">待签：' + ES.esc(waiters.join('、')) + '</div>' +
+        '<div class="es-miniflow" style="margin-top:10px;">' +
+          c.parties.map(function (p, i) { return '<span class="seg ' + (p.status === 'signed' ? 'on' : (i === firstUnsigned ? 'cur' : '')) + '"></span>'; }).join('') +
+          '<span class="pf" style="margin-left:8px;"><b>' + pg.signed + '</b>/' + pg.total + ' 方已签</span></div></div></div></div>';
+    }
+    var closed = {
+      completed: { ic: 'shield', bg: 'var(--es-moss-soft)', fg: 'var(--es-moss)', t: '合同已签署完成并完成存证', s: '全部签署方已完成签署，合同即时生效' },
+      rejected: { ic: 'x', bg: 'var(--bg-inset)', fg: 'var(--text-3)', t: '合同被拒签', s: ES.esc(c.rejectReason || '对方暂不同意签署，可修改后重新发起') },
+      expired: { ic: 'clock', bg: 'var(--bg-inset)', fg: 'var(--text-3)', t: '合同已逾期失效', s: '超过签署有效期未完成签署，已自动失效' },
+      withdrawn: { ic: 'x', bg: 'var(--bg-inset)', fg: 'var(--text-3)', t: '合同已撤回', s: '在对方签署前撤回，已退回 1 次签署次数' },
+      voided: { ic: 'warning', bg: 'var(--es-seal-soft)', fg: 'var(--es-seal)', t: '合同已作废', s: ES.esc(c.rejectReason || '平台风控作废，已退回 1 次签署次数') }
+    }[c.status] || { ic: 'doc', bg: 'var(--bg-inset)', fg: 'var(--text-3)', t: '合同已结束', s: '' };
+    return '<div class="es-card" style="display:flex;gap:11px;align-items:flex-start;">' +
+      '<span style="width:40px;height:40px;border-radius:11px;display:grid;place-items:center;background:' + closed.bg + ';color:' + closed.fg + ';flex:none;">' + ES.ic(closed.ic) + '</span>' +
+      '<div style="flex:1;"><div style="font-size:15px;font-weight:700;color:var(--text-1);">' + closed.t + '</div>' +
+      '<div class="es-muted" style="margin-top:3px;">' + closed.s + '</div></div></div>';
+  }
+  function pg2(c, p) { return c.parties.indexOf(p); }
+  function flowNodes(c) {
+    return c.parties.map(function (p) {
+      var cls = p.status === 'signed' ? 'done' : (p.ownerUid === ctx.user.id ? 'cur' : '');
+      return '<div class="node ' + cls + '"><div class="dot"></div><div class="lb">' + ES.esc(p.role) + (p.status === 'signed' ? '·已签' : '·待签') + '</div></div>';
+    }).join('') + '<div class="node ' + (c.status === 'completed' ? 'done' : '') + '"><div class="dot"></div><div class="lb">平台存证</div></div>';
+  }
+
+  function docbarHTML() {
+    return '<div class="es-docbar">' +
+      '<button class="es-toc" id="btnToc">' + ES.ic('receipt') + '目录</button>' +
+      '<div class="es-zoom"><button id="zM" aria-label="缩小字号">A−</button><span class="zv" id="zV">100%</span><button id="zP" aria-label="放大字号">A+</button></div>' +
+      '<div class="es-rd" id="rd"><span id="rdTxt">已读 0% · 共 ' + toc().length + ' 节</span><div class="bar"><i id="rdBar" style="width:0%"></i></div></div>' +
+    '</div>';
+  }
+  function toc() { var c = EsignStore.contractById(id); return c ? ES.contractTOC(c) : []; }
+
+  function render() {
+    var c = EsignStore.contractById(id);
+    if (!c) {
+      v.innerHTML = '<div class="es-empty">' + ES.ic('doc') + '<div class="t">未找到该合同</div>' +
+        '<div class="s">合同可能已被撤回，或不属于当前登录账号</div>' +
+        '<button class="es-btn primary" onclick="location.href=\'index.html\'">返回电子签首页</button></div>';
+      foot.innerHTML = '';
+      return;
+    }
+    var m = ES.meta(c), mp = ES.myParty(c);
+    var html = stateBanner(c, m, mp);
+    html += '<div class="es-card" style="margin-top:12px;">' +
+      '<div class="es-kv"><span class="k">合同编号</span><span class="v es-mono">' + ES.esc(c.code) + '</span></div>' +
+      '<div class="es-kv"><span class="k">合同金额</span><span class="v es-mono">' + ES.amountText(c) + '</span></div>' +
+      '<div class="es-kv"><span class="k">发起方</span><span class="v">' + ES.esc(c.initiatorCompany || c.initiatorName) + '</span></div>' +
+      '<div class="es-kv"><span class="k">签署方式</span><span class="v">' + (c.signOrder === 'sequential' ? '顺序签署' : '无序签署') + ' · ' + c.parties.length + ' 方</span></div>' +
+      '<div class="es-kv"><span class="k">发起时间</span><span class="v es-mono">' + ES.dtime(c.sentAt || c.createdAt) + '</span></div>' +
+      '<div class="es-kv"><span class="k">签署截止</span><span class="v es-mono">' + ES.ddate(c.deadline) + '（' + EsignStore.pricing().signValidDays + ' 天有效）</span></div>' +
+      (c.completedAt ? '<div class="es-kv"><span class="k">完成时间</span><span class="v es-mono">' + ES.dtime(c.completedAt) + '</span></div>' : '') +
+      '</div>';
+    html += '<div class="es-sec"><h2>合同正文</h2><div class="rule"></div><div class="more">全文 ' + ES.esc(c.code) + ' · 电子文本</div></div>';
+    html += docbarHTML() + ES.contractDocHTML(c) + '<div class="es-muted" style="margin-top:10px;">阅读提示：建议完整阅读后签署；签署页将校验阅读进度。</div>';
+    if (c.evidence) {
+      html += '<div class="es-sec"><h2>司法存证</h2></div><div class="es-card">' + ES.evidenceHTML(c.evidence) +
+        '<div class="es-muted" style="margin-top:10px;line-height:1.7;">存证由 ' + ES.esc(c.evidence.provider) + ' 出具，含签署主体、签署时间与文件哈希，可作为司法证据核验。</div></div>';
+    }
+    html += '<div class="es-sec"><h2>签署进度</h2></div><div class="es-card"><div class="es-tl" style="padding:0;">' + ES.timelineHTML(c) + '</div></div>';
+    v.innerHTML = html;
+    bindDocbar(c);
+    bindFoot(c, m, mp);
+  }
+
+  function bindDocbar(c) {
+    var zV = ES.$('#zV'), doc = ES.$('#esDoc');
+    function applyZoom(silent) {
+      if (!doc) return;
+      doc.style.setProperty('--es-dfs', (13 * dZoom).toFixed(1) + 'px');
+      doc.style.setProperty('--es-dhs', (13.5 * dZoom).toFixed(1) + 'px');
+      if (zV) zV.textContent = Math.round(dZoom * 100) + '%';
+      if (!silent) UI.toast('正文已缩放至 ' + Math.round(dZoom * 100) + '%');
+    }
+    var zM = ES.$('#zM'); if (zM) zM.onclick = function () { dZoom = Math.max(0.85, +(dZoom - 0.15).toFixed(2)); applyZoom(); };
+    var zP = ES.$('#zP'); if (zP) zP.onclick = function () { dZoom = Math.min(1.3, +(dZoom + 0.15).toFixed(2)); applyZoom(); };
+    applyZoom(true);
+    v.removeEventListener('scroll', onDocScroll);
+    v.addEventListener('scroll', onDocScroll);
+    onDocScroll();
+    var bt = ES.$('#btnToc'); if (bt) bt.onclick = openSheet;
+  }
+
+  function onDocScroll() {
+    var c = EsignStore.contractById(id);
+    var doc = ES.$('#esDoc');
+    if (!c || !doc) return;
+    var pct = ES.docReadPct(v, doc), p = Math.round(pct * 100);
+    var bar = ES.$('#rdBar'), txt = ES.$('#rdTxt');
+    if (bar) bar.style.width = p + '%';
+    if (txt) {
+      var arts = ES.$$('.es-clause[data-a]', v);
+      var cur2 = arts[0] || null;
+      for (var i = 0; i < arts.length; i++) {
+        var r = arts[i].getBoundingClientRect();
+        if (r.top < v.getBoundingClientRect().top + 130) cur2 = arts[i];
+      }
+      if (cur2) dCur = cur2.getAttribute('data-a');
+      var left = arts.length - (arts.indexOf(cur2) + 1);
+      txt.textContent = p >= 100 ? '已读完全部条款 · 可签署' : '已读 ' + p + '% · 剩 ' + left + ' 节';
+    }
+  }
+
+  function openSheet() {
+    var c = EsignStore.contractById(id);
+    if (!c) return;
+    ES.$('#sheet').classList.add('on'); ES.$('#scrim').classList.add('on');
+    var list = ES.$('#tocList');
+    list.innerHTML = ES.contractTOC(c).map(function (it) {
+      return '<div class="es-toc-item' + (it.a === dCur ? ' cur' : '') + '" data-a="' + it.a + '" data-t="' + ES.esc(it.t) + '">' +
+        '<span class="dot2"></span><span class="no">' + String(it.no).padStart(2, '0') + '</span><span>' + ES.esc(it.t) + '</span></div>';
+    }).join('');
+    ES.$$('.es-toc-item', list).forEach(function (it) {
+      it.onclick = function () {
+        var el = ES.$('[data-a="' + it.getAttribute('data-a') + '"]', v);
+        if (el) v.scrollTo({ top: el.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop - 120, behavior: 'smooth' });
+        closeSheet(); UI.toast('已跳转至「' + it.getAttribute('data-t') + '」');
+      };
+    });
+  }
+  function closeSheet() { ES.$('#sheet').classList.remove('on'); ES.$('#scrim').classList.remove('on'); }
+  ES.$('#scrim').onclick = closeSheet;
+
+  function bindFoot(c, m, mp) {
+    var html = '';
+    if (m.key === 'mine') {
+      html = '<button class="es-btn primary block" id="goSign">' + ES.ic('sign') + '立即签署</button>' +
+        '<button class="es-linkbtn" id="h5" style="display:block;margin:10px auto 0;">打开对方签署页（演示免登）</button>';
+    } else if (m.key === 'other') {
+      var otherSigned = c.parties.some(function (p) { return p.ownerUid !== c.initiatorUid && p.status === 'signed'; });
+      html = '<div class="es-actions"><button class="es-btn gold" id="remind">' + ES.ic('bell') + '催对方签署</button>' +
+        (otherSigned ? '' : '<button class="es-btn danger" id="withdraw">撤回合同</button>') + '</div>' +
+        '<button class="es-linkbtn" id="h5" style="display:block;margin:10px auto 0;">打开对方签署页（演示免登）</button>';
+    } else if (c.status === 'rejected' || c.status === 'expired' || c.status === 'voided') {
+      html = '<button class="es-btn primary block" id="again">重新发起一份合同</button>';
+    } else {
+      html = '<button class="es-btn ghost block" id="backHome">返回电子签首页</button>';
+    }
+    foot.innerHTML = html;
+    var gs = ES.$('#goSign'); if (gs) gs.onclick = function () { location.href = 'sign.html?id=' + encodeURIComponent(c.id); };
+    var h5 = ES.$('#h5'); if (h5) h5.onclick = function () { window.open('h5-sign.html?id=' + encodeURIComponent(c.id), '_blank'); };
+    var rm2 = ES.$('#remind'); if (rm2) rm2.onclick = function () {
+      var r = EsignStore.remindContract(c.id);
+      if (r.ok) UI.toast('已向待签方发送第 ' + r.remindCount + ' 次催签提醒（演示）', 'ok'); else UI.toast(r.error || '催签失败', 'warn');
+    };
+    var wd = ES.$('#withdraw'); if (wd) wd.onclick = function () {
+      UI.dialog({
+        title: '确认撤回该合同？', text: '对方尚未签署，撤回后本次消耗的 1 次签署次数将原路退回；撤回后合同不可恢复。',
+        ok: '确认撤回', danger: true, cancel: '再等等',
+        onOk: function () {
+          var r = EsignStore.withdrawContract(c.id);
+          if (r.ok) { UI.toast('已撤回，签署次数已退回', 'ok'); render(); } else UI.toast(r.error || '撤回失败', 'err');
+        }
+      });
+    };
+    var ag = ES.$('#again'); if (ag) ag.onclick = function () { ES.Draft.clear(); location.href = 'choose-type.html'; };
+    var bh = ES.$('#backHome'); if (bh) bh.onclick = function () { location.href = 'index.html'; };
+  }
+
+  ES.subscribe(render);
+  render();
+});
+</script>
+</body>
+</html>

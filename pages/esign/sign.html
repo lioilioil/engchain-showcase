@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/esign/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>签署合同 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="esign.common.css">
+</head>
+<body>
+<div class="phone">
+  <div class="es-shell">
+    <div class="navbar">
+      <button class="nav-back" id="navBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="nav-title">签署合同</div>
+      <div class="nav-right"></div>
+    </div>
+    <div class="es-view" id="view"><div class="es-scroll" id="v" style="padding-bottom:106px;"></div>
+      <div class="es-foot-bar" id="foot"></div>
+    </div>
+    <div class="es-verify-mask" id="mask">
+      <div class="es-verify-card">
+        <div class="es-face"><svg class="ic" style="width:40px;height:40px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+        <div class="vt" id="maskTitle">正在进行实名认证</div>
+        <div class="vs" id="maskSub">人脸识别中，请正对屏幕…</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="es-scrim" id="scrim"></div>
+<div class="es-sheet" id="sheet">
+  <div class="grab"></div>
+  <h5>合同目录</h5>
+  <div class="sub">点击条款直接跳转 · 完整正文 + 附件 + 签章页</div>
+  <div class="es-toc-list" id="tocList"></div>
+</div>
+<script src="../../js/common.js"></script>
+<script src="../../js/data.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="esign.common.js"></script>
+<script>
+ES.init(function (ctx) {
+  var id = ES.qs('id');
+  var v = ES.$('#v'), foot = ES.$('#foot'), mask = ES.$('#mask');
+  var readAll = false, agreed = false, busy = false, dZoom = 1, dCur = 'a0';
+
+  function contract() { return EsignStore.contractById(id); }
+  function myParty(c) { return c.parties.filter(function (p) { return p.ownerUid === ctx.user.id; })[0]; }
+  function sequentialTurn(c, key) {
+    var pend = c.parties.filter(function (p) { return p.status !== 'signed'; }).sort(function (a, b) { return a.order - b.order; })[0];
+    return !pend || pend.key === key;
+  }
+
+  function showBlocked(c, kind) {
+    var map = {
+      notfound: ['未找到该合同', '合同可能已失效，或不属于当前账号'],
+      done: ['你已完成签署', '该合同已记录你的电子签名，可在详情页查看存证进度'],
+      turn: ['还没轮到你签署', '该合同为顺序签署，请等待前序方完成后再签'],
+      closed: ['当前合同不可签署', '该合同已结束（完成 / 撤回 / 逾期 / 拒签 / 作废）']
+    }[kind];
+    v.innerHTML = '<div class="es-empty">' + ES.ic(kind === 'turn' ? 'clock' : 'doc') +
+      '<div class="t">' + map[0] + '</div><div class="s">' + map[1] + '</div>' +
+      '<button class="es-btn primary" style="margin-top:16px;" onclick="location.href=\'detail.html?id=' + encodeURIComponent(id) + '\'">查看合同详情</button></div>';
+    foot.innerHTML = '';
+  }
+
+  function docbarHTML() {
+    return '<div class="es-docbar">' +
+      '<button class="es-toc" id="sToc">' + ES.ic('receipt') + '目录</button>' +
+      '<div class="es-zoom"><button id="zM" aria-label="缩小字号">A−</button><span class="zv" id="zV">100%</span><button id="zP" aria-label="放大字号">A+</button></div>' +
+      '<div class="es-rd" id="sRd"><span id="sRdTxt">已读 0% · 共 ' + toc().length + ' 节</span><div class="bar"><i id="sRdBar" style="width:0%"></i></div></div>' +
+    '</div>';
+  }
+  function toc() { var c = contract(); return c ? ES.contractTOC(c) : []; }
+
+  function render() {
+    var c = contract();
+    if (!c) return showBlocked(null, 'notfound');
+    var mp = myParty(c);
+    if (!mp) return showBlocked(c, 'notfound');
+    if (c.status === 'completed' || mp.status === 'signed') return showBlocked(c, 'done');
+    if (c.status !== 'pending_mine' && c.status !== 'signing') return showBlocked(c, 'closed');
+    if (c.signOrder === 'sequential' && !sequentialTurn(c, mp.key)) return showBlocked(c, 'turn');
+    readAll = false; agreed = false;
+
+    v.innerHTML =
+      '<div class="es-card" style="margin:12px 14px 0;display:flex;gap:10px;align-items:center;">' +
+        '<span style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--es-seal-soft);color:var(--es-seal);flex:none;">' + ES.ic('sign') + '</span>' +
+        '<div style="flex:1;"><div style="font-size:14px;font-weight:700;color:var(--text-1);">' + ES.esc(c.title) + '</div>' +
+        '<div class="es-muted es-mono" style="margin-top:2px;">' + ES.esc(c.code) + ' · 你作为' + ES.esc(mp.role) + '签署 · ' + ES.amountText(c) + '</div></div></div>' +
+      '<div class="es-sec" style="margin:18px 2px 11px;"><h2>合同正文</h2><div class="rule"></div><div class="more">签署前请完整阅读</div></div>' +
+      docbarHTML() +
+      ES.contractDocHTML(c, { sealMine: false }) +
+      '<div style="padding:16px 16px 0;">' +
+        '<div class="es-agree" id="agRead"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+        '<span>我已完整阅读并知悉合同全部条款<span class="es-readhint" id="readHint">阅读至文末后可确认</span></span></div>' +
+        '<div class="es-agree" id="agTerm" style="margin-top:12px;"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>' +
+        '<span>我同意 <a href="agreement.html">《电子签名服务协议》</a>，确认使用本人/本企业实名认证的电子签名签署，认可其法律效力</span></div>' +
+        '<div class="es-muted" style="margin-top:12px;line-height:1.7;display:flex;gap:7px;"><span style="color:var(--primary-dim);flex:none;">' + ES.ic('shield') + '</span>' +
+        '<span>签署前将进行实名认证（演示为人脸识别模拟）；签署数据由 ' + ES.esc(EsignStore.pricing().provider) + ' 加密存证。</span></div>' +
+      '</div>';
+    foot.innerHTML = '<div style="padding:0 2px;"><button class="es-btn primary block" id="bSign" disabled>实名认证并签署</button>' +
+      '<div class="h5-note" style="padding-top:9px;">点击即表示对合同内容确认无误 · 签署后不可单方撤销</div></div>';
+
+    bindDocbar(c);
+    var readHint = ES.$('#readHint');
+    function setReadUI() {
+      ES.$('#agRead').classList.toggle('on', readAll);
+      readHint.textContent = readAll ? '· 已读至文末，可确认' : '阅读至文末后可确认';
+      readHint.classList.toggle('ok', readAll);
+    }
+    ES.$('#agRead').onclick = function () {
+      var pct = readPct();
+      if (pct < 99) { UI.toast('请先滚动阅读至合同文末（当前 ' + pct + '%）', 'warn'); return; }
+      readAll = !readAll; setReadUI(); refreshBtn();
+    };
+    ES.$('#agTerm').onclick = function () { agreed = !agreed; ES.$('#agTerm').classList.toggle('on', agreed); refreshBtn(); };
+    ES.$('#bSign').onclick = doSign;
+    setReadUI(); refreshBtn();
+  }
+
+  function readPct() { var doc = ES.$('#esDoc'); return doc ? Math.round(ES.docReadPct(v, doc) * 100) : 0; }
+  function refreshBtn() { var b = ES.$('#bSign'); if (b) b.disabled = !(readAll && agreed) || busy; }
+
+  function bindDocbar(c) {
+    var zV = ES.$('#zV'), doc = ES.$('#esDoc');
+    function applyZoom(silent) {
+      if (!doc) return;
+      doc.style.setProperty('--es-dfs', (13 * dZoom).toFixed(1) + 'px');
+      doc.style.setProperty('--es-dhs', (13.5 * dZoom).toFixed(1) + 'px');
+      if (zV) zV.textContent = Math.round(dZoom * 100) + '%';
+      if (!silent) UI.toast('正文已缩放至 ' + Math.round(dZoom * 100) + '%');
+    }
+    ES.$('#zM').onclick = function () { dZoom = Math.max(0.85, +(dZoom - 0.15).toFixed(2)); applyZoom(); };
+    ES.$('#zP').onclick = function () { dZoom = Math.min(1.3, +(dZoom + 0.15).toFixed(2)); applyZoom(); };
+    applyZoom(true);
+    v.removeEventListener('scroll', onDocScroll);
+    v.addEventListener('scroll', onDocScroll);
+    onDocScroll();
+    ES.$('#sToc').onclick = openSheet;
+  }
+
+  function onDocScroll() {
+    var c = contract();
+    var doc = ES.$('#esDoc');
+    if (!c || !doc) return;
+    var pct = ES.docReadPct(v, doc), p = Math.round(pct * 100);
+    var bar = ES.$('#sRdBar'), txt = ES.$('#sRdTxt');
+    if (bar) bar.style.width = p + '%';
+    if (txt) {
+      var arts = ES.$$('.es-clause[data-a]', v);
+      var cur2 = arts[0] || null;
+      for (var i = 0; i < arts.length; i++) {
+        var r = arts[i].getBoundingClientRect();
+        if (r.top < v.getBoundingClientRect().top + 130) cur2 = arts[i];
+      }
+      if (cur2) dCur = cur2.getAttribute('data-a');
+      var left = arts.length - (arts.indexOf(cur2) + 1);
+      txt.textContent = p >= 100 ? '已读完全部条款 · 可确认' : '已读 ' + p + '% · 剩 ' + left + ' 节';
+      if (p >= 99) {
+        var hint = ES.$('#readHint');
+        if (hint && !hint.classList.contains('ok')) hint.innerHTML = '· 已读至文末，可确认';
+      }
+    }
+  }
+
+  function openSheet() {
+    var c = contract();
+    if (!c) return;
+    ES.$('#sheet').classList.add('on'); ES.$('#scrim').classList.add('on');
+    var list = ES.$('#tocList');
+    list.innerHTML = ES.contractTOC(c).map(function (it) {
+      return '<div class="es-toc-item' + (it.a === dCur ? ' cur' : '') + '" data-a="' + it.a + '" data-t="' + ES.esc(it.t) + '">' +
+        '<span class="dot2"></span><span class="no">' + String(it.no).padStart(2, '0') + '</span><span>' + ES.esc(it.t) + '</span></div>';
+    }).join('');
+    ES.$$('.es-toc-item', list).forEach(function (it) {
+      it.onclick = function () {
+        var el = ES.$('[data-a="' + it.getAttribute('data-a') + '"]', v);
+        if (el) v.scrollTo({ top: el.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop - 120, behavior: 'smooth' });
+        closeSheet(); UI.toast('已跳转至「' + it.getAttribute('data-t') + '」');
+      };
+    });
+  }
+  function closeSheet() { ES.$('#sheet').classList.remove('on'); ES.$('#scrim').classList.remove('on'); }
+  ES.$('#scrim').onclick = closeSheet;
+
+  function doSign() {
+    if (busy) return; busy = true; refreshBtn();
+    mask.classList.add('on');
+    ES.$('#maskTitle').textContent = '正在进行实名认证'; ES.$('#maskSub').textContent = '人脸识别中，请正对屏幕…';
+    setTimeout(function () {
+      ES.$('#maskTitle').textContent = '核验通过，正在落章'; ES.$('#maskSub').textContent = '生成电子签名与时间戳…';
+    }, 1300);
+    setTimeout(function () {
+      var c2 = contract();
+      var mp2 = c2 && myParty(c2);
+      var r = EsignStore.signContract(c2.id, { partyKey: mp2.key, method: mp2.signerType === 'personal' ? '个人签名' : '企业公章' });
+      mask.classList.remove('on'); busy = false;
+      if (!r.ok) { refreshBtn(); UI.toast(r.error || '签署失败，请重试', 'err'); return; }
+      showResult(r.contract);
+    }, 2400);
+  }
+
+  function showResult(c) {
+    var completed = c.status === 'completed';
+    document.querySelector('#view').innerHTML = '<div class="es-scroll"><div class="es-result">' +
+      '<div class="ri" style="' + (completed ? '' : 'background:var(--es-gold-soft);color:var(--es-gold-deep);') + '">' + ES.ic(completed ? 'shield' : 'check') + '</div>' +
+      '<h3>' + (completed ? '合同已全部签署完成' : '你已签署成功') + '</h3>' +
+      '<p>' + (completed
+        ? '全部 ' + c.parties.length + ' 方均已完成签署，合同即时生效，司法存证已生成。'
+        : '你的电子签名已提交，正在等待其余签署方完成；全部签署后合同生效并生成存证。') + '</p>' +
+      (completed && c.evidence ? '<div class="es-card" style="text-align:left;">' + ES.evidenceHTML(c.evidence) + '</div>' : '') +
+      '<button class="es-btn primary block" id="rDetail">查看合同详情</button>' +
+      '<button class="es-btn ghost block" id="rHome" style="margin-top:10px;">返回电子签首页</button></div></div>';
+    ES.$('#rDetail').onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(c.id); };
+    ES.$('#rHome').onclick = function () { location.href = 'index.html'; };
+  }
+
+  ES.$('#navBack').onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(id); };
+  render();
+});
+</script>
+</body>
+</html>

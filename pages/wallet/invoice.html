@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>发票管理 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css">
+<style>
+  /* ===== 底部固定悬浮按钮组（样式同「资质招商·首页」.app-float-cta：白毛玻璃多层渐变 + backdrop-filter + 发丝边 + 内分隔竖线；data-lg-glass 容器挂载 WebGL 玻璃） ===== */
+  .app-float-cta {
+    position: absolute !important; left: 50%; right: auto; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 32px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 55; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 12px;
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+        rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+        rgba(255,255,255,.78) 100%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+        rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    border: 1px solid rgba(255,255,255,.88);
+    box-shadow:
+      0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+      inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+      inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.40);
+    user-select: none; -webkit-user-select: none;
+  }
+  .app-float-cta::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+      rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+  }
+  .app-float-cta .afc-item {
+    flex: none; height: 100%; min-width: 0; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    color: var(--text-1); font-size: 13px; font-weight: 500; letter-spacing: .02em;
+    transition: color .25s, font-weight .25s, transform .15s;
+    font-family: var(--font-display);
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+    padding: 0 9px;
+  }
+  .app-float-cta .afc-item svg {
+    width: 18px; height: 18px; stroke-width: 2; flex: none;
+    transition: stroke-width .2s, color .25s;
+  }
+  .app-float-cta .afc-item:active { transform: scale(.94); }
+  .app-float-cta .afc-sep { flex: none; color: rgba(22,22,22,.28); font-size: 12px; padding: 0 2px; position: relative; z-index: 2; }
+  /* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+  [data-theme="dark"] .app-float-cta {
+    background: linear-gradient(180deg,
+      rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+      rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+      inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  [data-theme="dark"] .app-float-cta::before {
+    background: linear-gradient(180deg,
+      rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+      rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+  }
+  [data-theme="dark"] .app-float-cta .afc-item {
+    color: var(--text-1);
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] .app-float-cta .afc-sep { color: rgba(242,240,236,.30); }
+  /* 待审核卡片右下角「催开票」按钮 */
+  .urge-btn {
+    font-size: 11px; padding: 4px 11px; border-radius: var(--r-full);
+    border: 1px solid var(--primary); color: var(--primary-dim);
+    background: var(--primary-soft); cursor: pointer; flex: none;
+    transition: opacity .15s;
+  }
+  .urge-btn:active { opacity: .7; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">发票管理</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:104px;">
+    <!-- 申请开票表单（默认隐藏，点击底部「申请开票」展开） -->
+    <div class="card" id="apply-form" style="display:none;margin:10px 14px;">
+      <div class="fw-600 fs-14" style="margin-bottom:10px;">申请开票 <span class="text-3 fs-11" id="title-count" style="font-weight:400;">0 个抬头</span></div>
+      <div class="field"><label class="field-label">发票抬头 <span class="req">*</span></label>
+        <select class="input" id="f-title"></select>
+      </div>
+      <div class="field"><label class="field-label">发票类型</label>
+        <div class="seg" id="f-type-seg">
+          <span class="seg-item is-on" data-t="增值税普通发票">增值税普通发票</span>
+          <span class="seg-item" data-t="增值税专用发票">增值税专用发票</span>
+        </div>
+      </div>
+      <div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>
+        <input class="input" id="f-amount" type="number" placeholder="请输入开票金额" value="">
+        <div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">可开票总额：—</div>
+      </div>
+      <div class="field"><label class="field-label">关联订单</label>
+        <select class="input" id="f-order"><option value="">不关联订单</option></select>
+      </div>
+      <div class="field"><label class="field-label">接收邮箱 <span class="req">*</span></label>
+        <input class="input" id="f-email" type="email" placeholder="电子发票将发送至该邮箱">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="cancelApply()">取消</button>
+        <button class="btn btn-primary" style="flex:1.6;" onclick="submitApply()">提交申请</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:18px;"><div class="st-left">开票记录</div><span class="more" id="inv-count"></span></div>
+    <div class="seg" id="inv-filter" style="margin:0 14px 10px;">
+      <span class="seg-item is-on" data-filter="all">全部</span>
+      <span class="seg-item" data-filter="pending">待审核</span>
+      <span class="seg-item" data-filter="issued">已开票</span>
+      <span class="seg-item" data-filter="rejected">已驳回</span>
+    </div>
+    <div id="inv-list"></div>
+    <div id="inv-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-3);">
+      <svg class="ic" style="width:44px;height:44px;color:var(--text-3);opacity:.5;margin-bottom:10px;"><use href="#i-doc"/></svg>
+      <div class="fs-13" style="margin-bottom:4px;">暂无发票</div>
+      <div class="fs-11" style="margin-bottom:16px;">消费后可在此申请开具电子发票</div>
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('btn-apply').click()">去开票</button>
+    </div>
+  </div>
+
+  <!-- 底部主操作：液态玻璃胶囊条，样式同「资质招商·首页」.app-float-cta（data-lg-glass 挂载 WebGL 玻璃） -->
+  <div class="app-float-cta" data-lg-glass>
+    <button type="button" class="afc-item" id="btn-apply" aria-label="申请开票">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15h6"/></svg>
+      <span class="afc-label">申请开票</span>
+    </button>
+    <span class="afc-sep" aria-hidden="true">|</span>
+    <button type="button" class="afc-item" onclick="location.href='invoice-info.html'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <span class="afc-label">信息管理</span>
+    </button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script><script src="../../js/guest-gate.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+  /* P2-7 游客门控：未登录不渲染发票数据、不允许提交申请 */
+  function isLoggedIn() { try { var st = UI.state.get(); return !!(st && st.loggedIn); } catch (e) { return false; } }
+  function ensureGuestGate() {
+    if (isLoggedIn()) return false;
+    window.GuestGate && GuestGate.open({
+      mode: 'overlay',
+      icon: 'lock',
+      badge: '游客模式',
+      title: '登录后查看发票',
+      note: '发票申请与管理仅对登录用户可见。',
+      btnText: '去登录',
+      btnHref: '../auth/login.html'
+    });
+    return true;
+  }
+  var TITLE_KEY = 'engchain-invoice-titles';
+  var invType = '增值税普通发票';
+
+  function loadTitles() {
+    try { return JSON.parse(localStorage.getItem(TITLE_KEY) || '[]'); } catch (e) { return []; }
+  }
+  function saveTitles(arr) {
+    try { localStorage.setItem(TITLE_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function money(n) { return '¥' + Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    function p(x) { return ('0' + x).slice(-2); }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  var ST_MAP = {
+    pending:  { label: '待审核', cls: 'tag-warning' },
+    issued:   { label: '已开票', cls: 'tag-success' },
+    rejected: { label: '已驳回', cls: 'tag-gray' }
+  };
+
+  function renderTitleSelect() {
+    var titles = loadTitles();
+    document.getElementById('title-count').textContent = titles.length + ' 个抬头';
+    var sel = document.getElementById('f-title');
+    if (!titles.length) {
+      sel.innerHTML = '<option value="">请先在「开票信息管理」添加抬头</option>';
+    } else {
+      sel.innerHTML = titles.map(function (t, i) {
+        return '<option value="' + i + '">' + esc(t.name) + '</option>';
+      }).join('');
+    }
+    /* 预填邮箱 */
+    var def = titles.filter(function (t) { return t.isDefault; })[0] || titles[0];
+    if (def && def.email) document.getElementById('f-email').value = def.email;
+  }
+
+  /* [FIX BM-037] 计算可开票总额：当前用户已结算/已完成订单实付累计 − 已开票（非驳回）金额。
+     发票金额不得自由输入任意大额，须 >0 且 ≤ 可开票总额。 */
+  function invoiceableOrders() {
+    var orders = [];
+    try { orders = (window.DataBus && DataBus.orders) ? DataBus.orders() : []; } catch (e) {}
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    var acct = '';
+    try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
+    var settledStates = { settled: 1, paid: 1, completed: 1, finished: 1, done: 1 };
+    return orders.filter(function (o) {
+      if (!(o.owner === uid || o.counterparty === uid || o.counterparty === acct)) return false;/* P2-6 补全对家为当前用户的可开票订单 */
+      return settledStates[o.state] || settledStates[o.status];
+    });
+  }
+  function invoiceableTotal() {
+    var orders = invoiceableOrders();
+    var gross = orders.reduce(function (s, o) { return s + (Number(o.amount) || 0); }, 0);
+    /* 减去已开票（非驳回）金额，避免重复开票 */
+    var invoiced = 0;
+    try {
+      var list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []);
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var uid = me ? me.id : '';
+      list.forEach(function (x) {
+        if (x.status === 'rejected') return;
+        if (uid && x.uid && x.uid !== uid) return;
+        invoiced += Number(x.amount) || 0;
+      });
+    } catch (e) {}
+    return Math.max(0, Math.round((gross - invoiced) * 100) / 100);
+  }
+  function refreshAmountHint() {
+    var el = document.getElementById('f-amount-hint');
+    if (!el) return;
+    el.textContent = '可开票总额：¥' + invoiceableTotal().toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '（金额不得超过此数）';
+  }
+
+  function renderOrderSelect() {
+    var sel = document.getElementById('f-order');
+    var orders = invoiceableOrders();
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    var acct = '';
+    try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
+    var mine = orders.filter(function (o) { return o.owner === uid || o.counterparty === uid || o.counterparty === acct; });/* P2-6 与订单列表过滤一致 */
+    sel.innerHTML = '<option value="">不关联订单</option>' + mine.slice(0, 20).map(function (o) {
+      var amt = Number(o.amount) || 0;
+      return '<option value="' + o.id + '" data-amt="' + amt + '">' + o.id + ' · ' + esc(o.title || '').slice(0, 16) + '（¥' + amt.toLocaleString() + '）</option>';
+    }).join('');
+    /* [FIX BM-037] 选择订单后自动带入该订单实付金额，避免自由输入任意大额 */
+    sel.onchange = function () {
+      var opt = sel.options[sel.selectedIndex];
+      var amt = opt && opt.getAttribute('data-amt');
+      if (amt && Number(amt) > 0) {
+        document.getElementById('f-amount').value = Number(amt);
+      }
+    };
+    refreshAmountHint();
+  }
+
+  var currentFilter = 'all';
+  function renderList() {
+    var list = [];
+    try { list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []); } catch (e) {}
+    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = me ? me.id : '';
+    /* 过滤当前用户的发票（如有 uid 字段） */
+    var mine = list.filter(function (x) { return !x.uid || x.uid === uid; });
+    if (currentFilter !== 'all') mine = mine.filter(function (x) { return x.status === currentFilter; });
+    var el = document.getElementById('inv-list');
+    var empty = document.getElementById('inv-empty');
+    var cnt = document.getElementById('inv-count');
+    if (cnt) cnt.textContent = mine.length + ' 条';
+    if (!mine.length) {
+      el.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    el.innerHTML = mine.map(function (x) {
+      var st = ST_MAP[x.status] || ST_MAP.pending;
+      var date = x.ts ? fmtDate(x.ts) : (x.applyAt || '');
+      var issuedDate = x.issuedAt ? fmtDate(x.issuedAt) : '';
+      var html = '<div class="card" style="margin-bottom:10px;">' +
+        '<div class="fb-between" style="margin-bottom:8px;"><span class="text-3 fs-11">' + date + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="fw-600 fs-14">' + esc(x.title || '') + ' · ' + esc(x.type || '增值税普通发票') + '</div>' +
+        '<div class="text-2 fs-12 mt-1">' + money(x.amount) + (x.orderId ? ' · 订单 ' + x.orderId : '') + '</div>' +
+        (x.email ? '<div class="text-3 fs-11 mt-1">接收邮箱：' + esc(x.email) + '</div>' : '');
+      if (x.status === 'issued') {
+        html += '<div class="text-3 fs-11 mt-1">发票号 ' + esc(x.invoiceNo || '') + (issuedDate ? ' · 开票日期 ' + issuedDate : '') + '</div>';
+        html += '<div class="mt-2 fb-between"><button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'发票已下载\',\'ok\')">下载发票</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'已重新发送至邮箱\',\'ok\')">重新发送</button></div>';
+      } else if (x.status === 'rejected') {
+        html += '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote || '资料不完整') + '</div>';
+      } else if (x.status === 'pending') {
+        html += '<div class="mt-2 fb-between"><span class="text-3 fs-11">财务审核中，预计 1-2 个工作日</span>' +
+          '<button type="button" class="urge-btn" onclick="urgeInvoice()">催开票</button></div>';
+      }
+      html += '</div>';
+      return html;
+    }).join('');
+  }
+
+  /* 记录筛选 */
+  var filterEl = document.getElementById('inv-filter');
+  if (filterEl) filterEl.querySelectorAll('.seg-item').forEach(function (el) {
+    el.onclick = function () {
+      filterEl.querySelectorAll('.seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+      el.classList.add('is-on');
+      currentFilter = el.getAttribute('data-filter');
+      renderList();
+    };
+  });
+
+  function render() { if (!isLoggedIn()) return;/* P2-7 游客不渲染发票数据 */
+    renderTitleSelect();
+    renderOrderSelect();
+    renderList();
+  }
+
+  /* 申请开票展开/收起 */
+  document.getElementById('btn-apply').onclick = function () {
+    var form = document.getElementById('apply-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    if (form.style.display === 'block') {
+      renderTitleSelect();
+      renderOrderSelect();
+    }
+  };
+
+  /* E1-20 企业认证门控：仅 enterprise/resident 可开专票 */
+  function isEnterpriseCertified() {
+    try { return !!(window.entryAccess && entryAccess().isResident); } catch (e) { return false; }
+  }
+  function isSpecial() { return invType === '增值税专用发票'; }
+  /* E1-20 税号格式：15/17/18/20 位字母数字 */
+  function validTaxNo(no) { return /^[A-Za-z0-9]{15,20}$/.test(String(no || '').trim()); }
+  function renderSpecialGate() {
+    var sp = document.querySelector('#f-type-seg .seg-item[data-t="增值税专用发票"]');
+    if (!sp) return;
+    var ok = isEnterpriseCertified();
+    sp.style.opacity = ok ? '' : '.45';
+    sp.style.pointerEvents = ok ? '' : 'none';
+    var hint = document.getElementById('f-special-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'f-special-hint';
+      hint.style.cssText = 'font-size:11px;color:var(--text-3);margin-top:6px;';
+      sp.parentNode.parentNode.insertBefore(hint, sp.parentNode.nextSibling);
+    }
+    hint.innerHTML = ok ? '' : '完成<b style="color:var(--primary-dim);">企业认证</b>后可开具增值税专用发票；普票无需企业认证。';
+  }
+  /* 发票类型切换 */
+  document.querySelectorAll('#f-type-seg .seg-item').forEach(function (el) {
+    el.onclick = function () {
+      var want = el.getAttribute('data-t');
+      if (want === '增值税专用发票' && !isEnterpriseCertified()) {
+        UI.toast('完成企业认证后可开具增值税专用发票', 'warn');
+        renderSpecialGate();
+        return;
+      }
+      document.querySelectorAll('#f-type-seg .seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+      el.classList.add('is-on');
+      invType = want;
+    };
+  });
+  renderSpecialGate();
+
+  window.cancelApply = function () {
+    document.getElementById('apply-form').style.display = 'none';
+  };
+
+  window.submitApply = function () { if (!isLoggedIn()) { UI.toast('请先登录','warn'); return; }/* P2-7 游客禁止提交申请 */
+    var titles = loadTitles();
+    var titleIdx = document.getElementById('f-title').value;
+    var title = titles[titleIdx];
+    if (!title) { UI.toast('请先添加发票抬头', 'warn'); return; }
+    var amount = parseFloat(document.getElementById('f-amount').value);
+    if (!amount || amount <= 0) { UI.toast('请输入有效的开票金额', 'warn'); return; }
+    /* [FIX BM-037] 发票金额必须 >0 且 ≤ 可开票总额（已结算订单实付累计 − 已开票），不得自由输入任意大额 */
+    var invTotal = invoiceableTotal();
+    if (amount > invTotal + 0.001) {
+      UI.toast('开票金额超过可开票总额 ¥' + invTotal.toLocaleString(), 'warn');
+      return;
+    }
+    var email = document.getElementById('f-email').value.trim();
+    if (!email) { UI.toast('请填写接收邮箱', 'warn'); return; }
+    /* E1-20 专票强制校验税号与开户行 */
+    if (invType === '增值税专用发票') {
+      if (!isEnterpriseCertified()) { UI.toast('完成企业认证后可开具增值税专用发票', 'warn'); return; }
+      var taxNo = (title.tax || '').trim();
+      if (!taxNo) { UI.toast('专票需填写纳税人识别号（税号），请在开票信息管理中补全', 'warn'); return; }
+      if (!validTaxNo(taxNo)) { UI.toast('税号格式不正确（应为 15/17/18/20 位字母或数字）', 'warn'); return; }
+      if (!((title.bankAccount || '').trim())) { UI.toast('专票需填写开户行及账号，请在开票信息管理中补全', 'warn'); return; }
+    }
+    var orderId = document.getElementById('f-order').value;
+    var payload = {
+      title: title.name,
+      tax: title.tax || '',
+      type: invType,
+      amount: amount,
+      email: email,
+      orderId: orderId || '',
+      address: title.address || '',
+      phone: title.phone || '',
+      bank: title.bank || '',
+      bankAccount: title.bankAccount || ''
+    };
+    var item = DataBus.invoiceApply(payload);
+    if (item && !item.error) {
+      UI.toast('开票申请已提交，待审核', 'ok');
+      document.getElementById('apply-form').style.display = 'none';
+      document.getElementById('f-amount').value = '';
+      render();
+    } else {
+      UI.toast((item && item.error) || '提交失败', 'warn');
+    }
+  };
+
+  window.addEventListener('engchain:invoice', render);
+  window.addEventListener('engchain:store-change', render);
+  /* P3-19 催开票：关联当前待处理发票号，无待处理单时标注演示 */
+  window.urgeInvoice = function () {
+    var id = '';
+    try {
+      var list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []);
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var uid = me ? me.id : '';
+      var mine = (list || []).filter(function (x) { return (!x.uid || x.uid === uid) && x.status !== 'rejected' && x.status !== 'issued'; });
+      if (mine.length) id = mine[0].invoiceNo || mine[0].id || '';
+    } catch (e) {}
+    UI.toast(id ? ('已催开票（发票号：' + id + '），财务将加急处理') : '已催开票，财务将加急处理（演示）', 'ok');
+  };
+
+  if (ensureGuestGate()) { /* P2-7 游客：遮罩登录引导，不渲染、不允许操作 */ } else { render(); }
+})();
+</script>
+</body>
+</html>

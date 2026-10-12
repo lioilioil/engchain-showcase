@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/message/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>消息 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/liquid-dock.css">
+</head>
+<body data-tab="message">
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8.5v5.2l-4-2.4v-2.8L3 5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="phone">
+  <div class="page-header" style="padding-top:10px;">
+    <div class="topbar">
+      <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
+      <div class="topbar-title">消息</div>
+      <div class="topbar-right"><button type="button" class="icon-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic"><use href="#i-search"/></svg></button><button type="button" class="icon-btn" id="msg-settings-btn" aria-label="会话设置" title="设置"><svg class="ic"><use href="#i-gear"/></svg></button></div>
+    </div>
+    <div class="msg-tabs" id="msg-tabs">
+      <button class="msg-tab active" data-tab="conv">会话<span class="mt-badge" id="badge-conv" style="display:none;">0</span></button>
+      <button class="msg-tab" data-tab="notice">通知<span class="mt-badge" id="badge-notice" style="display:none;">0</span></button>
+    </div>
+    <div class="msg-search" id="msg-search" style="display:none;">
+      <div class="msg-search-box">
+        <svg class="ic msg-search-ic"><use href="#i-search"/></svg>
+        <input class="msg-search-input" id="msg-search-input" type="search" placeholder="搜索会话与通知" autocomplete="off">
+        <button type="button" class="msg-search-clear" id="msg-search-clear" aria-label="清空">×</button>
+      </div>
+      <button type="button" class="msg-search-cancel" id="msg-search-cancel">取消</button>
+    </div>
+  </div>
+
+  <div class="scroll" style="padding-top:6px;">
+    <div id="pane-conv">
+      <div id="list"></div>
+    </div>
+    <div id="pane-notice" style="display:none;">
+      <div class="notice-bar-row">
+        <div class="notice-subbar" id="notice-subbar">
+          <button type="button" class="nsub active" data-cat="全部">全部</button>
+          <button type="button" class="nsub" data-cat="公告">公告</button>
+          <button type="button" class="nsub" data-cat="订单">订单</button>
+          <button type="button" class="nsub" data-cat="资金">资金</button>
+          <button type="button" class="nsub" data-cat="认证">认证</button>
+          <button type="button" class="nsub" data-cat="系统">系统</button>
+          <button type="button" class="nsub" data-cat="风控">风控</button>
+          <button type="button" class="nsub" data-cat="活动">活动</button>
+          <button type="button" class="nsub" data-cat="邀请">邀请</button>
+          <button type="button" class="nsub" data-cat="推荐">推荐</button>
+        </div>
+        <div class="notice-selected" id="notice-selected" style="display:none;"></div>
+        <div class="notice-filter" id="notice-filter">
+          <button type="button" class="notice-filter-btn" id="notice-filter-btn" aria-label="筛选通知"><svg class="ic"><use href="#i-filter"/></svg>筛选<span class="nf-dot" id="notice-filter-dot" style="display:none;"></span></button>
+        </div>
+      </div>
+      <div id="notice-list"></div>
+    </div>
+    <div id="msg-search-res" style="display:none;"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
+<script src="../../js/preview-sheet.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  var TYPE_STYLE = { '公告': 'gold', '系统': 'info', '风控': 'danger', '活动': 'warn', '订单': 'info', '资金': 'success', '认证': 'accent', '邀请': 'gold', '推荐': 'accent' };
+  function fmtTs(ts) {
+    if (!ts) return '';
+    var d = new Date(String(ts).indexOf('-') === 0 ? ts : (String(ts).length === 10 ? ts + 'T00:00:00' : ts));
+    if (isNaN(d)) return String(ts);
+    var m = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][d.getMonth()];
+    return m + d.getDate() + '日';
+  }
+
+  /* ---- 运营消息（同源 engchain-messages：后台消息中心发布 → App 实时可见） ---- */
+  var MSG_READ_KEY = 'engchain-msg-read';
+  function readMsgIds() { try { return JSON.parse(localStorage.getItem(MSG_READ_KEY) || '[]'); } catch (e) { return []; } }
+  function writeMsgIds(ids) { try { localStorage.setItem(MSG_READ_KEY, JSON.stringify(ids)); } catch (e) {} }
+  function isMsgRead(id) { return readMsgIds().indexOf(id) >= 0; }
+  function markMsgRead(id) { var ids = readMsgIds(); if (ids.indexOf(id) < 0) { ids.push(id); writeMsgIds(ids); } }
+  function markAllMsgRead() { var ids = readMsgs().map(function(m){return m.id;}); writeMsgIds(ids); }
+  function readMsgs() {
+    try {
+      var all = (window.DataBus && DataBus.messages()) || [];
+      /* 定向消息（企业邀请/移交通知等）仅本人可见；广播消息（无 targetUid）所有人可见 */
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (!me) return all;
+      return all.filter(function (m) { return !m.targetUid || m.targetUid === me.id; });
+    } catch (e) { return []; }
+  }
+  function sysUnreadCount() {
+    var list = readMsgs();
+    var readIds = readMsgIds();
+    return list.filter(function (m) { return readIds.indexOf(m.id) < 0; }).length;
+  }
+  /* ================= 消息页 v2：通知分页合并 + 搜索 =================
+     消息类型真实枚举（经数据源核实）：
+     - 运营消息 type = { 公告, 系统, 风控, 活动 }；定向系统消息(direct:true) type='系统'
+     - 原 system.html 静态消息主题 = { 订单, 资金, 认证, 公告 }（无独立"交易"类型，交易相关归入订单/资金）
+     - 独立消息流：企业邀请（engchain-orgs）、智能推荐（engchain-matches）
+     子 bar 修正：全部 / 公告 / 订单 / 资金 / 认证 / 系统 / 风控 / 活动 / 邀请 / 推荐 */
+  var noticeFilter = '全部';
+  /* 通知筛选：时间范围（all/today/7d/30d），类型复用 noticeFilter（与子 bar 联动） */
+  var noticeTimeFilter = 'all';
+  var TIME_OPTS = [{ v: 'all', l: '全部时间' }, { v: 'today', l: '今天' }, { v: '7d', l: '近7天' }, { v: '30d', l: '近30天' }];
+  function timeMatch(ts, range) {
+    if (!ts) return range === 'all';
+    var now = Date.now();
+    if (range === 'today') {
+      var d = new Date(ts), t = new Date();
+      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+    }
+    if (range === '7d') return now - ts <= 7 * 86400e3;
+    if (range === '30d') return now - ts <= 30 * 86400e3;
+    return true;
+  }
+  var curTab = 'conv';
+  var searchMode = false;
+
+  /* 系统消息已读（独立键，避免与运营消息 engchain-msg-read 混用） */
+  var SYS_READ_KEY = 'engchain-sys-read';
+  function readSysIds() { try { return JSON.parse(localStorage.getItem(SYS_READ_KEY) || '[]'); } catch (e) { return []; } }
+  function writeSysIds(ids) { try { localStorage.setItem(SYS_READ_KEY, JSON.stringify(ids)); } catch (e) {} }
+  function isSysRead(id) { return readSysIds().indexOf(id) >= 0; }
+  function markSysRead(id) { var ids = readSysIds(); if (ids.indexOf(id) < 0) { ids.push(id); writeSysIds(ids); } }
+  function sysMsgUnreadCount() {
+    try { return ((window.MOCK && MOCK.systemMessages) || []).filter(function (m) { return !isSysRead(m.id); }).length; } catch (e) { return 0; }
+  }
+
+  function tsNum(t) { if (!t) return 0; var d = new Date(String(t).length === 10 ? t + 'T00:00:00' : t); return isNaN(d) ? 0 : d.getTime(); }
+
+  /* 会话行的 time 多为展示串（HH:MM / 昨天 / 周X / x月x日），用于"最新未读"排序时解析为时间戳。
+     优先读会话对象上的真实数值字段（ts/updatedAt/lastTs），演示串按相对当天折算。 */
+  var CONV_WEEK = { '周日': 0, '周天': 0, '星期日': 0, '星期天': 0, '周一': 1, '星期二': 2, '周二': 2, '星期三': 3, '周三': 3, '星期四': 4, '周四': 4, '星期五': 5, '周五': 5, '星期六': 6, '周六': 6 };
+  function parseConvTime(s) {
+    if (s == null) return 0;
+    if (typeof s === 'number') return s;
+    s = String(s).trim();
+    if (!s) return 0;
+    var now = new Date(), p, m, d;
+    if (/^\d{1,2}:\d{2}$/.test(s)) { p = s.split(':'); return new Date(now.getFullYear(), now.getMonth(), now.getDate(), +p[0], +p[1], 0, 0).getTime(); }
+    if (s.indexOf('昨天') === 0) return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0).getTime();
+    if (CONV_WEEK[s] !== undefined) {
+      var target = CONV_WEEK[s], cur = now.getDay(), diff = (cur - target + 7) % 7;
+      if (diff === 0) diff = 7; /* 文案"周X"指最近一个已过去的该星期日，当天不重复计 */
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff, 12, 0, 0).getTime();
+    }
+    if ((m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日/))) return new Date(now.getFullYear(), +m[1] - 1, +m[2], 12, 0, 0).getTime();
+    d = Date.parse(s); return isNaN(d) ? 0 : d;
+  }
+  /* 会话子页"最新一条未读"时间戳（无未读返回 0）；真实数值字段优先，其次解析展示时间串 */
+  function latestUnreadConvTs() {
+    var t = 0;
+    try {
+      (readConvs().list || []).forEach(function (c) {
+        if (!(c.unread > 0)) return;
+        var raw = (c.ts != null) ? c.ts : (c.updatedAt != null ? c.updatedAt : c.lastTs);
+        var ms = (typeof raw === 'number') ? raw : (tsNum(raw) || parseConvTime(c.time));
+        if (ms > t) t = ms;
+      });
+    } catch (e) {}
+    return t;
+  }
+  /* 通知子页"最新一条未读"时间戳（无未读返回 0） */
+  function latestUnreadNoticeTs() {
+    var t = 0;
+    try { buildNoticeItems().forEach(function (x) { if (x.unread && x.ts > t) t = x.ts; }); } catch (e) {}
+    return t;
+  }
+  /* 初始进入哪个子页：进入"最新一条未读消息时间更晚"的子页；两边都无未读时默认"会话"；时间相等保持"会话" */
+  function pickInitialTab() {
+    var ct = latestUnreadConvTs(), nt = latestUnreadNoticeTs();
+    if (nt > ct) return 'notice';
+    return 'conv';
+  }
+  window.__pickInitialMsgTab = pickInitialTab; /* 只读暴露，便于联调/回归 */
+  window.__parseConvTime = parseConvTime;     /* 只读暴露，便于联调/回归 */
+
+  /* 类型标签配色（沿用 TYPE_STYLE 视觉语言） */
+  function catStyle(cat) {
+    var map = {
+      '公告': { c: 'var(--primary)', b: 'rgba(176, 138, 60, .15)' },
+      '订单': { c: 'var(--primary-dim)', b: 'rgba(46,102,255,.08)' },
+      '资金': { c: '#2E9E5B', b: 'rgba(46,158,91,.1)' },
+      '认证': { c: '#8B7BB5', b: 'rgba(139,123,181,.12)' },
+      '系统': { c: 'var(--primary-dim)', b: 'rgba(46,102,255,.08)' },
+      '风控': { c: '#dc2626', b: 'rgba(220,38,38,.1)' },
+      '活动': { c: '#d97706', b: 'rgba(217,119,6,.1)' },
+      '邀请': { c: 'var(--primary-dim)', b: 'rgba(176, 138, 60, .13)' },
+      '推荐': { c: '#8B7BB5', b: 'rgba(139,123,181,.12)' }
+    };
+    var st = map[cat] || map['系统'];
+    return 'color:' + st.c + ';background:' + st.b;
+  }
+
+  /* 系统消息主题 → 类型（标题关键词映射；"交易"无独立类型，归入订单/资金） */
+  function catOfSys(m) {
+    var t = (m.title || '') + (m.text || '') + (m.desc || '');
+    if (/公告/.test(m.title || '')) return '公告';
+    if (/订单|解锁/.test(t)) return '订单';
+    if (/提现|到账|转账|佣金|结算|入账|余额|钱包|资金/.test(t)) return '资金';
+    if (/认证|资质|审核/.test(t)) return '认证';
+    return '公告';
+  }
+
+  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 智能推荐），按时间倒序 */
+  function buildNoticeItems() {
+    var items = [];
+    readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); }).forEach(function (m) {
+      var cat = TYPE_STYLE[m.type] ? m.type : '系统';
+      var _guess = guessAction(m.title || '', m.body || '');
+      items.push({
+        kind: 'msg', cat: cat, id: m.id, title: m.title || '',
+        body: (m.body || '') + (m.target ? ' · ' + (m.direct ? '仅本人' : m.target) : ''),
+        time: fmtTs(m.ts), ts: tsNum(m.ts), unread: !isMsgRead(m.id),
+        actions: m.action ? [m.action] : (_guess ? [_guess] : []),
+        detail: m.detail || m.body || ''
+      });
+    });
+    ((window.MOCK && MOCK.systemMessages) || []).forEach(function (m, i) {
+      items.push({
+        kind: 'sys', cat: catOfSys(m), id: m.id, title: m.title || '',
+        body: m.text || m.desc || '', time: m.time || '',
+        ts: Date.now() - (i + 1) * 3600e3, unread: !isSysRead(m.id),
+        actions: (m.actions && m.actions.length) ? m.actions.slice(0, 2) : (m.action ? [m.action] : []),
+        detail: m.body ? String(m.body).replace(/<[^>]*>/g, ' ') : (m.text || m.desc || '')
+      });
+    });
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (me && window.OrgsStore) {
+        OrgsStore.inviteNoticesFor(me.id).slice(0, 20).forEach(function (item) {
+          var org = item.org, iv = item.invite;
+          var rl = { owner: '企业主', admin: '管理员', member: '成员' }[iv.role] || '成员';
+          items.push({
+            kind: 'inv', cat: '邀请', id: iv.inviteId,
+            title: (org.shortName || org.co) + ' 邀请您加入企业团队担任' + rl,
+            body: iv.name ? '（' + esc(iv.name) + '）' : '',
+            time: fmtInvTime(iv.updatedAt || iv.createdAt), ts: tsNum(iv.updatedAt || iv.createdAt || 0),
+            unread: iv.status === 'pending', invite: iv
+          });
+        });
+      }
+    } catch (e) {}
+    try {
+      var feed = (MatchStore.read && MatchStore.read().feed) || [];
+      feed.forEach(function (x) {
+        items.push({
+          kind: 'match', cat: '推荐', id: x.sourceId || x.id, title: x.title || '',
+          body: (x.type === 'supply' ? '供应' : '需求') + ' · ' + (x.cat || '') + (x.location ? ' · ' + x.location : ''),
+          time: '', ts: 0, unread: !x.read, match: x
+        });
+      });
+    } catch (e) {}
+    return items.sort(function (a, b) { return b.ts - a.ts; });
+  }
+
+  /* 通知未读角标 = 运营 + 系统 + 邀请 + 推荐 */
+  function renderNoticeBadge() {
+    var n = sysUnreadCount() + sysMsgUnreadCount() + inviteUnreadCount();
+    try { if (matchNotifyOn()) n += (MatchStore.listUnread ? MatchStore.listUnread().length : 0); } catch (e) {}
+    var bn = document.getElementById('badge-notice');
+    if (!bn) return;
+    bn.textContent = n; bn.style.display = n ? '' : 'none';
+  }
+
+  /* 统一通知列表渲染（按子 bar 筛选） */
+  function renderNoticeList() {
+    var box = document.getElementById('notice-list');
+    if (!box) return;
+    var items = buildNoticeItems().filter(function (x) { return (noticeFilter === '全部' || x.cat === noticeFilter) && timeMatch(x.ts, noticeTimeFilter); });
+    if (!items.length) {
+      box.innerHTML = '<div class="n-empty">' + (noticeFilter === '全部' ? '暂无通知' : '暂无「' + esc(noticeFilter) + '」类通知') + '</div>';
+      return;
+    }
+    box.innerHTML = items.map(function (x) {
+      var dot = x.unread ? '<span class="n-dot"></span>' : '';
+      var click = '';
+      if (x.kind === 'msg') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
+      if (x.kind === 'sys') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
+      if (x.kind === 'match') click = ' onclick="showMatchFeed();return false;"';
+      var acts = '';
+      if (x.kind === 'inv') {
+        acts = x.invite.status === 'pending'
+          ? '<div class="inv-act-row">' +
+              '<button class="inv-act ok" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'accept\',this)">确认加入</button>' +
+              '<button class="inv-act no" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'reject\',this)">拒绝</button>' +
+            '</div>'
+          : '<span class="inv-act-state ' + (x.invite.status === 'accepted' ? 'done' : 'no') + '">' + (x.invite.status === 'accepted' ? '已加入' : '已拒绝') + '</span>';
+      }
+      if ((x.kind === 'msg' || x.kind === 'sys') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办/.test((x.title || '') + (x.body || ''));
+        acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
+          var on = 'event.stopPropagation();readNotice(\'' + esc(x.id) + '\',\'' + x.kind + '\')';
+          var href = esc(a.href || '#');
+          var label = esc(a.label || '查看详情');
+          if (ai === 0) {
+            if (needAct) return '<a class="n-btn primary" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+            return '<a class="n-link" href="' + href + '" onclick="' + on + '">' + label + ' ›</a>';
+          }
+          return '<a class="n-link muted" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+        }).join('') + '</div>';
+      }
+      var score = (x.kind === 'match' && x.match && x.match.matchScore != null) ? '<div class="n-score">' + x.match.matchScore + '% 匹配</div>' : '';
+      return '<div class="n-item" data-kind="' + x.kind + '"' + click + '>' +
+        '<div class="n-head"><span class="n-cat" style="' + catStyle(x.cat) + '">' + esc(x.cat) + '</span>' +
+        '<span class="n-title">' + esc(x.title) + '</span>' +
+        (x.time ? '<span class="n-time">' + esc(x.time) + '</span>' : '') + '</div>' +
+        '<div class="n-body">' + (x.body ? esc(x.body) : '') + '</div>' +
+        score + acts + dot +
+        '</div>';
+    }).join('');
+  }
+  /* ---- 消息交互：业务动作跳转 + 详情 sheet + 关键词兜底 ---- */
+  function guessAction(title, body) {
+    var t = title + ' ' + body;
+    if (/成员已加入|已接受邀请|加入企业|企业主|移交/.test(t)) return { label: '查看成员', href: '../profile/org-members.html' };
+    if (/认证|资质/.test(t)) return { label: '查看我的认证', href: '../profile/auth.html' };
+    if (/提现|到账|转账|佣金|入账|余额|钱包/.test(t)) return { label: '查看资金明细', href: '../wallet/index.html' };
+    if (/共创|招募|活动/.test(t)) return { label: '立即参与', href: '../co-create/index.html' };
+    return null;
+  }
+  function noticeItemById(id, kind) {
+    var list = buildNoticeItems();
+    for (var i = 0; i < list.length; i++) if (list[i].kind === kind && String(list[i].id) === String(id)) return list[i];
+    return null;
+  }
+  window.openNotice = function (id, kind) {
+    if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
+    else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
+    var it = noticeItemById(id, kind);
+    if (!it) return;
+    /* 有明确业务落点：直接进入主操作 */
+    if (it.actions && it.actions.length && it.actions[0].href && it.actions[0].href !== '#') {
+      openNoticePreview(it.actions[0].href, it.actions[0].label || '页面预览');
+      return;
+    }
+    showNoticeDetail(it);
+  };
+  function showNoticeDetail(it) {
+    var head = '<div class="nd-head"><span class="n-cat" style="' + catStyle(it.cat) + '">' + esc(it.cat) + '</span>' +
+      '<span class="nd-time">' + esc(it.time || '') + '</span></div>' +
+      '<div class="nd-title">' + esc(it.title) + '</div>' +
+      '<div class="nd-body">' + esc(it.detail || it.body || '') + '</div>';
+    var foot = '';
+    if (it.actions && it.actions.length) {
+      foot = '<div class="nd-acts">' + it.actions.map(function (a, ai) {
+        return '<a class="n-btn ' + (ai === 0 ? 'primary' : 'ghost') + '" href="' + esc(a.href || '#') + '">' + esc(a.label || '查看详情') + '</a>';
+      }).join('') + '</div>';
+    }
+    var sh = UI.sheet(); sh.setText('通知详情'); sh.html('<div class="nd">' + head + foot + '</div>'); sh.show();
+  }
+  window.readNotice = function (id, kind) {
+    if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
+    else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
+  };
+  function bindSubbar() {
+    var bar = document.getElementById('notice-subbar');
+    if (!bar) return;
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.nsub') : null;
+      if (!b) return;
+      noticeFilter = b.getAttribute('data-cat');
+      var all = bar.querySelectorAll('.nsub');
+      for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i] === b);
+      renderNoticeFilterBar();
+      renderNoticeList();
+      updateFilterLink();
+    });
+  }
+
+  /* ========== 通知筛选：分类行右侧「筛选」链接 + 自下而上弹窗（时间/类型） ========== */
+  function noticeFilterActive() { return noticeFilter !== '全部' || noticeTimeFilter !== 'all'; }
+  function updateFilterLink() {
+    var btn = document.getElementById('notice-filter-btn');
+    var dot = document.getElementById('notice-filter-dot');
+    if (!btn) return;
+    btn.classList.toggle('active', noticeFilterActive());
+    if (dot) dot.style.display = noticeFilterActive() ? '' : 'none';
+  }
+  function openNoticeFilter() {
+    var types = ['全部', '公告', '订单', '资金', '认证', '系统', '风控', '活动', '邀请', '推荐'];
+    var sh = UI.sheet();
+    sh.setText('筛选通知');
+    var timeChips = TIME_OPTS.map(function (o) {
+      return '<button type="button" class="flt-chip' + (noticeTimeFilter === o.v ? ' active' : '') + '" data-tv="' + o.v + '">' + o.l + '</button>';
+    }).join('');
+    var typeChips = types.map(function (t) {
+      return '<button type="button" class="flt-chip' + (noticeFilter === t ? ' active' : '') + '" data-tv="' + t + '">' + t + '</button>';
+    }).join('');
+    sh.html(
+      '<div class="flt-sec"><div class="flt-label">时间</div><div class="flt-chips" id="flt-time">' + timeChips + '</div></div>' +
+      '<div class="flt-sec"><div class="flt-label">类型</div><div class="flt-chips" id="flt-type">' + typeChips + '</div></div>' +
+      '<div class="flt-actions">' +
+        '<button type="button" class="btn btn-ghost" id="flt-reset">重置</button>' +
+        '<button type="button" class="btn btn-primary" id="flt-ok">确定</button>' +
+      '</div>'
+    );
+    sh.show();
+    var timeBox = sh.body().querySelector('#flt-time');
+    var typeBox = sh.body().querySelector('#flt-type');
+    var _t = noticeTimeFilter, _ty = noticeFilter;
+    function bindChips(box, setter) {
+      box.addEventListener('click', function (e) {
+        var c = e.target.closest ? e.target.closest('.flt-chip') : null;
+        if (!c) return;
+        var all = box.querySelectorAll('.flt-chip');
+        for (var i = 0; i < all.length; i++) all[i].classList.remove('active');
+        c.classList.add('active');
+        setter(c.getAttribute('data-tv'));
+      });
+    }
+    bindChips(timeBox, function (v) { _t = v; });
+    bindChips(typeBox, function (v) { _ty = v; });
+    sh.body().querySelector('#flt-reset').addEventListener('click', function () {
+      _t = 'all'; _ty = '全部';
+      var tc = timeBox.querySelectorAll('.flt-chip'), tc2 = typeBox.querySelectorAll('.flt-chip');
+      for (var i = 0; i < tc.length; i++) tc[i].classList.toggle('active', tc[i].getAttribute('data-tv') === 'all');
+      for (var j = 0; j < tc2.length; j++) tc2[j].classList.toggle('active', tc2[j].getAttribute('data-tv') === '全部');
+    });
+    sh.body().querySelector('#flt-ok').addEventListener('click', function () {
+      noticeTimeFilter = _t; noticeFilter = _ty;
+      renderNoticeFilterBar();
+      renderNoticeList();
+      updateFilterLink();
+      UI.closeSheet();
+    });
+  }
+  /* 筛选生效后视图切换：隐藏原子 bar，改为展示已选筛选标签（带 × 清除） */
+  var TIME_LABEL = { today: '今天', '7d': '近7天', '30d': '近30天' };
+  function renderNoticeFilterBar() {
+    var bar = document.getElementById('notice-subbar');
+    var sel = document.getElementById('notice-selected');
+    if (!bar || !sel) return;
+    if (!noticeFilterActive()) {
+      bar.style.display = ''; sel.style.display = 'none';
+      var all = bar.querySelectorAll('.nsub');
+      for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].getAttribute('data-cat') === noticeFilter);
+      return;
+    }
+    bar.style.display = 'none'; sel.style.display = 'flex';
+    var chips = [];
+    if (noticeTimeFilter !== 'all') chips.push('<span class="nsel-chip"><span class="nsel-label">时间</span>' + esc(TIME_LABEL[noticeTimeFilter] || noticeTimeFilter) + '<span class="nsel-x" data-k="time"><svg class="ic"><use href="#i-x"/></svg></span></span>');
+    if (noticeFilter !== '全部') chips.push('<span class="nsel-chip"><span class="nsel-label">类型</span>' + esc(noticeFilter) + '<span class="nsel-x" data-k="type"><svg class="ic"><use href="#i-x"/></svg></span></span>');
+    sel.innerHTML = chips.join('');
+  }
+  function bindSelectedBar() {
+    var sel = document.getElementById('notice-selected');
+    if (!sel) return;
+    sel.addEventListener('click', function (e) {
+      var x = e.target.closest ? e.target.closest('.nsel-x') : null;
+      if (!x) return;
+      var k = x.getAttribute('data-k');
+      if (k === 'time') noticeTimeFilter = 'all';
+      else noticeFilter = '全部';
+      renderNoticeFilterBar(); renderNoticeList(); updateFilterLink();
+    });
+  }
+  function bindNoticeFilter() {
+    var btn = document.getElementById('notice-filter-btn');
+    if (btn) btn.addEventListener('click', openNoticeFilter);
+    bindSelectedBar();
+    renderNoticeFilterBar();
+    updateFilterLink();
+  }
+
+  /* ========== 搜索：会话 + 通知联合过滤 ========== */
+  function setSearchMode(on) {
+    searchMode = on;
+    document.getElementById('msg-search').style.display = on ? 'flex' : 'none';
+    document.getElementById('msg-tabs').style.display = on ? 'none' : 'flex';
+    document.getElementById('msg-search-res').style.display = on ? '' : 'none';
+    document.getElementById('pane-conv').style.display = (on || curTab !== 'conv') ? 'none' : '';
+    document.getElementById('pane-notice').style.display = (on || curTab !== 'notice') ? 'none' : '';
+    if (on) {
+      var inp = document.getElementById('msg-search-input');
+      inp.value = ''; renderSearch('');
+      setTimeout(function () { try { inp.focus(); } catch (e) {} }, 60);
+    } else {
+      renderNoticeList();
+    }
+  }
+  function renderSearch(kw) {
+    var box = document.getElementById('msg-search-res');
+    if (!box) return;
+    kw = (kw || '').trim();
+    if (!kw) { box.innerHTML = '<div class="n-empty">输入关键词，搜索会话与通知</div>'; return; }
+    var low = kw.toLowerCase();
+    var hits = [];
+    (readConvs().list || []).forEach(function (c) {
+      if ((c.name || '').toLowerCase().indexOf(low) >= 0 || (c.last || '').toLowerCase().indexOf(low) >= 0 || (c.role || '').toLowerCase().indexOf(low) >= 0) {
+        hits.push({ kind: 'conv', cat: '会话', id: c.id, title: c.name || '', body: c.last || '', time: c.time || '', unread: !!c.unread });
+      }
+    });
+    buildNoticeItems().forEach(function (x) {
+      if ((x.title || '').toLowerCase().indexOf(low) >= 0 || (x.body || '').toLowerCase().indexOf(low) >= 0) hits.push(x);
+    });
+    if (!hits.length) {
+      box.innerHTML = '<div class="n-empty">未找到与「' + esc(kw) + '」相关的会话或通知</div>';
+      return;
+    }
+    box.innerHTML = '<div class="sr-hint">共 ' + hits.length + ' 条结果</div>' + hits.map(function (x) {
+      var dot = x.unread ? '<span class="n-dot"></span>' : '';
+      var open = '';
+      if (x.kind === 'conv') open = ' onclick="openSearchConv(\'' + esc(x.id) + '\')"';
+      if (x.kind === 'msg') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
+      if (x.kind === 'sys') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
+      if (x.kind === 'match') open = ' onclick="showMatchFeed();return false;"';
+      var acts = '';
+      if (x.kind === 'inv' && x.invite && x.invite.status === 'pending') {
+        acts = '<div class="inv-act-row">' +
+          '<button class="inv-act ok" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'accept\',this)">确认加入</button>' +
+          '<button class="inv-act no" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'reject\',this)">拒绝</button>' +
+          '</div>';
+      }
+      if ((x.kind === 'msg' || x.kind === 'sys') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办/.test((x.title || '') + (x.body || ''));
+        acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
+          var on = 'event.stopPropagation();readNotice(\'' + esc(x.id) + '\',\'' + x.kind + '\')';
+          var href = esc(a.href || '#');
+          var label = esc(a.label || '查看详情');
+          if (ai === 0) {
+            if (needAct) return '<a class="n-btn primary" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+            return '<a class="n-link" href="' + href + '" onclick="' + on + '">' + label + ' ›</a>';
+          }
+          return '<a class="n-link muted" href="' + href + '" onclick="' + on + '">' + label + '</a>';
+        }).join('') + '</div>';
+      }
+      return '<div class="n-item" data-kind="' + x.kind + '"' + open + '>' +
+        '<div class="n-head"><span class="n-cat" style="' + catStyle(x.cat) + '">' + esc(x.cat) + '</span>' +
+        '<span class="n-title">' + esc(x.title) + '</span>' +
+        (x.time ? '<span class="n-time">' + esc(x.time) + '</span>' : '') + '</div>' +
+        '<div class="n-body">' + (x.body ? esc(x.body) : '') + '</div>' +
+        acts + dot + '</div>';
+    }).join('');
+  }
+  window.openSearchConv = function (id) {
+    try {
+      var convs = JSON.parse(localStorage.getItem(CONV_DEMO_KEY) || '[]');
+      var changed = false;
+      convs.forEach(function (c) { if (c.id === id && c.unread) { c.unread = 0; changed = true; } });
+      if (changed) localStorage.setItem(CONV_DEMO_KEY, JSON.stringify(convs));
+    } catch (err) {}
+    location.href = 'chat.html?id=' + id;
+  };
+  function bindSearch() {
+    var btn = document.getElementById('msg-search-btn');
+    var cancel = document.getElementById('msg-search-cancel');
+    var clear = document.getElementById('msg-search-clear');
+    var input = document.getElementById('msg-search-input');
+    if (btn) btn.addEventListener('click', function () { setSearchMode(true); });
+    if (cancel) cancel.addEventListener('click', function () { setSearchMode(false); });
+    if (clear) clear.addEventListener('click', function () { input.value = ''; renderSearch(''); try { input.focus(); } catch (e) {} });
+    if (input) input.addEventListener('input', function () { renderSearch(input.value); });
+  }
+
+  /* ========== 会话设置：清除会话记录 / 设置常用语 / 投诉举报 ========== */
+  function clearConvs() {
+    UI.dialog({
+      title: '清除会话记录',
+      text: '确定清除全部会话记录吗？<br>清除后记录<b>不可恢复</b>。',
+      ok: '清除', cancel: '取消', danger: true,
+      onOk: function () {
+        try { localStorage.removeItem(CONV_DEMO_KEY); } catch (e) {}
+        try { localStorage.setItem(CONV_CLEARED_KEY, '1'); } catch (e) {}
+        renderConvs();
+        UI.toast('会话记录已清除', 'ok');
+      }
+    });
+  }
+  function openSettings() {
+    var sh = UI.sheet();
+    sh.setText('会话设置');
+    var items = [
+      { icon: 'trash', title: '清除会话记录', sub: '删除全部会话与聊天记录，不可恢复', tint: 'rgba(179,38,30,.1);color:var(--error)', act: 'clear' },
+      { icon: 'edit', title: '设置常用语', sub: '按「一级分类 · 二级分类 · 内容」管理', tint: 'rgba(46,102,255,.1);color:var(--primary-dim)', act: 'phrases' },
+      { icon: 'alert', title: '投诉 / 举报', sub: '举报违规会话或消息，平台1-3个工作日核实', tint: 'rgba(217,119,6,.12);color:#d97706', act: 'complaint' }
+    ];
+    sh.html(items.map(function (it) {
+      return '<div class="set-item" data-act="' + it.act + '">' +
+        '<div class="si-ic" style="background:' + it.tint + '"><svg class="ic"><use href="#i-' + it.icon + '"/></svg></div>' +
+        '<div class="si-body"><div class="si-title">' + it.title + '</div><div class="si-sub">' + it.sub + '</div></div>' +
+        '<svg class="ic" style="width:14px;height:14px;color:var(--text-3);flex:none;"><use href="#i-chev-r"/></svg></div>';
+    }).join(''));
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var it = e.target.closest ? e.target.closest('.set-item') : null;
+      if (!it) return;
+      UI.closeSheet();
+      var act = it.getAttribute('data-act');
+      if (act === 'clear') clearConvs();
+      else if (act === 'phrases') location.href = 'phrases.html';
+      else location.href = 'complaint.html';
+    });
+  }
+  function bindSettings() {
+    var btn = document.getElementById('msg-settings-btn');
+    if (btn) btn.addEventListener('click', openSettings);
+  }
+
+  function esc(s) { return window.UI && UI.esc ? UI.esc(s) : String(s); }
+
+  /* ---- 企业邀请通知：邀请公司团队成员入驻 → 通知栏目确认/解决 ---- */
+  function inviteUnreadCount() {
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (!me || !window.OrgsStore) return 0;
+      return OrgsStore.inviteNoticesFor(me.id).filter(function (x) { return x.invite.status === 'pending'; }).length;
+    } catch (e) { return 0; }
+  }
+  function fmtInvTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  function renderInviteNotices() {
+    var box = document.getElementById('invite-notices');
+    if (!box) return;
+    var list = [];
+    try {
+      var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (me && window.OrgsStore) list = OrgsStore.inviteNoticesFor(me.id);
+    } catch (e) {}
+    if (!list.length) { box.innerHTML = ''; return; }
+    var roleTxt = { owner: '企业主', admin: '管理员', member: '成员' };
+    box.innerHTML =
+      '<div class="inv-sec-head">企业邀请</div>' +
+      list.slice(0, 6).map(function (item) {
+        var org = item.org, iv = item.invite;
+        var rl = roleTxt[iv.role] || '成员';
+        var pending = iv.status === 'pending';
+        var acts = pending
+          ? '<div class="inv-act-row">' +
+              '<button class="inv-act ok" onclick="omInviteAct(\'' + iv.inviteId + '\',\'accept\',this)">确认加入</button>' +
+              '<button class="inv-act no" onclick="omInviteAct(\'' + iv.inviteId + '\',\'reject\',this)">拒绝</button>' +
+            '</div>'
+          : '<span class="inv-act-state ' + (iv.status === 'accepted' ? 'done' : 'no') + '">' + (iv.status === 'accepted' ? '已加入' : '已拒绝') + '</span>';
+        return '<div class="inv-notice" data-status="' + iv.status + '">' +
+          '<div class="inv-n-head"><span class="inv-type">企业邀请</span><span class="inv-time">' + fmtInvTime(iv.updatedAt || iv.createdAt) + '</span></div>' +
+          '<div class="inv-n-body">' + esc(org.shortName || org.co) + ' 邀请您加入企业团队担任<b>' + rl + '</b>' + (iv.name ? '（' + esc(iv.name) + '）' : '') + '</div>' +
+          acts +
+        '</div>';
+      }).join('');
+  }
+  window.omInviteAct = function (inviteId, action, btn) {
+    if (!window.OrgsStore) return;
+    var doAct = function () {
+      var r;
+      if (action === 'accept') {
+        r = OrgsStore.acceptInvite(inviteId);
+        if (r && r.error) { UI.toast.err(r.error); return; }
+        UI.toast.ok('已确认加入，企业身份已生效');
+      } else {
+        r = OrgsStore.rejectInvite(inviteId);
+        if (r && r.error) { UI.toast.err(r.error); return; }
+        UI.toast('已拒绝该邀请');
+      }
+      renderConvs();
+      if (searchMode) { var _si = document.getElementById('msg-search-input'); if (_si) renderSearch(_si.value); }
+    };
+    if (action === 'accept') {
+      UI.dialog({ title: '确认加入企业', text: '确认接受该邀请并加入企业团队吗？加入后将叠加该企业的发布与招聘身份。', ok: '确认加入', cancel: '取消', onOk: doAct });
+    } else {
+      UI.dialog({ title: '拒绝邀请', text: '确定拒绝该企业邀请吗？', ok: '拒绝', cancel: '取消', danger: true, onOk: doAct });
+    }
+  };
+
+  /* 通知分页统一渲染（不再跳转 system.html） */
+  renderNoticeBadge(); renderNoticeList(); bindSubbar(); bindSearch(); bindNoticeFilter(); bindSettings();
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY) refreshAll(); });
+  window.addEventListener('engchain:messages', function () { refreshAll(); });
+
+  /* [FEAT 9.2-3] 进入消息中心时生成/更新智能推荐 */
+  try { MatchStore.generate(); } catch(e) {}
+  /* 智能推荐通知开关：偏好页关闭「接收智能推荐」后，未读角标不再累计（列表仍可见） */
+  function matchNotifyOn() {
+    try {
+      var p = MatchStore.read().preferences || {};
+      return p.notify !== false;
+    } catch (e) { return true; }
+  }
+  function renderMatchUnread() {
+    var unread = 0;
+    try { if (matchNotifyOn()) unread = MatchStore.listUnread().length; } catch(e) {}
+    var badge = document.getElementById("match-unread");
+    if (badge) { badge.textContent = unread; badge.style.display = unread ? "" : "none"; }
+  }
+  renderMatchUnread();
+  window.showMatchFeed = function () {
+    var feed = [];
+    try { feed = MatchStore.read().feed || []; } catch(e) {}
+    if (!feed.length) { UI.toast('暂无推荐，请先设置匹配偏好', 'info'); return; }
+    var rows = '<div class="mf-list">'+feed.slice(0, 5).map(function(f){
+      var tp = f.type==='supply' ? 'supply' : 'demand';
+      var tpTxt = f.type==='supply' ? '供应' : '需求';
+      var href = '../supply/detail.html?id=' + (f.sourceId || f.id);
+      return '<a class="mf-card" href="'+href+'">'
+        + '<div class="mf-top"><span class="mf-badge '+tp+'">'+tpTxt+'</span><span class="mf-score"><b>'+(f.matchScore||0)+'</b>% 匹配</span></div>'
+        + '<div class="mf-title">'+(f.title||'')+'</div>'
+        + '<div class="mf-meta">'+(f.cat||'')+' · '+(f.location||'')+'</div>'
+        + '</a>';
+    }).join('') + '</div>';
+    feed.forEach(function(f){ try { MatchStore.markRead(f.id); } catch(e) {} });
+    renderMatchUnread();
+    var foot = '<div class="mf-foot"><a class="mf-cta" href="../supply/list.html">去发现页看全部推荐</a><a class="mf-set" href="../match/preferences.html">调整匹配偏好</a></div>';
+    var sh = UI.sheet(); sh.setText('智能推荐'); sh.html(rows + foot); sh.show();
+  };
+  /* E2-11：会话为空时渲染空态引导卡，不再硬编码假数据。
+     [FIX] 新用户无真实会话时，列表顶部加"演示数据"灰色标注；首次访问种子写入 localStorage，后续可标记已读清零 unread */
+  var CONV_DEMO_KEY = 'engchain-conversations';
+  var CONV_CLEARED_KEY = 'engchain-convs-cleared';
+  function readConvs() {
+    try {
+      if (localStorage.getItem(CONV_CLEARED_KEY)) return { list: [], demo: false };
+    } catch (e) {}
+    try {
+      var raw = localStorage.getItem(CONV_DEMO_KEY);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (arr && arr.length) return { list: arr, demo: false };
+      }
+    } catch (e) {}
+    if (!localStorage.getItem(CONV_DEMO_KEY)) {
+      try { localStorage.setItem(CONV_DEMO_KEY, JSON.stringify(MOCK.conversations || [])); } catch (e) {}
+    }
+    return { list: MOCK.conversations || [], demo: true };
+  }
+  function renderConvs() {
+    var data = readConvs();
+    var convs = data.list || [];
+    var list = document.getElementById('list');
+    var demoNote = data.demo
+      ? '<div style="padding:8px 4px 2px;font-size:11px;color:var(--text-3);letter-spacing:.02em;">以下为演示数据</div>'
+      : '';
+    list.innerHTML = demoNote + (convs.length ? convs.map(function (c) {
+      return '<a href="chat.html?id=' + c.id + '" style="display:flex;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line);">' +
+        '<div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,rgba(176, 138, 60, .2),rgba(176, 138, 60, .05));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--primary);">' + c.avatar + '</div>' +
+        '<div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;justify-content:space-between;"><span class="fw-600 fs-14 elip">' + c.name + '</span><span class="text-3 fs-11">' + c.time + '</span></div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;"><span class="text-2 fs-12 elip" style="flex:1;">' + c.last + '</span>' +
+        (c.unread ? '<span class="badge" style="margin-left:8px;">' + c.unread + '</span>' : '') + '</div>' +
+        '<div class="text-3" style="font-size:10px;margin-top:4px;">' + c.role + '</div></div></a>';
+    }).join('') : '<a href="../supply/list.html" style="display:block;text-align:center;padding:48px 20px;"><div style="width:60px;height:60px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;"><svg class="ic" style="width:28px;height:28px;color:var(--primary);"><use href="#i-chat"/></svg></div><div class="fw-600 fs-14" style="color:var(--text-1);">暂无消息</div><div class="text-2 fs-12" style="margin-top:6px;line-height:1.6;">还没有会话，去供需大厅发布或对接商机<br>开始第一次沟通吧</div></a>');
+    var convUnread = convs.reduce(function (a, c) { return a + (c.unread || 0); }, 0);
+    var sysUnread = sysUnreadCount();
+    var matchUnread = 0;
+    try { if (matchNotifyOn()) matchUnread = MatchStore.listUnread().length; } catch (e) {}
+    var sysMsgUnread = sysMsgUnreadCount();
+    var inviteUnread = inviteUnreadCount();
+    var bc = document.getElementById('badge-conv');
+    bc.textContent = convUnread; bc.style.display = convUnread ? '' : 'none';
+    var bn = document.getElementById('badge-notice');
+    var noticeUnread = sysUnread + sysMsgUnread + matchUnread + inviteUnread;
+    bn.textContent = noticeUnread; bn.style.display = noticeUnread ? '' : 'none';
+    renderNoticeBadge(); renderNoticeList();
+  }
+  renderConvs();
+
+  /* ========== 双击 tab：滚动到未读（最新未读 → 依次下一条） ========== */
+  var jumpIdx = { conv: 0, notice: 0 };
+  function unreadTargets(name) {
+    var rows = [];
+    if (name === 'conv') {
+      var as = document.querySelectorAll('#list a[href*="chat.html?id="]');
+      for (var i = 0; i < as.length; i++) if (as[i].querySelector('.badge')) rows.push(as[i]);
+      return rows;
+    }
+    var items = document.querySelectorAll('#notice-list .n-item');
+    for (var j = 0; j < items.length; j++) if (items[j].querySelector('.n-dot')) rows.push(items[j]);
+    return rows;
+  }
+  function scrollToUnread(name) {
+    var targets = unreadTargets(name);
+    if (!targets.length) {
+      jumpIdx[name] = 0;
+      UI.toast(name === 'conv' ? '暂无未读会话' : '当前筛选下暂无未读通知', 'info');
+      return;
+    }
+    var idx = jumpIdx[name] % targets.length;
+    var el = targets[idx];
+    jumpIdx[name]++;
+    if (el._jumpTimer) clearTimeout(el._jumpTimer);
+    el.classList.remove('n-jump'); void el.offsetWidth; el.classList.add('n-jump');
+    el._jumpTimer = setTimeout(function () { el.classList.remove('n-jump'); }, 1600);
+    /* 精确滚动：将未读行定位到滚动容器顶部（即使已在视口内也执行） */
+    var sc = document.querySelector('.scroll');
+    if (sc) {
+      var top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
+      try { sc.scrollTo({ top: top, behavior: 'smooth' }); } catch (e) { sc.scrollTop = top; }
+    } else {
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { el.scrollIntoView(); }
+    }
+  }
+
+  (function(){
+    var tabs = document.querySelectorAll('#msg-tabs .msg-tab');
+    function activate(name){
+      curTab = name;
+      tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.tab===name); });
+      document.getElementById('pane-conv').style.display = name==='conv' ? '' : 'none';
+      document.getElementById('pane-notice').style.display = name==='notice' ? '' : 'none';
+    }
+    tabs.forEach(function(t){
+      t.addEventListener('click', function(){ activate(t.dataset.tab); });
+      t.addEventListener('dblclick', function(e){
+        e.preventDefault();
+        activate(t.dataset.tab);
+        scrollToUnread(t.dataset.tab);
+      });
+    });
+    /* 初始子页：进入「最新一条未读消息」时间更晚的子页（会话 vs 通知）；无未读默认会话 */
+    try { activate(pickInitialTab()); } catch (e) {}
+  })();
+  /* [FIX] 点击会话跳转 chat.html 前清除该会话未读数 */
+  document.getElementById('list').addEventListener('click', function (e) {
+    var a = e.target.closest('a[href*="chat.html?id="]');
+    if (!a) return;
+    var id = (a.getAttribute('href').split('id=')[1] || '').split('&')[0];
+    if (!id) return;
+    try {
+      var convs = JSON.parse(localStorage.getItem(CONV_DEMO_KEY) || '[]');
+      var changed = false;
+      convs.forEach(function (c) { if (c.id === id && c.unread) { c.unread = 0; changed = true; } });
+      if (changed) localStorage.setItem(CONV_DEMO_KEY, JSON.stringify(convs));
+    } catch (err) {}
+  });
+  /* [FIX] 登录/退出/入驻后消息列表刷新 */
+  function refreshAll() { renderConvs(); renderNoticeBadge(); renderNoticeList(); }
+  window.addEventListener('engchain:auth', refreshAll);
+  window.addEventListener('engchain:entry', refreshAll);
+  /* 通知分页内其余站内跳转（智能推荐卡片 / 推荐区链接 / 列表与详情操作按钮）统一走预览弹窗。
+     用捕获阶段拦截：列表操作按钮的 onclick 含 stopPropagation，冒泡阶段监听收不到；
+     会话入口链接（chat.html）保持整页跳转，不预览。 */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || href === '#' || /^(https?:|javascript?:|mailto:|tel:)/i.test(href)) return;
+    if (href.indexOf('chat.html') > -1) return;
+    var scope = a.closest('.mf-card, .mf-foot, .n-acts, .nd-acts');
+    if (!scope) return;
+    e.preventDefault();
+    openNoticePreview(href, (a.textContent || '').trim() || '页面预览');
+  }, true);
+  window.addEventListener('engchain:org', refreshAll);
+  window.addEventListener('storage', function (e) {
+    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages' || e.key === 'engchain-orgs') refreshAll();
+  });
+})();
+</script>
+<style>
+  /* 本页为普通 .scroll（已提供 16px 页面边距），清零 .sys-entry 自带的水平外边距，避免双重缩进，与下方会话行对齐 */
+  .sys-entry { margin-left: 0; margin-right: 0; }
+  .msg-tabs{display:flex;gap:6px;margin-top:10px;padding:3px;background:var(--bg-card-2);border-radius:12px;border:1px solid var(--line);}
+  .msg-tab{flex:1;height:36px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:all .18s ease;}
+  .msg-tab.active{background:var(--bg-card);color:var(--text-1);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  .mt-badge{min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--error);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+  /* 智能推荐弹窗卡片 */
+  .mf-list{display:flex;flex-direction:column;gap:10px;padding:2px 0 4px;}
+  .mf-card{display:block;background:var(--bg-card-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;text-decoration:none;color:inherit;transition:transform .12s ease,border-color .12s ease;}
+  .mf-card:active{transform:scale(.98);border-color:var(--accent-line);}
+  .mf-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .mf-badge{font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:6px;}
+  .mf-badge.supply{background:rgba(34,139,90,.12);color:#1f9d63;}
+  .mf-badge.demand{background:rgba(217,119,6,.12);color:#d97706;}
+  .mf-score{font-family:var(--font-num);font-size:11px;color:var(--text-3);}
+  .mf-score b{font-size:15px;font-weight:700;color:var(--primary-dim);margin-right:2px;}
+  .mf-title{font-size:13.5px;font-weight:600;line-height:1.4;color:var(--text-1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .mf-meta{font-size:11px;color:var(--text-3);margin-top:7px;display:flex;align-items:center;gap:5px;}
+  .mf-foot{margin-top:14px;}
+  .mf-cta{display:block;height:44px;line-height:44px;text-align:center;background:linear-gradient(180deg,var(--primary),var(--primary-dim));color:#fff;border-radius:11px;font-size:14px;font-weight:600;box-shadow:0 6px 16px -8px var(--primary-dim);}
+  .mf-set{display:block;text-align:center;margin-top:10px;font-size:12px;color:var(--primary-dim);}
+
+  /* ---- 消息页 v2：搜索 + 通知分页合并 ---- */
+  .msg-search{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .msg-search-box{flex:1;display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:999px;}
+  .msg-search-ic{width:16px;height:16px;color:var(--text-3);flex:none;}
+  .msg-search-input{flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:13px;color:var(--text-1);}
+  .msg-search-input::-webkit-search-cancel-button{display:none;}
+  .msg-search-clear{width:20px;height:20px;border:none;border-radius:50%;background:var(--bg-card-3);color:var(--text-3);font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+  .msg-search-cancel{border:none;background:transparent;color:var(--primary-dim);font-size:13px;font-weight:600;padding:0 4px;cursor:pointer;flex:none;}
+  .notice-subbar{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .notice-subbar::-webkit-scrollbar{display:none;}
+  .nsub{flex:none;height:30px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card-2);color:var(--text-2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s ease;}
+  .nsub.active{background:linear-gradient(180deg,var(--primary-strong) 0%,var(--primary) 45%,var(--primary-dim) 100%);color:var(--text-inv);border-color:transparent;}
+  .n-item{position:relative;padding:14px 4px;border-bottom:1px solid var(--line);}
+  .n-dot{position:absolute;left:0;top:18px;width:6px;height:6px;border-radius:50%;background:var(--error);}
+  .n-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .n-cat{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;flex:none;}
+  .n-title{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .n-time{font-size:10px;color:var(--text-3);flex:none;}
+  .n-body{font-size:12px;line-height:1.6;color:var(--text-2);}
+  .n-score{margin-top:6px;font-size:11px;color:var(--text-3);}
+  .n-empty{text-align:center;color:var(--text-3);font-size:12px;padding:48px 20px;line-height:1.7;}
+  .sr-hint{padding:8px 4px 4px;font-size:11px;color:var(--text-3);letter-spacing:.02em;}
+
+  /* ---- 消息页 v4：业务动作按钮（成熟消息中心样式） ---- */
+  :root{--primary-deep:#6B4F26;}
+  .n-acts{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px;}
+  .n-btn{display:inline-flex;align-items:center;justify-content:center;height:28px;padding:0 12px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;border:none;cursor:pointer;transition:transform .12s ease,opacity .12s ease;}
+  .n-btn:active{transform:scale(.96);}
+  .n-btn.primary{background:var(--primary-deep);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+  .n-btn.primary:active{opacity:.9;}
+  .n-link{font-size:12px;font-weight:600;color:var(--primary-deep);text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:1px;padding:4px 0;line-height:1;}
+  .n-link:active{opacity:.75;}
+  .n-link.muted{color:var(--text-3);font-weight:500;}
+  .nd{padding:2px 2px 8px;}
+  .nd-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .nd-time{font-size:10px;color:var(--text-3);margin-left:auto;}
+  .nd-title{font-size:16px;font-weight:700;line-height:1.5;color:var(--text-1);}
+  .nd-body{margin-top:12px;font-size:13px;line-height:1.9;color:var(--text-2);white-space:pre-wrap;word-break:break-word;}
+  .nd-acts{margin-top:18px;display:flex;flex-direction:column;gap:8px;}
+  .nd-acts .n-btn{height:44px;font-size:14px;width:100%;border-radius:11px;}
+  .nd-acts .n-btn.primary{background:var(--primary-deep);color:#fff;box-shadow:none;}
+  .nd-acts .n-btn.ghost{background:var(--bg-card-2);color:var(--text-2);border:1px solid var(--line);}
+
+  /* 企业邀请通知卡片（通知栏目） */
+  .inv-sec-head { display:flex; align-items:center; gap:6px; margin:16px 4px 8px; font-size:11px; font-weight:800; color:var(--primary-dim); letter-spacing:.06em; }
+  .inv-sec-head::after { content:""; flex:1; height:1px; background:linear-gradient(90deg,var(--line),transparent); }
+  .inv-notice { background:var(--bg-card); border:1px solid rgba(176, 138, 60, .3); border-radius:14px; padding:12px 13px; margin-bottom:10px; }
+  .inv-n-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .inv-type { font-size:10px; font-weight:700; color:var(--primary-dim); background:rgba(176, 138, 60, .13); border:1px solid rgba(176, 138, 60, .35); padding:2px 8px; border-radius:999px; }
+  .inv-time { font-size:10px; color:var(--text-3); margin-left:auto; }
+  .inv-n-body { font-size:12.5px; line-height:1.6; color:var(--text-1); }
+  .inv-n-body b { color:var(--primary-dim); }
+  .inv-act-row { display:flex; gap:8px; margin-top:11px; }
+  .inv-act { flex:1; height:38px; border-radius:999px; font-size:12.5px; font-weight:700; border:none; cursor:pointer; }
+  .inv-act.ok { background:linear-gradient(180deg,var(--primary),var(--primary-dim)); color:var(--text-inv); }
+  .inv-act.no { background:var(--bg-card-2); color:var(--text-2); border:1px solid var(--line); }
+  .inv-act-state { display:inline-block; margin-top:9px; font-size:11px; font-weight:700; color:var(--primary-dim); background:rgba(176, 138, 60, .1); border:1px solid rgba(176, 138, 60, .3); padding:3px 10px; border-radius:999px; }
+  .inv-act-state.done { color:#2E9E5B; background:rgba(46,158,91,.1); border-color:rgba(46,158,91,.3); }
+  .inv-act-state.no { color:var(--text-3); background:var(--bg-card-2); border-color:var(--line); }
+
+  /* ---- 通知筛选：分类行右侧筛选链接 + 左侧渐变遮盖 ---- */
+  .notice-bar-row{position:relative;}
+  .notice-subbar{padding-right:0;}
+  .notice-filter{position:absolute;top:2px;right:0;bottom:10px;display:flex;align-items:center;background:linear-gradient(90deg,rgba(0,0,0,0) 0%,var(--bg) 26%,var(--bg) 100%);padding-left:34px;pointer-events:none;z-index:2;}
+  /* 筛选生效后：原子 bar 切换为已选筛选标签（标签样式 + 可清除） */
+  .notice-selected{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .notice-selected::-webkit-scrollbar{display:none;}
+  .nsel-chip{flex:none;height:30px;padding:0 6px 0 12px;border-radius:999px;border:1px solid rgba(176, 138, 60, .45);background:rgba(176, 138, 60, .08);color:var(--primary-dim);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:default;}
+  .nsel-label{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:var(--text-3);}
+  .nsel-x{flex:none;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer;transition:background .12s ease;}
+  .nsel-x:active{background:rgba(0,0,0,.1);}
+  .nsel-x .ic{width:10px;height:10px;}
+  .notice-filter-btn{pointer-events:auto;position:relative;flex:none;height:30px;padding:0 12px 0 9px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card);color:var(--text-2);font-size:12px;font-weight:600;display:flex;align-items:center;gap:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:all .15s ease;}
+  .notice-filter-btn .ic{width:13px;height:13px;}
+  .notice-filter-btn:active{transform:scale(.96);}
+  .notice-filter-btn.active{color:var(--primary-dim);border-color:rgba(176, 138, 60, .45);background:rgba(176, 138, 60, .08);}
+  .nf-dot{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--error);border:2px solid var(--bg);}
+
+  /* 筛选弹窗 */
+  .flt-sec{margin-bottom:20px;}
+  .flt-label{font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.06em;margin-bottom:10px;}
+  .flt-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .flt-chip{flex:none;height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-card-2);color:var(--text-2);font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s ease;}
+  .flt-chip.active{background:linear-gradient(180deg,var(--primary-strong) 0%,var(--primary) 45%,var(--primary-dim) 100%);color:var(--text-inv);border-color:transparent;}
+  .flt-actions{display:flex;gap:10px;padding-top:4px;}
+  .flt-actions .btn{flex:1;height:44px;border-radius:11px;font-size:14px;font-weight:600;}
+
+  /* 会话设置菜单 */
+  .set-item{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .set-item:last-child{border-bottom:none;}
+  .set-item:active{opacity:.72;}
+  .si-ic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none;}
+  .si-ic svg{width:18px;height:18px;}
+  .si-body{flex:1;min-width:0;}
+  .si-title{font-size:13.5px;font-weight:600;color:var(--text-1);}
+  .si-sub{font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;}
+
+  /* 双击滚动未读目标高亮 */
+  @keyframes n-jump-bg{0%{background:rgba(176, 138, 60, .26);}100%{background:transparent;}}
+  .n-jump{animation:n-jump-bg 1.6s ease 1;}
+</style>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
+</body>
+</html>

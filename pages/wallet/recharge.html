@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/wallet/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>账户充值 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/guest-gate.css">
+<style>
+  /* —— 充值流程内联视图切换 —— */
+  .pay-view { display: none; }
+  .pay-view.show { display: block; }
+
+  /* —— 金额展示 —— */
+  .pay-amount { text-align: center; padding: 6px 0 16px; }
+  .pay-amount .pa-label { font-size: 12px; color: var(--text-3); }
+  .pay-amount .pa-value { font-family: var(--font-num); font-size: 30px; font-weight: 700; color: var(--primary-dim); margin-top: 2px; }
+
+  /* —— 支付方式（并入初始页） —— */
+  .pay-method-label { font-size: 13px; font-weight: 600; color: var(--text-1); margin: 18px 0 10px; display: flex; align-items: center; gap: 6px; }
+  .pay-method-label svg { width: 15px; height: 15px; color: var(--primary); }
+  .pm-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1.5px solid var(--line); border-radius: var(--r-m); background: var(--bg-card); margin-bottom: 10px; cursor: pointer; transition: border-color var(--d-fast), background var(--d-fast); }
+  .pm-row:active { transform: scale(.99); }
+  .pm-row.on { border-color: var(--primary); background: var(--primary-soft); }
+  .pm-row .pm-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .pm-row .pm-icon svg { width: 19px; height: 19px; }
+  .pm-row .pm-body { flex: 1; min-width: 0; }
+  .pm-row .pm-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+  .pm-row .pm-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .pm-row .pm-tag { font-size: 10px; font-weight: 600; color: var(--primary-dim); background: var(--primary-soft); padding: 2px 7px; border-radius: var(--r-full); flex: none; }
+  .pm-row .pm-check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: flex; align-items: center; justify-content: center; transition: all var(--d-fast); }
+  .pm-check svg { width: 10px; height: 10px; display: none; }
+  .pm-row.on .pm-check { border-color: var(--primary); background: var(--primary); }
+  .pm-row.on .pm-check svg { display: block; stroke: #fff; stroke-width: 3; }
+
+  /* —— 对公转账 4 步流程（弹窗内 步骤1-2） —— */
+  .flow-steps { display: flex; margin-bottom: 18px; }
+  .flow-step { flex: 1; text-align: center; position: relative; }
+  .flow-step .fs-dot { width: 22px; height: 22px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; font-family: var(--font-num); background: var(--bg-card-2); color: var(--text-3); border: 1px solid var(--line); }
+  .flow-step .fs-label { font-size: 9.5px; color: var(--text-3); margin-top: 5px; }
+  .flow-step.done .fs-dot { background: var(--success-soft); color: var(--success); border-color: transparent; }
+  .flow-step.done .fs-label { color: var(--success); }
+  .flow-step.active .fs-dot { background: var(--primary); color: #fff; border-color: transparent; box-shadow: 0 0 0 3px var(--primary-soft); }
+  .flow-step.active .fs-label { color: var(--primary-dim); font-weight: 600; }
+  .flow-step:not(:last-child)::after { content: ""; position: absolute; top: 10px; left: calc(50% + 16px); right: calc(-50% + 16px); height: 1.5px; background: var(--line); }
+  .flow-step.done:not(:last-child)::after { background: var(--success); }
+
+  /* —— 付款信息卡（含行内复制 icon） —— */
+  .corp-card { border: 1px solid var(--line); border-radius: var(--r-m); background: var(--bg-card); padding: 2px 16px; margin-bottom: 14px; }
+  .row-mini { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .row-mini:last-child { border-bottom: none; }
+  .row-mini .k { color: var(--text-2); flex: none; }
+  .row-mini .v { font-weight: 600; text-align: right; word-break: break-all; }
+  .row-copy { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: none; border: none; background: none; color: var(--text-3); border-radius: 8px; cursor: pointer; margin: -4px -6px -4px 2px; transition: color var(--d-fast), background var(--d-fast); }
+  .row-copy:active { background: var(--primary-soft); color: var(--primary-dim); }
+  .row-copy svg { width: 15px; height: 15px; }
+
+  .corp-note { display: flex; gap: 8px; padding: 11px 13px; border-radius: var(--r-m); background: var(--bg-subtle); font-size: 11.5px; color: var(--text-2); line-height: 1.6; margin-bottom: 14px; }
+  .corp-note svg { width: 14px; height: 14px; flex: none; margin-top: 1px; color: var(--primary); }
+
+  /* —— 弹窗吸底按钮 —— */
+  .corp-sheet-foot { position: sticky; bottom: -1px; background: var(--bg-elev); padding: 10px 0 14px; z-index: 2; }
+
+  /* —— 充值金额快捷按钮 —— */
+  .amt { text-align: center; padding: 12px 0; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line); font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color var(--d-fast), background var(--d-fast), color var(--d-fast); }
+  .amt:active { border-color: var(--primary); background: var(--primary-soft); }
+  .amt.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dim); }
+
+  /* —— 充值成功弹窗（与 credits.html 同款） —— */
+  .recharge-success { text-align: center; padding: 10px 0; }
+  .rs-icon { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #2E7D50, #4CAF7D); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  .rs-icon svg { width: 28px; height: 28px; stroke: #fff; stroke-width: 2.5; fill: none; }
+  .rs-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
+  .rs-desc { font-size: 13px; color: var(--text-2); margin-top: 6px; line-height: 1.6; }
+  .rs-amount { font-size: 28px; font-weight: 800; color: var(--primary); font-family: var(--font-num); margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" id="navBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">账户充值</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="scroll" style="padding-top:10px;">
+    <!-- 初始页：充值金额 + 支付方式（单页收银台） -->
+    <div id="view-amount" class="pay-view show">
+      <div style="text-align:center;padding:8px 0;">
+        <div class="text-2 fs-12">当前余额（元）</div>
+        <div class="mono fw-700" style="font-size:32px;margin-top:4px;" id="cur-bal">—</div>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label class="field-label">充值金额</label>
+        <div class="unit-input"><input class="input" id="amount" placeholder="输入或选择金额" inputmode="decimal"><span class="unit">¥</span></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;">
+        <span class="amt" data-value="500">¥500</span><span class="amt" data-value="1000">¥1,000</span><span class="amt" data-value="2000">¥2,000</span><span class="amt" data-value="5000">¥5,000</span>
+      </div>
+
+      <!-- 支付方式（并入初始页） -->
+      <div class="pay-method-label"><svg class="ic"><use href="#i-card"/></svg> 选择支付方式</div>
+      <div class="pm-row on" data-pm="wechat">
+        <span class="pm-icon" style="background:rgba(176, 138, 60, .16);color:var(--primary-dim);"><svg class="ic"><use href="#i-chat"/></svg></span>
+        <span class="pm-body"><div class="pm-name">微信支付</div><div class="pm-desc">推荐使用，实时到账</div></span>
+        <span class="pm-tag">推荐</span>
+        <span class="pm-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span>
+      </div>
+      <div class="pm-row" data-pm="alipay">
+        <span class="pm-icon" style="background:rgba(37,99,235,.14);color:#2563EB;"><svg class="ic"><use href="#i-card"/></svg></span>
+        <span class="pm-body"><div class="pm-name">支付宝</div><div class="pm-desc">支持余额、花呗、银行卡</div></span>
+        <span class="pm-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span>
+      </div>
+      <div class="pm-row" data-pm="corp">
+        <span class="pm-icon" style="background:rgba(124,91,189,.14);color:#7C5BBD;"><svg class="ic"><use href="#i-bank"/></svg></span>
+        <span class="pm-body"><div class="pm-name">对公转账</div><div class="pm-desc">公对公打款，大额更便捷</div></span>
+        <span class="pm-tag">大额推荐</span>
+        <span class="pm-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg></span>
+      </div>
+
+      <!-- 底部留白：避免固定支付栏遮盖 -->
+      <div style="height:120px;flex:none;"></div>
+    </div>
+  </div>
+
+  <div class="paybar">
+    <label class="pay-agree" id="agreeRow"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html#recharge">《充值协议》</a>，充值后可用于支付、解锁与消费。</span></label>
+    <button class="btn btn-primary btn-block btn-lg" id="cta">确认充值</button>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js?v=20260916"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script src="../../js/guest-gate.js"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* ---- E2-17 新用户零余额 ---- */
+  (function initNewUser(){
+    try { if (localStorage.getItem('engchain-balance') === null) { var z = BalanceStore.read(); z.balance = 0; z.frozen = 0; z.totalIn = 0; z.totalRebate = 0; z.logs = []; BalanceStore.write(z); } } catch (e) {}
+  })();
+
+  /* ---- E2-10 未登录门控（与钱包首页同款覆盖层） ---- */
+  function isLoggedIn() {
+    try { var st = UI.state.get(); return !!(st && st.loggedIn); } catch (e) { return false; }
+  }
+  function ensureGuestGate() {
+    if (isLoggedIn()) return;
+    window.GuestGate && GuestGate.open({
+      mode: 'overlay',
+      icon: 'lock',
+      badge: '游客模式',
+      title: '登录后充值余额',
+      note: '余额充值与支付仅对登录用户开放。',
+      btnText: '去登录',
+      btnHref: '../auth/login.html'
+    });
+  }
+  ensureGuestGate();
+
+  /* ---- E3-16 破冰期新客首充横幅 ---- */
+  (function renderBreakInBanner(){
+    try {
+      if (!(window.ModeStore && ModeStore.isBreakIn())) return;
+      var view = document.getElementById('view-amount');
+      if (!view || document.getElementById('breakin-banner')) return;
+      var b = document.createElement('div');
+      b.id = 'breakin-banner';
+      b.style.cssText = 'margin:10px 0 0;padding:11px 13px;border-radius:11px;background:linear-gradient(135deg,rgba(176, 138, 60, .16),rgba(238,214,151,.10));border:1px solid rgba(176, 138, 60, .35);font-size:12px;color:var(--primary-dim);line-height:1.6;';
+      b.innerHTML = '<b>🎁 新客破冰福利</b> · 首充即送积分，多充多送，完成企业入驻还可领专属奖励。';
+      view.insertBefore(b, view.firstChild);
+    } catch (e) {}
+  })();
+
+  var v = 0;                    // 充值金额
+  var pm = 'wechat';            // 支付方式
+  var corpSheet = null;         // 对公底部弹窗
+  var currentRecord = null;     // 本次对公转账记录
+
+  var cta = document.getElementById('cta');
+
+  /* ---- 充值金额：快捷按钮联动 ---- */
+  document.querySelectorAll('.amt').forEach(function (el) {
+    el.addEventListener('click', function () {
+      document.getElementById('amount').value = el.dataset.value;
+      document.querySelectorAll('.amt').forEach(function (x) { x.classList.toggle('active', x === el); });
+    });
+  });
+  document.getElementById('amount').addEventListener('input', function () {
+    document.querySelectorAll('.amt').forEach(function (x) { x.classList.remove('active'); });
+  });
+
+  /* ---- 余额真渲染 ---- */
+  BalanceStore.seedLogs();
+  function renderBalance() {
+    var b = BalanceStore.read();
+    document.getElementById('cur-bal').textContent = UI.money(b.balance);
+  }
+  renderBalance();
+
+  /* ---- 支付方式选择（初始页单选） ---- */
+  document.querySelectorAll('.pm-row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      document.querySelectorAll('.pm-row').forEach(function (x) { x.classList.remove('on'); });
+      row.classList.add('on');
+      pm = row.dataset.pm;
+    });
+  });
+
+  /* ---- 返回导航 ---- */
+  document.getElementById('navBack').addEventListener('click', function () { history.back(); });
+
+  /* ---- 确认充值（校验通过） ---- */
+  cta.onclick = function () {
+    var rowAgreed = document.getElementById('agreeRow').classList.contains('on');
+    if (!rowAgreed) {
+      UI.dialog({ title: '确认协议', text: '请确认您已阅读并同意<a href="../agreement/user.html#recharge">《充值协议》</a>', ok: '确认并继续支付', cancel: '取消', onOk: function () {
+        document.getElementById('agreeRow').classList.add('on');
+        document.getElementById('cta').click();
+      }});
+      return;
+    }
+    var rawAmt = (document.getElementById('amount').value || '').trim();
+    if (!/^\d+(\.\d{1,2})?$/.test(rawAmt)) { UI.toast('请输入正确的充值金额（最多两位小数）', 'warn'); return; }
+    v = parseFloat(rawAmt) || 0;
+    var minRecharge = (MOCK.business.recharge && MOCK.business.recharge.min) || 10;
+    if (v < minRecharge) { UI.toast('最低充值金额为 ¥' + minRecharge, 'warn'); return; }
+    var maxRecharge = (MOCK.business.recharge && MOCK.business.recharge.max) || 500000;
+    if (v > maxRecharge) { UI.toast('单笔充值上限为 ' + UI.money(maxRecharge), 'warn'); return; }
+    if (pm === 'corp') {
+      // 生成对公转账记录（待上传凭证），并打开对公弹窗
+      currentRecord = CorpPay.create({ amount: v, account: CorpPay.BANK, remark: '工程链充值・尾号 4638' });
+      openCorpSheet();
+    } else {
+      // 余额入账（微信/支付宝即时到账）
+      BalanceStore.recharge(v, pm, null);
+      showRechargeSuccess(v, BalanceStore.read().balance);
+    }
+  };
+
+  /* [PayBar] 协议勾选点亮按钮 */
+  var agreeRow = document.getElementById('agreeRow');
+  if (agreeRow) agreeRow.addEventListener('click', function (e) {
+    if (e.target.tagName === 'A') return;
+    var on = this.classList.toggle('on');
+    document.getElementById('cta').classList.toggle('btn-pay-disabled', !on);
+  });
+  /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式） ---- */
+  function showRechargeSuccess(amount, newBalance) {
+    var sh = UI.sheet();
+    sh.setClosable(false);
+    sh.html(
+      '<div class="recharge-success">' +
+        '<div class="rs-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '<div class="rs-title">充值成功</div>' +
+        '<div class="rs-amount">+¥' + amount.toFixed(2) + ' 已到账</div>' +
+        '<div class="rs-desc">当前余额 ¥' + newBalance.toFixed(2) + '</div>' +
+        '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="rechargeDone()">完成</button>' +
+      '</div>'
+    ).show();
+  }
+  window.rechargeDone = function () {
+    UI.closeSheet();
+    location.href = 'index.html';
+  };
+
+  /* ---- 复制对公付款信息（全部 4 条 + 金额） ---- */
+  window.copyCorpInfo = function () {
+    var info = '收款户名：' + CorpPay.BANK.name + '\n开户银行：' + CorpPay.BANK.bank + '\n收款账号：' + CorpPay.BANK.acct + '\n备注：工程链充值・尾号 4638' + '\n转账金额：' + UI.money(v);
+    function done() { UI.toast('已复制对公付款信息', 'ok'); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = info; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      done();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(info).then(done, fallback);
+    } else { fallback(); }
+  };
+
+  /* ---- 对公底部弹窗（步骤1 复制信息 → 步骤2 确认支付） ---- */
+  var corpStep = 1;
+  function openCorpSheet() {
+    corpStep = 1;
+    corpSheet = UI.sheet();
+    corpSheet.setText('对公转账');
+    corpSheet.html(sheetHtml());
+    corpSheet.show();
+  }
+  function sheetHtml() {
+    return '<div class="pay-amount" style="padding:2px 0 14px;"><div class="pa-label">转账金额</div><div class="pa-value">' + UI.money(v) + '</div></div>' +
+      flowHtml(corpStep) + corpStepHtml(corpStep) + sheetFoot();
+  }
+  function sheetFoot() {
+    if (corpStep === 1) {
+      return '<div class="corp-sheet-foot"><button class="btn btn-primary btn-block btn-lg" onclick="corpCopyNext()">复制信息，下一步</button></div>';
+    }
+    if (corpStep === 2) {
+      return '<div class="corp-sheet-foot"><button class="btn btn-primary btn-block btn-lg" onclick="corpConfirmNext()">确认已安排支付</button></div>';
+    }
+    return '';
+  }
+  window.corpCopyNext = function () {
+    copyCorpInfo();
+    corpStep = 2;
+    corpSheet.html(sheetHtml());
+  };
+  window.corpConfirmNext = function () {
+    if (corpSheet) corpSheet.close();
+    corpSheet = null;
+    // 进入统一的全页「对公转账确认支付」（上传凭证 / 查看审批状态）
+    location.href = 'corp-pay.html?id=' + currentRecord.id;
+  };
+
+  /* ---- 4 步进度条 ---- */
+  function flowHtml(cur) {
+    var steps = ['复制信息', '确认支付', '上传凭证', '等待确认'];
+    var h = '<div class="flow-steps">';
+    for (var i = 0; i < 4; i++) {
+      var cls = '';
+      if (i + 1 < cur) cls = ' done';
+      if (i + 1 === cur) cls = ' active';
+      h += '<div class="flow-step' + cls + '"><div class="fs-dot">' + (i + 1) + '</div><div class="fs-label">' + steps[i] + '</div></div>';
+    }
+    return h + '</div>';
+  }
+
+  /* ---- 弹窗步骤正文（步骤1-2） ---- */
+  function copyRow(k, vv, mono) {
+    return '<div class="row-mini"><span class="k">' + k + '</span><span class="v' + (mono ? ' mono' : '') + '">' + vv + '</span>' +
+      '<button class="row-copy" onclick="copyCorpInfo()" aria-label="复制付款信息">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>';
+  }
+  function plainRow(k, vv, mono, gold) {
+    return '<div class="row-mini"><span class="k">' + k + '</span><span class="v' + (mono ? ' mono' : '') + '"' + (gold ? ' style="color:var(--primary-dim);"' : '') + '>' + vv + '</span></div>';
+  }
+  function corpStepHtml(step) {
+    if (step === 1) {
+      return '<div class="corp-note"><svg class="ic"><use href="#i-info"/></svg><div>请将款项转至平台对公账户，转账时按"备注"填写，便于财务识别入账。点击任一行右侧图标即可复制全部付款信息。</div></div>' +
+        '<div class="corp-card">' +
+          copyRow('收款户名', CorpPay.BANK.name) +
+          copyRow('开户银行', CorpPay.BANK.bank) +
+          copyRow('收款账号', CorpPay.BANK.acct, true) +
+          copyRow('备注', '工程链充值・尾号 4638') +
+        '</div>';
+    }
+    if (step === 2) {
+      return '<div class="corp-card">' +
+          plainRow('收款户名', CorpPay.BANK.name) +
+          plainRow('转账金额', UI.money(v), false, true) +
+          plainRow('收款账号', CorpPay.BANK.acct, true) +
+        '</div>' +
+        '<div class="corp-note"><svg class="ic"><use href="#i-check"/></svg><div>请确认您已通过银行 App / 网银完成上述转账，再进行下一步确认。</div></div>';
+    }
+    return '';
+  }
+})();
+</script>
+</body>
+</html>

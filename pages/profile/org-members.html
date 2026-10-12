@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>企业成员管理 · 工程链</title>
+<!-- design-intent: system-icons（B 端后台：与全项目统一的手绘 24px stroke 图标，不用通用描边图标集） -->
+<link rel="stylesheet" href="../../css/app.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   企业成员管理 · v2.0 深度改版
+   设计签名：亮场暖纸 · 无衬线冷静 · 网格 · 三色分工（金主色 + 语义色）· 静+入场揭示
+   机箱：机构条 → 待办区(主角) → 企业主身份栏 → 成员列表
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ---- 动效：入场错峰（阅读次序=信息优先级） ---- */
+@keyframes om-rise { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+.om-rise { animation: om-rise .3s cubic-bezier(.2,.75,.3,1) both; }
+.om-rise:nth-child(2){animation-delay:.04s}
+.om-rise:nth-child(3){animation-delay:.08s}
+.om-rise:nth-child(4){animation-delay:.12s}
+.om-rise:nth-child(5){animation-delay:.16s}
+.om-rise:nth-child(6){animation-delay:.2s}
+@keyframes om-pop { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:none; } }
+.om-pop { animation: om-pop .22s var(--e-emph) both; }
+@keyframes om-slide { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+.om-slide { animation: om-slide .32s var(--e-emph) both; }
+
+/* ---- 导航「邀请成员」弱胶囊已统一为共享 .nav-pill（保留 id=om-invite-btn 供显隐/事件） ---- */
+
+/* ---- 页面容器 ---- */
+.om-scroll { padding:0 14px calc(var(--sp-6) + 96px); }
+
+/* ── 机构条（企业信息卡：弱化为背景信息，不做主角） ── */
+.om-comp { position:relative; margin:12px 0 4px; padding:16px 16px 14px; border-radius:var(--r-xl);
+  background:var(--bg-card); border:1px solid var(--line); box-shadow:var(--shadow-card); overflow:hidden; }
+.om-comp::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(180deg,var(--primary-strong),var(--primary-dim)); }
+.om-comp-hd { display:flex; align-items:center; gap:8px; }
+.om-comp-name { font-size:var(--fs-title); font-weight:700; color:var(--text-1);
+  letter-spacing:.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.om-verified { flex:none; font-size:9.5px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:2px 8px;
+  border-radius:var(--r-full); letter-spacing:.5px; }
+.om-comp-meta { display:grid; grid-template-columns:1fr 1fr; gap:7px 12px; margin-top:12px; }
+.om-comp-meta .kv { display:flex; align-items:baseline; gap:5px; min-width:0; font-size:11px; color:var(--text-3); }
+.om-comp-meta .kv i { flex:none; font-style:normal; }
+.om-comp-meta b { color:var(--text-2); font-weight:600; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.om-comp-meta b.om-kv-gold { color:var(--primary-dim); font-weight:700; }
+.om-cap { margin-top:13px; padding-top:11px; border-top:1px dashed var(--line);
+  display:flex; align-items:center; gap:10px; }
+.om-cap-l { font-size:11px; color:var(--text-3); white-space:nowrap; }
+.om-cap-l b { font-variant-numeric:tabular-nums; color:var(--primary-dim); font-weight:800; font-size:12.5px; }
+.om-cap-bar { flex:1; height:6px; border-radius:var(--r-full); background:var(--bg-inset); overflow:hidden; }
+.om-cap-fill { height:100%; border-radius:var(--r-full);
+  background:linear-gradient(90deg,var(--primary-strong),var(--primary));
+  transition:width .5s var(--e-out); }
+.om-cap-pct { flex:none; font-size:10px; font-weight:700; color:var(--text-3);
+  font-variant-numeric:tabular-nums; }
+
+/* ── 区块标题：金色短竖线 + 标题 + 右计数 ── */
+.om-sec { display:flex; align-items:center; gap:8px; margin:20px 2px 10px; }
+.om-sec::before { content:""; flex:none; width:3px; height:14px; border-radius:2px;
+  background:linear-gradient(180deg,var(--primary-strong),var(--primary-dim)); }
+.om-sec b { font-size:13.5px; color:var(--text-1); letter-spacing:.02em; }
+.om-sec span { font-size:11px; color:var(--text-3); margin-left:auto;
+  font-variant-numeric:tabular-nums; }
+.om-sec .om-badge { min-width:18px; height:18px; padding:0 6px; border-radius:var(--r-full);
+  background:var(--error); color:#fff; font-size:10px; font-weight:700; margin-left:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(179,38,30,.3); }
+
+/* ── 待办区（当页主角之一）：待审批加入申请 ── */
+.pending-card { position:relative; background:var(--bg-card); border:1px solid var(--accent-line);
+  border-radius:var(--r-l); margin-bottom:10px; padding:14px 14px 12px; box-shadow:var(--shadow-card); }
+.pending-card::before { content:""; position:absolute; left:0; top:14px; bottom:14px; width:2.5px;
+  border-radius:2px; background:linear-gradient(180deg,var(--primary),var(--primary-soft)); }
+.pc-top { display:flex; align-items:flex-start; gap:11px; }
+.pc-ava { flex:none; width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary)); color:#fff;
+  font-weight:700; font-size:15px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 2px var(--bg-card), 0 0 0 3.5px var(--accent-line); }
+.pc-info { flex:1; min-width:0; }
+.pc-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.pc-tag { flex:none; font-size:9px; font-weight:700; color:#fff;
+  background:linear-gradient(135deg,var(--primary),var(--primary-dim)); padding:2px 7px;
+  border-radius:var(--r-full); letter-spacing:.5px; }
+.pc-note { font-size:12px; color:var(--text-2); margin-top:3px; line-height:1.55; }
+.pc-meta { font-size:10.5px; color:var(--text-3); margin-top:4px; display:flex;
+  align-items:center; gap:4px; flex-wrap:wrap; }
+.pc-meta .src { color:var(--primary-dim); font-weight:600; }
+.pc-acts { display:flex; gap:9px; margin-top:12px; }
+.pc-btn { flex:1; height:40px; border-radius:var(--r-full); font-size:12.5px; font-weight:700;
+  cursor:pointer; border:none; transition:transform .15s var(--e-out), opacity .15s; }
+.pc-btn:active { transform:scale(.97); }
+.pc-btn.ok { background:linear-gradient(180deg,var(--primary-strong),var(--primary));
+  color:#fff; box-shadow:0 4px 12px rgba(176, 138, 60, .3); }
+.pc-btn.no { background:var(--bg-subtle); color:var(--text-2); border:1px solid var(--line); }
+.pc-btn[disabled] { opacity:.6; pointer-events:none; }
+
+/* ── 待办区：审批中/移交待确认（次级待办，非主角不抢戏） ── */
+.tr-card { background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l);
+  margin-bottom:10px; padding:13px 14px; box-shadow:var(--shadow-xs); }
+.tr-card.gold { border-color:var(--accent-line); }
+.tr-head { display:flex; align-items:flex-start; gap:10px; }
+.tr-ic { flex:none; width:34px; height:34px; border-radius:10px; background:var(--primary-soft);
+  color:var(--primary-dim); display:flex; align-items:center; justify-content:center; }
+.tr-ic svg { width:16px; height:16px; }
+.tr-info { flex:1; min-width:0; }
+.tr-title { font-size:13px; font-weight:700; color:var(--text-1); }
+.tr-sub { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.6; }
+.tr-sub b { color:var(--text-2); font-weight:600; }
+.tr-meta { font-size:10px; color:var(--text-3); margin-top:4px; opacity:.85; }
+.tr-acts { display:flex; gap:8px; margin-top:11px; }
+.tr-btn { flex:1; height:40px; border-radius:var(--r-full); font-size:12px; font-weight:700;
+  cursor:pointer; border:none; transition:transform .15s var(--e-out), opacity .15s; }
+.tr-btn:active { transform:scale(.97); }
+.tr-btn.ok { background:linear-gradient(180deg,var(--primary-strong),var(--primary)); color:#fff; }
+.tr-btn.no { background:var(--bg-subtle); color:var(--text-2); border:1px solid var(--line); }
+.tr-btn.ghost { background:transparent; color:var(--text-3); border:1px dashed var(--line-strong); }
+
+/* ── 企业主（实际控制人）身份栏：当页第二主角 ── */
+.om-owner-card { position:relative; margin-bottom:10px; border-radius:var(--r-xl);
+  border:1.5px solid var(--accent-line); background:
+  linear-gradient(180deg,var(--primary-soft),transparent 82%), var(--bg-card);
+  overflow:hidden; box-shadow:var(--shadow-card); }
+.om-owner-card::before { content:""; position:absolute; left:0; top:0; right:0; height:2.5px;
+  background:linear-gradient(90deg,var(--primary-strong),var(--primary-soft)); }
+.om-owner-inner { display:flex; align-items:center; gap:12px; padding:15px 14px; }
+.om-owner-ava { flex:none; width:44px; height:44px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary)); color:#fff;
+  font-weight:700; font-size:17px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-line); }
+.om-owner-main { flex:1; min-width:0; }
+.om-owner-name { font-size:15px; font-weight:700; color:var(--text-1); display:flex;
+  align-items:center; gap:6px; flex-wrap:wrap; }
+.om-owner-cap { margin-top:2px; font-size:10.5px; color:var(--primary-dim); font-weight:700;
+  display:flex; align-items:center; gap:4px; letter-spacing:.03em; }
+.om-owner-cap svg { width:11px; height:11px; }
+.om-owner-sub { font-size:10.5px; color:var(--text-3); margin-top:3px;
+  font-variant-numeric:tabular-nums; }
+.om-owner-side { flex:none; display:flex; align-items:center; }
+.om-change-link { font-size:11px; font-weight:600; color:var(--text-3); background:transparent;
+  border:none; border-bottom:1px dashed var(--line-strong); padding:0 0 2px; cursor:pointer;
+  letter-spacing:.03em; transition:color .15s; }
+.om-change-link:active { color:var(--primary-dim); }
+.om-change-lock { flex:none; font-size:10px; font-weight:600; color:var(--text-3);
+  background:var(--bg-subtle); border:1px solid var(--line); padding:3px 9px; border-radius:var(--r-full); }
+
+/* 空态：主邀请按钮 + 「或」分隔 + 自认领次级入口 */
+.oe-or { display:flex; align-items:center; gap:10px; margin:14px 0 10px; }
+.oe-or::before, .oe-or::after { content:""; flex:1; height:1px; background:var(--line); }
+.oe-or span { font-size:10px; color:var(--text-3); letter-spacing:.1em; }
+.oe-claim-btn { display:flex; align-items:center; justify-content:center; gap:6px;
+  width:100%; height:42px; border-radius:var(--r-full); border:1.5px dashed var(--accent-line);
+  background:var(--primary-soft); color:var(--primary-dim); font-size:12.5px; font-weight:700;
+  cursor:pointer; transition:transform .15s var(--e-out), background .15s; }
+.oe-claim-btn svg { width:14px; height:14px; }
+.oe-claim-btn:active { transform:scale(.98); background:rgba(176, 138, 60, .18); }
+.oe-claim-tip { font-size:10px; color:var(--text-3); text-align:center; margin-top:8px; line-height:1.6; }
+.oe-claim-tip b { color:var(--primary-dim); font-weight:600; }
+
+/* 认领审核中卡片（替代空态展示） */
+.oclaim-card { position:relative; border-radius:var(--r-xl); border:1.5px solid var(--accent-line);
+  background:linear-gradient(180deg,var(--primary-soft),transparent 82%), var(--bg-card);
+  overflow:hidden; box-shadow:var(--shadow-card); margin-bottom:10px; }
+.oclaim-inner { display:flex; align-items:center; gap:12px; padding:15px 14px; }
+.oclaim-ic { flex:none; width:40px; height:40px; border-radius:12px; background:var(--primary-soft);
+  color:var(--primary-dim); display:flex; align-items:center; justify-content:center; }
+.oclaim-ic svg { width:20px; height:20px; }
+.oclaim-main { flex:1; min-width:0; }
+.oclaim-t { font-size:13.5px; font-weight:800; color:var(--text-1); }
+.oclaim-s { font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.6; }
+.oclaim-s b { color:var(--primary-dim); font-weight:700; }
+.oclaim-mode { flex:none; font-size:9.5px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:3px 9px; border-radius:var(--r-full); }
+
+/* 企业主空缺空态 */
+.om-owner-empty { padding:20px 16px 22px; }
+.oe-t { font-size:13.5px; font-weight:800; color:var(--text-1); }
+.oe-s { font-size:11px; color:var(--text-3); margin:5px 0 14px; line-height:1.7; }
+.oe-s b { color:var(--text-2); }
+
+/* 企业主邀请卡（邀请入驻 / 待实名） */
+.om-owner-inv { display:flex; align-items:center; gap:11px; padding:14px; }
+.oi-info { flex:1; min-width:0; }
+.oi-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.oi-sub { font-size:10.5px; color:var(--text-3); margin-top:3px; line-height:1.55; }
+.oi-acts { display:flex; gap:7px; flex:none; }
+.oi-btn { font-size:11px; font-weight:700; padding:7px 12px; border-radius:var(--r-full);
+  border:1px solid var(--accent-line); color:var(--primary-dim); background:var(--primary-soft);
+  cursor:pointer; transition:transform .15s var(--e-out); }
+.oi-btn:active { transform:scale(.95); }
+.oi-btn.off { color:var(--text-3); background:var(--bg-subtle); border-color:var(--line); cursor:default; }
+.oi-btn.ghost { color:var(--text-2); background:var(--bg-subtle); border-color:var(--line); }
+.inv-tag { flex:none; font-size:9px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:2px 7px;
+  border-radius:var(--r-full); }
+.mc-sub { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--primary-dim);
+  margin-top:3px; font-weight:600; }
+.mc-sub svg { width:11px; height:11px; }
+
+/* ── 成员：搜索 + 首字母索引 + 分组列表 ── */
+.om-search { display:flex; align-items:center; gap:8px; margin:0 0 10px; padding:0 13px;
+  height:42px; border:1.5px solid var(--line); border-radius:var(--r-m); background:var(--bg-card);
+  box-shadow:var(--shadow-xs); transition:border-color .15s, box-shadow .15s; }
+.om-search:focus-within { border-color:var(--primary); box-shadow:var(--shadow-focus); }
+.om-search svg { width:15px; height:15px; color:var(--text-3); flex:none; }
+.om-search input { flex:1; min-width:0; border:none; outline:none; background:transparent;
+  font-size:13.5px; color:var(--text-1); }
+.om-search input::placeholder { color:var(--text-3); }
+
+.om-member-wrap { display:flex; gap:4px; }
+.om-groups { flex:1; min-width:0; }
+.om-groups .om-empty { margin:0 0 10px; }
+.om-azbar { flex:none; width:22px; display:flex; flex-direction:column; align-items:center;
+  gap:2px; position:sticky; top:10px; height:fit-content; padding-top:8px; }
+.om-azbar:empty { display:none; }
+.om-az { width:20px; height:20px; border-radius:6px; display:flex; align-items:center;
+  justify-content:center; font-size:10px; font-weight:700; color:var(--text-3); cursor:pointer;
+  transition:background .15s, color .15s; }
+.om-az.on { background:var(--primary); color:#fff; }
+.om-az:active { transform:scale(.9); }
+.om-letter-head { display:flex; align-items:center; gap:6px; margin:4px 2px 7px; font-size:11px;
+  font-weight:800; color:var(--primary-dim); letter-spacing:.06em; scroll-margin-top:12px; }
+.om-letter-head::after { content:""; flex:1; height:1px;
+  background:linear-gradient(90deg,var(--accent-line),transparent); }
+
+/* 成员卡：同一结构，信息/操作分列 */
+.member-card { display:flex; align-items:center; gap:11px; background:var(--bg-card);
+  border:1px solid var(--line); border-radius:var(--r-l); margin-bottom:10px;
+  padding:12px 14px; box-shadow:var(--shadow-xs); transition:transform .15s var(--e-out); }
+.member-card:active { transform:scale(.985); background:var(--bg-alp); }
+.mc-ava { flex:none; width:40px; height:40px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary)); color:#fff;
+  font-weight:700; display:flex; align-items:center; justify-content:center; font-size:15px; }
+.mc-info { flex:1; min-width:0; }
+.mc-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.mc-time { font-size:10.5px; color:var(--text-3); margin-top:3px;
+  font-variant-numeric:tabular-nums; }
+.mc-self { flex:none; font-size:10.5px; color:var(--text-3); }
+.role-tag { flex:none; font-size:9.5px; font-weight:700; padding:2.5px 8px; border-radius:var(--r-full); }
+.role-owner { background:var(--primary-soft); color:var(--primary-dim); border:1px solid var(--accent-line); }
+.role-admin { background:var(--bg-subtle); color:var(--primary-dim); border:1px solid var(--line); }
+.role-member { background:var(--bg-subtle); color:var(--text-3); border:1px solid var(--line); }
+.mc-acts { flex:none; display:flex; gap:6px; align-items:center; }
+.mc-btn { font-size:11px; font-weight:600; padding:6px 11px; border-radius:var(--r-full);
+  cursor:pointer; transition:transform .15s var(--e-out); }
+.mc-btn:active { transform:scale(.95); }
+.mc-btn.ghost { color:var(--text-2); background:var(--bg-subtle); border:1px solid var(--line); }
+.mc-btn.gold { color:var(--primary-dim); background:var(--primary-soft); border:1px solid var(--accent-line); }
+.mc-btn.danger { color:var(--error); background:transparent; border:1px solid rgba(179,38,30,.3); }
+.mc-btn.off { opacity:.5; cursor:default; }
+/* 成员卡移交状态签：有活动移交时替代「移交」按钮 */
+.mc-chip { flex:none; font-size:10px; font-weight:700; color:var(--primary-dim);
+  background:var(--primary-soft); border:1px solid var(--accent-line); padding:4px 9px;
+  border-radius:var(--r-full); white-space:nowrap; }
+.mc-chip.wait { color:var(--text-3); background:var(--bg-subtle); border-color:var(--line); }
+
+.om-empty { text-align:center; color:var(--text-3); font-size:12px; padding:26px 20px;
+  background:var(--bg-card); border:1px dashed var(--line); border-radius:var(--r-l);
+  margin:0 0 10px; line-height:1.7; }
+.om-empty b { color:var(--text-2); }
+
+/* ── 底部说明卡 ── */
+.om-tip { margin:18px 0 0; padding:14px 14px 12px; background:var(--bg-card);
+  border:1px solid var(--line); border-radius:var(--r-l); box-shadow:var(--shadow-xs); }
+.om-tip-t { font-size:11.5px; font-weight:800; color:var(--text-2); margin-bottom:9px;
+  letter-spacing:.04em; display:flex; align-items:center; gap:6px; }
+.om-tip-t::before { content:""; width:3px; height:11px; border-radius:2px;
+  background:var(--primary); }
+.om-tip-row { display:flex; gap:8px; font-size:10.5px; color:var(--text-3); line-height:1.7;
+  margin-bottom:7px; }
+.om-tip-row:last-child { margin-bottom:0; }
+.ot-dot { flex:none; width:6px; height:6px; border-radius:50%; margin-top:6px; }
+
+/* ═══════════════════ 弹层（UI.sheet 内联样式，统一角色化） ═══════════════════ */
+/* 邀请 sheet */
+.inv-tabs { display:flex; gap:4px; margin:2px 0 14px; background:var(--bg-subtle);
+  border-radius:var(--r-m); padding:4px; }
+.inv-tab { flex:1; text-align:center; padding:9px 0; border-radius:9px; font-size:12.5px;
+  font-weight:600; color:var(--text-3); cursor:pointer; transition:all .15s; }
+.inv-tab.on { background:var(--bg-card); color:var(--primary-dim); box-shadow:var(--shadow-xs); }
+.mob-row { display:flex; align-items:center; gap:8px; }
+.mob-input { width:100%; height:44px; border:1.5px solid var(--line-strong); border-radius:var(--r-m);
+  padding:0 13px; font-size:14px; outline:none; letter-spacing:.03em; background:var(--bg-card);
+  color:var(--text-1); box-sizing:border-box; transition:border-color .15s, box-shadow .15s; }
+.mob-input:focus { border-color:var(--primary); box-shadow:var(--shadow-focus); }
+.mob-tip { font-size:10.5px; color:var(--text-3); line-height:1.7; margin:10px 2px 12px; }
+.mob-tip b { color:var(--primary-dim); }
+.vf-field { margin:12px 2px; }
+.vf-field label { display:block; font-size:11px; color:var(--text-3); margin-bottom:6px; }
+.vf-field label .req { color:var(--error); margin-left:2px; }
+.vf-field input, .vf-field textarea { width:100%; border:1.5px solid var(--line-strong);
+  border-radius:var(--r-m); padding:0 13px; font-size:14px; outline:none; background:var(--bg-card);
+  color:var(--text-1); box-sizing:border-box; transition:border-color .15s, box-shadow .15s; }
+.vf-field input { height:44px; }
+.vf-field textarea { padding:10px 13px; resize:none; line-height:1.6; font-family:inherit; }
+.vf-field input:focus, .vf-field textarea:focus { border-color:var(--primary); box-shadow:var(--shadow-focus); }
+.om-detect { margin:8px 2px 2px; font-size:11px; line-height:1.55; display:flex; gap:6px;
+  align-items:flex-start; }
+.om-detect svg { flex:none; width:14px; height:14px; margin-top:1px; }
+.om-detect.ok { color:var(--success); }
+.om-detect.warn { color:var(--warning); }
+.om-detect.err { color:var(--error); }
+
+/* 已认证用户搜索（弹窗内实时过滤，不另开窗口） */
+.om-users-search { display:flex; align-items:center; gap:8px; margin:2px 0 10px; padding:0 12px;
+  height:42px; border:1.5px solid var(--line); border-radius:var(--r-m); background:var(--bg-subtle);
+  transition:border-color .15s, box-shadow .15s; }
+.om-users-search:focus-within { border-color:var(--primary); box-shadow:var(--shadow-focus); }
+.om-users-search svg { width:15px; height:15px; color:var(--text-3); flex:none; }
+.om-users-search input { flex:1; min-width:0; border:none; outline:none; background:transparent;
+  font-size:13.5px; color:var(--text-1); }
+.om-users-search input::placeholder { color:var(--text-3); }
+.om-users-head { display:flex; align-items:center; gap:8px; margin:2px 2px 6px; }
+.om-users-head span:first-child { font-size:11px; color:var(--text-3); flex:1; }
+.om-sel-count { font-size:11px; font-weight:700; color:var(--primary-dim);
+  font-variant-numeric:tabular-nums; }
+.cand { display:flex; align-items:center; gap:11px; padding:11px 4px; border-bottom:1px solid var(--line);
+  border-radius:10px; cursor:pointer; transition:background .15s; }
+.cand:last-child { border-bottom:none; }
+.cand:active { background:var(--bg-subtle); }
+.cand-ava { flex:none; width:38px; height:38px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary-strong),var(--primary)); color:#fff;
+  font-weight:700; display:flex; align-items:center; justify-content:center; }
+.cand-info { flex:1; min-width:0; }
+.cand-name { font-size:14px; font-weight:700; color:var(--text-1); display:flex; align-items:center; gap:6px; }
+.cand-sub { font-size:10.5px; color:var(--text-3); margin-top:2px; }
+.cand-check { flex:none; width:22px; height:22px; border-radius:50%; border:1.5px solid var(--line);
+  display:flex; align-items:center; justify-content:center; transition:all .15s; }
+.cand.sel .cand-check { background:var(--primary); border-color:var(--primary); }
+.cand.sel .cand-check svg { display:block; }
+.cand-check svg { display:none; width:12px; height:12px; color:#fff; }
+.role-pick { display:flex; gap:8px; margin:14px 2px 6px; }
+.role-opt { flex:1; text-align:center; padding:10px 0; border-radius:var(--r-m);
+  border:1px solid var(--line); background:var(--bg-subtle); font-size:12px; font-weight:600;
+  color:var(--text-2); cursor:pointer; transition:all .15s; }
+.role-opt.sel { border-color:var(--primary); background:var(--primary-soft); color:var(--primary-dim);
+  box-shadow:var(--shadow-xs); }
+.role-opt.disabled { opacity:.45; cursor:not-allowed; }
+
+/* 企业主变更弹窗 */
+.oc-wrap { padding:2px 2px 4px; }
+.oc-note { font-size:11px; color:var(--text-3); line-height:1.7; background:var(--bg-subtle);
+  border:1px solid var(--line); border-radius:var(--r-m); padding:10px 12px; margin-bottom:2px; }
+.oc-note b { color:var(--primary-dim); }
+.oc-reason { width:100%; border:1.5px solid var(--line-strong); border-radius:var(--r-m);
+  padding:10px 13px; font-size:13px; outline:none; background:var(--bg-card); color:var(--text-1);
+  font-family:inherit; resize:none; line-height:1.6; box-sizing:border-box;
+  transition:border-color .15s, box-shadow .15s; }
+.oc-reason:focus { border-color:var(--primary); box-shadow:var(--shadow-focus); }
+.oc-reason::placeholder { color:var(--text-3); }
+.oc-actions { margin:10px 2px 2px; padding:11px 12px; border:1px dashed var(--accent-line);
+  border-radius:var(--r-m); background:var(--primary-soft); }
+.oc-actions-t { font-size:10.5px; color:var(--text-2); margin-bottom:9px; line-height:1.6; }
+.oc-actions .oi-acts { width:100%; }
+.oc-actions .oi-btn { flex:1; padding:8px 0; text-align:center; }
+
+/* 企业主身份验证（法人 / 实际控制人） */
+.vf-opt { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--line);
+  border-radius:var(--r-m); margin-bottom:8px; cursor:pointer; background:var(--bg-subtle);
+  transition:all .15s; }
+.vf-opt.sel { border-color:var(--primary); background:var(--primary-soft); box-shadow:var(--shadow-xs); }
+.vf-opt-dot { flex:none; width:18px; height:18px; border-radius:50%; border:1.5px solid var(--line);
+  display:flex; align-items:center; justify-content:center; }
+.vf-opt.sel .vf-opt-dot { border-color:var(--primary); }
+.vf-opt.sel .vf-opt-dot::after { content:""; width:8px; height:8px; border-radius:50%;
+  background:var(--primary); }
+.vf-opt-meta { flex:1; min-width:0; }
+.vf-opt-t { font-size:12.5px; font-weight:700; color:var(--text-1); }
+.vf-opt-s { font-size:10.5px; color:var(--text-3); margin-top:2px; line-height:1.55; }
+.vf-check { display:flex; align-items:flex-start; gap:8px; padding:4px 2px; font-size:11.5px;
+  color:var(--text-2); line-height:1.6; }
+.vf-check input { width:16px; height:16px; accent-color:var(--primary); flex:none; margin-top:2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .om-rise, .om-pop, .om-slide { animation: none; }
+  .om-cap-fill { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">企业成员管理</div>
+    <div class="nav-right">
+      <button class="nav-pill" id="om-invite-btn" aria-label="邀请成员"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>邀请成员</button>
+    </div>
+  </div>
+  <div class="scroll no-pad">
+    <div class="om-scroll" id="om-root"></div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/orgs.js"></script>
+<script>
+(function () {
+  var root = document.getElementById('om-root');
+  var ROLE_LABEL = { owner: '企业主', admin: '管理员', member: '成员' };
+
+  function me() { try { return window.DataBus && DataBus.current(); } catch (e) { return null; } }
+  function qs(name) { var m = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search); return m ? decodeURIComponent(m[1]) : ''; }
+
+  /* 确定当前企业：URL 指定 > 当前代表企业 > 第一个成员身份的企业。
+     普通成员也可进入（自助退出 / 接收移交验证）；管理操作仍按角色校验。 */
+  function resolveOrg() {
+    var u = me(); if (!u || !window.OrgsStore) return null;
+    var byUrl = qs('orgId');
+    if (byUrl) {
+      var m = OrgsStore.membershipOf(u.id, byUrl);
+      if (m) return m.org;
+    }
+    var cur = OrgsStore.currentMembership();
+    if (cur) return cur.org;
+    var list = OrgsStore.orgsOf(u.id);
+    if (list.length) return list[0].org;
+    return null;
+  }
+
+  function esc(s) { return window.UI && UI.esc ? UI.esc(s) : String(s); }
+  function fmtDate(ts) { if (!ts) return ''; var d = new Date(ts); return (d.getMonth() + 1) + '月' + d.getDate() + '日加入'; }
+  function fmtTime(ts) { if (!ts) return ''; var d = new Date(ts); return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+
+  function renderGate(text) {
+    root.innerHTML =
+      '<div class="om-empty" style="margin-top:60px;">' +
+        (text || '你当前不是任何企业的管理员。<br>企业主/管理员可邀请员工、管理成员与审批加入申请。') +
+      '</div>';
+  }
+
+  function render() {
+    var org = resolveOrg();
+    var u = me();
+    if (!u) { renderGate('请先登录'); return; }
+    if (!org) { renderGate(); document.getElementById('om-invite-btn').style.display = 'none'; return; }
+    document.getElementById('om-invite-btn').style.display = '';
+
+    var myRole = OrgsStore.myRole(org.orgId);
+    var isOwner = myRole === 'owner';
+    var isManager = isOwner || myRole === 'admin';
+    document.getElementById('om-invite-btn').style.display = isManager ? '' : 'none';
+    var members = OrgsStore.members(org.orgId);
+    var cap = org.memberLimit || OrgsStore.MEMBER_LIMIT;
+    var used = OrgsStore.memberCount(org);
+    var joins = OrgsStore.pendingJoins(org.orgId);
+    var activeTr = null;
+    (OrgsStore.transfersOf(org.orgId) || []).forEach(function (t) {
+      if (t.status === 'verify-pending' || t.status === 'owner-confirm') activeTr = t;
+    });
+    var ocPending = OrgsStore.pendingOwnerChangeOf ? OrgsStore.pendingOwnerChangeOf(org.orgId) : null;
+    var typeLabel = (org.entryTypes && org.entryTypes[0] === 'construction') ? '建筑入驻' : (org.entStatus === 'resident' ? '企业入驻' : '企业认证');
+
+    var html = '';
+
+    /* ── 机构条（背景信息，非主角） ── */
+    html +=
+      '<div class="om-comp om-rise">' +
+        '<div class="om-comp-hd"><div class="om-comp-name">' + esc(org.shortName || org.co) + '</div>' +
+        '<span class="om-verified">已认证</span></div>' +
+        '<div class="om-comp-meta">' +
+          '<span class="kv"><i>统一社会信用代码</i><b>' + esc(org.code || '—') + '</b></span>' +
+          '<span class="kv"><i>法定代表人</i><b>' + esc(org.legal || '—') + '</b></span>' +
+          '<span class="kv"><i>类型</i><b>' + typeLabel + '</b></span>' +
+          '<span class="kv"><i>企业主</i><b class="om-kv-gold">实际控制人</b></span>' +
+        '</div>' +
+        '<div class="om-cap">' +
+          '<span class="om-cap-l">成员 <b>' + used + '/' + cap + '</b> 人</span>' +
+          '<div class="om-cap-bar"><div class="om-cap-fill" style="width:' + Math.min(100, used / cap * 100) + '%;"></div></div>' +
+          '<span class="om-cap-pct">' + Math.round(used / cap * 100) + '%</span>' +
+        '</div>' +
+      '</div>';
+
+    /* ── 待办区：待审批加入申请（当页主角，仅企业主/管理员可见） ── */
+    if (joins.length && isManager) {
+      html += '<div class="om-sec om-rise"><b>待审批申请</b><span class="om-badge">' + joins.length + '</span></div>';
+      joins.forEach(function (j) {
+        var jU = (window.DataBus && DataBus.byId) ? DataBus.byId(j.uid) : null;
+        var jMob = jU ? (jU.mobile || '') : '';
+        html +=
+          '<div class="pending-card om-rise om-pop">' +
+            '<div class="pc-top">' +
+              '<div class="pc-ava">' + esc((j.name || '?').charAt(0)) + '</div>' +
+              '<div class="pc-info">' +
+                '<div class="pc-name">' + esc(j.name) + ' <span class="pc-tag">申请加入</span></div>' +
+                '<div class="pc-note">' + (j.note ? esc(j.note) : '申请加入本企业号') + '</div>' +
+                '<div class="pc-meta">' + (jMob ? esc(maskMobile(jMob)) + ' · ' : '') + fmtTime(j.createdAt) + ' 提交 · <span class="src">员工主动申请</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="pc-acts">' +
+              '<button class="pc-btn ok" id="jb-' + j.joinId + '" onclick="omApprove(\'' + j.joinId + '\', this)">通过</button>' +
+              '<button class="pc-btn no" onclick="omReject(\'' + j.joinId + '\')">驳回</button>' +
+            '</div>' +
+          '</div>';
+      });
+    }
+
+    /* ── 待办区：企业主变更审批中（发起侧展示审批进度） ── */
+    if (ocPending && isManager) {
+      html +=
+        '<div class="tr-card gold om-rise">' +
+          '<div class="tr-head">' +
+            '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>' +
+            '<div class="tr-info"><div class="tr-title">企业主变更 · 后台审批中</div>' +
+            '<div class="tr-sub">' + esc(ocPending.createdByName || '管理员') + ' 申请将企业主（实际控制人）变更为 <b>' + esc(ocPending.name) + '</b>（' + esc(ocPending.mobile || '') + '）<br>原因：' + esc(ocPending.reason || '—') + '</div>' +
+            '<div class="tr-meta">' + fmtTime(ocPending.createdAt) + ' 提交 · 后台审批通过后自动生效</div></div>' +
+          '</div>' +
+        '</div>';
+    }
+
+    /* ── 待办区：企业主移交（待确认 / 待验证 / 进行中） ──
+       同一时间仅一条活动移交（store 已约束）。按「当前用户身份」分流：
+         - 企业主：owner-confirm 单 → 确认/驳回（其余身份只读或看到自己的跟踪卡）
+         - 发起人（owner/admin）：待企业主确认 / 已确认待接收人验证 → 可撤回
+         - 接收人：待企业主确认（只读）→ 验证入口 → 已提交待审核 */
+    if (activeTr) {
+      var trFrom = (window.DataBus && DataBus.byId) ? DataBus.byId(activeTr.fromUid) : null;
+      var trTo = (window.DataBus && DataBus.byId) ? DataBus.byId(activeTr.toUid) : null;
+      var trFromName = trFrom ? trFrom.name : activeTr.fromUid;
+      var trToName = trTo ? trTo.name : activeTr.toUid;
+      var isTrFrom = activeTr.fromUid === (u && u.id);
+      var isTrTo = activeTr.toUid === (u && u.id);
+
+      if (activeTr.status === 'owner-confirm') {
+        /* 管理员发起，等待企业主确认 */
+        if (isOwner) {
+          html +=
+            '<div class="tr-card gold om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">企业主移交待确认</div>' +
+                '<div class="tr-sub">' + esc(trFromName) + ' 申请将企业主身份移交给 ' + esc(trToName) + '，确认后对方需完成法人认证或实际控制人验证，并由后台审核。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts">' +
+                '<button class="tr-btn ok" onclick="omConfirmTransfer(\'' + activeTr.id + '\')">确认移交</button>' +
+                '<button class="tr-btn no" onclick="omRejectTransfer(\'' + activeTr.id + '\')">驳回</button>' +
+              '</div>' +
+            '</div>';
+        } else if (isTrFrom) {
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">移交申请待企业主确认</div>' +
+                '<div class="tr-sub">您已申请将企业主身份移交给 <b>' + esc(trToName) + '</b>，等待企业主确认后，对方需完成身份验证并经后台审核。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts"><button class="tr-btn no" onclick="omCancelTransfer(\'' + activeTr.id + '\')">撤回申请</button></div>' +
+            '</div>';
+        } else if (isTrTo) {
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">企业主移交待确认</div>' +
+                '<div class="tr-sub"><b>' + esc(trFromName) + '</b> 申请将企业主身份移交给您。待企业主确认后，您将收到验证通知并需完成身份验证。</div></div>' +
+              '</div>' +
+            '</div>';
+        }
+      } else if (activeTr.status === 'verify-pending') {
+        /* 已进入接收人验证阶段 */
+        if (isTrTo) {
+          var v = activeTr.verify || { status: 'none', mode: '' };
+          if (v.status === 'none') {
+            html +=
+              '<div class="tr-card om-rise">' +
+                '<div class="tr-head">' +
+                  '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
+                  '<div class="tr-info"><div class="tr-title">请完成企业主身份验证</div>' +
+                  '<div class="tr-sub">企业主身份将移交给您。需通过<b>法人认证</b>（姓名须与营业执照法定代表人一致）或<b>实际控制人验证</b>，提交后由后台审核。</div></div>' +
+                '</div>' +
+                '<div class="tr-acts"><button class="tr-btn ok" onclick="omOpenVerify(\'' + org.orgId + '\')">去验证</button></div>' +
+              '</div>';
+          } else if (v.status === 'pending') {
+            html +=
+              '<div class="tr-card om-rise">' +
+                '<div class="tr-head">' +
+                  '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
+                  '<div class="tr-info"><div class="tr-title">企业主验证已提交</div>' +
+                  '<div class="tr-sub">已提交' + (v.mode === 'legal' ? '法人认证' : '实际控制人验证') + '，等待后台审核。通过后企业主身份正式生效。</div></div>' +
+                '</div>' +
+              '</div>';
+          }
+        } else if (isTrFrom) {
+          var vv = activeTr.verify || { status: 'none', mode: '' };
+          html +=
+            '<div class="tr-card om-rise">' +
+              '<div class="tr-head">' +
+                '<div class="tr-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>' +
+                '<div class="tr-info"><div class="tr-title">移交进行中</div>' +
+                '<div class="tr-sub">已将企业主身份移交给 <b>' + esc(trToName) + '</b>' + (vv.status === 'pending' ? '，对方已提交' + (vv.mode === 'legal' ? '法人认证' : '实际控制人验证') + '，等待后台审核' : '，等待对方完成企业主身份验证') + '。后台审核通过后正式生效。</div></div>' +
+              '</div>' +
+              '<div class="tr-acts"><button class="tr-btn no" onclick="omCancelTransfer(\'' + activeTr.id + '\')">撤回申请</button></div>' +
+            '</div>';
+        }
+      }
+    }
+
+    /* ── 企业主（实际控制人）身份栏：当页第二主角 ── */
+    var ownerMember = null, ownerInv = null;
+    members.forEach(function (m) { if (m.role === 'owner') ownerMember = m; });
+    try { ownerInv = OrgsStore.ownerInviteOf(org.orgId); } catch (e) {}
+    /* 当前登录用户是否有待审核的企业主自认领（u4 登录 org3 时命中） */
+    var myClaim = null;
+    try { myClaim = OrgsStore.myPendingClaim ? OrgsStore.myPendingClaim(org.orgId) : null; } catch (e) {}
+
+    html += '<div class="om-sec om-rise"><b>企业主 · 实际控制人</b><span>企业最高权限身份</span></div>';
+
+    if (ownerMember) {
+      var selfTag = (ownerMember.uid === (u && u.id)) ? '<span class="mc-self">（我）</span>' : '';
+      var sideHtml = '';
+      if (isManager) {
+        sideHtml = ocPending
+          ? '<span class="om-change-lock">变更审批中</span>'
+          : '<button class="om-change-link" onclick="omOpenOwnerChange()">变更</button>';
+      }
+      html +=
+        '<div class="om-owner-card om-rise"><div class="om-owner-inner">' +
+          '<div class="om-owner-ava">' + esc(ownerMember.avatar || (ownerMember.name || '?').charAt(0)) + '</div>' +
+          '<div class="om-owner-main">' +
+            '<div class="om-owner-name">' + esc(ownerMember.name) + selfTag + ' <span class="role-tag role-owner">企业主</span></div>' +
+            '<div class="om-owner-cap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>实际控制人</div>' +
+            '<div class="om-owner-sub">' + fmtDate(ownerMember.joinedAt) + (ownerMember.mobile ? ' · ' + esc(maskMobile(ownerMember.mobile)) : '') + '</div>' +
+          '</div>' +
+          '<div class="om-owner-side">' + sideHtml + '</div>' +
+        '</div></div>';
+    } else if (ownerInv) {
+      var invU = (ownerInv.targetUid && window.DataBus && DataBus.byId) ? DataBus.byId(ownerInv.targetUid) : null;
+      var canSms = OrgsStore.canSendInviteSms(org.orgId, ownerInv.inviteId);
+      var sendBtnHtml = canSms.ok
+        ? '<button class="oi-btn" onclick="omSendInviteSms(\'' + ownerInv.inviteId + '\')">发送邀请</button>'
+        : '<button class="oi-btn off" onclick="UI.toast.warn(\'今日已发送过邀请短信，请明天再试\')">今日已发送</button>';
+      html +=
+        '<div class="om-owner-card om-rise"><div class="om-owner-inv">' +
+          '<div class="mc-ava">' + esc((ownerInv.name || '?').charAt(0)) + '</div>' +
+          '<div class="oi-info">' +
+            '<div class="oi-name">' + esc(ownerInv.name || '待确认用户') + ' <span class="inv-tag">邀请入驻</span></div>' +
+            '<div class="oi-sub">' + esc(maskMobile(ownerInv.mobile || '')) + ' · 企业主（实际控制人） · ' + fmtTime(ownerInv.createdAt) + ' 发出' + (invU && invU.auth && invU.auth.realname && invU.auth.realname.ok ? ' · 已实名' : ' · 待实名') + '</div>' +
+          '</div>' +
+          '<div class="oi-acts">' + sendBtnHtml + '<button class="oi-btn ghost" onclick="omOpenEditInvite(\'' + ownerInv.inviteId + '\')">修改</button></div>' +
+        '</div></div>';
+    } else if (myClaim) {
+      /* 当前登录用户已提交企业主自认领，等待后台审核 */
+      var claimModeLabel = myClaim.mode === 'legal' ? '法人认证' : '实际控制人声明';
+      html +=
+        '<div class="oclaim-card om-rise"><div class="oclaim-inner">' +
+          '<div class="oclaim-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+          '<div class="oclaim-main">' +
+            '<div class="oclaim-t">企业主认领审核中</div>' +
+            '<div class="oclaim-s">你已提交<b>' + esc(claimModeLabel) + '</b>认领申请，等待后台审核。<br>通过后自动成为「' + esc(org.shortName || org.co) + '」的企业主。</div>' +
+          '</div>' +
+          '<span class="oclaim-mode">' + esc(claimModeLabel) + '</span>' +
+        '</div></div>';
+    } else {
+      /* 空态：主按钮「邀请企业主」+ 次级入口「我就是实际控制人，立即认领」 */
+      html +=
+        '<div class="om-owner-card om-rise"><div class="om-owner-empty">' +
+          '<div class="oe-t">企业主空缺</div>' +
+          '<div class="oe-s">企业主指企业<b>实际控制人</b>（非工商登记的法定代表人）。<br>邀请公司实际控制人担任企业主，行使企业认证、成员管理与签约权限。</div>' +
+          '<button class="pc-btn ok" style="max-width:240px;margin:0 auto;" onclick="openInvite(true)">邀请企业主</button>' +
+          '<div class="oe-or"><span>或</span></div>' +
+          '<button class="oe-claim-btn" onclick="omOpenClaim()">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+            '我就是实际控制人，立即认领' +
+          '</button>' +
+          '<div class="oe-claim-tip">法人即本人可走<b>法人认证</b>快速通道；非法人但实际控股请走<b>实控人声明</b>，需后台审核。</div>' +
+        '</div></div>';
+    }
+
+    /* ── 成员列表：搜索 + 首字母索引（企业主已置顶于身份栏） ── */
+    html += '<div class="om-sec om-rise"><b>成员</b><span>' + used + ' 人</span></div>';
+    html +=
+      '<div class="om-search om-rise"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>' +
+      '<input id="om-search-input" placeholder="搜索成员姓名 / 手机号"></div>' +
+      '<div class="om-member-wrap"><div class="om-azbar" id="om-azbar"></div><div class="om-groups" id="om-groups"></div></div>';
+
+    if (isManager) {
+      html +=
+        '<div class="om-tip om-rise">' +
+          '<div class="om-tip-t">成员管理说明</div>' +
+          '<div class="om-tip-row"><span class="ot-dot" style="background:var(--primary);"></span><span><b>邀请</b>：手机号邀请（已注册自动识别 + 短信 1 天 1 次）或从已认证用户搜索选择；企业主空缺时可邀请企业主。</span></div>' +
+          '<div class="om-tip-row"><span class="ot-dot" style="background:var(--primary-dim);"></span><span><b>退出</b>：成员可自助退出本企业；企业主退出前需先移交企业主身份。</span></div>' +
+          '<div class="om-tip-row"><span class="ot-dot" style="background:var(--error);"></span><span><b>移交 / 移出</b>：企业主可向成员申请移交企业主身份（接收人验证 + 后台审核）；移出成员后其待处理邀请/申请/移交自动失效。</span></div>' +
+          '<div class="om-tip-row"><span class="ot-dot" style="background:var(--warning);"></span><span><b>企业主</b>：指企业实际控制人。变更需后台审批；目标未注册/未实名时可先发送邀请与实名认证提醒。</span></div>' +
+        '</div>';
+    }
+
+    root.innerHTML = html;
+    renderMemberList();
+    var si = document.getElementById('om-search-input');
+    if (si) { si.value = omSearchKw; si.oninput = function () { omSearchKw = this.value; renderMemberList(); }; }
+    bindMemberScroll();
+  }
+
+  /* ============ 邀请：手机号邀请 + 已认证用户搜索选择 ============ */
+  var lastSheetRef = null;
+  var omSearchKw = '';
+
+  /* ---- 中文姓名 → 拼音首字母（锚字二分 + 常用字表兜底，未知归 #） ---- */
+  var PY_MAP = { '陈':'C','李':'L','王':'W','张':'Z','赵':'Z','刘':'L','周':'Z','吴':'W','郑':'Z','川':'C','诚':'C','成':'C','建':'J','国':'G','强':'Q','敏':'M','磊':'L','洋':'Y','航':'H','雅':'Y','罗':'L','军':'J','科':'K','技':'J','设':'S','有':'Y','限':'X','公':'G','司':'S','家':'J','安':'A','智':'Z','慧':'H','宏':'H','达':'D','鑫':'X','源':'Y','宇':'Y','晨':'C','曦':'X','涛':'T','波':'B','鹏':'P','飞':'F','云':'Y','松':'S','梅':'M','兰':'L','竹':'Z','菊':'J','杰':'J','俊':'J','峰':'F','伟':'W','芳':'F','艳':'Y','静':'J','丽':'L','娟':'J','秀':'X','明':'M','亮':'L','刚':'G','勇':'Y','志':'Z','荣':'R','华':'H','富':'F','贵':'G','金':'J','银':'Y','德':'D','福':'F','春':'C','夏':'X','秋':'Q','冬':'D','新':'X','中':'Z','大':'D','小':'X','永':'Y','光':'G','辉':'H','玉':'Y','珍':'Z','红':'H','平':'P','文':'W','武':'W','超':'C','龙':'L','虎':'H','马':'M','牛':'N','杨':'Y','黄':'H','徐':'X','朱':'Z','孙':'S','胡':'H','郭':'G','何':'H','高':'G','林':'L','程':'C','范':'F','石':'S','姚':'Y','谭':'T','廖':'L','邹':'Z','熊':'X','陆':'L','郝':'H','孔':'K','白':'B','崔':'C','康':'K','毛':'M','邱':'Q','秦':'Q','江':'J','史':'S','顾':'G','侯':'H','邵':'S','孟':'M','万':'W','段':'D','雷':'L','钱':'Q','汤':'T','尹':'Y','黎':'L','易':'Y','常':'C','乔':'Q','贺':'H','赖':'L','龚':'G' };
+  var PY_ANCHORS = ['啊','芭','擦','搭','蛾','发','噶','哈','击','喀','垃','妈','拿','哦','啪','期','然','撒','塌','挖','昔','压','匝'];
+  var PY_LETTERS = ['A','B','C','D','E','F','G','H','J','K','L','M','N','O','P','Q','R','S','T','W','X','Y','Z'];
+  function pyInitial(name) {
+    var ch = String(name || '').trim().charAt(0);
+    if (!ch) return '#';
+    var c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) return ch;
+    if (c >= 97 && c <= 122) return ch.toUpperCase();
+    if (c < 0x4E00 || c > 0x9FFF) return '#';
+    if (PY_MAP[ch]) return PY_MAP[ch];
+    var idx = -1;
+    for (var i = 0; i < PY_ANCHORS.length; i++) {
+      try { if (ch.localeCompare(PY_ANCHORS[i], 'zh-CN') >= 0) idx = i; else break; } catch (e) { break; }
+    }
+    return idx >= 0 ? PY_LETTERS[idx] : '#';
+  }
+  function maskMobile(m) { return String(m || '').replace(/^(\d{3})\d{4}(\d{4})$/, '$1****$2'); }
+  function roleOptHtml(role, label) {
+    return '<div class="role-opt" data-role="' + role + '" onclick="omPickRole(this)">' + label + '</div>';
+  }
+
+  window.openInvite = openInvite;
+  function openInvite(fromOwnerEmpty) {
+    var org = resolveOrg(); if (!org) return;
+    if (OrgsStore.memberCount(org) >= (org.memberLimit || OrgsStore.MEMBER_LIMIT)) { UI.toast.warn('成员数已达上限，如需扩容请联系平台'); return; }
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('邀请成员加入「' + (org.shortName || org.co) + '」');
+    sh._selRole = fromOwnerEmpty ? 'owner' : 'member';
+    sh._selUids = []; sh._detected = null; sh._tab = 'mobile';
+    sh._invName = ''; sh._invMobile = '';
+    sh.html(invShellHtml());
+    sh.show();
+    bindInvEvents();
+    setInvRole(sh._selRole);
+  }
+
+  function invShellHtml() {
+    var org = resolveOrg(); if (!org) return '';
+    var hasOwn = OrgsStore.hasOwner(org.orgId);
+    var ownerOpt = hasOwn
+      ? '<div class="role-opt disabled" data-role="owner" onclick="UI.toast.warn(\'该企业已有企业主\')">企业主</div>'
+      : roleOptHtml('owner', '企业主');
+    return '' +
+      '<div class="inv-tabs">' +
+        '<div class="inv-tab on" data-tab="mobile" onclick="omInvTab(this)">手机号邀请</div>' +
+        '<div class="inv-tab" data-tab="users" onclick="omInvTab(this)">从已认证用户选择</div>' +
+      '</div>' +
+      '<div id="inv-pane-mobile" class="om-slide">' +
+        '<div class="vf-field"><label>被邀请人姓名<span class="req">*</span></label><input id="om-name" class="mob-input" placeholder="请输入姓名"></div>' +
+        '<div class="vf-field"><label>手机号<span class="req">*</span></label><input id="om-mobile" class="mob-input" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
+        '<div id="om-detect" class="om-detect"></div>' +
+        '<div class="mob-tip">输入手机号后自动识别注册状态：<b>已注册</b> → 弹出确认邀请；<b>未注册</b> → 直接发送注册邀请短信。<br>短信邀请 1 天 1 次。</div>' +
+      '</div>' +
+      '<div id="inv-pane-users" class="om-slide" style="display:none;">' +
+        '<div class="om-users-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>' +
+        '<input id="inv-user-search" placeholder="搜索姓名 / 手机号（模糊匹配）"></div>' +
+        '<div class="om-users-head"><span id="inv-user-hint">已实名认证用户</span><span class="om-sel-count" id="om-sel-count">已选 0 人</span></div>' +
+        '<div id="inv-user-list" style="max-height:30vh;overflow-y:auto;padding:2px;"></div>' +
+      '</div>' +
+      '<div class="role-pick" id="om-inv-rolepick">' +
+        '<div class="role-opt" data-role="member" onclick="omPickRole(this)">成员</div>' +
+        '<div class="role-opt" data-role="admin" onclick="omPickRole(this)">管理员</div>' +
+        ownerOpt +
+      '</div>' +
+      '<button type="button" id="om-send" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:8px;">发送邀请</button>';
+  }
+
+  function setInvRole(role) {
+    var pick = document.getElementById('om-inv-rolepick');
+    if (pick) pick.querySelectorAll('.role-opt').forEach(function (r) {
+      r.classList.toggle('sel', r.getAttribute('data-role') === role && !r.classList.contains('disabled'));
+    });
+    var sh = lastSheetRef; if (sh) sh._selRole = role;
+    omRefreshSelCount();
+  }
+
+  /* ---- 已认证用户候选：已实名、非本企业成员、无待接受邀请、无待审批申请 ---- */
+  function invUserCands(org) {
+    var all = (window.DataBus && DataBus.users) ? DataBus.users() : [];
+    var out = [];
+    all.forEach(function (c) {
+      if (!c) return;
+      if (!(c.auth && c.auth.realname && c.auth.realname.ok)) return;
+      if (OrgsStore.membershipOf(c.id, org.orgId)) return;
+      var hasInv = (org.invites || []).some(function (iv) { return iv.targetUid === c.id && iv.status === 'pending'; });
+      if (hasInv) return;
+      var hasJoin = (org.joins || []).some(function (j) { return j.uid === c.id && j.status === 'pending'; });
+      if (hasJoin) return;
+      out.push(c);
+    });
+    return out;
+  }
+
+  /* 渲染候选列表：默认提示搜索，输入后按姓名/手机号实时过滤（弹窗内，不另开窗口） */
+  function renderInvUserList() {
+    var sh = lastSheetRef; if (!sh) return;
+    var org = resolveOrg(); if (!org) return;
+    var listEl = document.getElementById('inv-user-list');
+    var hintEl = document.getElementById('inv-user-hint');
+    if (!listEl) return;
+    var kw = String(sh._userKw || '').trim().toLowerCase();
+    if (!kw) {
+      if (hintEl) hintEl.textContent = '已实名认证用户 · 输入关键字过滤';
+      listEl.innerHTML = '<div class="om-empty" style="margin:6px 0;">输入<b>姓名</b>或<b>手机号</b>模糊搜索已认证用户<br>搜索结果随输入实时变化</div>';
+      return;
+    }
+    var cands = (sh._cands || []).filter(function (c) {
+      return (c.name || '').toLowerCase().indexOf(kw) > -1 || String(c.mobile || '').indexOf(kw) > -1;
+    });
+    if (hintEl) hintEl.textContent = '匹配 ' + cands.length + ' 人';
+    listEl.innerHTML = cands.length ? cands.map(function (c) {
+      var selCls = (sh._selUids && sh._selUids.indexOf(c.id) > -1) ? ' sel' : '';
+      return '<div class="cand' + selCls + '" data-uid="' + c.id + '" onclick="omPickCand(this)">' +
+        '<div class="cand-ava">' + esc((c.avatar || c.name || '?').charAt(0)) + '</div>' +
+        '<div class="cand-info"><div class="cand-name">' + esc(c.name) + ' <span class="role-tag role-member" style="font-size:9px;">已实名</span></div>' +
+        '<div class="cand-sub">' + esc(maskMobile(c.mobile || '')) + (c.tag ? ' · ' + esc(c.tag) : '') + '</div></div>' +
+        '<div class="cand-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+      '</div>';
+    }).join('') : '<div class="om-empty" style="margin:6px 0;">未找到匹配「' + esc(kw) + '」的已认证用户</div>';
+  }
+
+  function bindInvEvents() {
+    var org = resolveOrg(); if (!org) return;
+    var sh = lastSheetRef;
+    var nameEl = document.getElementById('om-name');
+    var mobEl = document.getElementById('om-mobile');
+    if (nameEl) nameEl.value = (sh && sh._invName) || '';
+    if (mobEl) {
+      mobEl.value = (sh && sh._invMobile) || '';
+      mobEl.addEventListener('input', omDetectMobile);
+      mobEl.addEventListener('blur', omDetectMobile);
+      mobEl.addEventListener('change', omDetectMobile);
+    }
+
+    /* 已认证用户候选：搜索框 + 实时过滤（输入即过滤，列表伴随变化） */
+    sh._cands = invUserCands(org);
+    sh._userKw = '';
+    var searchEl = document.getElementById('inv-user-search');
+    if (searchEl) {
+      searchEl.addEventListener('input', function () { sh._userKw = this.value; renderInvUserList(); });
+      searchEl.addEventListener('keydown', function (e) { if (e.key === 'Escape') { this.value = ''; sh._userKw = ''; renderInvUserList(); } });
+    }
+    renderInvUserList();
+
+    var sendBtn = document.getElementById('om-send');
+    if (sendBtn) sendBtn.onclick = function () {
+      var cur = lastSheetRef;
+      if (cur && cur._tab === 'users') omSubmitUsers(); else omSubmitMobile();
+    };
+    omRefreshSelCount();
+  }
+
+  function omRefreshSelCount() {
+    var sh = lastSheetRef;
+    var el = document.getElementById('om-sel-count');
+    if (el) el.textContent = '已选 ' + ((sh && sh._selUids) ? sh._selUids.length : 0) + ' 人';
+  }
+
+  /* 手机号输入即识别注册状态 */
+  function omDetectMobile() {
+    var sh = lastSheetRef; if (!sh) return;
+    var inp = document.getElementById('om-mobile');
+    var box = document.getElementById('om-detect');
+    var v = inp ? inp.value.replace(/\s+/g, '') : '';
+    if (!/^1\d{10}$/.test(v)) { if (box) box.innerHTML = ''; sh._detected = null; return; }
+    var t = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(v) : null;
+    sh._detected = t || null;
+    if (box) {
+      if (t) {
+        var real = !!(t.auth && t.auth.realname && t.auth.realname.ok);
+        box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span class="' + (real ? 'om-detect ok' : 'om-detect warn') + '">已注册：' + esc(t.name) + '（' + esc(maskMobile(t.mobile || '')) + '）' + (real ? ' · 已实名认证' : ' · 未实名，需先完成实名认证') + '</span>';
+      } else {
+        box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span class="om-detect warn">该手机号未注册，将发送注册邀请短信</span>';
+      }
+    }
+  }
+
+  /* 手机号邀请提交：已注册 → 确认邀请弹窗；未注册 → 直接发短信 */
+  function omSubmitMobile() {
+    var sh = lastSheetRef; var org = resolveOrg(); if (!sh || !org) return;
+    var nameEl = document.getElementById('om-name');
+    var inp = document.getElementById('om-mobile');
+    var name = nameEl ? nameEl.value.trim() : '';
+    var mobile = inp ? inp.value.replace(/\s+/g, '') : '';
+    var role = sh._selRole || 'member';
+    if (!name) { UI.toast.warn('请填写被邀请人姓名'); return; }
+    if (!/^1\d{10}$/.test(mobile)) { UI.toast.warn('请输入正确的 11 位手机号'); return; }
+    var orgName = org.shortName || org.co;
+    var doSend = function () {
+      var r = OrgsStore.inviteByMobile(org.orgId, mobile, role, name);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      if (r.case === 'verified') UI.toast.ok('已发送邀请：短信+站内消息已提醒 ' + r.name + '（' + r.sms + '）');
+      else if (r.case === 'unverified') UI.toast.warn('该手机号已注册未实名，已发送短信邀请引导认证');
+      else UI.toast.ok('该手机号未注册，已发送注册邀请短信');
+      render();
+    };
+    if (sh._detected) {
+      UI.dialog({
+        title: '确认邀请',
+        text: '已注册用户 <b>' + esc(sh._detected.name) + '</b>（' + esc(maskMobile(sh._detected.mobile || '')) + '）将收到邀请短信，邀请其加入「' + esc(orgName) + '」担任<b>' + (ROLE_LABEL[role] || '成员') + '</b>。确认发送？',
+        ok: '确认发送', cancel: '再想想',
+        onOk: doSend
+      });
+    } else {
+      doSend();
+    }
+  }
+
+  /* 已认证用户多选提交 */
+  function omSubmitUsers() {
+    var sh = lastSheetRef; var org = resolveOrg(); if (!sh || !org) return;
+    var role = sh._selRole || 'member';
+    var uids = sh._selUids || [];
+    if (!uids.length) { UI.toast.warn('请先选择要邀请的用户'); return; }
+    var okN = 0, errs = [];
+    uids.forEach(function (uid) {
+      var r = OrgsStore.invite(org.orgId, uid, role);
+      if (r && r.error) errs.push(r.error); else okN++;
+    });
+    UI.closeSheet();
+    if (okN) UI.toast.ok('已发送 ' + okN + ' 条邀请' + (errs.length ? '，' + errs.length + ' 条未成功' : ''));
+    if (errs.length && !okN) UI.toast.err(errs[0]);
+    render();
+  }
+
+  /* 企业主邀请卡：补发短信（1 天 1 次，超限置灰） */
+  window.omSendInviteSms = function (inviteId) {
+    var org = resolveOrg(); if (!org) return;
+    var r = OrgsStore.sendInviteSms(org.orgId, inviteId);
+    if (r && r.error) { UI.toast.err(r.error); return; }
+    UI.toast.ok('邀请短信已发送（' + r.sms + '）');
+    render();
+  };
+
+  /* 企业主邀请卡：修改邀请（姓名 / 手机号 / 身份） */
+  window.omOpenEditInvite = function (inviteId) {
+    var org = resolveOrg(); if (!org) return;
+    var inv = null;
+    (org.invites || []).forEach(function (iv) { if (iv.inviteId === inviteId) inv = iv; });
+    if (!inv) { UI.toast.warn('邀请不存在'); return; }
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('修改邀请 · ' + (org.shortName || org.co));
+    var hasOwn = OrgsStore.hasOwner(org.orgId);
+    var ownerOpt = hasOwn
+      ? '<div class="role-opt disabled" data-role="owner" onclick="UI.toast.warn(\'该企业已有企业主\')">企业主</div>'
+      : roleOptHtml('owner', '企业主');
+    sh.html(
+      '<div class="oc-wrap">' +
+        '<div class="vf-field"><label>被邀请人姓名</label><input id="ed-name" class="mob-input" placeholder="请输入姓名"></div>' +
+        '<div class="vf-field"><label>手机号</label><input id="ed-mobile" class="mob-input" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
+        '<div class="role-pick" id="om-edit-rolepick">' +
+          roleOptHtml('member', '成员') + roleOptHtml('admin', '管理员') + ownerOpt +
+        '</div>' +
+        '<button type="button" id="ed-save" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">保存修改</button>' +
+      '</div>'
+    );
+    sh.show();
+    sh._selRole = inv.role || 'member';
+    document.getElementById('ed-name').value = inv.name || '';
+    document.getElementById('ed-mobile').value = inv.mobileRaw || '';
+    var pick = document.getElementById('om-edit-rolepick');
+    if (pick) pick.querySelectorAll('.role-opt').forEach(function (r) {
+      r.classList.toggle('sel', r.getAttribute('data-role') === sh._selRole && !r.classList.contains('disabled'));
+    });
+    document.getElementById('ed-save').onclick = function () {
+      var name = document.getElementById('ed-name').value.trim();
+      var mobile = document.getElementById('ed-mobile').value.replace(/\s+/g, '');
+      var role = sh._selRole || inv.role;
+      if (!name) { UI.toast.warn('请填写姓名'); return; }
+      if (!/^1\d{10}$/.test(mobile)) { UI.toast.warn('请输入正确的 11 位手机号'); return; }
+      var r = OrgsStore.updateInvite(org.orgId, inviteId, { name: name, mobile: mobile, role: role });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      UI.toast.ok('已保存修改');
+      render();
+    };
+  };
+
+  /* ============ 企业主变更（实际控制人）· 后台审批 ============ */
+  window.omOpenOwnerChange = function () {
+    var org = resolveOrg(); if (!org) return;
+    if (OrgsStore.pendingOwnerChangeOf && OrgsStore.pendingOwnerChangeOf(org.orgId)) { UI.toast.warn('已有企业主变更正在审批中，请等待结果'); return; }
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('企业主变更 · ' + (org.shortName || org.co));
+    sh._ocName = ''; sh._ocMobile = ''; sh._ocReason = '';
+    sh.html(
+      '<div class="oc-wrap">' +
+        '<div class="oc-note">企业主指企业<b>实际控制人</b>（非工商登记的法定代表人）。提交后进入<b>后台审批</b>，通过后自动生效（原企业主转为管理员）。</div>' +
+        '<div class="vf-field"><label>新企业主姓名<span class="req">*</span></label><input id="oc-name" class="mob-input" placeholder="请输入实际控制人姓名"></div>' +
+        '<div class="vf-field"><label>手机号<span class="req">*</span></label><input id="oc-mobile" class="mob-input" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
+        '<div id="oc-detect" class="om-detect"></div>' +
+        '<div id="oc-actions" class="oc-actions" style="display:none;">' +
+          '<div class="oc-actions-t">变更目标尚未注册或未完成实名认证：<br>可先发送邀请或实名认证提醒，引导其注册并实名后，后台方可审批通过。</div>' +
+          '<div class="oi-acts">' +
+            '<button class="oi-btn" id="oc-invite-btn" onclick="omOcSms(\'invite\')">邀请</button>' +
+            '<button class="oi-btn ghost" id="oc-verify-btn" onclick="omOcSms(\'verify\')">提醒实名认证</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="vf-field"><label>变更原因<span class="req">*</span></label><textarea id="oc-reason" class="oc-reason" rows="3" maxlength="120" placeholder="请说明变更原因（如：实际控制人调整、股权变更等），供后台审核参考"></textarea></div>' +
+        '<button type="button" id="oc-submit" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">提交变更，等待后台审批</button>' +
+      '</div>'
+    );
+    sh.show();
+    document.getElementById('oc-name').addEventListener('input', function () { sh._ocName = this.value; });
+    var mobEl = document.getElementById('oc-mobile');
+    mobEl.addEventListener('input', omOcDetect);
+    mobEl.addEventListener('blur', omOcDetect);
+    mobEl.addEventListener('change', omOcDetect);
+    document.getElementById('oc-reason').addEventListener('input', function () { sh._ocReason = this.value; });
+    document.getElementById('oc-submit').onclick = function () {
+      var r = OrgsStore.requestOwnerChange(org.orgId, { name: sh._ocName, mobile: sh._ocMobile, reason: sh._ocReason });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      UI.toast.ok('已提交企业主变更，等待后台审批');
+      render();
+    };
+  };
+
+  /* 变更弹窗：输入手机号即时识别注册 / 实名状态 */
+  function omOcDetect() {
+    var sh = lastSheetRef; if (!sh) return;
+    var inp = document.getElementById('oc-mobile');
+    var box = document.getElementById('oc-detect');
+    var acts = document.getElementById('oc-actions');
+    var v = inp ? inp.value.replace(/\s+/g, '') : '';
+    sh._ocMobile = v;
+    if (!/^1\d{10}$/.test(v)) {
+      if (box) { box.innerHTML = ''; box.className = 'om-detect'; }
+      if (acts) acts.style.display = 'none';
+      return;
+    }
+    var t = (window.DataBus && DataBus.byMobile) ? DataBus.byMobile(v) : null;
+    if (box) {
+      if (t) {
+        var real = !!(t.auth && t.auth.realname && t.auth.realname.ok);
+        box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>' + (real ? '已注册：' + esc(t.name) + '（' + esc(maskMobile(t.mobile || '')) + '） · 已实名认证' : '已注册：' + esc(t.name) + '（' + esc(maskMobile(t.mobile || '')) + '） · 未实名，需先完成实名认证') + '</span>';
+        box.className = 'om-detect ' + (real ? 'ok' : 'warn');
+      } else {
+        box.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span>该手机号未注册，需先注册并完成实名认证后方可通过变更审批</span>';
+        box.className = 'om-detect warn';
+      }
+    }
+    if (acts) acts.style.display = (!t || !(t.auth && t.auth.realname && t.auth.realname.ok)) ? '' : 'none';
+  }
+
+  /* 变更弹窗：邀请 / 提醒实名认证（短信 1 天 1 次） */
+  window.omOcSms = function (type) {
+    var sh = lastSheetRef; var org = resolveOrg(); if (!sh || !org) return;
+    var name = String(sh._ocName || '').trim();
+    if (!name) { UI.toast.warn('请先填写新企业主姓名'); return; }
+    if (!/^1\d{10}$/.test(sh._ocMobile || '')) { UI.toast.warn('请输入正确的 11 位手机号'); return; }
+    var r = OrgsStore.sendOwnerChangeSms(org.orgId, type, name, sh._ocMobile);
+    if (r && r.error) { UI.toast.warn(r.error); return; }
+    UI.toast.ok((type === 'invite' ? '邀请短信已发送' : '实名认证提醒已发送') + '（' + r.sms + '）');
+  };
+
+  /* 字母索引跳转 + 滚动高亮 */
+  window.omAzJump = function (L) {
+    var el = document.querySelector('.om-letter-head[data-letter="' + L + '"]');
+    if (!el) el = document.querySelector('.member-card[data-letter="' + L + '"]');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var bar = document.getElementById('om-azbar');
+    if (bar) bar.querySelectorAll('.om-az').forEach(function (z) { z.classList.toggle('on', z.getAttribute('data-letter') === L); });
+  };
+  function omOnScroll() {
+    var bar = document.getElementById('om-azbar');
+    if (!bar) return;
+    var cur = '';
+    document.querySelectorAll('.om-letter-head').forEach(function (h) {
+      if (h.getBoundingClientRect().top <= 110) cur = h.getAttribute('data-letter');
+    });
+    bar.querySelectorAll('.om-az').forEach(function (z) { z.classList.toggle('on', z.getAttribute('data-letter') === cur); });
+  }
+  function bindMemberScroll() {
+    var sc = document.querySelector('.phone .scroll');
+    if (!sc) return;
+    sc.removeEventListener('scroll', omOnScroll);
+    sc.addEventListener('scroll', omOnScroll, { passive: true });
+  }
+
+  /* 成员列表分组渲染（搜索时仅刷新分组，保持输入焦点） */
+  function renderMemberList() {
+    var org = resolveOrg(); var u = me();
+    var azEl = document.getElementById('om-azbar');
+    var gEl = document.getElementById('om-groups');
+    if (!gEl || !org) return;
+    var members = OrgsStore.members(org.orgId);
+    var myRole = OrgsStore.myRole(org.orgId);
+    var isOwner = myRole === 'owner';
+    var isManager = isOwner || myRole === 'admin';
+    var activeTr = null;
+    (OrgsStore.transfersOf(org.orgId) || []).forEach(function (t) {
+      if (t.status === 'verify-pending' || t.status === 'owner-confirm') activeTr = t;
+    });
+    var sortList = members.filter(function (m) { return m.role !== 'owner'; }); /* 企业主已在身份栏 */
+    var kw = (omSearchKw || '').toLowerCase();
+    if (kw) {
+      sortList = sortList.filter(function (m) {
+        return (m.name || '').toLowerCase().indexOf(kw) > -1 || (m.mobile || '').indexOf(kw) > -1;
+      });
+    }
+    sortList.sort(function (a, b) {
+      var la = pyInitial(a.name), lb = pyInitial(b.name);
+      if (la === lb) return (a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
+      if (la === '#') return 1; if (lb === '#') return -1;
+      return la < lb ? -1 : 1;
+    });
+    var groups = '', letterSet = [], currentLetter = '';
+    sortList.forEach(function (m) {
+      var L = pyInitial(m.name);
+      if (L !== currentLetter) {
+        currentLetter = L; letterSet.push(L);
+        groups += '<div class="om-letter-head" data-letter="' + L + '">' + (L === '#' ? '#' : L) + '</div>';
+      }
+      var isSelf = m.uid === (u && u.id);
+      var actBtns = '';
+      if (m.uid === (u && u.id)) {
+        if (m.role !== 'owner') actBtns += '<button class="mc-btn ghost" onclick="omLeave(\'' + org.orgId + '\')">退出</button>';
+      } else if (isManager && m.role !== 'owner') {
+        /* 移交：有活动移交时，接收人卡片显示状态签；其余成员按钮置灰防重复发起 */
+        if (activeTr && activeTr.toUid === m.uid) {
+          actBtns += '<span class="mc-chip' + (activeTr.status === 'owner-confirm' ? ' wait' : '') + '">移交中 · ' + (activeTr.status === 'owner-confirm' ? '待企业主确认' : '待对方验证') + '</span>';
+        } else if (activeTr) {
+          actBtns += '<button class="mc-btn gold off" onclick="UI.toast.warn(\'已有移交申请在处理中，请先完成或撤回后再发起\')">移交</button>';
+        } else {
+          actBtns += '<button class="mc-btn gold" onclick="omRequestTransfer(\'' + org.orgId + '\',\'' + m.uid + '\')">移交</button>';
+        }
+        if (isOwner) actBtns += '<button class="mc-btn danger" onclick="omRemove(\'' + m.uid + '\')">移除</button>';
+      }
+      groups +=
+        '<div class="member-card" data-letter="' + L + '">' +
+          '<div class="mc-ava">' + esc(m.avatar || (m.name || '?').charAt(0)) + '</div>' +
+          '<div class="mc-info"><div class="mc-name">' + esc(m.name) + (isSelf ? '<span class="mc-self">（我）</span>' : '') + ' <span class="role-tag role-' + m.role + '">' + (ROLE_LABEL[m.role] || '成员') + '</span></div>' +
+          '<div class="mc-time">' + fmtDate(m.joinedAt) + (m.mobile ? ' · ' + esc(maskMobile(m.mobile)) : '') + '</div></div>' +
+          '<div class="mc-acts">' + actBtns + '</div>' +
+        '</div>';
+    });
+    if (!sortList.length) {
+      groups += '<div class="om-empty">' + (kw ? '没有匹配的成员' : '暂无其他成员') + '</div>';
+    }
+    gEl.innerHTML = groups;
+    if (azEl) {
+      azEl.innerHTML = (kw || letterSet.length <= 5) ? '' : letterSet.map(function (L) {
+        return '<div class="om-az" data-letter="' + L + '" onclick="omAzJump(\'' + L + '\')">' + (L === '#' ? '#' : L) + '</div>';
+      }).join('');
+    }
+  }
+
+  window.omInvTab = function (el) {
+    var tab = el.getAttribute('data-tab');
+    document.querySelectorAll('.inv-tab').forEach(function (t) { t.classList.toggle('on', t === el); });
+    var m = document.getElementById('inv-pane-mobile');
+    var u = document.getElementById('inv-pane-users');
+    if (m) m.style.display = tab === 'mobile' ? '' : 'none';
+    if (u) u.style.display = tab === 'users' ? '' : 'none';
+    var sh = lastSheetRef; if (sh) sh._tab = tab;
+    if (tab === 'users') renderInvUserList();
+  };
+  window.omPickCand = function (el) {
+    var sh = lastSheetRef; if (!sh) return;
+    var uid = el.getAttribute('data-uid');
+    var uids = sh._selUids || (sh._selUids = []);
+    var i = uids.indexOf(uid);
+    if (i > -1) {
+      uids.splice(i, 1); el.classList.remove('sel');
+    } else {
+      if (sh._selRole === 'owner' && uids.length >= 1) { UI.toast.warn('企业主邀请仅可选择 1 人'); return; }
+      uids.push(uid); el.classList.add('sel');
+    }
+    omRefreshSelCount();
+  };
+  window.omPickRole = function (el) {
+    if (el.classList.contains('disabled')) { UI.toast.warn('该企业已有企业主'); return; }
+    var pick = el.closest ? el.closest('.role-pick') : null;
+    (pick ? pick.querySelectorAll('.role-opt') : document.querySelectorAll('.role-opt')).forEach(function (r) { r.classList.remove('sel'); });
+    el.classList.add('sel');
+    var sh = lastSheetRef; if (sh) sh._selRole = el.getAttribute('data-role');
+  };
+
+  window.omApprove = function (joinId, btn) {
+    /* 按钮 loading 态：控件文案响应当前状态 */
+    if (btn) { btn.textContent = '处理中…'; btn.disabled = true; }
+    var r = OrgsStore.approveJoin(joinId);
+    if (r && r.error) { UI.toast.warn(r.error); if (btn) { btn.textContent = '通过'; btn.disabled = false; } return; }
+    UI.toast.ok('已通过，成员已加入企业'); render();
+  };
+  window.omReject = function (joinId) {
+    UI.dialog({ title: '驳回申请', text: '确定驳回该成员的加入申请吗？', ok: '驳回', cancel: '再想想', danger: true, onOk: function () {
+      OrgsStore.rejectJoin(joinId); UI.toast('已驳回'); render();
+    }});
+  };
+  window.omRemove = function (uid) {
+    var org = resolveOrg(); if (!org) return;
+    var m = null;
+    (OrgsStore.members(org.orgId) || []).forEach(function (x) { if (x.uid === uid) m = x; });
+    var name = m ? m.name : uid;
+    var rl = m ? (ROLE_LABEL[m.role] || '成员') : '成员';
+    UI.dialog({ title: '移出成员', text: '确定将 <b>' + esc(name) + '</b>（' + rl + '）移出本企业吗？<br><br>移出后该成员将失去本企业身份与发布/招聘权限，其待处理的邀请、申请与移交将一并失效。', ok: '确认移出', cancel: '取消', danger: true, onOk: function () {
+      var r = OrgsStore.removeMember(org.orgId, uid);
+      if (r && r.error) { UI.toast.warn(r.error); return; }
+      UI.toast.ok('已移出'); render();
+    }});
+  };
+
+  /* ============ 退出企业 ============ */
+  window.omLeave = function (orgId) {
+    UI.dialog({ title: '退出本企业', text: '退出后将失去本企业身份与发布/招聘权限，如需重新加入需由管理员邀请或重新申请。', ok: '退出', cancel: '取消', danger: true, onOk: function () {
+      var r = OrgsStore.leave(orgId);
+      if (r && r.error) { UI.toast.warn(r.error); return; }
+      UI.toast.ok('已退出企业'); render();
+    }});
+  };
+
+  /* ============ 企业主移交 ============ */
+  window.omRequestTransfer = function (orgId, uid) {
+    var u = me(); var toU = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null;
+    var fromName = u ? u.name : '';
+    var toName = toU ? toU.name : uid;
+    var myRole = OrgsStore.myRole(orgId);
+    var real = !!(toU && toU.auth && toU.auth.realname && toU.auth.realname.ok);
+    var flowNote = myRole === 'owner'
+      ? '接收人需完成<b>法人认证</b>或<b>实际控制人验证</b>，提交后由平台后台审核，通过后正式生效。'
+      : '需先经企业主确认，再由接收人完成<b>法人认证</b>或<b>实际控制人验证</b>，后台审核通过后正式生效。';
+    var realNote = real
+      ? '该成员已通过实名认证，可继续移交流程。'
+      : '该成员尚未完成实名认证，接收验证前需先完成实名认证。';
+    UI.dialog({ title: '申请移交企业主身份', text: fromName + ' 申请将企业主身份移交给 <b>' + esc(toName) + '</b>。' + flowNote + '<br><br><span style="font-size:11px;color:var(--text-3);">' + realNote + '</span>', ok: '发起申请', cancel: '取消', onOk: function () {
+      var r = OrgsStore.requestTransfer(orgId, uid);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast.ok('已发起移交申请，已通知接收人完成验证');
+      render();
+    }});
+  };
+  window.omConfirmTransfer = function (transferId) {
+    UI.dialog({ title: '确认移交', text: '确认将企业主身份移交给该成员吗？确认后对方需完成法人认证或实际控制人验证，并经后台审核。', ok: '确认移交', cancel: '取消', onOk: function () {
+      var r = OrgsStore.confirmTransfer(transferId);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast.ok('已确认，对方完成验证后经后台审核生效'); render();
+    }});
+  };
+  window.omRejectTransfer = function (transferId) {
+    UI.dialog({ title: '驳回移交申请', text: '确定驳回该企业主移交申请吗？驳回后申请作废，发起人将收到通知。', ok: '驳回', cancel: '再想想', danger: true, onOk: function () {
+      var r = OrgsStore.rejectTransfer(transferId);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast('已驳回该移交申请'); render();
+    }});
+  };
+  window.omCancelTransfer = function (transferId) {
+    UI.dialog({ title: '撤回移交申请', text: '撤回后该移交申请将作废，接收人不会再收到验证通知。', ok: '撤回申请', cancel: '取消', danger: true, onOk: function () {
+      var r = OrgsStore.cancelTransfer(transferId);
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.toast('已撤回移交申请'); render();
+    }});
+  };
+
+  /* ============ 企业主身份验证（法人认证 / 实际控制人验证） ============ */
+  var verifyMode = 'legal';
+  window.omOpenVerify = function (orgId) {
+    var org = OrgsStore.get(orgId); if (!org) return;
+    var sh = UI.sheet();
+    sh.setText('企业主身份验证 · ' + (org.shortName || org.co));
+    sh.html(
+      '<div class="oc-wrap">' +
+        '<div class="vf-opt sel" data-mode="legal" onclick="omPickVerifyMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">法人认证</div>' +
+          '<div class="vf-opt-s">姓名须与营业执照法定代表人「' + esc(org.legal || '—') + '」一致</div></div>' +
+        '</div>' +
+        '<div class="vf-opt" data-mode="controller" onclick="omPickVerifyMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">实际控制人验证</div>' +
+          '<div class="vf-opt-s">本人为该企业实际控制人，承诺材料真实</div></div>' +
+        '</div>' +
+        '<div class="vf-field"><label>姓名<span class="req">*</span></label><input id="vf-name" placeholder="请输入真实姓名"></div>' +
+        '<div class="vf-field"><label>身份证号<span class="req">*</span></label><input id="vf-idno" maxlength="18" placeholder="18 位身份证号"></div>' +
+        '<div class="vf-field" id="vf-decl-wrap" style="display:none;">' +
+          '<label class="vf-check"><input type="checkbox" id="vf-decl"><span>本人为该企业实际控制人，以上信息真实有效，自愿接受平台核验</span></label>' +
+        '</div>' +
+        '<button type="button" id="vf-submit" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">提交，等待后台审核</button>' +
+      '</div>'
+    );
+    sh.show();
+    verifyMode = 'legal';
+    document.getElementById('vf-submit').onclick = function () {
+      var name = document.getElementById('vf-name').value;
+      var idNo = document.getElementById('vf-idno').value;
+      var declaration = document.getElementById('vf-decl') ? document.getElementById('vf-decl').checked : true;
+      var r = OrgsStore.submitOwnerVerify(orgId, verifyMode, { name: name, idNo: idNo, declaration: declaration });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      UI.toast.ok('已提交，等待后台审核');
+      render();
+    };
+    var declWrap = document.getElementById('vf-decl-wrap');
+    if (declWrap) {
+      declWrap.style.display = verifyMode === 'controller' ? '' : 'none';
+    }
+  };
+  window.omPickVerifyMode = function (el) {
+    document.querySelectorAll('.vf-opt').forEach(function (o) { o.classList.remove('sel'); });
+    el.classList.add('sel');
+    verifyMode = el.getAttribute('data-mode');
+    var w = document.getElementById('vf-decl-wrap');
+    if (w) w.style.display = verifyMode === 'controller' ? '' : 'none';
+  };
+
+  /* ============ 企业主自认领（实际控制人本人） ============
+     与 omOpenVerify 的区别：这是企业主空缺时，当前登录人本人认领自己。
+     - 自动预填当前用户实名姓名（来自 DataBus.auth.realname）
+     - 法人模式实时校验姓名 == org.legal，匹配则提示"工商信息一致，可快速通过"
+     - 实控人模式要求勾选法律声明 */
+  var claimMode = 'legal';
+  window.omOpenClaim = function () {
+    var org = resolveOrg(); if (!org) return;
+    var u = me(); if (!u) { UI.toast.warn('请先登录'); return; }
+    /* 前置校验（与后端一致，提前拦截给即时反馈） */
+    if (OrgsStore.hasOwner(org.orgId)) { UI.toast.warn('该企业已有企业主'); return; }
+    if (OrgsStore.myPendingClaim && OrgsStore.myPendingClaim(org.orgId)) { UI.toast.warn('你的认领申请已在审核中'); return; }
+    if (!(u.auth && u.auth.realname && u.auth.realname.ok)) {
+      UI.dialog({ title: '需先实名认证', text: '认领企业主身份需先完成个人实名认证（姓名+身份证+人脸）。是否前往？', ok: '去认证', cancel: '取消', onOk: function () { location.href = 'auth-personal.html'; } });
+      return;
+    }
+    var realName = (u.auth && u.auth.realname && u.auth.realname.name) || u.name || '';
+    var legalName = org.legal || '';
+    /* 智能默认：实名姓名 == 营业执照法人 → 默认选法人通道（快速通过）；否则默认实控人通道 */
+    claimMode = (realName && legalName && realName === legalName) ? 'legal' : 'controller';
+
+    var sh = UI.sheet();
+    lastSheetRef = sh;
+    sh.setText('认领企业主 · ' + (org.shortName || org.co));
+    sh.html(
+      '<div class="oc-wrap">' +
+        '<div class="oc-note">企业主指企业<b>实际控制人</b>。认领即由你本人行使企业认证、成员管理与签约权限。<br>提交后由后台审核；法人通道姓名与营业执照一致时<b>可快速通过</b>。</div>' +
+
+        /* 预填提示条 */
+        '<div class="om-detect ok" style="margin:0 2px 10px;">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+          '<span>已根据你的实名认证预填姓名 <b>' + esc(realName) + '</b>，请补充身份证号</span>' +
+        '</div>' +
+
+        /* 双通道选项 */
+        '<div class="vf-opt" data-mode="legal" onclick="omPickClaimMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">法人认证（快速通道）</div>' +
+          '<div class="vf-opt-s">本人即营业执照法定代表人「' + esc(legalName || '—') + '」，工商+实名双重佐证，可快速通过</div></div>' +
+        '</div>' +
+        '<div class="vf-opt" data-mode="controller" onclick="omPickClaimMode(this)">' +
+          '<div class="vf-opt-dot"></div><div class="vf-opt-meta"><div class="vf-opt-t">实际控制人声明</div>' +
+          '<div class="vf-opt-s">本人非法人但实际控股/经营本企业，需上传佐证材料并经后台人工审核</div></div>' +
+        '</div>' +
+
+        /* 实时法人匹配提示 */
+        '<div id="oc-legal-hint" class="om-detect" style="margin:2px 2px 6px;"></div>' +
+
+        '<div class="vf-field"><label>姓名<span class="req">*</span></label><input id="oclaim-name" class="mob-input" placeholder="请输入真实姓名" value="' + esc(realName) + '"></div>' +
+        '<div class="vf-field"><label>身份证号<span class="req">*</span></label><input id="oclaim-idno" maxlength="18" placeholder="18 位身份证号"></div>' +
+        '<div class="vf-field" id="oclaim-decl-wrap" style="display:none;">' +
+          '<label class="vf-check"><input type="checkbox" id="oclaim-decl"><span>本人为「' + esc(org.shortName || org.co) + '」的实际控制人，所填信息与材料真实有效，自愿接受平台核验与法律责任追究</span></label>' +
+        '</div>' +
+
+        '<button type="button" id="oclaim-submit" class="btn btn-primary" style="width:100%;height:48px;border-radius:999px;margin-top:10px;">提交认领，等待后台审核</button>' +
+      '</div>'
+    );
+    sh.show();
+    /* 初始化选中态与提示 */
+    function refreshClaimUI() {
+      document.querySelectorAll('.vf-opt').forEach(function (o) {
+        o.classList.toggle('sel', o.getAttribute('data-mode') === claimMode);
+      });
+      var declWrap = document.getElementById('oclaim-decl-wrap');
+      if (declWrap) declWrap.style.display = claimMode === 'controller' ? '' : 'none';
+      var hint = document.getElementById('oc-legal-hint');
+      if (hint) {
+        if (claimMode === 'legal') {
+          var nm = (document.getElementById('oclaim-name') || {}).value || '';
+          if (nm && legalName && nm === legalName) {
+            hint.className = 'om-detect ok';
+            hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>✓ 姓名与营业执照法定代表人一致，工商信息+实名认证双重佐证，后台将快速通过</span>';
+          } else {
+            hint.className = 'om-detect err';
+            hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>✗ 姓名「' + esc(nm) + '」与营业执照法人「' + esc(legalName || '—') + '」不一致，请改走实际控制人声明</span>';
+          }
+        } else {
+          hint.className = 'om-detect warn';
+          hint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>实控人声明需后台人工审核，请准备股权结构/代持协议等材料</span>';
+        }
+      }
+    }
+    window.omPickClaimMode = function (el) {
+      claimMode = el.getAttribute('data-mode');
+      refreshClaimUI();
+    };
+    var nameEl = document.getElementById('oclaim-name');
+    if (nameEl) nameEl.addEventListener('input', refreshClaimUI);
+    refreshClaimUI();
+
+    document.getElementById('oclaim-submit').onclick = function () {
+      var name = (document.getElementById('oclaim-name').value || '').trim();
+      var idNo = (document.getElementById('oclaim-idno').value || '').trim();
+      var decl = document.getElementById('oclaim-decl') ? document.getElementById('oclaim-decl').checked : false;
+      var r = OrgsStore.submitOwnerClaim(org.orgId, claimMode, { name: name, idNo: idNo, declaration: decl });
+      if (r && r.error) { UI.toast.err(r.error); return; }
+      UI.closeSheet();
+      if (r.autoSuggest === 'approve') {
+        UI.toast.ok('已提交法人认证认领，后台将快速审核通过');
+      } else {
+        UI.toast.ok('已提交实际控制人认领，等待后台审核');
+      }
+      render();
+    };
+  }
+
+  document.getElementById('om-invite-btn').addEventListener('click', function () { openInvite(false); });
+
+  render();
+  window.addEventListener('engchain:org', render);
+  window.addEventListener('engchain:apply', render);
+  window.addEventListener('engchain:auth', render);
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'engchain-orgs' || e.key === 'engchain-users') render();
+  });
+})();
+</script>
+</body>
+</html>

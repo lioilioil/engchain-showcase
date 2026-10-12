@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/publish/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>我的发布 · 工程链</title><link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css"><style>
+  /* ===== 我的发布 · 体验重构副本（redesign）===== */
+  #pub-content { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+  #pub-content > .scroll { min-height:0; }
+
+  .list-scroll { padding:0 16px calc(var(--sp-6) + 80px); }
+  .list-head { display:flex; align-items:center; justify-content:space-between; padding:8px 0 12px; }
+  /* 右上角发布入口已统一为共享 .nav-pill-primary（修复原 --gold-hi 缺失导致的透明背景；保留 id=plus-new） */
+  .list-sub { color:var(--text-3); font-size:12px; line-height:1.5; }
+  .draft-entry { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--primary-dim); text-decoration:none; }
+  .draft-entry .n { min-width:16px; height:16px; padding:0 5px; border-radius:var(--r-full); background:var(--primary); color:#fff; font-size:10px; line-height:16px; text-align:center; }
+  .draft-entry .n.zero { background:rgba(22,22,22,.08); color:var(--text-3); }
+
+  .list-summary { display:flex; align-items:center; gap:10px; padding:10px 13px; margin-bottom:11px; border:1px solid var(--line); border-radius:var(--r-s); background:var(--bg-card); font-size:var(--fs-xs); color:var(--text-3); flex-wrap:wrap; }
+  .list-summary b { color:var(--text-1); font-weight:700; font-variant-numeric:tabular-nums; }
+  .list-summary .sum-sep { width:3px; height:3px; border-radius:50%; background:var(--line-strong); }
+
+  .filter-bar { position:sticky; top:0; z-index:6; margin:0 -16px 6px; padding:2px 16px 8px; background:color-mix(in srgb, var(--bg-card-2) 92%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .seg .seg-item { display:flex; align-items:center; justify-content:center; gap:6px; }
+  .seg-n { min-width:17px; height:17px; padding:0 5px; border-radius:var(--r-full); background:rgba(22,22,22,.06); color:var(--text-3); font-size:10px; font-weight:700; line-height:17px; text-align:center; }
+  .seg-item.is-on .seg-n { background:var(--primary); color:#fff; }
+
+  .record { position:relative; padding:15px 14px 13px; margin-bottom:0; border:1px solid var(--line); border-radius:var(--r-m); background:var(--bg-card); box-shadow:0 1px 2px rgba(22,22,22,.04), 0 8px 22px -12px rgba(22,22,22,.20); overflow:hidden; transition:border-color var(--d-fast), transform var(--d-fast), box-shadow var(--d-fast); }
+  /* 顶部状态色渐变细线（遵循先进卡片视觉，替代原左侧竖条） */
+  .record::before { content:''; position:absolute; left:0; right:0; top:0; height:2.5px; }
+  .record.is-demand::before { background:linear-gradient(90deg,var(--primary),color-mix(in srgb, var(--primary) 55%, transparent)); }
+  .record.is-supply::before { background:linear-gradient(90deg,#3f9d6e,color-mix(in srgb, var(--success) 55%, transparent)); }
+  .record.is-rejected { border-color:color-mix(in srgb, var(--error) 32%, var(--line)); background:color-mix(in srgb, var(--error-soft) 30%, var(--bg-card)); }
+  .record.is-active { border-color:color-mix(in srgb, var(--success) 26%, var(--line)); }
+  .record.is-review { border-color:color-mix(in srgb, var(--primary) 26%, var(--line)); }
+  .record.is-closed { border-color:color-mix(in srgb, var(--text-3) 22%, var(--line)); }
+  .record:active { transform:scale(.993); }
+
+  .record-hd { display:flex; align-items:flex-start; gap:10px; }
+  .cat-ic { flex:none; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .cat-ic svg { width:20px; height:20px; }
+  .is-demand .cat-ic { background:var(--primary-soft); color:var(--primary-dim); }
+  .is-supply .cat-ic { background:var(--success-soft); color:var(--success); }
+  .record-main { flex:1; min-width:0; }
+  .record-tags { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .dir-chip { flex:none; display:inline-flex; align-items:center; gap:3px; height:19px; padding:0 7px; border-radius:var(--r-s); font-size:10px; font-weight:700; }
+  .dir-demand { background:var(--primary-soft); color:var(--primary-dim); }
+  .dir-supply { background:var(--success-soft); color:var(--success); }
+  .cat-name { font-size:10.5px; color:var(--text-3); font-weight:600; }
+  .record-title { font-size:var(--fs-md); font-weight:600; line-height:1.42; color:var(--text-1); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .record-status { flex:none; display:inline-flex; align-items:center; gap:5px; height:21px; padding:0 9px; border-radius:var(--r-full); font-size:10px; font-weight:700; white-space:nowrap; margin-top:2px; }
+  .record-status .sd { width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .status-active { background:var(--success-soft); color:var(--success); }
+  .status-review, .status-pending_review { background:var(--primary-soft); color:var(--primary-dim); }
+  .status-paused, .status-expired, .status-off { background:var(--bg-subtle); color:var(--text-3); }
+  .status-rejected { background:var(--error-soft); color:var(--error); }
+  .record-status.is-pending .sd { animation:sdPulse 1.2s ease-in-out infinite; }
+  @keyframes sdPulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+
+  /* ══ 时间轴：状态节点 + 渐变连接线。节点列仅承载状态轴，时间统一在卡片内展示（避免重复） ══ */
+  .tl { position:relative; margin-top:14px; }
+  .tl-item { display:flex; gap:14px; position:relative; margin-bottom:14px; }
+  .tl-item:last-child { margin-bottom:0; }
+  .tl-axis { flex:none; width:24px; display:flex; justify-content:center; position:relative; }
+  /* 渐变连接线：从本节点中心向下贯穿到下一节点，下淡出 */
+  .tl-item::before { content:''; position:absolute; left:11px; top:22px; bottom:-14px; width:2px; border-radius:2px;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--line-strong) 60%, transparent), color-mix(in srgb, var(--line-strong) 28%, transparent)); }
+  .tl-item:last-child::before { display:none; }
+  /* 状态节点：实心点 + 柔和光晕 + 外描边环，由状态色驱动 */
+  .tl-dot { position:relative; width:13px; height:13px; margin-top:15px; color:var(--text-3); }
+  .tl-dot::before { content:''; position:absolute; inset:0; border-radius:50%; background:currentColor; }
+  .tl-dot::after { content:''; position:absolute; inset:-4.5px; border-radius:50%; border:1.5px solid color-mix(in srgb, currentColor 40%, transparent); }
+  .tl-item.is-active   .tl-dot { color:var(--success); }
+  .tl-item.is-review   .tl-dot { color:var(--primary); }
+  .tl-item.is-rejected .tl-dot { color:var(--error); }
+  .tl-item.is-closed   .tl-dot { color:var(--text-3); }
+  .tl-item.is-active   .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--success) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--success) 40%, transparent); }
+  .tl-item.is-review   .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--primary) 38%, transparent); }
+  .tl-item.is-rejected .tl-dot::before { box-shadow:0 0 0 4px color-mix(in srgb, var(--error) 16%, transparent), 0 0 12px 1px color-mix(in srgb, var(--error) 38%, transparent); }
+  .tl-item .record { margin-bottom:0; }
+
+  .record-meta { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:9px; color:var(--text-3); font-size:var(--fs-xs); }
+  .meta-item { display:inline-flex; align-items:center; gap:4px; }
+  .meta-item .ic { width:12px; height:12px; opacity:.85; }
+  .record-amount { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+  .amt { display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:16px; font-variant-numeric:tabular-nums; }
+  .is-demand .amt { color:var(--primary-dim); }
+  .is-supply .amt { color:var(--success); }
+  .amt .ic { width:14px; height:14px; }
+  .qty { display:inline-flex; align-items:center; gap:5px; color:var(--text-2); font-size:var(--fs-sm); }
+  .qty .ic { width:13px; height:13px; color:var(--text-3); }
+  .record-desc { margin-top:8px; color:var(--text-2); font-size:var(--fs-sm); line-height:1.6; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .record-reject { margin-top:9px; display:flex; align-items:flex-start; gap:6px; padding:9px 11px; border-radius:var(--r-s); background:var(--error-soft); color:var(--error); font-size:var(--fs-xs); line-height:1.55; }
+  .record-reject .ic { width:14px; height:14px; flex:none; margin-top:1px; }
+  .record-reject b { font-weight:700; }
+
+  .record-actions { display:flex; gap:9px; margin-top:12px; }
+  .record-actions button { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; height:38px; border-radius:var(--r-s); font-size:var(--fs-sm); font-weight:700; cursor:pointer; transition:background var(--d-fast), border-color var(--d-fast), color var(--d-fast); -webkit-user-select:none; user-select:none; }
+  .record-actions button .ic { width:15px; height:15px; }
+  .act-ghost { border:1px solid var(--line-strong); background:var(--bg-card); color:var(--text-2); }
+  .act-ghost:active { background:var(--bg-alp); }
+  .act-primary { border:1px solid transparent; background:var(--primary-soft); color:var(--primary-dim); }
+  .act-primary:active { background:rgba(176, 138, 60, .2); }
+  .act-share { border:1px solid transparent; background:linear-gradient(180deg,var(--primary),var(--primary-dim)); color:#fff; box-shadow:0 3px 9px -2px var(--primary-dim); }
+  .act-danger { border:1px solid transparent; background:linear-gradient(180deg,#e0695c,var(--error)); color:#fff; box-shadow:0 3px 9px -2px var(--error); }
+  .act-disabled { border:1px solid var(--line); background:var(--bg-subtle); color:var(--text-3); cursor:default; box-shadow:none; }
+  .nav-back:focus-visible, .icon-btn:focus-visible, .seg-item:focus-visible, .status-chip:focus-visible, .record-actions button:focus-visible, .empty-btn:focus-visible { outline:2px solid var(--primary); outline-offset:1px; }
+
+  .empty-state { padding:52px 24px 40px; text-align:center; }
+  .empty-ic { position:relative; width:84px; height:84px; margin:0 auto 20px; border-radius:50%; background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft)); display:flex; align-items:center; justify-content:center; }
+  .empty-ic::before { content:''; position:absolute; inset:-9px; border-radius:50%; border:1.5px dashed var(--line-strong); opacity:.8; }
+  .empty-ic svg { width:38px; height:38px; color:var(--primary-dim); }
+  .empty-plus { position:absolute; right:0; bottom:0; width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-sm); }
+  .empty-plus svg { width:12px; height:12px; color:#fff; }
+  .empty-title { font-size:16px; font-weight:700; color:var(--text-1); margin-bottom:8px; }
+  .empty-desc { font-size:var(--fs-sm); color:var(--text-3); line-height:1.7; margin:0 auto 26px; max-width:250px; }
+
+  .pub-gate { display:none; padding:64px 28px; text-align:center; }
+  .gate-ic { width:76px; height:76px; margin:0 auto 18px; border-radius:50%; background:linear-gradient(135deg,var(--primary-soft),var(--accent-soft)); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-xs); }
+  .gate-ic svg { width:32px; height:32px; color:var(--primary-dim); }
+  .gate-title { font-size:17px; font-weight:700; color:var(--text-1); }
+  .gate-note { font-size:var(--fs-sm); color:var(--text-3); line-height:1.7; margin-top:8px; }
+  .pub-gate .btn { margin-top:22px; }
+  .gate-link { display:block; margin-top:14px; text-align:center; color:var(--primary-dim); font-size:var(--fs-sm); text-decoration:none; }
+
+  /* ══ 底部固定悬浮发布条：样式同「钱包·首页」.app-float-cta（液态玻璃胶囊条，双主题自适应）══ */
+  #pub-content .app-float-cta {
+    position: absolute !important; left: 50%; right: auto; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 32px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 55; height: 52px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 12px;
+    background:
+      linear-gradient(90deg,
+        rgba(255,255,255,.78) 0%, rgba(255,255,255,.94) 6%,
+        rgba(255,255,255,.88) 50%, rgba(255,255,255,.94) 94%,
+        rgba(255,255,255,.78) 100%),
+      linear-gradient(180deg,
+        rgba(255,255,255,.96) 0%, rgba(255,255,255,.84) 35%,
+        rgba(255,255,255,.76) 65%, rgba(255,255,255,.90) 100%);
+    -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    backdrop-filter: blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+    border: 1px solid rgba(255,255,255,.88);
+    box-shadow:
+      0 16px 48px rgba(22,22,22,.20), 0 6px 20px rgba(22,22,22,.12), 0 2px 8px rgba(22,22,22,.07),
+      inset 0 2px 3px rgba(255,255,255,.95), inset 0 -2px 3px rgba(255,255,255,.35),
+      inset 2px 0 3px rgba(255,255,255,.30), inset -2px 0 3px rgba(255,255,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.40);
+    user-select: none; -webkit-user-select: none;
+  }
+  #pub-content .app-float-cta::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,.85) 0%, rgba(255,255,255,.70) 38%,
+      rgba(255,255,255,.58) 62%, rgba(255,255,255,.74) 100%);
+  }
+  #pub-content .app-float-cta .afc-item {
+    flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--text-1); font-size: 14px; font-weight: 600; letter-spacing: .02em;
+    transition: color .25s, font-weight .25s, transform .15s;
+    font-family: var(--font-display);
+    position: relative; z-index: 2;
+    text-shadow: 0 1px 2px rgba(255,255,255,.65), 0 0 8px rgba(255,255,255,.35);
+    text-decoration: none; padding: 0 9px;
+    white-space: nowrap;
+  }
+  #pub-content .app-float-cta .afc-item svg { width: 18px; height: 18px; stroke-width: 2; flex: none; transition: stroke-width .2s, color .25s; }
+  #pub-content .app-float-cta .afc-item:active { transform: scale(.94); }
+  #pub-content .app-float-cta .afc-sep { flex: none; color: rgba(22,22,22,.28); font-size: 12px; padding: 0 2px; position: relative; z-index: 2; }
+  /* 暗色模式：深色玻璃 + 亮白文字/图标 + 白分隔符 */
+  [data-theme="dark"] #pub-content .app-float-cta {
+    background: linear-gradient(180deg,
+      rgba(32,32,36,.94) 0%, rgba(28,28,30,.88) 40%,
+      rgba(24,24,28,.82) 62%, rgba(30,30,34,.90) 100%);
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 16px 48px rgba(0,0,0,.55), 0 6px 20px rgba(0,0,0,.38), 0 2px 8px rgba(0,0,0,.22),
+      inset 0 2px 3px rgba(255,255,255,.10), inset 0 -2px 3px rgba(255,255,255,.04),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta::before {
+    background: linear-gradient(180deg,
+      rgba(22,22,26,.72) 0%, rgba(22,22,26,.60) 38%,
+      rgba(22,22,26,.50) 62%, rgba(22,22,26,.66) 100%);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta .afc-item {
+    color: var(--text-1);
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 8px rgba(0,0,0,.30);
+  }
+  [data-theme="dark"] #pub-content .app-float-cta .afc-sep { color: rgba(242,240,236,.30); }
+</style></head><body><div class="phone">
+  <div id="pub-gate-login" class="pub-gate">
+    <div class="gate-ic"><svg class="ic"><use href="#i-user"/></svg></div>
+    <div class="gate-title">登录后查看发布记录</div>
+    <div class="gate-note">登录后可管理已发布信息，查看浏览、匹配与咨询数据。</div>
+    <a href="../auth/login.html" class="btn btn-primary btn-block btn-lg">立即登录</a>
+  </div>
+  <div id="pub-gate-realname" class="pub-gate">
+    <div class="gate-ic"><svg class="ic"><use href="#i-shield"/></svg></div>
+    <div class="gate-title">实名认证后可管理发布</div>
+    <div class="gate-note">完成实名认证后，即可发布信息并查看对接进展。</div>
+    <a href="../profile/auth-personal.html" class="btn btn-primary btn-block btn-lg">前往实名认证</a>
+    <a href="../supply/list.html" class="gate-link">了解发布流程 · 看看平台示例 ›</a>
+  </div>
+  <div id="pub-content">
+    <div class="navbar"><button class="nav-back" onclick="history.back()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button><div class="nav-title">我的发布</div><div class="nav-right"><a href="guide.html" class="nav-pill-primary" id="plus-new" aria-label="发布供需信息">发布供需信息</a></div></div>
+    <main class="scroll list-scroll">
+      <header class="list-head">
+        <div class="list-sub">管理发布状态与对接反馈</div>
+        <a class="draft-entry" href="drafts.html">草稿箱<span class="n zero" id="draft-n">0</span></a>
+      </header>
+      <div class="filter-bar">
+        <div class="seg" id="filters"><span class="seg-item is-on" data-filter="all">全部<b class="seg-n">0</b></span><span class="seg-item" data-filter="demand">需求<b class="seg-n">0</b></span><span class="seg-item" data-filter="supply">供应<b class="seg-n">0</b></span></div>
+      </div>
+      <div class="list-summary"><span>共 <b id="sum-all">0</b> 条</span><span class="sum-sep"></span><span>上架中 <b id="sum-active">0</b></span><span class="sum-sep"></span><span>待审核 <b id="sum-review">0</b></span><span class="sum-sep"></span><span style="color:var(--error);">待处理驳回 <b id="sum-reject">0</b></span></div>
+      <div id="record-list" style="margin-top:12px"></div>
+    </main>
+    <!-- 底部固定悬浮发布条：发布需求 / 发布供应（样式同「钱包·首页」.app-float-cta） -->
+    <div class="app-float-cta" id="pub-cta">
+      <a class="afc-item" href="guide.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-search"/></svg>
+        <span class="afc-label">发布需求</span>
+      </a>
+      <span class="afc-sep" aria-hidden="true">|</span>
+      <a class="afc-item" href="guide.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-upload"/></svg>
+        <span class="afc-label">发布供应</span>
+      </a>
+    </div>
+  </div>
+</div><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/guest-gate.js"></script><script>
+(function(){
+  function checkPublishAuth() {
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var content = document.getElementById('pub-content');
+    var gateReal = document.getElementById('pub-gate-realname');
+    if (!st.loggedIn) { if (window.GuestGate) GuestGate.open({mode:'replace', icon:'list', badge:'游客模式', title:'登录后查看发布记录', note:'登录后可管理已发布信息，查看浏览、匹配与咨询数据。', btnText:'立即登录', btnHref:'../auth/login.html'}); return false; }
+    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+    if (!(auth.realname && auth.realname.ok)) { if (content) content.style.display='none'; if (gateReal) gateReal.style.display='block'; return false; }
+    return true;
+  }
+  if (!checkPublishAuth()) return;
+  try {
+    var acc2 = window.entryAccess ? entryAccess() : null;
+    var per2 = acc2 && acc2.identity ? acc2.identity.personal : 'none';
+    var plus2 = document.getElementById('plus-new');
+    if (plus2) plus2.href = 'guide.html';
+  } catch (e) {}
+
+  var I = {
+    material:'<rect x="3" y="7" width="18" height="11" rx="1.5"/><path d="M3 12.5h18M8.5 7v11M15.5 7v11"/>',
+    equipment:'<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/>',
+    labor:'<circle cx="12" cy="7.5" r="3.3"/><path d="M5.5 20v-1.2a6.5 6.5 0 0 1 13 0V20"/>',
+    franchise:'<circle cx="12" cy="9" r="5"/><path d="M9.2 13.3L8.2 21l3.8-2 3.8 2-1-7.7"/>',
+    trade:'<path d="M3 21h18M5 21V8l7-4 7 4v13"/><path d="M9 21v-4h6v4M9 11h.01M15 11h.01"/>',
+    agency:'<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5M3 12.5h18"/>',
+    personnel:'<circle cx="9" cy="8.5" r="3.3"/><path d="M3.5 20v-1a5.5 5.5 0 0 1 11 0v1M17 8.5v6M14 11.5h6"/>',
+    talent:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6.4 16.5a2.6 2.6 0 0 1 5.2 0M15 10h3M15 13h3"/>'
+  };
+  var CAT_KEY = {'材料':'material','设备':'equipment','劳务':'labor','资质招商':'franchise','建企买卖':'trade','中介服务':'agency','企业招聘':'personnel','招聘':'personnel','人才求职':'talent','求职':'talent'};
+  function catIcon(cat){ var k = CAT_KEY[cat] || ''; var body = I[k] || I.material; return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+body+'</svg>'; }
+
+  var list=document.getElementById('record-list');
+  var dirFilter='all';
+  var STATUS_LABEL = { pending_review:'审核中', active:'已上架', rejected:'已驳回', off:'已下架', review:'审核中', paused:'已暂停', expired:'已过期' };
+  var DIR_LABEL = { demand:'需求', supply:'供应' };
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function myPublishes(){
+    if (!window.SupplyStore) return [];
+    var cur = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = cur ? cur.id : '';
+    return SupplyStore.read().items.filter(function (x){ return (x.source==='user_publish'||x.source==='migrated_publish') && x.publisher===uid; });
+  }
+  function fmtTime(ts){ if(!ts) return ''; try{ return new Date(ts).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); }catch(e){ return ''; } }
+  function statusGroup(s){
+    if (s==='active') return 'active';
+    if (s==='pending_review'||s==='review') return 'review';
+    if (s==='rejected') return 'rejected';
+    return 'closed';
+  }
+  try { var dn = (window.PublishStore && PublishStore.get().drafts) ? PublishStore.get().drafts.length : 0;
+    var elN = document.getElementById('draft-n'); elN.textContent = dn; elN.classList.toggle('zero', dn===0);
+  } catch(e){}
+
+  function actionsFor(r){
+    var g = statusGroup(r.status);
+    if (g==='active') return {l:{t:'管理',a:'manage',cls:'act-ghost'}, r:{t:'分享',a:'share',cls:'act-share',ic:'share'}};
+    if (g==='review') return {l:{t:'撤回编辑',a:'withdraw',cls:'act-ghost'}, r:{t:'审核中',a:'__none',cls:'act-disabled',pending:true}};
+    if (g==='rejected') return {l:{t:'查看详情',a:'detail',cls:'act-ghost'}, r:{t:'去修改重新提交',a:'edit',cls:'act-danger',ic:'edit'}};
+    if (g==='closed') return {l:{t:'查看详情',a:'detail',cls:'act-ghost'}, r:{t:'重新上架',a:'republish',cls:'act-primary',ic:'upload'}};
+    return {l:{t:'查看详情',a:'detail',cls:'act-ghost'}, r:{t:'编辑信息',a:'edit',cls:'act-primary'}};
+  }
+  var IC = { share:'<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>',
+    edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+    upload:'<path d="M12 19V5M5 12l7-7 7 7"/>' };
+
+  function cardHtml(r){
+    var stClass = r.status || 'pending_review', g = statusGroup(r.status);
+    var status = STATUS_LABEL[r.status] || r.status || '未知';
+    var dir = r.dir==='supply' ? 'supply' : 'demand';
+    var dirIcon = dir==='supply' ? '#i-upload' : '#i-search';
+    var cat = r.cat || r.category || '';
+    var amount = r.amount || (r.price ? (r.price + (r.unit ? ' '+r.unit : '')) : '');
+    var qty = r.qty || '';
+    var meta='<span class="meta-item"><svg class="ic"><use href="#i-pin"/></svg>'+esc(r.location||'未填城市')+'</span>'+
+             '<span class="meta-item"><svg class="ic"><use href="#i-clock"/></svg>'+esc(fmtTime(r.ts||r.updatedAt))+'</span>';
+    var money = (amount||qty) ? '<div class="record-amount">'+(amount?'<span class="amt"><svg class="ic"><use href="#i-wallet"/></svg>'+esc(amount)+'</span>':'')+(qty?'<span class="qty"><svg class="ic"><use href="#i-box"/></svg>'+esc(qty)+'</span>':'')+'</div>' : '';
+    var desc = (r.desc||r.description) ? '<p class="record-desc">'+esc(r.desc||r.description)+'</p>' : '';
+    var rej = r.rejectNote ? '<div class="record-reject"><svg class="ic"><use href="#i-info"/></svg><span><b>驳回原因：</b>'+esc(r.rejectNote)+'</span></div>' : '';
+    var ac = actionsFor(r);
+    function btn(b){ var ic = b.ic ? '<svg class="ic">'+IC[b.ic]+'</svg>' : ''; var pend = b.pending ? '<i class="sd" style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;animation:sdPulse 1.2s infinite;"></i>' : ''; return '<button class="'+b.cls+'" data-action="'+b.a+'" data-id="'+esc(r.id)+'">'+pend+b.t+ic+'</button>'; }
+    return '<article class="record is-'+dir+' is-'+g+'">'+
+      '<div class="record-hd">'+
+        '<div class="cat-ic">'+catIcon(cat)+'</div>'+
+        '<div class="record-main">'+
+          '<div class="record-tags"><span class="dir-chip dir-'+dir+'"><svg class="ic" style="width:12px;height:12px"><use href="'+dirIcon+'"/></svg>'+DIR_LABEL[dir]+'</span><span class="cat-name">'+esc(cat||'未分类')+'</span></div>'+
+          '<h3 class="record-title">'+esc(r.title)+'</h3>'+
+        '</div>'+
+        '<span class="record-status status-'+esc(stClass)+(g==='review'?' is-pending':'')+'"><i class="sd"></i>'+esc(status)+'</span>'+
+      '</div>'+
+      '<div class="record-meta">'+meta+'</div>'+
+      money+desc+rej+
+      '<div class="record-actions">'+btn(ac.l)+btn(ac.r)+'</div>'+
+    '</article>';
+  }
+  function emptyHtml(){
+    return '<div class="empty-state"><div class="empty-ic"><svg class="ic"><use href="#i-doc"/></svg><span class="empty-plus"><svg class="ic" style="width:12px;height:12px"><path d="M12 5v14M5 12h14"/></svg></span></div><div class="empty-title">还没有发布信息</div><div class="empty-desc">发布供需信息，让更多建筑企业与建筑人看到你的需求与资源</div></div>';
+  }
+
+  function update(id, patch){
+    var st = SupplyStore.read();
+    var it = st.items.filter(function(x){return x.id===id;})[0];
+    if (!it) return false;
+    Object.assign(it, patch);
+    SupplyStore.write(st);
+    return true;
+  }
+
+  function render(){
+    var all = myPublishes();
+    var rows = all.filter(function(r){
+      if (dirFilter!=='all' && r.dir!==dirFilter) return false;
+      return true;
+    }).sort(function(a,b){ return (b.ts||b.updatedAt||0) - (a.ts||a.updatedAt||0); });
+    var dirC={all:all.length,demand:0,supply:0};
+    var stC={active:0,review:0,rejected:0,closed:0};
+    all.forEach(function(r){ if(r.dir==='supply')dirC.supply++;else dirC.demand++; stC[statusGroup(r.status)]++; });
+    document.getElementById('sum-all').textContent=all.length;
+    document.getElementById('sum-active').textContent=stC.active;
+    document.getElementById('sum-review').textContent=stC.review;
+    document.getElementById('sum-reject').textContent=stC.rejected;
+    document.querySelectorAll('#filters .seg-item').forEach(function(el){ var n=el.querySelector('.seg-n'); if(n)n.textContent=dirC[el.dataset.filter]||0; });
+    list.innerHTML = rows.length
+      ? '<div class="tl">' + rows.map(function (r) {
+          var g = statusGroup(r.status);
+          return '<div class="tl-item is-' + g + '">' +
+            '<div class="tl-axis"><span class="tl-dot"></span></div>' +
+            cardHtml(r) +
+          '</div>';
+        }).join('') + '</div>'
+      : emptyHtml();
+  }
+
+  document.querySelectorAll('#filters .seg-item').forEach(function(el){
+    el.onclick=function(){ dirFilter=el.dataset.filter; document.querySelectorAll('#filters .seg-item').forEach(function(x){x.classList.remove('is-on');}); el.classList.add('is-on'); render(); };
+  });
+
+  list.onclick=function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var id=b.dataset.id, action=b.dataset.action, rec=myPublishes().filter(function(x){return x.id===id;})[0];
+    if (action==='__none' || !rec) return;
+    if (action==='detail'){ location.href='../supply/detail.html?id='+encodeURIComponent(id); return; }
+    if (action==='edit'){ location.href='editor.html?record='+encodeURIComponent(id); return; }
+    if (action==='share'){
+      if (window.UI && UI.sheet){
+        var sh=UI.sheet(); sh.setText('分享这条发布');
+        var channels=['微信好友','朋友圈','复制链接','二维码'], glyphs=['\uD83D\uDCAC','\uD83C\uDF10','\uD83D\uDD17','\u25A6'];
+        sh.html('<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:8px 4px;text-align:center;">'+
+          channels.map(function(t,i){return '<div style="cursor:pointer;-webkit-tap-highlight-color:transparent;" data-share="'+i+'"><div style="width:46px;height:46px;margin:0 auto 6px;border-radius:50%;background:var(--primary-soft);color:var(--primary-dim);display:flex;align-items:center;justify-content:center;font-size:20px;">'+glyphs[i]+'</div><div style="font-size:11px;color:var(--text-2);">'+t+'</div></div>';}).join('')+'</div>');
+        sh.body().onclick=function(ev){ var n=ev.target.closest('[data-share]'); if(!n)return; sh.close(); UI.toast('分享链接已复制（演示）','ok'); };
+        sh.show();
+      } else UI.toast('分享链接已复制（演示）','ok');
+      return;
+    }
+    if (action==='manage'){
+      var m=UI.sheet(); m.setText('管理这条发布');
+      m.html('<div style="display:flex;flex-direction:column;">'+
+        '<button class="btn btn-block" id="m-edit" style="margin-bottom:9px;">编辑信息</button>'+
+        '<button class="btn btn-block" id="m-refresh" style="margin-bottom:9px;">刷新置顶 · 提升曝光</button>'+
+        '<button class="btn btn-block" id="m-off" style="background:var(--bg-subtle);color:var(--text-2);">下架这条发布</button></div>');
+      m.show();
+      m.body().querySelector('#m-edit').onclick=function(){ m.close(); location.href='editor.html?record='+encodeURIComponent(id); };
+      m.body().querySelector('#m-refresh').onclick=function(){ m.close(); UI.toast('已刷新置顶，曝光提升中（演示）','ok'); };
+      m.body().querySelector('#m-off').onclick=function(){ m.close(); UI.dialog({title:'下架发布',text:'下架后其他用户将看不到这条信息，可随时重新上架。',ok:'确认下架',cancel:'取消',onOk:function(){ if(update(id,{status:'off'})){render();UI.toast('已下架','ok');} }}); };
+      return;
+    }
+    if (action==='withdraw'){
+      UI.dialog({title:'撤回审核',text:'撤回后这条信息将被下架，你可以修改后重新提交。',ok:'撤回编辑',cancel:'继续等待',onOk:function(){ if(update(id,{status:'off'})){render();UI.toast('已撤回，可继续编辑','ok');} }});
+      return;
+    }
+    if (action==='republish'){
+      UI.dialog({title:'重新上架',text:'将重新提交审核，通过后恢复展示。',ok:'重新提交',cancel:'取消',onOk:function(){ if(update(id,{status:'pending_review'})){render();UI.toast('已重新提交审核','ok');} }});
+      return;
+    }
+  };
+
+  window.addEventListener('engchain:supply', function(){ render(); });
+  window.addEventListener('storage', function(e){ if(e.key==='engchain-supply') render(); });
+  render();
+})();
+</script></body></html>

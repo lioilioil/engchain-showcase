@@ -1,0 +1,2948 @@
+/* =====================================================================
+   js/stores.js —— 商业模式 v1.2 Store 基建（COMMERCE-EXECUTION-MANUAL §2.1）
+   遵循 common.js 的 stateStore / CorpPay 范式：
+   - 所有 localStorage 键统一 engchain-* 前缀
+   - 每个 Store 提供 read/write/reset，write 派发 CustomEvent('engchain:<name>',{detail})
+   依赖：js/data.js（window.MOCK.business）；js/common.js（window.UI）
+   引入顺序：data.js → common.js → stores.js
+   ===================================================================== */
+(function () {
+  'use strict';
+  var LS = window.localStorage;
+  var MOCK = window.MOCK || {};
+
+  function jsonSafe(v) { try { return JSON.parse(v); } catch (e) { return null; } }
+
+  /* 所有 Store 实例注册表（用于批量失效缓存） */
+  var _allStores = [];
+
+  /* 通用 Store 工厂（v2.0：添加内存缓存，减少 JSON.parse） */
+  function makeStore(KEY, def, evtName) {
+    var _cached = false;
+    var _cacheVal = null;
+    var _savePending = false;
+
+    function load() {
+      if (_cached) return Object.assign({}, _cacheVal);
+      var val = Object.assign({}, def, jsonSafe(LS.getItem(KEY)) || {});
+      _cacheVal = val;
+      _cached = true;
+      return Object.assign({}, val);
+    }
+    function save(s) {
+      _cacheVal = s;
+      _cached = true;
+      try { LS.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+      window.dispatchEvent(new CustomEvent(evtName, { detail: s }));
+      return s;
+    }
+    var store = {
+      KEY: KEY,
+      read: load,
+      get: load,
+      write: save,
+      set: function (part) { return save(Object.assign(load(), part)); },
+      reset: function () { _cached = false; _cacheVal = null; try { LS.removeItem(KEY); } catch (e) {} return save(def); },
+      invalidateCache: function () { _cached = false; _cacheVal = null; }
+    };
+    _allStores.push(store);
+    return store;
+  }
+
+  /* 批量失效所有 Store 的内存缓存（跨页面同步时调用） */
+  window.invalidateAllStoreCaches = function () {
+    _allStores.forEach(function (s) { s.invalidateCache(); });
+  };
+
+  /* ---- 认证记录（R1，v3.0 五身份叠加） ----
+     personalQual = 个人建筑类专业资质（建造师等）；enterpriseQual = 企业资质（建筑业企业资质等）
+     personalEntry = 个人入驻（资质+完整简历，v3.0 新增；personalQual 保留为兼容别名）
+     partner = 个人合伙人（分销意向+推广渠道，v3.0 新增；与企业入驻 partner 类型分离）
+     enterprise.shortName/nameBasis/nameProof = 企业简称及命名依据（v3.0 新增）
+     旧 qual 字段保留为兼容别名（取 personalQual + enterpriseQual 合并） */
+  var AuthStore = makeStore('engchain-auth',
+    { realname: { ok: false, ts: 0, name: '', idNo: '', mobile: '', idMask: '' },
+      enterprise: { ok: false, expireAt: 0, co: '', code: '', legal: '', status: '', note: '', fee: 0, submittedAt: 0, contactName: '', contactPhone: '', contactWechat: '', address: '', region: '',
+        shortName: '', nameBasis: '', nameProof: [],
+        /* [FEAT 9.2-3] 多维资质核验：5项逐项提交/审核 */
+        dimensions: { business: { status: 'pending', submittedAt: 0, files: [] }, legal: { status: 'pending', submittedAt: 0, files: [] }, qualification: { status: 'pending', submittedAt: 0, files: [] }, bank: { status: 'pending', submittedAt: 0, files: [] }, office: { status: 'pending', submittedAt: 0, files: [] } },
+        registeredAddress: '',
+        lastReviewAt: 0, reviewDueAt: 0, annualStatus: 'ok', annualNote: '',
+        pendingChanges: { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' },
+        changeHistory: [] },
+      personalQual: { ok: false, list: [], certs: [], status: '', note: '', submittedAt: 0 },
+      personalEntry: { ok: false, status: '', note: '', submittedAt: 0, list: [], certs: [],
+        userType: 'jobseeker', resumeComplete: false, /* v3.1：个人入驻两类用户区分（jobseeker求职/standard标准）+ 简历完成标记 */
+        profile: { basic: { gender: '', birth: '', location: '', jobStatus: '', mobile: '', wechat: '', address: '' },
+          education: [], work: [], project: [], skills: [],
+          jobIntent: { position: '', salary: '', salaryRange: '', minAcceptable: '', certSubsidy: '', arrivalTime: '', location: '', workType: '' },
+          intro: '', resumeFile: '', regStatus: null, socialSecurity: null } },
+      enterpriseQual: { ok: false, list: [] },
+      partner: { ok: false, status: '', note: '', submittedAt: 0, approvedAt: 0,
+        channel: [], intent: '', intro: '', experience: '', profitConfig: {} },
+      qual: { ok: false, list: [] } },
+    'engchain:auth');
+  /* [FEAT 9.2-3] 提交某一维核验材料 */
+  AuthStore.submitDimension = function (type, payload) {
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.dimensions) s.enterprise.dimensions = {};
+    if (!s.enterprise.dimensions[type]) s.enterprise.dimensions[type] = { status: 'pending', submittedAt: 0, files: [] };
+    s.enterprise.dimensions[type].status = 'pending_review';
+    s.enterprise.dimensions[type].submittedAt = Date.now();
+    s.enterprise.dimensions[type].files = (payload && payload.files) || s.enterprise.dimensions[type].files || [];
+    return this.write(s);
+  };
+  /* [FEAT 9.2-3] 返回各维度审核状态和整体进度，并计算认证等级 */
+  AuthStore.dimensionStatus = function () {
+    var s = this.read();
+    var dims = (s.enterprise && s.enterprise.dimensions) || {};
+    var cfg = (MOCK.business.certification && MOCK.business.certification.dimensions) || [];
+    var list = [];
+    var doneCount = 0;
+    cfg.forEach(function (d) {
+      var cur = dims[d.id] || { status: 'pending', submittedAt: 0, files: [] };
+      var isDone = cur.status === 'approved' || cur.status === 'done';
+      if (isDone) doneCount++;
+      list.push({ id: d.id, label: d.label, required: d.required, status: cur.status, submittedAt: cur.submittedAt, done: isDone });
+    });
+    /* 认证等级：完成必选项=基础认证，完成3项以上=高级认证，完成全部5项=完整认证 */
+    var level = 'none';
+    if (doneCount >= 5) level = 'full';
+    else if (doneCount >= 3) level = 'advanced';
+    else if (doneCount >= 2) level = 'basic';
+    var levelLabelMap = { none: '未认证', basic: '基础认证', advanced: '高级认证', full: '完整认证' };
+    return { list: list, doneCount: doneCount, total: cfg.length, level: level, levelLabel: levelLabelMap[level] || '未认证' };
+  };
+
+  /* [FEAT 留档审核] 读取待审核变更（安全兜底，旧数据无 pendingChanges 时返回 none） */
+  AuthStore.getPendingEnterpriseChange = function () {
+    var s = this.read();
+    var pc = (s.enterprise && s.enterprise.pendingChanges) || {};
+    return {
+      co: pc.co || '', code: pc.code || '', legal: pc.legal || '', shortName: pc.shortName || '',
+      registeredAddress: pc.registeredAddress || '',
+      reason: pc.reason || '', files: pc.files || [], submittedAt: pc.submittedAt || 0,
+      status: pc.status || 'none', rejectReason: pc.rejectReason || '', reviewType: pc.reviewType || 'daily'
+    };
+  };
+  /* [FEAT 留档审核] 提交B类字段变更：未认证直接写回正式字段，已认证写入 pendingChanges（正式字段冻结） */
+  AuthStore.submitEnterpriseChange = function (payload) {
+    payload = payload || {};
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.ok) {
+      if (payload.co !== undefined && payload.co !== null) s.enterprise.co = payload.co;
+      if (payload.code !== undefined && payload.code !== null) s.enterprise.code = payload.code;
+      if (payload.legal !== undefined && payload.legal !== null) s.enterprise.legal = payload.legal;
+      if (payload.shortName !== undefined && payload.shortName !== null) s.enterprise.shortName = payload.shortName;
+      if (payload.registeredAddress !== undefined && payload.registeredAddress !== null) s.enterprise.registeredAddress = payload.registeredAddress;
+      return this.write(s);
+    }
+    /* 法人变更严格材料校验：legal 有变化时必须有佐证材料(>=1)和变更原因 */
+    var legalChanged = !!(payload.legal && payload.legal !== s.enterprise.legal);
+    if (legalChanged && (!payload.reason || !payload.files || payload.files.length < 1)) {
+      return { ok: false, msg: '法人变更需上传佐证材料（如变更核准通知书/股东会决议），并填写变更原因' };
+    }
+    s.enterprise.pendingChanges = {
+      co: payload.co || '', code: payload.code || '', legal: payload.legal || '', shortName: payload.shortName || '',
+      registeredAddress: payload.registeredAddress || '',
+      reason: payload.reason || '', files: payload.files || [], submittedAt: Date.now(),
+      status: 'pending', rejectReason: '', reviewType: payload.reviewType || 'daily'
+    };
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 审核通过：pending值写入正式字段，旧值入 changeHistory，清空 pendingChanges，广播 engchain:auth */
+  AuthStore.approveEnterpriseChange = function (operator) {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.pendingChanges) return s;
+    var pc = s.enterprise.pendingChanges;
+    if (pc.status !== 'pending') return s;
+    if (!s.enterprise.changeHistory) s.enterprise.changeHistory = [];
+    var now = Date.now();
+    var fields = ['co', 'code', 'legal', 'shortName', 'registeredAddress'];
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (pc[f] && pc[f] !== s.enterprise[f]) {
+        s.enterprise.changeHistory.push({ field: f, oldValue: s.enterprise[f], newValue: pc[f], changedAt: pc.submittedAt, approvedAt: now, operator: operator || '', reviewType: pc.reviewType || 'daily' });
+        s.enterprise[f] = pc[f];
+      }
+    }
+    /* 年度复核通过：更新年检时间戳与状态 */
+    if (pc.reviewType === 'annual') {
+      s.enterprise.lastReviewAt = now;
+      s.enterprise.reviewDueAt = now + 365 * 864e5;
+      s.enterprise.annualStatus = 'ok';
+      s.enterprise.annualNote = '';
+    }
+    s.enterprise.pendingChanges = { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' };
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 审核驳回：记录 rejectReason，正式值不变，pendingChanges 保留 rejected 状态供用户查看 */
+  AuthStore.rejectEnterpriseChange = function (reason, operator) {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.pendingChanges) return s;
+    s.enterprise.pendingChanges.status = 'rejected';
+    s.enterprise.pendingChanges.rejectReason = reason || '';
+    /* 年度复核驳回：标记年检状态 */
+    if (s.enterprise.pendingChanges.reviewType === 'annual') {
+      s.enterprise.annualStatus = 'rejected';
+      s.enterprise.annualNote = reason || '';
+    }
+    return this.write(s);
+  };
+  /* [FEAT 留档审核] 撤回待审核变更（用户主动取消） */
+  AuthStore.withdrawEnterpriseChange = function () {
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    s.enterprise.pendingChanges = { co: '', code: '', legal: '', shortName: '', registeredAddress: '', reason: '', files: [], submittedAt: 0, status: 'none', rejectReason: '', reviewType: 'daily' };
+    /* 撤回年度复核：恢复年检状态为 due（仍需复核） */
+    if (s.enterprise.annualStatus === 'under_review') s.enterprise.annualStatus = 'due';
+    return this.write(s);
+  };
+
+  /* [FEAT 年度复核] 提交年度认证复核：要求B类全字段，reviewType='annual'，annualStatus='under_review' */
+  AuthStore.submitAnnualReview = function (payload) {
+    payload = payload || {};
+    var s = this.read();
+    if (!s.enterprise) s.enterprise = {};
+    if (!s.enterprise.ok) return { ok: false, msg: '企业未认证，无需年度复核' };
+    var pc = s.enterprise.pendingChanges || {};
+    if (pc.status === 'pending') return { ok: false, msg: '已有待审核变更，请勿重复提交' };
+    /* 年度复核要求B类全字段（co/code/legal/registeredAddress 为必填，shortName可选） */
+    if (!payload.co || !payload.code || !payload.legal || !payload.registeredAddress) {
+      return { ok: false, msg: '年度复核需填写企业名称、税号、法人、注册地址' };
+    }
+    /* 年度复核基线要求佐证材料（营业执照等）；legal变更不再叠加日常法人材料要求 */
+    if (!payload.files || payload.files.length < 1) {
+      return { ok: false, msg: '年度复核需上传佐证材料（营业执照等）' };
+    }
+    s.enterprise.pendingChanges = {
+      co: payload.co, code: payload.code, legal: payload.legal,
+      shortName: payload.shortName || s.enterprise.shortName,
+      registeredAddress: payload.registeredAddress,
+      reason: payload.reason || '年度信息更新', files: payload.files || [],
+      submittedAt: Date.now(), status: 'pending', rejectReason: '', reviewType: 'annual'
+    };
+    s.enterprise.annualStatus = 'under_review';
+    this.write(s);
+    return { ok: true };
+  };
+  /* [FEAT 年度复核] 检查年检状态：距上次复核满365天→due，返回当前状态 */
+  AuthStore.checkAnnualStatus = function () {
+    var s = this.read();
+    if (!s.enterprise || !s.enterprise.ok) return 'none';
+    var st = s.enterprise.annualStatus || 'ok';
+    if (st === 'ok' || st === 'due') {
+      var last = s.enterprise.lastReviewAt || 0;
+      var due = !last || (Date.now() - last >= 365 * 864e5);
+      if (due && st !== 'due') {
+        s.enterprise.annualStatus = 'due';
+        s.enterprise.reviewDueAt = last ? last + 365 * 864e5 : Date.now();
+        this.write(s);
+        st = 'due';
+      }
+    }
+    return st;
+  };
+
+  /* ---- 入驻记录（R2，v2.0 多类型并行 + v3.0 扩展资料） ----
+     types = 入驻类型数组，支持并行（合伙人可与建筑/中介同时存在；建筑⇄中介互斥）
+     qualifications[] = 建筑资质列表（v3.0 新增）
+     intro{} = 企业介绍（成立年份/注册资本/员工规模/简介，v3.0 新增）
+     cases[] = 企业案例列表（v3.0 新增）
+     address/website = 办公地址/官网（v3.0 新增）
+     旧 type 字段保留为兼容别名（取 types[0]） */
+  var EntryStore = makeStore('engchain-entry',
+    { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0,
+      depositType: null, depositPaid: 0, fee: 0, contact: '', tel: '', scope: '', submittedAt: 0, note: '',
+      /* [FEAT 9.2-2] 付费模式：once=一次性入驻 / yearly=年度订阅 */
+      cycle: 'once',
+      qualifications: [], intro: { founded: '', capital: '', staffSize: '', desc: '' },
+      cases: [], address: { province: '', city: '', district: '', detail: '' }, website: '', attachments: [] },
+    'engchain:entry');
+  /* [FEAT 9.2-2] 年度订阅续费：cycle==='yearly' 时扣减年费并延长一年 */
+  EntryStore.renew = function (fee) {
+    var s = this.read();
+    if (s.cycle !== 'yearly') return { error: '当前非年度订阅模式' };
+    var price = fee || 0;
+    if (price > 0 && window.BalanceStore) {
+      var r = BalanceStore.consume(price, 'entry_renew', { method: 'balance', remark: '入驻年费续费' });
+      if (!r) return { error: '余额不足，请先充值' };
+    }
+    var base = Math.max(s.expireAt || Date.now(), Date.now());
+    s.expireAt = base + 365 * 864e5;
+    s.paidAt = Date.now();
+    s.renewedAt = Date.now();
+    return this.write(s);
+  };
+  /* [FEAT 9.2-2] 到期提醒：expireAt - now <= remindDays 天 */
+  EntryStore.needRenew = function () {
+    var s = this.read();
+    if (s.cycle !== 'yearly' || !s.active || !s.expireAt) return false;
+    var remindDays = (MOCK.business.subscription && MOCK.business.subscription.remindDays) || 30;
+    var daysLeft = (s.expireAt - Date.now()) / 864e5;
+    return daysLeft <= remindDays && daysLeft > 0;
+  };
+  EntryStore.approve = function () { var s = this.read(); s.status = 'active'; s.active = true; return this.write(s); };
+  EntryStore.pending = function () { var s = this.read(); s.status = 'pending'; s.active = false; return this.write(s); };
+
+  /* ---- 解锁积分账户（R3+R4） ---- */
+  var CreditStore = makeStore('engchain-credits',
+    { balance: 0, logs: [], quota: { month: '', used: 0 } },
+    'engchain:credits');
+  CreditStore.monthKey = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1); };
+  /* [FEAT 9.2-2] 积分 TTL：入账流水记录 expireAt = ts + ttlDays*86400000；旧历史流水无 expireAt，不参与过期清理（平滑迁移）。 */
+  CreditStore._ttlMs = function () {
+    var days = (MOCK.business.credits && MOCK.business.credits.ttlDays) || 365;
+    return days * 864e5;
+  };
+  CreditStore.add = function (credits, reason, meta) {
+    this.expireDue();
+    var s = this._rawLoad(); s.balance += credits;
+    var rec = Object.assign({ type: 'recharge', credits: credits, reason: reason || '充值到账', ts: Date.now(), expireAt: Date.now() + this._ttlMs(), status: 'success' }, meta || {});
+    s.logs.unshift(rec);
+    return this.write(s);
+  };
+  /* [FEAT 9.2-2] 惰性过期清理：扫描 logs 中 expireAt<=now 的入账流水，批量扣减 balance 并写 credits_expired 汇总流水。
+     内部直接读写 LS（_rawLoad/write），避免 read() 递归调用。 */
+  var _creditExpireLastRun = 0;
+  CreditStore.expireDue = function (force) {
+    var now = Date.now();
+    /* 节流：每60秒最多执行一次，避免每次 read() 都扫描 logs；consume() 调用时 force=true 绕过节流，确保消费前余额准确 */
+    if (!force && now - _creditExpireLastRun < 60000) return 0;
+    _creditExpireLastRun = now;
+    var s = this._rawLoad();
+    var expiredTotal = 0;
+    (s.logs || []).forEach(function (rec) {
+      if (rec && rec.credits > 0 && rec.expireAt && !rec.expired && rec.expireAt <= now) {
+        rec.expired = true;
+        expiredTotal += rec.credits;
+      }
+    });
+    if (expiredTotal > 0) {
+      s.balance = Math.max(0, (s.balance || 0) - expiredTotal);
+      s.logs.unshift({ type: 'credits_expired', credits: -expiredTotal, reason: '积分到期自动清零', ts: now, status: 'success' });
+      this.write(s);
+    }
+    return expiredTotal;
+  };
+  /* [FEAT 9.2-2] 查询未来 withinDays 天内即将过期的积分数（钱包页"即将过期"提示用） */
+  CreditStore.expiringSoon = function (withinDays) {
+    this.expireDue();
+    var s = this._rawLoad();
+    var horizon = Date.now() + (withinDays || 30) * 864e5;
+    var sum = 0;
+    (s.logs || []).forEach(function (rec) {
+      if (rec && rec.credits > 0 && rec.expireAt && !rec.expired && rec.expireAt <= horizon) sum += rec.credits;
+    });
+    return sum;
+  };
+  CreditStore.consume = function (cost, reason, meta) {
+    this.expireDue(true); /* [FIX AUDIT-07] 消费前强制执行过期清理，绕开60秒节流，确保余额准确 */
+    var s = this._rawLoad(); if (s.balance < cost) return null;
+    s.balance -= cost;
+    var rec = Object.assign({ type: 'unlock', credits: -cost, reason: reason || '信息解锁', ts: Date.now(), status: 'success' }, meta || {});
+    s.logs.unshift(rec);
+    return this.write(s);
+  };
+  /* [FEAT 9.2-2] 包裹 read()：每次读取前惰性过期清理；_rawLoad 为 makeStore 原始 load */
+  CreditStore._rawLoad = CreditStore.read;
+  CreditStore.read = function () { this.expireDue(); return this._rawLoad(); };
+  CreditStore.freeUsed = function () {
+    var s = this.read(); var mk = this.monthKey();
+    if (s.quota.month !== mk) { s.quota = { month: mk, used: 0 }; this.write(s); }
+    return s.quota.used;
+  };
+  CreditStore.freeSpend = function (n) {
+    var s = this.read(); var mk = this.monthKey();
+    if (s.quota.month !== mk) s.quota = { month: mk, used: 0 };
+    s.quota.used += (n || 1);
+    return this.write(s);
+  };
+  /* 任务奖励领取（v1.3）：注册/实名/入驻等一次性奖励，防重发放 */
+  var REWARDS_KEY = 'engchain-credits-rewards';
+  CreditStore.rewards = function () {
+    try { var r = JSON.parse(LS.getItem(REWARDS_KEY)); if (r && r.claimed) return r; } catch (e) {}
+    return { claimed: {} };
+  };
+  CreditStore.claimed = function (key) { return !!this.rewards().claimed[key]; };
+  CreditStore.claim = function (key, amount, reason) {
+    var r = this.rewards();
+    if (r.claimed[key]) return false;
+    var cfg = (MOCK.business.credits && MOCK.business.credits.rewards) || {};
+    var amt = (typeof amount === 'number') ? amount : (cfg[key] || 0);
+    if (amt <= 0) return false;
+    r.claimed[key] = { ts: Date.now() };
+    try { LS.setItem(REWARDS_KEY, JSON.stringify(r)); } catch (e) {}
+    this.add(amt, reason || '任务奖励');
+    return true;
+  };
+  /* 邀请奖励（v1.3）：被邀注册填写邀请码后发放给邀请方
+     [FIX BM-036] 修复：原实现接受任意非空邀请码即发 50 积分，无防重。
+     新规则：(1) 邀请码必须对应用户表中真实存在的用户（account 或 id 匹配）；
+             (2) 同一设备已领取过的邀请码不可重复领取（localStorage 记录）。 */
+  var INVITED_CODES_KEY = 'engchain-credits-invited-codes';
+  CreditStore._invitedCodes = function () {
+    try { var r = JSON.parse(LS.getItem(INVITED_CODES_KEY) || '[]'); if (Array.isArray(r)) return r; } catch (e) {}
+    return [];
+  };
+  CreditStore.inviteReward = function (code) {
+    if (!code) return false;
+    code = String(code).trim();
+    if (!code) return false;
+    var cfg = (MOCK.business.credits && MOCK.business.credits.rewards) || {};
+    var amt = cfg.invite || 50;
+    var st = (window.UI && UI.state) ? UI.state.get() : {};
+    var me = st.account || '';
+    if (code === me) return false;
+    /* (1) 邀请码须对应真实用户（account 或 id 匹配用户表） */
+    var exists = false;
+    try {
+      if (window.DataBus && typeof window.DataBus.users === 'function') {
+        var users = window.DataBus.users() || [];
+        for (var i = 0; i < users.length; i++) {
+          if (String(users[i].account) === code || String(users[i].id) === code) { exists = true; break; }
+        }
+      }
+    } catch (e) {}
+    if (!exists) return false;
+    /* (2) 同一设备防重：已领过该邀请码则拒绝 */
+    var claimed = this._invitedCodes();
+    if (claimed.indexOf(code) >= 0) return false;
+    claimed.push(code);
+    try { LS.setItem(INVITED_CODES_KEY, JSON.stringify(claimed)); } catch (e) {}
+    this.add(amt, '邀请好友奖励', { inviteCode: code });
+    return true;
+  };
+
+  /* ---- 每日签到（v1.3）：同日防重、连签计数、满 N 天额外送 ---- */
+  var CheckinStore = makeStore('engchain-checkin', { last: '', count: 0 }, 'engchain:checkin');
+  CheckinStore.today = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  CheckinStore.yesterday = function () { var d = new Date(Date.now() - 864e5); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  CheckinStore.checkedToday = function () { return this.read().last === this.today(); };
+  CheckinStore.checkin = function () {
+    var s = this.read();
+    var today = this.today();
+    if (s.last === today) return { ok: false, credits: 0, count: s.count, reason: '今日已签到' };
+    var count = (s.last === this.yesterday()) ? (s.count + 1) : 1;
+    var cfg = (MOCK.business.credits && MOCK.business.credits.rewards) || {};
+    var base = cfg.checkin || 10;
+    var streak = cfg.checkinStreak || 50;
+    var days = cfg.checkinStreakDays || 7;
+    var extra = (count % days === 0) ? streak : 0;
+    s.last = today; s.count = count;
+    this.write(s);
+    if (extra) CreditStore.add(base + extra, '连续签到 ' + count + ' 天奖励');
+    else CreditStore.add(base, '每日签到');
+    return { ok: true, credits: base + extra, count: count, extra: extra };
+  };
+
+  /* ---- 人民币余额账本（v1.3）：充值/提现/对公审批入账 全部落账 ----
+     [FIX BM-045] 注释：当前原型为单用户单钱包，frozen 种子 ¥200 为演示占位数据；
+     多用户切换时余额会随用户表快照同步（见 databus.js login / syncSnapshotIfCurrent）。
+     [FIX BM-038] 新增 totalRebate 字段：分销返佣累计（与 totalIn 累计充值口径分离，不污染充值统计）。 */
+  var BalanceStore = makeStore('engchain-balance',
+    {
+      balance: (MOCK.wallet && typeof MOCK.wallet.balance === 'number') ? MOCK.wallet.balance : 1286.50,
+      frozen: (MOCK.wallet && typeof MOCK.wallet.frozen === 'number') ? MOCK.wallet.frozen : 200,
+      totalIn: (MOCK.wallet && typeof MOCK.wallet.total === 'number') ? MOCK.wallet.total : 13486.50,
+      totalRebate: 0,
+      logs: []
+    }, 'engchain:balance');
+  /* 首访种子流水：把 MOCK.transactions 静态明细映射为余额账流水（幂等：logs 非空即跳过） */
+  BalanceStore.seedLogs = function () {
+    var s = this.read();
+    if (s.logs && s.logs.length) return s;
+    var arr = ((MOCK.transactions) || []).map(function (t) {
+      return { type: t.type, amount: t.amount, method: t.type, reason: t.t, ts: new Date(String(t.date).replace(/-/g, '/')).getTime() || Date.now() };
+    });
+    s.logs = arr;
+    return this.write(s);
+  };
+  BalanceStore.available = function () {
+    var s = this.read();
+    return Math.round((s.balance - s.frozen) * 100) / 100;
+  };
+  /* [FIX BM-050] recharge 保持干净：只做充值入账（balance += amt, totalIn += amt），
+     不夹带任何返佣/外部 monkey-patch 钩子。返佣请显式调用下方 rebate()。 */
+  BalanceStore.recharge = function (amount, method, extra) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.balance += amt; s.totalIn += amt;
+    s.logs.unshift({
+      type: 'recharge', amount: amt, method: method || 'wechat',
+      reason: (extra && extra.remark) || (method === 'corp' ? '对公转账' : '充值到账'),
+      ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-005/BM-008/BM-009] 统一消费入口：校验 available() 后扣减并写 logs。
+     type 建议 'certification'/'entry'/'consume'；meta.method 记录支付方式。 */
+  BalanceStore.consume = function (amount, type, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    if (this.available() < amt) return null;
+    s.balance = Math.round((s.balance - amt) * 100) / 100;
+    s.logs.unshift({
+      type: type || 'consume', amount: -amt, method: meta.method || 'balance',
+      reason: meta.remark || '消费支出', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-003/BM-006] 退款回退：balance += amt，写退款流水。 */
+  BalanceStore.refund = function (amount, reason, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    s.logs.unshift({
+      type: 'refund', amount: amt, method: meta.method || 'balance',
+      reason: reason || '退款', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-038] 分销返佣派发：balance += amt 且 totalRebate += amt（不计入 totalIn 累计充值）。 */
+  BalanceStore.rebate = function (amount, reason, meta) {
+    meta = meta || {};
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    s.totalRebate = Math.round(((s.totalRebate || 0) + amt) * 100) / 100;
+    s.logs.unshift({
+      type: 'rebate', amount: amt, method: 'rebate',
+      reason: reason || '分销返佣', ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金冻结：available() 校验后 frozen += amt。 */
+  BalanceStore.freezeDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return s;
+    if (this.available() < amt) return null;
+    s.frozen = Math.round((s.frozen + amt) * 100) / 100;
+    s.logs.unshift({ type: 'freeze', amount: -amt, method: 'deposit', reason: reason || '保证金冻结', ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金解冻（驳回/退出）：frozen -= amt，余额不变。 */
+  BalanceStore.unfreezeDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
+    s.logs.unshift({ type: 'unfreeze', amount: amt, method: 'deposit', reason: reason || '保证金解冻', ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-007] 保证金转正（终审入驻）：frozen 划转至实缴 depositPaid（frozen -= amt 且 balance -= amt）。 */
+  BalanceStore.commitDeposit = function (amount, reason) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    /* [健壮性] 0 元保证金（演示/partner 审核制）不产生流水，与 consume/freeze/rebate 的 0 守卫一致 */
+    if (amt <= 0) return s;
+    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
+    s.balance = Math.max(0, Math.round((s.balance - amt) * 100) / 100);
+    s.logs.unshift({ type: 'deposit_paid', amount: -amt, method: 'deposit', reason: reason || '保证金缴纳', ts: Date.now() });
+    return this.write(s);
+  };
+  BalanceStore.withdraw = function (amount, method, extra) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    if (s.balance - s.frozen < amt) return null;
+    s.balance -= amt;
+    s.logs.unshift({
+      type: 'withdraw', amount: -amt, method: method || 'bank',
+      reason: (extra && extra.remark) || '余额提现',
+      ts: Date.now()
+    });
+    return this.write(s);
+  };
+  /* 对公审批通过入账（v1.3）：CorpPay 记录 approved 后调用 */
+  BalanceStore.settleCorp = function (corpId, amount) {
+    var s = this.read(); var amt = Math.round(amount * 100) / 100;
+    s.balance += amt; s.totalIn += amt;
+    s.logs.unshift({
+      type: 'recharge', amount: amt, method: 'corp', reason: '对公转账 · 审批通过', corpId: corpId,
+      ts: Date.now()
+    });
+    return this.write(s);
+  };
+
+  /* ---- 中介线上订单（R5） ---- */
+  var AgencyOrderStore = makeStore('engchain-agency-orders', { list: [] }, 'engchain:agency-orders');
+  AgencyOrderStore.create = function (o) {
+    var s = this.read();
+    o.id = 'AO' + String(Date.now()).slice(-8);
+    o.state = 'pending'; o.createdAt = Date.now(); o.updatedAt = o.createdAt;
+    s.list.unshift(o);
+    this.write(s);
+    return o;
+  };
+  AgencyOrderStore.byId = function (id) {
+    var s = this.read(); var i;
+    for (i = 0; i < s.list.length; i++) if (s.list[i].id === id) return s.list[i];
+    return null;
+  };
+  /* [FIX BM-023] 修复：原 transition() 不校验状态机，订单可任意跳变。
+     新增合法迁移表校验，非法迁移返回 null 并 console.warn。 */
+  var AGENCY_ORDER_LEGAL = {
+    pending: ['paid', 'cancelled'],
+    paid: ['serving', 'cancelled', 'refunded'],
+    serving: ['completed', 'refunded'],
+    completed: [],
+    cancelled: [],
+    refunded: []
+  };
+  AgencyOrderStore.transition = function (id, next, patch) {
+    var s = this.read(); var it = null; var i;
+    for (i = 0; i < s.list.length; i++) if (s.list[i].id === id) { it = s.list[i]; break; }
+    if (!it) return null;
+    var allowed = AGENCY_ORDER_LEGAL[it.state] || [];
+    if (allowed.indexOf(next) < 0) {
+      console.warn('[AgencyOrder] 非法状态迁移 ' + it.state + ' -> ' + next + ' (order ' + id + ')');
+      return null;
+    }
+    it.state = next;
+    if (patch) for (var k in patch) if (patch.hasOwnProperty(k)) it[k] = patch[k];
+    it.updatedAt = Date.now();
+    return this.write(s);
+  };
+
+  /* ---- 发票（engchain-invoices：申请→审核→开票/驳回全链路） ----
+     items[] = { id, title, tax, type, amount, email, orderId, status, ts, issuedAt, rejectNote, invoiceNo }
+     status: pending(待审核) / issued(已开票) / rejected(已驳回)
+     与 databus.js 旧 engchain-invoices 数组兼容：首次加载自动迁移旧格式 */
+  var InvoiceStore = makeStore('engchain-invoices', { items: [] }, 'engchain:invoice');
+  (function migrateInvoices() {
+    try {
+      var old = JSON.parse(LS.getItem('engchain-invoices') || 'null');
+      if (Array.isArray(old) && old.length) {
+        var s = InvoiceStore.read();
+        if (!s.items || !s.items.length) {
+          s.items = old.map(function (x) {
+            var stMap = { pending: 'pending', issued: 'issued', shipped: 'issued', void: 'rejected' };
+            return {
+              id: x.id || ('INV' + Date.now()),
+              title: x.title || '', tax: x.tax || '', type: x.type || '增值税普通发票',
+              amount: x.amount || 0, email: x.email || '', orderId: x.orderId || '',
+              status: stMap[x.status] || 'pending',
+              ts: x.applyAt ? new Date(String(x.applyAt).replace(/-/g, '/')).getTime() : Date.now(),
+              issuedAt: x.status === 'issued' ? Date.now() : 0,
+              rejectNote: x.note || '', invoiceNo: x.invoiceNo || ''
+            };
+          });
+          InvoiceStore.write(s);
+        }
+      }
+    } catch (e) {}
+  })();
+  InvoiceStore.apply = function (payload) {
+    var s = this.read();
+    var item = Object.assign({ id: 'INV' + Date.now(), status: 'pending', ts: Date.now(), issuedAt: 0, rejectNote: '', invoiceNo: '' }, payload);
+    s.items.unshift(item);
+    this.write(s);
+    return item;
+  };
+  InvoiceStore.approve = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) {
+      if (i.id === id) { i.status = 'issued'; i.issuedAt = Date.now(); i.invoiceNo = i.invoiceNo || ('FP' + Date.now()); }
+    });
+    this.write(s);
+  };
+  InvoiceStore.reject = function (id, note) {
+    var s = this.read();
+    s.items.forEach(function (i) {
+      if (i.id === id) { i.status = 'rejected'; i.rejectNote = note || '资料不完整'; }
+    });
+    this.write(s);
+  };
+  InvoiceStore.list = function () { return this.read().items || []; };
+
+  /* ---- 佣金流水 + 防跳单违规（R5 后台跟踪） ----
+     [FIX BM-025] 修复：原 flows 无状态细分（仅 done），T+1 为文案。
+     新结构：flow.status = pending(待结算) / settled(已结算) / withdrawable(可提现) / paid(已提现)；
+     frozenUntil = 可结算时间戳（默认创建 +1 天），读取时惰性到期自动 pending->settled。 */
+  var CommissionStore = makeStore('engchain-commission', { flows: [], violations: [] }, 'engchain:commission');
+  CommissionStore.addFlow = function (f) {
+    var s = this.read();
+    f = Object.assign({ status: 'pending', frozenUntil: Date.now() + 864e5 }, f || {});
+    s.flows.unshift(f);
+    return this.write(s);
+  };
+  CommissionStore.addViolation = function (v) { var s = this.read(); s.violations.unshift(v); return this.write(s); };
+  /* 惰性结算：frozenUntil 到期的 pending 流水自动转 settled，返回本次结算条数 */
+  CommissionStore._lazySettle = function (s) {
+    var now = Date.now(), n = 0;
+    (s.flows || []).forEach(function (fl) {
+      if (fl.status === 'pending' && fl.frozenUntil && fl.frozenUntil <= now) { fl.status = 'settled'; n++; }
+    });
+    return n;
+  };
+  CommissionStore.settleFlow = function (id) {
+    var s = this.read(); var hit = false;
+    (s.flows || []).forEach(function (fl) {
+      if (String(fl.id) === String(id) && fl.status === 'pending') { fl.status = 'settled'; hit = true; }
+    });
+    if (hit) this.write(s);
+    return hit;
+  };
+  CommissionStore.markWithdrawable = function (id) {
+    var s = this.read(); var hit = false;
+    (s.flows || []).forEach(function (fl) {
+      if (String(fl.id) === String(id) && fl.status === 'settled') { fl.status = 'withdrawable'; hit = true; }
+    });
+    if (hit) this.write(s);
+    return hit;
+  };
+
+  /* ---- 企业关注/监控（P0-7.1） ----
+     [FIX BM-040] 修复：监控限额原仅页面级校验，未下沉 Store 层。
+     follow() 现按当前身份从 MOCK.business.monitor.limits 取限额；超限返回 {error}。
+     checkDailyPush() 每日首次调用为每个 follow 生成一条 feed 推送。 */
+  var MonitorStore = makeStore('engchain-monitor', { follows: [], feed: [], lastPushDate: '' }, 'engchain:monitor');
+  MonitorStore._limitForIdentity = function () {
+    var limits = (MOCK.business.monitor && MOCK.business.monitor.limits) || { realname: 5, pro: 10, construction: 30, agency: 50, partner: 200 };
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    if (idy.isGuest) return limits.realname;
+    if (idy.primary === 'partner') return limits.partner;
+    if (idy.primary === 'pro') return limits.pro;
+    if (idy.primary === 'realname') return limits.realname;
+    if (idy.primary === 'resident') {
+      var t = (idy.entryTypes && idy.entryTypes[0]) || 'construction';
+      return limits[t] || limits.construction;
+    }
+    return limits.realname;
+  };
+  MonitorStore.follow = function (companyId) {
+    var s = this.read(); var i;
+    for (i = 0; i < s.follows.length; i++) if (s.follows[i].companyId === companyId) return s;
+    var limit = this._limitForIdentity();
+    if (s.follows.length >= limit) return { error: '关注数量已达上限' };
+    s.follows.push({ companyId: companyId, ts: Date.now() });
+    return this.write(s);
+  };
+  /* [FIX BM-040] 每日推送：跨天首次调用时为每个 follow 生成一条 feed */
+  MonitorStore.checkDailyPush = function () {
+    var s = this.read();
+    var d = new Date(); var today = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    if (s.lastPushDate === today) return s;
+    s.lastPushDate = today;
+    var dims = (MOCK.business.monitor && MOCK.business.monitor.dimensions) || ['资质到期', '项目更新'];
+    (s.follows || []).forEach(function (f, idx) {
+      s.feed.unshift({
+        companyId: f.companyId,
+        dim: dims[idx % dims.length],
+        title: '监控日报 · ' + (f.companyId || '企业'),
+        read: false,
+        ts: Date.now()
+      });
+    });
+    return this.write(s);
+  };
+  MonitorStore.unfollow = function (companyId) {
+    var s = this.read(); s.follows = s.follows.filter(function (x) { return x.companyId !== companyId; });
+    return this.write(s);
+  };
+  MonitorStore.isFollowed = function (companyId) {
+    var s = this.read(); var i;
+    for (i = 0; i < s.follows.length; i++) if (s.follows[i].companyId === companyId) return true;
+    return false;
+  };
+  MonitorStore.pushFeed = function (item) {
+    var s = this.read(); s.feed.unshift(Object.assign({ read: false, ts: Date.now() }, item));
+    return this.write(s);
+  };
+
+  /* ---- 收藏夹（engchain-favorites：供需/人才/企业等收藏条目） ----
+     items[] = { id, bizKey, title, type, dir, location, amount, ts }
+     兼容旧键 engchain-favorite（原始数组）首次加载自动迁移 */
+  var FavoriteStore = makeStore('engchain-favorites', { items: [] }, 'engchain:favorite');
+  (function migrateFavorites() {
+    try {
+      var old = JSON.parse(LS.getItem('engchain-favorite') || 'null');
+      if (Array.isArray(old) && old.length) {
+        var s = FavoriteStore.read();
+        var existIds = {};
+        (s.items || []).forEach(function (it) { existIds[it.id] = true; });
+        old.forEach(function (x) {
+          var o = (typeof x === 'object' && x) ? x : { id: String(x) };
+          if (!existIds[o.id]) { s.items.push({ id: o.id, bizKey: o.bizKey || 'supply', title: o.title || '收藏条目', type: o.type || '', dir: o.dir || '', location: o.location || '', amount: o.amount || '', ts: o.ts || Date.now() }); existIds[o.id] = true; }
+        });
+        FavoriteStore.write(s);
+      }
+      LS.removeItem('engchain-favorite');
+    } catch (e) {}
+  })();
+  FavoriteStore.list = function () { return this.read().items || []; };
+  FavoriteStore.add = function (item) {
+    var s = this.read();
+    if (!s.items) s.items = [];
+    for (var i = 0; i < s.items.length; i++) if (String(s.items[i].id) === String(item.id)) return s.items[i];
+    s.items.unshift(Object.assign({ ts: Date.now() }, item));
+    this.write(s);
+    return item;
+  };
+  FavoriteStore.remove = function (id) {
+    var s = this.read();
+    s.items = (s.items || []).filter(function (it) { return String(it.id) !== String(id); });
+    this.write(s);
+    return true;
+  };
+  FavoriteStore.has = function (id) {
+    return (this.read().items || []).some(function (it) { return String(it.id) === String(id); });
+  };
+  FavoriteStore.toggle = function (item) {
+    if (this.has(item.id)) { this.remove(item.id); return false; }
+    this.add(item); return true;
+  };
+
+  /* ---- 联系人备注昵称（engchain-contact-remarks）----
+     map = { [peerKey]: { name, ts } }。peerKey 用对方稳定身份：
+     有个人认证档案用 'person:<id>'，否则降级 'conv:<会话id>'（同一人多端会话共用同一备注）。
+     备注仅影响本机展示名，不改动对方认证姓名等任何档案数据。 */
+  var ContactRemarkStore = makeStore('engchain-contact-remarks', { map: {} }, 'engchain:contact-remark');
+  ContactRemarkStore.get = function (key) {
+    var m = this.read().map || {};
+    return (m[key] && m[key].name) || '';
+  };
+  ContactRemarkStore.set = function (key, name) {
+    var s = this.read(); s.map = s.map || {};
+    name = String(name == null ? '' : name).trim().slice(0, 20);
+    if (name) s.map[key] = { name: name, ts: Date.now() }; else delete s.map[key];
+    this.write(s);
+    return name;
+  };
+  ContactRemarkStore.remove = function (key) {
+    var s = this.read();
+    if (s.map && s.map[key]) { delete s.map[key]; this.write(s); }
+    return true;
+  };
+
+  /* ---- 统一供需 Store（L1：发布→审核→上架→App 可见 主供需体系） ----
+     数据结构：{ items: [...] }，状态机：pending_review(待审核)→active(已上架) / rejected(已驳回)；active↔off(已下架)
+     迁移：旧 engchain-supply 数组格式（状态 pending/on/off/rejected）→ 对象格式 + 状态统一
+     迁移：旧 engchain-publish 孤岛键记录 → SupplyStore（Step 6） */
+  /* 先迁移旧数组格式，避免 makeStore 的 Object.assign 把数组展开成数字键 */
+  (function migrateSupplyArrayFormat() {
+    try {
+      var raw = LS.getItem('engchain-supply');
+      if (raw === null) return;
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        var items = parsed.map(function (x) {
+          var st = x.status;
+          if (st === 'on') st = 'active';
+          else if (st === 'pending') st = 'pending_review';
+          return Object.assign({}, x, { status: st });
+        });
+        LS.setItem('engchain-supply', JSON.stringify({ items: items }));
+      }
+    } catch (e) {}
+  })();
+
+  var SupplyStore = makeStore('engchain-supply', { items: [] }, 'engchain:supply');
+  SupplyStore.add = function (item) {
+    var s = this.read();
+    s.items.unshift(Object.assign({ id: 'SP' + Date.now() + Math.floor(Math.random() * 1000), status: 'pending_review', ts: Date.now() }, item));
+    this.write(s);
+    return s.items[0];
+  };
+  SupplyStore.approve = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) i.status = 'active'; });
+    this.write(s);
+  };
+  SupplyStore.reject = function (id, note) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) { i.status = 'rejected'; i.rejectNote = note; } });
+    this.write(s);
+  };
+  SupplyStore.listActive = function () {
+    return this.read().items.filter(function (i) { return i.status === 'active'; });
+  };
+  SupplyStore.listPending = function () {
+    return this.read().items.filter(function (i) { return i.status === 'pending_review'; });
+  };
+  SupplyStore.byId = function (id) {
+    var items = this.read().items, i;
+    for (i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  };
+  SupplyStore.remove = function (id) {
+    var s = this.read();
+    s.items = s.items.filter(function (i) { return i.id !== id; });
+    this.write(s);
+  };
+  /* 岗位/信息上架与下架（active↔off） */
+  SupplyStore.off = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) i.status = 'off'; });
+    this.write(s);
+  };
+  SupplyStore.on = function (id) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) i.status = 'active'; });
+    this.write(s);
+  };
+
+  /* 投递记录补充发布者：按 jobId 反查 SupplyStore.publisher（幂等，兼容旧数据） */
+  function applyPublisherOf(jobId) {
+    try {
+      var items = (window.SupplyStore && SupplyStore.read) ? SupplyStore.read().items : [];
+      var hit = null;
+      for (var i = 0; i < items.length; i++) { if (String(items[i].id) === String(jobId)) { hit = items[i]; break; } }
+      return hit ? (hit.publisher || '') : '';
+    } catch (e) { return ''; }
+  }
+  var ApplyStore = makeStore('engchain-applies', { items: [] }, 'engchain:apply');
+  ApplyStore.add = function (record) {
+    var s = this.read();
+    var id = record.id || ('AP' + Date.now() + Math.floor(Math.random() * 1000));
+    var item = Object.assign({
+      id: id, jobId: '', jobTitle: '', company: '', resumeSnapshot: {},
+      applyMsg: '', certsSelected: [], expSelected: '', status: 'pending',
+      publisherId: applyPublisherOf(record.jobId),
+      ts: Date.now(), updatedAt: Date.now()
+    }, record);
+    if (!item.publisherId && item.jobId) item.publisherId = applyPublisherOf(item.jobId);
+    var existIdx = s.items.findIndex(function (i) {
+      /* 去重键 = 岗位 + 投递人姓名：不同求职者可投同一岗位；同一人重复投递同岗位则覆盖（防重投） */
+      var n1 = (i.resumeSnapshot && i.resumeSnapshot.name) || '';
+      var n2 = (item.resumeSnapshot && item.resumeSnapshot.name) || '';
+      return i.jobId === item.jobId && n1 === n2;
+    });
+    if (existIdx >= 0) {
+      item.id = s.items[existIdx].id;
+      item.ts = s.items[existIdx].ts;
+      s.items[existIdx] = item;
+    } else {
+      s.items.unshift(item);
+    }
+    this.write(s);
+    return item;
+  };
+  ApplyStore.list = function () { return this.read().items; };
+  /* 按岗位聚合投递（企业侧"我的招聘"使用） */
+  ApplyStore.listByJob = function (jobId) {
+    return this.read().items.filter(function (i) { return String(i.jobId) === String(jobId); });
+  };
+  /* 按发布者聚合投递（企业侧收简历）；旧数据无 publisherId 时惰性反查回填 */
+  ApplyStore.byPublisher = function (uid) {
+    var s = this.read();
+    var dirty = false;
+    var out = [];
+    s.items.forEach(function (i) {
+      var pid = i.publisherId;
+      if (!pid && i.jobId) { pid = applyPublisherOf(i.jobId); if (pid) { i.publisherId = pid; dirty = true; } }
+      if (pid === uid) out.push(i);
+    });
+    if (dirty) this.write(s);
+    return out;
+  };
+  ApplyStore.byJob = function (jobId) {
+    return this.read().items.find(function (i) { return i.jobId === jobId; }) || null;
+  };
+  ApplyStore.hasApplied = function (jobId) {
+    return !!this.byJob(jobId);
+  };
+  ApplyStore.updateStatus = function (id, status) {
+    var s = this.read();
+    s.items.forEach(function (i) { if (i.id === id) { i.status = status; i.updatedAt = Date.now(); } });
+    this.write(s);
+  };
+  ApplyStore.remove = function (id) {
+    var s = this.read();
+    s.items = s.items.filter(function (i) { return i.id !== id; });
+    this.write(s);
+  };
+
+  /* 迁移旧 engchain-publish 孤岛键中的发布记录 → SupplyStore（Step 6，幂等） */
+  (function migrateOldPublishRecords() {
+    try {
+      var old = JSON.parse(LS.getItem('engchain-publish') || 'null');
+      if (old && old.records && old.records.length) {
+        var s = SupplyStore.read();
+        old.records.forEach(function (r) {
+          if (!s.items.find(function (x) { return x.id === r.id; })) {
+            var amount = r.price ? (r.price + (r.unit ? ' ' + r.unit : '')) : '';
+            s.items.push(Object.assign({
+              id: r.id, status: r.status === 'active' ? 'active' : (r.status === 'review' ? 'pending_review' : 'rejected'),
+              ts: Date.now(), title: r.title || '未命名信息', cat: r.category || '材料',
+              dir: r.role || 'demand', company: r.company || '', location: r.location || '',
+              amount: amount, publisher: 'u1', source: 'migrated_publish',
+              sub: r.subType || '', unit: r.unit || '', qty: r.qty || '', price: r.price || '',
+              spec: r.spec || '', delivery: r.delivery || '', qualification: r.qualification || '',
+              tags: r.tags || [], desc: r.description || '', contact: r.contact || {}, address: r.address || ''
+            }));
+          }
+        });
+        SupplyStore.write(s);
+      }
+    } catch (e) {}
+  })();
+
+  /* ---- 服务广场·询盘线索（v3.2）：用户"免费咨询"留资即生成线索，服务商工作台可见 ----
+     字段：id / svcId / svcName / sellerId / buyerId / name / phone / serve(办理事项) / urge(紧急度)
+           note / status(new=新线索|contacted=已联系|dealt=已成交|invalid=无效) / createdAt ---- */
+  var LeadStore = makeStore('engchain-agency-leads', { items: [] }, 'engchain:lead');
+  LeadStore.create = function (input) {
+    var s = this.read();
+    var lead = Object.assign({
+      id: 'LD' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      svcId: input.svcId || '', svcName: input.svcName || '中介服务', sellerId: input.sellerId || 'u2',
+      buyerId: input.buyerId || '', name: input.name || '', phone: input.phone || '',
+      serve: input.serve || '', urge: input.urge || '', note: input.note || '',
+      status: 'new', createdAt: Date.now()
+    }, input);
+    s.items.unshift(lead);
+    this.write(s);
+    return lead;
+  };
+  LeadStore.list = function (opt) {
+    opt = opt || {};
+    var a = this.read().items.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
+    if (opt.sellerId) a = a.filter(function (l) { return l.sellerId === opt.sellerId; });
+    if (opt.svcId) a = a.filter(function (l) { return l.svcId === opt.svcId; });
+    if (opt.status) a = a.filter(function (l) { return l.status === opt.status; });
+    return a;
+  };
+  LeadStore.byId = function (id) {
+    var items = this.read().items, i;
+    for (i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  };
+  LeadStore.setStatus = function (id, status) {
+    var s = this.read();
+    var hit = null;
+    s.items.forEach(function (l) { if (l.id === id) { l.status = status; l.updatedAt = Date.now(); hit = l; } });
+    this.write(s);
+    return hit;
+  };
+  LeadStore.countBySvc = function (svcId) {
+    return this.list({ svcId: svcId }).length;
+  };
+  LeadStore.stats = function (sellerId) {
+    var all = this.list({ sellerId: sellerId });
+    return {
+      total: all.length,
+      fresh: all.filter(function (l) { return l.status === 'new'; }).length,
+      bySvc: (function () {
+        var m = {};
+        all.forEach(function (l) { m[l.svcId] = (m[l.svcId] || 0) + 1; });
+        return m;
+      })()
+    };
+  };
+
+  /* ---- 需求广场（v4.0 双向撮合）：买家发布需求 → 服务商报价 → 买家接受报价生成托管单 ----
+     需求状态机：open(开放报价) → quoted(已有报价) → matched(已接受报价) → closed(已转订单)
+                 / expired(超时自动关闭) / cancelled(买家取消)
+     报价 status：pending(待选择) / accepted(被接受) / declined(被拒绝) / withdrawn(撤回)
+     规则：需求发布即开放（实名即可），超时（commission.demandExpireDays，默认7天）未成交自动关闭；
+           买家可接受一个报价 → 生成订单后 markOrdered 关闭需求；服务商可撤回自己的 pending 报价 */
+  var DemandStore = makeStore('engchain-agency-demands', { items: [] }, 'engchain:demand');
+  DemandStore.expireDays = function () {
+    return (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.demandExpireDays) || 7;
+  };
+  DemandStore.create = function (input) {
+    var s = this.read();
+    var d = Object.assign({
+      id: 'DM' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      buyerId: input.buyerId || '', title: input.title || '', goal: input.goal || '',
+      state: input.state || '', time: input.time || '', budget: input.budget || '',
+      budgetWan: Number(input.budgetWan) || 0, desc: input.desc || '',
+      status: 'open', quotes: [], orderId: '', createdAt: Date.now(),
+      expiresAt: Date.now() + this.expireDays() * 86400000, updatedAt: Date.now()
+    }, input);
+    s.items.unshift(d); this.write(s); return d;
+  };
+  DemandStore._expire = function () {
+    var s = this.read(), now = Date.now(), changed = false;
+    s.items.forEach(function (d) {
+      if ((d.status === 'open' || d.status === 'quoted') && d.expiresAt && d.expiresAt <= now) {
+        d.status = 'expired'; d.updatedAt = now; changed = true;
+      }
+    });
+    if (changed) this.write(s);
+  };
+  DemandStore.list = function (opt) {
+    this._expire();
+    opt = opt || {};
+    var a = this.read().items.slice().sort(function (x, y) { return y.createdAt - x.createdAt; });
+    if (opt.buyerId) a = a.filter(function (d) { return d.buyerId === opt.buyerId; });
+    if (opt.sellerId) a = a.filter(function (d) { return (d.quotes || []).some(function (q) { return q.sellerId === opt.sellerId; }); });
+    if (opt.status) a = a.filter(function (d) { return d.status === opt.status; });
+    if (opt.openOnly) a = a.filter(function (d) { return d.status === 'open' || d.status === 'quoted'; });
+    return a;
+  };
+  DemandStore.byId = function (id) {
+    this._expire();
+    var items = this.read().items, i;
+    for (i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+    return null;
+  };
+  DemandStore._save = function (d) {
+    var s = this.read(), found = false;
+    s.items.forEach(function (x, i) { if (x.id === d.id) { s.items[i] = d; found = true; } });
+    if (!found) s.items.unshift(d);
+    this.write(s); return d;
+  };
+  /* 服务商报价（需求 open/quoted 均可报；同一服务商对同一需求仅保留一条报价，重复报价视为修改） */
+  DemandStore.quote = function (id, input) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.status !== 'open' && d.status !== 'quoted') return { error: '该需求已结束报价' };
+    var sellerId = input.sellerId || '';
+    if (!sellerId) return { error: '缺少报价方' };
+    var amount = Number(input.amount) || 0;
+    if (!(amount > 0)) return { error: '请输入有效报价金额' };
+    var dup = null;
+    d.quotes.forEach(function (q) { if (q.sellerId === sellerId) dup = q; });
+    if (dup) {
+      dup.amount = amount; dup.note = input.note || dup.note || ''; dup.updatedAt = Date.now();
+    } else {
+      d.quotes.push({
+        id: 'DQ' + Date.now() + Math.floor(Math.random() * 90 + 10),
+        sellerId: sellerId, sellerName: input.sellerName || '', amount: amount,
+        note: input.note || '', status: 'pending', createdAt: Date.now(), updatedAt: Date.now()
+      });
+    }
+    d.status = 'quoted'; d.updatedAt = Date.now();
+    this._save(d); return { demand: d, quote: dup || d.quotes[d.quotes.length - 1] };
+  };
+  DemandStore.quoteOf = function (id, sellerId) {
+    var d = this.byId(id);
+    if (!d || !sellerId) return null;
+    var hit = null;
+    (d.quotes || []).forEach(function (q) { if (q.sellerId === sellerId) hit = q; });
+    return hit;
+  };
+  DemandStore.withdrawQuote = function (id, qid, sellerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    var q = null;
+    d.quotes = d.quotes.filter(function (x) { if (x.id === qid && x.sellerId === sellerId && x.status === 'pending') { q = x; return false; } return true; });
+    if (!q) return { error: '无可撤回的报价' };
+    if (!d.quotes.length) d.status = 'open';
+    d.updatedAt = Date.now(); this._save(d); return d;
+  };
+  /* 买家接受报价：需求 → matched（保留选中报价）；随后在订单创建页按报价生成托管单并 markOrdered */
+  DemandStore.acceptQuote = function (id, qid, buyerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId !== buyerId) return { error: '无权操作该需求' };
+    if (d.status === 'closed' || d.status === 'matched') return { error: '需求已成交' };
+    var q = null;
+    (d.quotes || []).forEach(function (x) { if (x.id === qid) q = x; });
+    if (!q) return { error: '报价不存在' };
+    d.quotes.forEach(function (x) { x.status = (x.id === qid) ? 'accepted' : 'declined'; });
+    d.status = 'matched'; d.selectedQuoteId = qid; d.updatedAt = Date.now();
+    this._save(d); return { demand: d, quote: q };
+  };
+  DemandStore.markOrdered = function (id, orderId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    d.status = 'closed'; d.orderId = orderId || d.orderId || ''; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+  DemandStore.cancel = function (id, buyerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId !== buyerId) return { error: '无权操作该需求' };
+    if (d.status === 'closed') return { error: '已成交需求不可取消' };
+    d.status = 'cancelled'; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+
+  DemandStore.platformClose = function (id, note) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.status === 'closed') return { error: '需求已成交，不可下架' };
+    d.status = 'cancelled'; d.platformClosed = true; d.platformNote = note || ''; d.updatedAt = Date.now();
+    this._save(d); return d;
+  };
+  /* [FEAT 9.2-1+] 需求广场精准解锁：标记需求已被某服务商解锁（先到先得，防重复），返回是否首次 */
+  DemandStore.unlockLead = function (id, sellerId) {
+    var d = this.byId(id);
+    if (!d) return { error: '需求不存在' };
+    if (d.buyerId === sellerId) return { error: '不可解锁自己发布的需求' };
+    if (d.unlockedBy) return { error: '该需求已被其他服务商解锁' };
+    d.unlockedBy = sellerId; d.unlockedAt = Date.now();
+    this._save(d); return d;
+  };
+
+  /* ---- 服务评价聚合（v3.2）：订单评价回流到服务卡片，形成口碑资产 ---- */
+  var SvcRatingStore = makeStore('engchain-svc-ratings', { items: {} }, 'engchain:svc-rating');
+  SvcRatingStore.add = function (svcId, score) {
+    var s = this.read();
+    var r = s.items[svcId] || { count: 0, sum: 0 };
+    r.count += 1; r.sum += (Number(score) || 0);
+    s.items[svcId] = r;
+    this.write(s);
+    return r;
+  };
+  SvcRatingStore.get = function (svcId) {
+    var r = this.read().items[svcId];
+    if (!r || !r.count) return null;
+    return { count: r.count, avg: Math.round((r.sum / r.count) * 10) / 10 };
+  };
+
+  /* ---- 服务商信用分（v3.3 WP4）：评价均分 + 履约率，首期只展示不计权 ----
+     公式：基础分60 + 评价分(avg/5*20) + 履约率分(履约订单/总订单*20)，上限100
+     无订单/无评价时返回默认分80（新服务商起步分） */
+  function svcCreditOf(sellerId, svcId) {
+    var base = 60, ratingMax = 20, fulfillMax = 20, defaultScore = 80;
+    var ratingScore = 0, ratingInfo = null;
+    if (svcId) {
+      /* 单服务维度：直接查该服务的评价 */
+      var r = SvcRatingStore.get(svcId);
+      if (r && r.count > 0) { ratingScore = Math.min(ratingMax, (r.avg / 5) * ratingMax); ratingInfo = r; }
+    } else if (sellerId) {
+      /* 服务商综合维度：遍历该服务商所有订单关联的服务，聚合评价 */
+      try {
+        if (window.Mediation) {
+          var allOrders = Mediation.list({ uid: sellerId, role: 'seller' });
+          var svcIds = {};
+          allOrders.forEach(function (o) { if (o.svcId) svcIds[o.svcId] = true; });
+          var totalCount = 0, totalSum = 0;
+          Object.keys(svcIds).forEach(function (sid) {
+            var sr = SvcRatingStore.get(sid);
+            if (sr && sr.count > 0) { totalCount += sr.count; totalSum += sr.sum; }
+          });
+          if (totalCount > 0) {
+            var avg = Math.round((totalSum / totalCount) * 10) / 10;
+            ratingScore = Math.min(ratingMax, (avg / 5) * ratingMax);
+            ratingInfo = { count: totalCount, avg: avg };
+          }
+        }
+      } catch (e) {}
+    }
+    var fulfillScore = 0, totalOrders = 0, fulfillRate = null;
+    try {
+      if (window.Mediation && sellerId) {
+        var orders = Mediation.list({ uid: sellerId, role: 'seller' });
+        totalOrders = orders.length;
+        if (totalOrders > 0) {
+          var bad = orders.filter(function (o) { return o.state === 'disputed' || o.state === 'refunded' || o.state === 'partial_refund'; }).length;
+          fulfillRate = Math.round(((totalOrders - bad) / totalOrders) * 100);
+          fulfillScore = Math.min(fulfillMax, ((totalOrders - bad) / totalOrders) * fulfillMax);
+        }
+      }
+    } catch (e) {}
+    if (ratingScore === 0 && totalOrders === 0) return { score: defaultScore, rating: null, fulfillRate: null, totalOrders: 0, level: '新入驻' };
+    var score = Math.round(Math.min(100, base + ratingScore + fulfillScore));
+    var level = score >= 95 ? '金牌' : (score >= 85 ? '银牌' : (score >= 70 ? '铜牌' : '观察'));
+    return { score: score, rating: ratingInfo, fulfillRate: fulfillRate, totalOrders: totalOrders, level: level };
+  }
+
+  /* ---- 破冰期/成熟期模式（v1.2 §10.4；phase: breakin=破冰期 / normal=成熟期） ---- */
+  var ModeStore = makeStore('engchain-mode', { phase: 'breakin' }, 'engchain:mode');
+  ModeStore.isBreakIn = function () {
+    var b = MOCK.business && MOCK.business.breakin;
+    return !!(b && b.enabled && this.read().phase === 'breakin');
+  };
+  ModeStore.switch = function (phase) { return this.set({ phase: phase === 'normal' ? 'normal' : 'breakin' }); };
+
+  /* ---- v3.0 五身份叠加推导：返回结构化身份对象 ----
+     个人线 personal: none=未认证 / verified=个人认证(实名) / professional=个人入驻(资质+简历)
+                      / partner=个人合伙人 / full=个人入驻+个人合伙人(叠加)
+     企业线 enterprise: none=未认证 / verified=企业认证 / resident=企业入驻
+     identities[]: 所有拥有的身份标识数组（realname/pro/partner/enterprise/resident）
+     partner: 是否拥有个人合伙人身份（布尔，与企业入驻 partner 类型区分）
+     entryTypes: 入驻类型数组（支持并行）
+     primary 优先级：企业入驻>企业认证>个人合伙人>个人入驻>个人认证>游客
+     这是全局唯一的身份推导函数，所有页面应调用此函数 */
+  var GUEST_IDENTITY = { personal: 'none', partner: false, enterprise: 'none', identities: [], entryTypes: [], isGuest: true, primary: 'guest',
+        personalEntryUserType: 'jobseeker', personalEntryResumeComplete: false };
+  function deriveIdentity() {
+    var a = AuthStore.read();
+    var e = EntryStore.read();
+    /* [S5] 统一游客判断口径（DataBus.isGuest：loggedIn===false 或 status==='guest'） */
+    if (window.DataBus && DataBus.isGuest && DataBus.isGuest()) {
+      return GUEST_IDENTITY;
+    }
+    /* v2 兜底：个别页面未引 databus.js（如 home/monitor/all-functions），DataBus 不存在。
+       回退读 UI.state 的【显式负信号】loggedIn===false / status==='guest' 判定游客，
+       避免空 Store 被默认推导成 registered。全新默认态（无该字段）不视为游客，保持原行为。 */
+    if (!window.DataBus || typeof DataBus.isGuest !== 'function') {
+      var _st = (window.UI && UI.state) ? UI.state.get() : null;
+      if (_st && (_st.loggedIn === false || _st.status === 'guest')) {
+        return GUEST_IDENTITY;
+      }
+    }
+    /* 个人线推导 */
+    var realnameOk = !!(a.realname && a.realname.ok);
+    /* personalEntry 优先（v3.0 新结构），回退 personalQual / qual（兼容旧数据） */
+    var pe = a.personalEntry || a.personalQual || a.qual || { ok: false, list: [] };
+    /* v3.1：个人入驻用户类型与简历完成标记，仅从 personalEntry 读取，旧数据回退默认值 */
+    var peUserType = (a.personalEntry && a.personalEntry.userType) ? a.personalEntry.userType : 'jobseeker';
+    var peResumeComplete = !!(a.personalEntry && a.personalEntry.resumeComplete);
+    var proOk = !!(pe.ok && pe.list && pe.list.length);
+    var partnerOk = !!(a.partner && a.partner.ok);
+    var personal = 'none';
+    if (proOk && partnerOk) personal = 'full';
+    else if (partnerOk) personal = 'partner';
+    else if (proOk) personal = 'professional';
+    else if (realnameOk) personal = 'verified';
+    /* identities 数组：列出所有叠加身份 */
+    var identities = [];
+    if (realnameOk) identities.push('realname');
+    if (proOk) identities.push('pro');
+    if (partnerOk) identities.push('partner');
+    /* 企业线推导 */
+    var enterprise = 'none';
+    var types = (e.types && e.types.length) ? e.types : (e.type ? [e.type] : []);
+    if (types.length && e.active && e.status === 'active') enterprise = 'resident';
+    else if (a.enterprise && a.enterprise.ok && a.enterprise.expireAt > Date.now()) enterprise = 'verified';
+    if (enterprise === 'verified') identities.push('enterprise');
+    if (enterprise === 'resident') identities.push('resident');
+    /* 主身份（v3.0 优先级：企业入驻>企业认证>个人合伙人>个人入驻>个人认证>游客） */
+    var primary = 'registered';
+    if (enterprise === 'resident') primary = 'resident';
+    else if (enterprise === 'verified') primary = 'enterprise';
+    else if (partnerOk) primary = 'partner';
+    else if (proOk) primary = 'pro';
+    else if (realnameOk) primary = 'realname';
+    return { personal: personal, partner: partnerOk, enterprise: enterprise, identities: identities, entryTypes: types, isGuest: false, primary: primary,
+      personalEntryUserType: peUserType, personalEntryResumeComplete: peResumeComplete };
+  }
+
+  /* ---- v3.0 五轨道"成长路径"状态推导（与认证中心 auth.html 同源的唯一权威） ----
+     入参可省略，默认读当前 AuthStore/EntryStore；亦可显式传入 auth/entry 快照用于断言。
+     返回：
+       states  : { realname, 'personal-entry', partner, enterprise, entry }
+                 每轨取值 locked(未解锁) / todo(待开通) / review(审核中) / reject(已驳回) / done(已通过)
+       notes   : 各轨驳回/提示文案（实名轨恒为空，实名自动核验）
+       doneN   : 已点亮轨道数（0–5）
+       priority: 当前应引导用户处理的轨道 key——先 reject 后 review；企业线优先于个人线；无则 null
+       idy     : 同步计算的 deriveIdentity() 结果（供权益/主身份展示）
+     说明：实名为基石且为二要素+活体自动核验通过，业务上只有 todo/done（无 review/reject 写入路径）。 */
+  var IDENTITY_STATE_KEYS = ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'];
+  var IDENTITY_PRIORITY_ORDER = ['enterprise', 'entry', 'partner', 'personal-entry', 'realname'];
+  function deriveIdentityStates(authArg, entryArg) {
+    var a = authArg || (window.AuthStore ? AuthStore.read() : {});
+    var e = entryArg || (window.EntryStore ? EntryStore.read() : {});
+    var now = Date.now();
+    var states = {}, notes = {};
+
+    var rnDone = !!(a.realname && a.realname.ok);
+    states.realname = rnDone ? 'done' : (a.realname && a.realname.status === 'pending' ? 'review' : 'todo');
+    notes.realname = '';
+
+    var pe = a.personalEntry || a.personalQual || a.qual || { ok: false, list: [], status: '', note: '' };
+    notes['personal-entry'] = pe.note || '';
+    states['personal-entry'] = (function () {
+      if (pe.ok && pe.list && pe.list.length) return 'done';
+      if (!rnDone) return 'locked';
+      if (pe.status === 'pending') return 'review';
+      if (!pe.ok && pe.note) return 'reject';
+      return 'todo';
+    })();
+
+    var pt = a.partner || { ok: false, status: '', note: '' };
+    notes.partner = pt.note || '';
+    states.partner = (function () {
+      if (pt.ok) return 'done';
+      if (!rnDone) return 'locked';
+      if (pt.status === 'pending') return 'review';
+      if (pt.status === 'rejected' || (!pt.ok && pt.note)) return 'reject';
+      return 'todo';
+    })();
+
+    var ent = a.enterprise || { ok: false, expireAt: 0, status: '', note: '' };
+    notes.enterprise = ent.note || '';
+    states.enterprise = (function () {
+      if (ent.ok && ent.expireAt > now) return 'done';
+      if (!rnDone) return 'locked';
+      if (ent.status === 'pending') return 'review';
+      if (ent.status === 'rejected' || (!ent.ok && ent.note)) return 'reject';
+      return 'todo';
+    })();
+
+    var types = (e.types && e.types.length) ? e.types : (e.type ? [e.type] : []);
+    notes.entry = e.note || '';
+    states.entry = (function () {
+      if (!rnDone) return 'locked';
+      if (types.length && e.active && e.status === 'active') return 'done';
+      if (e.status === 'pending' || e.status === 'first_ok') return 'review';
+      if (!e.active && e.status === 'rejected') return 'reject';
+      return 'todo';
+    })();
+
+    var priority = null;
+    for (var r = 0; r < IDENTITY_PRIORITY_ORDER.length; r++) {
+      if (states[IDENTITY_PRIORITY_ORDER[r]] === 'reject') { priority = IDENTITY_PRIORITY_ORDER[r]; break; }
+    }
+    if (!priority) {
+      for (var v = 0; v < IDENTITY_PRIORITY_ORDER.length; v++) {
+        if (states[IDENTITY_PRIORITY_ORDER[v]] === 'review') { priority = IDENTITY_PRIORITY_ORDER[v]; break; }
+      }
+    }
+    var doneN = 0;
+    for (var i = 0; i < IDENTITY_STATE_KEYS.length; i++) if (states[IDENTITY_STATE_KEYS[i]] === 'done') doneN++;
+
+    return { states: states, notes: notes, doneN: doneN, priority: priority, idy: deriveIdentity() };
+  }
+
+  /* ---- 状态推导：据认证/入驻记录返回当前有效用户状态 id（六级，@deprecated 兼容旧代码） ----
+     v2.0：内部调用 deriveIdentity()，返回主身份单值；新代码应直接使用 deriveIdentity() */
+  function deriveStatus() {
+    return deriveIdentity().primary;
+  }
+
+  /* ---- 会员折扣：按入驻类型取积分折扣系数（v2.0 多类型并行取最高折扣） ---- */
+  function creditDiscount() {
+    /* [FEAT 9.2-1] 年度解锁会员：积分折扣提升至 0.5x（最高优先级） */
+    if (window.MemberStore && MemberStore.isActive()) {
+      var annualCfg = (MOCK.business.membership && MOCK.business.membership.membershipAnnual) || {};
+      return annualCfg.creditDiscount || 0.5;
+    }
+    var idy = deriveIdentity();
+    /* P3-7：个人合伙人享有 0.8x 积分折扣（假设：与建筑企业同档，作为推广者激励；产品决策可调整） */
+    if (idy.partner && idy.enterprise !== 'resident') return 0.8;
+    if (idy.enterprise !== 'resident') return 1;
+    var types = idy.entryTypes;
+    if (!types.length) return 1;
+    var t = (MOCK.business.membership && MOCK.business.membership.types) || [];
+    var best = 1;
+    for (var i = 0; i < t.length; i++) {
+      if (types.indexOf(t[i].id) >= 0 && t[i].creditDiscount < best) best = t[i].creditDiscount;
+    }
+    return best;
+  }
+
+  /* ---- 佣金阶梯：按金额取费率（P0-5.1）；破冰期首档优惠至 commissionFirstTier ---- */
+  function commissionRate(amount) {
+    var cm = MOCK.business.commission || { tier: [] };
+    var rate = 0.08; var i;
+    for (i = 0; i < cm.tier.length; i++) if (amount >= cm.tier[i].min) rate = cm.tier[i].rate;
+    var firstMin = (cm.tier[1] && cm.tier[1].min) || 50000;
+    if (window.ModeStore && ModeStore.isBreakIn() && MOCK.business.breakin && amount < firstMin) {
+      rate = MOCK.business.breakin.commissionFirstTier || rate;
+    }
+    var total = Math.round(amount * rate);
+    /* [FIX BM-028] 佣金下限（小额保护）：按用户确认改为"最低单笔佣金"。
+       原保底规则（amount>=500000 && total<10000）在 4%/3% 档下永不触发（死逻辑），
+       现改为对全部订单生效的单笔下限，避免超小额订单佣金趋零、也不产生倒挂。 */
+    if (amount > 0 && total < cm.minCommission) total = cm.minCommission;
+    return { rate: rate, fee: total };
+  }
+
+  /* ---- 入口门控源：身份+入驻类型 → 专有入口显隐/档位（单一来源，v3.0 五身份叠加） ----
+     规则：分销中心 = 企业入驻 或 个人合伙人；中介服务 = 中介服务企业（入驻类型含 agency）专有。
+     多类型入驻时：分销档位取最高（合伙人>中介>建筑），中介权限只要含 agency 即可。
+     个人合伙人：享有二级分销 distTier='full'，但无团队管理权限（hasTeam=false）。
+     profile 宫格 / distribution×3 / agency×2 统一引用本函数，杜绝入口显隐与页面门控错配。 */
+  function entryAccess() {
+    var idy = deriveIdentity();
+    var id = idy.primary;
+    var types = idy.entryTypes;
+    var isResident = (idy.enterprise === 'resident');
+    /* 个人合伙人：拥有 partner 身份但非企业入驻（与企业入驻 partner 类型区分） */
+    var isIndividualPartner = !!(idy.partner && idy.identities.indexOf('partner') >= 0 && !isResident);
+    /* 主入驻类型：取数组第一个（兼容旧单值 type） */
+    var type = isResident ? (types.length ? types[0] : 'construction') : '';
+    /* 多类型入驻时分销档位取最高：合伙人=完整二级 / 中介=受限一级6% / 建筑=基础一级
+       个人合伙人也享有完整二级分销，但无团队管理 */
+    var distTier = 'base';
+    if (types.indexOf('partner') >= 0) distTier = 'full';
+    else if (types.indexOf('agency') >= 0) distTier = 'limited';
+    else if (isIndividualPartner) distTier = 'full';
+    var dist = isResident || isIndividualPartner;
+    return {
+      statusId: id,
+      identity: idy,
+      isResident: isResident,
+      isIndividualPartner: isIndividualPartner,
+      type: type,
+      types: types,
+      /* 分销中心：企业入驻 或 个人合伙人可见；档位按入驻类型/身份取最高 */
+      dist: dist,
+      distTier: distTier,
+      distBadge: distTier === 'full' ? (isIndividualPartner ? '个人合伙人' : '专属') : (distTier === 'limited' ? '受限' : '蓝V'),
+      /* 中介服务：入驻类型含 agency 即可（多类型并行时也有效） */
+      agency: isResident && types.indexOf('agency') >= 0,
+      agencyBadge: '金V',
+      /* 团队管理：仅企业入驻且类型含 partner 时拥有；个人合伙人无团队管理 */
+      hasTeam: isResident && types.indexOf('partner') >= 0
+    };
+  }
+
+  /* ---- 发布能力矩阵（v2 叠加身份模型）：按账号实时计算可用品类 ----
+     个人侧：实名→材料/设备/劳务(D+S)+资质招商(D)；专业入驻→+求职(S，单独核准)
+     企业侧：认证→材料/设备/劳务(D+S)+资质招商(D+S)+招聘(D)+建企买卖(D，非中介)
+             建筑入驻→+建企买卖(S)；中介入驻→资质招商仅D、招聘/建企买卖不可发、+中介服务(S，
+             编辑器内由 data-locked 锁定机制控制仅工作台可见)
+     return: role==='demand'? 需求侧品类数组 : 供应侧品类数组 */
+  function publishableCats(acc, role) {
+    var d = [], s = [];
+    if (!acc || !acc.identity) return role === 'demand' ? d : s;
+    var per = acc.identity.personal || 'none';
+    var ent = acc.identity.enterprise || 'none';
+    var types = acc.types || [];
+    var isAgency = types.indexOf('agency') >= 0;
+    var isConst = types.indexOf('construction') >= 0;
+    var isEnt = ent === 'verified' || ent === 'resident';
+    var isPer = per === 'verified' || per === 'professional';
+    var base = ['材料', '设备', '劳务'];
+    if (isPer || isEnt) { d = d.concat(base); s = s.concat(base); }
+    if (isPer) d.push('资质招商');
+    if (isEnt) {
+      d.push('资质招商');
+      if (!isAgency) {
+        s.push('资质招商');
+        d.push('招聘');
+        d.push('建企买卖');
+      }
+      if (isConst) s.push('建企买卖');
+    }
+    if (per === 'professional') s.push('求职');
+    if (isAgency) s.push('中介服务');
+    /* 中介需求侧（找中介服务）本期开放：已实名个人/企业均可发代办/担保等需求 */
+    if (isPer || isEnt) d.push('中介服务');
+    return role === 'demand' ? d : s;
+  }
+
+
+  /* ---- [FEAT 9.2-1] 增值道具 Store（R6 B端增值道具） ----
+     键 engchain-upgrades，结构 { items: [{id, type, targetId, startedAt, expireAt, status}] } */
+  var UpgradeStore = makeStore('engchain-upgrades', { items: [], meta: {} }, 'engchain:upgrades');
+  UpgradeStore.purchase = function (type, targetId) {
+    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades[type]) || null;
+    if (!cfg || !cfg.enabled) return { error: '该道具未上架' };
+    /* [FEAT 9.2-4] 入驻类型权限检查 */
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    var isIndividualPartner = !!(idy.partner && idy.enterprise !== 'resident');
+    var types = idy.entryTypes || [];
+    var allowed = cfg.entryTypes || [];
+    var canBuy = false;
+    /* 个人合伙人：可购买 topListing 和 saasTools */
+    if (isIndividualPartner && (type === 'topListing' || type === 'saasTools')) canBuy = true;
+    /* 企业入驻：检查 entryTypes 匹配 */
+    if (!canBuy) {
+      for (var i = 0; i < types.length; i++) {
+        if (allowed.indexOf(types[i]) >= 0) { canBuy = true; break; }
+      }
+    }
+    if (!canBuy) return { error: '您的入驻类型暂不支持购买该道具' };
+    /* 置顶道具必须指定目标信息（组合包名额除外，走 applyTop） */
+    if (type === 'topListing' && !targetId) return { error: '请先选择要置顶的供需信息' };
+    /* 扣减费用（新客礼首购立减） */
+    var price = this.effectivePrice(cfg.price || 0);
+    var _mg = (MOCK.business.commission.vendorUpgrades.marketing) || {};
+    var _gd = (_mg.newGift || {}).discount || 0;
+    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (cfg.label || type) + (this.newGiftClaimed() ? '' : '（新客礼立减¥' + _gd + '）') });
+    if (!consumed) return { error: '余额不足，无法购买' };
+    /* 创建道具记录 */
+    var now = Date.now();
+    var duration = (cfg.durationDays || 0) * 86400000;
+    var item = {
+      id: 'UG' + now + Math.floor(Math.random() * 90 + 10),
+      type: type,
+      targetId: targetId || '',
+      startedAt: now,
+      expireAt: duration ? now + duration : 0,
+      count: cfg.count || 0,
+      used: 0,
+      status: 'active',
+      purchasedAt: now
+    };
+    var s = this.read();
+    s.items.unshift(item);
+    this.write(s);
+    if (!this.newGiftClaimed()) this.claimNewGift();
+    return item;
+  };
+  /* [FEAT 9.2-1+] 营销层：meta 读写与新客礼状态 */
+  UpgradeStore.meta = function () { return this.read().meta || {}; };
+  UpgradeStore.newGiftClaimed = function () { return !!(this.meta() && this.meta().newGiftClaimed); };
+  UpgradeStore.claimNewGift = function () {
+    var s = this.read();
+    if (!s.meta) s.meta = {};
+    s.meta.newGiftClaimed = true; s.meta.newGiftClaimedAt = Date.now();
+    this.write(s);
+  };
+  /* 新客礼：首次购买立减；返回优惠后的应付价（无优惠则原价） */
+  UpgradeStore.effectivePrice = function (price) {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var mg = vus.marketing || {};
+    if (mg.newGift && mg.newGift.enabled && !this.newGiftClaimed() && price > 0) {
+      return Math.max(0, Math.round((price - (mg.newGift.discount || 0)) * 100) / 100);
+    }
+    return price;
+  };
+  /* 组合包购买：按 marketing.combo 配置一次创建多个道具（置顶名额先建后应用） */
+  UpgradeStore.purchaseCombo = function () {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var mg = vus.marketing || {};
+    var combo = mg.combo;
+    if (!combo || !combo.enabled) return { error: '组合包未上架' };
+    var price = this.effectivePrice(combo.price || 0);
+    var _gd = (mg.newGift || {}).discount || 0;
+    var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (combo.label || '流量组合包') + (this.newGiftClaimed() ? '' : '（新客礼立减¥' + _gd + '）') });
+    if (!consumed) return { error: '余额不足，无法购买' };
+    var now = Date.now();
+    var items = [];
+    (combo.items || []).forEach(function (c) {
+      var cfg = vus[c.type];
+      if (!cfg || !cfg.enabled) return;
+      for (var k = 0; k < (c.qty || 1); k++) {
+        var duration = (cfg.durationDays || 0) * 86400000;
+        var isTop = c.type === 'topListing';
+        items.push({
+          id: 'UG' + Date.now() + Math.floor(Math.random() * 90 + 10) + k,
+          type: c.type,
+          targetId: '',
+          startedAt: isTop ? 0 : now,
+          expireAt: isTop ? 0 : (duration ? now + duration : 0),
+          count: isTop ? 0 : (cfg.count || 0),
+          used: 0,
+          status: 'active',
+          purchasedAt: now,
+          fromCombo: true
+        });
+      }
+    });
+    if (!items.length) { BalanceStore.refund(price, '组合包退款：无可创建道具', {}); return { error: '组合包无可创建道具' }; }
+    var s = this.read();
+    s.items = items.concat(s.items);
+    this.write(s);
+    if (!this.newGiftClaimed()) this.claimNewGift();
+    return items;
+  };
+  /* 应用置顶名额：组合包未使用的 topListing 名额 → 指定目标信息，开始置顶计时 */
+  UpgradeStore.applyTop = function (itemId, targetId) {
+    var s = this.read();
+    var hit = null;
+    (s.items || []).forEach(function (it) { if (it.id === itemId) hit = it; });
+    if (!hit) return { error: '名额不存在' };
+    if (hit.type !== 'topListing' || hit.targetId) return { error: '该名额已使用' };
+    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades.topListing) || {};
+    if (!cfg.enabled) return { error: '该道具未上架' };
+    var now = Date.now();
+    var activeTop = this.listActive();
+    for (var i = 0; i < activeTop.length; i++) {
+      var t = activeTop[i];
+      if (t.type === 'topListing' && t.targetId === targetId) return { error: '该信息已在置顶中' };
+    }
+    hit.targetId = targetId;
+    hit.startedAt = now;
+    hit.expireAt = now + (cfg.durationDays || 7) * 86400000;
+    this.write(s);
+    return hit;
+  };
+  UpgradeStore.isActive = function (type, targetId) {
+    var now = Date.now();
+    var items = this.read().items || [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (it.type !== type || it.status !== 'active') continue;
+      /* 未使用名额不视为生效（topListing 空 targetId，组合包名额待应用） */
+      if (it.type === 'topListing' && !it.targetId) continue;
+      if (targetId && it.targetId && it.targetId !== targetId) continue;
+      if (it.expireAt && it.expireAt <= now) continue;
+      return true;
+    }
+    return false;
+  };
+  UpgradeStore.listActive = function () {
+    var now = Date.now();
+    return (this.read().items || []).filter(function (it) {
+      if (it.status !== 'active') return false;
+      if (it.expireAt && it.expireAt <= now) return false;
+      return true;
+    });
+  };
+  UpgradeStore.listAvailable = function () {
+    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    var isIndividualPartner = !!(idy.partner && idy.enterprise !== 'resident');
+    var types = idy.entryTypes || [];
+    var out = [];
+    Object.keys(vus).forEach(function (key) {
+      var cfg = vus[key];
+      if (!cfg || !cfg.enabled) return;
+      if (key === 'marketing') return; /* 营销配置非道具 */
+      var allowed = cfg.entryTypes || [];
+      var canBuy = false;
+      if (isIndividualPartner && (key === 'topListing' || key === 'saasTools')) canBuy = true;
+      if (!canBuy) {
+        for (var i = 0; i < types.length; i++) {
+          if (allowed.indexOf(types[i]) >= 0) { canBuy = true; break; }
+        }
+      }
+      out.push(Object.assign({}, cfg, { key: key, available: canBuy }));
+    });
+    return out;
+  };
+  UpgradeStore.countActiveByType = function (type) {
+    return this.listActive().filter(function (it) { return it.type === type; }).length;
+  };
+  /* [FEAT 9.2-1+] 线索包配额：usage 已用 / remaining 剩余 / consume 消耗 1 条 */
+  UpgradeStore.usage = function (type) {
+    var used = 0;
+    this.listActive().forEach(function (it) { if (it.type === type) used += (it.used || 0); });
+    return used;
+  };
+  UpgradeStore.remaining = function (type) {
+    var rem = 0;
+    this.listActive().forEach(function (it) { if (it.type === type) rem += Math.max(0, (it.count || 0) - (it.used || 0)); });
+    return rem;
+  };
+  UpgradeStore.consume = function (type, meta) {
+    var now = Date.now();
+    var s = this.read();
+    var hit = null;
+    (s.items || []).forEach(function (it) {
+      if (hit) return;
+      if (it.type !== type || it.status !== 'active') return;
+      if (it.expireAt && it.expireAt <= now) return;
+      if ((it.count || 0) - (it.used || 0) <= 0) return;
+      hit = it;
+    });
+    if (!hit) {
+      var _lb = ((MOCK.business.commission.vendorUpgrades || {})[type] || {}).label || type;
+      return { error: '暂无可用' + _lb + '配额' };
+    }
+    hit.used = (hit.used || 0) + 1;
+    this.write(s);
+    return { item: hit, used: hit.used, remaining: Math.max(0, (hit.count || 0) - hit.used) };
+  };
+  /* 到期提醒：返回在 days 天内到期的生效道具 */
+  UpgradeStore.expireSoon = function (days) {
+    var now = Date.now(), out = [];
+    this.listActive().forEach(function (it) {
+      if (it.expireAt && it.expireAt - now <= days * 86400000 && it.expireAt > now) out.push(it);
+    });
+    return out;
+  };
+
+  /* ---- [FEAT 9.2-3] 供需匹配智能推送 Store ----
+     键 engchain-matches，结构 { feed: [...], preferences: {cats, subs, dir, location, notify, updatedAt} }
+     v2：匹配池与发现页 mergedList 同源（MOCK.catalog + SupplyStore 活跃条目），
+         评分升级为 一级品类/二级细分/方向/地区/认证/热门/新发布 七维；
+         preferences 结构向后兼容（旧数据缺字段时按默认值补齐）。 */
+  var MatchStore = makeStore('engchain-matches',
+    { feed: [], preferences: { cats: [], subs: [], dir: '', location: '', notify: true, updatedAt: 0 } }, 'engchain:matches');
+
+  /* 品类归一：目录内部口径（中介/加盟/买卖/资质/人才）→ 用户可见标准品类 */
+  MatchStore.normCat = function (cat) {
+    var m = { '材料':'材料', '设备':'设备', '劳务':'劳务',
+      '中介':'中介服务', '中介服务':'中介服务', '加盟':'资质招商', '资质招商':'资质招商', '招商':'资质招商',
+      '买卖':'建企买卖', '建企买卖':'建企买卖', '资质':'招聘', '人才':'求职',
+      '招聘':'招聘', '求职':'求职' };
+    return m[cat] || cat || '';
+  };
+
+  /* 有效方向：机会类（资质招商/建企买卖/招商加盟）按业务语义判定供需侧 */
+  MatchStore.effDir = function (item) {
+    var d = item.dir || item.type || '';
+    if (d === 'supply' || d === 'demand') return d;
+    var t = String(item.title || '');
+    if (item.bizKey === 'personnel') return 'demand';
+    if (item.bizKey === 'talent') return 'supply';
+    if (item.bizKey === 'franchise') return 'supply';
+    if (item.bizKey === 'trade') return /收购|求购|购买/.test(t) ? 'demand' : 'supply';
+    if (d === 'opportunity') return /收购|求购|购买|招聘|急需|需要|发包|采购|急租/.test(t) ? 'demand' : 'supply';
+    return 'supply';
+  };
+
+  /* 城市归一：city 字段优先，缺失时取 location「·」前段 */
+  MatchStore.cityOf = function (item) {
+    if (item.city) return String(item.city).split('·')[0];
+    if (item.location) return String(item.location).split('·')[0];
+    return '';
+  };
+
+  /* 匹配池：与发现页 mergedList 同源（MOCK.catalog + SupplyStore 活跃条目），按 id 去重 */
+  MatchStore.pool = function () {
+    var out = [], seen = {};
+    function push(x) {
+      if (!x) return;
+      var k = String(x.id || '');
+      if (k && seen[k]) return;
+      if (k) seen[k] = 1;
+      out.push(x);
+    }
+    try { ((window.MOCK && MOCK.catalog) || []).forEach(push); } catch (e) {}
+    try { ((window.SupplyStore ? SupplyStore.listActive() : []) || []).forEach(push); } catch (e) {}
+    return out;
+  };
+
+  /* 七维评分：页面实时预览与 generate 共用同一逻辑 */
+  MatchStore.score = function (item, prefs) {
+    var p = prefs || {};
+    var cats = p.cats || [], subs = p.subs || [], dir = p.dir || '', loc = p.location || '';
+    if (!cats.length && !subs.length && !dir && !loc) {
+      return { score: 30, hints: [] };
+    }
+    var s = 0, hints = [];
+    var ncat = MatchStore.normCat(item.cat || item.category || '');
+    if (cats.length && cats.indexOf(ncat) >= 0) { s += 35; hints.push('品类'); }
+    var sub = item.sub || item.subType || '';
+    if (subs.length && sub && subs.indexOf(sub) >= 0) { s += 20; hints.push('细分'); }
+    var ed = MatchStore.effDir(item);
+    if (dir && ed === dir) { s += 15; hints.push('方向'); }
+    var c = MatchStore.cityOf(item);
+    if (loc && c && (c === loc || String(item.location || '').indexOf(loc) >= 0)) { s += 20; hints.push('地区'); }
+    if (item.verified) { s += 5; hints.push('认证'); }
+    if (item.hot) { s += 5; hints.push('热门'); }
+    if (item.ts) {
+      try { if ((Date.now() - Date.parse(item.ts)) / 864e5 <= 7) { s += 5; hints.push('新发布'); } } catch (e) {}
+    }
+    return { score: Math.min(100, s), hints: hints };
+  };
+
+  MatchStore.setPreferences = function (prefs) {
+    var merged = Object.assign({}, this.read().preferences, prefs || {});
+    merged.updatedAt = Date.now();
+    return this.set({ preferences: merged });
+  };
+
+  MatchStore.generate = function () {
+    var s = this.read();
+    var prefs = Object.assign({ cats: [], subs: [], dir: '', location: '', notify: true, updatedAt: 0 }, s.preferences || {});
+    var list = MatchStore.pool();
+    var scored = list.map(function (item) {
+      var r = MatchStore.score(item, prefs);
+      return { item: item, score: r.score, hints: r.hints };
+    });
+    scored.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      var ta = a.item.ts ? (Date.parse(a.item.ts) || 0) : 0;
+      var tb = b.item.ts ? (Date.parse(b.item.ts) || 0) : 0;
+      return tb - ta;
+    });
+    var top = scored.slice(0, 10);
+    /* 生成 feed（保留已读状态与旧时间戳） */
+    var existing = {};
+    (s.feed || []).forEach(function (f) { existing[f.sourceId] = f; });
+    var now = Date.now();
+    var newFeed = top.map(function (x, idx) {
+      var src = x.item;
+      var eid = src.id || ('M' + idx);
+      var old = existing[eid];
+      var ed = MatchStore.effDir(src);
+      return {
+        id: eid,
+        type: ed,
+        title: src.title || src.cat || '供需信息',
+        desc: src.desc || src.sub || '',
+        matchScore: x.score,
+        sourceId: src.id,
+        cat: MatchStore.normCat(src.cat || ''),
+        sub: src.sub || '',
+        location: src.location || src.city || '',
+        effDir: ed,
+        hints: x.hints || [],
+        verified: !!src.verified,
+        hot: !!src.hot,
+        ts: old ? old.ts : now,
+        read: old ? old.read : false
+      };
+    });
+    this.write({ feed: newFeed, preferences: prefs });
+    return newFeed;
+  };
+  MatchStore.markRead = function (id) {
+    var s = this.read();
+    (s.feed || []).forEach(function (f) { if (f.id === id) f.read = true; });
+    this.write(s);
+  };
+  MatchStore.listUnread = function () {
+    return (this.read().feed || []).filter(function (f) { return !f.read; });
+  };
+  /* ---- [FEAT 9.2-1] 年度解锁会员订阅（P1）：年费 ¥999/年，全部详情免费解锁 + 积分折扣 0.5x ----
+     结构：{ active, type, startedAt, expireAt, autoRenew }
+     subscribe()：BalanceStore.consume 扣年费；已在有效期内则续费叠加（expireAt 在原到期日上顺延 365 天） */
+  var MemberStore = makeStore('engchain-member',
+    { active: false, type: 'annual', startedAt: 0, expireAt: 0, autoRenew: false },
+    'engchain:member');
+  MemberStore.isActive = function () {
+    var s = this.read();
+    return !!(s.active && s.expireAt > Date.now());
+  };
+  MemberStore.subscribe = function (type) {
+    var cfg = (MOCK.business.membership && MOCK.business.membership.membershipAnnual) || { price: 999, cycle: 'year', label: '年度解锁会员' };
+    var price = Math.round((cfg.price || 999) * 100) / 100;
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < price) return { ok: false, reason: 'insufficient_balance' };
+      BalanceStore.consume(price, 'membership', { remark: (cfg.label || '年度解锁会员') + '订阅' });
+    }
+    var now = Date.now();
+    var s = this.read();
+    var base = (s.active && s.expireAt > now) ? s.expireAt : now;
+    s.active = true; s.type = type || 'annual';
+    if (!s.startedAt) s.startedAt = now;
+    s.expireAt = base + 365 * 864e5;
+    this.write(s);
+    return { ok: true, expireAt: s.expireAt };
+  };
+  MemberStore.renew = function () { return this.subscribe(this.read().type || 'annual'); };
+
+  /* ---- [FEAT 9.2-4] 每日免费浏览摘要额度（P1）：游客3 / 注册未实名5 / 实名及以上10，跨天 0 点重置 ----
+     remaining() 惰性跨天重置 used；use(n) 原子扣减并返回是否成功。 */
+  var FreeQuotaStore = makeStore('engchain-free-quota', { date: '', used: 0 }, 'engchain:free-quota');
+  FreeQuotaStore._today = function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  FreeQuotaStore._limit = function () {
+    var q = (MOCK.business.freeDailyQuota) || { guest: 2, registered: 3, realname: 5 };
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    if (idy.isGuest) return q.guest || 2;
+    var realnameOk = (idy.personal === 'verified' || idy.personal === 'professional' || idy.personal === 'full' || idy.personal === 'partner' ||
+                      idy.enterprise === 'verified' || idy.enterprise === 'resident' || idy.partner === true);
+    return realnameOk ? (q.realname || 5) : (q.registered || 3);
+  };
+  FreeQuotaStore.remaining = function () {
+    var s = this.read(); var today = this._today();
+    if (s.date !== today) { s.date = today; s.used = 0; this.write(s); }
+    return Math.max(this._limit() - (s.used || 0), 0);
+  };
+  FreeQuotaStore.use = function (n) {
+    n = n || 1;
+    if (this.remaining() < n) return false;
+    var s = this.read(); s.used = (s.used || 0) + n; this.write(s);
+    return true;
+  };
+
+  /* ---- [FEAT 9.2-4] 经营数据看板 Store（P2） ----
+     键 engchain-dashboard，结构 { stats, trends, topCategories }
+     generate()：从 SupplyStore/LeadStore 等聚合数据生成统计；trend(period) 返回趋势 */
+  var DashboardStore = makeStore('engchain-dashboard',
+    { stats: { publishCount: 0, viewCount: 0, inquiryCount: 0, orderCount: 0, totalAmount: 0, avgAmount: 0 },
+      trends: { daily: [], weekly: [], monthly: [] }, topCategories: [] },
+    'engchain:dashboard');
+  DashboardStore.generate = function () {
+    var s = this.read();
+    var publishCount = 0, inquiryCount = 0, orderCount = 0, totalAmount = 0;
+    try {
+      var supplies = (window.SupplyStore ? SupplyStore.read().items : []) || [];
+      publishCount = supplies.filter(function (i) { return i.status === 'active'; }).length;
+    } catch (e) {}
+    try {
+      var leads = (window.LeadStore ? LeadStore.list() : []) || [];
+      inquiryCount = leads.length;
+    } catch (e) {}
+    try {
+      var orders = (window.Mediation ? Mediation.list({}) : []) || [];
+      orderCount = orders.filter(function (o) { return o.state === 'completed' || o.state === 'settled'; }).length;
+      totalAmount = orders.reduce(function (sum, o) { return sum + (Number(o.amount) || 0); }, 0);
+    } catch (e) {}
+    /* 模拟浏览量与客单价 */
+    var viewCount = publishCount * 47 + inquiryCount * 12;
+    var avgAmount = orderCount > 0 ? Math.round(totalAmount / orderCount) : 0;
+    s.stats = { publishCount: publishCount, viewCount: viewCount, inquiryCount: inquiryCount, orderCount: orderCount, totalAmount: totalAmount, avgAmount: avgAmount };
+    /* 生成近30天趋势 Mock 数据 */
+    var daily = [];
+    var now = Date.now();
+    for (var i = 29; i >= 0; i--) {
+      var dayTs = now - i * 864e5;
+      var seed = (i * 7 + 13) % 100;
+      daily.push({
+        date: new Date(dayTs).getMonth() + 1 + '/' + new Date(dayTs).getDate(),
+        amount: Math.round(5000 + seed * 300 + (29 - i) * 100),
+        inquiries: 2 + (seed % 8),
+        views: 20 + (seed % 40)
+      });
+    }
+    s.trends.daily = daily;
+    /* 近6个月周/月趋势 */
+    var weekly = [], monthly = [];
+    for (var w = 11; w >= 0; w--) {
+      var wSeed = (w * 13 + 7) % 100;
+      weekly.push({ label: 'W' + (12 - w), amount: Math.round(20000 + wSeed * 800), inquiries: 10 + (wSeed % 20) });
+    }
+    for (var m = 5; m >= 0; m--) {
+      var mSeed = (m * 17 + 3) % 100;
+      monthly.push({ label: (m + 1) + '月', amount: Math.round(80000 + mSeed * 3000), inquiries: 40 + (mSeed % 30) });
+    }
+    s.trends.weekly = weekly;
+    s.trends.monthly = monthly;
+    /* 品类分布 */
+    var catMap = {};
+    supplies.forEach(function (sup) {
+      var c = sup.cat || '其他';
+      catMap[c] = (catMap[c] || 0) + 1;
+    });
+    s.topCategories = Object.keys(catMap).map(function (k) { return { name: k, count: catMap[k] }; }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+    this.write(s);
+    return s;
+  };
+  DashboardStore.trend = function (period) {
+    var s = this.read();
+    return (s.trends && s.trends[period]) || [];
+  };
+
+  /* ---- [FEAT 9.2-5] 行业资讯/数据报告订阅 Store（P2） ----
+     键 engchain-reports，结构 { subscribed, expireAt, readIds, reports } */
+  var ReportStore = makeStore('engchain-reports',
+    { subscribed: false, expireAt: 0, readIds: [], reports: [] },
+    'engchain:reports');
+  ReportStore.subscribe = function (cycle) {
+    var cfg = (MOCK.business.industryReport && MOCK.business.industryReport.subscription) || { monthly: 29, yearly: 299 };
+    var price = cycle === 'yearly' ? (cfg.yearly || 299) : (cfg.monthly || 29);
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < price) return { error: '余额不足，请先充值' };
+      BalanceStore.consume(price, 'report_subscribe', { remark: '行业报告订阅-' + (cycle === 'yearly' ? '年费' : '月费') });
+    }
+    var now = Date.now();
+    var s = this.read();
+    var base = (s.subscribed && s.expireAt > now) ? s.expireAt : now;
+    s.subscribed = true;
+    s.expireAt = cycle === 'yearly' ? base + 365 * 864e5 : base + 30 * 864e5;
+    this.write(s);
+    return { ok: true, expireAt: s.expireAt, price: price };
+  };
+  ReportStore.isSubscribed = function () {
+    var s = this.read();
+    return !!(s.subscribed && s.expireAt > Date.now());
+  };
+  ReportStore.list = function (category) {
+    var reports = (window.MOCK && MOCK.reports) || [];
+    if (category && category !== '全部') reports = reports.filter(function (r) { return r.category === category; });
+    return reports;
+  };
+  var _origReportRead = ReportStore.read;
+  ReportStore.read = function (id) {
+    var s = _origReportRead.call(this);
+    if (id !== undefined) {
+      if (s.readIds.indexOf(id) < 0) { s.readIds.push(id); this.write(s); }
+    }
+    return s;
+  };
+  ReportStore.isRead = function (id) {
+    return (this.read().readIds || []).indexOf(id) >= 0;
+  };
+
+  /* ---- [FEAT 9.2-6] R7 B端数据服务/API Store（P3） ----
+     键 engchain-api，结构 { balance, calls, subscriptions } */
+  var ApiStore = makeStore('engchain-api',
+    { balance: 0, calls: [], subscriptions: [] },
+    'engchain:api');
+  ApiStore.recharge = function (amount) {
+    var amt = Math.round(amount * 100) / 100;
+    if (amt <= 0) return { error: '充值金额必须大于0' };
+    if (window.BalanceStore) {
+      if (BalanceStore.available() < amt) return { error: '余额不足，请先充值' };
+      BalanceStore.consume(amt, 'api_recharge', { remark: 'API余额充值' });
+    }
+    var s = this.read();
+    s.balance = Math.round((s.balance + amt) * 100) / 100;
+    this.write(s);
+    return { ok: true, balance: s.balance };
+  };
+  ApiStore.call = function (productId, params) {
+    var products = (MOCK.business.dataApi && MOCK.business.dataApi.products) || [];
+    var prod = null;
+    for (var i = 0; i < products.length; i++) { if (products[i].id === productId) { prod = products[i]; break; } }
+    if (!prod) return { error: 'API产品不存在' };
+    var s = this.read();
+    if (s.balance < prod.price) return { error: 'API余额不足，请充值' };
+    s.balance = Math.round((s.balance - prod.price) * 100) / 100;
+    var result = (window.MOCK && MOCK.apiResults && MOCK.apiResults[productId]) ? MOCK.apiResults[productId](params || {}) : { code: 0, message: 'success', data: {} };
+    var callRec = {
+      id: 'API' + Date.now() + Math.floor(Math.random() * 90 + 10),
+      product: productId, productName: prod.name,
+      params: params || {}, result: result,
+      ts: Date.now(), status: 'success', cost: prod.price
+    };
+    s.calls.unshift(callRec);
+    this.write(s);
+    return callRec;
+  };
+  ApiStore.history = function () {
+    return (this.read().calls || []).slice(0, 50);
+  };
+  ApiStore.products = function () {
+    return (MOCK.business.dataApi && MOCK.business.dataApi.products) || [];
+  };
+
+  /* ---- [FEAT 9.2-7] 收入结构规划与路线图 Store（P3） ----
+     键 engchain-revenue，结构 { streams, monthly, total }
+     generate()：从 BalanceStore.logs/CommissionStore 等聚合各收入流数据 */
+  var RevenueStore = makeStore('engchain-revenue',
+    { streams: { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 },
+      monthly: [], total: 0 },
+    'engchain:revenue');
+  RevenueStore.generate = function () {
+    var s = this.read();
+    var streams = { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 };
+    /* R1/R2/R6：从 BalanceStore.logs 聚合 */
+    try {
+      var logs = (window.BalanceStore ? BalanceStore.read().logs : []) || [];
+      logs.forEach(function (log) {
+        var amt = Math.abs(Number(log.amount) || 0);
+        if (log.type === 'certification') streams.R1_cert += amt;
+        else if (log.type === 'entry') streams.R2_entry += amt;
+        else if (log.type === 'entry_renew') streams.R2_entry += amt;
+        else if (log.type === 'membership') streams.R6_upgrade += amt;
+        else if (log.type === 'upgrade') streams.R6_upgrade += amt;
+        else if (log.type === 'report_subscribe') streams.R6_upgrade += amt;
+        else if (log.type === 'esign') streams.R6_upgrade += amt;
+        else if (log.type === 'api_recharge') streams.R7_api += amt;
+        else if (log.type === 'unlock_cny_pay') streams.R3_unlock += amt;
+        else if (log.type === 'consume' || log.type === 'recharge') { /* skip */ }
+      });
+    } catch (e) {}
+    /* R3/R4：从 CreditStore.logs 聚合（积分充值额；积分消耗不再重复计收入——充值时已确认） */
+    try {
+      var creditLogs = (window.CreditStore ? CreditStore.read().logs : []) || [];
+      creditLogs.forEach(function (log) {
+        var amt = Math.abs(Number(log.credits) || 0);
+        if (log.type === 'recharge') streams.R4_credits += Math.round(amt);
+        /* [P2 修复] type='unlock' 是消耗已充值积分，钱在充值时已计入 R4，不再重复计 R3。
+           现金直付解锁（unlock_cny_pay）在上面 BalanceStore.logs 里已归入 R3。 */
+      });
+    } catch (e) {}
+    /* R5：从 CommissionStore.flows 聚合 */
+    try {
+      var flows = (window.CommissionStore ? CommissionStore.read().flows : []) || [];
+      flows.forEach(function (fl) {
+        streams.R5_commission += Math.abs(Number(fl.amount) || Number(fl.fee) || 0);
+      });
+    } catch (e) {}
+    /* R7：从 ApiStore.calls 聚合 API 调用费用 */
+    try {
+      var apiCalls = (window.ApiStore ? ApiStore.read().calls : []) || [];
+      apiCalls.forEach(function (c) { streams.R7_api += Math.abs(Number(c.cost) || 0); });
+    } catch (e) {}
+    /* 生成 Mock 月度趋势（近6个月） */
+    var monthly = [];
+    var now = new Date();
+    for (var m = 5; m >= 0; m--) {
+      var d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      var seed = (m * 13 + 7) % 100;
+      monthly.push({
+        month: (d.getMonth() + 1) + '月',
+        total: Math.round(50000 + seed * 2000 + (5 - m) * 8000),
+        R1_cert: Math.round(streams.R1_cert / 6 + seed * 200),
+        R2_entry: Math.round(streams.R2_entry / 6 + seed * 300),
+        R3_unlock: Math.round(streams.R3_unlock / 6 + seed * 150),
+        R5_commission: Math.round(streams.R5_commission / 6 + seed * 250)
+      });
+    }
+    s.streams = streams;
+    s.monthly = monthly;
+    s.total = Object.keys(streams).reduce(function (sum, k) { return sum + streams[k]; }, 0);
+    this.write(s);
+    return s;
+  };
+  RevenueStore.byStream = function () {
+    var s = this.read();
+    var streams = s.streams || {};
+    var total = s.total || 1;
+    var labels = { R1_cert: 'R1认证费', R2_entry: 'R2入驻费', R3_unlock: 'R3解锁', R4_credits: 'R4积分', R5_commission: 'R5佣金', R6_upgrade: 'R6增值', R7_api: 'R7API', other: '其他' };
+    return Object.keys(streams).map(function (k) {
+      return { key: k, label: labels[k] || k, amount: streams[k] || 0, pct: Math.round((streams[k] / total) * 1000) / 10 };
+    });
+  };
+  RevenueStore.trend = function () {
+    return (this.read().monthly) || [];
+  };
+
+  /* ---- 历史文件（FileStore）：全站文件事件统一收口 ----
+     记录企业在「工商信息查询 / 详情页编辑 / 浏览详情页 / 会话消息发送·接收 / 转发」等场景
+     生成、上传、发送、收到的文件，按最近事件时间倒序展示，带来源标签。
+     键 engchain-history-files，结构 { items: [ { id, name, ext, size, source, sourceKey,
+     time, createdAt, timeText, href, note, forwarded, event } ] }
+     add() 对同名文件做“去重置新”（同一文件再次生成/上传/发送只刷新时间，不重复建档）。 */
+  var FileStore = makeStore('engchain-history-files', { items: [] }, 'engchain:files');
+  FileStore.list = function () {
+    var s = this.read();
+    return (s.items || []).slice().sort(function (a, b) { return (b.time || 0) - (a.time || 0); });
+  };
+  FileStore.count = function () {
+    return ((this.read().items) || []).length;
+  };
+  FileStore.add = function (rec) {
+    if (!rec || !rec.name) return null;
+    var s = this.read();
+    var items = s.items || [];
+    var now = Date.now();
+    var base = {
+      id: 'f' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+      name: rec.name,
+      ext: rec.ext || 'PDF',
+      size: rec.size || '',
+      source: rec.source || '其他',
+      sourceKey: rec.sourceKey || 'other',
+      time: rec.time || now,
+      createdAt: now,
+      timeText: rec.timeText || '',
+      href: rec.href || '',
+      note: rec.note || '',
+      forwarded: 0,
+      event: rec.event || ''
+    };
+    var dup = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].name === base.name) { dup = items[i]; break; }
+    }
+    if (dup) {
+      dup.time = base.time;
+      dup.timeText = base.timeText || dup.timeText;
+      dup.source = base.source || dup.source;
+      dup.sourceKey = base.sourceKey || dup.sourceKey;
+      dup.href = base.href || dup.href;
+      dup.note = base.note || dup.note;
+      dup.ext = base.ext || dup.ext;
+      dup.size = base.size || dup.size;
+      if (base.event) dup.event = base.event;
+      this.write(s);
+      return dup;
+    }
+    items.unshift(base);
+    if (items.length > 200) items.length = 200;
+    this.write(s);
+    return base;
+  };
+  FileStore.remove = function (id) {
+    var s = this.read();
+    s.items = (s.items || []).filter(function (it) { return it.id !== id; });
+    this.write(s);
+  };
+  FileStore.clear = function () {
+    this.write({ items: [] });
+  };
+  /* 转发：文件被转发到会话窗口 → 刷新最近事件时间并计数 */
+  FileStore.markForwarded = function (id, convName) {
+    var s = this.read();
+    var it = null;
+    (s.items || []).forEach(function (x) { if (x.id === id) it = x; });
+    if (!it) return null;
+    it.forwarded = (it.forwarded || 0) + 1;
+    it.time = Date.now();
+    it.event = '转发到会话';
+    it.note = convName ? ('转发至 ' + convName) : it.note;
+    this.write(s);
+    return it;
+  };
+  /* ---- 操作记录（OpLog）：文件每次操作的按时间流水 ----
+     由 FileStore.add / markForwarded 及历史文件页的 下载/转发/删除/撤销 写入；
+     键 engchain-oplog，结构 { items: [ { id, ts, fid, name, type, label, detail } ] }。
+     type: created 生成类 / download / forward / delete / undo */
+  var OpLog = makeStore('engchain-oplog', { items: [] }, 'engchain:oplog');
+  OpLog.list = function () {
+    var s = this.read();
+    return (s.items || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+  };
+  OpLog.push = function (rec) {
+    if (!rec || !rec.name) return;
+    var s = this.read();
+    var items = s.items || [];
+    items.push({
+      id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      ts: rec.ts || Date.now(),
+      fid: rec.fid || '',
+      name: rec.name,
+      type: rec.type || 'created',
+      label: rec.label || '',
+      detail: rec.detail || ''
+    });
+    if (items.length > 200) items.splice(0, items.length - 200);
+    this.write(s);
+  };
+  function opCreatedLabel(it) {
+    if (it.sourceKey === 'qcc') return '生成';
+    if (it.sourceKey === 'edit') return '上传';
+    if (it.sourceKey === 'detail') return '下载';
+    if (it.sourceKey === 'view') return '浏览';
+    if ((it.source || '').indexOf('收到') > -1) return '收到';
+    if ((it.source || '').indexOf('发送') > -1) return '发送';
+    if (it.event === '转发到会话') return '转发';
+    return '生成';
+  }
+  /* 采集钩子：文件建档（生成/上传/浏览/发送/收到）与 转发到会话 自动落流水 */
+  var _fsAdd = FileStore.add;
+  FileStore.add = function (rec) {
+    var out = _fsAdd.call(this, rec);
+    if (out) {
+      try { OpLog.push({ fid: out.id, name: out.name, ts: out.time || Date.now(), type: 'created', label: opCreatedLabel(out), detail: out.source || '' }); } catch (e) {}
+    }
+    return out;
+  };
+  var _fsMark = FileStore.markForwarded;
+  FileStore.markForwarded = function (id, convName) {
+    var out = _fsMark.call(this, id, convName);
+    if (out) {
+      try { OpLog.push({ fid: out.id, name: out.name, ts: Date.now(), type: 'forward', label: '转发', detail: convName ? ('会话：' + convName) : '会话' }); } catch (e) {}
+    }
+    return out;
+  };
+
+  /* 会话消息源：文件消息发送/接收落库（去重键 = 会话id + 文件名） */
+  FileStore.ensureChatFile = function (convId, name, size, me) {
+    var s = this.read();
+    var items = s.items || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].note && items[i].note.indexOf('会话·' + convId) === 0 && items[i].name === name) return items[i];
+    }
+    return this.add({
+      name: name, size: size, ext: 'PDF',
+      source: me ? '会话消息·发送' : '会话消息·收到',
+      sourceKey: 'chat',
+      note: '会话·' + convId
+    });
+  };
+
+  window.AuthStore = AuthStore;
+  window.EntryStore = EntryStore;
+  window.CreditStore = CreditStore;
+  window.CheckinStore = CheckinStore;
+  /* [健壮性修复] 余额/积分 Store 可能被缺少 logs 的快照整体覆盖（如登录同步种子余额），
+     保证 read()/get() 永远返回带 logs 数组（积分另带 quota）的对象，杜绝 logs.unshift 崩溃。 */
+  (function () {
+    var _br = BalanceStore.read.bind(BalanceStore);
+    BalanceStore.read = function () { var s = _br(); if (!Array.isArray(s.logs)) s.logs = []; return s; };
+    BalanceStore.get = BalanceStore.read;
+    var _cr = CreditStore.read.bind(CreditStore);
+    CreditStore.read = function () {
+      var s = _cr();
+      if (!Array.isArray(s.logs)) s.logs = [];
+      if (!s.quota) s.quota = { month: '', used: 0 };
+      return s;
+    };
+    CreditStore.get = CreditStore.read;
+  })();
+  window.BalanceStore = BalanceStore;
+  window.AgencyOrderStore = AgencyOrderStore;
+  window.InvoiceStore = InvoiceStore;
+  window.CommissionStore = CommissionStore;
+  window.MonitorStore = MonitorStore;
+  window.FavoriteStore = FavoriteStore;
+  window.ContactRemarkStore = ContactRemarkStore;
+  window.SupplyStore = SupplyStore;
+  window.ApplyStore = ApplyStore;
+  window.LeadStore = LeadStore;
+  window.DemandStore = DemandStore;
+  window.SvcRatingStore = SvcRatingStore;
+  window.ModeStore = ModeStore;
+  window.MemberStore = MemberStore;
+  window.FreeQuotaStore = FreeQuotaStore;
+  window.UpgradeStore = UpgradeStore;
+  window.MatchStore = MatchStore;
+  window.DashboardStore = DashboardStore;
+  window.ReportStore = ReportStore;
+  window.ApiStore = ApiStore;
+  window.RevenueStore = RevenueStore;
+  window.FileStore = FileStore;
+  window.OpLog = OpLog;
+  /* 派生规则暴露给后台复用（规则同源：后台佣金试算/身份派生与 App 同一函数） */
+  window.commissionRate = commissionRate;
+  window.deriveStatus = deriveStatus;
+  window.deriveIdentity = deriveIdentity;
+  window.deriveIdentityStates = deriveIdentityStates;
+  window.creditDiscount = creditDiscount;
+  window.entryAccess = entryAccess;
+  window.publishableCats = publishableCats;
+
+  /* =====================================================================
+     电子签 EsignStore（电子签板块重构新增）
+     - 键 engchain-esign，事件 engchain:esign；Store 内按 uid 隔离，不改 9 个种子用户、不碰 login
+     - 合同统一状态机：draft/pending_mine/signing/completed/rejected/expired/withdrawn/voided
+     - 次数：发送扣1；对方签署前撤回退1；拒签/过期不退；后台作废退1
+     - 资金：购买走 BalanceStore.consume；退款后台审核通过后在所属用户会话内入账（settleMyApprovedRefunds）
+     - 依赖运行时：window.DataBus（current/byId/isGuest/audit）、window.entryAccess、window.BalanceStore、MOCK.business.esign
+     ===================================================================== */
+  var ES_DAY = 864e5;
+  function esPad(n) { return (n < 10 ? '0' : '') + n; }
+  function esMonthKey(d) { d = d || new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1); }
+  function esIso(ts) { var d = new Date(ts); return d.getFullYear() + '-' + esPad(d.getMonth() + 1) + '-' + esPad(d.getDate()); }
+  function esAddYearsIso(years) { var d = new Date(); d.setFullYear(d.getFullYear() + years); return esIso(d.getTime()); }
+  function esHash() { var s = '0123456789abcdef', h = '0x'; for (var i = 0; i < 40; i++) h += s.charAt(Math.floor(Math.random() * 16)); return h; }
+  function esCertNo() { var d = new Date(); return 'EC-' + d.getFullYear() + esPad(d.getMonth() + 1) + esPad(d.getDate()) + '-' + Math.floor(1000 + Math.random() * 9000); }
+
+  function esParty(o) {
+    return {
+      key: o.key, name: o.name, company: o.company || '', mobileMask: o.mobileMask || '',
+      role: o.role, signerType: o.signerType || 'enterprise', order: o.order || 1,
+      ownerUid: o.ownerUid || null,
+      status: o.status || 'pending', signedAt: o.signedAt || 0, signMethod: o.signMethod || '',
+      rejectReason: o.rejectReason || '', rejectedAt: o.rejectedAt || 0
+    };
+  }
+  function esContract(o) {
+    var T = Date.now();
+    return {
+      id: o.id, code: o.code, title: o.title,
+      templateId: o.templateId || '', fileName: o.fileName || '', amount: (typeof o.amount === 'number') ? o.amount : 0,
+      initiatorUid: o.initiatorUid, initiatorName: o.initiatorName, initiatorCompany: o.initiatorCompany || '',
+      parties: (o.parties || []).map(esParty),
+      signOrder: o.signOrder || 'unordered',
+      status: o.status || 'draft',
+      deadline: o.deadline || 0, createdAt: o.createdAt || T, sentAt: o.sentAt || 0,
+      completedAt: o.completedAt || 0, costQuota: 1, orderId: o.orderId || '',
+      remindCount: o.remindCount || 0, lastRemindAt: o.lastRemindAt || 0,
+      rejectReason: o.rejectReason || '',
+      evidence: o.evidence || null,
+      detail: o.detail || null
+    };
+  }
+
+  function esBuildSeed() {
+    var T = Date.now();
+    var u1 = 'u1', u8 = 'u8', u9 = 'u9';
+    var c = [];
+
+    /* u1 陈建国（四川省××建设有限公司，乙方/甲方随合同） */
+    c.push(esContract({
+      id: 'c001', code: 'C001-2026', title: '材料采购合同（钢筋）', templateId: 't-material', amount: 86500,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'sequential', status: 'pending_mine',
+      deadline: T + 2 * ES_DAY + 4 * 36e5, createdAt: T - ES_DAY, sentAt: T - ES_DAY,
+      detail: {
+        unit: '吨',
+        items: [
+          { spec: '螺纹钢 HRB400E Φ12', qty: 15, unit: '吨', price: 2433, amount: 36495 },
+          { spec: '螺纹钢 HRB400E Φ16', qty: 12, unit: '吨', price: 2410, amount: 28920 },
+          { spec: '螺纹钢 HRB400E Φ20', qty: 9, unit: '吨', price: 2342, amount: 21085 }
+        ]
+      },
+      parties: [
+        { key: 'pA', name: '王总', company: '成都恒信建材有限公司', mobileMask: '138****2233', role: '甲方', order: 1, status: 'signed', signedAt: T - 36e5 },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 2, ownerUid: u1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c002', code: 'C002-2026', title: '设备租赁合同（塔吊）', templateId: 't-equipment', amount: 120000,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'signing',
+      deadline: T + 3 * ES_DAY, createdAt: T - 20 * 36e5, sentAt: T - 20 * 36e5,
+      parties: [
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '甲方', order: 1, ownerUid: u1, status: 'signed', signedAt: T - 18 * 36e5, signMethod: '企业公章' },
+        { key: 'pB', name: '李经理', company: '重庆渝工机械设备租赁站', mobileMask: '139****7712', role: '乙方', order: 1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c005', code: 'C005-2026', title: '保密协议（NDA）', amount: 0,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'completed',
+      deadline: T - 6 * ES_DAY, createdAt: T - 8 * ES_DAY, sentAt: T - 8 * ES_DAY, completedAt: T - 6 * ES_DAY,
+      parties: [
+        { key: 'pA', name: '赵工', company: '北京京诚建设集团有限公司', mobileMask: '137****0045', role: '甲方', order: 1, status: 'signed', signedAt: T - 6 * ES_DAY - 2 * 36e5, signMethod: '企业公章' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 1, ownerUid: u1, status: 'signed', signedAt: T - 6 * ES_DAY, signMethod: '企业公章' }
+      ],
+      evidence: { provider: 'e签宝', certNo: 'EC-20260920-7741', hash: '0x8f3ac9e2b41d6f08a7c5e3b9d214f608a1c7e5b3d9', timestamp: T - 6 * ES_DAY }
+    }));
+    c.push(esContract({
+      id: 'c006', code: 'C006-2026', title: '水泥采购合同', templateId: 't-material', amount: 38200,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'rejected',
+      deadline: T - 2 * ES_DAY, createdAt: T - 4 * ES_DAY, sentAt: T - 4 * ES_DAY,
+      rejectReason: '对方认为本批报价偏高，价格未达成一致，暂不签署。',
+      parties: [
+        { key: 'pA', name: '孙销售', company: '北京冀东水泥股份有限公司', mobileMask: '135****6620', role: '甲方', order: 1, status: 'rejected', rejectedAt: T - 2 * ES_DAY, rejectReason: '价格未达成一致，暂不签署' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 1, ownerUid: u1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c007', code: 'C007-2026', title: '劳务分包合同', templateId: 't-labor', amount: 216000,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'unordered', status: 'expired',
+      deadline: T - ES_DAY, createdAt: T - 9 * ES_DAY, sentAt: T - 9 * ES_DAY,
+      parties: [
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '甲方', order: 1, ownerUid: u1, status: 'pending' },
+        { key: 'pB', name: '周班长', company: '四川恒信建筑劳务有限公司', mobileMask: '136****3088', role: '乙方', order: 1, status: 'pending' }
+      ]
+    }));
+    c.push(esContract({
+      id: 'c008', code: 'C008-2026', title: '战略合作框架协议', amount: 0,
+      initiatorUid: u1, initiatorName: '陈建国', initiatorCompany: '四川省××建设有限公司',
+      signOrder: 'sequential', status: 'signing',
+      deadline: T + 5 * ES_DAY, createdAt: T - 2 * ES_DAY, sentAt: T - 2 * ES_DAY,
+      parties: [
+        { key: 'pA', name: '吴总', company: '成都天府商砼有限公司', mobileMask: '139****1207', role: '甲方', order: 1, status: 'signed', signedAt: T - 2 * ES_DAY + 3 * 36e5, signMethod: '企业公章' },
+        { key: 'me', name: '陈建国', company: '四川省××建设有限公司', role: '乙方', order: 2, ownerUid: u1, status: 'signed', signedAt: T - ES_DAY, signMethod: '企业公章' },
+        { key: 'pC', name: '郑总', company: '成都蓉城工程监理有限公司', mobileMask: '138****5566', role: '丙方', order: 3, status: 'pending' }
+      ]
+    }));
+
+    var orders1 = [
+      { id: 'ESO1001', uid: u1, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'paid', timesUsed: 3, createdAt: T - 40 * ES_DAY, paidAt: T - 40 * ES_DAY, expireAt: T + 730 * ES_DAY - 40 * ES_DAY, refundId: '' },
+      { id: 'ESO1002', uid: u1, pkgId: 'single', pkgName: '单次体验', times: 1, price: 10, unitPrice: 10, payMethod: 'balance', status: 'paid', timesUsed: 1, createdAt: T - 44 * ES_DAY, paidAt: T - 44 * ES_DAY, expireAt: T + 730 * ES_DAY - 44 * ES_DAY, refundId: '' }
+    ];
+
+    /* u8 周航（合伙人企业，高频），含一笔退款审核中 */
+    var c8 = [
+      esContract({
+        id: 'c801', code: 'C801-2026', title: '设备采购合同（搅拌站）', templateId: 't-equipment', amount: 458000,
+        initiatorUid: u8, initiatorName: '周航', initiatorCompany: '××合伙企业管理中心',
+        signOrder: 'unordered', status: 'signing', deadline: T + 4 * ES_DAY, createdAt: T - 12 * 36e5, sentAt: T - 12 * 36e5,
+        parties: [
+          { key: 'me', name: '周航', company: '××合伙企业管理中心', role: '甲方', order: 1, ownerUid: u8, status: 'signed', signedAt: T - 10 * 36e5, signMethod: '企业公章' },
+          { key: 'pB', name: '何经理', company: '成都重工装备有限公司', mobileMask: '133****8821', role: '乙方', order: 1, status: 'pending' }
+        ]
+      }),
+      esContract({
+        id: 'c802', code: 'C802-2026', title: '联合投标合作协议', amount: 0,
+        initiatorUid: u8, initiatorName: '周航', initiatorCompany: '××合伙企业管理中心',
+        signOrder: 'unordered', status: 'completed', deadline: T - 15 * ES_DAY, createdAt: T - 17 * ES_DAY, sentAt: T - 17 * ES_DAY, completedAt: T - 15 * ES_DAY,
+        parties: [
+          { key: 'me', name: '周航', company: '××合伙企业管理中心', role: '甲方', order: 1, ownerUid: u8, status: 'signed', signedAt: T - 15 * ES_DAY, signMethod: '企业公章' },
+          { key: 'pB', name: '罗总', company: '四川宏图建设有限公司', mobileMask: '137****0923', role: '乙方', order: 1, status: 'signed', signedAt: T - 15 * ES_DAY + 2 * 36e5, signMethod: '企业公章' }
+        ],
+        evidence: { provider: 'e签宝', certNo: 'EC-20260911-3320', hash: '0x51bf74e9c02a8d63f4b1e7c09a5d2f846b1e93ac70', timestamp: T - 15 * ES_DAY }
+      })
+    ];
+    var orders8 = [
+      { id: 'ESO8001', uid: u8, pkgId: 'p100', pkgName: '100 次签署包', times: 100, price: 600, unitPrice: 6, payMethod: 'balance', status: 'paid', timesUsed: 14, createdAt: T - 60 * ES_DAY, paidAt: T - 60 * ES_DAY, expireAt: T + 730 * ES_DAY - 60 * ES_DAY, refundId: '' },
+      { id: 'ESO8002', uid: u8, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'refunding', timesUsed: 2, createdAt: T - 20 * ES_DAY, paidAt: T - 20 * ES_DAY, expireAt: T + 730 * ES_DAY - 20 * ES_DAY, refundId: 'ESR8001' }
+    ];
+    var refunds8 = [
+      { id: 'ESR8001', orderId: 'ESO8002', uid: u8, amount: 80, usedTimes: 2, deduct: 20, refundAmount: 60, reason: '项目结束，剩余次数短期用不上，申请退回。', status: 'pending', createdAt: T - ES_DAY, handledAt: 0, handlerNote: '', credited: false }
+    ];
+
+    /* u9 孙小美（个人合伙人） */
+    var c9 = [
+      esContract({
+        id: 'c901', code: 'C901-2026', title: '渠道合作保密协议（NDA）', amount: 0,
+        initiatorUid: u9, initiatorName: '孙小美', initiatorCompany: '个人合伙人 · 孙小美',
+        signOrder: 'unordered', status: 'completed', deadline: T - 5 * ES_DAY, createdAt: T - 7 * ES_DAY, sentAt: T - 7 * ES_DAY, completedAt: T - 5 * ES_DAY,
+        parties: [
+          { key: 'me', name: '孙小美', company: '个人合伙人 · 孙小美', role: '甲方', order: 1, ownerUid: u9, signerType: 'personal', status: 'signed', signedAt: T - 6 * ES_DAY, signMethod: '个人签名' },
+          { key: 'pB', name: '刘先生', company: '成都智链科技有限公司', mobileMask: '132****4471', role: '乙方', order: 1, status: 'signed', signedAt: T - 5 * ES_DAY, signMethod: '企业公章' }
+        ],
+        evidence: { provider: 'e签宝', certNo: 'EC-20260921-1188', hash: '0x2c94fa61e0b7d38c56f02a91d4e7b8c3056af2d19e', timestamp: T - 5 * ES_DAY }
+      })
+    ];
+    var orders9 = [
+      { id: 'ESO9001', uid: u9, pkgId: 'p10', pkgName: '10 次签署包', times: 10, price: 80, unitPrice: 8, payMethod: 'balance', status: 'paid', timesUsed: 7, createdAt: T - 30 * ES_DAY, paidAt: T - 30 * ES_DAY, expireAt: T + 730 * ES_DAY - 30 * ES_DAY, refundId: '' }
+    ];
+
+    function emptyQuota() { return { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }; }
+    function sub(quota, contracts, orders, refunds, drafts) {
+      return { quota: quota || emptyQuota(), contracts: contracts || [], orders: orders || [], refunds: refunds || [], drafts: drafts || [] };
+    }
+
+    return {
+      byUid: {
+        u1: sub({ remaining: 12, earliestExpire: '2028-09-26', totalUsed: 12, monthUsed: 3, monthKey: esMonthKey() }, c, orders1, [], []),
+        u8: sub({ remaining: 30, earliestExpire: '2028-06-30', totalUsed: 16, monthUsed: 2, monthKey: esMonthKey() }, c8, orders8, refunds8, []),
+        u9: sub({ remaining: 3, earliestExpire: '2028-03-15', totalUsed: 7, monthUsed: 1, monthKey: esMonthKey() }, c9, orders9, [], [])
+      }
+    };
+  }
+
+  var EsignStore = makeStore('engchain-esign', esBuildSeed(), 'engchain:esign');
+
+  (function () {
+    var GUEST_VIEW = function () {
+      return { guest: true, quota: { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }, contracts: [], orders: [], refunds: [], drafts: [] };
+    };
+    function emptySub() {
+      return { quota: { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() }, contracts: [], orders: [], refunds: [], drafts: [] };
+    }
+    function pricing() { return ((MOCK.business && MOCK.business.esign) || { packages: [], validYears: 2, refundUnit: 10, signValidDays: 7 }); }
+    function curUid() {
+      try { var u = window.DataBus && DataBus.current(); return u ? u.id : 'u1'; } catch (e) { return 'u1'; }
+    }
+    function isGuest() { try { return !!(window.DataBus && DataBus.isGuest && DataBus.isGuest()); } catch (e) { return false; } }
+    function canUse() { try { return !!(window.entryAccess && entryAccess().dist); } catch (e) { return false; } }
+    function uname(uid) { try { var u = window.DataBus && DataBus.byId(uid); return u ? { name: u.name, company: u.company || '' } : { name: '', company: '' }; } catch (e) { return { name: '', company: '' }; } }
+    function audit(action, target, extra) { try { if (window.DataBus && DataBus.audit) DataBus.audit(action, '电子签', target, extra); } catch (e) {} }
+    function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+    function ensure(s, uid) {
+      if (!s.byUid) s.byUid = {};
+      if (!s.byUid[uid]) s.byUid[uid] = emptySub();
+      var sub2 = s.byUid[uid];
+      if (!sub2.quota) sub2.quota = { remaining: 0, earliestExpire: '', totalUsed: 0, monthUsed: 0, monthKey: esMonthKey() };
+      ['contracts', 'orders', 'refunds', 'drafts'].forEach(function (k) { if (!Array.isArray(sub2[k])) sub2[k] = []; });
+      return sub2;
+    }
+    /* 读当前用户子树（不落库） */
+    EsignStore.bundle = function () {
+      if (isGuest()) return GUEST_VIEW();
+      var uid = curUid(), s = this.read();
+      return { guest: false, uid: uid, sub: ensure(s, uid) };
+    };
+    EsignStore.packages = function () { return pricing().packages.slice(); };
+    EsignStore.pricing = pricing;
+    EsignStore.canUse = canUse;
+
+    function mut(uid, fn) {
+      var s = EsignStore.read();
+      var sub2 = ensure(s, uid);
+      var r = fn(sub2);
+      EsignStore.write(s);
+      return r;
+    }
+
+    function rollMonth(q) {
+      var mk = esMonthKey();
+      if (q.monthKey !== mk) { q.monthKey = mk; q.monthUsed = 0; }
+    }
+    /* 消耗 1 次：配额-1，归因到最早一个尚有剩余次数的有效订单 */
+    function consumeOnce(sub2, contractId) {
+      var q = sub2.quota; rollMonth(q);
+      if ((q.remaining || 0) < 1) return false;
+      q.remaining -= 1; q.totalUsed = (q.totalUsed || 0) + 1; q.monthUsed = (q.monthUsed || 0) + 1;
+      var order = null;
+      for (var i = 0; i < sub2.orders.length; i++) {
+        var o = sub2.orders[i];
+        if (o.status === 'paid' && (o.timesUsed || 0) < o.times) { if (!order || o.paidAt < order.paidAt) order = o; }
+      }
+      if (order) { order.timesUsed = (order.timesUsed || 0) + 1; }
+      var cc = sub2.contracts.filter(function (x) { return x.id === contractId; })[0];
+      if (cc && order) cc.orderId = order.id;
+      return true;
+    }
+    function refundOnce(sub2, contractId) {
+      var q = sub2.quota;
+      q.remaining = (q.remaining || 0) + 1;
+      q.totalUsed = Math.max(0, (q.totalUsed || 0) - 1);
+      q.monthUsed = Math.max(0, (q.monthUsed || 0) - 1);
+      var cc = sub2.contracts.filter(function (x) { return x.id === contractId; })[0];
+      if (cc && cc.orderId) {
+        var o = sub2.orders.filter(function (x) { return x.id === cc.orderId; })[0];
+        if (o) o.timesUsed = Math.max(0, (o.timesUsed || 0) - 1);
+      }
+    }
+
+    EsignStore.contractById = function (id) {
+      var b = this.bundle(); if (b.guest) return null;
+      var list = b.sub.contracts.filter(function (x) { return x.id === id || x.code === id; });
+      return list.length ? clone(list[0]) : null;
+    };
+    EsignStore.myPartyKey = function (c, uid) {
+      uid = uid || curUid();
+      for (var i = 0; i < (c.parties || []).length; i++) if (c.parties[i].ownerUid === uid) return c.parties[i].key;
+      return '';
+    };
+    /* 当前用户在该合同的签署态：mine=待我签 other=待对方签 done=已完成 closed=终态 */
+    EsignStore.flowOf = function (c, uid) {
+      uid = uid || curUid();
+      if (c.status === 'pending_mine') return 'mine';
+      if (c.status === 'signing') {
+        var mineKey = EsignStore.myPartyKey(c, uid);
+        var mp = (c.parties || []).filter(function (p) { return p.key === mineKey; })[0];
+        if (mp && mp.status !== 'signed') return 'mine';
+        return 'other';
+      }
+      return 'closed';
+    };
+
+    /* ---- 草稿 ---- */
+    EsignStore.saveDraft = function (draft) {
+      if (isGuest() || !canUse()) return { error: '当前身份未开通电子签' };
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        draft.uid = uid; draft.updatedAt = Date.now();
+        if (!draft.id) draft.id = 'd' + Date.now();
+        var i; for (i = 0; i < sub2.drafts.length; i++) if (sub2.drafts[i].id === draft.id) break;
+        if (i < sub2.drafts.length) sub2.drafts[i] = draft; else sub2.drafts.unshift(draft);
+        return { ok: true, draft: clone(draft) };
+      });
+    };
+    EsignStore.discardDraft = function (id) {
+      if (isGuest()) return { ok: true };
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        sub2.drafts = sub2.drafts.filter(function (d) { return d.id !== id; });
+        return { ok: true };
+      });
+    };
+
+    /* ---- 发送合同（扣 1 次） ---- */
+    EsignStore.sendContract = function (input) {
+      if (isGuest()) return { code: 'GUEST', error: '请先登录后再使用电子签' };
+      if (!canUse()) return { code: 'NEED_DIST', error: '完成企业入驻或个人合伙人认证后开通电子签' };
+      var uid = curUid();
+      var b = this.bundle(), q = b.sub.quota;
+      if ((q.remaining || 0) < 1) return { code: 'NO_QUOTA', error: '签署次数不足，请先购买次数包' };
+      if (!input || !input.title) return { error: '缺少合同标题' };
+      if (!input.parties || !input.parties.length) return { error: '请至少添加一个签署方' };
+      var me = uname(uid);
+      var T = Date.now();
+      var days = pricing().signValidDays || 7;
+      var id = 'c' + String(T).slice(-9);
+      var contract = esContract({
+        id: id, code: 'EC' + esIso(T).replace(/-/g, '').slice(2) + Math.floor(100 + Math.random() * 900),
+        title: input.title, templateId: input.templateId || '', fileName: input.fileName || '',
+        amount: Number(input.amount) || 0,
+        initiatorUid: uid, initiatorName: me.name, initiatorCompany: me.company,
+        parties: input.parties, signOrder: input.signOrder || 'unordered',
+        status: 'pending_mine', deadline: T + days * ES_DAY, createdAt: T, sentAt: T
+      });
+      var r = mut(uid, function (sub2) {
+        if (!consumeOnce(sub2, id)) return { code: 'NO_QUOTA', error: '签署次数不足，请先购买次数包' };
+        sub2.contracts.unshift(contract);
+        sub2.drafts = sub2.drafts.filter(function (d) { return d.id !== (input.draftId || ''); });
+        return { ok: true, contract: clone(contract) };
+      });
+      if (r && r.ok) audit('发起电子合同', contract.code, contract.title + '（消耗 1 次签署次数）');
+      return r;
+    };
+
+    function withOwnerContract(id, fn) {
+      var s = EsignStore.read(); var hit = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        for (var i = 0; i < list.length; i++) if (list[i].id === id || list[i].code === id) { hit = { uid: uid, c: list[i] }; }
+      });
+      if (!hit) return { error: '合同不存在' };
+      var r = fn(hit.uid, hit.c, s);
+      EsignStore.write(s);
+      return r;
+    }
+
+    /* ---- 签署（App 本人 / H5 对方均可） ---- */
+    EsignStore.signContract = function (id, opts) {
+      opts = opts || {};
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前合同状态不可签署' };
+        var key = opts.partyKey;
+        if (!key) key = EsignStore.myPartyKey(c, ownerUid);
+        var party = (c.parties || []).filter(function (p) { return p.key === key; })[0];
+        if (!party) return { error: '签署方不存在' };
+        if (party.status === 'signed') return { error: '该方已完成签署' };
+        /* 顺序签：只能签当前轮到的一方 */
+        if (c.signOrder === 'sequential') {
+          var pend = (c.parties || []).filter(function (p) { return p.status !== 'signed'; }).sort(function (a, b2) { return a.order - b2.order; })[0];
+          if (pend && pend.key !== key) return { error: '当前为顺序签署，请等待前序方完成后再签' };
+        }
+        party.status = 'signed'; party.signedAt = Date.now();
+        party.signMethod = opts.method || (party.signerType === 'personal' ? '个人签名' : '企业公章');
+        if (c.status === 'pending_mine') c.status = 'signing';
+        var allSigned = c.parties.every(function (p) { return p.status === 'signed'; });
+        if (allSigned) {
+          c.status = 'completed'; c.completedAt = Date.now();
+          c.evidence = { provider: pricing().provider || 'e签宝', certNo: esCertNo(), hash: esHash(), timestamp: c.completedAt };
+        }
+        audit('电子合同签署', c.code, c.title + ' · ' + (party.company || party.name) + ' 已' + party.signMethod);
+        if (allSigned) audit('电子合同存证生成', c.code, '存证号 ' + c.evidence.certNo);
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    EsignStore.rejectContract = function (id, reason, opts) {
+      opts = opts || {};
+      return withOwnerContract(id, function (ownerUid, c) {
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前合同状态不可拒签' };
+        var key = opts.partyKey;
+        if (!key) {
+          key = (c.parties || []).filter(function (p) { return p.status !== 'signed' && p.ownerUid !== ownerUid; })[0];
+          key = key ? key.key : (c.parties[0] && c.parties[0].key);
+        }
+        var party = (c.parties || []).filter(function (p) { return p.key === key; })[0];
+        if (!party) return { error: '签署方不存在' };
+        party.status = 'rejected'; party.rejectedAt = Date.now(); party.rejectReason = reason || '暂不同意签署';
+        c.status = 'rejected'; c.rejectReason = party.rejectReason;
+        audit('电子合同拒签', c.code, c.title + ' · ' + (party.company || party.name) + '：' + party.rejectReason);
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    EsignStore.remindContract = function (id) {
+      return withOwnerContract(id, function (ownerUid, c) {
+        if (c.status !== 'signing' && c.status !== 'pending_mine') return { error: '当前状态无需催签' };
+        var gap = Date.now() - (c.lastRemindAt || 0);
+        if (c.lastRemindAt && gap < 60000) return { error: '催签过于频繁，请稍后再试' };
+        c.remindCount = (c.remindCount || 0) + 1; c.lastRemindAt = Date.now();
+        audit('电子合同催签', c.code, c.title + '（第 ' + c.remindCount + ' 次提醒对方）');
+        return { ok: true, remindCount: c.remindCount };
+      });
+    };
+
+    EsignStore.withdrawContract = function (id) {
+      var uid = curUid();
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (ownerUid !== uid) return { error: '仅发起方可撤回合同' };
+        if (c.status !== 'pending_mine' && c.status !== 'signing') return { error: '当前状态不可撤回' };
+        var otherSigned = (c.parties || []).some(function (p) { return p.ownerUid !== ownerUid && p.status === 'signed'; });
+        if (otherSigned) return { error: '对方已签署，无法撤回' };
+        c.status = 'withdrawn';
+        var sub2 = ensure(s, ownerUid);
+        refundOnce(sub2, c.id);
+        audit('撤回电子合同', c.code, c.title + '（对方签署前撤回，退回 1 次签署次数）');
+        return { ok: true, contract: clone(c) };
+      });
+    };
+
+    /* ---- 购买次数包（真实扣余额） ---- */
+    EsignStore.buyPackage = function (pkgId, payMethod) {
+      if (isGuest()) return { code: 'GUEST', error: '请先登录后再购买' };
+      if (!canUse()) return { code: 'NEED_DIST', error: '完成企业入驻或个人合伙人认证后开通电子签' };
+      if (payMethod && payMethod !== 'balance') return { code: 'DEMO_METHOD', error: '演示环境仅支持余额支付，请选择余额' };
+      var pkg = pricing().packages.filter(function (p) { return p.id === pkgId; })[0];
+      if (!pkg) return { error: '套餐不存在' };
+      if (!window.BalanceStore || BalanceStore.available() < pkg.price) return { code: 'NO_BALANCE', error: '可用余额不足，请先充值' };
+      var uid = curUid();
+      var T = Date.now();
+      var order = {
+        id: 'ESO' + String(T).slice(-10), uid: uid, pkgId: pkg.id, pkgName: pkg.name,
+        times: pkg.times, price: pkg.price, unitPrice: Math.round(pkg.price / pkg.times * 100) / 100,
+        payMethod: 'balance', status: 'paid', timesUsed: 0,
+        createdAt: T, paidAt: T, expireAt: T + (pricing().validYears || 2) * 365 * ES_DAY, refundId: ''
+      };
+      var consumeR = window.BalanceStore.consume(pkg.price, 'esign', { method: 'balance', remark: '购买电子签' + pkg.name });
+      if (!consumeR) return { code: 'NO_BALANCE', error: '可用余额不足，请先充值' };
+      var r = mut(uid, function (sub2) {
+        var q = sub2.quota; rollMonth(q);
+        q.remaining = (q.remaining || 0) + pkg.times;
+        var expIso = esIso(order.expireAt);
+        if (!q.earliestExpire || expIso < q.earliestExpire) q.earliestExpire = expIso;
+        sub2.orders.unshift(order);
+        return { ok: true, order: clone(order) };
+      });
+      if (r && r.ok) audit('购买电子签次数包', order.id, pkg.name + ' ×' + pkg.times + '，实付 ¥' + pkg.price);
+      return r;
+    };
+
+    /* ---- 退款申请 ---- */
+    EsignStore.applyRefund = function (orderId, reason) {
+      var uid = curUid();
+      return mut(uid, function (sub2) {
+        var o = sub2.orders.filter(function (x) { return x.id === orderId; })[0];
+        if (!o) return { error: '订单不存在' };
+        if (o.status !== 'paid') return { error: '该订单当前状态不可申请退款' };
+        var busy = sub2.refunds.some(function (r2) { return r2.orderId === orderId && r2.status === 'pending'; });
+        if (busy) return { error: '该订单已有退款申请正在审核' };
+        var used = o.timesUsed || 0;
+        var deduct = used * (pricing().refundUnit || 10);
+        var amount = Math.round((o.price - deduct) * 100) / 100;
+        if (amount <= 0) return { error: '该次数包已用次数对应金额已超过实付金额，无可退金额' };
+        var r2 = {
+          id: 'ESR' + String(Date.now()).slice(-9), orderId: o.id, uid: uid,
+          amount: o.price, usedTimes: used, deduct: deduct, refundAmount: amount,
+          reason: reason || '', status: 'pending', createdAt: Date.now(), handledAt: 0, handlerNote: '', credited: false
+        };
+        o.status = 'refunding'; o.refundId = r2.id;
+        sub2.refunds.unshift(r2);
+        audit('申请电子签退款', o.id, o.pkgName + '，应退 ¥' + amount + '（已用 ' + used + ' 次扣除 ¥' + deduct + '）');
+        return { ok: true, refund: clone(r2) };
+      });
+    };
+
+    /* 所属用户会话内，把已通过退款入账（跨窗口审核后切回该用户时调用），幂等 */
+    EsignStore.settleMyApprovedRefunds = function () {
+      if (isGuest() || !window.BalanceStore) return 0;
+      var uid = curUid(); var n = 0;
+      mut(uid, function (sub2) {
+        sub2.refunds.forEach(function (r2) {
+          if (r2.status === 'approved' && !r2.credited) {
+            window.BalanceStore.refund(r2.refundAmount, '电子签' + '次数包退款', { method: 'balance' });
+            r2.credited = true; n++;
+          }
+        });
+        return n;
+      });
+      if (n) audit('电子签退款到账', '电子签', n + ' 笔退款已原路退回余额');
+      return n;
+    };
+
+    /* ---- 后台 ---- */
+    function flatten(key) {
+      var s = EsignStore.read(); var out = [];
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var sub2 = s.byUid[uid]; var arr = sub2[key] || [];
+        var info = uname(uid);
+        arr.forEach(function (it) {
+          var row = clone(it); row.uid = uid; row.ownerName = info.name; row.ownerCompany = info.company; out.push(row);
+        });
+      });
+      return out;
+    }
+    EsignStore.adminListContracts = function () {
+      return flatten('contracts').sort(function (a, b) { return (b.sentAt || b.createdAt) - (a.sentAt || a.createdAt); });
+    };
+    EsignStore.adminListOrders = function () {
+      return flatten('orders').sort(function (a, b) { return (b.paidAt || b.createdAt) - (a.paidAt || a.createdAt); });
+    };
+    EsignStore.adminListRefunds = function () {
+      return flatten('refunds').sort(function (a, b) { return b.createdAt - a.createdAt; });
+    };
+    EsignStore.stats = function () {
+      var cs = this.adminListContracts(), os = this.adminListOrders(), rs = this.adminListRefunds();
+      var T = Date.now();
+      return {
+        contractTotal: cs.length,
+        signing: cs.filter(function (c) { return c.status === 'pending_mine' || c.status === 'signing'; }).length,
+        completed: cs.filter(function (c) { return c.status === 'completed'; }).length,
+        pendingRefund: rs.filter(function (r2) { return r2.status === 'pending'; }).length,
+        orderAmount: os.filter(function (o) { return o.status === 'paid' || o.status === 'refunding' || o.status === 'refunded'; }).reduce(function (a, o) { return a + (o.price || 0); }, 0)
+      };
+    };
+
+    EsignStore.approveRefund = function (refundId, note) {
+      var s = this.read(); var target = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var r2 = (s.byUid[uid].refunds || []).filter(function (x) { return x.id === refundId; })[0];
+        if (r2) target = { uid: uid, r: r2 };
+      });
+      if (!target) return { error: '退款单不存在' };
+      var r2 = target.r;
+      if (r2.status !== 'pending') return { error: '该退款单已处理' };
+      var sub2 = ensure(s, target.uid);
+      var o = sub2.orders.filter(function (x) { return x.id === r2.orderId; })[0];
+      r2.status = 'approved'; r2.handledAt = Date.now(); r2.handlerNote = note || '审核通过';
+      if (o) {
+        o.status = 'refunded';
+        /* 核销该订单未使用次数（从总剩余中扣减，下限 0） */
+        var unused = Math.max(0, (o.times || 0) - (o.timesUsed || 0));
+        sub2.quota.remaining = Math.max(0, (sub2.quota.remaining || 0) - unused);
+      }
+      this.write(s);
+      /* 若审核人会话即所属用户（少见），立即入账；否则等该用户会话 settleMyApprovedRefunds 入账 */
+      var cur = curUid();
+      if (cur === target.uid && window.BalanceStore) {
+        window.BalanceStore.refund(r2.refundAmount, '电子签次数包退款', { method: 'balance' });
+        r2.credited = true; this.write(s);
+      }
+      audit('通过电子签退款审核', r2.id, '退款 ¥' + r2.refundAmount + '，核销未使用 ' + (o ? Math.max(0, o.times - (o.timesUsed || 0)) : 0) + ' 次');
+      return { ok: true, refund: clone(r2) };
+    };
+
+    EsignStore.rejectRefund = function (refundId, note) {
+      var s = this.read(); var target = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var r2 = (s.byUid[uid].refunds || []).filter(function (x) { return x.id === refundId; })[0];
+        if (r2) target = { uid: uid, r: r2 };
+      });
+      if (!target) return { error: '退款单不存在' };
+      if (target.r.status !== 'pending') return { error: '该退款单已处理' };
+      var sub2 = ensure(s, target.uid);
+      target.r.status = 'rejected'; target.r.handledAt = Date.now(); target.r.handlerNote = note || '审核驳回';
+      var o = sub2.orders.filter(function (x) { return x.id === target.r.orderId; })[0];
+      if (o) o.status = 'paid';
+      this.write(s);
+      audit('驳回电子签退款审核', target.r.id, '原因：' + (note || '未通过审核'));
+      return { ok: true, refund: clone(target.r) };
+    };
+
+    /* 后台作废（平台原因，退 1 次，留痕） */
+    EsignStore.voidContract = function (id, note) {
+      return withOwnerContract(id, function (ownerUid, c, s) {
+        if (c.status === 'completed' || c.status === 'voided') return { error: '已完成或已作废合同不可作废' };
+        var charged = (c.status === 'pending_mine' || c.status === 'signing' || c.status === 'rejected' || c.status === 'expired' || c.status === 'withdrawn');
+        c.status = 'voided'; c.rejectReason = note || '平台风控作废';
+        if (charged) { var sub2 = ensure(s, ownerUid); refundOnce(sub2, c.id); }
+        audit('后台作废电子合同', c.code, c.title + '（' + (note || '平台风控作废') + '，退回 1 次签署次数）');
+        return { ok: true, contract: clone(c) };
+      });
+    };
+    /* H5 对方免登：跨 uid 查找合同（只读视图），找到返回 {uid, contract(副本)} */
+    EsignStore.findAnyContract = function (id) {
+      var s = this.read(), hit = null;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        for (var i = 0; i < list.length; i++) if (list[i].id === id || list[i].code === id) hit = { uid: uid, contract: clone(list[i]) };
+      });
+      return hit;
+    };
+
+    /* 逾期清扫：pending_mine/signing 且超过截止时间 → expired（次数不退），幂等，可审计 */
+    EsignStore.expireDue = function () {
+      var s = this.read(); var now = Date.now(); var n = 0;
+      Object.keys(s.byUid || {}).forEach(function (uid) {
+        var list = (s.byUid[uid] && s.byUid[uid].contracts) || [];
+        list.forEach(function (c) {
+          if ((c.status === 'pending_mine' || c.status === 'signing') && c.deadline && c.deadline < now) {
+            c.status = 'expired'; n++;
+            audit('电子合同逾期失效', c.code, c.title + '（超过 ' + esIso(c.deadline) + ' 签署截止，次数不退）');
+          }
+        });
+      });
+      if (n) this.write(s);
+      return n;
+    };
+  })();
+
+  window.EsignStore = EsignStore;
+  window.svcCreditOf = svcCreditOf;
+})();
+
