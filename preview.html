@@ -67,6 +67,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .svc-btn { flex: none; border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); font-size: 11px; font-weight: 600; padding: 4px 11px; border-radius: 999px; cursor: pointer; transition: all var(--d-fast); }
   .svc-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary-dim); }
   .svc-btn:disabled { opacity: .45; cursor: not-allowed; }
+  /* 服务状态备注：提醒卡片样式（左侧色条 + 信息圆点图标） */
+  .pv-svc-note { position: relative; margin-top: 10px; padding: 9px 11px 9px 28px; background: var(--bg-card-2); border: 1px solid var(--line); border-left: 3px solid var(--primary); border-radius: var(--r-s); font-size: 10.5px; line-height: 1.6; color: var(--text-2); }
+  .pv-svc-note::before { content: "i"; position: absolute; left: 10px; top: 10px; width: 13px; height: 13px; border-radius: 50%; background: var(--primary-dim); color: #fff; font-size: 9px; font-weight: 700; font-style: normal; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .pv-svc-note a { color: var(--primary-dim); text-decoration: underline; }
   .svc-btn.go { background: linear-gradient(135deg, var(--primary), var(--primary-dim)); border-color: transparent; color: #fff; }
   .svc-btn.stop { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
   .svc-note { margin-top: 8px; font-size: 10.5px; line-height: 1.55; color: var(--text-3); }
@@ -128,6 +132,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .pv-quick { margin-top: 14px; padding: 10px 12px 8px; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-card); }
   .pv-quick .pv-row { padding: 4px 0; }
   .pv-quick .pv-note { margin: 4px 0 2px; }
+  /* 演示场景标题行：可点击折叠/展开，hover 反馈 + 箭头旋转 */
+  .pv-quick .pv-row { cursor: pointer; border-radius: var(--r-s); transition: background var(--d-fast); }
+  .pv-quick .pv-row:hover { background: var(--bg-card-2); }
+  .quick-caret { flex: none; width: 14px; height: 14px; color: var(--text-3); transition: transform var(--d-fast); }
+  .pv-quick.collapsed .quick-caret { transform: rotate(-90deg); }
+  .pv-quick.collapsed #status-note { display: none; }
 
   /* 页面分组导航（随 .pv-scroll 整体滚动，不再独立滚动） */
   .pv-nav { padding: 8px 16px 40px; }
@@ -585,12 +595,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         进入新版管理后台
       </a>
 
-      <!-- 固定展示：五轨道身份 × 状态场景选择器（起点/审核中/驳回，与认证中心"身份成长路径"同构） -->
-      <div class="pv-quick">
-        <div class="pv-row"><span class="k">演示场景</span>
+      <!-- 固定展示：五轨道身份 × 状态场景选择器（起点/审核中/驳回，与认证中心"身份成长路径"同构）；标题行点击展开/收起状态详情，默认收起 -->
+      <div class="pv-quick collapsed" id="pv-quick">
+        <div class="pv-row" id="pv-quick-hd" role="button" aria-expanded="false" title="点击展开/收起状态详情">
+          <span class="k">演示场景</span>
           <span class="pv-state-right">
             <select class="pv-select" id="sel-scenario"></select>
-
+            <svg class="quick-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </span>
         </div>
         <div class="pv-note" id="status-note"></div>
@@ -607,13 +618,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="svc-ctl" id="svc-ctl"><span class="ctl-dot check" id="svc-ctl-dot"></span><span id="svc-ctl-text">检测中…</span></span>
         </div>
         <div class="pv-svc-row" data-svc="front">
-          <span class="svc-name"><b>前端</b><em>App 用户端 · 127.0.0.1:8767</em></span>
+          <span class="svc-name"><b>App demo</b><em>127.0.0.1:8767</em></span>
           <span class="svc-dot" id="svc-front-dot"></span>
           <span class="svc-state" id="svc-front-state">检测中…</span>
           <button type="button" class="svc-btn go" id="svc-front-btn" disabled>启动</button>
         </div>
         <div class="pv-svc-row" data-svc="back">
-          <span class="svc-name"><b>后端</b><em>管理后台 · 127.0.0.1:5174</em></span>
+          <span class="svc-name"><b>后台 demo</b><em>127.0.0.1:5174</em></span>
           <span class="svc-dot" id="svc-back-dot"></span>
           <span class="svc-state" id="svc-back-state">检测中…</span>
           <button type="button" class="svc-btn go" id="svc-back-btn" disabled>启动</button>
@@ -758,8 +769,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="pv-nav-hd">
         <div class="nh-title">目录树</div>
         <div class="nh-stats">
-          <span class="nh-total" id="nh-total">共 0 页</span>
-          <span class="nh-badge nh-app" id="nh-app">App 0</span>
+          <span class="nh-badge nh-app" id="nh-app">App 0 页</span>
         </div>
       </div>
       <!-- 目录树图标释义：快速理解各图标分类含义 -->
@@ -769,12 +779,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <span class="lg-item"><span class="lg-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>子页面</span>
         <span class="lg-item"><span class="lg-ic lg-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2.2 4L16 12H5"/></svg></span>状态页<em class="lg-badge">状态</em></span>
       </div>
-      <!-- 搜索 + 过滤 + 折叠控制 -->
+      <!-- 搜索 + 折叠控制 -->
       <div class="pv-nav-tools">
-        <div class="nav-filter" id="nav-filter" role="tablist" aria-label="页面范围过滤">
-          <button type="button" data-f="all" class="on" role="tab" aria-selected="true">全部 <span class="n" id="nf-all">0</span></button>
-          <button type="button" data-f="app" role="tab" aria-selected="false">App <span class="n" id="nf-app">0</span></button>
-        </div>
         <div class="nav-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           <input type="text" id="nav-search" placeholder="搜索页面名 / 路径 / 描述…" autocomplete="off">
@@ -1015,11 +1021,29 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       { name:'信息工作台', src:'pages/publish/index.html', desc:'信息工作台', children:[
         ['pages/publish/choose.html', '选择发布类型', '发布什么 · 兜底入口，直接选择发布类型'],
         ['pages/publish/guide.html', '发布助手·对话引导', '发布助手 · 对话式发布引导（单选直达类型）'],
-        ['pages/publish/editor.html?type=material-demand', '发布需求·编辑', '发布信息 · 需求发布编辑（type=material-demand）'],
-        ['pages/publish/editor.html?type=material-supply', '发布供应·编辑', '发布信息 · 供应发布编辑（type=material-supply）'],
         ['pages/publish/records.html', '我的发布', '我的发布'],
         ['pages/publish/drafts.html', '草稿箱', '草稿箱'],
         ['pages/publish/unlocked.html', '已解锁线索', '已解锁线索'],
+      ]},
+      { name:'详细类·提交页（8）', src:'pages/publish/editor.html?type=material-supply', desc:'企业认证可发 · 每类专属字段列项不同 · 三步表单 + 发布预览', children:[
+        ['pages/publish/editor.html?type=material-supply', '材料-供应', '详细 · 报价区间/日供能力/技术参数/交货时效/自身资质'],
+        ['pages/publish/editor.html?type=labor-supply', '劳务-供应', '详细 · 计价方式/可出工人数/工种构成/进场时间/班组合规资质'],
+        ['pages/publish/editor.html?type=equipment-supply', '设备-供应', '详细 · 月租报价/可租台数/设备型号参数/进场时间/设备证件'],
+        ['pages/publish/editor.html?type=transport-supply', '运输-供应', '详细 · 计价方式/可用车台数/车型运力/调度响应/运输资质'],
+        ['pages/publish/editor.html?type=franchise-supply', '建筑企业-招商', '详细 · 加盟费/开放区域数/总部资质包/授权时间/总部资质'],
+        ['pages/publish/editor.html?type=trade-supply', '建企转让-需求', '详细 · 转让公司股权与资质 · 平台自动算风险雷达'],
+        ['pages/publish/editor.html?type=personnel-demand', '人才-招聘', '详细 · 薪资范围/招聘人数/证书经验/到岗时间/岗位证书'],
+        ['pages/publish/editor.html?type=agency-supply&via=seller', '提供服务-中介', '详细 · 服务费/可接单量/服务范围/办理周期/中介资质（via=seller）'],
+      ]},
+      { name:'简要类·提交页（8）', src:'pages/publish/brief-editor.html?type=material-demand', desc:'个人认证可发 · 一句话 AI 结构化 · 语音输入 · 即时上架', children:[
+        ['pages/publish/brief-editor.html?type=material-demand', '材料-需求', '简要 · 一句话采购 · AI 结构化标签与供应方匹配'],
+        ['pages/publish/brief-editor.html?type=labor-demand', '劳务-需求', '简要 · 一句话用工'],
+        ['pages/publish/brief-editor.html?type=equipment-demand', '设备-需求', '简要 · 买卖/租赁一句话'],
+        ['pages/publish/brief-editor.html?type=transport-demand', '运输-需求', '简要 · 用车/运输承包一句话'],
+        ['pages/publish/brief-editor.html?type=franchise-demand', '加盟或单项目挂靠-需求', '简要 · 想挂靠/加盟，一句话发意向'],
+        ['pages/publish/brief-editor.html?type=trade-demand', '收购或控股建筑企业-需求', '简要 · 一句话收购意向 · 提交收购顾问闭环'],
+        ['pages/publish/brief-editor.html?type=talent-supply', '人才应聘-需求', '简要 · 一句话求职 + 简历（仅应聘类个人可发）'],
+        ['pages/publish/brief-editor.html?type=agency-demand', '找中介服务-需求', '简要 · 资质新办/担保一句话 · 供需池/服务广场双出口'],
       ]},
     ]},
     { name:'搜索中心', pages:[
@@ -1331,7 +1355,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var elApp = document.getElementById('nh-app');
     var elAdmin = document.getElementById('nh-admin');
     if (elTotal) elTotal.textContent = '共 ' + total + ' 页';
-    if (elApp) elApp.textContent = 'App ' + appCount;
+    if (elApp) elApp.textContent = 'App ' + appCount + ' 页';
     if (elAdmin) elAdmin.textContent = '后台 ' + adminCount;
     ['nf-all', 'nf-app', 'nf-admin'].forEach(function (id) {
       var el = document.getElementById(id);
@@ -2569,6 +2593,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     apply();
     hd.addEventListener('click', function (e) { e.preventDefault(); collapsed = !collapsed; apply(); });
+  })();
+
+  /* ---- 演示场景标题行折叠（默认收起；点击标题行展开/收起状态详情，点 select 不触发折叠） ---- */
+  (function scenarioCollapse(){
+    var box = document.getElementById('pv-quick');
+    var hd = document.getElementById('pv-quick-hd');
+    if (!box || !hd) return;
+    hd.addEventListener('click', function (e) {
+      if (e.target.closest && e.target.closest('select')) return;  /* 点击下拉框本身不折叠 */
+      var collapsed = box.classList.toggle('collapsed');
+      hd.setAttribute('aria-expanded', String(!collapsed));
+    });
   })();
 
   /* ---- 控制台内子折叠（Tabbar / 按钮 液态玻璃） ---- */

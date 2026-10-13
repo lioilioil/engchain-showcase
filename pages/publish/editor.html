@@ -199,6 +199,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .file-upload-add svg { width:16px; height:16px; }
 .file-upload-add span { font-size:11.5px; font-weight:600; }
 
+/* ===== 添加附件·来源选择底部弹窗（本机 / 历史 / 微信，样式与会话窗口一致） ===== */
+.fp-pick{display:flex;flex-direction:column;margin:2px 0 4px;}
+.fp-pick-item{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer;}
+.fp-pick-item:last-child{border-bottom:0;}
+.fp-pick-item:active{background:var(--bg-card-2);border-radius:10px;}
+.fp-pick-ic{flex:none;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;}
+.fp-pick-ic svg{width:19px;height:19px;}
+.fp-pick-t{font-size:13.5px;font-weight:600;color:var(--text-1);}
+.fp-pick-s{font-size:10.5px;color:var(--text-3);margin-top:2px;line-height:1.5;}
+.fp-pick-item .fp-chev{width:15px;height:15px;color:var(--text-3);flex:none;}
+.fp-tint-d{background:rgba(217,119,6,.12);color:#d97706;}
+.fp-tint-a{background:var(--primary-soft);color:var(--primary-dim);}
+.fp-tint-b{background:rgba(46,102,255,.1);color:#2e66ff;}
+.fp-tip{font-size:11px;color:var(--text-3);line-height:1.75;background:var(--bg-card-2);border:1px dashed var(--line);border-radius:10px;padding:11px 13px;}
+.fp-tip b{color:var(--text-2);}
+.fp-empty{padding:26px 6px;text-align:center;color:var(--text-3);font-size:12px;line-height:1.9;}
+.fp-empty small{font-size:10.5px;}
+
 /* ===== 开关行 ===== */
 .switch-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
 .switch-row:last-child { border-bottom:none; }
@@ -2247,15 +2265,114 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       });
     });
   }
+  /* ===== 附件上传：自下而上选择来源（本机文件 / 历史文件 / 微信聊天记录） =====
+     允许类型（与需求口径一致）：pdf html doc docx xls xlsx txt ppt pptx rar zip 7z tar */
+  var FP_EXTS = ['pdf','html','doc','docx','xls','xlsx','txt','ppt','pptx','rar','zip','7z','tar'];
+  var FP_ACCEPT = '.' + FP_EXTS.join(',.');
+  function fpExt(name){ var i = (name || '').lastIndexOf('.'); return i > -1 ? name.slice(i + 1).toLowerCase() : ''; }
+  function fpFmtSize(n){
+    if (n == null) return '';
+    if (typeof n === 'string') return n;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function fpHas(name){ return files.some(function (f){ return f.name === name; }); }
+  function fpAdd(rec){
+    if (files.length >= 5) { UI.toast('最多上传5个附件', 'warn'); return false; }
+    if (fpHas(rec.name)) { UI.toast('「' + rec.name + '」已在附件列表中', 'warn'); return false; }
+    files.push({ name: rec.name, size: rec.size });
+    renderFiles();
+    try { if (window.FileStore) FileStore.add({ name: rec.name, ext: rec.ext || fpExt(rec.name).toUpperCase(), size: rec.size, source: rec.source || '发布编辑', sourceKey: rec.sourceKey || 'publish-edit', note: '发布编辑附件' }); } catch (e) {}
+    scheduleAutoSave();
+    return true;
+  }
+  var FP_IC = {
+    folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+    file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+  };
+  function fpChev(){ return '<svg class="fp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>'; }
+  var _fpInput = null;
+  function fpPickLocal(){
+    if (!_fpInput) {
+      _fpInput = document.createElement('input');
+      _fpInput.type = 'file'; _fpInput.multiple = true; _fpInput.accept = FP_ACCEPT;
+      _fpInput.style.display = 'none'; document.body.appendChild(_fpInput);
+      _fpInput.addEventListener('change', function () {
+        var picked = Array.prototype.slice.call(_fpInput.files || []);
+        if (!picked.length) return;
+        var bad = [], added = 0;
+        picked.forEach(function (f) {
+          var ext = fpExt(f.name);
+          if (FP_EXTS.indexOf(ext) < 0) { bad.push(f.name); return; }
+          if (fpAdd({ name: f.name, size: fpFmtSize(f.size), ext: ext.toUpperCase(), source: '本机文件', sourceKey: 'publish-local' })) added++;
+        });
+        if (bad.length) UI.toast('不支持的文件类型：' + bad.slice(0, 2).join('、') + '（仅支持 pdf/word/excel/ppt/txt/网页/压缩包）', 'warn');
+        if (added) UI.toast('已添加 ' + added + ' 个附件', 'ok');
+        _fpInput.value = '';
+      });
+    }
+    _fpInput.click();
+  }
+  function fpOpenHistory(){
+    var items = [];
+    try { items = (window.FileStore ? FileStore.list() : []).filter(function (it){ return FP_EXTS.indexOf(fpExt(it.name)) > -1; }); } catch (e) {}
+    var sh = UI.sheet();
+    sh.setText('历史文件 · 选择添加');
+    if (!items.length) {
+      sh.html('<div class="fp-empty">暂无历史文件<br><small>从「本机文件」选择过的文件会自动存入历史文件</small></div>');
+      sh.show(); return;
+    }
+    sh.html('<div class="fp-pick">' + items.slice(0, 30).map(function (it) {
+      return '<div class="fp-pick-item" data-fp-hf="' + UI.esc(it.id) + '">' +
+        '<div class="fp-pick-ic fp-tint-b">' + FP_IC.file + '</div>' +
+        '<div style="flex:1;min-width:0;"><div class="fp-pick-t">' + UI.esc(it.name) + '</div>' +
+        '<div class="fp-pick-s">' + UI.esc(it.size || '') + ' · ' + UI.esc(it.source || '') + '</div></div>' + fpChev() + '</div>';
+    }).join('') + '</div>');
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var row = e.target.closest('[data-fp-hf]');
+      if (!row) return;
+      var f = null, id = row.getAttribute('data-fp-hf');
+      items.forEach(function (x){ if (x.id === id) f = x; });
+      if (!f) return;
+      UI.closeSheet();
+      if (fpAdd({ name: f.name, size: f.size || '—', ext: f.ext, source: '历史文件', sourceKey: 'publish-history' })) UI.toast('已添加「' + f.name + '」', 'ok');
+    });
+  }
+  function fpOpenWechat(){
+    var sh = UI.sheet();
+    sh.setText('微信聊天记录');
+    sh.html(
+      '<div class="fp-tip">出于隐私保护，本平台<b>无法直接读取</b>您的微信聊天记录与其中的文件。请在微信中先将文件保存到本机（长按 → 保存到手机/电脑，或发送到「文件传输助手」），再回到这里从本机文件中选择。</div>'
+      + '<div style="height:12px;"></div><button type="button" class="btn btn-block" id="fp-wx-pick">去选本机文件</button>'
+    );
+    sh.show();
+    document.getElementById('fp-wx-pick').addEventListener('click', function () { UI.closeSheet(); setTimeout(fpPickLocal, 260); });
+  }
+  function fpOpenSheet(){
+    var sh = UI.sheet();
+    sh.setText('添加附件');
+    sh.html(
+      '<div class="fp-pick">' +
+        '<div class="fp-pick-item" id="fp-local"><div class="fp-pick-ic fp-tint-d">' + FP_IC.folder + '</div><div style="flex:1;min-width:0;"><div class="fp-pick-t">本机文件</div><div class="fp-pick-s">pdf / word / excel / ppt / txt / 网页 / rar·zip·7z 等</div></div>' + fpChev() + '</div>' +
+        '<div class="fp-pick-item" id="fp-history"><div class="fp-pick-ic fp-tint-a">' + FP_IC.file + '</div><div style="flex:1;min-width:0;"><div class="fp-pick-t">历史文件</div><div class="fp-pick-s">本 App 中上传 / 接收过的文件</div></div>' + fpChev() + '</div>' +
+        '<div class="fp-pick-item" id="fp-wechat"><div class="fp-pick-ic fp-tint-b">' + FP_IC.chat + '</div><div style="flex:1;min-width:0;"><div class="fp-pick-t">微信聊天记录</div><div class="fp-pick-s">微信会话中保存过的文件</div></div>' + fpChev() + '</div>' +
+      '</div>'
+    );
+    sh.show();
+    sh.body().addEventListener('click', function (e) {
+      var row = e.target.closest('[id]');
+      if (!row) return;
+      if (row.id === 'fp-local') { UI.closeSheet(); setTimeout(fpPickLocal, 260); }
+      else if (row.id === 'fp-history') { UI.closeSheet(); setTimeout(fpOpenHistory, 260); }
+      else if (row.id === 'fp-wechat') { UI.closeSheet(); setTimeout(fpOpenWechat, 260); }
+    });
+  }
   $('file-add').addEventListener('click', function () {
     if (files.length >= 5) { UI.toast('最多上传5个附件', 'warn'); return; }
-    var f = sampleFiles[files.length % sampleFiles.length];
-    files.push({ name: f.name, size: f.size });
-    renderFiles();
-    UI.toast('附件已添加（演示环境）', 'ok');
-    /* [历史文件] 详情页编辑·附件上传 → 历史文件（来源：详情页编辑） */
-    try { if (window.FileStore) FileStore.add({ name: f.name, size: f.size, source: '详情页编辑', sourceKey: 'edit', note: '发布编辑附件' }); } catch (e) {}
-    scheduleAutoSave();
+    fpOpenSheet();
   });
 
   /* ===== 有效期选择 ===== */
