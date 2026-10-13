@@ -95,8 +95,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div style="position:relative;">
           <button id="sort-btn" style="color:var(--text-2);font-size:12px;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;">排序 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:11px;height:11px;"><path d="m6 9 6 6 6-6"/></svg></button>
           <div class="sort-popover" id="sort-popover" style="display:none;">
-            <button class="sort-opt active" data-sort="newest">最新</button>
-            <button class="sort-opt" data-sort="match">匹配度</button>
+            <button class="sort-opt active" data-sort="smart">智能推荐</button>
+            <button class="sort-opt" data-sort="newest">最新</button>
+            <button class="sort-opt" data-sort="near">同城优先</button>
+            <button class="sort-opt" data-sort="trust">高信用</button>
           </div>
         </div>
       </div>
@@ -130,6 +132,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/ranking.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -247,6 +250,50 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return out;
   }
 
+  /* ---- 排序上下文：企业/用户映射 + 匹配偏好 ---- */
+  function buildCompanyMap() {
+    var m = {};
+    try {
+      (MOCK.companies || []).forEach(function (c) {
+        m[c.name] = { grade: c.grade || (c.score && c.score.grade), riskFlag: c.riskFlag || '' };
+      });
+    } catch (e) {}
+    return m;
+  }
+  function buildUserMap() {
+    var m = {};
+    try {
+      var users = DataBus.users() || [];
+      var orders = DataBus.orders() || [];
+      /* 每个用户的成交记录（settled 订单） */
+      var dealt = {};
+      orders.forEach(function (o) {
+        if (o.status === 'settled') { dealt[o.owner] = true; if (o.counterpartyId) dealt[o.counterpartyId] = true; }
+      });
+      users.forEach(function (u) {
+        /* 演示：u6（刘洋，30天未活跃注册会员）标记为处罚中+观察档，用于演示负向降权 */
+        var punished = (u.id === 'u6');
+        var creditLevel = punished ? '观察' : (u.id === 'u1' ? '金' : (u.id === 'u2' ? '银' : ''));
+        m[u.id] = {
+          entryTypes: (u.entry && u.entry.types) || [],
+          authLevel: (u.auth && u.auth.enterprise && u.auth.enterprise.ok) ? 'full' : ((u.auth && u.auth.realname && u.auth.realname.ok) ? 'basic' : ''),
+          status: u.status,
+          hasAnnual: false,
+          hasDeal: !!dealt[u.id],
+          punished: punished,
+          creditLevel: creditLevel
+        };
+      });
+    } catch (e) {}
+    return m;
+  }
+  function buildPrefs() {
+    try {
+      if (window.MatchStore) return MatchStore.read().preferences || {};
+    } catch (e) {}
+    return {};
+  }
+
   /* ---- 一级分类切换 + 二级分类栏 ---- */
   var segs = document.querySelectorAll('.discover-seg .seg-item');
   var subBar = document.getElementById('discover-sub');
@@ -293,7 +340,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
 
   /* ---- 排序：气泡弹窗 ---- */
-  var sortBy = 'newest';
+  var sortBy = 'smart';
   var sortBtn = document.getElementById('sort-btn');
   var sortPopover = document.getElementById('sort-popover');
   sortBtn.addEventListener('click', function (e) {
@@ -462,18 +509,59 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (filterState.verified === '未认证') list = list.filter(function (s) { return !s.verified; });
 
     /* 排序 */
-    if (sortBy === 'match') list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
-    else list.sort(function (a, b) { return (b.ts || b.time || 0) - (a.ts || a.time || 0); });
-    /* [FEAT 9.2-1] 置顶道具：置顶信息排最前 */
+    var rankingOpts = {
+      companyMap: buildCompanyMap(),
+      userMap: buildUserMap(),
+      prefs: buildPrefs(),
+      bizKey: (sub !== 'all') ? sub : '',
+      viewerDir: ''
+    };
+    /* D4: 假 distance 字符串 → 同城/省内/跨省标签 */
     try {
-      if (window.UpgradeStore) {
-        list.sort(function (a, b) {
-          var ta = UpgradeStore.isActive('topListing', a.id) ? 1 : 0;
-          var tb = UpgradeStore.isActive('topListing', b.id) ? 1 : 0;
-          return tb - ta;
-        });
-      }
+      var _pm = (window.Ranking && Ranking.cfg().provinceMap) || {};
+      var _vc = rankingOpts.prefs.location || '成都';
+      list.forEach(function (it) {
+        var _c = (it.city || '').toString().split('·')[0].trim();
+        if (!_c) { it.distance = ''; return; }
+        if (_c === _vc) it.distance = '同城';
+        else if (_pm[_c] && _pm[_vc] && _pm[_c] === _pm[_vc]) it.distance = '省内';
+        else it.distance = '跨省';
+      });
     } catch (e) {}
+    if (sortBy === 'smart' && window.Ranking) {
+      list = Ranking.sort(list, rankingOpts);
+    } else {
+      if (sortBy === 'newest') {
+        list.sort(function (a, b) { return (b.ts || b.time || 0) - (a.ts || a.time || 0); });
+      } else if (sortBy === 'near') {
+        /* 同城优先：viewerCity 命中排前 */
+        var vCity = rankingOpts.prefs.location || '成都';
+        list.sort(function (a, b) {
+          var aSame = (a.city === vCity) ? 1 : 0, bSame = (b.city === vCity) ? 1 : 0;
+          if (aSame !== bSame) return bSame - aSame;
+          return (b.ts || 0) - (a.ts || 0);
+        });
+      } else if (sortBy === 'trust') {
+        list.sort(function (a, b) {
+          var ta = (a.verified ? 1 : 0) + ((a._badge === '平台认证') ? 1 : 0);
+          var tb = (b.verified ? 1 : 0) + ((b._badge === '平台认证') ? 1 : 0);
+          if (ta !== tb) return tb - ta;
+          return (b.match || 0) - (a.match || 0);
+        });
+      } else {
+        list.sort(function (a, b) { return (b.match || 0) - (a.match || 0); });
+      }
+      /* 非智能模式下，置顶仍排最前（简单稳定排序） */
+      try {
+        if (window.UpgradeStore) {
+          list.sort(function (a, b) {
+            var ta = UpgradeStore.isActive('topListing', a.id) ? 1 : 0;
+            var tb = UpgradeStore.isActive('topListing', b.id) ? 1 : 0;
+            return tb - ta;
+          });
+        }
+      } catch (e) {}
+    }
 
     document.getElementById('count').textContent = '共 ' + list.length + ' 条';
     var html = list.length

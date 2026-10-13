@@ -1535,7 +1535,17 @@ window.Cards = (function () {
       if (s.dir === 'demand') dirCls = ' is-demand';
       else if (s.dir === 'supply') dirCls = ' is-supply';
       /* [FEAT 9.2-1] 卡片底部增加查看详情按钮，联系方式/详细描述付费墙后可见 */
-      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + fn(s) +'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--text-3);">联系方式查看详情后可见</span><span style="font-size:12px;color:var(--primary);font-weight:600;">查看详情 ›</span></div></a>';
+      /* 付费置地位广告标识（合规要求：付费结果必须标注） */
+      var adBadge = s._sponsored
+        ? '<div style="font-size:10px;color:var(--text-3);background:var(--bg-muted,#f5f5f5);padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;">广告</div>'
+        : '';
+      /* 地域标签（同城/省内/跨省，由 list.html 排序时注入） */
+      var geoBadge = s.distance && /^(同城|省内|跨省)$/.test(s.distance)
+        ? '<div style="font-size:11px;font-weight:600;margin:2px 0 4px;color:'
+          + (s.distance === '同城' ? 'var(--primary)' : s.distance === '省内' ? 'var(--text-2)' : 'var(--text-3)')
+          + ';">' + esc(s.distance) + '</div>'
+        : '';
+      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + adBadge + fn(s) + geoBadge + '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--text-3);">联系方式查看详情后可见</span><span style="font-size:12px;color:var(--primary);font-weight:600;">查看详情 ›</span></div></a>';
       } catch (e) {
         console.error('Cards.render: single card render error, skipped', e, s);
         return '';

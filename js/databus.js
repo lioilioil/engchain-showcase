@@ -994,7 +994,7 @@ window.DataBus = (function () {
   var ORDERS_KEY = 'engchain-orders';
   function seedOrders() {
     var t = function (d) { return new Date(Date.now() - d * 864e5).toISOString().slice(0, 10); };
-    function mk(id, type, title, amount, owner, counterparty, counterpartyId, status, day, ms) {
+    function mk(id, type, title, amount, owner, counterparty, counterpartyId, status, day, ms, supplyId) {
       var M = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.milestone) || { enable: true, minAmount: 50000, nodes: [0.3,0.3,0.3,0.1], labels:['合同签订','服务进度50%','验收','质保期满'] };
       var multi = M.enable && amount >= M.minAmount;
       var nodes = multi ? M.nodes : [1];
@@ -1011,26 +1011,26 @@ window.DataBus = (function () {
         fee = c.fee; rate = c.rate;
       }
       return { id:id, type:type, title:title, amount:amount, owner:owner, counterparty:counterparty, counterpartyId:counterpartyId || '',
-               status:status, ts:t(day), milestones:milestones, fee:fee, rate:rate, note:'',
+               status:status, ts:t(day), milestones:milestones, fee:fee, rate:rate, note:'', supplyId: supplyId || '',
                contactPhone: '13' + String(80000000 + (id.charCodeAt(id.length-2) * 137 + id.charCodeAt(id.length-1) * 911) % 90000000).slice(0,9) };
     }
     return [
-      mk('EN20260904001','supply','商品混凝土供应承接 · 天府新区综合体', 320000, 'u1', '四川中建××建设有限公司', 'u2', 'settled', 1, true),
+      mk('EN20260904001','supply','商品混凝土供应承接 · 天府新区综合体', 320000, 'u1', '四川中建××建设有限公司', 'u2', 'settled', 1, true, '1001'),
       mk('EN20260903058','need','塔吊租赁需求匹配 · 重庆江津河道治理', 86000, 'u5', '成都××机械租赁有限公司', 'u1', 'serving', 2, true),
       mk('EN20260903021','agency','中介撮合 · 资质升级代办（二升一）', 500000, 'u2', '××建设集团有限公司', 'u1', 'await_accept', 3, true),
-      mk('EN20260902094','supply','劳务班组供应承接 · 贵阳旧改防水分包', 45200, 'u1', '贵阳××建设有限公司', 'u3', 'serving', 4, false),
+      mk('EN20260902094','supply','劳务班组供应承接 · 贵阳旧改防水分包', 45200, 'u1', '贵阳××建设有限公司', 'u3', 'serving', 4, false, '1004'),
       mk('EN20260902012','need','砂石料采购匹配 · 西安浐灞项目', 12800, 'u5', '西安××建设集团有限公司', 'u2', 'cancelled', 5, false),
       mk('EN20260901077','transfer','建企买卖 · 公路二级整体转让', 580000, 'u1', '××路桥建设工程有限公司', 'u5', 'serving', 6, true),
       mk('EN20260901033','qual','资质招商 · 电力一级分公司合作', 200000, 'u1', '贵州黔电电力工程有限公司', 'u3', 'pending', 6, true),
       mk('EN20260831009','agency','中介撮合 · 安许代办承诺制', 25000, 'u2', '××企业管理咨询有限公司', 'u3', 'settled', 8, false),
-      mk('EN20260831021','supply','水泥供应承接 · 成都双流仓', 96000, 'u3', '成都××建材供应有限公司', 'u1', 'serving', 8, true),
+      mk('EN20260831021','supply','水泥供应承接 · 成都双流仓', 96000, 'u3', '成都××建材供应有限公司', 'u1', 'serving', 8, true, '1009'),
       mk('EN20260830055','need','汽车吊租赁匹配 · 西安泾河项目', 54000, 'u5', '成都××工程机械有限公司', 'u2', 'await_accept', 9, true),
       mk('EN20260830018','transfer','建企买卖 · 机电一级带安许转让', 420000, 'u1', '××机电安装工程有限公司', 'u5', 'pending', 9, true),
       mk('EN20260829003','qual','资质招商 · 水利二级联营合作', 0, 'u3', '××水利水电工程有限公司', 'u2', 'cancelled', 10, true),
       mk('EN20260828044','supply','水电班组承接 · 成都金牛项目', 61000, 'u3', '四川××水电安装有限公司', 'u1', 'serving', 11, true),
       mk('EN20260828007','agency','中介撮合 · 工商注册加急代办', 8800, 'u2', '××企业管理服务有限公司', 'u5', 'settled', 11, false),
       mk('EN20260827019','need','防水分包匹配 · 西安浐灞旧改', 33200, 'u5', '××防水工程有限公司', 'u3', 'settled', 12, false),
-      mk('EN20260827031','supply','塔吊整机租赁承接 · 成都辐射西南', 158000, 'u1', '××建设集团有限公司', 'u2', 'pending', 12, true)
+      mk('EN20260827031','supply','塔吊整机租赁承接 · 成都辐射西南', 158000, 'u1', '××建设集团有限公司', 'u2', 'pending', 12, true, '1003')
     ];
   }
   function loadOrders() {
