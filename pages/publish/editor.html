@@ -163,9 +163,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                     <span class="unit-caret" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
                   </div>
                   <div class="unit-chips" id="chips-price-unit" role="listbox" aria-label="价格常用单位">
-                    <div class="unit-chips-head"><span class="uch-title">价格单位</span><span class="uch-tag" id="price-unit-rec-tag">按类型推荐</span></div>
                     <div class="unit-chips-body" id="price-unit-chips-body"></div>
-                    <div class="unit-chips-foot">也可直接输入自定义单位，如：元/方 · 万元</div>
                   </div>
                 </div>
               </div>
@@ -771,7 +769,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           || ((realname.mobile && String(realname.mobile).indexOf('*') === -1) ? realname.mobile : '')
           || '';
         if (!fields.contactName.value && (realname.name || st.user)) fields.contactName.value = realname.name || st.user;
-        if (!fields.contactPhone.value && __entMobile) fields.contactPhone.value = __entMobile;
+        if (!fields.contactPhone.value && __entMobile) {
+          var __p1 = String(__entMobile).replace(/[^\d]/g, '').slice(0, 11);
+          fields.contactPhone.dataset.phoneRaw = __p1;
+          fields.contactPhone.value = __p1.slice(0, 3) + (__p1.length > 3 ? ' ' + __p1.slice(3, 7) : '') + (__p1.length > 7 ? ' ' + __p1.slice(7) : '');
+        }
         if (!fields.contactWechat.value && basic.wechat) fields.contactWechat.value = basic.wechat;
       }
       /* 企业名称：企业认证档案自动带出（详情「发布主体」/企业名称引用，隐藏权威值） */
@@ -1490,7 +1492,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }, true);
   // 失焦即时校验：手机号格式 blur 即提示（空值不提前红字）
   fields.contactPhone.addEventListener('blur', function () {
-    var v = this.value.trim();
+    var v = ((this.dataset && this.dataset.phoneRaw) || this.value.replace(/\s+/g, '')).trim();
     if (v && !MOBILE_RE.test(v)) {
       this.classList.add('error'); var e=$('err-contact-phone'); e.textContent='请填写正确的 11 位手机号'; e.classList.add('show');
     } else {
@@ -1615,7 +1617,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (e.send){ e.send.disabled=false; e.send.textContent='获取验证码'; }
   }
   function refreshPhoneVerify(){
-    var v = fields.contactPhone.value.trim();
+    var pvRaw = (fields.contactPhone.dataset && fields.contactPhone.dataset.phoneRaw) || fields.contactPhone.value.replace(/\s+/g, '');
+    var v = pvRaw.trim();
     var valid = MOBILE_RE.test(v);
     var locked = !!fields.contactPhone.dataset.authLocked || fields.contactPhone.readOnly;
     var trusted = (valid && !!trustedPhoneSet()[v]) || (locked && valid);
@@ -1647,7 +1650,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   var btnSendCode=$('btn-send-code');
   if (btnSendCode) btnSendCode.addEventListener('click', function(){
-    var v=fields.contactPhone.value.trim();
+    var v = ((fields.contactPhone.dataset && fields.contactPhone.dataset.phoneRaw) || fields.contactPhone.value.replace(/\s+/g, '')).trim();
     if (!MOBILE_RE.test(v)){ UI.toast('请先填写正确的 11 位手机号','warn'); fields.contactPhone.focus(); return; }
     if (trustedPhoneSet()[v]){ refreshPhoneVerify(); UI.toast('该号码为本人 / 本企业已认证号码，无需验证','ok'); return; }
     PV2.pendingCode = String(Math.floor(100000 + Math.random()*900000));
@@ -1662,7 +1665,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var fPhoneCode=$('f-phone-code');
   if (fPhoneCode) fPhoneCode.addEventListener('input', function(){
     this.value=this.value.replace(/\D/g,'').slice(0,6);
-    var e=pvEls(); var v=fields.contactPhone.value.trim();
+    var e=pvEls(); var v=((fields.contactPhone.dataset && fields.contactPhone.dataset.phoneRaw) || fields.contactPhone.value.replace(/\s+/g, '')).trim();
     if (this.value.length===6){
       if (PV2.sent && this.value===PV2.pendingCode){
         PV2.verified=true; PV2._verifiedPhone=v;
@@ -1679,7 +1682,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     updateNextButton();
   });
   fields.contactPhone.addEventListener('input', function(){
-    var v=this.value.trim();
+    var v=((this.dataset && this.dataset.phoneRaw) || this.value.replace(/\s+/g, '')).trim();
     if (PV2._lastPhone!==v){ PV2._lastPhone=v; if (PV2.required || PV2.sent) pvResetUI(); }
     refreshPhoneVerify();
   });
@@ -2960,7 +2963,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           $('autofill-name').classList.add('show');
         }
         if (cur.phone && !fields.contactPhone.value) {
-          fields.contactPhone.value = cur.phone;
+          var __p2 = String(cur.phone).replace(/[^\d]/g, '').slice(0, 11);
+          fields.contactPhone.dataset.phoneRaw = __p2;
+          fields.contactPhone.value = __p2.slice(0, 3) + (__p2.length > 3 ? ' ' + __p2.slice(3, 7) : '') + (__p2.length > 7 ? ' ' + __p2.slice(7) : '');
           $('autofill-phone').classList.add('show');
         }
       }
@@ -5414,7 +5419,7 @@ function collectDynamicData() {
       fee: Object.keys(fFee).length ? fFee : null, staff: fStaff, staffConfig: fStaff,
       benefits: d.benefits || [], cases: d.cases || [], pdfFiles: fPdf,
       flow: toSteps(d.joinProcess), joinProcess: toSteps(d.joinProcess),
-      contact: { name: fields.contactName.value.trim(), phone: fields.contactPhone.value.trim(), wechat: fields.contactWechat.value.trim(), addr: fields.address.value.trim() || fields.location.value.trim() },
+      contact: { name: fields.contactName.value.trim(), phone: (fields.contactPhone.dataset && fields.contactPhone.dataset.phoneRaw) || fields.contactPhone.value.replace(/\s+/g, ''), wechat: fields.contactWechat.value.trim(), addr: fields.address.value.trim() || fields.location.value.trim() },
       regions: openCities.map(function (c) { var i2 = c.indexOf('·'); return { city: (i2 > -1 ? c.slice(i2 + 1) : c), status: 'vacant', seats: 1 }; }),
       nationalRegions: groupOpenRegions(openCities),
       name: fName, founded: fFounded, capital: fCapital, registeredArea: fRegArea
