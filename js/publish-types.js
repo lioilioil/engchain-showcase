@@ -1,7 +1,8 @@
 /* ================================================================
  * publish-types.js — 16类信息注册表（详细8类 + 简要8类）
  * 被以下页面共用：
- *   - pages/publish/choose.html  （发布前类型选择页，按详细/简要分组）
+ *   - js/publish-type-sheet.js   （底部类型选择弹窗，全产品唯一类型选择交互；guide/editor/brief 复用）
+ *   - pages/publish/guide.html   （对话式发布引导）
  *   - pages/publish/editor.html  （详细类：按 type 渲染专属结构）
  *   - pages/publish/brief-editor.html （简要类：一句话AI分析+文件发布）
  *
@@ -147,16 +148,17 @@
     return out;
   }
 
-  /* type → 编辑器 URL（简要类 → brief-editor.html，详细类 → editor.html） */
+  /* type → 编辑器 URL（简要类 → brief-editor.html，详细类 → editor.html）；
+     无效 / 隐藏类型回到对话式发布引导 guide.html（独立 choose.html 已移除） */
   function editorHref(typeKey) {
     var t = PUBLISH_TYPES[typeKey];
-    if (!t || t.hide) return 'choose.html';
+    if (!t || t.hide) return 'guide.html';
     var q = 'type=' + encodeURIComponent(typeKey);
     if (t.viaSeller) q += '&via=seller';
     return (t.detailLevel === 'brief' ? 'brief-editor.html?' : 'editor.html?') + q;
   }
 
-  /* 兼容旧接口：按角色返回可发 type（choose.html 新版改用 availableTypesByAccount） */
+  /* 兼容旧接口：按角色返回可发 type（类型选择弹窗统一用 availableTypesByAccount） */
   function availableTypes(acc, role) {
     var all = availableTypesByAccount(acc);
     return all.filter(function (k) { return !role || PUBLISH_TYPES[k].role === role; });

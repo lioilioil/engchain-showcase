@@ -1,0 +1,293 @@
+/* ============================================================================
+   Liquid Glass Popups — 弹窗液态玻璃层（v1 · 2026-10-16）
+   ----------------------------------------------------------------------------
+   目标：app demo 中所有「自下而上弹窗」与「页面居中弹窗」按底部主 tabbar
+   的液态玻璃效果整体更换视觉。布局 / 内容 / 交互一律不动：
+   本文件只覆盖材质属性（background / backdrop-filter / box-shadow / border），
+   不触碰尺寸、位置、圆角、过渡、显隐逻辑。
+
+   参数来源（联动规则，非新建）：
+   全部材质参数与 css/liquid-dock.css 同源 —— 该文件由
+   artifacts/tabbar-redesign/lg/dock.css 经 sync.py 生成，唯一视觉源头。
+   · blur / saturate / brightness 逐条取自 .lg-base（L0 玻璃基底）；
+   · 边缘高光 / 发丝边 / 贴身投影逐条取自 .lg-spec（L2 锐利层）；
+   · 面板玻璃 alpha 为 dock 基底按「面板需承载内容」等比上调
+     （亮色 ×1.6 / 暗色 ×1.2），模糊与饱和度完全同源。
+   未来调整 dock.css 材质时，同步更新下方 :root 的 --lgp-* 变量即可全量联动。
+
+   覆盖矩阵：
+   A. 通用 JS 弹窗（app.css）：.sheet（含 .city-sheet/.cs-fb-sheet 子类）、
+      .cert-modal、.modal-overlay、.sheet-overlay
+   B. 页面自建 bottom sheet：[data-sheet-box]（22 处，类名各异统一挂钩）
+   C. JS 动态注入样式的弹窗：.pts-sheet/.pts-mask（publish-type-sheet.js）、
+      .kefu-modal（common.js）—— 注入晚于本文件，材质用 !important 强制
+   D. 居中面板统一视觉（4→1）：通用 .dialog 与页面自建确认框
+      .confirm-box/.vh-confirm-box/.leave-dialog 共用同一份玻璃视觉；
+      连同 .modal-box、.map-modal .mm-panel 等居中面板一并收敛
+   E. 遮罩统一：.sheet-overlay/.modal-overlay/.pts-mask + 各页面遮罩类枚举
+   F. 完整性审计补漏（2026-10-16 二轮）：.add-sheet/.at-sheet（自下而上）、
+      .match-modal/.deliver-modal/.onboarding-card/.fee-confirm-dialog（居中）、
+      .at-scrim/.cert-modal-overlay/.onboarding-mask/.fee-confirm-mask（遮罩）
+      （editor.css 的 .pro-panel/.pro-mask 为页面未引用的死样式，未纳入）
+   G. 例外（不处理）：wonder-popup 惊喜时刻弹窗（独立游戏化视觉，异形无容器）、
+      toast（非弹窗）、内容锁定层（.core-lock-overlay/.epq-lock-mask 等，非弹窗遮罩）、
+      人脸识别遮罩 .ap-mask（专注识别场景）、esign 独立签章页（不加载 common.js）
+   ============================================================================ */
+
+/* ---- 材质参数：唯一调整点，与 dock.css 同源 ---- */
+:root{
+  /* L0 玻璃基底 filter（= dock.css .lg-base / 暗色 .lg-base） */
+  --lgp-glass-filter: blur(30px) saturate(185%) brightness(1.04);
+  --lgp-glass-filter-dark: blur(30px) saturate(160%) brightness(.96);
+  /* 玻璃面板渐变（dock .lg-base alpha × 1.6 亮色 / × 1.2 暗色；方向与 dock 一致 180deg） */
+  --lgp-bg-light: linear-gradient(180deg,
+    rgba(255,255,255,.14) 0%, rgba(255,255,255,.065) 40%,
+    rgba(255,255,255,.055) 62%, rgba(255,255,255,.11) 100%);
+  --lgp-bg-dark: linear-gradient(180deg,
+    rgba(58,58,68,.34) 0%, rgba(38,38,46,.24) 40%,
+    rgba(32,32,40,.22) 62%, rgba(48,48,58,.30) 100%);
+  /* 边缘高光 / 发丝边（= dock.css .lg-spec 的 inset 部分） */
+  --lgp-edge-light:
+    inset 0 1px 0 rgba(255,255,255,.62),
+    inset 0 -1px 1px rgba(255,255,255,.16),
+    inset 0 0 0 1px rgba(255,255,255,.30);
+  --lgp-edge-dark:
+    inset 0 1px 0 rgba(255,255,255,.26),
+    inset 0 -1px 1px rgba(255,255,255,.07),
+    inset 0 0 0 1px rgba(255,255,255,.13);
+  /* 自下而上弹窗贴身投影（= dock .lg-spec 外投影，向上翻，贴屏幕底） */
+  --lgp-shadow-sheet-light: 0 -1px 2px rgba(16,18,22,.05), 0 -8px 22px -8px rgba(16,18,22,.16);
+  --lgp-shadow-sheet-dark: 0 -1px 3px rgba(0,0,0,.30), 0 -10px 26px -10px rgba(0,0,0,.42);
+  /* 居中弹窗贴身投影（= dock .lg-spec 外投影原版） */
+  --lgp-shadow-dialog-light: 0 1px 2px rgba(16,18,22,.05), 0 8px 22px -8px rgba(16,18,22,.16);
+  --lgp-shadow-dialog-dark: 0 1px 3px rgba(0,0,0,.30), 0 10px 26px -10px rgba(0,0,0,.42);
+  /* 玻璃遮罩：亮色 = 白色半透明雾化（用户指定明亮模式蒙版为白色半透明），
+     暗色 = 深色半透明；模糊 + 提纯保持弹窗玻璃的"底"，背景可辨 */
+  --lgp-scrim: rgba(255,255,255,.50);
+  --lgp-scrim-filter: blur(8px) saturate(150%) brightness(.98);
+  --lgp-scrim-dark: rgba(8,10,14,.58);
+  --lgp-scrim-filter-dark: blur(10px) saturate(135%) brightness(.94);
+}
+
+/* ============================================================================
+   A. 通用 JS 弹窗（app.css 定义）
+      面板材质统一 !important：部分页面在 common.js 注入点之后才输出 <style>
+      （如 agency / supply-detail），同特异性规则会因加载顺序被页面压过；
+      !important 使玻璃层与页面 style 顺序无关，几何仍由页面规则控制。
+   ========================================================================== */
+
+/* ---- 自下而上 Bottom Sheet ---- */
+.sheet{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-sheet-light) !important;
+}
+[data-theme="dark"] .sheet{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-sheet-dark) !important;
+}
+
+/* 企业认证档案弹窗（app.css .cert-modal，居中，DEPRECATED 保留兼容） */
+.cert-modal{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-dialog-light) !important;
+}
+[data-theme="dark"] .cert-modal{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-dialog-dark) !important;
+}
+
+/* ============================================================================
+   B. 页面自建 bottom sheet：[data-sheet-box]（类名各异，属性统一挂钩）
+      材质属性用 !important 强制统一 —— 页面 <style> 与动态注入的样式
+      均不得破坏玻璃层；几何（圆角/尺寸/位置/过渡）仍由页面规则控制。
+   ========================================================================== */
+[data-sheet-box]{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-sheet-light) !important;
+}
+[data-theme="dark"] [data-sheet-box]{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-sheet-dark) !important;
+}
+
+/* 特殊：.pts-sheet 由 publish-type-sheet.js 动态注入 <style>（晚于本文件），
+   背景等材质需显式压制其局部色板（#FBFAF7 / #211D18） */
+.pts-sheet{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-sheet-light) !important;
+}
+[data-theme="dark"] .pts-sheet{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-sheet-dark) !important;
+}
+
+/* 一句话发布 · 发布预览 sheet（brief-editor .be-sheet，自下而上，无 data-sheet-box） */
+.be-sheet{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-sheet-light) !important;
+}
+[data-theme="dark"] .be-sheet{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-sheet-dark) !important;
+}
+
+/* ---- 完整性审计补漏（2026-10-16）：自下而上面板 ----
+   monitor .add-sheet / auth .at-sheet（半屏身份详情） */
+.add-sheet,
+.at-sheet{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-sheet-light) !important;
+}
+[data-theme="dark"] .add-sheet,
+[data-theme="dark"] .at-sheet{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-sheet-dark) !important;
+}
+
+/* ============================================================================
+   D. 居中面板统一视觉（4→1 收敛：通用确认弹窗 .dialog 与页面自建确认框
+      .confirm-box/.vh-confirm-box/.leave-dialog 共用同一份玻璃视觉定义；
+      几何布局（宽度/内边距/圆角/按钮排列）仍由各页面规则控制，零改动）
+   ========================================================================== */
+.dialog,
+.modal-box,
+.confirm-box,
+.vh-confirm-box,
+.leave-dialog,
+.ref-pop,
+.fs-dialog,
+.map-modal .mm-panel,
+.match-modal,
+.deliver-modal,
+.onboarding-card,
+.fee-confirm-dialog{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-dialog-light) !important;
+}
+[data-theme="dark"] .dialog,
+[data-theme="dark"] .modal-box,
+[data-theme="dark"] .confirm-box,
+[data-theme="dark"] .vh-confirm-box,
+[data-theme="dark"] .leave-dialog,
+[data-theme="dark"] .ref-pop,
+[data-theme="dark"] .fs-dialog,
+[data-theme="dark"] .map-modal .mm-panel,
+[data-theme="dark"] .match-modal,
+[data-theme="dark"] .deliver-modal,
+[data-theme="dark"] .onboarding-card,
+[data-theme="dark"] .fee-confirm-dialog{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-dialog-dark) !important;
+}
+
+/* editor.css 对 .leave-dialog/.ref-pop/.fee-confirm-dialog 另有高特异性投影
+   （.editor-page 前缀），此处同特异性提升以恢复同源玻璃投影（背景/模糊已由上方规则覆盖） */
+.editor-page .leave-dialog,
+.editor-page .ref-pop,
+.editor-page .fee-confirm-dialog{
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-dialog-light) !important;
+}
+[data-theme="dark"] .editor-page .leave-dialog,
+[data-theme="dark"] .editor-page .ref-pop,
+[data-theme="dark"] .editor-page .fee-confirm-dialog{
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-dialog-dark) !important;
+}
+
+/* 客服中心面板（common.js injectKefuStyle 动态注入，晚于本文件 → 压制） */
+.kefu-modal{
+  background: var(--lgp-bg-light) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter) !important;
+  backdrop-filter: var(--lgp-glass-filter) !important;
+  border-color: transparent !important;
+  box-shadow: var(--lgp-edge-light), var(--lgp-shadow-dialog-light) !important;
+}
+[data-theme="dark"] .kefu-modal{
+  background: var(--lgp-bg-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  backdrop-filter: var(--lgp-glass-filter-dark) !important;
+  box-shadow: var(--lgp-edge-dark), var(--lgp-shadow-dialog-dark) !important;
+}
+
+/* ============================================================================
+   E. 玻璃遮罩统一
+      只覆盖 background / backdrop-filter：深色半透明 + 模糊 + 提纯，
+      与面板玻璃同源（遮罩即"玻璃的底"）。显隐逻辑 / 定位 / z-index 不动。
+   ========================================================================== */
+.sheet-overlay,
+.modal-overlay,
+.pts-mask,
+.filter-mask, .filter-overlay, .delegate-mask, .exclusive-mask, .deliver-mask,
+.dfm-mask, .ddm-mask, .qt-mask, .ns-mask, .dqm-mask, .match-mask,
+.be-mask, .avatar-sheet-mask, .ss-overlay, .preview-mask, .city-mask,
+.vh-confirm-overlay, .add-sheet-mask, .modal-mask, .confirm-mask,
+.report-modal, .leave-mask, .ref-pop-mask, .fs-overlay,
+.cert-modal-overlay, .at-scrim, .onboarding-mask, .fee-confirm-mask,
+.map-modal{
+  background: var(--lgp-scrim) !important;
+  -webkit-backdrop-filter: var(--lgp-scrim-filter) !important;
+  backdrop-filter: var(--lgp-scrim-filter) !important;
+}
+[data-theme="dark"] .sheet-overlay,
+[data-theme="dark"] .modal-overlay,
+[data-theme="dark"] .pts-mask,
+[data-theme="dark"] .filter-mask, [data-theme="dark"] .filter-overlay,
+[data-theme="dark"] .delegate-mask, [data-theme="dark"] .exclusive-mask,
+[data-theme="dark"] .deliver-mask, [data-theme="dark"] .dfm-mask,
+[data-theme="dark"] .ddm-mask, [data-theme="dark"] .qt-mask,
+[data-theme="dark"] .ns-mask, [data-theme="dark"] .dqm-mask,
+[data-theme="dark"] .match-mask, [data-theme="dark"] .be-mask,
+[data-theme="dark"] .avatar-sheet-mask, [data-theme="dark"] .ss-overlay,
+[data-theme="dark"] .preview-mask, [data-theme="dark"] .city-mask,
+[data-theme="dark"] .vh-confirm-overlay, [data-theme="dark"] .add-sheet-mask,
+[data-theme="dark"] .modal-mask, [data-theme="dark"] .confirm-mask,
+[data-theme="dark"] .report-modal, [data-theme="dark"] .leave-mask,
+[data-theme="dark"] .ref-pop-mask, [data-theme="dark"] .fs-overlay,
+[data-theme="dark"] .cert-modal-overlay, [data-theme="dark"] .at-scrim,
+[data-theme="dark"] .onboarding-mask, [data-theme="dark"] .fee-confirm-mask,
+[data-theme="dark"] .map-modal{
+  background: var(--lgp-scrim-dark) !important;
+  -webkit-backdrop-filter: var(--lgp-scrim-filter-dark) !important;
+  backdrop-filter: var(--lgp-scrim-filter-dark) !important;
+}
+
+/* ============================================================================
+   兜底：暗色主题下页面内联抓条（data-sheet-drag 内的横线）压暗为可见半透明，
+   明色主题保持不变（避免玻璃底上不可见）。
+   ========================================================================== */
+[data-theme="dark"] [data-sheet-drag] div{
+  background: rgba(255,255,255,.24) !important;
+}

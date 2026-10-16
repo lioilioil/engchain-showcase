@@ -97,7 +97,7 @@ window.DETAIL = (function () {
     return '<div class="detail-hero ' + (o.dark ? 'detail-hero--dark' : '') + '" style="padding:22px 24px 18px;">' +
       '<div class="dh-tag">' + cfgText(o.tag) + (o.verifiedHint ? ' · ' + o.verifiedHint : '') + '</div>' +
       '<div class="dh-title">' + cfgText(o.title) + '</div>' +
-      (o.price ? '<div class="dh-price-row"><span class="dh-price">' + o.price + '</span><span class="dh-price-unit">' + cfgText(o.unit) + '</span></div>' : '') +
+      (o.price ? '<div class="dh-price-row"><span class="dh-price">' + o.price + '</span><span class="dh-price-unit">' + cfgText(o.priceUnit || o.unit) + '</span></div>' : '') +
       (o.meta && o.meta.length ? '<div class="dh-meta">' + o.meta.map(function (m) { return '<span class="dh-meta-item">' + m + '</span>'; }).join('') + '</div>' : '') +
       '</div>';
   }
@@ -1788,7 +1788,7 @@ window.DETAIL = (function () {
       { k: '年终绩效', v: ss.annualBonus, w: 6, c: 'var(--info, #2563EB)' }
     ];
     var h = '<div class="p-salary">' +
-      '<div class="ps-head"><div><div class="ps-total">' + cfgText(ss.total) + '</div><div class="ps-sub">综合年薪构成（全职）</div></div>' +
+      '<div class="ps-head"><div><div class="ps-total">' + cfgText(ss.total) + '</div><div class="ps-sub">薪资范围（全职）</div></div>' +
       '<span class="ps-free">' + icon('check') + '投递免费</span></div>';
     rows.forEach(function (rw) {
       if (!rw.v) return;

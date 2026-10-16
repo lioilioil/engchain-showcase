@@ -2,6 +2,30 @@
    工程链 ENGCHAIN — 通用脚本 (common.js)
    Toast / 半屏弹窗 / 居中对话框 / 返回 / iPhone 状态栏 / 支付墙解锁
    ============================================================================ */
+/* ---- [弹窗液态玻璃] 注入 css/liquid-popup.css ----
+   与底部主 tabbar 的液态玻璃（css/liquid-dock.css，源 artifacts/tabbar-redesign/lg/dock.css）
+   同源联动：所有自下而上弹窗 / 页面居中弹窗按同一套玻璃材质参数整体更换视觉，
+   布局 / 内容 / 交互零改动。此处仅注入样式表链接，不触碰任何弹窗逻辑。
+   用 document.currentScript 定位 js/common.js 自身，推导同级的 css/ 目录，
+   不依赖 window.__ROOT__（其在 common.js 之后才由页面设置）。 */
+(function () {
+  try {
+    var href = null;
+    var cs = document.currentScript;
+    if (cs && cs.src) {
+      href = cs.src.replace(/[?#].*$/, '').replace(/js\/common\.js[^/]*$/, 'css/liquid-popup.css');
+    } else {
+      var p = location.pathname, q = p.indexOf('?') > -1 ? p.slice(0, p.indexOf('?')) : p;
+      href = q.slice(0, q.lastIndexOf('/') + 1) + 'css/liquid-popup.css';
+    }
+    if (!href || document.querySelector('link[data-lgp="1"]')) return;
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.setAttribute('data-lgp', '1');
+    document.head.appendChild(link);
+  } catch (e) {}
+})();
 window.UI = (function () {
   /* ---- 页面相对路径基准：页面位于 pages/xx/ 目录时与根目录的差价 ---- */
   function base(depth) {

@@ -1,11 +1,12 @@
 /* ================================================================
- * publish-type-sheet.js — 「切换发布类型」自下而上底部弹窗（bottom sheet）
- * 被详细类 editor.html、简要类 brief-editor.html 复用，替代整页跳转 choose.html。
+ * publish-type-sheet.js — 「选择 / 切换发布类型」自下而上底部弹窗（bottom sheet）
+ * 被详细类 editor.html、简要类 brief-editor.html、对话引导 guide.html 复用，
+ * 是全产品唯一的类型选择交互（独立的 choose.html 已于 2026-10-16 移除）。
  *
- * 设计口径（2026-10-15 与用户确认）：
- *   - 仅用于提交页顶部类型卡「更换类型」：在当前页原地弹出，不离开页面层级；
+ * 设计口径（2026-10-15 与用户确认；2026-10-16 扩展到 guide「查看全部类型」）：
+ *   - 提交页顶部类型卡「更换类型」、引导页「查看全部类型」均在当前页原地弹出，不离开页面层级；
  *   - 复用 publish-types.js 的 16 类注册表 / 当前身份可发类型 / 编辑器路由，
- *     与 choose.html 的分组、供需要、权限锁定、认证引导保持一致；
+ *     各入口的分组、供需要、权限锁定、认证引导保持一致；
  *   - 选中一个【与当前不同且可发布】的类型后直接切换，不做二次确认
  *     （切换必然进入另一种空白提交页，不存在编辑内容复用）；
  *   - 是否保存草稿由调用方决定：本组件只产出目标 href，editor 在 onPick 中
@@ -16,8 +17,10 @@
  *
  * 用法：
  *   PublishTypeSheet.open({
- *     current: 'material-supply',          // 当前 typeKey，用于标记“当前”并禁用该项
- *     onPick: function(href, key){ ... }   // 可选；默认 location.href = href
+ *     current: 'material-supply',          // 可选；当前 typeKey，传入则标记“当前”并禁用该项（引导页首次选择不传）
+ *     title: '选择发布类型',                // 可选；默认“切换发布类型”
+ *     sub: '选择一个类型，进入对应发布表单', // 可选；默认切换语义的说明文案
+ *     onPick: function(href, key){ ... }   // 可选；默认 location.href = href；返回 false 可自行接管导航
  *   });
  * ================================================================ */
 (function (global) {
@@ -103,6 +106,10 @@
       + 'html[data-theme="dark"] .pts-row{background:#2A251E;border-color:rgba(244,240,233,.1);}'
       + 'html[data-theme="dark"] .pts-main b{color:#F4F0E9;}'
       + 'html[data-theme="dark"] .pts-main span{color:rgba(244,240,233,.45);}'
+      + 'html[data-theme="dark"] .pts-row.is-locked{opacity:.62;}'
+      + 'html[data-theme="dark"] .pts-row.is-locked .pts-main b{color:rgba(244,240,233,.40);}'
+      + 'html[data-theme="dark"] .pts-row.is-locked .pts-ic{background:rgba(244,240,233,.10);color:rgba(244,240,233,.42);}'
+      + 'html[data-theme="dark"] .pts-badge.lock{color:rgba(244,240,233,.55);background:rgba(244,240,233,.08);border-color:rgba(244,240,233,.20);}'
       + 'html[data-theme="dark"] .pts-row.is-current{border-color:rgba(111,184,154,.4);background:rgba(111,184,154,.08);}'
       + 'html[data-theme="dark"] .pts-ic.supply{background:rgba(201,164,92,.16);color:#C9A45C;}'
       + 'html[data-theme="dark"] .pts-badge.supply{color:#C9A45C;background:rgba(201,164,92,.16);}'
@@ -154,6 +161,8 @@
 
     var PT = global.PUBLISH_TYPES || {};
     var current = opts.current || '';
+    var title = opts.title || '切换发布类型';
+    var subText = opts.sub || '选择后进入该类型的全新表单；当前未点「存草稿」的内容不会保留、也不会自动保存。';
     var allowed = {};
     try { (global.availableTypesByAccount(getAccount()) || []).forEach(function (k) { allowed[k] = true; }); } catch (e) {}
     var au = authState();
@@ -164,7 +173,7 @@
     panel.className = 'pts-sheet';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-label', '切换发布类型');
+    panel.setAttribute('aria-label', title);
 
     var rowsHtml = '';
     GROUPS.forEach(function (g) {
@@ -190,8 +199,8 @@
 
     panel.innerHTML = ''
       + '<div class="pts-grab"></div>'
-      + '<div class="pts-hd"><div class="pts-ti"><b>切换发布类型</b>'
-      + '<span class="pts-sub">选择后进入该类型的全新表单；当前未点「存草稿」的内容不会保留、也不会自动保存。</span></div>'
+      + '<div class="pts-hd"><div class="pts-ti"><b>' + esc(title) + '</b>'
+      + '<span class="pts-sub">' + esc(subText) + '</span></div>'
       + '<button type="button" class="pts-x" aria-label="关闭">' + SVG.close + '</button></div>'
       + '<div class="pts-bd">' + rowsHtml + '</div>';
 
