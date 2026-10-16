@@ -50,19 +50,41 @@ html[data-theme="dark"] .resume-go{color:var(--gold-hi);}
 .dir-bd b{display:block;font-size:14px;font-weight:700;line-height:1.25;}
 .dir-bd span{display:block;margin-top:3px;font-size:10.5px;color:var(--ink-3);line-height:1.45;}
 
-/* 类型宫格：2 列紧凑 */
-.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.type-card{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:10px 10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:transform .12s;}
-.type-card:active{transform:scale(.96);}
-.type-ic{flex:none;width:30px;height:30px;border-radius:8px;background:var(--world);display:flex;align-items:center;justify-content:center;color:var(--ink-2);}
-.type-ic svg{width:16px;height:16px;}
-.type-bd{display:flex;flex-direction:column;gap:2px;min-width:0;width:100%;}
-.type-bd b{display:block;font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink);}
-.type-bd span{display:block;font-size:10px;color:var(--ink-3);line-height:1.35;}
+/* 分类分组：一行一条紧凑列表 */
+.pg{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.pg-h{display:flex;align-items:center;gap:8px;margin:0 2px 2px;}
+.pg-ic{flex:none;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;letter-spacing:.02em;color:var(--gold-deep);background:var(--gold-soft);}
+.pg-h b{font-size:13.5px;font-weight:700;letter-spacing:.01em;}
+.pg-h span{font-size:10.5px;color:var(--ink-3);margin-left:2px;}
+.type-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);text-decoration:none;color:var(--ink);transition:transform .12s,box-shadow .12s;}
+.type-row:active{transform:scale(.985);}
+.tr-ic{flex:none;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.tr-ic svg{width:15px;height:15px;}
+.tr-ic.supply{background:var(--gold-soft);color:var(--gold-deep);}
+.tr-ic.demand{background:var(--green-soft);color:var(--green);}
+.tr-bd{flex:1;min-width:0;}
+.tr-bd b{display:block;font-size:13px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tr-bd span{display:block;margin-top:2px;font-size:10.5px;color:var(--ink-3);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tr-side{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;padding:3px 8px;border-radius:999px;}
+.tr-side.supply{color:var(--gold-deep);background:var(--gold-soft);}
+.tr-side.demand{color:var(--green);background:var(--green-soft);}
+.tr-arrow{flex:none;color:var(--ink-3);}
+.tr-arrow svg{width:14px;height:14px;display:block;}
+/* 权限外列项：灰度锁定 + 引导认证 */
+.type-row.is-locked{opacity:.6;}
+.type-row.is-locked .tr-bd b{color:var(--ink-3);}
+.type-row.is-locked .tr-ic{background:var(--world);color:var(--ink-3);opacity:.75;}
+.type-row.is-locked .tr-side.lock{color:#8A5A2A;background:rgba(138,90,42,.12);border:1px dashed rgba(138,90,42,.38);}
+html[data-theme="dark"] .type-row.is-locked .tr-side.lock{color:#D7B774;background:rgba(215,183,116,.10);border-color:rgba(215,183,116,.32);}
+.type-row.is-locked .tr-arrow{opacity:0;}
+
+/* 游客 / 未实名引导条 */
+.auth-tip{display:flex;flex-direction:column;gap:3px;margin:12px 0 2px;padding:10px 12px;border-radius:12px;background:rgba(138,106,40,.08);border:1px solid rgba(138,106,40,.28);}
+.auth-tip b{font-size:12.5px;font-weight:700;color:var(--gold-deep);}
+html[data-theme="dark"] .auth-tip b{color:var(--gold-hi);}
+.auth-tip span{font-size:10.5px;color:var(--ink-2);line-height:1.5;}
 
 .back-link{display:inline-flex;align-items:center;gap:5px;margin-top:16px;font-size:11.5px;color:var(--ink-3);text-decoration:none;}
-.empty{padding:30px 0;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.8;}
-.empty a{color:var(--gold-deep);}
 </style>
 </head>
 <body>
@@ -86,14 +108,17 @@ html[data-theme="dark"] .resume-go{color:var(--gold-hi);}
 <script>
 (function(){
   var st = (window.UI && UI.state) ? UI.state.get() : {};
-  if (!st.loggedIn) { location.href = '../auth/login.html'; return; }
+  var loggedIn = !!(st.loggedIn && st.status !== 'guest');
   var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
-  if (!(auth.realname && auth.realname.ok)) { location.href = '../profile/auth-personal.html'; return; }
+  var realname = !!(auth.realname && auth.realname.ok);
+  /* 游客 / 未实名不再跳转：全量展示并灰度锁定，点击时按身份分级引导登录 / 实名 / 认证入驻 */
 
   var acc = null;
   try { acc = window.entryAccess ? entryAccess() : null; } catch(e){}
 
   var body = document.getElementById('body');
+
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
   function icon(name){
     var icons = {
@@ -123,29 +148,73 @@ html[data-theme="dark"] .resume-go{color:var(--gold-hi);}
       a.className = 'resume';
       a.href = publishTypeHref(hit);
       a.innerHTML = '<span class="resume-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></span>'
-        + '<div class="resume-bd"><b>' + (rec.title || '继续上次发布') + '</b><span>上次发过「' + (PUBLISH_TYPES[hit].label) + '」，点此快速续发</span></div>'
+        + '<div class="resume-bd"><b>' + (rec.title || '继续上次发布') + '</b><span>上次发过「' + (PUBLISH_TYPES[hit].guideLabel || PUBLISH_TYPES[hit].label) + '」，点此快速续发</span></div>'
         + '<span class="resume-go">续发 ›</span>';
       slot.appendChild(a);
     } catch(e){}
   })();
 
-  /* 按业务品类对顺序平铺当前身份可发布的类目（分类深度为内部规则，不在界面展示） */
-  var ORDER = ['material-supply','material-demand','labor-supply','labor-demand','equipment-supply','equipment-demand','transport-supply','transport-demand','franchise-supply','franchise-demand','trade-supply','trade-demand','personnel-demand','talent-supply','agency-supply','agency-demand'];
+  /* 全量 16 类按业务分类分组列项（一行一条）：
+     - 分类顺序与「发布助手·对话引导」一级分类一致（材料/设备/劳务/运输/建筑企业/人才/中介服务）
+     - 全部行为描述均展示；当前身份不可发布的类型灰度锁定并标注所需认证，点击引导认证/入驻 */
+  var GROUPS=[
+    { name:'材料', keys:['material-supply','material-demand'] },
+    { name:'设备', keys:['equipment-supply','equipment-demand'] },
+    { name:'劳务', keys:['labor-supply','labor-demand'] },
+    { name:'运输', keys:['transport-supply','transport-demand'] },
+    { name:'建筑企业', keys:['franchise-supply','franchise-demand','trade-supply','trade-demand'] },
+    { name:'人才', keys:['personnel-demand','talent-supply'] },
+    { name:'中介服务', keys:['agency-supply','agency-demand'] }
+  ];
+  function lockReason(typeKey){
+    var t=PUBLISH_TYPES[typeKey]; if(!t) return '需认证';
+    if(!loggedIn) return '需登录';
+    if(!realname) return '需实名';
+    if(t.detailLevel==='detail') return '需企业认证';
+    if(t.cat==='求职') return '需专业入驻';
+    return '需认证';
+  }
   function renderGroups(){
-    var keys = [];
-    try { keys = (window.availableTypesByAccount) ? availableTypesByAccount(acc) : []; } catch(e){ keys = []; }
-    if (!keys.length) {
-      body.innerHTML = '<div class="empty">当前身份暂无可发布的类目<br><a href="../profile/auth.html">前往完成实名认证 / 企业认证 / 入驻 ›</a></div>';
-      return;
-    }
-    var set = {};
-    keys.forEach(function(k){ set[k] = true; });
-    var ordered = ORDER.filter(function(k){ return set[k]; });
-    function cardHtml(k){
-      var t = PUBLISH_TYPES[k];
-      return '<a class="type-card" href="'+publishTypeHref(k)+'"><span class="type-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg></span><span class="type-bd"><b>'+t.label+'</b><span>'+t.sub+'</span></span></a>';
-    }
-    body.innerHTML = '<div class="type-grid">' + ordered.map(cardHtml).join('') + '</div>';
+    var allowed={};
+    try { (availableTypesByAccount(acc)||[]).forEach(function(k){ allowed[k]=true; }); } catch(e){}
+    var html='';
+    GROUPS.forEach(function(g){
+      html+='<div class="pg"><div class="pg-h"><span class="pg-ic">'+esc(g.name.charAt(0))+'</span><b>'+esc(g.name)+'</b><span>'+g.keys.length+' 类</span></div>';
+      g.keys.forEach(function(k){
+        var t=PUBLISH_TYPES[k]; if(!t) return;
+        var locked=!allowed[k];
+        var side=t.role==='supply'?'supply':'demand';
+        var badge=locked
+          ? '<span class="tr-side lock">'+esc(lockReason(k))+'</span>'
+          : '<span class="tr-side '+side+'">'+(side==='supply'?'供':'需')+'</span>';
+        html+='<a class="type-row'+(locked?' is-locked':'')+'" data-key="'+esc(k)+'" href="'+(locked?'javascript:void(0)':publishTypeHref(k))+'">'
+          +'<span class="tr-ic '+side+'">'+icon(side)+'</span>'
+          +'<span class="tr-bd"><b>'+esc(t.guideLabel||t.label)+'</b><span>'+esc(t.guideSub||t.sub)+'</span></span>'
+          +badge+'<span class="tr-arrow">'+icon('arr')+'</span></a>';
+      });
+      html+='</div>';
+    });
+    body.innerHTML=html;
+    /* 锁定入口：提示所需认证并分级引导（未登录→登录 / 未实名→实名 / 已实名→企业认证或入驻），不进入编辑器 */
+    body.addEventListener('click',function(ev){
+      var row=ev.target.closest('.type-row.is-locked'); if(!row) return;
+      ev.preventDefault();
+      var k=row.getAttribute('data-key');
+      if(window.UI&&UI.toast) UI.toast('「'+lockReason(k)+'」后方可发布','warn');
+      setTimeout(function(){
+        location.href = !loggedIn ? '../auth/login.html' : (!realname ? '../profile/auth-personal.html' : '../profile/auth.html');
+      },420);
+    });
+  }
+
+  /* 游客 / 未实名：顶部引导条，说明全量列表当前不可发布 */
+  if(!loggedIn || !realname){
+    var tip=document.createElement('div');
+    tip.className='auth-tip';
+    tip.innerHTML = !loggedIn
+      ? '<b>登录后可发布</b><span>当前为游客浏览，全部类型暂不可发布，点击任意类型可先登录</span>'
+      : '<b>完成实名认证后可发布</b><span>当前仅浏览，全部类型暂不可发布，点击任意类型可先实名</span>';
+    document.getElementById('resume-slot').parentNode.insertBefore(tip, document.getElementById('body'));
   }
 
   renderGroups();

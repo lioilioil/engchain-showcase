@@ -441,33 +441,12 @@
     };
   }
 
-  /* ---------- 客服入口（已承接态共用） ---------- */
+  /* ---------- 客服入口（已承接态共用）→ 全站统一联系客服弹窗（js/common.js openKefu） ---------- */
   function openServiceSheet() {
-    var s = UI.sheet();
-    s.setText('在线客服');
-    s.html(
-      '<div style="padding:10px 0 20px;text-align:center;">' +
-        '<div style="width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);">' +
-          '<svg class="ic" style="width:28px;height:28px;" viewBox="0 0 24 24"><use href="#i-headset"/></svg>' +
-        '</div>' +
-        '<div style="font-size:16px;font-weight:700;color:var(--text-1);">ENGCHAIN 在线客服</div>' +
-        '<div style="font-size:12px;color:var(--text-3);margin-top:6px;line-height:1.6;">工作时间：周一至周日 9:00 - 21:00<br>平均响应时间：3 分钟</div>' +
-        '<button class="btn btn-primary btn-block" style="margin-top:18px;height:46px;" onclick="UI.toast(\'正在接入客服...\',\'ok\');UI.closeSheet();">' +
-          '<svg class="ic" style="width:18px;height:18px;" viewBox="0 0 24 24"><use href="#i-chat"/></svg>开始对话' +
-        '</button>' +
-        '<div style="font-size:11px;color:var(--text-3);margin-top:12px;">也可拨打热线 400-888-6688</div>' +
-      '</div>'
-    );
-    s.show();
+    if (window.openKefu) window.openKefu();
   }
   function openCallDialog() {
-    UI.dialog({
-      title: '联系客服',
-      text: '客服热线：<b style="color:var(--primary);font-size:16px;">400-888-6688</b><br><br>工作时间：周一至周日 9:00 - 21:00',
-      ok: '拨打',
-      cancel: '取消',
-      onOk: function () { UI.toast('正在拨打 400-888-6688', 'ok'); }
-    });
+    if (window.openKefu) window.openKefu();
   }
 
   /* ═══════════════════════════════════════════════════════════════

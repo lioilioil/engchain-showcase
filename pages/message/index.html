@@ -24,7 +24,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <div class="phone">
   <div class="page-header" style="padding-top:10px;">
     <div class="topbar">
-      <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN <span class="ai-badge">AI</span></div></div>
+      <div class="topbar-left"><div class="app-eyebrow">ENGCHAIN</div></div>
       <div class="topbar-title">消息</div>
       <div class="topbar-right"><button type="button" class="icon-btn" id="msg-search-btn" aria-label="搜索消息" title="搜索"><svg class="ic"><use href="#i-search"/></svg></button><button type="button" class="icon-btn" id="msg-settings-btn" aria-label="会话设置" title="设置"><svg class="ic"><use href="#i-gear"/></svg></button></div>
     </div>
@@ -115,7 +115,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
      消息类型真实枚举（经数据源核实）：
      - 运营消息 type = { 公告, 系统, 风控, 活动 }；定向系统消息(direct:true) type='系统'
      - 原 system.html 静态消息主题 = { 订单, 资金, 认证, 公告 }（无独立"交易"类型，交易相关归入订单/资金）
-     - 独立消息流：企业邀请（engchain-orgs）、智能推荐（engchain-matches）
+     - 独立消息流：企业邀请（engchain-orgs）、匹配推荐（engchain-matches）
      子 bar 修正：全部 / 公告 / 订单 / 资金 / 认证 / 系统 / 风控 / 活动 / 邀请 / 推荐 */
   var noticeFilter = '全部';
   /* 通知筛选：时间范围（all/today/7d/30d），类型复用 noticeFilter（与子 bar 联动） */
@@ -221,7 +221,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '公告';
   }
 
-  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 智能推荐），按时间倒序 */
+  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 匹配推荐），按时间倒序 */
   function buildNoticeItems() {
     var items = [];
     readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); }).forEach(function (m) {
@@ -688,9 +688,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY) refreshAll(); });
   window.addEventListener('engchain:messages', function () { refreshAll(); });
 
-  /* [FEAT 9.2-3] 进入消息中心时生成/更新智能推荐 */
+  /* [FEAT 9.2-3] 进入消息中心时生成/更新匹配推荐 */
   try { MatchStore.generate(); } catch(e) {}
-  /* 智能推荐通知开关：偏好页关闭「接收智能推荐」后，未读角标不再累计（列表仍可见） */
+  /* 匹配推荐通知开关：偏好页关闭「接收匹配推荐」后，未读角标不再累计（列表仍可见） */
   function matchNotifyOn() {
     try {
       var p = MatchStore.read().preferences || {};
@@ -721,7 +721,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     feed.forEach(function(f){ try { MatchStore.markRead(f.id); } catch(e) {} });
     renderMatchUnread();
     var foot = '<div class="mf-foot"><a class="mf-cta" href="../supply/list.html">去发现页看全部推荐</a><a class="mf-set" href="../match/preferences.html">调整匹配偏好</a></div>';
-    var sh = UI.sheet(); sh.setText('智能推荐'); sh.html(rows + foot); sh.show();
+    var sh = UI.sheet(); sh.setText('匹配推荐'); sh.html(rows + foot); sh.show();
   };
   /* E2-11：会话为空时渲染空态引导卡，不再硬编码假数据。
      [FIX] 新用户无真实会话时，列表顶部加"演示数据"灰色标注；首次访问种子写入 localStorage，后续可标记已读清零 unread */
@@ -845,7 +845,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function refreshAll() { renderConvs(); renderNoticeBadge(); renderNoticeList(); }
   window.addEventListener('engchain:auth', refreshAll);
   window.addEventListener('engchain:entry', refreshAll);
-  /* 通知分页内其余站内跳转（智能推荐卡片 / 推荐区链接 / 列表与详情操作按钮）统一走预览弹窗。
+  /* 通知分页内其余站内跳转（匹配推荐卡片 / 推荐区链接 / 列表与详情操作按钮）统一走预览弹窗。
      用捕获阶段拦截：列表操作按钮的 onclick 含 stopPropagation，冒泡阶段监听收不到；
      会话入口链接（chat.html）保持整页跳转，不预览。 */
   document.addEventListener('click', function (e) {
@@ -872,7 +872,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .msg-tab{flex:1;height:36px;border:none;background:transparent;border-radius:9px;font-size:13px;font-weight:600;color:var(--text-2);display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:all .18s ease;}
   .msg-tab.active{background:var(--bg-card);color:var(--text-1);box-shadow:0 1px 4px rgba(0,0,0,.06);}
   .mt-badge{min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--error);color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;}
-  /* 智能推荐弹窗卡片 */
+  /* 匹配推荐弹窗卡片 */
   .mf-list{display:flex;flex-direction:column;gap:10px;padding:2px 0 4px;}
   .mf-card{display:block;background:var(--bg-card-2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;text-decoration:none;color:inherit;transition:transform .12s ease,border-color .12s ease;}
   .mf-card:active{transform:scale(.98);border-color:var(--accent-line);}

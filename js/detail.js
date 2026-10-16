@@ -81,7 +81,18 @@ window.DETAIL = (function () {
     return { cls: 'tag-gold', txt: '机会' };
   }
   function heroPrice(r) { if (r.price) return r.price; return r.budget || ''; }
-  function cfgText(s) { return (s == null ? '' : String(s)); }
+  function cfgText(s) {
+    if (s == null) return '';
+    if (typeof s === 'object') return ''; /* 防止对象被渲染成 [object Object]（强类型字段错配兜底） */
+    return String(s);
+  }
+  /* 统一取联系人姓名：contact 可能是对象 {name,...} 或历史字符串 */
+  function contactName(r) {
+    if (!r) return '';
+    var c = r.contact;
+    if (c && typeof c === 'object') return c.name || r.contactName || '';
+    return (typeof c === 'string' ? c : '') || r.contactName || '';
+  }
   function dHero(o) {
     return '<div class="detail-hero ' + (o.dark ? 'detail-hero--dark' : '') + '" style="padding:22px 24px 18px;">' +
       '<div class="dh-tag">' + cfgText(o.tag) + (o.verifiedHint ? ' · ' + o.verifiedHint : '') + '</div>' +
@@ -226,16 +237,19 @@ window.DETAIL = (function () {
   function sec(label, inner) { return '<div class="detail-section"><div class="ds-label">' + label + '</div>' + inner + '</div>'; }
   /* ---- 供需匹配 4 类：共用结构，仅字段标签/文案不同 ---- */
   var MATCH = {
-    material:    { label: '材料采购',          contactLabel: '采购方', addrLabel: '交货地址',   fileLabel: '招标采购文件', fileDefault: '招标清单（联系获取）', cta: '联系采购方', secTitle: '采购说明', supplyTitle: '供应说明', fieldsTitle: '关键参数', qualTitle: '供应商要求' },
-    labor:       { label: '劳务用工',          contactLabel: '用工方', addrLabel: '项目地址',   fileLabel: '上岗材料',    fileDefault: '上岗清单（联系获取）', cta: '联系用工方', secTitle: '用工说明', supplyTitle: '班组介绍', fieldsTitle: '用工需求', qualTitle: '用工要求' },
-    equipment:   { label: '设备租赁',          contactLabel: '出租方', addrLabel: '设备/仓库地址', fileLabel: '设备清单',   fileDefault: '设备清单（联系获取）', cta: '联系出租方', secTitle: '设备说明', supplyTitle: '设备说明', fieldsTitle: '设备参数与租赁条款', qualTitle: '设备与服务要求' },
+    material:    { label: '材料采购',          contactLabel: '采购方', addrLabel: '交货地址',   fileLabel: '招标采购文件', fileDefault: '招标清单（联系获取）', cta: '联系采购方', secTitle: '采购说明', supplyTitle: '供应说明', fieldsTitle: '关键参数', qualTitle: '供应商要求', supplyQualTitle: '我方资质' },
+    labor:       { label: '劳务用工',          contactLabel: '用工方', addrLabel: '项目地址',   fileLabel: '上岗材料',    fileDefault: '上岗清单（联系获取）', cta: '联系用工方', secTitle: '用工说明', supplyTitle: '班组介绍', fieldsTitle: '用工需求', qualTitle: '用工要求', supplyQualTitle: '班组资质与合规' },
+    equipment:   { label: '设备租赁',          contactLabel: '出租方', addrLabel: '设备/仓库地址', fileLabel: '设备清单',   fileDefault: '设备清单（联系获取）', cta: '联系出租方', secTitle: '设备说明', supplyTitle: '设备说明', fieldsTitle: '设备参数与租赁条款', qualTitle: '设备与服务要求', supplyQualTitle: '设备与资质' },
   };
   function matchBody(r, cfg) {
     var h = '';
     var introTitle = r.dir === 'demand' ? cfg.secTitle : (cfg.supplyTitle || cfg.secTitle);
     if (r.desc || r.detail) h += sec(introTitle, '<div class="ds-text">' + (r.desc || r.detail) + '</div>');
     if (r.fields && r.fields.length) h += sec(cfg.fieldsTitle || '关键信息', dList(r.fields));
-    if (r.qual) h += sec(cfg.qualTitle, '<div class="ds-text">' + r.qual + '</div>');
+    if (r.qual) {
+      var _qt = r.dir === 'demand' ? cfg.qualTitle : (cfg.supplyQualTitle || '我方资质');
+      h += sec(_qt, '<div class="ds-text">' + r.qual + '</div>');
+    }
     return h;
   }
   /* ---- 通用：扶持/权益卡网格（条目格式「标题：描述」） ---- */
@@ -339,7 +353,7 @@ window.DETAIL = (function () {
   function matchLock(r, c, cfg) {
     return [
       { k: cfg.contactLabel, v: c.name },
-      { k: '联系人', v: r.contact || c.contact.name },
+      { k: '联系人', v: contactName(r) || c.contact.name },
       { k: '联系电话', v: r.phone || c.contact.phone },
       { k: '微信号', v: r.wechat || (c.short + '· 对接') },
       { k: cfg.addrLabel, v: r.address || r.location },
@@ -408,7 +422,7 @@ window.DETAIL = (function () {
     var addrFull = mc.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(mc.name || r.contact), ccAction('contact', mc.name || r.contact, locked)) +
+        row('联系人', cfgText(mc.name || contactName(r)), ccAction('contact', mc.name || contactName(r), locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
         row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
         row(demand ? '项目/交货地址' : '发货/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确门牌付费可见'), ccAction('nav', addrFull, locked)) +
@@ -487,7 +501,7 @@ window.DETAIL = (function () {
     var addrFull = ec.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(ec.name || r.contact), ccAction('contact', ec.name || r.contact, locked)) +
+        row('联系人', cfgText(ec.name || contactName(r)), ccAction('contact', ec.name || contactName(r), locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
         row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
         row(demand ? '项目/工地地址' : '设备/仓库地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确场地付费可见'), ccAction('nav', addrFull, locked)) +
@@ -590,7 +604,7 @@ window.DETAIL = (function () {
     var lc = (l && l.contact) || {};
     var cc = c.contact || {};
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
-    var rawName = lc.name || cc.name || r.contact || '';
+    var rawName = lc.name || cc.name || contactName(r) || '';
     /* 供应侧联系人即班组长：未解锁显示「X 师傅」占位，解锁原地展开全名（须用 Lock.partial 双份以随 is-unlocked 切换） */
     var name = (!demand && l.foreman && l.foreman.freeName)
       ? Lock.partial(rawName, locked, l.foreman.freeName + ' · 劳务负责人')
@@ -744,7 +758,16 @@ window.DETAIL = (function () {
       { k: '企业名称', v: r.name || '' },
       { k: '注册地区', v: r.registeredArea || '' }
     ];
-    basicHtml += dList(detailInfo);
+    /* 工商认证项 + 发布方在「企业基本信息」补充的自定义行（如法定代表人、信用代码、员工规模、官网等）；
+       与上方关键数据卡/名称/地区重复的键不再列出 */
+    var _shownKeys = { '企业名称': 1, '注册地区': 1, '注册资本': 1, '注册资金': 1, '成立时间': 1, '成立': 1 };
+    ((fc && fc.companyInfo) || []).forEach(function (row) {
+      if (!row || typeof row !== 'object') return;
+      var kk = String(row.k || '').trim(), vv = String(row.v || '').trim();
+      if (!kk || !vv || _shownKeys[kk]) return;
+      detailInfo.push({ k: kk, v: vv });
+    });
+    basicHtml += dList(detailInfo.filter(function (x) { return x.v; }));
     h += sec('企业基本信息', basicHtml);
     var qualList = (fc && fc.qualPack) || r.qualPack || [];
     if (qualList.length) {
@@ -753,7 +776,8 @@ window.DETAIL = (function () {
       if (fc.safety && fc.safety.note) qualRows.push({ k: '备注说明', v: cfgText(fc.safety.note) });
       h += sec('资质与证照', tradeQualPack(qualList) + (qualRows.length ? '<div class="qual-extra-table">' + dList(qualRows) + '</div>' : ''));
     }
-    if (r.qual) h += sec('核验状态', '<div class="cert-verify-bar"><div class="cvb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="cvb-body"><div class="cvb-title">资质与证照已核验</div><div class="cvb-desc">' + r.qual + '</div></div><span class="cvb-badge">✓ 平台核验</span></div>');
+    /* 已移除：原此处把发布者自填的 r.qual 文本包装成「✓ 平台核验·资质与证照已核验」徽章，
+       属用户自填内容冒充平台背书。核验状态只能来自真实企业认证（qualPack 权威源，见上方「资质与证照」），不再渲染该自填核验条。 */
     /* 资质证照图（带水印） */
     if (r.certImages && r.certImages.length) {
       var certHtml = '<div class="cert-gallery">';
@@ -818,24 +842,44 @@ window.DETAIL = (function () {
             '</div></div>';
         }).join('') + '</div>');
     }
+    /* 已有分公司案例（编辑器 kvlist 兼容：cases:[{k,v}]，如 成都·天府新区 → 20 个中标项目） */
+    var caseList = (fc && fc.cases) || [];
+    if (caseList.length) {
+      h += sec('已有分公司案例',
+        '<div style="display:flex;flex-direction:column;gap:6px;">' +
+        caseList.map(function (c) {
+          return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:var(--bg-card);border:1px solid var(--line);">' +
+            '<div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;flex:none;box-shadow:0 2px 6px -1px var(--primary-dim);">' + (cfgText(c.k).charAt(0) || '案') + '</div>' +
+            '<span style="flex:1;font-size:12.5px;font-weight:600;color:var(--text-1);min-width:0;">' + cfgText(c.k) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-2);text-align:right;">' + cfgText(c.v) + '</span></div>';
+        }).join('') + '</div>');
+    }
     if (r.descMd || r.desc) {
       var introHtml = r.descMd ? '<div class="md-content">' + renderMarkdown(r.descMd) + '</div>' : '<div class="ds-text">' + r.desc + '</div>';
       h += sec('企业介绍', introHtml);
     }
-    /* 企业宣传文件（PDF 上传/浏览/下载）— 内侧环形进度 */
-    if (r.pdfFiles && r.pdfFiles.length) {
-      var pdfHtml = '<div class="fd-list">';
-      r.pdfFiles.forEach(function (p, idx) {
-        var fid = 'pdf_' + (r.id || 'rec') + '_' + idx;
-        var fsize = p.sizeKb || (2048 + idx * 1024);
-        pdfHtml += window.FileDownload.renderInnerRing({
-          id: fid, name: p.name, size: fsize,
-          sub: (p.pages || '12') + '页 · ' + (p.uploadTime || '2026-09')
-        });
+    /* 可提供宣传资料：仅为“资料名称声明”（编辑器 taglist），不伪装成已上传 PDF */
+    var declFiles = (r.pdfFiles || []).map(function (p) {
+      return typeof p === 'string' ? p : (p && p.name) || '';
+    }).filter(Boolean);
+    if (declFiles.length) {
+      h += sec('可提供宣传资料',
+        '<div class="qual-chips">' + declFiles.map(function (n) {
+          return '<span class="tag tag-primary">' + cfgText(n) + '</span>';
+        }).join('') + '</div>' +
+        '<div class="ds-text" style="margin-top:8px;color:var(--text-2);">发布方声明可提供以上资料，完整原件见下方附件或联系后索取。</div>');
+    }
+    /* 真实上传的原件：仅来源于发布时最后一步「附件资料」(r.files)，解锁后查看/下载 */
+    if (r.files && r.files.length) {
+      var attHtml = '<div class="fd-list">';
+      r.files.forEach(function (f, idx) {
+        var fid = 'att_' + (r.id || 'rec') + '_' + idx;
+        var kb = 2048, m = String(f.size || '').match(/([\d.]+)\s*(KB|MB|GB|B)/i);
+        if (m) { var n = parseFloat(m[1]); var u = (m[2] || '').toUpperCase(); kb = u === 'GB' ? n * 1048576 : u === 'MB' ? n * 1024 : u === 'KB' ? n : n / 1; }
+        attHtml += window.FileDownload.renderInnerRing({ id: fid, name: f.name, size: kb, sub: f.size || '附件' });
       });
-      pdfHtml += '</div>';
-      /* 上传入口已移除（信息浏览页不提供上传） */
-      h += sec('企业宣传文件', pdfHtml);
+      attHtml += '</div>';
+      h += sec('相关附件', attHtml);
     }
     /* 招商联系方式（免费留资后开放）+ 加盟流程 */
     h += sec('招商联系方式', franchContact(r, c, locked));
@@ -843,13 +887,18 @@ window.DETAIL = (function () {
     return h;
   }
   function franchiseLock(r, c) {
+    /* 开放区域：多城市（regions[{city}]）优先，单城市回退 region/location */
+    function openRegionsTxt() {
+      if (r.regions && r.regions.length) return r.regions.map(function (x) { return x.city; }).join('、');
+      return r.region || r.location || '';
+    }
     if (r.type === 'qualification') {
       return [
         { k: '企业名称', v: r.name || c.name },
         { k: '招商负责人', v: c.contact.name + ' · ' + c.contact.title },
         { k: '联系电话', v: c.contact.phone },
         { k: '微信号', v: c.short + '· 加盟咨询' },
-        { k: '开放区域', v: r.region || r.location },
+        { k: '开放区域', v: openRegionsTxt() },
         { k: '加盟模式', v: r.mode || '' }
       ];
     }
@@ -858,7 +907,7 @@ window.DETAIL = (function () {
       { k: '招商经理', v: c.contact.name + ' · ' + c.contact.title },
       { k: '联系电话', v: c.contact.phone },
       { k: '微信号', v: c.short + '· 加盟咨询' },
-      { k: '开放区域', v: r.location },
+      { k: '开放区域', v: openRegionsTxt() },
       { k: '加盟政策', v: '品牌授权 + 区域保护' }
     ];
   }
@@ -979,7 +1028,10 @@ window.DETAIL = (function () {
       { k: '政策依据', v: r.policyBasis }
     ]));
     if (r.cases && r.cases.length) h += sec('真实成功案例（' + r.cases.length + '）', agencyCaseCard(r.cases));
-    if (r.qual) h += sec('机构资质', '<div class="ds-text">' + r.qual + '</div>');
+    /* 我方机构资质：专业页 orgQuals 标签（供应方自身经营资质）；兼容嵌套 agencyDetail 与历史 r.qual 文本 */
+    var _oqs = (r.orgQuals || (r.agencyDetail && r.agencyDetail.orgQuals) || []).filter(function (x) { return x; });
+    if (_oqs.length) h += sec('我方机构资质', '<div class="qual-chips">' + _oqs.map(function (q) { return '<span class="tag tag-primary">' + cfgText(q) + '</span>'; }).join('') + '</div>');
+    else if (r.qual) h += sec('机构资质', '<div class="ds-text">' + r.qual + '</div>');
     if (r.refundPolicy) h += sec('退款保障', '<div class="ds-text">' + r.refundPolicy + '</div>');
     if (r.overdueClause) h += sec('超期赔付', '<div class="ds-text">' + r.overdueClause + '</div>');
     h += sec('机构联系方式', agencyContact(r, c, locked));
@@ -1353,12 +1405,15 @@ window.DETAIL = (function () {
     var h = '<div class="dd-pdf-list">';
     files.forEach(function (p) {
       var pname = String(p.name).replace(/'/g, "\\'");
-      var body = '<div class="dpf-item" onclick="DETAIL.viewPdf(\'' + pname + '\')">' +
+      var tail = p.real
+        ? '<div class="dpf-dl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>'
+        : '<span class="dpf-type" style="background:transparent;color:var(--text-3);border:1px dashed var(--line);">可提供</span>';
+      var body = '<div class="dpf-item"' + (p.real ? ' onclick="DETAIL.viewPdf(\'' + pname + '\')"' : ' style="cursor:default;"') + '>' +
         '<div class="dpf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>' +
         '<div class="dpf-body"><div class="dpf-name">' + p.name + '</div>' +
-        '<div class="dpf-meta"><span class="dpf-type">' + (p.type || 'PDF') + '</span><span>' + p.size + '</span><span>' + p.pages + '页</span><span>' + p.uploadTime + '</span></div></div>' +
-        '<div class="dpf-dl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div></div>';
-      h += locked ? Lock.file(body, true, '解锁查看 / 下载文件') : body;
+        '<div class="dpf-meta"><span class="dpf-type">' + (p.type || '资料') + '</span>' + (p.size ? '<span>' + p.size + '</span>' : '') + (p.pages ? '<span>' + p.pages + '页</span>' : '') + (p.uploadTime ? '<span>' + p.uploadTime + '</span>' : '') + '</div></div>' +
+        tail + '</div>';
+      h += (p.real || !locked) ? body : Lock.file(body, true, '解锁查看完整尽调资料');
     });
     h += '</div>';
     return h;
@@ -1413,11 +1468,16 @@ window.DETAIL = (function () {
       if (r.qualExpiry) qualRows.push({ k: '主资质有效期', v: r.qualExpiry });
       if (r.businessAbnormal) qualRows.push({ k: '经营合规', v: r.businessAbnormal });
       h += sec('资质与证照', tradeQualPack(r.qualPack) + (qualRows.length ? '<div class="qual-extra-table">' + dList(qualRows) + '</div>' : ''));
+    } else if (r.spec) {
+      /* 未完善资质证照包时，回退展示发布页轻字段「核心资质（标的）」 */
+      h += sec('资质与证照', dList([{ k: '核心资质（标的）', v: r.spec }]));
     }
     /* 交易 · 结算 · 交付 */
     var dealRows = [];
     if (r.transferMethod) dealRows.push({ k: '转让方式', v: r.transferMethod });
+    else if (r.qty) dealRows.push({ k: '转让标的 / 股权比例', v: r.qty });
     if (r.changeCycle) dealRows.push({ k: '变更周期', v: r.changeCycle });
+    else if (r.delivery) dealRows.push({ k: '变更周期与交接', v: r.delivery });
     if (r.urgentReason) dealRows.push({ k: '转让原因', v: r.urgentReason });
     if (r.priceDrop) dealRows.push({ k: '降价幅度', v: r.priceDrop });
     if (dealRows.length) h += sec('交易 · 结算 · 交付', dList(dealRows) + tradePayment(r.paymentTerms, locked) + depositCard(r));
@@ -1442,7 +1502,23 @@ window.DETAIL = (function () {
     /* 尽调档案 */
     var ddHtml = '';
     if (r.ddSummary) ddHtml += ddSummaryCard(r.ddSummary, locked);
-    if (r.pdfFiles && r.pdfFiles.length) ddHtml += ddPdfList(r.pdfFiles, locked);
+    /* 尽调档案：声明项（可提供哪些尽调/审计/评估资料）+ 发布时末页真实上传的原件(r.files)；同名以真实原件为准 */
+    var ddAll = [];
+    (r.pdfFiles || []).forEach(function (p) {
+      ddAll.push({ name: p.name, type: p.type || '资料', real: false });
+    });
+    var ddRealNames = {};
+    (r.files || []).forEach(function (f) {
+      ddRealNames[f.name] = 1;
+      ddAll.push({ name: f.name, type: '已上传原件', size: f.size || '', real: true });
+    });
+    var ddList = ddAll.filter(function (p, i) {
+      if (p.real) return true;
+      var laterReal = !!ddRealNames[p.name];
+      if (laterReal) return false; /* 同名已有真实原件，声明项不再重复显示 */
+      return ddAll.findIndex(function (q) { return !q.real && q.name === p.name; }) === i;
+    });
+    if (ddList.length) ddHtml += ddPdfList(ddList, locked);
     if (ddHtml) h += sec('尽调档案', ddHtml);
     /* 风险与承诺 */
     if (r.hiddenDebtCommitment) h += sec('风险与承诺', commitmentCard(r.hiddenDebtCommitment, locked));
@@ -1465,7 +1541,7 @@ window.DETAIL = (function () {
     var addrFull = tc.addr || r.fullAddress || r.address || r.location || '';
     return '<div class="contact-card">' +
       '<div class="cc-list">' +
-        row('联系人', cfgText(tc.name || r.contact || '转让方'), ccAction('contact', tc.name || r.contact || '', locked)) +
+        row('联系人', cfgText(tc.name || contactName(r) || '转让方'), ccAction('contact', tc.name || contactName(r) || '', locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
         (wechatFull ? row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) : '') +
         row('详细地址', Lock.partial(addrFull, locked, cfgText(r.location || '') + ' · 详细地址保证金解锁'), ccAction('nav', addrFull, locked)) +
@@ -1543,7 +1619,7 @@ window.DETAIL = (function () {
     var addrFull = tc.addr || r.address || r.location || '';
     return '<div class="contact-card">' +
       '<div class="cc-list">' +
-        row('对接人', cfgText(tc.name || r.contact), ccAction('contact', tc.name || r.contact, locked)) +
+        row('对接人', cfgText(tc.name || contactName(r)), ccAction('contact', tc.name || contactName(r), locked)) +
         row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
         row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
         row(demand ? '卸货/项目地址' : '车场/调度地址', Lock.partial(addrFull, locked, cfgText(r.location) + ' · 精确门牌付费可见'), ccAction('nav', addrFull, locked)) +
@@ -1569,7 +1645,10 @@ window.DETAIL = (function () {
     }
     if (tp.settle) h += sec('结算与开票', '<div class="ds-text">' + cfgText(tp.settle) + '</div>');
     if (tp.guarantee && tp.guarantee.length) h += sec('服务保障', dList(tp.guarantee));
-    if (r.qual) h += sec('资质要求', '<div class="ds-text">' + r.qual + '</div>');
+    /* 我方营运资质：专业页 qualTags 标签（车队自身许可/保险/从业资格）；兼容历史 r.qual 文本，且供应方不再用采购视角“资质要求”标题 */
+    var _tqs = ((tp && tp.qualTags) || []).filter(function (x) { return x; });
+    if (_tqs.length) h += sec('我方营运资质', '<div class="qual-chips">' + _tqs.map(function (q) { return '<span class="tag tag-primary">' + cfgText(q) + '</span>'; }).join('') + '</div>');
+    else if (r.qual) h += sec(transportIsDemand(r) ? '资质要求' : '我方营运资质', '<div class="ds-text">' + r.qual + '</div>');
     h += sec(transportIsDemand(r) ? '用车方联系方式' : '运输联系方式', transportContact(r, c, locked));
     if (tp.flow && tp.flow.length) h += sec('合作流程（' + tp.flow.length + ' 步）', stepTimeline(tp.flow));
     return h;
@@ -2336,7 +2415,7 @@ window.DETAIL = (function () {
         var base = dHero({ tag: d.txt + ' · ' + (r.cat || t0.label), verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
         var ai = r.aiAnalysis || {};
         var chips = (ai.tags || []).slice(0, 5).map(function (x) { return cfgText(x.k) + ' ' + cfgText(x.v); });
-        return base + (chips.length ? '<div class="hero-grade"><span class="hg-label">AI 速览</span><div class="hg-list">' +
+        return base + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +
           chips.map(function (x) { return '<span class="tag tag-gold">' + x + '</span>'; }).join('') + '</div></div>' : '');
       },
       sections: function (r, c) {
@@ -2344,7 +2423,7 @@ window.DETAIL = (function () {
         var ai = r.aiAnalysis || {};
         var h = '';
         if (ai.tags && ai.tags.length) {
-          h += sec('AI 智能分析', '<div class="qual-chips">' + ai.tags.map(function (x) {
+          h += sec('结构化分析', '<div class="qual-chips">' + ai.tags.map(function (x) {
             return '<span class="tag tag-primary">' + cfgText(x.k) + '：' + cfgText(x.v) + '</span>';
           }).join('') + '</div>' + (ai.summary ? '<div class="ds-text" style="margin-top:8px;">' + cfgText(ai.summary) + '</div>' : ''));
         }
@@ -3610,6 +3689,56 @@ window.DETAIL = (function () {
   /* _mapZoom 已随地图组件移除 */
   /* ================= 发布信息（publish）：信息工作台发布项的通用详情渲染器 ================= */
   /* 发布者自持信息（isFree 已放行），完整结构化字段 → 关键参数/描述/联系/发布主体/流程/保障 */
+  /* 编辑器动态字段组中文标题映射（trade/talent 等走通用渲染器时的「业务专属信息」区块） */
+  var _DYN_TITLES = {
+    'spec':'核心参数','priceRange':'价格与计价','priceBasis':'计价依据','trade':'交易·结算条款','deliveryRadius':'交付与配送','deliveryCapacity':'供应能力','deliveryEta':'交货时效','deliveryCost':'配送费用','quals':'资质标签','docs':'可提供质量证明','warranty':'质量与售后承诺','flow':'流程',
+    'specs':'核心技术参数','feeRange':'费用区间','feeRows':'费用明细','feeTotal':'合计参考','promise':'服务承诺','history':'设备履历',
+    'workforce':'工种需求明细','wage':'工资与计价','compliance':'合规保障','foremanName':'班组长/对接人',
+    'fleet':'运力速览','capacity':'运力说明','dispatch':'调度响应','vehicles':'车辆配置','pricing':'计价方式','settle':'结算与开票','guarantee':'服务保障',
+    'companyInfo':'企业基本信息','qualPack':'资质与证照','coopTerms':'合作模式与核心条件','feeStructure':'费用结构','staffConfig':'注册人员配置','benefits':'扶持权益','cases':'已有案例','pdfFiles':'可提供宣传资料','joinProcess':'加盟流程',
+    'companyProfile':'企业概况','dealTerms':'交易条款','paymentTerms':'付款条款','deposit':'诚意保证金','finInfo':'财务税务信息','litigation':'司法涉诉','radar':'风险雷达·六维体检','ddHtml':'尽调摘要','hiddenDebtCommitment':'风险与承诺',
+    'intent':'求职意向','basicInfo':'基本信息','certPack':'持有证书','expectedSalary':'期望薪资','regStatus':'注册状态','socialSecurity':'社保情况','workHistory':'工作履历','projectExp':'项目经验','education':'教育背景',
+    'jobDesc':'岗位说明','salaryStructure':'薪资结构','requirements':'任职要求','projectInfo':'项目信息','regContinuing':'注册与培训','applyHtml':'投递说明','hireProcess':'招聘流程',
+    'serveType':'服务类型','quote':'报价明细','serveProcess':'办理流程','requiredMaterials':'所需材料清单','staffPolicy':'人员与政策','refundPolicy':'退款保障','overdueClause':'超期赔付','serviceCats':'服务类目'
+  };
+  /* 编辑器动态字段组 → 详情「业务专属信息」区块（kvlist/标签/流程/文本四种形态） */
+  function renderDynFieldsBlock(df) {
+    if (!df || typeof df !== 'object') return '';
+    var out = '';
+    Object.keys(df).forEach(function (k) {
+      var v = df[k];
+      if (v === undefined || v === null || v === '') return;
+      var title = _DYN_TITLES[k] || k;
+      var inner = '';
+      if (Array.isArray(v)) {
+        if (!v.length) return;
+        if (typeof v[0] === 'string') {
+          inner = '<div class="qual-chips">' + v.map(function (s) { return '<span class="tag tag-primary">' + cfgText(s) + '</span>'; }).join('') + '</div>';
+        } else if (v[0] && typeof v[0] === 'object') {
+          if (v[0].k !== undefined) {
+            inner = dList(v.map(function (x) { return { k: cfgText(x.k), v: cfgText(x.v) }; }));
+          } else if (v[0].name !== undefined) {
+            inner = '<div class="qual-chips">' + v.map(function (x) { return '<span class="tag tag-primary">' + cfgText(x.name) + (x.level ? ' · ' + cfgText(x.level) : '') + '</span>'; }).join('') + '</div>';
+          } else if (v[0].step !== undefined) {
+            inner = '<div style="display:flex;flex-direction:column;gap:8px;">' + v.map(function (x, i) {
+              return '<div style="display:flex;gap:9px;align-items:flex-start;"><span style="flex:none;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">' + (i + 1) + '</span>' +
+                '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:600;color:var(--text-1);">' + cfgText(x.title || x.step) + '</div>' +
+                (x.duration ? '<div style="font-size:10.5px;color:var(--text-3);margin-top:1px;">' + cfgText(x.duration) + '</div>' : '') +
+                (x.desc ? '<div style="font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.5;">' + cfgText(x.desc) + '</div>' : '') + '</div></div>';
+            }).join('') + '</div>';
+          } else {
+            inner = dList(v.map(function (x) { return { k: cfgText(x.title || x.date || ''), v: cfgText(x.desc || x.company || x.name || '') }; }));
+          }
+        }
+      } else {
+        inner = '<div class="ds-text">' + cfgText(String(v)) + '</div>';
+      }
+      if (inner) {
+        out += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:6px;display:flex;align-items:center;gap:6px;"><span style="width:3px;height:12px;border-radius:2px;background:linear-gradient(180deg,var(--primary),var(--primary-dim));"></span>' + title + '</div>' + inner + '</div>';
+      }
+    });
+    return out;
+  }
   function publishMeta(r) {
     var meta = [];
     if (r.location) meta.push(mt('pin', r.location));
@@ -3627,14 +3756,23 @@ window.DETAIL = (function () {
     var locked = !UnlockStore.isUnlocked(r);
     var h = '';
     var params = [];
+    var _isTrade = r.category === '建企买卖';
+    var _isFranchise = r.category === '资质招商';
+    var _tradeSupply = _isTrade && ((r.role || r.dir) === 'supply');
     if (r.category) params.push({ k: '品类', v: r.category });
     if (r.subType) params.push({ k: '子类 / 品名', v: r.subType });
-    if (r.qty) params.push({ k: '数量 / 规模', v: r.qty });
-    if (r.spec) params.push({ k: '规格 / 参数', v: r.spec });
-    var _pl = { '招聘': '薪资范围', '求职': '期望薪资', '建企买卖': '意向预算', '资质招商': '意向费用' }[r.category];
+    if (r.qty) params.push({ k: _isTrade ? '转让标的 / 股权比例' : '数量 / 规模', v: r.qty });
+    /* spec 标签按品类语义：建企买卖=核心资质（标的）；资质招商=总部资质包（认证只读）；其余=规格/参数 */
+    if (r.spec) params.push({ k: _isTrade ? '核心资质（标的）' : (_isFranchise ? '总部资质包' : '规格 / 参数'), v: r.spec });
+    var _pl = _isTrade
+      ? (_tradeSupply ? '转让价' : '意向预算')
+      : ({ '招聘': '薪资范围', '求职': '期望薪资', '资质招商': '意向费用' }[r.category]);
     if (r.price) params.push({ k: _pl || (r.role === 'supply' ? '报价单价' : '预算区间'), v: r.price + (r.unit ? ' ' + r.unit : '') });
-    if (r.delivery) params.push({ k: '交付 / 工期', v: r.delivery });
-    if (r.qualification) params.push({ k: '资质要求', v: r.qualification });
+    if (r.delivery) params.push({ k: _isTrade ? '变更周期与交接' : '交付 / 工期', v: r.delivery });
+    /* 通用资质行（仅历史数据可能有值，新数据该字段恒空）：按发布方向正名——
+       供应方自填的是“我方资质”，需求/采购方才是对对方的“资质要求”；建企买卖不渲染（见专业资质区） */
+    var _isSupply = (r.role || r.dir) === 'supply';
+    if (r.qualification && !_isTrade) params.push({ k: _isSupply ? '我方资质' : '资质要求', v: r.qualification });
     /* 建企买卖收购需求：标的四要素（标的/负债/人员/税务） */
     if (r.tradeInfo) {
       var _ti = r.tradeInfo;
@@ -3646,6 +3784,9 @@ window.DETAIL = (function () {
     }
     if (r.tags && r.tags.length) params.push({ k: '标签', v: r.tags.join(' · ') });
     if (params.length) h += sec('关键参数', dList(params));
+    /* 业务专属信息：编辑器动态字段组（trade/talent 等走通用渲染器时的完整业务数据展示） */
+    var dynBlock = renderDynFieldsBlock(r.dynFields);
+    if (dynBlock) h += sec('业务专属信息', dynBlock);
     if (r.description) h += sec('详细描述', '<div class="ds-text">' + renderMarkdown(r.description) + '</div>');
     var cc = r.contact || {};
     var contactRows = [];

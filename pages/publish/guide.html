@@ -78,7 +78,16 @@ svg{display:block}
     radial-gradient(120% 30% at 50% -6%,rgba(176,138,60,.13),transparent 62%),
     radial-gradient(90% 20% at 88% 2%,rgba(110,156,131,.10),transparent 70%)}
 html[data-theme="dark"] #app.phone::after{opacity:.7}
-#app.phone>header,#app.phone>nav,#app.phone>main{position:relative;z-index:1}
+/* 页面自有布局元素提升层叠顺序。
+   注意：必须排除 pura 注入的 nav.pura-sidebar —— 它在短屏下依赖 app.css 的
+   position:absolute 悬浮于左侧，若被本条规则改为 relative 会占流把内容区整体下推 */
+#app.phone>header,#app.phone>nav:not(.pura-sidebar),#app.phone>main{position:relative;z-index:1}
+/* Pura X View 短屏（视口高≤720px，common.js 自动注入 .pura-sidebar）：
+   恢复 app.css 定义的横向布局（侧边栏绝对定位、内容区 margin-left:56px），
+   避免本页 flex-direction:column 将内容区纵向顶出视口 */
+@media (max-height:720px){
+  #app.phone.has-pura-sidebar{flex-direction:row}
+}
 
 /* ── 顶栏：navbar 规范（返回钮 demo 圆形玻璃 + 居中页面名，无右侧操作） ── */
 .topbar{flex:none;position:relative;display:flex;align-items:center;
@@ -187,6 +196,21 @@ html[data-theme="dark"] .opt.supply .oic{color:var(--gold-hi)}
 html[data-theme="dark"] .opt.supply .oside{color:var(--gold-hi)}
 html[data-theme="dark"] .opt.demand .oside{color:var(--green-hi)}
 .opt.action .oside{display:none}
+
+/* 锁定入口：当前身份不可发布的类型弱化展示，保留入口可见性并标注所需认证 */
+.opt.is-locked{opacity:.62}
+.opt.is-locked .obd b{color:var(--ink-3)}
+.opt.is-locked .oic{color:var(--ink-3);opacity:.55}
+.opt.is-locked .ogo{opacity:0}
+.opt.supply.is-locked .oside,.opt.demand.is-locked .oside{color:#8A5A2A;background:rgba(138,90,42,.12);border:1px dashed rgba(138,90,42,.38)}
+html[data-theme="dark"] .opt.supply.is-locked .oside,html[data-theme="dark"] .opt.demand.is-locked .oside{color:#D7B774;background:rgba(215,183,116,.10);border-color:rgba(215,183,116,.32)}
+.tile.is-locked{opacity:.62}
+.tile.is-locked .tic{color:var(--ink-3);opacity:.55}
+.tile.is-locked b{color:var(--ink-3)}
+.tile .lock-tag{position:absolute;right:8px;top:8px;z-index:2;font-size:9px;font-weight:700;letter-spacing:.02em;
+  padding:2.5px 7px;border-radius:999px;color:#8A5A2A;background:rgba(255,255,255,.72);
+  border:1px solid rgba(138,90,42,.30);box-shadow:0 1px 4px rgba(74,58,32,.08)}
+html[data-theme="dark"] .tile .lock-tag{color:#D7B774;background:rgba(36,32,25,.72);border-color:rgba(215,183,116,.30)}
 .opt .ogo{flex:none;color:var(--ink-3);margin-left:2px}
 .opt .ogo svg{width:16px;height:16px}
 .opt.supply:active{border-color:var(--gold-line)}
@@ -203,7 +227,7 @@ html[data-theme="dark"] .opt.demand .oside{color:var(--green-hi)}
 html[data-theme="dark"] .confirm b{color:var(--green-hi)}
 .confirm p{margin:9px 0 0;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
 .confirm .cbar{margin-top:12px;height:4px;border-radius:99px;background:var(--green-soft);overflow:hidden}
-.confirm .cbar i{display:block;height:100%;width:40%;border-radius:99px;background:linear-gradient(90deg,var(--green-hi),var(--green));animation:load 1.5s var(--ease) infinite}
+.confirm .cbar i{display:block;height:100%;width:40%;border-radius:99px;background:linear-gradient(90deg,var(--green-hi),var(--green));animation:load 5s var(--ease) infinite}
 .confirm .cgo{margin-top:12px;width:100%;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:7px;
   background:var(--green);color:#fff;font-size:14.5px;font-weight:700}
 .confirm .cgo:active{transform:scale(.98)}
@@ -282,24 +306,9 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
   function typeHref(typeKey){ return window.publishTypeHref ? publishTypeHref(typeKey) : 'choose.html'; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 
-  /* ── 在线客服弹窗（与 app 内已有案例一致：refund/index.html contactService 同款） ── */
+  /* ── 联系客服弹窗（全站统一：js/common.js openKefu，含热线/企业微信二维码/复制链接） ── */
   window.contactService = function () {
-    var sh = UI.sheet();
-    sh.setText('在线客服');
-    sh.html(
-      '<div style="padding:10px 0 20px;text-align:center;">' +
-        '<div style="width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;color:var(--primary-dim);">' +
-          '<svg class="ic" style="width:28px;height:28px;" viewBox="0 0 24 24"><use href="#i-headset"/></svg>' +
-        '</div>' +
-        '<div style="font-size:16px;font-weight:700;color:var(--text-1);">ENGCHAIN 在线客服</div>' +
-        '<div style="font-size:12px;color:var(--text-3);margin-top:6px;line-height:1.6;">工作时间：周一至周日 9:00 - 21:00<br>平均响应时间：3 分钟</div>' +
-        '<button class="btn btn-primary btn-block" style="margin-top:18px;height:46px;" onclick="UI.toast(\'正在接入客服...\',\'ok\');UI.closeSheet();">' +
-          '<svg class="ic" style="width:18px;height:18px;" viewBox="0 0 24 24"><use href="#i-chat"/></svg>开始对话' +
-        '</button>' +
-        '<div style="font-size:11px;color:var(--text-3);margin-top:12px;">也可拨打热线 400-888-6688</div>' +
-      '</div>'
-    );
-    sh.show();
+    if (window.openKefu) window.openKefu();
   };
 
   var ICONS={
@@ -395,9 +404,23 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
   function botRow(){var row=el('div','msg bot');row.appendChild(el('span','mava',svg('hat')));var col=el('div','mcol');row.appendChild(col);return {row:row,col:col};}
   function typingBubble(col){var t=el('div','typing','<i></i><i></i><i></i>');col.appendChild(t);follow();return t;}
 
-  /* 身份过滤：无 type 的动作类不过滤；type 必须在 allowed 内 */
+  /* 二级选项完整展示 FLOW 配置的全部入口（详细类 + 简要类），不再按身份裁剪；
+     对当前身份不可发布的类型标记 _locked，渲染时弱化并提示所需认证，点击引导认证 */
   function filterOpts(opts){
-    return opts.filter(function(o){ if(!o.type) return true; return !!allowed[o.type]; });
+    return opts.map(function(o){
+      if(!o.type) return o;
+      var n=Object.assign({},o);
+      n._locked=!allowed[o.type];
+      return n;
+    });
+  }
+  /* 锁定原因文案：详细类需企业认证；求职类需个人专业入驻 */
+  function lockReason(typeKey){
+    var t=(window.PUBLISH_TYPES&&PUBLISH_TYPES[typeKey])?PUBLISH_TYPES[typeKey]:null;
+    if(!t) return '需认证';
+    if(t.detailLevel==='detail') return '需企业认证';
+    if(t.cat==='求职') return '需专业入驻';
+    return '需认证';
   }
 
   function renderQuestion(qkey,q,opt){
@@ -406,7 +429,7 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       var opts=filterOpts(q.options);
       if(!opts.length){
         var empty=botRow();flowEl.appendChild(empty.row);
-        empty.col.appendChild(el('div','bubble','当前身份暂无可发布的该类目，<a href="../help/index.html">联系客服</a> 了解认证后可发布的类型。'));
+        empty.col.appendChild(el('div','bubble','当前身份暂无可发布的该类目，<a href="javascript:void(0)" onclick="openKefu&&openKefu()">联系客服</a> 了解认证后可发布的类型。'));
         scrollBottom();return;
       }
       var br=botRow();flowEl.appendChild(br.row);
@@ -417,19 +440,20 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       var wrap=el('div','opts '+(q.grid?'tiles':'rows'));
       if(q.grid){
         wrap.innerHTML=opts.map(function(o){
-          return '<button type="button" class="tile" data-key="'+esc(o.key)+'">'
+          return '<button type="button" class="tile'+(o._locked?' is-locked':'')+'" data-key="'+esc(o.key)+'">'
             +'<span class="tic">'+svg(CATICON[o.cat]||'lifebuoy')+'</span>'
-            +'<span><b>'+esc(o.label)+'</b><span>'+esc(o.sub)+'</span></span></button>';
+            +'<span><b>'+esc(o.label)+'</b><span>'+esc(o.sub)+'</span></span>'
+            +(o._locked?'<span class="lock-tag">'+esc(lockReason(o.type))+'</span>':'')+'</button>';
         }).join('');
       }else{
         wrap.innerHTML=opts.map(function(o){
           var side=o.side||'action';
           var icn=side==='supply'?'up':side==='demand'?'down':(o.action==='help'?'lifebuoy':'squaresfour');
           var badge=side==='supply'?'供':side==='demand'?'需':'';
-          return '<button type="button" class="opt '+side+'" data-key="'+esc(o.key)+'">'
+          return '<button type="button" class="opt '+side+(o._locked?' is-locked':'')+'" data-key="'+esc(o.key)+'">'
             +'<span class="oic">'+svg(icn)+'</span>'
             +'<span class="obd"><b>'+esc(o.label)+'</b><span>'+(o.sub?esc(o.sub):'')+'</span></span>'
-            +(badge?'<span class="oside">'+badge+'</span>':'')
+            +(o._locked?'<span class="oside lock">'+esc(lockReason(o.type))+'</span>':(badge?'<span class="oside">'+badge+'</span>':''))
             +'<span class="ogo">'+svg('go')+'</span></button>';
         }).join('');
       }
@@ -460,6 +484,12 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
   }
 
   function choose(o,qkey){
+    /* 锁定入口：当前身份不可发布，提示所需认证并引导至认证中心，不进入编辑器 */
+    if(o.type&&o._locked){
+      if(window.UI&&UI.toast) UI.toast('「'+lockReason(o.type)+'」后方可发布','warn');
+      setTimeout(function(){ location.href='../profile/auth.html'; },420);
+      return;
+    }
     busy=(async function(){
       await busy;
       if(goTimer){clearTimeout(goTimer);goTimer=null;}
@@ -486,7 +516,7 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       +'<a class="cgo" href="'+esc(href)+'">进入发布页 '+svg('go')+'</a>';
     br.col.appendChild(card);
     follow();
-    goTimer=setTimeout(function(){location.href=href;},800);
+    goTimer=setTimeout(function(){location.href=href;},5000);
   }
 
   function rebuildTo(idx){

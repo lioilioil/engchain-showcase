@@ -157,7 +157,7 @@
 
     /* 底部位置：自动避开底部固定栏（tabbar / fixed-cta / detail-actionbar / 输入条） */
     function measureBottom() {
-      var sels = ['.app-nav-shell', '.app-tabbar', '.fixed-cta', '.detail-actionbar', '.ai-orb-entry', '.chat-input'];
+      var sels = ['.app-nav-shell', '.app-tabbar', '.fixed-cta', '.detail-actionbar', '.ai-orb-entry', '.chat-input', '.fixed-bottom'];
       var max = 28;
       var hostRect = host.getBoundingClientRect();
       var scale = 1;

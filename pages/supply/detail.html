@@ -87,10 +87,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       /* 动态字段映射层：判断用户发布条目是否包含编辑器提交的业务结构化数据 */
       var _hasRich = !!(sup.mat || sup.equip || sup.labor || sup.fc || sup.tradeDetail || sup.agencyDetail || sup.personnelDetail || sup.talentDetail);
       /* 含结构化数据的用户条目走专业渲染器；无结构化数据的四类+缺serveType的中介仍降级为通用渲染器 */
-      var _bk = ((_isUser && (_bk0 === 'trade' || _bk0 === 'franchise' || _bk0 === 'personnel' || _bk0 === 'talent') && !_hasRich) || (_bk0 === 'agency' && !sup.serveType && !_hasRich)) ? 'publish' : _bk0;
+      var _agServe = (sup.agencyDetail && sup.agencyDetail.serveType) || sup.serveType || '';
+      var _bk = ((_isUser && (_bk0 === 'trade' || _bk0 === 'franchise' || _bk0 === 'personnel' || _bk0 === 'talent') && !_hasRich) || (_bk0 === 'agency' && !_agServe && !_hasRich)) ? 'publish' : _bk0;
       rec = Object.assign({}, sup, {
         bizKey: _bk,
         dir: sup.dir || sup.type || 'demand',
+        /* franchise 供应侧（资质招商）→ qualification 渲染器；其余保持 supply/demand */
+        type: (_bk0 === 'franchise' && (sup.dir === 'supply' || sup.type === 'supply')) ? 'qualification' : (sup.type || 'demand'),
         title: sup.title || '',
         cat: sup.cat || sup.category || '',
         category: sup.category || sup.cat || '',
@@ -105,17 +108,39 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         qty: sup.qty || '',
         tags: sup.tags || [],
         company: sup.company || '',
-        desc: sup.desc || sup.description || '',
+        /* personnel 以 jobDesc 作为详情正文（F20）；其余业务回退通用 desc */
+        desc: (sup.personnelDetail && (sup.personnelDetail.desc || sup.personnelDetail.jobDesc)) || sup.desc || sup.description || '',
         description: sup.description || sup.desc || '',
         verified: sup.verified !== undefined ? sup.verified : !_isUser,
         match: typeof sup.match === 'number' ? sup.match : (_isUser ? 55 : 70),
         hot: sup.hot || false,
         ts: sup.ts || Date.now(),
         views: typeof sup.views === 'number' ? sup.views : 0,
-        /* contact 在 SupplyStore 中可能是对象 {name,phone}，详情模板期望 r.contact 为联系人姓名字符串 */
-        contact: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.name || '') : (sup.contact || ''),
-        phone: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.phone || '') : (sup.phone || ''),
-        wechat: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.wechat || '') : (sup.wechat || ''),
+        /* contact 统一为对象 {name,phone,wechat,addr}（agency/talent/brief 联系卡按对象读取）；
+           同时冗余标量 contactName/phone/wechat 供字符串型渲染器使用，避免对象被渲染成 [object Object] */
+        contact: (function () {
+          /* talent 简历联系卡为脱敏对象 {phone,phoneMasked,wechat,wechatMasked}，优先整组保留脱敏字段 */
+          if (sup.talentDetail && sup.talentDetail.contact && typeof sup.talentDetail.contact === 'object') {
+            var tc = sup.talentDetail.contact;
+            return Object.assign({
+              name: sup.talentDetail.name || sup.talentDetail.nameMasked || sup.contactName || '',
+              phone: tc.phone || '',
+              wechat: tc.wechat || '',
+              addr: sup.talentDetail.address || sup.talentDetail.addressDetail || sup.address || ''
+            }, tc);
+          }
+          var raw = sup.contact || {};
+          if (typeof raw === 'string') raw = { name: raw };
+          return {
+            name: raw.name || sup.contactName || '',
+            phone: raw.phone || sup.phone || '',
+            wechat: raw.wechat || sup.wechat || '',
+            addr: raw.addr || sup.address || ''
+          };
+        })(),
+        contactName: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.name || '') : (typeof sup.contact === 'string' ? sup.contact : (sup.contactName || '')),
+        phone: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.phone || sup.phone || '') : (sup.phone || ''),
+        wechat: (sup.contact && typeof sup.contact === 'object') ? (sup.contact.wechat || sup.wechat || '') : (sup.wechat || ''),
         address: sup.address || '',
         spec: sup.spec || '',
         delivery: sup.delivery || '',
@@ -130,45 +155,114 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         labor: sup.labor || null,
         fc: sup.fc || null,
         /* 嵌套对象展开为扁平字段：trade/agency/personnel/talent 专业渲染器读取扁平字段 */
-        projectInfo: (sup.personnelDetail && sup.personnelDetail.projectInfo) || sup.projectInfo || [],
-        /* trade 展开 */
+        /* personnel 岗位项目信息（trade 的在建项目走 ongoingProjects，键不共用） */
+        projectInfo: (sup.personnelDetail && sup.personnelDetail.projectInfo) || sup.projectInfo || null,
+        /* trade 展开：tradeBody 读取 r 顶层强类型字段 */
+        registeredCapital: (sup.tradeDetail && sup.tradeDetail.registeredCapital) || sup.registeredCapital || '',
+        establishmentDate: (sup.tradeDetail && sup.tradeDetail.establishmentDate) || sup.establishmentDate || '',
+        equityStructure: (sup.tradeDetail && sup.tradeDetail.equityStructure) || sup.equityStructure || '',
+        equityPledge: (sup.tradeDetail && sup.tradeDetail.equityPledge) || sup.equityPledge || '',
+        info: (sup.tradeDetail && sup.tradeDetail.info) || sup.info || [],
+        safetyLicense: (sup.tradeDetail && sup.tradeDetail.safetyLicense) || sup.safetyLicense || null,
+        qualExpiry: (sup.tradeDetail && sup.tradeDetail.qualExpiry) || sup.qualExpiry || '',
+        businessAbnormal: (sup.tradeDetail && sup.tradeDetail.businessAbnormal) || sup.businessAbnormal || '',
+        transferMethod: (sup.tradeDetail && sup.tradeDetail.transferMethod) || sup.transferMethod || '',
+        changeCycle: (sup.tradeDetail && sup.tradeDetail.changeCycle) || sup.changeCycle || '',
+        urgentReason: (sup.tradeDetail && sup.tradeDetail.urgentReason) || sup.urgentReason || '',
+        priceDrop: (sup.tradeDetail && sup.tradeDetail.priceDrop) || sup.priceDrop || '',
+        /* 付款约定：trade 为分期数组、agency 为字符串说明——同一记录只属一种业务，按嵌套来源优先 */
+        paymentTerms: (sup.tradeDetail && sup.tradeDetail.paymentTerms)
+          || (sup.agencyDetail && sup.agencyDetail.paymentTerms)
+          || sup.paymentTerms || (sup.fc && sup.fc.paymentTerms) || [],
+        deposit: (sup.tradeDetail && sup.tradeDetail.deposit) || sup.deposit || '',
+        taxStatus: (sup.tradeDetail && sup.tradeDetail.taxStatus) || sup.taxStatus || '',
+        /* 社保：trade 为字符串说明、talent 为社保对象——按嵌套来源优先，互不为对方回退空值 */
+        socialSecurity: (sup.tradeDetail && sup.tradeDetail.socialSecurity)
+          || (sup.talentDetail && sup.talentDetail.socialSecurity)
+          || sup.socialSecurity || null,
+        bankAccount: (sup.tradeDetail && sup.tradeDetail.bankAccount) || sup.bankAccount || null,
+        externalGuarantee: (sup.tradeDetail && sup.tradeDetail.externalGuarantee) || sup.externalGuarantee || null,
+        ongoingProjects: (sup.tradeDetail && sup.tradeDetail.ongoingProjects) || sup.ongoingProjects || [],
+        riskRadar: (sup.tradeDetail && sup.tradeDetail.radar) || sup.riskRadar || null,
+        /* 证照/宣传文件：trade 尽调 PDF 与 franchise 宣传 PDF 共用顶层 pdfFiles，按嵌套来源优先 */
+        pdfFiles: (sup.tradeDetail && sup.tradeDetail.pdfFiles)
+          || (sup.fc && sup.fc.pdfFiles)
+          || sup.pdfFiles || [],
+        revenue: (sup.tradeDetail && sup.tradeDetail.revenue) || sup.revenue || [],
+        transferProcess: (sup.tradeDetail && sup.tradeDetail.transferProcess) || sup.transferProcess || [],
         staffConfig: (sup.tradeDetail && sup.tradeDetail.staffConfig) || (sup.fc && sup.fc.staffConfig) || sup.staffConfig || [],
         qualPack: (sup.tradeDetail && sup.tradeDetail.qualPack) || (sup.fc && sup.fc.qualPack) || sup.qualPack || [],
         dealTerms: (sup.tradeDetail && sup.tradeDetail.dealTerms) || sup.dealTerms || [],
         finInfo: (sup.tradeDetail && sup.tradeDetail.finInfo) || sup.finInfo || [],
         litigation: (sup.tradeDetail && sup.tradeDetail.litigation) || sup.litigation || '',
-        hiddenDebtCommitment: (sup.tradeDetail && sup.tradeDetail.commitment) || sup.hiddenDebtCommitment || '',
+        hiddenDebtCommitment: (sup.tradeDetail && (sup.tradeDetail.commitment || sup.tradeDetail.hiddenDebtCommitment)) || sup.hiddenDebtCommitment || '',
         companyProfile: (sup.tradeDetail && sup.tradeDetail.companyProfile) || sup.companyProfile || [],
-        /* agency 展开 */
-        serveType: (sup.agencyDetail && sup.agencyDetail.serveType) || sup.serveType || [],
+        /* agency 展开（强类型对齐 agencyBody） */
+        serveType: (sup.agencyDetail && sup.agencyDetail.serveType) || sup.serveType || '',
+        targetQualLevel: (sup.agencyDetail && sup.agencyDetail.targetQualLevel) || sup.targetQualLevel || '',
+        targetQualMajor: (sup.agencyDetail && sup.agencyDetail.targetQualMajor) || sup.targetQualMajor || '',
+        handleCycle: (sup.agencyDetail && sup.agencyDetail.handleCycle) || sup.handleCycle || '',
         quote: (sup.agencyDetail && sup.agencyDetail.quote) || sup.quote || null,
+        priceInclude: (sup.agencyDetail && sup.agencyDetail.priceInclude) || sup.priceInclude || '',
+        govFeeNote: (sup.agencyDetail && sup.agencyDetail.govFeeNote) || sup.govFeeNote || '',
+        invoiceType: (sup.agencyDetail && sup.agencyDetail.invoiceType) || sup.invoiceType || '',
         serveProcess: (sup.agencyDetail && sup.agencyDetail.serveProcess) || sup.serveProcess || [],
         requiredMaterials: (sup.agencyDetail && sup.agencyDetail.requiredMaterials) || sup.requiredMaterials || [],
-        staffPolicy: (sup.agencyDetail && sup.agencyDetail.staffPolicy) || sup.staffPolicy || [],
-        cases: (sup.agencyDetail && sup.agencyDetail.cases) || sup.cases || [],
+        personnelReq: (sup.agencyDetail && sup.agencyDetail.personnelReq) || sup.personnelReq || '',
+        policyBasis: (sup.agencyDetail && sup.agencyDetail.policyBasis) || sup.policyBasis || '',
+        /* 成功案例：agency 真实案例与 franchise 分公司案例共用顶层 cases，按嵌套来源优先 */
+        cases: (sup.agencyDetail && sup.agencyDetail.cases)
+          || (sup.fc && sup.fc.cases)
+          || sup.cases || [],
+        successRate: (sup.agencyDetail && sup.agencyDetail.successRate != null) ? sup.agencyDetail.successRate : (sup.successRate != null ? sup.successRate : null),
+        rating: (sup.agencyDetail && sup.agencyDetail.rating != null) ? sup.agencyDetail.rating : (sup.rating != null ? sup.rating : null),
         refundPolicy: (sup.agencyDetail && sup.agencyDetail.refundPolicy) || sup.refundPolicy || '',
         overdueClause: (sup.agencyDetail && sup.agencyDetail.overdueClause) || sup.overdueClause || '',
-        /* personnel 展开 */
+        /* 我方机构资质：专业页 orgQuals 标签（供应方自身经营资质），随 agencyDetail 一并拍平到顶层 */
+        orgQuals: (sup.agencyDetail && sup.agencyDetail.orgQuals) || sup.orgQuals || [],
+        /* personnel 展开（强类型对齐 personnelBody） */
         jobDesc: (sup.personnelDetail && sup.personnelDetail.jobDesc) || sup.jobDesc || '',
-        salaryStructure: (sup.personnelDetail && sup.personnelDetail.salaryStructure) || sup.salaryStructure || [],
+        certReq: (sup.personnelDetail && sup.personnelDetail.certReq) || sup.certReq || null,
+        jobType: (sup.personnelDetail && sup.personnelDetail.jobType) || sup.jobType || '',
+        hireCount: (sup.personnelDetail && sup.personnelDetail.hireCount) || sup.hireCount || '',
+        arrivalTime: (sup.personnelDetail && sup.personnelDetail.arrivalTime) || sup.arrivalTime || '',
+        educationReq: (sup.personnelDetail && sup.personnelDetail.educationReq) || sup.educationReq || '',
+        experienceReq: (sup.personnelDetail && sup.personnelDetail.experienceReq) || sup.experienceReq || '',
+        registerStatusReq: (sup.personnelDetail && sup.personnelDetail.registerStatusReq) || sup.registerStatusReq || '',
+        socialSecurityReq: (sup.personnelDetail && sup.personnelDetail.socialSecurityReq) || sup.socialSecurityReq || '',
+        registerHandler: (sup.personnelDetail && sup.personnelDetail.registerHandler) || sup.registerHandler || '',
+        registerCycle: (sup.personnelDetail && sup.personnelDetail.registerCycle) || sup.registerCycle || '',
+        continuingEdu: (sup.personnelDetail && sup.personnelDetail.continuingEdu) || sup.continuingEdu || '',
+        companyQual: (sup.personnelDetail && sup.personnelDetail.companyQual) || sup.companyQual || '',
+        companyScale: (sup.personnelDetail && sup.personnelDetail.companyScale) || sup.companyScale || '',
+        applyHtml: (sup.personnelDetail && sup.personnelDetail.applyHtml) || sup.applyHtml || '',
+        salaryStructure: (sup.personnelDetail && sup.personnelDetail.salaryStructure) || sup.salaryStructure || null,
         requirements: (sup.personnelDetail && sup.personnelDetail.requirements) || sup.requirements || [],
         regContinuing: (sup.personnelDetail && sup.personnelDetail.regContinuing) || sup.regContinuing || [],
         benefits: (sup.personnelDetail && sup.personnelDetail.benefits) || (sup.fc && sup.fc.benefits) || sup.benefits || [],
         hireProcess: (sup.personnelDetail && sup.personnelDetail.hireProcess) || sup.hireProcess || [],
         /* talent 展开 */
-        intent: (sup.talentDetail && sup.talentDetail.intent) || sup.intent || [],
+        /* talent 兜底展平（权威展平见下方 Object.assign(rec, sup.talentDetail)；此处仅补非嵌套来源） */
         certPack: (sup.talentDetail && sup.talentDetail.certPack) || sup.certPack || [],
-        expectedSalary: (sup.talentDetail && sup.talentDetail.expectedSalary) || sup.expectedSalary || '',
-        regStatus: (sup.talentDetail && sup.talentDetail.regStatus) || sup.regStatus || [],
-        socialSecurity: (sup.talentDetail && sup.talentDetail.socialSecurity) || sup.socialSecurity || [],
+        expectedSalary: (sup.talentDetail && sup.talentDetail.expectedSalary) || sup.expectedSalary || null,
+        registerStatus: (sup.talentDetail && sup.talentDetail.registerStatus) || sup.registerStatus || sup.regStatus || null,
         workHistory: (sup.talentDetail && sup.talentDetail.workHistory) || sup.workHistory || [],
-        projectExp: (sup.talentDetail && sup.talentDetail.projectExp) || sup.projectExp || [],
-        education: (sup.talentDetail && sup.talentDetail.education) || sup.education || [],
+        projectExperience: (sup.talentDetail && sup.talentDetail.projectExperience) || sup.projectExperience || sup.projectExp || [],
+        education: (sup.talentDetail && sup.talentDetail.education) || sup.education || null,
+        /* contact 统一在上方唯一处构建（含 talent 脱敏字段），此处不再重复定义 */
         /* franchise 扁平字段兼容 */
         companyInfo: (sup.fc && sup.fc.companyInfo) || sup.companyInfo || [],
         coopTerms: (sup.fc && sup.fc.coopTerms) || sup.coopTerms || [],
         feeStructure: (sup.fc && sup.fc.feeStructure) || sup.feeStructure || [],
         joinProcess: (sup.fc && sup.fc.joinProcess) || sup.joinProcess || [],
+        /* franchise 区域名额 / 宣传文件 / 分公司案例：fc 嵌套透传为顶层（详情渲染器读取位置） */
+        regions: (sup.fc && sup.fc.regions) || sup.regions || [],
+        nationalRegions: (sup.fc && sup.fc.nationalRegions) || sup.nationalRegions || [],
+        /* pdfFiles / cases 已在上方按 trade·agency·franchise 优先级唯一构建，此处不再重复定义以免覆盖 */
+        name: sup.name || (sup.fc && sup.fc.name) || sup.company || '',
+        capital: sup.capital || (sup.fc && sup.fc.capital) || '',
+        founded: sup.founded || (sup.fc && sup.fc.founded) || '',
+        registeredArea: sup.registeredArea || (sup.fc && sup.fc.registeredArea) || '',
         /* 动态字段原始数据保留（用于调试和后续扩展） */
         dynamic: sup.dynamic || null
       });

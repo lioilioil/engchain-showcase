@@ -20,41 +20,49 @@
     'material-supply': {
       cat: '材料', role: 'supply', group: 'supply', detailLevel: 'detail',
       label: '材料-供应', sub: '卖建材',
+      guideLabel: '我有材料要卖', guideSub: '材料生产企业 / 经销商发布供应',
       nav: '发布材料供应', desc: '你有材料要卖'
     },
     'labor-supply': {
       cat: '劳务', role: 'supply', group: 'supply', detailLevel: 'detail',
       label: '劳务-供应', sub: '班组供应 / 分包承接',
+      guideLabel: '我有班组要接活', guideSub: '劳务公司 / 班组长发布供应',
       nav: '发布劳务供应', desc: '你有班组要接活'
     },
     'equipment-supply': {
       cat: '设备', role: 'supply', group: 'supply', detailLevel: 'detail',
       label: '设备-供应', sub: '塔吊/挖机/脚手架等',
+      guideLabel: '我有设备可租可卖', guideSub: '租赁公司 / 机主发布供应',
       nav: '发布设备供应', desc: '你有设备要出租或出售'
     },
     'transport-supply': {
       cat: '运输', role: 'supply', group: 'supply', detailLevel: 'detail',
       label: '运输-供应', sub: '砂石/混凝土/设备运输',
+      guideLabel: '我有车队运力', guideSub: '物流 / 运输公司发布供应',
       nav: '发布运输供应', desc: '你有车队、线路与运力'
     },
     'franchise-supply': {
       cat: '资质招商', role: 'supply', group: 'resource', detailLevel: 'detail',
       label: '建筑企业-招商', sub: '加盟招商 / 单项目合作',
+      guideLabel: '我司招加盟 / 单项目合作', guideSub: '总公司招商，长期合作',
       nav: '发布招商', desc: '招加盟、开分公司、单项目合作'
     },
     'trade-supply': {
       cat: '建企买卖', role: 'supply', group: 'resource', detailLevel: 'detail',
       label: '建企转让-需求', sub: '转让公司股权与资质',
+      guideLabel: '我要转让公司', guideSub: '转让公司股权与资质',
       nav: '发布建企转让', desc: '转让公司、资质，找买家'
     },
     'personnel-demand': {
       cat: '招聘', role: 'demand', group: 'resource', detailLevel: 'detail',
       label: '人才-招聘', sub: '企业招人',
+      guideLabel: '企业方，我要招人', guideSub: '发布详细招聘岗位',
       nav: '发布招聘', desc: '企业发岗位，收简历'
     },
     'agency-supply': {
       cat: '中介服务', role: 'supply', group: 'supply', detailLevel: 'detail',
       label: '提供服务-中介', sub: '资质代办/担保/咨询',
+      guideLabel: '我是服务商，提供服务', guideSub: '资质代办 / 咨询等中介服务',
       nav: '发布中介服务', desc: '中介服务商挂服务菜单',
       viaSeller: true
     },
@@ -63,41 +71,49 @@
     'material-demand': {
       cat: '材料', role: 'demand', group: 'supply', detailLevel: 'brief',
       label: '材料-需求', sub: '一句话采购',
+      guideLabel: '我要采购材料', guideSub: '项目采购询价，一句话发布',
       nav: '发布材料需求', desc: '你要采购材料'
     },
     'labor-demand': {
       cat: '劳务', role: 'demand', group: 'supply', detailLevel: 'brief',
       label: '劳务-需求', sub: '一句话用工',
+      guideLabel: '我要找工人干活', guideSub: '项目分包 / 找班组，一句话发布',
       nav: '发布用工需求', desc: '你要找工人干活'
     },
     'equipment-demand': {
       cat: '设备', role: 'demand', group: 'supply', detailLevel: 'brief',
       label: '设备-需求', sub: '买卖 / 租赁一句话',
+      guideLabel: '我要租或买设备', guideSub: '项目急租 / 采购，一句话发布',
       nav: '发布设备需求', desc: '你要租或买设备'
     },
     'transport-demand': {
       cat: '运输', role: 'demand', group: 'supply', detailLevel: 'brief',
       label: '运输-需求', sub: '租赁 / 承包一句话',
+      guideLabel: '我要用车运输', guideSub: '项目运输 / 租赁承包，一句话发布',
       nav: '发布运输需求', desc: '你要用车运输'
     },
     'franchise-demand': {
       cat: '资质招商', role: 'demand', group: 'resource', detailLevel: 'brief',
       label: '加盟或单项目挂靠-需求', sub: '想挂靠 / 加盟',
+      guideLabel: '我想加盟或挂靠', guideSub: '加入总公司 / 单项目挂靠',
       nav: '发布加盟意向', desc: '你想找资质合作，发需求'
     },
     'trade-demand': {
       cat: '建企买卖', role: 'demand', group: 'resource', detailLevel: 'brief',
       label: '收购或控股建筑企业-需求', sub: '收购带资质公司',
+      guideLabel: '我要收购公司', guideSub: '收购 / 控股建筑企业',
       nav: '发布收购意向', desc: '买公司、控股，提收购意向'
     },
     'talent-supply': {
       cat: '求职', role: 'demand', group: 'resource', detailLevel: 'brief',
       label: '人才应聘-需求', sub: '一句话求职 + 简历',
+      guideLabel: '个人，我要找工作', guideSub: '求职简历 / 求职意向',
       nav: '发布应聘', desc: '人才发求职意向，等企业联系'
     },
     'agency-demand': {
       cat: '中介服务', role: 'demand', group: 'supply', detailLevel: 'brief',
       label: '找中介服务-需求', sub: '资质新办 / 担保一句话',
+      guideLabel: '我要找中介办事', guideSub: '找中介代办 / 咨询服务',
       nav: '发布找中介需求', desc: '你要办资质、找担保等'
     },
 
