@@ -53,8 +53,10 @@
   var btnCfg = loadBtnCfg();
   /* 按钮语义 → 玻璃颜色（0-1 RGB，乘在明暗 tint 基底上） */
   var COLORS = {
-    primary:  [0.620, 0.480, 0.260],  /* 品牌金（明亮·深金 #9E7A42，加深按钮深度） */
-    primaryDark: [0.900, 0.780, 0.560],  /* 品牌金（暗色·亮金 #E6C78F，提升按钮亮度） */
+    primary:  [0.620, 0.480, 0.260],  /* 品牌金（明亮·深金 #9E7A42）——仅用于图标/选中激活态签名 */
+    primaryDark: [0.900, 0.780, 0.560],  /* 品牌金（暗色·亮金 #E6C78F）——图标/选中激活态 */
+    action:   [0.149, 0.125, 0.102],  /* 主行动暖墨（明 #26201A，V3.4：主操作统一暖墨，金不做按钮底） */
+    actionDark: [0.922, 0.894, 0.839],  /* 主行动暗色象牙（暗 #EBE4D6） */
     unlocked: [0.140, 0.380, 0.270],  /* 解锁/成功绿（明亮·深绿 #245F45，加深按钮深度） */
     unlockedDark: [0.450, 0.720, 0.580],  /* 解锁/成功绿（暗色·亮绿 #73B894） */
     neutral:  [1.000, 1.000, 1.000]   /* 中性乳白（次行动/图标钮） */
@@ -161,7 +163,7 @@
     var custom = parseColor(btn.getAttribute('data-lg-tint-color'));
     if (custom) return custom;
     if (btn.classList.contains('is-unlocked') || btn.classList.contains('lg-btn-submitted')) return isDark() ? COLORS.unlockedDark : COLORS.unlocked;
-    if (isGoldBtn(btn)) return isDark() ? COLORS.primaryDark : COLORS.primary;
+    if (isGoldBtn(btn)) return isDark() ? COLORS.actionDark : COLORS.action;
     if (btn.classList.contains('dab-icon') && btn.classList.contains('active')) return isDark() ? COLORS.primaryDark : COLORS.primary;
     return COLORS.neutral;
   }
