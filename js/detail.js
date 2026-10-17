@@ -378,10 +378,11 @@ window.DETAIL = (function () {
   /* 价格区间条：区间免费，精确成交价/计价依据付费 */
   function matPriceBar(p, locked) {
     if (!p) return '';
-    var real = '<b>' + cfgText(p.exact) + '</b><span class="pb-basis">' + cfgText(p.basis) + '</span>';
+    var u = p.unit ? ' ' + cfgText(p.unit) : '';
+    var real = '<b>' + cfgText(p.exact) + u + '</b><span class="pb-basis">' + cfgText(p.basis) + '</span>';
     var exact = Lock.price(real, locked, '精确成交价 · 计价依据待解锁');
     return '<div class="price-bar">' +
-      '<div class="pb-top"><span class="pb-range">' + cfgText(p.range) + '</span><span class="pb-free">市场区间 · 免费可见</span></div>' +
+      '<div class="pb-top"><span class="pb-range">' + cfgText(p.range) + u + '</span><span class="pb-free">市场区间 · 免费可见</span></div>' +
       '<div class="pb-track"><div class="pb-fill"></div><div class="pb-dot"></div></div>' +
       '<div class="pb-exact' + (locked ? ' is-locked' : '') + '">' + exact + '</div></div>';
   }
@@ -463,14 +464,15 @@ window.DETAIL = (function () {
   /* ② 费用明细表：区间免费，各费用项明细付费（原地展开），合计行强调 */
   function equipFee(fee, locked) {
     if (!fee) return '';
+    var u = fee.unit ? ' ' + cfgText(fee.unit) : '';
     var rows = fee.rows.map(function (x) {
       var v = x.lock ? Lock.price(x.v, locked, '费用明细待解锁') : cfgText(x.v);
       return '<div class="fb-row"><span class="fb-k">' + cfgText(x.k) + '</span><span class="fb-v">' + v + '</span></div>';
     }).join('');
     return '<div class="fee-breakdown">' +
-      '<div class="fb-range"><span class="fb-range-v">' + cfgText(fee.range) + '</span><span class="fb-free">费用区间 · 免费可见</span></div>' +
+      '<div class="fb-range"><span class="fb-range-v">' + cfgText(fee.range) + u + '</span><span class="fb-free">费用区间 · 免费可见</span></div>' +
       '<div class="fb-rows">' + rows + '</div>' +
-      (fee.total ? '<div class="fb-total"><span>合计参考</span><b>' + cfgText(fee.total) + '</b></div>' : '') +
+      (fee.total ? '<div class="fb-total"><span>合计参考</span><b>' + cfgText(fee.total) + u + '</b></div>' : '') +
       '</div>';
   }
   /* 风险与服务承诺（免费） */
@@ -511,7 +513,7 @@ window.DETAIL = (function () {
   }
   function equipHero(r, c) {
     var d = dirTag(r.type || r.dir);
-    var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
+    var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
     var o = r.equip && r.equip.overview;
     var chips = o ? [o.brand, o.equipType, o.yearBuilt, o.workHours, o.condition].filter(function (x) { return !!x; }) : [];
     var quick = chips.length ? '<div class="hero-grade"><span class="hg-label">设备速览</span><div class="hg-list">' +
@@ -563,7 +565,7 @@ window.DETAIL = (function () {
     }).join('');
     return '<div class="wage-structure">' +
       (types ? '<div class="ws-types">' + types + '</div>' : '') +
-      '<div class="ws-range"><b>' + cfgText(wage.range) + '</b><span>工资区间 · 免费可见</span></div>' +
+      '<div class="ws-range"><b>' + cfgText(wage.range) + (wage.unit ? ' ' + cfgText(wage.unit) : '') + '</b><span>工资区间 · 免费可见</span></div>' +
       '<div class="ws-rows">' + rows + '</div>' +
       '<div class="ws-foot"><span class="ws-settle">结算：' + cfgText(wage.settle) + '</span>' +
       '<span class="ws-account">' + icon('check') + cfgText(wage.account) + '</span></div></div>';
@@ -624,7 +626,7 @@ window.DETAIL = (function () {
   }
   function laborHero(r, c) {
     var d = dirTag(r.type || r.dir);
-    var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
+    var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
     var o = r.labor && r.labor.overview;
     var chips = o ? [o.total, o.available, o.area].filter(function (x) { return !!x; }) : [];
     var quick = chips.length ? '<div class="hero-grade"><span class="hg-label">' + (laborIsDemand(r) ? '用工速览' : '班组速览') + '</span><div class="hg-list">' +
@@ -1569,7 +1571,7 @@ window.DETAIL = (function () {
     var cfg = MATCH[k];
     byType[k] = {
       label: cfg.label, cta: '立即咨询', verified: '已认证',
-      hero: function (r, c) { var d = dirTag(r.dir); return dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) }); },
+      hero: function (r, c) { var d = dirTag(r.dir); return dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) }); },
       sections: function (r, c) { return matchBody(r, cfg); },
       lockRows: function (r, c) { return matchLock(r, c, cfg); }
     };
@@ -1580,7 +1582,7 @@ window.DETAIL = (function () {
     ctaText: function (r) { return matIsDemand(r) ? '联系采购方' : '联系供应商'; },
     hero: function (r, c) {
       var d = dirTag(r.type || r.dir);
-      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
+      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
       var g = r.mat && r.mat.grade;
       var quick = g ? '<div class="hero-grade"><span class="hg-label">' + cfgText(g.label) + '</span><div class="hg-list">' +
         g.chips.map(function (x) { return '<span class="tag tag-gold">' + cfgText(x) + '</span>'; }).join('') + '</div></div>' : '';
@@ -1658,7 +1660,7 @@ window.DETAIL = (function () {
     ctaText: function (r) { return transportIsDemand(r) ? '联系用车方' : '联系运输方'; },
     hero: function (r, c) {
       var d = dirTag(r.type || r.dir);
-      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
+      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
       var ov = r.transport && r.transport.overview;
       var chips = [];
       if (ov) { if (ov.fleet) chips.push(ov.fleet); if (ov.capacity) chips.push(ov.capacity); if (ov.dispatch) chips.push(ov.dispatch); }
@@ -1674,7 +1676,7 @@ window.DETAIL = (function () {
     hero: function (r, c) {
       var tag = r.type === 'qualification' ? ('资质招商 · ' + (r.qualLevel || '') + '·' + (r.qualType || '')) : ('机会 · ' + r.sub);
       var vh = r.type === 'qualification' ? (r.verified ? '企业已认证' : '') : (r.verified ? '品牌已认证' : '');
-      return dHero({ tag: tag, verifiedHint: vh, title: r.title, price: heroPrice(r), unit: r.unit, meta: oppMeta(r) });
+      return dHero({ tag: tag, verifiedHint: vh, title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: oppMeta(r) });
     },
     sections: function (r, c) {
       if (r.type === 'qualification') return qualFranchiseBody(r, c);
@@ -1706,7 +1708,7 @@ window.DETAIL = (function () {
     inlineLock: true,
     ctaText: function (r, unlocked) { return unlocked ? '联系转让方 · 信息已解锁' : '缴纳保证金查看详情'; },
     hero: function (r, c) {
-      var base = dHero({ tag: '机会 · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: oppMeta(r) });
+      var base = dHero({ tag: '机会 · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: oppMeta(r) });
       var radar = r.riskRadar || {};
       var chips = [];
       if (radar.level) chips.push(radar.level + '风险');
@@ -1738,7 +1740,7 @@ window.DETAIL = (function () {
     label: '中介服务', cta: '解锁联系方式', ctaLocked: '解锁联系方式', inlineLock: true, verified: '机构已认证',
     hero: function (r, c) {
       var d = dirTag(r.dir);
-      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '机构已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: oppMeta(r) });
+      var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '机构已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: oppMeta(r) });
       var chips = [];
       /* WP4 服务商信用分：详情页服务速览展示 */
       try {
@@ -1841,7 +1843,7 @@ window.DETAIL = (function () {
   }
   byType.personnel = {
     label: '企业招聘·需求详情', cta: '立即投递', verified: '已认证',
-    hero: function (r, c) { return dHero({ tag: '需求 · ' + r.sub, verifiedHint: (r.verified ? '企业已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) }); },
+    hero: function (r, c) { return dHero({ tag: '需求 · ' + r.sub, verifiedHint: (r.verified ? '企业已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) }); },
     sections: function (r, c) {
       var h = '';
       /* 岗位说明 + 证书要求条 */
@@ -2412,7 +2414,7 @@ window.DETAIL = (function () {
       ctaText: function (r, unlocked) { return unlocked ? '沟通权限已开通' : '解锁联系方式'; },
       hero: function (r, c) {
         var d = dirTag(r.type || r.dir);
-        var base = dHero({ tag: d.txt + ' · ' + (r.cat || t0.label), verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, meta: matchMeta(r) });
+        var base = dHero({ tag: d.txt + ' · ' + (r.cat || t0.label), verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
         var ai = r.aiAnalysis || {};
         var chips = (ai.tags || []).slice(0, 5).map(function (x) { return cfgText(x.k) + ' ' + cfgText(x.v); });
         return base + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +

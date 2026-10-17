@@ -285,13 +285,19 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
 <script src="../../js/publish-types.js"></script>
 <script src="../../js/publish-workbench.js"></script>
 <script src="../../js/publish-type-sheet.js"></script>
+<script src="../../js/guest-gate.js"></script>
 <script>
 (function(){
-  /* ── 登录 / 实名门控（与原生产页一致） ── */
+  /* ── 登录 / 实名门控（统一收敛到 guest-gate 的 checkIdentity；保留直写 fallback 防加载异常） ── */
   var st = (window.UI && UI.state) ? UI.state.get() : {};
-  if (!st.loggedIn) { location.href = '../auth/login.html'; return; }
   var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
-  if (!(auth.realname && auth.realname.ok)) { location.href = '../profile/auth-personal.html'; return; }
+  if (window.GuestGate && GuestGate.checkIdentity) {
+    if (!GuestGate.checkIdentity('guest', { mode: 'redirect', loginHref: '../auth/login.html' })) return;
+    if (!GuestGate.checkIdentity('realname', { mode: 'redirect', realnameHref: '../profile/auth-personal.html' })) return;
+  } else {
+    if (!st.loggedIn) { location.href = '../auth/login.html'; return; }
+    if (!(auth.realname && auth.realname.ok)) { location.href = '../profile/auth-personal.html'; return; }
+  }
 
   var acc = null, allowed = {};
   try {
@@ -584,7 +590,28 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
   buildStrip();
   syncStrip();
 
-  renderQuestion('q1',FLOW.q1,{instant:reduced});
+  /* ── 上次发布快捷卡（重复发布者一键直达；新用户无记录则走对话） ──
+     记录由 editor.html 提交成功时写入 localStorage『engchain-last-publish』 */
+  var lastPub = null;
+  try {
+    var _lp = JSON.parse(localStorage.getItem('engchain-last-publish') || 'null');
+    if (_lp && _lp.type && window.PUBLISH_TYPES && PUBLISH_TYPES[_lp.type]) lastPub = _lp;
+  } catch (e) {}
+  var fastMode = !!lastPub;
+  if (lastPub) {
+    var _lt = (window.PUBLISH_TYPES[lastPub.type] && window.PUBLISH_TYPES[lastPub.type].label) || lastPub.type;
+    var _href = window.publishTypeHref ? publishTypeHref(lastPub.type) : ('editor.html?type=' + encodeURIComponent(lastPub.type));
+    var _lrow = botRow(); flowEl.appendChild(_lrow.row);
+    var _lcard = el('div', 'confirm lastpub-card');
+    _lcard.innerHTML = '<div class="chd"><span class="cic">' + svg('seal') + '</span><b>上次发布：「' + esc(_lt) + '」</b></div>'
+      + '<p>继续发布同一类型，可直接进入表单；想发别的类型，从下方对话重新选择。</p>'
+      + '<div class="cbar"><i></i></div>'
+      + '<a class="cgo" href="' + esc(_href) + '">再次发布 ' + svg('go') + '</a>';
+    _lrow.col.appendChild(_lcard);
+    follow();
+  }
+
+  renderQuestion('q1',FLOW.q1,{instant:reduced || fastMode});
 })();
 </script>
 </body>

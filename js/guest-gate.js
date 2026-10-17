@@ -81,5 +81,58 @@
     return el;
   }
 
-  w.GuestGate = { open: open };
+  /* ── 统一身份校验（收敛 index/guide/editor 三层重复判定） ──
+     level: 'guest'(登录) | 'realname'(实名) | 'enterprise'(企业认证)
+     opts:
+       mode         'overlay'(默认，未通过时用 GuestGate.open 弹层 / 显示门控层) | 'redirect'(直接跳转)
+       gateEl       实名门控 DOM（overlay 模式：未实名时显示该层）
+       entGateEl    企业门控 DOM（enterprise 级：未企业认证时显示该层）
+       hideEls      需同步隐藏的 DOM 数组（如工作台 #pub-content）
+       overlayMode  弹层模式（'replace' | 'overlay'），默认 'replace'
+       弹层文案透传：icon / badge / title / note / perk / btnText / btnHref
+       跳转目标：loginHref / realnameHref / enterpriseHref
+     返回 true=通过；false=未通过（已按 mode 拦截） */
+  function hideExtra(o) {
+    if (o.hideEls) o.hideEls.forEach(function (el) { if (el) { try { el.style.display = 'none'; } catch (e) {} } });
+  }
+  function checkIdentity(level, opts) {
+    var o = opts || {};
+    var st = (w.UI && w.UI.state) ? w.UI.state.get() : {};
+    var loggedIn = !!st.loggedIn;
+    var auth = (w.AuthStore && w.AuthStore.read) ? w.AuthStore.read() : {};
+    var realname = !!(auth.realname && auth.realname.ok);
+    var enterprise = !!(auth.enterprise && auth.enterprise.ok);
+
+    if (!loggedIn) {
+      if (o.mode === 'redirect') { w.location.href = o.loginHref || '../auth/login.html'; }
+      else {
+        w.GuestGate.open({
+          mode: o.overlayMode || 'replace', icon: o.icon || 'lock', badge: o.badge,
+          title: o.title || '登录后继续', note: o.note, perk: o.perk,
+          btnText: o.btnText || '立即登录', btnHref: o.loginHref || '../auth/login.html'
+        });
+      }
+      hideExtra(o);
+      return false;
+    }
+    if (!realname) {
+      if (o.mode === 'redirect') { w.location.href = o.realnameHref || '../profile/auth-personal.html'; }
+      else if (o.gateEl) {
+        try { o.gateEl.classList.remove('gate-hidden'); o.gateEl.style.display = ''; } catch (e) {}
+      }
+      hideExtra(o);
+      return false;
+    }
+    if (level === 'enterprise' && !enterprise) {
+      if (o.mode === 'redirect') { w.location.href = o.enterpriseHref || '../profile/auth-enterprise.html'; }
+      else if (o.entGateEl) {
+        try { o.entGateEl.classList.remove('gate-hidden'); o.entGateEl.style.display = ''; } catch (e) {}
+      }
+      hideExtra(o);
+      return false;
+    }
+    return true;
+  }
+
+  w.GuestGate = { open: open, checkIdentity: checkIdentity };
 })(window);

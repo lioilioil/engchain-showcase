@@ -400,27 +400,34 @@ html[data-theme="dark"] .wb-dl .dl-gate-perk{color:var(--gold-hi);}
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/publish-types.js"></script>
+<script src="../../js/publish-type-sheet.js"></script>
 <script src="../../js/liquid-cta.js?v=20260928213953"></script>
 <script src="../../js/publish-workbench.js"></script>
 <script src="../../js/guest-gate.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
-  /* ---- 身份门控（逻辑不变） ---- */
+  /* ---- 身份门控（统一收敛到 guest-gate 的 checkIdentity；保留直写 fallback） ---- */
   function checkPublishAuth() {
-    var st = (window.UI && UI.state) ? UI.state.get() : {};
     var content = document.getElementById('pub-content');
     var gateLogin = document.getElementById('pub-gate-login');
     var gateReal = document.getElementById('pub-gate-realname');
-    if (!st.loggedIn) {
-      if (window.GuestGate) { GuestGate.open({ mode:'replace', icon:'key', badge:'游客模式', title:'登录后使用信息工作台', note:'登录后可发布供需信息、管理草稿与发布记录、查看对接进展。', perk:'注册即送 50 积分 · 实名认证免费解锁 5 条供需', btnText:'立即登录', btnHref:'../auth/login.html' }); }
-      return false;
-    }
-    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
-    if (!(auth.realname && auth.realname.ok)) {
-      if (content) content.style.display = 'none';
-      if (gateReal) gateReal.style.display = '';
-      return false;
+    if (window.GuestGate && GuestGate.checkIdentity) {
+      if (!GuestGate.checkIdentity('guest', { icon:'key', badge:'游客模式', title:'登录后使用信息工作台', note:'登录后可发布供需信息、管理草稿与发布记录、查看对接进展。', perk:'注册即送 50 积分 · 实名认证免费解锁 5 条供需', btnText:'立即登录', btnHref:'../auth/login.html' })) return false;
+      if (!GuestGate.checkIdentity('realname', { gateEl: gateReal, hideEls: [content] })) return false;
+    } else {
+      var st = (window.UI && UI.state) ? UI.state.get() : {};
+      if (!st.loggedIn) {
+        if (window.GuestGate) { GuestGate.open({ mode:'replace', icon:'key', badge:'游客模式', title:'登录后使用信息工作台', note:'登录后可发布供需信息、管理草稿与发布记录、查看对接进展。', perk:'注册即送 50 积分 · 实名认证免费解锁 5 条供需', btnText:'立即登录', btnHref:'../auth/login.html' }); }
+        return false;
+      }
+      var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+      if (!(auth.realname && auth.realname.ok)) {
+        if (content) content.style.display = 'none';
+        if (gateReal) gateReal.style.display = '';
+        return false;
+      }
     }
     return true;
   }
@@ -459,13 +466,27 @@ html[data-theme="dark"] .wb-dl .dl-gate-perk{color:var(--gold-hi);}
     var isAgency = !!(acc && acc.agency);
     var acts = [];
     function push(a) { acts.push(a); }
-    /* N1：所有发布按钮统一进入对话式发布引导（guide.html），由引导按语义直达类型表单；
-          需要浏览全部类型时在引导内原地弹出底部类型面板（独立 choose.html 已移除） */
-    push({ href: 'guide.html', ic: 'i-doc', t: '发布供需信息', kind: 'primary' });
+    /* N1：发布入口双通道——熟练用户「快速发布」原地弹类型面板直达表单；
+          新手/换类型走「对话引导」（引导内仍可「查看全部类型」弹面板）。
+          原「发布供需信息→guide」降级为引导入口，保留全部直达/记忆能力 */
+    push({ action: 'sheet', ic: 'i-doc', t: '快速发布', kind: 'primary' });
+    push({ href: 'guide.html', ic: 'i-help', t: '不会选？对话引导', kind: 'ghost' });
     box.innerHTML = acts.map(function (a) {
-      return '<a class="wb-act btn btn-primary" data-lg-glass href="' + a.href + '">'
+      var cls = 'wb-act btn ' + (a.kind === 'ghost' ? 'btn-ghost' : 'btn-primary');
+      if (a.action === 'sheet') {
+        return '<button type="button" class="' + cls + '" data-lg-glass data-pts-open>'
+          + '<svg class="ic"><use href="#' + a.ic + '"/></svg>' + a.t + '</button>';
+      }
+      return '<a class="' + cls + '" data-lg-glass href="' + a.href + '">'
         + '<svg class="ic"><use href="#' + a.ic + '"/></svg>' + a.t + '</a>';
     }).join('');
+    var _po = box.querySelector('[data-pts-open]');
+    if (_po) {
+      _po.addEventListener('click', function () {
+        if (window.PublishTypeSheet) { PublishTypeSheet.open({ title: '快速发布', sub: '选择一个类型，进入对应的发布表单' }); }
+        else { location.href = 'guide.html'; }
+      });
+    }
   })();
 
   /* 我的招聘任务卡（身份门控不变） */

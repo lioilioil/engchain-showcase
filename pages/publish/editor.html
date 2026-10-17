@@ -533,16 +533,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function () {
   /* ===== 身份门控 ===== */
   function checkAuth() {
-    var st = (window.UI && UI.state) ? UI.state.get() : {};
     var content = document.getElementById('pub-content');
     var gateLogin = document.getElementById('pub-gate-login');
     var gateReal = document.getElementById('pub-gate-realname');
-    if (!st.loggedIn) {
-      if (window.GuestGate) GuestGate.open({mode:'replace', icon:'edit', badge:'游客模式', title:'登录后发布供需信息', note:'登录后可发布供需信息、保存草稿并查看对接进展。', btnText:'立即登录', btnHref:'../auth/login.html'}); return false;
-    }
-    var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
-    if (!(auth.realname && auth.realname.ok)) {
-      gateReal.classList.remove('gate-hidden'); return false;
+    var gateEnt = document.getElementById('pub-gate-enterprise');
+    /* 统一收敛到 guest-gate 的 checkIdentity（保留直写 fallback 防加载异常） */
+    if (window.GuestGate && GuestGate.checkIdentity) {
+      if (!GuestGate.checkIdentity('guest', { icon:'edit', badge:'游客模式', title:'登录后发布供需信息', note:'登录后可发布供需信息、保存草稿并查看对接进展。', btnText:'立即登录', btnHref:'../auth/login.html' })) return false;
+      if (!GuestGate.checkIdentity('realname', { gateEl: gateReal })) return false;
+    } else {
+      var st = (window.UI && UI.state) ? UI.state.get() : {};
+      if (!st.loggedIn) {
+        if (window.GuestGate) GuestGate.open({mode:'replace', icon:'edit', badge:'游客模式', title:'登录后发布供需信息', note:'登录后可发布供需信息、保存草稿并查看对接进展。', btnText:'立即登录', btnHref:'../auth/login.html'}); return false;
+      }
+      var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
+      if (!(auth.realname && auth.realname.ok)) {
+        gateReal.classList.remove('gate-hidden'); return false;
+      }
     }
     return true;
   }
@@ -578,7 +585,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var entAuth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
   if (!(entAuth.enterprise && entAuth.enterprise.ok)) {
     var gateEnt = document.getElementById('pub-gate-enterprise');
-    if (gateEnt) { gateEnt.classList.remove('gate-hidden'); }
+    if (window.GuestGate && GuestGate.checkIdentity) { GuestGate.checkIdentity('enterprise', { entGateEl: gateEnt }); }
+    else if (gateEnt) { gateEnt.classList.remove('gate-hidden'); }
     return;
   }
   var draftId = params.get('draft'), recordId = params.get('record');
@@ -3369,7 +3377,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     var data = collectData();
     var curUser = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-    var amount = data.price ? (data.price + (data.unit ? ' ' + data.unit : '')) : '';
+    var amount = data.price ? (data.price + (data.priceUnit ? ' ' + data.priceUnit : (data.unit ? ' ' + data.unit : ''))) : '';
     /* B2：提交前费用确认（有费用项目时先弹确认层，决策前置，避免提交瞬间才告知） */
     var feeRowsHtml = buildFeeRows(data.category, role);
     if (feeRowsHtml) {
@@ -3521,6 +3529,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var sd = $('success-desc'), st = $('success-time');
     if (sd) sd.textContent = successDesc;
     if (st) st.textContent = successTime;
+    /* 记录最近发布类型：guide.html 据此展示「上次发布」快捷卡（重复发布者一键直达） */
+    try { localStorage.setItem('engchain-last-publish', JSON.stringify({ type: typeKey, title: (data && data.title) || '', t: Date.now() })); } catch (e) {}
     dirty = false;
     $('success-page').classList.add('show');
   }
@@ -3598,7 +3608,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       city: (d.location || '').split('·')[0] || '',
       location: d.location || '',
       price: d.price || '', budget: d.price || '',
-      amount: d.price ? (d.price + (d.unit ? ' ' + d.unit : '')) : '',
+      amount: d.price ? (d.price + (d.priceUnit ? ' ' + d.priceUnit : (d.unit ? ' ' + d.unit : ''))) : '',
       unit: d.unit || '', qty: d.qty || '',
       tags: (d.tags || []).slice(),
       company: '',
@@ -5322,9 +5332,9 @@ function collectDynamicData() {
   /* 按业务类型组装嵌套对象，与详情页渲染器数据结构对齐 */
   var d = result.dynamic;
   if (biz === 'material') {
-    result.mat = { spec: d.spec || [], price: {range: d.priceRange || collectPrice(), exact: fields.price.value, basis: d.priceBasis || ''}, trade: d.trade || [], delivery: d.deliveryRadius ? {radius: d.deliveryRadius, capacity: d.deliveryCapacity, eta: d.deliveryEta, cost: d.deliveryCost} : null, quals: d.quals || [], docs: d.docs || [], warranty: d.warranty || '', flow: toSteps(d.flow) };
+    result.mat = { spec: d.spec || [], price: {range: d.priceRange || collectPrice(), exact: fields.price.value, basis: d.priceBasis || '', unit: (fields.priceUnit && fields.priceUnit.value.trim()) || ''}, trade: d.trade || [], delivery: d.deliveryRadius ? {radius: d.deliveryRadius, capacity: d.deliveryCapacity, eta: d.deliveryEta, cost: d.deliveryCost} : null, quals: d.quals || [], docs: d.docs || [], warranty: d.warranty || '', flow: toSteps(d.flow) };
   } else if (biz === 'equipment') {
-    result.equip = { specs: d.specs || [], fee: {range: d.feeRange || collectPrice(), rows: d.feeRows || [], total: d.feeTotal || ''}, trade: d.trade || [], quals: d.quals || [], docs: d.docs || [], promise: d.promise || [], history: toHistory(d.history), flow: toSteps(d.flow) };
+    result.equip = { specs: d.specs || [], fee: {range: d.feeRange || collectPrice(), rows: d.feeRows || [], total: d.feeTotal || '', unit: (fields.priceUnit && fields.priceUnit.value.trim()) || ''}, trade: d.trade || [], quals: d.quals || [], docs: d.docs || [], promise: d.promise || [], history: toHistory(d.history), flow: toSteps(d.flow) };
   } else if (biz === 'labor') {
     /* 工种人数：{work,count,senior,mid,junior} -> 详情 laborWorkforce {work,count,lv:[{n,v,c}]} */
     var lfWf = (d.workforce || []).map(function (w) {
@@ -5358,6 +5368,7 @@ function collectDynamicData() {
       wage: {
         types: d.wageTypes || [],
         range: d.wageRange || collectPrice(),
+        unit: (fields.priceUnit && fields.priceUnit.value.trim()) || '',
         rows: d.wageRows || [],
         settle: d.wageSettle || '',
         account: d.wageAccount || ''
@@ -5396,7 +5407,8 @@ function collectDynamicData() {
       else if (k.indexOf('开票') > -1 || k.indexOf('账单') > -1 || k.indexOf('分成') > -1) fFee.bill = v;
     });
     /* 加盟费唯一采集点＝Step2「交易要求」页的加盟费区间；费用结构未拆分加盟费时以静态值兜底，保证详情费用区有值且不重复采集 */
-    if (!fFee.join && collectPrice()) fFee.join = collectPrice();
+    var _feeUnit = (fields.priceUnit && fields.priceUnit.value.trim()) || '';
+    if (!fFee.join && collectPrice()) fFee.join = collectPrice() + (_feeUnit ? ' ' + _feeUnit : '');
     var fStaff = (d.staffConfig || []).map(function (s) { return { k: String(s.k || ''), v: String(s.v || '') }; });
     /* 合作模式与核心条件：kvlist 解析为详情渲染器期望的 mode/term/protect/account/share */
     var fCoop = d.coopTerms || [];
