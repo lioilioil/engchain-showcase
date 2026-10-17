@@ -86,6 +86,13 @@ window.DETAIL = (function () {
     if (typeof s === 'object') return ''; /* 防止对象被渲染成 [object Object]（强类型字段错配兜底） */
     return String(s);
   }
+  /* 详情页内嵌 HTML 转义（子类/品名/原文为用户或词库文本，渲染前必须转义） */
+  function escHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; });
+  }
+  /* 品类 → 搜索页业务 key（与编辑器 bizMap 口径一致） */
+  var ENGCHAIN_BIZ = { '材料': 'material', '设备': 'equipment', '劳务': 'labor', '运输': 'transport', '中介服务': 'agency', '资质招商': 'franchise', '建企买卖': 'trade', '招聘': 'personnel', '求职': 'talent' };
   /* 统一取联系人姓名：contact 可能是对象 {name,...} 或历史字符串 */
   function contactName(r) {
     if (!r) return '';
@@ -235,8 +242,7 @@ window.DETAIL = (function () {
     return '<div class="spec-table">' + fields.map(function (f) { return '<div class="spt-row"><span class="spt-k">' + cfgText(f.k) + '</span><span class="spt-v">' + cfgText(f.v) + '</span></div>'; }).join('') + '</div>';
   }
   function sec(label, inner) { return '<div class="detail-section"><div class="ds-label">' + label + '</div>' + inner + '</div>'; }
-  /* ---- 供需匹配 4 类：共用结构，仅字段标签/文案不同 ---- */
-  var MATCH = {
+  /* ---- 供需匹配 4 类：共用结构，仅字段标签/文案不同 ---- */  var MATCH = {
     material:    { label: '材料采购',          contactLabel: '采购方', addrLabel: '交货地址',   fileLabel: '招标采购文件', fileDefault: '招标清单（联系获取）', cta: '联系采购方', secTitle: '采购说明', supplyTitle: '供应说明', fieldsTitle: '关键参数', qualTitle: '供应商要求', supplyQualTitle: '我方资质' },
     labor:       { label: '劳务用工',          contactLabel: '用工方', addrLabel: '项目地址',   fileLabel: '上岗材料',    fileDefault: '上岗清单（联系获取）', cta: '联系用工方', secTitle: '用工说明', supplyTitle: '班组介绍', fieldsTitle: '用工需求', qualTitle: '用工要求', supplyQualTitle: '班组资质与合规' },
     equipment:   { label: '设备租赁',          contactLabel: '出租方', addrLabel: '设备/仓库地址', fileLabel: '设备清单',   fileDefault: '设备清单（联系获取）', cta: '联系出租方', secTitle: '设备说明', supplyTitle: '设备说明', fieldsTitle: '设备参数与租赁条款', qualTitle: '设备与服务要求', supplyQualTitle: '设备与资质' },
@@ -323,6 +329,18 @@ window.DETAIL = (function () {
       '</div>');
   }
   /* ---- 通用：相关推荐（同业务类型，同子类/同城优先，人才/招聘各自有推荐则跳过） ---- */
+  /* 同子类判定：受控值等值优先；无受控值时用词库对品名做近似匹配，仍无则退回旧 sub 等值 */
+  function sameSubCate(x, rec) {
+    if (!x || !rec) return false;
+    var xc = x.subCate || '', rc = rec.subCate || '';
+    if (xc && rc) return xc === rc;
+    if (window.EngchainCatalog && x.category && (x.subType || x.sub) && (rec.subType || rec.sub)) {
+      try {
+        if (EngchainCatalog.matchSubCate(x.category, x.subType || x.sub, rec.subType || rec.sub)) return true;
+      } catch (e) {}
+    }
+    return !!((x.sub && rec.sub) && x.sub === rec.sub);
+  }
   var RELATED_LABEL = { material: '材料', equipment: '设备', labor: '劳务', franchise: '资质招商', trade: '转让', agency: '服务', personnel: '招聘' };
   function relatedSec(rec) {
     if (!MOCK.byBizType) return '';
@@ -341,8 +359,9 @@ window.DETAIL = (function () {
     } catch (e) {}
     if (!pool.length) return '';
     pool.sort(function (a, b) {
-      var sa = (a.sub === rec.sub ? 2 : 0) + (a.city === rec.city ? 1 : 0) + ((a.match || 0) / 100);
-      var sb = (b.sub === rec.sub ? 2 : 0) + (b.city === rec.city ? 1 : 0) + ((b.match || 0) / 100);
+      /* 同子类优先（受控 subCate 等值，或词库近似匹配），次之同城，再次按匹配度 */
+      var sa = (sameSubCate(a, rec) ? 2 : 0) + (a.city === rec.city ? 1 : 0) + ((a.match || 0) / 100);
+      var sb = (sameSubCate(b, rec) ? 2 : 0) + (b.city === rec.city ? 1 : 0) + ((b.match || 0) / 100);
       return sb - sa;
     });
     var rel = pool.slice(0, 3);
@@ -3762,7 +3781,46 @@ window.DETAIL = (function () {
     var _isFranchise = r.category === '资质招商';
     var _tradeSupply = _isTrade && ((r.role || r.dir) === 'supply');
     if (r.category) params.push({ k: '品类', v: r.category });
-    if (r.subType) params.push({ k: '子类 / 品名', v: r.subType });
+    /* 子类 / 品名：三段式权威展示块（品类行保留在参数表内；子类可点击 → 搜索页；品名带来源徽标；自定义保留提交原文溯源） */
+    var _subBlock = '';
+    if (r.subCate || r.subType || r.subNorm || r.subRaw) {
+      var _subCate = r.subCate || '';
+      var _subName = r.subNorm || r.subType || '';
+      var _subOrigin = r.subOrigin || '';
+      var _subRaw = r.subRaw || '';
+      /* 旧数据兜底：仅有品名（subType/sub）而无受控子类时，按词库对品名/标题做归类猜测 */
+      if (!_subCate && _subName && window.EngchainCatalog && EngchainCatalog.guessRecord) {
+        try {
+          var _g = EngchainCatalog.guessRecord({ category: r.category || r.cat, subType: _subName, title: r.title });
+          if (_g && _g.subCate) { _subCate = _g.subCate; if (!_subOrigin) _subOrigin = ''; }
+        } catch (e) {}
+      }
+      var _subRows = '';
+      if (_subCate) {
+        var _bizKey = ENGCHAIN_BIZ[r.category] || r.bizKey || '';
+        /* 搜索页 business 视图仅覆盖 franchise/trade/personnel 三业务；其余品类走全局搜索按子类关键词命中 */
+        var _searchHref;
+        if (['franchise', 'trade', 'personnel'].indexOf(_bizKey) >= 0) {
+          _searchHref = '../search/index.html?v=business&b=' + encodeURIComponent(_bizKey) + '&sub=' + encodeURIComponent(_subCate);
+        } else {
+          _searchHref = '../search/index.html?v=global&q=' + encodeURIComponent(_subCate);
+        }
+        _subRows += '<div class="spt-row"><span class="spt-k">子类</span><span class="spt-v"><a class="sub-cate-link" href="' + _searchHref + '">' + escHtml(_subCate) + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="sub-cate-arrow"><path d="M7 17L17 7M8 7h9v9"/></svg></a></span></div>';
+      } else {
+        _subRows += '<div class="spt-row"><span class="spt-k">子类</span><span class="spt-v"><span class="sub-cate-link sub-cate-link--none">未分类</span></span></div>';
+      }
+      /* 品名：标准品名绿标 / 自定义灰标；提交原文与标准名不一致时降级展示 */
+      if (_subName && _subName !== _subCate) {
+        var _badge = _subOrigin === 'standard'
+          ? '<span class="sub-badge sub-badge--std">标准品名</span>'
+          : (_subOrigin === 'custom' ? '<span class="sub-badge sub-badge--cus">自定义 · 待核验</span>' : '');
+        _subRows += '<div class="spt-row"><span class="spt-k">品名</span><span class="spt-v"><span class="sub-name">' + escHtml(_subName) + '</span>' + _badge + '</span></div>';
+        if (_subRaw && _subRaw !== _subName && _subOrigin === 'custom') {
+          _subRows += '<div class="spt-row sub-raw-row"><span class="spt-k">提交原文</span><span class="spt-v"><span class="sub-raw">' + escHtml(_subRaw) + '</span></span></div>';
+        }
+      }
+      if (_subRows) _subBlock = '<div class="spec-table sub-triple-table">' + _subRows + '</div>';
+    }
     if (r.qty) params.push({ k: _isTrade ? '转让标的 / 股权比例' : '数量 / 规模', v: r.qty });
     /* spec 标签按品类语义：建企买卖=核心资质（标的）；资质招商=总部资质包（认证只读）；其余=规格/参数 */
     if (r.spec) params.push({ k: _isTrade ? '核心资质（标的）' : (_isFranchise ? '总部资质包' : '规格 / 参数'), v: r.spec });
@@ -3785,7 +3843,8 @@ window.DETAIL = (function () {
       if (_ti.tax) params.push({ k: '税务要求', v: _ti.tax });
     }
     if (r.tags && r.tags.length) params.push({ k: '标签', v: r.tags.join(' · ') });
-    if (params.length) h += sec('关键参数', dList(params));
+    if (params.length) h += sec('关键参数', _subBlock + dList(params));
+    else if (_subBlock) h += sec('关键参数', _subBlock);
     /* 业务专属信息：编辑器动态字段组（trade/talent 等走通用渲染器时的完整业务数据展示） */
     var dynBlock = renderDynFieldsBlock(r.dynFields);
     if (dynBlock) h += sec('业务专属信息', dynBlock);

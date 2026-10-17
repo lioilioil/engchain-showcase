@@ -102,6 +102,12 @@ body { background: var(--bg); }
   background: linear-gradient(var(--bg) 78%, transparent);
 }
 .bs-subcats::-webkit-scrollbar { display: none; }
+/* PickX 聚合下拉入口：沿用横滑条 chip 视觉语言（长词表 >12 项时出现） */
+.bs-sub-more { position:relative; flex:none; }
+.bs-sub-more .pickx-trigger { border:0; background:transparent; box-shadow:none; padding:6px 10px; border-radius:999px; font-size:11px; color:var(--text-2,#6a6b70); display:inline-flex; }
+.bs-sub-more .pickx-trigger:hover { border:0; color:var(--primary-dim,#4d8de0); background:var(--primary-soft,rgba(77,141,224,.08)); }
+.bs-sub-more .pickx-trigger.open { background:var(--primary-soft,rgba(77,141,224,.12)); color:var(--primary,#2f6fd0); }
+.bs-sub-more .pickx-caret { width:12px; height:12px; }
 .bs-sub {
   flex: none;
   display: inline-flex; align-items: center; gap: 4px;
@@ -565,6 +571,13 @@ body { background: var(--bg); }
 
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
+<script src="../../js/publish-catalog.js"></script>
+<script src="../../js/pickx.js"></script>
+<script type="module">
+  /* 真折射面板（vendor 原版，无 iife 副作用；editor 页已由 liquid-glass.iife.js 提供同一 API） */
+  import { LiquidGlass } from '../../vendor/liquid-glass-webgl/src/index.js';
+  window.LiquidGlass = LiquidGlass;
+</script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/domain.js"></script>
@@ -656,6 +669,7 @@ body { background: var(--bg); }
         title: x.title || '',
         cat: x.cat || x.category || '',
         sub: x.sub || x.subType || '',
+        subCate: x.subCate || '',
         city: x.city || x.location || '',
         location: x.location || x.city || '',
         price: x.price || x.budget || '',
@@ -682,7 +696,7 @@ body { background: var(--bg); }
       return out;
     }
     function blobOf(s) {
-      var parts = [s.title, s.name, s.maskedName, s.cat, s.sub, s.location, s.city, s.company, s.desc, s.description,
+      var parts = [s.title, s.name, s.maskedName, s.cat, s.subCate, s.sub, s.location, s.city, s.company, s.desc, s.description,
         s.qualCategory, s.qualLevel, s.expectedPosition, s.experience, s.transferMethod,
         (s.tags || []).join(' '),
         (s.fields || []).map(function (f) { return (f && f.k ? f.k + ' ' + f.v : ''); }).join(' ')];
@@ -942,6 +956,34 @@ body { background: var(--bg); }
     }
   };
   var BIZ_ORDER = ['franchise', 'trade', 'personnel'];
+  /* 品类 key：搜索业务 → 词表品类（受控子类聚合用） */
+  var BIZ_CAT_KEY = { franchise: '资质招商', trade: '建企买卖', personnel: '招聘' };
+  /* 子类受控化：进入业务视图时用词表重写 subCats（label=受控子类值；「全部」/「其他」为聚合空槽） */
+  function ensureCatalogSubCats() {
+    var cfg = getCfg();
+    if (!cfg || cfg._catLoaded || !window.PUBLISH_CATALOG) return;
+    var catKey = BIZ_CAT_KEY[cfg.bizKey];
+    var list = (catKey && PUBLISH_CATALOG[catKey] && PUBLISH_CATALOG[catKey].subCats) || null;
+    if (list && list.length) {
+      cfg.subCats = [{ label: '全部', value: null }]
+        .concat(list.map(function (s) { return { label: s, value: s }; }))
+        .concat([{ label: '其他', value: '__other__' }]);
+    }
+    cfg._catLoaded = true;
+  }
+  /* 条目受控子类：subCate 优先，旧数据按品名/标题 guess 兜底 */
+  function subCateOf(item) {
+    if (!item) return '';
+    if (item.subCate) return item.subCate;
+    var name = item.subType || item.sub || '';
+    if (name && window.EngchainCatalog && EngchainCatalog.guessRecord) {
+      try {
+        var g = EngchainCatalog.guessRecord({ category: item.cat || item.category, subType: name, title: item.title });
+        if (g && g.subCate) return g.subCate;
+      } catch (e) {}
+    }
+    return '';
+  }
   function getCfg() { return TYPE_CONFIG[curB]; }
 
   function initBusiness() {
@@ -959,6 +1001,8 @@ body { background: var(--bg); }
     var clearHistoryBtn = document.getElementById('b-clear-history');
 
     var curSub = '全部';
+    /* 受控子类词表注入（按当前业务品类从 PUBLISH_CATALOG 重写筛选条） */
+    ensureCatalogSubCats();
 
     function updateClear() {
       if (searchInput.value) searchClear.classList.add('show');
@@ -989,15 +1033,12 @@ body { background: var(--bg); }
       var counts = {};
       cfg.subCats.forEach(function (c) { counts[c.label] = 0; });
       var base = searchData(kw, true);
-      var others = cfg.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; });
+      var known = cfg.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; });
       base.forEach(function (item) {
-        var text = [item.title || '', item.name || '', item.cat || '', item.sub || '',
-          item.city || '', item.location || '', item.company || '',
-          item.desc || item.description || '',
-          (item.tags || []).join(' ')].join(' ').toLowerCase();
         counts['全部']++;
+        var cate = subCateOf(item);
         var hit = false;
-        others.forEach(function (c) { if (c.re.test(text)) { counts[c.label]++; hit = true; } });
+        known.forEach(function (c) { if (c.value === cate) { counts[c.label]++; hit = true; } });
         if (!hit) counts['其他']++;
       });
       return counts;
@@ -1021,15 +1062,44 @@ body { background: var(--bg); }
           if (afterSearch.style.display !== 'none') doSearch(searchInput.value.trim());
         });
       });
+      /* PickX 聚合下拉：真实子类超过 12 项时追加「全部子类」入口（可搜索直达，长词表友好） */
+      var real = cfg.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; });
+      var more = document.getElementById('bs-sub-more');
+      if (real.length > 12 && window.PickX) {
+        if (!more) {
+          more = document.createElement('span');
+          more.id = 'bs-sub-more';
+          more.className = 'bs-sub-more';
+          el.appendChild(more);
+          window.__pickxSearch = new PickX.Select({
+            host: more,
+            placeholder: '全部子类',
+            searchThreshold: 12,
+            closeOnScroll: true,
+            data: function () {
+              var c2 = getCfg();
+              return c2.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; }).map(function (c) { return c.label; });
+            },
+            onSelect: function (label) {
+              curSub = label;
+              renderSubCats();
+              if (afterSearch.style.display !== 'none') doSearch(searchInput.value.trim());
+            }
+          });
+        }
+      } else if (more) {
+        more.remove();
+      }
     }
 
-    function subPass(text) {
+    function subPass(item) {
       var cfg = getCfg();
       if (!cfg.subCats || curSub === '全部') return true;
-      var others = cfg.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; });
-      if (curSub === '其他') return !others.some(function (c) { return c.re.test(text); });
+      var known = cfg.subCats.filter(function (c) { return c.label !== '全部' && c.label !== '其他'; });
+      var cate = subCateOf(item);
+      if (curSub === '其他') return !known.some(function (c) { return c.value === cate; });
       var cur = cfg.subCats.filter(function (c) { return c.label === curSub; })[0];
-      return !!(cur && cur.re && cur.re.test(text));
+      return !!(cur && cur.value && cur.value === cate);
     }
 
     /* 历史 */
@@ -1082,7 +1152,7 @@ body { background: var(--bg); }
       return Object.assign({}, x, {
         id: x.id, bizKey: x.bizKey || '', dir: x.dir || x.type || 'demand',
         title: x.title || '', cat: x.cat || x.category || '', sub: x.sub || x.subType || '',
-        city: x.city || x.location || '', location: x.location || x.city || '',
+        subCate: x.subCate || '', city: x.city || x.location || '', location: x.location || x.city || '',
         company: x.company || '', tags: x.tags || [],
         match: typeof x.match === 'number' ? x.match : (isUser ? 55 : 70),
         verified: x.verified !== undefined ? x.verified : !isUser, hot: x.hot || false,
@@ -1110,10 +1180,7 @@ body { background: var(--bg); }
       }
       if (!skipSub) {
         filtered = filtered.filter(function (item) {
-          var text = [item.title || '', item.name || '', item.cat || '', item.sub || '',
-            item.city || '', item.location || '', item.company || '',
-            item.desc || item.description || '', (item.tags || []).join(' ')].join(' ').toLowerCase();
-          return subPass(text);
+          return subPass(item);
         });
       }
       return filtered;
@@ -1190,6 +1257,7 @@ body { background: var(--bg); }
     window.bsSwitchBiz = function (b) {
       if (BIZ_ORDER.indexOf(b) < 0 || b === curB) return;
       curB = b;
+      ensureCatalogSubCats();
       bizTitle = function () { return getCfg().title + '搜索'; };
       renderNav();
       var p = new URLSearchParams(); p.set('v', 'business'); p.set('b', b);
@@ -1223,6 +1291,21 @@ body { background: var(--bg); }
     renderSubCats();
     renderHistory();
     renderHot();
+    /* 子类直达：详情页子类 chip 跳转 `?v=business&b=xxx&sub=子类` → 恢复筛选并直达结果态 */
+    window.bSetSub = function (sub) {
+      if (!sub) return;
+      var cfg = getCfg();
+      var valid = cfg.subCats.some(function (c) { return c.label === sub; });
+      curSub = valid ? sub : '全部';
+      searchInput.value = '';
+      updateClear();
+      beforeSearch.style.display = 'none';
+      afterSearch.style.display = '';
+      renderSubCats();
+      renderResults('', searchData(''));
+      var sc = document.querySelector('.scroll');
+      if (sc) sc.scrollTop = 0;
+    };
   }
 
   /* ═══════════════════════ 状态：企业查询（双模式） ═══════════════════════
@@ -2203,7 +2286,14 @@ body { background: var(--bg); }
   setTimeout(function () {
     try {
       if (initV === 'global') { var gq = params.get('q'); if (gq && window.gGoKw) window.gGoKw(gq); }
-      if (initV === 'business') { var kw = params.get('kw'); if (kw && window.bDoSearch) window.bDoSearch(kw); }
+      if (initV === 'business') {
+        var kw = params.get('kw');
+        if (kw && window.bDoSearch) window.bDoSearch(kw);
+        else {
+          var sub = params.get('sub');
+          if (sub && window.bSetSub) window.bSetSub(sub);
+        }
+      }
       if (initV === 'enterprise') { var ekw = params.get('kw'); if (ekw && window.eDoSearch) window.eDoSearch(ekw); }
       if (initV === 'agency') {
         var aq = params.get('q'), ac = params.get('cat');

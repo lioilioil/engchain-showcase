@@ -304,6 +304,7 @@ textarea.step-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0
 </div>
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
+<script src="../../js/publish-catalog.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/publish-types.js"></script>
@@ -836,6 +837,15 @@ textarea.step-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0
     var payload = {
       title: txt.substring(0, 24),
       type: TYPE.role, cat: TYPE.cat, sub: '',
+      /* 简要类轻量归类：发布时对标题做受控子类猜测（guess 不上则为空，详情页显示「未分类」） */
+      subCate: (function () {
+        if (!window.EngchainCatalog || !EngchainCatalog.guessRecord) return '';
+        try {
+          var g = EngchainCatalog.guessRecord({ category: TYPE.cat, subType: '', title: txt });
+          return g && g.subCate ? g.subCate : '';
+        } catch (e) { return ''; }
+      })(),
+      subNorm: '', subOrigin: '', subRaw: '',
       desc: txt,
       location: (a.tags.filter(function(t){return t.k==='地区';})[0]||{}).v || '',
       city: (a.tags.filter(function(t){return t.k==='地区';})[0]||{}).v || '',
