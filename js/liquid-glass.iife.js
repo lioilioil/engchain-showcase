@@ -5199,6 +5199,21 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
   }
   var tabMat = loadMat();
 
+  /* C-022 P4（D 样式注入 · 纯可选叠加，不改默认行为）：元素可经 data-lg-mat（JSON 材质覆盖，
+     如 {"refraction":56,"rim":0.12,"edgeReach":0.08,"absorption":0.22,"frost":0.32}）与
+     data-lg-frost（0–1，顶层 frost）单独覆盖本实例；属性缺省时行为与之前完全一致，
+     主 tabbar / 其他 data-lg-glass 元素 / 返回顶部按钮均不受影响。 */
+  function readPerEl(el) {
+    var mat = null, frost = null;
+    try {
+      var raw = el.getAttribute('data-lg-mat');
+      if (raw) mat = JSON.parse(raw);
+      var fr = el.getAttribute('data-lg-frost');
+      if (fr !== null && fr !== '') frost = Number(fr);
+    } catch (e) { mat = null; frost = null; }
+    return { mat: mat, frost: frost };
+  }
+
   /* 挂载目标：主 tabbar（.app-tabbar）+ 其他声明 data-lg-glass 的容器（如信息工作台发布栏、
      返回顶部按钮 .engchain-backtop）。
      全部共用同一份 cfg 与 <html data-theme> 联动 → 各实例参数完全同源一致，
@@ -5227,10 +5242,12 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
       Array.prototype.forEach.call(els, function (el) {
         if (LiquidGlass.from(el)) return;
         try {
+          var per = readPerEl(el);
+          var perFrost = (per.frost != null && Number.isFinite(per.frost)) ? per.frost : params().frost;
           var inst = new LiquidGlass(el, {
             tint: params().tint,
             tintTone: params().tintTone,
-            frost: params().frost,
+            frost: perFrost,
             // live 用库的 'auto' 语义：玻璃下有播放中 video / 动画 canvas 时自动逐帧实时；
             // 静态内容页（本项目的个人中心等）由滚动/DOM/字体加载事件驱动重绘，效果等同
             // 实时且零空转开销。实测强制 live:true 并不改善折射（白雾源是材质 frost/tint）。
@@ -5245,7 +5262,7 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
             //   ③ dispersion 5.0 又使图形边缘 RGB 分离达 6px → 图形"模糊不可辨"。
             //   修复：shader refractionSupport 0.50→1.50（42px，图形主体折射 ≥17%、位移 ≈12px 可见），
             //   dispersion 5.0→3.0（图形清晰 + 保留色散质感）。
-            material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat)
+            material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat, per.mat || {})
           });
           /* 挂载标记：仅 WebGL 玻璃真正激活（非 fallback）时打标。
              .engchain-backtop 据此中性化自带 CSS 玻璃（见 back-to-top.js 样式），
@@ -5288,7 +5305,8 @@ global.webgl2Supported = __m['./dom.js'].webgl2Supported;
         var g = LiquidGlass.from(el);
         if (!g) return;
         try {
-          g.update(Object.assign({}, params(), { material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat) }));
+          var per = readPerEl(el);
+          g.update(Object.assign({}, params(), { material: Object.assign({ refraction: 110, edgeReach: 0.45, edgeWidth: 0.42, dispersion: 3.0, absorption: 0.15 }, tabMat, per.mat || {}) }));
         } catch (e) {}
       });
     });

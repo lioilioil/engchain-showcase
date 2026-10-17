@@ -113,8 +113,12 @@
     /* 面板文字可读性优先：真折射仅当 LiquidGlass 可用且 WebGL2 支持 */
     if (global.LiquidGlass && typeof LiquidGlass.isSupported === 'function' && LiquidGlass.isSupported()) {
       try {
+        /* C-006（B 样式注入微调）：tintTone 仅补暗态 dark，明色保持 light；
+           材质 4 键保持 §9（refraction:56 / rim:0.16 / edgeReach:0.08 / absorption:0.1）不变。 */
+        var _darkTone = document.documentElement.getAttribute('data-theme') === 'dark'
+          || document.documentElement.dataset.theme === 'dark';
         var g = new global.LiquidGlass(panel, {
-          frost: 0.32, tint: 0.62, tintTone: 'light',
+          frost: 0.32, tint: 0.62, tintTone: _darkTone ? 'dark' : 'light',
           material: { refraction: 56, rim: 0.16, edgeReach: 0.08, absorption: 0.1 }
         });
         _activeGlass = g;

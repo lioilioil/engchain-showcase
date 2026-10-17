@@ -104,9 +104,10 @@ body { background: var(--bg); }
 .bs-subcats::-webkit-scrollbar { display: none; }
 /* PickX 聚合下拉入口：沿用横滑条 chip 视觉语言（长词表 >12 项时出现） */
 .bs-sub-more { position:relative; flex:none; }
-.bs-sub-more .pickx-trigger { border:0; background:transparent; box-shadow:none; padding:6px 10px; border-radius:999px; font-size:11px; color:var(--text-2,#6a6b70); display:inline-flex; }
-.bs-sub-more .pickx-trigger:hover { border:0; color:var(--primary-dim,#4d8de0); background:var(--primary-soft,rgba(77,141,224,.08)); }
-.bs-sub-more .pickx-trigger.open { background:var(--primary-soft,rgba(77,141,224,.12)); color:var(--primary,#2f6fd0); }
+/* N-14（D 审计收口）：删除蓝族 fallback（#6a6b70/#4d8de0/#2f6fd0），统一走墨金令牌 */
+.bs-sub-more .pickx-trigger { border:0; background:transparent; box-shadow:none; padding:6px 10px; border-radius:999px; font-size:11px; color:var(--text-2); display:inline-flex; }
+.bs-sub-more .pickx-trigger:hover { border:0; color:var(--primary-dim); background:var(--primary-soft); }
+.bs-sub-more .pickx-trigger.open { background:var(--primary-soft); color:var(--primary-dim); }
 .bs-sub-more .pickx-caret { width:12px; height:12px; }
 .bs-sub {
   flex: none;
@@ -335,7 +336,8 @@ body { background: var(--bg); }
 .e-rec { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; text-align: left; }
 .e-rec-item { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-card-2); cursor: pointer; transition: border-color var(--d-fast); }
 .e-rec-item:active { border-color: var(--accent-line); }
-.e-rec-av { width: 30px; height: 30px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--primary-strong); background: linear-gradient(135deg,#2A313C,#161B23); }
+/* N-12（D 审计收口）：推荐头像块去深色品牌渐变，改中性身份块 --bg-card-2 + --text-2 */
+.e-rec-av { width: 30px; height: 30px; border-radius: 9px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--text-2); background: var(--bg-card-2); }
 .e-rec-t { flex: 1; font-size: 11.5px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .e-rec-go { color: var(--text-3); font-size: 12px; }
 .e-help { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 11px; font-weight: 600; color: var(--primary-dim); background: var(--primary-soft); border-radius: 99px; padding: 7px 14px; cursor: pointer; }
@@ -343,6 +345,13 @@ body { background: var(--bg); }
 
 /* 全局搜索：方向/分类/排序吸顶区（位于统一搜索行下方） */
 #v-global .sr-sticky { top: 54px; padding-top: 8px; }
+
+/* 阶段⑦-B P1：全局筛选吸顶条 WebGL 真折射激活后，去掉 app.css 实底 --bg 与投影，让玻璃透射背景；
+   降级（data-liquid-glass=fallback）保留 app.css 实底，保证滚动结果上可读。 */
+.sr-sticky[data-liquid-glass="webgl"]{
+  background: transparent !important;
+  box-shadow: none !important;
+}
 .g-hot { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 16px 0; }
 
 /* 空态/加载态水平边距：与整行卡片 16px 规范对齐 */
@@ -2304,6 +2313,66 @@ body { background: var(--bg); }
       }
     } catch (e) {}
   }, 120);
+})();
+</script>
+
+<script>
+/* 阶段⑦-B P1：全局搜索筛选吸顶条（方向 seg + 9 类 chips + 排序行）单实例真折射玻璃。
+   window.LiquidGlass 由顶部 ESM 异步挂好；参数对齐 PickX 面板体系（frost.32/tint.62/tintTone 明light暗dark/material 4键）。
+   WebGL2 不可用 → data-liquid-glass=fallback，CSS 实底/毛玻璃降级可读；显隐跟随 #g-after，隐藏即释放上下文。 */
+(function () {
+  var glass = null;
+  function root() {
+    return document.querySelector('#v-global .sr-sticky') || document.querySelector('.sr-sticky');
+  }
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark'
+      || document.documentElement.dataset.theme === 'dark';
+  }
+  var mountedEl = null;
+  function destroy() {
+    if (glass) { try { glass.destroy(); } catch (e) {} glass = null; }
+    mountedEl = null;
+  }
+  function mount() {
+    var el = root();
+    if (!el) return;
+    /* 已在同一元素上挂载则跳过，避免自愈轮询反复 destroy/重建导致 WebGL 初始化抖动 */
+    if (glass && mountedEl === el) return;
+    if (!window.LiquidGlass || !window.LiquidGlass.isSupported || !window.LiquidGlass.isSupported()) {
+      el.setAttribute('data-liquid-glass', 'fallback');
+      return;
+    }
+    try {
+      glass = new window.LiquidGlass(el, {
+        frost: 0.32, tint: 0.62, tintTone: isDark() ? 'dark' : 'light',
+        material: { refraction: 56, rim: 0.16, edgeReach: 0.08, absorption: 0.1 }
+      });
+      mountedEl = el;
+    } catch (e) {
+      el.setAttribute('data-liquid-glass', 'fallback');
+      glass = null;
+      mountedEl = null;
+    }
+  }
+  function sync() {
+    var after = document.getElementById('g-after');
+    var visible = after && after.style.display !== 'none' && after.offsetParent !== null;
+    if (visible) mount(); else destroy();
+  }
+  /* 等 ESM 异步挂好 window.LiquidGlass；就绪后挂显隐观察者，
+     并在前 6s 做自愈轮询，消除「显隐变更早于观察者挂载」的竞态。 */
+  var tries = 0;
+  var timer = setInterval(function () {
+    if (window.LiquidGlass || ++tries > 50) {
+      clearInterval(timer);
+      var after = document.getElementById('g-after');
+      if (after) new MutationObserver(sync).observe(after, { attributes: true, attributeFilter: ['style'] });
+      sync();
+      var heal = setInterval(sync, 400);
+      setTimeout(function () { clearInterval(heal); }, 6000);
+    }
+  }, 100);
 })();
 </script>
 </body>

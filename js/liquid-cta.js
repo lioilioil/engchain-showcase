@@ -94,6 +94,27 @@
   var MAT_KEY = 'engchain-btn-glass-material';
   var MAT_DEFAULTS = { refraction: 84, dispersion: 3.0, reflection: 0.55, highlight: 0.60, hairline: 0.95, edgeWidth: 0.24 };
   try { var mRaw = localStorage.getItem(MAT_KEY); if (mRaw) Object.assign(GLASS_MATERIAL, JSON.parse(mRaw)); } catch (e) {}
+
+  /* C-005（B 样式注入微调 · 仅小尺寸中性胶囊 .btn-draft「存草稿」玻璃条）：
+     小胶囊内图标/文字下缘 RGB 色散 fringe 收敛——
+       absorption 0.1 → 0.22（吸收色差），rim 0.16 → 0.12（收边缘高光），
+       refraction 56 / edgeReach 0.08 / frost 0.32 保持；其余材质项继承 GLASS_MATERIAL。
+     只命中 .btn-draft，不改全局 GLASS_MATERIAL，金/绿主按钮与其他中性钮不受影响。
+     文字层（图标+文案）始终是 DOM 实色，不参与折射，仅底层面板玻璃化。 */
+  var SMALL_CAPSULE_MATERIAL = {
+    refraction: 56,
+    edgeReach: 0.08,
+    frost: 0.32,
+    absorption: 0.22,
+    rim: 0.12
+  };
+  function materialFor(btn) {
+    var base = (btn && btn.classList.contains('btn-draft'))
+      ? Object.assign({}, GLASS_MATERIAL, SMALL_CAPSULE_MATERIAL)
+      : Object.assign({}, GLASS_MATERIAL);
+    base.tintColor = colorFor(btn);
+    return base;
+  }
   var mounted = [];
 
   function isDark() {
@@ -177,7 +198,7 @@
     }
     try {
       var g = new LiquidGlass(btn, Object.assign({}, params(btn, null), {
-        material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(btn) })
+        material: materialFor(btn)
       }));
       btn.setAttribute('data-lg-mounted', '1');
       mounted.push({ el: btn, glass: g });
@@ -200,7 +221,7 @@
           if (mounted[i].el === btn) {
             try {
               mounted[i].glass.update({
-                material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(btn) })
+                material: materialFor(btn)
               });
             } catch (e) {}
             break;
@@ -217,7 +238,7 @@
         mounted.forEach(function (rec) {
           try {
             rec.glass.update(Object.assign({}, params(rec.el, null), {
-              material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(rec.el) })
+              material: materialFor(rec.el)
             }));
           } catch (e) {}
         });
@@ -325,7 +346,7 @@
     btnCfg = merged;
     try { localStorage.setItem(BTN_CFG_KEY, JSON.stringify(btnCfg)); } catch (e) {}
     mounted.forEach(function (rec) {
-      try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(rec.el) }) })); } catch (e) {}
+      try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: materialFor(rec.el) })); } catch (e) {}
     });
   }
   /* ---- preview.html「按钮材质」面板联动：postMessage + localStorage 双通道（更新 GLASS_MATERIAL） ---- */
@@ -337,7 +358,7 @@
     });
     try { localStorage.setItem(MAT_KEY, JSON.stringify(GLASS_MATERIAL)); } catch (e) {}
     mounted.forEach(function (rec) {
-      try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: Object.assign({}, GLASS_MATERIAL, { tintColor: colorFor(rec.el) }) })); } catch (e) {}
+      try { rec.glass.update(Object.assign({}, params(rec.el, null), { material: materialFor(rec.el) })); } catch (e) {}
     });
   }
   try {

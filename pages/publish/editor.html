@@ -6330,6 +6330,67 @@ fillData = function(d) {
 <script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
 <script src="../../js/liquid-cta.js?v=20260928184535"></script>
 
+<style>
+/* ═══ 阶段⑦-B P1：类型切换底部弹窗 .pts-sheet 真折射玻璃（页面内样式，不改共享 liquid-popup.css）═══
+   WebGL 激活后中和 liquid-popup.css 的 !important 平面 blur，避免「折射 + 平面模糊」叠加发白；
+   降级态（data-liquid-glass=fallback）保留 liquid-popup.css 毛玻璃，保证可读。 */
+.pts-sheet[data-liquid-glass="webgl"]{
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+</style>
+<script>
+/* 阶段⑦-B P1：类型切换底部弹窗 .pts-sheet 单实例真折射玻璃。
+   挂钩 PublishTypeSheet.open/close（不改共享 publish-type-sheet.js），参数对齐 PickX 面板体系：
+   frost .32 / tint .62 / tintTone 明 light 暗 dark / material 仅 4 键 56·.16·.08·.1。
+   文字行（.pts-row 实心卡片）留在 DOM 层不参与折射；WebGL 不可用 → 保留 CSS 毛玻璃降级。 */
+(function () {
+  if (!window.LiquidGlass || !window.PublishTypeSheet) return;
+  var sheetGlass = null;
+  function destroySheet() {
+    if (sheetGlass) { try { sheetGlass.destroy(); } catch (e) {} sheetGlass = null; }
+  }
+  function isDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark'
+      || document.documentElement.dataset.theme === 'dark';
+  }
+  function mountSheet(panel) {
+    destroySheet();
+    if (!window.LiquidGlass.isSupported || !window.LiquidGlass.isSupported()) {
+      panel.setAttribute('data-liquid-glass', 'fallback');
+      return;
+    }
+    try {
+      sheetGlass = new window.LiquidGlass(panel, {
+        frost: 0.32, tint: 0.62, tintTone: isDark() ? 'dark' : 'light',
+        material: { refraction: 56, rim: 0.16, edgeReach: 0.08, absorption: 0.1 }
+      });
+    } catch (e) {
+      panel.setAttribute('data-liquid-glass', 'fallback');
+      sheetGlass = null;
+    }
+  }
+  var origOpen = window.PublishTypeSheet.open;
+  var origClose = window.PublishTypeSheet.close;
+  window.PublishTypeSheet.open = function () {
+    origOpen.apply(this, arguments);
+    requestAnimationFrame(function () {
+      var panel = document.querySelector('.pts-sheet');
+      if (panel) mountSheet(panel);
+    });
+  };
+  window.PublishTypeSheet.close = function () {
+    destroySheet();
+    return origClose.apply(this, arguments);
+  };
+  /* 兜底：组件内部 close（重开时）不经过包装，DOM 被移除即释放上下文 */
+  new MutationObserver(function () {
+    if (!document.querySelector('.pts-sheet') && sheetGlass) destroySheet();
+  }).observe(document.body, { childList: true, subtree: true });
+})();
+</script>
+
 <script>
 (function () {
   /* 详细描述：默认 4 行高度；右下角「放大」→ 全屏覆盖层内动态渐变放大至最大尺寸（两侧/上/下均按页面通用 16px 边距），
