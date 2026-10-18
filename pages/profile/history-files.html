@@ -15,9 +15,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="../../css/app.css">
 <style>
 /* ═══════════════════════════════════════════════════════════════
-   历史文件 V2.2
+   历史文件 V2.3
    全站文件统一档案：按生成/上传/发送/收到时间倒序，来源标签标记；
    · 点击卡片 → 弹窗（下载 / 转发）
+   · 卡片右侧预览icon → 自下而上弹窗展示文件内容（按类型模拟预览）
    · 长按卡片 → 批量管理态（全选 / 多选 / 底部悬浮 删除·下载·转发）
    · 首次进入弹出操作提示气泡
    · 右上角“操作记录”：自下而上弹窗，按时间倒序展示每次文件操作（生成/下载/转发/删除/撤销）
@@ -267,6 +268,90 @@ body, .phone { background: var(--hf-bg); }
   color: var(--hf-text-3);
   background: var(--hf-border);
 }
+
+/* 文件卡片 · 右侧预览入口 */
+.hf-preview {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-right: -2px;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hf-text-3);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, transform 0.15s;
+}
+.hf-preview svg { width: 18px; height: 18px; }
+.hf-preview:active { transform: scale(0.88); background: rgba(176, 138, 60, 0.14); color: var(--hf-gold-deep); }
+/* 按压预览icon时不触发整卡缩放反馈 */
+.hf-card:has(.hf-preview:active) { transform: none; }
+
+/* 文件内容预览弹窗（自下而上） */
+.hf-pv-head { display: flex; align-items: center; gap: 12px; padding: 2px 2px 14px; }
+.hf-pv-head .hf-file-ic { width: 46px; height: 46px; border-radius: 13px; font-size: 12px; }
+.hf-pv-name { font-size: 15px; font-weight: 700; color: var(--text-1); line-height: 1.35; word-break: break-all; }
+.hf-pv-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--text-3); }
+.hf-pv-tag { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 700; background: var(--hf-border); color: var(--hf-text-2); }
+/* 模拟纸张 */
+.hf-pv-page {
+  background: var(--bg-card-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 20px 18px;
+  margin-bottom: 4px;
+  box-shadow: var(--hf-shadow);
+}
+.hf-pv-p-title { font-size: 16px; font-weight: 800; color: var(--text-1); text-align: center; letter-spacing: .02em; }
+.hf-pv-p-sub { font-size: 11px; color: var(--text-3); text-align: center; margin-top: 6px; }
+.hf-pv-p-rule { height: 1px; background: var(--line); margin: 14px 0; position: relative; }
+.hf-pv-p-rule::after { content: ''; position: absolute; left: 0; top: -1px; width: 56px; height: 2px; background: linear-gradient(90deg, var(--hf-gold), transparent); }
+.hf-pv-sec { margin-bottom: 14px; }
+.hf-pv-sec-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.hf-pv-sec-title::before { content: ''; width: 3px; height: 13px; border-radius: 2px; background: linear-gradient(180deg, var(--hf-gold), var(--hf-gold-deep)); }
+.hf-pv-p { font-size: 12px; color: var(--text-2); line-height: 1.85; margin: 0 0 6px; }
+.hf-pv-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.hf-pv-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--text-2); }
+.hf-pv-table td.k { width: 88px; color: var(--text-3); font-weight: 600; }
+.hf-pv-table tr:last-child td { border-bottom: none; }
+.hf-pv-p-foot { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); margin-top: 12px; }
+.hf-pv-stamp {
+  flex: none;
+  width: 74px;
+  height: 74px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  border: 2px dashed var(--hf-gold);
+  opacity: .5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hf-gold-deep);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  transform: rotate(-12deg);
+}
+/* 图片预览 */
+.hf-pv-img { border-radius: 14px; border: 1px solid var(--line); overflow: hidden; background: linear-gradient(135deg, rgba(176, 138, 60, 0.14), rgba(176, 138, 60, 0.04)); }
+.hf-pv-img-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 240px; padding: 28px 20px; color: var(--text-3); text-align: center; }
+.hf-pv-img-ic { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.6); box-shadow: var(--hf-shadow); }
+.hf-pv-img-ic svg { width: 26px; height: 26px; color: var(--success); }
+[data-theme="dark"] .hf-pv-img-ic { background: rgba(255, 255, 255, 0.08); }
+.hf-pv-img-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); word-break: break-all; }
+.hf-pv-img-size { font-size: 11px; color: var(--text-3); }
+/* 压缩包预览 */
+.hf-pv-zip { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.hf-pv-zip-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.hf-pv-zip-row:last-child { border-bottom: none; }
+.hf-pv-zip-row .zf { flex: none; width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; color: #fff; }
+.hf-pv-zip-name { flex: 1; min-width: 0; color: var(--text-1); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hf-pv-zip-size { flex: none; color: var(--text-3); font-size: 10.5px; }
+/* 文本预览 */
+.hf-pv-txt { font-family: ui-monospace, Consolas, "Courier New", monospace; font-size: 11.5px; line-height: 1.9; color: var(--text-2); background: var(--bg-card-2); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; white-space: pre-wrap; word-break: break-all; }
 
 /* 批量管理态 · 底部悬浮操作栏（按钮行无背景） */
 .hf-mbar {
@@ -590,6 +675,8 @@ body, .phone { background: var(--hf-bg); }
   var IC_MAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>';
   var IC_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
   var IC_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  var IC_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var IC_IMG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
 
   /* 来源标签配色（sourceKey → class） */
   function srcCls(key) {
@@ -750,6 +837,7 @@ body, .phone { background: var(--hf-bg); }
                   (fwdN ? '<span class="fwd-badge">已转发 ' + fwdN + ' 次</span>' : '') +
                   '</div>' : '') +
               '</div>' +
+              '<button type="button" class="hf-preview" data-preview-id="' + esc(it.id) + '" aria-label="预览文件" title="预览文件">' + IC_EYE + '</button>' +
             '</div>' +
           '</div>';
       });
@@ -1024,6 +1112,168 @@ body, .phone { background: var(--hf-bg); }
     sh.show();
   }
 
+  /* ── 文件预览：卡片右侧预览icon → 自下而上弹窗展示文件内容 ── */
+  function pvTitle(name) {
+    var s = String(name || '文件').replace(/\.(pdf|docx?|jpe?g|png|webp|gif|zip|rar|7z|txt|md)$/i, '');
+    return s || '文件内容';
+  }
+  /* 文档类（PDF / DOC / DOCX）模拟纸张预览 */
+  function pvDocContent(file) {
+    var title = pvTitle(file.name);
+    var company = file.note || '示例企业';
+    var isQcc = file.sourceKey === 'qcc' || /工商/.test(file.name);
+    var ts = esc(file.timeText || fmtTime(file.time || file.createdAt));
+    var page =
+      '<div class="hf-pv-page">' +
+        '<div class="hf-pv-p-title">' + (isQcc ? '工商信息报告' : esc(title)) + '</div>' +
+        '<div class="hf-pv-p-sub">' + esc(company) + ' · 工程链生成 · ' + ts + '</div>' +
+        '<div class="hf-pv-p-rule"></div>';
+    if (isQcc) {
+      page +=
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">企业基本信息</div>' +
+          '<table class="hf-pv-table">' +
+            '<tr><td class="k">法定代表人</td><td>王××</td></tr>' +
+            '<tr><td class="k">统一社会信用代码</td><td>91510100MA6×××××</td></tr>' +
+            '<tr><td class="k">注册资本</td><td>5000 万元人民币</td></tr>' +
+            '<tr><td class="k">成立日期</td><td>2015-06-12</td></tr>' +
+            '<tr><td class="k">企业状态</td><td>存续</td></tr>' +
+            '<tr><td class="k">所属行业</td><td>房屋建筑业</td></tr>' +
+            '<tr><td class="k">注册地址</td><td>成都市××区××路 ××号</td></tr>' +
+          '</table></div>' +
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">股东信息</div>' +
+          '<table class="hf-pv-table">' +
+            '<tr><td class="k">股东一</td><td>王×× · 认缴 3000 万元 · 持股 60%</td></tr>' +
+            '<tr><td class="k">股东二</td><td>李×× · 认缴 2000 万元 · 持股 40%</td></tr>' +
+          '</table></div>' +
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">主要人员</div>' +
+          '<table class="hf-pv-table">' +
+            '<tr><td class="k">执行董事</td><td>王××</td></tr>' +
+            '<tr><td class="k">监事</td><td>李××</td></tr>' +
+          '</table></div>' +
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">风险概览</div>' +
+          '<p class="hf-pv-p">法律诉讼 0 条 · 法院公告 0 条 · 被执行 0 条 · 失信信息 0 条</p></div>' +
+        '<div class="hf-pv-stamp">工程链</div>';
+    } else {
+      page +=
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">文件说明</div>' +
+          '<p class="hf-pv-p">本文件为工程链平台收录的项目文件，共 3 页，以下为文档关键内容预览，完整内容请下载后查看。</p>' +
+          '<p class="hf-pv-p">文档包含项目背景、技术要求、商务条款与签署页等内容，关键条款以红字标注。</p>' +
+        '</div>' +
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">关键信息</div>' +
+          '<table class="hf-pv-table">' +
+            '<tr><td class="k">文件名称</td><td>' + esc(file.name) + '</td></tr>' +
+            '<tr><td class="k">文件大小</td><td>' + esc(file.size || '—') + '</td></tr>' +
+            '<tr><td class="k">收录来源</td><td>' + esc(file.source || '其他') + '</td></tr>' +
+            '<tr><td class="k">收录时间</td><td>' + ts + '</td></tr>' +
+          '</table></div>' +
+        '<div class="hf-pv-sec"><div class="hf-pv-sec-title">内容摘要</div>' +
+          '<p class="hf-pv-p">一、项目概况：本项目位于四川省成都市，建设内容包含土建、安装及装饰装修工程。</p>' +
+          '<p class="hf-pv-p">二、工期要求：计划开工后 180 个日历天内完成全部施工内容并具备验收条件。</p>' +
+          '<p class="hf-pv-p">三、质量标准：符合国家现行施工验收规范，一次验收合格率 100%。</p>' +
+        '</div>';
+    }
+    page +=
+        '<div class="hf-pv-p-foot"><span>工程链 · 文件预览</span><span>第 1 页 / 共 3 页</span></div>' +
+      '</div>';
+    return page;
+  }
+  /* 图片类模拟预览 */
+  function pvImgContent(file) {
+    var extTxt = esc(String(file.name.split('.').pop() || '图片').toUpperCase());
+    return '<div class="hf-pv-img">' +
+      '<div class="hf-pv-img-inner">' +
+        '<div class="hf-pv-img-ic">' + IC_IMG + '</div>' +
+        '<div class="hf-pv-img-name">' + esc(pvTitle(file.name)) + '</div>' +
+        '<div class="hf-pv-img-size">' + esc(file.size || '') + (file.size ? ' · ' : '') + extTxt + ' 图片（模拟预览）</div>' +
+      '</div>' +
+    '</div>';
+  }
+  /* 压缩包类模拟预览 */
+  function pvZipContent(file) {
+    var base = pvTitle(file.name);
+    var rows = [
+      [base + '·明细清单.xlsx', '86 KB', '#1E9E5A', 'XLS'],
+      ['检测报告.pdf', '1.8 MB', '#D9534F', 'PDF'],
+      ['盖章确认单.pdf', '642 KB', '#D9534F', 'PDF'],
+      ['合同扫描件.docx', '2.1 MB', '#3478F6', 'DOC'],
+      ['说明.txt', '4 KB', '#7F8C8D', 'TXT']
+    ];
+    var html = '<div class="hf-pv-zip">';
+    rows.forEach(function (r) {
+      html += '<div class="hf-pv-zip-row">' +
+        '<div class="zf" style="background:' + r[3] + ';">' + r[3] + '</div>' +
+        '<div class="hf-pv-zip-name">' + esc(r[0]) + '</div>' +
+        '<div class="hf-pv-zip-size">' + r[1] + '</div>' +
+      '</div>';
+    });
+    return html + '</div>';
+  }
+  /* 文本类模拟预览 */
+  function pvTxtContent(file) {
+    var lines = [
+      '【' + pvTitle(file.name) + '】',
+      '',
+      '文件收录时间：' + (file.timeText || fmtTime(file.time || file.createdAt)),
+      '收录来源：' + (file.source || '其他'),
+      '',
+      '—— 以下为文件内容预览（模拟文本） ——',
+      '',
+      '本文件为工程链平台生成/收录的文本文件。',
+      '预览仅展示前若干行内容，完整内容请下载后查看。'
+    ];
+    return '<div class="hf-pv-txt">' + lines.map(esc).join('\n') + '</div>';
+  }
+  /* 其他类型：文件信息卡 */
+  function pvOtherContent(file) {
+    return '<div class="hf-pv-page">' +
+      '<div class="hf-pv-sec"><div class="hf-pv-sec-title">文件信息</div>' +
+        '<table class="hf-pv-table">' +
+          '<tr><td class="k">文件名称</td><td>' + esc(file.name) + '</td></tr>' +
+          '<tr><td class="k">文件类型</td><td>' + esc(file.ext || String(file.name.split('.').pop() || '文件').toUpperCase()) + '</td></tr>' +
+          '<tr><td class="k">文件大小</td><td>' + esc(file.size || '—') + '</td></tr>' +
+          '<tr><td class="k">收录来源</td><td>' + esc(file.source || '其他') + '</td></tr>' +
+          '<tr><td class="k">收录时间</td><td>' + esc(file.timeText || fmtTime(file.time || file.createdAt)) + '</td></tr>' +
+        '</table></div>' +
+      '<div class="hf-pv-sec"><div class="hf-pv-sec-title">预览说明</div>' +
+        '<p class="hf-pv-p">该文件类型暂不支持在线预览，可下载到本地后使用对应应用打开查看。</p></div>' +
+    '</div>';
+  }
+  function previewContent(file) {
+    var ext = (file.name.split('.').pop() || '').toLowerCase();
+    var head =
+      '<div class="hf-pv-head">' + fileIc(file.name) +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="hf-pv-name">' + esc(file.name) + '</div>' +
+          '<div class="hf-pv-meta">' +
+            '<span class="hf-pv-tag">' + esc(file.ext || (ext ? ext.toUpperCase() : 'FILE')) + '</span>' +
+            '<span>' + esc(file.size || '—') + '</span>' +
+            '<span>·</span>' +
+            '<span>' + verbFor(file) + ' ' + esc(file.timeText || fmtTime(file.time || file.createdAt)) + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    var body;
+    if (ext === 'pdf' || ext === 'doc' || ext === 'docx') body = pvDocContent(file);
+    else if (ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'webp' || ext === 'gif') body = pvImgContent(file);
+    else if (ext === 'zip' || ext === 'rar' || ext === '7z') body = pvZipContent(file);
+    else if (ext === 'txt' || ext === 'md') body = pvTxtContent(file);
+    else body = pvOtherContent(file);
+    return head + body;
+  }
+  function openPreview(id) {
+    var file = findFile(id);
+    if (!file) { UI.toast('文件不存在或已删除', 'warn'); return; }
+    var sh = UI.sheet();
+    sh.setText('文件预览');
+    sh.html(
+      previewContent(file) +
+      '<button type="button" class="btn btn-primary btn-block" id="hf-pv-dl" style="margin-top:16px;">下载文件</button>'
+    );
+    var dl = sh.body().querySelector('#hf-pv-dl');
+    if (dl) dl.addEventListener('click', function () { UI.closeSheet(); downloadFiles([file.id]); });
+    sh.show();
+  }
+
   /* ── 手势：点击弹窗 / 长按批量（互斥） ── */
   var gs = null;
   function cancelGesture() {
@@ -1033,6 +1283,7 @@ body, .phone { background: var(--hf-bg); }
   }
 
   content.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('.hf-preview')) return;                    /* 预览icon：独立于卡片点按/长按手势 */
     var card = e.target.closest('.hf-card');
     if (!card || !e.isPrimary) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1076,8 +1327,14 @@ body, .phone { background: var(--hf-bg); }
   content.addEventListener('pointerup', onPointerEnd);
   content.addEventListener('pointercancel', function (e) { if (gs && e.pointerId === gs.id) cancelGesture(); });
 
-  /* 事件委托：管理态勾选切换 */
+  /* 事件委托：预览入口 + 管理态勾选切换 */
   content.addEventListener('click', function (e) {
+    var pv = e.target.closest('.hf-preview');
+    if (pv) {
+      if (window.__hfSuppressClick && Date.now() < window.__hfSuppressClick) return;
+      openPreview(pv.getAttribute('data-preview-id'));
+      return;
+    }
     if (window.__hfSuppressClick && Date.now() < window.__hfSuppressClick) return;
     if (MODE === 'manage') {
       var card = e.target.closest('.hf-card');
