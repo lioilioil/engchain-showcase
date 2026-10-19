@@ -276,8 +276,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     UI.toast('已解锁核心控制人信息', 'ok');
   });
 
-  /* 该企业发布的供需 · 统一目录 */
-  var list = (c.published || []).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean);
+  /* 该企业发布的供需 · 统一目录；MOCK 未命中时经 DataBus.getRecord 三源兜底（P0-05），缺失返回 null 被 filter 剔除 */
+  var list = (c.published || []).map(function (idStr) {
+    return MOCK.listingById(idStr) || (window.DataBus && DataBus.getRecord ? DataBus.getRecord(idStr) : null);
+  }).filter(Boolean);
   if (!list.length) {
     document.getElementById('published').innerHTML = '<div class="pub-empty">该企业暂未发布供需信息</div>';
   } else {

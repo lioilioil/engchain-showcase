@@ -34,7 +34,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
   <div id="pub-content">
   <div class="navbar"><button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button><div class="nav-title">已解锁线索</div><div class="nav-right"></div></div><main class="scroll unlock-scroll"><header class="unlock-head"><div class="unlock-sub" id="unlock-sub">这里管理你已经获得查看权限的信息</div></header><div id="lead-list"></div></main></div></div>
-<script src="../../js/data.js"></script><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-workbench.js"></script>
+<script src="../../js/data.js"></script><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-workbench.js"></script><script src="../../js/publish-types.js"></script>
 <script src="../../js/guest-gate.js"></script>
 <script>
 (function(){
@@ -51,15 +51,34 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   if (!checkPublishAuth()) return;
   window.__ROOT__='../../';
+  /* G-U2：16 类精确定位优先取 PUBLISH_TYPES[typeKey].label（typeKey/pubType 来自记录信封）；
+     KINDS 仅作 bizKey 兜底映射（MOCK/旧记录无 typeKey 时使用），不删除 */
   var KINDS = { material:'材料采购', equipment:'设备租赁', labor:'劳务用工', franchise:'招商加盟', trade:'企业转让', agency:'中介服务', personnel:'企业招聘', talent:'人才线索', publish:'发布信息' };
+  function kindLabel(rec, bizKey){
+    var tk = rec && (rec.typeKey || rec.pubType);
+    if (tk && window.PUBLISH_TYPES && PUBLISH_TYPES[tk] && PUBLISH_TYPES[tk].label) return PUBLISH_TYPES[tk].label;
+    return KINDS[bizKey] || bizKey || '信息';
+  }
   function esc(value){return String(value == null ? '' : value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function readUnlocks(){ try { return JSON.parse(localStorage.getItem('engchain-unlocked') || '{}'); } catch (e){ return {}; } }
   function resolve(bizKey, id){
     if (bizKey === 'publish') { var r = window.PublishStore && PublishStore.getRecordById(id); if (r) return { title: r.title, kind: KINDS.publish + ' · ' + (r.category || ''), link: '../supply/detail.html?id=' + encodeURIComponent(r.id || id) }; return null; }
     var listing = window.MOCK && MOCK.listingById(id);
-    if (listing) return { title: listing.title || listing.name || '信息 #' + id, kind: KINDS[bizKey] || bizKey, link: '../supply/detail.html?id=' + encodeURIComponent(id) };
+    if (listing) return { title: listing.title || listing.name || '信息 #' + id, kind: kindLabel(listing, bizKey), link: '../supply/detail.html?id=' + encodeURIComponent(id) };
+    /* MOCK.personById 未命中会兜底返回 list[0]，必须精确比对 id，否则会冒用第一个 MOCK 人才并阻断 SupplyStore 兜底 */
     var person = window.MOCK && MOCK.personById(id);
-    if (person) return { title: person.name || '人才 ' + id, kind: KINDS.personnel || bizKey, link: '../personal/index.html?id=' + encodeURIComponent(id) };
+    if (person && String(person.id) === String(id)) return { title: person.name || '人才 ' + id, kind: kindLabel(person, bizKey), link: '../personal/index.html?id=' + encodeURIComponent(id) };
+    /* G-U1：用户发布的 detail/brief 记录权威源是 SupplyStore；MOCK 未命中时兜底，与 supply/detail.html 归一化口径一致。
+       记录缺失返回 null，由调用方跳过，全局空态兜底，不抛错 */
+    if (window.SupplyStore && SupplyStore.byId) {
+      var sr = SupplyStore.byId(id);
+      if (sr) return { title: sr.title || sr.name || '信息 #' + id, kind: kindLabel(sr, bizKey), link: '../supply/detail.html?id=' + encodeURIComponent(sr.id || id) };
+    }
+    /* [分片N] 统一三源兜底：DataBus.getRecord（MOCK→SupplyStore→PublishStore），未命中返回 null */
+    if (window.DataBus && DataBus.getRecord) {
+      var dr = DataBus.getRecord(id);
+      if (dr) return { title: dr.title || dr.name || '信息 #' + id, kind: kindLabel(dr, bizKey), link: '../supply/detail.html?id=' + encodeURIComponent(dr.id || id) };
+    }
     return null;
   }
   function fmtDate(t){ if (!t) return '已解锁'; var d = new Date(t); if (isNaN(d.getTime())) return '已解锁'; return '解锁于 ' + d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }

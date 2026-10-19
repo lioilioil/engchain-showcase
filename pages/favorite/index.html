@@ -78,17 +78,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     empty.style.display = 'none';
     if(manageBtn) manageBtn.style.display = 'flex';
+    /* [分片N P1-08] 用 DataBus.getRecord 反查回填缺失字段；无记录则不展示缺字段 */
+    function backfill(it){
+      var rec = null;
+      try { if (window.DataBus && DataBus.getRecord) rec = DataBus.getRecord(it.id); } catch (e) {}
+      return {
+        title: (rec && rec.title) || it.title || '收藏条目',
+        location: (rec && (rec.location || rec.city)) || it.location || '',
+        amount: (rec && (rec.price || rec.budget)) || it.amount || '',
+        typeKey: (rec && rec.typeKey) || it.typeKey || ''
+      };
+    }
     box.innerHTML = filtered.map(function(it){
-      return '<div class="supply-card" data-id="'+esc(it.id)+'" style="position:relative;">' +
+      var bf = backfill(it);
+      var href = '../supply/detail.html?id=' + encodeURIComponent(it.id) + (bf.typeKey ? '&typeKey=' + encodeURIComponent(bf.typeKey) : '');
+      return '<a class="supply-card fav-card-link" href="'+href+'" data-id="'+esc(it.id)+'" style="position:relative;display:block;text-decoration:none;">' +
         '<div class="sc-top"><span class="tag '+dirTag(it.dir)+'">'+dirLabel(it.dir)+'</span>' +
         (it.type?'<span class="tag tag-gray">'+esc(it.type)+'</span>':'') +
         '<span style="margin-left:auto;" class="text-3 fs-11">'+fmtTime(it.ts)+'</span></div>' +
-        '<div class="sc-title">'+esc(it.title||'收藏条目')+'</div>' +
-        (it.location?'<div class="sc-meta"><span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>'+esc(it.location)+'</span></div>':'') +
+        '<div class="sc-title">'+esc(bf.title)+'</div>' +
+        (bf.location?'<div class="sc-meta"><span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>'+esc(bf.location)+'</span></div>':'') +
         '<div class="sc-foot">' +
-        (it.amount?'<span class="sc-price">'+esc(it.amount)+'</span>':'<span></span>') +
+        (bf.amount?'<span class="sc-price">'+esc(bf.amount)+'</span>':'<span></span>') +
         '<button type="button" class="btn btn-ghost btn-sm" data-fav-remove="'+esc(it.id)+'" style="padding:4px 10px;font-size:11px;">取消收藏</button>' +
-        '</div></div>';
+        '</div></a>';
     }).join('');
   }
 

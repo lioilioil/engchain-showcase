@@ -220,7 +220,8 @@ body { background: var(--bg); }
 .epcc-meta svg { width: 11px; height: 11px; }
 .epcc-quals { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
 .epcc-qual { font-size: 11px; color: var(--primary-dim); background: var(--primary-soft); padding: 3px 8px; border-radius: var(--r-full); font-weight: 500; }
-.epcc-qual.more { background: var(--bg-card-2); color: var(--text-3); }
+/* “+N”为纯展示标签：重置 app.css 全局触控热区 .more（min-height:36px/inline-flex），避免胶囊高度异常 */
+.epcc-qual.more { background: var(--bg-card-2); color: var(--text-3); min-height: 0; display: block; }
 .epcc-stats { display: flex; padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 8px; }
 .epcc-stats .es-item { flex: 1; text-align: center; }
 .epcc-stats .es-item + .es-item { border-left: 1px solid var(--line); }
@@ -677,6 +678,7 @@ body { background: var(--bg); }
       return Object.assign({}, x, {
         id: x.id,
         bizKey: x.bizKey || SEARCH_BIZ_MAP[x.cat] || 'material',
+        typeKey: x.typeKey || '',
         dir: x.dir || x.type || 'demand',
         title: x.title || '',
         cat: x.cat || x.category || '',
@@ -702,8 +704,11 @@ body { background: var(--bg); }
     function mergedCatalog() {
       var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
       var active = readActiveSearchSupplies().map(normSearchItem);
+      var published = [];
+      try { if (window.PublishStore && PublishStore.list) published = PublishStore.list() || []; } catch (e) {}
       var seen = {}, out = [];
       active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+      published.forEach(function (x) { var n = normSearchItem(x); if (!seen[n.id]) { seen[n.id] = true; out.push(n); } });
       mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
       return out;
     }
@@ -727,7 +732,7 @@ body { background: var(--bg); }
         });
       }
       if (state.dir !== 'all') list = list.filter(function (s) { return s.dir === state.dir; });
-      if (state.biz !== 'all') list = list.filter(function (s) { return s.bizKey === state.biz; });
+      if (state.biz !== 'all') list = list.filter(function (s) { return s.bizKey === state.biz || s.typeKey === state.biz; });
       if (state.sort === 'newest') {
         list.sort(function (a, b) { return String(b.time || '').localeCompare(String(a.time || '')); });
       } else if (state.sort === 'match') {

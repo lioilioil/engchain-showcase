@@ -201,8 +201,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
 <script src="js/data.js"></script>
 <script src="js/common.js"></script>
-<script src="js/promo-cards.js"></script>
+<script src="js/publish-catalog.js"></script>
 <script src="js/stores.js"></script>
+<script src="js/databus.js"></script>
 <script src="js/delegates.js"></script>
 <script src="js/liquid-glass.iife.js?v=2026100310"></script>
 <script src="js/dynamic-island.js?v=2026100341"></script>
@@ -540,25 +541,39 @@ body.di-alert-on .dynamic-island { display: none !important; }
   /* ---- 统一分类卡片（供需 / 资源 共用 · 9 类模板由 js/common.js 的 window.Cards 提供） ---- */
 
   /* ---- mergedList 同源：MOCK.catalog + SupplyStore active（用户发布） ---- */
+  /* [分片N P1-09] match 补 transport（首页原看不到运输）；resource 保留四类，新增需求态入口由 SUBTABS 承接 */
   var FLOW_KEYS = {
-    match: ['material','equipment','labor','agency'],
+    match: ['material','equipment','labor','agency','transport'],
     resource: ['franchise','trade','personnel','talent']
   };
   function readActiveSupplies() {
     try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
   }
   function mergedCatalog() {
+    /* [观察项-1] 优先走 DataBus.getListing（MOCK ∪ SupplyStore.active ∪ 本人 pending ∪ PublishStore 正式项，去重）；
+       未挂 databus 时回退本地合并，保证降级可用。默认视角 active，不并入他人 pending。 */
+    try {
+      if (window.DataBus && DataBus.getListing) return DataBus.getListing({});
+    } catch (e) {}
     var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
     var active = readActiveSupplies();
+    var published = [];
+    try { if (window.PublishStore && PublishStore.list) published = PublishStore.list() || []; } catch (e) {}
     var seen = {}, out = [];
     active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
+    published.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
     mock.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
     return out;
   }
+  /* 键可命中 bizKey 或 typeKey（D 层归一后记录带 typeKey），兼容旧键 */
+  function recordMatches(x, key) {
+    if (key === 'all') return true;
+    return x.bizKey === key || x.typeKey === key;
+  }
   function listFor(flow, key) {
     var all = mergedCatalog();
-    if (key === 'all') return all.filter(function (x) { return FLOW_KEYS[flow].indexOf(x.bizKey) >= 0; });
-    return all.filter(function (x) { return x.bizKey === key; });
+    if (key === 'all') return all.filter(function (x) { return FLOW_KEYS[flow].indexOf(x.bizKey) >= 0 || FLOW_KEYS[flow].indexOf(x.typeKey) >= 0; });
+    return all.filter(function (x) { return recordMatches(x, key); });
   }
   function countFor(flow, key) { return listFor(flow, key).length; }
 
@@ -569,7 +584,7 @@ body.di-alert-on .dynamic-island { display: none !important; }
   /* ---- 二级分类 Tab（全部 + 两字分类 · 横向滑动 · 动画指示条） ---- */
   var SUBTABS = {
     match: [{ key: 'all', label: '全部' }, { key: 'material', label: '材料' }, { key: 'equipment', label: '设备' }, { key: 'labor', label: '劳务' }, { key: 'agency', label: '中介服务' }],
-    resource: [{ key: 'all', label: '全部' }, { key: 'franchise', label: '资质招商' }, { key: 'trade', label: '建企买卖' }, { key: 'personnel', label: '企业招聘' }, { key: 'talent', label: '人才求职' }]
+    resource: [{ key: 'all', label: '全部' }, { key: 'franchise', label: '资质招商' }, { key: 'trade', label: '建企买卖' }, { key: 'personnel', label: '企业招聘' }, { key: 'talent', label: '人才求职' }, { key: 'franchise-demand', label: '挂靠需求' }, { key: 'trade-demand', label: '收购需求' }]
   };
   var subTabs = document.getElementById('sub-tabs');
   var subScroll = document.getElementById('sub-scroll');
@@ -601,10 +616,36 @@ body.di-alert-on .dynamic-island { display: none !important; }
     '</div>';
   }
 
+  /* [V-P1-03] 运输（车队/运力）从 Cards 分流，首页自建运输轨，确保供应/需求两态运输卡稳定上首页 */
+  function isTransport(x) { return x.bizKey === 'transport' || /^transport-/.test(x.typeKey || ''); }
+  function escT(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function transportRailHtml(list) {
+    if (!list || !list.length) return '';
+    var rows = list.map(function (x) {
+      var isD = x.role === 'demand' || x.dir === 'demand' || x.typeKey === 'transport-demand';
+      var badge = isD
+        ? '<span style="display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;background:var(--primary-soft,#f6efe2);color:#2a6fb0;font-weight:700;">需求</span>'
+        : '<span style="display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;background:var(--primary-soft,#f6efe2);color:#8a6a2f;font-weight:700;">供应</span>';
+      var price = isD ? (x.budget || '面议') : (x.price || '面议');
+      var loc = x.location || x.city || '';
+      var tk = x.typeKey || (isD ? 'transport-demand' : 'transport-supply');
+      return '<a href="pages/supply/detail.html?id=' + encodeURIComponent(x.id) + '&typeKey=' + escT(tk) + '" style="display:block;text-decoration:none;padding:12px 14px;margin-bottom:8px;background:var(--bg-card,#fff);border:1px solid var(--line,#eee);border-radius:14px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;">' + badge + '<span style="font-size:12px;color:var(--text-3,#999);">运输·' + escT(x.sub || x.subCate || '整车货运') + '</span></div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--text-1,#222);margin-top:6px;line-height:1.5;">' + escT(x.title || '') + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">'
+        + '<span style="font-size:14px;font-weight:800;color:var(--primary,#8a6a2f);">' + escT(price) + '</span>'
+        + (loc ? '<span style="font-size:12px;color:var(--text-3,#999);">📍 ' + escT(loc) + '</span>' : '')
+        + '</div></a>';
+    }).join('');
+    return '<div style="margin:14px 0 8px;"><div style="font-size:14px;font-weight:800;color:var(--text-1,#222);margin-bottom:10px;">🚚 车队运力 · 整车货运</div>' + rows + '</div>';
+  }
   function renderList() {
-    var items = listFor(currentFlow, currentSub);
-    var html = window.Cards.render(items);
+    var all = listFor(currentFlow, currentSub);
+    var trans = all.filter(isTransport);
+    var others = all.filter(function (x) { return !isTransport(x); });
+    var html = window.Cards.render(others);
     if (!html) html = renderEmptyState();
+    html += transportRailHtml(trans);
     tabList.innerHTML = html;
     injectInfeedCarousel();
   }
@@ -618,7 +659,9 @@ body.di-alert-on .dynamic-island { display: none !important; }
         franchise: 'pages/franchise/index.html',
         trade: 'pages/trade/index.html',
         personnel: 'pages/personnel/index.html',
-        talent: 'pages/personnel/index.html?tab=talent'
+        talent: 'pages/personnel/index.html?tab=talent',
+        'franchise-demand': 'pages/franchise/index.html?demand=1',
+        'trade-demand': 'pages/trade/index.html?demand=1'
       };
       subMore.href = R[currentSub] || '';
       return;

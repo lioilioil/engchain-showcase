@@ -834,9 +834,24 @@ textarea.step-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0
     var ms = matches(5);
     var curUser = null;
     try { curUser = (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch(e){}
+    /* G-P5：从账号/认证档案注入 contact{name,phone,wechat}；取不到留空字符串，不写假号码。
+       明文手机优先级：个人入驻档案 basic.mobile → 登录账号 st.mobile → 当前账号 mobile/phone；
+       realname.mobile 为脱敏串（含*）自动跳过。微信取 basic.wechat → st.wechat。 */
+    var st = (window.UI && UI.state && UI.state.get) ? UI.state.get() : {};
+    var basic = (auth.personalEntry && auth.personalEntry.profile && auth.personalEntry.profile.basic) || {};
+    var rn = auth.realname || {};
+    var plainMobile = '';
+    [basic.mobile, st.mobile, curUser && (curUser.mobile || curUser.phone), rn.mobile, st.phone].forEach(function (v) {
+      if (plainMobile) return;
+      var s = (v == null ? '' : String(v).trim());
+      if (s && s.indexOf('*') === -1) plainMobile = s;
+    });
+    var contact = { name: rn.name || (curUser && curUser.name) || st.user || '', phone: plainMobile, wechat: basic.wechat || st.wechat || '' };
     var payload = {
       title: txt.substring(0, 24),
       type: TYPE.role, cat: TYPE.cat, sub: '',
+      /* G-P4：brief 六键——detailLevel/typeKey/pubType/role/cat/bizKey；pubType 兼容旧读 */
+      role: TYPE.role, typeKey: typeKey, pubType: typeKey, contact: contact,
       /* 简要类轻量归类：发布时对标题做受控子类猜测（guess 不上则为空，详情页显示「未分类」） */
       subCate: (function () {
         if (!window.EngchainCatalog || !EngchainCatalog.guessRecord) return '';
@@ -862,6 +877,8 @@ textarea.step-input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0
     try { saved = DataBus.publishSupply ? DataBus.publishSupply(payload) : null; }
     catch(e){ saved = null; }
     if (!saved) { if (window.UI && UI.toast) UI.toast('发布失败，请重试', 'err'); return; }
+    /* G-P6：对齐 editor L3841 形状写 engchain-last-publish，供 guide「上次发布」快捷卡 */
+    try { localStorage.setItem('engchain-last-publish', JSON.stringify({ type: typeKey, title: payload.title || '', t: Date.now() })); } catch (e) {}
     closePreview();
     /* 成功页：展示匹配结果 */
     var sucM = document.getElementById('suc-matches');

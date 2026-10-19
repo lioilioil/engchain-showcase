@@ -838,7 +838,25 @@
   var SupplyStore = makeStore('engchain-supply', { items: [] }, 'engchain:supply');
   SupplyStore.add = function (item) {
     var s = this.read();
-    s.items.unshift(Object.assign({ id: 'SP' + Date.now() + Math.floor(Math.random() * 1000), status: 'pending_review', ts: Date.now() }, item));
+    var now = Date.now();
+    /* G-P3/G-P7：统一补 ts/updatedAt（展示时间列）；条目自带值优先，不覆盖。
+       G-P8：定位键缺省安全兜底——只在缺失时按现有字段/注册表推断，已有值不动、不臆造、不张冠李戴。
+       权威信封补齐仍在发布页（editor/brief doSubmit），此处仅兜底旧记录/迁移记录缺键。 */
+    var rec = Object.assign({
+      id: 'SP' + now + Math.floor(Math.random() * 1000),
+      status: 'pending_review',
+      ts: now,
+      updatedAt: now
+    }, item);
+    if (!rec.typeKey) rec.typeKey = rec.pubType || '';
+    if (!rec.pubType) rec.pubType = rec.typeKey || '';
+    if (!rec.role) rec.role = rec.dir || rec.type || '';
+    if (!rec.detailLevel) {
+      var tk = rec.typeKey || '';
+      var td = (window.PUBLISH_TYPES && PUBLISH_TYPES[tk]) ? PUBLISH_TYPES[tk].detailLevel : '';
+      rec.detailLevel = td || '';
+    }
+    s.items.unshift(rec);
     this.write(s);
     return s.items[0];
   };
@@ -857,6 +875,16 @@
   };
   SupplyStore.listPending = function () {
     return this.read().items.filter(function (i) { return i.status === 'pending_review'; });
+  };
+  /* [分片D P0-01] 本人视角待审核：只返回 ownerId 本人发布的 pending_review 条目；
+     不传 ownerId 时返回全部 pending（供后台审核）。不做自动通过，保留人工审核。 */
+  SupplyStore.listMinePending = function (ownerId) {
+    var items = this.read().items || [];
+    return items.filter(function (i) {
+      if (i.status !== 'pending_review') return false;
+      if (ownerId == null || ownerId === '') return true;
+      return String(i.publisher) === String(ownerId) || String(i.publisherId) === String(ownerId) || String(i.owner) === String(ownerId);
+    });
   };
   SupplyStore.byId = function (id) {
     var items = this.read().items, i;
@@ -2141,6 +2169,79 @@
      time, createdAt, timeText, href, note, forwarded, event } ] }
      add() 对同名文件做“去重置新”（同一文件再次生成/上传/发送只刷新时间，不重复建档）。 */
   var FileStore = makeStore('engchain-history-files', { items: [] }, 'engchain:files');
+
+  /* ---- 引擎信封判别工具（契约 §4.3 / §6.1），供 file-editor adapter 与历史页预览共用 ----
+     信封：{ v:1, engine, kind:'doc'|'sheet', data, snapshot, meta:{updatedAt,engineVersion} }
+     纯函数，不依赖 Store 状态；挂 window.EcUtils 跨页复用。 */
+  function ecIsEnvelope(content) {
+    return !!(content && typeof content === 'object' && content.v === 1 && content.engine);
+  }
+  function ecUnwrapEnvelope(content) {
+    return ecIsEnvelope(content) ? content.data : null;
+  }
+  /* 旧 doc：HTML 字符串（trim 后以 < 开头） */
+  function ecIsLegacyDoc(content) {
+    return typeof content === 'string' && /^\s*</.test(content);
+  }
+  /* 旧 sheet：JSON 字符串且 parse 为二维数组（首元素为数组） */
+  function ecIsLegacySheet(content) {
+    if (typeof content !== 'string' || !content.trim()) return false;
+    try {
+      var v = JSON.parse(content);
+      return Array.isArray(v) && v.length > 0 && Array.isArray(v[0]);
+    } catch (e) { return false; }
+  }
+  window.EcUtils = {
+    isEnvelope: ecIsEnvelope,
+    unwrapEnvelope: ecUnwrapEnvelope,
+    isLegacyDoc: ecIsLegacyDoc,
+    isLegacySheet: ecIsLegacySheet
+  };
+
+  /* attrs：按文件类型存储的属性元数据对象；null=未设置。
+     tags 为字符串数组；xlsx/xls 的 rows/cols 为表格实际行列数。
+     由“编辑文件”页写入，历史文件页可读；不传时为 null，不影响原有行为。
+     engine/formatVer：新引擎信封标记（§4.3，旧记录无此字段也兼容）；
+     legacy：旧格式惰性打标（'html'=旧 doc HTML 串 / 'array'=旧 sheet 二维数组串）。 */
+  FileStore.DEFAULT_ATTRS = {
+    txt:  { encoding: 'UTF-8', author: '', tags: [] },
+    md:   { encoding: 'UTF-8', author: '', tags: [] },
+    docx: { title: '', author: '', fontSize: '13.5px', header: '', footer: '', engine: null, formatVer: null, legacy: null },
+    doc:  { title: '', author: '', fontSize: '13.5px', header: '', footer: '', engine: null, formatVer: null, legacy: null },
+    xlsx: { sheetName: 'Sheet1', rows: 0, cols: 0, delimiter: ',', author: '', engine: null, formatVer: null, legacy: null },
+    xls:  { sheetName: 'Sheet1', rows: 0, cols: 0, delimiter: ',', author: '', engine: null, formatVer: null, legacy: null }
+  };
+
+  /* ---- 旧格式惰性打标迁移（契约 §6.1，仿 migrateInvoices IIFE 模式） ----
+     只给 attrs.engine 为空的旧 doc/sheet 记录原地补 attrs.legacy 标记：
+     不转换 content、不新建记录、不改写信封；txt/md 与其他类型不碰。
+     真正的内容迁移由编辑页 load() 时惰性完成（引擎装载 legacy.raw → 保存时写新信封）。 */
+  (function migrateLegacyEngineFiles() {
+    try {
+      var s = FileStore.read();
+      var items = s.items || [];
+      var changed = false;
+      items.forEach(function (it) {
+        try {
+          if (!it || ecIsEnvelope(it.content)) return;
+          var attrs = (it.attrs && typeof it.attrs === 'object') ? it.attrs : null;
+          if (attrs && attrs.engine) return;
+          var suffix = String(it.name || '').split('.').pop().toLowerCase();
+          var legacy = null;
+          if (suffix === 'docx' || suffix === 'doc') {
+            if (ecIsLegacyDoc(it.content)) legacy = 'html';
+          } else if (suffix === 'xlsx' || suffix === 'xls') {
+            if (ecIsLegacySheet(it.content)) legacy = 'array';
+          }
+          if (legacy && (!attrs || attrs.legacy !== legacy)) {
+            it.attrs = Object.assign(attrs || {}, { legacy: legacy });
+            changed = true;
+          }
+        } catch (e) {}
+      });
+      if (changed) FileStore.write(s);
+    } catch (e) {}
+  })();
   FileStore.list = function () {
     var s = this.read();
     return (s.items || []).slice().sort(function (a, b) { return (b.time || 0) - (a.time || 0); });
@@ -2165,8 +2266,10 @@
       timeText: rec.timeText || '',
       href: rec.href || '',
       note: rec.note || '',
+      content: rec.content || '',
       forwarded: 0,
-      event: rec.event || ''
+      event: rec.event || '',
+      attrs: rec.attrs || null
     };
     var dup = null;
     for (var i = 0; i < items.length; i++) {
@@ -2181,7 +2284,9 @@
       dup.note = base.note || dup.note;
       dup.ext = base.ext || dup.ext;
       dup.size = base.size || dup.size;
+      if (base.content) dup.content = base.content;
       if (base.event) dup.event = base.event;
+      if (base.attrs) dup.attrs = base.attrs;
       this.write(s);
       return dup;
     }
@@ -2194,6 +2299,24 @@
     var s = this.read();
     s.items = (s.items || []).filter(function (it) { return it.id !== id; });
     this.write(s);
+  };
+  /* 编辑：更新已有文件（名称/扩展名/内容/大小/备注/时间），返回更新后的记录 */
+  FileStore.updateContent = function (id, patch) {
+    if (!id || !patch) return null;
+    var s = this.read();
+    var it = null;
+    (s.items || []).forEach(function (x) { if (x.id === id) it = x; });
+    if (!it) return null;
+    if (patch.name != null) it.name = patch.name;
+    if (patch.ext != null) it.ext = patch.ext;
+    if (patch.content != null) it.content = patch.content;
+    if (patch.size != null) it.size = patch.size;
+    if (patch.note != null) it.note = patch.note;
+    if (patch.attrs != null) it.attrs = patch.attrs;
+    it.time = patch.time || Date.now();
+    it.timeText = patch.timeText || '';
+    this.write(s);
+    return it;
   };
   FileStore.clear = function () {
     this.write({ items: [] });

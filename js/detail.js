@@ -534,7 +534,9 @@ window.DETAIL = (function () {
     var d = dirTag(r.type || r.dir);
     var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
     var o = r.equip && r.equip.overview;
-    var chips = o ? [o.brand, o.equipType, o.yearBuilt, o.workHours, o.condition].filter(function (x) { return !!x; }) : [];
+    /* [分片X P1-07] overview 缺失时双读 specs（D 已把旧 overview 并入 specs），保证新设备记录速览不空 */
+    var chips = o ? [o.brand, o.equipType, o.yearBuilt, o.workHours, o.condition].filter(function (x) { return !!x; })
+      : ((r.equip && r.equip.specs) || []).map(function (s) { return s && s.v; }).filter(Boolean);
     var quick = chips.length ? '<div class="hero-grade"><span class="hg-label">设备速览</span><div class="hg-list">' +
       chips.map(function (x) { return '<span class="tag tag-gold">' + cfgText(x) + '</span>'; }).join('') +
       '</div></div>' : '';
@@ -762,19 +764,14 @@ window.DETAIL = (function () {
     var fc = r.fc || {};
     var h = '';
     /* 企业基本信息：关键数据卡片 + 详细信息 */
+    /* C片：MOCK 富字段（成立年限/注册资本/年中标/分公司数）缺键时不渲染 '—' 假卡片；
+       统计卡与详细行全部为空时整段隐藏，不冒充平台预置企业档案 */
     var keyStats = [
-      { label: '成立年限', value: r.years ? r.years + '年' : '—', sub: r.founded || '' },
-      { label: '注册资本', value: r.capital || '—', sub: '实缴资本' },
-      { label: '年中标项目', value: r.annualProjects ? r.annualProjects + '个' : '—', sub: '近3年平均' },
-      { label: '已加盟分公司', value: r.branchCount ? r.branchCount + '家' : '—', sub: '全国分布' }
-    ];
-    var basicHtml = '<div class="fbi-grid">' +
-      keyStats.map(function (s) {
-        return '<div class="fbi-card">' +
-          '<div class="fbi-l"><div class="fbi-label">' + s.label + '</div>' + (s.sub ? '<div class="fbi-sub">' + s.sub + '</div>' : '') + '</div>' +
-          '<div class="fbi-value">' + s.value + '</div>' +
-          '</div>';
-      }).join('') + '</div>';
+      { label: '成立年限', value: r.years ? r.years + '年' : '', sub: r.founded || '' },
+      { label: '注册资本', value: r.capital || '', sub: '实缴资本' },
+      { label: '年中标项目', value: r.annualProjects ? r.annualProjects + '个' : '', sub: '近3年平均' },
+      { label: '已加盟分公司', value: r.branchCount ? r.branchCount + '家' : '', sub: '全国分布' }
+    ].filter(function (s) { return !!s.value; });
     var detailInfo = [
       { k: '企业名称', v: r.name || '' },
       { k: '注册地区', v: r.registeredArea || '' }
@@ -788,8 +785,19 @@ window.DETAIL = (function () {
       if (!kk || !vv || _shownKeys[kk]) return;
       detailInfo.push({ k: kk, v: vv });
     });
-    basicHtml += dList(detailInfo.filter(function (x) { return x.v; }));
-    h += sec('企业基本信息', basicHtml);
+    var detailRows = detailInfo.filter(function (x) { return x.v; });
+    if (keyStats.length || detailRows.length) {
+      var basicHtml = '';
+      if (keyStats.length) basicHtml = '<div class="fbi-grid">' +
+        keyStats.map(function (s) {
+          return '<div class="fbi-card">' +
+            '<div class="fbi-l"><div class="fbi-label">' + s.label + '</div>' + (s.sub ? '<div class="fbi-sub">' + s.sub + '</div>' : '') + '</div>' +
+            '<div class="fbi-value">' + s.value + '</div>' +
+            '</div>';
+        }).join('') + '</div>';
+      basicHtml += dList(detailRows);
+      h += sec('企业基本信息', basicHtml);
+    }
     var qualList = (fc && fc.qualPack) || r.qualPack || [];
     if (qualList.length) {
       var qualRows = [];
@@ -1029,11 +1037,16 @@ window.DETAIL = (function () {
     var locked = !UnlockStore.isUnlocked(r);
     var h = '';
     if (r.desc) h += sec('服务介绍', '<div class="ds-text">' + r.desc + '</div>' + agencyRefundBadge(r));
-    h += sec('服务类型与办理目标', dList([
+    /* [分片X P1-07] serviceCats 服务类目标签（兼容顶层与 agencyDetail 嵌套，空则整段不渲染） */
+    var _svcCats = (r.serviceCats || (r.agencyDetail && r.agencyDetail.serviceCats) || []).filter(function (x) { return x; });
+    if (_svcCats.length) h += sec('服务类目', '<div class="qual-chips">' + _svcCats.map(function (q) { return '<span class="tag tag-primary">' + cfgText(q) + '</span>'; }).join('') + '</div>');
+    /* C片：空键不渲染空表格，逐行过滤后无内容则整段隐藏（MOCK 富记录字段齐全不受影响） */
+    var _agTypeRows = [
       { k: '服务类型', v: r.serveType },
       { k: '目标资质等级', v: r.targetQualLevel },
       { k: '目标资质专业', v: r.targetQualMajor }
-    ]));
+    ].filter(function (x) { return x.v; });
+    if (_agTypeRows.length) h += sec('服务类型与办理目标', dList(_agTypeRows));
     if (r.quote) h += sec('报价明细（透明公开）', agencyQuoteCard(r.quote) + dList([
       { k: '报价包含', v: r.priceInclude },
       { k: '官方费用说明', v: r.govFeeNote },
@@ -1044,10 +1057,11 @@ window.DETAIL = (function () {
       (r.handleCycle ? '<div class="ag-cycle">' + icon('clock') + '<span>预计办理周期：<b>' + cfgText(r.handleCycle) + '</b></span></div>' : '') +
       agencyProcess(r.serveProcess));
     if (r.requiredMaterials && r.requiredMaterials.length) h += sec('所需材料清单', agencyMaterials(r.requiredMaterials));
-    h += sec('人员配置与政策依据', dList([
+    var _agPolicyRows = [
       { k: '人员配置要求', v: r.personnelReq },
       { k: '政策依据', v: r.policyBasis }
-    ]));
+    ].filter(function (x) { return x.v; });
+    if (_agPolicyRows.length) h += sec('人员配置与政策依据', dList(_agPolicyRows));
     if (r.cases && r.cases.length) h += sec('真实成功案例（' + r.cases.length + '）', agencyCaseCard(r.cases));
     /* 我方机构资质：专业页 orgQuals 标签（供应方自身经营资质）；兼容嵌套 agencyDetail 与历史 r.qual 文本 */
     var _oqs = (r.orgQuals || (r.agencyDetail && r.agencyDetail.orgQuals) || []).filter(function (x) { return x; });
@@ -1448,15 +1462,17 @@ window.DETAIL = (function () {
   }
   function tradeBody(r, c) {
     var locked = !UnlockStore.isUnlocked(r);
-    var sc = c.score ? c.score.value : 9.0;
-    var gr = c.score ? c.score.grade : 'AAA级';
+    /* C片：GEO 综合评分是 MOCK 认证档案富字段；用户记录无 c.score 时不渲染默认 9.0/AAA 假评分卡 */
+    var hasGeo = !!(c && c.score);
+    var sc = hasGeo ? c.score.value : 9.0;
+    var gr = hasGeo ? c.score.grade : 'AAA级';
     var bars = [
       { k: '信息真实性', v: (sc + 0.2).toFixed(1), w: Math.min(100, Math.round((sc + 0.2) * 10)), c: 'var(--accent)' },
       { k: '财务健康', v: (sc - 0.1).toFixed(1), w: Math.min(100, Math.round((sc - 0.1) * 10)), c: 'var(--success)' },
       { k: '综合评分', v: sc.toFixed(1), w: Math.min(100, Math.round(sc * 10)), c: 'var(--info)' }
     ];
     var radar = r.riskRadar || {};
-    var h = geoCard(sc, gr, bars);
+    var h = hasGeo ? geoCard(sc, gr, bars) : '';
     /* 风险等级速览（联动雷达） */
     if (radar.level) {
       var lvCls = radar.level === '高' ? 'high' : (radar.level === '中' ? 'mid' : 'low');
@@ -1470,7 +1486,7 @@ window.DETAIL = (function () {
           return '<span class="trs-chip"><b>' + d.k + '</b>' + ((radar.counts || {})[d.key] || '—') + '</span>';
         }).join('') + '</div></div>';
     }
-    h = sec('交易概况', h);
+    if (h) h = sec('交易概况', h);
     /* 风险雷达（六维体检） */
     if (radar.scores) h += sec('风险雷达 · 六维体检', riskRadarChart(radar, locked));
     /* 企业概况 */
@@ -1480,7 +1496,8 @@ window.DETAIL = (function () {
     if (r.equityStructure) baseRows.push({ k: '股权结构', v: r.equityStructure });
     if (r.equityPledge) baseRows.push({ k: '股权质押 / 冻结', v: r.equityPledge });
     if (r.info && r.info.length) baseRows = baseRows.concat(r.info);
-    h += sec('企业概况', dList(baseRows));
+    /* C片：baseRows 全空时不渲染空「企业概况」表格 */
+    if (baseRows.length) h += sec('企业概况', dList(baseRows));
     if (r.staffConfig && r.staffConfig.list) h += sec('注册人员配置', tradeStaff(r.staffConfig));
     /* 资质与证照 */
     if (r.qualPack && r.qualPack.length) {
@@ -1655,9 +1672,16 @@ window.DETAIL = (function () {
     if (r.detail || r.desc) h += sec(transportIsDemand(r) ? '用车说明' : '服务说明', '<div class="ds-text">' + (r.detail || r.desc) + '</div>');
     if (r.fields && r.fields.length) h += sec('运输信息', dList(r.fields));
     if (tp.vehicles && tp.vehicles.length) {
-      h += sec('车辆运力', '<div class="hero-grade"><div class="hg-list">' + tp.vehicles.map(function (v) {
-        return '<span class="tag tag-gold">' + cfgText(v.type) + ' ' + cfgText(v.count) + ' 台 · ' + cfgText(v.spec) + '</span>';
-      }).join('') + '</div><div class="ds-text" style="margin-top:8px;color:var(--text-2);">' + tp.vehicles.map(function (v) { return cfgText(v.note); }).join('；') + '</div></div>');
+      /* [V-P2-04] 空车辆项不输出、空部件不拼空分隔符；空 note 不产生悬空「；」 */
+      var _vc = tp.vehicles.map(function (v) {
+        var parts = [cfgText(v.type), cfgText(v.count) ? cfgText(v.count) + ' 台' : '', cfgText(v.spec)].filter(Boolean);
+        return parts.length ? '<span class="tag tag-gold">' + parts.join(' · ') + '</span>' : '';
+      }).filter(Boolean);
+      var _vn = tp.vehicles.map(function (v) { return cfgText(v.note); }).filter(Boolean);
+      var _vb = '<div class="hero-grade"><div class="hg-list">' + _vc.join('') + '</div>';
+      if (_vn.length) _vb += '<div class="ds-text" style="margin-top:8px;color:var(--text-2);">' + _vn.join('；') + '</div>';
+      _vb += '</div>';
+      h += sec('车辆运力', _vb);
     }
     if (tp.pricing && tp.pricing.length) {
       h += sec('计价方式', '<div class="kv-table">' + tp.pricing.map(function (x) {
@@ -1866,12 +1890,13 @@ window.DETAIL = (function () {
     sections: function (r, c) {
       var h = '';
       /* 岗位说明 + 证书要求条 */
+      /* C片：desc 与 certReq 均缺时整段隐藏，不渲染空标题区 */
       var intro = (r.desc ? '<div class="ds-text">' + r.desc + '</div>' : '') + personCertBar(r);
-      h += sec('岗位说明与证书要求', intro);
+      if (intro) h += sec('岗位说明与证书要求', intro);
       /* 薪资结构卡 */
       if (r.salaryStructure) h += sec('薪资结构（透明拆解）', personSalaryCard(r));
-      /* 岗位与任职要求 */
-      h += sec('岗位与任职要求', dList([
+      /* 岗位与任职要求：空键过滤后整段隐藏 */
+      var _pJobRows = [
         { k: '岗位类型', v: r.jobType },
         { k: '招聘人数', v: r.hireCount },
         { k: '到岗时间', v: r.arrivalTime },
@@ -1879,21 +1904,27 @@ window.DETAIL = (function () {
         { k: '经验要求', v: r.experienceReq },
         { k: '注册状态要求', v: r.registerStatusReq },
         { k: '社保要求', v: r.socialSecurityReq }
-      ]));
+      ].filter(function (x) { return x.v; });
+      if (_pJobRows.length) h += sec('岗位与任职要求', dList(_pJobRows));
       /* 项目信息卡 */
       if (r.projectInfo) h += sec('入职项目信息', personProjectCard(r.projectInfo));
-      /* 注册与继续教育 */
-      h += sec('注册办理与继续教育', dList([
+      /* 注册与继续教育：空键过滤后整段隐藏 */
+      var _pRegRows = [
         { k: '注册协办', v: r.registerHandler },
         { k: '注册周期', v: r.registerCycle },
         { k: '继续教育', v: r.continuingEdu }
-      ]));
-      /* 企业实力与福利 */
-      var comp = dList([
+      ].filter(function (x) { return x.v; });
+      if (_pRegRows.length) h += sec('注册办理与继续教育', dList(_pRegRows));
+      /* 企业实力与福利：资质/规模行 + benefits 均空时整段隐藏 */
+      var _pCompRows = [
         { k: '企业资质', v: r.companyQual },
         { k: '企业规模', v: r.companyScale }
-      ]) + personBenefits(r.benefits);
-      h += sec('企业实力与福利待遇', comp);
+      ].filter(function (x) { return x.v; });
+      var _pBenefit = personBenefits(r.benefits);
+      if (_pCompRows.length || _pBenefit) {
+        var comp = (_pCompRows.length ? dList(_pCompRows) : '') + _pBenefit;
+        h += sec('企业实力与福利待遇', comp);
+      }
       /* 招聘流程时间线（免费） */
       if (r.hireProcess && r.hireProcess.length) h += sec('投递与招聘流程', personApplyTimeline(r.hireProcess, r.applyCount));
       /* 该企业在招职位 */
@@ -2403,6 +2434,27 @@ window.DETAIL = (function () {
   }
   /* ================= 简要类（brief）：一句话 + AI 分析 + 简版账号 + 就近打码 ================= */
   /* 简要类判定：detailLevel=brief 且无完整详情子对象（存量详细形态数据保留完整展示） */
+  /* [分片X P0-06] talent 丰富块识别：命中任一 rich 键即走 talentBody，不再被 briefTemplate 跳过 */
+  function talentRich(rec) {
+    if (!rec) return false;
+    return !!(rec.registerStatus || rec.socialSecurity || rec.expectedSalary ||
+      rec.education || rec.experience || rec.expectedPosition ||
+      rec.workArea || rec.arrivalTime || rec.certPack);
+  }
+  /* [分片X P0-02] typeKey → 专业渲染器解析；brief 类型返回 null（交由 briefTemplate） */
+  function resolveRendererByType(typeKey, bt) {
+    switch (typeKey) {
+      case 'material-supply': return bt.material;
+      case 'labor-supply': return bt.labor;
+      case 'equipment-supply': return bt.equipment;
+      case 'transport-supply': return bt.transport;
+      case 'franchise-supply': return bt.franchise;
+      case 'trade-supply': return bt.trade;
+      case 'personnel-demand': return bt.personnel;
+      case 'agency-supply': return bt.agency;
+      default: return null; /* 8 类 brief → briefTemplate */
+    }
+  }
   function isBriefSimple(rec) {
     if (!rec || rec.detailLevel !== 'brief') return false;
     var detailKeys = ['mat', 'labor', 'equip', 'transport', 'fc', 'tradeDetail', 'agencyDetail', 'personnelDetail', 'talentDetail'];
@@ -2416,13 +2468,13 @@ window.DETAIL = (function () {
     var phoneFull = (rec.contact && rec.contact.phone) || rec.phone || '';
     var wechatFull = (rec.contact && rec.contact.wechat) || rec.wechat || '';
     function row(k, v, action) { return '<div class="cc-row"><span class="k">' + k + '</span><span class="v">' + v + '</span>' + (action || '') + '</div>'; }
+    /* C片 G-P5 配套：contact 为空（账号档案未带电话/微信）时隐藏对应行，不留空白占位、不写假号码 */
+    var rows = row('发布账号', cfgText(name)) +
+      row('账号认证', '<span class="tag tag-gold" style="font-size:10px;padding:2px 8px;">' + flag + '</span>');
+    if (phoneFull) rows += row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked));
+    if (wechatFull) rows += row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked));
     return '<div class="contact-card">' +
-      '<div class="cc-list">' +
-        row('发布账号', cfgText(name)) +
-        row('账号认证', '<span class="tag tag-gold" style="font-size:10px;padding:2px 8px;">' + flag + '</span>') +
-        row('联系电话', Lock.partial(phoneFull, locked), ccAction('phone', phoneFull, locked)) +
-        row('微信号', Lock.full(wechatFull, locked), ccAction('copy', wechatFull, locked)) +
-      '</div>' +
+      '<div class="cc-list">' + rows + '</div>' +
       Lock.inline(locked, '解锁与对方沟通权限', '电话 · 微信 · 完整文件', unlockCreditText(rec)) +
       '</div>';
   }
@@ -2436,13 +2488,35 @@ window.DETAIL = (function () {
         var base = dHero({ tag: d.txt + ' · ' + (r.cat || t0.label), verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, meta: matchMeta(r) });
         var ai = r.aiAnalysis || {};
         var chips = (ai.tags || []).slice(0, 5).map(function (x) { return cfgText(x.k) + ' ' + cfgText(x.v); });
-        return base + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +
+        var matchPill = (ai.matchCount != null && ai.matchCount !== '')
+          ? '<span class="match-pill">匹配 ' + cfgText(ai.matchCount) + ' 位</span>' : '';
+        return base + matchPill + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +
           chips.map(function (x) { return '<span class="tag tag-gold">' + x + '</span>'; }).join('') + '</div></div>' : '');
       },
       sections: function (r, c) {
         var locked = !UnlockStore.isUnlocked(r);
         var ai = r.aiAnalysis || {};
         var h = '';
+        /* [分片X P1-01] AI 抽取要点：城市/预算/数量/工期，取 aiAnalysis.tags + 顶层 price/location */
+        var points = [];
+        if (r.location) points.push({ k: '城市', v: r.location });
+        else if (r.city) points.push({ k: '城市', v: r.city });
+        if (r.price || r.budget) points.push({ k: '预算', v: r.price || r.budget });
+        if (r.qty) points.push({ k: '数量', v: r.qty });
+        if (r.unit) points.push({ k: '单位', v: r.unit });
+        if (r.delivery) points.push({ k: '工期', v: r.delivery });
+        (ai.tags || []).forEach(function (tg) {
+          var k = String(tg.k || ''), v = String(tg.v || '');
+          if (!k) return;
+          var hit = points.some(function (p) { return p.k === k; });
+          if (!hit && v) points.push({ k: k, v: v });
+        });
+        if (points.length) {
+          h += sec('AI 抽取要点', '<div class="ai-points">' + points.map(function (p) {
+            return '<div class="ai-point"><span class="ap-k">' + cfgText(p.k) + '</span><span class="ap-v">' + cfgText(p.v) + '</span></div>';
+          }).join('') + '</div>');
+        }
+        if (ai.text) h += sec('结构化分析', '<div class="ds-text ai-text">' + cfgText(ai.text) + '</div>');
         if (ai.tags && ai.tags.length) {
           h += sec('结构化分析', '<div class="qual-chips">' + ai.tags.map(function (x) {
             return '<span class="tag tag-primary">' + cfgText(x.k) + '：' + cfgText(x.v) + '</span>';
@@ -2451,9 +2525,14 @@ window.DETAIL = (function () {
         if (r.desc || r.detail) h += sec('信息说明', '<div class="ds-text">' + cfgText(r.desc || r.detail) + '</div>');
         if (r.fields && r.fields.length) h += sec('补充信息', dList(r.fields));
         if (r.files && r.files.length) {
-          h += sec('提交文件', '<div class="qual-chips">' + r.files.map(function (f) {
+          /* C片 01§4①：files[].summary 文件摘要文本公开可见，逐文件渲染（无摘要的文件只显示名称，不补假说明） */
+          var fileChips = r.files.map(function (f) {
             return '<span class="tag tag-gold">' + cfgText(f.name) + '</span>';
-          }).join('') + '</div><div class="ds-text" style="margin-top:8px;color:var(--text-2);">文件名称与摘要公开可见，完整内容解锁后查看 / 下载。</div>');
+          }).join('');
+          var fileSummaries = r.files.filter(function (f) { return f.summary; }).map(function (f) {
+            return '<div class="ds-text" style="margin-top:6px;color:var(--text-2);">' + cfgText(f.name) + '：' + cfgText(f.summary) + '</div>';
+          }).join('');
+          h += sec('提交文件', '<div class="qual-chips">' + fileChips + '</div>' + fileSummaries + '<div class="ds-text" style="margin-top:8px;color:var(--text-2);">文件名称与摘要公开可见，完整内容解锁后查看 / 下载。</div>');
         }
         return h;
       },
@@ -2463,10 +2542,17 @@ window.DETAIL = (function () {
   }
   function attach(rec) {
     sweepTradeDeposits(); /* [FIX BM-010] 每次进入详情页清扫已过 30 天 TTL 的保证金并解冻退还 */
-    var t = byType[rec.bizKey];
-    /* 简要类（无完整详情子对象）→ 简版模板：AI 分析 + 一句话 + 简版账号 + 就近打码 */
+    /* [分片X P0-02] 分发：优先 resolveType(rec).typeKey → 专业渲染器；回退旧 bizKey；
+       resolveType 为 null 的 legacy 记录（f1/f2/t1-t6/p1 等）继续走旧 bizKey 渲染器，不直接空态。 */
+    var resolved = (window.DataBus && DataBus.resolveType) ? DataBus.resolveType(rec) : null;
+    var t = null;
+    if (resolved) t = resolveRendererByType(resolved.typeKey, byType);
+    if (!t) t = byType[rec.bizKey];
+    /* 简要类（无完整详情子对象）→ 简版模板：AI 分析 + 一句话 + 简版账号 + 就近打码；
+       talent rich 块优先走 talentBody（P0-06），不被 briefTemplate 覆盖。 */
     var briefMode = isBriefSimple(rec);
-    if (briefMode) t = briefTemplate(rec);
+    var skipBrief = (rec.bizKey === 'talent' && talentRich(rec));
+    if (briefMode && !skipBrief) t = briefTemplate(rec);
     if (!t) {
       /* P0：bizKey 异常时不张冠李戴到其他类别（历史上会错误回退到材料详情），直接空状态 */
       var ntNf = document.getElementById('nav-title'); if (ntNf) ntNf.textContent = '内容不存在';
@@ -2489,6 +2575,27 @@ window.DETAIL = (function () {
     if (phoneEl) phoneEl.classList.toggle('is-unlocked', !!unlocked);
     if ($('nav-title')) $('nav-title').textContent = t.label;
     if ($('hero')) $('hero').innerHTML = t.hero(rec, c);
+    /* [分片X P1-06/P2-05/P1-05] Hero 后处理：subCate 副标题、有效期/可议价角标、图片画廊 */
+    try {
+      var heroEl = $('hero');
+      if (heroEl) {
+        var heroBadges = '';
+        if (rec.subCate) heroBadges += '<span class="dh-subcate">' + cfgText(rec.subCate) + '</span>';
+        if (rec.negotiable) heroBadges += '<span class="dh-badge dh-badge--deal">可议价</span>';
+        if (rec.expireDays) heroBadges += '<span class="dh-badge dh-badge--expire">有效期剩余 ' + cfgText(rec.expireDays) + ' 天</span>';
+        if (heroBadges) {
+          var dhTag = heroEl.querySelector('.dh-tag');
+          if (dhTag) dhTag.insertAdjacentHTML('afterend', '<div class="dh-badges">' + heroBadges + '</div>');
+        }
+        /* P1-05 图片画廊：images[] 命中才渲染，onerror 占位，无图整块不渲染 */
+        if (rec.images && rec.images.length) {
+          var gallery = '<div class="detail-gallery">' + rec.images.slice(0, 6).map(function (src) {
+            return '<figure class="dg-item"><img src="' + cfgText(src) + ' alt="信息配图" onerror="this.parentNode.classList.add(\'dg-fallback\');this.remove();"><figcaption class="dg-cap"></figcaption></figure>';
+          }).join('') + '</div>';
+          heroEl.insertAdjacentHTML('afterend', gallery);
+        }
+      }
+    } catch (eHero) {}
     var certHtml = '';
     if ($('cert')) {
       var home = (rec.bizKey === 'talent' || rec.bizKey === 'franchise' || rec.bizKey === 'trade') ? null : ('../company/index.html?id=' + c.id);
@@ -2500,7 +2607,19 @@ window.DETAIL = (function () {
       // V4.1: 认证卡位移至「用户提交信息（业务正文）」与「平台信息（平台保障）」之间
       $('cert').style.display = 'none';
     }
-    var __bodyHtml = t.sections(rec, c) + certHtml + guaranteeSec(rec) + relatedSec(rec);
+    /* [分片X P0-03/P0-04] 需求态专属小节：trade-demand 挂 ¥5000 保证金锁说明 + openDelegate=1 出口；
+       franchise-demand 提供配对出口提示。纯展示与出口，不新增费用副作用。 */
+    var __demandExtras = '';
+    if (resolved && resolved.typeKey === 'trade-demand') {
+      __demandExtras = sec('收购意向说明',
+        '<div class="ds-text">收购意向为意向登记，不构成要约。对接转让经纪前需按平台规则冻结诚意保证金 <b>¥5,000</b>（成交可抵作交易款，未成交按规则解冻退还）。</div>' +
+        '<a class="demand-export-btn" href="../trade/index.html?openDelegate=1">联系转让经纪 · 了解收购流程</a>');
+    } else if (resolved && resolved.typeKey === 'franchise-demand') {
+      __demandExtras = sec('挂靠 / 合作说明',
+        '<div class="ds-text">本项为个人/项目方的合作或挂靠意向，平台按区域与资质等级撮合匹配，对接前请核实对方主体资质与合同条款。</div>' +
+        '<a class="demand-export-btn" href="../franchise/index.html">查看可合作招商方</a>');
+    }
+    var __bodyHtml = __demandExtras + t.sections(rec, c) + certHtml + guaranteeSec(rec) + relatedSec(rec);
     if ($('body')) $('body').innerHTML = __bodyHtml;
     /* [FIX HOME-NAV] 认证卡名称跳转主页：homeUrl 生成的是相对根路径，在详情页 base(pages/supply/) 下会解析错误，
        统一重写为相对本页的正确路径（c- → ../company/，其他 → ../personal/） */

@@ -77,6 +77,22 @@
     '.pickx-footer a:hover{background:var(--primary-soft,rgba(77,141,224,.1));}',
     '.pickx-simbar{padding:7px 10px;margin:0;border-bottom:1px dashed var(--line,#e3e4e6);font-size:11.5px;color:var(--primary-dim,#4d8de0);cursor:pointer;flex:none;}',
     '.pickx-simbar:hover{background:var(--primary-soft,rgba(77,141,224,.1));}',
+    /* 待审核（我的申请）分组：非可选，仅展示状态 + 撤回 */
+    '.pickx-badge.pending{background:rgba(192,68,42,.12);color:var(--warning-ink,#A8321C);}',
+    '.pickx-pending-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:12.5px;color:var(--text-2,#555);cursor:default;user-select:none;}',
+    '.pickx-pending-item .pickx-pending-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+    '.pickx-pending-cancel{flex:none;width:18px;height:18px;border-radius:50%;border:none;background:transparent;color:var(--text-3,#9a9ba1);font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}',
+    '.pickx-pending-cancel:hover{color:var(--danger,#d44c47);background:rgba(212,76,71,.08);}',
+    /* 空态引导（品名未选子类） */
+    '.pickx-guide{padding:14px 12px;}',
+    '.pickx-guide-title{font-size:12.5px;font-weight:700;color:var(--text-1,#1c1c1e);margin-bottom:9px;}',
+    '.pickx-guide-step{display:flex;gap:8px;font-size:11.5px;color:var(--text-2,#555);line-height:1.6;margin-bottom:7px;}',
+    '.pickx-guide-num{flex:none;width:16px;height:16px;border-radius:50%;background:var(--primary-soft,rgba(77,141,224,.12));color:var(--primary-dim,#4d8de0);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;}',
+    '.pickx-guide-btn{margin-top:10px;width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--primary-dim,#4d8de0);background:var(--primary-soft,rgba(77,141,224,.1));color:var(--primary-dim,#4d8de0);font-size:12.5px;font-weight:600;cursor:pointer;}',
+    '.pickx-guide-btn:active{transform:scale(.98);}',
+    /* 面板底部次级入口（申请收录） */
+    '.pickx-footer a.pickx-request-name{color:var(--text-2,#555);font-weight:500;}',
+    '.pickx-footer a.pickx-request-name:hover{color:var(--primary-dim,#4d8de0);background:var(--primary-soft,rgba(77,141,224,.1));}',
     /* 组合框（品名）：input 即触发框 */
     '.pickx-combo-wrap{position:relative;}',
     '.pickx-combo-wrap .pickx-combo-caret{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3,#9a9ba1);pointer-events:none;}',
@@ -231,6 +247,12 @@
     if (this.searchEl) this.searchEl.addEventListener('input', function () { self.query = this.value; self._render(); });
     this.listEl.addEventListener('mousedown', function (e) { e.preventDefault(); });
     this.listEl.addEventListener('click', function (e) {
+      var cancel = e.target.closest ? e.target.closest('.pickx-pending-cancel') : null;
+      if (cancel) {
+        e.stopPropagation();
+        if (self.opts.onWithdraw) self.opts.onWithdraw(cancel.dataset.id);
+        return;
+      }
       var it = e.target.closest ? e.target.closest('.pickx-item') : null;
       if (it) self._pick(it.dataset.v);
     });
@@ -283,17 +305,35 @@
     this.list = items.slice();
     if (this.query) this.filtered = items.filter(function (v) { return contains(v, self.query); });
     else this.filtered = items.slice();
-    if (!this.filtered.length) {
-      this.listEl.innerHTML = '<div class="pickx-empty">' + esc(this.query ? '未找到匹配项，可输入更少关键词' : '暂无可用选项') + '</div>';
-      return;
+    /* 我的申请（待审核）：非受控、不可选，仅状态展示 + 撤回 */
+    var pending = [];
+    if (typeof this.opts.pendingFn === 'function') {
+      try { pending = this.opts.pendingFn() || []; } catch (e) { pending = []; }
+      if (this.query) pending = pending.filter(function (p) { return contains(p.name, self.query); });
     }
     this.listEl.innerHTML = '';
+    if (!this.filtered.length && !pending.length) {
+      this.listEl.innerHTML = '<div class="pickx-empty">' + esc(this.query
+        ? '未找到「' + this.query + '」，可在底部申请新增'
+        : '当前品类暂无可选子类，可在底部申请新增') + '</div>';
+      return;
+    }
     this.filtered.forEach(function (v) {
       var it = makeEl('div', 'pickx-item' + (v === self.value ? ' selected' : ''));
       it.dataset.v = v;
       it.innerHTML = CHECK_SVG + '<span class="pickx-item-text">' + esc(v) + '</span>';
       self.listEl.appendChild(it);
     });
+    if (pending.length) {
+      this.listEl.appendChild(makeEl('div', 'pickx-group-label', '我的申请 · 审核中'));
+      pending.forEach(function (p) {
+        var row = makeEl('div', 'pickx-pending-item');
+        row.innerHTML = '<span class="pickx-pending-name">' + esc(p.name) + '</span>'
+          + '<span class="pickx-badge pending">审核中</span>'
+          + '<button type="button" class="pickx-pending-cancel" data-id="' + esc(p.id) + '" aria-label="撤回申请">×</button>';
+        self.listEl.appendChild(row);
+      });
+    }
     this.highlight = Math.min(this.highlight, this.filtered.length - 1);
   };
   PickXSelect.prototype._markHighlight = function () {
@@ -417,12 +457,32 @@
     });
     this.listEl.addEventListener('mousedown', function (e) { e.preventDefault(); });
     this.listEl.addEventListener('click', function (e) {
+      var cancel = e.target.closest ? e.target.closest('.pickx-pending-cancel') : null;
+      if (cancel) {
+        e.stopPropagation();
+        if (self.opts.onWithdraw) self.opts.onWithdraw(cancel.dataset.id);
+        return;
+      }
+      var guideBtn = e.target.closest ? e.target.closest('.pickx-guide-btn') : null;
+      if (guideBtn && guideBtn.dataset.act === 'subcat') {
+        e.stopPropagation();
+        self.close();
+        if (self.opts.onPickSubcat) self.opts.onPickSubcat();
+        return;
+      }
       var it = e.target.closest ? e.target.closest('.pickx-item') : null;
       if (it) self._pickItem({ g: Number(it.dataset.g), v: it.dataset.v });
       var sim = e.target.closest ? e.target.closest('.pickx-simbar') : null;
       if (sim && self._simCache && self._simCache.name) { self._applySimilar(self._simCache.name); }
     });
     this.footerEl.addEventListener('click', function (e) {
+      var req = e.target.closest ? e.target.closest('.pickx-request-name') : null;
+      if (req) {
+        e.stopPropagation();
+        var q = (self.input.value || '').trim();
+        if (self.opts.onRequestName) self.opts.onRequestName(q);
+        return;
+      }
       var a = e.target.closest ? e.target.closest('.pickx-use-custom') : null;
       if (a) { self._confirmCustom(); }
     });
@@ -464,6 +524,12 @@
     this.filtered = flat;
     var self = this;
     this.listEl.innerHTML = '';
+    /* 我的申请（待审核品名）：非受控、不可选，仅状态展示 + 撤回 */
+    var pending = [];
+    if (typeof this.opts.pendingFn === 'function') {
+      try { pending = this.opts.pendingFn() || []; } catch (e) { pending = []; }
+      if (q) pending = pending.filter(function (p) { return contains(p.name, q); });
+    }
     /* 相似名引导条（输入时） */
     this.simBar = null;
     if (this.similarFn && q && q.trim()) {
@@ -477,11 +543,30 @@
         } else this._simCache = null;
       } catch (e) { this._simCache = null; }
     } else this._simCache = null;
-    if (!flat.length) {
-      /* 有输入 → 提示可自定义；无输入 → 空态 */
-      this.listEl.appendChild(makeEl('div', 'pickx-empty',
-        q ? '词库暂无匹配，可直接输入你的品名' : '暂无品名联想，可直接输入'));
-      this.footerEl.innerHTML = q && q.trim() ? '<a class="pickx-use-custom" href="javascript:void(0)">使用「' + esc(q.trim()) + '」作为品名（自定义）</a>' : '';
+    if (!flat.length && !pending.length) {
+      var showGuide = typeof this.opts.guideSubcat === 'function'
+        ? !!this.opts.guideSubcat() : (this.opts.guideSubcat !== false);
+      if (!q && showGuide) {
+        /* 未选子类 · 无输入：分步引导（先选子类看推荐，或直接自定义） */
+        var guide = makeEl('div', 'pickx-guide');
+        guide.innerHTML =
+          '<div class="pickx-guide-title">填写品名</div>'
+          + '<div class="pickx-guide-step"><span class="pickx-guide-num">1</span><span>先在上方选择「子类」，系统推荐该子类的常用标准品名</span></div>'
+          + '<div class="pickx-guide-step"><span class="pickx-guide-num">2</span><span>也可以不选子类，直接输入你的自定义品名</span></div>'
+          + '<button type="button" class="pickx-guide-btn" data-act="subcat">去选择子类</button>';
+        this.listEl.appendChild(guide);
+        this.footerEl.innerHTML = '';
+      } else {
+        this.listEl.appendChild(makeEl('div', 'pickx-empty',
+          q ? '词库暂无匹配，可直接使用自定义品名' : '暂无品名联想，可直接输入'));
+        var qt = q && q.trim();
+        this.footerEl.innerHTML = qt
+          ? '<a class="pickx-use-custom" href="javascript:void(0)">使用「' + esc(qt) + '」作为品名（自定义）</a>'
+            + (typeof this.opts.onRequestName === 'function'
+              ? '<a class="pickx-request-name" href="javascript:void(0)">申请收录「' + esc(qt) + '」为标准品名</a>' : '')
+          : '';
+      }
+      this.highlight = 0;
       return;
     }
     var lastGi = -1;
@@ -497,6 +582,16 @@
         (g.badge ? '<span class="pickx-badge ' + esc(g.badgeCls || '') + '">' + esc(g.badge) + '</span>' : '');
       self.listEl.appendChild(it);
     });
+    if (pending.length) {
+      this.listEl.appendChild(makeEl('div', 'pickx-group-label', '我的申请 · 审核中'));
+      pending.forEach(function (p) {
+        var row = makeEl('div', 'pickx-pending-item');
+        row.innerHTML = '<span class="pickx-pending-name">' + esc(p.name) + '</span>'
+          + '<span class="pickx-badge pending">审核中</span>'
+          + '<button type="button" class="pickx-pending-cancel" data-id="' + esc(p.id) + '" aria-label="撤回申请">×</button>';
+        self.listEl.appendChild(row);
+      });
+    }
     this.footerEl.innerHTML = '';
     this.highlight = Math.min(this.highlight, flat.length - 1);
   };

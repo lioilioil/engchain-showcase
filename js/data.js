@@ -14,8 +14,8 @@ window.MOCK = (function () {
       location: '成都市·天府新区', city: '成都', distance: '8.6km',
       tags: ['C30', 'C40', '泵送', '单次3000方'],
       time: ago(12),
-      company: '四川中建××建设有限公司', contact: '李工', phone: '138****8888', wechat: 'li****_2024',
-      address: '成都市天府新区××大道南段188号', file: '招标文件.pdf',
+      company: '四川中建建设有限公司', contact: '李工', phone: '138****8888', wechat: 'li****_2024',
+      address: '成都市天府新区大道南段188号', file: '招标文件.pdf',
       detail: '本项目为天府新区核心区商业综合体，总建筑面积约18万㎡，地上7层、地下3层。近期进入主体结构施工阶段，急需商品混凝土供应。要求混凝土公司具备绿色环保认证及成都市预拌混凝土生产企业资质。',
       fields: [
         { k: '需求方量', v: '单次约 3,000 方，总量约 1.2 万方' },
@@ -36,7 +36,7 @@ window.MOCK = (function () {
       budget: '¥286,000', price: '', location: '重庆市·江津区', city: '重庆', distance: '12.3km',
       tags: ['波形护栏', '热镀锌', '国标'], time: ago(48),
       company: '重庆×建设集团有限公司', contact: '王经理', phone: '139****2365', wechat: 'w***_88',
-      address: '重庆市江津区××大道', file: '清单.xlsx',
+      address: '重庆市江津区大道', file: '清单.xlsx',
       detail: '市政道路工程配套波形梁钢护栏约3.6公里，要求热镀锌处理，满足GB标准。供应商需资质齐全并可开具增值税专用发票。',
       fields: [
         { k: '采购品类', v: '波形梁钢护栏（Gr-A-4E）' },
@@ -55,8 +55,8 @@ window.MOCK = (function () {
       id: 1003, type: 'supply', title: '供应 盘扣式脚手架/钢管租赁 西南地区自营仓库', cat: '设备', sub: '脚手架',
       budget: '', price: '¥0.32/吨/天', location: '成都市·青白江', city: '成都', distance: '5.2km',
       tags: ['盘扣', '48*3.0', '现货', '可租可售'], time: ago(5),
-      company: '四川××租赁有限公司', contact: '刘总', phone: '137****6702', wechat: 'liu***_99',
-      address: '成都市青白江区××物流园', file: '报价单.xlsx',
+      company: '四川租赁有限公司', contact: '刘总', phone: '137****6702', wechat: 'liu***_99',
+      address: '成都市青白江区物流园', file: '报价单.xlsx',
       detail: '自有盘扣式脚手架仓库20000吨现货，覆盖西南地区，提供租赁及售后技术支持，可开13%专票。',
       fields: [
         { k: '在租资源', v: '盘扣式脚手架 20,000 吨，钢管扣件配套' },
@@ -113,7 +113,7 @@ window.MOCK = (function () {
           { date: '2024-06', title: '周转归库维保', desc: '清污、补镀、分拣、重新打包', state: 'done' },
           { date: '当前', title: '现货可排发出库', desc: '青白江自营仓 20,000 吨现货', state: 'plan' }
         ],
-        contact: { name: '刘总（仓储调度负责人）', phone: '1378286 6702', wechat: 'liuzong_pkk028', addr: '成都市青白江区祥福镇现代物流园 ×× 库区 6 号门' },
+        contact: { name: '刘总（仓储调度负责人）', phone: '1378286 6702', wechat: 'liuzong_pkk028', addr: '成都市青白江区祥福镇现代物流园  库区 6 号门' },
         flow: [
           { step: 1, title: '提报用量', desc: '提供方案图与立杆横杆用量清单' },
           { step: 2, title: '报价锁货', desc: '确认吨天单价并预留库存' },
@@ -129,8 +129,8 @@ window.MOCK = (function () {
       id: 1004, type: 'supply', title: '供应 劳务班组 钢筋工/木工/混凝土工 可进场', cat: '劳务', sub: '钢筋工',
       budget: '', price: '¥420/人/天', location: '贵阳市·观山湖', city: '贵阳', distance: '28km',
       tags: ['150人', '5年经验', '可全国'] , time: ago(30),
-      company: '贵州××劳务有限公司', contact: '赵总', phone: '135****4451', wechat: 'zhao***',
-      address: '贵阳市观山湖区××街道', file: '班组介绍.pdf',
+      company: '贵州劳务有限公司', contact: '赵总', phone: '135****4451', wechat: 'zhao***',
+      address: '贵阳市观山湖区街道', file: '班组介绍.pdf',
       detail: '专业劳务班组150人，钢筋工42人、木工60人、混凝土工48人，全部实名制，可提供近5年项目业绩。',
       fields: [
         { k: '班组规模', v: '150 人（钢筋 42 / 木工 60 / 混凝土 48）' },
@@ -199,7 +199,7 @@ window.MOCK = (function () {
           { k: '工期承诺', v: '可接受两班倒，赶工期间 48 小时内增配人手' },
           { k: '安全承诺', v: '专职安全员驻场，近 3 年零重大安全事故' }
         ],
-        contact: { name: '赵有材（劳务负责人）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区××产业园劳务基地 3 栋' },
+        contact: { name: '赵有材（劳务负责人）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区产业园劳务基地 3 栋' },
         flow: [{step:1,title:'需求对接',desc:'沟通工种、人数、工期与工地位置'},{step:2,title:'班组报价',desc:'按计件 / 计时 / 包工出具报价'},{step:3,title:'实名制登记',desc:'全国建筑工人管理服务平台建档'},{step:4,title:'签订合同',desc:'劳务分包合同 / 用工书面协议'},{step:5,title:'三级安全教育',desc:'公司 / 项目 / 班组级教育考核合格'},{step:6,title:'进场施工',desc:'人脸 / 指纹考勤，按计划作业'},{step:7,title:'过程管理',desc:'日常考勤、质量检查、安全巡查'},{step:8,title:'工程量核算',desc:'按月 / 节点对账确认工程量或工时'},{step:9,title:'工资专户发放',desc:'银行按月足额直发工人本人卡'},{step:10,title:'维权公示',desc:'现场设维权告示牌，公开支付情况'},{step:11,title:'退场结算',desc:'完工结清全部工资，办退场手续'},{step:12,title:'评价归档',desc:'质量 / 进度 / 安全评价纳入诚信档案'}]
       }
     },
@@ -207,8 +207,8 @@ window.MOCK = (function () {
       id: 1005, type: 'demand', title: '西安浐灞生态区项目 急需塔吊租赁（QTZ63）', cat: '设备', sub: '塔吊',
       budget: '¥76,000/月', price: '', location: '西安市·浐灞', city: '西安', distance: '—',
       tags: ['QTZ63', '5台', '带司机', '半年'], time: ago(70),
-      company: '陕西××置业有限公司', contact: '孙工', phone: '136****9920', wechat: 'sun***_20',
-      address: '西安市浐灞生态区××路', file: '需求书.pdf',
+      company: '陕西置业有限公司', contact: '孙工', phone: '136****9920', wechat: 'sun***_20',
+      address: '西安市浐灞生态区路', file: '需求书.pdf',
       detail: '项目需塔吊QTZ63共5台，带司机进场，租期半年起，要求设备完好、手续齐全。',
       fields: [
         { k: '需求设备', v: 'QTZ63 塔式起重机 5 台' },
@@ -227,8 +227,8 @@ window.MOCK = (function () {
       id: 1006, type: 'supply', title: '供应 珍珠岩保温板/保温砂浆 厂家直发', cat: '材料', sub: '保温',
       budget: '', price: '¥45/㎡', location: '昆明市·官渡', city: '昆明', distance: '—',
       tags: ['A级防火', '厂家直发', '当日达'], time: ago(120),
-      company: '云南××建材科技有限公司', contact: '陈经理', phone: '138****7710', wechat: 'chen***_10',
-      address: '昆明市官渡区××工业园', file: '检测报告.pdf',
+      company: '云南建材科技有限公司', contact: '陈经理', phone: '138****7710', wechat: 'chen***_10',
+      address: '昆明市官渡区工业园', file: '检测报告.pdf',
       detail: 'A级防火珍珠岩保温板厂价直发，产能充足，可开专票，支持全国物流配送。',
       fields: [
         { k: '主营产品', v: 'A 级防火珍珠岩保温板 / 保温砂浆' },
@@ -281,8 +281,8 @@ window.MOCK = (function () {
       id: 1007, type: 'demand', title: '贵阳乌当区老旧小区改造 防水项目分包', cat: '劳务', sub: '防水施工',
       budget: '¥2,180,000', price: '', location: '贵阳市·乌当', city: '贵阳', distance: '22km',
       tags: ['防水', '包工包料', '15栋'], time: ago(240),
-      company: '贵阳××城建集团', contact: '吴工', phone: '133****3125', wechat: 'wu***_25',
-      address: '贵阳市乌当区××路', file: '分包招标.pdf',
+      company: '贵阳城建集团', contact: '吴工', phone: '133****3125', wechat: 'wu***_25',
+      address: '贵阳市乌当区路', file: '分包招标.pdf',
       detail: '老旧小区改造防水工程分包，共15栋楼约6.5万㎡，包工包料，要求二级防水资质。',
       fields: [
         { k: '项目名称', v: '贵阳乌当区老旧小区改造工程' },
@@ -301,8 +301,8 @@ window.MOCK = (function () {
       id: 1008, type: 'supply', title: '供应 工程机械 挖掘机/装载机 台班出租', cat: '设备', sub: '挖掘机',
       budget: '', price: '¥1,150/台班', location: '长沙·岳麓', city: '长沙', distance: '—',
       tags: ['三一SY215', '30台', '带操作手'], time: ago(200),
-      company: '湖南××工程机械有限公司', contact: '周总', phone: '139****8874', wechat: 'zhou***_74',
-      address: '长沙市岳麓区××产业园', file: '设备清单.pdf',
+      company: '湖南工程机械有限公司', contact: '周总', phone: '139****8874', wechat: 'zhou***_74',
+      address: '长沙市岳麓区产业园', file: '设备清单.pdf',
       detail: '自有三一/徐工设备30台，含SY215挖掘机、50装载机，可按台班或包月出租，带操作手，手续齐全。',
       fields: [
         { k: '设备资源', v: '三一 SY215 挖掘机、徐工 50 装载机等 30 台' },
@@ -360,7 +360,7 @@ window.MOCK = (function () {
           { date: '2024-08', title: '完工归库', desc: '长沙某基坑项目退场、全面检修', state: 'done' },
           { date: '当前', title: '可租随时进场', desc: '操作手与平板车待命', state: 'plan' }
         ],
-        contact: { name: '周总（机队调度）', phone: '1397488 8874', wechat: 'zhou_sany74', addr: '长沙市岳麓区含浦产业园 ×× 工程机械停放场' },
+        contact: { name: '周总（机队调度）', phone: '1397488 8874', wechat: 'zhou_sany74', addr: '长沙市岳麓区含浦产业园  工程机械停放场' },
         flow: [
           { step: 1, title: '说明工况', desc: '吨位/斗容/工时/是否破碎' },
           { step: 2, title: '报价确认', desc: '台班或包月、进出场与燃油约定' },
@@ -376,8 +376,8 @@ window.MOCK = (function () {
       id: 1009, type: 'supply', title: '供应 P.O42.5 散装水泥/商品砂浆 厂家直发 成都仓', cat: '材料', sub: '水泥',
       budget: '', price: '¥420/吨', location: '成都市·龙泉驿', city: '成都', distance: '3.1km',
       tags: ['P.O42.5', '现货', '可开专票', '当日达'], time: ago(18),
-      company: '四川××建材供应有限公司', contact: '何经理', phone: '132****5521', wechat: 'he***_21',
-      address: '成都市龙泉驿区××工业园', file: '报价单.xlsx',
+      company: '四川建材供应有限公司', contact: '何经理', phone: '132****5521', wechat: 'he***_21',
+      address: '成都市龙泉驿区工业园', file: '报价单.xlsx',
       detail: '自有水泥罐仓2000吨现货，覆盖成都及周边，支持散装水泥与商品砂浆配送，可开13%专票，当日可送达。',
       fields: [
         { k: '主营产品', v: 'P.O42.5 散装水泥 / 商品砂浆' },
@@ -431,7 +431,7 @@ window.MOCK = (function () {
       budget: '¥920,000', price: '', location: '重庆市·江津区', city: '重庆', distance: '15.6km',
       tags: ['级配碎石', '砂石料', '国标', '月结'], time: ago(64),
       company: '重庆×建设集团有限公司', contact: '王经理', phone: '139****2365', wechat: 'w***_88',
-      address: '重庆市江津区××大道', file: '材料清单.xlsx',
+      address: '重庆市江津区大道', file: '材料清单.xlsx',
       detail: '河道治理配套级配碎石与砂石料约2.4万吨，要求符合国标级配，供应商需具备开采或经营许可并可按月结算。',
       fields: [
         { k: '采购品类', v: '级配碎石、机制砂、河砂' },
@@ -450,8 +450,8 @@ window.MOCK = (function () {
       id: 1011, type: 'demand', title: '西安泾河新城项目 急租 汽车吊25T/50T 带司机', cat: '设备', sub: '汽车吊',
       budget: '¥58,000/月', price: '', location: '西安市·泾河新城', city: '西安', distance: '—',
       tags: ['25T', '50T', '带司机', '3台'], time: ago(88),
-      company: '陕西××置业有限公司', contact: '孙工', phone: '136****9920', wechat: 'sun***_20',
-      address: '西安市泾河新城××路', file: '设备需求书.pdf',
+      company: '陕西置业有限公司', contact: '孙工', phone: '136****9920', wechat: 'sun***_20',
+      address: '西安市泾河新城路', file: '设备需求书.pdf',
       detail: '主体吊装阶段急租汽车吊25T、50T共3台，带司机进场，租期3个月起，要求设备年限5年内、手续齐全。',
       fields: [
         { k: '需求设备', v: '25T、50T 汽车吊共 3 台' },
@@ -470,8 +470,8 @@ window.MOCK = (function () {
       id: 1012, type: 'supply', title: '供应 塔吊/施工电梯 整机租赁 成都辐射西南', cat: '设备', sub: '塔吊',
       budget: '', price: '¥32,000/月', location: '成都市·新都', city: '成都', distance: '6.8km',
       tags: ['QTZ80', '施工电梯', '现货', '手续齐全'], time: ago(26),
-      company: '四川××租赁有限公司', contact: '刘总', phone: '137****6702', wechat: 'liu***_99',
-      address: '成都市新都区××物流园', file: '设备清单.pdf',
+      company: '四川租赁有限公司', contact: '刘总', phone: '137****6702', wechat: 'liu***_99',
+      address: '成都市新都区物流园', file: '设备清单.pdf',
       detail: '塔吊QTZ80、施工电梯等整机租赁，自有设备120台套，覆盖西南地区，含安装拆除与维保，手续齐全可开专票。',
       fields: [
         { k: '设备资源', v: 'QTZ80 塔吊、施工电梯共 120 台套' },
@@ -529,7 +529,7 @@ window.MOCK = (function () {
           { date: '2024-07', title: '完工归库', desc: '成都某超高层项目退场、整机翻新', state: 'done' },
           { date: '当前', title: '现货可租', desc: '48h 内组织进场', state: 'plan' }
         ],
-        contact: { name: '刘总（整机租赁经理）', phone: '1378286 6702', wechat: 'liuzong_tadiao', addr: '成都市新都区 ×× 物流园设备基地' },
+        contact: { name: '刘总（整机租赁经理）', phone: '1378286 6702', wechat: 'liuzong_tadiao', addr: '成都市新都区  物流园设备基地' },
         flow: [
           { step: 1, title: '需求对接', desc: '型号/高度/工期/工地位置' },
           { step: 2, title: '方案报价', desc: '月租+进出场+顶升附墙明细' },
@@ -547,8 +547,8 @@ window.MOCK = (function () {
       id: 1013, type: 'supply', title: '供应 水电安装班组 持证上岗 可全国进场', cat: '劳务', sub: '水电工',
       budget: '', price: '¥380/人/天', location: '成都市·双流', city: '成都', distance: '9.4km',
       tags: ['水电工', '持证', '50人', '可全国'], time: ago(41),
-      company: '贵州××劳务有限公司', contact: '赵总', phone: '135****4451', wechat: 'zhao***',
-      address: '成都市双流区××街道', file: '班组介绍.pdf',
+      company: '贵州劳务有限公司', contact: '赵总', phone: '135****4451', wechat: 'zhao***',
+      address: '成都市双流区街道', file: '班组介绍.pdf',
       detail: '专业水电安装班组50人，均持电工证/焊工证，实名制管理，可全国进场，提供近3年水电安装项目业绩。',
       fields: [
         { k: '班组规模', v: '50 人，均持电工证 / 焊工证' },
@@ -616,7 +616,7 @@ window.MOCK = (function () {
           { k: '工期承诺', v: '配合土建穿插施工，按节点交付不拖期' },
           { k: '持证承诺', v: '电工、焊工 100% 持应急管理部特种作业操作证上岗' }
         ],
-        contact: { name: '赵有材（劳务负责人）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '成都市双流区××项目工人生活区' },
+        contact: { name: '赵有材（劳务负责人）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '成都市双流区项目工人生活区' },
         flow: [{step:1,title:'需求对接',desc:'沟通工种、人数、工期与工地位置'},{step:2,title:'班组报价',desc:'按计件 / 计时 / 包工出具报价'},{step:3,title:'实名制登记',desc:'全国建筑工人管理服务平台建档'},{step:4,title:'签订合同',desc:'劳务分包合同 / 用工书面协议'},{step:5,title:'三级安全教育',desc:'公司 / 项目 / 班组级教育考核合格'},{step:6,title:'进场施工',desc:'人脸 / 指纹考勤，按计划作业'},{step:7,title:'过程管理',desc:'日常考勤、质量检查、安全巡查'},{step:8,title:'工程量核算',desc:'按月 / 节点对账确认工程量或工时'},{step:9,title:'工资专户发放',desc:'银行按月足额直发工人本人卡'},{step:10,title:'维权公示',desc:'现场设维权告示牌，公开支付情况'},{step:11,title:'退场结算',desc:'完工结清全部工资，办退场手续'},{step:12,title:'评价归档',desc:'质量 / 进度 / 安全评价纳入诚信档案'}]
       }
     },
@@ -624,8 +624,8 @@ window.MOCK = (function () {
       id: 1014, type: 'supply', title: '供应 砂石运输车队 自有罐车/自卸车 24小时调度', cat: '运输', sub: '砂石运输',
       budget: '', price: '¥30/吨·公里', location: '成都市·青白江', city: '成都', distance: '6.2km',
       tags: ['砂石运输', '自有车队', '罐车8台', '24小时调度'], time: ago(26),
-      company: '四川××物流运输有限公司', contact: '刘经理', phone: '137****3322', wechat: 'liu***log',
-      address: '成都市青白江区××物流园', file: '运输服务方案.pdf',
+      company: '四川物流运输有限公司', contact: '刘经理', phone: '137****3322', wechat: 'liu***log',
+      address: '成都市青白江区物流园', file: '运输服务方案.pdf',
       detail: '自有混凝土罐车8台、自卸车12台，长期服务成都周边砂石场与搅拌站，覆盖主城区及二绕内项目，24小时调度响应。',
       fields: [
         { k: '运力配置', v: '混凝土罐车 8 台（12-15方）、自卸车 12 台（30-40吨）' },
@@ -653,7 +653,7 @@ window.MOCK = (function () {
           { k: '时效承诺', v: '接单后 2 小时内派车到位' },
           { k: '安全承诺', v: '近 3 年无重大运输事故' }
         ],
-        contact: { name: '刘经理（运输调度）', phone: '1388091 3322', wechat: 'liu_log_0825', addr: '成都市青白江区××物流园' },
+        contact: { name: '刘经理（运输调度）', phone: '1388091 3322', wechat: 'liu_log_0825', addr: '成都市青白江区物流园' },
         flow: [{step:1,title:'线路确认',desc:'沟通起运点、卸货点、运输频次'},{step:2,title:'报价出单',desc:'按吨·公里 / 趟次出具报价单'},{step:3,title:'签订运输合同',desc:'明确计价、结算、保险条款'},{step:4,title:'派车装运',desc:'24 小时调度，按计划装车'},{step:5,title:'在途跟踪',desc:'定位 + 回单管理'},{step:6,title:'结算开票',desc:'月结对账，开具运输发票'}]
       }
     },
@@ -661,8 +661,8 @@ window.MOCK = (function () {
       id: 1015, type: 'demand', title: '成都双流项目 需要混凝土罐车运输 租赁或承包均可', cat: '运输', sub: '',
       budget: '', price: '', location: '成都市·双流', city: '成都', distance: '3.8km',
       tags: ['罐车', '租赁', '承包'], time: ago(18),
-      company: '重庆××建工集团有限公司', contact: '陈工', phone: '136****9988', wechat: 'chen***',
-      address: '成都市双流区××项目部', file: '运输需求说明.docx',
+      company: '重庆建工集团有限公司', contact: '陈工', phone: '136****9988', wechat: 'chen***',
+      address: '成都市双流区项目部', file: '运输需求说明.docx',
       detail: '双流区在建项目高峰期每日需混凝土罐车 8-10 台，租期 6 个月，租赁或承包均可，就近车队优先。',
       fields: [
         { k: '用车类型', v: '混凝土罐车（12方以上）' },
@@ -683,8 +683,8 @@ window.MOCK = (function () {
       id: 1016, type: 'demand', title: '成都 需要建筑资质新办服务 建筑施工总承包三级 找正规中介', cat: '中介服务', sub: '',
       budget: '', price: '', location: '成都市·武侯', city: '成都', distance: '2.1km',
       tags: ['资质新办', '总承包三级'], time: ago(55),
-      company: '四川××建设咨询有限公司', contact: '周经理', phone: '139****6677', wechat: 'zhou***',
-      address: '成都市武侯区××大厦', file: '',
+      company: '四川建设咨询有限公司', contact: '周经理', phone: '139****6677', wechat: 'zhou***',
+      address: '成都市武侯区大厦', file: '',
       detail: '公司需要新办建筑工程施工总承包三级资质（含安许），要求正规中介机构代办，价格合理、流程透明。',
       fields: [
         { k: '服务类型', v: '资质新办（总承包三级 + 安许）' },
@@ -708,9 +708,9 @@ window.MOCK = (function () {
 
   /* ---- 会话 (消息) ---- */
   const conversations = [
-    { id: 'c1', name: '李工', role: '四川中建××建设', last: '您好，混凝土型号确认了吗？', time: '09:12', unread: 2, avatar: '李' },
-    { id: 'c2', name: '刘总', role: '四川××租赁', last: '报价单已发您，请查收', time: '08:47', unread: 0, avatar: '刘' },
-    { id: 'c3', name: '赵总', role: '贵州××劳务', last: '班组明天可进场', time: '昨天', unread: 1, avatar: '赵' },
+    { id: 'c1', name: '李工', role: '四川中建建设', last: '您好，混凝土型号确认了吗？', time: '09:12', unread: 2, avatar: '李' },
+    { id: 'c2', name: '刘总', role: '四川租赁', last: '报价单已发您，请查收', time: '08:47', unread: 0, avatar: '刘' },
+    { id: 'c3', name: '赵总', role: '贵州劳务', last: '班组明天可进场', time: '昨天', unread: 1, avatar: '赵' },
     { id: 'c4', name: '王经理', role: '重庆×建设集团', last: '感谢，后续再合作', time: '昨天', unread: 0, avatar: '王' },
     { id: 'c5', name: '平台客服', role: '工程链官方', last: '您的发票已开具成功', time: '周一', unread: 0, avatar: '链' }
   ];
@@ -748,7 +748,7 @@ window.MOCK = (function () {
   ];
 
   /* ---- 认证 ---- */
-  const profile = { name: '陈建国', idMasked: '5101**********1234', company: '四川省××建设有限公司', role: '供方', tiers: ['企业用户', '专业版', '合伙人'], avatar: '陈' };
+  const profile = { name: '陈建国', idMasked: '5101**********1234', company: '四川省建设有限公司', role: '供方', tiers: ['企业用户', '专业版', '合伙人'], avatar: '陈' };
 
   /* ---- 用户状态 (账号权益分级) ----
      不同身份对应不同的账号权益与功能；level 越高，功能越完整。
@@ -1107,7 +1107,7 @@ window.MOCK = (function () {
      score/dims 用于认证卡片的高端评分表现；certs 为认证清单；published 挂供需。 */
   const companies = [
     {
-      id: 'c-znzjs', name: '四川中建××建设有限公司', short: '中建建工', avatar: '中',
+      id: 'c-znzjs', name: '四川中建建设有限公司', short: '中建建工', avatar: '中',
       industry: '建筑施工总承包', mainBusiness: '房屋建筑 · 市政 · 装饰装修', location: '成都·天府新区',
       creditCode: '91510100MA6C9LKD1X', legalRep: '李建国', regCapital: '8,800万元', founded: '2011-06-18', status: '存续（在营）',
       score: { value: 9.2, grade: 'AAA级' },
@@ -1151,7 +1151,7 @@ window.MOCK = (function () {
       contact: { name: '张经理', title: '商务负责人', phone: '139****0000' }, published: [1001]
     },
     {
-      id: 'c-gzlw', name: '贵州××劳务有限公司', short: '黔工劳务', avatar: '劳',
+      id: 'c-gzlw', name: '贵州劳务有限公司', short: '黔工劳务', avatar: '劳',
       industry: '建筑劳务分包', mainBusiness: '钢筋 · 木工 · 混凝土 劳务分包', location: '贵阳·观山湖',
       creditCode: '91520190MA6C09PK3W', legalRep: '赵有材', regCapital: '2,000万元', founded: '2016-09-02', status: '存续（在营）',
       score: { value: 8.8, grade: 'A级' },
@@ -1172,7 +1172,7 @@ window.MOCK = (function () {
       contact: { name: '赵总', title: '劳务负责人', phone: '135****4451' }, published: [1004]
     },
     {
-      id: 'c-sczl', name: '四川××租赁有限公司', short: '蜀建租赁', avatar: '租',
+      id: 'c-sczl', name: '四川租赁有限公司', short: '蜀建租赁', avatar: '租',
       industry: '机械设备租赁', mainBusiness: '盘扣脚手架 · 塔吊 · 挖掘机 租赁', location: '成都·青白江',
       creditCode: '91510113MA6C2LN10Y', legalRep: '刘志强', regCapital: '3,600万元', founded: '2017-05-20', status: '存续（在营）',
       score: { value: 9.4, grade: 'AAA级' },
@@ -1193,7 +1193,7 @@ window.MOCK = (function () {
       contact: { name: '刘总', title: '业务总监', phone: '137****6702' }, published: [1003, 1008]
     },
     {
-      id: 'c-ynjc', name: '云南××建材科技有限公司', short: '云岭建材', avatar: '建',
+      id: 'c-ynjc', name: '云南建材科技有限公司', short: '云岭建材', avatar: '建',
       industry: '建材生产·供应', mainBusiness: 'A级防火保温 · 砂浆 · 板材', location: '昆明·官渡',
       creditCode: '91530111MA6C7QR54K', legalRep: '陈建国', regCapital: '1,500万元', founded: '2019-02-28', status: '存续（在营）',
       score: { value: 9.0, grade: 'AA级' },
@@ -1214,7 +1214,7 @@ window.MOCK = (function () {
       contact: { name: '陈经理', title: '销售经理', phone: '138****7710' }, published: [1006]
     },
     {
-      id: 'c-scjc', name: '四川××建材供应有限公司', short: '蜀川建材', avatar: '建',
+      id: 'c-scjc', name: '四川建材供应有限公司', short: '蜀川建材', avatar: '建',
       industry: '建材生产·供应', mainBusiness: '散装水泥 · 商品砂浆 · 骨料', location: '成都·龙泉驿',
       creditCode: '91510112MA6C9SC238', legalRep: '罗建军', regCapital: '2,000万元', founded: '2016-06-18', status: '存续（在营）',
       score: { value: 9.0, grade: 'AA级' },
@@ -1255,7 +1255,7 @@ window.MOCK = (function () {
       contact: { name: '王经理', title: '采购总监', phone: '139****2365' }, published: [1002]
     },
     {
-      id: 'c-sxzy', name: '陕西××置业有限公司', short: '陕建置业', avatar: '陕',
+      id: 'c-sxzy', name: '陕西置业有限公司', short: '陕建置业', avatar: '陕',
       industry: '房地产开发', mainBusiness: '商住开发 · 工程代建', location: '西安·浐灞',
       creditCode: '91610104MA6C9JQ08M', legalRep: '孙国栋', regCapital: '5,000万元', founded: '2015-04-22', status: '存续（在营）',
       score: { value: 8.6, grade: 'A级' },
@@ -1275,7 +1275,7 @@ window.MOCK = (function () {
       contact: { name: '孙工', title: '工程负责人', phone: '136****9920' }, published: [1005]
     },
     {
-      id: 'c-gycj', name: '贵阳××城建集团', short: '贵阳城建', avatar: '筑',
+      id: 'c-gycj', name: '贵阳城建集团', short: '贵阳城建', avatar: '筑',
       industry: '建筑施工总承包', mainBusiness: '房屋建筑 · 市政工程', location: '贵阳·乌当',
       creditCode: '91520102MA6C7BM28W', legalRep: '吴志华', regCapital: '7,000万元', founded: '2010-11-30', status: '存续（在营）',
       score: { value: 8.9, grade: 'AA级' },
@@ -1296,7 +1296,7 @@ window.MOCK = (function () {
       contact: { name: '吴工', title: '招标负责人', phone: '133****3125' }, published: [1007]
     },
     {
-      id: 'c-hnjq', name: '湖南××工程机械有限公司', short: '湘机租赁', avatar: '湘',
+      id: 'c-hnjq', name: '湖南工程机械有限公司', short: '湘机租赁', avatar: '湘',
       industry: '工程机械租赁', mainBusiness: '挖掘机 · 装载机 · 台班/包月', location: '长沙·岳麓',
       creditCode: '91430104MA6C8KL33V', legalRep: '周立新', regCapital: '3,000万元', founded: '2018-06-11', status: '存续（在营）',
       score: { value: 9.3, grade: 'AAA级' },
@@ -1317,7 +1317,7 @@ window.MOCK = (function () {
       contact: { name: '周总', title: '设备负责人', phone: '139****8874' }, published: [1008]
     },
     {
-      id: 'c-znzx', name: '四川中建××咨询有限公司', short: '中建咨询', avatar: '咨',
+      id: 'c-znzx', name: '四川中建咨询有限公司', short: '中建咨询', avatar: '咨',
       industry: '建筑企业服务·咨询', mainBusiness: '资质代办 · 工商注册 · 安全生产许可', location: '成都·天府新区',
       creditCode: '91510100MA6C0ZXX7X', legalRep: '王建国', regCapital: '500万元', founded: '2019-03-12', status: '存续（在营）',
       score: { value: 9.0, grade: 'AAA级' },
@@ -1358,7 +1358,7 @@ window.MOCK = (function () {
       ],
       qual: '总包单位持「建筑工程施工总承包一级」，三级安全教育与实名制入场，安全兜底。',
       labor: {
-        overview: { teamName: '中建××建设 · 产业园二期项目部', total: '需求 240 人', age: '18-55 岁 · 持证优先', available: '即日进场', area: '成都天府新区项目现场' },
+        overview: { teamName: '中建建设 · 产业园二期项目部', total: '需求 240 人', age: '18-55 岁 · 持证优先', available: '即日进场', area: '成都天府新区项目现场' },
         workforce: [
           { work: '钢筋工（需求）', count: '120', lv: [{ n: '高级工', v: 15, c: 's' }, { n: '中级工', v: 60, c: 'm' }, { n: '初级工', v: 45, c: 'l' }] },
           { work: '木工（需求）', count: '70', lv: [{ n: '高级工', v: 10, c: 's' }, { n: '中级工', v: 35, c: 'm' }, { n: '初级工', v: 25, c: 'l' }] },
@@ -1413,7 +1413,7 @@ window.MOCK = (function () {
           { k: '结清承诺', v: '完工 7 日内一次性结清全部工资' },
           { k: '保障承诺', v: '统一包食宿、配发劳保用品、项目工伤参保' }
         ],
-        contact: { name: '李工（用工负责人）', phone: '1380800 8888', wechat: 'ligong_zjjs66', addr: '成都天府新区××产业园二期项目部' },
+        contact: { name: '李工（用工负责人）', phone: '1380800 8888', wechat: 'ligong_zjjs66', addr: '成都天府新区产业园二期项目部' },
         flow: [{step:1,title:'发布用工需求',desc:'工种、人数、工期、工资范围公示'},{step:2,title:'班组 / 工人报名',desc:'平台按工种、持证、距离匹配'},{step:3,title:'实名 + 持证核验',desc:'身份证、特种作业证联网核验'},{step:4,title:'签订用工协议',desc:'劳动合同 / 书面协议明确工资'},{step:5,title:'三级安全教育',desc:'考核合格后凭证进场'},{step:6,title:'进场考勤施工',desc:'人脸识别门禁，统一劳保食宿'},{step:7,title:'工资专户直发',desc:'总包工资专户按月足额直发'},{step:8,title:'完工结清退场',desc:'完工 7 日内结清，评价归档'}]
       }
     },
@@ -1486,7 +1486,7 @@ window.MOCK = (function () {
           { k: '质量承诺', v: '施工部位提供 5 年质保维修' },
           { k: '安全承诺', v: '高空作业配备安全带、防坠网与专项教育' }
         ],
-        contact: { name: '赵有材（项目对接）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '重庆江津区××片区防水工程项目部' },
+        contact: { name: '赵有材（项目对接）', phone: '1359511 4451', wechat: 'zhao_gzlw0851', addr: '重庆江津区片区防水工程项目部' },
         flow: [{step:1,title:'发布用工需求',desc:'工种、人数、工期、工资范围公示'},{step:2,title:'班组 / 工人报名',desc:'平台按工种、持证、距离匹配'},{step:3,title:'实名 + 持证核验',desc:'身份证、特种作业证联网核验'},{step:4,title:'签订用工协议',desc:'劳动合同 / 书面协议明确工资'},{step:5,title:'三级安全教育',desc:'考核合格后凭证进场'},{step:6,title:'进场考勤施工',desc:'人脸识别门禁，统一劳保食宿'},{step:7,title:'工资专户直发',desc:'总包工资专户按月足额直发'},{step:8,title:'完工结清退场',desc:'完工 7 日内结清，评价归档'}]
       }
     },
@@ -1506,7 +1506,7 @@ window.MOCK = (function () {
       ],
       qual: '总包单位持「建筑工程施工总承包二级」，三级安全教育与实名制入场。',
       labor: {
-        overview: { teamName: '中建××建设 · 泸州酒谷产业园项目部', total: '需求 120 人', age: '18-55 岁 · 架子工持证', available: '三级教育后即进场', area: '泸州江阳项目现场' },
+        overview: { teamName: '中建建设 · 泸州酒谷产业园项目部', total: '需求 120 人', age: '18-55 岁 · 架子工持证', available: '三级教育后即进场', area: '泸州江阳项目现场' },
         workforce: [
           { work: '木工（需求）', count: '70', lv: [{ n: '高级工', v: 10, c: 's' }, { n: '中级工', v: 35, c: 'm' }, { n: '初级工', v: 25, c: 'l' }] },
           { work: '架子工（需求）', count: '50', lv: [{ n: '高级工', v: 8, c: 's' }, { n: '中级工', v: 24, c: 'm' }, { n: '初级工', v: 18, c: 'l' }] }
@@ -1560,7 +1560,7 @@ window.MOCK = (function () {
           { k: '保障承诺', v: '包食宿、统一生活区，高空作业配齐防护' },
           { k: '安全承诺', v: '架子工持证上岗，专项方案与旁站管理' }
         ],
-        contact: { name: '李工（用工负责人）', phone: '1380800 8888', wechat: 'ligong_zjjs66', addr: '泸州江阳区××酒谷产业园项目部' },
+        contact: { name: '李工（用工负责人）', phone: '1380800 8888', wechat: 'ligong_zjjs66', addr: '泸州江阳区酒谷产业园项目部' },
         flow: [{step:1,title:'发布用工需求',desc:'工种、人数、工期、工资范围公示'},{step:2,title:'班组 / 工人报名',desc:'平台按工种、持证、距离匹配'},{step:3,title:'实名 + 持证核验',desc:'身份证、特种作业证联网核验'},{step:4,title:'签订用工协议',desc:'劳动合同 / 书面协议明确工资'},{step:5,title:'三级安全教育',desc:'考核合格后凭证进场'},{step:6,title:'进场考勤施工',desc:'人脸识别门禁，统一劳保食宿'},{step:7,title:'工资专户直发',desc:'总包工资专户按月足额直发'},{step:8,title:'完工结清退场',desc:'完工 7 日内结清，评价归档'}]
       }
     }
@@ -1577,7 +1577,7 @@ window.MOCK = (function () {
         protect: '云贵川按县级区域独家代理，区域内不再发展第二家',
         account: '经销代理模式，不设分公司账户，款到发货',
         term: '首批开放24家，年度考核续约',
-        contact: { name: '陈经理', title: '招商经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '昆明市官渡区××建材产业园云岭厂区' }
+        contact: { name: '陈经理', title: '招商经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '昆明市官渡区建材产业园云岭厂区' }
       },
       title: '云岭建材 区域代理招商（A级防火保温）开放云贵川',
       budget: '¥9.8', unit: '万元 · 意向金', location: '昆明·官渡', city: '昆明', distance: '—',
@@ -1615,7 +1615,7 @@ window.MOCK = (function () {
         protect: '每个城市仅发展1名城市合伙人，享本地资源独家对接',
         account: '总部工资专户代发，项目结算与开票协同',
         term: '年度合伙人协议，达标自动续约',
-        contact: { name: '赵有材', title: '合伙人招募负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区××劳务产业园' }
+        contact: { name: '赵有材', title: '合伙人招募负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区劳务产业园' }
       },
       title: '黔工劳务 城市合伙人招募（劳务资源整合）',
       budget: '¥5.0', unit: '万元 · 履约金', location: '贵阳·观山湖', city: '贵阳', distance: '—',
@@ -1668,7 +1668,7 @@ window.MOCK = (function () {
         share: '分公司业绩100%计入总公司，可用于资质升级；总公司业绩与荣誉按需授权分公司投标使用',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '3年起签，续签免加盟费',
-        contact: { name: '李工', title: '招商经理', phone: '13808008888', wechat: 'ligong_zjjs66', addr: '北京市朝阳区建国路××号中辉大厦18层' },
+        contact: { name: '李工', title: '招商经理', phone: '13808008888', wechat: 'ligong_zjjs66', addr: '北京市朝阳区建国路号中辉大厦18层' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '中辉建工集团 · 建筑工程施工总承包一级 · 全国寻分公司合作',
@@ -1748,7 +1748,7 @@ window.MOCK = (function () {
         share: '分公司业绩100%计入总公司，可用于资质升级；总公司业绩与荣誉按需授权分公司投标使用',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '2年起签，续签优惠',
-        contact: { name: '张经理', title: '招商总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '成都市武侯区天府三街××号润锦中心' },
+        contact: { name: '张经理', title: '招商总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '成都市武侯区天府三街号润锦中心' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '十局建工 · 市政公用工程施工总承包二级 · 全国开放',
@@ -1784,7 +1784,7 @@ window.MOCK = (function () {
         share: '电力工程业绩共享，可用于总承包升特级与承装（修、试）许可证升级',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '1年起签，可逐年续签',
-        contact: { name: '赵有材', title: '招商负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区××产业园电力大厦' },
+        contact: { name: '赵有材', title: '招商负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '贵阳市观山湖区产业园电力大厦' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '黔电电力 · 电力工程施工总承包一级 · 寻分公司合作',
@@ -1819,7 +1819,7 @@ window.MOCK = (function () {
         share: '分公司业绩100%计入总公司，可用于资质升级；总公司业绩与荣誉按需授权分公司投标使用',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '2年起签',
-        contact: { name: '陈经理', title: '渠道经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '昆明市五华区××商务广场A座' },
+        contact: { name: '陈经理', title: '渠道经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '昆明市五华区商务广场A座' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '云路建设 · 公路工程施工总承包二级 · 全国空缺',
@@ -1854,7 +1854,7 @@ window.MOCK = (function () {
         share: '设计业绩与获奖作品可署名共享，用于合作方投标',
         account: '不设分公司账户，按项目签约、总公司统一结算开票',
         term: '按项目签约，长期合作可签框架协议',
-        contact: { name: '张经理', title: '设计合作总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '西安市雁塔区××设计产业园（西北对接点）' },
+        contact: { name: '张经理', title: '设计合作总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '西安市雁塔区设计产业园（西北对接点）' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '华设工程设计 · 建筑行业甲级设计 · 寻合作',
@@ -1889,7 +1889,7 @@ window.MOCK = (function () {
         share: '监理与造价业绩共享，可用于监理甲级延续与升级',
         account: '不设分公司账户，项目款由总公司统一收取后按约划转',
         term: '按项目签约，可签年度框架',
-        contact: { name: '赵有材', title: '华中合作负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '长沙市岳麓区××监理大楼（华中对接点）' },
+        contact: { name: '赵有材', title: '华中合作负责人', phone: '13595114451', wechat: 'zhao_gzlw0851', addr: '长沙市岳麓区监理大楼（华中对接点）' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '湘监工程监理 · 市政公用工程监理甲级 · 项目合作',
@@ -1924,7 +1924,7 @@ window.MOCK = (function () {
         share: '分公司业绩100%计入总公司，可用于资质升级；总公司业绩与荣誉按需授权分公司投标使用',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '1年起签，到期可续',
-        contact: { name: '陈经理', title: '渠道经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '武汉市江汉区××消防产业园' },
+        contact: { name: '陈经理', title: '渠道经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '武汉市江汉区消防产业园' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '楚专建设 · 消防设施工程专业承包一级 · 全国空缺',
@@ -1960,7 +1960,7 @@ window.MOCK = (function () {
         share: '分公司业绩100%计入总公司，可用于资质升级；总公司业绩与荣誉按需授权分公司投标使用',
         account: '支持分公司独立对公账户，工程款直达、独立核算、独立开票',
         term: '2年起签，续签免加盟费',
-        contact: { name: '张经理', title: '招商总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '成都市双流区××市政大厦' },
+        contact: { name: '张经理', title: '招商总监', phone: '13908001234', wechat: 'zhangmj_runjin', addr: '成都市双流区市政大厦' },
         flow: [{step:1,title:'在线咨询',desc:'提交目标区域、拟投标类型与预算，招商顾问1个工作日内联系'},{step:2,title:'资质匹配审核',desc:'双向核验资金经验与资质等级、有效期、人员配置，平台出具核验报告'},{step:3,title:'合同谈判签订',desc:'商定加盟费、管理费、保证金与区域保护，签订分公司加盟合作协议'},{step:4,title:'注册分公司',desc:'协助工商注册、税务登记、独立开户，约7-15个工作日'},{step:5,title:'人员配置授权',desc:'配置注册建造师/职称人员，移交资质复印件、出图章与投标授权书'},{step:6,title:'授权运营',desc:'以总公司名义独立投标签约施工，定期合规检查与技术支持'}]
       },
       title: '天府市政 · 市政公用工程施工总承包一级 · 西南寻分公司',
@@ -1985,9 +1985,9 @@ window.MOCK = (function () {
     {
       id: 't1', bizType: '企业买卖', cat: '买卖', sub: '股权转让', verified: true, hot: true,
       title: '【四川】建筑工程施工总承包一级公司带安许 · 无债务无诉讼 · 急转',
-      maskedName: '四川XX建设工程有限公司', creditCode: '91510100MA6XXXXX1X',
-      fullAddress: '四川省成都市XX区XX路XX号', legalRep: '张XX',
-      shareholders: '2名自然人股东（张XX、李XX）',
+      maskedName: '四川宏筑建设工程有限公司', creditCode: '91510100MA6XXXXX1X',
+      fullAddress: '四川省成都市高新区天府大道南段1688号', legalRep: '张建国',
+      shareholders: '2名自然人股东（张建国、李茂林）',
       price: '¥286', unit: '万 · 100%股权转让', location: '成都·高新区', city: '成都', distance: '—',
       tags: ['已尽调', '一级总包', '急转降价', '干净无债'], time: ago(5), views: 5628, match: 94, companyId: 'c-cdrj',
       desc: '成都市高新区建筑工程施工总承包一级企业整体转让，无对外担保、无未结诉讼，含2名一级建造师，急转降价。',
@@ -1997,7 +1997,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 10, guarantee: 0, pledge: 0, tax: 10, socialSecurity: 10, project: 5 }, counts: { litigation: '未结 0 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '无在建' } },
       info: [
         { k: '成立时间', v: '2017年3月（8年）' }, { k: '注册资本', v: '5000万元' },
-        { k: '资质等级', v: '建筑工程施工总承包一级' }, { k: '法定代表人', v: '张XX（可变更）' },
+        { k: '资质等级', v: '建筑工程施工总承包一级' }, { k: '法定代表人', v: '张建国（可变更）' },
         { k: '股东结构', v: '2名自然人股东（可全部转让）' }, { k: '员工规模', v: '128人（管理32人）' }
       ],
       revenue: [{ year: '2023', v: 1280 }, { year: '2024', v: 1560 }, { year: '2025', v: 1740 }],
@@ -2006,7 +2006,7 @@ window.MOCK = (function () {
       safetyLicense: { no: '（川）JZ安许证字〔2021〕00XXXX', expiry: '2027-03-15' },
       registeredCapital: '5000万元（实缴 5000 万元）',
       establishmentDate: '2017-03-20（成立 8 年）',
-      equityStructure: '张XX 60% · 李XX 40%，本次转让 100% 股权',
+      equityStructure: '张建国 60% · 李茂林 40%，本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
       ongoingProjects: [],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
@@ -2016,7 +2016,7 @@ window.MOCK = (function () {
       ]},
       taxStatus: '近三年完税证明齐全，无欠税、无税务行政处罚、无虚开发票记录',
       socialSecurity: '在册员工 128 人，社保正常缴纳，无欠缴记录',
-      bankAccount: { status: '基本户正常', detail: '中国建设银行成都XX支行 · 一般户 2 个 · 无冻结、无贷款逾期' },
+      bankAccount: { status: '基本户正常', detail: '中国建设银行成都高新支行 · 一般户 2 个 · 无冻结、无贷款逾期' },
       changeCycle: '工商变更 7-15 工作日 + 资质变更 15-30 工作日 + 安许变更 15-30 工作日，整体约 2.5-3 个月',
       staffConfig: { list: [{k:'一级建造师', v:'5 人'}, {k:'二级建造师', v:'10 人'}, {k:'中级职称', v:'15 人'}, {k:'技术工人', v:'30 人'}], note: '人员可协商留任 6 个月' },
       businessAbnormal: '未列入经营异常名录 · 未列入严重违法失信名单',
@@ -2028,7 +2028,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '14.3万' }
       ],
       ddSummary: {
-        agency: '四川XX律师事务所 · 成都XX会计师事务所（联合尽调）',
+        agency: '四川明炬律师事务所 · 成都中汇会计师事务所（联合尽调）',
         date: '2026-07-15',
         legal: { status: '通过', findings: ['工商档案与股权结构无瑕疵', '无未决诉讼、无被执行记录'] },
         finance: { status: '通过', findings: ['近三年审计报告无保留意见', '无欠税、无对外担保'] },
@@ -2089,9 +2089,9 @@ window.MOCK = (function () {
     {
       id: 't2', bizType: '企业买卖', cat: '买卖', sub: '股权转让', verified: true, hot: false,
       title: '【重庆】市政公用工程施工总承包二级 · 干净无债 · 含安许',
-      maskedName: '重庆XX市政工程有限公司', creditCode: '91500100MA5XXXXX2X',
-      fullAddress: '重庆市渝北区XX大道XX号', legalRep: '王XX',
-      shareholders: '1名法人股东（XX控股集团）',
+      maskedName: '重庆渝城市政工程有限公司', creditCode: '91500100MA5XXXXX2X',
+      fullAddress: '重庆市渝北区龙溪大道266号', legalRep: '王德福',
+      shareholders: '1名法人股东（渝城控股集团）',
       price: '¥128', unit: '万 · 100%股权转让', location: '重庆·渝北', city: '重庆', distance: '—',
       tags: ['已尽调', '二级总包', '干净无债', '含安许'], time: ago(12), views: 2341, match: 88, companyId: 'c-cdrj',
       desc: '重庆渝北区市政公用工程施工总承包二级企业转让，干净无债，含安全生产许可证，变更周期短。',
@@ -2101,7 +2101,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 0, guarantee: 0, pledge: 0, tax: 10, socialSecurity: 10, project: 20 }, counts: { litigation: '未结 0 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '在建 1 项 · 已收尾' } },
       info: [
         { k: '成立时间', v: '2018年6月（6年）' }, { k: '注册资本', v: '3000万元' },
-        { k: '资质等级', v: '市政公用工程施工总承包二级' }, { k: '法定代表人', v: '王XX（可变更）' },
+        { k: '资质等级', v: '市政公用工程施工总承包二级' }, { k: '法定代表人', v: '王德福（可变更）' },
         { k: '股东结构', v: '1名法人股东（可全部转让）' }, { k: '员工规模', v: '56人' }
       ],
       revenue: [{ year: '2023', v: 680 }, { year: '2024', v: 820 }, { year: '2025', v: 910 }],
@@ -2109,9 +2109,9 @@ window.MOCK = (function () {
       safetyLicense: { no: '（渝）JZ安许证字〔2020〕00XXXX', expiry: '2026-06-30' },
       registeredCapital: '3000万元（实缴 3000 万元）',
       establishmentDate: '2018-06-15（成立 6 年）',
-      equityStructure: '法人股东 100%（XX控股集团），本次转让 100% 股权',
+      equityStructure: '法人股东 100%（渝城控股集团），本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
-      ongoingProjects: [{ name: '重庆渝北XX市政道路改造', amount: '¥250万', progress: '主体完成 · 收尾阶段', payment: '已回款 70%' }],
+      ongoingProjects: [{ name: '重庆渝北龙华路市政道路改造', amount: '¥250万', progress: '主体完成 · 收尾阶段', payment: '已回款 70%' }],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
       litigation: { count: 0, asDefendant: 0, asPlaintiff: 0, list: [] },
       taxStatus: '近三年完税证明齐全，无欠税、无税务行政处罚',
@@ -2128,7 +2128,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '6.4万' }
       ],
       ddSummary: {
-        agency: '重庆XX律师事务所 · 天健会计师事务所（联合尽调）',
+        agency: '重庆百君律师事务所 · 天健会计师事务所（联合尽调）',
         date: '2026-07-20',
         legal: { status: '通过', findings: ['股权结构清晰、无质押冻结', '无未决诉讼、无被执行记录'] },
         finance: { status: '通过', findings: ['近三年审计无保留意见', '无欠税、无对外担保'] },
@@ -2178,8 +2178,8 @@ window.MOCK = (function () {
     {
       id: 't3', bizType: '企业买卖', cat: '买卖', sub: '资产转让', verified: true, hot: false,
       title: '【贵州】消防设施工程专业承包一级 · 含建造师 · 资产打包',
-      maskedName: '贵州XX消防工程有限公司', creditCode: '91520100MA6XXXXX3X',
-      fullAddress: '贵州省贵阳市XX区XX路XX号', legalRep: '刘XX',
+      maskedName: '贵州黔安消防工程有限公司', creditCode: '91520100MA6XXXXX3X',
+      fullAddress: '贵州省贵阳市观山湖区金阳南路99号', legalRep: '刘怀远',
       shareholders: '2名自然人股东',
       price: '¥86', unit: '万 · 资产打包转让', location: '贵阳·观山湖', city: '贵阳', distance: '—',
       tags: ['已尽调', '专包一级', '含建造师', '资产打包'], time: ago(20), views: 1567, match: 82, companyId: 'c-gzlw',
@@ -2190,7 +2190,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 0, guarantee: 0, pledge: 0, tax: 15, socialSecurity: 15, project: 0 }, counts: { litigation: '未结 0 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '无在建' } },
       info: [
         { k: '成立时间', v: '2019年2月（5年）' }, { k: '注册资本', v: '1500万元' },
-        { k: '资质等级', v: '消防设施工程专业承包一级' }, { k: '法定代表人', v: '刘XX（可变更）' },
+        { k: '资质等级', v: '消防设施工程专业承包一级' }, { k: '法定代表人', v: '刘怀远（可变更）' },
         { k: '股东结构', v: '2名自然人股东' }, { k: '员工规模', v: '32人' }
       ],
       revenue: [{ year: '2023', v: 420 }, { year: '2024', v: 510 }, { year: '2025', v: 560 }],
@@ -2198,7 +2198,7 @@ window.MOCK = (function () {
       safetyLicense: { no: '（黔）JZ安许证字〔2021〕00XXXX', expiry: '2026-12-31' },
       registeredCapital: '1500万元（实缴 1500 万元）',
       establishmentDate: '2019-02-28（成立 5 年）',
-      equityStructure: '2 名自然人股东（刘XX 70% · 何XX 30%），本次转让 100% 股权',
+      equityStructure: '2 名自然人股东（刘怀远 70% · 何秀兰 30%），本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
       ongoingProjects: [],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
@@ -2217,7 +2217,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '4.3万' }
       ],
       ddSummary: {
-        agency: '贵州XX律师事务所 · 亚太会计师事务所（联合尽调）',
+        agency: '贵州贵达律师事务所 · 亚太会计师事务所（联合尽调）',
         date: '2026-07-10',
         legal: { status: '通过', findings: ['资产权属清晰、无抵押', '无未决诉讼'] },
         finance: { status: '通过', findings: ['近三年审计无保留意见', '无欠税'] },
@@ -2266,8 +2266,8 @@ window.MOCK = (function () {
     {
       id: 't4', bizType: '企业买卖', cat: '买卖', sub: '股权转让', verified: true, hot: true,
       title: '【云南】电力工程施工总承包二级 · 急转 · 含承装修试许可证',
-      maskedName: '云南XX电力工程有限公司', creditCode: '91530100MA6XXXXX4X',
-      fullAddress: '云南省昆明市XX区XX路XX号', legalRep: '陈XX',
+      maskedName: '云南滇能电力工程有限公司', creditCode: '91530100MA6XXXXX4X',
+      fullAddress: '云南省昆明市官渡区彩云北路188号', legalRep: '陈志远',
       shareholders: '3名自然人股东',
       price: '¥198', unit: '万 · 100%股权转让', location: '昆明·五华', city: '昆明', distance: '—',
       tags: ['已尽调', '电力二级', '急转', '含承装修试'], time: ago(3), views: 3892, match: 90, companyId: 'c-gzlw',
@@ -2278,7 +2278,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 15, guarantee: 0, pledge: 0, tax: 10, socialSecurity: 10, project: 25 }, counts: { litigation: '未结 0 件 · 已结 1 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '在建 1 项' } },
       info: [
         { k: '成立时间', v: '2016年8月（8年）' }, { k: '注册资本', v: '4000万元' },
-        { k: '资质等级', v: '电力工程施工总承包二级' }, { k: '法定代表人', v: '陈XX（可变更）' },
+        { k: '资质等级', v: '电力工程施工总承包二级' }, { k: '法定代表人', v: '陈志远（可变更）' },
         { k: '股东结构', v: '3名自然人股东（可全部转让）' }, { k: '员工规模', v: '78人' }
       ],
       revenue: [{ year: '2023', v: 960 }, { year: '2024', v: 1180 }, { year: '2025', v: 1360 }],
@@ -2286,9 +2286,9 @@ window.MOCK = (function () {
       safetyLicense: { no: '（云）JZ安许证字〔2020〕00XXXX', expiry: '2026-09-30' },
       registeredCapital: '4000万元（实缴 4000 万元）',
       establishmentDate: '2016-08-10（成立 8 年）',
-      equityStructure: '3 名自然人股东（陈XX 50% · 罗XX 30% · 杨XX 20%），本次转让 100% 股权',
+      equityStructure: '3 名自然人股东（陈志远 50% · 罗志明 30% · 杨丽华 20%），本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
-      ongoingProjects: [{ name: '昆明XX光伏电站升压站工程', amount: '¥480万', progress: '在建 · 进度约 60%', payment: '已回款 55%' }],
+      ongoingProjects: [{ name: '昆明富民光伏电站升压站工程', amount: '¥480万', progress: '在建 · 进度约 60%', payment: '已回款 55%' }],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
       litigation: { count: 1, asDefendant: 0, asPlaintiff: 1, list: [
         { date: '2024-03-18', type: '原告', cause: '建设工程施工合同纠纷（工程款）', amount: '¥80万', status: '已结案', result: '胜诉，款项已履行' }
@@ -2307,7 +2307,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '9.9万' }
       ],
       ddSummary: {
-        agency: '云南XX律师事务所 · 中审众环会计师事务所（联合尽调）',
+        agency: '云南建广律师事务所 · 中审众环会计师事务所（联合尽调）',
         date: '2026-07-25',
         legal: { status: '通过', findings: ['无未决诉讼、无被执行', '股权清晰无质押'] },
         finance: { status: '通过', findings: ['近三年审计无保留意见', '无欠税、无对外担保'] },
@@ -2359,8 +2359,8 @@ window.MOCK = (function () {
     {
       id: 't5', bizType: '企业买卖', cat: '买卖', sub: '股权转让', verified: true, hot: false,
       title: '【陕西】机电工程施工总承包三级 · 干净无债 · 变更快',
-      maskedName: '陕西XX机电安装工程有限公司', creditCode: '91610100MA6XXXXX5X',
-      fullAddress: '陕西省西安市XX区XX路XX号', legalRep: '赵XX',
+      maskedName: '陕西秦安机电安装工程有限公司', creditCode: '91610100MA6XXXXX5X',
+      fullAddress: '陕西省西安市经开区未央路138号', legalRep: '赵宝山',
       shareholders: '1名自然人股东',
       price: '¥56', unit: '万 · 100%股权转让', location: '西安·雁塔', city: '西安', distance: '—',
       tags: ['已尽调', '机电三级', '干净无债', '变更快'], time: ago(15), views: 987, match: 78, companyId: 'c-cdrj',
@@ -2371,7 +2371,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 0, guarantee: 0, pledge: 0, tax: 10, socialSecurity: 10, project: 0 }, counts: { litigation: '未结 0 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '无在建' } },
       info: [
         { k: '成立时间', v: '2020年4月（4年）' }, { k: '注册资本', v: '1000万元' },
-        { k: '资质等级', v: '机电工程施工总承包三级' }, { k: '法定代表人', v: '赵XX（可变更）' },
+        { k: '资质等级', v: '机电工程施工总承包三级' }, { k: '法定代表人', v: '赵宝山（可变更）' },
         { k: '股东结构', v: '1名自然人股东（可全部转让）' }, { k: '员工规模', v: '18人' }
       ],
       revenue: [{ year: '2023', v: 280 }, { year: '2024', v: 350 }, { year: '2025', v: 400 }],
@@ -2379,7 +2379,7 @@ window.MOCK = (function () {
       safetyLicense: { no: '（陕）JZ安许证字〔2021〕00XXXX', expiry: '2027-02-28' },
       registeredCapital: '1000万元（实缴 1000 万元）',
       establishmentDate: '2020-04-22（成立 4 年）',
-      equityStructure: '1 名自然人股东（赵XX 100%），本次转让 100% 股权',
+      equityStructure: '1 名自然人股东（赵宝山 100%），本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
       ongoingProjects: [],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
@@ -2398,7 +2398,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '2.8万' }
       ],
       ddSummary: {
-        agency: '陕西XX律师事务所 · 陕西XX会计师事务所（联合尽调）',
+        agency: '陕西宝伦律师事务所 · 陕西同信会计师事务所（联合尽调）',
         date: '2026-07-18',
         legal: { status: '通过', findings: ['单股东股权清晰、变更快', '无未决诉讼'] },
         finance: { status: '通过', findings: ['近三年审计无保留意见', '无欠税'] },
@@ -2447,8 +2447,8 @@ window.MOCK = (function () {
     {
       id: 't6', bizType: '企业买卖', cat: '买卖', sub: '资产转让', verified: true, hot: false,
       title: '【四川】建筑装修装饰专业承包一级 · 含设计资质 · 资产打包',
-      maskedName: '成都XX装饰设计工程有限公司', creditCode: '91510100MA6XXXXX6X',
-      fullAddress: '四川省成都市XX区XX路XX号', legalRep: '孙XX',
+      maskedName: '成都锦华装饰设计工程有限公司', creditCode: '91510100MA6XXXXX6X',
+      fullAddress: '四川省成都市高新区天府大道南段1688号', legalRep: '孙慧敏',
       shareholders: '2名自然人股东',
       price: '¥128', unit: '万 · 资产打包转让', location: '成都·锦江', city: '成都', distance: '—',
       tags: ['已尽调', '装饰一级', '含设计资质', '资产打包'], time: ago(8), views: 1876, match: 85, companyId: 'c-cdrj',
@@ -2459,7 +2459,7 @@ window.MOCK = (function () {
       riskRadar: { level: '低', scores: { litigation: 0, guarantee: 0, pledge: 0, tax: 10, socialSecurity: 10, project: 0 }, counts: { litigation: '未结 0 件', guarantee: '余额 0 元', pledge: '无质押', tax: '无欠税', socialSecurity: '无欠缴', project: '无在建' } },
       info: [
         { k: '成立时间', v: '2018年11月（6年）' }, { k: '注册资本', v: '2000万元' },
-        { k: '资质等级', v: '建筑装修装饰专业承包一级' }, { k: '法定代表人', v: '孙XX（可变更）' },
+        { k: '资质等级', v: '建筑装修装饰专业承包一级' }, { k: '法定代表人', v: '孙慧敏（可变更）' },
         { k: '股东结构', v: '2名自然人股东' }, { k: '员工规模', v: '45人' }
       ],
       revenue: [{ year: '2023', v: 780 }, { year: '2024', v: 920 }, { year: '2025', v: 1050 }],
@@ -2467,7 +2467,7 @@ window.MOCK = (function () {
       safetyLicense: { no: '（川）JZ安许证字〔2022〕00XXXX', expiry: '2027-05-31' },
       registeredCapital: '2000万元（实缴 2000 万元）',
       establishmentDate: '2018-11-05（成立 6 年）',
-      equityStructure: '2 名自然人股东（孙XX 55% · 周XX 45%），本次转让 100% 股权',
+      equityStructure: '2 名自然人股东（孙慧敏 55% · 周国强 45%），本次转让 100% 股权',
       equityPledge: '无股权质押 · 无司法冻结',
       ongoingProjects: [],
       externalGuarantee: { amount: '0 元', detail: '无对外担保记录' },
@@ -2486,7 +2486,7 @@ window.MOCK = (function () {
         { stage: '交接完成', ratio: '5%', amount: '6.4万' }
       ],
       ddSummary: {
-        agency: '四川XX律师事务所 · 信永中和会计师事务所（联合尽调）',
+        agency: '四川法典律师事务所 · 信永中和会计师事务所（联合尽调）',
         date: '2026-07-22',
         legal: { status: '通过', findings: ['股权清晰、无质押', '无未决诉讼'] },
         finance: { status: '通过', findings: ['近三年审计无保留意见', '无欠税'] },
@@ -4555,6 +4555,301 @@ window.MOCK = (function () {
       x.detailLevel = (briefBiz[x.bizKey] && x.dir === 'demand') ? 'brief' : 'detail';
     });
   })();
+
+  /* ============================================================
+     [分片D] 数据补齐与清洗（C3 §6 / C2：P0-07,P1-02,P1-03,P1-04,P1-07,P2-02）
+     - 存量记录回补 typeKey/bizKey/role/detailLevel/cat（不改原专属块，保留旧键）
+     - 新增 8 条高质量记录，补齐 franchise-demand/trade-demand（原 0 条）
+     - 清洗：w1-w3 升级 detail（保留 rich labor 块）；p1-p13 补 views/match；
+       1015/1016 补价格位；旧 equip.overview 并入 specs；空值不造假
+     ============================================================ */
+  (function augmentCatalog() {
+    /* 本地类型镜像（与 databus TYPE_MAP 同源；data.js 先于 databus 加载，故自带兜底） */
+    var M = {
+      'material-supply':   { cat: '材料',   role: 'supply',  detailLevel: 'detail', bizKey: 'material' },
+      'labor-supply':      { cat: '劳务',   role: 'supply',  detailLevel: 'detail', bizKey: 'labor' },
+      'equipment-supply':  { cat: '设备',   role: 'supply',  detailLevel: 'detail', bizKey: 'equipment' },
+      'transport-supply':  { cat: '运输',   role: 'supply',  detailLevel: 'detail', bizKey: 'transport' },
+      'franchise-supply':  { cat: '资质招商', role: 'supply', detailLevel: 'detail', bizKey: 'franchise' },
+      'trade-supply':      { cat: '建企买卖', role: 'supply', detailLevel: 'detail', bizKey: 'trade' },
+      'personnel-demand':  { cat: '招聘',   role: 'demand',  detailLevel: 'detail', bizKey: 'personnel' },
+      'agency-supply':     { cat: '中介服务', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
+      'material-demand':   { cat: '材料',   role: 'demand',  detailLevel: 'brief',  bizKey: 'material' },
+      'labor-demand':      { cat: '劳务',   role: 'demand',  detailLevel: 'brief',  bizKey: 'labor' },
+      'equipment-demand':  { cat: '设备',   role: 'demand',  detailLevel: 'brief',  bizKey: 'equipment' },
+      'transport-demand':  { cat: '运输',   role: 'demand',  detailLevel: 'brief',  bizKey: 'transport' },
+      'franchise-demand':  { cat: '资质招商', role: 'demand', detailLevel: 'brief',  bizKey: 'franchise' },
+      'trade-demand':      { cat: '建企买卖', role: 'demand', detailLevel: 'brief',  bizKey: 'trade' },
+      'talent-supply':     { cat: '求职',   role: 'demand',  detailLevel: 'brief',  bizKey: 'talent' },
+      'agency-demand':     { cat: '中介服务', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
+    };
+    function backfill(x) {
+      if (!x) return;
+      var t = x.typeKey;
+      if (!t && M[x.bizKey]) {
+        /* bizKey + dir/detailLevel 反推 typeKey */
+        var byDir = {
+          'material': (x.dir === 'demand' || x.type === 'demand') ? 'material-demand' : 'material-supply',
+          'labor': (x.dir === 'demand' || x.type === 'demand') ? 'labor-demand' : 'labor-supply',
+          'equipment': (x.dir === 'demand' || x.type === 'demand') ? 'equipment-demand' : 'equipment-supply',
+          'transport': (x.dir === 'demand' || x.type === 'demand') ? 'transport-demand' : 'transport-supply',
+          'franchise': (x.dir === 'demand') ? 'franchise-demand' : 'franchise-supply',
+          'trade': (x.dir === 'demand') ? 'trade-demand' : 'trade-supply',
+          'personnel': 'personnel-demand',
+          'agency': (x.dir === 'demand') ? 'agency-demand' : 'agency-supply',
+          'talent': 'talent-supply'
+        };
+        t = byDir[x.bizKey];
+      }
+      if (!t) {
+        /* cat 兜底（无 bizKey 的存量记录：1001 类、talents 等），不臆造方向 */
+        var byCat = {
+          '材料': (x.type === 'supply' || x.dir === 'supply') ? 'material-supply' : 'material-demand',
+          '设备': (x.type === 'supply' || x.dir === 'supply') ? 'equipment-supply' : 'equipment-demand',
+          '劳务': (x.type === 'supply' || x.dir === 'supply') ? 'labor-supply' : 'labor-demand',
+          '运输': (x.type === 'supply' || x.dir === 'supply') ? 'transport-supply' : 'transport-demand',
+          '资质招商': (x.dir === 'demand') ? 'franchise-demand' : 'franchise-supply',
+          '建企买卖': (x.dir === 'demand') ? 'trade-demand' : 'trade-supply',
+          '招聘': 'personnel-demand',
+          '人才': 'talent-supply',
+          '求职': 'talent-supply',
+          '中介服务': (x.dir === 'demand') ? 'agency-demand' : 'agency-supply'
+        };
+        t = byCat[x.cat];
+      }
+      var meta = M[t];
+      if (meta) {
+        if (!x.typeKey) x.typeKey = t;
+        if (!x.bizKey) x.bizKey = meta.bizKey;
+        if (!x.role) x.role = meta.role;
+        if (!x.detailLevel) x.detailLevel = meta.detailLevel;
+        if (!x.cat) x.cat = meta.cat;
+      }
+    }
+    catalog.forEach(backfill);
+
+    /* ---- 新增高质量记录（真实西南工程链场景；联系方式脱敏） ---- */
+    var nowTs = Date.now();
+    var EXTRA = [
+      /* 1) transport-supply 车队供应 #1 */
+      {
+        id: 'D-TRP-01', typeKey: 'transport-supply', bizKey: 'transport', role: 'supply', detailLevel: 'detail',
+        cat: '运输', title: '自有自卸车队 成都周边砂石/土方/建材整车运输 可开票可包线',
+        subCate: '整车货运', sub: '自卸运输', location: '成都市·新津区', city: '成都',
+        price: '面议', priceNum: 0, priceUnit: '', unit: '',
+        description: '自有前四后八自卸车 12 台，承接成都及周边 150km 内砂石、土方、建渣、建材整车运输，支持单程零担与长期包线，24 小时调度，可开 9% 运输增值税发票。',
+        tags: ['自有车队', '可开票', '包线', '24h调度'],
+        contact: { name: '罗队长', phone: '138****2210', wechat: 'luodui88' },
+        address: '成都市新津区物流集散中心', privacyContact: true, negotiable: true,
+        verified: true, hot: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 92, views: 216,
+        transport: {
+          overview: { fleet: '自有自卸车 12 台', capacity: '单车 25–35 方，日运力 300 方', dispatch: '24 小时调度响应' },
+          vehicles: [
+            { k: '前四后八自卸车', v: '12 台', count: '12' },
+            { k: '6.8 米厢式货车', v: '4 台（建材零担）', count: '4' }
+          ],
+          pricing: [
+            { k: '成都周边砂石短驳', v: '按方/按车次计价，区间免费可见' },
+            { k: '长期包线', v: '按月包干，面议（明细解锁）', lock: true }
+          ],
+          settle: '单程现结 / 包月月结，支持对公转账',
+          guarantee: [
+            { k: '道路运输许可', v: '持道路运输经营许可证，车辆保险齐全' },
+            { k: '按时发车', v: '约定时间准点装车，延误协商赔付' }
+          ],
+          qualTags: ['道路运输经营许可证', '车辆交强险/商业险'],
+          flow: [
+            { step: 1, title: '需求报价', desc: '货量、起点、终点、时效报给调度' },
+            { step: 2, title: '派车装车', desc: '就近派车，现场装车过磅' },
+            { step: 3, title: '在途送达', desc: '在途可跟踪，到货回单' },
+            { step: 4, title: '结算开票', desc: '回单结算，按需开票' }
+          ]
+        }
+      },
+      /* 2) transport-supply 车队供应 #2（罐车/建材配送） */
+      {
+        id: 'D-TRP-02', typeKey: 'transport-supply', bizKey: 'transport', role: 'supply', detailLevel: 'detail',
+        cat: '运输', title: '商品混凝土罐车/搅拌车租赁 成都辐射川内 带司机可承包',
+        subCate: '罐车租赁', sub: '搅拌车', location: '成都市·双流区', city: '成都',
+        price: '面议', priceNum: 0, priceUnit: '', unit: '',
+        description: '提供 12 方/15 方混凝土搅拌车带司机长期租赁与项目承包，覆盖成都及川内工地，配合搅拌站调度，可单租可包项目。',
+        tags: ['搅拌车', '带司机', '可承包', '川内覆盖'],
+        contact: { name: '何师傅', phone: '139****5567', wechat: 'hesf_truck' },
+        address: '成都市双流区九江街道', privacyContact: true, negotiable: true,
+        verified: true, hot: true, status: 'active', ts: nowTs, updatedAt: nowTs, match: 90, views: 188,
+        transport: {
+          overview: { fleet: '搅拌车 9 台（12/15 方）', capacity: '日供 60 车次', dispatch: '随搅拌站班次调度' },
+          vehicles: [
+            { k: '12 方搅拌车', v: '6 台', count: '6' },
+            { k: '15 方搅拌车', v: '3 台', count: '3' }
+          ],
+          pricing: [
+            { k: '单车月租', v: '面议（明细解锁）', lock: true },
+            { k: '项目承包', v: '按方包干，面议', lock: true }
+          ],
+          settle: '月租月结 / 项目进度款结算',
+          guarantee: [
+            { k: '持证驾驶', v: '司机持 B 证及从业资格证，定期安全培训' },
+            { k: '设备完好', v: '罐车定期保养，坏车备用替换' }
+          ],
+          qualTags: ['道路运输经营许可证'],
+          flow: [
+            { step: 1, title: '项目对接', desc: '工地位置、方量、班次需求对接' },
+            { step: 2, title: '签约派车', desc: '约定租期/承包方式，安排车辆进场' },
+            { step: 3, title: '配合运输', desc: '随搅拌站班次点对点配送' },
+            { step: 4, title: '结算退场', desc: '按期结算，车辆退场' }
+          ]
+        }
+      },
+      /* 3) transport-demand 简要需求（罐车用车） */
+      {
+        id: 'B-TDd-01', typeKey: 'transport-demand', bizKey: 'transport', role: 'demand', detailLevel: 'brief',
+        cat: '运输', title: '成都东部新区市政项目 需混凝土罐车 6 台 租赁或承包 租期 6 个月',
+        subCate: '罐车需求', sub: '搅拌车', location: '成都市·东部新区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '东部新区市政道路项目高峰期需混凝土罐车 6 台，租期 6 个月，可月租可项目承包，就近车队优先，配合夜间浇筑。',
+        detail: '东部新区市政道路项目高峰期需混凝土罐车 6 台，租期 6 个月，可月租可项目承包，就近车队优先，配合夜间浇筑。',
+        tags: ['罐车', '6台', '6个月'],
+        contact: { name: '杨工', phone: '136****7780', wechat: 'yanggong_sd' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 86, views: 64,
+        aiAnalysis: {
+          text: '成都东部新区市政项目 需混凝土罐车 6 台 租赁或承包 租期6个月',
+          tags: [{ k: '品类', v: '运输' }, { k: '地区', v: '成都' }, { k: '数量', v: '6台' }, { k: '获取方式', v: '租赁/承包' }, { k: '时效', v: '6个月' }],
+          summary: '系统判定为「运输-需求」意向，目标区域成都，已自动匹配同品类运输供应方，解锁后可查看联系方式与完整文件。',
+          matchCount: 3
+        },
+        files: [{ name: '用车说明.docx', size: '18KB', summary: '含车次、租期、结算方式说明，完整内容解锁后查看。' }]
+      },
+      /* 4) franchise-demand 加盟/挂靠意向 #1 */
+      {
+        id: 'B-FD-01', typeKey: 'franchise-demand', bizKey: 'franchise', role: 'demand', detailLevel: 'brief',
+        cat: '资质招商', title: '个人带项目 寻求建筑工程总包一级公司 单项目合作/资质挂靠 川内',
+        subCate: '挂靠意向', sub: '单项目合作', location: '成都市·武侯区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '手上有房建标段意向，寻求施工总承包一级或市政一级总公司谈单项目合作，可接受合理管理费与保证金，希望流程透明、对公走账。',
+        detail: '手上有房建标段意向，寻求施工总承包一级或市政一级总公司谈单项目合作，可接受合理管理费与保证金，希望流程透明、对公走账。',
+        tags: ['单项目合作', '找挂靠', '川内'],
+        contact: { name: '蒋先生', phone: '135****3321', wechat: 'jiangxz99' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 89, views: 97,
+        aiAnalysis: {
+          text: '个人带项目 寻求建筑工程总包一级公司 单项目合作/资质挂靠 川内',
+          tags: [{ k: '品类', v: '资质招商' }, { k: '地区', v: '四川' }, { k: '意向', v: '单项目合作/挂靠' }, { k: '期望资质', v: '施工总承包一级' }],
+          summary: '系统判定为「加盟或单项目挂靠-需求」意向，已为你匹配可开放合作的总公司，解锁后可对接招商负责人。',
+          matchCount: 4
+        },
+        files: [{ name: '项目意向说明.pdf', size: '42KB', summary: '项目概况与合作诉求说明，完整内容解锁后查看。' }]
+      },
+      /* 5) franchise-demand 加盟/挂靠意向 #2 */
+      {
+        id: 'B-FD-02', typeKey: 'franchise-demand', bizKey: 'franchise', role: 'demand', detailLevel: 'brief',
+        cat: '资质招商', title: '区县施工队 想加盟消防/装修公司 拿区域授权 长期合作',
+        subCate: '加盟意向', sub: '区域加盟', location: '南充市·顺庆区', city: '南充',
+        price: '', budget: '面议', unit: '',
+        desc: '南充本地 8 人施工队，有本地人脉，希望加盟成熟消防工程或装饰公司拿区县授权，接受加盟费与统一管理，求长期稳定合作。',
+        detail: '南充本地 8 人施工队，有本地人脉，希望加盟成熟消防工程或装饰公司拿区县授权，接受加盟费与统一管理，求长期稳定合作。',
+        tags: ['找加盟', '区县授权', '施工队'],
+        contact: { name: '蒲队长', phone: '137****9045', wechat: 'pudui0817' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 85, views: 73,
+        aiAnalysis: {
+          text: '区县施工队 想加盟消防/装修公司 拿区域授权 长期合作',
+          tags: [{ k: '品类', v: '资质招商' }, { k: '地区', v: '南充' }, { k: '意向', v: '区域加盟' }, { k: '方向', v: '消防/装修' }],
+          summary: '系统判定为「加盟或单项目挂靠-需求」意向，已匹配开放加盟的品牌总部，解锁后可查看加盟政策。',
+          matchCount: 2
+        },
+        files: []
+      },
+      /* 6) trade-demand 收购意向 #1（保证金锁说明见详情） */
+      {
+        id: 'B-TAd-01', typeKey: 'trade-demand', bizKey: 'trade', role: 'demand', detailLevel: 'brief',
+        cat: '建企买卖', title: '意向收购 川内水利水电三级带安许建企 干净无诉讼 可控股',
+        subCate: '收购意向', sub: '收购控股', location: '成都市·成华区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '投资方意向收购川内水利水电施工总承包三级（带安许、无重大诉讼、无大额负债）建企，可整体收购或控股，价格面议，资料齐全可尽调。',
+        detail: '投资方意向收购川内水利水电施工总承包三级（带安许、无重大诉讼、无大额负债）建企，可整体收购或控股，价格面议，资料齐全可尽调。',
+        tags: ['收购', '水利水电三级', '干净壳'],
+        contact: { name: '欧先生', phone: '138****6612', wechat: 'ouinvest' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 91, views: 120,
+        aiAnalysis: {
+          text: '意向收购 川内水利水电三级带安许建企 干净无诉讼 可控股',
+          tags: [{ k: '品类', v: '建企买卖' }, { k: '地区', v: '四川' }, { k: '意向', v: '收购/控股' }, { k: '目标', v: '水利水电三级带安许' }],
+          summary: '系统判定为「收购或控股建筑企业-需求」意向，已匹配待转让建企，对接需缴纳诚意保证金（锁定收购意向）。',
+          matchCount: 3
+        },
+        files: [{ name: '收购需求说明.pdf', size: '36KB', summary: '收购标的要求与付款诉求，完整内容解锁后查看。' }]
+      },
+      /* 7) trade-demand 收购意向 #2 */
+      {
+        id: 'B-TAd-02', typeKey: 'trade-demand', bizKey: 'trade', role: 'demand', detailLevel: 'brief',
+        cat: '建企买卖', title: '求购 机电安装专业承包二级 带安许 成渝两地均可 尽调透明',
+        subCate: '收购意向', sub: '整体收购', location: '重庆市·渝北区', city: '重庆',
+        price: '', budget: '面议', unit: '',
+        desc: '求购成渝两地机电安装专业承包二级（带安许、股权清晰、无经营异常）建企，整体收购，接受分期付款，要求可配合财税尽调。',
+        detail: '求购成渝两地机电安装专业承包二级（带安许、股权清晰、无经营异常）建企，整体收购，接受分期付款，要求可配合财税尽调。',
+        tags: ['求购', '机电安装二级', '成渝'],
+        contact: { name: '秦女士', phone: '139****2874', wechat: 'qinma_buy' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 88, views: 86,
+        aiAnalysis: {
+          text: '求购 机电安装专业承包二级 带安许 成渝两地均可 尽调透明',
+          tags: [{ k: '品类', v: '建企买卖' }, { k: '地区', v: '成渝' }, { k: '意向', v: '整体收购' }, { k: '目标', v: '机电安装二级带安许' }],
+          summary: '系统判定为「收购或控股建筑企业-需求」意向，对接需缴纳诚意保证金，已匹配待转让标的。',
+          matchCount: 2
+        },
+        files: []
+      },
+      /* 8) agency-demand 找中介 #2（1016 为 #1） */
+      {
+        id: 'B-AGd-02', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '中介服务', title: '成都企业 想找中介代办 施工总承包二级升一级 全程透明报价',
+        subCate: '找中介', sub: '资质升级', location: '成都市·青羊区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办中介，要求先报价后签约、流程可查、不捆绑隐形消费。',
+        detail: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办中介，要求先报价后签约、流程可查、不捆绑隐形消费。',
+        tags: ['找中介', '资质升级', '二级升一级'],
+        contact: { name: '高经理', phone: '136****4490', wechat: 'gaojl_hr' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 83, views: 52,
+        aiAnalysis: {
+          text: '成都企业 想找中介代办 施工总承包二级升一级 全程透明报价',
+          tags: [{ k: '品类', v: '中介服务' }, { k: '地区', v: '成都' }, { k: '需求', v: '资质升级代办' }, { k: '级别', v: '二级升一级' }],
+          summary: '系统判定为「找中介服务-需求」意向，已匹配入驻资质代办服务商，解锁后可查看服务菜单与报价。',
+          matchCount: 3
+        },
+        files: []
+      }
+    ];
+    EXTRA.forEach(function (x) { backfill(x); catalog.push(x); });
+
+    /* ---- 定点清洗 ---- */
+    var byId = {};
+    catalog.forEach(function (x) { byId[String(x.id)] = x; });
+    /* P1-02：w1-w3 带 rich labor 块，升级为 detail（不再标 brief），保留完整块 */
+    ['w1', 'w2', 'w3'].forEach(function (id) { var r = byId[id]; if (r) r.detailLevel = 'detail'; });
+    /* P1-03：personnel p1-p13 补合理 views/match（原为 0/0 占位） */
+    for (var pi = 1; pi <= 13; pi++) {
+      var p = byId['p' + pi];
+      if (p) {
+        if (!p.views) p.views = 80 + ((pi * 37) % 120);
+        if (!p.match) p.match = 78 + ((pi * 13) % 18);
+      }
+    }
+    /* P1-04：1015/1016 原无价格位，补「面议」，不留空占位 */
+    ['1015', '1016'].forEach(function (id) {
+      var r = byId[id];
+      if (r && !r.price && !r.budget) r.budget = '面议';
+    });
+    /* P1-07：旧 equip.overview 并入 specs（新渲染器读 specs，避免 hero 速览空） */
+    catalog.forEach(function (x) {
+      if (x.equip && x.equip.overview && (!x.equip.specs || !x.equip.specs.length)) {
+        var o = x.equip.overview;
+        x.equip.specs = [
+          { k: '品牌', v: o.brand || '' },
+          { k: '设备类型', v: o.equipType || o.model || '' },
+          { k: '出厂年份', v: o.yearBuilt || '' },
+          { k: '工时/成色', v: o.workHours || o.condition || '' }
+        ].filter(function (s) { return s.v; });
+      }
+    });
+  })();
+
   /* ---- v3.1：表单预填模拟数据（实名认证/企业认证/个人入驻/企业入驻/合伙人） ---- */
   const mockFormData = {
     realname: { name: '陈建国', idNo: '510104199003151237', mobile: '13800138000', gender: '男', birth: '1990-03-15', address: '四川省成都市武侯区天府大道北段1700号' },

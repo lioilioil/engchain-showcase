@@ -17,6 +17,76 @@ window.DataBus = (function () {
   var now = Date.now();
   var DAY = 864e5, YEAR = 365 * DAY;
 
+  /* ============================================================
+     [分片D P0-02] 16 类型注册表（typeKey ↔ cat/role/detailLevel/bizKey）
+     权威来源 js/publish-types.js:18-121；此处为消费端只读镜像，供分发兜底。
+     分发优先级：typeKey → 注册表 → 旧 bizKey → null（未识别不回退材料，禁止张冠李戴）。
+     ============================================================ */
+  var TYPE_MAP = {
+    'material-supply':   { cat: '材料',   role: 'supply',  detailLevel: 'detail', bizKey: 'material' },
+    'labor-supply':      { cat: '劳务',   role: 'supply',  detailLevel: 'detail', bizKey: 'labor' },
+    'equipment-supply':  { cat: '设备',   role: 'supply',  detailLevel: 'detail', bizKey: 'equipment' },
+    'transport-supply':  { cat: '运输',   role: 'supply',  detailLevel: 'detail', bizKey: 'transport' },
+    'franchise-supply':  { cat: '资质招商', role: 'supply', detailLevel: 'detail', bizKey: 'franchise' },
+    'trade-supply':      { cat: '建企买卖', role: 'supply', detailLevel: 'detail', bizKey: 'trade' },
+    'personnel-demand':  { cat: '招聘',   role: 'demand',  detailLevel: 'detail', bizKey: 'personnel' },
+    'agency-supply':     { cat: '中介服务', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
+    'material-demand':   { cat: '材料',   role: 'demand',  detailLevel: 'brief',  bizKey: 'material' },
+    'labor-demand':      { cat: '劳务',   role: 'demand',  detailLevel: 'brief',  bizKey: 'labor' },
+    'equipment-demand':  { cat: '设备',   role: 'demand',  detailLevel: 'brief',  bizKey: 'equipment' },
+    'transport-demand':  { cat: '运输',   role: 'demand',  detailLevel: 'brief',  bizKey: 'transport' },
+    'franchise-demand':  { cat: '资质招商', role: 'demand', detailLevel: 'brief',  bizKey: 'franchise' },
+    'trade-demand':      { cat: '建企买卖', role: 'demand', detailLevel: 'brief', bizKey: 'trade' },
+    'talent-supply':     { cat: '求职',   role: 'demand',  detailLevel: 'brief',  bizKey: 'talent' },
+    'agency-demand':     { cat: '中介服务', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
+  };
+  /* 旧 bizKey + 方向/深度 → typeKey 反查表（用于存量记录兜底，不臆造新定位） */
+  var BIZ_TO_TYPE = {
+    'material|supply|detail': 'material-supply', 'material|demand|brief': 'material-demand',
+    'labor|supply|detail': 'labor-supply', 'labor|demand|brief': 'labor-demand',
+    'equipment|supply|detail': 'equipment-supply', 'equipment|demand|brief': 'equipment-demand',
+    'transport|supply|detail': 'transport-supply', 'transport|demand|brief': 'transport-demand',
+    'franchise|supply|detail': 'franchise-supply', 'franchise|demand|brief': 'franchise-demand',
+    'trade|supply|detail': 'trade-supply', 'trade|demand|brief': 'trade-demand',
+    'personnel|demand|detail': 'personnel-demand',
+    'agency|supply|detail': 'agency-supply', 'agency|demand|brief': 'agency-demand',
+    'talent|demand|brief': 'talent-supply'
+  };
+  /* resolveType(rec)：返回 {typeKey,cat,role,detailLevel,bizKey}；无法识别返回 null。
+     只读，不修改入参。 */
+  function resolveType(rec) {
+    if (!rec || typeof rec !== 'object') return null;
+    var tk = rec.typeKey || rec.pubType || '';
+    if (tk && TYPE_MAP[tk]) {
+      var m = TYPE_MAP[tk];
+      return { typeKey: tk, cat: m.cat, role: m.role, detailLevel: m.detailLevel, bizKey: m.bizKey };
+    }
+    /* 回退：旧 bizKey + role/dir + detailLevel 反查 */
+    var biz = rec.bizKey || '';
+    var role = rec.role || rec.dir || rec.type || '';
+    var dl = rec.detailLevel || '';
+    var key = biz + '|' + role + '|' + dl;
+    if (BIZ_TO_TYPE[key]) {
+      var m2 = TYPE_MAP[BIZ_TO_TYPE[key]];
+      return { typeKey: BIZ_TO_TYPE[key], cat: m2.cat, role: m2.role, detailLevel: m2.detailLevel, bizKey: m2.bizKey };
+    }
+    return null;
+  }
+  /* normalizeRecord(rec)：只读层补定位键（不覆盖自带值），供 getListing/getRecord 输出。 */
+  function normalizeRecord(rec) {
+    if (!rec || typeof rec !== 'object') return rec;
+    var out = Object.assign({}, rec);
+    var r = resolveType(out);
+    if (r) {
+      if (!out.typeKey) out.typeKey = r.typeKey;
+      if (!out.bizKey) out.bizKey = r.bizKey;
+      if (!out.role) out.role = r.role;
+      if (!out.detailLevel) out.detailLevel = r.detailLevel;
+      if (!out.cat) out.cat = r.cat;
+    }
+    return out;
+  }
+
   /* ---- 内存缓存（v2.0：减少 JSON.parse） ---- */
   var _dbCache = {};
   function _cacheGet(key) { return _dbCache.hasOwnProperty(key) ? _dbCache[key] : undefined; }
@@ -891,7 +961,20 @@ window.DataBus = (function () {
     ];
   }
   /* 演示池版本：seed 内容更新时递增，旧 localStorage 数据按 id 去重合并新条目（不覆盖用户发布） */
-  var SEED_SUPPLY_V = 'v4';
+  var SEED_SUPPLY_V = 'v5';
+  /* cat + dir → 定位键兜底（种子 thin 池无 bizKey/detailLevel，按注册表补，不臆造专属块） */
+  var SEED_CAT_MAP = {
+    '材料':   { supply: { typeKey: 'material-supply', bizKey: 'material', detailLevel: 'detail' }, demand: { typeKey: 'material-demand', bizKey: 'material', detailLevel: 'brief' } },
+    '劳务':   { supply: { typeKey: 'labor-supply', bizKey: 'labor', detailLevel: 'detail' }, demand: { typeKey: 'labor-demand', bizKey: 'labor', detailLevel: 'brief' } },
+    '设备':   { supply: { typeKey: 'equipment-supply', bizKey: 'equipment', detailLevel: 'detail' }, demand: { typeKey: 'equipment-demand', bizKey: 'equipment', detailLevel: 'brief' } },
+    '运输':   { supply: { typeKey: 'transport-supply', bizKey: 'transport', detailLevel: 'detail' }, demand: { typeKey: 'transport-demand', bizKey: 'transport', detailLevel: 'brief' } },
+    '资质招商': { supply: { typeKey: 'franchise-supply', bizKey: 'franchise', detailLevel: 'detail' }, demand: { typeKey: 'franchise-demand', bizKey: 'franchise', detailLevel: 'brief' } },
+    '建企买卖': { supply: { typeKey: 'trade-supply', bizKey: 'trade', detailLevel: 'detail' }, demand: { typeKey: 'trade-demand', bizKey: 'trade', detailLevel: 'brief' } },
+    '招聘':   { demand: { typeKey: 'personnel-demand', bizKey: 'personnel', detailLevel: 'detail' } },
+    '中介服务': { supply: { typeKey: 'agency-supply', bizKey: 'agency', detailLevel: 'detail' }, demand: { typeKey: 'agency-demand', bizKey: 'agency', detailLevel: 'brief' } },
+    '求职':   { demand: { typeKey: 'talent-supply', bizKey: 'talent', detailLevel: 'brief' } }
+  };
+  function cleanPlaceholder(s) { return String(s == null ? '' : s).split('××').join(''); }
   function mergeSeed(items) {
     var seed = seedSupply();
     var have = {};
@@ -902,7 +985,20 @@ window.DataBus = (function () {
       var st = x.status;
       if (st === 'on') st = 'active';
       else if (st === 'pending') st = 'pending_review';
-      out.push(Object.assign({}, x, { status: st }));
+      var role = x.dir === 'supply' ? 'supply' : (x.dir === 'demand' ? 'demand' : '');
+      var backfill = (SEED_CAT_MAP[x.cat] && SEED_CAT_MAP[x.cat][role]) || {};
+      out.push(Object.assign({}, x, {
+        status: st,
+        role: role,
+        cat: x.cat,
+        typeKey: backfill.typeKey || '',
+        bizKey: backfill.bizKey || '',
+        detailLevel: backfill.detailLevel || ''
+      }, {
+        /* 清除历史占位符 ××（P1-04），不写假公司名 */
+        company: cleanPlaceholder(x.company),
+        note: cleanPlaceholder(x.note)
+      }));
     });
     return out;
   }
@@ -963,9 +1059,13 @@ window.DataBus = (function () {
   /* ---- L1 统一供需发布/审核 API（publish/* → DataBus → SupplyStore → 后台审核 → App 可见） ---- */
   function publishSupply(payload) {
     if (!window.SupplyStore) return null;
-    var item = SupplyStore.add(payload);
-    audit('发布供需', '运营', '供需管理', item.title + '（待审核）');
-    return item;
+    var item = payload || {};
+    /* 入口信封透传兜底：typeKey/pubType 互为缺省（权威补齐在发布页），不臆造其他定位键 */
+    if (!item.typeKey) item.typeKey = item.pubType || '';
+    if (!item.pubType) item.pubType = item.typeKey || '';
+    var saved = SupplyStore.add(item);
+    audit('发布供需', '运营', '供需管理', saved.title + '（待审核）');
+    return saved;
   }
   function supplyApprove(id) {
     if (!window.SupplyStore) return;
@@ -984,6 +1084,57 @@ window.DataBus = (function () {
     if (status === 'active') return SupplyStore.listActive();
     if (status === 'pending') return SupplyStore.listPending();
     return SupplyStore.read().items || [];
+  }
+
+  /* ---- [分片D P0-05] 统一目录聚合 / 统一查找链 ----
+     getListing({scope,ownerId,includePending})：
+       MOCK.catalog ∪ SupplyStore.listActive() ∪ 本人 listMinePending() ∪ PublishStore 正式项，
+       按 id/sourceId 去重；输出经 normalizeRecord 补定位键，不改原对象。
+       scope='mine'（或 includePending=true）才并入本人 pending_review；他人视角只看 active。 */
+  function getListing(opts) {
+    opts = opts || {};
+    var out = [], seen = {};
+    function push(r) {
+      if (!r) return;
+      var k = String(r.id);
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      out.push(normalizeRecord(r));
+    }
+    if (window.MOCK && MOCK.catalog) (MOCK.catalog || []).forEach(push);
+    if (window.SupplyStore && SupplyStore.listActive) (SupplyStore.listActive() || []).forEach(push);
+    if (opts.scope === 'mine' || opts.includePending) {
+      if (window.SupplyStore && SupplyStore.listMinePending) (SupplyStore.listMinePending(opts.ownerId) || []).forEach(push);
+    }
+    if (window.PublishStore) {
+      var recs = (PublishStore.get() && PublishStore.get().records) || [];
+      recs.forEach(function (r) {
+        if (r.sourceId != null && window.MOCK && MOCK.listingById) {
+          var src = MOCK.listingById(r.sourceId);
+          if (src) { push(src); return; }
+        }
+        push(r);
+      });
+    }
+    return out;
+  }
+
+  /* getRecord(id)：MOCK.listingById → SupplyStore.byId → PublishStore.getRecordById；
+     PublishStore 项若 sourceId 命中 MOCK 目录则回丰富目录记录（保留专属块，不强制 publish 降级）；
+     未命中返回 null。 */
+  function getRecord(id) {
+    if (id == null) return null;
+    var r = (window.MOCK && MOCK.listingById) ? MOCK.listingById(id) : null;
+    if (r) return normalizeRecord(r);
+    if (window.SupplyStore && SupplyStore.byId) { r = SupplyStore.byId(id); if (r) return normalizeRecord(r); }
+    if (window.PublishStore && PublishStore.getRecordById) {
+      r = PublishStore.getRecordById(id);
+      if (r) {
+        var src = (r.sourceId != null && window.MOCK && MOCK.listingById) ? MOCK.listingById(r.sourceId) : null;
+        return normalizeRecord(src || r);
+      }
+    }
+    return null;
   }
 
   /* ---- 订单生命周期 Store（Phase 2 运营中心 · 订单管理） ----
@@ -1869,6 +2020,8 @@ window.DataBus = (function () {
     SUPPLY_KEY: SUPPLY_KEY, supply: loadSupply, supplyAudit: supplyAudit,
     /* L1 统一供需发布/审核 */
     publishSupply: publishSupply, supplyApprove: supplyApprove, supplyReject: supplyReject, supplyList: supplyList,
+    /* [分片D P0-02/P0-05] 类型注册表 + 统一目录/查找 API（C/X/N 分片稳定签名，勿再变） */
+    TYPE_MAP: TYPE_MAP, resolveType: resolveType, getListing: getListing, getRecord: getRecord,
     ORDERS_KEY: ORDERS_KEY, orders: loadOrders, orderCalc: orderCalc,
     orderTransition: orderTransition, orderAdvanceMilestone: orderAdvanceMilestone,
     MSG_KEY: MSG_KEY, messages: loadMessages, publishMessage: publishMessage, pushDirectMessage: pushDirectMessage,

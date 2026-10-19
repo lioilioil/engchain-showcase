@@ -528,13 +528,32 @@ html[data-theme="dark"] .wb-dl .dl-gate-perk{color:var(--gold-hi);}
   });
 
   var s = PublishStore.stats();
+  /* G-W1：已发布/在架/待审核改读 SupplyStore（权威发布源，与 records.html 同源过滤）；
+     草稿数、新匹配、待咨询仍读 PublishStore，不改 countUp 与布局 */
+  function mySupply(){
+    if (!window.SupplyStore) return [];
+    var cur = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    var uid = cur ? cur.id : '';
+    return SupplyStore.read().items.filter(function (x) {
+      return (x.source==='user_publish'||x.source==='migrated_publish') && x.publisher===uid;
+    });
+  }
+  function fmtTime(v){
+    if (!v) return '';
+    if (typeof v==='string') return v;
+    try { return new Date(v).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}); } catch(e){ return ''; }
+  }
+  var mine = mySupply();
+  var activeN = mine.filter(function(r){ return r.status==='active'; }).length;
+  var reviewRows = mine.filter(function(r){ return r.status==='pending_review'||r.status==='review'; });
+  var askRows = s.records.filter(function(r){ return (r.inquiries||0)>0; });
   function setCount(id, n, has) {
     var el = document.getElementById(id);
     if (!el) return;
     el.textContent = n;
     if (has) el.classList.add('has');
   }
-  setCount('record-count', s.records.length, s.records.length > 0);
+  setCount('record-count', mine.length, mine.length > 0);
   setCount('draft-count', s.drafts.length, s.drafts.length > 0);
   setCount('unlock-count', unlockCount(), unlockCount() > 0);
   setCount('favorite-count', favoriteCount(), favoriteCount() > 0);
@@ -544,39 +563,40 @@ html[data-theme="dark"] .wb-dl .dl-gate-perk{color:var(--gold-hi);}
     '<div class="hs-item"><div class="hs-num" id="mini-draft">0</div><div class="hs-label">草稿</div></div>' +
     '<div class="hs-item"><div class="hs-num" id="mini-match">0</div><div class="hs-label">新匹配</div></div>' +
     '<div class="hs-item"><div class="hs-num is-hot" id="mini-ask">0</div><div class="hs-label">待咨询</div></div>';
-  countUp(document.getElementById('adv-num'), s.active);
+  countUp(document.getElementById('adv-num'), activeN);
   countUp(document.getElementById('mini-draft'), s.drafts.length);
   countUp(document.getElementById('mini-match'), s.matches);
   countUp(document.getElementById('mini-ask'), s.inquiries);
 
-  /* 待处理：筛选胶囊（纯前端显示切换，数据仍取 s.pending） */
+  /* 待处理：审核中行对齐 SupplyStore 记录（标题/状态/详情链接）；待咨询沿用 PublishStore 聚合；筛选胶囊交互不变 */
   var box = document.getElementById('wb-pending');
   var chipsBox = document.getElementById('wb-chips');
-  var nAsk = 0, nReview = 0;
-  s.pending.forEach(function (r) { if ((r.inquiries || 0) > 0) nAsk++; else nReview++; });
+  var pendingRows = reviewRows.map(function(r){ return {r:r, kind:'review'}; })
+    .concat(askRows.map(function(r){ return {r:r, kind:'ask'}; }));
 
   function chipsHTML() {
-    var F = [['all', '全部', s.pending.length], ['review', '审核中', nReview], ['ask', '待咨询', nAsk]];
+    var F = [['all', '全部', pendingRows.length], ['review', '审核中', reviewRows.length], ['ask', '待咨询', askRows.length]];
     return F.map(function (f, i) {
       return '<button class="dl-chip' + (i === 0 ? ' on' : '') + '" data-f="' + f[0] + '" role="tab" aria-selected="' + (i === 0) + '">'
         + '<span>' + f[1] + '</span><span class="dl-chip-n">' + f[2] + '</span></button>';
     }).join('');
   }
   function listHTML() {
-    if (!s.pending.length) return '';
-    return '<div class="dl-list">' + s.pending.slice(0, 4).map(function (r) {
-      var ask = (r.inquiries || 0) > 0;
+    if (!pendingRows.length) return '';
+    return '<div class="dl-list">' + pendingRows.slice(0, 4).map(function (entry) {
+      var r = entry.r, ask = entry.kind==='ask';
       var badge = ask
         ? '<span class="dl-tag ask">' + r.inquiries + ' 条咨询</span>'
         : '<span class="dl-tag review">审核中</span>';
-      var cat = (r.category || r.cat || ((r.role === 'supply' || r.dir === 'supply') ? '供应' : '需求'));
+      var cat = r.cat || r.category || ((r.role === 'supply' || r.dir === 'supply') ? '供应' : '需求');
+      var time = fmtTime(r.ts||r.updatedAt) || r.updatedAt || '';
       return '<a class="dl-item" data-f="' + (ask ? 'ask' : 'review') + '" href="../supply/detail.html?id=' + encodeURIComponent(r.id || '') + '">' +
         '<span class="dl-item-bd">' +
         '<span class="dl-item-top"><span class="dl-item-cat">' + esc(cat) + '</span>' + badge + '</span>' +
         '<b class="dl-item-title">' + esc(r.title) + '</b>' +
         '<span class="dl-item-meta">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>' +
-          '<span class="loc">' + esc(r.location || '') + '</span><span class="sep">·</span>' + esc(r.updatedAt || '') +
+          '<span class="loc">' + esc(r.location || '') + '</span><span class="sep">·</span>' + esc(time) +
           '<span class="go dl-item-go">处理<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>' +
         '</span></span></a>';
     }).join('') + '</div>';

@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/profile/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>新建文件 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928183624">
+<style>
+:root {
+  --fe-gold: #B08A3C;
+  --fe-gold-deep: #8A6A28;
+  --fe-border: rgba(176, 138, 60, 0.16);
+}
+[data-theme="dark"] {
+  --fe-gold: #E0C083;
+  --fe-gold-deep: #B89A5A;
+  --fe-border: rgba(201, 164, 92, 0.12);
+}
+
+/* 文件名输入行 */
+.fe-name-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 16px; }
+.fe-name-row .input { flex: 1; min-width: 0; }
+.fe-ext-pill {
+  flex: none;
+  padding: 7px 13px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  background: rgba(176, 138, 60, 0.14);
+  color: var(--fe-gold-deep);
+}
+/* 类型提示条 */
+.fe-type-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.fe-type-tip svg { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--primary-dim); }
+
+/* 文本/编辑区（外包 position:relative 容器，供右下角放大按钮锚定） */
+.fe-zoom-wrap { position: relative; }
+.fe-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 46vh;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card-2);
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.85;
+  padding: 14px 15px;
+  resize: none;
+  outline: none;
+  -webkit-appearance: none;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+}
+.fe-textarea:focus { border-color: var(--fe-gold); }
+/* md 工具栏可见时，文本域上圆角与顶边去除，与工具栏连成一张卡片 */
+#fe-textwrap.is-md #fe-text { border-radius: 0 0 14px 14px; border-top: none; }
+
+/* txt 状态栏：行数 / 字符数 / 编码（编码取 attrs.encoding，声明性元数据） */
+.fe-txt-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 9px 6px 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+  padding-right: 46px; /* 给右下角放大按钮让位 */
+}
+.fe-txt-status b { color: var(--fe-gold-deep); font-weight: 700; }
+
+/* md 工具栏（即 md 的顶部格式编辑行，全屏态保留可见可点） */
+.fe-md-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  background: var(--bg-card-2);
+}
+.fe-md-preview-btn { margin-left: auto; }
+
+/* md 预览面板（渲染器与历史文件页一致） */
+#fe-mdpv {
+  min-height: 46vh;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card-2);
+  padding: 16px 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text-2);
+  word-break: break-word;
+  overflow-y: auto;
+}
+#fe-mdpv .hf-md-h { color: var(--text-1); font-weight: 800; line-height: 1.4; margin: 14px 0 8px; }
+#fe-mdpv .hf-md-h1 { font-size: 16px; }
+#fe-mdpv .hf-md-h2 { font-size: 14px; padding-left: 10px; border-left: 3px solid var(--fe-gold); }
+#fe-mdpv .hf-md-h3 { font-size: 13px; }
+#fe-mdpv .hf-md-p { margin: 0 0 8px; }
+#fe-mdpv .hf-md-ul, #fe-mdpv .hf-md-ol { margin: 6px 0 10px; padding-left: 20px; }
+#fe-mdpv li { margin: 3px 0; }
+#fe-mdpv .hf-md-code { background: rgba(176, 138, 60, 0.14); color: var(--fe-gold-deep); border-radius: 5px; padding: 1px 5px; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+#fe-mdpv .hf-md-bq { border-left: 3px solid var(--fe-gold); background: rgba(176, 138, 60, 0.08); margin: 8px 0; padding: 8px 12px; border-radius: 0 8px 8px 0; color: var(--text-2); font-size: 12px; }
+#fe-mdpv .hf-md-pre { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; line-height: 1.7; color: var(--text-1); margin: 10px 0; white-space: pre; }
+#fe-mdpv .hf-md-hr { border: none; border-top: 1px dashed var(--line); margin: 14px 0; }
+#fe-mdpv table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 8px 0 12px; }
+#fe-mdpv th, #fe-mdpv td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+#fe-mdpv th { color: var(--text-1); font-weight: 700; background: rgba(176, 138, 60, 0.08); }
+#fe-mdpv tr:last-child td { border-bottom: none; }
+
+/* 富文本编辑器 */
+.fe-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 8px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 14px 14px 0 0;
+  background: var(--bg-card-2);
+}
+.fe-tb-btn {
+  min-width: 32px;
+  height: 30px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.fe-tb-btn:active { background: rgba(176, 138, 60, 0.14); color: var(--fe-gold-deep); }
+.fe-tb-div { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+.fe-doc-select {
+  height: 30px;
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--text-2);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 0 6px;
+  outline: none;
+  -webkit-appearance: none;
+}
+.fe-color-swatches { display: inline-flex; align-items: center; gap: 4px; padding: 0 2px; }
+.fe-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-3);
+  background: transparent;
+  transition: transform .15s;
+}
+.fe-color-swatch:active { transform: scale(.9); }
+#fe-doc {
+  min-height: 42vh;
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  background: var(--bg-card-2);
+  color: var(--text-1);
+  font-size: 13.5px;
+  line-height: 1.85;
+  padding: 14px 15px;
+  outline: none;
+  overflow-y: auto;
+}
+#fe-doc:empty::before { content: '请输入文档内容…'; color: var(--text-3); }
+#fe-doc h1, #fe-doc h2, #fe-doc h3 { color: var(--text-1); line-height: 1.4; margin: 10px 0 6px; }
+#fe-doc h2 { padding-left: 10px; border-left: 3px solid var(--fe-gold); }
+#fe-doc ul, #fe-doc ol { padding-left: 22px; margin: 6px 0; }
+#fe-doc blockquote { border-left: 3px solid var(--fe-gold); background: rgba(176, 138, 60, 0.08); margin: 8px 0; padding: 8px 12px; border-radius: 0 8px 8px 0; color: var(--text-2); }
+#fe-doc a { color: var(--fe-gold-deep); }
+
+/* 表格编辑器（xlsx/xls） */
+.fe-xls-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg-card-2); }
+.fe-xls-table { width: 100%; border-collapse: collapse; }
+.fe-xls-table th, .fe-xls-table td { border-bottom: 1px solid var(--line); padding: 0; }
+.fe-xls-table tr:last-child th, .fe-xls-table tr:last-child td { border-bottom: none; }
+/* 列字母表头 / 行号列：纯 UI 装饰，不进入存储二维数组 */
+.fe-xls-corner { width: 36px; }
+.fe-xls-colh {
+  position: relative;
+  width: 36px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-align: center;
+  padding: 7px 2px;
+  background: rgba(176, 138, 60, 0.06);
+}
+.fe-xls-rowno {
+  width: 36px;
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: center;
+  background: rgba(176, 138, 60, 0.04);
+}
+.fe-xls-delcol {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.fe-xls-delcol:active { color: var(--error); }
+.fe-xls-cell {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 12.5px;
+  padding: 10px 12px;
+  outline: none;
+  -webkit-appearance: none;
+}
+.fe-xls-cell:focus { background: rgba(176, 138, 60, 0.08); }
+.fe-xls-opt { width: 40px; text-align: center; }
+.fe-xls-del {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fe-xls-del:active { background: var(--error-soft); color: var(--error); }
+.fe-xls-footer { display: flex; border-top: 1px dashed var(--line); }
+.fe-xls-add {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fe-gold-deep);
+  cursor: pointer;
+}
+.fe-xls-add + .fe-xls-add { border-left: 1px dashed var(--line); }
+.fe-xls-add:active { background: rgba(176, 138, 60, 0.08); }
+.fe-xls-tip { font-size: 11px; color: var(--text-3); padding: 10px 12px 2px; line-height: 1.6; }
+.fe-xls-tip b { color: var(--fe-gold-deep); font-weight: 700; }
+
+/* ===== 文件属性卡片 ===== */
+.fe-attrs-card {
+  margin: 16px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card-2);
+  padding: 14px 14px 8px;
+}
+.fe-attrs-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--fe-gold-deep);
+  margin-bottom: 12px;
+}
+.fe-attrs-title svg { width: 14px; height: 14px; flex: none; }
+.fe-attr-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.fe-attr-row label { flex: 0 0 64px; font-size: 12px; color: var(--text-3); }
+.fe-attr-row .input { flex: 1; min-width: 0; height: 38px; font-size: 12.5px; border-radius: 10px; }
+.fe-attr-hint { font-size: 10.5px; color: var(--text-3); margin: -6px 0 10px 74px; line-height: 1.5; }
+[data-theme="dark"] .fe-attrs-card { border-color: rgba(255,255,255,.10); }
+[data-theme="dark"] .fe-expand-btn { background: rgba(255,255,255,.10); }
+
+/* ===== 全屏放大/缩小（与 publish/editor.html 一致：层级 覆盖层 z60 < 放大态 z61 < 缩小按钮 z62，DUR 340ms，同款 easing） ===== */
+/* 编辑面（textarea / #fe-doc / 表格网格）的相对定位壳，放大按钮锚定其右下角内缩 12px，
+   不压状态栏、底部操作行或顶部工具栏，三形态视觉一致 */
+.fe-surface { position: relative; }
+.fe-expand-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 9px;
+  background: var(--bg-card-2);
+  color: var(--text-3);
+  cursor: pointer;
+  z-index: 2;
+  box-shadow: var(--shadow-xs);
+  transition: all .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.fe-expand-btn::after { content: ''; position: absolute; inset: -8px; } /* 触控目标 ≥44px */
+.fe-expand-btn:active { transform: scale(.94); }
+.fe-expand-btn svg { width: 14px; height: 14px; }
+.fe-expanded { position: fixed; margin: 0; box-shadow: var(--shadow-sm); z-index: 61; display: flex; flex-direction: column; }
+.fe-expanded #fe-text, .fe-expanded #fe-mdpv { flex: 1 1 auto; min-height: 0; }
+.fe-expanded #fe-doc { flex: 1 1 auto; min-height: 0; }
+.fe-expanded #fe-xls-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.fe-expanded #fe-xls-grid { flex: 1 1 auto; overflow-y: auto; }
+#fe-overlay {
+  position: fixed; left: 0; right: 0; top: 50px; bottom: 0;
+  background: var(--bg); z-index: 60;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+#fe-overlay.show { opacity: 1; pointer-events: auto; }
+#fe-shrink {
+  position: absolute; right: 24px; bottom: 24px;
+  width: 30px; height: 30px;
+  display: none; align-items: center; justify-content: center;
+  background: var(--bg-card); border: 1px solid var(--line); color: var(--text-2);
+  border-radius: 9px; cursor: pointer; z-index: 62;
+  box-shadow: var(--shadow-xs); transition: all .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+#fe-shrink:active { transform: scale(.94); }
+#fe-shrink svg { width: 14px; height: 14px; }
+[data-theme="dark"] #fe-shrink { background: var(--bg-card); border-color: rgba(255,255,255,.14); color: var(--text-2); }
+
+/* ===== 在线引擎（ONLYOFFICE / Univer）挂载态 ===== */
+.fe-engine-notice {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 9px 12px; margin-bottom: 12px;
+  border-radius: 12px; font-size: 11.5px; line-height: 1.6;
+  background: rgba(176, 138, 60, 0.10);
+  border: 1px solid var(--fe-border); color: var(--text-2);
+}
+.fe-engine-notice svg { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--fe-gold-deep); }
+.fe-engine-loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 62vh; min-height: 42vh; color: var(--text-3); font-size: 12.5px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--bg-card-2);
+}
+/* 引擎接管后：doc 旧工具栏隐藏；sheet 旧增删行/列脚隐藏；挂载面填满 */
+.fe-docbox.fe-engine-on .fe-toolbar { display: none; }
+.fe-engine-on #fe-doc {
+  height: 62vh; min-height: 42vh; padding: 0; border: 0; border-radius: 14px;
+  background: transparent; overflow: hidden;
+}
+.fe-xlsbox.fe-engine-on #fe-xls-footer { display: none; }
+.fe-engine-on #fe-xls-grid { height: 62vh; min-height: 42vh; overflow: hidden; }
+.fe-expanded.fe-engine-on #fe-doc,
+.fe-expanded.fe-engine-on #fe-xls-grid { flex: 1 1 auto; height: auto; min-height: 0; }
+/* 底部操作：取消（小尺寸 · 色彩弱化）+ 保存文件（主行动） */
+.fe-cta { display: flex; align-items: center; gap: 10px; }
+.fe-cta .fe-cancel { flex: none; opacity: .78; }
+.fe-cta .fe-save { flex: 1; min-width: 0; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="window.goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title" id="fe-title">新建文件</div>
+  </div>
+
+  <div class="scroll" style="padding-top:8px;padding-bottom:116px;">
+    <!-- 文件名 -->
+    <div class="fe-name-row">
+      <input class="input" id="fe-name" placeholder="请输入文件名" maxlength="60" autocomplete="off">
+      <span class="fe-ext-pill" id="fe-ext">.TXT</span>
+    </div>
+
+    <!-- 类型提示 -->
+    <div class="fe-type-tip" id="fe-tip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <span id="fe-tip-text">纯文本文件，保存后将收录至「历史文件」列表。</span>
+    </div>
+
+    <!-- 文本编辑区（txt / md）：外包 #fe-textwrap 作全屏放大容器，md 工具栏/预览/状态栏均在内 -->
+    <div id="fe-textwrap" class="fe-zoom-wrap" style="display:none;">
+      <div class="fe-md-toolbar" id="fe-md-toolbar" style="display:none;">
+        <button type="button" class="fe-tb-btn" data-md="bold"><b>B</b></button>
+        <button type="button" class="fe-tb-btn" data-md="italic"><i>I</i></button>
+        <span class="fe-tb-div"></span>
+        <button type="button" class="fe-tb-btn" data-md="h1">H1</button>
+        <button type="button" class="fe-tb-btn" data-md="h2">H2</button>
+        <button type="button" class="fe-tb-btn" data-md="h3">H3</button>
+        <button type="button" class="fe-tb-btn" data-md="quote">❝ 引用</button>
+        <button type="button" class="fe-tb-btn" data-md="code">` 代码</button>
+        <button type="button" class="fe-tb-btn" data-md="link">链接</button>
+        <span class="fe-tb-div"></span>
+        <button type="button" class="fe-tb-btn" data-md="ul">• 列表</button>
+        <button type="button" class="fe-tb-btn" data-md="ol">1. 列表</button>
+        <button type="button" class="fe-tb-btn fe-md-preview-btn" id="fe-md-preview">预览</button>
+      </div>
+      <div class="fe-surface">
+        <textarea class="fe-textarea" id="fe-text" placeholder="请输入文件内容…"></textarea>
+        <div id="fe-mdpv" style="display:none;"></div>
+        <button type="button" class="fe-expand-btn" id="fe-expand-text" aria-label="放大编辑区" title="放大编辑区">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+      </div>
+      <div class="fe-txt-status" id="fe-txt-status" style="display:none;">
+        <span>行数 <b id="fe-st-lines">0</b></span>
+        <span>字符 <b id="fe-st-chars">0</b></span>
+        <span>编码 <b id="fe-st-enc">UTF-8</b></span>
+      </div>
+    </div>
+
+    <!-- 富文本编辑区（docx / doc）：#fe-docbox 本身作全屏放大容器，工具栏随容器一起放大并保持可见可点 -->
+    <div id="fe-docbox" class="fe-zoom-wrap" style="display:none;">
+      <div class="fe-toolbar">
+        <button type="button" class="fe-tb-btn" data-cmd="bold"><b>B</b></button>
+        <button type="button" class="fe-tb-btn" data-cmd="italic"><i>I</i></button>
+        <button type="button" class="fe-tb-btn" data-cmd="underline"><u>U</u></button>
+        <span class="fe-tb-div"></span>
+        <select class="fe-doc-select" id="fe-doc-fontsize" title="字号（应用到选中文本）">
+          <option value="12px">12px</option>
+          <option value="13px">13px</option>
+          <option value="13.5px" selected>13.5px</option>
+          <option value="14px">14px</option>
+          <option value="15px">15px</option>
+          <option value="16px">16px</option>
+          <option value="18px">18px</option>
+          <option value="20px">20px</option>
+          <option value="24px">24px</option>
+        </select>
+        <span class="fe-color-swatches">
+          <button type="button" class="fe-color-swatch" data-color="" title="默认色">A</button>
+          <button type="button" class="fe-color-swatch" data-color="#E5484D" title="红色" style="background:#E5484D;"></button>
+          <button type="button" class="fe-color-swatch" data-color="#30A46C" title="绿色" style="background:#30A46C;"></button>
+          <button type="button" class="fe-color-swatch" data-color="#3E86F5" title="蓝色" style="background:#3E86F5;"></button>
+          <button type="button" class="fe-color-swatch" data-color="#B08A3C" title="金色" style="background:#B08A3C;"></button>
+        </span>
+        <span class="fe-tb-div"></span>
+        <button type="button" class="fe-tb-btn" data-cmd="justifyLeft" title="左对齐">⇤</button>
+        <button type="button" class="fe-tb-btn" data-cmd="justifyCenter" title="居中">⇥</button>
+        <button type="button" class="fe-tb-btn" data-cmd="justifyRight" title="右对齐">⇥</button>
+        <button type="button" class="fe-tb-btn" data-cmd="indent" title="缩进">≫</button>
+        <button type="button" class="fe-tb-btn" data-cmd="outdent" title="反缩进">≪</button>
+        <span class="fe-tb-div"></span>
+        <button type="button" class="fe-tb-btn" data-cmd="undo" title="撤销">↶</button>
+        <button type="button" class="fe-tb-btn" data-cmd="redo" title="重做">↷</button>
+        <button type="button" class="fe-tb-btn" data-cmd="insertHorizontalRule" title="分割线">―</button>
+        <button type="button" class="fe-tb-btn" id="fe-doc-link" title="插入链接">🔗</button>
+        <span class="fe-tb-div"></span>
+        <button type="button" class="fe-tb-btn" data-cmd="formatBlock" data-arg="h2">H2</button>
+        <button type="button" class="fe-tb-btn" data-cmd="formatBlock" data-arg="p">正文</button>
+        <button type="button" class="fe-tb-btn" data-cmd="insertUnorderedList">• 列表</button>
+        <button type="button" class="fe-tb-btn" data-cmd="insertOrderedList">1. 列表</button>
+        <button type="button" class="fe-tb-btn" data-cmd="formatBlock" data-arg="blockquote">❝ 引用</button>
+      </div>
+      <div class="fe-surface">
+        <div id="fe-doc" contenteditable="true"></div>
+        <button type="button" class="fe-expand-btn" id="fe-expand-doc" aria-label="放大编辑区" title="放大编辑区">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 表格编辑区（xlsx / xls）：#fe-xlsbox 作全屏放大容器 -->
+    <div id="fe-xlsbox" class="fe-zoom-wrap" style="display:none;">
+      <div class="fe-xls-tip">工作表「<b id="fe-xls-sheet">Sheet1</b>」：首行为表头，可增删行列，保存后按表格形式预览。</div>
+      <div class="fe-xls-card">
+        <div class="fe-surface">
+          <div id="fe-xls-grid"></div>
+          <button type="button" class="fe-expand-btn" id="fe-expand-xls" aria-label="放大编辑区" title="放大编辑区">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          </button>
+        </div>
+        <div class="fe-xls-footer">
+          <button type="button" class="fe-xls-add" id="fe-xls-addrow">+ 添加一行</button>
+          <button type="button" class="fe-xls-add" id="fe-xls-addcol">+ 添加一列</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件属性（按类型渲染，attrs 按冻结契约存取 FileStore.DEFAULT_ATTRS） -->
+    <div class="fe-attrs-card" id="fe-attrs-card">
+      <div class="fe-attrs-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        文件属性
+      </div>
+      <div id="fe-attrs-body"></div>
+    </div>
+  </div>
+
+  <div class="fixed-cta fe-cta" data-lg-cta="bar">
+    <button type="button" class="btn btn-ghost btn-sm fe-cancel" id="fe-cancel" onclick="window.goBack()">取消</button>
+    <button type="button" class="btn btn-primary btn-lg fe-save" id="fe-save" onclick="save()">保存文件</button>
+  </div>
+
+  <!-- 全屏放大层：覆盖层 z60 < 放大态容器 z61 < 缩小按钮 z62（缩小按钮与覆盖层平级，否则被放大态盖住点不到）。
+       唯一适配：本页底部有常驻 fixed-cta 保存栏，覆盖层与放大态最大高度均算到 CTA 栏上方，保证「取消/保存」全屏时仍可点击。 -->
+  <div id="fe-overlay"></div>
+  <button type="button" id="fe-shrink" aria-label="缩小编辑区" title="缩小编辑区">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+  </button>
+</div>
+
+<script>window.__ENGCHAIN_SILENT_FILE_RECORD = true;</script>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/editor-adapter.js?v=2026101801"></script>
+<script src="../../js/file-download.js"></script>
+<script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
+<script src="../../js/liquid-cta.js?v=20260928184535"></script>
+<script>
+(function () {
+  window.__ROOT__ = '../../';
+
+  /* 可编辑类型 → 编辑器形态 */
+  var EDITOR = {
+    txt: 'text', md: 'text',
+    docx: 'doc', doc: 'doc',
+    xlsx: 'xls', xls: 'xls'
+  };
+  var TYPE_LABEL = {
+    txt: 'TXT', md: 'MD', docx: 'DOCX', doc: 'DOC', xlsx: 'XLSX', xls: 'XLS'
+  };
+  var TYPE_TIP = {
+    txt: '纯文本文件，保存后将收录至「历史文件」列表。',
+    md: 'Markdown 文件，支持标题、列表、代码块等语法，历史页按 Markdown 排版预览。',
+    docx: '富文本文档，使用顶部工具栏排版，历史页按文档样式预览。',
+    doc: '富文本文档，使用顶部工具栏排版，历史页按文档样式预览。',
+    xlsx: '表格文件，首行为表头，保存后按表格形式预览。',
+    xls: '表格文件，首行为表头，保存后按表格形式预览。'
+  };
+  var NEW_TEMPLATE = {
+    txt: '这是新建的文本文件。\n\n请输入或粘贴你的内容…',
+    md: '# 新建文档\n\n- 支持 **Markdown** 语法\n- 保存后在历史文件页按格式预览\n\n```\n代码块示例\n```\n',
+    docx: '<h2>新建文档</h2><p>请输入文档内容…</p>',
+    doc: '<h2>新建文档</h2><p>请输入文档内容…</p>',
+    xlsx: [['项目', '内容', '备注'], ['示例项目', '示例值', '']]
+  };
+
+  var params = new URLSearchParams(location.search);
+  var mode = params.get('mode');          /* new | edit */
+  var newType = String(params.get('type') || '').toLowerCase();
+  var editId = params.get('id') || '';
+
+  var ext = '';
+  var file = null;                        /* 编辑模式：FileStore 记录 */
+  var editorKind = 'text';
+  var attrsObj = null;                    /* 当前文件属性（冻结契约） */
+
+  /* ---- 在线引擎状态（契约 §2/§3）：adapter 非空即引擎接管；否则走原生轻量编辑器 ---- */
+  var adapter = null;
+  var engineActive = false;
+  var engineName = '';                    /* 'onlyoffice' | 'univer' | '' */
+  var loadedEnvelope = null;              /* 编辑模式已装载的信封（用于往返判别） */
+
+  function findFile(id) {
+    var r = null;
+    try { FileStore.list().forEach(function (f) { if (f.id === id) r = f; }); } catch (e) {}
+    return r;
+  }
+  function kbSize(text) {
+    try {
+      var b = new Blob([String(text || '')]).size;
+      return b < 1024 ? '1KB' : Math.ceil(b / 1024) + 'KB';
+    } catch (e) { return '1KB'; }
+  }
+
+  /* ===== attrs 属性：默认值取 FileStore.DEFAULT_ATTRS，编辑模式从 file.attrs 浅覆盖回填 ===== */
+  function resolveAttrs() {
+    var base = (FileStore.DEFAULT_ATTRS && FileStore.DEFAULT_ATTRS[ext]) || {};
+    var a = JSON.parse(JSON.stringify(base));
+    if (file && file.attrs) {
+      for (var k in file.attrs) {
+        if (Object.prototype.hasOwnProperty.call(file.attrs, k)) a[k] = file.attrs[k];
+      }
+    }
+    return a;
+  }
+  function parseTags(raw) {
+    return String(raw == null ? '' : raw)
+      .split(/[,，]/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+  }
+
+  /* ---- 属性卡片渲染（按类型渲染匹配字段） ---- */
+  function attrRow(label, inner) {
+    return '<div class="fe-attr-row"><label>' + label + '</label>' + inner + '</div>';
+  }
+  function renderAttrs() {
+    var body = document.getElementById('fe-attrs-body');
+    var html = '';
+    if (editorKind === 'text') {
+      html += attrRow('编码',
+        '<select class="input" id="fe-a-encoding">' +
+        ['UTF-8', 'UTF-8(BOM)', 'GBK', 'ASCII'].map(function (o) {
+          return '<option value="' + o + '"' + (attrsObj.encoding === o ? ' selected' : '') + '>' + o + '</option>';
+        }).join('') + '</select>');
+      html += attrRow('作者', '<input class="input" id="fe-a-author" placeholder="作者名称" value="' + esc(attrsObj.author || '') + '">');
+      var tagsRaw = Array.isArray(attrsObj.tags) ? attrsObj.tags.join('，') : '';
+      html += attrRow('标签', '<input class="input" id="fe-a-tags" placeholder="逗号分隔，如：合同，范本" value="' + esc(tagsRaw) + '">');
+      html += '<div class="fe-attr-hint">编码为声明性元数据，显示在文本框下方状态栏；标签保存为数组。</div>';
+    } else if (editorKind === 'doc') {
+      html += attrRow('标题', '<input class="input" id="fe-a-title" placeholder="文档标题" value="' + esc(attrsObj.title || '') + '">');
+      html += attrRow('作者', '<input class="input" id="fe-a-author" placeholder="作者名称" value="' + esc(attrsObj.author || '') + '">');
+      html += attrRow('正文字号',
+        '<select class="input" id="fe-a-fontsize">' +
+        ['12px', '13px', '13.5px', '14px', '15px', '16px', '18px'].map(function (o) {
+          return '<option value="' + o + '"' + (attrsObj.fontSize === o ? ' selected' : '') + '>' + o + '</option>';
+        }).join('') + '</select>');
+      html += attrRow('页眉', '<input class="input" id="fe-a-header" placeholder="页眉文字" value="' + esc(attrsObj.header || '') + '">');
+      html += attrRow('页脚', '<input class="input" id="fe-a-footer" placeholder="页脚文字" value="' + esc(attrsObj.footer || '') + '">');
+    } else {
+      html += attrRow('工作表名', '<input class="input" id="fe-a-sheet" placeholder="Sheet1" value="' + esc(attrsObj.sheetName || 'Sheet1') + '">');
+      html += attrRow('行数', '<input class="input" id="fe-a-rows" type="number" min="1" value="' + (attrsObj.rows || 0) + '">');
+      html += attrRow('列数', '<input class="input" id="fe-a-cols" type="number" min="1" value="' + (attrsObj.cols || 0) + '">');
+      html += attrRow('分隔符',
+        '<select class="input" id="fe-a-delim">' +
+        [['逗号', ','], ['分号', ';'], ['制表符', '\t'], ['竖线', '|']].map(function (p) {
+          return '<option value="' + p[1] + '"' + (attrsObj.delimiter === p[1] ? ' selected' : '') + '>' + p[0] + '</option>';
+        }).join('') + '</select>');
+      html += attrRow('作者', '<input class="input" id="fe-a-author" placeholder="作者名称" value="' + esc(attrsObj.author || '') + '">');
+      html += '<div class="fe-attr-hint">修改行数/列数：变大补空行/列；变小仅当尾部行/列全空才执行。</div>';
+    }
+    body.innerHTML = html;
+    bindAttrs();
+  }
+  function bindAttrs() {
+    if (editorKind === 'text') {
+      document.getElementById('fe-a-encoding').addEventListener('change', function (e) {
+        attrsObj.encoding = e.target.value;
+        refreshTxtStatus();
+      });
+      document.getElementById('fe-a-author').addEventListener('input', function (e) { attrsObj.author = e.target.value; });
+      document.getElementById('fe-a-tags').addEventListener('input', function (e) { attrsObj.tags = parseTags(e.target.value); });
+    } else if (editorKind === 'doc') {
+      document.getElementById('fe-a-title').addEventListener('input', function (e) { attrsObj.title = e.target.value; });
+      document.getElementById('fe-a-author').addEventListener('input', function (e) { attrsObj.author = e.target.value; });
+      var fs = document.getElementById('fe-a-fontsize');
+      fs.addEventListener('change', function (e) {
+        attrsObj.fontSize = e.target.value;
+        /* 正文字号真实联动：同步为 #fe-doc 基础字号 */
+        document.getElementById('fe-doc').style.fontSize = e.target.value;
+      });
+      document.getElementById('fe-a-header').addEventListener('input', function (e) { attrsObj.header = e.target.value; });
+      document.getElementById('fe-a-footer').addEventListener('input', function (e) { attrsObj.footer = e.target.value; });
+    } else {
+      var sheet = document.getElementById('fe-a-sheet');
+      sheet.addEventListener('input', function (e) {
+        attrsObj.sheetName = e.target.value || 'Sheet1';
+        document.getElementById('fe-xls-sheet').textContent = attrsObj.sheetName;
+      });
+      document.getElementById('fe-a-rows').addEventListener('change', function (e) {
+        var n = parseInt(e.target.value, 10);
+        if (isNaN(n) || n < 1) { syncRowColInputs(); return; }
+        adjustRows(n);
+      });
+      document.getElementById('fe-a-cols').addEventListener('change', function (e) {
+        var n = parseInt(e.target.value, 10);
+        if (isNaN(n) || n < 1) { syncRowColInputs(); return; }
+        adjustCols(n);
+      });
+      document.getElementById('fe-a-delim').addEventListener('change', function (e) { attrsObj.delimiter = e.target.value; });
+      document.getElementById('fe-a-author').addEventListener('input', function (e) { attrsObj.author = e.target.value; });
+    }
+  }
+  function collectAttrs() {
+    var a = {};
+    if (editorKind === 'text') {
+      a.encoding = val('fe-a-encoding');
+      a.author = val('fe-a-author');
+      a.tags = parseTags(val('fe-a-tags'));
+    } else if (editorKind === 'doc') {
+      a.title = val('fe-a-title');
+      a.author = val('fe-a-author');
+      a.fontSize = val('fe-a-fontsize');
+      a.header = val('fe-a-header');
+      a.footer = val('fe-a-footer');
+    } else {
+      a.sheetName = val('fe-a-sheet') || 'Sheet1';
+      a.rows = parseInt(val('fe-a-rows'), 10) || 0;
+      a.cols = parseInt(val('fe-a-cols'), 10) || 0;
+      a.delimiter = val('fe-a-delim');
+      a.author = val('fe-a-author');
+    }
+    return a;
+  }
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? el.value : '';
+  }
+
+  /* 切换编辑器形态 */
+  function applyEditor(kind) {
+    editorKind = kind;
+    document.getElementById('fe-textwrap').style.display = kind === 'text' ? '' : 'none';
+    document.getElementById('fe-docbox').style.display = kind === 'doc' ? '' : 'none';
+    document.getElementById('fe-xlsbox').style.display = kind === 'xls' ? '' : 'none';
+  }
+
+  function init() {
+    if (mode === 'new' && EDITOR[newType]) {
+      ext = newType;
+    } else if (editId) {
+      file = findFile(editId);
+      if (!file) {
+        UI.toast('文件不存在或已删除', 'warn');
+        setTimeout(function () { location.href = 'history-files.html'; }, 800);
+        return;
+      }
+      ext = String(file.name.split('.').pop() || '').toLowerCase();
+      if (!EDITOR[ext]) {
+        UI.toast('该文件类型暂不支持编辑', 'warn');
+        setTimeout(function () { location.href = 'history-files.html'; }, 800);
+        return;
+      }
+    } else {
+      UI.toast('参数错误', 'warn');
+      setTimeout(function () { location.href = 'history-files.html'; }, 800);
+      return;
+    }
+
+    attrsObj = resolveAttrs();
+    document.getElementById('fe-title').textContent = file ? '编辑文件' : '新建文件';
+    document.getElementById('fe-ext').textContent = '.' + TYPE_LABEL[ext];
+    document.getElementById('fe-tip-text').textContent = TYPE_TIP[ext] || '';
+
+    var kind = EDITOR[ext];
+    applyEditor(kind);
+
+    var nameInput = document.getElementById('fe-name');
+    if (file) {
+      nameInput.value = file.name.replace(/\.(txt|md|docx?|xlsx?)$/i, '');
+      if (kind === 'text') {
+        document.getElementById('fe-text').value = file.content || '';
+      } else {
+        prepareEngineOrLegacy(kind);
+      }
+    } else {
+      nameInput.value = '新建文档';
+      if (kind === 'text') {
+        document.getElementById('fe-text').value = NEW_TEMPLATE[ext] || '';
+      } else {
+        prepareEngineOrLegacy(kind);
+      }
+    }
+
+    /* 形态专属：md 工具栏/预览、txt 状态栏、doc 基础字号、xls 工作表名与行列数回填 */
+    var tw = document.getElementById('fe-textwrap');
+    if (kind === 'text') {
+      if (ext === 'md') {
+        tw.classList.add('is-md');
+        document.getElementById('fe-md-toolbar').style.display = '';
+      } else {
+        document.getElementById('fe-txt-status').style.display = '';
+        refreshTxtStatus();
+      }
+      document.getElementById('fe-text').addEventListener('input', refreshTxtStatus);
+    } else if (kind === 'doc' && !engineActive) {
+      document.getElementById('fe-doc').style.fontSize = attrsObj.fontSize || '13.5px';
+    } else if (kind === 'xls') {
+      document.getElementById('fe-xls-sheet').textContent = attrsObj.sheetName || 'Sheet1';
+    }
+
+    renderAttrs();
+    if (kind === 'xls' && !engineActive) syncRowColInputs();
+  }
+
+  /* ===================== 在线引擎装载（OO / Univer）与轻量降级 ===================== */
+
+  function nameBase() { return document.getElementById('fe-name').value.trim(); }
+
+  function showEngineNotice(text) {
+    var box = document.getElementById(editorKind === 'doc' ? 'fe-docbox' : 'fe-xlsbox');
+    if (!box) return;
+    var old = box.querySelector('.fe-engine-notice');
+    if (old) old.parentNode.removeChild(old);
+    var n = document.createElement('div');
+    n.className = 'fe-engine-notice';
+    n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>' + esc(text) + '</span>';
+    box.insertBefore(n, box.firstChild);
+  }
+
+  function showEngineLoading(mountEl, text) {
+    mountEl.innerHTML = '<div class="fe-engine-loading">' + esc(text) + '，首次加载需数十秒，请稍候…</div>';
+  }
+
+  function legacyDocFill() {
+    var el = document.getElementById('fe-doc');
+    el.contentEditable = 'true';
+    var raw = file ? file.content : NEW_TEMPLATE[ext] || '';
+    if (raw && typeof raw === 'object' && raw.v === 1) {
+      /* 引擎信封在当前环境未能重新挂载：只读展示快照，不留白 */
+      el.innerHTML = raw.snapshot || '<p style="color:#888">（引擎文档，当前环境无法展开）</p>';
+      showEngineNotice('引擎文档未能在当前环境重新挂载，已以只读快照展示；请通过本地服务完整打开。');
+    } else {
+      el.innerHTML = (typeof raw === 'string') ? raw : '';
+    }
+    el.style.fontSize = attrsObj.fontSize || '13.5px';
+  }
+
+  function legacySheetFill() {
+    var raw = file ? file.content : NEW_TEMPLATE.xlsx;
+    if (raw && typeof raw === 'object' && raw.v === 1) {
+      /* 引擎信封降级：把快照静态表格塞进网格，不再走二维数组解析 */
+      document.getElementById('fe-xls-grid').innerHTML =
+        '<div style="padding:14px;font-size:12px;color:var(--text-2)">' +
+        (raw.snapshot || '（引擎表格，当前环境无法展开）') + '</div>';
+      showEngineNotice('引擎表格未能在当前环境重新挂载，已以只读快照展示。');
+    } else {
+      buildXlsTable(parseXls(raw));
+    }
+    document.getElementById('fe-xls-sheet').textContent = attrsObj.sheetName || 'Sheet1';
+  }
+
+  /* ---- 离线快照库懒加载（与 adapter 同源 vendor 目录），用于 OO 失败后的轻量回填 ---- */
+  var _feVendor = {};
+  function ensureVendor(name, src) {
+    if (_feVendor[name]) return _feVendor[name];
+    _feVendor[name] = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('vendor load fail: ' + name)); };
+      document.head.appendChild(s);
+    });
+    return _feVendor[name];
+  }
+  function feVendorUrl(path) {
+    /* 与 wrapper 同源：从当前页相对推导到 onlyoffice-runtime/vendor/ */
+    return '/Engchain3.0-archive/onlyoffice-runtime/' + path;
+  }
+
+  function b64ToAb(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  /* OO 打开失败 → 把已存信封 buffer 解码为轻量可编辑（doc: mammoth→HTML；sheet: SheetJS→二维数组） */
+  function fillLightFromEnv(env, kind) {
+    if (kind === 'doc') {
+      var b64 = env && env.data;
+      if (!b64) return Promise.resolve();
+      return ensureVendor('mammoth', feVendorUrl('vendor/mammoth.min.js')).then(function () {
+        var ab = b64ToAb(b64);
+        return window.mammoth.convertToHtml({ arrayBuffer: ab });
+      }).then(function (res) {
+        var el = document.getElementById('fe-doc');
+        el.contentEditable = 'true';
+        el.innerHTML = (res && res.value) || '';
+        el.style.fontSize = attrsObj.fontSize || '13.5px';
+      });
+    }
+    /* sheet：SheetJS 读首个 sheet → 二维数组 → 轻量表格网格 */
+    var data = env && env.data;
+    if (!data) return Promise.resolve();
+    return ensureVendor('xlsx', feVendorUrl('vendor/xlsx.full.min.js')).then(function () {
+      var ab = b64ToAb(data);
+      var wb = window.XLSX.read(ab, { type: 'array' });
+      var nm = wb.SheetNames && wb.SheetNames[0];
+      var arr = window.XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, defval: '' });
+      buildXlsTable(arr);
+      document.getElementById('fe-xls-sheet').textContent = attrsObj.sheetName || 'Sheet1';
+    });
+  }
+
+  /* 轻量信封（engine:'light'）直接装载到轻量编辑器（doc=HTML 字符串；sheet=JSON 二维数组） */
+  function loadLightEnvelope(env, kind) {
+    engineActive = false;
+    engineName = 'light';
+    if (kind === 'doc') {
+      var el = document.getElementById('fe-doc');
+      el.contentEditable = 'true';
+      el.innerHTML = env.data || '';
+      el.style.fontSize = attrsObj.fontSize || '13.5px';
+    } else if (kind === 'xls') {
+      buildXlsTable(parseXls(env.data));
+      document.getElementById('fe-xls-sheet').textContent = attrsObj.sheetName || 'Sheet1';
+    }
+    showEngineNotice('轻量编辑模式：内容已载入，可继续编辑；完整排版请通过本地服务使用在线引擎。');
+  }
+
+  function prepareEngineOrLegacy(kind) {
+    var env = (window.EcUtils && EcUtils.isEnvelope(file && file.content)) ? file.content : null;
+    loadedEnvelope = env;
+    var theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    var http = EcEditor && EcEditor.isHttp();
+
+    /* 轻量信封（engine:'light'）：直接走轻量编辑器装载，无需引擎 */
+    if (env && env.engine === 'light') {
+      loadLightEnvelope(env, kind);
+      return;
+    }
+
+    /* file:// doc：OO 被 CORS 阻断 → 保留原生 contenteditable 轻量编辑器 + 提示条（契约 §4 兜底） */
+    if (kind === 'doc' && !http) {
+      legacyDocFill();
+      showEngineNotice('当前为 file:// 直开模式，DOCX 使用轻量编辑；完整真实编辑请通过「启动演示.bat」启动本地服务后使用。');
+      return;
+    }
+    /* http：docx/doc 与 xlsx/xls 均走 ONLYOFFICE 全真引擎 */
+    if (http) { startOo(kind, env, theme); return; }
+    /* file:// sheet：优先 Univer（需联网），失败降级现有轻量表格 */
+    startUniver(env, theme);
+  }
+
+  function startOo(kind, env, theme) {
+    var mountEl = kind === 'doc' ? document.getElementById('fe-doc') : document.getElementById('fe-xls-grid');
+    var legacy = { isLegacy: false, raw: '' };
+    if (!env && file) {
+      if (kind === 'doc' && EcUtils.isLegacyDoc(file.content)) legacy = { isLegacy: true, raw: file.content };
+      else if (kind === 'xls' && EcUtils.isLegacySheet(file.content)) legacy = { isLegacy: true, raw: file.content };
+    }
+    showEngineLoading(mountEl, '正在启动 ONLYOFFICE 引擎');
+    adapter = EcEditor.createOo(kind === 'doc' ? 'doc' : 'sheet', mountEl);
+    adapter.load(env ? env.data : null, {
+      ext: ext,
+      theme: theme,
+      title: nameBase() + '.' + (kind === 'doc' ? 'docx' : 'xlsx'),
+      legacy: legacy,
+      attrs: attrsObj
+    }).then(function () {
+      engineActive = true;
+      engineName = 'onlyoffice';
+      window.__ecAdapter = adapter; /* 调试/自检句柄，生产无害 */
+      var box = document.getElementById(kind === 'doc' ? 'fe-docbox' : 'fe-xlsbox');
+      box.classList.add('fe-engine-on');
+      if (kind === 'doc') document.getElementById('fe-doc').contentEditable = 'false';
+    }).catch(function (err) {
+      console.warn('[EcEditor] OO 启动失败，降级轻量可编辑：', err);
+      try { adapter.destroy(); } catch (e) {}
+      adapter = null;
+      /* OO 打不开（冷启动 x2t 失败/超时）→ 解码信封回填轻量编辑器，保持可编辑、内容不丢失 */
+      fillLightFromEnv(env, kind).catch(function (e) { console.warn('[FE] 轻量回填失败：', e); });
+      showEngineNotice('在线引擎未能打开，已切换为轻量可编辑，原内容已载入。');
+    });
+  }
+
+  function ooFallback(kind, msg) {
+    if (kind === 'doc') legacyDocFill(); else legacySheetFill();
+    showEngineNotice(msg);
+  }
+
+  function startUniver(env, theme) {
+    var mountEl = document.getElementById('fe-xls-grid');
+    var legacy = { isLegacy: false, raw: '' };
+    if (!env && file && EcUtils.isLegacySheet(file.content)) legacy = { isLegacy: true, raw: file.content };
+    showEngineLoading(mountEl, '正在加载 Univer 表格引擎（需联网）');
+    adapter = EcEditor.createUniver('sheet', mountEl);
+    adapter.load(env ? env.data : null, { ext: ext, theme: theme, legacy: legacy, attrs: attrsObj })
+      .then(function () {
+        engineActive = true;
+        engineName = 'univer';
+        window.__ecAdapter = adapter; /* 调试/自检句柄，生产无害 */
+        document.getElementById('fe-xlsbox').classList.add('fe-engine-on');
+        showEngineNotice('file:// 联网 Univer 表格模式：数据以快照 JSON 保存（无 .xlsx 二进制导出）；断网时将退回轻量表格。');
+      })
+      .catch(function (err) {
+        console.warn('[EcEditor] Univer 启动失败，降级轻量表格：', err);
+        try { adapter.destroy(); } catch (e) {}
+        adapter = null;
+        legacySheetFill();
+        showEngineNotice('Univer 加载失败（需联网 esm.sh），已切换为轻量表格模式。');
+      });
+  }
+
+  /* ---- txt 状态栏：行数 / 字符数 / 编码（输入实时更新，编码取 attrs.encoding） ---- */
+  function refreshTxtStatus() {
+    if (editorKind !== 'text' || ext !== 'txt') return;
+    var v = document.getElementById('fe-text').value;
+    document.getElementById('fe-st-lines').textContent = v.length ? v.split('\n').length : 0;
+    document.getElementById('fe-st-chars').textContent = v.length;
+    document.getElementById('fe-st-enc').textContent = attrsObj.encoding || 'UTF-8';
+  }
+
+  /* ---- Markdown 轻量渲染（自包含复制自 history-files.html，保证同文同渲染） ---- */
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+  function mdInline(s) {
+    return esc(s)
+      .replace(/`([^`]+)`/g, '<code class="hf-md-code">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  }
+  function mdRender(src) {
+    var lines = String(src || '').replace(/\r\n/g, '\n').split('\n');
+    var out = '', i = 0, listTag = null, inCode = false, codeLines = [], inTable = false;
+    function flushList() {
+      if (listTag) { out += '</' + listTag + '>'; listTag = null; }
+    }
+    function flushTable() {
+      if (inTable) { out += '</tbody></table>'; inTable = false; }
+    }
+    for (; i < lines.length; i++) {
+      var ln = lines[i];
+      if (inCode) {
+        if (/^```/.test(ln.trim())) { inCode = false; out += '<pre class="hf-md-pre"><code>' + codeLines.join('\n') + '</code></pre>'; codeLines = []; }
+        else { codeLines.push(esc(ln)); }
+        continue;
+      }
+      if (/^```/.test(ln.trim())) { flushList(); flushTable(); inCode = true; continue; }
+      if (/^#{1,4}\s/.test(ln)) {
+        flushList(); flushTable();
+        var hm = /^(#{1,4})\s+(.*)$/.exec(ln);
+        var lv = hm[1].length;
+        out += '<h' + (lv + 1) + ' class="hf-md-h hf-md-h' + lv + '">' + mdInline(hm[2]) + '</h' + (lv + 1) + '>';
+        continue;
+      }
+      if (/^\s*>\s?/.test(ln)) {
+        flushList(); flushTable();
+        out += '<blockquote class="hf-md-bq">' + mdInline(ln.replace(/^\s*>\s?/, '')) + '</blockquote>';
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(ln)) {
+        flushTable();
+        if (listTag !== 'ul') { flushList(); out += '<ul class="hf-md-ul">'; listTag = 'ul'; }
+        out += '<li>' + mdInline(ln.replace(/^\s*[-*]\s+/, '')) + '</li>';
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(ln)) {
+        flushTable();
+        if (listTag !== 'ol') { flushList(); out += '<ol class="hf-md-ol">'; listTag = 'ol'; }
+        out += '<li>' + mdInline(ln.replace(/^\s*\d+\.\s+/, '')) + '</li>';
+        continue;
+      }
+      if (/^\s*\|/.test(ln) && /\|\s*$/.test(ln)) {
+        flushList();
+        var cells = ln.replace(/^\s*\|\s*|\s*\|\s*$/g, '').split(/\s*\|\s*/);
+        if (/^[\s:|-]+$/.test(cells.join(''))) continue;          /* 表头分隔行 */
+        if (!inTable) {
+          out += '<table><thead><tr>';
+          cells.forEach(function (c) { out += '<th>' + mdInline(c) + '</th>'; });
+          out += '</tr></thead><tbody>';
+          inTable = true;
+        } else {
+          out += '<tr>';
+          cells.forEach(function (c) { out += '<td>' + mdInline(c) + '</td>'; });
+          out += '</tr>';
+        }
+        continue;
+      }
+      flushTable();
+      if (/^\s*---+\s*$/.test(ln)) { flushList(); out += '<hr class="hf-md-hr">'; continue; }
+      if (ln.trim() === '') { flushList(); continue; }
+      flushList();
+      out += '<p class="hf-md-p">' + mdInline(ln) + '</p>';
+    }
+    if (inCode) out += '<pre class="hf-md-pre"><code>' + codeLines.join('\n') + '</code></pre>';
+    flushTable();
+    flushList();
+    return out;
+  }
+
+  /* ---- md 工具栏：textarea 选区包裹（不用 execCommand） + 编辑/预览互切 ---- */
+  var mdPreviewOn = false;
+  function mdTa() { return document.getElementById('fe-text'); }
+  function mdReplace(selStart, selEnd, insert, caretStart, caretEnd) {
+    var ta = mdTa();
+    var v = ta.value;
+    ta.value = v.slice(0, selStart) + insert + v.slice(selEnd);
+    ta.focus();
+    ta.setSelectionRange(caretStart == null ? insert.length : caretStart, caretEnd == null ? insert.length : caretEnd);
+  }
+  function mdWrap(before, after, ph) {
+    var ta = mdTa();
+    var s = ta.selectionStart, e = ta.selectionEnd;
+    var sel = ta.value.slice(s, e);
+    if (!sel) {
+      mdReplace(s, e, before + ph + after, s + before.length, s + before.length + ph.length);
+    } else {
+      mdReplace(s, e, before + sel + after);
+    }
+  }
+  function mdLinePrefix(prefix, reToggle) {
+    var ta = mdTa();
+    var s = ta.selectionStart, e = ta.selectionEnd;
+    var v = ta.value;
+    var lineStart = v.lastIndexOf('\n', s - 1) + 1;
+    var lineEnd = v.indexOf('\n', e);
+    if (lineEnd === -1) lineEnd = v.length;
+    var block = v.slice(lineStart, lineEnd);
+    var lines = block.split('\n');
+    var next = lines.map(function (ln) {
+      if (reToggle && reToggle.test(ln)) return ln.replace(reToggle, '');
+      return prefix + ln;
+    }).join('\n');
+    mdReplace(lineStart, lineEnd, next, s - lineStart, e - lineStart + (next.length - block.length));
+  }
+  function mdApply(cmd) {
+    var ta = mdTa();
+    if (cmd === 'bold') mdWrap('**', '**', '粗体');
+    else if (cmd === 'italic') mdWrap('*', '*', '斜体');
+    else if (cmd === 'h1') mdLinePrefix('# ', /^#\s+/);
+    else if (cmd === 'h2') mdLinePrefix('## ', /^##\s+/);
+    else if (cmd === 'h3') mdLinePrefix('### ', /^###\s+/);
+    else if (cmd === 'quote') mdLinePrefix('> ', /^>\s?/);
+    else if (cmd === 'code') mdWrap('`', '`', '代码');
+    else if (cmd === 'ul') mdLinePrefix('- ', /^-\s+/);
+    else if (cmd === 'ol') mdLinePrefix('1. ', /^\d+\.\s+/);
+    else if (cmd === 'link') {
+      var url = prompt('请输入链接地址');
+      if (!url) return;
+      var s = ta.selectionStart, e = ta.selectionEnd;
+      var sel = ta.value.slice(s, e) || '链接';
+      mdReplace(s, e, '[' + sel + '](' + url + ')');
+    }
+  }
+  (function bindMdToolbar() {
+    var bar = document.getElementById('fe-md-toolbar');
+    bar.addEventListener('mousedown', function (e) {
+      if (e.target.closest('button')) e.preventDefault(); /* 保留下拉/选区不被夺走 */
+    });
+    bar.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-md]');
+      if (btn) { mdApply(btn.getAttribute('data-md')); return; }
+      if (e.target.closest('#fe-md-preview')) toggleMdPreview();
+    });
+  })();
+  function toggleMdPreview() {
+    var ta = mdTa();
+    var pv = document.getElementById('fe-mdpv');
+    var btn = document.getElementById('fe-md-preview');
+    mdPreviewOn = !mdPreviewOn;
+    if (mdPreviewOn) {
+      pv.innerHTML = mdRender(ta.value);
+      ta.style.display = 'none';
+      pv.style.display = '';
+      btn.textContent = '编辑';
+    } else {
+      pv.style.display = 'none';
+      ta.style.display = '';
+      btn.textContent = '预览';
+      ta.focus();
+    }
+  }
+
+  /* ---- xlsx 表格 ---- */
+  function parseXls(raw) {
+    try {
+      var arr = JSON.parse(raw || 'null');
+      if (Array.isArray(arr) && arr.length) return arr;
+    } catch (e) {}
+    return [['项目', '内容', '备注']];
+  }
+  function colLetter(n) {
+    var s = '';
+    n = n + 1;
+    while (n > 0) {
+      var m = (n - 1) % 26;
+      s = String.fromCharCode(65 + m) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+  function buildXlsTable(data) {
+    var wrap = document.getElementById('fe-xls-grid');
+    wrap.innerHTML = '';
+    var table = document.createElement('table');
+    table.className = 'fe-xls-table';
+
+    /* 列字母表头行（UI 装饰，不进入存储） */
+    var thead = document.createElement('thead');
+    var htr = document.createElement('tr');
+    var corner = document.createElement('th');
+    corner.className = 'fe-xls-corner';
+    htr.appendChild(corner);
+    var colCount = data.length && data[0].length ? data[0].length : 0;
+    for (var c = 0; c < colCount; c++) {
+      var th = document.createElement('th');
+      th.className = 'fe-xls-colh';
+      th.textContent = colLetter(c);
+      var delc = document.createElement('button');
+      delc.type = 'button';
+      delc.className = 'fe-xls-delcol';
+      delc.textContent = '×';
+      delc.title = '删除此列（仅可删除全空的最后一列）';
+      (function (ci) {
+        delc.addEventListener('click', function () { deleteColumn(ci); });
+      })(c);
+      th.appendChild(delc);
+      htr.appendChild(th);
+    }
+    thead.appendChild(htr);
+    table.appendChild(thead);
+
+    var tbody = document.createElement('tbody');
+    data.forEach(function (row, ri) {
+      var tr = document.createElement('tr');
+      /* 行号列（UI 装饰，不进入存储） */
+      var rno = document.createElement('th');
+      rno.className = 'fe-xls-rowno';
+      rno.textContent = ri + 1;
+      tr.appendChild(rno);
+      row.forEach(function (cell) {
+        var td = document.createElement('td');
+        var inp = document.createElement('input');
+        inp.className = 'fe-xls-cell';
+        inp.value = cell == null ? '' : String(cell);
+        td.appendChild(inp);
+        tr.appendChild(td);
+      });
+      if (ri > 0) {
+        var td = document.createElement('td');
+        td.className = 'fe-xls-opt';
+        var del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'fe-xls-del';
+        del.textContent = '×';
+        del.title = '删除此行';
+        del.addEventListener('click', function () {
+          tr.remove();
+          renumberRows();
+          syncRowColInputs();
+        });
+        td.appendChild(del);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    syncRowColInputs();
+  }
+  function renumberRows() {
+    var rows = document.querySelectorAll('#fe-xls-grid tbody tr');
+    rows.forEach(function (tr, i) {
+      var rno = tr.querySelector('.fe-xls-rowno');
+      if (rno) rno.textContent = i + 1;
+    });
+  }
+  function readXlsTable() {
+    var data = [];
+    var rows = document.querySelectorAll('#fe-xls-grid tbody tr');
+    rows.forEach(function (tr) {
+      var row = [];
+      tr.querySelectorAll('input.fe-xls-cell').forEach(function (inp) { row.push(inp.value.trim()); });
+      data.push(row);
+    });
+    return data;
+  }
+  /* 表格增删后 → 同步属性区行数/列数输入框与 attrsObj */
+  function syncRowColInputs() {
+    var data = readXlsTable();
+    var n = data.length;
+    var m = data.length ? Math.max.apply(null, data.map(function (r) { return r.length; })) : 0;
+    var rowsEl = document.getElementById('fe-a-rows');
+    var colsEl = document.getElementById('fe-a-cols');
+    if (rowsEl) rowsEl.value = n;
+    if (colsEl) colsEl.value = m;
+    attrsObj.rows = n;
+    attrsObj.cols = m;
+  }
+  function adjustRows(target) {
+    var data = readXlsTable();
+    var cur = data.length;
+    if (target > cur) {
+      var cols = cur ? data[0].length : 3;
+      for (var i = cur; i < target; i++) {
+        var row = [];
+        for (var j = 0; j < cols; j++) row.push('');
+        data.push(row);
+      }
+      buildXlsTable(data);
+    } else if (target < cur) {
+      /* 变小：仅当尾部待删行全空才执行 */
+      for (var r = target; r < cur; r++) {
+        var nonEmpty = data[r].some(function (c) { return String(c == null ? '' : c).trim() !== ''; });
+        if (nonEmpty) {
+          UI.toast('尾部存在非空行，无法减少行数', 'warn');
+          syncRowColInputs();
+          return;
+        }
+      }
+      data.length = target;
+      buildXlsTable(data);
+    }
+  }
+  function adjustCols(target) {
+    var data = readXlsTable();
+    if (!data.length) data = [[]];
+    var cur = Math.max.apply(null, data.map(function (r) { return r.length; }));
+    if (target > cur) {
+      data.forEach(function (r) { while (r.length < target) r.push(''); });
+      buildXlsTable(data);
+    } else if (target < cur) {
+      /* 变小：仅当尾部待删列全空才执行 */
+      for (var c = target; c < cur; c++) {
+        var nonEmpty = data.some(function (r) { return String(r[c] == null ? '' : r[c]).trim() !== ''; });
+        if (nonEmpty) {
+          UI.toast('尾部存在非空列，无法减少列数', 'warn');
+          syncRowColInputs();
+          return;
+        }
+      }
+      data.forEach(function (r) { r.length = target; });
+      buildXlsTable(data);
+    }
+  }
+  function deleteColumn(ci) {
+    var data = readXlsTable();
+    var cur = data.length ? Math.max.apply(null, data.map(function (r) { return r.length; })) : 0;
+    if (ci !== cur - 1) {
+      UI.toast('仅可删除全部为空的最后一列', 'warn');
+      return;
+    }
+    var nonEmpty = data.some(function (r) { return String(r[ci] == null ? '' : r[ci]).trim() !== ''; });
+    if (nonEmpty) {
+      UI.toast('最后一列存在内容，无法删除', 'warn');
+      return;
+    }
+    data.forEach(function (r) { r.splice(ci, 1); });
+    buildXlsTable(data);
+  }
+  document.getElementById('fe-xls-addrow').addEventListener('click', function () {
+    var data = readXlsTable();
+    if (!data.length) data = [['', '', '']];
+    var cols = data[0].length || 3;
+    var row = [];
+    for (var i = 0; i < cols; i++) row.push('');
+    data.push(row);
+    buildXlsTable(data);
+  });
+  document.getElementById('fe-xls-addcol').addEventListener('click', function () {
+    var data = readXlsTable();
+    if (!data.length) data = [['']];
+    data.forEach(function (r) { r.push(''); });
+    buildXlsTable(data);
+  });
+
+  /* ---- 富文本工具栏（按下即执行：保存编辑器选区 → 恢复 → 执行命令） ---- */
+  var feDocSel = null;
+  function saveDocSel() {
+    try {
+      var sel = document.getSelection();
+      if (sel && sel.rangeCount) feDocSel = sel.getRangeAt(0).cloneRange();
+    } catch (e) {}
+  }
+  function restoreDocSel() {
+    try {
+      var doc = document.getElementById('fe-doc');
+      var live = null;
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount) live = sel.getRangeAt(0).cloneRange();
+      doc.focus();
+      var s2 = window.getSelection();
+      s2.removeAllRanges();
+      if (feDocSel) s2.addRange(feDocSel);
+      else if (live && doc.contains(live.startContainer)) s2.addRange(live);
+    } catch (e) {}
+  }
+  function fireCmd(btn) {
+    try {
+      saveDocSel();
+      restoreDocSel();
+      document.execCommand(btn.getAttribute('data-cmd'), false, btn.getAttribute('data-arg') || null);
+    } catch (e) {}
+  }
+  window.docCmd = function (cmd, arg) {
+    try {
+      restoreDocSel();
+      document.execCommand(cmd, false, arg || null);
+    } catch (e) {}
+  };
+  /* 对选中文本应用内联样式（字号 / 颜色）；跨节点选区用 extractContents 兜底包裹 */
+  function applyInlineStyle(prop, val) {
+    restoreDocSel();
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+    var range = sel.getRangeAt(0);
+    var span = document.createElement('span');
+    if (val) span.style[prop] = val;
+    else span.style[prop] = 'inherit';
+    try {
+      range.surroundContents(span);
+    } catch (e) {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+    }
+    saveDocSel();
+  }
+  (function () {
+    var btns = document.querySelectorAll('.fe-tb-btn[data-cmd]');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener('mousedown', function (e) { e.preventDefault(); fireCmd(this); });
+      btns[i].addEventListener('touchstart', function (e) { e.preventDefault(); fireCmd(this); }, { passive: false });
+    }
+    /* 字号 select：pointerdown 保选区，change 执行 */
+    var fs = document.getElementById('fe-doc-fontsize');
+    fs.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+    fs.addEventListener('change', function () { applyInlineStyle('fontSize', fs.value); });
+    /* 颜色 swatch */
+    var swatches = document.querySelectorAll('.fe-color-swatch');
+    for (var j = 0; j < swatches.length; j++) {
+      swatches[j].addEventListener('mousedown', function (e) { e.preventDefault(); });
+      swatches[j].addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+      swatches[j].addEventListener('click', function () { applyInlineStyle('color', this.getAttribute('data-color') || ''); });
+    }
+    /* 插入链接 */
+    var linkBtn = document.getElementById('fe-doc-link');
+    linkBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    linkBtn.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    linkBtn.addEventListener('click', function () {
+      var url = prompt('请输入链接地址');
+      if (!url) return;
+      restoreDocSel();
+      document.execCommand('createLink', false, url);
+    });
+    var doc = document.getElementById('fe-doc');
+    doc.addEventListener('mouseup', saveDocSel);
+    doc.addEventListener('keyup', saveDocSel);
+  })();
+
+  /* ===== 全屏放大/缩小（对齐 publish/editor.html：EDGE 16 / DUR 340 / EASE cubic-bezier(.4,0,.2,1)，层级 60/61/62） =====
+     唯一适配：本页底部常驻 fixed-cta 保存栏，targetRect 与 overlay 底边均算到 CTA 栏上方，保证取消/保存全屏可点。 */
+  var EDGE = 16;
+  var DUR = 340;
+  var EASE = 'cubic-bezier(.4,0,.2,1)';
+  var expanded = false;
+  var origRect = null;
+  var scrollLockEl = null;
+  var activeEl = null;
+  var activeExpandBtn = null;
+  var overlay = document.getElementById('fe-overlay');
+  var shrinkBtn = document.getElementById('fe-shrink');
+
+  function phoneScale() {
+    var phone = document.querySelector('.phone') || document.body;
+    var pr = phone.getBoundingClientRect();
+    var sx = (phone.offsetWidth > 0 && pr.width > 0) ? pr.width / phone.offsetWidth : 1;
+    var sy = (phone.offsetHeight > 0 && pr.height > 0) ? pr.height / phone.offsetHeight : 1;
+    return { phone: phone, pr: pr, sx: sx, sy: sy };
+  }
+  /* 视口坐标 → phone 本地坐标（fit-scale 缩放归一化） */
+  function toLocal(r, s) {
+    return {
+      top: (r.top - s.pr.top) / s.sy,
+      left: (r.left - s.pr.left) / s.sx,
+      width: r.width / s.sx,
+      height: r.height / s.sy
+    };
+  }
+  function navbarBottomLocal(s) {
+    var nb = document.querySelector('.navbar');
+    return nb ? (nb.getBoundingClientRect().bottom - s.pr.top) / s.sy : 50;
+  }
+  function targetRect() {
+    var s = phoneScale();
+    var nbB = navbarBottomLocal(s);
+    var vw = s.phone.offsetWidth, vh = s.phone.offsetHeight;
+    /* 底边距窗口底 16px（EDGE），与 publish/editor 基准一致；不再为常驻保存栏留白，
+       放大态由覆盖层 z60 盖住 CTA（z9），规避误操作 */
+    return {
+      top: nbB + EDGE,
+      left: EDGE,
+      width: Math.max(EDGE * 2, vw - EDGE * 2),
+      height: Math.max(80, vh - EDGE - (nbB + EDGE))
+    };
+  }
+  function setRect(r, animate) {
+    activeEl.style.transition = animate
+      ? 'top ' + DUR + 'ms ' + EASE + ', left ' + DUR + 'ms ' + EASE + ', width ' + DUR + 'ms ' + EASE + ', height ' + DUR + 'ms ' + EASE
+      : 'none';
+    activeEl.style.top = r.top + 'px';
+    activeEl.style.left = r.left + 'px';
+    activeEl.style.width = r.width + 'px';
+    activeEl.style.height = r.height + 'px';
+  }
+  function bindZoom(el, btn) {
+    btn.addEventListener('pointerdown', function (e) { e.preventDefault(); }); /* 不抢编辑焦点 */
+    btn.addEventListener('click', function () { expand(el, btn); });
+  }
+  function expand(el, btn) {
+    if (expanded) return;
+    expanded = true;
+    activeEl = el;
+    activeExpandBtn = btn;
+    var s = phoneScale();
+    origRect = toLocal(el.getBoundingClientRect(), s);
+    /* 覆盖层先出现（遮住被抽离流后的布局回弹），再锚定容器原位；CSS bottom:0 覆盖到窗口底部，盖住常驻 CTA */
+    overlay.style.top = navbarBottomLocal(s) + 'px';
+    overlay.classList.add('show');
+    var sc = document.querySelector('.scroll');
+    if (sc) { sc.style.overflow = 'hidden'; scrollLockEl = sc; }
+    el.classList.add('fe-expanded');
+    setRect(origRect, false);
+    void el.offsetHeight; /* 强制 reflow，保证从原位起画 */
+    setRect(targetRect(), true);
+    btn.style.display = 'none';
+    shrinkBtn.style.display = 'flex'; /* CSS right:24px bottom:24px 锚定 .phone，即全屏编辑区右下角 */
+    /* 契约 §2.3-3：引擎形态走 adapter.focus() 聚焦引擎编辑面；原生形态保持原聚焦 */
+    if (engineActive && adapter) { try { adapter.focus(); } catch (e) {} }
+    else if (editorKind === 'text') { try { mdTa().focus(); } catch (e) {} }
+    else if (editorKind === 'doc') { try { document.getElementById('fe-doc').focus(); } catch (e) {} }
+    else { try { var c = document.querySelector('#fe-xls-grid .fe-xls-cell'); if (c) c.focus(); } catch (e) {} }
+  }
+  function collapse() {
+    if (!expanded || !activeEl) return;
+    expanded = false;
+    var back = origRect || toLocal(activeEl.getBoundingClientRect(), phoneScale());
+    setRect(back, true); /* 渐变缩回原位（仍为 fixed） */
+    var fired = false;
+    var tmr = null;
+    function done() {
+      if (fired) return;
+      fired = true;
+      clearTimeout(tmr);
+      activeEl.removeEventListener('transitionend', done);
+      activeEl.classList.remove('fe-expanded');
+      activeEl.style.position = ''; activeEl.style.top = ''; activeEl.style.left = '';
+      activeEl.style.width = ''; activeEl.style.height = ''; activeEl.style.transition = ''; activeEl.style.zIndex = '';
+      activeEl.scrollTop = 0;
+      /* 契约 §2.3-4：引擎形态完成回调 adapter.scrollToTop()；原生形态保持原复位 */
+      if (engineActive && adapter) { try { adapter.scrollToTop(); } catch (e) {} }
+      else if (editorKind === 'text') mdTa().scrollTop = 0;
+      else if (editorKind === 'doc') document.getElementById('fe-doc').scrollTop = 0;
+      overlay.classList.remove('show');
+      overlay.style.bottom = ''; /* 防御性清除残留内联值，还原后 CTA 恢复可见可点 */
+      if (scrollLockEl) { scrollLockEl.style.overflow = ''; scrollLockEl = null; }
+      shrinkBtn.style.display = 'none';
+      if (activeExpandBtn) activeExpandBtn.style.display = 'flex';
+    }
+    tmr = setTimeout(done, DUR + 120);
+    activeEl.addEventListener('transitionend', done);
+  }
+  shrinkBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+  shrinkBtn.addEventListener('click', collapse);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && expanded) collapse(); });
+  var rt;
+  function reTarget() {
+    if (!expanded) return;
+    clearTimeout(rt);
+    rt = setTimeout(function () { setRect(targetRect(), false); }, 120);
+  }
+  window.addEventListener('resize', reTarget);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', reTarget);
+  bindZoom(document.getElementById('fe-textwrap'), document.getElementById('fe-expand-text'));
+  bindZoom(document.getElementById('fe-docbox'), document.getElementById('fe-expand-doc'));
+  bindZoom(document.getElementById('fe-xlsbox'), document.getElementById('fe-expand-xls'));
+
+  /* ---- 返回 ---- */
+  window.goBack = function () {
+    /* 离开前显式销毁引擎（移除监听器/iframe/Univer 实例），防止重复进入累积（契约 §2.1） */
+    try { if (adapter) adapter.destroy(); } catch (e) {}
+    adapter = null; engineActive = false;
+    if (document.referrer && document.referrer.indexOf(location.hostname) !== -1) window.history.back();
+    else location.href = 'history-files.html';
+  };
+
+  /* ---- 保存 ----
+     引擎路径（engineActive）：异步 adapter.export() 取信封 → 落库；
+     原生轻量路径（text / file:// doc / 轻量表格）：保持原同步逻辑。 */
+  function persistRecord(content, saveExt, attrs, mainName, isEngine) {
+    var name = mainName.replace(/\.[^.]+$/, '') + '.' + saveExt;
+    var size = kbSize(typeof content === 'string' ? content : JSON.stringify(content));
+    var now = Date.now();
+    var timeText = (function () {
+      var d = new Date();
+      var hh = (d.getHours() < 10 ? '0' : '') + d.getHours();
+      var mm = (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+      return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hh + ':' + mm;
+    })();
+    var renamed = isEngine && saveExt !== ext;
+    var okMsg = renamed ? ('已保存（格式转为 .' + saveExt.toUpperCase() + '）') : '文件已保存';
+    var out;
+    if (file && file.id) {
+      /* 编辑已有文件 */
+      var origName = file.name;
+      out = FileStore.updateContent(file.id, {
+        name: name, ext: TYPE_LABEL[saveExt] || saveExt.toUpperCase(), content: content, size: size,
+        note: file.note || '', time: now, timeText: timeText, attrs: attrs
+      });
+      try {
+        if (window.OpLog && OpLog.push) OpLog.push({ fid: file.id, name: name, ts: now, type: 'edit', label: '编辑', detail: origName !== name ? ('改名自 ' + origName) : '' });
+      } catch (e) {}
+      if (out) { UI.toast(okMsg, 'ok'); }
+      else { UI.toast('保存失败：文件不存在', 'err'); return; }
+    } else {
+      /* 新建文件 */
+      out = FileStore.add({
+        name: name, ext: TYPE_LABEL[saveExt] || saveExt.toUpperCase(), size: size,
+        source: '新建文件', sourceKey: 'new',
+        content: content, time: now, timeText: timeText,
+        note: '', attrs: attrs
+      });
+      UI.toast(out ? okMsg : '保存失败', out ? 'ok' : 'err');
+      if (!out) return;
+    }
+    setTimeout(function () { location.href = 'history-files.html'; }, 700);
+  }
+
+  window.save = function () {
+    var mainName = document.getElementById('fe-name').value.trim();
+    if (!mainName) { UI.toast('请填写文件名', 'warn'); document.getElementById('fe-name').focus(); return; }
+
+    /* 引擎尚未就绪时拦截，避免误走轻量路径覆盖 */
+    if (adapter && !engineActive) { UI.toast('引擎正在加载，请稍候再保存', 'warn'); return; }
+
+    /* 引擎路径：异步导出信封（等 onlyoffice-saved / Univer getSnapshot）→ 构造信封落库 */
+    if (engineActive && adapter) {
+      UI.toast('正在导出，请稍候…', 'ok');
+      adapter.export().then(function (env) {
+        var saveExt = editorKind === 'doc' ? 'docx' : 'xlsx';
+        var attrs = collectAttrs();
+        attrs.engine = env.engine;
+        attrs.formatVer = 1;
+        attrs.legacy = null;
+        persistRecord(env, saveExt, attrs, mainName, true);
+      }).catch(function (err) {
+        UI.toast('保存失败：' + ((err && err.message) || '导出失败'), 'err');
+      });
+      return;
+    }
+
+    /* txt/md：保持原字符串保存，链路不动 */
+    if (editorKind === 'text') {
+      var txtContent = document.getElementById('fe-text').value;
+      var txtAttrs = collectAttrs();
+      persistRecord(txtContent, ext, txtAttrs, mainName, false);
+      return;
+    }
+
+    /* doc/xls 轻量（file:// 直开 或 http OO 失败降级）：统一产出 light 信封 */
+    var lightEnv = buildLightEnvelope(editorKind === 'doc' ? 'doc' : 'sheet');
+    var lightAttrs = collectAttrs();
+    lightAttrs.engine = 'light';
+    lightAttrs.formatVer = 1;
+    lightAttrs.legacy = null;
+    persistRecord(lightEnv, ext, lightAttrs, mainName, true);
+  };
+
+  /* 轻量信封：doc=HTML 字符串 / sheet=JSON 二维数组；snapshot 为去脚本静态版（HF 渲染用） */
+  function buildLightEnvelope(kind) {
+    var meta = { updatedAt: Date.now(), engineVersion: 'light' };
+    if (kind === 'doc') {
+      var html = document.getElementById('fe-doc').innerHTML;
+      return { v: 1, engine: 'light', kind: 'doc', data: html, snapshot: sanitizeLightHtml(html), meta: meta };
+    }
+    var arr = readXlsTable();
+    var data = JSON.stringify(arr);
+    return { v: 1, engine: 'light', kind: 'sheet', data: data, snapshot: arrayToTableHtml(arr), meta: meta };
+  }
+
+  function sanitizeLightHtml(html) {
+    var s = String(html || '');
+    s = s.replace(/<script[\s\S]*?<\/script>/gi, '');
+    s = s.replace(/\son\w+\s*=\s*"[^"]*"/gi, '').replace(/\son\w+\s*=\s*'[^']*'/gi, '');
+    s = s.replace(/javascript:\s*/gi, '');
+    return s;
+  }
+
+  function arrayToTableHtml(arr) {
+    var rows = (arr || []).map(function (r) {
+      var cells = (r || []).map(function (c) { return '<td>' + esc(c == null ? '' : c) + '</td>'; }).join('');
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+    return '<table class="hf-pv-xls-table">' + rows + '</table>';
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

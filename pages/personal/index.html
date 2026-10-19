@@ -501,8 +501,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   }
 
-  /* ---- 该用户发布的供需 ---- */
-  var list = (p.published || []).map(function (idStr) { return MOCK.listingById(idStr); }).filter(Boolean);
+  /* ---- 该用户发布的供需；MOCK 未命中经 DataBus.getRecord 三源兜底，缺失剔除（P0-05） ---- */
+  var list = (p.published || []).map(function (idStr) {
+    return MOCK.listingById(idStr) || (window.DataBus && DataBus.getRecord ? DataBus.getRecord(idStr) : null);
+  }).filter(Boolean);
   document.getElementById('published').innerHTML = list.map(function (s) {
     var cls = s.dir === 'demand' ? 'tag-blue' : s.dir === 'supply' ? 'tag-primary' : 'tag-gold';
     var lbl = s.dir === 'demand' ? '需求' : s.dir === 'supply' ? '供应' : '机会';

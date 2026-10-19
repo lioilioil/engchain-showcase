@@ -10,10 +10,12 @@ window.PublishStore = (function () {
     paused: '已暂停',
     expired: '已过期'
   };
-  /* 发布信息条目缺省字段（保证详情渲染器 / 记录卡片永远拿到完整结构，不出现 undefined） */
+  /* 发布信息条目缺省字段（保证详情渲染器 / 记录卡片永远拿到完整结构，不出现 undefined）。
+     定位键 typeKey/detailLevel/pubType/role/cat/bizKey 给空缺省，条目自带值优先，不被默认值覆盖（G-D3 信封透传） */
   function recordDefaults(r) {
     return Object.assign({
-      id: '', sourceId: '', role: 'demand', title: '未命名信息', category: '材料',
+      id: '', sourceId: '', role: 'demand', typeKey: '', detailLevel: '', pubType: '', cat: '', bizKey: '',
+      title: '未命名信息', category: '材料',
       subType: '', location: '', unit: '', price: '', qty: '', spec: '',
       delivery: '', qualification: '', description: '', tags: [],
       contact: { name: '', phone: '', wechat: '' },
@@ -61,7 +63,12 @@ window.PublishStore = (function () {
   }
   function saveDraft(draft) {
     var value = read();
-    var next = Object.assign({ id: 'd-' + Date.now(), role: 'demand', category: '材料', title: '', completion: 0, missing: '尚未填写' }, draft, { updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) });
+    /* 定位键（typeKey/detailLevel/pubType/role/cat/bizKey）原样透传：draft 自带值覆盖缺省，
+       不被 role='demand'/category='材料' 默认值覆盖（G-D3）；drafts 能力保留不删 */
+    var next = Object.assign({
+      id: 'd-' + Date.now(), role: 'demand', category: '材料', title: '', completion: 0, missing: '尚未填写',
+      typeKey: '', detailLevel: '', pubType: '', cat: '', bizKey: ''
+    }, draft, { updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) });
     if (!next.id) next.id = 'd-' + Date.now();
     value.drafts = value.drafts.filter(function (item) { return item.id !== next.id; });
     value.drafts.unshift(next);

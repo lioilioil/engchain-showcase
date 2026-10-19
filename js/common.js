@@ -1546,18 +1546,80 @@ window.Cards = (function () {
     return out;
   }
 
-  /* 顶部徽标行：类型/方向 + 认证 + 热点 + 匹配度 */
-  function head(s) {
+  /* [分片C P2-07] 统一角标体系：方向(供应墨/需求蓝) · 详细/简要 · 认证 · 急/热 · 审核中 · 匹配 pill。
+     同时保留旧 tag 类名，供未加载 supply-list.css 的页面（home/search/personnel）维持原样。 */
+  function head(s, ctx) {
+    ctx = ctx || {};
+    var role = ctx.role || s.role || s.dir || s.type || '';
     var out = '';
-    if (s.bizKey === 'talent') out += '<span class="tag tag-supply">求职</span>';
-    else if (s.bizKey === 'agency') out += '<span class="tag tag-purple">服务</span>';
-    else if (s.bizKey === 'franchise') out += '<span class="tag tag-gold">资质招商</span>';
-    else if (s.bizKey === 'trade') out += '<span class="tag tag-gold">建企买卖</span>';
-    else out += s.dir === 'demand' ? '<span class="tag tag-demand">需求</span>' : '<span class="tag tag-supply">供应</span>';
-    if (s.verified) out += '<span class="tag tag-gold">✓已认证</span>';
-    if (s.hot) out += '<span class="tag tag-red">热点</span>';
-    out += '<span class="match-pill match-high" style="margin-left:auto;">' + (s.match || '—') + '%</span>';
-    return '<div class="jc-tags" style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:9px;">' + out + '</div>';
+    if (role === 'demand') out += '<span class="tag tag-demand sc-badge sc-dir-demand">需求</span>';
+    else if (role === 'supply') out += '<span class="tag tag-supply sc-badge sc-dir-supply">供应</span>';
+    /* 详细 / 简要 */
+    var dl = ctx.detailLevel || s.detailLevel || '';
+    if (dl === 'brief') out += '<span class="sc-chip sc-dl">简要</span>';
+    else if (dl === 'detail') out += '<span class="sc-chip sc-dl">详细</span>';
+    if (s.verified) out += '<span class="tag tag-gold sc-badge sc-verify">✓已认证</span>';
+    if (s.urgent) out += '<span class="sc-badge sc-urgent">急</span>';
+    if (s.hot) out += '<span class="tag tag-red sc-badge sc-hot">热点</span>';
+    /* [P0-01] 本人 pending_review：审核中灰角标，卡片可点进只读预览 */
+    if (s.status === 'pending_review') out += '<span class="sc-badge sc-pending">审核中</span>';
+    var match = (typeof s.match === 'number') ? s.match : '';
+    out += '<span class="match-pill match-high sc-match' + (match === '' ? ' is-empty' : '') + '" style="margin-left:auto;">' + (match === '' ? '—' : match + '%') + '</span>';
+    return '<div class="sc-badges jc-tags">' + out + '</div>';
+  }
+
+  /* agency 服务类目 chips（P1-07）：serviceCats 优先，回退顶层 cats（D 层已同步） */
+  function serviceCatsOf(s) {
+    var arr = s.serviceCats || s.cats || s.serveCats || [];
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(Boolean);
+  }
+
+  /* [P1-05] 可选首图缩略：images[0]，onerror 占位，无图纯文降级（不补假图） */
+  function thumbHtml(s) {
+    var img = (s.images && s.images[0]) || '';
+    if (!img) return '';
+    return '<div class="sc-thumb"><img src="' + esc(img) + '" alt="" loading="lazy" ' +
+      'onerror="this.parentNode.classList.add(\'is-empty\');this.remove();">' +
+      '<div class="sc-thumb-ph" aria-hidden="true">图</div></div>';
+  }
+
+  /* [P1-06] meta 行：city + cat·subCate·prodName；空段隐藏不造假值 */
+  function metaParts(s, ctx) {
+    var parts = [];
+    var city = s.city || s.location || '';
+    if (city) parts.push(esc(city));
+    var cat = (ctx.meta && ctx.meta.cat) || s.cat || s.category || '';
+    var sub = s.subCate || s.sub || s.subType || s.subNorm || '';
+    var prod = s.prodName || s.subOrigin || '';
+    var chain = [cat, sub, prod].filter(Boolean).join('·');
+    if (chain) parts.push(esc(chain));
+    return parts.join('<span class="dot"></span>');
+  }
+
+  /* [§3.2] 价格位：price/budget + unit；面议显「面议」；无价不占位 */
+  function priceOf(s) {
+    var p = s.price || s.budget || '';
+    var unit = s.unit || s.priceUnit || '';
+    if (!p) return { text: '', unit: '' };
+    return { text: esc(p), unit: esc(unit) };
+  }
+
+  /* brief 类 AI 抽取要点 chips（aiAnalysis.tags: [{k,v}]），最多 n 个 */
+  function aiChips(s, n) {
+    var tags = (s.aiAnalysis && s.aiAnalysis.tags) || [];
+    var list = tags.filter(function (t) { return t && t.v; }).slice(0, n == null ? 3 : n)
+      .map(function (t) { return (t.k ? t.k + ' ' : '') + t.v; });
+    return list.length ? chips(list, n) : '';
+  }
+
+  /* 发布方：companyId→companies.avatar/short；无则隐藏（§3.4 空字段隐藏） */
+  function companyLine(s) {
+    var M = window.MOCK || {};
+    var co = (M.companyById ? M.companyById(s.companyId) : null) || {};
+    var name = co.short || s.company || '';
+    if (!name) return '';
+    return '<div class="jc-company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21V8l6-3v16M9 21V5l9-2v18M3 21h18"/></svg>' + esc(name) + '</div>';
   }
 
   function chips(arr, n) {
@@ -1587,21 +1649,32 @@ window.Cards = (function () {
     return '';
   }
 
+  /* 价格/发布方底行：价格空则不占位（§3.4），右侧发布方空则隐藏 */
   function foot(price, unit, right) {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">' +
-      '<div class="jc-price">' + price + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div>' +
-      (right || '') + '</div>';
+    var priceHtml = price
+      ? '<div class="jc-price">' + price + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div>'
+      : '';
+    return '<div class="sc-foot-row">' + priceHtml + (right || '') + '</div>';
   }
 
-  function meta(s) {
-    var parts = [];
-    if (s.city) parts.push(esc(s.city));
-    if (s.cat) parts.push(esc(s.cat) + (s.sub ? '·' + esc(s.sub) : ''));
-    return parts.join('<span class="dot"></span>');
+  /* 标题+meta 主区，右侧可选首图（P1-05） */
+  function textBlock(s, ctx, titleHtml, metaHtml) {
+    return '<div class="sc-main"><div class="sc-text">' +
+      (titleHtml || '<div class="jc-title">' + esc(s.title || s.name || '') + '</div>') +
+      (metaHtml != null ? metaHtml : '<div class="jc-meta">' + metaParts(s, ctx) + '</div>') +
+      '</div>' + thumbHtml(s) + '</div>';
   }
 
-  /* ---- 资质招商 ---- */
-  function franchise(s) {
+  /* ---- 资质招商：供应态(franchise-supply) / 需求态(franchise-demand 挂靠意向) ---- */
+  function franchise(s, ctx) {
+    var isDemand = ctx && ctx.role === 'demand';
+    if (isDemand) {
+      /* P0-03 需求态：AI 摘要 + 期望要点，面议 */
+      var summary = (s.aiAnalysis && s.aiAnalysis.summary) || s.desc || s.detail || '';
+      var body = head(s, ctx) + textBlock(s, ctx) + aiChips(s, 3);
+      if (summary) body += '<div class="sc-ai-summary">' + esc(summary) + '</div>';
+      return body + foot('面议', '', companyLine(s));
+    }
     var name = s.name || s.title;
     var q = ((s.qualCategory || '') + (s.qualLevel || '')).trim();
     var m = esc(s.region || s.location || s.city || '');
@@ -1609,8 +1682,9 @@ window.Cards = (function () {
     var price = (s.unlockPrice ? '¥' + s.unlockPrice : (s.budget || '面议'));
     if (s.originalPrice) price += '<span class="o" style="font-size:11px;color:var(--text-3);text-decoration:line-through;font-weight:400;margin-left:5px;">¥' + s.originalPrice + '</span>';
     var unit = s.unlockPrice ? '意向金' : (s.unit || '');
-    var body = head(s) + '<div class="jc-title">' + esc(name) + (q ? ' · ' + esc(q) : '') + '</div>' +
-      '<div class="jc-meta">' + m + '</div>' + chips(s.tags, 3);
+    var body = head(s, ctx) + textBlock(s, ctx,
+      '<div class="jc-title">' + esc(name) + (q ? ' · ' + esc(q) : '') + '</div>',
+      '<div class="jc-meta">' + m + '</div>') + chips(s.tags, 3);
     if (s.regions && s.regions.length) {
       body += statRow([
         [s.branchCount || 0, '已加盟'],
@@ -1625,20 +1699,29 @@ window.Cards = (function () {
         [s.budget ? s.budget + '万' : '面议', '费用']
       ]);
     }
-    return body + foot(price, unit, '<div class="jc-company">' + company(s) + '</div>');
+    return body + foot(price, unit, companyLine(s));
   }
 
-  /* ---- 建企买卖 ---- */
-  function trade(s) {
-    return head(s) +
-      '<div class="jc-title">' + esc(s.maskedName || s.title) + '</div>' +
-      '<div class="jc-meta">' + esc(s.location || s.city || '') + (s.transferMethod ? '<span class="dot"></span>' + esc(s.transferMethod) : '') + '</div>' +
+  /* ---- 建企买卖：转让态(trade-supply) / 收购态(trade-demand) ---- */
+  function trade(s, ctx) {
+    var isDemand = ctx && ctx.role === 'demand';
+    if (isDemand) {
+      /* P0-04 收购态：收购意向 AI 要点，面议；出口 openDelegate=1 由详情/专题页负责 */
+      var summary = (s.aiAnalysis && s.aiAnalysis.summary) || s.desc || s.detail || '';
+      var body = head(s, ctx) + textBlock(s, ctx) + aiChips(s, 3);
+      if (summary) body += '<div class="sc-ai-summary">' + esc(summary) + '</div>';
+      return body + foot('面议', '收购意向', companyLine(s));
+    }
+    var metaHtml = '<div class="jc-meta">' + esc(s.location || s.city || '') +
+      (s.transferMethod ? '<span class="dot"></span>' + esc(s.transferMethod) : '') + '</div>';
+    return head(s, ctx) +
+      textBlock(s, ctx, '<div class="jc-title">' + esc(s.maskedName || s.title) + '</div>', metaHtml) +
       chips(s.tags, 3) +
-      foot(s.price ? s.price + '万' : '面议', s.price ? '100%转让' : '', '<div class="jc-company">' + company(s) + '</div>');
+      foot(s.price ? s.price + '万' : '面议', s.price ? '100%转让' : '', companyLine(s));
   }
 
-  /* ---- 企业招聘 ---- */
-  function personnel(s) {
+  /* ---- 企业招聘 personnel-demand ---- */
+  function personnel(s, ctx) {
     var kv = [];
     if (s.hireCount) kv.push(esc('招 ' + s.hireCount));
     if (s.jobType) kv.push(esc(s.jobType));
@@ -1647,69 +1730,140 @@ window.Cards = (function () {
     if (kv.length) m = kv.join('<span class="dot"></span>') + '<span class="dot"></span>' + m;
     var av = companyAvatar(s);
     var avatarHtml = av ? '<div class="jc-avatar">' + esc(av) + '</div>' : '';
-    return head(s) +
+    return head(s, ctx) +
       '<div class="jc-head">' + avatarHtml + '<div class="jc-title">' + esc(s.title) + '</div></div>' +
       '<div class="jc-meta">' + m + '</div>' + chips(s.tags, 3) +
-      foot(s.budget || '', s.unit || '', '<div class="jc-company">' + company(s) + '</div>');
+      foot(s.budget || '', s.unit || '', companyLine(s));
   }
 
-  /* ---- 人才求职 ---- */
-  function talent(s) {
+  /* ---- 人才求职 talent-supply ---- */
+  function talent(s, ctx) {
     var av = esc(s.avatar || (s.nameMasked ? String(s.nameMasked).charAt(0) : ''));
     var avatarHtml = av ? '<div class="jc-avatar">' + av + '</div>' : '';
     var regTxt = s.registerStatus && typeof s.registerStatus === 'object' ? s.registerStatus.status : s.registerStatus;
     var ssTxt = s.socialSecurity && typeof s.socialSecurity === 'object' ? s.socialSecurity.status : s.socialSecurity;
     var salTxt = (s.expectedSalary && s.expectedSalary.salaryRange) ? s.expectedSalary.salaryRange : (s.salaryRange || '面议');
-    return head(s) +
+    return head(s, ctx) +
       '<div class="jc-head">' + avatarHtml + '<div class="jc-title">' + esc(s.nameMasked || s.name || '') + ' · ' + esc(s.title || '') + '</div></div>' +
       '<div class="jc-meta">' + esc(s.location || s.city || '') + '<span class="dot"></span>' + esc(s.experience || '') + '<span class="dot"></span>' + esc(s.expectedPosition || '') + '</div>' +
       chips([regTxt, ssTxt, s.workArea, s.arrivalTime ? s.arrivalTime + '到岗' : ''], 3) +
       foot(esc(salTxt), '期望年薪', '<div class="jc-company">' + esc(s.nameMasked || s.name || '') + '</div>');
   }
 
-  /* ---- 材料 / 设备 / 劳务 / 中介：共用供需卡，按类型微调 meta ---- */
-  function supplyLike(s) {
-    var amt = s.price || s.budget || '';
-    var unit = s.unit || '';
-    var m = meta(s);
-    if (s.bizKey === 'agency') {
-      var sc = fieldsOf(s, ['办理范围', '周期']);
-      if (sc.length) m = sc.join('<span class="dot"></span>') + '<span class="dot"></span>' + m;
+  /* ---- 运输 transportLike：车队/车型速览（P0-08），供应/需求两态 ---- */
+  function transportLike(s, ctx) {
+    var chipsHtml = '';
+    var t = s.transport || {};
+    if (ctx.role === 'supply' && t.overview) {
+      var ov = t.overview;
+      var quick = [ov.fleet, ov.capacity, ov.dispatch].filter(Boolean);
+      (t.vehicles || []).slice(0, 3).forEach(function (v) { if (v && v.k) quick.push(v.k + (v.v ? ' ' + v.v : '')); });
+      chipsHtml = chips(quick, 4);
+    } else {
+      /* 需求态：AI 抽取要点 */
+      chipsHtml = aiChips(s, 3) || chips(s.tags, 3);
     }
-    return head(s) +
-      '<div class="jc-title">' + esc(s.title) + '</div>' +
-      '<div class="jc-meta">' + m + '</div>' + chips(s.tags, 3) +
-      foot(amt, unit, '<div class="jc-company">' + company(s) + '</div>');
+    var body = head(s, ctx) + textBlock(s, ctx) + chipsHtml;
+    var p = priceOf(s);
+    return body + foot(p.text || '面议', p.unit, companyLine(s));
   }
+
+  /* ---- 中介供应 agencyLike：serviceCats chips 直上（P1-07），由 supplyLike 派生 ---- */
+  function agencyLike(s, ctx) {
+    var sc = serviceCatsOf(s);
+    var scRow = sc.length ? '<div class="sc-svcats">' + sc.map(function (c) { return '<span class="sc-chip sc-svcat">' + esc(c) + '</span>'; }).join('') + '</div>' : '';
+    return head(s, ctx) + scRow + textBlock(s, ctx) + chips(s.tags, 3) +
+      foot(priceOf(s).text || '', priceOf(s).unit, companyLine(s));
+  }
+
+  /* ---- 通用供需卡：材料/设备/劳务/各类需求（supplyLike） ---- */
+  function supplyLike(s, ctx) {
+    var p = priceOf(s);
+    return head(s, ctx) + textBlock(s, ctx) + chips(s.tags, 3) +
+      foot(p.text, p.unit, companyLine(s));
+  }
+
+  /* ---- 保守通用卡：未识别类型（resolveType=null 且无旧 bizKey）只做纯文展示，不丢弃、不张冠李戴 ---- */
+  function generic(s, ctx) {
+    return head(s, ctx) + textBlock(s, ctx) + chips(s.tags, 3) + foot('', '', companyLine(s));
+  }
+
+  /* typeKey → 卡片变体（C3 §3.1）；分发在 render() 内完成 */
+  var VARIANT_BY_TYPE = {
+    'material-supply': 'supplyLike', 'material-demand': 'supplyLike',
+    'labor-supply': 'supplyLike', 'labor-demand': 'supplyLike',
+    'equipment-supply': 'supplyLike', 'equipment-demand': 'supplyLike',
+    'transport-supply': 'transportLike', 'transport-demand': 'transportLike',
+    'franchise-supply': 'franchise', 'franchise-demand': 'franchise',
+    'trade-supply': 'trade', 'trade-demand': 'trade',
+    'personnel-demand': 'personnel', 'talent-supply': 'talent',
+    'agency-supply': 'agencyLike', 'agency-demand': 'supplyLike'
+  };
 
   var BUILDERS = {
     franchise: franchise, trade: trade, personnel: personnel, talent: talent,
-    material: supplyLike, equipment: supplyLike, labor: supplyLike, agency: supplyLike
+    transportLike: transportLike, agencyLike: agencyLike,
+    supplyLike: supplyLike, generic: generic,
+    /* 旧 bizKey 回退（legacy 记录） */
+    material: supplyLike, equipment: supplyLike, labor: supplyLike, agency: supplyLike,
+    transport: transportLike
   };
 
-  /* 渲染一列卡片：list=条目数组；href=详情前缀（默认按 __ROOT__ 推算） */
+  /* resolve：优先 DataBus.resolveType(s).typeKey → 变体；回退旧 bizKey；未识别→generic */
+  function resolveCtx(s) {
+    var meta = (window.DataBus && DataBus.resolveType) ? DataBus.resolveType(s) : null;
+    /* [V2] 记录自带 typeKey 优先，缺失才回退 resolveType，避免反查覆盖 */
+    var typeKey = s.typeKey || s.pubType || (meta ? meta.typeKey : '');
+    var variant = (typeKey && VARIANT_BY_TYPE[typeKey]) || '';
+    if (!variant) {
+      var bk = s.bizKey || '';
+      if (BUILDERS[bk] && bk !== 'generic') variant = bk;
+    }
+    /* [cosmetic] resolveType=null 且无旧 bizKey 时，仅按中文品类/服务类目选保守 builder，
+       不回填 typeKey、不参与数据分发，避免丰富 legacy 记录掉进纯文通用卡。 */
+    if (!variant && !meta) {
+      var ctxt = String(s.cat || '') + ' ' + (Array.isArray(s.cats) ? s.cats.join(' ') : '');
+      if (/中介|agency|服务代办/i.test(ctxt)) variant = 'agencyLike';
+    }
+    if (!variant) variant = 'generic';
+    /* [V2 回修 V-P1-01] 记录自带 role/detailLevel/typeKey 优先，仅缺失时才用 resolveType
+       (TYPE_MAP) 回填，避免把已是 detail 的记录反查覆盖成 brief。 */
+    return {
+      meta: meta,
+      typeKey: typeKey,
+      variant: variant,
+      role: s.role || s.dir || s.type || (meta ? meta.role : ''),
+      detailLevel: s.detailLevel || (meta ? meta.detailLevel : '')
+    };
+  }
+
+  /* 渲染一列卡片：list=条目数组；href=详情前缀（默认按 __ROOT__ 推算）。
+     [P0-02] 分发：resolveType(s).typeKey → VARIANT_BY_TYPE；回退旧 bizKey；未识别→generic 保守卡（不丢弃）。
+     [§3.3] 跳转 URL 带 typeKey：detail.html?id={id}&typeKey={typeKey}。 */
   function render(list, href) {
     href = href || (window.__ROOT__ || '') + 'pages/supply/detail.html?id=';
-    return list.map(function (s) {
+    return (list || []).map(function (s) {
       try {
         if (!s || typeof s !== 'object') return '';
-      var fn = BUILDERS[s.bizKey] || supplyLike;
-      /* 供应/需求类卡片附加方向类名，用于左上角弥散渐变标识（仅明亮模式） */
-      var dirCls = '';
-      if (s.dir === 'demand') dirCls = ' is-demand';
-      else if (s.dir === 'supply') dirCls = ' is-supply';
-      /* [FEAT 9.2-1] 卡片底部增加查看详情按钮，联系方式/详细描述付费墙后可见 */
-      /* 付费置地位广告标识（合规要求：付费结果必须标注） */
-      var adBadge = s._sponsored
-        ? '<div style="font-size:10px;color:var(--text-3);background:var(--bg-muted,#f5f5f5);padding:2px 8px;border-radius:4px;display:inline-block;margin-bottom:6px;letter-spacing:1px;">广告</div>'
-        : '';
-      /* 地域标签（同城/省内/跨省，由 list.html 排序时注入） */
-      var geoBadge = s.distance && /^(同城|省内|跨省)$/.test(s.distance)
-        ? '<div style="font-size:11px;font-weight:600;margin:2px 0 4px;color:'
-          + (s.distance === '同城' ? 'var(--primary)' : s.distance === '省内' ? 'var(--text-2)' : 'var(--text-3)')
-          + ';">' + esc(s.distance) + '</div>'
-        : '';
-      return '<a href="' + href + s.id + '" class="job-card' + dirCls + '">' + adBadge + fn(s) + geoBadge + '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:var(--text-3);">联系方式查看详情后可见</span><span style="font-size:12px;color:var(--primary);font-weight:600;">查看详情 ›</span></div></a>';
+        var ctx = resolveCtx(s);
+        var fn = BUILDERS[ctx.variant] || generic;
+        /* 方向类名：供左上角弥散渐变标识（明亮模式）；角色回退 dir/type */
+        var role = ctx.role || s.role || s.dir || s.type || '';
+        var dirCls = role === 'demand' ? ' is-demand' : (role === 'supply' ? ' is-supply' : '');
+        var pendingCls = s.status === 'pending_review' ? ' is-pending' : '';
+        /* 付费置地位广告标识（合规要求：付费结果必须标注） */
+        var adBadge = s._sponsored
+          ? '<div class="sc-ad">广告</div>'
+          : '';
+        /* 地域标签（同城/省内/跨省，由 list.html 排序时注入） */
+        var geoBadge = s.distance && /^(同城|省内|跨省)$/.test(s.distance)
+          ? '<div class="sc-geo sc-geo-' + s.distance + '">' + esc(s.distance) + '</div>'
+          : '';
+        var qs = ctx.typeKey ? '&typeKey=' + encodeURIComponent(ctx.typeKey) : '';
+        return '<a href="' + href + s.id + qs + '" class="job-card' + dirCls + pendingCls + '">' +
+          adBadge + fn(s, ctx) + geoBadge +
+          '<div class="sc-card-foot"><span class="sc-foot-hint">联系方式查看详情后可见</span>' +
+          '<span class="sc-foot-cta">查看详情 ›</span></div></a>';
       } catch (e) {
         console.error('Cards.render: single card render error, skipped', e, s);
         return '';

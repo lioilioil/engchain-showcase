@@ -15,6 +15,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <link rel="stylesheet" href="../../css/app.css">
 <link rel="stylesheet" href="../../css/wonder-popup.css">
 <link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928182312">
+<link rel="stylesheet" href="../../css/supply-detail.css">
 </head>
 <body>
 <div class="phone">
@@ -85,13 +86,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var _isUser = (sup.source === 'user_publish' || sup.source === 'migrated_publish');
       /* 重组件渲染器不兼容的四类用户条目 → 通用发布渲染器；其余保持原业务渲染器（行为不变） */
       var _bk0 = sup.bizKey || _BIZ_MAP[sup.cat] || 'material';
+      /* G-R1：detailLevel==='brief' 的记录一律走 briefTemplate，不参与「无 rich → publish」降级，
+         避免 brief 的 trade/franchise 等被误降级成通用 publish 页（bizKey 保留供解锁 TTL/CTA 取用） */
+      var _isBrief = sup.detailLevel === 'brief';
       /* 动态字段映射层：判断用户发布条目是否包含编辑器提交的业务结构化数据 */
       var _hasRich = !!(sup.mat || sup.equip || sup.labor || sup.fc || sup.tradeDetail || sup.agencyDetail || sup.personnelDetail || sup.talentDetail);
       /* 含结构化数据的用户条目走专业渲染器；无结构化数据的四类+缺serveType的中介仍降级为通用渲染器 */
       var _agServe = (sup.agencyDetail && sup.agencyDetail.serveType) || sup.serveType || '';
-      var _bk = ((_isUser && (_bk0 === 'trade' || _bk0 === 'franchise' || _bk0 === 'personnel' || _bk0 === 'talent') && !_hasRich) || (_bk0 === 'agency' && !_agServe && !_hasRich)) ? 'publish' : _bk0;
+      var _needDegrade = !_isBrief && ((_isUser && (_bk0 === 'trade' || _bk0 === 'franchise' || _bk0 === 'personnel' || _bk0 === 'talent') && !_hasRich) || (_bk0 === 'agency' && !_agServe && !_hasRich));
+      var _bk = _needDegrade ? 'publish' : _bk0;
       rec = Object.assign({}, sup, {
         bizKey: _bk,
+        /* 定位键显式透传（sup 自带值优先，此处仅防被后续覆盖，不改写）：detailLevel/typeKey/pubType 供 detail.js 分流与 unlocked 取 label */
+        detailLevel: sup.detailLevel || '',
+        typeKey: sup.typeKey || sup.pubType || '',
+        pubType: sup.pubType || sup.typeKey || '',
         dir: sup.dir || sup.type || 'demand',
         /* franchise 供应侧（资质招商）→ qualification 渲染器；其余保持 supply/demand */
         type: (_bk0 === 'franchise' && (sup.dir === 'supply' || sup.type === 'supply')) ? 'qualification' : (sup.type || 'demand'),
@@ -278,15 +287,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   }
 
-  if (!rec && window.PublishStore) {
-    /* P2：id 不在目录但存在于发布信息存储 → 解析发布项；若其 sourceId 指向真实目录条目则优先展示目录丰富详情 */
-    var stored = PublishStore.getRecordById(id);
-    if (stored) {
-      var src = stored.sourceId != null ? stored.sourceId : stored.id;
-      var cat = MOCK.listingById(src);
-      if (cat && String(src) !== String(stored.id)) rec = cat;
-      else rec = Object.assign({}, stored, { bizKey: 'publish' });
-    }
+  /* [分片X P0-05] 三源统一查找（MOCK→SupplyStore→PublishStore），保留专属块；
+     不再强制降级为 bizKey='publish'，由 detail.js 按 resolveType/typeKey 分发。 */
+  if (!rec && window.DataBus && typeof DataBus.getRecord === 'function') {
+    var fetched = DataBus.getRecord(id);
+    if (fetched) rec = fetched;
   }
   if (!rec) {
     /* P0：id 失效/不存在 → 正式空状态页（不再错误回退到其他类别详情） */

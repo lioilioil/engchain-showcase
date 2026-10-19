@@ -22,6 +22,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>发现 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/supply-list.css">
 <link rel="stylesheet" href="../../css/liquid-dock.css">
 <style>
 /* 发现页一级分类：横向滚动 seg */
@@ -222,35 +223,77 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return 62 + (h % 35);
   }
+  /* [分片C P0-02] 分组键：优先 DataBus.resolveType(s).bizKey，回退记录自带 bizKey / 中文品类映射；
+     仅用于列表 tab/筛选分组，不参与卡片分发（分发在 common.js Cards 内完成），不臆造类型。 */
+  function bizOf(s) {
+    if (window.DataBus && DataBus.resolveType) {
+      var m = DataBus.resolveType(s);
+      if (m && m.bizKey) return m.bizKey;
+    }
+    return s.bizKey || BIZ_MAP[s.cat] || '';
+  }
+  /* 角色（供/需）：resolveType → role → dir/type */
+  function roleOf(s) {
+    if (window.DataBus && DataBus.resolveType) {
+      var m = DataBus.resolveType(s);
+      if (m && m.role) return m.role;
+    }
+    return s.role || s.dir || s.type || '';
+  }
   function normSupplyItem(x) {
     var isUser = (x.source === 'user_publish' || x.source === 'migrated_publish');
+    var meta = (window.DataBus && DataBus.resolveType) ? DataBus.resolveType(x) : null;
+    /* [V2 回修 V-P1-01] 记录自带的 role/detailLevel/typeKey 优先，仅在缺失时才用
+       resolveType(TYPE_MAP) 回填，避免把已是 detail 的记录反查覆盖成 brief。 */
     return Object.assign({}, x, {
-      id: x.id, bizKey: x.bizKey || BIZ_MAP[x.cat] || 'material',
-      dir: x.dir || x.type || 'demand', title: x.title || '', cat: x.cat || x.category || '',
-      sub: x.sub || x.subType || '', city: x.city || x.location || '',
-      price: x.price || x.budget || '', budget: x.budget || x.price || '', unit: x.unit || '',
-      tags: x.tags || [], company: x.company || '',
+      id: x.id,
+      role: x.role || x.dir || x.type || (meta ? meta.role : ''),
+      detailLevel: x.detailLevel || (meta ? meta.detailLevel : ''),
+      typeKey: x.typeKey || x.pubType || (meta ? meta.typeKey : '') || '',
       match: typeof x.match === 'number' ? x.match : (isUser ? 55 : varyMatch(x)),
-      verified: x.verified !== undefined ? x.verified : !isUser, hot: x.hot || false,
-      detailLevel: x.detailLevel || 'detail',
-      _badge: isUser ? '用户发布' : '平台认证'
+      verified: x.verified !== undefined ? x.verified : !isUser,
+      hot: x.hot || false
     });
   }
-  function readActiveSupplies() {
-    try { return (window.SupplyStore ? SupplyStore.listActive() : []) || []; } catch (e) { return []; }
+  /* [V2 回修 V-P1-05] 解析当前登录身份。发布记录 publisher 写的是用户表 id（如 u1），
+     而 engchain-state.account 是登录账号串（邮箱/手机），两者口径不同；直接拿 account 比
+     publisher 必然不等，导致本人待审被当他人丢弃。统一经 DataBus.current() 同时取
+     id/account/name/mobile 做比对。 */
+  function currentSelf() {
+    try {
+      if (window.DataBus && DataBus.current) {
+        var u = DataBus.current();
+        if (u) return { id: u.id || '', account: u.account || '', name: u.name || '', mobile: u.mobile || u.phone || '' };
+      }
+      var st = JSON.parse(localStorage.getItem('engchain-state') || '{}');
+      return { id: '', account: st.account || '', name: st.user || st.name || '', mobile: st.mobile || '' };
+    } catch (e) { return { id: '', account: '', name: '', mobile: '' }; }
   }
+  function isSelfPending(x, me) {
+    if (x.status !== 'pending_review' || !me) return false;
+    var cand = [x.publisher, x.publisherId, x.owner].map(String);
+    var selfVals = [me.id, me.account, me.name, me.mobile].filter(Boolean).map(String);
+    return cand.some(function (c) { return c && selfVals.indexOf(c) >= 0; });
+  }
+  /* [分片C P0-01/P0-05][V2] 统一走 DataBus.getListing({scope:'mine', includePending:true})；
+     不传 ownerId（数据层 listMinePending 只认 publisher id，account 口径不匹配会先被过滤），
+     本人 pending_review 在此自行门控打「审核中」卡，他人 pending 一律不进入发现页。 */
   function mergedList() {
-    var mock = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
-    var active = readActiveSupplies().map(function (x) {
-      try { return normSupplyItem(x); } catch (e) { console.warn('mergedList: skip bad supply item', e, x); return null; }
-    }).filter(Boolean);
-    var seen = {}, out = [];
-    active.forEach(function (x) { if (!seen[x.id]) { seen[x.id] = true; out.push(x); } });
-    mock.forEach(function (x) {
-      if (seen[x.id]) return;
-      seen[x.id] = true;
-      out.push(Object.assign({}, x, { match: varyMatch(x) }));
-    });
+    var out = [];
+    var me = currentSelf();
+    try {
+      var rows = (window.DataBus && DataBus.getListing)
+        ? DataBus.getListing({ scope: 'mine', includePending: true })
+        : [];
+      rows.forEach(function (x) {
+        if (!x) return;
+        if (x.status === 'pending_review' && !isSelfPending(x, me)) return;
+        try { out.push(normSupplyItem(x)); }
+        catch (e) { console.warn('mergedList: skip bad supply item', e, x); }
+      });
+    } catch (e) {
+      console.warn('mergedList: getListing unavailable, fallback empty', e);
+    }
     return out;
   }
 
@@ -481,37 +524,44 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try {
     var list = mergedList();
 
-    /* 按一级分类 + 二级分类筛选 */
+    /* 按一级分类 + 二级分类筛选（分组键走 resolveType 兜底，不臆造类型） */
     if (type === 'resource') {
       var RES_KEYS = ['franchise', 'trade', 'personnel', 'talent'];
-      list = list.filter(function (s) { return RES_KEYS.indexOf(s.bizKey) >= 0; });
-      if (sub !== 'all') list = list.filter(function (s) { return s.bizKey === sub; });
+      list = list.filter(function (s) { return RES_KEYS.indexOf(bizOf(s)) >= 0; });
+      if (sub !== 'all') list = list.filter(function (s) { return bizOf(s) === sub; });
     } else if (type === 'biz') {
       /* 供需聚合 tab：材料/设备/劳务/运输 供+需混合，方向由筛选弹窗单选 */
       var BIZ_KEYS = ['material', 'labor', 'equipment', 'transport'];
-      list = list.filter(function (s) { return BIZ_KEYS.indexOf(s.bizKey) >= 0; });
-      if (sub !== 'all') list = list.filter(function (s) { return s.bizKey === sub; });
+      list = list.filter(function (s) { return BIZ_KEYS.indexOf(bizOf(s)) >= 0; });
+      if (sub !== 'all') list = list.filter(function (s) { return bizOf(s) === sub; });
     } else if (type === 'service') {
-      list = list.filter(function (s) { return s.bizKey === 'agency'; });
+      list = list.filter(function (s) { return bizOf(s) === 'agency'; });
       list = list.filter(function (s) { return matchService(s, sub); });
     }
     /* type === 'all'：无一级品类过滤，但支持 cat 参数直达子类（cat 为中文品类名，需映射 bizKey） */
     if (type === 'all' && sub !== 'all') {
       var catBiz = BIZ_MAP[sub] || sub;
-      list = list.filter(function (s) { return s.bizKey === catBiz; });
+      list = list.filter(function (s) { return bizOf(s) === catBiz; });
     }
 
-    /* 筛选条件 */
-    if (filterState.dir === '供应（我提供）') list = list.filter(function (s) { return s.dir === 'supply'; });
-    if (filterState.dir === '需求（我需要）') list = list.filter(function (s) { return s.dir === 'demand'; });
+    /* 筛选条件（方向走 role 兜底 dir） */
+    if (filterState.dir === '供应（我提供）') list = list.filter(function (s) { return roleOf(s) === 'supply'; });
+    if (filterState.dir === '需求（我需要）') list = list.filter(function (s) { return roleOf(s) === 'demand'; });
     if (filterState.category !== '全部') {
       var bizKey = BIZ_MAP[filterState.category] || filterState.category;
-      list = list.filter(function (s) { return s.bizKey === bizKey; });
+      list = list.filter(function (s) { return bizOf(s) === bizKey; });
     }
     if (filterState.city !== '全部') list = list.filter(function (s) { return (s.city || s.location || '') === filterState.city || (s.city || s.location || '').indexOf(filterState.city) >= 0; });
     if (filterState.budget !== '全部') list = list.filter(function (s) { return matchBudget(s, filterState.budget); });
     if (filterState.verified === '已认证') list = list.filter(function (s) { return s.verified; });
     if (filterState.verified === '未认证') list = list.filter(function (s) { return !s.verified; });
+
+    /* [V2 回修 V-P1-05] 本人待审卡从送排序的列表中拆出：Ranking.hardFilter 会无条件跳过
+       pending_review（ranking.js:72），直接送排序会被丢弃；审核中卡单独保留并在排序后置顶，
+       既绕过硬过滤，又不影响 active 结果的排序。他人 pending 已在 mergedList 门控剔除。 */
+    var _me = currentSelf();
+    var pendingSelf = list.filter(function (s) { return s.status === 'pending_review' && isSelfPending(s, _me); });
+    list = list.filter(function (s) { return !(s.status === 'pending_review' && isSelfPending(s, _me)); });
 
     /* 排序 */
     var rankingOpts = {
@@ -568,6 +618,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       } catch (e) {}
     }
 
+    /* 本人审核中卡置顶（绕过 Ranking hardFilter 的 pending_review 丢弃） */
+    list = pendingSelf.concat(list);
+
     document.getElementById('count').textContent = '共 ' + list.length + ' 条';
     var html = list.length
       ? window.Cards.render(list, 'detail.html?id=')
@@ -575,18 +628,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div style="margin-top:18px;display:flex;justify-content:center;"><button class="btn btn-primary" onclick="window.resetEmptyFilter()">重置筛选</button></div></div>';
     document.getElementById('list').innerHTML = html;
 
-    /* 为用户发布条目注入角标 */
+    /* 角标（方向/详细简要/认证/急热/审核中）已由 Cards.head 统一渲染；此处仅做置顶标签注入 */
     var cards = document.querySelectorAll('#list .job-card');
-    list.forEach(function (item, idx) {
-      if (item._badge && cards[idx]) {
-        var tag = document.createElement('span');
-        tag.className = 'tag ' + (item._badge === '用户发布' ? 'tag-supply' : 'tag-gold');
-        tag.style.cssText = 'margin-left:6px;font-size:10px;';
-        tag.textContent = item._badge;
-        var tagsRow = cards[idx].querySelector('.jc-tags');
-        if (tagsRow) tagsRow.appendChild(tag);
-      }
-    });
     /* [FEAT 9.2-1] 置顶标签注入 */
     try {
       if (window.UpgradeStore) {

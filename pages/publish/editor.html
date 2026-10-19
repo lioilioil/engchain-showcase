@@ -87,12 +87,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
               <select class="input" id="f-subcat"><option value="">请选择子类</option></select>
               <div class="field-error" id="err-subcat">请选择子类</div>
               <div class="subcat-request"><a href="javascript:void(0)" id="subcat-request-link">没有合适的子类？申请新增</a></div>
+              <div class="pending-chips" id="pending-subcat-chips"></div>
             </div>
             <div class="form-field">
               <label for="f-subname"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>品名 <span class="req">*</span></label>
               <input class="input" id="f-subname" placeholder="选择或输入品名，如 C30商品混凝土" autocomplete="off" list="subname-list">
               <datalist id="subname-list"></datalist>
               <div class="subname-sim" id="subname-sim"></div>
+              <div class="subname-origin" id="subname-origin"></div>
+              <div class="pending-chips" id="pending-subname-chips"></div>
               <div class="field-error" id="err-sub">请填写品名</div>
             </div>
             <div class="form-field">
@@ -148,12 +151,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <!-- ===== Step 2: 交易要求（redesign 双轨：轻主路径 + 专业信息可后补） ===== -->
         <div class="form-step" data-step="2">
           <div class="step-head"><span class="sh-no">02</span><span class="sh-title">交易要求</span></div>
-          <!-- C2：信息完整度（内容丰富度，非流程进度）移入本步，作为次要提示 -->
-          <div class="completion-wrap" id="completion-wrap">
-            <div class="completion-track"><div class="completion-fill" id="completion-fill"></div></div>
-            <span class="completion-num" id="completion-num">0%</span>
-            <span class="completion-hint" id="completion-hint">信息完整度</span>
-          </div>
           <!-- 价格（唯一必填） -->
           <div class="form-card">
             <div class="card-label"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span id="price-card-title">预算空间 <span class="req">*</span></span>
@@ -169,7 +166,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <div class="unit-picker price-unit-picker" id="price-unit-picker">
                   <div class="unit-input-wrap">
                     <input class="input" id="f-price-unit" placeholder="单位" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" title="选择或输入价格单位，如 元/方、万元">
-                    <span class="unit-caret" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
                   </div>
                   <div class="unit-chips" id="chips-price-unit" role="listbox" aria-label="价格常用单位">
                     <div class="unit-chips-body" id="price-unit-chips-body"></div>
@@ -194,7 +190,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <div class="unit-picker" id="unit-picker">
                   <div class="unit-input-wrap">
                     <input class="input" id="f-unit" placeholder="单位" autocomplete="off" aria-haspopup="listbox" aria-expanded="false">
-                    <span class="unit-caret" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
                   </div>
                   <div class="unit-chips" id="chips-unit" role="listbox" aria-label="常用单位">
                     <div class="unit-chips-head"><span class="uch-title">常用单位</span><span class="uch-tag" id="unit-rec-tag">按品类推荐</span></div>
@@ -434,13 +429,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           </div><!-- /opt-group-trade -->
   </div><!-- /trade-orphan -->
 
-  <!-- 填写案例参考弹窗 -->
+  <!-- 填写案例参考弹窗（R5：定位条 品类/子类/品名 + 内部分页） -->
   <div class="ref-pop-mask" id="ref-pop-mask"></div>
-  <div class="ref-pop" id="ref-pop">
+  <div class="ref-pop" id="ref-pop" role="dialog" aria-modal="true" aria-labelledby="ref-pop-title">
     <div class="ref-pop-head">
       <div class="ref-pop-title" id="ref-pop-title"></div>
-      <button class="ref-pop-close" id="ref-pop-close" type="button">×</button>
+      <button class="ref-pop-close" id="ref-pop-close" type="button" aria-label="关闭参考">×</button>
     </div>
+    <div class="ref-crumb" id="ref-crumb"></div>
     <div class="ref-pop-body" id="ref-pop-body"></div>
   </div>
 
@@ -518,8 +514,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <!-- 草稿离开保护 -->
   <div class="leave-mask" id="leave-mask"></div>
-  <div class="leave-dialog" id="leave-dialog">
-    <div class="ld-title">离开编辑？</div>
+  <div class="leave-dialog" id="leave-dialog" role="dialog" aria-modal="true" aria-labelledby="ld-title">
+    <div class="ld-title" id="ld-title">离开编辑？</div>
     <div class="ld-text">当前有未保存的修改，离开前是否保存为草稿？</div>
     <div class="ld-actions">
       <button class="btn btn-primary" type="button" id="ld-save">保存草稿并离开</button>
@@ -994,7 +990,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         + '.tlb-bd{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}'
         + '.tlb-bd b{font-size:14px;font-weight:700;color:var(--text-1);}'
         + '.tlb-bd span{font-size:11.5px;color:var(--text-2);}'
-        + '.tlb-tag{flex:none;font-size:10px;font-weight:600;padding:4px 10px;border-radius:999px;background:rgba(43,107,79,.1);color:var(--success);}'
         + '.tlb-act{flex:none;margin-left:2px;padding:8px 12px;border:none;border-radius:999px;background:var(--bg-card);border:1px solid var(--line);color:var(--primary-dim);font-size:11.5px;font-weight:600;cursor:pointer;transition:all .15s;}'
         + '.tlb-act:active{transform:scale(.96);}';
       document.head.appendChild(st);
@@ -1010,7 +1005,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       banner.className = 'type-locked-banner';
       banner.innerHTML = '<span class="tlb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'
         + '<div class="tlb-bd"><b>' + TYPE_DEF.label + '</b><span>' + TYPE_DEF.sub + '</span></div>'
-        + '<span class="tlb-tag">已锁定</span>'
         + '<button class="tlb-act" type="button">更换类型</button>';
       var actBtn = banner.querySelector('.tlb-act');
       if (actBtn) actBtn.addEventListener('click', function(){
@@ -1210,6 +1204,37 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   /* ===== 步骤切换 ===== */
+  /* R6：实测固定操作栏高度（含 padding 与安全区）+ 视口溢出补偿，给出滚动区底部留白；
+     内联值不得低于 CSS 兜底 96px，避免把兜底留白压小。步内新增行/标签导致内容变长时，
+     由 MutationObserver 节流复算，末段不会被悬浮按钮覆盖。 */
+  function syncBottomInset() {
+    var box = document.querySelector('.editor-scroll');
+    if (!box) return;
+    var fbEl = document.getElementById('fixed-bottom') || document.getElementById('actionbar');
+    var barH = fbEl ? fbEl.offsetHeight : 64;
+    var r = box.getBoundingClientRect();
+    var over = Math.max(0, Math.round(r.bottom - window.innerHeight));
+    var need = Math.max(96, barH + over + 18);
+    box.style.paddingBottom = need + 'px';
+  }
+  function initBottomInsetWatcher() {
+    var box = document.querySelector('.editor-scroll');
+    if (!box || box.__insetWatched) return;
+    box.__insetWatched = true;
+    var raf = 0;
+    function schedule() {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(syncBottomInset);
+    }
+    try {
+      var mo = new MutationObserver(schedule);
+      mo.observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'data-display'] });
+    } catch (e) {}
+    window.addEventListener('resize', schedule);
+    window.addEventListener('orientationchange', schedule);
+    schedule();
+  }
+
   function goStep(step, dir) {
     var total = STEP_MODEL.total, contact = STEP_MODEL.contactStep;
     if (step < 1 || step > total) return;
@@ -1244,23 +1269,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     // 协议行固定区：仅末步（联系发布）显示；滚动区底部留出固定区高度
     var agRow = $('agreement-row');
     if (agRow) agRow.style.display = (step === contact) ? 'flex' : 'none';
-    var scrollBox = document.querySelector('.editor-scroll');
-    /* #52 底部留白按实测几何自适应：固定操作栏（末步还多一条协议行）悬浮在
-       滚动区之上，且 .editor-scroll 下沿相对视口存在固定溢出量，二者都要补偿，
-       才能保证新增的“本页说明”最后一行不被协议行 / 操作栏遮挡，并留出舒适间隙。
-       切换分页时布局有过渡，故先同步设一版、再在 rAF（布局稳定后）复算一版。 */
+    /* R6 底部留白按实测几何自适应：固定操作栏悬浮在滚动区之上，且 .editor-scroll
+       下沿相对视口可能存在固定溢出量，二者都要补偿，保证末段内容（含新增行/标签后
+       变长的页）完整露出于操作栏上方。内联值永不低于 CSS 兜底 96px。 */
     var __insetStep = step;
-    function applyBottomInset() {
-      var box = document.querySelector('.editor-scroll');
-      var fbEl1 = document.getElementById('fixed-bottom');
-      if (!box) return;
-      var barH1 = fbEl1 ? fbEl1.offsetHeight : 64;
-      var r = box.getBoundingClientRect();
-      var over = Math.max(0, Math.round(r.bottom - window.innerHeight));
-      box.style.paddingBottom = (barH1 + over + 18) + 'px';
-    }
-    applyBottomInset();
-    try { window.requestAnimationFrame(function () { if (__insetStep === currentStep) applyBottomInset(); }); } catch (e) {}
+    syncBottomInset();
+    try { window.requestAnimationFrame(function () { if (__insetStep === currentStep) syncBottomInset(); }); } catch (e) {}
     // 滚动到顶部
     document.querySelector('.editor-scroll').scrollTop = 0;
     updateNextButton();
@@ -1844,7 +1858,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         try { updateCategoryPlaceholders(); } catch(e){}
         /* 收购标的四要素由 buildDynSteps 在对应专业分页内统一安置，无需此处手动搬运 */
         try { renderDynamicFields(); } catch(e) {}
-        syncGrid(); updateNextButton(); updateCompletion(); scheduleAutoSave();
+        syncGrid(); updateNextButton(); scheduleAutoSave();
       });
       cell.addEventListener("keydown", function(e){
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.click(); }
@@ -2213,6 +2227,177 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       qtyDemand: ''
     }
   };
+  /* ===== 待审核词库申请池（MVP 落 localStorage；后台审核通过后并入永久词表，随 App 更新生效） =====
+     口径：用户提交的新增子类/品名均为「待定」状态，审核前不可作为受控值选择，仅展示审核中；
+     本次发布仍须选择现有受控子类、品名可自定义直接使用。 */
+  var PENDING_KEYS = { subcat: 'engchain_subcat_requests', subname: 'engchain_subname_requests' };
+  function pendingRead(kind) {
+    try { var arr = JSON.parse(localStorage.getItem(PENDING_KEYS[kind]) || '[]'); return Array.isArray(arr) ? arr : []; }
+    catch (e) { return []; }
+  }
+  function pendingWrite(kind, arr) { try { localStorage.setItem(PENDING_KEYS[kind], JSON.stringify(arr)); } catch (e) {} }
+  function pendingNorm(v) {
+    return (window.EngchainCatalog && EngchainCatalog.normalizeName)
+      ? EngchainCatalog.normalizeName(v) : String(v == null ? '' : v).trim();
+  }
+  function pendingExists(kind, cat, sub, name) {
+    var n = pendingNorm(name);
+    if (!n) return false;
+    return pendingRead(kind).some(function (x) {
+      return x.cat === cat && (kind === 'subcat' || (x.sub || '') === (sub || '')) && pendingNorm(x.name) === n;
+    });
+  }
+  function pendingAdd(entry) {
+    entry.id = entry.id || ('p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4));
+    entry.at = entry.at || new Date().toISOString();
+    entry.status = 'pending';
+    var arr = pendingRead(entry.kind);
+    arr.push(entry);
+    pendingWrite(entry.kind, arr);
+    return entry;
+  }
+  function pendingWithdrawById(kind, id) {
+    pendingWrite(kind, pendingRead(kind).filter(function (x) { return x.id !== id; }));
+  }
+  /* 当前品类（品名再限当前子类）的待审核清单，供面板「我的申请」分组 */
+  function pendingForPanel(kind) {
+    var cat = fields.category.value;
+    var sub = (fields.subcat && fields.subcat.value) || '';
+    return pendingRead(kind).filter(function (x) {
+      return x.cat === cat && (kind === 'subcat' || (x.sub || '') === sub);
+    });
+  }
+
+  /* ===== 申请新增底部弹层（子类 / 品名共用） ===== */
+  function openPendingSheet(kind, prefill) {
+    var cat = fields.category.value;
+    var sub = (fields.subcat && fields.subcat.value) || '';
+    var isSubcat = kind === 'subcat';
+    var title = isSubcat ? '申请新增子类' : '申请收录品名';
+    var maxLen = isSubcat ? 12 : 30;
+    var ex = isSubcat ? '如「铝合金门窗」' : '如「C30 细石商品混凝土」';
+    var sh = UI.sheet();
+    sh.setText(title);
+    var breadcrumb = '当前品类：' + (cat || '未选择') + (isSubcat ? '' : ' · 当前子类：' + (sub || '未选择'));
+    sh.html(
+      '<div class="pd-sheet">'
+      + '<div class="pd-crumb">' + UI.esc(breadcrumb) + '</div>'
+      + '<label class="pd-label">' + (isSubcat ? '子类名称' : '品名名称') + '</label>'
+      + '<input class="pd-input" id="pd-input" maxlength="' + maxLen + '" placeholder="' + UI.esc(ex) + '" autocomplete="off">'
+      + '<div class="pd-count"><span id="pd-count-num">0</span>/' + maxLen + '</div>'
+      + '<div class="pd-note">'
+      + '提交后进入平台<b>审核</b>，审核通过才会永久加入词库并随 App 更新生效；'
+      + '审核期间为「待定」状态，本次发布仍需先选择现有' + (isSubcat ? '子类' : '品名') + '。'
+      + '</div>'
+      + '<div id="pd-success" style="display:none;"></div>'
+      + '<button type="button" class="btn btn-primary btn-block pd-submit" id="pd-submit">提交申请</button>'
+      + '</div>'
+    );
+    sh.show();
+    var input = sh.body().querySelector('#pd-input');
+    var num = sh.body().querySelector('#pd-count-num');
+    if (prefill) input.value = prefill;
+    var syncCount = function () { num.textContent = input.value.trim().length; };
+    input.addEventListener('input', syncCount); syncCount();
+    setTimeout(function () { try { input.focus(); } catch (e) {} }, 260);
+
+    function fail(msg) { UI.toast(msg, 'warn'); }
+    sh.body().querySelector('#pd-submit').addEventListener('click', function () {
+      var name = input.value.trim();
+      if (!name) { fail((isSubcat ? '子类' : '品名') + '名称不能为空'); return; }
+      if (name.length > maxLen) { fail('请控制在 ' + maxLen + ' 字以内'); return; }
+      /* 与永久词表查重 */
+      if (isSubcat) {
+        var std = (window.EngchainCatalog && EngchainCatalog.subCats) ? EngchainCatalog.subCats(cat) : [];
+        if (std.some(function (s) { return pendingNorm(s) === pendingNorm(name); })) { fail('该子类已在词库中，直接选择即可'); return; }
+      } else {
+        var hints = (window.EngchainCatalog && EngchainCatalog.nameHints) ? EngchainCatalog.nameHints(cat, sub) : [];
+        if (hints.some(function (h) { return pendingNorm(h) === pendingNorm(name); })) { fail('该品名已是标准品名，直接选择即可'); return; }
+      }
+      /* 与待审池查重 */
+      if (pendingExists(kind, cat, sub, name)) { fail('该' + (isSubcat ? '子类' : '品名') + '已在申请队列中，请耐心等待审核'); return; }
+      var entry = pendingAdd({ kind: kind, cat: cat, sub: isSubcat ? '' : sub, name: name, by: (window.PV && PV._authCompany) || 'user' });
+      /* 成功态：替换为审核中卡片，并清空被吸底提升走的旧提交按钮 */
+      var box = sh.body().querySelector('.pd-sheet');
+      var footBox = box.closest('.sheet') ? box.closest('.sheet').querySelector('.sheet-foot') : null;
+      if (footBox) { footBox.innerHTML = ''; footBox.style.display = 'none'; }
+      box.innerHTML =
+        '<div class="pd-done">'
+        + '<div class="pd-done-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>'
+        + '<div class="pd-done-t">申请已提交 · 审核中</div>'
+        + '<div class="pd-done-s">「' + UI.esc(name) + '」已进入平台审核队列，通过后永久加入词库；可在下方字段的「审核中」标签查看进度。</div>'
+        + '</div>'
+        + '<button type="button" class="btn btn-primary btn-block" id="pd-done-btn">完成</button>';
+      sh.body().querySelector('#pd-done-btn').addEventListener('click', function () { UI.closeSheet(); });
+      refreshPendingUI();
+      UI.toast('申请已提交，审核通过后即可使用', 'ok');
+    });
+  }
+
+  /* 待审核 chips（字段下方）+ 面板分组刷新 */
+  function refreshPendingUI() {
+    renderPendingChips('subcat', $('pending-subcat-chips'));
+    renderPendingChips('subname', $('pending-subname-chips'));
+    if (window.__pickx) {
+      if (window.__pickx.subcat) window.__pickx.subcat._render();
+      if (window.__pickx.subname) window.__pickx.subname._render();
+    }
+  }
+  function renderPendingChips(kind, box) {
+    if (!box) return;
+    var items = pendingForPanel(kind);
+    if (!items.length) { box.innerHTML = ''; return; }
+    box.innerHTML = items.map(function (p) {
+      return '<span class="pending-chip" data-id="' + UI.esc(p.id) + '">'
+        + '<svg class="pc-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+        + '<span class="pc-name">' + UI.esc(p.name) + '</span>'
+        + '<span class="pc-state">审核中</span>'
+        + '<button type="button" class="pc-cancel" aria-label="撤回申请">×</button>'
+        + '</span>';
+    }).join('');
+  }
+  /* chips 撤回（事件委托） */
+  document.addEventListener('click', function (e) {
+    var chip = e.target.closest ? e.target.closest('.pending-chip') : null;
+    if (!chip) return;
+    var box = chip.parentElement;
+    var kind = box === $('pending-subcat-chips') ? 'subcat' : 'subname';
+    if (e.target.closest('.pc-cancel')) {
+      pendingWithdrawById(kind, chip.dataset.id);
+      refreshPendingUI();
+      UI.toast('已撤回申请', 'info');
+    }
+  });
+
+  /* 品名标准/自定义状态行：命中当前子类标准词库 → 标准；否则自定义（可申请收录） */
+  function refreshSubnameOrigin() {
+    var box = $('subname-origin');
+    if (!box) return;
+    var v = fields.sub.value.trim();
+    if (!v) { box.innerHTML = ''; return; }
+    var cat = fields.category.value, sub = (fields.subcat && fields.subcat.value) || '';
+    var isStd = !!(window.EngchainCatalog && EngchainCatalog.isStandardName && sub && EngchainCatalog.isStandardName(cat, sub, v));
+    if (isStd) {
+      box.innerHTML = '<span class="origin-tag std"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>标准品名</span>';
+    } else {
+      box.innerHTML = '<span class="origin-tag custom">自定义品名</span>'
+        + '<a href="javascript:void(0)" class="origin-apply" id="origin-apply-btn">申请收录为标准品名</a>';
+      var btn = box.querySelector('#origin-apply-btn');
+      if (btn) btn.addEventListener('click', function (e) { e.preventDefault(); openPendingSheet('subname', v); });
+    }
+  }
+  /* 品名占位提示：未选子类 → 引导先选子类；已选子类 → 角色示例占位（updateCategoryPlaceholders 设置） */
+  function updateSubPlaceholder() {
+    if (!fields.sub) return;
+    var sub = (fields.subcat && fields.subcat.value) || '';
+    if (!sub) {
+      fields.sub.placeholder = '先选子类可看推荐品名，也可直接输入';
+    }
+  }
+  fields.sub.addEventListener('input', function () {
+    refreshSubnameOrigin();
+  });
+
   /* ===== 子类 / 品名：PickX 自绘下拉接管（词表仍来自 publish-catalog.js） =====
    * 原生 <select> / <input> 保留为 value 镜像与 focus 校验通道（组件内部写回），
    * collectData / 必填校验 / 品类联动 / 续编回填等数据链路零改动。
@@ -2232,7 +2417,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         data: function () {
           return (window.EngchainCatalog && EngchainCatalog.subCats) ? EngchainCatalog.subCats(fields.category.value) : [];
         },
-        onRequest: function () { var r = $('subcat-request-link'); if (r) r.click(); }
+        pendingFn: function () { return pendingForPanel('subcat'); },
+        onWithdraw: function (id) {
+          pendingWithdrawById('subcat', id);
+          refreshPendingUI();
+          UI.toast('已撤回申请', 'info');
+        },
+        onRequest: function () { openPendingSheet('subcat'); }
       });
     }
     /* ---- 品名：可输可选组合下拉（datalist / 相似名行停用，面板内分组承担） ---- */
@@ -2244,8 +2435,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         input: fields.sub,
         host: fields.sub.parentElement,
         closeOnScroll: true,
+        guideSubcat: function () { return !(fields.subcat && fields.subcat.value); },
         memoryKey: function () {
           return (fields.category.value || 'x') + '|' + (fields.subcat ? fields.subcat.value : 'x');
+        },
+        pendingFn: function () { return pendingForPanel('subname'); },
+        onWithdraw: function (id) {
+          pendingWithdrawById('subname', id);
+          refreshPendingUI();
+          UI.toast('已撤回申请', 'info');
+        },
+        onRequestName: function (q) { openPendingSheet('subname', q || ''); },
+        onPickSubcat: function () {
+          if (window.__pickx && window.__pickx.subcat) window.__pickx.subcat.focus();
         },
         groups: function () {
           var cat = fields.category.value, sub = fields.subcat ? fields.subcat.value : '';
@@ -2347,6 +2549,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (fields.sub) fields.sub.value = '';
       if (window.__pickx && window.__pickx.subcat) window.__pickx.subcat.setValue('');
       var simEl = $('subname-sim'); if (simEl) { simEl.innerHTML = ''; simEl.classList.remove('show'); }
+      refreshPendingUI();
+      refreshSubnameOrigin();
       if (cat === '建企买卖' && role === 'demand') {
         UI.toast('已展开收购标的四要素（标的 / 负债 / 人员 / 税务）', 'ok');
       } else if (cat === '招聘' && role === 'demand') {
@@ -2361,6 +2565,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     renderSubcatOptions();
     /* 品名输入框提示按供需角色区分（如 建企买卖供应=转让语境、需求=收购语境） */
     fields.sub.placeholder = '选择或输入品名，如 ' + ((role === 'supply' && cfg.subSupply) ? cfg.subSupply : cfg.sub).replace(/^例如：/, '').split(' / ')[0];
+    updateSubPlaceholder();
     fields.spec.placeholder = (role === 'supply' && cfg.specSupply) ? cfg.specSupply : cfg.spec;
     fields.qual.placeholder = cfg.qual;
     // 更新推荐标签
@@ -2557,29 +2762,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   if (fields.subcat) fields.subcat.addEventListener('change', function () {
     renderSubnameList();
     var simEl = $('subname-sim'); if (simEl) { simEl.innerHTML = ''; simEl.classList.remove('show'); }
+    refreshPendingUI();
+    refreshSubnameOrigin();
+    updateCategoryPlaceholders();
+    updateSubPlaceholder();
     updateNextButton();
     scheduleAutoSave();
   });
   /* 品名输入联想 + 相似度去重提示 */
   bindSubnameSim();
-  /* 「申请新增子类」入口：写入本地待审池（MVP 落 localStorage，后台页后续接入） */
+  /* 「申请新增子类」入口：打开申请弹层，写入本地待审池（MVP 落 localStorage，后台页后续接入） */
   var reqLink = $('subcat-request-link');
-  if (reqLink) reqLink.addEventListener('click', function () {
-    var cat = fields.category.value;
-    if (!window.UI || !UI.prompt) return;
-    var name = UI.prompt('申请新增「' + cat + '」子类：\n请输入你要新增的子类名称（如「铝合金门窗」）', '');
-    if (name == null) return;
-    name = String(name || '').trim();
-    if (!name) { UI.toast('子类名称不能为空', 'warn'); return; }
-    if (name.length > 12) { UI.toast('子类名称请控制在 12 字以内', 'warn'); return; }
-    try {
-      var key = 'engchain_subcat_requests';
-      var list = JSON.parse(localStorage.getItem(key) || '[]');
-      if (list.some(function (x) { return x.cat === cat && x.name === name; })) { UI.toast('该子类已在申请队列中，请耐心等待审核', 'info'); return; }
-      list.push({ cat: cat, name: name, by: (window.PV && PV._authCompany) || 'user', at: new Date().toISOString(), status: 'pending' });
-      localStorage.setItem(key, JSON.stringify(list));
-      UI.toast('子类申请已提交，审核通过后即可选择', 'ok');
-    } catch (e) { UI.toast('申请提交失败，请重试', 'warn'); }
+  if (reqLink) reqLink.addEventListener('click', function (e) {
+    e.preventDefault();
+    openPendingSheet('subcat');
   });
   // 建企买卖四要素：选择/输入即刷新下一步状态（四要素现位于首个专业分页，不再固定 step2）
   if (fields.tradeQualCat) fields.tradeQualCat.addEventListener('change', function () {
@@ -3202,30 +3398,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
 
   /* ===== 自动保存 ===== */
-  function updateCompletion() {
-    var pct = calcCompletion();
-    var fill = $('completion-fill'), num = $('completion-num'), wrap = $('completion-wrap');
-    if (fill) fill.style.width = pct + '%';
-    if (num) num.textContent = pct + '%';
-    if (wrap) {
-      var wasFull = wrap.classList.contains('full');
-      wrap.classList.toggle('full', pct === 100);
-      if (pct === 100 && !wasFull) {
-        var track = wrap.querySelector('.completion-track');
-        if (track) { track.classList.remove('full-bounce'); void track.offsetWidth; track.classList.add('full-bounce'); }
-      }
-    }
-  }
   var dirty = false;
   function scheduleAutoSave() {
     /* fresh 切换进入且用户尚未真实操作：不置脏、不弹保存状态、不写自动草稿 */
-    if (suppressFreshAutosave) { try { updateCompletion(); } catch (e) {} return; }
+    if (suppressFreshAutosave) { return; }
     dirty = true;
     clearTimeout(autoSaveTimer);
     var status = $('save-status');
     status.textContent = '正在保存...';
     status.classList.add('show');
-    updateCompletion();
     autoSaveTimer = setTimeout(function () {
       saveDraftSilent();
       status.textContent = '已自动保存';
@@ -3249,14 +3430,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var raw = localStorage.getItem(key);
       if (!raw) return;
       var data = JSON.parse(raw);
-      /* 草稿提醒须匹配当前信息类型（品类一致才提示），跨类型草稿不打扰；TYPE_DEF 规避品类锁定时序 */
+      /* 草稿提醒须匹配当前信息类型：优先按 typeKey 精确匹配（G-D1/B4，同 role 不同品类不误恢复）；
+         旧版 autosave 无 typeKey 时回退品类一致，保持向后兼容；TYPE_DEF 规避品类锁定时序 */
       var targetCat = (TYPE_DEF && TYPE_DEF.cat) || fields.category.value;
-      if (data.title && data.category === targetCat && window.UI && UI.dialog) {
+      var typeKeyOk = !data.typeKey || !typeKey || data.typeKey === typeKey;
+      if (data.title && typeKeyOk && data.category === targetCat && window.UI && UI.dialog) {
         UI.dialog({
           title: '恢复上次编辑',
           text: '检测到未完成的编辑内容：<b>' + data.title.slice(0, 24) + (data.title.length > 24 ? '…' : '') + '</b><br>是否恢复继续编辑？',
           ok: '恢复编辑', cancel: '放弃',
-          onOk: function () { fillData(data); updateCompletion(); }
+          onOk: function () { fillData(data); }
         });
       }
     } catch (e) {}
@@ -3335,6 +3518,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     return {
       role: role,
+      /* 信封定位键（出口附加，不改字段采集面）：typeKey/detailLevel/pubType/cat/bizKey 同源携带，
+         供手动草稿、autosave、正式发布三条路径使用（G-D2/G-D3/G-P1） */
+      typeKey: typeKey || '',
+      detailLevel: 'detail',
+      pubType: typeKey || '',
+      cat: fields.category.value,
+      bizKey: catToBizKey(fields.category.value),
       title: fields.title.value.trim(),
       category: fields.category.value,
       subCate: fields.subcat ? fields.subcat.value : '',
@@ -3453,6 +3643,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (fields.tradeStaff) fields.tradeStaff.value = ti.staff || '';
     if (fields.tradeTax) fields.tradeTax.value = ti.tax || '';
     renderTags(); renderImages(); renderFiles(); updateCategoryPlaceholders();
+    refreshPendingUI(); refreshSubnameOrigin(); updateSubPlaceholder();
     if (window.__syncPriceMode) window.__syncPriceMode();
   }
 
@@ -3520,8 +3711,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     else navState.textContent = '新建发布';
   }
   updateCategoryPlaceholders();
+  refreshPendingUI(); refreshSubnameOrigin(); updateSubPlaceholder();
   goStep(1, 1);
-  updateCompletion();
+  /* R6：启动底部留白监听（实测操作栏高度 + 内容新增复算） */
+  try { initBottomInsetWatcher(); } catch (e) {}
 
   /* ===== "复制上次发布"引导条已按需求移除：新建发布时不再主动展示/引导使用历史信息。
      草稿（手动"存草稿"、自动保存）为独立逻辑，不受影响。以下初始化停用。 ===== */
@@ -3553,7 +3746,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         fillData(norm);
         updateCategoryPlaceholders();
         updateNextButton();
-        updateCompletion();
         scheduleAutoSave();
         UI.toast('已复制上次发布，请确认并补充', 'ok');
       });
@@ -3631,50 +3823,99 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var curUser = (window.DataBus && DataBus.current) ? DataBus.current() : null;
     var amount = data.price ? (data.price + (data.priceUnit ? ' ' + data.priceUnit : (data.unit ? ' ' + data.unit : ''))) : '';
     /* B2：提交前费用确认（有费用项目时先弹确认层，决策前置，避免提交瞬间才告知） */
-    var feeRowsHtml = buildFeeRows(data.category, role);
-    if (feeRowsHtml) {
-      var fcMask = document.createElement('div');
-      fcMask.className = 'fee-confirm-mask show';
-      fcMask.innerHTML = '<div class="fee-confirm-dialog">'
-        + '<div class="fee-confirm-title">确认发布费用</div>'
-        + '<div class="fee-confirm-sub">本次发布将产生以下费用，提交后立即生效：</div>'
-        + '<div class="fee-confirm-rows">' + feeRowsHtml + '</div>'
-        + '<div class="fee-confirm-actions">'
-        + '<button class="fc-cancel" type="button">取消</button>'
-        + '<button class="fc-ok" type="button">确认发布</button>'
-        + '</div></div>';
-      document.body.appendChild(fcMask);
-      /* 对齐通用对话框交互：点击遮罩 = 取消关闭（仅点在遮罩本体，不干扰按钮） */
-      fcMask.addEventListener('click', function (e) { if (e.target === fcMask) fcMask.remove(); });
-      fcMask.querySelector('.fc-cancel').addEventListener('click', function () { fcMask.remove(); });
-      fcMask.querySelector('.fc-ok').addEventListener('click', function () { fcMask.remove(); proceedSubmit(data, curUser, amount); });
+    var fee = inspectFee(data.category, role);
+    if (fee) {
+      /* B4：余额/积分不足前置校验：不足则不弹确认层，直接 toast，保留现有充值引导 */
+      if (fee.kind === 'deposit') {
+        var avail = (window.BalanceStore && BalanceStore.available) ? BalanceStore.available() : 0;
+        if (avail < fee.dep) {
+          UI.toast('诚意保证金 ¥' + fee.dep + '，当前可用余额 ¥' + avail.toFixed(2) + '，请先充值', 'warn');
+          if (confirm('发布建企买卖需求需冻结诚意保证金 ¥' + fee.dep + '（审核不通过原路解冻）。当前可用余额不足，是否前往充值？')) {
+            location.href = '../wallet/index.html';
+          }
+          return;
+        }
+      } else if (fee.kind === 'credits') {
+        var cb = (window.CreditStore && CreditStore.read) ? CreditStore.read().balance : 0;
+        if (cb < fee.cost) {
+          UI.toast('本月免费发布额度已用完，超出需 ' + fee.cost + ' 积分/条，积分不足', 'warn');
+          return;
+        }
+      }
+      openFeeConfirm(fee, data, curUser, amount);
       return;
     }
     proceedSubmit(data, curUser, amount);
   }
-  /* B2：费用明细构建（仅产生费用的类型返回内容；免费类型直接提交不打扰） */
-  function buildFeeRows(cat, r) {
+
+  /* B：费用场景识别（仅产生费用的类型返回；免费类型直接提交不打扰）。
+     积分价格只取 consume.talent，不再回退 material；缺配置给显式默认 98。 */
+  function inspectFee(cat, r) {
     var biz = (window.MOCK && MOCK.business && MOCK.business.credits) || {};
-    var rows = [];
-    function row(k, v, note) {
-      return '<div class="fee-confirm-row"><span style="color:var(--text-2);">' + k + '</span><b>' + v + (note ? '<em style="display:block;font-style:normal;font-size:11px;color:var(--text-2);font-weight:400;">' + note + '</em>' : '') + '</b></div>';
-    }
     if (cat === '建企买卖' && r === 'demand') {
-      var dep = (biz && biz.tradeDeposit) || 5000;
-      rows.push(row('诚意保证金（冻结）', '¥' + dep, '审核不通过原路解冻'));
-      return rows.join('');
+      return { kind: 'deposit', dep: (biz && biz.tradeDeposit) || 5000 };
     }
     if (cat === '招聘' && r === 'demand') {
-      var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 5;
+      var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 3;
       var used = (window.CreditStore && CreditStore.freeUsed) ? CreditStore.freeUsed() : 0;
-      var left = Math.max(0, freeTotal - used);
-      var cost = (biz && biz.consume) ? (biz.consume.talent || biz.consume.material || 98) : 98;
-      if (left <= 0) {
-        rows.push(row('发布费用', cost + ' 积分/条', '本月免费额度已用完'));
-        return rows.join('');
+      if (used >= freeTotal) {
+        var cost = (biz && biz.consume && typeof biz.consume.talent === 'number') ? biz.consume.talent : 98;
+        return { kind: 'credits', cost: cost, freeTotal: freeTotal, used: used };
       }
     }
     return null;
+  }
+  function feeRowHtml(k, v, note) {
+    return '<div class="fee-confirm-row"><span style="color:var(--text-2);">' + escHtml(k) + '</span><b>' + escHtml(v)
+      + (note ? '<em style="display:block;font-style:normal;font-size:11px;color:var(--text-2);font-weight:400;">' + escHtml(note) + '</em>' : '') + '</b></div>';
+  }
+  /* B：打开费用确认层（防叠加单例 / 防重复触发 / ESC 取消 / 滚动锁定 / 焦点返回） */
+  function openFeeConfirm(fee, data, curUser, amount) {
+    document.querySelectorAll('.fee-confirm-mask').forEach(function (m) { m.remove(); });
+    var trigger = ModalUX.saveTrigger();
+    var subHtml = fee.kind === 'deposit'
+      ? '诚意保证金将冻结至平台托管；审核不通过原路解冻，成交或下架后按平台规则退回。'
+      : '本月免费额度已用完，本条将消耗 ' + fee.cost + ' 积分。';
+    var okLabel = fee.kind === 'deposit' ? '确认冻结并发布' : '确认消耗积分并发布';
+    var rowsHtml = fee.kind === 'deposit'
+      ? feeRowHtml('诚意保证金（冻结）', '¥' + fee.dep, '审核不通过原路解冻，成交或下架后按平台规则退回')
+      : feeRowHtml('发布费用', fee.cost + ' 积分/条', '本月免费额度已用完');
+    var fcMask = document.createElement('div');
+    fcMask.className = 'fee-confirm-mask show';
+    fcMask.innerHTML = '<div class="fee-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="fc-title">'
+      + '<div class="fee-confirm-title" id="fc-title">确认发布费用</div>'
+      + '<div class="fee-confirm-sub">' + escHtml(subHtml) + '</div>'
+      + '<div class="fee-confirm-rows">' + rowsHtml + '</div>'
+      + '<div class="fee-confirm-actions">'
+      + '<button class="fc-cancel" type="button">取消</button>'
+      + '<button class="fc-ok" type="button">' + escHtml(okLabel) + '</button>'
+      + '</div></div>';
+    document.body.appendChild(fcMask);
+    ModalUX.lockScroll();
+    var closed = false;
+    function close() {
+      if (closed) return;
+      closed = true;
+      fcMask.remove();
+      ModalUX.unlockScroll();
+      ModalUX.restoreFocus(trigger);
+    }
+    fcMask.addEventListener('click', function (e) { if (e.target === fcMask) close(); });
+    fcMask.querySelector('.fc-cancel').addEventListener('click', close);
+    var okBtn = fcMask.querySelector('.fc-ok');
+    okBtn.addEventListener('click', function () {
+      if (okBtn.disabled) return; /* 防重复触发：置灰禁用，避免重复提交 */
+      okBtn.disabled = true;
+      okBtn.classList.add('is-busy');
+      close();
+      proceedSubmit(data, curUser, amount);
+    });
+    var first = fcMask.querySelector('.fc-cancel');
+    if (first) first.focus();
+  }
+  /* 仅 CDP 直调测试挂钩：?__test=1 时暴露真实费用函数，产品行为不受影响 */
+  if (location.search.indexOf('__test=1') > -1) {
+    window.__feeTest = { inspectFee: inspectFee, openFeeConfirm: openFeeConfirm };
   }
   /* B2：费用执行 + 提交（用户确认后进入） */
   function proceedSubmit(data, curUser, amount) {
@@ -3713,7 +3954,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       desc: data.description, contact: data.contact, company: data.company,
       dir: data.role, amount: amount,
       publisher: curUser ? curUser.id : '', publisherName: curUser ? curUser.name : '',
-      source: 'user_publish', bizKey: catToBizKey(data.category), pubType: typeKey,
+      source: 'user_publish', bizKey: catToBizKey(data.category),
+      /* G-P1：detail 六键齐全——detailLevel/typeKey/pubType/role/cat/bizKey；pubType 兼容旧读保留 */
+      typeKey: typeKey || data.typeKey || '', pubType: typeKey || data.pubType || '',
+      detailLevel: 'detail', role: data.role,
       unit: data.unit, qty: data.qty, spec: data.spec, delivery: data.delivery, priceUnit: data.priceUnit, priceNum: data.priceNum,
       qualification: data.qualification, tags: data.tags, address: data.address,
       images: data.images, files: data.files, expireDays: data.expireDays,
@@ -3722,12 +3966,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       cats: (data.category === '中介服务' && data.dynamic && Array.isArray(data.dynamic.serviceCats)) ? data.dynamic.serviceCats : [],
       match: computeMatch(data), verified: false, status: 'pending_review'
     };
-    /* redesign：持久化专业信息（动态字段），修复提交未保存专业字段的缺口；空嵌套不挂载 */
+    /* redesign：持久化专业信息（动态字段），修复提交未保存专业字段的缺口；空嵌套不挂载。
+       G-P2：正式发布路径与预览同源调用 collectDynamicData() 装配 mat/equip/labor/fc/transport/
+       tradeDetail/agencyDetail/personnelDetail/talentDetail 嵌套对象（旧发布路径未装配，专业渲染器读空）。 */
     payload.dynFields = data.dynFields || {};
-    payload.dynamic = data.dynamic || {};
+    var bizNested = {};
+    try { bizNested = collectDynamicData() || {}; } catch (e) { console.warn('submit collectDynamicData', e); }
+    payload.dynamic = data.dynamic || bizNested.dynamic || {};
     (function(){
       function richNonEmpty(o){ if(!o||typeof o!=="object")return false; return Object.keys(o).some(function(kk){ var vv=o[kk]; if(Array.isArray(vv))return vv.length>0; if(vv&&typeof vv==="object")return richNonEmpty(vv); return !!vv; }); }
-      ["mat","equip","labor","fc","tradeDetail","agencyDetail","personnelDetail","talentDetail"].forEach(function(k){ var v=data[k]; if(richNonEmpty(v)) payload[k]=v; });
+      ["mat","equip","labor","fc","transport","tradeDetail","agencyDetail","personnelDetail","talentDetail"].forEach(function(k){ var v=data[k]||bizNested[k]; if(richNonEmpty(v)) payload[k]=v; });
     })();
     var saved;
     if (recordId && window.SupplyStore && SupplyStore.byId(recordId)) {
@@ -3739,7 +3987,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       saved = DataBus.publishSupply(payload);
       if (saved && draftId) PublishStore.removeDraft(draftId);
     }
-    if (!saved) { UI.toast('信息提交失败，请重试', 'err'); return; }
+    if (!saved) { UI.toast('发布失败，请重试', 'err'); return; }
     /* P0-1：落库成功后才执行费用（先落库后收费）；执行异常仅提示，不影响已提交的信息 */
     try {
       if (data.category === '建企买卖' && role === 'demand') {
@@ -4130,13 +4378,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       location.href = '../../home.html';
     }
   }
+  var leaveTrigger = null;
   function closeLeaveDialog() {
     $('leave-mask').classList.remove('show');
     $('leave-dialog').classList.remove('show');
+    ModalUX.unlockScroll();
+    ModalUX.restoreFocus(leaveTrigger);
+    leaveTrigger = null;
   }
   function showLeaveDialog() {
+    leaveTrigger = ModalUX.saveTrigger();
     $('leave-mask').classList.add('show');
     $('leave-dialog').classList.add('show');
+    ModalUX.lockScroll();
+    var f = $('ld-save'); if (f) f.focus();
   }
   $('nav-back').addEventListener('click', function () {
     if (dirty) { showLeaveDialog(); return; }
@@ -4144,10 +4399,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   });
   $('leave-mask').addEventListener('click', closeLeaveDialog);
   $('ld-save').addEventListener('click', function () {
-    saveDraftSilent(); dirty = false; closeLeaveDialog(); doLeave();
+    /* C2：走正式草稿箱（PublishStore.saveDraft，与底部「存草稿」同路径）；不可用时回退自动暂存 */
+    var data = collectData();
+    data.completion = calcCompletion();
+    if (draftId) data.id = draftId;
+    var saved = (window.PublishStore && PublishStore.saveDraft) ? PublishStore.saveDraft(data) : null;
+    if (saved) {
+      try { localStorage.removeItem('engchain-autosave-' + role); } catch (e) {}
+      dirty = false; closeLeaveDialog(); doLeave();
+    } else {
+      saveDraftSilent(); dirty = false; closeLeaveDialog(); doLeave();
+    }
   });
   $('ld-discard').addEventListener('click', function () {
-    dirty = false; closeLeaveDialog(); doLeave();
+    /* C2：直接离开=丢弃，清除自动暂存键，避免再进仍弹「恢复上次编辑」 */
+    dirty = false;
+    try { localStorage.removeItem('engchain-autosave-' + role); } catch (e) {}
+    closeLeaveDialog(); doLeave();
   });
   $('ld-cancel').addEventListener('click', closeLeaveDialog);
 
@@ -4951,6 +5219,101 @@ var DEMO_DATA = {
   }
 };
 
+/* ============================================================
+   R6+ 子类差异化静态样例（2026-10-18，材料优先）
+   独立于 DEMO_DATA：键=品类→子类→角色(supply/demand)；数字均为「演示样例」，
+   不构成对外承诺，不写锁价/产能/通过率。其余七业态子类样例本期后置。
+   词表事实（publish-catalog.js）：钢筋归「钢材」、玻璃归「装饰装修」、
+   「钢结构」不是材料子类；本表不硬造不存在的子类。
+   ============================================================ */
+var SUBCAT_EXAMPLES = {
+  '材料': {
+    '混凝土及制品': {
+      supply: {
+        title: 'C30泵送商品混凝土供应 · 成都天府新区（演示样例）',
+        subType: 'C30商品混凝土',
+        price: '320', unit: '元/方', qty: '日供2000方（演示样例）',
+        spec: '强度等级C30；坍落度180±30mm；抗渗等级P6；初凝4-6小时（演示样例）',
+        delivery: '下单后2小时内发车，30公里内含运费（演示样例）',
+        qualification: 'GB/T 14902 预拌混凝土；出厂合格证；批次质检报告（演示样例）',
+        description: '供应C15-C60各强度等级预拌混凝土，自有搅拌站与罐车车队，支持泵送与工地直卸；按批次提供配合比通知单与质检报告（演示样例）。',
+        tags: ['现货供应', '国标合规', '包配送', '急单可接']
+      }
+    },
+    '钢材': {
+      supply: {
+        title: 'HRB400E抗震螺纹钢筋供应 · 成都绕城配送（演示样例）',
+        subType: '钢筋HRB400',
+        price: '3850', unit: '元/吨', qty: '月供800吨（演示样例）',
+        spec: '牌号HRB400E（抗震带E）；直径Φ12/Φ16/Φ20/Φ25mm；定尺9m/12m（演示样例）',
+        delivery: '48小时内装车配送，可按需调直、切断（演示样例）',
+        qualification: 'GB/T 1499.2 热轧带肋钢筋；原厂质保书；炉批号可追溯（演示样例）',
+        description: '供应HRB400E/HRB500螺纹钢与盘螺，附原厂质保书，支持按规格分捆配送至工地（演示样例）；H型钢、钢板、镀锌钢管、钢绞线同属钢材类。',
+        tags: ['抗震钢筋', '国标质保', '按需分捆', '当日装车']
+      }
+    },
+    '水泥及掺合料': {
+      supply: {
+        title: 'P.O42.5普通硅酸盐水泥供应 · 成都（演示样例）',
+        subType: '水泥P.O42.5',
+        price: '480', unit: '元/吨', qty: '按需分批（演示样例）',
+        spec: '强度等级42.5；普通硅酸盐P.O；袋装50kg/散装可选（演示样例）',
+        delivery: '3天内分批配送（演示样例）',
+        qualification: 'GB 175 通用硅酸盐水泥；出厂检验报告（演示样例）',
+        description: '供应P.O42.5/P.O52.5普通硅酸盐水泥，以及粉煤灰、矿粉、膨胀剂等掺合料，袋装散装均可、分批配送（演示样例）。',
+        tags: ['大厂水泥', '袋装散装', '分批配送']
+      }
+    },
+    '砂石骨料': {
+      supply: {
+        title: '机制砂与级配碎石供应 · 成都周边车队配送（演示样例）',
+        subType: '机制砂',
+        price: '95', unit: '元/吨', qty: '按需派车（演示样例）',
+        spec: '机制砂细度模数2.6-2.9；碎石粒径5-25mm连续级配；含泥量≤3%（演示样例）',
+        delivery: '24小时内派车（演示样例）',
+        qualification: 'GB/T 14684 建设用砂、GB/T 14685 建设用卵石碎石；筛分报告（演示样例）',
+        description: '供应机制砂、河砂与5-25mm级配碎石，车队直送、可过磅，附筛分报告（演示样例）。',
+        tags: ['级配合格', '车队直送', '可过磅']
+      }
+    },
+    '防水保温': {
+      supply: {
+        title: '防水卷材与岩棉保温板供应 · 成都（演示样例）',
+        subType: '防水卷材',
+        price: '', unit: '', qty: '按单配送（演示样例）',
+        spec: '卷材3mm厚聚酯胎Ⅱ型；岩棉板密度100kg/m³、厚50mm（演示样例）',
+        delivery: '5天内到场（演示样例）',
+        qualification: 'GB 18242 弹性体改性沥青防水卷材；GB/T 25975 外墙外保温岩棉带；型式检验报告（演示样例）',
+        description: '供应SBS改性沥青防水卷材、防水涂料、EPS/XPS保温板与岩棉板，可提供型式检验报告（演示样例）。',
+        tags: ['国标卷材', '阻燃保温', '可提供检测']
+      }
+    },
+    '装饰装修': {
+      supply: {
+        title: '家装工装装饰材料配送 · 成都（演示样例）',
+        subType: '瓷砖',
+        price: '', unit: '', qty: '按单配送（演示样例）',
+        spec: '瓷砖/乳胶漆/木地板/门窗/卫浴五金/吊顶材料；自定义品名「钢化中空玻璃」参考口径：5+12A+5中空钢化、LOW-E镀膜、原片厚度5mm、安全玻璃3C认证（演示样例）',
+        delivery: '按单配送、送样确认（演示样例）',
+        qualification: '对应产品国标/行标检测报告；安全玻璃3C认证（演示样例）',
+        description: '供应瓷砖、乳胶漆、木地板、门窗、卫浴五金、吊顶材料等装饰装修品类，送样确认后按单配送（演示样例）；玻璃无独立子类，归本类。',
+        tags: ['品类齐全', '送样确认', '按单配送']
+      }
+    }
+  }
+};
+
+/* 回退链：品类+子类+角色精确 → 品类+子类 supply → 业态默认 DEMO_DATA[biz].static（保证缺样例不空白板） */
+function resolveStaticExample(biz, cat, sub, role) {
+  var byCat = SUBCAT_EXAMPLES[cat] || {};
+  var node = byCat[sub] || byCat['*'] || null;
+  if (node) {
+    var branch = (role && node[role]) || node.supply || node.demand || null;
+    if (branch) return branch;
+  }
+  return (DEMO_DATA[biz] && DEMO_DATA[biz].static) || {};
+}
+
 /* ---- 动态字段渲染引擎 ---- */
 /* ============================================================
    动态专业分页构建器（替代原全屏"完善专业信息"弹窗）
@@ -5085,11 +5448,32 @@ function renderDynamicFields() {
 
 /* ---- 填写案例参考弹窗（复用 DEMO_DATA 示例，格式与填写控件对应；示例可一键填入） ---- */
 function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* R5：把结构化案例（obj / gridlist / resumeCard / 数组对象）压成可读文本，避免 [object Object] */
+var REF_FIELD_LABELS = { name:'名称', title:'名称', role:'岗位', position:'岗位', major:'专业', required:'要求', k:'项', v:'内容', cert:'证书', level:'等级', note:'说明', cycle:'周期', date:'日期', result:'结果', caseCompany:'公司', caseLevel:'等级', caseQual:'事项', caseCycle:'周期', caseDate:'日期', caseResult:'结果', salary:'薪资', base:'底薪', benefit:'福利', stage:'阶段', pct:'比例', who:'提供方', price:'价格', unit:'单位', majorCert:'证书', handleCycle:'办理周期', serveType:'服务类型', targetQualLevel:'目标等级', targetQualMajor:'目标专业', govFee:'官方规费', successRate:'成功率', rating:'评分', intro:'简介', bio:'简介' };
+function refPlainItem(o) {
+  if (o == null) return '';
+  if (typeof o !== 'object') return String(o);
+  var parts = [];
+  Object.keys(o).forEach(function (k) {
+    var val = o[k];
+    if (val == null || val === '') return;
+    if (typeof val === 'object') val = refPlainItem(val);
+    if (!val) return;
+    parts.push((REF_FIELD_LABELS[k] || k) + '：' + val);
+  });
+  return parts.join('；');
+}
+function refFmt(v) {
+  if (Array.isArray(v)) return v.map(refPlainItem).filter(Boolean).join('；');
+  if (v && typeof v === 'object') return refPlainItem(v);
+  return v == null ? '' : String(v);
+}
+
 function renderRefSample(f) {
   var biz = catToBizKey(fields.category.value);
   var d = (DEMO_DATA[biz] && DEMO_DATA[biz].dynamic) || {};
   var v = d[f.key];
-  var has = Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && String(v).trim() !== '');
+  var has = Array.isArray(v) ? v.length > 0 : (v !== undefined && v !== null && String(refFmt(v)).trim() !== '');
   var html = '<div class="ref-item" data-fill="1" data-key="' + escHtml(f.key) + '"><div class="ref-item-label">' + escHtml(f.label);
   if (has) html += '<button type="button" class="ref-item-fill">填入</button>';
   html += '</div>';
@@ -5100,33 +5484,184 @@ function renderRefSample(f) {
   } else if (f.type === 'kvlist' && Array.isArray(v)) {
     html += '<div class="ref-kv">' + v.map(function(r){ return '<div class="ref-kv-row"><span>' + escHtml(r.k) + '</span><b>' + escHtml(r.v) + '</b></div>'; }).join('') + '</div>';
   } else if (f.type === 'taglist' && Array.isArray(v)) {
-    html += '<div class="ref-tags">' + v.map(function(t){ return '<span class="ref-tag">' + escHtml(t) + '</span>'; }).join('') + '</div>';
+    html += '<div class="ref-tags">' + v.map(function(t){ return '<span class="ref-tag">' + escHtml(typeof t === 'object' ? refPlainItem(t) : t) + '</span>'; }).join('') + '</div>';
   } else if (f.type === 'steplist' && Array.isArray(v)) {
-    html += '<ol class="ref-steps">' + v.map(function(s){ return '<li>' + escHtml(typeof s === 'object' ? (s.title || String(s)) : s) + '</li>'; }).join('') + '</ol>';
+    html += '<ol class="ref-steps">' + v.map(function(s){ return '<li>' + escHtml(typeof s === 'object' ? (s.title || refPlainItem(s)) : s) + '</li>'; }).join('') + '</ol>';
+  } else if (f.type === 'obj' && v && typeof v === 'object' && !Array.isArray(v)) {
+    html += '<div class="ref-kv">' + Object.keys(v).map(function(k){ var val = refPlainItem(v[k]); return '<div class="ref-kv-row"><span>' + escHtml(k) + '</span><b>' + escHtml(val) + '</b></div>'; }).join('') + '</div>';
+  } else if (f.type === 'gridlist' && Array.isArray(v)) {
+    html += v.map(function(row){ return '<div class="ref-text">' + escHtml(refPlainItem(row)) + '</div>'; }).join('');
   } else {
-    html += '<div class="ref-text">' + escHtml(String(v)) + '</div>';
+    html += '<div class="ref-text">' + escHtml(refFmt(v)) + '</div>';
   }
   html += '</div>';
   return html;
 }
-function openRefPop() {
+/* ===== R5：参考弹窗（一个弹窗只显示当前按钮对应的一个板块，不做全量堆砌） =====
+   静态板块：标题 / 品名 / 价格·单位 / 数量·规格·交付 / 详细描述 / 资质要求 / 推荐标签；
+   动态板块：当前专业分组（只渲染该组字段示例）。每次打开按当前品类/子类/品名重建。 */
+var refState = { board: null, group: null };
+var refTrigger = null;
+
+/* ===== R6+ 三弹窗统一交互加固：背景滚动锁定 / 焦点圈定与返回 / ESC 路由 =====
+   ref-pop / leave-dialog / fee-confirm 共用；锁滚动计数器支持嵌套，关闭归零后还原。 */
+var ModalUX = (function () {
+  var lockCount = 0;
+  var saved = null;
+  function scrollBox() { return document.querySelector('.editor-scroll') || document.scrollingElement || document.body; }
+  function lockScroll() {
+    var box = scrollBox();
+    if (lockCount === 0) saved = { el: box, top: box.scrollTop, overflow: box.style.overflow };
+    lockCount++;
+    box.style.overflow = 'hidden';
+  }
+  function unlockScroll() {
+    lockCount = Math.max(0, lockCount - 1);
+    if (lockCount === 0 && saved) {
+      saved.el.style.overflow = saved.overflow || '';
+      saved.el.scrollTop = saved.top;
+      saved = null;
+    }
+  }
+  function saveTrigger() { return document.activeElement; }
+  function restoreFocus(trigger) {
+    if (trigger && typeof trigger.focus === 'function' && document.contains(trigger)) {
+      try { trigger.focus(); } catch (e) {}
+    }
+  }
+  return { lockScroll: lockScroll, unlockScroll: unlockScroll, saveTrigger: saveTrigger, restoreFocus: restoreFocus };
+})();
+
+/* ESC 统一路由：fee(z420)=取消 → leave=取消 → ref=关闭不丢数据；遮罩点击行为保持现状 */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  var fee = document.querySelector('.fee-confirm-mask.show');
+  if (fee) { e.preventDefault(); var fc = fee.querySelector('.fc-cancel'); if (fc) fc.click(); return; }
+  var leave = document.getElementById('leave-dialog');
+  if (leave && leave.classList.contains('show')) { e.preventDefault(); closeLeaveDialog(); return; }
+  var ref = document.getElementById('ref-pop');
+  if (ref && ref.classList.contains('show')) { e.preventDefault(); closeRefPop(); return; }
+});
+
+function refCrumbHtml() {
+  var cat = fields.category.value || '未选品类';
+  var sub = (fields.subcat && fields.subcat.value) || '';
+  var name = (fields.sub && fields.sub.value) || '';
+  function seg(label, val, empty) {
+    return '<span class="rc-seg' + (empty ? ' is-empty' : '') + '">' + label + '<b>' + escHtml(val || empty) + '</b></span>';
+  }
+  return seg('品类', cat, cat) + '<span class="rc-sep">›</span>'
+    + seg('子类', sub, sub || '未选择') + '<span class="rc-sep">›</span>'
+    + seg('品名', name, name || '未填写');
+}
+
+/* 静态单条案例行（可一键填入） */
+function staticRefRow(kind, label, val) {
+  if (!val) return '';
+  return '<div class="ref-item" data-fill="1" data-static="' + kind + '">'
+    + '<div class="ref-item-label">' + escHtml(label) + '<button type="button" class="ref-item-fill">填入</button></div>'
+    + '<div class="ref-text">' + escHtml(val) + '</div></div>';
+}
+
+/* 品名板：子类快捷点选 + 当前子类品名联想 + 静态品名示例 */
+function renderSubnameBoard(s) {
+  var cat = fields.category.value;
+  var sub = (fields.subcat && fields.subcat.value) || '';
+  var hints = (window.EngchainCatalog && EngchainCatalog.nameHints) ? EngchainCatalog.nameHints(cat, sub) : [];
+  var allSubs = (window.EngchainCatalog && EngchainCatalog.subCats) ? EngchainCatalog.subCats(cat) : [];
+  var html = '<div class="ref-pop-note">按「品类 → 子类 → 品名」逐级细化：先选子类，再从品名联想中点选。'
+    + (sub ? '当前子类「' + escHtml(sub) + '」常用品名（点选即填入品名框）：' : '尚未选择子类，点选下面的子类即可直接选中并查看品名建议。') + '</div>';
+  if (!sub && allSubs.length) {
+    html += '<div class="ref-tags rc-subcat-list">' + allSubs.map(function (x) {
+      return '<span class="ref-tag rc-subcat" data-sub="' + escHtml(x) + '">' + escHtml(x) + '</span>';
+    }).join('') + '</div>';
+  }
+  if (hints.length) {
+    html += '<div class="ref-tags">' + hints.map(function (h) {
+      return '<span class="ref-tag rc-name-hint" data-name="' + escHtml(h) + '">' + escHtml(h) + '</span>';
+    }).join('') + '</div>';
+    /* 已选子类且有联想：底部品名示例行随 resolveStaticExample 结果替换 */
+    html += staticRefRow('sub', '品名示例', s.subType || '');
+  } else if (sub) {
+    /* 选中无联想子类（如「其他」）：不挂业态默认示例行，改空态文案 */
+    html += '<div class="ref-pop-note">该子类暂无推荐品名，可自行输入</div>';
+  } else {
+    html += staticRefRow('sub', '品名示例', s.subType || '');
+  }
+  return html;
+}
+
+/* 各静态板块内容，只取本板块字段 */
+function buildStaticBoard(board, s) {
+  switch (board) {
+    case 'title':
+      return { title: '信息标题', html: staticRefRow('title', '标题示例', s.title || '')
+        + '<div class="ref-pop-note">标题写「品类 + 核心卖点 + 区域」，建议控制在 20 字以内，便于搜索与筛选。</div>' };
+    case 'subname':
+      return { title: '品名', html: renderSubnameBoard(s) };
+    case 'price':
+      return { title: '价格 · 单位', html: staticRefRow('price', '价格 · 单位示例', s.price ? (s.price + (s.unit ? '（' + s.unit + '）' : '')) : '') };
+    case 'qtydelivery':
+      return { title: '数量 · 规格 · 交付', html:
+        staticRefRow('qty', '数量/规模 · 单位', s.qty ? (s.qty + (s.unit ? '（单位：' + s.unit + '）' : '')) : '')
+        + staticRefRow('spec', '规格/参数示例', s.spec || '')
+        + staticRefRow('delivery', '交付/工期示例', s.delivery || '') };
+    case 'desc':
+      return { title: '详细描述', html: staticRefRow('desc', '描述示例', s.description || '')
+        + (role === 'demand' ? '<div class="ref-pop-note">需求方写法：写明要什么 + 关键规格 + 用量 + 期望交付时间与验收口径。</div>' : '<div class="ref-pop-note">把规格、数量、交付、资质等关键条件写清，50 字以上提升匹配度。</div>') };
+    case 'qual':
+      return { title: '资质要求', html: staticRefRow('qual', '资质示例', s.qualification || '')
+        + '<div class="ref-pop-note">这里是希望对方具备的资质条件；你的自有资质由企业认证自动带出。</div>' };
+    case 'tags':
+      return { title: '推荐标签', html: (s.tags && s.tags.length)
+        ? '<div class="ref-item" data-fill="1" data-static="tags"><div class="ref-item-label">推荐标签<button type="button" class="ref-item-fill">填入</button></div><div class="ref-tags">' + s.tags.map(function (t) { return '<span class="ref-tag">' + escHtml(t) + '</span>'; }).join('') + '</div></div>'
+        : '<div class="ref-pop-note">暂无推荐标签。</div>' };
+    default:
+      return { title: '填写参考', html: '' };
+  }
+}
+
+/* 动态分组板块：只渲染该组字段示例 */
+function buildGroupBoard(g) {
+  return { title: g.title, html: (g.fields || []).map(renderRefSample).join('') };
+}
+
+function openRefBoard(board, group) {
+  var biz = catToBizKey(fields.category.value);
+  refState.board = board; refState.group = group || null;
+  var roleLabel = (role === 'demand') ? '采购方' : '供应方';
+  var wasOpen = document.getElementById('ref-pop').classList.contains('show');
+  if (!wasOpen) { refTrigger = ModalUX.saveTrigger(); ModalUX.lockScroll(); }
+  var s = group ? null : resolveStaticExample(biz, fields.category.value, (fields.subcat && fields.subcat.value) || '', role);
+  var b = group ? buildGroupBoard(group) : buildStaticBoard(board, s || {});
+  document.getElementById('ref-pop-title').textContent = '填写参考 · ' + b.title + '（' + roleLabel + '）';
+  document.getElementById('ref-crumb').innerHTML = refCrumbHtml();
+  document.getElementById('ref-pop-body').innerHTML = b.html;
   document.getElementById('ref-pop').classList.add('show');
   document.getElementById('ref-pop-mask').classList.add('show');
+  if (!wasOpen) { var c = document.getElementById('ref-pop-close'); if (c) c.focus(); }
 }
-function showRefPop(g, btn) {
+function showRefPop(g, btn) { openRefBoard(null, g); }
+
+function fillStaticRef(kind) {
   var biz = catToBizKey(fields.category.value);
-  var roleLabel = (role === 'demand') ? '采购方' : '供应方';
-  document.getElementById('ref-pop-title').textContent = '填写参考 · ' + g.title + '（' + roleLabel + '）';
-  document.getElementById('ref-pop-body').innerHTML = g.fields.map(renderRefSample).join('');
-  openRefPop();
+  var s = resolveStaticExample(biz, fields.category.value, (fields.subcat && fields.subcat.value) || '', role);
+  switch (kind) {
+    case 'title': fields.title.value = s.title || ''; break;
+    case 'sub': fields.sub.value = s.subType || ''; break;
+    case 'price': if (s.price) fields.price.value = s.price; if (s.unit) { var pu = $('f-price-unit'); if (pu) pu.value = s.unit; } break;
+    case 'qty': if (s.qty) fields.qty.value = s.qty; if (s.unit) fields.unit.value = s.unit; break;
+    case 'spec': fields.spec.value = s.spec || ''; break;
+    case 'delivery': fields.delivery.value = s.delivery || ''; break;
+    case 'qual': { var q = $('f-qual'); if (q) q.value = s.qualification || ''; break; }
+    case 'desc': fields.desc.value = s.description || ''; break;
+    case 'tags': (s.tags || []).forEach(function (t) { addTag(t); }); break;
+  }
+  scheduleAutoSave();
+  closeRefPop();
+  UI.toast('参考示例已填入，可继续编辑', 'ok');
 }
-function showFieldRefPop(f, btn) {
-  var biz = catToBizKey(fields.category.value);
-  var roleLabel = (role === 'demand') ? '采购方' : '供应方';
-  document.getElementById('ref-pop-title').textContent = '填写参考 · ' + f.label + '（' + roleLabel + '）';
-  document.getElementById('ref-pop-body').innerHTML = renderRefSample(f);
-  openRefPop();
-}
+
 function fillRefToField(key) {
   var biz = catToBizKey(fields.category.value);
   var d = (DEMO_DATA[biz] && DEMO_DATA[biz].dynamic) || {};
@@ -5154,6 +5689,9 @@ function fillRefToField(key) {
 function closeRefPop() {
   document.getElementById('ref-pop').classList.remove('show');
   document.getElementById('ref-pop-mask').classList.remove('show');
+  ModalUX.unlockScroll();
+  ModalUX.restoreFocus(refTrigger);
+  refTrigger = null;
 }
 (function(){
   var c = document.getElementById('ref-pop-close');
@@ -5162,12 +5700,65 @@ function closeRefPop() {
   if (m) m.addEventListener('click', closeRefPop);
   var body = document.getElementById('ref-pop-body');
   if (body) body.addEventListener('click', function(e){
+    /* 子类快捷点选 → 经 PickX 选中并刷新当前品名板的品名联想 */
+    var subEl = e.target.closest ? e.target.closest('.rc-subcat') : null;
+    if (subEl) {
+      var sv = subEl.dataset.sub;
+      if (window.__pickx && window.__pickx.subcat && sv) window.__pickx.subcat._pick(sv);
+      else if (fields.subcat) { fields.subcat.value = sv; fields.subcat.dispatchEvent(new Event('change', { bubbles: true })); }
+      scheduleAutoSave();
+      openRefBoard(refState.board || 'subname', refState.group);
+      return;
+    }
+    /* 品名联想词点选 → 直接填入品名框并刷新当前板 */
+    var hint = e.target.closest ? e.target.closest('.rc-name-hint') : null;
+    if (hint) {
+      if (fields.sub) fields.sub.value = hint.dataset.name || '';
+      scheduleAutoSave();
+      openRefBoard(refState.board || 'subname', refState.group);
+      return;
+    }
     var t = e.target.closest ? e.target.closest('.ref-item-fill,.ref-item') : null;
     if (!t) return;
     var item = t.classList.contains('ref-item') ? t : t.closest('.ref-item');
-    if (!item || !item.getAttribute('data-key')) return;
-    fillRefToField(item.getAttribute('data-key'));
+    if (!item) return;
+    var sk = item.getAttribute('data-static');
+    if (sk) { fillStaticRef(sk); return; }
+    var dk = item.getAttribute('data-key');
+    if (dk) fillRefToField(dk);
   });
+
+  /* 静态各板块「参考」入口：每个按钮只打开自己对应的一块 */
+  function mountBoardBtn(anchorEl, board, useLabel) {
+    if (!anchorEl || anchorEl.querySelector('.fld-ref')) return;
+    var host = useLabel ? anchorEl
+      : (anchorEl.querySelector('.card-label') || anchorEl.querySelector('.form-field label'));
+    if (!host) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'fld-ref static-ref-btn';
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>参考';
+    b.addEventListener('click', function(){ openRefBoard(board, null); });
+    host.appendChild(b);
+  }
+  /* 标题（挂在标题 label） */
+  var titleField = document.getElementById('f-title') ? document.getElementById('f-title').closest('.form-field') : null;
+  mountBoardBtn(titleField && titleField.querySelector('label'), 'title', true);
+  /* 品名（挂在品名 label） */
+  var subnameField = document.getElementById('f-subname') ? document.getElementById('f-subname').closest('.form-field') : null;
+  mountBoardBtn(subnameField && subnameField.querySelector('label'), 'subname', true);
+  /* 价格·单位卡 */
+  var priceCard = document.getElementById('f-price') ? document.getElementById('f-price').closest('.form-card') : null;
+  mountBoardBtn(priceCard, 'price', false);
+  /* 数量·规格·交付卡 */
+  mountBoardBtn(document.getElementById('qty-delivery-card'), 'qtydelivery', false);
+  /* 详细描述卡 */
+  var descCard = document.getElementById('f-desc') ? document.getElementById('f-desc').closest('.form-card') : null;
+  mountBoardBtn(descCard, 'desc', false);
+  /* 资质要求卡 */
+  mountBoardBtn(document.getElementById('qual-require-card'), 'qual', false);
+  /* 标签卡（tag-wrap 所在卡片） */
+  var tagCard = document.getElementById('tag-wrap') ? document.getElementById('tag-wrap').closest('.form-card') : null;
+  mountBoardBtn(tagCard, 'tags', false);
 })();
 
 function renderDynField(f) {
@@ -5178,9 +5769,39 @@ function renderDynField(f) {
   labelRow.className = 'dyn-label-row';
   var label = document.createElement('label');
   label.innerHTML = f.label + (f.req ? ' <span class="req">*</span>' : '');
+  /* R1：每个专业字段挂问号帮助；优先用字段 hint，缺省按字段类型给通用说明 */
+  var DYN_HINT_FALLBACK = {
+    text: '按字段要求填写具体内容，信息越具体越容易被精准匹配。',
+    textarea: '可分段补充说明，把条件、要求、口径写完整。',
+    kvlist: '逐项填写参数名与参数值，可点「添加一行」继续补充；留空的行会自动忽略。',
+    taglist: '输入关键词后回车添加标签，可添加多个，便于同类需求检索匹配。',
+    steplist: '按办理/施工的先后顺序逐条补充流程步骤，便于对方了解时间安排。',
+    chips: '点选适用项，可多选；选中项会高亮。',
+    gridlist: '按行补充明细，每列含义见列标题，可继续添加行；留空行会自动忽略。',
+    obj: '按子项逐项填写，带 * 的子项为必填。'
+  };
+  var dynHelpText = f.hint || DYN_HINT_FALLBACK[f.type] || '按字段要求填写具体内容。';
+  var dynHelp = document.createElement('span');
+  dynHelp.className = 'field-help dyn-help';
+  dynHelp.setAttribute('role', 'button');
+  dynHelp.setAttribute('tabindex', '0');
+  dynHelp.setAttribute('aria-label', '查看填写说明');
+  dynHelp.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.__ecFieldBubble) window.__ecFieldBubble(dynHelpText, dynHelp);
+  });
+  dynHelp.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.__ecFieldBubble) window.__ecFieldBubble(dynHelpText, dynHelp);
+    }
+  });
   /* 去重：字段级"参考"按钮一律不在此渲染——每组唯一"参考"由 buildDynSteps 挂到该组首个字段的标签行右侧
      （展示该组全部字段示例），避免单字段组/多字段组出现一排重复"参考"。chips 等字段同理。 */
   labelRow.appendChild(label);
+  labelRow.appendChild(dynHelp);
   wrap.appendChild(labelRow);
   var rolePh = role === 'demand' ? (f.demandPlaceholder || f.placeholder) : (f.supplyPlaceholder || f.placeholder);
   if (f.type === 'text') {
@@ -6014,7 +6635,7 @@ function quickFill(demoKey) {
   /* 更新按钮状态 */
   document.querySelectorAll('.quick-fill-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.demo === demoKey); });
   var __qh0 = $('quick-fill-hint'); if (__qh0) __qh0.textContent = '已填充「' + (FIELD_CONFIG[demoKey] ? FIELD_CONFIG[demoKey].label : demoKey) + '」演示数据，可直接预览或提交';
-  updateNextButton(); updateCompletion(); scheduleAutoSave();
+  updateNextButton(); scheduleAutoSave();
   UI.toast('演示数据已填充', 'ok');
 }
 
@@ -6033,7 +6654,7 @@ if (clearBtn) {
     renderDynamicFields();
     document.querySelectorAll('.quick-fill-btn').forEach(function(b) { b.classList.remove('active'); });
     var __qh1 = $('quick-fill-hint'); if (__qh1) __qh1.textContent = '已清空所有字段，可重新填写或选择演示数据';
-    updateNextButton(); updateCompletion();
+    updateNextButton();
     UI.toast('已清空所有字段', 'ok');
   });
 }
@@ -6283,47 +6904,144 @@ fillData = function(d) {
       ? '信息标题：建议"要什么+关键规格+区域"，如"急需C30商品混凝土 · 成都天府新区"'
       : '信息标题：建议"品类+核心卖点+区域"，如"C30商品混凝土供应 · 成都天府新区"';
   }
-  var helpTexts = {
-    'f-title': _tt,
-    'f-category': '品类：选择最匹配的品类，帮助买方快速找到你',
-    'f-location': '城市：选择信息所在城市，影响同城匹配精度',
-    'f-price': '价格：选「自定义」可填写区间上下限（支持"万"为单位，如 135万）；选「面议」表示价格面谈',
-    'f-desc': _cat
-      ? '详细描述：按输入框提示的要点补充（' + _cat + '类），50字以上提升匹配度与对接效率'
-      : '详细描述：补充关键信息（品类、规格、数量、交付等），50字以上提升匹配度与对接效率',
-    'f-contact-name': '联系人：填写你的姓名，对方看到后可以直接联系你',
-    'f-contact-phone': '手机号：填写你的联系电话，发布后对方可见'
-  };
+  /* R1：全部可编辑项帮助文案。anchor 为控件/卡片容器 id，mount 决定问号挂到哪里：
+     label=表单字段 label；card=卡片 .card-label；switch=开关行 .switch-label。 */
+  var HELP_ENTRIES = [
+    { anchor: 'f-title', mount: 'label', text: _tt },
+    { anchor: 'f-subcat', mount: 'label', text: '子类：在所选品类下选择最贴近的受控分类，它决定系统把你的信息推荐给哪一类浏览者；列表里没有合适分类时，可点下方「申请新增」。' },
+    { anchor: 'f-subname', mount: 'label', text: '品名：写清具体产品/服务名称与关键规格（品牌、型号、标号、尺寸），如「钢筋 HRB400 Φ12」；可直接从输入框联想词中选择。' },
+    { anchor: 'f-category', mount: 'label', text: '品类：选择最匹配的品类，决定信息进入哪一类业务池，帮助对接方快速找到你；与发布身份不符的品类会被锁定或引导更换。' },
+    { anchor: 'f-location', mount: 'label', text: '城市·区域：取企业注册地址（省/市/区），用于同城与就近匹配，不可手动修改；如注册地有误，请先更新企业认证信息。' },
+    { anchor: 'f-desc', mount: 'card', text: _cat
+      ? '详细描述：按输入框提示的要点补充（' + _cat + '类），把规格、数量、交付、资质等关键条件写清，50字以上提升匹配度与对接效率。'
+      : '详细描述：补充关键信息（品类、规格、数量、交付、资质等），50字以上提升匹配度与对接效率。' },
+    { anchor: 'image-grid', mount: 'card', text: '图片展示：首图作为封面，建议上传清晰的产品、场地或资质实拍，最多6张；图片越真实，对接方判断与决策越快。' },
+    { anchor: 'f-price', mount: 'card', text: '价格：自定义可填区间上下限（支持「万」，如 135万）；选「面议」表示不公开报价、留待洽谈。完整报价比「面议」更易被精准筛选。' },
+    { anchor: 'f-price-unit', mount: 'card', text: '价格单位：与金额配套，如 元/方、元/吨、万元/年；点输入框可看按品类推荐的常用单位，也可直接输入自定义单位。' },
+    { anchor: 'f-qty', mount: 'label', text: '数量/规模：填写可供应或需求的数量规模，便于对方判断是否匹配套餐；选填，但填写后更易被按数量筛选命中。' },
+    { anchor: 'f-unit', mount: 'label', text: '单位：与数量配套的计量单位（吨/方/米/台/人·天等），点输入框查看品类推荐，也可直接输入自定义单位。' },
+    { anchor: 'f-spec', mount: 'label', text: '规格/参数：把决定报价与匹配的技术参数写全，如标号、尺寸、型号、材质、功率、等级。' },
+    { anchor: 'f-delivery', mount: 'label', text: '交付/工期：写明供货周期、批次、进场或完成时间要求，便于双方排期与核对履约能力。' },
+    { anchor: 'qual-chips', mount: 'card', text: '资质要求：已认证企业的自有资质会自动带出并同步到详情页；这里点选/自定义的是希望对方具备的资质条件，不是你的自有资质。' },
+    { anchor: 'tag-wrap', mount: 'card', text: '标签：3-6个简洁关键词（如 国标、现货、包配送），帮助信息被搜索与筛选命中；回车或逗号添加，最多10个。' },
+    { anchor: 'f-open-regions', mount: 'label', text: '开放城市：资质招商供应侧选择允许开设分公司/合作的城市，可多选，数量自动统计为开放城市数。' },
+    { anchor: 'f-contact-name', mount: 'label', text: '联系人：填写对接人的姓名，对方看到后可以直接称呼并联系你；已由账号/实名自动带入，核对无误即可。' },
+    { anchor: 'f-contact-phone', mount: 'label', text: '手机号：填写对接电话，发布后对方通过平台流程与你联系；非本人/本企业已认证号码需先完成短信验证。' },
+    { anchor: 'f-phone-code', mount: 'label', text: '验证码：号码非本人/本企业已认证时需短信验证归属；点「获取验证码」后填入收到的6位数字码。' },
+    { anchor: 'f-contact-wechat', mount: 'label', text: '微信号：选填，便于对方添加微信继续对接；需符合微信号格式（6-20位，字母开头，可含数字、-、_）。' },
+    { anchor: 'f-address', mount: 'label', text: '联系地址：选填，用于线下面谈、自提或配送对接，可写到区/街道级别。' },
+    { anchor: 'file-list', mount: 'card', text: '附件资料：上传资质文件、产品手册、宣传册、尽调报告等 PDF/Word/图片原件，最多5个，便于对方核验。' },
+    { anchor: 'expire-options', mount: 'label', text: '信息有效期：发布后信息在站内展示的时长，到期自动下架；「长期」为365天。' },
+    { anchor: 'f-privacy-contact', mount: 'switch', text: '联系方式解锁：开启后对方需按平台解锁流程才能看到你的联系方式；关闭则所有浏览者可直接查看。' },
+    { anchor: 'f-negotiable', mount: 'switch', text: '接受议价：开启后允许买家发起议价，供应模式适用；需求/收购模式一般保持关闭。' }
+  ];
 
-  /* 为必填字段加帮助图标 */
-  Object.keys(helpTexts).forEach(function(id){
-    var el = document.getElementById(id);
-    if (!el) return;
-    var label = el.closest('.form-field') ? el.closest('.form-field').querySelector('label') : null;
-    if (!label) return;
-    var help = document.createElement('span');
-    help.className = 'field-help';
-    help.textContent = '?';
-    help.addEventListener('click', function(e){
-      e.stopPropagation();
-      showBubble(helpTexts[id]);
-    });
-    label.appendChild(help);
-  });
-
-  /* 气泡 */
+  /* 气泡（导出给动态专业字段的问号复用）：常驻可关、跟随问号定位、点击切换、外点关闭，不再 3 秒自动消失 */
   var bubble = document.createElement('div');
   bubble.className = 'help-bubble';
+  bubble.innerHTML = '<span class="help-bubble-text"></span><button type="button" class="help-bubble-close" aria-label="关闭">×</button>';
   document.body.appendChild(bubble);
-  var hideTimer = null;
-  function showBubble(text) {
-    bubble.textContent = text;
-    bubble.classList.add('show');
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(function(){ bubble.classList.remove('show'); }, 3000);
+  var bubbleText = bubble.querySelector('.help-bubble-text');
+  var bubbleClose = bubble.querySelector('.help-bubble-close');
+  var bubbleAnchor = null;
+  var openAt = 0;
+
+  function positionBubble(anchorEl) {
+    var r = anchorEl.getBoundingClientRect();
+    var bw = bubble.offsetWidth, bh = bubble.offsetHeight;
+    var x = Math.min(Math.max(8, r.left - 6), window.innerWidth - bw - 8);
+    var below = (r.bottom + 10 + bh) < window.innerHeight;
+    var y = below ? (r.bottom + 10) : Math.max(8, r.top - bh - 10);
+    bubble.style.left = x + 'px';
+    bubble.style.top = y + 'px';
+    bubble.classList.toggle('above', !below);
   }
-  /* 点击其他地方关闭 */
-  document.addEventListener('click', function(){ bubble.classList.remove('show'); });
+  function showBubble(text, anchorEl) {
+    if (!text) return;
+    /* 再次点击同一问号 → 切换关闭 */
+    if (bubble.classList.contains('show') && bubbleAnchor === anchorEl) {
+      hideBubble(); return;
+    }
+    bubbleText.textContent = text;
+    bubble.classList.add('show');
+    bubbleAnchor = anchorEl || null;
+    openAt = Date.now();
+    /* 先显示再量尺寸定位，避免宽高为 0 */
+    requestAnimationFrame(function(){ if (anchorEl) positionBubble(anchorEl); });
+  }
+  function hideBubble() { bubble.classList.remove('show'); bubbleAnchor = null; }
+  bubbleClose.addEventListener('click', function(e){ e.stopPropagation(); hideBubble(); });
+  bubble.addEventListener('click', function(e){ e.stopPropagation(); });
+  window.__ecFieldBubble = showBubble;
+  /* 点击其他地方关闭（打开后 250ms 内忽略程序化聚焦/即时点击，避免被误关）；缩放关闭；滚动跟随重定位 */
+  document.addEventListener('click', function(){
+    if (Date.now() - openAt < 250) return;
+    hideBubble();
+  });
+  window.addEventListener('resize', hideBubble);
+  window.addEventListener('scroll', function(){
+    if (!bubble.classList.contains('show') || !bubbleAnchor) return;
+    var r = bubbleAnchor.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) { hideBubble(); return; }
+    positionBubble(bubbleAnchor);
+  }, true);
+
+  /* 问号帮助 icon 统一绑定：preventDefault 阻断 <label for> 的默认激活行为
+     （否则点击 label 内非交互的 ? 会把焦点转发给下方关联控件，造成输入框误亮选中态）；
+     补 role/tabindex/键盘可达。 */
+  function bindHelpIcon(help, text) {
+    help.className = 'field-help';
+    help.textContent = '?';
+    help.setAttribute('role', 'button');
+    help.setAttribute('tabindex', '0');
+    help.setAttribute('aria-label', '查看填写说明');
+    help.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      showBubble(text, help);
+    });
+    help.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        showBubble(text, help);
+      }
+    });
+  }
+  /* 通用挂载：按 mount 找锚点，在对应位置追加问号；找不到锚点则跳过，不留空 icon */
+  function mountHelp(entry) {
+    var el = document.getElementById(entry.anchor);
+    if (!el) return;
+    /* 特例：验证码无独立 label，挂到验证提示条内 */
+    if (entry.anchor === 'f-phone-code') {
+      var pv = document.getElementById('phone-verify');
+      var tip = pv ? pv.querySelector('.pv-tip') : null;
+      if (tip && !tip.querySelector('.field-help')) {
+        var hi0 = document.createElement('span');
+        bindHelpIcon(hi0, entry.text);
+        tip.appendChild(hi0);
+      }
+      return;
+    }
+    var anchor = null;
+    if (entry.mount === 'card') {
+      var card = el.closest('.form-card');
+      anchor = card ? card.querySelector('.card-label') : null;
+    } else if (entry.mount === 'switch') {
+      var sw = el.closest('.switch-row');
+      anchor = sw ? sw.querySelector('.switch-label') : null;
+    } else {
+      var ff = el.closest('.form-field');
+      anchor = ff ? ff.querySelector('label') : null;
+    }
+    if (!anchor || anchor.querySelector('.field-help')) return;
+    /* f-category 为被锁定隐藏的原生输入框（由类型选择器接管），不挂死问号；其余按步骤/品类显隐的项照常挂载，切到该步即可见 */
+    if (entry.anchor === 'f-category') return;
+    var help = document.createElement('span');
+    bindHelpIcon(help, entry.text);
+    anchor.appendChild(help);
+  }
+  HELP_ENTRIES.forEach(mountHelp);
 })();
 </script>
 

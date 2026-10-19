@@ -166,7 +166,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .tc-mask-badge svg { width: 9px; height: 9px; }
   .tc-quals { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
   .tc-qual { font-size: 10px; color: var(--primary-dim); background: var(--primary-soft); padding: 3px 8px; border-radius: var(--r-full); font-weight: 500; }
-  .tc-qual.more { background: var(--bg-card-2); color: var(--text-3); }
+  /* “+N”为纯展示标签：重置 app.css 全局触控热区 .more（min-height:36px/inline-flex），避免胶囊高度异常 */
+  .tc-qual.more { background: var(--bg-card-2); color: var(--text-3); min-height: 0; display: block; }
   .tc-meta { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--text-3); flex-wrap: wrap; margin-bottom: 10px; }
   .tc-meta span { display: flex; align-items: center; gap: 4px; }
   .tc-meta svg { width: 11px; height: 11px; }
@@ -588,6 +589,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   });
 
+  /* [分片N] trade-demand（收购意向/控股需求）承接：从 MOCK.catalog 取 typeKey=trade-demand */
+  function demandList() {
+    var cat = (window.MOCK && MOCK.catalog) || [];
+    return cat.filter(function (r) { return r && r.typeKey === 'trade-demand'; });
+  }
+  function demandCardHtml(r) {
+    function e(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+    var loc = r.location || r.city || '';
+    return '<a class="trade-card" style="margin-top:10px;" href="../supply/detail.html?id=' + encodeURIComponent(r.id) + '&typeKey=trade-demand">'
+      + '<span class="td-demand-tag" style="display:inline-block;font-size:11px;font-weight:600;color:var(--success);background:rgba(43,107,79,.12);border-radius:999px;padding:3px 10px;margin-bottom:6px;">收购意向</span>'
+      + '<div style="font-weight:700;font-size:15px;margin:4px 0;">' + e(r.title || '') + '</div>'
+      + (loc ? '<div style="font-size:12px;color:var(--text-3);">📍 ' + e(loc) + '</div>' : '')
+      + '</a>';
+  }
   /* ---- qualPack 兼容：条目可能是字符串(旧)或 {name,level,...}(新) ---- */
   function qpName(q) { return (typeof q === 'object' && q) ? String(q.name || '') : String(q == null ? '' : q); }
   function qpLevel(q) { return (typeof q === 'object' && q && q.level) ? String(q.level) : ''; }
@@ -846,6 +861,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         lm.style.display = 'flex';
         lm.innerHTML = '加载更多（' + (sorted.length - shownCount) + '） <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg>';
       }
+    }
+    /* [分片N] trade-demand 收购意向承接块 + openDelegate=1 出口 */
+    var _dl = demandList();
+    if (_dl.length) {
+      fullListEl.insertAdjacentHTML('beforeend',
+        '<div style="margin:18px 0 8px;font-size:14px;font-weight:700;color:var(--text-1);">收购意向 / 控股需求</div>' +
+        _dl.map(demandCardHtml).join('') +
+        '<a class="trade-card" style="display:flex;align-items:center;justify-content:center;min-height:44px;text-decoration:none;font-weight:600;font-size:14px;color:var(--on-action,#FFF);background:linear-gradient(180deg,var(--action,#26201A),var(--action-deep,#17130F));" href="?openDelegate=1">联系转让经纪 · 了解收购流程</a>');
     }
     ensureMinScrollHeight();
     checkSticky();

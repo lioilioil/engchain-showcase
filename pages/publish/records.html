@@ -96,6 +96,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .record-reject .ic { width:14px; height:14px; flex:none; margin-top:1px; }
   .record-reject b { font-weight:700; }
 
+  /* 类型 label 徽标（需求金 / 供应绿，与 dir-chip 同轨软底）；tags 胶囊；附件数角标；brief AI 速览 */
+  .type-chip { flex:none; display:inline-flex; align-items:center; gap:3px; height:19px; padding:0 8px; border-radius:var(--r-full); font-size:var(--fs-xs); font-weight:700; white-space:nowrap; }
+  .is-demand .type-chip { background:var(--primary-soft); color:var(--primary-dim); }
+  .is-supply .type-chip { background:var(--success-soft); color:var(--success); }
+  .tag-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .tag-pill { display:inline-flex; align-items:center; height:20px; padding:0 9px; border-radius:var(--r-full); background:var(--bg-subtle); color:var(--text-2); font-size:var(--fs-xs); font-weight:600; white-space:nowrap; }
+  .file-badge { display:inline-flex; align-items:center; gap:4px; height:20px; padding:0 9px; border-radius:var(--r-full); background:var(--bg-subtle); color:var(--text-2); font-size:var(--fs-xs); font-weight:600; }
+  .file-badge svg { width:12px; height:12px; }
+  .ai-summary { margin-top:8px; padding:9px 11px; border-radius:var(--r-s); background:var(--bg-subtle); color:var(--text-2); font-size:var(--fs-xs); line-height:1.6; }
+
   .record-actions { display:flex; gap:9px; margin-top:12px; }
   .record-actions button { flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; height:38px; border-radius:var(--r-s); font-size:var(--fs-sm); font-weight:700; cursor:pointer; transition:background var(--d-fast), border-color var(--d-fast), color var(--d-fast); -webkit-user-select:none; user-select:none; }
   .record-actions button .ic { width:15px; height:15px; }
@@ -226,7 +236,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       </a>
     </div>
   </div>
-</div><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/guest-gate.js"></script><script>
+</div><script src="../../js/common.js"></script><script src="../../js/stores.js"></script><script src="../../js/databus.js"></script><script src="../../js/publish-types.js"></script><script src="../../js/guest-gate.js"></script><script>
 (function(){
   function checkPublishAuth() {
     var st = (window.UI && UI.state) ? UI.state.get() : {};
@@ -260,6 +270,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var dirFilter='all';
   var STATUS_LABEL = { pending_review:'审核中', active:'已上架', rejected:'已驳回', off:'已下架', review:'审核中', paused:'已暂停', expired:'已过期' };
   var DIR_LABEL = { demand:'需求', supply:'供应' };
+  /* 定位键解析：typeKey/pubType → 注册表；显式 detailLevel 优先（G-E1 分流 / C9 徽标） */
+  function resolveType(r){
+    var tk=r.typeKey||r.pubType||'';
+    var t=(window.PUBLISH_TYPES&&tk&&PUBLISH_TYPES[tk])?PUBLISH_TYPES[tk]:null;
+    var lv=r.detailLevel||(t&&t.detailLevel)||'';
+    return {tk:tk,t:t,lv:lv,isBrief:lv==='brief'};
+  }
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function myPublishes(){
     if (!window.SupplyStore) return [];
@@ -280,6 +297,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   function actionsFor(r){
     var g = statusGroup(r.status);
+    var info = resolveType(r);
+    /* brief 即时上架、无审核轨：不提供「编辑/重提」进 editor，统一「再发一条」直达 brief-editor（G-E1/C5） */
+    if (info.isBrief) {
+      if (g==='active') return {l:{t:'再发一条',a:'brief-new',cls:'act-primary',ic:'edit'}, r:{t:'分享',a:'share',cls:'act-share',ic:'share'}};
+      return {l:{t:'查看详情',a:'detail',cls:'act-ghost'}, r:{t:'再发一条',a:'brief-new',cls:'act-primary',ic:'edit'}};
+    }
     if (g==='active') return {l:{t:'管理',a:'manage',cls:'act-ghost'}, r:{t:'分享',a:'share',cls:'act-share',ic:'share'}};
     if (g==='review') return {l:{t:'撤回编辑',a:'withdraw',cls:'act-ghost'}, r:{t:'审核中',a:'__none',cls:'act-disabled',pending:true}};
     if (g==='rejected') return {l:{t:'查看详情',a:'detail',cls:'act-ghost'}, r:{t:'去修改重新提交',a:'edit',cls:'act-danger',ic:'edit'}};
@@ -303,19 +326,33 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var money = (amount||qty) ? '<div class="record-amount">'+(amount?'<span class="amt"><svg class="ic"><use href="#i-wallet"/></svg>'+esc(amount)+'</span>':'')+(qty?'<span class="qty"><svg class="ic"><use href="#i-box"/></svg>'+esc(qty)+'</span>':'')+'</div>' : '';
     var desc = (r.desc||r.description) ? '<p class="record-desc">'+esc(r.desc||r.description)+'</p>' : '';
     var rej = r.rejectNote ? '<div class="record-reject"><svg class="ic"><use href="#i-info"/></svg><span><b>驳回原因：</b>'+esc(r.rejectNote)+'</span></div>' : '';
+    var info = resolveType(r);
+    var typeChip = info.t ? '<span class="type-chip">'+esc(info.t.label)+'</span>' : '';
+    /* tags 胶囊（有才展示，无则不占位）+ 附件/files 数量角标（C9） */
+    var tagsArr = Array.isArray(r.tags) ? r.tags.filter(Boolean) : [];
+    var pills = '';
+    if (tagsArr.length || (r.files && r.files.length)) {
+      var parts = tagsArr.slice(0,6).map(function(tg){ return '<span class="tag-pill">'+esc(tg)+'</span>'; }).join('');
+      if (r.files && r.files.length) {
+        parts += '<span class="file-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>'+r.files.length+' 个附件</span>';
+      }
+      pills = '<div class="tag-pills">'+parts+'</div>';
+    }
+    /* brief 的 aiAnalysis.summary 一句话速览（有则显示） */
+    var aiSum = (info.isBrief && r.aiAnalysis && r.aiAnalysis.summary) ? '<p class="ai-summary">'+esc(r.aiAnalysis.summary)+'</p>' : '';
     var ac = actionsFor(r);
     function btn(b){ var ic = b.ic ? '<svg class="ic">'+IC[b.ic]+'</svg>' : ''; var pend = b.pending ? '<i class="sd" style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;animation:sdPulse 1.2s infinite;"></i>' : ''; return '<button class="'+b.cls+'" data-action="'+b.a+'" data-id="'+esc(r.id)+'">'+pend+b.t+ic+'</button>'; }
     return '<article class="record is-'+dir+' is-'+g+'">'+
       '<div class="record-hd">'+
         '<div class="cat-ic">'+catIcon(cat)+'</div>'+
         '<div class="record-main">'+
-          '<div class="record-tags"><span class="dir-chip dir-'+dir+'"><svg class="ic" style="width:12px;height:12px"><use href="'+dirIcon+'"/></svg>'+DIR_LABEL[dir]+'</span><span class="cat-name">'+esc(cat||'未分类')+'</span></div>'+
+          '<div class="record-tags"><span class="dir-chip dir-'+dir+'"><svg class="ic" style="width:12px;height:12px"><use href="'+dirIcon+'"/></svg>'+DIR_LABEL[dir]+'</span>'+typeChip+'<span class="cat-name">'+esc(cat||'未分类')+'</span></div>'+
           '<h3 class="record-title">'+esc(r.title)+'</h3>'+
         '</div>'+
         '<span class="record-status status-'+esc(stClass)+(g==='review'?' is-pending':'')+'"><i class="sd"></i>'+esc(status)+'</span>'+
       '</div>'+
       '<div class="record-meta">'+meta+'</div>'+
-      money+desc+rej+
+      pills+aiSum+money+desc+rej+
       '<div class="record-actions">'+btn(ac.l)+btn(ac.r)+'</div>'+
     '</article>';
   }
@@ -366,6 +403,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var id=b.dataset.id, action=b.dataset.action, rec=myPublishes().filter(function(x){return x.id===id;})[0];
     if (action==='__none' || !rec) return;
     if (action==='detail'){ location.href='../supply/detail.html?id='+encodeURIComponent(id); return; }
+    /* brief「再发一条」：直达 brief-editor 新发布，不进 editor（G-E1/C5） */
+    if (action==='brief-new'){
+      var tk = rec.typeKey||rec.pubType||'';
+      location.href = tk ? ('brief-editor.html?type='+encodeURIComponent(tk)) : 'guide.html';
+      return;
+    }
     if (action==='edit'){ location.href='editor.html?record='+encodeURIComponent(id); return; }
     if (action==='share'){
       if (window.UI && UI.sheet){

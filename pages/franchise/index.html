@@ -561,6 +561,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   } catch (e) {}
 
+  /* [分片N] franchise-demand（挂靠/合作需求）承接：从 MOCK.catalog 取 typeKey=franchise-demand，不改动供给列表 */
+  function demandList() {
+    var cat = (window.MOCK && MOCK.catalog) || [];
+    return cat.filter(function (r) { return r && r.typeKey === 'franchise-demand'; });
+  }
+  function demandCardHtml(r) {
+    var loc = r.location || r.city || '';
+    function e(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+    return '<a class="franchise-card" style="margin-top:10px;" href="../supply/detail.html?id=' + encodeURIComponent(r.id) + '&typeKey=franchise-demand">'
+      + '<span class="fc-demand-tag">挂靠 / 合作需求</span>'
+      + '<div class="fc-title" style="font-weight:700;font-size:15px;margin:6px 0 4px;">' + e(r.title || '') + '</div>'
+      + (loc ? '<div class="fc-loc" style="font-size:12px;color:var(--text-3);">📍 ' + e(loc) + '</div>' : '')
+      + '</a>';
+  }
   function filtered() { return all; }
 
   /* ---- 筛选维度定义 ---- */
@@ -937,6 +951,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         lm.style.display = 'flex';
         lm.innerHTML = '加载更多（' + (sorted.length - shownCount) + '） <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m6 9 6 6 6-6"/></svg>';
       }
+    }
+    /* [分片N] 挂靠/合作需求承接块（franchise-demand），追加在供给列表之后 */
+    var _dl = demandList();
+    if (_dl.length) {
+      fullListEl.insertAdjacentHTML('beforeend',
+        '<div style="margin:18px 0 8px;font-size:14px;font-weight:700;color:var(--text-1);">挂靠 / 合作需求</div>' +
+        _dl.map(demandCardHtml).join(''));
     }
     ensureMinScrollHeight();
   }
