@@ -13,267 +13,87 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>浏览历史 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M8%201.2%2013.2%203.3v4.1c0%203.1-2.2%205.5-5.2%206.4-3-.9-5.2-3.3-5.2-6.4V3.3L8%201.2Z%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.3%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cellipse%20cx%3D%226.55%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3Cellipse%20cx%3D%229.45%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3C%2Fsvg%3E" />
+<link rel="stylesheet" href="../../css/state.css">
 <style>
-/* ═══════════════════════════════════════════════════════════════
-   浏览历史 V1.1
-   修复：返回/清除/去发现按钮事件 + 移除底部主bar
-   ═══════════════════════════════════════════════════════════════ */
-:root {
-  --vh-gold: #B08A3C;
-  --vh-gold-deep: #8A6A28;
-  --vh-bg: #F2EFE8;
-  --vh-card: rgba(255,255,255,0.78);
-  --vh-border: rgba(176, 138, 60, 0.16);
-  --vh-text: #2A2722;
-  --vh-text-2: #6B6358;
-  --vh-text-3: #9A9185;
-  --vh-shadow: 0 1px 2px rgba(42,39,34,0.04), 0 2px 8px rgba(42,39,34,0.03);
-}
-[data-theme="dark"] {
-  --vh-gold: #E0C083;
-  --vh-gold-deep: #B89A5A;
-  --vh-bg: #0E0D0B;
-  --vh-card: rgba(32,30,27,0.72);
-  --vh-border: rgba(201, 164, 92, 0.12);
-  --vh-text: #F0EBE0;
-  --vh-text-2: #B0A898;
-  --vh-text-3: #7A7265;
-  --vh-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15);
-}
-
-body, .phone { background: var(--vh-bg); }
-.phone::before {
-  content: '';
-  position: absolute;
-  top: -80px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 400px;
-  height: 240px;
-  background: radial-gradient(ellipse at center, rgba(176, 138, 60, 0.12) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
+/* 浏览历史：对齐全站 A2 令牌（暖米白 + 墨主操作 + 金仅点缀） */
+body, .phone { background: var(--bg); }
 
 /* 导航栏 */
 .vh-navbar {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 50px;
-  padding: 0 16px 0 4px;
-  flex: 0 0 auto;
+  position: relative; z-index: 2; display: flex; align-items: center;
+  justify-content: space-between; height: 50px; padding: 0 16px 0 4px; flex: 0 0 auto;
 }
 .vh-nav-back {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  font-size: 22px;
-  color: var(--vh-text);
-  cursor: pointer;
-  border-radius: 50%;
-  transition: background 0.2s;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; font-size: 22px; color: var(--text-1);
+  cursor: pointer; border-radius: 50%; transition: background .2s;
 }
-.vh-nav-back:active { background: rgba(176, 138, 60, 0.12); }
+.vh-nav-back:active { background: var(--primary-soft); }
 .vh-nav-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--vh-text);
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  font-size: 16px; font-weight: 700; color: var(--text-1);
+  position: absolute; left: 50%; transform: translateX(-50%);
 }
-/* 「清除历史」按钮已统一为共享 .nav-text-btn（保留 id=clear-btn 供 JS 禁用态） */
 
 /* 内容区 */
 .vh-content {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 16px 40px;
-  -webkit-overflow-scrolling: touch;
+  position: relative; z-index: 1; flex: 1; overflow-y: auto;
+  padding: 4px 16px 40px; -webkit-overflow-scrolling: touch;
 }
 
 /* 日期分组标题 */
 .vh-date-group {
-  font-size: 12px;
-  color: var(--vh-text-3);
-  font-weight: 600;
-  margin: 16px 0 8px;
-  padding-left: 2px;
-  letter-spacing: 0.3px;
+  font-size: 12px; color: var(--text-3); font-weight: 600;
+  margin: 16px 0 8px; padding-left: 2px; letter-spacing: .3px;
 }
 .vh-date-group:first-child { margin-top: 8px; }
 
 /* 历史记录卡片 */
 .vh-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--vh-card);
-  border: 1px solid var(--vh-border);
-  box-shadow: var(--vh-shadow);
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  text-decoration: none;
+  display: flex; align-items: center; gap: 12px; padding: 16px;
+  border-radius: 14px; background: var(--bg-card); border: 1px solid var(--line);
+  box-shadow: var(--shadow-card); margin-bottom: 8px; cursor: pointer;
+  transition: transform .2s, box-shadow .2s; text-decoration: none;
 }
-.vh-card:active { transform: scale(0.98); }
+.vh-card:active { transform: scale(.98); }
 .vh-card-icon {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(176, 138, 60, 0.15), rgba(176, 138, 60, 0.05));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--vh-gold-deep);
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px;
+  background: var(--primary-soft); display: flex; align-items: center; justify-content: center;
+  color: var(--primary-dim);
 }
 .vh-card-icon svg { width: 22px; height: 22px; }
-.vh-card-body {
-  flex: 1;
-  min-width: 0;
-}
+.vh-card-body { flex: 1; min-width: 0; }
 .vh-card-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--vh-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 3px;
+  font-size: 13.5px; font-weight: 600; color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px;
 }
-.vh-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--vh-text-3);
-}
-.vh-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--vh-text-3); }
-.vh-card-price {
-  flex-shrink: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--vh-gold-deep);
-}
-
-/* 空状态 */
-.vh-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  text-align: center;
-}
-.vh-empty-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(176, 138, 60, 0.12), rgba(176, 138, 60, 0.04));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--vh-gold-deep);
-  margin-bottom: 16px;
-}
-.vh-empty-icon svg { width: 32px; height: 32px; opacity: 0.6; }
-.vh-empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--vh-text);
-  margin-bottom: 6px;
-}
-.vh-empty-desc {
-  font-size: 12.5px;
-  color: var(--vh-text-3);
-  line-height: 1.6;
-  margin-bottom: 24px;
-}
-.vh-empty-btn {
-  padding: 11px 36px;
-  border-radius: 999px;
-  border: none;
-  background: linear-gradient(135deg, var(--action), var(--action-deep));
-  color: var(--on-action);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  box-shadow: inset 0 1px 0 rgba(176, 138, 60, 0.45), 0 4px 12px rgba(38, 32, 26, 0.18);
-}
-.vh-empty-btn:active { transform: scale(0.97); }
+.vh-card-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); }
+.vh-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-3); }
+.vh-card-price { flex-shrink: 0; font-size: 14px; font-weight: 700; color: var(--primary-dim); }
 
 /* 确认弹窗 */
 .vh-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
+  position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .2s;
 }
 .vh-confirm-overlay.show { opacity: 1; pointer-events: auto; }
 .vh-confirm-box {
-  width: 280px;
-  border-radius: 16px;
-  padding: 24px 20px 16px;
-  text-align: center;
-  transform: scale(0.9);
-  transition: transform 0.2s;
+  width: 280px; border-radius: 16px; padding: 24px 20px 16px; text-align: center;
+  background: var(--bg-card); border: 1px solid var(--line); box-shadow: var(--shadow-float);
+  transform: scale(.9); transition: transform .2s;
 }
 .vh-confirm-overlay.show .vh-confirm-box { transform: scale(1); }
-.vh-confirm-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--vh-text);
-  margin-bottom: 8px;
-}
-.vh-confirm-desc {
-  font-size: 13px;
-  color: var(--vh-text-2);
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-.vh-confirm-btns {
-  display: flex;
-  gap: 10px;
-}
+.vh-confirm-title { font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.vh-confirm-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; margin-bottom: 20px; }
+.vh-confirm-btns { display: flex; gap: 10px; }
 .vh-confirm-btn {
-  flex: 1;
-  height: 40px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: opacity 0.2s;
+  flex: 1; height: 44px; border-radius: 11px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none; transition: opacity .2s;
 }
-.vh-confirm-btn:active { opacity: 0.8; }
-.vh-confirm-cancel {
-  background: var(--vh-bg);
-  color: var(--vh-text-2);
-  border: 1px solid var(--vh-border);
-}
-.vh-confirm-ok {
-  background: linear-gradient(135deg, var(--vh-gold), var(--vh-gold-deep));
-  color: #fff;
-}
+.vh-confirm-btn:active { opacity: .8; }
+.vh-confirm-cancel { background: var(--bg-card-2); color: var(--text-2); border: 1px solid var(--line); }
+.vh-confirm-ok { background: linear-gradient(180deg, var(--action), var(--action-deep)); color: var(--on-action); }
 </style>
 </head>
 <body>
@@ -359,11 +179,11 @@ body, .phone { background: var(--vh-bg); }
 
     if (items.length === 0) {
       content.innerHTML =
-        '<div class="vh-empty">' +
-          '<div class="vh-empty-icon">' + CAT_ICONS.default + '</div>' +
-          '<div class="vh-empty-title">暂无浏览记录</div>' +
-          '<div class="vh-empty-desc">去发现页看看，找到你需要的<br>建筑供需信息</div>' +
-          '<button class="vh-empty-btn" id="go-discover">去发现</button>' +
+        '<div class="empty-state">' +
+          '<div class="e-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>' +
+          '<div class="e-title">暂无浏览记录</div>' +
+          '<div class="e-desc">去发现页看看，找到你需要的建筑供需信息</div>' +
+          '<div class="es-actions"><button class="btn" id="go-discover" style="background:linear-gradient(180deg,var(--action),var(--action-deep));color:var(--on-action);height:46px;padding:0 28px;border:none;border-radius:11px;font-size:15px;font-weight:600;cursor:pointer;">去发现</button></div>' +
         '</div>';
       var goBtn = document.getElementById('go-discover');
       if (goBtn) goBtn.addEventListener('click', function () {

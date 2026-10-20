@@ -13,6 +13,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>个人主页 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M8%201.2%2013.2%203.3v4.1c0%203.1-2.2%205.5-5.2%206.4-3-.9-5.2-3.3-5.2-6.4V3.3L8%201.2Z%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.3%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cellipse%20cx%3D%226.55%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3Cellipse%20cx%3D%229.45%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3C%2Fsvg%3E" />
+<link rel="stylesheet" href="../../css/state.css">
 <link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928182312">
 <style>
   /* ---- 核心信息付费墙 ---- */
@@ -76,6 +78,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .bio-card .bio-head .md-badge { font-size: 9.5px; font-weight: 700; color: var(--primary-dim); background: var(--primary-soft); padding: 2px 7px; border-radius: var(--r-full); letter-spacing: .04em; font-family: var(--font-num); }
   .cert-card { margin-left:0; margin-right:0; margin-top:6px; }
   .group .row .value { color: var(--text-1); font-size: 13px; }
+  /* 空态主引导 CTA：墨色主操作面（非金） */
+  .es-cta { background:linear-gradient(180deg,var(--action),var(--action-deep)); color:var(--on-action); box-shadow:var(--btn-lift); }
+  .es-cta:active { transform:scale(.98); }
 
   /* ---- 简历模式（投简历）---- */
   .rv-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: var(--r-full); background: var(--primary-soft); color: var(--primary-dim); font-size: 11px; font-weight: 600; }
@@ -506,14 +511,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return MOCK.listingById(idStr) || (window.DataBus && DataBus.getRecord ? DataBus.getRecord(idStr) : null);
   }).filter(Boolean);
   document.getElementById('published').innerHTML = list.map(function (s) {
-    var cls = s.dir === 'demand' ? 'tag-blue' : s.dir === 'supply' ? 'tag-primary' : 'tag-gold';
-    var lbl = s.dir === 'demand' ? '需求' : s.dir === 'supply' ? '供应' : '机会';
-    return '<a href="../supply/detail.html?id=' + s.id + '" class="supply-card"><div class="sc-top"><span class="tag ' + cls + '">' + lbl + '</span>' +
-      '<span class="match-pill match-high" style="margin-left:auto;">' + s.match + '%</span></div>' +
-      '<div class="sc-title elip">' + s.title + '</div>' +
-      '<div class="sc-foot"><span class="sc-price" style="font-size:14px;">' + (s.dir === 'demand' ? s.budget : (s.price || s.budget)) + '</span>' +
-      '<span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>' + s.location + '</span></div></a>';
-  }).join('') || '<div class="pub-empty" style="text-align:center;font-size:12px;color:var(--text-3);padding:20px;">该用户暂未发布供需信息</div>';
+    var badgeCls = s.dir === 'demand' ? 'badge b-demand' : s.dir === 'supply' ? 'badge b-supply' : 'badge b-brief';
+    var lbl = s.dir === 'demand' ? '需求' : s.dir === 'supply' ? '供应' : '信息';
+    var tk = s.typeKey || s.pubType || '';
+    var href = '../supply/detail.html?id=' + s.id + (tk ? '&typeKey=' + encodeURIComponent(tk) : '');
+    var matchPill = (s.match != null && s.match !== '') ? '<span class="match-pill match-high" style="margin-left:auto;">' + s.match + '%</span>' : '';
+    var price = (s.dir === 'demand' ? s.budget : (s.price || s.budget)) || '';
+    var priceHtml = price ? '<span class="sc-price" style="font-size:14px;">' + price + '</span>' : '';
+    var locHtml = s.location ? '<span class="sc-loc"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:2px;"><use href="#i-pin"/></svg>' + s.location + '</span>' : '';
+    return '<a href="' + href + '" class="supply-card"><div class="sc-top"><span class="' + badgeCls + '">' + lbl + '</span>' + matchPill + '</div>' +
+      '<div class="sc-title elip">' + (s.title || '') + '</div>' +
+      '<div class="sc-foot">' + priceHtml + locHtml + '</div></a>';
+  }).join('') || '<div class="empty-state"><div class="e-icon"><svg class="ic" style="width:44px;height:44px;stroke-width:1.2;color:var(--text-3);"><use href="#i-folder"/></svg></div><div class="e-title">暂未发布供需信息</div><div class="e-desc">该用户还没有发布供需内容，可去供需大厅浏览其他商机</div><div class="es-actions"><a href="../supply/list.html" class="btn es-cta es-action">去供需大厅</a></div></div>';
 
   /* ---- 解锁流程 (M3: 统一积分体系) ---- */
   function freeQuotaInfoP() {

@@ -13,6 +13,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>我的订单 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M8%201.2%2013.2%203.3v4.1c0%203.1-2.2%205.5-5.2%206.4-3-.9-5.2-3.3-5.2-6.4V3.3L8%201.2Z%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.3%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cellipse%20cx%3D%226.55%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3Cellipse%20cx%3D%229.45%22%20cy%3D%228%22%20rx%3D%221.55%22%20ry%3D%221.05%22%20stroke%3D%22%23B08A3C%22%20stroke-width%3D%221.1%22%2F%3E%3C%2Fsvg%3E" />
+<link rel="stylesheet" href="../../css/state.css">
 <style>
 /* 状态chips样式 */
 /* [FIX] 头部两行（seg 分类 + 状态 chips）禁止被 .phone 纵向 flex 挤压：
@@ -38,12 +40,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   border-color: var(--accent-line);
   font-weight: 600;
 }
-/* [FIX] 订单骨架屏（首次加载脉冲） */
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
-.skeleton-card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-.sk-line { height: 12px; border-radius: 6px; background: var(--bg-card-2); animation: pulse 1.3s ease-in-out infinite; }
-.sk-line + .sk-line { margin-top: 8px; }
-.sk-line.w80 { width: 80%; } .sk-line.w60 { width: 60%; } .sk-line.w40 { width: 40%; }
+/* 骨架屏由 state.css 的 S0 .sk-list/.sk-card/.sk-line 提供（shimmer）；此处仅定义空态墨色主 CTA */
+.es-cta { background: linear-gradient(180deg, var(--action), var(--action-deep)); color: var(--on-action); box-shadow: var(--btn-lift); }
+.es-cta:active { transform: scale(.98); }
 </style>
 </head>
 <body>
@@ -174,7 +173,9 @@ function currentUser() {
     if (!acct) {
       list.innerHTML = '';
       empty.style.display = 'block';
-      empty.innerHTML = emptyIcon() + '请先登录查看订单<br><a href="../auth/login.html" style="color:var(--primary);font-size:12px;">去登录</a>';
+      empty.innerHTML = '<div class="empty-state"><div class="e-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:40px;height:40px;color:var(--text-3);"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>' +
+        '<div class="e-title">登录后查看订单</div><div class="e-desc">登录后可查看你的全部订单与对接进展</div>' +
+        '<div class="es-actions"><a href="../auth/login.html" class="btn es-cta es-action">去登录</a></div></div>';
       return;
     }
     /* [PERF] 使用缓存：首次读取后缓存，事件触发时清除缓存重新读取 */
@@ -197,12 +198,10 @@ function currentUser() {
       list.innerHTML = '';
       empty.style.display = 'block';
       var tip = currentTab === 'normal' ? '暂无普通订单' : '暂无订单';
-      empty.innerHTML = emptyIcon() +
-        '<div style="font-weight:600;color:var(--text-1);">' + tip + '</div>' +
-        '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;align-items:center;">' +
-          '<a href="../supply/list.html" style="display:inline-block;padding:10px 30px;border-radius:var(--r-full);background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:600;text-decoration:none;">去供需大厅</a>' +
-          '<a href="../publish/index.html" style="display:inline-block;padding:9px 26px;border-radius:var(--r-full);border:1px solid var(--line);color:var(--text-2);font-size:12px;text-decoration:none;">去发布</a>' +
-        '</div>';
+      empty.innerHTML = '<div class="empty-state"><div class="e-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:40px;height:40px;color:var(--text-3);"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg></div>' +
+        '<div class="e-title">' + tip + '</div><div class="e-desc">去供需大厅发现商机，成交后订单会展示在这里</div>' +
+        '<div class="es-actions"><a href="../supply/list.html" class="btn es-cta es-action">去供需大厅</a>' +
+        '<a href="../publish/index.html" class="btn btn-ghost es-action">去发布</a></div></div>';
       return;
     }
     empty.style.display = 'none';
@@ -220,7 +219,7 @@ function currentUser() {
     }).join('');
     } catch (e) {
       console.error('order render error:', e);
-      if (list) list.innerHTML = '<div class=text-3 style=padding:20px;text-align:center;font-size:12px>加载失败，请刷新</div>';
+      if (list) list.innerHTML = '<div class="st-error"><div class="st-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:24px;height:24px;"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></div><div class="st-title">加载失败</div><div class="st-desc">网络好像开小差了，请重试</div><div class="st-actions"><button class="btn btn-ghost es-action" onclick="location.reload()">重试</button></div></div>';
       if (empty) empty.style.display = 'none';
     }
   }
@@ -252,15 +251,11 @@ function currentUser() {
   function showSkeleton() {
     var list = document.getElementById('order-list');
     if (!list) return;
-    var sk = '';
-    for (var i = 0; i < 4; i++) {
-      sk += '<div class="skeleton-card">' +
-        '<div class="sk-line w60"></div>' +
-        '<div class="sk-line w80"></div>' +
-        '<div class="sk-line w40"></div>' +
-        '</div>';
+    var sk = '<div class="sk-list" aria-hidden="true">';
+    for (var i = 0; i < 3; i++) {
+      sk += '<div class="sk-card"><div class="sk-line w70"></div><div class="sk-line w95"></div><div class="sk-line w45"></div></div>';
     }
-    list.innerHTML = sk;
+    list.innerHTML = sk + '</div>';
   }
   /* [PERF] 只监听订单相关事件 */
   window.addEventListener('engchain:orders', function () { invalidateCache(); scheduleRender(); });

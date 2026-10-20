@@ -26,6 +26,33 @@
     document.head.appendChild(link);
   } catch (e) {}
 })();
+
+/* [S0 §3] 全局成功反馈 Toast：已存在则不重复定义；独立挂到 body，2.2s 自动移除。
+   样式由 css/state.css 的 body > .toast(.show) 提供，不影响 .toast-wrap 内的 UI.toast。 */
+if (typeof window.showToast !== 'function') {
+  window.showToast = function (msg) {
+    try {
+      document.body.querySelectorAll('body > .toast.show').forEach(function (n) { n.remove(); });
+      var t = document.createElement('div');
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      var ic = document.createElement('span');
+      ic.className = 'toast-ic';
+      ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      var txt = document.createElement('span');
+      txt.textContent = (msg == null ? '' : String(msg));
+      t.appendChild(ic);
+      t.appendChild(txt);
+      document.body.appendChild(t);
+      requestAnimationFrame(function () { t.classList.add('show'); });
+      setTimeout(function () {
+        t.classList.remove('show');
+        setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+      }, 2200);
+    } catch (e) {}
+  };
+}
+
 window.UI = (function () {
   /* ---- 页面相对路径基准：页面位于 pages/xx/ 目录时与根目录的差价 ---- */
   function base(depth) {
@@ -1552,19 +1579,20 @@ window.Cards = (function () {
     ctx = ctx || {};
     var role = ctx.role || s.role || s.dir || s.type || '';
     var out = '';
-    if (role === 'demand') out += '<span class="tag tag-demand sc-badge sc-dir-demand">需求</span>';
-    else if (role === 'supply') out += '<span class="tag tag-supply sc-badge sc-dir-supply">供应</span>';
+    /* [S0 §1] 角标改用统一 badge/b-* 类；同时保留旧 tag/sc-* 类供未引入 state.css 的页面维持原样 */
+    if (role === 'demand') out += '<span class="tag tag-demand badge b-demand sc-badge sc-dir-demand">需求</span>';
+    else if (role === 'supply') out += '<span class="tag tag-supply badge b-supply sc-badge sc-dir-supply">供应</span>';
     /* 详细 / 简要 */
     var dl = ctx.detailLevel || s.detailLevel || '';
-    if (dl === 'brief') out += '<span class="sc-chip sc-dl">简要</span>';
-    else if (dl === 'detail') out += '<span class="sc-chip sc-dl">详细</span>';
-    if (s.verified) out += '<span class="tag tag-gold sc-badge sc-verify">✓已认证</span>';
-    if (s.urgent) out += '<span class="sc-badge sc-urgent">急</span>';
-    if (s.hot) out += '<span class="tag tag-red sc-badge sc-hot">热点</span>';
-    /* [P0-01] 本人 pending_review：审核中灰角标，卡片可点进只读预览 */
-    if (s.status === 'pending_review') out += '<span class="sc-badge sc-pending">审核中</span>';
+    if (dl === 'brief') out += '<span class="badge b-brief sc-chip sc-dl">简要</span>';
+    else if (dl === 'detail') out += '<span class="badge b-detail sc-chip sc-dl">详细</span>';
+    if (s.verified) out += '<span class="tag tag-gold badge b-verified sc-badge sc-verify">✓已认证</span>';
+    if (s.urgent) out += '<span class="badge b-urgent sc-badge sc-urgent">急</span>';
+    if (s.hot) out += '<span class="tag tag-red badge b-hot sc-badge sc-hot">热点</span>';
+    /* [P0-01] 本人 pending_review：审核中灰角标（.sc-pending 由 state.css 纳入体系），卡片可点进只读预览 */
+    if (s.status === 'pending_review') out += '<span class="sc-pending">审核中</span>';
     var match = (typeof s.match === 'number') ? s.match : '';
-    out += '<span class="match-pill match-high sc-match' + (match === '' ? ' is-empty' : '') + '" style="margin-left:auto;">' + (match === '' ? '—' : match + '%') + '</span>';
+    out += '<span class="match-pill match-high badge b-match sc-match' + (match === '' ? ' is-empty' : '') + '" style="margin-left:auto;">' + (match === '' ? '—' : match + '%') + '</span>';
     return '<div class="sc-badges jc-tags">' + out + '</div>';
   }
 
@@ -1860,6 +1888,10 @@ window.Cards = (function () {
           ? '<div class="sc-geo sc-geo-' + s.distance + '">' + esc(s.distance) + '</div>'
           : '';
         var qs = ctx.typeKey ? '&typeKey=' + encodeURIComponent(ctx.typeKey) : '';
+        /* [收尾项1] legacy 存量补 typeKey：MOCK catalog 已按 bizType 注入 bizKey；
+           bizKey==='trade'（企业买卖/股权转让/资产转让，trades 存量供应侧）归 trade-supply。
+           无注册表/resolveType 证据的记录保持 qs 为空，不臆造定位。 */
+        if (!qs && s.bizKey === 'trade') qs = '&typeKey=trade-supply';
         return '<a href="' + href + s.id + qs + '" class="job-card' + dirCls + pendingCls + '">' +
           adBadge + fn(s, ctx) + geoBadge +
           '<div class="sc-card-foot"><span class="sc-foot-hint">联系方式查看详情后可见</span>' +

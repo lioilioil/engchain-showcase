@@ -1,0 +1,303 @@
+/* ============================================================================
+   S0 统一状态组件契约（冻结版）· 单一事实源
+   范围：卡片角标体系 / 空态动作位 / 加载骨架 / 状态区块 / 未解锁门 / 成功 Toast
+   约束：颜色全部走 app.css 变量，禁硬编码 hex；[data-theme=dark] 自动适配；
+        主操作墨色 --action→--action-deep，金 --primary 仅用于徽章/选中/签名。
+   本文件只提供样式，不改任何页面逻辑；由 list.html / detail.html 按需引入。
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1. 卡片角标体系（替代散落写法；顺序：方向 → 详细/简要 → 认证/急/热/匹配 → 审核中）
+   --------------------------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+/* 方向：供应=墨浅底/墨字；需求=蓝浅底/蓝字 */
+.b-supply { background: color-mix(in srgb, var(--action) 10%, transparent); color: var(--action); }
+.b-demand { background: var(--info-soft); color: var(--blue); }
+
+/* 详细=金浅底/金深字；简要=中性凹陷底/次文 */
+.b-detail { background: var(--primary-soft); color: var(--primary-dim); }
+.b-brief { background: var(--bg-card-2); color: var(--text-2); }
+
+/* 认证：金（✓已认证，仅徽章，不作主操作） */
+.b-verified { background: var(--primary-soft); color: var(--primary-dim); }
+
+/* 急=warning soft；热=error soft；匹配=success soft（靠右 pill） */
+.b-urgent { background: var(--warning-soft); color: var(--warning-ink); }
+.b-hot { background: var(--error-soft); color: var(--error); }
+.b-match {
+  background: var(--success-soft);
+  color: var(--success);
+  margin-left: auto;
+  font-family: var(--font-num);
+  font-weight: 700;
+}
+
+/* 审核中灰角标（沿用 .sc-pending，纳入统一体系） */
+.sc-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  background: var(--bg-card-2);
+  color: var(--text-2);
+  border: 1px solid transparent;
+}
+
+/* 角标行通用排布（未引入 supply-list.css 的页面兜底） */
+.sc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 9px;
+}
+
+/* ---------------------------------------------------------------------------
+   2. 空态 / 无数据（沿用 app.css .empty-state 外壳，扩展动作位）
+   --------------------------------------------------------------------------- */
+.empty-state .es-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+.empty-state .es-action {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border-radius: var(--r-m);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--d-fast) var(--e-standard), background var(--d-fast);
+}
+.empty-state .es-action:active { transform: scale(.98); }
+
+/* ---------------------------------------------------------------------------
+   3. 加载骨架（列表/详情首屏；数据到达后由真实内容替换）
+   --------------------------------------------------------------------------- */
+.sk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sk-card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  padding: 16px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sk-line {
+  height: 12px;
+  border-radius: var(--r-s);
+  background: linear-gradient(90deg, var(--bg-card-2) 25%, var(--bg-elev) 50%, var(--bg-card-2) 75%);
+  background-size: 200% 100%;
+  animation: state-shimmer 1.4s linear infinite;
+}
+.sk-line.w45 { width: 45%; }
+.sk-line.w70 { width: 70%; }
+.sk-line.w95 { width: 95%; }
+@keyframes state-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   4. 状态区块（同一套，各页复用）
+   --------------------------------------------------------------------------- */
+.st-block {
+  margin: 24px 16px;
+  padding: 32px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+.st-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  background: var(--bg-card-2);
+  color: var(--text-3);
+}
+.st-icon svg { width: 22px; height: 22px; stroke-width: 1.8; }
+.st-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 8px;
+}
+.st-desc {
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.st-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+.st-actions .btn,
+.st-actions .es-action { min-height: 44px; }
+
+/* 4.1 审核中 pending_review（本人只读预览）：时钟，warning 浅底点缀 */
+.st-reviewing .st-icon { background: var(--warning-soft); color: var(--warning-ink); }
+
+/* 4.2 已驳回 rejected：error soft 浅底 + error 描边 */
+.st-rejected {
+  background: var(--bg-card);
+  border-color: color-mix(in srgb, var(--error) 28%, var(--line));
+  background-image: linear-gradient(180deg, var(--error-soft), transparent 60%);
+}
+.st-rejected .st-icon { background: var(--error-soft); color: var(--error); }
+
+/* 4.3 已下架 off：中性凹陷底 */
+.st-off { background: var(--bg-card-2); box-shadow: none; }
+.st-off .st-icon { background: var(--bg-card); color: var(--text-3); }
+
+/* 4.4 错误 / 404 / 网络失败：error soft 浅底 + error 描边 */
+.st-error {
+  background: var(--bg-card);
+  border-color: color-mix(in srgb, var(--error) 28%, var(--line));
+  background-image: linear-gradient(180deg, var(--error-soft), transparent 60%);
+}
+.st-error .st-icon { background: var(--error-soft); color: var(--error); }
+
+/* 状态区块主操作（墨色 action 渐变，非金）；次操作为幽灵 */
+.st-primary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  border-radius: var(--r-m);
+  border: none;
+  background: linear-gradient(180deg, var(--action), var(--action-deep));
+  color: var(--on-action);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--btn-lift);
+  transition: transform var(--d-fast) var(--e-standard);
+}
+.st-primary:active { transform: scale(.98); }
+.st-actions .btn-primary {
+  background: linear-gradient(180deg, var(--action), var(--action-deep));
+  color: var(--on-action);
+  border: none;
+  box-shadow: var(--btn-lift);
+}
+
+/* ---------------------------------------------------------------------------
+   5. 未解锁门（.lock-gate 为既有 #lock-area 的视觉皮肤，叠加不改解锁逻辑）
+   未解锁：锁 icon / 标题 / 解锁项清单 / 墨色主按钮；已解锁 .unlocked 隐藏付费墙。
+   --------------------------------------------------------------------------- */
+.lock-gate {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-l);
+  box-shadow: var(--shadow-sm);
+}
+.lock-gate .lp-icon {
+  background: var(--bg-card-2);
+  color: var(--text-3);
+}
+.lock-gate .lock-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+  text-align: left;
+}
+.lock-gate .lock-list .lock-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.lock-gate .lock-list .lock-item svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+  flex: none;
+}
+/* 已解锁：付费墙整体隐藏（既有 .lock-area.unlocked 机制保留） */
+.lock-gate.unlocked .la-paywall,
+.lock-gate.unlocked .lp-head,
+.lock-gate.unlocked .lp-benefits,
+.lock-gate.unlocked .lp-foot { display: none; }
+
+/* ---------------------------------------------------------------------------
+   6. 成功反馈 Toast（固定底部居中，位于操作栏上方安全区；2.2s 自动移除）
+   仅作用于 showToast 直接挂到 body 的独立 .toast；UI.toast 在 .toast-wrap 内不受影响。
+   --------------------------------------------------------------------------- */
+body > .toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--actionbar-height) + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 12px);
+  z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 78%;
+  padding: 11px 18px;
+  border-radius: var(--r-full);
+  background: linear-gradient(180deg, var(--action), var(--action-deep));
+  color: var(--on-action);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-float);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-norm) var(--e-out), transform var(--d-norm) var(--e-out);
+}
+body > .toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+body > .toast .toast-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+body > .toast .toast-ic svg { width: 14px; height: 14px; }

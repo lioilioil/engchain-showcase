@@ -315,7 +315,7 @@ window.DETAIL = (function () {
       var isBreakin = !!(window.ModeStore && ModeStore.isBreakIn());
       var firstRate = isBreakin ? ((MOCK.business.breakin || {}).commissionFirstTier || 0.05) : (tiers[0] ? tiers[0].rate : 0.08);
       var tierText = tiers.map(function(t) { return (t.min / 10000) + '万以上 ' + (t.rate * 100) + '%'; }).join(' / ');
-      commHtml = '<div style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border:1px solid var(--accent-line);border-radius:8px;"><div style="font-size:11px;font-weight:600;color:var(--primary-dim);margin-bottom:3px;">平台服务费（成交后收取）</div><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;">阶梯费率：' + tierText + '%，最低 ' + (cm.minCommission || 10000).toLocaleString() + ' 元' + (isBreakin ? '；<b style="color:var(--accent);">破冰期首档优惠至 ' + (firstRate * 100) + '%（5万以下成交）</b>' : '') + '</div></div>';
+      commHtml = '<div style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border:1px solid var(--accent-line);border-radius:8px;"><div style="font-size:11px;font-weight:600;color:var(--primary-dim);margin-bottom:3px;">平台服务费（成交后收取）</div><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;">阶梯费率：' + tierText + '，最低 ' + (cm.minCommission || 10000).toLocaleString() + ' 元' + (isBreakin ? '；<b style="color:var(--accent);">破冰期首档优惠至 ' + (firstRate * 100) + '%（5万以下成交）</b>' : '') + '</div></div>';
     }
     var gtIcons = ['shield', 'wallet', 'doc', 'check'];
     var rows = items.map(function (x, i) {
@@ -367,7 +367,8 @@ window.DETAIL = (function () {
     var rel = pool.slice(0, 3);
     var label = RELATED_LABEL[rec.bizKey] || '相关';
     var relHtml = window.Cards ? Cards.render(rel, 'detail.html?id=') : rel.map(function (x) { return '<a class="job-card" href="detail.html?id=' + x.id + '">' + (x.title || x.name) + '</a>'; }).join('');
-    return sec('同类' + label + '推荐', relHtml);
+    /* [需求确认] 同类推荐卡片包 .rel-list：JS 初始化后默认半透明(0.45)，卡片中心越过视口中线逐张点亮（见 initRecommendDim） */
+    return sec('同类' + label + '推荐', '<div class="rel-list">' + relHtml + '</div>');
   }
   function matchLock(r, c, cfg) {
     return [
@@ -1674,7 +1675,11 @@ window.DETAIL = (function () {
     if (tp.vehicles && tp.vehicles.length) {
       /* [V-P2-04] 空车辆项不输出、空部件不拼空分隔符；空 note 不产生悬空「；」 */
       var _vc = tp.vehicles.map(function (v) {
-        var parts = [cfgText(v.type), cfgText(v.count) ? cfgText(v.count) + ' 台' : '', cfgText(v.spec)].filter(Boolean);
+        /* [V2-01] 记录车辆项实际存 k(车型)/v(完整文案)/count；旧 type/spec 作兜底；count 仅作数字兜底，不再只输出裸计数 */
+        var label = cfgText(v.k) || cfgText(v.type) || '';
+        var full = cfgText(v.v) || '';
+        var num = cfgText(v.count) ? cfgText(v.count) + ' 台' : '';
+        var parts = [label, full || num, cfgText(v.spec)].filter(Boolean);
         return parts.length ? '<span class="tag tag-gold">' + parts.join(' · ') + '</span>' : '';
       }).filter(Boolean);
       var _vn = tp.vehicles.map(function (v) { return cfgText(v.note); }).filter(Boolean);
@@ -2296,7 +2301,8 @@ window.DETAIL = (function () {
     var breakNote = (window.ModeStore && ModeStore.isBreakIn() && (up.original || up.price)) ? '<div style="font-size:10px;color:var(--accent);margin-top:2px;">限时优惠 · 正式期恢复原价 ' + (up.original || up.price) + ' 积分</div>' : '';
     var _uc = 0; try { _uc = Object.keys(UnlockStore._read()).length; } catch (e) {}
     var socialText = _uc > 0 ? ('已有 ' + _uc + ' 位同行解锁') : '已有多位同行解锁';
-    return '<div class="lock-area" id="lock-area">' +
+    /* [S0 §2.6] 叠加 lock-gate 视觉皮肤，既有 #lock-area 解锁逻辑/打码机制不变 */
+    return '<div class="lock-area lock-gate" id="lock-area">' +
       '<div class="la-head">' + label + badge + '</div>' +
       '<div class="la-body">' + rowsHtml + '</div>' +
       '<div class="la-paywall" id="paywall">' +
@@ -2329,14 +2335,39 @@ window.DETAIL = (function () {
     var ctaBtn = '<button class="dab-cta" id="cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + cta + '</button>';
     return bookmark + share + ctaBtn;
   }
+  /* [S0 §2.7] 错误 / 404 / 网络失败：统一 .st-error 区块（墨色重试主按钮 + 幽灵返回） */
   function notFoundHtml() {
-    return '<div class="empty-state">' +
-      '<div class="e-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>' +
-      '<div class="e-title">未找到该条目</div>' +
-      '<div class="e-desc">该信息可能已下架，或类型与链接不匹配<br>返回上一页重新浏览</div>' +
-      '<button onclick="history.back()" style="margin-top:18px;padding:10px 28px;border-radius:var(--r-full);border:none;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:13px;font-weight:600;cursor:pointer;">返回上一页</button>' +
+    return '<div class="st-block st-error">' +
+      '<div class="st-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg></div>' +
+      '<div class="st-title">页面不存在</div>' +
+      '<div class="st-desc">该信息可能已下架，或链接地址有误</div>' +
+      '<div class="st-actions">' +
+        '<button type="button" class="st-primary" onclick="location.reload()">重试</button>' +
+        '<button type="button" class="btn btn-ghost" onclick="history.back()">返回</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  /* [S0 §2] 状态区块图标（内联，不依赖 sprite 加载顺序） */
+  var ST_ICON = {
+    reviewing: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    rejected: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
+  };
+  /* [S0 §2] 渲染状态区块并隐藏底部操作栏（只读，不进入渲染器分发） */
+  function renderStatusBlock(cls, icon, title, desc, actionsHtml) {
+    var nt = document.getElementById('nav-title'); if (nt) nt.textContent = '提示';
+    var ab = document.getElementById('actionbar'); if (ab) ab.style.display = 'none';
+    var box = document.querySelector('.scroll');
+    if (box) box.innerHTML =
+      '<div class="st-block ' + cls + '">' +
+        '<div class="st-icon">' + icon + '</div>' +
+        '<div class="st-title">' + title + '</div>' +
+        (desc ? '<div class="st-desc">' + desc + '</div>' : '') +
+        (actionsHtml ? '<div class="st-actions">' + actionsHtml + '</div>' : '') +
       '</div>';
   }
+  var BACK_ACTION = '<button type="button" class="btn btn-ghost" onclick="history.back()">返回</button>';
   /* ---- 组装 + 交互 ---- */
   /* UX-FIX：企业认证卡按本条发布方解析，避免张冠李戴到示例企业 c-znzjs。
      - franchise(资质招商)/trade(建企买卖)：本条即标的企业本体，用本条自报企业名覆盖代发机构；
@@ -2516,12 +2547,7 @@ window.DETAIL = (function () {
             return '<div class="ai-point"><span class="ap-k">' + cfgText(p.k) + '</span><span class="ap-v">' + cfgText(p.v) + '</span></div>';
           }).join('') + '</div>');
         }
-        if (ai.text) h += sec('结构化分析', '<div class="ds-text ai-text">' + cfgText(ai.text) + '</div>');
-        if (ai.tags && ai.tags.length) {
-          h += sec('结构化分析', '<div class="qual-chips">' + ai.tags.map(function (x) {
-            return '<span class="tag tag-primary">' + cfgText(x.k) + '：' + cfgText(x.v) + '</span>';
-          }).join('') + '</div>' + (ai.summary ? '<div class="ds-text" style="margin-top:8px;">' + cfgText(ai.summary) + '</div>' : ''));
-        }
+        /* [需求确认] 整节删除「结构化分析」：其标签与「结构化速览」重复，速览 + AI 抽取要点已足够 */
         if (r.desc || r.detail) h += sec('信息说明', '<div class="ds-text">' + cfgText(r.desc || r.detail) + '</div>');
         if (r.fields && r.fields.length) h += sec('补充信息', dList(r.fields));
         if (r.files && r.files.length) {
@@ -2540,8 +2566,79 @@ window.DETAIL = (function () {
       unlockItems: function () { return ['完整联系电话 / 微信', '提交文件全文', '发布方账号信息']; }
     };
   }
+  /* [需求确认] 「同类X推荐」卡片滚动点亮动效：
+     JS 初始化后给 .rel-list 加 .is-dim → 卡片默认半透明(0.45)；卡片中心越过滚动容器视口中线后
+     点亮(is-lit)并保持；未越过的仍半透明；滚动至视口内全为推荐卡时全部恢复正常，动效自然结束。
+     监听实际滚动容器（.scroll 详情页 / 预览抽屉滚动区），rAF 节流；JS 缺失时不降级可读性。 */
+  function initRecommendDim() {
+    var body = document.getElementById('body');
+    var list = body ? body.querySelector('.rel-list') : null;
+    if (!list) return;
+    var cards = Array.prototype.slice.call(list.querySelectorAll('.job-card'));
+    if (!cards.length) return;
+    /* 最近的可滚动祖先：详情页为 .scroll，发布预览为 sheet-body 等滚动区；兜底 .scroll / documentElement */
+    var box = null;
+    var node = list.parentElement;
+    while (node && node !== document.documentElement && node !== document.body) {
+      var cs = window.getComputedStyle ? getComputedStyle(node) : null;
+      if (cs && /(auto|scroll|overlay)/.test(cs.overflowY)) { box = node; break; }
+      node = node.parentElement;
+    }
+    if (!box) box = document.querySelector('.scroll') || document.documentElement;
+    var ticking = false;
+    function lit() {
+      ticking = false;
+      /* 到底部（视口内已全为推荐卡）→ 全部点亮，动效自然结束 */
+      var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight <= 2;
+      var mid = box.getBoundingClientRect().top + box.clientHeight / 2;
+      for (var i = 0; i < cards.length; i++) {
+        var r = cards[i].getBoundingClientRect();
+        cards[i].classList.toggle('is-lit', atBottom || (r.top + r.height / 2) <= mid);
+      }
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      if (window.requestAnimationFrame) requestAnimationFrame(lit); else lit();
+    }
+    list.classList.add('is-dim');
+    box.addEventListener('scroll', onScroll, { passive: true });
+    lit();
+  }
+
   function attach(rec) {
     sweepTradeDeposits(); /* [FIX BM-010] 每次进入详情页清扫已过 30 天 TTL 的保证金并解冻退还 */
+
+    /* [S0 §2.3/2.4/2.5] 状态门：rejected / off / pending_review 只读预览，直接渲染 S0 状态区块，
+       不进入 16 类渲染器分发，不动解锁/保证金/actionbar 行为。 */
+    var _st = rec && rec.status;
+    if (_st === 'rejected' || _st === 'off' || _st === 'pending_review') {
+      var _me = null;
+      try { _me = (window.DataBus && DataBus.current) ? DataBus.current() : null; } catch (eMe) { _me = null; }
+      var _isOwner = false;
+      if (_me) {
+        var _cand = [rec.publisher, rec.publisherId, rec.owner, rec.publisherName].map(String);
+        var _mine = [_me.id, _me.account, _me.name, _me.mobile || _me.phone].filter(Boolean).map(String);
+        _isOwner = _cand.some(function (c) { return c && _mine.indexOf(c) >= 0; });
+      }
+      if (_st === 'rejected') {
+        var _note = rec.rejectNote || rec.note || '平台审核未通过，可修改后重新提交';
+        renderStatusBlock('st-rejected', ST_ICON.rejected, '内容未通过审核', cfgText(_note), BACK_ACTION);
+        return;
+      }
+      if (_st === 'off') {
+        renderStatusBlock('st-off', ST_ICON.off, '该信息已下架', '内容已被发布者或平台下架，暂不可查看', BACK_ACTION);
+        return;
+      }
+      /* pending_review：本人只读预览；非本人不可见（按下架处理） */
+      if (_isOwner) {
+        renderStatusBlock('st-reviewing', ST_ICON.reviewing, '审核中', '发布者本人可见，审核通过后对公开展示', BACK_ACTION);
+      } else {
+        renderStatusBlock('st-off', ST_ICON.off, '该信息已下架', '内容已被发布者或平台下架，暂不可查看', BACK_ACTION);
+      }
+      return;
+    }
+
     /* [分片X P0-02] 分发：优先 resolveType(rec).typeKey → 专业渲染器；回退旧 bizKey；
        resolveType 为 null 的 legacy 记录（f1/f2/t1-t6/p1 等）继续走旧 bizKey 渲染器，不直接空态。 */
     var resolved = (window.DataBus && DataBus.resolveType) ? DataBus.resolveType(rec) : null;
@@ -2621,6 +2718,8 @@ window.DETAIL = (function () {
     }
     var __bodyHtml = __demandExtras + t.sections(rec, c) + certHtml + guaranteeSec(rec) + relatedSec(rec);
     if ($('body')) $('body').innerHTML = __bodyHtml;
+    /* [需求确认] 同类推荐卡片滚动点亮：渲染完成后初始化默认半透明 + 视口中线点亮 */
+    initRecommendDim();
     /* [FIX HOME-NAV] 认证卡名称跳转主页：homeUrl 生成的是相对根路径，在详情页 base(pages/supply/) 下会解析错误，
        统一重写为相对本页的正确路径（c- → ../company/，其他 → ../personal/） */
     try {
@@ -2710,9 +2809,10 @@ window.DETAIL = (function () {
       try {
         if (gate.isGuest) return '登录后投递';
         if (window.DataBus && DataBus.canDeliverResume) {
-          var r = DataBus.canDeliverResume();
+          var r = DataBus.canDeliverResume(rec);
           if (r.can) return '立即投递';
-          if (r.reason && r.reason.indexOf('简历') >= 0) return '完善简历后投递';
+          if (r.type === 'resume') return '完善简历后投递';
+          if (r.type === 'unsupported') return '暂不支持投递';
           return '完成入驻后投递';
         }
       } catch (e) {}
@@ -2892,7 +2992,7 @@ window.DETAIL = (function () {
           '<div class="trust-item">' + _IC.star + '<div class="trust-num">98.6%</div><div class="trust-label">用户好评率</div></div>' +
         '</div></div>';
     }
-    /* V3.2: 解锁内容清单（默认折叠，点击展开） */
+    /* [需求确认] 解锁内容清单：直接展开显示（移除折叠/展开箭头与点击切换） */
     function unlockListHtml(rec, t, lockRows) {
       var itemNames = (t.inlineLock && t.unlockItems) ? t.unlockItems(rec) : lockRows.map(function (x) { return x.k; });
       if (!itemNames || !itemNames.length) return '';
@@ -2900,11 +3000,10 @@ window.DETAIL = (function () {
         return '<span class="us-unlock-item">' + _IC.check + name + '</span>';
       }).join('');
       return '<div class="us-section us-unlock-section">' +
-        '<div class="section-title unlock-toggle" role="button" tabindex="0">' +
+        '<div class="section-title">' +
           _IC.fileText + '解锁内容清单（' + itemNames.length + '项）' +
-          '<span class="unlock-toggle-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>' +
         '</div>' +
-        '<div class="us-unlock-list" style="display:none">' + itemsHtml + '</div>' +
+        '<div class="us-unlock-list">' + itemsHtml + '</div>' +
         '</div>';
     }
     function openPay() {
@@ -3036,16 +3135,7 @@ window.DETAIL = (function () {
           card.classList.add('selected');
         });
       });
-      /* V3.2: 解锁内容清单折叠/展开 */
-      var toggleEl = sheet.body().querySelector('.unlock-toggle');
-      var listEl = sheet.body().querySelector('.us-unlock-list');
-      if (toggleEl && listEl) {
-        toggleEl.addEventListener('click', function () {
-          var isOpen = listEl.style.display !== 'none';
-          listEl.style.display = isOpen ? 'none' : 'flex';
-          toggleEl.classList.toggle('open', !isOpen);
-        });
-      }
+      /* [需求确认] 解锁内容清单已直接展开显示，移除原折叠/展开点击逻辑 */
       /* 协议勾选切换 */
       var agreeRow = sheet.body().querySelector('#unlockAgree');
       var agreed = false;
@@ -3104,10 +3194,22 @@ window.DETAIL = (function () {
     }
     /* v3.1: 简历投递门控（动态文案+按钮+跳转） */
     /* 根据 canDeliverResume 返回的 reason 判断拦截类型，返回完整的弹窗配置 */
-    function resolveDeliverBlocked(reason, userType) {
+    function resolveDeliverBlocked(reason, userType, rtype) {
       var r = (reason || '').toString();
+      var t = (rtype || '').toString();
+      /* 类型0：条目/平台不支持投递（与用户状态无关；不提供"去完善"误导按钮） */
+      if (t === 'unsupported') {
+        return {
+          type: 'unsupported',
+          title: '该信息暂不支持在线投递',
+          desc: '该岗位暂不支持简历投递，您可以浏览其他在招岗位，或联系平台客服获取更多机会。',
+          btnText: '知道了',
+          btnHref: '',
+          iconColor: 'var(--danger)'
+        };
+      }
       /* 类型1：未完成个人入驻 */
-      if (r.indexOf('个人入驻') >= 0 || r.indexOf('入驻') >= 0 && r.indexOf('标准') < 0 && r.indexOf('简历') < 0) {
+      if (t === 'entry' || r.indexOf('个人入驻') >= 0 || r.indexOf('入驻') >= 0 && r.indexOf('标准') < 0 && r.indexOf('简历') < 0) {
         return {
           type: 'entry',
           title: '需要个人入驻',
@@ -3129,7 +3231,7 @@ window.DETAIL = (function () {
         };
       }
       /* 类型3：求职者但简历未完成 */
-      if (r.indexOf('简历') >= 0) {
+      if (t === 'resume' || r.indexOf('简历') >= 0) {
         return {
           type: 'resume',
           title: '完善简历信息',
@@ -3139,20 +3241,20 @@ window.DETAIL = (function () {
           iconColor: 'var(--primary)'
         };
       }
-      /* 兜底：未知原因 */
+      /* 兜底：未知原因（不再引导"去完善"，避免平台不支持时误导用户） */
       return {
         type: 'unknown',
-        title: '暂不支持简历投递',
-        desc: r || '请先完成个人入驻并完善简历信息',
-        btnText: '去完善',
-        btnHref: '../profile/auth-qualification.html?mode=edit',
+        title: '暂时无法投递',
+        desc: r || '当前暂不支持简历投递，如有疑问请联系平台客服。',
+        btnText: '联系客服',
+        btnHref: '../help/index.html',
         iconColor: 'var(--danger)'
       };
     }
     /* 当前弹窗配置（用于按钮跳转） */
     var _currentDeliverConfig = null;
-    function openDeliverBlocked(reason, userType) {
-      var cfg = resolveDeliverBlocked(reason, userType);
+    function openDeliverBlocked(reason, userType, rtype) {
+      var cfg = resolveDeliverBlocked(reason, userType, rtype);
       _currentDeliverConfig = cfg;
       /* 动态设置标题 */
       var titleEl = document.getElementById('deliverModalTitle');
@@ -3175,6 +3277,9 @@ window.DETAIL = (function () {
           iconEl.style.background = 'linear-gradient(135deg,rgba(212,76,71,.15),rgba(212,76,71,.05))';
         }
       }
+      /* 平台不支持/未知原因：只保留单个确认按钮，隐藏"取消"按钮 */
+      var cancelBtn = document.getElementById('deliverCancel');
+      if (cancelBtn) cancelBtn.style.display = (cfg.type === 'unsupported' || cfg.type === 'unknown') ? 'none' : '';
       var mask = document.getElementById('deliverMask');
       var modal = document.getElementById('deliverModal');
       if (mask) mask.classList.add('show');
@@ -3187,17 +3292,17 @@ window.DETAIL = (function () {
       if (modal) modal.classList.remove('show');
     }
     function checkDeliverPermission(rec, c) {
-      var can = true, reason = '', userType = '';
+      var can = true, reason = '', userType = '', rtype = 'unknown';
       try {
         if (window.DataBus && DataBus.canDeliverResume) {
-          var r = DataBus.canDeliverResume();
-          can = r.can; reason = r.reason; userType = r.userType;
+          var r = DataBus.canDeliverResume(rec);
+          can = r.can; reason = r.reason; userType = r.userType; rtype = r.type || 'unknown';
         }
       } catch (e) { console.warn('canDeliverResume error', e); }
       if (can) {
         openApply(rec, c);
       } else {
-        openDeliverBlocked(reason, userType);
+        openDeliverBlocked(reason, userType, rtype);
       }
     }
     /* 绑定弹窗关闭事件（只绑定一次） */
@@ -3213,10 +3318,9 @@ window.DETAIL = (function () {
       if (goBtn) goBtn.addEventListener('click', function () {
         var cfg = _currentDeliverConfig;
         closeDeliverBlocked();
+        /* 只有明确跳转目标才跳转（"知道了/联系客服"仅关闭弹窗，不再误跳去完善简历） */
         if (cfg && cfg.btnHref) {
           location.href = cfg.btnHref;
-        } else {
-          location.href = '../profile/auth-qualification.html?mode=edit';
         }
       });
       document.addEventListener('keydown', function (e) {

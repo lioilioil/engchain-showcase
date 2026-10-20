@@ -1808,21 +1808,33 @@ window.DataBus = (function () {
     return f;
   }
 
-  /* ---- v3.1：简历投递门控（个人入驻两类用户区分 + 简历完成状态） ----
-     返回 { can, reason, userType }；读取 AuthStore.personalEntry 判断 */
-  function canDeliverResume() {
+  /* ---- v3.1：简历投递门控（个人入驻两类用户区分 + 简历完成状态 + 条目级可投递能力） ----
+     返回 { can, reason, userType, type }；读取 AuthStore.personalEntry 判断；
+     rec 可选：提供时先做条目级能力判定（rec.applyable 显式字段，缺省用 status 推断），
+     条目不支持投递时优先于用户状态拦截（该状态与用户行为无关，不应引导"去完善简历"）。 */
+  function canDeliverResume(rec) {
+    /* ① 条目级能力：该条信息是否开放投递（数据源优先） */
+    if (rec) {
+      var applyable = rec.applyable;
+      if (applyable === undefined && rec.status) {
+        applyable = !/^(closed|expired|offline|ended|已截止|已下线|已结束|已招满|暂停)$/i.test(String(rec.status));
+      }
+      if (applyable === false) {
+        return { can: false, reason: '该信息暂不支持在线投递', userType: '', type: 'unsupported' };
+      }
+    }
     var pe = (window.AuthStore && AuthStore.read) ? AuthStore.read().personalEntry : null;
     if (!pe || !pe.ok) {
-      return { can: false, reason: '请先完成个人入驻', userType: '' };
+      return { can: false, reason: '请先完成个人入驻', userType: '', type: 'entry' };
     }
     var ut = pe.userType || 'jobseeker';
     if (ut === 'standard') {
-      return { can: false, reason: '您当前为标准入驻用户，暂不支持简历投递。完成简历编辑后即可解锁投递权益', userType: 'standard' };
+      return { can: false, reason: '您当前为标准入驻用户，暂不支持简历投递。升级为求职者入驻后即可投递', userType: 'standard', type: 'standard' };
     }
     if (ut === 'jobseeker' && !pe.resumeComplete) {
-      return { can: false, reason: '请先完成简历详情编辑', userType: 'jobseeker' };
+      return { can: false, reason: '请先完成简历详情编辑', userType: 'jobseeker', type: 'resume' };
     }
-    return { can: true, reason: '', userType: 'jobseeker' };
+    return { can: true, reason: '', userType: 'jobseeker', type: 'ok' };
   }
 
   /* ============================================================================

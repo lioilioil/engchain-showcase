@@ -11,7 +11,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 })();
 </script><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>发票管理 · 工程链</title>
+<title>开票记录 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css"><link rel="stylesheet" href="../../css/guest-gate.css">
 <style>
   /* ===== 底部固定悬浮按钮组（样式同「资质招商·首页」.app-float-cta：白毛玻璃多层渐变 + backdrop-filter + 发丝边 + 内分隔竖线；data-lg-glass 容器挂载 WebGL 玻璃） ===== */
@@ -90,7 +90,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     transition: opacity .15s;
   }
   .urge-btn:active { opacity: .7; }
-  /* ===== 发票管理页对齐样式（V3.4 墨金双轨） ===== */
+  /* ===== 开票记录页对齐样式（V3.4 墨金双轨） ===== */
   .inv-scroll{padding-top:10px;padding-bottom:104px;}
   /* 概览条（对齐钱包首页 ov-grid 语言） */
   .ov-grid{display:flex;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:11px 4px;box-sizing:border-box;margin-bottom:14px;}
@@ -98,13 +98,58 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .ov-cell + .ov-cell{border-left:1px solid var(--line);}
   .ov-label{font-size:10px;color:var(--text-3);white-space:nowrap;}
   .ov-val{font-family:var(--font-num);font-size:17px;font-weight:700;color:var(--text-1);margin-top:3px;white-space:nowrap;font-variant-numeric:tabular-nums;}
-  /* 申请开票表单 */
-  #apply-form{margin:0 0 14px;}
-  .inv-form-title{font-size:14px;font-weight:600;color:var(--text-1);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-  .inv-title-count{font-size:10.5px;font-weight:600;color:var(--primary-dim);background:var(--primary-soft);border-radius:999px;padding:2px 8px;}
-  /* 开票记录 */
-  .inv-sec{margin-top:20px;}
-  #inv-filter{margin:0 0 12px;}
+  /* 申请开票弹窗（UI.sheet 自下而上）：选择行 + 操作区 + 选择列表（复用 pm-radio 视觉语言） */
+  .sel-row{display:flex;align-items:center;justify-content:space-between;width:100%;height:48px;padding:0 var(--sp-4);
+    background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--r-m);font-size:var(--fs-md);
+    color:var(--text-2);cursor:pointer;transition:border-color var(--d-fast),box-shadow var(--d-fast),transform .15s;box-shadow:var(--shadow-xs);}
+  .sel-row:active{transform:scale(.99);}
+  .sel-row .sel-val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-weight:500;}
+  .sel-row.has-val .sel-val{color:var(--text-1);}
+  .sel-row .sel-arrow{width:16px;height:16px;flex:none;color:var(--text-3);}
+  .inv-form-actions{display:flex;gap:10px;width:100%;}
+  .inv-form-actions .btn{flex:1;}
+  .pm-empty{text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;}
+  .pm-item{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:8px;width:100%;
+    border:1.5px solid var(--line);border-radius:12px;background:var(--bg-card);cursor:pointer;transition:all .2s;}
+  .pm-item:active{transform:scale(.99);}
+  .pm-item.selected{border-color:var(--primary);background:var(--primary-soft);}
+  .pm-body{flex:1;min-width:0;text-align:left;}
+  .pm-name{font-size:14px;font-weight:600;color:var(--text-1);}
+  .pm-desc{font-size:11px;color:var(--text-3);margin-top:1px;}
+  .pm-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+  .pm-item.selected .pm-radio{border-color:var(--primary);}
+  .pm-item.selected .pm-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--primary);}
+  .pm-def{font-size:10px;color:var(--primary-dim);background:var(--primary-soft);border-radius:999px;padding:1px 6px;margin-left:6px;font-weight:600;vertical-align:middle;}
+  /* 发票抬头下拉菜单：字段下方内联展开（对齐 pm-radio 视觉语言，非独立弹窗） */
+  .drop-wrap{position:relative;}
+  .drop-panel{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;max-height:280px;overflow-y:auto;
+    background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:6px;
+    box-shadow:var(--shadow-card);transform-origin:top;animation:drop-in var(--d-fast) var(--e-out);}
+  @keyframes drop-in{from{opacity:0;transform:translateY(-4px) scale(.985);}to{opacity:1;transform:none;}}
+  .drop-panel .pm-item{margin-bottom:6px;}
+  .drop-panel .pm-item:last-child{margin-bottom:0;}
+  .sel-row.open .sel-arrow{transform:rotate(90deg);}
+  .sel-arrow{transition:transform var(--d-fast) var(--e-standard);}
+  /* ---- 下拉菜单优化规则（drop 组件，抬头/关联订单共用）----
+     ① 面板高度上限 280px，选项过多时内部滚动；
+     ② 可滚动时上下边缘渐隐遮罩（fade-top/fade-bottom），提示可继续查看；
+     ③ 选项数 > 6 时自动显示搜索框（drop-search）吸顶过滤，避免长列表翻找；
+     ④ 默认选项（不关联订单）固定首项，不受过滤影响语义；搜索无结果给空态；
+     ⑤ 列表超 20 条时截断并提示「仅展示最近 20 笔，可在搜索框精确查找」；
+     ⑥ 选中即收起、点击面板外收起、箭头随展开旋转。 */
+  .drop-fade-top,.drop-fade-bottom{position:absolute;left:0;right:0;height:20px;pointer-events:none;opacity:0;transition:opacity .18s ease;z-index:2;}
+  .drop-fade-top{top:0;background:linear-gradient(to bottom,var(--bg-card),transparent);}
+  .drop-fade-bottom{bottom:0;background:linear-gradient(to top,var(--bg-card),transparent);}
+  .drop-panel.fade-top .drop-fade-top{opacity:1;}
+  .drop-panel.fade-bottom .drop-fade-bottom{opacity:1;}
+  .drop-search{display:none;position:sticky;top:0;z-index:3;background:var(--bg-card);padding:2px 2px 8px;}
+  .drop-search-input{width:100%;height:38px;padding:0 12px;background:var(--bg-card-2);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--text-1);outline:none;transition:border-color var(--d-fast);}
+  .drop-search-input:focus{border-color:var(--primary);}
+  .drop-search-input::placeholder{color:var(--text-3);}
+  .pm-more{text-align:center;font-size:10.5px;color:var(--text-3);padding:6px 0 2px;}
+  /* 记录筛选条：向上滑动后吸顶悬浮（对齐首页/搜索页吸顶先例） */
+  #inv-filter{position:sticky;top:0;z-index:20;margin:0 0 12px;background:var(--bg);padding:6px 0;box-shadow:0 10px 24px -18px rgba(22,22,22,.30);}
+  [data-theme="dark"] #inv-filter{box-shadow:0 10px 24px -18px rgba(0,0,0,.65);}
   /* 发票卡片 */
   #inv-list .inv-card{margin-bottom:0;}
   #inv-list .inv-card + .inv-card{margin-top:10px;}
@@ -123,7 +168,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <div class="phone">
   <div class="navbar">
     <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
-    <div class="nav-title">发票管理</div>
+    <div class="nav-title">开票记录</div>
     <div class="nav-right"></div>
   </div>
 
@@ -134,35 +179,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="ov-cell"><div class="ov-label">待审核</div><div class="ov-val" id="ov-inv-pending">—</div></div>
       <div class="ov-cell"><div class="ov-label">已开票</div><div class="ov-val" id="ov-inv-issued">—</div></div>
     </div>
-    <!-- 申请开票表单（默认隐藏，点击底部「申请开票」展开） -->
-    <div class="card" id="apply-form" style="display:none;">
-      <div class="inv-form-title">申请开票 <span class="inv-title-count" id="title-count">0 个抬头</span></div>
-      <div class="field"><label class="field-label">发票抬头 <span class="req">*</span></label>
-        <select class="input" id="f-title"></select>
-      </div>
-      <div class="field"><label class="field-label">发票类型</label>
-        <div class="seg" id="f-type-seg">
-          <span class="seg-item is-on" data-t="增值税普通发票">增值税普通发票</span>
-          <span class="seg-item" data-t="增值税专用发票">增值税专用发票</span>
-        </div>
-      </div>
-      <div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>
-        <input class="input" id="f-amount" type="number" placeholder="请输入开票金额" value="">
-        <div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">可开票总额：—</div>
-      </div>
-      <div class="field"><label class="field-label">关联订单</label>
-        <select class="input" id="f-order"><option value="">不关联订单</option></select>
-      </div>
-      <div class="field"><label class="field-label">接收邮箱 <span class="req">*</span></label>
-        <input class="input" id="f-email" type="email" placeholder="电子发票将发送至该邮箱">
-      </div>
-      <div style="display:flex;gap:10px;margin-top:6px;">
-        <button class="btn btn-ghost" style="flex:1;" onclick="cancelApply()">取消</button>
-        <button class="btn btn-primary" style="flex:1.6;" onclick="submitApply()">提交申请</button>
-      </div>
-    </div>
+    <!-- 申请开票改为底部弹窗（UI.sheet），由底部「申请开票」按钮触发 -->
 
-    <div class="section-title inv-sec"><div class="st-left">开票记录</div><span class="text-3 fs-11" id="inv-count"></span></div>
     <div class="seg" id="inv-filter">
       <span class="seg-item is-on" data-filter="all">全部</span>
       <span class="seg-item" data-filter="pending">待审核</span>
@@ -239,20 +257,271 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     rejected: { label: '已驳回', cls: 'tag-gray' }
   };
 
-  function renderTitleSelect() {
+  /* ---- 申请开票 Bottom Sheet（UI.sheet 自下而上弹窗；抬头/关联订单用选择列表，复用 pm-radio 视觉语言） ---- */
+  var selTitleIdx = -1;  /* 选中的抬头索引（-1 = 未选） */
+  var selOrder = null;   /* 选中的关联订单 {id,title,amount}；null = 不关联 */
+  var applySheet = null; /* 当前申请开票弹窗实例 */
+
+  function titleSelHtml() {
     var titles = loadTitles();
-    document.getElementById('title-count').textContent = titles.length + ' 个抬头';
-    var sel = document.getElementById('f-title');
-    if (!titles.length) {
-      sel.innerHTML = '<option value="">请先在「开票信息管理」添加抬头</option>';
-    } else {
-      sel.innerHTML = titles.map(function (t, i) {
-        return '<option value="' + i + '">' + esc(t.name) + '</option>';
-      }).join('');
-    }
-    /* 预填邮箱 */
+    var val = (selTitleIdx > -1 && titles[selTitleIdx]) ? titles[selTitleIdx].name : '';
+    if (!val) { var def = titles.filter(function (t) { return t.isDefault; })[0] || titles[0]; if (def) val = def.name; }
+    return '<div class="field drop-wrap"><label class="field-label">发票抬头 <span class="req">*</span></label>' +
+      '<button type="button" class="sel-row' + (val ? ' has-val' : '') + '" id="f-title-row" onclick="toggleTitleDrop()">' +
+      '<span class="sel-val" id="f-title-val">' + esc(val || '请选择抬头') + '</span>' +
+      '<svg class="sel-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>' +
+      '<div class="drop-panel" id="title-drop" style="display:none;">' +
+        '<div class="drop-fade-top"></div><div class="drop-fade-bottom"></div>' +
+        '<div class="drop-list" id="title-drop-list"></div>' +
+      '</div></div>';
+  }
+  function orderSelHtml() {
+    var val = selOrder ? (selOrder.id + ' · ' + selOrder.title) : '不关联订单';
+    return '<div class="field drop-wrap"><label class="field-label">关联订单</label>' +
+      '<button type="button" class="sel-row' + (selOrder ? ' has-val' : '') + '" id="f-order-row" onclick="toggleOrderDrop()">' +
+      '<span class="sel-val" id="f-order-val">' + esc(val) + '</span>' +
+      '<svg class="sel-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>' +
+      '<div class="drop-panel" id="order-drop" style="display:none;">' +
+        '<div class="drop-fade-top"></div><div class="drop-fade-bottom"></div>' +
+        '<div class="drop-search" id="order-drop-search"><input class="drop-search-input" type="text" placeholder="搜索订单号 / 项目名称" oninput="onOrderSearch(this.value)"></div>' +
+        '<div class="drop-list" id="order-drop-list"></div>' +
+      '</div></div>';
+  }
+
+  window.openApplySheet = function () {
+    if (!isLoggedIn()) { UI.toast('请先登录', 'warn'); return; }/* P2-7 游客禁止提交申请 */
+    var sh = UI.sheet();
+    applySheet = sh;
+    sh.setText('申请开票');
+    sh.body().innerHTML =
+      titleSelHtml() +
+      '<div class="field"><label class="field-label">发票类型</label>' +
+        '<div class="seg" id="f-type-seg">' +
+          '<span class="seg-item is-on" data-t="增值税普通发票">增值税普通发票</span>' +
+          '<span class="seg-item" data-t="增值税专用发票">增值税专用发票</span>' +
+        '</div></div>' +
+      '<div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>' +
+        '<input class="input" id="f-amount" type="number" placeholder="请输入开票金额" value="">' +
+        '<div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">可开票总额：—</div></div>' +
+      orderSelHtml() +
+      '<div class="field"><label class="field-label">接收邮箱 <span class="req">*</span></label>' +
+        '<input class="input" id="f-email" type="email" placeholder="电子发票将发送至该邮箱"></div>' +
+      '<div class="inv-form-actions btn-block">' +
+        '<button type="button" class="btn btn-ghost" onclick="cancelApply()">取消</button>' +
+        '<button type="button" class="btn btn-primary" onclick="submitApply()">提交申请</button>' +
+      '</div>';
+    /* 预填默认抬头邮箱 */
+    var titles = loadTitles();
     var def = titles.filter(function (t) { return t.isDefault; })[0] || titles[0];
     if (def && def.email) document.getElementById('f-email').value = def.email;
+    refreshAmountHint();
+    renderSpecialGate();
+    bindTypeSeg();
+    sh.show();
+  };
+
+  /* 专票资格判定：当前抬头为企业类型 + 税号合法 + 开户行账号完整，缺一不可 */
+  function currentTitle() {
+    var titles = loadTitles();
+    if (selTitleIdx > -1 && titles[selTitleIdx]) return titles[selTitleIdx];
+    return titles.filter(function (t) { return t.isDefault; })[0] || titles[0] || null;
+  }
+  function specEligible(title) {
+    if (!title) return false;
+    if (title.titleType === 'personal') return false;              /* 个人抬头不可开专票 */
+    var tax = String(title.tax || '').trim();
+    if (!tax || !validTaxNo(tax)) return false;                    /* 税号缺失或格式非法 */
+    if (!String(title.bankAccount || '').trim()) return false;     /* 开户行及账号缺失 */
+    return true;
+  }
+  function specBlockMsg(title) {
+    if (!title) return '请先选择发票抬头';
+    if (title.titleType === 'personal') return '个人抬头无法开具增值税专用发票';
+    var tax = String(title.tax || '').trim();
+    if (!tax) return '该抬头缺少纳税人识别号，无法开具专票，请先在开票信息中补全';
+    if (!validTaxNo(tax)) return '该抬头税号格式不正确，无法开具专票';
+    if (!String(title.bankAccount || '').trim()) return '该抬头缺少开户行及账号，无法开具专票，请先在开票信息中补全';
+    return '该抬头信息不完整，无法开具增值税专用发票';
+  }
+  function bindTypeSeg() {
+    var seg = document.getElementById('f-type-seg');
+    if (!seg) return;
+    seg.querySelectorAll('.seg-item').forEach(function (el) {
+      el.onclick = function () {
+        var want = el.getAttribute('data-t');
+        if (want === '增值税专用发票') {
+          if (!isEnterpriseCertified()) { UI.toast('完成企业认证后可开具增值税专用发票', 'warn'); renderSpecialGate(); return; }
+          var title = currentTitle();
+          if (!specEligible(title)) { UI.toast(specBlockMsg(title), 'warn'); return; }/* 信息不完整不可选专票，保持当前类型 */
+        }
+        seg.querySelectorAll('.seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+        el.classList.add('is-on');
+        invType = want;
+      };
+    });
+  }
+
+  /* 发票抬头下拉菜单：字段下方内联展开，选中即回填收起（复用 pm-radio 视觉语言） */
+  window.toggleTitleDrop = function () {
+    var panel = document.getElementById('title-drop');
+    var row = document.getElementById('f-title-row');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+      panel.style.display = 'block';
+      renderTitleDrop();
+      if (row) row.classList.add('open');
+      panel.onscroll = updateDropFades;
+      document.addEventListener('click', hideTitleDropDoc, true);
+    } else {
+      hideTitleDrop();
+    }
+  };
+  function hideTitleDropDoc(e) {
+    var w = document.querySelector('.drop-wrap');
+    if (!w) { document.removeEventListener('click', hideTitleDropDoc, true); return; }
+    if (!w.contains(e.target)) hideTitleDrop();
+  }
+  function hideTitleDrop() {
+    var panel = document.getElementById('title-drop');
+    var row = document.getElementById('f-title-row');
+    if (panel) { panel.style.display = 'none'; panel.onscroll = null; }
+    if (row) row.classList.remove('open');
+    document.removeEventListener('click', hideTitleDropDoc, true);
+  }
+  function renderTitleDrop() {
+    var panel = document.getElementById('title-drop');
+    var list = document.getElementById('title-drop-list');
+    if (!panel || !list) return;
+    var titles = loadTitles();
+    if (!titles.length) {
+      list.innerHTML = '<div class="pm-empty">暂无发票抬头，请先新增抬头</div>' +
+        '<div style="padding:4px 0 8px;"><button type="button" class="btn btn-primary btn-block" onclick="location.href=\'invoice-title-new.html\'">＋ 新增抬头</button></div>';
+    } else {
+      list.innerHTML = titles.map(function (t, i) {
+        var type = t.invoiceType || (t.titleType === 'personal' ? '增值税普通发票' : '增值税专用发票');
+        return '<button type="button" class="pm-item' + (i === selTitleIdx ? ' selected' : '') + '" data-idx="' + i + '" onclick="pickTitle(' + i + ')">' +
+          '<div class="pm-body"><div class="pm-name">' + esc(t.name) + (t.isDefault ? ' <span class="pm-def">默认</span>' : '') + '</div>' +
+          '<div class="pm-desc">' + esc(type) + '</div></div>' +
+          '<div class="pm-radio"></div></button>';
+      }).join('');
+    }
+    updateDropFades();
+  }
+  window.pickTitle = function (i) {
+    var titles = loadTitles();
+    if (!titles[i]) { hideTitleDrop(); return; }
+    selTitleIdx = i;
+    var t = titles[i];
+    var valEl = document.getElementById('f-title-val');
+    if (valEl) { valEl.textContent = t.name; valEl.parentNode.classList.add('has-val'); }
+    if (t.email) { var em = document.getElementById('f-email'); if (em && !em.value) em.value = t.email; }
+    /* 换抬头后若已选专票但新抬头不满足资格 → 自动回落普票 */
+    if (invType === '增值税专用发票' && !specEligible(t)) {
+      invType = '增值税普通发票';
+      var segEl = document.getElementById('f-type-seg');
+      if (segEl) {
+        segEl.querySelectorAll('.seg-item').forEach(function (x) { x.classList.remove('is-on'); });
+        var pk = segEl.querySelector('[data-t="增值税普通发票"]');
+        if (pk) pk.classList.add('is-on');
+      }
+      UI.toast('该抬头信息不完整，已切换为增值税普通发票', 'warn');
+    }
+    hideTitleDrop();
+  };
+
+  /* 关联订单下拉菜单：与发票抬头同一 drop 组件语言，含搜索过滤（规则③）/渐隐遮罩（规则②）/20 条截断提示（规则⑤） */
+  window.toggleOrderDrop = function () {
+    var panel = document.getElementById('order-drop');
+    var row = document.getElementById('f-order-row');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+      panel.style.display = 'block';
+      renderOrderDrop();
+      if (row) row.classList.add('open');
+      panel.onscroll = updateDropFades;
+      document.addEventListener('click', hideOrderDropDoc, true);
+    } else {
+      hideOrderDrop();
+    }
+  };
+  function hideOrderDropDoc(e) {
+    var w = document.querySelector('#order-drop');
+    if (!w) { document.removeEventListener('click', hideOrderDropDoc, true); return; }
+    var wrap = document.querySelector('.drop-wrap');
+    if (!wrap || !wrap.contains(e.target)) hideOrderDrop();
+  }
+  function hideOrderDrop() {
+    var panel = document.getElementById('order-drop');
+    var row = document.getElementById('f-order-row');
+    if (panel) { panel.style.display = 'none'; panel.onscroll = null; }
+    if (row) row.classList.remove('open');
+    document.removeEventListener('click', hideOrderDropDoc, true);
+  }
+  function renderOrderDrop() {
+    var panel = document.getElementById('order-drop');
+    var list = document.getElementById('order-drop-list');
+    var search = document.getElementById('order-drop-search');
+    if (!panel || !list) return;
+    var orders = invoiceableOrders().slice(0, 20);
+    /* 规则③：选项数 > 6 时显示搜索框 */
+    if (search) search.style.display = orders.length > 6 ? 'block' : 'none';
+    renderOrderList(list, orders, '');
+    updateDropFades();
+  }
+  function renderOrderList(list, orders, kw) {
+    var html = '<button type="button" class="pm-item' + (selOrder ? '' : ' selected') + '" data-role="none" onclick="pickOrder(-1)">' +
+      '<div class="pm-body"><div class="pm-name">不关联订单</div><div class="pm-desc">开票金额手动填写</div></div>' +
+      '<div class="pm-radio"></div></button>';
+    var k = String(kw || '').trim().toLowerCase();
+    var shown = 0;
+    orders.forEach(function (o, i) {
+      var amt = Number(o.amount) || 0;
+      if (k) {
+        var hay = ((o.id || '') + ' ' + (o.title || '')).toLowerCase();
+        if (hay.indexOf(k) === -1) return;
+      }
+      shown++;
+      html += '<button type="button" class="pm-item' + (selOrder && selOrder.id === o.id ? ' selected' : '') + '" data-idx="' + i + '" onclick="pickOrder(' + i + ')">' +
+        '<div class="pm-body"><div class="pm-name">' + esc(o.id) + ' · ' + esc(o.title || '').slice(0, 16) + '</div>' +
+        '<div class="pm-desc">¥' + amt.toLocaleString() + '</div></div>' +
+        '<div class="pm-radio"></div></button>';
+    });
+    if (k && shown === 0) html += '<div class="pm-empty">未找到匹配订单</div>';
+    /* 规则⑤：列表已截断时给出可搜索提示 */
+    if (!k && orders.length >= 20) html += '<div class="pm-more">仅展示最近 20 笔，可在搜索框精确查找</div>';
+    list.innerHTML = html;
+  }
+  window.onOrderSearch = function (v) {
+    var list = document.getElementById('order-drop-list');
+    if (!list) return;
+    renderOrderList(list, invoiceableOrders().slice(0, 20), v);
+    updateDropFades();
+  };
+  window.pickOrder = function (idx) {
+    var valEl = document.getElementById('f-order-val');
+    if (idx === -1) {
+      selOrder = null;
+      if (valEl) { valEl.textContent = '不关联订单'; valEl.parentNode.classList.remove('has-val'); }
+    } else {
+      var orders = invoiceableOrders().slice(0, 20);
+      var o = orders[idx];
+      if (!o) { hideOrderDrop(); return; }
+      selOrder = { id: o.id, title: o.title || '', amount: Number(o.amount) || 0 };
+      if (valEl) { valEl.textContent = selOrder.id + ' · ' + selOrder.title; valEl.parentNode.classList.add('has-val'); }
+      if (selOrder.amount > 0) document.getElementById('f-amount').value = selOrder.amount;/* [FIX BM-037] 选订单自动带入实付金额 */
+    }
+    refreshAmountHint();
+    hideOrderDrop();
+  };
+  /* 规则②：可滚动时上下边缘渐隐（title-drop / order-drop 共用） */
+  function updateDropFades() {
+    ['title-drop', 'order-drop'].forEach(function (id) {
+      var panel = document.getElementById(id);
+      if (!panel || panel.style.display === 'none') return;
+      var canScroll = panel.scrollHeight > panel.clientHeight + 2;
+      panel.classList.toggle('fade-top', canScroll && panel.scrollTop > 2);
+      panel.classList.toggle('fade-bottom', canScroll && (panel.scrollTop + panel.clientHeight < panel.scrollHeight - 2));
+    });
   }
 
   /* [FIX BM-037] 计算可开票总额：当前用户已结算/已完成订单实付累计 − 已开票（非驳回）金额。
@@ -293,28 +562,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     el.textContent = '可开票总额：¥' + invoiceableTotal().toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '（金额不得超过此数）';
   }
 
-  function renderOrderSelect() {
-    var sel = document.getElementById('f-order');
-    var orders = invoiceableOrders();
-    var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-    var uid = me ? me.id : '';
-    var acct = '';
-    try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
-    var mine = orders.filter(function (o) { return o.owner === uid || o.counterparty === uid || o.counterparty === acct; });/* P2-6 与订单列表过滤一致 */
-    sel.innerHTML = '<option value="">不关联订单</option>' + mine.slice(0, 20).map(function (o) {
-      var amt = Number(o.amount) || 0;
-      return '<option value="' + o.id + '" data-amt="' + amt + '">' + o.id + ' · ' + esc(o.title || '').slice(0, 16) + '（¥' + amt.toLocaleString() + '）</option>';
-    }).join('');
-    /* [FIX BM-037] 选择订单后自动带入该订单实付金额，避免自由输入任意大额 */
-    sel.onchange = function () {
-      var opt = sel.options[sel.selectedIndex];
-      var amt = opt && opt.getAttribute('data-amt');
-      if (amt && Number(amt) > 0) {
-        document.getElementById('f-amount').value = Number(amt);
-      }
-    };
-    refreshAmountHint();
-  }
+  /* 关联订单选择已并入弹窗 openOrderSheet()（UI.sheet 选择列表，自动带入订单实付金额） */
 
   var currentFilter = 'all';
   function renderList() {
@@ -372,8 +620,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   function render() { if (!isLoggedIn()) return;/* P2-7 游客不渲染发票数据 */
     renderOv();
-    renderTitleSelect();
-    renderOrderSelect();
     renderList();
   }
 
@@ -395,15 +641,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (e3) e3.textContent = issued;
   }
 
-  /* 申请开票展开/收起 */
-  document.getElementById('btn-apply').onclick = function () {
-    var form = document.getElementById('apply-form');
-    form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    if (form.style.display === 'block') {
-      renderTitleSelect();
-      renderOrderSelect();
-    }
-  };
+  /* 申请开票：底部弹窗（UI.sheet 自下而上） */
+  document.getElementById('btn-apply').onclick = openApplySheet;
 
   /* E1-20 企业认证门控：仅 enterprise/resident 可开专票 */
   function isEnterpriseCertified() {
@@ -427,31 +666,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
     hint.innerHTML = ok ? '' : '完成<b style="color:var(--primary-dim);">企业认证</b>后可开具增值税专用发票；普票无需企业认证。';
   }
-  /* 发票类型切换 */
-  document.querySelectorAll('#f-type-seg .seg-item').forEach(function (el) {
-    el.onclick = function () {
-      var want = el.getAttribute('data-t');
-      if (want === '增值税专用发票' && !isEnterpriseCertified()) {
-        UI.toast('完成企业认证后可开具增值税专用发票', 'warn');
-        renderSpecialGate();
-        return;
-      }
-      document.querySelectorAll('#f-type-seg .seg-item').forEach(function (x) { x.classList.remove('is-on'); });
-      el.classList.add('is-on');
-      invType = want;
-    };
-  });
-  renderSpecialGate();
+  /* 发票类型切换已并入 bindTypeSeg()，随申请开票弹窗打开时绑定 */
 
-  window.cancelApply = function () {
-    document.getElementById('apply-form').style.display = 'none';
-  };
+  window.cancelApply = function () { if (applySheet) applySheet.close(); };
 
   window.submitApply = function () { if (!isLoggedIn()) { UI.toast('请先登录','warn'); return; }/* P2-7 游客禁止提交申请 */
     var titles = loadTitles();
-    var titleIdx = document.getElementById('f-title').value;
-    var title = titles[titleIdx];
-    if (!title) { UI.toast('请先添加发票抬头', 'warn'); return; }
+    var title = (selTitleIdx > -1 && titles[selTitleIdx]) ? titles[selTitleIdx] : null;
+    if (!title) { UI.toast('请选择发票抬头', 'warn'); return; }
     var amount = parseFloat(document.getElementById('f-amount').value);
     if (!amount || amount <= 0) { UI.toast('请输入有效的开票金额', 'warn'); return; }
     /* [FIX BM-037] 发票金额必须 >0 且 ≤ 可开票总额（已结算订单实付累计 − 已开票），不得自由输入任意大额 */
@@ -470,14 +692,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (!validTaxNo(taxNo)) { UI.toast('税号格式不正确（应为 15/17/18/20 位字母或数字）', 'warn'); return; }
       if (!((title.bankAccount || '').trim())) { UI.toast('专票需填写开户行及账号，请在开票信息管理中补全', 'warn'); return; }
     }
-    var orderId = document.getElementById('f-order').value;
     var payload = {
       title: title.name,
       tax: title.tax || '',
       type: invType,
       amount: amount,
       email: email,
-      orderId: orderId || '',
+      orderId: selOrder ? selOrder.id : '',
       address: title.address || '',
       phone: title.phone || '',
       bank: title.bank || '',
@@ -486,8 +707,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var item = DataBus.invoiceApply(payload);
     if (item && !item.error) {
       UI.toast('开票申请已提交，待审核', 'ok');
-      document.getElementById('apply-form').style.display = 'none';
-      document.getElementById('f-amount').value = '';
+      if (applySheet) applySheet.close();
+      applySheet = null;
+      selTitleIdx = -1; selOrder = null;
       render();
     } else {
       UI.toast((item && item.error) || '提交失败', 'warn');
