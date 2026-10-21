@@ -260,43 +260,32 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 16px;
+  max-height: 46vh;
+  overflow-y: auto;
 }
 .avatar-preset {
   aspect-ratio: 1;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 600;
-  color: #fff;
+  overflow: hidden;
   cursor: pointer;
   transition: transform 0.2s;
   border: 3px solid transparent;
+  background: var(--bg-card-2, #F5F3EE);
+  padding: 0;
 }
+.avatar-preset img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar-preset:active { transform: scale(0.92); }
 .avatar-preset.selected { border-color: #B08A3C; box-shadow: 0 0 0 3px rgba(176, 138, 60, 0.2); }
+.av-cat { font-size: 11px; font-weight: 600; color: var(--text-3, #999); margin: 6px 4px 2px; }
+.av-default-row { display: flex; justify-content: center; padding: 2px 0; }
+.av-default-row .avatar-preset { width: 72px; height: 72px; }
 
 .avatar-sheet-action {
-  padding: 0 16px 16px;
-}
-.avatar-upload-btn {
-  width: 100%;
-  padding: 12px;
-  border: 1.5px dashed var(--line, #D8D4CC);
-  border-radius: 12px;
-  background: transparent;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-2, #666);
-  cursor: pointer;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 10px;
 }
-.avatar-upload-btn svg { width: 16px; height: 16px; }
-.avatar-upload-btn:active { background: rgba(176, 138, 60, 0.06); }
+.avatar-sheet-action .btn { flex: 1; height: 44px; font-size: 14px; font-weight: 600; }
 
 /* Toast */
 .toast {
@@ -330,7 +319,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   <!-- 头像区域 -->
   <div class="avatar-section">
     <div class="avatar-large-wrap">
-      <div class="avatar-large" id="ep-avatar">游</div>
+      <div class="avatar-large" id="ep-avatar" style="cursor:pointer;" onclick="openAvatarSheet()">游</div>
       <div class="avatar-edit-btn" onclick="openAvatarSheet()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </div>
@@ -339,7 +328,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
       更换头像
     </div>
-    <div class="avatar-hint">支持 JPG/PNG 格式，建议尺寸 400×400</div>
+    <div class="avatar-hint">从 20 个奢华动物头像中选择，点确定后生效</div>
   </div>
 
   <!-- 表单区域 -->
@@ -402,10 +391,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   </div>
   <div class="avatar-presets" id="avatar-presets"></div>
   <div class="avatar-sheet-action">
-    <button class="avatar-upload-btn" onclick="showToast('暂不支持自定义上传，可选择上方预设头像')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      从相册上传
-    </button>
+    <button class="btn btn-ghost" onclick="closeAvatarSheet()">取消</button>
+    <button class="btn btn-primary" onclick="confirmAvatar()">确定</button>
   </div>
 </div>
 
@@ -415,23 +402,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
+<script src="../../js/avatar-pool.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
 
-  /* 预设头像颜色 */
-  var AVATAR_PRESETS = [
-    { bg: 'linear-gradient(135deg,#E8D9B5,#B08A3C)', text: '游' },
-    { bg: 'linear-gradient(135deg,#A8D5BA,#5B9A6F)', text: '工' },
-    { bg: 'linear-gradient(135deg,#B8D4E8,#5B8AB5)', text: '程' },
-    { bg: 'linear-gradient(135deg,#F0C8C0,#D4655A)', text: '建' },
-    { bg: 'linear-gradient(135deg,#F0E0C0,#D4945A)', text: '材' },
-    { bg: 'linear-gradient(135deg,#D0C8E8,#8B7BB5)', text: '设' },
-    { bg: 'linear-gradient(135deg,#C8E0E8,#5BA5B5)', text: '机' },
-    { bg: 'linear-gradient(135deg,#E8D0C0,#B5805A)', text: '劳' }
-  ];
-
-  var selectedAvatar = null;
+  /* 头像：默认龙 + 20 个奢华动物头像池（js/avatar-pool.js），selectedPath 为当前选中图片路径 */
+  var selectedPath = (window.AvatarPool && AvatarPool.currentOrDefault()) || '';
   var selectedGender = 'secret';
 
   /* 加载已保存的资料 */
@@ -448,18 +425,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         document.getElementById('ep-bio').value = saved.bio;
         document.getElementById('ep-bio-count').textContent = saved.bio.length;
       }
-      if (saved.avatar != null) {
-        selectedAvatar = saved.avatar;
-        applyAvatar(selectedAvatar);
+      /* 头像：池内图片/默认龙直接出图；旧版数字索引/未设置 → 默认龙兜底 */
+      var savedPath = (window.AvatarPool && typeof saved.avatar === 'string') ? saved.avatar : null;
+      if (savedPath && savedPath.indexOf('.jpg') > -1) {
+        selectedPath = savedPath;
       } else {
-        /* 从UI.state读取用户名 */
-        try {
-          var st = UI.state.get();
-          var name = st.user || (st.loggedIn ? '工程用户' : '游客');
-          document.getElementById('ep-avatar').textContent = name.charAt(0) || '游';
-          document.getElementById('ep-nickname').value = name;
-        } catch (e) {}
+        selectedPath = AvatarPool.currentOrDefault();
       }
+      applyAvatarPath(selectedPath);
       /* [Auth 连通] 从 AuthStore 预填已认证信息：仅在本页未保存时填充 */
       try {
         var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
@@ -468,7 +441,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         var basic = (auth.personalEntry && auth.personalEntry.profile && auth.personalEntry.profile.basic) || {};
         if (!saved.nickname && rn.name) {
           document.getElementById('ep-nickname').value = rn.name;
-          document.getElementById('ep-avatar').textContent = rn.name.charAt(0) || '游';
+          var avEl = document.getElementById('ep-avatar');
+          if (avEl && !avEl.querySelector('img')) avEl.textContent = rn.name.charAt(0) || '游';
         }
         var cityEl = document.getElementById('ep-city');
         if (cityEl && !cityEl.value) { cityEl.value = en.region || basic.location || ''; }
@@ -488,27 +462,49 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     });
   }
 
-  /* 应用头像 */
-  function applyAvatar(index) {
-    var preset = AVATAR_PRESETS[index];
+  /* 直接渲染任意图片路径到大预览（默认龙、池内头像通用） */
+  function applyAvatarPath(path) {
     var el = document.getElementById('ep-avatar');
-    el.style.background = preset.bg;
-    el.textContent = preset.text;
+    if (el && path) el.innerHTML = '<img src="' + path + '" alt="头像">';
   }
 
-  /* 渲染预设头像 */
+  /* 渲染头像选择：默认龙置顶 + 按物种分组（牛/马/猫/狗） */
   function renderPresets() {
     var box = document.getElementById('avatar-presets');
-    box.innerHTML = AVATAR_PRESETS.map(function (p, i) {
-      return '<div class="avatar-preset' + (selectedAvatar === i ? ' selected' : '') +
-        '" style="background:' + p.bg + ';" onclick="selectAvatar(' + i + ')">' + p.text + '</div>';
-    }).join('');
+    var html = '<div class="av-cat">默认</div><div class="av-default-row">' +
+      '<div class="avatar-preset' + (AvatarPool.isDefault(selectedPath) ? ' selected' : '') +
+      '" onclick="selectPreset(\'' + AvatarPool.defaultAvatar() + '\')" title="默认 · 朴素龙">' +
+      '<img src="' + AvatarPool.defaultAvatar() + '" alt="默认 · 朴素龙"></div></div>';
+    var groups = [['牛', 0, 5], ['马', 5, 10], ['猫', 10, 15], ['狗', 15, 20]];
+    groups.forEach(function (g) {
+      html += '<div class="av-cat">' + g[0] + '</div>';
+      for (var i = g[1]; i < g[2]; i++) {
+        var it = AvatarPool.list[i];
+        var p = AvatarPool.url(i);
+        html += '<div class="avatar-preset' + (p === selectedPath ? ' selected' : '') +
+          '" onclick="selectPreset(\'' + p + '\')" title="' + it.label + '">' +
+          '<img src="' + p + '" alt="' + it.label + '"></div>';
+      }
+    });
+    box.innerHTML = html;
   }
 
-  window.selectAvatar = function (index) {
-    selectedAvatar = index;
-    applyAvatar(index);
+  /* 点选：仅临时选中并刷新大预览，点「确定」才持久化 */
+  window.selectPreset = function (path) {
+    selectedPath = path;
+    applyAvatarPath(path);
     renderPresets();
+  };
+
+  /* 确定：写入头像并关闭弹窗 */
+  window.confirmAvatar = function () {
+    if (!selectedPath) {
+      showToast('请先选择一个头像');
+      return;
+    }
+    AvatarPool.saveAvatar(selectedPath);
+    closeAvatarSheet();
+    showToast('头像已更换');
   };
 
   /* 打开/关闭头像选择弹窗 */
@@ -551,12 +547,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       showToast('请输入昵称');
       return;
     }
+    /* 头像：以弹窗当前选中为准；缺省回退默认龙，不再写旧数字索引 */
+    var avatarValue = selectedPath || (window.AvatarPool ? AvatarPool.defaultAvatar() : null);
     var data = {
       nickname: nickname,
       gender: selectedGender,
       city: document.getElementById('ep-city').value.trim(),
       bio: document.getElementById('ep-bio').value.trim(),
-      avatar: selectedAvatar,
+      avatar: avatarValue,
       updatedAt: Date.now()
     };
     try {

@@ -92,6 +92,71 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .trp-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: var(--sp-2); gap: 8px; }
 .trp-price { font-family: var(--font-num); font-size: var(--fs-base); font-weight: 800; color: var(--primary-dim); }
 .trp-loc { font-size: var(--fs-sm); color: var(--text-3); display: flex; align-items: center; gap: 3px; }
+
+/* 首页 #tab-list 通用卡片脚注：说明居左、CTA 居右 + 细分隔线 + 44px 热区。
+   首页不在 #list 作用域，缺该样式导致说明文字与「查看详情」同色同重紧贴连读，此处对齐列表标准补齐。 */
+#tab-list .sc-card-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); min-height: 44px;
+}
+#tab-list .sc-foot-hint { font-size: var(--fs-xs); color: var(--text-3); }
+#tab-list .sc-foot-cta {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--action);
+  padding: 10px 6px; margin: -10px -6px; white-space: nowrap;
+}
+
+/* 首页 #tab-list 卡片：价格/发布方底行两端对齐（对齐 #list，修复 block 堆叠、发布方掉行）。
+   主价深色稳重，单位/后缀次级灰，发布方靠右弱化。 */
+/* 卡片底部内边距收紧为 8px（仅覆盖底部，顶部 14px、左右 16px 不变） */
+#tab-list .job-card { padding-bottom: 8px; }
+#tab-list .sc-foot-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 8px; min-width: 0;
+}
+#tab-list .sc-foot-row .jc-price { color: var(--text-1); }
+#tab-list .sc-foot-row .jc-company { min-width: 0; color: var(--text-3); font-size: var(--fs-xs); }
+#tab-list .sc-foot-row .jc-company svg { flex: none; opacity: .5; }
+
+/* 标题 + 首图主区横向（无图时 sc-text 占满，不影响纯文卡） */
+#tab-list .sc-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+#tab-list .sc-text { flex: 1; min-width: 0; }
+#tab-list .sc-thumb {
+  flex: none; width: 64px; height: 64px; border-radius: var(--r-s); overflow: hidden;
+  background: var(--bg-card-2); display: flex; align-items: center; justify-content: center;
+}
+#tab-list .sc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* AI 摘要块：浅灰底 + 圆角 + 2 行截断（修复裸文字无层级） */
+#tab-list .sc-ai-summary {
+  font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6;
+  background: var(--bg-card-2); border-radius: var(--r-s); padding: 8px 10px; margin: 4px 0 10px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* 中介服务类目胶囊 */
+#tab-list .sc-svcats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+#tab-list .sc-svcat { background: var(--primary-soft); color: var(--primary-dim); }
+#tab-list .sc-chip {
+  display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 9px;
+  border-radius: var(--r-full); font-size: var(--fs-xs); font-weight: 600; line-height: 1; white-space: nowrap;
+}
+
+/* ===== 首页专属重排（仅 #tab-list，不改共享模板） =====
+   ① 发布方公司名移到城市 meta 行右侧；② 价格移到底部「查看详情」行左侧，说明文字删除。 */
+/* 城市/地区行：公司名用 margin-left:auto 推到右侧，中间内容不被 space-between 拉散 */
+#tab-list .jc-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#tab-list .jc-meta > .jc-company {
+  margin-left: auto; min-width: 0; color: var(--text-3); font-size: var(--fs-xs);
+  display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+#tab-list .jc-meta > .jc-company svg { flex: none; opacity: .5; }
+/* 底部 CTA 行：价格居左（数字强调、单位灰），「查看详情」居右 */
+#tab-list .sc-card-foot .jc-price {
+  color: var(--text-1); font-family: var(--font-num); font-weight: 800; min-width: 0;
+  display: inline-flex; align-items: baseline; gap: 2px;
+}
+#tab-list .sc-card-foot .jc-price .unit { color: var(--text-3); font-family: inherit; font-weight: 400; }
 </style>
 <link rel="stylesheet" href="css/state.css">
 </head>
@@ -675,6 +740,34 @@ body.di-alert-on .dynamic-island { display: none !important; }
     }).join('');
     return '<div class="trp-rail"><div class="trp-rail-title">车队运力 · 整车货运</div>' + rows + '</div>';
   }
+  /* 首页专属卡片重排（仅作用于 #tab-list，不改共享模板 common.js）：
+     ① 发布方公司名 .jc-company 从价格行移到城市 meta 行右侧；
+     ② 价格 .jc-price 移到底部 CTA 行左侧，并删除「联系方式查看详情后可见」说明。
+     幂等：重复渲染后节点已在目标位置，重复移动无副作用。 */
+  function homeRelayout() {
+    tabList.querySelectorAll('a.job-card').forEach(function (card) {
+      var footRow = card.querySelector('.sc-foot-row');
+      var company = footRow ? footRow.querySelector(':scope > .jc-company') : null;
+      var price = footRow ? footRow.querySelector(':scope > .jc-price') : null;
+      /* meta 行：招商/买卖卡在 .sc-main 内，招聘/人才卡为卡片直接子级，两种都命中 */
+      var meta = card.querySelector('.sc-main .jc-meta') || card.querySelector(':scope > .jc-meta');
+      // ① 公司名 → 城市 meta 行右侧
+      if (company && meta) meta.appendChild(company);
+      // ② 价格 → 底部 CTA 行左侧，删除说明文字
+      var foot = card.querySelector('.sc-card-foot');
+      if (foot) {
+        var hint = foot.querySelector('.sc-foot-hint');
+        var cta = foot.querySelector('.sc-foot-cta');
+        if (price && price.textContent.trim()) {
+          if (hint) hint.remove();
+          if (cta) foot.insertBefore(price, cta);
+          else foot.appendChild(price);
+        }
+      }
+      // ③ 价格/公司都移走后，移除空的价格行
+      if (footRow && !footRow.textContent.trim()) footRow.remove();
+    });
+  }
   function renderList() {
     var all = listFor(currentFlow, currentSub);
     var trans = all.filter(isTransport);
@@ -683,6 +776,7 @@ body.di-alert-on .dynamic-island { display: none !important; }
     if (!html) html = renderEmptyState();
     html += transportRailHtml(trans);
     tabList.innerHTML = html;
+    homeRelayout();
     injectInfeedCarousel();
   }
   /* 查看全部：供需→发现页；资源→对应专门页（资质招商/建企买卖/人员招聘/持证人才） */

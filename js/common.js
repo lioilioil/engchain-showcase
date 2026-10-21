@@ -1582,17 +1582,17 @@ window.Cards = (function () {
     /* [S0 §1] 角标改用统一 badge/b-* 类；同时保留旧 tag/sc-* 类供未引入 state.css 的页面维持原样 */
     if (role === 'demand') out += '<span class="tag tag-demand badge b-demand sc-badge sc-dir-demand">需求</span>';
     else if (role === 'supply') out += '<span class="tag tag-supply badge b-supply sc-badge sc-dir-supply">供应</span>';
-    /* 详细 / 简要 */
-    var dl = ctx.detailLevel || s.detailLevel || '';
-    if (dl === 'brief') out += '<span class="badge b-brief sc-chip sc-dl">简要</span>';
-    else if (dl === 'detail') out += '<span class="badge b-detail sc-chip sc-dl">详细</span>';
+    /* 详细 / 简要属发布入口类型，前端不展示：detailLevel 数据保留供详情分流/筛选，此处不再渲染角标 */
     if (s.verified) out += '<span class="tag tag-gold badge b-verified sc-badge sc-verify">✓已认证</span>';
     if (s.urgent) out += '<span class="badge b-urgent sc-badge sc-urgent">急</span>';
     if (s.hot) out += '<span class="tag tag-red badge b-hot sc-badge sc-hot">热点</span>';
     /* [P0-01] 本人 pending_review：审核中灰角标（.sc-pending 由 state.css 纳入体系），卡片可点进只读预览 */
     if (s.status === 'pending_review') out += '<span class="sc-pending">审核中</span>';
     var match = (typeof s.match === 'number') ? s.match : '';
-    out += '<span class="match-pill match-high badge b-match sc-match' + (match === '' ? ' is-empty' : '') + '" style="margin-left:auto;">' + (match === '' ? '—' : match + '%') + '</span>';
+    /* 无匹配分（match 非数字）时不渲染匹配度胶囊，避免出现带「—」的空壳占位块（首页/列表通用） */
+    if (match !== '') out += '<span class="match-pill match-high badge b-match sc-match" style="margin-left:auto;">' + match + '%</span>';
+    /* 无任何角标时不输出空壳包裹行，避免 .sc-badges 的 margin-bottom 形成孤立空隙（纯视觉） */
+    if (!out) return '';
     return '<div class="sc-badges jc-tags">' + out + '</div>';
   }
 
@@ -1682,14 +1682,20 @@ window.Cards = (function () {
     var priceHtml = price
       ? '<div class="jc-price">' + price + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div>'
       : '';
-    return '<div class="sc-foot-row">' + priceHtml + (right || '') + '</div>';
+    var inner = priceHtml + (right || '');
+    /* 价格与发布方均空时不输出空壳底行，避免 margin-top 形成孤立空隙（纯视觉） */
+    return inner ? '<div class="sc-foot-row">' + inner + '</div>' : '';
   }
 
   /* 标题+meta 主区，右侧可选首图（P1-05） */
   function textBlock(s, ctx, titleHtml, metaHtml) {
+    var defMeta = metaParts(s, ctx);
+    /* meta 为空时不输出空壳 .jc-meta 包裹，避免其 margin 形成孤立空隙（纯视觉） */
+    var meta = metaHtml != null ? metaHtml
+      : (defMeta ? '<div class="jc-meta">' + defMeta + '</div>' : '');
     return '<div class="sc-main"><div class="sc-text">' +
       (titleHtml || '<div class="jc-title">' + esc(s.title || s.name || '') + '</div>') +
-      (metaHtml != null ? metaHtml : '<div class="jc-meta">' + metaParts(s, ctx) + '</div>') +
+      meta +
       '</div>' + thumbHtml(s) + '</div>';
   }
 

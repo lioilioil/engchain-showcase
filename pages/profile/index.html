@@ -71,7 +71,25 @@ html, body { margin:0; padding:0; background:var(--bg); }
   background:linear-gradient(135deg,#E8D9B5,#B08A3C); color:#fff;
   font-size:22px; font-weight:700; display:flex; align-items:center; justify-content:center;
   box-shadow:0 0 0 3px #fff, 0 0 0 4px rgba(176, 138, 60, .3), 0 2px 8px rgba(176, 138, 60, .28);
+  overflow:hidden; cursor:pointer; position:relative;
+  transition:transform .15s ease;
 }
+.wb-avatar:active { transform:scale(.94); }
+.wb-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+
+/* ---------- 头像选择底部弹窗（20 个奢华动物头像） ---------- */
+.ap-preview { display:flex; justify-content:center; padding:6px 0 14px; }
+.ap-preview .ap-pv { width:72px; height:72px; border-radius:50%; object-fit:cover;
+  box-shadow:0 0 0 3px #fff, 0 0 0 4px rgba(176,138,60,.3); }
+.ap-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:2px 2px 6px; }
+.ap-item { aspect-ratio:1; border-radius:50%; overflow:hidden; cursor:pointer;
+  border:3px solid transparent; position:relative; background:var(--wb-bg,#F5F3EE); }
+.ap-item img { width:100%; height:100%; object-fit:cover; display:block; }
+.ap-item.sel { border-color:#B08A3C; box-shadow:0 0 0 3px rgba(176,138,60,.2); }
+.ap-item:active { transform:scale(.94); }
+.ap-cat { font-size:10px; color:var(--wb-text-3,#999); text-align:center; margin:10px 0 4px; font-weight:600; }
+.ap-default-row { display:flex; justify-content:center; padding:2px 0; }
+.ap-default-row .ap-item { width:72px; height:72px; }
 .wb-user-info { flex:1; min-width:0; }
 .wb-name-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .wb-name { font-size:17px; font-weight:700; color:var(--wb-text-1); line-height:1.2; }
@@ -438,7 +456,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     <!-- ═══ 顶部：用户信息（微博风白底通栏） ═══ -->
     <div class="wb-head">
       <div class="wb-top-row">
-        <div class="wb-avatar" id="pf-avatar">游</div>
+        <div class="wb-avatar" id="pf-avatar" role="button" title="点击更换头像" onclick="pfOpenAvatarSheet()">游</div>
         <div class="wb-user-info">
           <div class="wb-name-row">
             <span class="wb-name" id="pf-username">游客</span>
@@ -530,6 +548,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
+<script src="../../js/avatar-pool.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/orgs.js"></script>
 <script src="../../js/delegates.js"></script>
@@ -588,8 +607,82 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var nameEl = document.getElementById('pf-username');
     if (nameEl) nameEl.textContent = name;
     var avatarEl = document.getElementById('pf-avatar');
-    if (avatarEl) avatarEl.textContent = name.charAt(0) || '游';
+    if (avatarEl && window.AvatarPool) {
+      /* 无已存头像（未设置/旧数字索引）时回退默认龙 */
+      var src = AvatarPool.currentOrDefault();
+      avatarEl.innerHTML = '<img src="' + src + '" alt="头像">';
+    }
   }
+
+  /* ---------- 更换头像：自下而上弹窗，默认龙 + 20 个奢华动物头像，选中 + 确定生效 ---------- */
+  window.pfOpenAvatarSheet = function () {
+    if (!window.UI || !UI.sheet || !window.AvatarPool) return;
+    var cur = AvatarPool.currentOrDefault();
+    var tempPath = cur;
+
+    var sh = UI.sheet();
+    sh.setText('更换头像');
+    sh.setClosable(true);
+
+    function gridHtml() {
+      var html = '<div class="ap-cat">默认</div><div class="ap-default-row">' +
+        '<div class="ap-item' + (AvatarPool.isDefault(tempPath) ? ' sel' : '') + '" data-path="' + AvatarPool.defaultAvatar() + '" title="默认 · 朴素龙">' +
+        '<img src="' + AvatarPool.defaultAvatar() + '" alt="默认 · 朴素龙"></div></div>';
+      var groups = [['牛', 0, 5], ['马', 5, 10], ['猫', 10, 15], ['狗', 15, 20]];
+      groups.forEach(function (g) {
+        html += '<div class="ap-cat">' + g[0] + '</div><div class="ap-grid">';
+        for (var i = g[1]; i < g[2]; i++) {
+          var it = AvatarPool.list[i];
+          html += '<div class="ap-item' + (AvatarPool.url(i) === tempPath ? ' sel' : '') + '" data-path="' + AvatarPool.url(i) + '" title="' + it.label + '">' +
+            '<img src="' + AvatarPool.url(i) + '" alt="' + it.label + '"></div>';
+        }
+        html += '</div>';
+      });
+      return html;
+    }
+
+    function previewHtml() {
+      return '<div class="ap-preview"><img class="ap-pv" src="' + tempPath + '" alt="预览"></div>';
+    }
+
+    sh.html('<div id="ap-preview-box">' + previewHtml() + '</div><div id="ap-grid-box">' + gridHtml() + '</div>');
+
+    var body = sh.body();
+    body.addEventListener('click', function (e) {
+      var item = e.target.closest('.ap-item');
+      if (!item) return;
+      tempPath = item.dataset.path;
+      body.querySelectorAll('.ap-item').forEach(function (n) {
+        n.classList.toggle('sel', n.dataset.path === tempPath);
+      });
+      var pv = body.querySelector('#ap-preview-box');
+      if (pv) pv.innerHTML = previewHtml();
+    });
+
+    sh.show();
+
+    /* show() 内部 boostStickyFoot 在 rAF 中异步隐藏 foot，
+       延迟到其后再填充操作栏并强制显示，避免被重新藏起 */
+    var foot = sh.querySelector('.sheet-foot');
+    setTimeout(function () {
+      if (!foot) return;
+      foot.innerHTML = '<div class="sheet-foot-inner">' +
+        '<button type="button" class="btn btn-ghost" id="ap-cancel">取消</button>' +
+        '<button type="button" class="btn btn-primary" id="ap-confirm">确定</button>' +
+      '</div>';
+      foot.style.display = 'block';
+    }, 80);
+
+    foot.addEventListener('click', function (e) {
+      if (e.target.closest('#ap-cancel')) { sh.close(); return; }
+      if (e.target.closest('#ap-confirm')) {
+        AvatarPool.saveAvatar(tempPath);
+        renderHeader();
+        window.showToast('头像已更换');
+        sh.close();
+      }
+    });
+  };
 
   /* ---------- 入驻类型 → 标签 / 徽标（E1-15 单一来源） ---------- */
   var ENTRY_TYPE_MAP = {
