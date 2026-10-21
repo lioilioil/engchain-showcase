@@ -108,6 +108,43 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     };
   }
 
+  /* ---- [P0-3] 页面内解锁态助手：与 detail.js UnlockStore 同 key 同语义（本页未加载 detail.js） ----
+     localStorage key 'engchain-unlocked'，结构 {bizKey_id:{t:timestamp}}；
+     personnel/publish 免费；talent 7 天；trade 30 天；其余（含 company）永久。 */
+  var PW = {
+    KEY: 'engchain-unlocked',
+    _read: function () { try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { return {}; } },
+    _write: function (o) {
+      try { localStorage.setItem(this.KEY, JSON.stringify(o)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('engchain-unlock-changed', { detail: o })); } catch (e) {}
+    },
+    _key: function (rec) { return (rec.bizKey || 'unknown') + '_' + rec.id; },
+    _ttlDays: function (rec) {
+      var bk = rec && rec.bizKey;
+      if (bk === 'talent') return 7;
+      if (bk === 'trade') return 30;
+      if (rec && rec.detailLevel === 'brief') return 7;
+      return -1;
+    },
+    isFree: function (bk) { return bk === 'personnel' || bk === 'publish'; },
+    isUnlocked: function (rec) {
+      if (!rec) return false;
+      if (this.isFree(rec.bizKey)) return true;
+      var r0 = this._read()[this._key(rec)];
+      if (!r0) return false;
+      var days = this._ttlDays(rec);
+      if (days < 0) return true;
+      return (Date.now() - (r0.t || 0)) < days * 864e5;
+    },
+    mark: function (rec) { var o = this._read(); o[this._key(rec)] = { t: Date.now() }; this._write(o); }
+  };
+  var pwRec = { bizKey: 'company', id: c.id };
+  function cOpen() { return UI.isOwner(c.id) || PW.isUnlocked(pwRec); }
+  /* 锁定态就近解锁胶囊（与 detail.js Lock.inline 同构） */
+  function lockInlineHtml(title, sub) {
+    return '<div class="pw-inline" data-pw-unlock><div class="pw-inline-l"><div class="pw-inline-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></div><div><div class="pw-inline-t">' + UI.esc(title || '解锁查看完整信息') + '</div>' + (sub ? '<div class="pw-inline-s">' + UI.esc(sub) + '</div>' : '') + '</div></div></div>';
+  }
+
   /* ---- 企业成员管理联动：orgId 参数 → 展示企业号信息 + 「申请加入企业」入口 ----
      补全「待审批申请」完整执行路径：员工在企业页申请 → org.joins → 管理员在企业成员管理审批。 */
   var orgIdParam = new URLSearchParams(location.search).get('orgId');
@@ -165,8 +202,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   document.getElementById('pf-sub').textContent = (c.industry || '—') + (c.location ? ' · ' + c.location : '');
 
   /* 认证档案卡 V4.1 · 轻量视觉（取消金色深色奢华风，白底+主色认证标识）
-     位移至「该企业发布的供需」（用户提交信息）上方 */
-  document.getElementById('cert').innerHTML = UI.certExpanded(c, { type: 'company' });
+     位移至「该企业发布的供需」（用户提交信息）上方
+     [P0-3/问题6] 浏览者视角按 locked 透传：隐藏资质清单/评分明细/分项数值/certId */
+  function renderCert() {
+    document.getElementById('cert').innerHTML = UI.certExpanded(c, { type: 'company', locked: !cOpen() });
+  }
+  renderCert();
 
   /* 企业主页内容（用户自主编辑：Markdown 富文本 + 标签） */
   var _defBio = '## 关于' + (c.short || c.name) + '\n\n' +
@@ -211,29 +252,55 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '<div class="biz-info-item"><div class="biz-info-label">' + r.k + '</div><div class="biz-info-value ' + (r.mono ? 'mono' : '') + '">' + r.v + '</div></div>';
   }).join('') + '</div>';
 
-  /* 核心控制人信息（付费墙） */
+  /* 核心控制人信息（付费墙）
+     [P0-3/问题7/8] 未解锁不把控制人姓名/持股比例/电话/微信明文写入 DOM（不靠 CSS blur）；
+     解锁走 CreditStore 扣费 + UnlockStore 持久化（engchain-unlocked），刷新后仍解锁。 */
   var ctrl = c.controller;
   var _phoneIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
   var _copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-  var controllerHtml = '<div class="controller-card">' +
-    '<div class="cc-head">' +
-      '<div class="cc-avatar">' + (ctrl.name ? ctrl.name.charAt(0) : '控') + '</div>' +
-      '<div class="cc-id">' +
-        '<div class="cc-name">' + ctrl.name + '<span class="cc-copy-btn" data-copy="' + ctrl.name + '" title="复制姓名">' + _copyIcon + '</span></div>' +
-        '<div class="cc-sub">' + ctrl.title + '</div>' +
+  function buildControllerHtml(open) {
+    /* 已解锁：明文（原结构） */
+    if (open) {
+      return '<div class="controller-card">' +
+        '<div class="cc-head">' +
+          '<div class="cc-avatar">' + (ctrl.name ? ctrl.name.charAt(0) : '控') + '</div>' +
+          '<div class="cc-id">' +
+            '<div class="cc-name">' + UI.esc(ctrl.name || '') + '<span class="cc-copy-btn" data-copy="' + UI.esc(ctrl.name || '') + '" title="复制姓名">' + _copyIcon + '</span></div>' +
+            '<div class="cc-sub">' + UI.esc(ctrl.title || '') + '</div>' +
+          '</div>' +
+          '<span class="cc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>实控人认证</span>' +
+        '</div>' +
+        '<div class="cc-list">' +
+          '<div class="cc-row"><span class="k">持股比例</span><span class="v">' + UI.esc(ctrl.shareRatio || '') + '</span></div>' +
+          '<div class="cc-row"><span class="k">联系电话</span><span class="v">' + UI.esc(ctrl.phone || '') + '<span class="cc-phone-btn" data-phone="' + UI.esc(ctrl.phone || '') + '" title="拨打电话">' + _phoneIcon + '</span></span></div>' +
+          '<div class="cc-row"><span class="k">微信号</span><span class="v">' + UI.esc(ctrl.wechat || '') + '<span class="cc-copy-btn" data-copy="' + UI.esc(ctrl.wechat || '') + '" title="复制微信号">' + _copyIcon + '</span></span></div>' +
+        '</div>' +
+        '<div class="cc-tip">实际控制人信息由平台核验，仅供商业合作参考</div>' +
+        '</div>';
+    }
+    /* 未解锁：占位/掩码，姓名/持股/电话/微信明文与 data-* 均不进 DOM */
+    return '<div class="controller-card">' +
+      '<div class="cc-head">' +
+        '<div class="cc-avatar">控</div>' +
+        '<div class="cc-id">' +
+          '<div class="cc-name">实控人（已认证）</div>' +
+          '<div class="cc-sub">' + UI.esc(ctrl.title || '实际控制人') + '</div>' +
+        '</div>' +
+        '<span class="cc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>实控人认证</span>' +
       '</div>' +
-      '<span class="cc-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>实控人认证</span>' +
-    '</div>' +
-    '<div class="cc-list">' +
-      '<div class="cc-row"><span class="k">持股比例</span><span class="v">' + ctrl.shareRatio + '</span></div>' +
-      '<div class="cc-row"><span class="k">联系电话</span><span class="v">' + ctrl.phone + '<span class="cc-phone-btn" data-phone="' + ctrl.phone + '" title="拨打电话">' + _phoneIcon + '</span></span></div>' +
-      '<div class="cc-row"><span class="k">微信号</span><span class="v">' + ctrl.wechat + '<span class="cc-copy-btn" data-copy="' + ctrl.wechat + '" title="复制微信号">' + _copyIcon + '</span></span></div>' +
-    '</div>' +
-    '<div class="cc-tip">实际控制人信息由平台核验，仅供商业合作参考</div>' +
-    '</div>';
-  document.getElementById('controller-card').innerHTML = controllerHtml;
+      '<div class="cc-list">' +
+        '<div class="cc-row"><span class="k">持股比例</span><span class="v">解锁后查看</span></div>' +
+        '<div class="cc-row"><span class="k">联系电话</span><span class="v">解锁后获取</span></div>' +
+        '<div class="cc-row"><span class="k">微信号</span><span class="v">解锁后获取</span></div>' +
+      '</div>' +
+      '<div class="cc-tip">实际控制人信息由平台核验，仅供商业合作参考</div>' +
+      '</div>';
+  }
+  function renderController() {
+    document.getElementById('controller-card').innerHTML = buildControllerHtml(cOpen());
+  }
 
-  /* 控制人卡片操作按钮事件 */
+  /* 控制人卡片操作按钮事件（仅解锁态渲染 data-*，锁定态无按钮可点） */
   document.getElementById('controller-card').addEventListener('click', function (e) {
     var phoneBtn = e.target.closest('.cc-phone-btn');
     var copyBtn = e.target.closest('.cc-copy-btn');
@@ -253,13 +320,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }
   });
 
-  /* 付费墙解锁状态：所有者直接解锁 */
-  var controllerUnlocked = UI.isOwner(c.id);
+  /* 付费墙解锁状态：本人 / UnlockStore 已解锁 */
   function updateControllerLock() {
+    var open = cOpen();
     var section = document.getElementById('controller-section');
     var overlay = document.getElementById('controller-lock-overlay');
     var statusEl = document.getElementById('controller-unlock-status');
-    if (controllerUnlocked) {
+    if (open) {
       section.classList.remove('locked');
       overlay.style.display = 'none';
       statusEl.innerHTML = '<span class="unlocked-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 6 9 17l-5-5"/></svg>' + (UI.isOwner(c.id) ? '本人查看' : '已解锁') + '</span>';
@@ -269,14 +336,64 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       statusEl.innerHTML = '';
     }
   }
-  updateControllerLock();
 
-  /* 解锁按钮事件 */
-  document.getElementById('controller-unlock-btn').addEventListener('click', function () {
-    controllerUnlocked = true;
+  /* ---- 解锁流程（M3 统一积分体系）：免费额度 → CreditStore.consume → PW.mark 持久化 → 重建视图 ---- */
+  function freeQuotaInfoC() {
+    var st = window.deriveStatus ? deriveStatus() : 'registered';
+    var allow = (st === 'realname' || st === 'pro' || st === 'enterprise' || st === 'resident');
+    var monthly = (window.RULE ? RULE('credits.freeQuota.monthly', 5) : ((MOCK.business.credits && MOCK.business.credits.freeQuota) ? MOCK.business.credits.freeQuota.monthly : 5));
+    if (window.ModeStore && ModeStore.isBreakIn()) monthly += ((MOCK.business.breakin || {}).registerBonus) || 0;
+    var used = window.CreditStore ? CreditStore.freeUsed() : 0;
+    return { allow: allow, remain: allow ? Math.max(monthly - used, 0) : 0 };
+  }
+  function afterUnlock() {
+    renderCert();
+    renderController();
     updateControllerLock();
-    UI.toast('已解锁核心控制人信息', 'ok');
+  }
+  function openCompanyUnlockSheet() {
+    var sh = UI.sheet();
+    sh.setText('解锁查看核心控制人信息');
+    var cost = (MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.material) || 98;
+    var disc = window.creditDiscount ? creditDiscount() : 1;
+    var costP = Math.round(cost * disc);
+    var fq = freeQuotaInfoC();
+    var bal = window.CreditStore ? CreditStore.read().balance : 0;
+    var freeBtn = (fq.allow && fq.remain > 0);
+    var btnText = freeBtn ? '免费解锁（本月剩 ' + fq.remain + ' 条）' : (bal >= costP ? '扣 ' + costP + ' 积分解锁（余额 ' + bal + '）' : '积分不足 · 去充值');
+    var priceHtml = freeBtn
+      ? '<div class="fw-600" style="font-size:16px;color:var(--success);margin-top:6px;">本月免费额度可用</div>'
+      : '<div class="mono fw-700" style="font-size:22px;color:var(--primary);margin-top:6px;">' + costP + ' 积分' + (disc < 1 ? ' <span style="font-size:11px;color:var(--text-3);">会员' + Math.round(disc * 10) + '折</span>' : '') + '</div>';
+    sh.html(
+      '<div style="padding:4px 4px 16px;">' +
+        '<div style="font-size:12.5px;color:var(--text-2);line-height:1.65;margin-bottom:14px;">解锁后可查看该企业的<b style="color:var(--text-1);">实际控制人、持股比例与联系方式</b>，解锁即获对接权，平台不售卖联系方式。</div>' +
+        '<div style="text-align:center;">' + priceHtml +
+          '<div style="font-size:11px;color:var(--text-3);margin-top:8px;">账户余额 ' + bal + ' 积分 · 实名用户每月免费额度 ' + (function(){var m=(window.RULE?RULE('credits.freeQuota.monthly',5):((MOCK.business.credits&&MOCK.business.credits.freeQuota)?MOCK.business.credits.freeQuota.monthly:5));if(window.ModeStore&&ModeStore.isBreakIn())m+=((MOCK.business.breakin||{}).registerBonus)||0;return m;})() + ' 条</div>' +
+        '</div>' +
+        '<div class="unlock-note">积分用于解锁供需详情，可在「钱包 · 积分」充值<br>' + (window.RULE ? RULE('refund.days', 7) : 7) + '天无理由退款保障 · 客服 400-888-6688</div>' +
+        '<button class="btn btn-primary btn-block btn-lg" id="confirm-unlock" style="margin-top:14px;">' + btnText + '</button>' +
+      '</div>'
+    );
+    sh.show();
+    sh.body().querySelector('#confirm-unlock').addEventListener('click', function () {
+      sh.close();
+      if (freeBtn) { CreditStore.freeSpend(1); PW.mark(pwRec); afterUnlock(); UI.toast('已使用免费解锁额度 1 条', 'ok'); return; }
+      if (bal >= costP) { CreditStore.consume(costP, '解锁' + (c.name || '')); PW.mark(pwRec); afterUnlock(); UI.toast('已扣 ' + costP + ' 积分解锁', 'ok'); return; }
+      UI.toast('积分不足，请先充值', 'warn');
+      setTimeout(function () { location.href = '../../pages/wallet/credits.html'; }, 700);
+    });
+  }
+
+  renderController();
+  updateControllerLock();
+  document.getElementById('controller-unlock-btn').addEventListener('click', openCompanyUnlockSheet);
+  /* [P0-3] 认证卡锁层 [data-pw-unlock] 点击 → 同一解锁 Sheet（本页未加载 detail.js，无全局委托） */
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-pw-unlock]') : null;
+    if (el) openCompanyUnlockSheet();
   });
+  /* 其他页面解锁后经事件联动刷新 */
+  window.addEventListener('engchain-unlock-changed', function () { afterUnlock(); });
 
   /* 该企业发布的供需 · 统一目录；MOCK 未命中时经 DataBus.getRecord 三源兜底（P0-05），缺失返回 null 被 filter 剔除 */
   var list = (c.published || []).map(function (idStr) {

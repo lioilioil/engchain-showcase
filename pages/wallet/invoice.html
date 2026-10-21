@@ -106,6 +106,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .sel-row .sel-val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-weight:500;}
   .sel-row.has-val .sel-val{color:var(--text-1);}
   .sel-row .sel-arrow{width:16px;height:16px;flex:none;color:var(--text-3);}
+  /* 开票金额只读展示行：与 .sel-row/.input 同高同边框同圆角，保证表单内视觉对齐；数值走数字字体 */
+  .amt-display{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:48px;padding:0 var(--sp-4);
+    background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--r-m);box-shadow:var(--shadow-xs);box-sizing:border-box;
+    user-select:none;-webkit-user-select:none;}
+  .amt-display .amt-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;
+    font-family:var(--font-num);font-size:var(--fs-md);font-weight:700;color:var(--text-1);font-variant-numeric:tabular-nums;}
+  .amt-display.is-empty .amt-val{font-family:var(--font-display);font-weight:500;color:var(--text-3);}
+  .amt-tag{flex:none;font-size:10px;font-weight:600;color:var(--primary-dim);background:var(--primary-soft);border-radius:999px;padding:2px 8px;}
   .inv-form-actions{display:flex;gap:10px;width:100%;}
   .inv-form-actions .btn{flex:1;}
   .pm-empty{text-align:center;padding:28px 16px;color:var(--text-3);font-size:13px;}
@@ -134,7 +142,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
      ① 面板高度上限 280px，选项过多时内部滚动；
      ② 可滚动时上下边缘渐隐遮罩（fade-top/fade-bottom），提示可继续查看；
      ③ 选项数 > 6 时自动显示搜索框（drop-search）吸顶过滤，避免长列表翻找；
-     ④ 默认选项（不关联订单）固定首项，不受过滤影响语义；搜索无结果给空态；
+     ④ 关联订单为必选（开票金额仅展示自动带入值），列表无默认首项；搜索无结果给空态；
      ⑤ 列表超 20 条时截断并提示「仅展示最近 20 笔，可在搜索框精确查找」；
      ⑥ 选中即收起、点击面板外收起、箭头随展开旋转。 */
   .drop-fade-top,.drop-fade-bottom{position:absolute;left:0;right:0;height:20px;pointer-events:none;opacity:0;transition:opacity .18s ease;z-index:2;}
@@ -276,7 +284,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       '</div></div>';
   }
   function orderSelHtml() {
-    var val = selOrder ? (selOrder.id + ' · ' + selOrder.title) : '不关联订单';
+    var val = selOrder ? (selOrder.id + ' · ' + selOrder.title) : '请选择关联订单';
     return '<div class="field drop-wrap"><label class="field-label">关联订单</label>' +
       '<button type="button" class="sel-row' + (selOrder ? ' has-val' : '') + '" id="f-order-row" onclick="toggleOrderDrop()">' +
       '<span class="sel-val" id="f-order-val">' + esc(val) + '</span>' +
@@ -300,10 +308,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           '<span class="seg-item is-on" data-t="增值税普通发票">增值税普通发票</span>' +
           '<span class="seg-item" data-t="增值税专用发票">增值税专用发票</span>' +
         '</div></div>' +
-      '<div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>' +
-        '<input class="input" id="f-amount" type="number" placeholder="请输入开票金额" value="">' +
-        '<div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">可开票总额：—</div></div>' +
       orderSelHtml() +
+      '<div class="field"><label class="field-label">开票金额（元） <span class="req">*</span></label>' +
+        '<div class="amt-display' + (selOrder ? '' : ' is-empty') + '" id="f-amount-display" aria-live="polite">' +
+          '<span class="amt-val" id="f-amount-val">' + (selOrder && Number(selOrder.amount) > 0 ? money(selOrder.amount) : '—') + '</span>' +
+          '<span class="amt-tag">自动带入</span>' +
+        '</div>' +
+        '<div class="text-3 fs-11" id="f-amount-hint" style="margin-top:4px;">请选择关联订单，开票金额将自动带入</div></div>' +
       '<div class="field"><label class="field-label">接收邮箱 <span class="req">*</span></label>' +
         '<input class="input" id="f-email" type="email" placeholder="电子发票将发送至该邮箱"></div>' +
       '<div class="inv-form-actions btn-block">' +
@@ -314,7 +325,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var titles = loadTitles();
     var def = titles.filter(function (t) { return t.isDefault; })[0] || titles[0];
     if (def && def.email) document.getElementById('f-email').value = def.email;
-    refreshAmountHint();
+    renderAmountField();
     renderSpecialGate();
     bindTypeSeg();
     sh.show();
@@ -469,10 +480,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     updateDropFades();
   }
   function renderOrderList(list, orders, kw) {
-    var html = '<button type="button" class="pm-item' + (selOrder ? '' : ' selected') + '" data-role="none" onclick="pickOrder(-1)">' +
-      '<div class="pm-body"><div class="pm-name">不关联订单</div><div class="pm-desc">开票金额手动填写</div></div>' +
-      '<div class="pm-radio"></div></button>';
     var k = String(kw || '').trim().toLowerCase();
+    var html = '';
     var shown = 0;
     orders.forEach(function (o, i) {
       var amt = Number(o.amount) || 0;
@@ -486,7 +495,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="pm-desc">¥' + amt.toLocaleString() + '</div></div>' +
         '<div class="pm-radio"></div></button>';
     });
-    if (k && shown === 0) html += '<div class="pm-empty">未找到匹配订单</div>';
+    if (!shown && !k) html = '<div class="pm-empty">暂无已结算订单，完成订单结算后可申请开票</div>';
+    else if (k && shown === 0) html += '<div class="pm-empty">未找到匹配订单</div>';
     /* 规则⑤：列表已截断时给出可搜索提示 */
     if (!k && orders.length >= 20) html += '<div class="pm-more">仅展示最近 20 笔，可在搜索框精确查找</div>';
     list.innerHTML = html;
@@ -498,19 +508,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     updateDropFades();
   };
   window.pickOrder = function (idx) {
+    var orders = invoiceableOrders().slice(0, 20);
+    var o = orders[idx];
+    if (!o) { hideOrderDrop(); return; }
+    selOrder = { id: o.id, title: o.title || '', amount: Number(o.amount) || 0 };
     var valEl = document.getElementById('f-order-val');
-    if (idx === -1) {
-      selOrder = null;
-      if (valEl) { valEl.textContent = '不关联订单'; valEl.parentNode.classList.remove('has-val'); }
-    } else {
-      var orders = invoiceableOrders().slice(0, 20);
-      var o = orders[idx];
-      if (!o) { hideOrderDrop(); return; }
-      selOrder = { id: o.id, title: o.title || '', amount: Number(o.amount) || 0 };
-      if (valEl) { valEl.textContent = selOrder.id + ' · ' + selOrder.title; valEl.parentNode.classList.add('has-val'); }
-      if (selOrder.amount > 0) document.getElementById('f-amount').value = selOrder.amount;/* [FIX BM-037] 选订单自动带入实付金额 */
-    }
-    refreshAmountHint();
+    if (valEl) { valEl.textContent = selOrder.id + ' · ' + selOrder.title; valEl.parentNode.classList.add('has-val'); }
+    renderAmountField();/* [FIX] 选订单自动带入实付金额，开票金额为只读结果值，不可手工修改 */
     hideOrderDrop();
   };
   /* 规则②：可滚动时上下边缘渐隐（title-drop / order-drop 共用） */
@@ -556,13 +560,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     } catch (e) {}
     return Math.max(0, Math.round((gross - invoiced) * 100) / 100);
   }
-  function refreshAmountHint() {
-    var el = document.getElementById('f-amount-hint');
-    if (!el) return;
-    el.textContent = '可开票总额：¥' + invoiceableTotal().toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '（金额不得超过此数）';
+  /* 开票金额为只读结果值：数值由关联订单实付金额自动带入，不可手工修改；提示行同步可开票总额上限 */
+  function renderAmountField() {
+    var disp = document.getElementById('f-amount-display');
+    var val = document.getElementById('f-amount-val');
+    var hint = document.getElementById('f-amount-hint');
+    if (!disp || !val) return;
+    var amt = selOrder ? (Number(selOrder.amount) || 0) : 0;
+    disp.classList.toggle('is-empty', amt <= 0);
+    val.textContent = amt > 0 ? money(amt) : '—';
+    if (hint) {
+      var cap = '可开票总额：¥' + invoiceableTotal().toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      hint.textContent = amt > 0 ? ('已自动带入订单实付金额 · ' + cap) : ('请选择关联订单，开票金额将自动带入 · ' + cap);
+    }
   }
 
-  /* 关联订单选择已并入弹窗 openOrderSheet()（UI.sheet 选择列表，自动带入订单实付金额） */
+  /* 关联订单为必选：选中后实付金额自动带入开票金额（只读结果值，不可手工修改） */
 
   var currentFilter = 'all';
   function renderList() {
@@ -674,8 +687,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var titles = loadTitles();
     var title = (selTitleIdx > -1 && titles[selTitleIdx]) ? titles[selTitleIdx] : null;
     if (!title) { UI.toast('请选择发票抬头', 'warn'); return; }
-    var amount = parseFloat(document.getElementById('f-amount').value);
-    if (!amount || amount <= 0) { UI.toast('请输入有效的开票金额', 'warn'); return; }
+    /* 开票金额为只读结果值：必须先选择关联订单，实付金额自动带入，不可手工修改 */
+    var amount = selOrder ? (Number(selOrder.amount) || 0) : 0;
+    if (!amount || amount <= 0) { UI.toast('请选择关联订单，开票金额将自动带入', 'warn'); return; }
     /* [FIX BM-037] 发票金额必须 >0 且 ≤ 可开票总额（已结算订单实付累计 − 已开票），不得自由输入任意大额 */
     var invTotal = invoiceableTotal();
     if (amount > invTotal + 0.001) {

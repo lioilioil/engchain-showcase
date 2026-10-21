@@ -91,7 +91,7 @@ onMounted(loadUser)
               <el-descriptions-item label="用户ID">{{ user.id }}</el-descriptions-item>
               <el-descriptions-item label="账号">{{ user.account }}</el-descriptions-item>
               <el-descriptions-item label="姓名">{{ user.name }}</el-descriptions-item>
-              <el-descriptions-item label="手机号">{{ user.mobile }}</el-descriptions-item>
+              <el-descriptions-item label="手机号">{{ permStore.has('sensitive:view') ? user.mobile : maskPhone(user.mobile) }}</el-descriptions-item>
               <el-descriptions-item label="企业">{{ user.company || '-' }}</el-descriptions-item>
               <el-descriptions-item label="状态">{{ user.status }}</el-descriptions-item>
               <el-descriptions-item label="地址" v-if="user.entry?.address">
@@ -140,7 +140,9 @@ onMounted(loadUser)
                 <el-table :data="user.entry.qualifications" size="small">
                   <el-table-column prop="name" label="资质名称" />
                   <el-table-column prop="level" label="等级" width="100" />
-                  <el-table-column prop="no" label="证书编号" width="150" />
+                  <el-table-column label="证书编号" width="150">
+                    <template #default="{ row }">{{ permStore.has('sensitive:view') ? row.no : '****' }}</template>
+                  </el-table-column>
                   <el-table-column prop="expireAt" label="到期日期" width="120" />
                 </el-table>
               </div>

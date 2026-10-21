@@ -61,13 +61,70 @@ ES.init(function (ctx) {
     };
   }
 
+  /* ---- 签约方滚动状态区：自动轮播 + 手动滑动（触摸/滚轮后暂停，无操作恢复） ---- */
+  var _psJobs = [];
+  function initPartyScroller(el) {
+    var list = el.querySelector('.es-ps-list');
+    var items = el.querySelectorAll('.es-ps-item');
+    var n = items.length;
+    if (n <= 1 || !list || !items[0]) return;
+    var idx = 0, timer = null, idle = null, tracking = false, startY = 0;
+    var itemH = items[0].offsetHeight;
+    function render() {
+      list.style.transform = 'translateY(' + (-idx * itemH) + 'px)';
+      el.setAttribute('data-pos', (idx + 1) + '/' + n);
+    }
+    function next() { idx = (idx + 1) % n; render(); }
+    function prev() { idx = (idx - 1 + n) % n; render(); }
+    function startAuto() { stopAuto(); timer = setInterval(next, 2600); }
+    function stopAuto() { if (timer) { clearInterval(timer); timer = null; } }
+    function resumeLater() { stopAuto(); if (idle) clearTimeout(idle); idle = setTimeout(startAuto, 4200); }
+    el.addEventListener('touchstart', function (e) {
+      stopAuto();
+      tracking = true;
+      startY = e.touches[0].clientY;
+      list.style.transition = 'none';
+    }, { passive: true });
+    el.addEventListener('touchmove', function (e) {
+      if (!tracking) return;
+      var dy = e.touches[0].clientY - startY;
+      list.style.transform = 'translateY(' + (-idx * itemH + dy) + 'px)';
+    }, { passive: true });
+    el.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      tracking = false;
+      list.style.transition = '';
+      var dy = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY - startY : 0;
+      if (dy <= -itemH * 0.35) next();
+      else if (dy >= itemH * 0.35) prev();
+      render();
+      resumeLater();
+    }, { passive: true });
+    var wAcc = 0, wT = 0;
+    el.addEventListener('wheel', function (e) {
+      stopAuto();
+      wAcc += e.deltaY;
+      if (Date.now() - wT > 380 && Math.abs(wAcc) >= 22) {
+        wAcc = 0; wT = Date.now();
+        if (e.deltaY > 0) next(); else prev();
+      }
+      resumeLater();
+    }, { passive: true });
+    render();
+    startAuto();
+    _psJobs.push({ el: el, stop: stopAuto });
+  }
+  function stopAllPartyScrollers() {
+    _psJobs.forEach(function (j) { j.stop(); });
+    _psJobs = [];
+  }
+
   function heroHTML(c, moreCount) {
     var cd = ES.countdown(c.deadline);
     var pg = ES.progress(c);
-    var nodes = c.parties.map(function (p, i) {
-      var cls = p.status === 'signed' ? 'done' : (p.ownerUid === ctx.user.id ? 'cur' : '');
-      return '<div class="node ' + cls + '"><div class="dot"></div><div class="lb">' + ES.esc(p.role + (p.company || p.name)) + (p.status === 'signed' ? '·已签' : (p.ownerUid === ctx.user.id ? '·待签' : '')) + '</div></div>';
-    }).join('') + '<div class="node"><div class="dot"></div><div class="lb">平台存证</div></div>';
+    /* 签署状态：动态滚动展示所有签约方（角色标签·状态 + 名称），司法存证以辅助行呈现 */
+    var partyArea = '<div class="es-hero-ps">' + ES.partyScroll(c) +
+      '<div class="es-hero-note">平台司法存证 · 全流程加密可验真</div></div>';
     return '<section class="es-hero" data-sign="' + ES.esc(c.id) + '">' +
       '<div class="kicker"><span>待我签署 · <b class="es-mono">' + (moreCount + 1) + '</b> 份</span><span class="seal">待<br>签</span></div>' +
       '<h3>' + ES.esc(c.title) + '</h3>' +
@@ -76,7 +133,7 @@ ES.init(function (ctx) {
         '<span class="role">' + ES.esc(ES.roleText(c).replace(' · 发起', '')) + '</span></div>' +
       '<div class="due">' + ES.ic('clock') + '<span>距签署截止 <span class="es-mono">' + ES.esc(cd.text.replace('剩 ', '')) + '</span></span>' +
         '<span class="normal">· 逾期自动失效</span></div>' +
-      '<div class="es-flowline">' + nodes + '</div>' +
+      partyArea +
       (moreCount > 0 ? '<div style="margin-top:10px;font-size:11.5px;color:var(--es-on-world-gold);">另有 ' + moreCount + ' 份合同待你签署，可在下方"待我签"中查看</div>' : '') +
       '<div class="acts"><button class="go" data-sign="' + ES.esc(c.id) + '">' + ES.ic('sign') + '立即签署</button>' +
         '<button class="ghost" data-detail="' + ES.esc(c.id) + '">查看合同</button></div>' +
@@ -102,7 +159,8 @@ ES.init(function (ctx) {
     var low = (q.remaining || 0) <= 2;
     return '<div class="es-sec"><h2>我的签署次数</h2></div>' +
       '<div class="es-quota' + (low ? ' low' : '') + '"><span class="qi">' + ES.ic('package') + '</span>' +
-      '<div class="ql"><div>剩余 <b class="es-mono">' + (q.remaining || 0) + '</b> 次　<span class="dim">本月已用 ' + (q.monthUsed || 0) + ' · 累计 ' + (q.totalUsed || 0) + ' 次</span></div>' +
+      '<div class="ql"><div>剩余 <b class="es-mono">' + (q.remaining || 0) + '</b> 次</div>' +
+        '<div class="dim">本月已用 ' + (q.monthUsed || 0) + ' · 累计 ' + (q.totalUsed || 0) + ' 次</div>' +
         '<div class="dim">' + (q.earliestExpire ? '最早 ' + ES.esc(q.earliestExpire) + ' 到期' : '购买后 2 年有效') + '</div></div>' +
       '<button class="es-btn sm gold" id="btnBuy" style="flex:none;white-space:nowrap;">购买次数</button></div>';
   }
@@ -127,6 +185,7 @@ ES.init(function (ctx) {
         '<div class="s">' + (filter === 'mine' ? '没有待你签署的合同，到期合同会在顶部提醒' : '点击右下角「发起签署」创建第一份电子合同') + '</div>' +
         (filter !== 'mine' ? '<button class="es-btn primary" id="btnEmptyNew">' + ES.ic('plus') + '发起签署</button>' : '') + '</div>';
     }
+    stopAllPartyScrollers();
     scrollEl.innerHTML = html;
     bind();
   }
@@ -157,9 +216,7 @@ ES.init(function (ctx) {
     scrollEl.querySelectorAll('.es-cc .body').forEach(function (bd) {
       bd.onclick = function () { location.href = 'detail.html?id=' + encodeURIComponent(bd.parentNode.getAttribute('data-id')); };
     });
-    scrollEl.querySelectorAll('.es-cc .caret').forEach(function (ca) {
-      ca.onclick = function (e) { e.stopPropagation(); ca.closest('.es-cc').classList.toggle('open'); };
-    });
+    scrollEl.querySelectorAll('.es-ps').forEach(initPartyScroller);
   }
 
   function openSheet() {

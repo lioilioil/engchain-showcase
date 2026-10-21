@@ -156,19 +156,34 @@
     }
     return h + '</span><span class="pf">签署 <b>' + pg.signed + '</b>/' + pg.total + ' 方</span>';
   }
+  /* 角色标签配色：按签约角色固定色（甲方=朱红 / 乙方=金 / 丙方=蓝 / 丁方=墨绿 / 其他=灰） */
+  function roleClass(role) {
+    var r = String(role || '');
+    if (r.indexOf('甲') > -1) return 'role-a';
+    if (r.indexOf('乙') > -1) return 'role-b';
+    if (r.indexOf('丙') > -1) return 'role-c';
+    if (r.indexOf('丁') > -1) return 'role-d';
+    return 'role-x';
+  }
+  /* 签约方滚动状态区：展示所有签约方（角色标签·状态 + 名称），由页面层驱动上下滚动切换 */
+  function partyScroll(c) {
+    var ps = (c.parties || []).map(function (p) {
+      var st = p.status === 'signed' ? '已签' : (p.status === 'rejected' ? '拒签' : '待签');
+      return '<div class="es-ps-item"><span class="es-ptag ' + roleClass(p.role) + '">' + esc(p.role || '签署方') + ' · ' + st + '</span>' +
+        '<span class="es-pname">' + esc(p.company || p.name) + '</span></div>';
+    }).join('');
+    return '<div class="es-ps" data-id="' + esc(c.id) + '" data-n="' + (c.parties || []).length + '"><div class="es-ps-list">' + ps + '</div></div>';
+  }
   function cardHTML(c) {
     var m = meta(c);
     return '<article class="es-cc ' + m.spine + '" data-id="' + esc(c.id) + '">' +
       '<div class="body">' +
         '<div class="r1"><h4>' + esc(c.title) + '</h4><span class="es-badge ' + m.badge + '">' + m.badgeText + '</span></div>' +
-        '<div class="r2"><span class="amt es-mono">' + amountText(c) + '</span><span class="role">' + esc(roleText(c)) + '</span>' +
-          '<span class="other">' + esc(counterpartyText(c)) + '</span></div>' +
-        '<div class="r3">' + segBar(c) + '</div>' +
+        '<div class="r2"><span class="amt es-mono">' + amountText(c) + '</span><span class="role">' + esc(roleText(c)) + '</span></div>' +
+        '<div class="r3">' + partyScroll(c) + '</div>' +
         '<div class="foot"><span class="cno">' + esc(c.code) + '</span>' +
-          '<span class="st ' + m.foot + '">' + esc(m.footText) + '</span>' +
-          '<span class="caret">' + ic('chevron') + '</span></div>' +
+          '<span class="st ' + m.foot + '">' + esc(m.footText) + '</span></div>' +
       '</div>' +
-      '<div class="more"><div class="es-tl">' + timelineHTML(c) + '</div></div>' +
     '</article>';
   }
 
@@ -595,6 +610,7 @@
     myParty: myParty, otherParties: otherParties, progress: progress, roleText: roleText,
     amountText: amountText, counterpartyText: counterpartyText, meta: meta,
     timeline: timeline, timelineHTML: timelineHTML, evidenceHTML: evidenceHTML, cardHTML: cardHTML,
+    partyScroll: partyScroll, roleClass: roleClass,
     subscribe: subscribe, init: init,
     Draft: Draft, newDraft: newDraft, sendFromDraft: sendFromDraft,
     stepsHTML: stepsHTML, docHTML: docHTML, docSections: docSections, externalPending: externalPending,

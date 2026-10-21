@@ -662,16 +662,23 @@ window.UI = (function () {
       var url = homeUrl(c.id);
       nameHtml = '<span class="cert-name-link" data-home-url="' + url + '" style="cursor:pointer;">' + nameHtml + '</span>';
     }
+    /* [P0-1] locked：隐藏 GEO 综合评分/等级块（评分数值不进锁定态 DOM），仅保留名称+官方认证徽章+存续行业 */
+    var scoreHtml = opts.locked ? '' :
+      '<div class="cert-score"><div class="cert-score-row"><span class="cert-score-num">' + (c.score && c.score.value) + '</span><span class="cert-score-max">/10</span></div>' +
+        '<div class="cert-score-label">GEO 综合评分</div>' +
+        '<div class="cert-score-grade">✦ ' + ((c.score && c.score.grade) || '—') + '</div></div>';
     return '<div class="cert-header">' +
       '<div class="cert-badge-wrap"><div class="cert-seal">' + icon('shield', '') + '</div>' +
         '<div class="cert-badge-text"><div class="cert-badge-title">' + nameHtml +
           '<svg class="verified-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></div>' +
         '<div class="cert-badge-sub">ENGCHAIN 官方认证 · 信息已核验</div>' +
         '<div class="cert-badge-meta">' + (c.industry || '工程服务') + ' · 工商存续 · 平台年度核验</div></div></div>' +
-      '<div class="cert-score"><div class="cert-score-row"><span class="cert-score-num">' + (c.score && c.score.value) + '</span><span class="cert-score-max">/10</span></div>' +
-        '<div class="cert-score-label">GEO 综合评分</div>' +
-        '<div class="cert-score-grade">✦ ' + ((c.score && c.score.grade) || '—') + '</div></div>' +
+      scoreHtml +
     '</div>';
+  }
+  /* [P0-1] 锁定态就近解锁胶囊（与 detail.js Lock.inline 同构；点击行为由宿主页面/详情页委托绑定） */
+  function certLockInline() {
+    return '<div class="pw-inline" data-pw-unlock><div class="pw-inline-l"><div class="pw-inline-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></div><div><div class="pw-inline-t">解锁查看完整认证档案</div><div class="pw-inline-s">资质清单 · 评分明细 · 核验记录</div></div></div></div>';
   }
   function certTags(c) {
     const tags = c.tags || [];
@@ -679,7 +686,9 @@ window.UI = (function () {
       (c.reviewCount ? '<span class="cert-tag review">' + c.reviewCount + '条企业评价</span>' : '') + '</div>';
   }
   // V4.0 状态摘要行：一行传达核心信任信号（已认证项数/最高资质/信用档位）
-  function certSummary(c) {
+  // [P0-1] locked：隐藏已认证项数/信用档位等数值摘要
+  function certSummary(c, opts) {
+    if (opts && opts.locked) return '';
     const certs = c.certs || [];
     const dims = c.dims || [];
     const topQual = c.emphasis || (c.tags && c.tags.length ? c.tags[0].t : '资质完备');
@@ -692,7 +701,9 @@ window.UI = (function () {
     '</div>';
   }
   // V4.0 概览维度网格（替代原 .cert-mid）
-  function certOverviewDims(c) {
+  // [P0-1] locked：隐藏分项数值与进度条
+  function certOverviewDims(c, opts) {
+    if (opts && opts.locked) return '';
     const dims = c.dims || [];
     return '<div class="cert-overview-dims">' +
       dims.map(function (d) {
@@ -709,14 +720,16 @@ window.UI = (function () {
     '</div>';
   }
   // V4.0 Tab 面板集合（移除企业基本信息，避免与详情页重复）
-  function certPanels(c) {
+  // [P0-1] locked：整块隐藏（资质清单条目、评分公式/权重/数值均不进 DOM）
+  function certPanels(c, opts) {
+    if (opts && opts.locked) return '';
     const dims = c.dims || [];
     const certs = c.certs || [];
     const gw = (dims.length ? (100 / dims.length) : 25);
     const formula = dims.map(d => d.k + '(' + Math.round(gw) + '%)×' + d.v).join(' + ');
     const avg = dims.length ? (dims.reduce((a, d) => a + parseFloat(d.v), 0) / dims.length) : 0;
     return '<div class="cert-panels">' +
-      '<div class="cert-panel active" data-panel="overview">' + certSummary(c) + certOverviewDims(c) + '</div>' +
+      '<div class="cert-panel active" data-panel="overview">' + certSummary(c, opts) + certOverviewDims(c, opts) + '</div>' +
       '<div class="cert-panel" data-panel="certs"><div class="cert-cert-list">' +
         certs.map(function (ct) { return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>'; }).join('') +
       '</div></div>' +
@@ -729,29 +742,35 @@ window.UI = (function () {
     '</div>';
   }
   function certFooter(c, opts) {
+    /* [P0-1] locked：隐藏 certId 编号，保留「区块链存证 · 可在线验证」文案 */
     return '<div class="cert-footer">' +
       '<div class="cert-verify">' + icon('shield', '') + '区块链存证 · 可在线验证</div>' +
-      (opts && opts.home ? '<a class="cert-home" href="' + opts.home + '">企业主页 ›</a>' : '<div class="cert-id">' + (c.certId || '') + '</div>') +
+      (opts && opts.home ? '<a class="cert-home" href="' + opts.home + '">企业主页 ›</a>' : ((opts && opts.locked) ? '' : '<div class="cert-id">' + (c.certId || '') + '</div>')) +
     '</div>';
   }
   // opts.compact=true → 详情页完整卡(页内Tab，无弹窗)；opts.home=true → 主页精简卡(无Header/Tags，纯Tab内容)；默认 → 企业主页折叠卡
   function certCard(c, opts) {
     opts = opts || {};
     c = c || {};
+    /* [P0-1] locked：不渲染 Tab 栏/资质清单/评分明细，尾部追加解锁胶囊 */
+    var panelsHtml = opts.locked ? '' : (certTabs() + certPanels(c, opts));
+    var lockHtml = opts.locked ? certLockInline() : '';
     if (opts.compact) {
-      return '<div class="cert-card cert-card--compact">' + certHeader(c, opts) + certTabs() + certPanels(c) + certFooter(c, opts) + '</div>';
+      return '<div class="cert-card cert-card--compact">' + certHeader(c, opts) + panelsHtml + certFooter(c, opts) + lockHtml + '</div>';
     }
     if (opts.home) {
-      return '<div class="cert-card cert-card--home">' + certTabs() + certPanels(c) + certFooter(c, opts) + '</div>';
+      return '<div class="cert-card cert-card--home">' + panelsHtml + certFooter(c, opts) + lockHtml + '</div>';
     }
-    return '<div class="cert-card fold-0">' + certHeader(c, opts) + certTags(c) + certTabs() + certPanels(c) + certFooter(c, opts) +
-      '<div class="cert-toggle"><span>展开认证详情</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>' +
+    return '<div class="cert-card fold-0">' + certHeader(c, opts) + certTags(c) + panelsHtml + certFooter(c, opts) + lockHtml +
+      (opts.locked ? '' : '<div class="cert-toggle"><span>展开认证详情</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>') +
     '</div>';
   }
   function certFull(c, opts) {
     opts = opts || {};
     c = c || {};
-    return '<div class="cert-card cert-card--full">' + certHeader(c, opts) + certTags(c) + certTabs() + certPanels(c) + certFooter(c, opts) + '</div>';
+    /* [P0-1] 同步支持 locked（deprecated 保留兼容，不改签名） */
+    var panelsHtml = opts.locked ? '' : (certTabs() + certPanels(c, opts));
+    return '<div class="cert-card cert-card--full">' + certHeader(c, opts) + certTags(c) + panelsHtml + certFooter(c, opts) + (opts.locked ? certLockInline() : '') + '</div>';
   }
 
   /* ============================================================================
@@ -865,17 +884,23 @@ window.UI = (function () {
   // 企业/个人主页「展开式」认证：不折叠成详情页紧凑卡，把认证内容直接展开显示
   function certExpanded(c, opts) {
     opts = opts || {}; c = c || {};
+    var o = Object.assign({}, opts, { noLink: true });
+    /* [P0-1] locked：仅展示名称+官方认证徽章+标签，隐藏状态摘要数值/分项数值/资质清单/评分明细/certId，尾部解锁胶囊 */
+    if (opts.locked) {
+      return '<div class="cert-card cert-card--expanded">' +
+        certHeader(c, o) + certTags(c) + certLockInline() + certFooter(c, o) +
+      '</div>';
+    }
     var certs = c.certs || [];
     var dims = c.dims || [];
     var gw = dims.length ? (100 / dims.length) : 25;
     var formula = dims.map(function(d){ return d.k + '(' + Math.round(gw) + '%)×' + d.v; }).join(' + ');
     var avg = dims.length ? (dims.reduce(function(a,d){ return a + parseFloat(d.v); }, 0) / dims.length) : 0;
-    var o = Object.assign({}, opts, { noLink: true });
     var html = '<div class="cert-card cert-card--expanded">' +
       certHeader(c, o) +
-      certSummary(c) +
+      certSummary(c, o) +
       certTags(c) +
-      certOverviewDims(c);
+      certOverviewDims(c, o);
     if (certs.length) {
       html += '<div class="cert-panel-title">资质清单</div><div class="cert-cert-list">' +
         certs.map(function(ct){ return '<div class="cert-cert-item"><span class="cci-icon">✓</span><span class="cci-name">' + ct.name + '</span><span class="cci-date">' + ct.date + '</span></div>'; }).join('') +
