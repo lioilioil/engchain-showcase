@@ -77,19 +77,13 @@ html, body { margin:0; padding:0; background:var(--bg); }
 .wb-avatar:active { transform:scale(.94); }
 .wb-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
 
-/* ---------- 头像选择底部弹窗（20 个奢华动物头像） ---------- */
-.ap-preview { display:flex; justify-content:center; padding:6px 0 14px; }
-.ap-preview .ap-pv { width:72px; height:72px; border-radius:50%; object-fit:cover;
-  box-shadow:0 0 0 3px #fff, 0 0 0 4px rgba(176,138,60,.3); }
+/* ---------- 头像选择底部弹窗：平铺单一网格，无分类文字、无当前头像预览 ---------- */
 .ap-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:2px 2px 6px; }
 .ap-item { aspect-ratio:1; border-radius:50%; overflow:hidden; cursor:pointer;
   border:3px solid transparent; position:relative; background:var(--wb-bg,#F5F3EE); }
 .ap-item img { width:100%; height:100%; object-fit:cover; display:block; }
 .ap-item.sel { border-color:#B08A3C; box-shadow:0 0 0 3px rgba(176,138,60,.2); }
 .ap-item:active { transform:scale(.94); }
-.ap-cat { font-size:10px; color:var(--wb-text-3,#999); text-align:center; margin:10px 0 4px; font-weight:600; }
-.ap-default-row { display:flex; justify-content:center; padding:2px 0; }
-.ap-default-row .ap-item { width:72px; height:72px; }
 .wb-user-info { flex:1; min-width:0; }
 .wb-name-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .wb-name { font-size:17px; font-weight:700; color:var(--wb-text-1); line-height:1.2; }
@@ -624,28 +618,21 @@ html, body { margin:0; padding:0; background:var(--bg); }
     sh.setText('更换头像');
     sh.setClosable(true);
 
+    /* 平铺单一网格：默认龙 + 20 个动物，不分类、无文字标签、不显示当前头像预览 */
     function gridHtml() {
-      var html = '<div class="ap-cat">默认</div><div class="ap-default-row">' +
-        '<div class="ap-item' + (AvatarPool.isDefault(tempPath) ? ' sel' : '') + '" data-path="' + AvatarPool.defaultAvatar() + '" title="默认 · 朴素龙">' +
-        '<img src="' + AvatarPool.defaultAvatar() + '" alt="默认 · 朴素龙"></div></div>';
-      var groups = [['牛', 0, 5], ['马', 5, 10], ['猫', 10, 15], ['狗', 15, 20]];
-      groups.forEach(function (g) {
-        html += '<div class="ap-cat">' + g[0] + '</div><div class="ap-grid">';
-        for (var i = g[1]; i < g[2]; i++) {
-          var it = AvatarPool.list[i];
-          html += '<div class="ap-item' + (AvatarPool.url(i) === tempPath ? ' sel' : '') + '" data-path="' + AvatarPool.url(i) + '" title="' + it.label + '">' +
-            '<img src="' + AvatarPool.url(i) + '" alt="' + it.label + '"></div>';
-        }
-        html += '</div>';
+      var items = [{ path: AvatarPool.defaultAvatar(), img: AvatarPool.defaultAvatar() }];
+      AvatarPool.list.forEach(function (it, i) {
+        items.push({ path: AvatarPool.url(i), img: AvatarPool.url(i) });
       });
-      return html;
+      var html = '<div class="ap-grid">';
+      items.forEach(function (it) {
+        html += '<div class="ap-item' + (it.path === tempPath ? ' sel' : '') + '" data-path="' + it.path + '">' +
+          '<img src="' + it.img + '" alt=""></div>';
+      });
+      return html + '</div>';
     }
 
-    function previewHtml() {
-      return '<div class="ap-preview"><img class="ap-pv" src="' + tempPath + '" alt="预览"></div>';
-    }
-
-    sh.html('<div id="ap-preview-box">' + previewHtml() + '</div><div id="ap-grid-box">' + gridHtml() + '</div>');
+    sh.html(gridHtml());
 
     var body = sh.body();
     body.addEventListener('click', function (e) {
@@ -655,8 +642,6 @@ html, body { margin:0; padding:0; background:var(--bg); }
       body.querySelectorAll('.ap-item').forEach(function (n) {
         n.classList.toggle('sel', n.dataset.path === tempPath);
       });
-      var pv = body.querySelector('#ap-preview-box');
-      if (pv) pv.innerHTML = previewHtml();
     });
 
     sh.show();
