@@ -402,13 +402,53 @@ window.OrgsStore = (function () {
     var m = membershipOf(u.id, orgId);
     return m ? m.role : '';
   }
+
+  /* ============ M1-9 新体系三角色骨架（D33，复用 OrgsStore，不改既有流程） ============
+     legalRep：执照法定代表人(legal)派生的只读展示位，不进 canManage、不自动获得操作权；
+     legalRep 与 admin 可为不同自然人。存量 owner 迁移期保留 canManage 兼容不失权。 */
+  function legalRepOf(orgId) {
+    var org = get(orgId);
+    if (!org) return null;
+    return { name: org.legal || '', role: 'legalRep', readonly: true, canManage: false,
+      source: 'license', note: '执照法定代表人派生只读，不进 canManage' };
+  }
+  /* 角色视角权限位（供 M3-10 团队页按角色显隐；M1 仅骨架，不改邀请/审批/移除/移交/认领流程） */
+  function agentRoleView(orgId, uid) {
+    var org = get(orgId);
+    if (!org) return { exists: false };
+    var id = uid || (me() && me().id);
+    var m = id ? membershipOf(id, orgId) : null;
+    var role = m ? m.role : '';
+    var canMgmt = !!(m && (role === 'owner' || role === 'admin'));
+    return {
+      exists: true, orgId: orgId, role: role,
+      legalRep: { name: org.legal || '', readonly: true },
+      canManage: canMgmt,        /* admin / 存量 owner：操作位（迁移期兼容） */
+      canSeeFinance: canMgmt,    /* 台账/测算/比例/协议：仅 canManage 可见可操作 */
+      canOperate: canMgmt,       /* 发起二级/录比例/协议/解约解绑：仅 admin（M3 细化） */
+      isLegalRep: !!m && role === 'legalRep',
+      isMember: !!m && role === 'member',
+      legacyOwner: !!org.legacyOwner
+    };
+  }
+  /* 存量 owner 迁移标记：保留 canManage 向后兼容；内部移交只变操作人，
+     不改变企业代理归属、不影响已签协议/台账/省独家（§3.12）。 */
+  function migrateLegacyOwner(orgId) {
+    var a = load();
+    var org = a.find(function (x) { return x.orgId === orgId; });
+    if (!org) return { error: '企业不存在' };
+    org.legacyOwner = true;
+    save(a);
+    return { ok: true, org: org };
+  }
   /* 移除成员：仅 owner；不可移除企业主。
      联动失效：被移出成员名下的待接受邀请 / 加入申请 / 移交申请 / 自认领 / 企业主变更目标一并作废，
      避免「人已不在企业，单据仍在流转」造成状态不一致；同时通知被移出成员。 */
   function removeMember(orgId, uid) {
     var a = load(); var org = a.find(function (x) { return x.orgId === orgId; }); var u = me(); if (!org) return { error: '企业不存在' };
     var cm = membershipOf(u.id, orgId);
-    if (!cm || cm.role !== 'owner') return { error: '仅企业主可移除成员' };
+    /* M1-9（§3.12）：移除成员权限由仅 owner 扩为 canManage(owner/admin)；存量 owner 不失权 */
+    if (!cm || !(cm.role === 'owner' || cm.role === 'admin')) return { error: '仅企业主/管理员可移除成员' };
     if (uid === org.ownerUid) return { error: '企业主不可被移除' };
     var target = (window.DataBus && DataBus.byId) ? DataBus.byId(uid) : null;
     var tName = target ? target.name : uid;
@@ -1164,6 +1204,7 @@ window.OrgsStore = (function () {
     orgsOf: orgsOf, membershipOf: membershipOf, currentMembership: currentMembership,
     members: members, memberCount: memberCount,
     canManage: canManage, myRole: myRole,
+    legalRepOf: legalRepOf, agentRoleView: agentRoleView, migrateLegacyOwner: migrateLegacyOwner,
     invite: invite, pendingInvitesFor: pendingInvitesFor, acceptInvite: acceptInvite, rejectInvite: rejectInvite,
     requestJoin: requestJoin, pendingJoins: pendingJoins, approveJoin: approveJoin, rejectJoin: rejectJoin,
     removeMember: removeMember,

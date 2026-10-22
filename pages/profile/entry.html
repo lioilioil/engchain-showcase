@@ -62,7 +62,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <div class="et-note">
       <svg class="ic" style="width:14px;height:14px;flex:none;margin-top:2px;color:var(--primary);"><use href="#i-shield"/></svg>
-      <span>建筑企业与中介服务企业两类互斥，不可同时入驻；合伙人企业可与上述任一类型并行。入驻费按次收取，合伙人采用后台人工审核制，不涉及线上入驻费。</span>
+      <span>建筑企业与中介服务企业两类互斥，不可同时入驻；省级总代（省代）为零入驻费、平台人工审核的一省独家授权，与企业入驻线并行但分属不同体系。个人合伙人申请走独立入口，不在本页。</span>
     </div>
   </div>
 </div>
@@ -71,17 +71,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- M2 省级总代体系：data→rules→tax→store→bridge→apply（缺失回退已具备） -->
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-bridge.js"></script>
+<script src="../../js/agent-apply.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 var entry=MOCK.business.entryTypes;
 var breakin=ModeStore.isBreakIn();
-var descs={construction:'承接工程项目供需 · 招标报价 · 蓝V 标识',agency:'提供中介服务 · 线上订单 · 佣金通道',partner:'深度共建 · 完整分销 · 后台审核'};
+var descs={construction:'承接工程项目供需 · 招标报价 · 蓝V 标识',agency:'提供中介服务 · 线上订单 · 佣金通道',provinceAgent:'省级独家授权 · 省内无限查看 · 招募二级合作公司（零入驻费）'};
 var feats={
   construction:['供需发布不限','招标报价权限','基础分销（一级）','无佣金通道'],
   agency:['服务橱窗展示','线上订单 + 佣金通道','分销受限','履约保证金机制'],
-  partner:['专属合伙人标识','完整二级分销','优先撮合与运营支持','后台人工审核入驻']
+  provinceAgent:['一省独家授权','本省无限查看','招募二级公司','¥0 · 平台人工审核']
 };
-var names={construction:'建筑企业',agency:'中介服务企业',partner:'合伙人企业'};
+var names={construction:'建筑企业',agency:'中介服务企业',provinceAgent:'省级总代（省代）'};
 function money(n){return '¥'+Number(n).toLocaleString();}
 function breakinFee(id){var bi=MOCK.business.breakin.entry;return id==='construction'?bi.construction:(id==='agency'?bi.agency:entry[id].fee);}
 
@@ -106,7 +112,17 @@ function render(){
   }
 
   var box=document.getElementById('entry-list');
-  box.innerHTML=['construction','agency','partner'].map(function(id,i){
+  /* [M4-4] 旧企业合伙人(partner/resident_partner)卡片彻底摘除，不再保留占位；个人合伙人(u9)不经此页 */
+  box.innerHTML=['construction','agency','provinceAgent'].map(function(id,i){
+    /* M2-1 省级总代（省代）：¥0 人工审核，无付费入口/金额按钮 */
+    if(id==='provinceAgent'){
+      return '<div class="et-card et-t-agency et-t-province" style="animation-delay:'+(i*70)+'ms">'+
+        '<div class="fb-between" style="margin-bottom:6px;"><div class="fw-700 fs-15">省级总代（省代）</div><span class="et-badge et-badge-on">一省独家</span></div>'+
+        '<div class="text-3 fs-12" style="margin-bottom:10px;line-height:1.6;">'+descs.provinceAgent+'</div>'+
+        '<div class="et-feats">'+feats.provinceAgent.map(function(f){return '<span class="et-chip"><i>✓</i>'+f+'</span>';}).join('')+'</div>'+
+        '<div class="fb-between" style="align-items:flex-end;margin-top:11px;"><div><div style="font-size:11px;color:var(--text-3);">入驻费</div><span class="fw-700 et-fee green">¥0 · 人工审核</span></div>'+
+        '<button class="btn btn-primary et-btn" onclick="location.href=\'entry-form.html?type=provinceAgent\'">申请省代</button></div></div>';
+    }
     var t=entry[id],fee=breakin?breakinFee(id):t.fee;
     var active=activeTypes.indexOf(id)>=0&&e.active;
     var pending=reviewing&&e.type===id;
@@ -150,24 +166,24 @@ function render(){
   var cmpRows=[
     {label:'入驻费（正式）',v:['¥'+Number(entry.construction.fee).toLocaleString()+'/次','¥'+Number(entry.agency.fee).toLocaleString()+'/次','¥0 · 人工审核']},
     {label:'入驻费（体验期）',v:[breakin?money(breakinFee('construction'))+' · 体验':'¥'+Number(entry.construction.fee).toLocaleString()+'/次',breakin?money(breakinFee('agency'))+' · 体验':'¥'+Number(entry.agency.fee).toLocaleString()+'/次','¥0']},
-    {label:'解锁折扣',v:[discText('construction'),discText('agency'),discText('partner')]},
-    {label:'佣金通道',v:['无佣金通道','订单+佣金通道','全渠道分销']},
-    {label:'分销返佣',v:['一级分销','分销受限','完整二级分销']},
-    {label:'专属徽标',v:[window.IdBadge?IdBadge.render('construction','sm'):'蓝V',window.IdBadge?IdBadge.render('agency','sm'):'金V',window.IdBadge?IdBadge.render('partner','sm'):'专属']},
-    {label:'专属后台',v:['供需发布后台','订单管理后台','合伙人专属后台']},
-    {label:'团队管理',v:['不支持','不支持','支持']},
-    {label:'监控额度',v:[(mon.construction||30)+' 家',(mon.agency||50)+' 家',(mon.partner||200)+' 家']}
+    {label:'解锁折扣',v:[discText('construction'),discText('agency'),'—']},
+    {label:'收益线',v:['无佣金通道','订单+佣金通道','代理两分区（约定/自留）']},
+    {label:'分成口径',v:['一级分销','分销受限','总盘50% · 约定比例分成']},
+    {label:'专属徽标',v:[window.IdBadge?IdBadge.render('construction','sm'):'蓝V',window.IdBadge?IdBadge.render('agency','sm'):'金V','省级授权徽标']},
+    {label:'专属后台',v:['供需发布后台','订单管理后台','代理工作台']},
+    {label:'团队管理',v:['不支持','不支持','支持（三角色）']},
+    {label:'监控额度',v:[(mon.construction||30)+' 家',(mon.agency||50)+' 家','本省无限']}
   ];
   var gridHtml='<div class="et-compare">';
   gridHtml+='<div class="et-cmp-row et-cmp-head">'+
     '<div class="et-cmp-lab"></div>'+
     '<div class="et-cmp-v et-cmp-col-construction"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>建筑企业</div>'+
     '<div class="et-cmp-v et-cmp-col-agency"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 20l1.3-3.5A8 8 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>中介服务</div>'+
-    '<div class="et-cmp-v et-cmp-col-partner"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6L8 14 2 9.4h7.6L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>合伙人</div>'+
+    '<div class="et-cmp-v et-cmp-col-partner"><span class="et-cmp-col-icon"><svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6L8 14 2 9.4h7.6L12 2z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>省级总代（省代）</div>'+
   '</div>';
   cmpRows.forEach(function(r, ri){
     gridHtml+='<div class="et-cmp-row'+(ri%2===1?' et-cmp-row-alt':'')+'"><div class="et-cmp-lab">'+r.label+'</div>'+
-      r.v.map(function(x, ci){return '<div class="et-cmp-v'+(ci===1?' et-cmp-blur':'')+'">'+x+'</div>';}).join('')+'</div>';
+      r.v.map(function(x){return '<div class="et-cmp-v">'+x+'</div>';}).join('')+'</div>';
   });
   gridHtml+='</div>';
   gridHtml+='<div class="et-agency-contact">'+
@@ -200,8 +216,13 @@ window.addEventListener('engchain:store-change',render);
 .et-rv-go{flex:none;border:none;background:var(--primary-soft);color:var(--primary);font-size:12px;font-weight:600;border-radius:999px;padding:6px 12px;}
 .et-card{position:relative;overflow:hidden;margin-bottom:12px;padding:14px 14px 13px 17px;opacity:0;animation:et-in .5s var(--e-out) forwards;}
 @keyframes et-in{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
-/* D12：不用贴边彩条，类型由浅语义底 + 描边区分（建筑卡走 et-card-core 自有品牌浅金底） */
-.et-card.et-t-agency{background:color-mix(in srgb,var(--primary) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--primary) 24%,var(--line));}
+/* L-05：非核心卡（中介/省代）统一中性灰卡面：统一圆角/描边/内边距，不套藏青/金棕，不改功能与费率 */
+.et-card{border:1px solid var(--line);background:var(--bg-card);border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.et-card.et-t-agency{background:var(--bg-card);border-color:var(--line);}
+.et-card.et-t-province{background:var(--bg-card);border-color:var(--line);}
+.et-card .fw-700.fs-15{font-size:15px;font-weight:700;line-height:1.3;}
+.et-card .et-chip{font-size:11px;color:var(--text-2);background:var(--bg-card-2);border-radius:8px;padding:4px 8px;}
+.et-card .et-btn{min-width:92px;padding:9px 16px;font-size:13px;}
 .et-card.et-t-partner{background:color-mix(in srgb,var(--purple) 6%,var(--bg-card));border-color:color-mix(in srgb,var(--purple) 22%,var(--line));}
 .et-card.is-on{border-color:rgba(176, 138, 60, .45);}
 .et-vbadge{font-size:10.5px;}
@@ -345,9 +366,6 @@ window.addEventListener('engchain:store-change',render);
 /* 对比表数据行建筑企业列（第2列）高亮 */
 .et-cmp-row:not(.et-cmp-head) .et-cmp-v:nth-child(2){background:rgba(176, 138, 60, .05);font-weight:600;color:var(--primary-dim);}
 .et-cmp-row-alt:not(.et-cmp-head) .et-cmp-v:nth-child(2){background:rgba(176, 138, 60, .09);}
-
-/* 中介列模糊覆盖 */
-.et-cmp-blur{filter:blur(3.5px);user-select:none;pointer-events:none;opacity:.5;position:relative;}
 
 /* 中介服务联系客服 */
 .et-agency-contact{display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,rgba(176, 138, 60, .12),rgba(176, 138, 60, .04));border:1px solid rgba(176, 138, 60, .3);border-radius:14px;padding:13px 14px;margin-top:11px;margin-bottom:14px;}

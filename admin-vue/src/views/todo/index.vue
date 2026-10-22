@@ -81,7 +81,7 @@ async function loadData() {
 
 const todoCards = [
   { key: 'authPending', title: '认证审核', desc: '实名认证 / 企业认证 / 资质审核', path: '/users/auth-review', color: '#1f883d' },
-  { key: 'entryPending', title: '入驻审核', desc: '企业入驻 / 中介入驻 / 合伙人入驻', path: '/users/entry-review', color: '#0969da' },
+  { key: 'entryPending', title: '入驻审核', desc: '建筑入驻 / 中介入驻（省代审核见独立桥接视图）', path: '/users/entry-review', color: '#0969da' },
   { key: 'withdrawPending', title: '提现审批', desc: '用户提现申请待处理', path: '/finance/withdraw', color: '#d4a72c' },
   { key: 'supplyPending', title: '供需审核', desc: '供需信息发布待审核', path: '/mediation/requests', color: '#cf222e' }
 ]

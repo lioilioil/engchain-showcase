@@ -65,6 +65,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 (function(){window.__ROOT__='../../';
 function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered',distTier:'base',isIndividualPartner:false};
+/* [M4 收口] 旧团队树仅向 legacy 企业入驻（base/limited）开放；新代理（总代/二级）、个人合伙人、游客/普通用户直达 URL 一律拒绝 */
+var isLegacy = !!(acc.isResident && (acc.distTier==='base'||acc.distTier==='limited') && !acc.isProvinceAgent && !acc.isSubAgent);
+function blockedView(title,note,btnHref,btnText){
+  var overviewEl=document.querySelector('.team-overview'); if(overviewEl)overviewEl.style.display='none';
+  var toggleEl=document.getElementById('view-toggle'); if(toggleEl)toggleEl.style.display='none';
+  var scrollEl=document.querySelector('.scroll');
+  if(scrollEl){
+    scrollEl.innerHTML='<div style="padding:64px 28px 40px;text-align:center;">'+
+      '<div style="width:72px;height:72px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);">'+
+      '<svg class="ic" style="width:34px;height:34px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>'+
+      '<div class="fw-700 fs-17" style="margin-bottom:8px;">'+title+'</div>'+
+      '<div class="text-3 fs-13" style="line-height:1.8;margin-bottom:28px;">'+note+'</div>'+
+      '<button class="btn btn-primary btn-block" onclick="location.href=\''+btnHref+'\'">'+btnText+'</button>'+
+      '</div>';
+  }
+}
 if(!acc.isResident && !acc.isIndividualPartner){
   var isGuest=(acc.statusId==='guest');
   if (window.GuestGate) GuestGate.open({
@@ -79,21 +95,16 @@ if(!acc.isResident && !acc.isIndividualPartner){
 }
 /* 个人合伙人：无团队管理功能，显示空态 */
 if(acc.isIndividualPartner){
-  var overviewEl=document.querySelector('.team-overview');
-  if(overviewEl)overviewEl.style.display='none';
-  var toggleEl=document.getElementById('view-toggle');
-  if(toggleEl)toggleEl.style.display='none';
-  var scrollEl=document.querySelector('.scroll');
-  if(scrollEl){
-    scrollEl.innerHTML='<div style="padding:64px 28px 40px;text-align:center;">'+
-      '<div style="width:72px;height:72px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:var(--primary-soft);">'+
-      '<svg class="ic" style="width:34px;height:34px;color:var(--primary-dim);"><use href="#i-user"/></svg></div>'+
-      '<div class="fw-700 fs-17" style="margin-bottom:8px;">个人合伙人无团队管理功能</div>'+
-      '<div class="text-3 fs-13" style="line-height:1.8;margin-bottom:28px;">个人合伙人享有二级分销权益（一级8% / 二级2%），可通过推广海报邀请伙伴消费并获得返佣。<br>团队管理功能仅面向企业入驻合伙人开放。</div>'+
-      '<button class="btn btn-primary btn-block" onclick="location.href=\'index.html\'">返回分销中心</button>'+
-      '<a href="poster.html" style="display:block;margin-top:14px;color:var(--primary);font-size:13px;font-weight:600;">去生成推广海报 ›</a>'+
-      '</div>';
-  }
+  blockedView('个人合伙人无团队管理功能','个人合伙人享有专属返佣（一级8% / 二级2%），可通过推广海报邀请伙伴消费并获得返佣；团队树为 legacy 企业入驻功能，个人合伙人不开放。','index.html','返回分销中心');
+  return;
+}
+/* 新代理（总代/二级）：团队走代理体系团队页，旧分销团队树拒绝直达 */
+if(acc.isProvinceAgent || acc.isSubAgent){
+  blockedView('旧分销团队树不可用','省级总代/二级合作公司的成员管理走代理体系团队页，不使用旧分销团队树。','../province-agent/team.html','前往代理团队');
+  return;
+}
+if(!isLegacy){
+  blockedView('无旧团队管理权限','当前身份不开放 legacy 分销团队树；如需推广收益，请走对应身份的收益通道。','index.html','返回分销中心');
   return;
 }
 var tier=acc.distTier;
@@ -129,9 +140,9 @@ function render(){
   if(!links.length){box.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   if(view==='list'){
-    var l1=links.filter(function(l){return l.level===1;}),l2=links.filter(function(l){return l.level===2;});
+    /* [M4-3/M4 收口] full 档已摘除，legacy base/limited 仅一级直推，不再渲染二级间推块 */
+    var l1=links.filter(function(l){return l.level===1;});
     var html='<div class="group-label"><span>直推伙伴（一级 · '+l1.length+'）</span></div><div class="m-card">'+l1.map(memberRow).join('')+'</div>';
-    if(tier==='full'&&l2.length)html+='<div class="group-label" style="margin-top:18px;"><span>间推伙伴（二级 · '+l2.length+'）</span><span class="gl-note">仅合伙人可见</span></div><div class="m-card">'+l2.map(memberRow).join('')+'</div>';
     box.innerHTML=html;
   }else{
     /* 树形视图：根节点（我）+ 一级/二级网格 + SVG 连线（archify 风格组织树） */

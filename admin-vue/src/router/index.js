@@ -40,6 +40,8 @@ const PAGE_COMPONENTS = {
   '/membership/renewal': () => import('@/views/membership/Renewal.vue'),
   '/marketing/props': () => import('@/views/marketing/Props.vue'),
   '/users/agent': () => import('@/views/users/Agent.vue'),
+  /* M2 省级总代：新独立视图，避开已占用的 /users/agent（Agent.vue） */
+  '/agents/province': () => import('@/views/agents/ProvinceAdmin.vue'),
   '/users/funnel': () => import('@/views/users/Funnel.vue'),
   '/finance/recharge': () => import('@/views/finance/Recharge.vue'),
   '/distribution/team': () => import('@/views/distribution/Team.vue'),
@@ -98,6 +100,7 @@ export const MENU_GROUPS = [
       { title: '入驻审核', path: '/users/entry-review' },
       { title: '企业主验证审核', path: '/users/owner-review' },
       { title: '委托代理', path: '/users/agent' },
+      { title: '省代开通/审核', path: '/agents/province' },
       { title: '转化漏斗', path: '/users/funnel' }
     ]
   },

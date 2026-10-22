@@ -52,12 +52,12 @@
     distribution: {
       maxLevel: 2, freezeDays: 1, bindWindowHours: 72,
       tiers: {
-        /* [FIX BM-028/BM-030] 档位：base/limited/full 企业三档 + individualPartner 个人合伙人档（8%/2%）。
+        /* [M4-3] 档位：base（建筑旧持有人）/limited（中介旧持有人）+ individualPartner 个人合伙人档（8%/2%）。
+           旧「full 完整二级（合伙人企业）」档位已摘除（旧企业合伙人随 M4-4 下线），不再配置/校验/结算。
            费率不硬编码死值：applyConfig 时以 MOCK.business.distribution.tier1/tier2 覆盖 base.t1/t2，
            以 MOCK.business.distribution.individualPartner 覆盖个人合伙人档；后台 ConfigAPI.save 改价即时生效。 */
         base: { label: '基础一级（建筑企业）', t1: 12, t2: 3 },
         limited: { label: '受限一级（中介企业）', t1: 6, t2: 0 },
-        full: { label: '完整二级（合伙人企业）', t1: 12, t2: 3 },
         individualPartner: { label: '个人合伙人', t1: 8, t2: 2 }
       },
       levelRules: [
@@ -143,9 +143,7 @@
       }
       num('distribution.tiers.base.t1', 0, 100);
       num('distribution.tiers.limited.t1', 0, 100);
-      num('distribution.tiers.full.t1', 0, 100);
-      num('distribution.tiers.full.t2', 0, 100);
-      /* [FIX BM-028] 个人合伙人档（8%/2%）校验 */
+      /* [M4-3] 旧 full 档位校验已摘除；个人合伙人档（8%/2%）校验保留 */
       num('distribution.tiers.individualPartner.t1', 0, 100);
       num('distribution.tiers.individualPartner.t2', 0, 100);
       /* 合规锁：分销层级最多二级 */
@@ -265,12 +263,11 @@
     _write: function (a) { return save(REF_KEY, a); },
     /* 直接上级链路：返回 invitee 的 L1 邀请人 link */
     uplineOf: function (inviteeId) { return this.all().filter(function (l) { return l.inviteeId === inviteeId && l.level === 1; })[0] || null; },
-    /* 下级（我邀请的人）；tier 决定可见层级（非 full 仅一级） */
+    /* 下级（我邀请的人）；[M4-3] full 档位摘除后仅可见一级（个人合伙人不建团队线） */
     downline: function (inviterId) {
-      var tier = (window.entryAccess ? safeDistTier(inviterId) : 'base');
       return this.all().filter(function (l) {
         if (l.inviterId !== inviterId || l.status !== 'active') return false;
-        return tier === 'full' ? true : l.level === 1;
+        return l.level === 1;
       });
     },
     /* 绑定邀请关系：code=邀请人码，inviteeId=被邀人；含全部合规校验 */
@@ -298,17 +295,10 @@
       var l1 = { id: uid('RF'), inviterId: inviterId, inviteeId: inviteeId, level: 1, rootId: inviterId,
                  channel: channel || 'register', code: String(code).toUpperCase(), boundAt: Date.now(), status: 'active' };
       links.push(l1); created.push(l1);
-      /* L2：若邀请人自身有 L1 上级 P，则 P 与被邀人形成二级关系（受合规上限约束） */
+      /* [M4-3] 旧 full 二级绑定分支已摘除：不再为旧合伙人企业自动建 L2 关系（合规上限 maxLevel 保留） */
       if (maxLevel >= 2) {
         var up = links.filter(function (l) { return l.inviteeId === inviterId && l.level === 1; })[0];
-        if (up) {
-          var pTier = safeDistTier(up.inviterId);
-          if (pTier === 'full') {
-            var l2 = { id: uid('RF'), inviterId: up.inviterId, inviteeId: inviteeId, level: 2, rootId: up.inviterId,
-                       channel: channel || 'register', code: String(code).toUpperCase(), boundAt: Date.now(), status: 'active' };
-            links.push(l2); created.push(l2);
-          }
-        }
+        /* full 档位摘除后无任何档位可触发 L2 自动绑定，此处仅保留结构占位，不创建 level2 记录 */
       }
       this._write(links);
       /* 双方各得邀请积分（仅一次，claim 防重） */
@@ -342,7 +332,7 @@
        修复原仅企业入驻可分销导致个人合伙人分销返佣资金断链 */
     if (u.auth && u.auth.partner && u.auth.partner.ok && (!u.identity || u.identity.enterprise !== 'resident')) return 'individualPartner';
     var types = (u.identity && u.identity.entryTypes) || (u.entry && u.entry.types) || (u.entry && u.entry.type ? [u.entry.type] : []);
-    if (types.indexOf('partner') >= 0) return 'full';
+    /* [M4-3] 旧企业 partner→full 映射摘除：旧企业合伙人随 M4-4 下线，落回 base 不再授予 full */
     if (types.indexOf('agency') >= 0) return 'limited';
     return 'base';
   }
@@ -495,11 +485,10 @@
     }
     try { LS.setItem(DataBus.USERS_KEY, JSON.stringify(users)); } catch (e) {}
     var cur = currentUid();
-    if (cur === uidStr && window.BalanceStore) {
-      /* [FIX BM-050] 优先调用核心层 BalanceStore.rebate()（totalRebate+=amount，不污染 totalIn、不重复触发充值返佣）；
-         核心层未升级时回退 recharge(method='rebate')——既有 recharge 挂接已对该 method 内部豁免，不会递归虚增 */
-      if (typeof BalanceStore.rebate === 'function') BalanceStore.rebate(amount, reason || '分销返佣');
-      else BalanceStore.recharge(amount, 'rebate', { remark: reason || '分销返佣' });
+    if (cur === uidStr && window.BalanceStore && typeof BalanceStore.rebate === 'function') {
+      /* [M4 收口] 返佣入账只走核心层 BalanceStore.rebate()（totalRebate+=amount，不污染 totalIn）；
+         物理移除旧 recharge(method='rebate') 回退链，充值通道不再承载任何返佣发放。 */
+      BalanceStore.rebate(amount, reason || '分销返佣');
     }
   }
 
@@ -1010,28 +999,22 @@
      7. 分佣引擎挂接三类消费事件（无侵入包装既有方法）
      ========================================================================== */
   function hookRebate() {
-    /* 7.1 充值成功 → 充值返佣
-       [FIX BM-050] 本挂钩保留两个合法职责：①真实充值时 Ledger 台账双账对齐（否则 Mediation.pay 扣 Ledger.available 会失败）；
-       ②真实充值触发充值返佣事件。返佣发放侧已不再依赖本挂钩的 method=rebate 隐式抑制——
-       safeMoneyAdd 已显式调用核心层 BalanceStore.rebate()（totalRebate 口径），本挂钩对该 method 的豁免仅作向后兼容保留。 */
+    /* 7.1 充值通道仅做资金双账对齐，物理不产生任何返佣：
+       - 合法职责：真实外部充值(wechat/alipay/corp…)时 Ledger 台账双账对齐（否则 Mediation.pay 扣 Ledger.available 会失败）；
+       - method='rebate'/internal 为领域层内部划转（卖家结算/退款回补），台账已由 Ledger.transfer 记过，跳过对齐防重复；
+       - [M4 收口] 充值不再触发也不承载任何返佣事件；返佣只由订单 settled(7.3) 与入驻终审(7.2) 经 Rebate.createFromEvent 产生，
+         返佣发放走 BalanceStore.rebate()，返佣基数=真实消费（解锁/入驻/增值实付），杜绝充值即返套现。 */
     if (window.BalanceStore && !BalanceStore.__rebateHooked) {
       var origRecharge = BalanceStore.recharge;
       BalanceStore.recharge = function (amount, method, extra) {
         var r = origRecharge.apply(this, arguments);
-        /* method='rebate' 为领域层内部划转（卖家结算/返佣发放/退款回补），其台账已由 Ledger.transfer 记过，
-           既不能重复记台账，也不能再次触发充值返佣（否则递归虚增）；仅外部真实充值(wechat/alipay/corp…)走挂钩 */
         if (method === 'rebate' || (extra && extra.internal)) return r;
         try {
           var me = currentUid();
-          if (me) {
-            /* 资金双账对齐：钱包充值同步记入台账（外部通道 PLATFORM.available → 用户 available，允许平台为负），
-               否则中介托管支付 Mediation.pay 扣 Ledger.available 时会因台账无余额而失败 */
-            if (window.Ledger) {
-              Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: me, toAcct: 'available',
-                amount: r2(amount), bizType: 'wallet_recharge', allowNegative: true, idemKey: 'rc_' + me + '_' + r2(amount) + '_' + Date.now(), remark: '钱包充值入账' });
-            }
-            /* [P0 修复] 充值不触发返佣：返佣基数改为真实消费（解锁/入驻/增值实付），
-               否则充值即返 12% + 提现零手续费 = 拉人头套现通道。 */
+          if (me && window.Ledger) {
+            /* 资金双账对齐：钱包充值同步记入台账（外部通道 PLATFORM.available → 用户 available，允许平台为负） */
+            Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: me, toAcct: 'available',
+              amount: r2(amount), bizType: 'wallet_recharge', allowNegative: true, idemKey: 'rc_' + me + '_' + r2(amount) + '_' + Date.now(), remark: '钱包充值入账' });
           }
         } catch (e) {}
         return r;

@@ -83,8 +83,9 @@ if(!acc.dist){
 }
 var me=DataBus.current(),uid=me?me.id:'';
 var STATES=RULE('distribution.states',{});
-var SRC={recharge:'充值返佣',order:'订单返佣',entry:'入驻返佣'};
-var SRC_ICON={recharge:'i-wallet',order:'i-doc',entry:'i-shield'};
+/* [M4-6] 充值不计入返佣基数，移除 recharge 来源标签/图标映射 */
+var SRC={order:'订单返佣',entry:'入驻返佣'};
+var SRC_ICON={order:'i-doc',entry:'i-shield'};
 var filter={status:'',level:'',source:''};
 var CHIPS=[{k:'',label:'全部'},{k:'frozen',label:'冻结中'},{k:'settled',label:'已结算'},{k:'paid',label:'已发放'},{k:'clawback',label:'已追回'}];
 var ST_TAG={frozen:{t:'冻结中',c:'var(--text-2)',b:'var(--bg-card-2)',bd:'var(--line)'},settled:{t:'已结算',c:'var(--success)',b:'rgba(43,107,79,.08)',bd:'rgba(43,107,79,.22)'},paid:{t:'已发放',c:'var(--primary-dim)',b:'var(--primary-soft)',bd:'var(--accent-line)'},clawback:{t:'已追回',c:'var(--danger)',b:'rgba(190,61,52,.08)',bd:'rgba(190,61,52,.22)'}};
@@ -139,7 +140,7 @@ window.showDetail=function(id){
   var tl=Timeline.list('rebate',id).map(function(t){return '<div class="text-3 fs-12" style="padding:3px 0;">'+fmt(t.ts)+' · '+t.event+'</div>';}).join('')||'<div class="text-3 fs-12">暂无</div>';
   var sh=UI.sheet();sh.setText('返佣单详情');sh.html('<div style="padding:6px 2px 14px;">'+
     '<div class="od-kv"><span>来源</span><b>'+(SRC[o.sourceType]||o.sourceType)+'（'+(o.sourceOrderId||'—')+'）</b></div>'+
-    '<div class="od-kv"><span>层级 / 档位</span><b>'+(o.level===1?'一级':'二级')+' · '+({full:'完整二级',limited:'受限一级',base:'基础一级'}[o.tier]||o.tier)+'</b></div>'+
+    '<div class="od-kv"><span>层级 / 档位</span><b>'+(o.level===1?'一级':'二级')+' · '+({limited:'受限一级',base:'基础一级'}[o.tier]||o.tier)+'</b></div>'+
     '<div class="od-kv"><span>计算</span><b>¥'+money(o.baseAmount)+' × '+o.rate+'% = ¥'+money(o.fee)+'</b></div>'+
     '<div class="od-kv"><span>状态</span><b><span class="er-tag" style="color:'+tag.c+';background:'+tag.b+';border-color:'+tag.bd+';">'+tag.t+'</span></b></div>'+
     (o.walletTxnId?'<div class="od-kv"><span>钱包流水</span><b>'+o.walletTxnId+'</b></div>':'')+
@@ -150,7 +151,7 @@ window.openFilter=function(){
     '<div class="text-3 fs-12" style="margin-bottom:6px;">层级</div><div class="chip-bar">'+
       ['','1','2'].map(function(l){return '<span class="f-chip'+(filter.level===l?' on':'')+'" onclick="setF(\'level\',\''+l+'\')">'+(l===''?'全部':l+'级')+'</span>';}).join('')+'</div>'+
     '<div class="text-3 fs-12" style="margin:10px 0 6px;">来源</div><div class="chip-bar">'+
-      ['','recharge','order','entry'].map(function(s){return '<span class="f-chip'+(filter.source===s?' on':'')+'" onclick="setF(\'source\',\''+s+'\')">'+({ '':'全部',recharge:'充值',order:'订单',entry:'入驻' }[s])+'</span>';}).join('')+'</div>'+
+      ['','order','entry'].map(function(s){return '<span class="f-chip'+(filter.source===s?' on':'')+'" onclick="setF(\'source\',\''+s+'\')">'+({ '':'全部',order:'订单',entry:'入驻' }[s])+'</span>';}).join('')+'</div>'+
     '<button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="UI.closeSheet()">完成</button></div>');sh.show();
 };
 window.setF=function(k,v){filter[k]=(filter[k]===v?'':v);openFilter();renderList();};

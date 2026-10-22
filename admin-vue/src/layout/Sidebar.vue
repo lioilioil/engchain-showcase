@@ -121,7 +121,7 @@ const visibleMenu = computed(() => {
   width: 36px;
   height: 36px;
   border-radius: $radius-md;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-700));
+  background: linear-gradient(135deg, var(--color-primary-800, #1f2a44), var(--color-primary-700));
   color: #fff;
   font-size: 20px;
   font-weight: $font-weight-bold;
@@ -195,8 +195,8 @@ const visibleMenu = computed(() => {
 }
 
 :deep(.el-menu-item.is-active) {
-  background: var(--color-primary-50) !important;
-  color: var(--color-primary) !important;
+  background: var(--color-accent-soft) !important;
+  color: var(--color-primary-800, #1f2a44) !important;
   font-weight: $font-weight-medium;
 }
 
@@ -207,7 +207,7 @@ const visibleMenu = computed(() => {
   transform: translateY(-50%);
   width: 3px;
   height: 20px;
-  background: var(--color-primary);
+  background: var(--color-accent);
   border-radius: 0 $radius-full $radius-full 0;
 }
 

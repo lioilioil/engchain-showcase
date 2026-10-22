@@ -150,6 +150,32 @@ function openAudit(row, action) {
   auditDialogVisible.value = true
 }
 
+// 命名依据中文展示（前端 setBasis：tradeName / trademark / brand）
+function basisLabel(v) {
+  const map = { tradeName: '基于字号/商号命名', trademark: '基于商标命名', brand: '基于品牌/产品命名' }
+  return map[v] || v || '-'
+}
+
+// 聚合可展示材料：命名证明 nameProof + 各核验维度 files + 个人资质 list，去重
+function collectMaterials(detail) {
+  const out = []
+  if (!detail) return out
+  if (detail.businessLicense) out.push(detail.businessLicense)
+  ;(detail.nameProof || []).forEach(p => { if (p && p.name) out.push(p.name) })
+  const dims = detail.dimensions
+  if (dims && typeof dims === 'object') {
+    Object.keys(dims).forEach(k => {
+      const d = dims[k]
+      ;(d && d.files || []).forEach(f => { if (f && f.name) out.push(f.name) })
+    })
+  }
+  ;(detail.list || []).forEach(x => {
+    const n = typeof x === 'string' ? x : (x && x.name)
+    if (n) out.push(n)
+  })
+  return [...new Set(out)]
+}
+
 async function handleAudit(passed) {
   // 驳回时校验意见必填
   if (!passed && !auditForm.value.note.trim()) {
@@ -166,7 +192,7 @@ async function handleAudit(passed) {
     row.status = passed ? 'approved' : 'rejected'
     if (auditForm.value.note) row.note = auditForm.value.note
 
-    // 真实回写共享用户数据层（mock users 缓存），刷新不还原
+    // 真实回写共享用户数据层（mock users 缓存 + localStorage engchain-users），刷新不还原、前端可见
     const users = await api.user.list()
     const u = users.find(x => x.id === row.userId)
     if (u && u.auth && u.auth[row.authType]) {
@@ -174,7 +200,12 @@ async function handleAudit(passed) {
       u.auth[row.authType].status = passed ? 'approved' : 'rejected'
       u.auth[row.authType].reviewedAt = new Date().toISOString()
       if (auditForm.value.note) u.auth[row.authType].note = auditForm.value.note
+      /* 企业认证通过：即时授予一年有效期（与前端 authApprove 口径一致） */
+      if (row.authType === 'enterprise' && passed) {
+        u.auth.enterprise.expireAt = Date.now() + 365 * 864e5
+      }
     }
+    await api.user.save()
     logStore.addLog({
       action: passed ? '认证审核通过' : '认证审核驳回',
       module: '认证审核',
@@ -203,9 +234,18 @@ async function batchApprove() {
   auditLoading.value = true
   try {
     await new Promise(resolve => setTimeout(resolve, 500))
+    const users = await api.user.list()
     selectedRows.value.forEach(row => {
       row.status = 'approved'
+      const u = users.find(x => x.id === row.userId)
+      if (u && u.auth && u.auth[row.authType]) {
+        u.auth[row.authType].ok = true
+        u.auth[row.authType].status = 'approved'
+        u.auth[row.authType].reviewedAt = new Date().toISOString()
+        if (row.authType === 'enterprise') u.auth.enterprise.expireAt = Date.now() + 365 * 864e5
+      }
     })
+    await api.user.save()
     logStore.addLog({
       action: '批量审核通过',
       module: '认证审核',
@@ -229,9 +269,17 @@ async function batchReject() {
   auditLoading.value = true
   try {
     await new Promise(resolve => setTimeout(resolve, 500))
+    const users = await api.user.list()
     selectedRows.value.forEach(row => {
       row.status = 'rejected'
+      const u = users.find(x => x.id === row.userId)
+      if (u && u.auth && u.auth[row.authType]) {
+        u.auth[row.authType].ok = false
+        u.auth[row.authType].status = 'rejected'
+        u.auth[row.authType].reviewedAt = new Date().toISOString()
+      }
     })
+    await api.user.save()
     logStore.addLog({
       action: '批量审核驳回',
       module: '认证审核',
@@ -314,11 +362,45 @@ onMounted(loadData)
           <el-descriptions-item label="手机号">{{ currentRow.mobile }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 证明材料预览 -->
+        <!-- 企业认证：工商信息与联系人 -->
+        <el-descriptions
+          v-if="currentRow.authType === 'enterprise' && currentRow.detail"
+          :column="1"
+          border
+          size="small"
+          style="margin-top: 12px"
+        >
+          <el-descriptions-item v-if="currentRow.detail.code" label="统一社会信用代码">
+            {{ currentRow.detail.code }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.legal" label="法定代表人">
+            {{ currentRow.detail.legal }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.shortName" label="企业简称">
+            {{ currentRow.detail.shortName }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.nameBasis" label="命名依据">
+            {{ basisLabel(currentRow.detail.nameBasis) }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.contactName" label="联系人">
+            {{ currentRow.detail.contactName }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.contactPhone" label="联系电话">
+            {{ currentRow.detail.contactPhone }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.registeredAddress" label="注册地址">
+            {{ currentRow.detail.registeredAddress }}
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentRow.detail.address" label="办公地址">
+            {{ currentRow.detail.address }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <!-- 证明材料预览：命名证明 + 维度材料 + 资质清单 -->
         <div class="materials" style="margin-top: 12px">
           <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">证明材料</div>
-          <div v-if="currentRow.detail?.list?.length" class="material-list">
-            <div v-for="(m, i) in currentRow.detail.list" :key="i" class="material-item">📄 {{ m }}</div>
+          <div v-if="collectMaterials(currentRow.detail).length" class="material-list">
+            <div v-for="(m, i) in collectMaterials(currentRow.detail)" :key="i" class="material-item">📄 {{ m }}</div>
           </div>
           <div v-else class="material-empty" style="font-size: 12px; color: #999">无提交材料</div>
         </div>

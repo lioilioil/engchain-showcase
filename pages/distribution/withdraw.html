@@ -399,6 +399,43 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   window.addEventListener('engchain:store-change', function () { renderCards(); renderAvail(); renderRecords(); renderLimit(); gate(); });
 })();
 </script>
+<!-- M3-4 个人合伙人税列叠加：仅在本表后追加预扣测算展示块，原 fee/到账/余额一行不改；公司主体不跑个人A/B预扣 -->
+<style>
+.ag-tax-panel{background:var(--bg-card-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 14px;}
+.ag-tax-panel h4{font-size:13px;font-weight:800;margin-bottom:8px;}
+.ag-tax-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--text-2);}
+.ag-tax-row span:last-child{font-family:var(--font-num);color:var(--text-1);}
+.ag-disc{font-size:10.5px;color:var(--text-3);line-height:1.7;margin-top:8px;}
+</style>
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-access.js"></script>
+<script>
+(function(){
+  function refresh(){
+    var acc = null; try { acc = window.entryAccess ? entryAccess() : null; } catch(e){}
+    if (!acc || !acc.isIndividualPartner) { var old=document.getElementById('ag-tax-panel'); if(old) old.remove(); return; }
+    if (!window.AgentTax) return;
+    var availEl = document.getElementById('cw-avail');
+    var amount = 0;
+    if (availEl) { var m = String(availEl.textContent).replace(/[¥,\s]/g,''); amount = parseFloat(m) || 0; }
+    var t = AgentTax.laborWithholding(amount);
+    var host = document.getElementById('cw-form') || document.querySelector('.scroll');
+    if (!host) return;
+    var box = document.getElementById('ag-tax-panel') || (function(){ var d=document.createElement('div'); d.id='ag-tax-panel'; host.appendChild(d); return d; })();
+    box.innerHTML = '<h4>预扣测算（劳务报酬·方案A，仅展示，不改原到账金额）</h4>'
+      + '<div class="ag-tax-row"><span>税前</span><span>¥' + t.gross.toFixed(2) + '</span></div>'
+      + '<div class="ag-tax-row"><span>预扣率</span><span>' + Math.round(t.rate*100) + '%</span></div>'
+      + '<div class="ag-tax-row"><span>预扣税额</span><span>¥' + t.tax.toFixed(2) + '</span></div>'
+      + '<div class="ag-tax-row"><span>税后实发(预扣口径)</span><span>¥' + t.net.toFixed(2) + '</span></div>'
+      + '<div class="ag-tax-row"><span>税单号(模拟)</span><span>EC-DEMO</span></div>'
+      + '<div class="ag-disc">' + AgentTax.disclaimer() + '</div>';
+  }
+  document.addEventListener('DOMContentLoaded', refresh);
+  window.addEventListener('engchain:store-change', refresh);
+  window.addEventListener('engchain:rebate', refresh);
+})();
+</script>
 <script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
 <script src="../../js/liquid-cta.js?v=20260928184535"></script>
 </body>

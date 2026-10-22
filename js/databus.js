@@ -147,13 +147,16 @@ window.DataBus = (function () {
         entry:{ type:null, types:[], orderId:null, status:null, active:false, paidAt:0, expireAt:0, note:'' },
         balance:{ balance:0, frozen:0, totalIn:0 },
         credits:{ balance:0, quota:{ month:'', used:0 } } },
-      { id:'u8', name:'周航', company:'××合伙企业管理中心', account:'zhouhang@engchain.cn', pwd:'demo8888',
-        mobile:'13300008901', avatar:'周', tag:'入驻企业 · 合伙人', status:'resident',
-        identity:{ personal:'verified', enterprise:'resident', entryTypes:['partner'] },
-        auth:{ realname:{ok:true,ts:now-DAY*90}, enterprise:{ok:true,expireAt:now+YEAR}, personalQual:{ok:false,list:[]}, enterpriseQual:{ok:true,list:['合伙企业执业资质']}, qual:{ok:true,list:['合伙企业执业资质']}, payment:{ok:true,ts:now-DAY*30} },
-        entry:{ type:'partner', types:['partner'], orderId:'EN20260701001', status:'active', active:true, paidAt:0, expireAt:now+YEAR, depositType:'high', depositPaid:50000, auditPass:true },
-        balance:{ balance:50000, frozen:5000, totalIn:120000 },
-        credits:{ balance:5000, quota:{ month:'', used:0 } } },
+      /* [M4-4] u8 旧企业合伙人（resident_partner）定点清零：旧合伙人企业下线，回退为实名普通注册用户，
+         不再注入 resident 身份/partner 入驻/高额保证金与企业资质；账号保留可登录，无旧返佣资格。
+         个人合伙人 u9、平台运营 u10、base/limited/franchise 均不动。 */
+      { id:'u8', name:'周航', company:'', account:'zhouhang@engchain.cn', pwd:'demo8888',
+        mobile:'13300008901', avatar:'周', tag:'实名用户', status:'verified',
+        identity:{ personal:'verified', enterprise:'none', entryTypes:[] },
+        auth:{ realname:{ok:true,ts:now-DAY*90}, enterprise:{ok:false,expireAt:0}, personalQual:{ok:false,list:[]}, enterpriseQual:{ok:false,list:[]}, qual:{ok:false,list:[]}, payment:{ok:false,ts:0} },
+        entry:{ type:null, types:[], orderId:null, status:null, active:false, paidAt:0, expireAt:0, note:'' },
+        balance:{ balance:0, frozen:0, totalIn:0 },
+        credits:{ balance:0, quota:{ month:'', used:0 } } },
       { id:'u9', name:'孙小美', company:'', account:'sunxiaomei@engchain.cn', pwd:'demo8888',
         mobile:'13200009012', avatar:'孙', tag:'个人合伙人', status:'partner',
         identity:{ personal:'partner', partner:true, enterprise:'none', identities:['realname','partner'], entryTypes:[] },
@@ -173,16 +176,16 @@ window.DataBus = (function () {
       { id:'u10', name:'周平台', company:'工程链·平台运营组', account:'platform@engchain.cn', pwd:'demo8888',
         mobile:'13000000000', avatar:'周', tag:'平台内部 · 运营', status:'resident',
         isPlatformStaff:true,
-        identity:{ personal:'verified', enterprise:'resident', entryTypes:['construction','agency','partner'], identities:['realname','personal-entry','partner','enterprise','entry'] },
+        identity:{ personal:'verified', enterprise:'resident', entryTypes:['construction','agency'], identities:['realname','personal-entry','enterprise','entry'] },
         auth:{ realname:{ok:true,ts:now-DAY*365,name:'周平台',idNo:'',mobile:'130****0000',idMask:''},
           enterprise:{ok:true,expireAt:now+YEAR,co:'工程链·平台运营组',code:'91510100PLATFORM001',legal:'周平台',shortName:'工程链运营'},
           personalQual:{ok:true,list:['平台运营管理员资质']},
           personalEntry:{ok:true,status:'approved',list:[{name:'平台运营管理员',no:'PLAT-0001',image:''}],certs:[],profile:{basic:{},education:[],work:[],project:[],skills:[],jobIntent:{},intro:'',resumeFile:''}},
-          partner:{ok:true,status:'approved',channel:['内部'],intent:'运营管理',intro:'平台内部运营账号',experience:'负责平台入驻/发布/需求/认证全量审核与治理',profitConfig:{}},
+          /* [M4 收口] u10 平台运营不携带旧企业合伙人 partner 标记（回归纯内部全功能账号，isPlatformStaff 保留） */
           enterpriseQual:{ok:true,list:['平台运营资质']},
           qual:{ok:true,list:['平台运营管理员资质']},
           payment:{ok:true,ts:now-DAY*365} },
-        entry:{ type:'construction', types:['construction','agency','partner'], orderId:'PLAT-0001', status:'active', active:true, paidAt:now-DAY*365, expireAt:now+YEAR, depositType:'basic', depositPaid:0, fee:0, contact:'周平台', tel:'13000000000', scope:'平台运营治理', qualifications:[], intro:{founded:'2026',capital:'-',staffSize:'平台方',desc:'工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。'}, cases:[], address:{province:'四川省',city:'成都市',district:'高新区',detail:'平台路1号'}, website:'', attachments:[] },
+        entry:{ type:'construction', types:['construction','agency'], orderId:'PLAT-0001', status:'active', active:true, paidAt:now-DAY*365, expireAt:now+YEAR, depositType:'basic', depositPaid:0, fee:0, contact:'周平台', tel:'13000000000', scope:'平台运营治理', qualifications:[], intro:{founded:'2026',capital:'-',staffSize:'平台方',desc:'工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。'}, cases:[], address:{province:'四川省',city:'成都市',district:'高新区',detail:'平台路1号'}, website:'', attachments:[] },
         balance:{ balance:0, frozen:0, totalIn:0 },
         credits:{ balance:0, quota:{ month:'', used:0 } } }
     ];
@@ -400,8 +403,9 @@ window.DataBus = (function () {
            App 端（同源 iframe）经 storage 事件 / preview refreshAll 即时派生；非当前登录仅写用户表，
            下次登录 login(id) 时自然读到新状态。 */
   var ENTRYFEE_KEY = 'engchain-entry-fees';
-  var TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业', partner: '合伙人企业' };
-  var DEPOSIT_TYPE = { construction: 'basic', agency: 'engineering', partner: 'high' };
+  /* [M4-4] 旧企业合伙人 partner 已摘除；TYPE_LABEL/DEPOSIT_TYPE 仅保留建筑/中介（个人合伙人走 auth.partner，不在此表） */
+  var TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业' };
+  var DEPOSIT_TYPE = { construction: 'basic', agency: 'engineering' };
   function statusOf(u) {
     if (u.banned) return 'banned';
     /* v3.0：优先使用 identity 结构化字段，回退旧字段兼容 */
@@ -728,6 +732,9 @@ window.DataBus = (function () {
       u.auth.enterprise = { ok: false, expireAt: 0, status: 'pending', submittedAt: t,
         co: payload.co || '', code: payload.code || '', legal: payload.legal || '',
         shortName: payload.shortName || '', nameBasis: payload.nameBasis || '', nameProof: payload.nameProof || [],
+        contactName: payload.contactName || '', contactPhone: payload.contactPhone || '',
+        registeredAddress: payload.registeredAddress || '', address: payload.address || '',
+        businessLicense: payload.businessLicense || '营业执照（已上传）',
         fee: (u.auth.enterprise && u.auth.enterprise.fee) || fee || 0, note: '', resubmit: !!paidBefore,
         payMethod: payMethod };
       if (charge) {
@@ -1680,9 +1687,9 @@ window.DataBus = (function () {
   ];
 
   /* ---- Phase 5 分销中心 API ----
-     档位派生复用 stores.js entryAccess（单一来源：建筑=基础一级 / 中介=受限一级6% / 合伙人=完整二级）；
-     本层新增：分销团队（engchain-dist-team：一级/二级邀请关系、有效伙伴、等级）、
-     返佣流水（engchain-dist-flows：充值/订单/入驻返佣，状态机 pending→settled→paid）。 */
+     档位派生复用 stores.js entryAccess（建筑=基础一级 / 中介=受限一级6% / 个人合伙人 8%/2%）；
+     [M4-3/M4-4] 旧企业合伙人完整二级(full)已摘除；充值不计入返佣基数。
+     本层：分销团队（engchain-dist-team）、返佣流水（engchain-dist-flows：订单/入驻，状态机 pending→settled→paid）。 */
   var DIST_TEAM_KEY = 'engchain-dist-team';
   var DIST_FLOW_KEY = 'engchain-dist-flows';
 
@@ -1694,8 +1701,8 @@ window.DataBus = (function () {
       { id: 'T2', uid: 'u5', name: '张涛', company: '××劳务有限公司', level: 1, active: true, joinedAt: t(30), orders: 4, credit: 8600, note: '' },
       { id: 'T3', uid: 'u3', name: '王芳', company: '××建设有限公司', level: 1, active: true, joinedAt: t(21), orders: 3, credit: 5200, note: '' },
       { id: 'T4', uid: 'u6', name: '刘洋', company: '××装饰工程有限公司', level: 1, active: false, joinedAt: t(15), orders: 1, credit: 1200, note: '30 天未活跃' },
-      { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, uplineId: 'T1', active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' },
-      { id: 'T6', uid: 'u7', name: '赵磊', company: '××机械租赁有限公司', level: 2, uplineId: 'T2', active: true, joinedAt: t(8), orders: 1, credit: 1800, note: '' }
+      { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, uplineId: 'T1', active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' }
+      /* [M4-7] T6 原误挂 uid=u7(游客)，已移除；游客不计分销团队 */
     ];
   }
   function saveDistTeam(a) { try { LS.setItem(DIST_TEAM_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('distTeam', a); return a; }
@@ -1710,11 +1717,10 @@ window.DataBus = (function () {
   function seedDistFlows() {
     var now = Date.now();
     var t = function (d, h) { return new Date(now - d * 864e5).toISOString().slice(0, 10) + ' ' + (h || '10:00'); };
+    /* [M4-6] 充值不计入返佣基数，移除 recharge 来源流水（DF001/DF004） */
     return [
-      { id: 'DF001', tier: 't1', source: 'recharge', member: '李明', uid: 'u2', amount: 2333, fee: 280, rate: 0.12, status: 'paid', ts: t(6, '10:23'), note: '一级分销 | 充值返佣' },
       { id: 'DF002', tier: 't2', source: 'order', member: '张涛', uid: 'u5', amount: 1533, fee: 46, rate: 0.03, status: 'settled', ts: t(6, '08:41'), note: '二级分销 | 订单返佣' },
       { id: 'DF003', tier: 't1', source: 'entry', member: '王芳', uid: 'u3', amount: 4167, fee: 500, rate: 0.12, status: 'pending', ts: t(7, '16:05'), note: '一级分销 | 入驻返佣' },
-      { id: 'DF004', tier: 't1', source: 'recharge', member: '李明', uid: 'u2', amount: 1500, fee: 180, rate: 0.12, status: 'settled', ts: t(9, '14:30'), note: '一级分销 | 充值返佣' },
       { id: 'DF005', tier: 't2', source: 'order', member: '张敏', uid: 'u4', amount: 2200, fee: 66, rate: 0.03, status: 'pending', ts: t(11, '09:15'), note: '二级分销 | 订单返佣' }
     ];
   }
@@ -1724,7 +1730,7 @@ window.DataBus = (function () {
     var member = '';
     try { var u = byId(rb.beneficiaryId); if (u) member = u.name || u.company || rb.beneficiaryId; } catch(e) {}
     var statusMap = { frozen: 'pending', settled: 'settled', paid: 'paid', clawback: 'clawback' };
-    var srcLabel = { order: '订单返佣', entry: '入驻返佣', recharge: '充值返佣' }[rb.sourceType] || rb.sourceType;
+    var srcLabel = { order: '订单返佣', entry: '入驻返佣' }[rb.sourceType] || rb.sourceType;
     return {
       id: rb.id, tier: rb.tier || ('t' + rb.level), source: rb.sourceType,
       member: member, uid: rb.beneficiaryId, amount: rb.baseAmount,
@@ -1850,7 +1856,9 @@ window.DataBus = (function () {
   }
   function _overwriteUser(u) {
     var a = loadUsers();
-    for (var i = 0; i < a.length; i++) if (a[i].id === u.id) { a[i] = u; break; }
+    var hit = false;
+    for (var i = 0; i < a.length; i++) if (a[i].id === u.id) { a[i] = u; hit = true; break; }
+    if (!hit) a.push(u);   /* 非种子账号（演示代理 u11/u12）未命中时追加，不丢失 */
     saveUsers(a);
   }
   /* 清除某 uid 的入驻费台账残留（终审会写台账但不扣款；反复演示不应虚增收入） */
@@ -1870,6 +1878,31 @@ window.DataBus = (function () {
     var cu = current();
     if (cu && cu.id === id) login(id);   /* 当前登录即该用户：login 同步全量 Store（余额也回种子） */
     return seed;
+  }
+
+  /* 演示代理账号（u11/u12）注入：仅 DEMO_SCENARIOS 使用，把不在 9 个种子账号内的代理演示身份
+     补进用户表（余额恒 0、不扣不冻），供 login() 同步会话；不写入任何费率/结算，生产路径不调用。 */
+  function _ensureDemoAgentUser(uid, meta) {
+    meta = meta || {};
+    var existing = byId(uid);
+    if (existing) return existing;
+    var u = {
+      id: uid, name: meta.name || '演示代理', company: meta.company || '',
+      account: meta.account || (uid + '@engchain.demo'), pwd: 'demo8888',
+      mobile: meta.mobile || '', avatar: (meta.name || '代').slice(0, 1),
+      tag: meta.tag || '代理演示', status: meta.status || 'realname',
+      identity: { personal: 'verified', enterprise: 'none', entryTypes: [] },
+      auth: {
+        realname: { ok: true, ts: Date.now(), name: meta.name || '演示代理', idNo: '', mobile: meta.mobile || '', idMask: '' },
+        enterprise: { ok: false, expireAt: 0 }, personalQual: { ok: false, list: [] },
+        enterpriseQual: { ok: false, list: [] }, qual: { ok: false, list: [] }, payment: { ok: false, ts: 0 }
+      },
+      entry: { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0, note: '' },
+      balance: { balance: 0, frozen: 0, totalIn: 0 },
+      credits: { balance: 0, quota: { month: '', used: 0 } }
+    };
+    _overwriteUser(u);
+    return u;
   }
 
   /* 入驻待审演示直写：在"不扣入驻费、不冻保证金（余额恒定）"前提下，造出与 entryApply 同构的
@@ -1911,7 +1944,29 @@ window.DataBus = (function () {
     enterprise: { label: '企业工商认证（未入驻）', group: 'start', base: 'u3' },
     resident_construction: { label: '企业入驻 · 建筑企业', group: 'start', base: 'u1' },
     resident_agency: { label: '企业入驻 · 中介服务', group: 'start', base: 'u2' },
-    resident_partner: { label: '企业入驻 · 合伙人企业', group: 'start', base: 'u8' },
+    /* [M4-4] 旧企业合伙人 resident_partner 场景已摘除（u8 回退为实名普通用户）；个人合伙人 partner 场景保留 */
+
+    /* ---- 省级代理体系终态（数据走 AgentDemo.seed() 真实播种：两分区/T+7/税列/团队/O4，余额不动） ---- */
+    province_agent_active: { label: '省级总代 · 已开通（四川 · active）', group: 'start', base: 'u11',
+      ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已开通' },
+      build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
+    sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12',
+      ensure: { name: '陈二级', company: '成都××合作公司', mobile: '139****0012', tag: '二级合作 · 已绑定' },
+      build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
+    province_agent_suspended: { label: '省级总代 · 已暂停（锁顶 · 台账只读）', group: 'start', base: 'u11',
+      ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已暂停' },
+      build: function () {
+        if (window.AgentDemo) AgentDemo.seed();
+        var S = window.AgentStore;
+        if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'suspended'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示暂停', fromStatus: 'active', toStatus: 'suspended' }); S.saveProvince(p); } }
+      } },
+    province_agent_terminated: { label: '省级总代 · 已终止（只读独立块）', group: 'start', base: 'u11',
+      ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已终止' },
+      build: function () {
+        if (window.AgentDemo) AgentDemo.seed();
+        var S = window.AgentStore;
+        if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'terminated'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示终止', fromStatus: 'active', toStatus: 'terminated' }); S.saveProvince(p); } }
+      } },
     /* B 审核中 */
     rev_qual: { label: '个人入驻 · 审核中', group: 'review', base: 'u5', build: function (uid) {
       authApply('qual', { list: ['一级建造师（建筑工程）', '注册安全工程师'] }); } },
@@ -1923,10 +1978,33 @@ window.DataBus = (function () {
       _demoEntryUnderReview(uid, 'construction', 'pending'); } },
     entry_agency_pending: { label: '企业入驻·中介 · 待初审', group: 'review', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'agency', 'pending'); } },
-    entry_partner_pending: { label: '企业入驻·合伙人企业 · 待初审', group: 'review', base: 'u3', build: function (uid) {
-      _demoEntryUnderReview(uid, 'partner', 'pending'); } },
+    /* [M4-4] 旧企业合伙人 entry_partner_pending 场景已摘除 */
     entry_construction_first: { label: '企业入驻·建筑 · 待终审', group: 'review', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'construction', 'pending'); entryFirstApprove(uid, 'construction', '资料初审通过'); } },
+    /* ---- 省级代理体系审核中（零付费，不扣入驻费/保证金，余额恒定） ---- */
+    rev_province_pending: { label: '省代申请 · 待初审（零付费）', group: 'review', base: 'u3',
+      build: function (uid) {
+        if (window.AgentDemo) AgentDemo.reset();
+        var A = window.AgentApply;
+        if (!A) return;
+        A.submitProvinceApplication({ uid: uid, companyName: '云南演示省级代理有限公司', uscc: '91510100DEMO-YN1', license: '营业执照(示例)', legalRep: '张演示', contact: '张演示', province: '云南省' });
+      } },
+    rev_province_first: { label: '省代申请 · 待终审（初审通过）', group: 'review', base: 'u3',
+      build: function (uid) {
+        if (window.AgentDemo) AgentDemo.reset();
+        var A = window.AgentApply, S = window.AgentStore;
+        if (!A) return;
+        var r = A.submitProvinceApplication({ uid: uid, companyName: '云南演示省级代理有限公司', uscc: '91510100DEMO-YN2', license: '营业执照(示例)', legalRep: '张演示', contact: '张演示', province: '云南省' });
+        var rec = r && r.record;
+        if (rec && S) { rec.firstBy = '运营初审'; rec.firstAt = Date.now(); rec.firstNote = '资料初审通过，待终审'; S.saveProvince(rec); }
+      } },
+    rev_sub_pending: { label: '二级申请 · 待平台审核（总代发起）', group: 'review', base: 'u11',
+      ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代' },
+      build: function () {
+        if (window.AgentDemo) AgentDemo.seed();
+        var S = window.AgentStore;
+        if (S) S.saveSub({ id: 'sb-demo-pending', parentUid: 'u11', uid: '', company: { name: '绵阳××合作公司', uscc: '91510100DEMO-SB1', license: '营业执照(示例)', legalRep: '演示法人', contact: '演示联系人' }, province: '四川省', ratioToSub: 0.15, status: 'pending', statusLog: [{ operator: 'u11', at: Date.now(), reason: '发起二级申请', fromStatus: '', toStatus: 'pending' }], rejects: [], ratioLog: [], signature: { status: 'pending' }, sealedAt: 0 });
+      } },
     /* C 已驳回 */
     rej_qual: { label: '个人入驻 · 已驳回', group: 'reject', base: 'u5', build: function (uid) {
       authApply('qual', { list: ['一级建造师（建筑工程）'] });
@@ -1940,6 +2018,16 @@ window.DataBus = (function () {
     rej_entry: { label: '企业入驻·建筑 · 已驳回', group: 'reject', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'construction', 'pending');
       entryReject(uid, 'construction', '企业资质材料不齐全，请补充建筑业企业资质证书', 'first'); } },
+    rej_province: { label: '省代申请 · 已驳回（可补资料重提）', group: 'reject', base: 'u3',
+      build: function (uid) {
+        if (window.AgentDemo) AgentDemo.reset();
+        var A = window.AgentApply, B = window.AgentBridge, S = window.AgentStore;
+        if (!A) return;
+        var r = A.submitProvinceApplication({ uid: uid, companyName: '云南演示省级代理有限公司', uscc: '91510100DEMO-YN3', license: '营业执照(示例)', legalRep: '张演示', contact: '张演示', province: '云南省' });
+        if (r && r.record && B) {
+          B.applySeed(B.seedToText(B.buildSeed([{ op: 'province.reject', id: r.record.id, rejectReason: '公司资质材料不齐全，请补充营业执照与省级代理授权说明' }])));
+        }
+      } },
     /* D 平台内部（与 C/B 端用户正交：五轨道全点亮 + isPlatformStaff 标记） */
     staff_internal: { label: '平台内部人员（运营）', group: 'staff', base: 'u10' }
   };
@@ -1955,6 +2043,11 @@ window.DataBus = (function () {
     try { if (window.UI && UI.state) UI.state.set({ displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '' }); } catch (e) {}
     var cu0 = current();
     if (!cu0 || cu0.id !== uid) login(uid);
+    /* 代理演示账号（u11/u12 等非种子账号）：先补进用户表并登录，再采余额基线，保证 build 不动余额 */
+    if (sc.ensure && (!current() || current().id !== uid)) {
+      _ensureDemoAgentUser(uid, sc.ensure);
+      login(uid);
+    }
     var balBefore = window.BalanceStore ? { balance: BalanceStore.read().balance, frozen: BalanceStore.read().frozen } : null;
     /* 2. 进入目标态（终态无需 build） */
     if (typeof sc.build === 'function') sc.build(uid);

@@ -87,6 +87,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/orgs.js"></script>
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-region.js"></script>
 <script src="../../js/homepage-editor.js"></script>
 <script src="../../js/preview-sheet.js"></script>
 <script src="../../js/chat-sheet.js"></script>
@@ -130,6 +134,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     isUnlocked: function (rec) {
       if (!rec) return false;
       if (this.isFree(rec.bizKey)) return true;
+      /* M4-1 本省免解锁：active 代理同省放行，不写 engchain-unlocked，trade/终止态除外 */
+      if (window.AgentRegion && AgentRegion.isProvinceFreeUnlock(rec)) return true;
       var r0 = this._read()[this._key(rec)];
       if (!r0) return false;
       var days = this._ttlDays(rec);
@@ -138,7 +144,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     },
     mark: function (rec) { var o = this._read(); o[this._key(rec)] = { t: Date.now() }; this._write(o); }
   };
-  var pwRec = { bizKey: 'company', id: c.id };
+  var pwRec = { bizKey: 'company', id: c.id, location: c.location || '', province: c.province || '' };
   function cOpen() { return UI.isOwner(c.id) || PW.isUnlocked(pwRec); }
   /* 锁定态就近解锁胶囊（与 detail.js Lock.inline 同构） */
   function lockInlineHtml(title, sub) {

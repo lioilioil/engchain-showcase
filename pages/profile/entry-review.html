@@ -23,12 +23,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <div class="nav-right"></div>
   </div>
   <div class="scroll er-scroll" id="root"></div>
+  <!-- M2 省级总代：我的申请 + 管理员导入审核种子（独立于旧入驻队列） -->
+  <div id="agent-panel" style="padding:0 14px 20px;"></div>
 </div>
 
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- M2 省级总代体系：data→rules→tax→store→bridge→apply -->
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-bridge.js"></script>
+<script src="../../js/agent-apply.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 function fmtT(t){if(!t)return '';var d=new Date(t),now=new Date();var p=function(n){return ('0'+n).slice(-2);};
@@ -173,7 +181,7 @@ function qualSection(e){
     return '<div class="er-qual-item">'
       +'<div class="er-qual-name">'+esc(q.name||'未命名资质')+'</div>'
       +'<div class="er-qual-meta">'+(q.level?esc(q.level)+'级':'')+(q.no?' · 编号：'+esc(q.no):'')+(q.expireAt?' · 有效期至 '+esc(q.expireAt):'')+'</div>'
-      +(q.image?'<div class="er-qual-img"><img src="'+q.image+'" alt="证书影像"></div>':'')
+      +(q.image?'<div class="er-qual-img"><img src="'+q.image+'" alt="证书影像" loading="lazy" decoding="async"></div>':'')
     +'</div>';
   }).join('');
   return sectionCard('建筑资质（'+qs.length+'项）',content);
@@ -191,7 +199,7 @@ function caseSection(e){
   var cs=e.cases||[];
   if(!cs.length)return '';
   var content=cs.map(function(c,i){
-    var imgs=(c.images||[]).map(function(img){return '<img src="'+img+'" alt="案例图">';}).join('');
+    var imgs=(c.images||[]).map(function(img){return '<img src="'+img+'" alt="案例图" loading="lazy" decoding="async">';}).join('');
     return '<div class="er-case-item">'
       +'<div class="er-case-name">'+esc(c.name||'未命名案例')+'</div>'
       +'<div class="er-case-meta">'+(c.type?esc(c.type):'')+(c.amount?' · '+esc(c.amount)+'万元':'')+(c.startDate&&c.endDate?' · '+esc(c.startDate)+' 至 '+esc(c.endDate):'')+'</div>'
@@ -228,6 +236,19 @@ function feeText(e,type){
 }
 
 render();
+/* M2 省代申请列表 + 管理员导入审核种子面板（独立于旧 EntryStore 队列，互不影响） */
+(function initAgentPanel(){
+  var box=document.getElementById('agent-panel');
+  if(!box||!window.AgentApply)return;
+  var q={quotaCfg:(window.MOCK&&MOCK.business.provinceAgentQuota)||{}};
+  box.innerHTML='<div id="agent-apply-list"></div><div id="agent-seed-import"></div>';
+  AgentApply.mountMyApplications(document.getElementById('agent-apply-list'),q);
+  /* D-13：审核记录导入面板仅平台内部运营可见，普通申请者仅见我的申请列表 */
+  var cur=(window.DataBus&&DataBus.current)?DataBus.current():null;
+  var isStaff=!!(cur&&cur.isPlatformStaff);
+  if(isStaff){ AgentApply.mountSeedImport(document.getElementById('agent-seed-import'),q); }
+  else { var si=document.getElementById('agent-seed-import'); if(si) si.remove(); }
+})();
 /* 后台在另一标签页审批后实时刷新 */
 window.addEventListener('storage',function(ev){if(['engchain-users','engchain-entry'].indexOf(ev.key)>=0)render();});
 window.addEventListener('engchain:entry',render);

@@ -90,7 +90,7 @@ const sparkColor = computed(() => {
   if (props.theme === 'success') return '#1f883d'
   if (props.theme === 'warning') return '#d4a72c'
   if (props.theme === 'danger') return '#cf222e'
-  return '#1f883d'
+  return '#1f2a44'
 })
 
 function buildPoints(arr, _area) {

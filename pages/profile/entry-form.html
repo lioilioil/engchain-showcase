@@ -13,6 +13,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>入驻资料 · 工程链</title>
 <link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/agent.css">
 <link rel="stylesheet" href="../../css/liquid-cta.css?v=20260928183624">
 </head>
 <body>
@@ -63,8 +64,27 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- M2 省级总代体系：data→rules→tax→store→bridge→apply（缺失回退已具备） -->
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-bridge.js"></script>
+<script src="../../js/agent-apply.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
+/* M2-1 省级总代（省代）独立 ¥0 表单：绕过建筑/中介通用五步与付费流程，不调用 DataBus.entryApply */
+var __typeQ=new URLSearchParams(location.search).get('type')||'construction';
+if(__typeQ==='provinceAgent'){
+  var __sc=document.getElementById('step-content');
+  var __head=document.querySelector('.ef-head');
+  if(__head)__head.style.display='none';
+  var __ind=document.getElementById('step-indicator'); if(__ind)__ind.style.display='none';
+  var __fb=document.querySelector('.ef-fill-bar'); if(__fb)__fb.style.display='none';
+  var __cta=document.getElementById('cta-bar'); if(__cta)__cta.style.display='none';
+  document.getElementById('nav-title').textContent='省级总代（省代）申请';
+  if(window.AgentApply&&__sc){ AgentApply.mountProvinceForm(__sc,{quotaCfg:(window.MOCK&&MOCK.business.provinceAgentQuota)||{}}); }
+  return;
+}
 /* ============ 配置 ============ */
 var DRAFT_KEY='engchain-draft-entry';
 var STEP_NAMES=['联系与经营','建筑资质','企业介绍','企业案例','确认提交'];
@@ -112,9 +132,9 @@ function renderFee(){
   var breakin=ModeStore.isBreakIn();
   /* [FEAT 9.2-2] 年度订阅模式：年费=入驻费*0.9 */
   if(cycle==='yearly' && t && t.yearly){
-    fee=type==='partner'?0:t.yearly.price;
+    fee=t.yearly.price;
   } else {
-    fee=type==='partner'?0:(breakin?(type==='construction'?bi.construction:bi.agency):t.fee);
+    fee=breakin?(type==='construction'?bi.construction:bi.agency):t.fee;
   }
 }
 function feeText(){
@@ -122,7 +142,6 @@ function feeText(){
   return '¥'+Number(fee).toLocaleString();
 }
 function feeNote(){
-  if(type==='partner')return '合伙人企业由平台人工审核，审核通过后入驻并开通完整分销权益，全程不收取线上入驻费。';
   var breakin=ModeStore.isBreakIn();
   if(breakin)return type==='construction'
     ?'破冰期建筑企业限免入驻（成熟期 ¥3,999/次），提交后进入两级审核。'
@@ -130,7 +149,6 @@ function feeNote(){
   return '入驻费按次收取，支付成功仅代表提交申请，需经平台初审、终审通过后正式生效。';
 }
 function depositText(){
-  if(type==='partner')return '无保证金要求';
   if(type==='construction')return '基础履约保证金 ¥5,000（入驻生效后缴纳，可退）';
   return '工程履约保证金 ¥20,000（入驻生效后缴纳，可退）';
 }
@@ -140,9 +158,7 @@ function renderHead(){
   document.getElementById('nav-title').textContent=(t?t.label:'企业')+' · 入驻资料';
   document.getElementById('type-label').textContent=t?t.label:'企业入驻';
   document.getElementById('type-badge').textContent=(t&&t.badge)||'';
-  document.getElementById('type-sub').textContent=type==='partner'
-    ?'后台人工审核制 · 不收取线上入驻费'
-    :'初审 + 终审两级审核 · 审核通过后入驻生效';
+  document.getElementById('type-sub').textContent='初审 + 终审两级审核 · 审核通过后入驻生效';
 }
 
 /* ============ Step 指示器 ============ */
@@ -457,7 +473,7 @@ function validateStep3(){
 function renderStep4(){
   var list=form.cases.length?form.cases.map(function(c,i){
     var imgs=(c.images||[]).map(function(img,ji){
-      return '<div class="ef-case-img"><img src="'+img+'" alt="案例图"><button class="ef-case-img-del" onclick="window.__delCaseImg('+i+','+ji+')">×</button></div>';
+      return '<div class="ef-case-img"><img src="'+img+'" alt="案例图" loading="lazy" decoding="async"><button class="ef-case-img-del" onclick="window.__delCaseImg('+i+','+ji+')">×</button></div>';
     }).join('');
     var addBtn=(c.images&&c.images.length<3)?'<div class="ef-up-box ef-up-box-sm" onclick="window.__upCaseImg('+i+',this)"><div class="ef-up-ph"><svg class="ic" style="width:16px;height:16px;"><use href="#i-upload"/></svg><span>图片</span></div></div>':'';
     return '<div class="ef-card" data-cidx="'+i+'">'

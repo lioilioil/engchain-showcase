@@ -49,6 +49,7 @@ export const userApi = {
   byMobile: mockRequest(users.byMobile),
   create: mockRequest(users.create),
   update: mockRequest(users.update),
+  save: mockRequest(users.save),
   stats: mockRequest(users.stats),
   statusOf: users.statusOf,
   tagOf: users.tagOf

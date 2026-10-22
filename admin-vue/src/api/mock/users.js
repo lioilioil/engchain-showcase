@@ -165,20 +165,21 @@ const seedUsers = [
     credits: { balance: 0, quota: { month: '', used: 0 } }
   },
   {
-    id: 'u8', name: '周航', company: '××合伙企业管理中心', account: 'zhouhang@engchain.cn', pwd: 'demo8888',
-    mobile: '13300008901', avatar: '周', tag: '入驻企业 · 合伙人', status: 'resident',
-    identity: { personal: 'verified', enterprise: 'resident', entryTypes: ['partner'] },
+    /* [M4-4] u8 旧企业合伙人定点清零：回退为实名普通用户，移除 resident/partner 入驻与高额保证金 */
+    id: 'u8', name: '周航', company: '', account: 'zhouhang@engchain.cn', pwd: 'demo8888',
+    mobile: '13300008901', avatar: '周', tag: '实名用户', status: 'verified',
+    identity: { personal: 'verified', enterprise: 'none', entryTypes: [] },
     auth: {
       realname: { ok: true, ts: now - DAY * 90 },
-      enterprise: { ok: true, expireAt: now + YEAR },
+      enterprise: { ok: false, expireAt: 0 },
       personalQual: { ok: false, list: [] },
-      enterpriseQual: { ok: true, list: ['合伙企业执业资质'] },
-      qual: { ok: true, list: ['合伙企业执业资质'] },
-      payment: { ok: true, ts: now - DAY * 30 }
+      enterpriseQual: { ok: false, list: [] },
+      qual: { ok: false, list: [] },
+      payment: { ok: false, ts: 0 }
     },
-    entry: { type: 'partner', types: ['partner'], orderId: 'EN20260701001', status: 'active', active: true, paidAt: 0, expireAt: now + YEAR, depositType: 'high', depositPaid: 50000, auditPass: true },
-    balance: { balance: 50000, frozen: 5000, totalIn: 120000 },
-    credits: { balance: 5000, quota: { month: '', used: 0 } }
+    entry: { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0, note: '' },
+    balance: { balance: 0, frozen: 0, totalIn: 0 },
+    credits: { balance: 0, quota: { month: '', used: 0 } }
   },
   {
     id: 'u9', name: '孙小美', company: '', account: 'sunxiaomei@engchain.cn', pwd: 'demo8888',
@@ -207,18 +208,18 @@ const seedUsers = [
     id: 'u10', name: '周平台', company: '工程链·平台运营组', account: 'platform@engchain.cn', pwd: 'demo8888',
     mobile: '13000000000', avatar: '周', tag: '平台内部 · 运营', status: 'resident',
     isPlatformStaff: true,
-    identity: { personal: 'verified', enterprise: 'resident', entryTypes: ['construction', 'agency', 'partner'], identities: ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'] },
+    identity: { personal: 'verified', enterprise: 'resident', entryTypes: ['construction', 'agency'], identities: ['realname', 'personal-entry', 'enterprise', 'entry'] },
     auth: {
       realname: { ok: true, ts: now - DAY * 365, name: '周平台', idNo: '', mobile: '130****0000', idMask: '' },
       enterprise: { ok: true, expireAt: now + YEAR, co: '工程链·平台运营组', code: '91510100PLATFORM001', legal: '周平台', shortName: '工程链运营' },
       personalQual: { ok: true, list: ['平台运营管理员资质'] },
       personalEntry: { ok: true, status: 'approved', list: [{ name: '平台运营管理员', no: 'PLAT-0001', image: '' }], certs: [], profile: { basic: {}, education: [], work: [], project: [], skills: [], jobIntent: {}, intro: '', resumeFile: '' } },
-      partner: { ok: true, status: 'approved', channel: ['内部'], intent: '运营管理', intro: '平台内部运营账号', experience: '负责平台入驻/发布/需求/认证全量审核与治理', profitConfig: {} },
+      /* [M4 收口] u10 平台运营不携带旧企业合伙人 partner 标记（isPlatformStaff/全量视角保留） */
       enterpriseQual: { ok: true, list: ['平台运营资质'] },
       qual: { ok: true, list: ['平台运营管理员资质'] },
       payment: { ok: true, ts: now - DAY * 365 }
     },
-    entry: { type: 'construction', types: ['construction', 'agency', 'partner'], orderId: 'PLAT-0001', status: 'active', active: true, paidAt: now - DAY * 365, expireAt: now + YEAR, depositType: 'basic', depositPaid: 0, fee: 0, contact: '周平台', tel: '13000000000', scope: '平台运营治理', qualifications: [], intro: { founded: '2026', capital: '-', staffSize: '平台方', desc: '工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。' }, cases: [], address: { province: '四川省', city: '成都市', district: '高新区', detail: '平台路1号' }, website: '', attachments: [] },
+    entry: { type: 'construction', types: ['construction', 'agency'], orderId: 'PLAT-0001', status: 'active', active: true, paidAt: now - DAY * 365, expireAt: now + YEAR, depositType: 'basic', depositPaid: 0, fee: 0, contact: '周平台', tel: '13000000000', scope: '平台运营治理', qualifications: [], intro: { founded: '2026', capital: '-', staffSize: '平台方', desc: '工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。' }, cases: [], address: { province: '四川省', city: '成都市', district: '高新区', detail: '平台路1号' }, website: '', attachments: [] },
     balance: { balance: 0, frozen: 0, totalIn: 0 },
     credits: { balance: 0, quota: { month: '', used: 0 } }
   }
@@ -227,14 +228,48 @@ const seedUsers = [
 // 内存缓存
 let _userCache = null
 
+/* Demo 桥接：前端 App 提交的认证申请写入 localStorage 的 engchain-users（与前端 DataBus 同键），
+   后台读取时按 id 合并，使「前端提交 → 后台可见 → 通过/驳回」在同一浏览器闭环。 */
+const LS_KEY = 'engchain-users'
+
+function readLS() {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return null
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : null
+  } catch {
+    return null
+  }
+}
+
+function writeLS(arr) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(arr)) } catch { /* 忽略写入失败 */ }
+}
+
 /**
- * 获取用户列表
+ * 获取用户列表：种子为基底，localStorage(engchain-users) 中同 id 用户覆盖/并入
  */
 export function list() {
   if (!_userCache) {
     _userCache = JSON.parse(JSON.stringify(seedUsers))
   }
+  const ls = readLS()
+  if (ls && ls.length) {
+    const merged = new Map()
+    _userCache.forEach(u => merged.set(u.id, u))
+    ls.forEach(u => { if (u && u.id) merged.set(u.id, u) })
+    _userCache = [...merged.values()]
+  }
   return _userCache
+}
+
+/**
+ * 把内存用户表持久化到 localStorage（审批通过/驳回后调用，刷新不还原、前端可见结果）
+ */
+export function save() {
+  writeLS(list())
+  return list()
 }
 
 /**
@@ -316,7 +351,8 @@ export function statusOf(u) {
 export function tagOf(u) {
   if (u.banned) return '已封禁'
   const st = statusOf(u)
-  const TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业', partner: '合伙人企业' }
+  /* [M4-4] 旧企业合伙人 partner 标签已摘除；个人合伙人(st=partner)在下方单独映射 */
+  const TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业' }
   if (st === 'resident') {
     const et = u.identity?.entryTypes?.[0] || u.entry?.type
     return '企业入驻 · ' + (TYPE_LABEL[et] || '')
@@ -329,4 +365,4 @@ export function tagOf(u) {
   return '注册会员'
 }
 
-export default { list, byId, byMobile, create, update, stats, statusOf, tagOf }
+export default { list, byId, byMobile, create, update, save, stats, statusOf, tagOf }

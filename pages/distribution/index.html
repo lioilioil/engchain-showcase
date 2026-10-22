@@ -125,6 +125,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/domain.js"></script><script src="../../js/orgs.js"></script><script src="../../js/guest-gate.js"></script>
+<script src="../../js/agent-access.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 function money(n){return '¥'+(Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -132,7 +133,20 @@ var acc=window.entryAccess?entryAccess():{isResident:false,statusId:'registered'
 var st=acc.statusId;
 var resident=acc.isResident;
 var isInd=!!acc.isIndividualPartner;
+var isProxy=!!(acc.agent && acc.agent.active); /* 新代理（总代/二级），旧团队树入口对其隐藏 */
 var hasTeam=!!acc.hasTeam;
+
+/* M3-7 新代理身份（总代/二级，且未叠加个人合伙人）：关闭旧邀请返佣中心，
+   走代理台账通道；叠加个人合伙人保留其返佣入口（并集，不互关）。 */
+if (acc.agent && acc.agent.active && !isInd && !resident) {
+  GuestGate.open({
+    mode:'replace', icon:'share', badge:'代理通道',
+    title:'新代理身份不走旧返佣中心',
+    note:'您的代理测算佣金在省级代理台账内查看，不可提现、不进入旧邀请返佣；旧返佣入口已关闭。',
+    btnText:'前往代理工作台', btnHref:'../province-agent/index.html'
+  });
+  return;
+}
 
 /* 非入驻且非个人合伙人：整页"专享"引导（与 profile 宫格门控同源 entryAccess） */
 if(!resident && !isInd){
@@ -147,103 +161,7 @@ if(!resident && !isInd){
   return;
 }
 
-/* ========================================================================
-   案例数据预填充：企业入驻 + 合伙人类型（完整二级分销）时，
-   若邀请关系和返佣记录为空，则预填充演示数据，便于展示收益明细和团队
-   ======================================================================== */
-(function seedDemoData() {
-  var isPartnerType = resident && (acc.types && acc.types.indexOf('partner') >= 0);
-  if (!isPartnerType) return;
-  var me2 = DataBus.current();
-  var myUid = me2 ? me2.id : '';
-  if (!myUid) return;
-  /* E2-09：演示数据仅 seed 一次，避免每次进入都改写 localStorage */
-  var SEED_KEY = 'engchain-dist-seeded-v1';
-  if (localStorage.getItem(SEED_KEY)) return;
-  try { localStorage.setItem(SEED_KEY, '1'); } catch(e) {}
-
-  var DAY = 86400000;
-  var now = Date.now();
-
-  /* 0. 同步用户表中的 entryTypes，确保 safeDistTier() 能正确识别为 full 档位
-     （safeDistTier 从 DataBus 用户表读取，而非当前登录态 EntryStore） */
-  var users = DataBus.users();
-  var userUpdated = false;
-  users.forEach(function(u) {
-    if (u.id === myUid) {
-      if (!u.identity) u.identity = {};
-      if (!u.identity.entryTypes || u.identity.entryTypes.indexOf('partner') < 0) {
-        u.identity.entryTypes = ['partner'];
-        userUpdated = true;
-      }
-      if (!u.entry) u.entry = {};
-      u.entry.types = ['partner'];
-      u.entry.type = 'partner';
-      u.entry.status = 'active';
-      u.entry.active = true;
-    }
-  });
-  if (userUpdated) {
-    try { localStorage.setItem('engchain-users', JSON.stringify(users)); } catch(e) {}
-    try { DataBus.invalidateCache('users'); } catch(e) {}
-  }
-
-  /* 1. 预填充邀请关系（团队成员） */
-  var links = Referral.all();
-  if (!links || links.length === 0) {
-    var demoLinks = [
-      { id: 'RF001', inviterId: myUid, inviteeId: 'u2', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 45, code: 'ENG2', channel: 'register' },
-      { id: 'RF002', inviterId: myUid, inviteeId: 'u4', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 30, code: 'ENG4', channel: 'register' },
-      { id: 'RF003', inviterId: myUid, inviteeId: 'u5', level: 1, rootId: myUid, status: 'active', boundAt: now - DAY * 18, code: 'ENG5', channel: 'register' },
-      /* 二级关系：inviterId 为顶级邀请人（当前用户），level=2 */
-      { id: 'RF004', inviterId: myUid, inviteeId: 'u3', level: 2, rootId: myUid, status: 'active', boundAt: now - DAY * 20, code: 'ENG3', channel: 'register' }
-    ];
-    Referral._write(demoLinks);
-  }
-
-  /* 2. 预填充返佣记录（收益明细） */
-  var rebates = Rebate.all();
-  if (!rebates || rebates.length === 0) {
-    var demoRebates = [
-      /* 已发放 - 一级 - 订单返佣 */
-      { id: 'RB001', beneficiaryId: myUid, sourceUserId: 'u2', level: 1, tier: 'full',
-        sourceType: 'order', sourceOrderId: 'ORD20240815001', baseAmount: 128000, rate: 12, fee: 15360,
-        status: 'paid', frozenUntil: now - DAY * 20, createdAt: now - DAY * 25, settledAt: now - DAY * 22, paidAt: now - DAY * 20,
-        walletTxnId: 'TXN001', clawbackOf: '', idemKey: 'order|ORD20240815001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
-      /* 已发放 - 一级 - 充值返佣 */
-      { id: 'RB002', beneficiaryId: myUid, sourceUserId: 'u4', level: 1, tier: 'full',
-        sourceType: 'recharge', sourceOrderId: 'RC20240820001', baseAmount: 580, rate: 12, fee: 69.6,
-        status: 'paid', frozenUntil: now - DAY * 15, createdAt: now - DAY * 18, settledAt: now - DAY * 16, paidAt: now - DAY * 15,
-        walletTxnId: 'TXN002', clawbackOf: '', idemKey: 'recharge|RC20240820001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
-      /* 已结算 - 一级 - 入驻返佣 */
-      { id: 'RB003', beneficiaryId: myUid, sourceUserId: 'u5', level: 1, tier: 'full',
-        sourceType: 'entry', sourceOrderId: 'ENT20240901001', baseAmount: 14999, rate: 12, fee: 1799.88,
-        status: 'settled', frozenUntil: now - DAY * 2, createdAt: now - DAY * 5, settledAt: now - DAY * 2, paidAt: 0,
-        walletTxnId: '', clawbackOf: '', idemKey: 'entry|ENT20240901001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
-      /* 冻结中 - 一级 - 订单返佣 */
-      { id: 'RB004', beneficiaryId: myUid, sourceUserId: 'u2', level: 1, tier: 'full',
-        sourceType: 'order', sourceOrderId: 'ORD20240905002', baseAmount: 56000, rate: 12, fee: 6720,
-        status: 'frozen', frozenUntil: now + DAY * 1, createdAt: now - DAY * 1, settledAt: 0, paidAt: 0,
-        walletTxnId: '', clawbackOf: '', idemKey: 'order|ORD20240905002|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } },
-      /* 已发放 - 二级 - 订单返佣（u3 由 u2 邀请，u2 是我的一级） */
-      { id: 'RB005', beneficiaryId: myUid, sourceUserId: 'u3', level: 2, tier: 'full',
-        sourceType: 'order', sourceOrderId: 'ORD20240825003', baseAmount: 89000, rate: 3, fee: 2670,
-        status: 'paid', frozenUntil: now - DAY * 10, createdAt: now - DAY * 14, settledAt: now - DAY * 11, paidAt: now - DAY * 10,
-        walletTxnId: 'TXN003', clawbackOf: '', idemKey: 'order|ORD20240825003|' + myUid + '|2', ruleSnapshot: { tier: 'full', rate: 3 } },
-      /* 冻结中 - 二级 - 充值返佣 */
-      { id: 'RB006', beneficiaryId: myUid, sourceUserId: 'u3', level: 2, tier: 'full',
-        sourceType: 'recharge', sourceOrderId: 'RC20240903002', baseAmount: 1280, rate: 3, fee: 38.4,
-        status: 'frozen', frozenUntil: now + DAY * 3, createdAt: now - DAY * 1, settledAt: 0, paidAt: 0,
-        walletTxnId: '', clawbackOf: '', idemKey: 'recharge|RC20240903002|' + myUid + '|2', ruleSnapshot: { tier: 'full', rate: 3 } },
-      /* 已结算 - 一级 - 充值返佣（今日） */
-      { id: 'RB007', beneficiaryId: myUid, sourceUserId: 'u4', level: 1, tier: 'full',
-        sourceType: 'recharge', sourceOrderId: 'RC20240907001', baseAmount: 1280, rate: 12, fee: 153.6,
-        status: 'settled', frozenUntil: now - 3600000, createdAt: now - 7200000, settledAt: now - 3600000, paidAt: 0,
-        walletTxnId: '', clawbackOf: '', idemKey: 'recharge|RC20240907001|' + myUid + '|1', ruleSnapshot: { tier: 'full', rate: 12 } }
-    ];
-    Rebate._write(demoRebates);
-  }
-})();
+/* [M4-4] 旧企业合伙人分销演示种子（RF001-004/RB001-007/充值返佣/full 档位/engchain-dist-seeded-v1）已彻底删除；旧企业合伙人定点下线，个人合伙人(u9)返佣提现与 base/limited 旧返佣不依赖此种子。 */
 
 /* 单一来源：档位取 entryAccess().distTier，费率全部走 RULE()（后台可配，不写死） */
 var tier=acc.distTier;
@@ -259,7 +177,7 @@ if(isInd){
   tr={t1:ipCfg.tier1,t2:ipCfg.tier2};
   dist.minWithdraw=ipCfg.minWithdraw;
   if(ipCfg.settleNote) dist.settleNote=ipCfg.settleNote;
-  /* 个人合伙人隐藏团队管理入口 */
+  /* 个人合伙人隐藏团队管理入口（新代理团队走代理体系，另在 applyTiles 统一隐藏） */
   var teamItem=document.getElementById('dq-team-item');
   if(teamItem){teamItem.style.display='none';}
   /* 显示个人合伙人专属标识（升级为系统 IdBadge 徽章槽，保留现有 display 分支） */
@@ -271,8 +189,8 @@ if(isInd){
   }
 }
 
-/* 二级开放语义：以 distTier 判定（full 或个人合伙人），禁止用 tr.t2 数值判定 */
-var hasSecond=(tier==='full')||isInd;
+/* [M4-3] 二级开放语义：旧 full 档位摘除后，仅个人合伙人(isInd)开放二级；禁止用 tr.t2 数值判定 */
+var hasSecond=isInd;
 
 /* 角色感知文案（init 与 renderDist 共用，身份静态、数值动态） */
 function teamCountText(n){ return n+(hasTeam?' 位伙伴':(resident?' 位好友':'')); }
@@ -298,7 +216,6 @@ function upgradeText(nx,a,c){
   if(!window.IdBadge){ slot.textContent=acc.distBadge||''; return; }
   var html='';
   if(acc.distBadge==='个人合伙人') html=IdBadge.render('individual','md');
-  else if(acc.distBadge==='专属') html=IdBadge.render('partner','md');
   else if(acc.distBadge==='蓝V') html=IdBadge.render('construction','md');
   else if(acc.distBadge==='受限') html=IdBadge.html('restricted','受限','vshield','md').replace('id-badge-restricted','id-badge-restricted on-dark');
   slot.innerHTML=html||acc.distBadge||'';
@@ -325,7 +242,8 @@ function upgradeText(nx,a,c){
 (function applyTiles(){
   var quick=document.querySelector('.dist-quick');
   var teamItem=document.getElementById('dq-team-item');
-  if(isInd){
+  /* [M4 收口] 旧团队树仅 legacy base/limited 可见；个人合伙人、新代理（总代/二级）一律隐藏 */
+  if(isInd || isProxy){
     if(teamItem) teamItem.style.display='none';
     if(quick) quick.classList.add('is-3');
   }else{
@@ -445,11 +363,12 @@ if(maxEl){
     :(tier==='limited'?'仅一级 · 平台可追溯（二级暂未开放）':'仅一级 · 平台可追溯');
 }
 var rule=document.getElementById('dist-rule');
-rule.textContent=(tier==='full')
-  ?(isInd?'个人合伙人二级分销':'完整二级分销')+'：邀请好友消费（充值/订单/入驻），获一级 '+tr.t1+'%、二级 '+tr.t2+'% 推广返佣；返佣先冻结，售后无退款后 '+dist.settleNote+' 结算发放。收益满 ¥'+dist.minWithdraw+' 可提现。'
+/* [M4-3/M4-6] full 分支摘除；个人合伙人(8%/2%)独立文案；充值不计入返佣基数 */
+rule.textContent=isInd
+  ?'个人合伙人二级分销：好友成交订单/入驻获一级 '+tr.t1+'%、二级 '+tr.t2+'% 推广返佣（充值不计入）；返佣先冻结，售后无退款后 '+dist.settleNote+' 结算，满 ¥'+dist.minWithdraw+' 可提现。'
   :(tier==='limited'
-  ?'受限分销：中介服务企业专注服务经营，仅享一级 '+tr.t1+'% 推广返佣（二级暂未开放）；返佣冻结后 '+dist.settleNote+' 结算，满 ¥'+dist.minWithdraw+' 可提现。'
-  :'基础分销：邀请好友消费（充值/订单/入驻），获一级 '+tr.t1+'% 推广返佣（二级暂未开放）；返佣冻结后 '+dist.settleNote+' 结算，满 ¥'+dist.minWithdraw+' 可提现。');
+  ?'受限分销：中介服务企业专注服务经营，仅享一级 '+tr.t1+'% 推广返佣（二级暂未开放，充值不计入）；返佣冻结后 '+dist.settleNote+' 结算，满 ¥'+dist.minWithdraw+' 可提现。'
+  :'基础分销：邀请好友成交订单/入驻获一级 '+tr.t1+'% 推广返佣（二级暂未开放，充值不计入）；返佣冻结后 '+dist.settleNote+' 结算，满 ¥'+dist.minWithdraw+' 可提现。');
 
 /* 数字滚动：累计返佣从 0 滚动到目标值 */
 (function(){

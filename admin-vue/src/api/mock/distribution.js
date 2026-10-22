@@ -15,16 +15,14 @@ const seedDistTeam = [
   { id: 'T2', uid: 'u5', name: '张涛', company: '××劳务有限公司', level: 1, active: true, joinedAt: t(30), orders: 4, credit: 8600, note: '' },
   { id: 'T3', uid: 'u3', name: '王芳', company: '××建设有限公司', level: 1, active: true, joinedAt: t(21), orders: 3, credit: 5200, note: '' },
   { id: 'T4', uid: 'u6', name: '刘洋', company: '××装饰工程有限公司', level: 1, active: false, joinedAt: t(15), orders: 1, credit: 1200, note: '30 天未活跃' },
-  { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, uplineId: 'T1', active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' },
-  { id: 'T6', uid: 'u7', name: '赵磊', company: '××机械租赁有限公司', level: 2, uplineId: 'T2', active: true, joinedAt: t(8), orders: 1, credit: 1800, note: '' }
+  { id: 'T5', uid: 'u4', name: '张敏', company: '××工程咨询有限公司', level: 2, uplineId: 'T1', active: true, joinedAt: t(12), orders: 2, credit: 3400, note: '' }
+  /* [M4-7] T6 原误挂 uid=u7(游客)，已移除；游客不计分销团队 */
 ]
 
-// ========== 返佣流水 ==========
+// ========== 返佣流水（[M4-6] 充值不计入返佣基数，移除 recharge 来源流水） ==========
 const seedDistFlows = [
-  { id: 'DF001', tier: 't1', source: 'recharge', member: '李明', uid: 'u2', amount: 2333, fee: 280, rate: 0.12, status: 'paid', ts: th(6, '10:23'), note: '一级分销 | 充值返佣' },
   { id: 'DF002', tier: 't2', source: 'order', member: '张涛', uid: 'u5', amount: 1533, fee: 46, rate: 0.03, status: 'settled', ts: th(6, '08:41'), note: '二级分销 | 订单返佣' },
   { id: 'DF003', tier: 't1', source: 'entry', member: '王芳', uid: 'u3', amount: 4167, fee: 500, rate: 0.12, status: 'pending', ts: th(7, '16:05'), note: '一级分销 | 入驻返佣' },
-  { id: 'DF004', tier: 't1', source: 'recharge', member: '李明', uid: 'u2', amount: 1500, fee: 180, rate: 0.12, status: 'settled', ts: th(9, '14:30'), note: '一级分销 | 充值返佣' },
   { id: 'DF005', tier: 't2', source: 'order', member: '张敏', uid: 'u4', amount: 2200, fee: 66, rate: 0.03, status: 'pending', ts: th(11, '09:15'), note: '二级分销 | 订单返佣' }
 ]
 

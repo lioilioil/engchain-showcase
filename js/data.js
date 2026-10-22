@@ -764,9 +764,9 @@ window.MOCK = (function () {
       rights: ['解锁联系方式', '付费详情', '精准匹配', '投标报价'] },
     { id: 'enterprise', label: '企业认证',      level: 4, desc: '企业工商 + 资质认证',
       rights: ['订单管理', '资金账户', '发票 / 对公', '企业店铺'] },
-    { id: 'resident',   label: '企业入驻',      level: 5, desc: '平台入驻企业（建筑/中介/合伙人）',
+    { id: 'resident',   label: '企业入驻',      level: 5, desc: '平台入驻企业（建筑/中介）',
       rights: ['全功能', '分销推广', '专属客服', '蓝V 企业标识'],
-      types: ['construction', 'agency', 'partner'] }
+      types: ['construction', 'agency'] }
   ];
 
   /* ---- 推荐数据 (工作台 AI 文件夹) ---- */
@@ -843,9 +843,86 @@ window.MOCK = (function () {
     /* 二级分销 */
     distribution: { rule: '二级分销', tier1: 12, tier2: 3, minWithdraw: 100, settleNote: '工作日 T+1 到账',
       individualPartner: { rule: '二级分销', tier1: 8, tier2: 2, minWithdraw: 50, settleNote: '工作日 T+1 到账', badge: '个人合伙人' } },
+    /* ====================================================================
+       M1-4 省级总代·省→地级市 Mock 表（D7/D27；生产前按民政部行政区划一次性落全量）
+       quotaCap=max(minCap,cityCount) 由 agent-rules.quotaCapOf 现算，不在此写死；
+       直辖市按1；自治州/地区/盟同级；<10保底10；港澳台本期不纳入；无匹配回退补录。 */
+    provinceAgentQuota: {
+      minCap: 10,
+      countRule: '直辖市按1计；自治州/地区/盟与地级市同级计入；cityCount<10保底10；港澳台本期不纳入',
+      aliases: {},
+      excluded: ['台湾省', '香港特别行政区', '澳门特别行政区'],
+      provinces: [
+        { provinceCode: '510000', provinceName: '四川省', cityCount: 21, countRule: '地级市同级计入', remark: 'demo示例（21个地级市/自治州），生产重新核定' },
+        { provinceCode: '110000', provinceName: '北京市', cityCount: 1, countRule: '直辖市按1', remark: '直辖市，保底10' },
+        { provinceCode: '120000', provinceName: '天津市', cityCount: 1, countRule: '直辖市按1', remark: '直辖市，保底10' },
+        { provinceCode: '310000', provinceName: '上海市', cityCount: 1, countRule: '直辖市按1', remark: '直辖市，保底10' },
+        { provinceCode: '500000', provinceName: '重庆市', cityCount: 1, countRule: '直辖市按1', remark: '直辖市，保底10' }
+      ]
+    },
+    /* ====================================================================
+       M1-5 税务配置块（D32 现行法定值；个人/企业分两张表，不套用同一张）
+       activeScheme=labor；labor 法定减除+预扣率表二；business 法定五级表 + deemedLevyRate=null
+       （不填/不设默认/禁1%，null 时仅展示五级表不产税额）；企业税目仅展示不计算。
+       全税数字：模拟测算，非税务意见，非实际代扣金额；不改 8%/2%、¥50、T+1。 */
+    withholdingTax: {
+      disclaimer: '模拟测算，非税务意见，非实际代扣金额，非完税凭证；本页数字仅为演示测算，不构成申报、扣缴、开票或实名认证依据。',
+      activeScheme: 'labor',
+      labor: {
+        deduction: { threshold: 4000, fixed: 800, pct: 0.2 },
+        brackets: [
+          { max: 20000, rate: 0.20, quick: 0 },
+          { max: 50000, rate: 0.30, quick: 2000 },
+          { max: Infinity, rate: 0.40, quick: 7000 }
+        ],
+        note: '20%/30%/40% 为预扣预缴率，不是最终税负；年度并入综合所得适用3%–45%七级超额累进汇算，多退少补。'
+      },
+      business: {
+        deemedLevyRate: null,
+        statutoryBrackets: [
+          { max: 30000, rate: 0.05, quick: 0 },
+          { max: 90000, rate: 0.10, quick: 1500 },
+          { max: 300000, rate: 0.20, quick: 10500 },
+          { max: 500000, rate: 0.30, quick: 40500 },
+          { max: Infinity, rate: 0.35, quick: 65500 }
+        ]
+      },
+      naturalPersonQualification: {
+        steps: ['是否办理市场主体登记', '是否持续经营', '是否存在雇佣关系'],
+        conclusion: '未登记+非持续经营+无雇佣关系的推荐/介绍返佣→劳务报酬所得；办理个体工商户/个独登记并持续经营→经营所得。生产定性以主管税务机关认定为准。'
+      },
+      enterpriseTaxItems: [
+        { name: '增值税·一般纳税人（现代服务—商务辅助—经纪代理服务）', rate: '6%', calc: false, basis: '《增值税法》2026-01-01施行第十条（三）；财税〔2016〕36号附件1税目注释' },
+        { name: '增值税·小规模纳税人', rate: '3%征收率；2026-01-01至2027-12-31 3%减按1%；月10万/季30万以下免征', calc: false, basis: '财政部税务总局2026年第10号公告；税务总局2026年第4号公告' },
+        { name: '企业所得税', rate: '基本税率25%', calc: false, basis: '《企业所得税法》第四条' },
+        { name: '小型微利优惠', rate: '减按25%计应纳税所得额×20%，实际税负5%（至2027-12-31）', calc: false, basis: '财政部税务总局2023年第12号公告第三条/第五条' },
+        { name: '附加税费', rate: '城建税市区7%/县城镇5%/其他1%；教育费附加3%；地方教育附加2%；六税两费减半（至2027-12-31）', calc: false, basis: '城建税法第四条；国务院令448号；财综〔2010〕98号；2023年第12号公告第二条' }
+      ]
+    },
+    /* ====================================================================
+       M1-6 台账消费闭合枚举 + T+7 冻结 + 自身10%（D9/D12/D26）
+       充值/免费积分/规费/退款笔不计入；frozenDays=7自然日；selfRate=0.10 独立分区。 */
+    agentLedger: {
+      frozenDays: 7,
+      selfRate: 0.10,
+      grossShare: 0.5,
+      ratioRange: { min: 0, max: 0.5 },
+      lines: ['subLedger', 'selfLedger'],
+      eligibleTypes: [
+        { id: 'order_paid_net', label: '订单成交实付净额' },
+        { id: 'points_unlock_paid', label: '积分解锁实付' },
+        { id: 'value_added_paid', label: '增值服务实付' }
+      ],
+      excludedTypes: [
+        { id: 'recharge', label: '钱包充值' },
+        { id: 'free_points', label: '免费积分面值' },
+        { id: 'entry_fee', label: '入驻/认证等平台规费' },
+        { id: 'refund_reversal', label: '退款/冲减笔' }
+      ]
+    },
     /* 专业版入驻
        [FIX BM-042] @deprecated legacy 旧结构（¥2000 专业版已无任何页面引用）；
-       入驻费唯一权威来源为下方 entryTypes（construction/agency/partner 分类定价），勿新增对本对象的引用。 */
+       入驻费唯一权威来源为下方 entryTypes（construction/agency 分类定价），勿新增对本对象的引用。 */
     entry: { audit: 300, seat: 1700, days: 30, total: 2000, trial: 7,
       benefits: ['完整查看联系信息', '不限次发布供需信息', '匹配优先权重', '企业专属标识与主页', '7 天无理由退款保障'] },
     /* 提现限制 */
@@ -985,9 +1062,8 @@ window.MOCK = (function () {
         yearly: { price: 3599, cycle: 'yearly', discount: 0.9 } },
       agency: { fee: 2999, cycle: 'once', label: '中介服务企业', badge: '金V',
         /* [PHASE 0] 入驻费重构为「深度认证年审费」：含人工能力评估+征信评估+案例核验+年度复审清退；建议参数（可调） */
-        yearly: { price: 2699, cycle: 'yearly', discount: 0.9 } },
-      partner: { fee: 0, cycle: 'once', label: '合伙人企业', badge: '专属', audit: true,
-        yearly: { price: 0, cycle: 'yearly', discount: 0.9 } }
+        yearly: { price: 2699, cycle: 'yearly', discount: 0.9 } }
+      /* [M4-4] 旧企业合伙人 partner 入驻档位已摘除（个人合伙人 individualPartner 配置不受影响） */
     },
     /* [FEAT 9.2-2] 入驻年度订阅全局配置 */
     subscription: { enabled: true, remindDays: 30, label: '年度订阅' },
@@ -995,8 +1071,8 @@ window.MOCK = (function () {
     membership: {
       types: [
         { id: 'construction', name: '建筑企业', creditDiscount: 0.8, badge: '蓝V' },
-        { id: 'agency',       name: '中介服务企业', creditDiscount: 0.7, badge: '金V' },
-        { id: 'partner',      name: '合伙人企业', creditDiscount: 0.5, badge: '专属' }
+        { id: 'agency',       name: '中介服务企业', creditDiscount: 0.7, badge: '金V' }
+        /* [M4-4] 旧企业合伙人 partner 会员档已摘除 */
       ],
       /* [FEAT 9.2-1] 年度解锁会员（P1）：年费订阅，全部详情免费解锁 + 积分折扣提升至 0.5x */
       membershipAnnual: {
@@ -1030,7 +1106,7 @@ window.MOCK = (function () {
          注意：leadPack 不使用 packs 字段——talent 详情页条数包 UI 的消费链路未接通（data-pw-unlock 只走单条解锁），
          启用 packs 会点亮不可用的条数包入口；线索包消费通道为「需求广场精准解锁」（seller-board 消耗配额走 LeadStore）。 */
       vendorUpgrades: {
-        topListing: { enabled: true, price: 99, durationDays: 7, label: '服务置顶', desc: '供需信息置顶展示7天', entryTypes: ['construction', 'agency', 'partner'],
+        topListing: { enabled: true, price: 99, durationDays: 7, label: '服务置顶', desc: '供需信息置顶展示7天', entryTypes: ['construction', 'agency'],
           effectAnchor: { text: '置顶后曝光显著提升', sub: '广场排序置前 + 金色置顶标识' } },
         leadPack: { enabled: true, price: 299, count: 50, label: '线索包', desc: '获取50条精准询盘线索', entryTypes: ['agency'],
           effectAnchor: { text: '低至 ¥6/条', sub: '对比人才单条解锁 ¥29' } },
@@ -1053,7 +1129,8 @@ window.MOCK = (function () {
     monitor: {
       dimensions: ['资质到期', '项目更新', '中标', '司法', '经营异常', '工商变更'],
       pushDaily: '09:00',
-      limits: { realname: 5, pro: 10, construction: 30, agency: 50, partner: 200 }
+      limits: { realname: 5, pro: 10, construction: 30, agency: 50 }
+      /* [M4-4] 旧企业合伙人 partner 监控额度200已摘除；省代本省无限由 agent-region/MonitorStore 单独实现 */
     },
     /* [FEAT 9.2-2] 诚信分体系：阈值与等级配置 */
     creditScore: {
@@ -4926,7 +5003,7 @@ window.MOCK.byFlow = function (flow) {
   var keys = flow === 'resource' ? ['franchise', 'trade', 'personnel', 'talent'] : ['material', 'labor', 'equipment', 'agency'];
   return (this.catalog || []).filter(function (x) { return keys.indexOf(x.bizKey) !== -1; });
 };
-/* 按企业入驻类型取模型（construction/agency/partner） */
+/* 按企业入驻类型取模型（construction/agency；旧 partner 已摘除） */
 window.MOCK.entryTypeById = function (id) {
   var t = this.business && this.business.entryTypes;
   return (t && t[id]) || null;

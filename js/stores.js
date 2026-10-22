@@ -234,11 +234,13 @@
     if (!s.enterprise || !s.enterprise.ok) return 'none';
     var st = s.enterprise.annualStatus || 'ok';
     if (st === 'ok' || st === 'due') {
-      var last = s.enterprise.lastReviewAt || 0;
-      var due = !last || (Date.now() - last >= 365 * 864e5);
+      /* [Demo补全] 无年检基线(lastReviewAt)时不立即判到期，避免新认证企业一进入就显示年检逾期；
+         有基线且满365天才置 due */
+      var last = s.enterprise.lastReviewAt || s.enterprise.approvedAt || 0;
+      var due = !!last && (Date.now() - last >= 365 * 864e5);
       if (due && st !== 'due') {
         s.enterprise.annualStatus = 'due';
-        s.enterprise.reviewDueAt = last ? last + 365 * 864e5 : Date.now();
+        s.enterprise.reviewDueAt = last + 365 * 864e5;
         this.write(s);
         st = 'due';
       }
@@ -696,7 +698,12 @@
      checkDailyPush() 每日首次调用为每个 follow 生成一条 feed 推送。 */
   var MonitorStore = makeStore('engchain-monitor', { follows: [], feed: [], lastPushDate: '' }, 'engchain:monitor');
   MonitorStore._limitForIdentity = function () {
-    var limits = (MOCK.business.monitor && MOCK.business.monitor.limits) || { realname: 5, pro: 10, construction: 30, agency: 50, partner: 200 };
+    var limits = (MOCK.business.monitor && MOCK.business.monitor.limits) || { realname: 5, pro: 10, construction: 30, agency: 50 };
+    /* [M4-4] 旧企业合伙人 partner 200 额度已摘除；省代本省无限由下方 M4-2 分支实现 */
+    /* M4-2 本省无限：active 代理（总代/二级）本省关注无限；终止态不放行；无省不误放开。
+       建筑30/中介50 旧额度原样保留。 */
+    var _ab = agentAccessBits();
+    if (_ab.active && (_ab.status === 'active')) return Infinity;
     var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
     if (idy.isGuest) return limits.realname;
     if (idy.primary === 'partner') return limits.partner;
@@ -708,12 +715,19 @@
     }
     return limits.realname;
   };
-  MonitorStore.follow = function (companyId) {
+  MonitorStore.follow = function (companyId, opts) {
     var s = this.read(); var i;
     for (i = 0; i < s.follows.length; i++) if (s.follows[i].companyId === companyId) return s;
+    /* M4-2 守卫同步：终止态不可关注；外省代理受限（候选先本省过滤，此处二次拦截） */
+    var _ab = agentAccessBits();
+    if (_ab.active) {
+      if (_ab.status !== 'active') return { error: '终止/暂停状态不可关注' };
+      var cp = opts && (opts.province || opts.companyProvince);
+      if (cp && window.AgentRegion && AgentRegion.unlimitedFollow(cp) === false) return { error: '仅可关注授权省内企业' };
+    }
     var limit = this._limitForIdentity();
-    if (s.follows.length >= limit) return { error: '关注数量已达上限' };
-    s.follows.push({ companyId: companyId, ts: Date.now() });
+    if (isFinite(limit) && s.follows.length >= limit) return { error: '关注数量已达上限' };
+    s.follows.push({ companyId: companyId, ts: Date.now(), province: (opts && opts.province) || '' });
     return this.write(s);
   };
   /* [FIX BM-040] 每日推送：跨天首次调用时为每个 follow 生成一条 feed */
@@ -1326,8 +1340,13 @@
     else if (partnerOk) primary = 'partner';
     else if (proOk) primary = 'pro';
     else if (realnameOk) primary = 'realname';
-    return { personal: personal, partner: partnerOk, enterprise: enterprise, identities: identities, entryTypes: types, isGuest: false, primary: primary,
+    var idy = { personal: personal, partner: partnerOk, enterprise: enterprise, identities: identities, entryTypes: types, isGuest: false, primary: primary,
       personalEntryUserType: peUserType, personalEntryResumeComplete: peResumeComplete };
+    /* M1-2 叠加资格位只读挂接（D31 并集，不互覆盖；不写 entry.types/auth.partner）：
+       仅命中代理身份时追加 agent 块，基线用户对象键集保持不变（R-01/R-09 深相等）。 */
+    var _ab = agentAccessBits();
+    if (_ab.active) idy.agent = _ab;
+    return idy;
   }
 
   /* ---- v3.0 五轨道"成长路径"状态推导（与认证中心 auth.html 同源的唯一权威） ----
@@ -1451,10 +1470,49 @@
     return { rate: rate, fee: total };
   }
 
+  /* ---- M1-2 省级总代资格位只读叠加（D31 并集，不互覆盖；禁止写 entry.types/auth.partner） ----
+     优先读 window.AgentStore.bitsFor(当前uid)；模块未加载时回退直读 localStorage 两键；
+     缺键 try/catch 回退空位；terminated/revoked/removed 终止态即时失效。
+     仅在命中代理身份时返回 active 块，保证 u1/u2/u7/u8/u9 基线用户深相等不受影响。 */
+  function agentBitsFromRaw(uid) {
+    var out = { isProvinceAgent: false, isSubAgent: false, agentProvince: '', agentQuotaUsed: 0, status: '', orgId: '' };
+    try {
+      var pa = JSON.parse(LS.getItem('engchain-province-agents') || '[]');
+      if (Array.isArray(pa)) pa.forEach(function (a) {
+        if (a.uid === uid && (a.status === 'active' || a.status === 'suspended')) {
+          out.isProvinceAgent = true; out.agentProvince = a.province || ''; out.status = a.status; out.orgId = a.orgId || '';
+        }
+      });
+      var subs = JSON.parse(LS.getItem('engchain-sub-agents') || '[]');
+      if (Array.isArray(subs)) subs.forEach(function (s) {
+        if (s.uid === uid && (s.status === 'approved' || s.status === 'suspended')) {
+          out.isSubAgent = true; if (!out.agentProvince) out.agentProvince = s.province || ''; out.orgId = s.orgId || '';
+        }
+      });
+    } catch (e) {}
+    return out;
+  }
+  function agentAccessBits() {
+    var empty = { active: false };
+    try {
+      var uid = '';
+      if (window.DataBus && typeof DataBus.current === 'function') { var u = DataBus.current(); uid = u ? u.id : ''; }
+      if (!uid) return empty;
+      var bits = null;
+      if (window.AgentStore && typeof AgentStore.bitsFor === 'function') bits = AgentStore.bitsFor(uid);
+      else bits = agentBitsFromRaw(uid);
+      if (!bits || (!bits.isProvinceAgent && !bits.isSubAgent)) return empty;
+      return { active: true, isProvinceAgent: !!bits.isProvinceAgent, isSubAgent: !!bits.isSubAgent,
+        agentProvince: bits.agentProvince || '', agentQuotaUsed: bits.agentQuotaUsed || 0,
+        status: bits.status || '', orgId: bits.orgId || '', legacyDistributor: false };
+    } catch (e) { return empty; }
+  }
+
   /* ---- 入口门控源：身份+入驻类型 → 专有入口显隐/档位（单一来源，v3.0 五身份叠加） ----
      规则：分销中心 = 企业入驻 或 个人合伙人；中介服务 = 中介服务企业（入驻类型含 agency）专有。
      多类型入驻时：分销档位取最高（合伙人>中介>建筑），中介权限只要含 agency 即可。
-     个人合伙人：享有二级分销 distTier='full'，但无团队管理权限（hasTeam=false）。
+     [M4-3] 个人合伙人全程 distTier='individualPartner'（8%/2%），无团队管理（hasTeam=false）；
+     旧企业 partner→full 档位已摘除（随 M4-4 下线）。
      profile 宫格 / distribution×3 / agency×2 统一引用本函数，杜绝入口显隐与页面门控错配。 */
   function entryAccess() {
     var idy = deriveIdentity();
@@ -1465,14 +1523,13 @@
     var isIndividualPartner = !!(idy.partner && idy.identities.indexOf('partner') >= 0 && !isResident);
     /* 主入驻类型：取数组第一个（兼容旧单值 type） */
     var type = isResident ? (types.length ? types[0] : 'construction') : '';
-    /* 多类型入驻时分销档位取最高：合伙人=完整二级 / 中介=受限一级6% / 建筑=基础一级
-       个人合伙人也享有完整二级分销，但无团队管理 */
+    /* 多类型入驻时分销档位：个人合伙人=individualPartner(8%/2%) / 中介=limited(6%) / 建筑=base(12%/3%)；
+       [M4-3] 旧企业 partner→full 映射摘除，不再授予 full */
     var distTier = 'base';
-    if (types.indexOf('partner') >= 0) distTier = 'full';
+    if (isIndividualPartner) distTier = 'individualPartner';
     else if (types.indexOf('agency') >= 0) distTier = 'limited';
-    else if (isIndividualPartner) distTier = 'full';
     var dist = isResident || isIndividualPartner;
-    return {
+    var acc = {
       statusId: id,
       identity: idy,
       isResident: isResident,
@@ -1482,13 +1539,25 @@
       /* 分销中心：企业入驻 或 个人合伙人可见；档位按入驻类型/身份取最高 */
       dist: dist,
       distTier: distTier,
-      distBadge: distTier === 'full' ? (isIndividualPartner ? '个人合伙人' : '专属') : (distTier === 'limited' ? '受限' : '蓝V'),
+      distBadge: distTier === 'individualPartner' ? '个人合伙人' : (distTier === 'limited' ? '受限' : '蓝V'),
       /* 中介服务：入驻类型含 agency 即可（多类型并行时也有效） */
       agency: isResident && types.indexOf('agency') >= 0,
       agencyBadge: '金V',
       /* 团队管理：仅企业入驻且类型含 partner 时拥有；个人合伙人无团队管理 */
       hasTeam: isResident && types.indexOf('partner') >= 0
     };
+    /* M1-2 叠加资格位（只读，独立布尔并存，不互覆盖既有位；未命中不追加键，保证基线深相等）。
+       legacyDistributor=false：新代理身份关闭旧邀请返佣中心（§3.2）；不改旧线结算。 */
+    var _ab = agentAccessBits();
+    if (_ab.active) {
+      acc.agent = _ab;
+      acc.isProvinceAgent = _ab.isProvinceAgent;
+      acc.isSubAgent = _ab.isSubAgent;
+      acc.agentProvince = _ab.agentProvince;
+      acc.agentQuotaUsed = _ab.agentQuotaUsed;
+      acc.legacyDistributor = _ab.legacyDistributor;
+    }
+    return acc;
   }
 
   /* ---- 发布能力矩阵（v2 叠加身份模型）：按账号实时计算可用品类 ----

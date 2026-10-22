@@ -762,6 +762,10 @@ body { background: var(--bg); }
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-tax.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-region.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
 
@@ -803,16 +807,19 @@ var limits=MOCK.business.monitor.limits;
 var idy=window.deriveIdentity?deriveIdentity():{personal:'none',enterprise:'none',entryTypes:[]};
 var st=idy.primary||'registered';
 var limit=limits.realname||5;
-var tierRank=['realname','pro','construction','agency','partner'];
+/* [M4-4] 旧企业合伙人 partner 额度200已摘除；省代本省无限由 MonitorStore/agent-region 单独实现，不进此档级排行 */
+var tierRank=['realname','pro','construction','agency'];
 var achieved=[];
 if(idy.enterprise==='resident'&&idy.entryTypes&&idy.entryTypes.length){achieved=achieved.concat(idy.entryTypes);}
-if(idy.partner) achieved.push('partner');
 if(idy.personal==='professional'||idy.personal==='full') achieved.push('pro');
 if(idy.personal==='verified'||idy.personal==='professional'||idy.personal==='partner'||idy.personal==='full') achieved.push('realname');
 var bestIdx=-1;
 achieved.forEach(function(t){var i=tierRank.indexOf(t);if(i>bestIdx)bestIdx=i;});
 if(bestIdx>=0){limit=limits[tierRank[bestIdx]]||limit;}
 if(st==='registered'||st==='guest')limit=0;
+/* M4-2 active 代理：授权省内无限关注（外省仍受限）；终止态不放行 */
+var _agBits=(window.AgentRegion&&AgentRegion.currentBits)?AgentRegion.currentBits():null;
+if(_agBits&&_agBits.active&&_agBits.status==='active'){limit=Infinity;}
 
 /* 破冰期试用 */
 var trialInfo=null;
@@ -830,7 +837,9 @@ if(window.ModeStore&&ModeStore.isBreakIn()&&st==='registered'){
 
 /* 额度标签 */
 var quotaTag=document.getElementById('quota-tag');
-if(trialInfo&&trialInfo.active){
+if(limit===Infinity){
+  quotaTag.textContent='授权省内无限关注';
+}else if(trialInfo&&trialInfo.active){
   quotaTag.textContent='试用剩 '+trialInfo.remain+' 天 · '+limit+' 家';
 }else{
   quotaTag.textContent='可关注 '+limit+' 家';
@@ -857,7 +866,7 @@ if(trialInfo){
   bannerSlot.innerHTML='<div class="trial-banner locked">'+
     '<div class="tb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'+
     '<div class="tb-body"><div class="tb-title">入驻企业解锁完整监控</div>'+
-    '<div class="tb-desc">建筑 30 家 / 中介 50 家 / 合伙人 200 家</div></div>'+
+    '<div class="tb-desc">建筑 30 家 / 中介 50 家；省级总代授权省内无限查看</div></div>'+
     '<button class="tb-btn" onclick="location.href=\'../profile/entry.html\'">去入驻</button>'+
   '</div>';
 }
@@ -1201,9 +1210,16 @@ document.getElementById('fab-add').addEventListener('click',openAddSheet);
 document.getElementById('add-close').addEventListener('click',closeAddSheet);
 addMask.addEventListener('click',closeAddSheet);
 
+/* M4-2 候选先本省过滤：active 代理仅展示授权省内企业（地址城市粗映射，生产接真实行政区划） */
+var CITY2PROV={'成都':'四川','绵阳':'四川','德阳':'四川','重庆':'重庆','北京':'北京','上海':'上海','天津':'天津','广州':'广东','深圳':'广东','杭州':'浙江','武汉':'湖北','西安':'陕西'};
+function coProvince(c){var a=c.address||'';for(var k in CITY2PROV){if(a.indexOf(k)>=0)return CITY2PROV[k];}return c.province||'';}
 function renderAddList(kw){
   var s=MonitorStore.read();
+  var ab=(window.AgentRegion&&AgentRegion.currentBits)?AgentRegion.currentBits():null;
   var filtered=COS.filter(function(c){
+    if(ab&&ab.active&&ab.status==='active'&&ab.province){
+      if(AgentRegion.norm(coProvince(c))!==AgentRegion.norm(ab.province))return false;
+    }
     if(!kw)return true;
     return c.name.indexOf(kw)>=0||c.tag.indexOf(kw)>=0;
   });
@@ -1221,21 +1237,23 @@ function renderAddList(kw){
       '</div>'+
       (isFollowed
         ?'<button class="add-co-btn followed">已关注</button>'
-        :'<button class="add-co-btn follow" onclick="follow(\''+c.id+'\')">+ 关注</button>')+
+        :'<button class="add-co-btn follow" onclick="follow(\''+c.id+'\',\''+(coProvince(c)||'')+'\')">+ 关注</button>')+
     '</div>';
   }).join('');
 }
 addSearchInput.addEventListener('input',function(){renderAddList(this.value.trim());});
 
 /* ═══ 关注/取关 ═══ */
-window.follow=function(id){
+window.follow=function(id,prov){
   var s=MonitorStore.read();
-  if(s.follows.length>=limit){
+  /* M4-2 本省无限：Infinity 不走上限；外省代理二次拦截（Store 守卫兜底） */
+  if(limit!==Infinity&&s.follows.length>=limit){
     if(limit<=0){UI.toast('入驻企业解锁完整监控','warn');}
     else{UI.toast('已达关注上限 '+limit+' 家','warn');}
     return;
   }
-  MonitorStore.follow(id);
+  var res=MonitorStore.follow(id,{province:prov||''});
+  if(res&&res.error){UI.toast(res.error,'warn');return;}
   var dim=dims[Math.floor(Math.random()*dims.length)];
   var kind=DIM_COLOR[dim]||'success';
   MonitorStore.pushFeed({company:id,dim:dim,kind:kind,text:SAMPLE_DIMS[dim]});

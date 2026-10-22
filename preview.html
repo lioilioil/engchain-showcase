@@ -914,6 +914,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="js/common.js"></script>
 <script src="js/stores.js"></script>
 <script src="js/databus.js"></script>
+<!-- 演示场景切换器：加载代理体系模块，供 DEMO_SCENARIOS build() 走真实接口播种（不改变页面既有展示） -->
+<script src="js/agent-rules.js"></script>
+<script src="js/agent-tax.js"></script>
+<script src="js/agent-store.js"></script>
+<script src="js/agent-ledger.js"></script>
+<script src="js/agent-esign.js"></script>
+<script src="js/agent-access.js"></script>
+<script src="js/agent-bridge.js"></script>
+<script src="js/agent-apply.js"></script>
+<script src="js/agent-demo.js"></script>
 <script src="js/wonder-engine.js"></script>
 <script src="js/wonder-popup.js"></script>
 <script>
@@ -1137,8 +1147,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/profile/entry.html', '企业入驻·三类', '企业入驻 · 三类'],
         ['pages/profile/entry-form.html?type=construction', '入驻申请·建筑', '入驻资料 · 建筑（type=construction）'],
         ['pages/profile/entry-form.html?type=agency', '入驻申请·中介', '入驻资料 · 中介服务（type=agency）'],
-        ['pages/profile/entry-form.html?type=partner', '入驻申请·合伙人', '入驻资料 · 合伙人（type=partner）'],
-        { name:'入驻审核·合伙人', src:'pages/profile/entry-review.html', stateIcon:true, desc:'入驻审核 · 审核进度与轨迹（合伙人）' },
+        ['pages/profile/entry-form.html?type=provinceAgent', '入驻申请·省代', '入驻资料 · 省级总代（type=provinceAgent，¥0 人工审核）'],
         { name:'入驻成功', src:'pages/profile/entry-result.html', stateIcon:true, desc:'入驻成功' },
         { name:'个人入驻·结果', src:'pages/profile/entry-personal-result.html', stateIcon:true, desc:'个人入驻 · 结果页' },
       ]},
@@ -1819,7 +1828,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     done:['已点亮','#1f9d6b','rgba(31,157,107,.14)'],
     locked:['未解锁','var(--text-3)','transparent']
   };
-  var PRIMARY_LABEL = { guest:'游客（未登录）', registered:'注册会员', realname:'实名用户', pro:'认证个人人才', partner:'认证个人合伙人', enterprise:'企业认证', resident:'企业入驻' };
+  var PRIMARY_LABEL = { guest:'游客（未登录）', registered:'注册会员', realname:'实名用户', pro:'认证个人人才', partner:'认证个人合伙人', enterprise:'企业认证', resident:'企业入驻', provinceAgent:'省级总代', subAgent:'二级合作' };
   function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
   var selScenario = document.getElementById('sel-scenario');
@@ -1856,7 +1865,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     u3: { key: 'enterprise',            done: ['realname', 'enterprise'],          type: null },
     u1: { key: 'resident_construction', done: ['realname', 'enterprise', 'entry'], type: 'construction' },
     u2: { key: 'resident_agency',       done: ['realname', 'enterprise', 'entry'], type: 'agency' },
-    u8: { key: 'resident_partner',      done: ['realname', 'enterprise', 'entry'], type: 'partner' }
+    /* [M4-4] u8 旧企业合伙人已回退为实名普通用户，START_SEED 同步 */
+    u8: { key: 'realname',              done: ['realname'],                        type: null }
   };
   var lastScenarioKey = '', lastScenarioSig = '';
   /* 当前身份签名：uid + 五轨道状态 + 入驻类型/审核阶段 + 各认证域 status，足以区分共用 base 的多场景 */
@@ -1908,8 +1918,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         + '<i style="width:6px;height:6px;border-radius:50%;background:'+meta[1]+';"></i>'
         + escAttr(t[1]) + '<b style="color:'+meta[1]+';font-weight:600;">'+meta[0]+'</b></span>';
     }).join('');
+    /* 省级总代/二级合作为叠加资格位：主身份文案按 agent 位优先显名，回退五轨道主身份，不渲染英文枚举 */
+    var agentMeta = (ds && ds.idy && ds.idy.agent) || {};
+    var agentLabel = agentMeta.isProvinceAgent ? '省级总代' : (agentMeta.isSubAgent ? '二级合作' : '');
+    var primaryText = agentLabel || PRIMARY_LABEL[idy.primary] || idy.primary;
     document.getElementById('status-note').innerHTML =
-      '<div style="margin-bottom:4px;color:var(--text-2);">当前主身份 · <b style="color:var(--text-1);">'+escAttr(PRIMARY_LABEL[idy.primary]||idy.primary)+'</b>　已点亮 <b style="color:var(--text-1);">'+(ds?ds.doneN:0)+'</b>/5</div>'
+      '<div style="margin-bottom:4px;color:var(--text-2);">当前主身份 · <b style="color:var(--text-1);">'+escAttr(primaryText)+'</b>　已点亮 <b style="color:var(--text-1);">'+(ds?ds.doneN:0)+'</b>/5</div>'
       + renderAcctRow()
       + '<div>'+badges+'</div>';
     syncScenarioSelect();
@@ -2349,8 +2363,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     function fmt(n){return n===0?'¥0':('¥'+Number(n).toLocaleString());}
     var note = document.getElementById('mode-note');
     if (note) note.innerHTML = isB
-      ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>¥0</b> / 中介 <b>¥14,999</b>（5折） / 合伙人 <b>¥0</b>（审核制）<br>首档佣金 <b>5%</b>｜实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
-      : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>¥3,999</b> / 中介 <b>¥29,999</b> / 合伙人 <b>¥0</b>（审核制）<br>首档佣金 <b>8%</b>｜实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
+      ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>¥0</b> / 中介 <b>¥14,999</b>（5折）；省级总代 <b>¥0</b>（人工审核·一省独家）<br>首档佣金 <b>5%</b>｜实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
+      : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>¥3,999</b> / 中介 <b>¥29,999</b>；省级总代 <b>¥0</b>（人工审核·一省独家）<br>首档佣金 <b>8%</b>｜实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
     updateStateSummary();
   }
   document.getElementById('seg-mode').addEventListener('click', function (e) {
@@ -2369,7 +2383,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     /* 企业认证费/周期：唯一数据源 MOCK.business.certification（不再硬编码 ¥999） */
     var cert=(window.MOCK&&MOCK.business&&MOCK.business.certification)||{enterprise:999,enterpriseCycle:'year'};
     var certCycle=cert.enterpriseCycle==='year'?'/年':'';
-    var TYPE={construction:'建筑',agency:'中介',partner:'合伙人'};
+    var TYPE={construction:'建筑',agency:'中介',provinceAgent:'省代'};
     /* 认证费行：已认证 / 审核中 / 已驳回 / 未认证 */
     var authTxt;
     if(a.enterprise&&a.enterprise.ok){ authTxt='企业 '+pvMoney(cert.enterprise)+certCycle+' ✓'; }
@@ -2377,7 +2391,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     else if(a.enterprise&&a.enterprise.status==='rejected'){ authTxt='企业认证已驳回'; }
     else { authTxt='实名免费 · 企业未认证'; }
     /* 入驻费行：active / 待初审(pending) / 待终审(first_ok) / 已驳回(rejected) / 未入驻；
-       当期入驻费随运营周期由 DataBus.entryFeeOf 取（破冰价/标准价），0 元为合伙人审核制 */
+       当期入驻费随运营周期由 DataBus.entryFeeOf 取（破冰价/标准价）；省代为 ¥0 人工审核 */
     var entryTxt='未入驻';
     if(e.type){
       var lab=TYPE[e.type]||'入驻';
@@ -2385,7 +2399,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       else {
         var fee=(window.DataBus&&DataBus.entryFeeOf)?DataBus.entryFeeOf(e.type):0;
         var feeDesc;
-        if(e.type==='partner'){ feeDesc='0 元审核制'; }
+        if(e.type==='provinceAgent'){ feeDesc='¥0 人工审核·一省独家'; }
         else if(fee<=0){ feeDesc='破冰期 0 元入驻'; }
         else { feeDesc='当期入驻费 '+pvMoney(fee); }
         if(e.status==='pending'){ entryTxt=lab+'入驻 · 待初审（'+feeDesc+'）'; }

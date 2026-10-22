@@ -241,6 +241,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/file-download.js?v=2"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- M4-1 补接：本省免解锁守卫（同 detail.js/company 口径：省名归一、默认拒绝、终止态不放行、不写 engchain-unlocked、排除 trade） -->
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-region.js"></script>
 <script src="../../js/domain.js"></script>
 <script src="../../js/homepage-editor.js"></script>
 <script src="../../js/preview-sheet.js"></script>
@@ -286,6 +289,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     isUnlocked: function (rec) {
       if (!rec) return false;
       if (this.isFree(rec.bizKey)) return true;
+      /* M4-1 本省免解锁：active 代理同省放行，不写 engchain-unlocked；trade/终止态/无省除外 */
+      if (window.AgentRegion && AgentRegion.isProvinceFreeUnlock(rec)) return true;
       var r0 = this._read()[this._key(rec)];
       if (!r0) return false;
       var days = this._ttlDays(rec);
@@ -295,7 +300,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     mark: function (rec) { var o = this._read(); o[this._key(rec)] = { t: Date.now() }; this._write(o); }
   };
   var recBizKey = isResume ? 'talent' : (p.bizKey || 'person');
-  var pwRec = { bizKey: recBizKey, id: displayId, detailLevel: p.detailLevel };
+  var pwRec = { bizKey: recBizKey, id: displayId, detailLevel: p.detailLevel,
+    province: p.province || '', location: p.location || p.city || '' };
   /* 锁定态就近解锁胶囊（与 detail.js Lock.inline 同构） */
   function lockInlineHtml(title, sub) {
     return '<div class="pw-inline" data-pw-unlock><div class="pw-inline-l"><div class="pw-inline-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><use href="#i-lock"/></svg></div><div><div class="pw-inline-t">' + UI.esc(title || '解锁查看完整信息') + '</div>' + (sub ? '<div class="pw-inline-s">' + UI.esc(sub) + '</div>' : '') + '</div></div></div>';

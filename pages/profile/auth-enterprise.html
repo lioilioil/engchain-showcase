@@ -119,6 +119,27 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
       </div>
 
+      <!-- [Demo补全] 联系信息与地址：便于后台审核联系，已认证态回显 -->
+      <div class="group-title">联系信息</div>
+      <div class="group ap-group">
+        <div class="ap-field">
+          <label>联系人</label>
+          <input id="in-contact" class="ap-input" placeholder="负责对接的联系人姓名" maxlength="20">
+        </div>
+        <div class="ap-field">
+          <label>联系电话</label>
+          <input id="in-phone" class="ap-input" placeholder="手机号，便于审核联系" maxlength="11">
+        </div>
+        <div class="ap-field">
+          <label>注册地址</label>
+          <input id="in-regaddr" class="ap-input" placeholder="营业执照上的注册地址">
+        </div>
+        <div class="ap-field" style="border:none;">
+          <label>办公地址</label>
+          <input id="in-office" class="ap-input" placeholder="实际办公地址（选填）">
+        </div>
+      </div>
+
       <div class="group-title">营业执照</div>
       <div class="ae-license" id="up-license" onclick="mockLicense()">
         <div class="ap-up-ic" id="lic-ic"><svg class="ic" style="width:18px;height:18px;"><use href="#i-upload"/></svg></div>
@@ -212,6 +233,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         <div class="ap-field ap-field-ro"><label>命名依据</label><b class="fs-13" id="d-basis">—</b></div>
         <div class="ap-field ap-field-ro"><label>信用代码</label><b class="fs-13 mono" id="d-code">—</b></div>
         <div class="ap-field ap-field-ro"><label>法定代表人</label><b class="fs-13" id="d-legal">—</b></div>
+        <div class="ap-field ap-field-ro"><label>联系人</label><b class="fs-13 text-2" id="d-contact">—</b></div>
+        <div class="ap-field ap-field-ro"><label>联系电话</label><b class="fs-13 mono text-2" id="d-phone">—</b></div>
         <div class="ap-field ap-field-ro"><label>办公地址</label><b class="fs-13 text-2" id="d-address">—</b></div>
         <div class="ap-field ap-field-ro"><label>注册地址</label><b class="fs-13 text-2" id="d-regaddr">—</b></div>
         <div class="ap-field ap-field-ro" style="border:none;"><label>有效期至</label><b class="fs-13" id="d-expire">—</b></div>
@@ -351,6 +374,11 @@ function initForm(a){
   document.getElementById('in-short').value=a.enterprise.shortName||'';
   document.getElementById('in-code').value=a.enterprise.code||'';
   document.getElementById('in-legal').value=a.enterprise.legal||a.realname.name||st.user||'';
+  /* [Demo补全] 回填联系信息与地址 */
+  document.getElementById('in-contact').value=a.enterprise.contactName||'';
+  document.getElementById('in-phone').value=a.enterprise.contactPhone||'';
+  document.getElementById('in-regaddr').value=a.enterprise.registeredAddress||'';
+  document.getElementById('in-office').value=a.enterprise.address||'';
   setBasis(a.enterprise.nameBasis||'tradeName');
   document.getElementById('err-short').classList.remove('show');
   resetLicense();
@@ -396,6 +424,8 @@ function fillDone(a){
   document.getElementById('d-basis').textContent=basisLabel(a.enterprise.nameBasis);
   document.getElementById('d-code').textContent=a.enterprise.code||'—';
   document.getElementById('d-legal').textContent=a.enterprise.legal||st.user||'—';
+  document.getElementById('d-contact').textContent=a.enterprise.contactName||'—';
+  document.getElementById('d-phone').textContent=a.enterprise.contactPhone||'—';
   document.getElementById('d-address').textContent=a.enterprise.address||'—';
   document.getElementById('d-regaddr').textContent=a.enterprise.registeredAddress||'—';
   document.getElementById('d-expire').textContent=fmtD(a.enterprise.expireAt);
@@ -638,14 +668,29 @@ window.payEnterprise=function(){
   var errEl=document.getElementById('err-short');
   if(!shortName){errEl.classList.add('show');document.getElementById('in-short').focus();return;}
   errEl.classList.remove('show');
-  if(!/^[\u4e00-\u9fa5()（）·]{4,40}$/.test(co)){UI.toast('请输入与执照一致的企业名称','warn');return;}
+  if(!/^[\u4e00-\u9fa5A-Za-z0-9()（）·\-]{4,40}$/.test(co)){UI.toast('请输入与执照一致的企业名称（4-40位，可含中英文/数字）','warn');return;}
   if(!validUscc(code)){UI.toast('统一社会信用代码应为 18 位','warn');return;}
   if(!legal){UI.toast('请填写法定代表人','warn');return;}
+  /* [Demo补全] 法定代表人须与当前实名认证姓名一致 */
+  var rnName=((cur().realname)||{}).name||'';
+  if(rnName && legal!==rnName){UI.toast('法定代表人须与实名认证姓名「'+rnName+'」一致','warn');return;}
+  /* [Demo补全] 按命名依据条件必填证明材料 */
+  if(currentBasis==='trademark' && !proofUploaded.trademark){UI.toast('选择「基于商标命名」需先上传商标注册证或授权材料','warn');return;}
+  if(currentBasis==='brand' && !proofUploaded.brand){UI.toast('选择「基于品牌/产品命名」需先上传名称证明材料','warn');return;}
   if(!licenseUploaded&&!cur().enterprise.co){UI.toast('请上传营业执照','warn');return;}
+  /* [Demo补全] 联系信息与地址校验 */
+  var contact=document.getElementById('in-contact').value.trim();
+  var phone=document.getElementById('in-phone').value.trim();
+  var regaddr=document.getElementById('in-regaddr').value.trim();
+  var office=document.getElementById('in-office').value.trim();
+  if(!contact){UI.toast('请填写联系人姓名','warn');return;}
+  if(!/^1[3-9]\d{9}$/.test(phone)){UI.toast('请填写正确的11位手机号','warn');return;}
+  if(!regaddr){UI.toast('请填写营业执照注册地址','warn');return;}
   var nameProof=[];
   if(currentBasis==='trademark'&&proofUploaded.trademark){nameProof.push({type:'trademark',name:'商标注册证书.pdf'});}
   else if(currentBasis==='brand'&&proofUploaded.brand){nameProof.push({type:'brand',name:'名称证明材料.jpg'});}
-  var payload={co:co,code:code,legal:legal,shortName:shortName,nameBasis:currentBasis,nameProof:nameProof};
+  var payload={co:co,code:code,legal:legal,shortName:shortName,nameBasis:currentBasis,nameProof:nameProof,
+    contactName:contact,contactPhone:phone,registeredAddress:regaddr,address:office};
   var prev=cur().enterprise;
   var resubmit=prev&&prev.fee&&!prev.ok;
   function doSubmit(){
@@ -670,7 +715,7 @@ window.payEnterprise=function(){
     /* 订单信息 */
     html+='<div style="background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;">';
     html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">认证服务费（年费）</span><b style="font-family:var(--font-num);">¥'+fee+'</b></div>';
-    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">审核时效</span><b>24 小时内人工复核</b></div>';
+    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">审核时效</span><b>1–3 个工作日人工复核</b></div>';
     html+='<div class="fb-between" style="font-size:13px;padding:5px 0 0;"><span class="text-2">服务内容</span><b>企业认证标识 + 详情页优先展示</b></div>';
     html+='</div>';
     /* 支付方式选择 */
@@ -755,6 +800,19 @@ window.renew=function(){
     var labels = { qualification: '企业资质', bank: '对公账户', office: '办公场地' };
     UI.toast(labels[type] + '已提交，等待审核', 'ok');
     renderDimProgress();
+    /* [Demo补全] Demo 无后台，模拟审核通过：延迟回写 approved 并刷新等级进度，避免进度条假反馈 */
+    setTimeout(function(){
+      try {
+        var s = AuthStore.read();
+        if (s.enterprise && s.enterprise.dimensions && s.enterprise.dimensions[type]) {
+          s.enterprise.dimensions[type].status = 'approved';
+          s.enterprise.dimensions[type].approvedAt = Date.now();
+          AuthStore.write(s);
+        }
+        UI.toast(labels[type] + '材料已审核通过', 'ok');
+        renderDimProgress();
+      } catch(e) {}
+    }, 1600);
   };
   function renderDimProgress() {
     try {

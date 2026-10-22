@@ -43,9 +43,9 @@ function next() {
 .guide-card { background: #fff; border-radius: 10px; padding: 24px; width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
 .guide-title { font-weight: 600; margin-bottom: 10px; }
 .guide-progress { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
-.guide-bar { height: 100%; background: #1f883d; transition: width .2s; }
+.guide-bar { height: 100%; background: #1f2a44; transition: width .2s; }
 .guide-body { color: #333; line-height: 1.6; margin-bottom: 16px; }
 .guide-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .g-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; }
-.g-btn.primary { background: #1f883d; color: #fff; border-color: #1f883d; }
+.g-btn.primary { background: #1f2a44; color: #fff; border-color: #1f2a44; }
 </style>

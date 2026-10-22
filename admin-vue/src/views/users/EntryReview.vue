@@ -1,8 +1,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import ProTable from '@/components/ProTable/index.vue'
 import api from '@/api'
 import { ElMessage } from 'element-plus'
+
+/* M2-2：省级总代审核/终止走独立桥接视图（方案A 种子导出），本队列仅处理旧入驻 */
+const router = useRouter()
 
 const columns = [
   { prop: 'id', label: '编号', width: 100 },
@@ -96,8 +100,9 @@ onMounted(loadData)
     <div class="page-header">
       <div>
         <h2>入驻审核</h2>
-        <p class="page-desc">企业/中介/合伙人入驻申请审核</p>
+        <p class="page-desc">建筑/中介入驻申请审核（省级总代审核/终止见独立桥接视图；个人合伙人走独立认证审核）</p>
       </div>
+      <el-button size="small" type="primary" plain @click="router.push('/agents/province')">省代开通/审核/终止（桥接）</el-button>
     </div>
 
     <ProTable

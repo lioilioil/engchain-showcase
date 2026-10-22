@@ -346,7 +346,7 @@ onUnmounted(() => {
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-700));
+  background: linear-gradient(135deg, var(--color-primary-800, #1f2a44), var(--color-primary-700));
   font-weight: $font-weight-medium;
   flex-shrink: 0;
 }
