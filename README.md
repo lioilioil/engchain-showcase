@@ -41,7 +41,7 @@ python serve_nocache.py 8766
 
 > 代理演示场景（u11/u12）通过页面「演示场景播种/重置」写入 `engchain-province-agents`/`engchain-sub-agents` 等代理键，硬刷新可还原；不覆盖 u9/u10 等既有种子。
 
-### 省级总代体系 · 完整旅程导览（9 节点）
+### 省级总代体系 · 完整旅程导览（13 节点）
 
 > 在 `preview.html` 左侧「完整旅程导览 · 省级总代体系」分组同步呈现；演示切换器按播种键选择场景后沿路径走查。
 
@@ -56,6 +56,12 @@ python serve_nocache.py 8766
 | 7 | 发起二级合作（待平台审核） | `pages/province-agent/index.html` | `rev_sub_pending`（u11 发起） | 二级卡片待审核/协议未签约 |
 | 8 | 二级签署（总代→二级→签回） | `pages/province-agent/sub.html` | `sub_agent_active`（u12 陈二级） | 约定 20%·已签·本人约定所得/自身余额 |
 | 9 | 台账 / 税务 / 打印（商用闭环） | `pages/province-agent/tax-guide.html` | `province_agent_active` | 两分区台账（T+7 冻结/结算/冲减/税列）→ 税说明法定预扣 → 打印 A4 |
+| 10 | 招商中心（招商码/海报导出） | `pages/province-agent/recruit.html` | `province_agent_active` | 招商码（一总代一有效码）+ 省独家海报 3 主题 + 话术包（合规硬门）→ Canvas 导出 |
+| 11 | 企业自助申请（双轨路径②） | `pages/province-agent/apply.html` | `province_agent_active` | 招商码→企业申请（同省锁定/隔离声明）→ 总代初审 20% → 平台终审 → 自动发起 O4 → 二级签署 |
+| 12 | 二级授权网络（名额/授权链） | `pages/province-agent/network.html` | `province_agent_active` | 两层授权链（总代根→二级公司）+ 名额使用率（含 pending 占用）+ 多态状态 + 聚合约定所得 |
+| 13 | 经营数据中心（总代/二级） | `pages/province-agent/data-center.html` | `province_agent_active` | 月度趋势（近 12 月柱线）/二级贡献排行/比例变更历史/退款冲减统计/月度对账单（打印+CSV）；二级视角：本人趋势/消费构成/冻结到期 |
+
+> 运营规则与 FAQ：`pages/province-agent/rules.html`（招募资格/比例变更/签约八条/终止清退状态机/合规边界/测算免责 + 10 条 FAQ，与税务说明互链）。
 
 > 红线说明：个人合伙人返佣/提现、base/limited、franchise ¥29,800、自身钱包等红线页仅作对照演示，不在本旅程主路径内操作。
 
