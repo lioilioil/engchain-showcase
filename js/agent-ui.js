@@ -41,6 +41,16 @@
   };
   function protoStatusTxt(s) { return PROTO_STATUS[s] || '状态未知'; }
 
+  /* L-2：总代视角协议状态词典（甲方视角：pending_mine 意为“待二级签署”，非“待我签署”；
+     T1 协议中心/档案/详情共用，T2 二级视角仍用 protoStatusTxt 的“待我签署”） */
+  var PROTO_TXT_OWNER = {
+    pending: '待发起',
+    pending_mine: '待二级签署',
+    completed: '已签署',
+    rejected: '已拒签'
+  };
+  function protoTxtOwner(s) { return PROTO_TXT_OWNER[s] || protoStatusTxt(s); }
+
   /* ---------- 统一 toast（H-4：成功/失败/警告三态，单一实现；兼容旧布尔 ok） ---------- */
   function toast(msg, kind) {
     if (typeof document === 'undefined') return;
@@ -60,6 +70,17 @@
     t.textContent = msg || '';
     clearTimeout(t._timer);
     t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2400);
+  }
+
+  /* S1-2：协议取最新一条（listBySub 按 push 序追加，重新发起后最新在后）；
+     避免固定取 [0] 导致重新发起后仍显示旧 rejected 合同 */
+  function latestContract(E, subId) {
+    var list = E && E.listBySub ? (E.listBySub(subId) || []) : [];
+    return list.length ? list[list.length - 1] : null;
+  }
+  function latestContractId(E, subId) {
+    var c = latestContract(E, subId);
+    return c ? c.id : '';
   }
 
   /* ---------- H-1/H-5 统一底部抽屉（遮罩/×/Esc 三通道关闭，锁背景滚动） ----------
@@ -119,6 +140,20 @@
       mask.remove();
       if (opts.onConfirm) opts.onConfirm();
     };
+  }
+
+  /* ---------- S1-3 组件级 busy 防重（点击置灰 + 「处理中」，失败原位恢复可重试） ---------- */
+  function busy(btn, label, fn) {
+    if (!btn || btn.disabled) return;
+    var orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = label || '处理中…';
+    var restore = function () { btn.disabled = false; btn.textContent = orig; };
+    try {
+      var r = fn();
+      if (r && typeof r.then === 'function') r.then(restore, restore);
+      else restore();
+    } catch (e) { restore(); throw e; }
   }
 
   /* D-6：叠加身份实时推导（entryAccess 实时计算，不读 seed 写死的 union） */
@@ -272,10 +307,10 @@
       var isCur = cur === now;
       var rows = allRows.filter(function (e) { return (e.month || ymOf(e.at)) === cur; });
       var nextDisabled = monthShift(cur, 1) > now;
-      var switcher = '<div class="ag-month-switch">'
-        + '<button type="button" class="ag-ms-btn" data-ml-prev aria-label="上月">‹</button>'
+      var switcher = '<div class="ag-month-switch ag-seg">'
+        + '<button type="button" data-ml-prev aria-label="上月">‹</button>'
         + '<span class="ag-ms-label' + (isCur ? ' is-today' : '') + '" data-ml-today>' + (isCur ? '本月' : cur) + '</span>'
-        + '<button type="button" class="ag-ms-btn" data-ml-next' + (nextDisabled ? ' disabled' : '') + ' aria-label="下月">›</button></div>';
+        + '<button type="button" data-ml-next' + (nextDisabled ? ' disabled' : '') + ' aria-label="下月">›</button></div>';
       holder.innerHTML = switcher + (rows.length ? tableFn(rows)
         : emptyState(cur + ' 暂无结算记录', '切换其他月份查看，口径与累计一致'));
     }
@@ -409,7 +444,7 @@
     var locked = me.status === 'suspended';
     var E = esign();
     var protoCount = (subs || []).filter(function (s) {
-      return E && E.listBySub && (E.listBySub(s.id) || [])[0];
+      return !!(latestContract(E, s.id));
     }).length;
     var cap = quotaCap(me.province);
     var used = Store.countActiveSubAgents ? Store.countActiveSubAgents(me.id)
@@ -493,7 +528,7 @@
     var unsigned = subs.filter(function (s) {
       if (s.status !== 'approved') return false;
       var cs = s.signature && s.signature.status === 'completed';
-      var c = E && E.listBySub ? (E.listBySub(s.id) || [])[0] : null;
+      var c = latestContract(E, s.id);
       return !cs && !(c && c.status === 'pending_mine');
     });
     var noticeItems = [];
@@ -591,7 +626,7 @@
 
     function subCardHtml(s) {
       var Es = esign();
-      var c = Es && Es.listBySub ? (Es.listBySub(s.id) || [])[0] : null;
+      var c = latestContract(Es, s.id);
       var signed = s.signature && s.signature.status === 'completed';
       /* P0-2 O4：发起/待签/已签/拒签真实接线（引擎 AgentEsign，独立键 engchain-agent-esign） */
       var sig;
@@ -677,7 +712,7 @@
       var s = Store.getSub(sid);
       if (!s) { renderSubList(); return; }
       var Es = esign();
-      var contract = Es && Es.listBySub ? (Es.listBySub(s.id) || [])[0] : null;
+      var contract = latestContract(Es, s.id);
       var sealed = s.status === 'terminated' || s.status === 'revoked' || s.sealedAt;
       var mineRows = entries.filter(function (e) { return e.subject === s.uid && e.line === 'subLedger'; });
       var cf = s.company || {};
@@ -693,7 +728,7 @@
         + field('意向授权省', s.province) + field('约定比例', fmt((s.ratioToSub || 0) * 100) + '%')
         + '</section>'
         + '<section class="ag-card"><h3>协议状态</h3>'
-        + (contract ? '<div class="ag-meta">' + esc(contract.code || '') + ' · ' + protoStatusTxt(contract.status)
+        + (contract ? '<div class="ag-meta">' + esc(contract.code || '') + ' · ' + protoTxtOwner(contract.status)
           + (contract.completedAt ? ' · 完成 ' + fmtDate(contract.completedAt) : '')
           + (canAdmin && !locked && !sealed ? ' <button class="ag-btn ag-btn--sm ag-btn--ghost" data-proto="' + escAttr(s.id) + '">查看协议</button>' : '')
           + '</div>' : '<div class="ag-meta">协议待发起</div>')
@@ -707,7 +742,7 @@
       if (back) back.onclick = renderSubList;
       var pv = box.querySelector('[data-proto]');
       if (pv) pv.onclick = function () {
-        var d = Es.contractById(pv.dataset.proto) || (Es.listBySub(pv.dataset.proto) || [])[0];
+        var d = Es.contractById(pv.dataset.proto) || latestContract(Es, pv.dataset.proto);
         openDrawer({ title: '二级合作协议（O4）', bodyHtml: protoDetail(d) });
       };
     }
@@ -767,7 +802,7 @@
       var ev = c.evidence ? '<div class="ag-disc">存证模拟（非真实 CA）：' + esc(c.evidence.certNo || '') + ' · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
       return '<div class="ag-card" style="margin-top:10px;">'
         + '<div class="ag-sub-card__name">《二级合作协议（O4）》' + esc(c.code || '') + '</div>'
-        + '<div class="ag-meta" style="margin-top:4px;">版本 ' + esc(c.version || '') + ' · 状态 ' + protoStatusTxt(c.status)
+        + '<div class="ag-meta" style="margin-top:4px;">版本 ' + esc(c.version || '') + ' · 状态 ' + protoTxtOwner(c.status)
         + (c.completedAt ? ' · 签署完成 ' + fmtDate(c.completedAt) : '') + '</div>'
         + parties + clauses + ev + '</div>';
     }
@@ -776,11 +811,11 @@
       if (!list) return;
       var E = esign(); if (!E) return;
       var rows = subs.map(function (s) {
-        var c = (E.listBySub(s.id) || [])[0];
+        var c = latestContract(E, s.id);
         if (!c) return '';
         return '<div class="ag-proto-row"><div class="ag-proto-row__main">'
           + '<div class="ag-proto-row__title">' + esc(c.code || '') + ' · ' + esc((s.company && s.company.name) || '') + '</div>'
-          + '<div class="ag-proto-row__meta">' + esc(c.version || '') + ' · ' + protoStatusTxt(c.status) + '</div></div>'
+          + '<div class="ag-proto-row__meta">' + esc(c.version || '') + ' · ' + protoTxtOwner(c.status) + '</div></div>'
           + '<button class="ag-btn ag-btn--sm ag-btn--ghost" data-proto="' + escAttr(s.id) + '">查看</button></div>';
       }).join('');
       list.innerHTML = rows || emptyState('暂无协议', '发起二级协议后在此集中查看。');
@@ -792,21 +827,23 @@
       btn.onclick = function () {
         var E = esign(); if (!E) return;
         var rec = Store.getSub(btn.dataset.sendContract); if (!rec) return;
-        var r = E.sendContract({
-          subId: rec.id, parentUid: me.uid || me.id, subUid: rec.uid || '',
-          parentName: (me.branchCompany && me.branchCompany.legalRep) || '总代',
-          parentCompany: (me.branchCompany && me.branchCompany.name) || me.province,
-          subName: (rec.company && rec.company.legalRep) || '',
-          subCompany: (rec.company && rec.company.name) || ''
+        busy(btn, '发起中…', function () {
+          var r = E.sendContract({
+            subId: rec.id, parentUid: me.uid || me.id, subUid: rec.uid || '',
+            parentName: (me.branchCompany && me.branchCompany.legalRep) || '总代',
+            parentCompany: (me.branchCompany && me.branchCompany.name) || me.province,
+            subName: (rec.company && rec.company.legalRep) || '',
+            subCompany: (rec.company && rec.company.name) || ''
+          });
+          if (r.ok) { toast('协议已发起，待二级签署', true); mountWorkbench(el); }
+          else toast(r.msg || '发起失败', false);
         });
-        if (r.ok) { toast('协议已发起，待二级签署', true); mountWorkbench(el); }
-        else toast(r.msg || '发起失败', false);
       };
     });
     /* H-5：协议八条进底部抽屉，签署/查看聚焦抽屉，身份卡只留摘要行 */
     el.querySelectorAll('[data-proto]').forEach(function (btn) {
       btn.onclick = function () {
-        var E = esign(); var c = E.contractById(btn.dataset.proto) || (E.listBySub(btn.dataset.proto) || [])[0];
+        var E = esign(); var c = E.contractById(btn.dataset.proto) || latestContract(E, btn.dataset.proto);
         openDrawer({ title: '二级合作协议（O4）', bodyHtml: protoDetail(c) });
       };
     });
@@ -826,10 +863,12 @@
 
     var csv = el.querySelector('#ag-csv');
     if (csv) csv.onclick = function () {
-      var month = Ledger.monthKey(Date.now());
-      var csvText = Ledger.toCsv(entries, month);
-      download('agent-ledger-' + month + '.csv', '\ufeff' + csvText);
-      toast('已导出当前月两分区 CSV', true);
+      busy(csv, '导出中…', function () {
+        var month = Ledger.monthKey(Date.now());
+        var csvText = Ledger.toCsv(entries, month);
+        download('agent-ledger-' + month + '.csv', '\ufeff' + csvText);
+        toast('已导出当前月两分区 CSV', true);
+      });
     };
 
     /* H-1 抽屉化：发起二级表单收进底部抽屉，字段校验/落盘在抽屉作用域内完成，busy 防连点 */
@@ -959,7 +998,7 @@
     var frozen = frozenStats(allRows, Ledger, function () { return true; });
     var signed = rec.signature && rec.signature.status === 'completed';
     var E = esign();
-    var contract = E && E.listBySub ? (E.listBySub(rec.id) || [])[0] : null;
+    var contract = latestContract(E, rec.id);
     var parentCo = parentCompanyOf(rec.parentUid);
 
     function subBoard(mode) {
@@ -1113,14 +1152,16 @@
       if (d) {
         var sb = d.body.parentNode.querySelector('[data-drawer-sign]');
         if (sb) sb.onclick = function () {
-          var r = E.sign(contract.id, 'sub', '企业签名', {
-            onSigned: function (subId, signature) {
-              var r2 = Store.getSub(subId);
-              if (r2) { r2.signature = signature; Store.saveSub(r2); }
-            }
+          busy(sb, '签署中…', function () {
+            var r = E.sign(contract.id, 'sub', '企业签名', {
+              onSigned: function (subId, signature) {
+                var r2 = Store.getSub(subId);
+                if (r2) { r2.signature = signature; Store.saveSub(r2); }
+              }
+            });
+            if (r.ok) { closeDrawer(); toast('协议已签署完成', true); mountSubView(el); }
+            else { closeDrawer(); toast(r.msg || '签署失败', 'err'); }
           });
-          if (r.ok) { closeDrawer(); toast('协议已签署完成', true); mountSubView(el); }
-          else { closeDrawer(); toast(r.msg || '签署失败', 'err'); }
         };
         var rb = d.body.parentNode.querySelector('[data-drawer-reject]');
         if (rb) rb.onclick = function () {
@@ -1132,14 +1173,16 @@
     };
     var signBtn = el.querySelector('[data-sub-sign]');
     if (signBtn) signBtn.onclick = function () {
-      var r = E.sign(contract.id, 'sub', '企业签名', {
-        onSigned: function (subId, signature) {
-          var r2 = Store.getSub(subId);
-          if (r2) { r2.signature = signature; Store.saveSub(r2); }
-        }
+      busy(signBtn, '签署中…', function () {
+        var r = E.sign(contract.id, 'sub', '企业签名', {
+          onSigned: function (subId, signature) {
+            var r2 = Store.getSub(subId);
+            if (r2) { r2.signature = signature; Store.saveSub(r2); }
+          }
+        });
+        if (r.ok) { toast('协议已签署完成', true); mountSubView(el); }
+        else toast(r.msg || '签署失败', false);
       });
-      if (r.ok) { toast('协议已签署完成', true); mountSubView(el); }
-      else toast(r.msg || '签署失败', false);
     };
     /* L-4：拒签内联原因面板：展开/取消/空原因内联拦截/确认拒签 */
     var rejToggle = el.querySelector('[data-sub-reject]');
@@ -1167,20 +1210,25 @@
           if (ta) ta.focus();
           return;
         }
-        /* openConfirm 居中确认：拒签使协议回到未签约、需重新发起，遮罩不可点关 */
+        /* openConfirm 居中确认：拒签使协议回到未签约、需重新发起，遮罩不可点关；
+           S1-3 防重：data-ok 在 onConfirm 前已移除，用模块级锁代替按钮 busy */
         openConfirm({
           title: '确认拒签协议',
           desc: '拒签后本协议将回到未签约状态，需由总代重新发起；已填原因：' + reason + '。是否确认拒签？',
           dangerLabel: '确认拒签',
           onConfirm: function () {
-            var r = E.reject(contract.id, 'sub', reason, {
-              onRejected: function (subId, why) {
-                var r2 = Store.getSub(subId);
-                if (r2) { r2.signature = { status: 'rejected', rejectReason: why, completedAt: 0 }; Store.saveSub(r2); }
-              }
-            });
-            if (r.ok) { toast('已拒签', 'err'); mountSubView(el); }
-            else toast(r.msg || '拒签失败', 'err');
+            if (window.__agRejectBusy) return;
+            window.__agRejectBusy = true;
+            try {
+              var r = E.reject(contract.id, 'sub', reason, {
+                onRejected: function (subId, why) {
+                  var r2 = Store.getSub(subId);
+                  if (r2) { r2.signature = { status: 'rejected', rejectReason: why, completedAt: 0 }; Store.saveSub(r2); }
+                }
+              });
+              if (r.ok) { toast('已拒签', 'err'); mountSubView(el); }
+              else toast(r.msg || '拒签失败', 'err');
+            } finally { window.__agRejectBusy = false; }
           }
         });
       };
@@ -1319,17 +1367,21 @@
           + '<button class="ag-btn ag-btn--primary" data-drawer-save>发送邀请</button>',
         onOpen: function (d) {
           d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
-          d.body.parentNode.querySelector('[data-drawer-save]').onclick = function () {
+          var save = d.body.parentNode.querySelector('[data-drawer-save]');
+          save.onclick = function () {
+            if (save.disabled) return;
             var target = (d.body.querySelector('[data-f="uid"]') || {}).value || '';
             var role = (d.body.querySelector('[data-f="role"]') || {}).value || 'member';
             target = target.trim();
             var err = d.body.querySelector('.ag-field-err');
             if (!target) { if (err) { err.textContent = '请填写对方 uid'; err.style.display = 'block'; } return; }
-            var r = OrgsStore.invite(orgId, target, role);
-            if (r.error) { toast(r.error, 'err'); return; }
-            closeDrawer();
-            toast('邀请已发送，待对方接受', true);
-            mountTeam(rootEl, orgId);
+            busy(save, '发送中…', function () {
+              var r = OrgsStore.invite(orgId, target, role);
+              if (r.error) { toast(r.error, 'err'); return; }
+              closeDrawer();
+              toast('邀请已发送，待对方接受', true);
+              mountTeam(rootEl, orgId);
+            });
           };
         }
       });
