@@ -68,6 +68,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 function money(n){return (Number(n||0)).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmt(ts){var d=new Date(ts);function p(x){return ('0'+x).slice(-2);}return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
 var acc=window.entryAccess?entryAccess():{isResident:false,dist:false,statusId:'registered'};
+/* P1-8：纯代理（总代/二级）无分销返佣资格，代理测算收益在台账查看·不可提；仅增代理说明，红线规则零改动。
+   dist=resident||个人合伙人，故 !acc.dist 即排除两类红线身份 */
+if(acc.agent && acc.agent.active && !acc.dist){
+  var _agentHref = acc.agent.isSubAgent && !acc.agent.isProvinceAgent ? '../province-agent/sub.html' : '../province-agent/index.html';
+  if (window.GuestGate) GuestGate.open({
+    mode:'replace', icon:'lock', badge:'代理身份',
+    title:'代理测算收益在代理台账查看',
+    note:'省级总代/二级合作的分账为内部测算，不在分销返佣页发放、不可提现；请前往代理工作台查看两分区台账。',
+    btnText:'前往代理台账',
+    btnHref:_agentHref,
+    altText:'返回分销中心 ›', altHref:'index.html'
+  });
+  return;
+}
 /* [FIX BM-028/BM-029] 门控统一为 entryAccess().dist（企业入驻 或 个人合伙人），个人合伙人须可访问收益页 */
 if(!acc.dist){
   var isGuest=(acc.statusId==='guest');

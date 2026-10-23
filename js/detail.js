@@ -1310,18 +1310,18 @@ window.DETAIL = (function () {
     var base = [];
     for (var i = 0; i < N; i++) base.push(pt(i, 0.30));
     h += poly(base, 'fill:rgba(217,119,6,.05);stroke:var(--warning);stroke-width:1.2;stroke-dasharray:4 3');
-    /* 公司得分多边形 */
+    /* 公司得分多边形（v1.1-M2-⑭ 描线入场：rr-plot） */
     var cp = [];
     for (var i = 0; i < N; i++) {
       var sc = Math.max(0, Math.min(100, Number(scores[dims[i].key]) || 0));
       cp.push([pt(i, sc / 100), sc]);
     }
-    h += poly(cp.map(function (x) { return x[0]; }), 'fill:var(--success-soft);stroke:var(--success);stroke-width:2;stroke-linejoin:round');
-    /* 顶点：高风险(>70) 橙色描点 + 分值 */
-    cp.forEach(function (q) {
+    h += '<polygon class="rr-plot" points="' + cp.map(function (x) { return x[0][0].toFixed(1) + ',' + x[0][1].toFixed(1); }).join(' ') + '" style="fill:var(--success-soft);stroke:var(--success);stroke-width:2;stroke-linejoin:round"/>';
+    /* 顶点：高风险(>70) 橙色描点 + 分值（rr-vert 逐点 stagger 入场） */
+    cp.forEach(function (q, vi) {
       var hi = q[1] > 70;
-      h += '<circle cx="' + q[0][0].toFixed(1) + '" cy="' + q[0][1].toFixed(1) + '" r="' + (hi ? 4 : 3) + '" style="fill:' + (hi ? 'var(--warning)' : 'var(--success)') + ';stroke:#fff;stroke-width:1"/>';
-      if (hi) h += '<text x="' + q[0][0].toFixed(1) + '" y="' + (q[0][1].toFixed(1) - 7) + '" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--warning)">' + q[1] + '</text>';
+      h += '<circle class="rr-vert" cx="' + q[0][0].toFixed(1) + '" cy="' + q[0][1].toFixed(1) + '" r="' + (hi ? 4 : 3) + '" style="fill:' + (hi ? 'var(--warning)' : 'var(--success)') + ';stroke:#fff;stroke-width:1;animation-delay:' + (0.18 + vi * 0.09).toFixed(2) + 's"/>';
+      if (hi) h += '<text class="rr-vert" x="' + q[0][0].toFixed(1) + '" y="' + (q[0][1].toFixed(1) - 7) + '" text-anchor="middle" style="font-size:9px;font-weight:700;fill:var(--warning);animation-delay:' + (0.22 + vi * 0.09).toFixed(2) + 's">' + q[1] + '</text>';
     });
     /* 轴标签 */
     for (var i = 0; i < N; i++) {
@@ -3727,6 +3727,37 @@ window.DETAIL = (function () {
       openPay();
     }
     function unlock(okMsg) {
+      /* v1.1-M1-⑮ 解锁揭示动画：打码层从触点擦除 + 明文金色高亮（reduced-motion 直切） */
+      var reduceOk = false;
+      try { reduceOk = !window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { reduceOk = true; }
+      var rx = 50, ry = 92;
+      var ctaEl = $('cta');
+      if (ctaEl) {
+        try {
+          var cr = ctaEl.getBoundingClientRect();
+          rx = Math.min(96, Math.max(4, Math.round((cr.left + cr.width / 2) / (document.documentElement.clientWidth || 390) * 100)));
+          ry = Math.min(96, Math.max(4, Math.round((cr.top + cr.height / 2) / (window.innerHeight || 800) * 100)));
+        } catch (e) {}
+      }
+      var phoneBox = document.querySelector('.phone');
+      var masks = document.querySelectorAll('.pwp-mask');
+      var reals = document.querySelectorAll('.pwp-real');
+      var veils = document.querySelectorAll('.pw-file-veil');
+      if (reduceOk) {
+        if (phoneBox) phoneBox.classList.add('unlock-anim');
+        masks.forEach(function (m) { m.style.setProperty('--rx', rx + '%'); m.style.setProperty('--ry', ry + '%'); m.classList.add('reveal-mask'); void m.offsetWidth; m.classList.add('off'); });
+        veils.forEach(function (v) { void v.offsetWidth; v.classList.add('off'); });
+        setTimeout(function () {
+          if (phoneBox) phoneBox.classList.remove('unlock-anim');
+          reals.forEach(function (r2) { r2.classList.add('reveal-flash'); });
+          if (UI.haptic) UI.haptic('unlock');
+        }, 340);
+        setTimeout(function () {
+          reals.forEach(function (r2) { r2.classList.remove('reveal-flash'); });
+        }, 800);
+      } else {
+        masks.forEach(function (m) { m.style.display = 'none'; });
+      }
       var lockArea = $('lock-area');
       if (lockArea) {
         lockArea.classList.add('unlocked');
@@ -3747,7 +3778,7 @@ window.DETAIL = (function () {
           });
         }
       }
-      if ($('cta')) { $('cta').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + (t.ctaText ? t.ctaText(rec, true) : '联系TA'); $('cta').classList.add('is-unlocked'); } /* [FIX BM-043] 解锁后 CTA 由橙变绿 */
+      if ($('cta')) { $('cta').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + (t.ctaText ? t.ctaText(rec, true) : '联系TA'); $('cta').classList.add('is-unlocked'); $('cta').style.animation = 'morph-pop .42s cubic-bezier(.34,1.56,.64,1)'; setTimeout(function () { if ($('cta')) $('cta').style.animation = ''; }, 460); } /* [FIX BM-043] 解锁后 CTA 由橙变绿 */
       unlocked = true;
       UnlockStore.mark(rec);
       if (phoneEl) phoneEl.classList.add('is-unlocked');

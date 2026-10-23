@@ -243,6 +243,16 @@ render();
   var q={quotaCfg:(window.MOCK&&MOCK.business.provinceAgentQuota)||{}};
   box.innerHTML='<div id="agent-apply-list"></div><div id="agent-seed-import"></div>';
   AgentApply.mountMyApplications(document.getElementById('agent-apply-list'),q);
+  /* H-6：有省代记录时，省代卡为首屏主体；旧企业队列空态降级不置顶、不压在省代卡上方 */
+  var mine=[];
+  try{mine=AgentApply.listMyApplications(undefined,q)||[];}catch(e){}
+  var root=document.getElementById('root');
+  if(mine.length){
+    var panel=document.getElementById('agent-panel');
+    if(panel&&root&&panel.parentNode)panel.parentNode.insertBefore(panel,root);
+    var e=EntryStore.read();
+    if(root&&!e.status)root.style.display='none';
+  }
   /* D-13：审核记录导入面板仅平台内部运营可见，普通申请者仅见我的申请列表 */
   var cur=(window.DataBus&&DataBus.current)?DataBus.current():null;
   var isStaff=!!(cur&&cur.isPlatformStaff);

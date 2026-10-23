@@ -207,6 +207,90 @@ ok('J 徽章禁用个人合伙人紫色声明', badge.indexOf('禁用个人合�
 const wd = fs.readFileSync(path.join(ROOT, 'pages', 'distribution', 'withdraw.html'), 'utf8');
 ok('J 提现页保留原最低门槛/到账逻辑', wd.indexOf('minWithdraw') >= 0 && wd.indexOf('cw-avail') >= 0);
 
+/* ================= L. 阶段2：O4 闭环写回 + 看板/证书/时间线/门控接线静态断言 ================= */
+console.log('\n===== L. 阶段2 O4 闭环 + 新组件接线 =====');
+{
+  const shim2 = makeStorage();
+  Store.init({ storage: shim2 });
+  /* 构造 approved 二级，走 send→sign→completed 并把 signature 写回 sub 记录 */
+  const subRec = { id: 'sb-t2', uid: 'u20', parentUid: 'u11', status: 'approved', ratioToSub: 0.2,
+    company: { name: '成都测试公司', legalRep: '陈二', uscc: '91510000X' }, province: '四川省' };
+  Store.saveSub(subRec);
+  const E2 = require(path.join(ROOT, 'js', 'agent-esign.js'));
+  const sent = E2.sendContract({ subId: 'sb-t2', parentUid: 'u11', subUid: 'u20',
+    parentName: '林总代', parentCompany: '四川总代公司', subName: '陈二', subCompany: '成都测试公司' }, { storage: shim2 });
+  ok('L admin 发起协议返回 pending_mine', sent.ok && sent.contract.status === 'pending_mine');
+  let written = null;
+  const signed = E2.sign(sent.contract.id, 'sub', '企业签名', { storage: shim2,
+    onSigned: function (subId, signature) {
+      const r = Store.getSub(subId); if (r) { r.signature = signature; Store.saveSub(r); written = r.signature; }
+    } });
+  ok('L 二级签署完成 completed', signed.ok && signed.contract.status === 'completed');
+  ok('L onSigned 写回 sub.signature=completed', written && written.status === 'completed' && written.code);
+  const back = Store.getSub('sb-t2');
+  ok('L sub 记录 signature 落盘', back.signature && back.signature.status === 'completed');
+  const rej = E2.reject('x', 'sub', '', { storage: shim2 });
+  ok('L 拒签原因必填 E_REASON_REQUIRED', rej.error === 'E_REASON_REQUIRED');
+
+  /* 静态接线断言（UI 层 DOM，源码标记） */
+  const ui = fs.readFileSync(path.join(ROOT, 'js', 'agent-ui.js'), 'utf8');
+  ok('L 看板本月/累计分段存在', ui.indexOf('data-mode="month"') >= 0 && ui.indexOf('data-mode="cum"') >= 0);
+  ok('L T+7 冻结聚合卡存在', ui.indexOf('T+7 冻结待结算') >= 0);
+  ok('L 授权证书卡存在', ui.indexOf('ag-certi') >= 0 && ui.indexOf('查看授权证书') >= 0);
+  ok('L 状态中心时间线存在', ui.indexOf('ag-timeline') >= 0 && ui.indexOf('状态中心') >= 0);
+  ok('L 协议中心列表+八条详情存在', ui.indexOf('ag-proto-row') >= 0 && ui.indexOf('第') >= 0);
+  ok('L 二级视角归属总代主体', ui.indexOf('归属总代') >= 0 && ui.indexOf('parentCompanyOf') >= 0);
+  ok('L 二级去签署/拒签写回', ui.indexOf('data-sub-sign') >= 0 && ui.indexOf('data-sub-reject') >= 0);
+  ok('L 行为记录只读入口', ui.indexOf('listBehavior') >= 0);
+  ok('L 发起二级表单补执照/法人/联系人/意向省', ui.indexOf('ag-sub-license') >= 0 && ui.indexOf('ag-sub-legal') >= 0 && ui.indexOf('ag-sub-contact') >= 0 && ui.indexOf('ag-sub-prov') >= 0);
+  const subHtml = fs.readFileSync(path.join(ROOT, 'pages', 'province-agent', 'sub.html'), 'utf8');
+  ok('L sub.html 挂载 agent-esign.js', subHtml.indexOf('agent-esign.js') >= 0);
+  const earn = fs.readFileSync(path.join(ROOT, 'pages', 'distribution', 'earnings.html'), 'utf8');
+  ok('L earnings 纯代理分流到代理台账', earn.indexOf('代理测算收益在代理台账查看') >= 0);
+  const wd2 = fs.readFileSync(path.join(ROOT, 'pages', 'distribution', 'withdraw.html'), 'utf8');
+  ok('L withdraw 纯代理说明不改提现规则', wd2.indexOf('代理测算收益在代理台账查看') >= 0 && wd2.indexOf('minWithdraw') >= 0);
+  const entry = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'entry.html'), 'utf8');
+  ok('L 省代卡三态（进入工作台/审核进度/补资料重提）', entry.indexOf('进入工作台') >= 0 && entry.indexOf('审核进度') >= 0 && entry.indexOf('补资料重提') >= 0);
+  const pf = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'index.html'), 'utf8');
+  ok('L profile 代理徽标+工作台直达', pf.indexOf('代理工作台') >= 0 && pf.indexOf('省级总代') >= 0);
+
+  /* L-2：协议状态中文词典，禁裸英文枚举直渲染 */
+  ok('L-2 协议状态中文映射(已完成/待我签署/签署中/已拒签)', ui.indexOf('已完成') >= 0 && ui.indexOf('待我签署') >= 0 && ui.indexOf('签署中') >= 0 && ui.indexOf('已拒签') >= 0 && ui.indexOf('PROTO_STATUS') >= 0);
+  ok('L-2 协议详情头部不直渲 c.status 英文枚举', ui.indexOf("' · 状态 ' + esc(c.status)") < 0 && ui.indexOf("状态 ' + esc(c.status)") < 0);
+
+  /* L-4：T2 拒签内联原因面板，无 window.prompt */
+  ok('L-4 拒签内联原因面板(ag-sub-reject-box)', ui.indexOf('ag-sub-reject-box') >= 0 && ui.indexOf('ag-sub-reject-reason') >= 0);
+  ok('L-4 T2 拒签不再调用 window.prompt', ui.indexOf('window.prompt(') < 0);
+  ok('L-4 空原因拒签错误显式 block（覆盖 CSS display:none）', /err\.style\.display\s*=\s*'block'/.test(ui));
+
+  /* M-1：消息中心本地代理通知分组 */
+  const msgHtml = fs.readFileSync(path.join(ROOT, 'pages', 'message', 'index.html'), 'utf8');
+  ok('M-1 消息中心「代理」分组子栏', msgHtml.indexOf('data-cat="代理"') >= 0);
+  ok('M-1 本地代理事件队列 agentNoticeItems + 读 AgentStore', msgHtml.indexOf('agentNoticeItems') >= 0 && msgHtml.indexOf('AgentStore.listProvinces') >= 0 && msgHtml.indexOf('AgentStore.listSubs') >= 0);
+  ok('M-1 挂载 agent-store/agent-esign 接线', msgHtml.indexOf('agent-store.js') >= 0 && msgHtml.indexOf('agent-esign.js') >= 0);
+
+  /* L-3：看板固定 2 列，无 640px 3 列误触发 */
+  const css = fs.readFileSync(path.join(ROOT, 'css', 'agent.css'), 'utf8');
+  ok('L-3 看板无 640px 三列断点（改固定 2 列）', css.indexOf('min-width: 640px') < 0);
+  ok('L-5 证书/冻结标签允许换行', css.indexOf('.ag-certi__field { white-space: normal') >= 0 && css.indexOf('overflow-wrap: anywhere') >= 0);
+
+  /* ===== P2 前端可做项 ===== */
+  /* P2-1 台账月份切换：切换器/上月下月/回位本月/空月态，打印隐藏 */
+  ok('P2-1 月份切换器 mountMonthLedger + 上月/下月/回位', ui.indexOf('mountMonthLedger') >= 0 && ui.indexOf('data-ml-prev') >= 0 && ui.indexOf('data-ml-next') >= 0 && ui.indexOf('data-ml-today') >= 0);
+  ok('P2-1 空月 ag-empty 文案', ui.indexOf('暂无结算记录') >= 0 && css.indexOf('.ag-month-switch') >= 0);
+  ok('P2-1 打印隐藏月份切换器', css.indexOf('.ag-month-switch') >= 0 && /@media print[\s\S]*\.ag-month-switch[^{]*\{[^}]*display:\s*none/.test(css));
+  /* P2-2 本地公告位：可关闭 localStorage 记忆，无公告不渲染 */
+  ok('P2-2 本地公告卡 localNoticeHtml + ag-notice-local + 关闭记忆', ui.indexOf('localNoticeHtml') >= 0 && ui.indexOf('ag-notice:') >= 0 && css.indexOf('.ag-notice-local') >= 0);
+  /* P2-3 正式徽章：总代盾/二级六边形双形态，不替换五档、无个人合伙人紫 */
+  ok('P2-3 盾/六边形徽章 emblemHtml(pa/sub)', ui.indexOf('emblemHtml(\'pa\')') >= 0 && ui.indexOf('emblemHtml(\'sub\')') >= 0 && css.indexOf('ag-emblem--shield') >= 0 && css.indexOf('ag-emblem--hex') >= 0);
+  const profHtml = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'index.html'), 'utf8');
+  const entryHtml = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'entry.html'), 'utf8');
+  ok('P2-3 profile/entry 落盾/六边形徽章', profHtml.indexOf('clip-path:polygon(50% 0') >= 0 && entryHtml.indexOf('clip-path:polygon(50% 0') >= 0);
+  /* P2-6 二级档案详情视图：资料/比例时间线/协议/本人线台账，仅 admin，T2 不自见 */
+  ok('P2-6 二级档案 renderSubProfile + 返回列表', ui.indexOf('renderSubProfile') >= 0 && ui.indexOf('data-sub-back') >= 0 && ui.indexOf('ag-sub-profile__field') >= 0);
+  ok('P2-6 详情入口仅 admin(data-sub-profile) 且 T2 无入口', ui.indexOf('data-sub-profile') >= 0 && subHtml.indexOf('data-sub-profile') < 0);
+}
+
 /* ================= K. 复跑 m1 / m2 不回归 ================= */
 console.log('\n===== K. 复跑 smoke-m1 / smoke-m2 =====');
 ['m1', 'm2'].forEach(tag => {

@@ -105,23 +105,47 @@ function render(){
   /* 破冰期入驻福利横幅：破冰期且未入驻、未审核中时显示（已入驻用户不再重复推送） */
   var perk=document.getElementById('breakin-perk');
   if(perk){ perk.style.display=(breakin&&!reviewing&&!e.active)?'flex':'none'; }
-  /* 门控 */
-  if(!qualified){var g=document.getElementById('gate-bar');g.style.display='flex';
+  /* E2-M-2：门控条纳入代理 active/suspended 身份——已是开通/暂停代理时不再显示「去认证」拦截 */
+  var _gateMe=(window.DataBus&&DataBus.current)?DataBus.current():null;
+  var _gatePa=false;
+  if(window.AgentStore&&_gateMe){(AgentStore.listProvinces()||[]).forEach(function(p){if(p.uid===_gateMe.id&&(p.status==='active'||p.status==='suspended'))_gatePa=true;});}
+  /* 门控（已是开通/暂停代理时跳过认证拦截条） */
+  if(!qualified&&!_gatePa){var g=document.getElementById('gate-bar');g.style.display='flex';
     document.getElementById('gate-txt').innerHTML='入驻需先完成 <b>企业工商认证</b> 或 <b>个人专业资质</b>，当前身份：'+({guest:'游客',registered:'已注册',realname:'已实名',partner:'个人合伙人',pro:'专业资质',resident:'已入驻',enterprise:'已认证企业'}[idy.primary]||'已认证');
     document.getElementById('gate-btn').onclick=function(){location.href=idy.personal==='verified'?'auth-qualification.html':'auth-personal.html';};
   }
 
   var box=document.getElementById('entry-list');
+  /* P0-3：省代卡三态（active 进入工作台 / pending 审核进度 / rejected 补资料重提 / 无记录申请），仅读 AgentStore 不改规则 */
+  var _me=(window.DataBus&&DataBus.current)?DataBus.current():null;
+  var _paRec=null;
+  if(window.AgentStore&&_me){(AgentStore.listProvinces()||[]).forEach(function(p){if(p.uid===_me.id)_paRec=p;});}
+  var _paCta,_paBadge;
+  if(_paRec&&(_paRec.status==='active'||_paRec.status==='suspended')){
+    /* P2-3：仅 active 态卡角落总代盾徽章（pending/rejected/无记录不渲染） */
+    var _shield='<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:24px;font-size:9px;font-weight:800;color:#F4EEDD;background:#1F2A44;border:1.5px solid #8A6A28;clip-path:polygon(50% 0,100% 16%,100% 70%,50% 100%,0 70%,0 16%);vertical-align:middle;margin-right:6px;">省代</span>';
+    _paBadge=_shield+'<span class="et-badge et-badge-on">✓ 已开通</span>';
+    _paCta='<button class="btn btn-primary et-btn" onclick="location.href=\'../province-agent/index.html\'">进入工作台</button>';
+  }else if(_paRec&&_paRec.status==='pending'){
+    _paBadge='<span class="et-badge et-badge-rv"><i></i>审核中</span>';
+    _paCta='<button class="btn btn-ghost et-btn" onclick="location.href=\'entry-review.html\'">审核进度</button>';
+  }else if(_paRec&&_paRec.status==='rejected'){
+    _paBadge='<span class="et-badge et-badge-rv">已驳回</span>';
+    /* E2-M-1：驳回卡落审核进度页（带驳回理由与预填补资料小表单），不再跳空白表单 */
+    _paCta='<button class="btn btn-primary et-btn" onclick="location.href=\'entry-review.html\'">补资料重提</button>';
+  }else{
+    _paBadge='<span class="et-badge et-badge-on">一省独家</span>';
+    _paCta='<button class="btn btn-primary et-btn" onclick="location.href=\'entry-form.html?type=provinceAgent\'">申请省代</button>';
+  }
   /* [M4-4] 旧企业合伙人(partner/resident_partner)卡片彻底摘除，不再保留占位；个人合伙人(u9)不经此页 */
   box.innerHTML=['construction','agency','provinceAgent'].map(function(id,i){
     /* M2-1 省级总代（省代）：¥0 人工审核，无付费入口/金额按钮 */
     if(id==='provinceAgent'){
       return '<div class="et-card et-t-agency et-t-province" style="animation-delay:'+(i*70)+'ms">'+
-        '<div class="fb-between" style="margin-bottom:6px;"><div class="fw-700 fs-15">省级总代（省代）</div><span class="et-badge et-badge-on">一省独家</span></div>'+
+        '<div class="fb-between" style="margin-bottom:6px;"><div class="fw-700 fs-15">省级总代（省代）</div>'+_paBadge+'</div>'+
         '<div class="text-3 fs-12" style="margin-bottom:10px;line-height:1.6;">'+descs.provinceAgent+'</div>'+
         '<div class="et-feats">'+feats.provinceAgent.map(function(f){return '<span class="et-chip"><i>✓</i>'+f+'</span>';}).join('')+'</div>'+
-        '<div class="fb-between" style="align-items:flex-end;margin-top:11px;"><div><div style="font-size:11px;color:var(--text-3);">入驻费</div><span class="fw-700 et-fee green">¥0 · 人工审核</span></div>'+
-        '<button class="btn btn-primary et-btn" onclick="location.href=\'entry-form.html?type=provinceAgent\'">申请省代</button></div></div>';
+        '<div class="fb-between" style="align-items:flex-end;margin-top:11px;"><div><div style="font-size:11px;color:var(--text-3);">入驻费</div><span class="fw-700 et-fee green">¥0 · 人工审核</span></div>'+_paCta+'</div></div>';
     }
     var t=entry[id],fee=breakin?breakinFee(id):t.fee;
     var active=activeTypes.indexOf(id)>=0&&e.active;

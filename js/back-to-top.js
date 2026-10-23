@@ -148,7 +148,9 @@
        TARGETS = ['.app-tabbar', '[data-lg-glass]', '.engchain-backtop'] 挂载，
        本按钮与主 tabbar 共享同一份 cfg / 材质 / 明暗联动参数。 */
     btn.setAttribute('data-lg-glass', '');
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="m5.5 12.5 6.5-6.5 6.5 6.5"/></svg>';
+    /* v1.1-M2-⑳ 滚动进度环：外圈 SVG 环（背景 + 金色进度），中心上箭头；进度 = 已读内容比例 */
+    btn.innerHTML = '<svg class="bt-ring" viewBox="0 0 36 36" aria-hidden="true"><circle class="bt-bg" cx="18" cy="18" r="16"/><circle class="bt-fg" cx="18" cy="18" r="16"/></svg>' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V6"/><path d="m5.5 12.5 6.5-6.5 6.5 6.5"/></svg>';
     host.appendChild(btn);
 
     /* 通知液态玻璃 loader 重挂载（幂等）：按钮为异步创建，loader 的 9s
@@ -199,10 +201,25 @@
     }
 
     var raf = null;
+    var RING = 100.53096491487338; /* 2π × r16 */
     function update() {
       raf = null;
       var show = getTop() > getViewH() * 1.5;   /* 下滑超过 1.5 个窗口高度才显示 */
       btn.classList.toggle('is-show', show);
+      /* v1.1-M2-⑳ 进度环：dashoffset = 周长 × (1 - 已读比例) */
+      var fg = btn.querySelector('.bt-fg');
+      if (fg) {
+        var max = getScrollRange();
+        var p = max > 0 ? Math.min(1, Math.max(0, getTop() / max)) : 0;
+        fg.style.strokeDashoffset = (RING * (1 - p)).toFixed(2);
+      }
+    }
+    function getScrollRange() {
+      if (scroller === window) {
+        var de = document.documentElement, db = document.body;
+        return Math.max(de.scrollHeight, db ? db.scrollHeight : 0) - (window.innerHeight || de.clientHeight || 0);
+      }
+      return scroller.scrollHeight - scroller.clientHeight;
     }
     function onScroll() {
       if (raf) return;

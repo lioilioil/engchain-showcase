@@ -4363,3 +4363,228 @@ html[data-theme="dark"] .n-btn.primary {
 #draft-count {
   color: var(--text-inv) !important;
 }
+
+/* ============================================================================
+   v1.1 交互升级（M1）样式系统 —— 与《高级交互审计报告 v1.1》《双专家评估报告》对齐
+   覆盖：① 按钮状态机 / ⑥ 图标Morph / ⑦ 庆祝时刻 / ② 勾选与批量管理 /
+         ⑮ 解锁揭示 / ⑱ 空状态微动画 / 通用动效工具
+   原则：全部走设计令牌（--primary/--action/--success/--error/--d-fast/--e-standard）；
+         明暗双主题自动适配；prefers-reduced-motion 一律降级为静态。
+   ========================================================================== */
+
+/* ---------- ① 按钮状态机（Button State Morphing） ---------- */
+.bs-btn { position: relative; overflow: hidden; }
+.bs-btn .bs-label { display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: opacity .18s var(--e-standard); }
+.bs-btn .bs-ic { position: absolute; left: 0; right: 0; top: 0; bottom: 0; margin: auto; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.4); pointer-events: none; transition: opacity .18s var(--e-standard), transform .3s cubic-bezier(.34,1.56,.64,1); }
+.bs-btn[data-bs="busy"] { pointer-events: none; }
+.bs-btn[data-bs="busy"] .bs-label { opacity: 0; }
+.bs-btn[data-bs="busy"] .bs-spin { opacity: 1; transform: scale(1); }
+.bs-btn[data-bs="ok"] .bs-label { opacity: 0; }
+.bs-btn[data-bs="ok"] .bs-check { opacity: 1; transform: scale(1); }
+.bs-btn[data-bs="err"] { animation: bs-shake .42s var(--e-standard); border-color: var(--error) !important; color: var(--error) !important; }
+.bs-spin { width: 17px; height: 17px; border-radius: 50%; border: 2.2px solid rgba(255,255,255,.35); border-top-color: currentColor; animation: bs-rot .7s linear infinite; }
+.bs-check { color: #fff; width: 21px; height: 21px; }
+.bs-check path { stroke-dasharray: 26; stroke-dashoffset: 26; animation: bs-draw .42s var(--e-standard) forwards; }
+@keyframes bs-rot { to { transform: rotate(360deg); } }
+@keyframes bs-draw { to { stroke-dashoffset: 0; } }
+@keyframes bs-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-3px); } 45% { transform: translateX(3px); } 70% { transform: translateX(-2px); } 85% { transform: translateX(2px); } }
+
+/* ---------- ⑥ 图标 Morph（Morphicons：描线/变形/弹簧） ---------- */
+.morph-ic { display: inline-flex; align-items: center; justify-content: center; }
+.morph-ic svg { overflow: visible; }
+.morph-ic .m-path { stroke-dasharray: var(--mlen, 26); stroke-dashoffset: var(--mlen, 26); transition: stroke-dashoffset .35s var(--e-standard); }
+.morph-ic.on .m-path { stroke-dashoffset: 0; }
+.morph-ic.pop { animation: morph-pop .42s cubic-bezier(.34,1.56,.64,1); }
+@keyframes morph-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.fav-morph { transition: fill .3s var(--e-standard), stroke .3s var(--e-standard), color .3s var(--e-standard); }
+.fav-morph.on { fill: var(--primary); stroke: var(--primary); color: var(--primary); }
+
+/* ---------- ⑦ 庆祝时刻（Celebration：spring 徽章 + 光环 + 高光） ---------- */
+.celebrate { animation: cel-in .55s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes cel-in { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+.celebrate-ring { position: relative; }
+.celebrate-ring::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--primary); opacity: 0; animation: cel-ring .9s var(--e-out) .15s forwards; pointer-events: none; }
+@keyframes cel-ring { 0% { transform: scale(.6); opacity: .8; } 100% { transform: scale(1.65); opacity: 0; } }
+.cel-glow { animation: cel-glow 1.2s var(--e-standard) .45s both; }
+@keyframes cel-glow { 0% { box-shadow: 0 0 0 0 rgba(176,138,60,0); } 40% { box-shadow: 0 0 0 14px rgba(176,138,60,.16); } 100% { box-shadow: 0 0 0 0 rgba(176,138,60,0); } }
+.cel-fadeup { animation: cel-fadeup .5s var(--e-out) both; }
+@keyframes cel-fadeup { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---------- ② 勾选组件与批量操作条（Selection & Batch Bar） ---------- */
+.sel-box { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text-3); background: var(--bg-card); display: inline-flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; flex: none; transition: border-color .18s var(--e-standard), background .18s var(--e-standard), transform .18s var(--e-standard), box-shadow .18s var(--e-standard); }
+.sel-box svg { width: 13px; height: 13px; opacity: 0; transform: scale(.3); transition: opacity .15s var(--e-standard), transform .24s cubic-bezier(.34,1.56,.64,1); }
+.sel-box.on { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(176,138,60,.18); }
+.sel-box.on svg { opacity: 1; transform: scale(1); }
+.sel-box.half { background: var(--primary-soft); border-color: var(--primary-dim); }
+.sel-box.half svg { opacity: 1; transform: scale(1); }
+.sel-box:active { transform: scale(.86); }
+.batch-bar { position: fixed; left: 16px; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 56; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 22px; background: rgba(28,26,20,.92); -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%); color: #fff; box-shadow: 0 12px 32px -8px rgba(20,16,12,.55), inset 0 1px 0 rgba(255,255,255,.14); transform: translateY(90px); opacity: 0; pointer-events: none; transition: transform .32s cubic-bezier(.2,1.2,.4,1), opacity .24s var(--e-standard); }
+.batch-bar.show { transform: none; opacity: 1; pointer-events: auto; }
+.batch-bar .bb-count { font-family: var(--font-num); font-weight: 800; color: #E3C88E; min-width: 26px; text-align: center; font-size: 15px; }
+.batch-bar .bb-actions { margin-left: auto; display: flex; gap: 8px; }
+.batch-bar .bb-btn { border: 0; background: rgba(255,255,255,.13); color: #fff; font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 999px; cursor: pointer; transition: background var(--d-fast), transform var(--d-fast); }
+.batch-bar .bb-btn:active { transform: scale(.95); }
+.batch-bar .bb-btn.danger { background: rgba(179,38,30,.88); }
+.batch-bar .bb-btn.danger:active { background: rgba(179,38,30,1); }
+
+/* ---------- ⑮ 解锁揭示（Unlock Reveal：触点擦除 + 金色高亮） ---------- */
+.reveal-mask { clip-path: circle(125% at 50% 50%); transition: clip-path .32s var(--e-standard), opacity .32s var(--e-standard); }
+.reveal-mask.off { clip-path: circle(0% at var(--rx, 50%) var(--ry, 50%)); opacity: 0; }
+.reveal-flash { transition: color .45s var(--e-standard), text-shadow .45s var(--e-standard); }
+.reveal-flash.on { color: var(--primary-dim) !important; text-shadow: 0 0 16px rgba(176,138,60,.4); }
+/* 解锁揭示动画期：接管 .pwp 显隐，避免 .is-unlocked 的 display:none 硬切打断擦除过渡 */
+.phone.unlock-anim .pwp-mask { display: inline !important; }
+.phone.unlock-anim .pwp-real { display: inline !important; }
+.phone.unlock-anim .pw-file-veil { display: flex !important; transition: transform .32s var(--e-standard), opacity .32s var(--e-standard); transform: translateY(0); opacity: 1; }
+.phone.unlock-anim .pw-file-veil.off { transform: translateY(-20px) rotate(1.5deg); opacity: 0; }
+
+/* ---------- ⑱ 空状态微动画（Empty-state Motion：漂浮 + 呼吸） ---------- */
+.empty-motion .e-icon { animation: em-float 3.2s ease-in-out infinite; }
+.empty-motion .e-icon svg { animation: em-breathe 3.2s ease-in-out infinite; }
+@keyframes em-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes em-breathe { 0%,100% { opacity: .7; } 50% { opacity: 1; } }
+
+/* ---------- 通用动效工具 ---------- */
+.anim-rise { animation: anim-rise .45s var(--e-out) both; }
+@keyframes anim-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.delay-1 { animation-delay: .06s; }
+.delay-2 { animation-delay: .12s; }
+.delay-3 { animation-delay: .18s; }
+.delay-4 { animation-delay: .24s; }
+
+/* ---------- 无障碍：全部动效降级 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .bs-btn[data-bs="err"] { animation: none; }
+  .bs-btn .bs-label, .bs-btn .bs-ic, .morph-ic .m-path, .fav-morph, .reveal-mask, .reveal-flash, .batch-bar { transition: none !important; }
+  .bs-check path { animation: none; stroke-dashoffset: 0; }
+  .celebrate, .celebrate-ring::after, .cel-glow, .cel-fadeup, .anim-rise { animation: none !important; }
+  .empty-motion .e-icon, .empty-motion .e-icon svg { animation: none !important; }
+  .morph-ic.pop { animation: none; }
+}
+/* ============ v1.1 交互升级（M2）样式系统 ============ */
+
+/* ---------- ⑬ 时间线点亮（Timeline Trail：节点 pop-in + 连线扫入 + 当前脉冲） ---------- */
+.tl-light > div { animation: tl-fadeup .45s var(--e-standard) both; }
+.tl-light > div.ok { animation: tl-gold .55s var(--e-out) both; }
+.tl-light > div.on { animation: tl-fadeup .45s var(--e-standard) .25s both, tl-breathe 1.7s ease-in-out .85s infinite; }
+.tl-light > i { transform-origin: left center; animation: tl-grow .4s var(--e-standard) both; }
+.tl-light > i:nth-of-type(2) { animation-delay: .22s; }
+.tl-light .wd-dot { animation: tl-pop .5s var(--e-out) both; }
+.tl-light .wd-step-line { transform-origin: left center; animation: tl-grow .45s var(--e-standard) both; }
+.tl-light .wd-step-line.on { animation-delay: .18s; }
+.tl-light .wd-step.active .wd-dot { animation: tl-pop .5s var(--e-out) both, tl-ring 1.8s ease-in-out .5s infinite; }
+@keyframes tl-gold { 0% { opacity: 0; transform: translateY(4px) scale(.86); } 60% { opacity: 1; transform: translateY(-1px) scale(1.06); } 100% { opacity: 1; transform: none; } }
+@keyframes tl-fadeup { 0% { opacity: 0; transform: translateY(5px); } 100% { opacity: 1; transform: none; } }
+@keyframes tl-grow { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes tl-pop { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes tl-ring { 0%,100% { box-shadow: 0 0 0 0 rgba(176,138,60,0); } 50% { box-shadow: 0 0 0 7px rgba(176,138,60,.14); } }
+@keyframes tl-breathe { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* ---------- ⑯ 主题切换过渡（Theme Transition，preview 专属：圆环扩散遮罩） ---------- */
+html.theme-switch::before {
+  content: ''; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
+  background: var(--bg);
+  clip-path: circle(0% at var(--tx, 50%) var(--ty, 50%));
+  opacity: 0;
+}
+html.theme-switch.theme-switch-in::before {
+  clip-path: circle(150% at var(--tx, 50%) var(--ty, 50%));
+  opacity: 1; transition: clip-path .4s var(--e-standard), opacity .3s var(--e-standard);
+}
+
+/* ---------- ⑭ 图表入场（Chart Entry：雷达描线 + 顶点/维度条 stagger） ---------- */
+.rr-svg .rr-plot { fill: var(--success-soft); stroke: var(--success); stroke-width: 2; stroke-linejoin: round; stroke-dasharray: 700; stroke-dashoffset: 700; animation: rr-draw 1s var(--e-standard) forwards; }
+.rr-svg .rr-vert { animation: tl-pop .32s var(--e-out) both; }
+.rr-dims .rrd-item { animation: tl-fadeup .4s var(--e-standard) both; }
+@keyframes rr-draw { to { stroke-dashoffset: 0; } }
+
+/* ---------- ⑰ 金色流光（Sheen，克制版：hover + 主 CTA ≥6s 低频周期） ---------- */
+.sheen { position: relative; overflow: hidden; }
+.sheen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.36), transparent);
+  transform: skewX(-18deg); pointer-events: none; opacity: 0;
+}
+.sheen:hover::after { opacity: 1; animation: sheen-sweep .8s var(--e-standard); }
+.sheen.sheen-loop::after { opacity: 1; animation: sheen-sweep 8.6s ease-in-out infinite; }
+@keyframes sheen-sweep { 0%,68% { left: -60%; } 88%,100% { left: 130%; } }
+
+/* ---------- ⑳ 滚动进度环（BackToTop 升级：阅读进度 %） ---------- */
+.engchain-backtop .bt-ring { position: absolute; inset: 1px; transform: rotate(-90deg); pointer-events: none; }
+.engchain-backtop .bt-ring circle { fill: none; stroke-width: 2.5; }
+.engchain-backtop .bt-ring .bt-bg { stroke: rgba(120,120,120,.30); }
+.engchain-backtop .bt-ring .bt-fg { stroke: var(--primary, #B08A3C); stroke-linecap: round; stroke-dasharray: 100.53; stroke-dashoffset: 100.53; transition: stroke-dashoffset .12s linear; }
+[data-theme="dark"] .engchain-backtop .bt-ring .bt-bg { stroke: rgba(255,255,255,.22); }
+
+/* M2 全量 prefers-reduced-motion 降级 */
+@media (prefers-reduced-motion: reduce) {
+  .tl-light > div, .tl-light > div.ok, .tl-light > div.on, .tl-light > i,
+  .tl-light .wd-dot, .tl-light .wd-step-line,
+  .rr-svg .rr-plot, .rr-svg .rr-vert, .rr-dims .rrd-item,
+  .sheen::after, .engchain-backtop .bt-ring .bt-fg { animation: none !important; transition: none !important; }
+  .rr-svg .rr-plot { stroke-dashoffset: 0; }
+  html.theme-switch::before { display: none; }
+}
+/* ---------- ⑨ 下拉刷新（Pull-to-Refresh：指示器三态 + 桌面刷新条） ---------- */
+.ptr-indicator { height: 0; overflow: hidden; transition: height .18s var(--e-standard); display: flex; align-items: flex-end; justify-content: center; }
+.ptr-inner { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); padding: 0 14px 8px; transition: transform .16s var(--e-standard); }
+.ptr-ic { width: 22px; height: 22px; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dim); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; transition: transform .18s var(--e-standard); }
+.ptr-indicator[data-state="pull"] .ptr-ic, .ptr-indicator[data-state="ready"] .ptr-ic { transform: rotate(180deg); }
+.ptr-indicator[data-state="loading"] .ptr-ic { animation: ptr-spin .7s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+.ptr-bar { margin: 0 0 10px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 12px; border-radius: 10px; background: var(--bg-card); border: 1px dashed var(--line); font-size: 11.5px; color: var(--text-3); cursor: pointer; transition: color var(--d-fast), border-color var(--d-fast); -webkit-user-select: none; user-select: none; }
+.ptr-bar:hover { color: var(--primary-dim); border-color: var(--primary-dim); }
+.ptr-bar svg { width: 13px; height: 13px; flex: none; }
+.ptr-bar.loading svg { animation: ptr-spin .8s linear infinite; }
+.ptr-bar.loading { cursor: default; opacity: .8; }
+@media (prefers-reduced-motion: reduce) {
+  .ptr-indicator, .ptr-inner, .ptr-ic { transition: none !important; }
+  .ptr-indicator[data-state="loading"] .ptr-ic, .ptr-bar.loading svg { animation-duration: 1.2s; }
+}
+/* ---------- ⑰ 金色流光 · 应用层（克制：详情主 CTA hover + 首页重点项目卡 ≥6s 周期） ---------- */
+.dab-cta, .cta-action { position: relative; overflow: hidden; }
+.dab-cta::after, .cta-action::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.34), transparent);
+  transform: skewX(-18deg); pointer-events: none; opacity: 0;
+}
+.dab-cta:hover::after, .cta-action:hover::after { opacity: 1; animation: sheen-sweep .8s var(--e-standard); }
+.hero-card.project-feature { position: relative; overflow: hidden; }
+.hero-card.project-feature::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.16), transparent);
+  transform: skewX(-18deg); pointer-events: none;
+  animation: sheen-sweep 8.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dab-cta::after, .cta-action::after, .hero-card.project-feature::after { animation: none !important; opacity: 0 !important; }
+}
+/* ---------- ⑩ 左滑快捷操作（Swipe Actions：消息会话列表） ---------- */
+.swipe-row { position: relative; overflow: hidden; }
+.swipe-actions { position: absolute; top: 0; bottom: 0; right: 0; display: flex; align-items: stretch; transform: translateX(100%); transition: transform .22s var(--e-standard); }
+.swipe-row.open .swipe-actions { transform: translateX(0); }
+.swipe-main { position: relative; z-index: 1; background: var(--bg); transition: transform .22s var(--e-standard); }
+.swipe-row.open .swipe-main { transform: translateX(-118px); }
+.sw-act { border: 0; color: #fff; font-size: 12.5px; font-weight: 600; padding: 0 15px; display: flex; align-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sw-act-read { background: var(--primary, #B08A3C); }
+.sw-act-del { background: var(--error, #C0392B); }
+.sw-act:active { filter: brightness(.92); }
+@media (prefers-reduced-motion: reduce) {
+  .swipe-actions, .swipe-main { transition: none !important; }
+}
+/* ---------- M3 preview 控制台 · 交互特效总开关：html.motion-off 全局降级（动画/过渡关闭，状态逻辑照常） ---------- */
+html.motion-off *,
+html.motion-off *::before,
+html.motion-off *::after {
+  animation: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition: none !important;
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
+}
+html.motion-off .ptr-indicator, html.motion-off .ptr-inner, html.motion-off .ptr-ic { transition: none !important; }
+html.motion-off .ptr-indicator[data-state="loading"] .ptr-ic, html.motion-off .ptr-bar.loading svg { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html.motion-off * { animation: none !important; transition: none !important; }
+}

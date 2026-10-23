@@ -145,9 +145,15 @@
   function el(html) { var d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
   function val(id){ var e=document.getElementById(id); return e?e.value.trim():''; }
 
-  /* 轻量 toast（与 AgentUI 同视觉，不引入依赖；M-02/M-11 替代裸 alert/黑字） */
+  /* H-4：toast 统一三态；优先委托 AgentUI 单一实现，未加载时本地兜底（同 #ag-toast 元素） */
   function applyToast(msg, ok) {
     if (typeof document === 'undefined') return;
+    if (window.AgentUI && typeof window.AgentUI.toast === 'function') {
+      window.AgentUI.toast(msg, ok);
+      return;
+    }
+    var kind = ok === false ? 'err' : 'ok';
+    var variant = kind === 'err' ? ' ag-toast--err' : ' ag-toast--ok';
     var t = document.getElementById('ag-toast');
     if (!t) {
       t = document.createElement('div');
@@ -155,10 +161,10 @@
       t.className = 'ag-toast';
       document.body.appendChild(t);
     }
-    t.className = 'ag-toast ag-toast--show' + (ok ? ' ag-toast--ok' : '');
+    t.className = 'ag-toast ag-toast--show' + variant;
     t.textContent = msg || '';
     clearTimeout(t._timer);
-    t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2200);
+    t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2400);
   }
 
   /* M2-1 省级总代表单（¥0，无付费入口）；浏览器专用（M-11：内联红框校验） */
@@ -245,7 +251,8 @@
         container.innerHTML='<div class="ag-card" style="text-align:center;padding:30px 16px;">'+
           '<div class="ag-prov" style="margin-bottom:8px;">申请已提交 · 等待平台审核</div>'+
           '<div class="ag-meta" style="line-height:1.8;">¥0 免费审核制 · 审核结果将在消息中心同步；省代为一省独家，通过后开通本省权益。</div>'+
-          '<div class="ag-actions" style="justify-content:center;margin-top:18px;"><button class="ag-btn ag-btn--primary" onclick="location.href=\'entry.html\'">返回类型选择</button></div></div>';
+          '<div class="ag-actions" style="justify-content:center;margin-top:18px;"><button class="ag-btn ag-btn--primary" onclick="location.href=\'entry-review.html\'">查看申请进度</button>'
+          + '<button class="ag-btn ag-btn--ghost" onclick="location.href=\'entry.html\'">返回类型选择</button></div></div>';
       } else {
         /* M2-6 省独家冲突提示：仅页面提示，无短信/Push/邮件外发；失败结果走 error 字段，兼容 code */
         var code = r.error || r.code;
@@ -304,16 +311,21 @@
               + '<div class="ag-field"><label>公司名称</label>'
               + '<input id="rc-' + a.id + '" class="ag-input" placeholder="补填公司名称" value="' + escAttr(a.branchCompany && a.branchCompany.name || '') + '"></div>'
               + '<div class="ag-field"><label>意向授权省</label>'
-              + '<select id="rp-' + a.id + '" class="ag-input"><option value="">请选择省份</option>' + provOpts + '</select>'
-              + '<div class="ag-field-err"></div></div>'
+              + '<select id="rp-' + a.id + '" class="ag-input"><option value="">请选择省份</option>'
+              + PROVINCE_LIST.map(function(p){return '<option value="'+p+'"'+(p===a.province?' selected':'')+'>'+p+'</option>';}).join('')
+              + '</select><div class="ag-field-err"></div></div>'
               + '<div class="ag-actions" style="margin-top:8px;"><button class="ag-btn ag-btn--primary ag-btn--sm" onclick="AgentApply._resubmitForm(\'' + a.id + '\')">补资料并重新提交</button></div>'
+            : '';
+          /* P0-5：已生效卡补「进入工作台」CTA（suspended 仍可进入只读视图） */
+          var activeCta = (a.status === 'active' || a.status === 'suspended')
+            ? '<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary ag-btn--sm" href="../province-agent/index.html">进入工作台</a></div>'
             : '';
           return '<div class="ag-member" style="align-items:flex-start;flex-direction:column;gap:6px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">' +
             '<div class="ag-member__main"><div class="ag-member__name">' + (a.branchCompany && a.branchCompany.name || '—') + '</div>' +
             '<div class="ag-member__sub">授权省：' + (a.province || '—') + '</div>' + rj + '</div>' +
             '<span class="ag-badge ' + (st[1] || '') + '">' + st[0] + '</span></div>' +
-            patchForm + '</div>';
+            patchForm + activeCta + '</div>';
         }).join('') + '</section>';
     }
     AgentApply._resubmit = function (id) {

@@ -710,6 +710,20 @@ html, body { margin:0; padding:0; background:var(--bg); }
       } else if (idy.partner && idy.identities.indexOf('partner') >= 0 && window.IdBadge) {
         badgeHtml += IdBadge.render('individual', 'sm');
       }
+      /* P0-3：代理身份常驻徽标（总代/二级，藏青金棕，非个人合伙人紫） */
+      try {
+        var acc = window.entryAccess ? entryAccess() : null;
+        if (acc && acc.agent && acc.agent.active) {
+          var isPa = acc.agent.isProvinceAgent;
+          var pLabel = isPa ? '省级总代' : '二级合作';
+          var pHref = isPa ? '../province-agent/index.html' : '../province-agent/sub.html';
+          /* P2-3 正式徽章：总代盾（深底金描边）/ 二级六边形（浅底金棕字），明度+形状双编码 */
+          var emblem = isPa
+            ? '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:24px;font-size:9px;font-weight:800;color:#F4EEDD;background:#1F2A44;border:1.5px solid #8A6A28;clip-path:polygon(50% 0,100% 16%,100% 70%,50% 100%,0 70%,0 16%);margin-right:6px;">省代</span>'
+            : '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:20px;font-size:9px;font-weight:800;color:#8A6A28;background:rgba(31,42,68,.06);border:1.5px solid rgba(176,138,60,.35);clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);margin-right:6px;">二级</span>';
+          badgeHtml += '<a href="' + pHref + '" style="display:inline-flex;align-items:center;height:24px;padding:0 8px 0 4px;border-radius:999px;font-size:11px;font-weight:600;color:#8A6A28;border:1px solid rgba(176,138,60,.35);background:rgba(31,42,68,.06);text-decoration:none;margin-right:6px;">' + emblem + pLabel + '</a>';
+        }
+      } catch (e) {}
       badgeBox.innerHTML = badgeHtml;
     }
   }
@@ -1024,6 +1038,16 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var agencyUnlocked = acc.agency;
 
     var items = [];
+    /* P0-3：代理工作台常驻直达（总代 T1 / 二级 T2），仅 active 代理可见，不锁 */
+    try {
+      var _acc = window.entryAccess ? entryAccess() : null;
+      if (_acc && _acc.agent && _acc.agent.active) {
+        items.push({
+          href: _acc.agent.isProvinceAgent ? '../province-agent/index.html' : '../province-agent/sub.html',
+          ic: 'i-grid', title: '代理工作台'
+        });
+      }
+    } catch (e) {}
     var qIds = (window.QuickConfig && QuickConfig.visibleIds) ? QuickConfig.visibleIds() : [];
     if (!qIds.length) qIds = ['delegate','dist','agency-sv','invoice','refund','auth-center','ent-search','hist-files','industry','my-applies','platform-dash','demo-reset'];
     qIds.forEach(function (id) {

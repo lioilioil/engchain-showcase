@@ -1200,7 +1200,77 @@ window.UI = (function () {
   window.helpAddWecom = helpAddWecom;
   window.helpCopyWecom = helpCopyWecom;
 
-  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl };
+  /* ---- 数字滚动 Count-up（v1.1 交互升级 · M1-⑫）
+     复用 wonder-popup 已验证的 easeOutCubic 实现，抽为公共方法，
+     供钱包余额 / 分销收益 / 积分 / KPI 等业务数字页使用。
+     约定：进入视口触发一次；reduced-motion 直接置终值；opts.format 支持千分位。 ---- */
+  function countUp(el, target, opts) {
+    opts = opts || {};
+    if (!el) return;
+    var dur = opts.duration || 900;
+    var formatter = opts.format || null;
+    var done = opts.done || null;
+    var reduce = false;
+    try { reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    function setVal(v) { el.textContent = formatter ? formatter(v) : v; }
+    if (reduce) { setVal(target); if (done) done(); return; }
+    var start = null;
+    function frame(ts) {
+      if (!start) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      var e = 1 - Math.pow(1 - p, 3); /* easeOutCubic */
+      setVal(Math.round(target * e));
+      if (p < 1) requestAnimationFrame(frame);
+      else { setVal(target); if (done) done(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---- 触觉反馈 Haptics（v1.1 交互升级 · M1-⑲）
+     关键操作触发 navigator.vibrate：light=15ms（成功）/ mid=30ms（解锁）/ err=40ms×2（错误）。
+     桌面或无 vibrate 环境无感降级；移动端真机演示有效。
+     v1.1-M3：html.motion-off（preview 控制台「交互特效」关闭）时静默，与视觉特效同步降级。 ---- */
+  function haptic(kind) {
+    try {
+      if (!navigator.vibrate) return;
+      if (document.documentElement.classList.contains('motion-off')) return;
+      var m = { light: 15, mid: 30, err: [40, 60, 40] };
+      navigator.vibrate(m[kind] || 15);
+    } catch (e) {}
+  }
+  haptic.ok = function () { haptic('light'); };
+  haptic.unlock = function () { haptic('mid'); };
+  haptic.err = function () { haptic('err'); };
+
+  /* ---- 交互特效总开关（v1.1-M3 · preview 控制台）
+     双通道：①初始化读同源 localStorage 的 pv-motion-default（preview「设置默认」体系）；
+     ②preview 实时 postMessage 下发 {type:'engchain:motion', enabled}。
+     关闭时挂 html.motion-off → app.css 全局关闭动画/过渡（状态逻辑照常）。 ---- */
+  (function () {
+    function applyMotion(enabled) {
+      document.documentElement.classList.toggle('motion-off', enabled === false);
+    }
+    try {
+      var _mRaw = localStorage.getItem('pv-motion-default');
+      if (_mRaw) {
+        var _mD = JSON.parse(_mRaw);
+        if (_mD && typeof _mD === 'object' && typeof _mD.enabled === 'boolean') applyMotion(_mD.enabled);
+      }
+    } catch (e) {}
+    window.addEventListener('message', function (ev) {
+      if (ev && ev.data && ev.data.type === 'engchain:motion') applyMotion(ev.data.enabled !== false);
+    });
+    window.addEventListener('storage', function (ev) {
+      if (ev && ev.key === 'pv-motion-default') {
+        try {
+          var _d = JSON.parse(ev.newValue || '{}');
+          if (_d && typeof _d.enabled === 'boolean') applyMotion(_d.enabled);
+        } catch (e2) {}
+      }
+    });
+  })();
+
+  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic };
 })();
 
 /* ============================================================================
@@ -2381,7 +2451,8 @@ window.ListFooter = (function () {
     }
     if (!dir) dir = (window.__ROOT__ || '') + 'js/';
     var el = document.createElement('script');
-    el.src = dir + 'back-to-top.js';
+    /* v1.1-M2-⑳ 进度环升级：追加版本参数避免旧缓存（与项目 ?v= 惯例一致） */
+    el.src = dir + 'back-to-top.js?v=2026100310';
     el.async = true;
     document.head.appendChild(el);
   }

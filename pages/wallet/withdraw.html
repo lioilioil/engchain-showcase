@@ -103,11 +103,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 
-  <div class="fixed-cta" id="wd-cta" data-lg-cta="bar"><button type="button" class="btn btn-primary btn-block btn-lg" id="withdraw-submit">提交提现申请</button></div>
+  <div class="fixed-cta" id="wd-cta" data-lg-cta="bar"><button type="button" class="btn btn-primary btn-block btn-lg bs-btn" id="withdraw-submit">
+    <span class="bs-label">提交提现申请</span>
+    <span class="bs-ic bs-spin"></span>
+    <span class="bs-ic bs-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+  </button></div>
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js"></script>
+<script src="../../js/common.js?v=2026100310"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script>
@@ -204,7 +208,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function timelineHtml(status) {
     var cur = stepIndex(status);
     if (!cur) return '';
-    var out = '<div class="wd-steps">';
+    var out = '<div class="wd-steps tl-light">';
     for (var i = 0; i < 4; i++) {
       var done = i < cur;
       var active = (i + 1) === cur;
@@ -308,26 +312,35 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     UI.dialog({
       title: '提现确认', text: '本次提现 <b style="color:var(--primary)">¥' + v.toLocaleString() + '</b> 至' + accName + '，提交后进入平台审批流程，审批通过后打款。', ok: '提交申请', cancel: '取消',
       onOk: function () {
+        var wb = document.getElementById('withdraw-submit');
+        var wl = wb ? wb.querySelector('.bs-label') : null;
+        if (wb) { wb.setAttribute('data-bs', 'busy'); if (wl) wl.textContent = '正在提交…'; }
         try {
           var u = currentUser();
           var r = DataBus.withdrawalApply(u ? u.id : '', v, method, { bank: accName });
-          if (!r || r.error) { UI.toast((r && r.error) || '提现申请失败', 'err'); return; }
+          if (!r || r.error) {
+            if (wb) wb.removeAttribute('data-bs');
+            UI.toast((r && r.error) || '提现申请失败', 'err'); return;
+          }
+          if (wb) { wb.setAttribute('data-bs', 'ok'); if (wl) wl.textContent = '已提交'; }
+          if (UI.haptic) UI.haptic('mid');
           if (amountEl) amountEl.value = '';
           renderAvail();
           renderRecords();
           var sh = UI.sheet();
           sh.html(
             '<div style="text-align:center;padding:14px 0;">' +
-              '<div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2E7D50,#4CAF7D);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+              '<div class="celebrate celebrate-ring" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#2E7D50,#4CAF7D);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
               '<svg viewBox="0 0 24 24" style="width:28px;height:28px;stroke:#fff;stroke-width:2.5;fill:none;"><polyline points="20 6 9 17 4 12"/></svg></div>' +
-              '<div style="font-size:17px;font-weight:700;">提现申请已提交</div>' +
-              '<div style="font-size:12px;color:var(--text-2);margin-top:6px;">单号 <span class="mono">' + (r.id || '') + '</span></div>' +
-              '<div style="font-size:12px;color:var(--text-2);margin-top:4px;">审批通过后预计 <b style="color:var(--primary-dim);">2 小时内</b> 到账</div>' +
-              '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="UI.closeSheet()">完成</button>' +
+              '<div class="cel-fadeup" style="font-size:17px;font-weight:700;">提现申请已提交</div>' +
+              '<div class="cel-fadeup delay-1" style="font-size:12px;color:var(--text-2);margin-top:6px;">单号 <span class="mono">' + (r.id || '') + '</span></div>' +
+              '<div class="cel-fadeup delay-1" style="font-size:12px;color:var(--text-2);margin-top:4px;">审批通过后预计 <b style="color:var(--primary-dim);">2 小时内</b> 到账</div>' +
+              '<button class="btn btn-primary btn-block btn-lg cel-fadeup delay-2" style="margin-top:20px;" onclick="UI.closeSheet()">完成</button>' +
             '</div>'
           ).show();
         } catch (err) {
           console.error('withdraw submit error:', err);
+          if (wb) wb.removeAttribute('data-bs');
           UI.toast('提现申请失败：' + (err.message || err), 'err');
         }
       }

@@ -59,6 +59,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   padding: 12px 10px;
   margin: -12px -10px;
 }
+
+/* ══ v1.1-M1-② 批量管理模式（编辑 / 勾选 / 全选三态 / 批量删除） ══ */
+.fav-sel { position: absolute; left: 10px; top: 10px; z-index: 2; display: none; }
+.fav-card-link.fav-edit .fav-sel { display: flex; }
+.fav-card-link.fav-edit { cursor: pointer; }
+.fav-card-link.is-sel { box-shadow: inset 0 0 0 1.5px var(--primary); background: var(--bg-card-2); }
+.fav-card-link.is-sel .sel-box { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 3px rgba(176,138,60,.18); }
+.fav-card-link.is-sel .sel-box svg { opacity: 1; transform: scale(1); }
+/* 编辑模式隐藏底部「取消收藏」快捷按钮，避免与勾选/批量语义打架 */
+.fav-card-link.fav-edit .sc-foot [data-fav-remove] { display: none; }
+.bb-label { flex: none; }
 </style>
 </head>
 <body>
@@ -77,17 +88,27 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <div class="scroll" style="padding-top:4px;">
     <div id="fav-list"></div>
-    <div class="empty-state" id="fav-empty" style="margin-top:10px;display:none;">
+    <div class="empty-state empty-motion" id="fav-empty" style="margin-top:10px;display:none;">
       <div class="e-icon"><svg class="ic" style="width:44px;height:44px;stroke-width:1.2;color:var(--text-3);"><use href="#i-star"/></svg></div>
       <div class="e-title">暂无收藏</div>
       <div class="e-desc">把感兴趣的供需信息收藏起来，随时查看对接</div>
       <div class="es-actions"><a href="../supply/list.html" class="btn es-cta es-action">去供需大厅发现</a></div>
     </div>
   </div>
+
+  <!-- 批量管理操作条（v1.1-M1-②）：编辑模式滑入，全选三态 + 删除 -->
+  <div class="batch-bar" id="fav-batch">
+    <button type="button" class="sel-box" id="fav-sel-all" aria-label="全选"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+    <span class="bb-label" style="font-size:12px;color:rgba(255,255,255,.75);">全选</span>
+    <span class="bb-count" id="fav-batch-count">0</span>
+    <div class="bb-actions">
+      <button type="button" class="bb-btn danger" id="fav-batch-del">删除</button>
+    </div>
+  </div>
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js"></script>
+<script src="../../js/common.js?v=2026100310"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script>
@@ -135,7 +156,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     box.innerHTML = filtered.map(function(it){
       var bf = backfill(it);
       var href = '../supply/detail.html?id=' + encodeURIComponent(it.id) + (bf.typeKey ? '&typeKey=' + encodeURIComponent(bf.typeKey) : '');
-      return '<a class="supply-card fav-card-link" href="'+href+'" data-id="'+esc(it.id)+'" style="position:relative;display:block;text-decoration:none;">' +
+      return '<a class="supply-card fav-card-link'+(editMode?' fav-edit':'')+'" href="'+href+'" data-id="'+esc(it.id)+'" style="position:relative;display:block;text-decoration:none;">' +
+        '<span class="fav-sel"><span class="sel-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>' +
         '<div class="sc-top"><span class="'+dirBadge(it.dir)+'">'+dirLabel(it.dir)+'</span>' +
         (it.type?'<span class="badge b-brief">'+esc(it.type)+'</span>':'') +
         '<span style="margin-left:auto;" class="text-3 fs-11">'+fmtTime(it.ts)+'</span></div>' +
@@ -146,29 +168,119 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<button type="button" class="btn btn-ghost btn-sm" data-fav-remove="'+esc(it.id)+'" style="padding:4px 10px;font-size:11px;">取消收藏</button>' +
         '</div></a>';
     }).join('');
+    updateSelUI();
+  }
+
+  /* ══ v1.1-M1-② 批量管理模式：状态与联动 ══ */
+  var editMode = false;
+  var selected = {};
+
+  function updateSelUI(){
+    var cards = Array.prototype.slice.call(document.querySelectorAll('#fav-list .supply-card'));
+    var ids = cards.map(function(c){ return c.getAttribute('data-id'); });
+    var selCount = ids.filter(function(id){ return selected[id]; }).length;
+    var allBox = document.getElementById('fav-sel-all');
+    var countEl = document.getElementById('fav-batch-count');
+    if(allBox){
+      allBox.classList.toggle('on', selCount>0 && selCount===ids.length);
+      allBox.classList.toggle('half', selCount>0 && selCount<ids.length);
+    }
+    if(countEl) countEl.textContent = selCount ? String(selCount) : '0';
+    cards.forEach(function(c){
+      var id = c.getAttribute('data-id');
+      c.classList.toggle('is-sel', !!selected[id]);
+      var box = c.querySelector('.sel-box');
+      if(box) box.classList.toggle('on', !!selected[id]);
+    });
+  }
+
+  function animateRemove(card, cb){
+    card.style.transition = 'transform .18s var(--e-standard), opacity .18s var(--e-standard)';
+    card.style.transform = 'scale(.94)';
+    card.style.opacity = '0';
+    setTimeout(cb || function(){ card.remove(); }, 180);
+  }
+
+  function batchDelete(){
+    var ids = Object.keys(selected).filter(function(k){ return selected[k]; });
+    if(!ids.length){ UI.toast('请先选择条目','warn'); return; }
+    ids.forEach(function(id){ if(window.FavoriteStore && FavoriteStore.remove) FavoriteStore.remove(id); });
+    if(UI.haptic) UI.haptic('mid');
+    UI.toast('已删除 '+ids.length+' 条收藏','ok');
+    selected = {};
+    try { window.dispatchEvent(new CustomEvent('engchain:favorite', { detail: { action:'batch-remove', ids: ids } })); } catch(err){}
+    var remain = (window.FavoriteStore && FavoriteStore.list) ? FavoriteStore.list().length : 0;
+    if(!remain){
+      editMode = false;
+      var btn = document.getElementById('manage-btn');
+      if(btn) btn.textContent = '编辑';
+      var bar = document.getElementById('fav-batch');
+      if(bar) bar.classList.remove('show');
+    }
+    render();
+  }
+
+  function exitEdit(){
+    editMode = false;
+    selected = {};
+    var btn = document.getElementById('manage-btn');
+    if(btn) btn.textContent = '编辑';
+    var bar = document.getElementById('fav-batch');
+    if(bar) bar.classList.remove('show');
+    render();
   }
 
   /* 取消收藏：事件委托 + 真实调用 FavoriteStore.remove + 即时 DOM 移除 + 跨 tab 同步 */
   document.getElementById('fav-list').addEventListener('click', function(e){
     var btn = e.target.closest('[data-fav-remove]');
-    if(!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    var id = btn.getAttribute('data-fav-remove');
-    if(window.FavoriteStore && FavoriteStore.remove){
-      var removed = FavoriteStore.remove(id);
-      /* 即时从 DOM 移除该卡片（不等待 re-render） */
-      var card = btn.closest('.supply-card');
-      if(card) card.remove();
-      UI.toast('已取消收藏','ok');
-      /* 触发跨 tab 同步事件（makeStore.write 已派发，此处兜底确保同 tab 其他监听者收到） */
-      try { window.dispatchEvent(new CustomEvent('engchain:favorite', { detail: { action: 'remove', id: id } })); } catch(err) {}
-      /* 重渲染以更新空状态/分类筛选 */
-      render();
-    } else {
-      UI.toast('收藏功能暂不可用','err');
+    if(btn){
+      e.preventDefault();
+      e.stopPropagation();
+      var id = btn.getAttribute('data-fav-remove');
+      if(window.FavoriteStore && FavoriteStore.remove){
+        var removed = FavoriteStore.remove(id);
+        /* 即时从 DOM 移除该卡片（不等待 re-render）+ 收起动画 + 触觉反馈 */
+        var card = btn.closest('.supply-card');
+        if(card) animateRemove(card);
+        if(UI.haptic) UI.haptic('light');
+        UI.toast('已取消收藏','ok');
+        /* 触发跨 tab 同步事件（makeStore.write 已派发，此处兜底确保同 tab 其他监听者收到） */
+        try { window.dispatchEvent(new CustomEvent('engchain:favorite', { detail: { action: 'remove', id: id } })); } catch(err) {}
+        /* 重渲染以更新空状态/分类筛选 */
+        render();
+      } else {
+        UI.toast('收藏功能暂不可用','err');
+      }
+      return;
+    }
+    /* 编辑模式：点击卡片切换勾选，不跳转 */
+    if(editMode){
+      e.preventDefault();
+      e.stopPropagation();
+      var card = e.target.closest('.supply-card');
+      if(!card) return;
+      var id = card.getAttribute('data-id');
+      if(!id) return;
+      if(selected[id]) delete selected[id]; else selected[id] = true;
+      if(UI.haptic) UI.haptic('light');
+      updateSelUI();
     }
   });
+
+  /* 批量操作条事件：全选三态 + 删除 */
+  document.getElementById('fav-sel-all').addEventListener('click', function(){
+    var cards = Array.prototype.slice.call(document.querySelectorAll('#fav-list .supply-card'));
+    var ids = cards.map(function(c){ return c.getAttribute('data-id'); });
+    var selCount = ids.filter(function(id){ return selected[id]; }).length;
+    if(selCount === ids.length && ids.length){
+      ids.forEach(function(id){ delete selected[id]; });
+    } else {
+      ids.forEach(function(id){ selected[id] = true; });
+    }
+    if(UI.haptic) UI.haptic('light');
+    updateSelUI();
+  });
+  document.getElementById('fav-batch-del').addEventListener('click', batchDelete);
 
   /* 分类切换 */
   document.querySelectorAll('.seg-item').forEach(function(el){
@@ -187,8 +299,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if(currentFilter==='all') return true;
       return it.dir === currentFilter;
     });
-    if(!filtered.length){ return; }
-    UI.toast('批量管理功能即将上线','ok');
+    if(!filtered.length){ if(UI.toast) UI.toast('暂无可管理的收藏','warn'); return; }
+    editMode = !editMode;
+    var btn = document.getElementById('manage-btn');
+    var bar = document.getElementById('fav-batch');
+    if(editMode){
+      if(btn) btn.textContent = '完成';
+      selected = {};
+      if(bar) bar.classList.add('show');
+      render();
+    } else {
+      exitEdit();
+    }
   };
 
   render();

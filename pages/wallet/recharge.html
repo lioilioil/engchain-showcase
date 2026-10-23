@@ -135,7 +135,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   <div class="paybar">
     <label class="pay-agree" id="agreeRow"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已阅读并同意<a href="../agreement/user.html#recharge">《充值协议》</a>，充值后可用于支付、解锁与消费。</span></label>
-    <button class="btn btn-primary btn-block btn-lg" id="cta">确认充值</button>
+    <button class="btn btn-primary btn-block btn-lg bs-btn" id="cta">
+      <span class="bs-label">确认充值</span>
+      <span class="bs-ic bs-spin"></span>
+      <span class="bs-ic bs-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+    </button>
   </div>
 </div>
 
@@ -246,9 +250,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       currentRecord = CorpPay.create({ amount: v, account: CorpPay.BANK, remark: '工程链充值・尾号 4638' });
       openCorpSheet();
     } else {
-      // 余额入账（微信/支付宝即时到账）
-      BalanceStore.recharge(v, pm, null);
-      showRechargeSuccess(v, BalanceStore.read().balance);
+      // 余额入账（微信/支付宝即时到账）—— v1.1-M1-① 按钮状态机：处理中 → 到账
+      var b = document.getElementById('cta');
+      if (b) {
+        b.classList.add('bs-btn');
+        b.setAttribute('data-bs', 'busy');
+        var bl = b.querySelector('.bs-label');
+        if (bl) bl.textContent = '正在入账…';
+      }
+      setTimeout(function () {
+        BalanceStore.recharge(v, pm, null);
+        if (b) {
+          b.setAttribute('data-bs', 'ok');
+          if (bl) bl.textContent = '已到账';
+        }
+        if (UI.haptic) UI.haptic('mid');
+        setTimeout(function () {
+          showRechargeSuccess(v, BalanceStore.read().balance);
+        }, 460);
+      }, 640);
     }
   };
 
@@ -259,17 +279,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var on = this.classList.toggle('on');
     document.getElementById('cta').classList.toggle('btn-pay-disabled', !on);
   });
-  /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式） ---- */
+  /* ---- 充值成功弹窗（复用 credits.html 成功 sheet 样式；v1.1-M1-⑦ 庆祝动画） ---- */
   function showRechargeSuccess(amount, newBalance) {
     var sh = UI.sheet();
     sh.setClosable(false);
     sh.html(
       '<div class="recharge-success">' +
-        '<div class="rs-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
-        '<div class="rs-title">充值成功</div>' +
-        '<div class="rs-amount">+¥' + amount.toFixed(2) + ' 已到账</div>' +
-        '<div class="rs-desc">当前余额 ¥' + newBalance.toFixed(2) + '</div>' +
-        '<button class="btn btn-primary btn-block btn-lg" style="margin-top:20px;" onclick="rechargeDone()">完成</button>' +
+        '<div class="rs-icon celebrate celebrate-ring"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+        '<div class="rs-title cel-fadeup">充值成功</div>' +
+        '<div class="rs-amount cel-fadeup delay-1">+¥' + amount.toFixed(2) + ' 已到账</div>' +
+        '<div class="rs-desc cel-fadeup delay-1">当前余额 ¥' + newBalance.toFixed(2) + '</div>' +
+        '<button class="btn btn-primary btn-block btn-lg cel-fadeup delay-2" style="margin-top:20px;" onclick="rechargeDone()">完成</button>' +
       '</div>'
     ).show();
   }

@@ -239,6 +239,50 @@ const kPfSrc = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'index.html')
 ok('K preview PRIMARY_LABEL 含 provinceAgent/subAgent 显名', /provinceAgent:'省级总代'/.test(kPvSrc) && /subAgent:'二级合作'/.test(kPvSrc));
 ok('K profile ENTRY_TYPE_MAP 补 subAgent（非个人合伙人紫）', /subAgent:\s*\{\s*label:\s*'二级合作'/.test(kPfSrc));
 
+console.log('\n===== L. 阶段B 增量：门控/承载/反馈收敛（只读源码断言，不动费率税算） =====');
+const erHtml = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'entry-review.html'), 'utf8');
+const applySrcL = fs.readFileSync(path.join(ROOT, 'js', 'agent-apply.js'), 'utf8');
+const uiSrcL = fs.readFileSync(path.join(ROOT, 'js', 'agent-ui.js'), 'utf8');
+const agCss = fs.readFileSync(path.join(ROOT, 'css', 'agent.css'), 'utf8');
+const idxHtml = fs.readFileSync(path.join(ROOT, 'pages', 'province-agent', 'index.html'), 'utf8');
+const subHtml = fs.readFileSync(path.join(ROOT, 'pages', 'province-agent', 'sub.html'), 'utf8');
+/* H-6：有省代记录时省代卡前置、旧企业空态降级隐藏 */
+ok('L H-6 省代记录存在时省代卡 insertBefore 前置且旧空态隐藏', erHtml.includes('insertBefore(panel,root)') && /!e\.status\)root\.style\.display='none'/.test(erHtml));
+/* E2-M-1：驳回卡落 review 页（带预填），不跳空白表单；意向省回填 selected */
+ok('L E2-M-1 驳回 CTA 指向 entry-review.html（非空白 entry-form）', /status==='rejected'[\s\S]{0,200}entry-review\.html/.test(entryHtml));
+ok('L E2-M-1 驳回补表单意向省按 a.province 回填 selected', /p===a\.province\?' selected':'/.test(applySrcL));
+/* E2-M-2：entry 门控条纳入 active/suspended 代理身份 */
+ok('L E2-M-2 gate-bar 跳过 active/suspended 代理(!_gatePa)', /!qualified&&!_gatePa/.test(entryHtml));
+/* H-4：toast 三态单一实现，apply 委托 AgentUI.toast */
+ok('L H-4 toast 成功/失败/警告三态变体', uiSrcL.includes("'err'") && uiSrcL.includes("'warn'") && agCss.includes('ag-toast--warn') && agCss.includes('ag-toast--err'));
+ok('L H-4 applyToast 委托 AgentUI.toast 单一实现', /window\.AgentUI\s*&&\s*typeof window\.AgentUI\.toast\s*===\s*'function'/.test(applySrcL));
+/* E1-T1-07：approved 比例默认只读徽章，编辑框点按才展开，无常驻输入框 */
+ok('L 比例默认只读徽章(ag-ratio-view)，补改比例展开编辑框', uiSrcL.includes('ag-ratio-view') && uiSrcL.includes('ag-ratio-editbox') && agCss.includes('.ag-ratio-view'));
+/* E1-T2-01/03/04/06：T2 协议卡条件渲染、operator 隐藏、归属结构化、钱包弱出口 */
+ok('L T2 无协议不渲染空白协议卡(protoCard 条件)', /var protoCard = contract/.test(uiSrcL));
+ok('L T2 时间线隐藏内部 operator(hideOperator)', /timelineHtml\(rec\.statusLog, rec\.ratioLog, \{ hideOperator: true \}\)/.test(uiSrcL));
+ok('L T2 钱包降级为弱出口(ag-entry-row--weak)', uiSrcL.includes('ag-entry-row--weak'));
+/* H-2/H-3：44px 热区 + focus-visible 明暗 */
+ok('L H-2 小控件热区≥44px(ms/close/sm)', agCss.includes('.ag-ms-btn { width: 44px; height: 44px;') && agCss.includes('.ag-notice-local__close { width: 44px; height: 44px;'));
+ok('L H-3 ag-* 含 :focus-visible 焦点环', agCss.includes(':focus-visible'));
+/* L-5：深链返回兜底到「我的」 */
+ok('L 返回兜底 agBack（无历史回 profile）', idxHtml.includes('function agBack()') && subHtml.includes('function agBack()'));
+
+console.log('\n===== M. H-1 IA 拆分 + H-5 协议承载（hash 视图/抽屉，只读源码断言） =====');
+/* H-1：T1 五视图 data-view 标签 + hashchange 路由 + home 快捷入口 */
+['home','subs','agreements','ledger','status'].forEach(function(v){
+  ok('M H-1 T1 视图标签 data-view="' + v + '"', uiSrcL.includes('data-view="' + v + '"'));
+});
+ok('M H-1 T1 hashchange 历史栈路由 agApplyRoute', uiSrcL.includes("addEventListener('hashchange', agApplyRoute)") && uiSrcL.includes("replace(/^#\\/?/, '')"));
+ok('M H-1 T1 home 快捷入口 #ag-quick 四格(二级/协议/台账/状态)', uiSrcL.includes('id="ag-quick"') && uiSrcL.includes('#/subs') && uiSrcL.includes('#/agreements') && uiSrcL.includes('#/ledger') && uiSrcL.includes('#/status'));
+ok('M H-1 T2 #/ledger 独立视图 + subApplyRoute', uiSrcL.includes('subApplyRoute') && uiSrcL.includes("addEventListener('hashchange', subApplyRoute)") && uiSrcL.includes('#ag-sub-led'));
+ok('M H-1 视图返回条 #ag-route-back 兜底回概览', uiSrcL.includes('ag-route-back') && agCss.includes('.ag-route-back'));
+/* H-5：协议/证书进底部抽屉 openDrawer，身份卡不再平铺八条 */
+ok('M H-5 协议查看走 openDrawer（非内嵌 #ag-proto-detail 填充）', /openDrawer\(\{ title: '二级合作协议（O4）'/.test(uiSrcL) && !/#ag-proto-detail'\)\.innerHTML = protoDetail/.test(uiSrcL));
+ok('M H-5 T2 待我签署抽屉底部操作区 去签署/拒签', uiSrcL.includes('data-drawer-sign') && uiSrcL.includes('data-drawer-reject'));
+ok('M H-5 授权证书改抽屉（删除内嵌 #ag-cert-card 折叠卡）', uiSrcL.includes("openDrawer({ title: '授权证书'") && !uiSrcL.includes('#ag-cert-card'));
+ok('M H-5 抽屉基元 CSS(.ag-drawer/.ag-drawer-mask) + 居中确认弹窗', agCss.includes('.ag-drawer-mask') && agCss.includes('.ag-drawer') && agCss.includes('.ag-modal-mask'));
+
 console.log('\n===== I. M1 回归：复跑 smoke-m1 =====');
 try {
   const out = execSync('node scripts/smoke-m1.js', { cwd: ROOT, encoding: 'utf8' });

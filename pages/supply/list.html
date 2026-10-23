@@ -116,6 +116,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       今日免费浏览摘要剩余 <b id="dq-remain" style="color:var(--primary-dim);">–</b> 条 · 查看详情自动扣减
     </div>
     <!-- [S0 §2.2] 首屏加载骨架；数据到达后由 render() 替换为真实列表 -->
+    <button type="button" id="ptr-bar" class="ptr-bar" aria-label="刷新列表">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <span>下拉刷新 · 点击立即刷新（有新供需即时更新）</span>
+    </button>
     <div id="list">
       <div class="sk-list" aria-label="加载中">
         <div class="sk-card"><div class="sk-line w45"></div><div class="sk-line w95"></div><div class="sk-line w70"></div></div>
@@ -143,7 +147,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js"></script>
+<script src="../../js/common.js?v=2026100310"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/ranking.js"></script>
@@ -654,6 +658,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         });
       }
     } catch (e) {}
+    /* v1.1-M2-⑨ 下拉刷新：_new 条目注入「NEW」徽章（金色胶囊，呼吸感） */
+    try {
+      list.forEach(function (item, idx) {
+        if (item._new && cards[idx]) {
+          var nTag = document.createElement('span');
+          nTag.className = 'tag tag-gold ptr-new';
+          nTag.style.cssText = 'margin-left:6px;font-size:10px;letter-spacing:.4px;background:linear-gradient(135deg,var(--action,#C8962F),var(--primary-dim));color:var(--text-inv);animation:tl-pop .5s var(--e-out) both;';
+          nTag.textContent = 'NEW';
+          var tagsRow3 = cards[idx].querySelector('.jc-tags');
+          if (tagsRow3) tagsRow3.insertBefore(nTag, tagsRow3.firstChild);
+        }
+      });
+    } catch (e) {}
     } catch (e) {
       console.error('render() error:', e);
       var listEl = document.getElementById('list');
@@ -693,6 +710,107 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       { type: 'scroll', el: '.discover-sub' }
     ]
   });
+
+  /* ============ v1.1-M2-⑨ 下拉刷新（保真版）：指示器三态 + 注入 NEW mock 条目 ============ */
+  (function () {
+    var scroller = document.querySelector('.scroll.no-pad');
+    var listEl = document.getElementById('list');
+    var bar = document.getElementById('ptr-bar');
+    if (!scroller || !listEl) return;
+
+    /* 指示器：插到 #list 之前（兄弟节点，避免被 render() 的 innerHTML 替换清除） */
+    var ind = document.createElement('div');
+    ind.className = 'ptr-indicator';
+    ind.setAttribute('data-state', 'idle');
+    ind.innerHTML = '<div class="ptr-inner"><span class="ptr-ic">↓</span><span class="ptr-tx">下拉刷新</span></div>';
+    listEl.parentNode.insertBefore(ind, listEl);
+
+    var TRIGGER = 64;
+    var state = 'idle', startY = 0, pullDist = 0, dragging = false, touchActive = false;
+
+    function setTx(t) { var x = ind.querySelector('.ptr-tx'); if (x) x.textContent = t; }
+    function setState(s) { state = s; ind.setAttribute('data-state', s); setTx(s === 'ready' ? '松开刷新' : (s === 'loading' ? '正在刷新…' : '下拉刷新')); }
+    function applyPull() {
+      var d = Math.min(pullDist, 110);
+      ind.style.height = d + 'px';
+      var inner = ind.querySelector('.ptr-inner');
+      if (inner) inner.style.transform = 'translateY(' + Math.max(0, d - 22) + 'px)';
+      if (d >= TRIGGER) { if (state !== 'ready') setState('ready'); }
+      else if (state === 'ready') setState('pull');
+    }
+    function resetInd() {
+      dragging = false; pullDist = 0;
+      ind.style.height = '0px';
+      var inner = ind.querySelector('.ptr-inner');
+      if (inner) inner.style.transform = '';
+      setState('idle');
+    }
+
+    /* 注入 2 条带 NEW 徽章的 mock 供需（保真：真实写入 SupplyStore，经事件驱动重渲染） */
+    function injectFresh() {
+      if (!window.SupplyStore) return;
+      var s = SupplyStore.read();
+      var items = Array.isArray(s.items) ? s.items : [];
+      var now = Date.now();
+      var fresh = [
+        { id: 'RF' + now + 'a', cat: '材料', dir: 'demand', title: '成都东部新区 安居工程 急需商品混凝土 C30（连续浇筑 2.4 万方）', type: 'material', bizKey: 'material', city: '成都', location: '成都 · 东部新区', match: 96, verified: true, price: '¥2,880/m³', unit: 'm³', status: 'active', ts: now - 2 * 60000, _new: true },
+        { id: 'RF' + now + 'b', cat: '劳务', dir: 'supply', title: '德阳旌阳区 安置房二期 木工班组 可随时进场（持证）', type: 'labor', bizKey: 'labor', city: '德阳', location: '德阳 · 旌阳区', match: 92, verified: true, price: '¥38/㎡', unit: '㎡', status: 'active', ts: now - 60000, _new: true }
+      ];
+      s.items = fresh.concat(items);
+      SupplyStore.write(s);
+      try { window.dispatchEvent(new CustomEvent('engchain:supply')); } catch (e) {}
+    }
+
+    function refresh() {
+      if (state === 'loading') return;
+      setState('loading');
+      if (bar) { bar.classList.add('loading'); var bt = bar.querySelector('span'); if (bt) bt.textContent = '正在更新…'; }
+      try { injectFresh(); } catch (e) {}
+      setTimeout(function () {
+        resetInd();
+        if (bar) { bar.classList.remove('loading'); var bt2 = bar.querySelector('span'); if (bt2) bt2.textContent = '下拉刷新 · 点击立即刷新（有新供需即时更新）'; }
+        if (window.UI && UI.toast) UI.toast('已为你更新 2 条新供需', 'ok');
+      }, 650);
+    }
+
+    /* 桌面：刷新条点击触发（可发现入口） */
+    if (bar) bar.addEventListener('click', refresh);
+
+    /* 手势：触摸（真机）+ 鼠标拖拽（桌面演示） */
+    var downY = 0, moved = false;
+    function onDragStart(y, isTouch) {
+      if (state === 'loading') return;
+      if (scroller.scrollTop > 0) return;
+      dragging = true; touchActive = !!isTouch; moved = false; startY = y; pullDist = 0;
+      setState('pull');
+    }
+    function onDragMove(y) {
+      if (!dragging) return;
+      var dy = y - startY;
+      if (dy > 2 && scroller.scrollTop <= 0) { moved = true; pullDist = dy * 0.5; applyPull(); }
+      else if (dy <= 2 && pullDist > 0) { pullDist = 0; applyPull(); }
+    }
+    function onDragEnd() {
+      if (!dragging) return;
+      dragging = false;
+      if (moved && pullDist >= TRIGGER) refresh();
+      else resetInd();
+    }
+
+    scroller.addEventListener('touchstart', function (e) { if (state !== 'loading' && scroller.scrollTop <= 0) { onDragStart(e.touches[0].clientY, true); } }, { passive: true });
+    scroller.addEventListener('touchmove', function (e) {
+      if (dragging && touchActive && scroller.scrollTop <= 0 && e.touches[0].clientY - startY > 0) {
+        e.preventDefault();
+        onDragMove(e.touches[0].clientY);
+      }
+    }, { passive: false });
+    scroller.addEventListener('touchend', function () { if (touchActive) onDragEnd(); }, { passive: true });
+    scroller.addEventListener('touchcancel', function () { if (touchActive) onDragEnd(); }, { passive: true });
+
+    scroller.addEventListener('mousedown', function (e) { if (state !== 'loading' && e.button === 0) onDragStart(e.clientY, false); });
+    window.addEventListener('mousemove', function (e) { if (dragging && !touchActive) onDragMove(e.clientY); });
+    window.addEventListener('mouseup', function () { if (dragging && !touchActive) onDragEnd(); });
+  })();
 })();
 </script>
 <script src="../../js/liquid-glass.iife.js?v=2026100310"></script>

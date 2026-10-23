@@ -671,6 +671,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             <button data-v="dark">暗色</button>
           </span>
         </div>
+        <div class="pv-row"><span class="k">交互特效</span>
+          <span class="seg" id="seg-motion" title="演示内全部动效/触觉总开关：关 = 即时呈现（与 prefers-reduced-motion 同效），便于评审对比">
+            <button data-v="on">开</button>
+            <button data-v="off">关</button>
+          </span>
+        </div>
         <div class="pv-sec" id="sec-tabbar">
           <button type="button" class="pv-sec-hd" aria-expanded="true">
             <svg class="sec-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M9 4v16"/></svg>
@@ -911,7 +917,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     </div>
   </div>
 <script src="js/data.js"></script>
-<script src="js/common.js"></script>
+<script src="js/common.js?v=2026100310"></script>
 <script src="js/stores.js"></script>
 <script src="js/databus.js"></script>
 <!-- 演示场景切换器：加载代理体系模块，供 DEMO_SCENARIOS build() 走真实接口播种（不改变页面既有展示） -->
@@ -1165,6 +1171,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/distribution/poster.html', '推广海报', '推广海报'],
         ['pages/distribution/rules.html', '分销规则', '分销规则'],
         ['pages/distribution/withdraw.html', '提现', '佣金提现'],
+      ]},
+    ]},
+    { name:'省级代理', pages:[
+      { name:'省级总代工作台', src:'pages/province-agent/index.html', desc:'省级总代工作台 · 身份卡（授权省独家/n·quotaCap）/二级合作方列表/发起二级/两分区台账/行为记录/团队与签署入口', children:[
+        ['pages/province-agent/sub.html', '二级合作视角', '二级合作视角 · 归属总代/授权省/签署状态/本人约定所得/自身余额提现'],
+        ['pages/province-agent/team.html', '公司团队管理', '公司团队管理 · 法人只读/管理员操作/成员日常（三角色，复用 OrgsStore）'],
+        ['pages/province-agent/tax-guide.html', '税务说明', '税务说明 · 个人法定预扣（方案A/方案B）与企业书面陈述，个人/企业分表'],
+        ['pages/province-agent/badge.html', '徽章静态方案', '徽章静态方案 · 省级总代盾形/二级合作六边形样例（仅样例，不改既有五档）'],
       ]},
     ]},
     { name:'订单', pages:[
@@ -2023,18 +2037,55 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }
   document.getElementById('seg-theme').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.v === 'dark') document.documentElement.dataset.theme = 'dark';
-    else delete document.documentElement.dataset.theme;
-    try { localStorage.setItem(THEME_KEY, b.dataset.v); } catch (e2) {}
-    document.querySelectorAll('#seg-theme button').forEach(function (x) { x.classList.toggle('on', x === b); });
-    applyAdminTheme();
-    /* 主题只切换风格：经 postMessage 实时下发到演示 iframe，不再整页重载（避免重载导致页面状态/滚动回退）。iframe 跨源时静默，下次加载自取 localStorage */
-    try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:theme', theme: b.dataset.v }, '*'); } catch (e3) {}
-    var _gp = document.getElementById('glass-params'); if (_gp) _gp.dataset.show = b.dataset.v;
-    var _bgp = document.getElementById('btn-glass-params'); if (_bgp) _bgp.dataset.show = b.dataset.v;
-    updateStateSummary();
-
+    if (b.classList.contains('on')) return; /* 相同主题不重复切换 */
+    var applyTheme = function () {
+      if (b.dataset.v === 'dark') document.documentElement.dataset.theme = 'dark';
+      else delete document.documentElement.dataset.theme;
+      try { localStorage.setItem(THEME_KEY, b.dataset.v); } catch (e2) {}
+      document.querySelectorAll('#seg-theme button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      applyAdminTheme();
+      /* 主题只切换风格：经 postMessage 实时下发到演示 iframe，不再整页重载（避免重载导致页面状态/滚动回退）。iframe 跨源时静默，下次加载自取 localStorage */
+      try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:theme', theme: b.dataset.v }, '*'); } catch (e3) {}
+      var _gp = document.getElementById('glass-params'); if (_gp) _gp.dataset.show = b.dataset.v;
+      var _bgp = document.getElementById('btn-glass-params'); if (_bgp) _bgp.dataset.show = b.dataset.v;
+      updateStateSummary();
+    };
+    /* v1.1-M2-⑯ 主题切换过渡（preview 专属）：圆环从按钮扩散覆盖旧主题色 → 切换 → 遮罩退场；reduced-motion 直切 */
+    var reduceMotion = false;
+    try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e4) {}
+    if (reduceMotion) { applyTheme(); return; }
+    var _r = b.getBoundingClientRect();
+    var _tx = Math.min(96, Math.max(4, Math.round((_r.left + _r.width / 2) / (window.innerWidth || 1280) * 100)));
+    var _ty = Math.min(96, Math.max(4, Math.round((_r.top + _r.height / 2) / (window.innerHeight || 800) * 100)));
+    var _html = document.documentElement;
+    _html.style.setProperty('--tx', _tx + '%');
+    _html.style.setProperty('--ty', _ty + '%');
+    _html.classList.add('theme-switch', 'theme-switch-in');
+    setTimeout(applyTheme, 380);
+    setTimeout(function () { _html.classList.remove('theme-switch', 'theme-switch-in'); }, 640);
   });
+  /* ---- 「交互特效」总开关（v1.1-M3 · 审计报告决策4）：持久化 pv-motion-default（pv-* 体系，重置演示不清理）
+          + postMessage 实时下发 iframe（iframe 端 common.js 全局监听挂/卸 html.motion-off，动画/触觉同步降级） ---- */
+  var MOTION_DEFAULT_KEY = 'pv-motion-default';
+  var motionEnabled = readDefault(MOTION_DEFAULT_KEY, { enabled: true }).enabled !== false;
+  function applyMotionUI() {
+    document.querySelectorAll('#seg-motion button').forEach(function (x) { x.classList.toggle('on', (x.dataset.v === 'on') === motionEnabled); });
+    updateStateSummary();
+  }
+  function pushMotion() {
+    try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'engchain:motion', enabled: motionEnabled }, '*'); } catch (e) {}
+  }
+  document.getElementById('seg-motion').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var next = (b.dataset.v === 'on');
+    if (next === motionEnabled) return;
+    motionEnabled = next;
+    saveDefault(MOTION_DEFAULT_KEY, { enabled: motionEnabled }, ['enabled']);
+    applyMotionUI();
+    pushMotion();
+  });
+  applyMotionUI();
+  pushMotion();
   /* ---- 「设置默认」系统默认值：持久化于 pv-* 键（避开 DataBus.resetAll 清理的 engchain-* 命名空间）。
          设置后，「重置默认」与「重置演示」均按新系统默认值执行；重启页面后依然生效 ---- */
   function readDefault(key, base) {
@@ -2734,7 +2785,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var dark = !!document.documentElement.dataset.theme;
     var m = window.ModeStore ? ModeStore.read() : {};
     var ph = m.phase === 'breakin' ? '破冰期' : '成熟期';
-    el.textContent = zt + ' · ' + (dark ? '暗色' : '明亮') + ' · ' + ph;
+    /* v1.1-M3 交互特效开关状态（motionEnabled 定义于 seg-motion 块） */
+    var mtx = (typeof motionEnabled === 'boolean') ? (motionEnabled ? '特效开' : '特效关') : '';
+    el.textContent = zt + ' · ' + (dark ? '暗色' : '明亮') + ' · ' + ph + (mtx ? ' · ' + mtx : '');
   }
   updateStateSummary();
 
