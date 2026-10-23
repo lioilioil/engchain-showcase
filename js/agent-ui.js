@@ -186,10 +186,16 @@
     return 10;
   }
 
-  /* 统一空态（M-08：无 demo 播种文案） */
-  function emptyState(title, sub) {
+  /* 统一空态（M-08：无 demo 播种文案；S2-6 场景图标：subs 无二级 / proto 无协议 / rec 无记录 / inv 无邀请，缺省同 rec） */
+  var EMPTY_ICONS = {
+    subs: '<svg class="ag-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>',
+    proto: '<svg class="ag-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+    rec: '<svg class="ag-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>',
+    inv: '<svg class="ag-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>'
+  };
+  function emptyState(title, sub, icon) {
     return '<div class="ag-empty">'
-      + '<svg class="ag-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>'
+      + (EMPTY_ICONS[icon] || EMPTY_ICONS.rec)
       + '<div class="ag-empty__title">' + esc(title) + '</div>'
       + (sub ? '<div class="ag-empty__sub">' + esc(sub) + '</div>' : '')
       + '</div>';
@@ -242,7 +248,7 @@
       items.push({ at: r.at, tone: 'active', event: '约定比例调整为 ' + fmt((r.ratio || 0) * 100) + '%', meta: metaOf(r) });
     });
     items.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
-    if (!items.length) return emptyState('暂无状态变更记录', '开通/比例/状态变更会在此留痕。');
+    if (!items.length) return emptyState('暂无状态变更记录', '开通/比例/状态变更会在此留痕。', 'rec');
     return '<ul class="ag-timeline">' + items.map(function (it) {
       return '<li data-tone="' + it.tone + '"><div class="ag-timeline__t">' + fmtDate(it.at) + '</div>'
         + '<div class="ag-timeline__e">' + esc(it.event) + '</div>'
@@ -260,7 +266,7 @@
       + '<div class="ag-certi__field">被授权主体：' + esc((me.branchCompany && me.branchCompany.name) || '—') + '</div>'
       + '<div class="ag-certi__field">证书编号：<span class="ag-certi__no">' + esc(no) + '</span></div>'
       + '<div class="ag-certi__field">有效期：以平台核发通知为准（演示静态展示）</div>'
-      + '<div style="margin-top:8px;">' + badge(me.status) + '</div>'
+      + '<div class="ag-mt-2">' + badge(me.status) + '</div>'
       + '<div class="ag-disc">证书为演示静态展示，正式编号与签发以平台核发为准。</div></div>';
   }
 
@@ -313,6 +319,7 @@
         + '<button type="button" data-ml-next' + (nextDisabled ? ' disabled' : '') + ' aria-label="下月">›</button></div>';
       holder.innerHTML = switcher + (rows.length ? tableFn(rows)
         : emptyState(cur + ' 暂无结算记录', '切换其他月份查看，口径与累计一致'));
+      bindLedgerScrollHints(holder);
     }
     render();
     holder.onclick = function (e) {
@@ -387,10 +394,25 @@
         + '</tr>';
     }).join('');
 
-    return '<div class="ag-ledger-scroll"><table class="ag-ledger">'
+    return '<div class="ag-ledger-scroll" data-ledger-scroll="1"><table class="ag-ledger">'
       + '<thead><tr><th>日期</th><th>流水号</th><th>线别</th><th>结算消费</th><th>总盘×50%</th><th>约定</th><th>自留</th><th>状态</th><th>税/冲减备注</th></tr></thead>'
       + '<tbody>' + (rows || '<tr><td colspan="9" style="text-align:center;color:var(--text-3);">暂无台账记录</td></tr>') + '</tbody>'
       + '</table></div>';
+  }
+
+  /* S2-5：台账横滑到最右时隐藏右缘遮罩（is-at-end），DOM 重挂后重新绑定 */
+  function bindLedgerScrollHints(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('[data-ledger-scroll]').forEach(function (sc) {
+      if (sc.dataset.bound === '1') return;
+      sc.dataset.bound = '1';
+      var sync = function () {
+        var atEnd = sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 4;
+        sc.classList.toggle('is-at-end', atEnd);
+      };
+      sync();
+      sc.addEventListener('scroll', sync, { passive: true });
+    });
   }
 
   /* ---------- M3-1 总代工作台 ---------- */
@@ -420,7 +442,7 @@
       }
       /* D-10：终止/封存独立块内提供封存台账只读折叠区（复用现有只读表，不产生新操作） */
       var sealedEntries = (Store.listLedger() || []).filter(function (e) { return e.line === 'subLedger' || e.line === 'selfLedger'; });
-      var ledgerFold = '<details class="ag-card" style="margin-top:12px;"><summary style="cursor:pointer;font-weight:600;font-size:13px;padding:6px 2px;">查看封存台账（只读）</summary>'
+      var ledgerFold = '<details class="ag-card ag-mt-3"><summary class="ag-ledger-fold__summary">查看封存台账（只读）</summary>'
         + ledgerTable(sealedEntries, 0, Ledger) + '</details>';
       el.innerHTML = '<div class="ag-wrap">'
         + '<div class="ag-terminal ag-card">'
@@ -437,7 +459,7 @@
     if (!me || (me.status !== 'active' && me.status !== 'suspended')) {
       el.innerHTML = '<div class="ag-wrap">' + emptyState(
         '当前账号未开通省级总代',
-        '开通需经平台人工审核（¥0）；可在入驻类型选择页提交省级总代（省代）申请。') + '</div>';
+        '开通需经平台人工审核（¥0）；可在入驻类型选择页提交省级总代（省代）申请。', 'subs') + '</div>';
       return;
     }
 
@@ -505,10 +527,14 @@
       return '<div class="ag-seg" id="ag-board-seg">'
         + '<button data-mode="month" class="' + (mode === 'month' ? 'is-on' : '') + '">本月</button>'
         + '<button data-mode="cum" class="' + (mode === 'cum' ? 'is-on' : '') + '">累计</button></div>'
+        /* S2-7：主收益「约定所得」置顶大数字卡（挂接 .ag-big），辅助指标网格次级弱化 */
+        + '<div class="ag-hero ag-card--deep">'
+        + '<div class="ag-hero__lb">约定所得（' + (mode === 'month' ? '本月' : '累计') + '）</div>'
+        + '<div class="ag-big">¥' + fmt(a.agreed) + '</div>'
+        + '<div class="ag-hero__sub">' + (mode === 'month' ? '本月已结算' : '累计已结算') + ' · 模拟测算，非税务意见</div></div>'
         + '<div class="ag-board-grid">'
         + boardCell('合格消费', a.gross, mode === 'month' ? '本月已结算' : '累计已结算')
         + boardCell('总盘(×50%)', a.pool)
-        + boardCell('约定所得', a.agreed)
         + boardCell('总代自留', a.retained)
         + boardCell('自身10%', a.selfAmt, '自身线独立分区')
         + '<div class="ag-board-cell ag-board-cell--frozen"><div class="ag-board-cell__lb">T+7 冻结待结算</div>'
@@ -545,7 +571,7 @@
       + '<section class="ag-card ag-card--deep ag-rise" data-view="home">'
       + '<div class="ag-identity-row">' + emblemHtml('pa') + '<div class="ag-prov">授权省：' + esc(me.province) + '</div></div>'
       + '<div class="ag-quota">名额 ' + used + ' / ' + cap + '（省表核定名额，非固定 10）</div>'
-      + '<div style="margin-top:8px;">' + badge(me.status) + '</div>'
+      + '<div class="ag-mt-2">' + badge(me.status) + '</div>'
       + '<div class="ag-union">'
       + '<span class="ag-chip ag-chip--pa">省级总代</span>'
       + (isIndividualPartnerNow() ? '<span class="ag-chip ag-chip--ip">叠加 · 个人合伙人（并集独立，不合并身份）</span>' : '')
@@ -609,8 +635,12 @@
       + '<section class="ag-card" data-view="ledger"><div class="ag-actions ag-actions--edit">'
       + '<button class="ag-btn ag-btn--ghost" onclick="window.print()" ' + (locked ? 'disabled' : '') + '>打印视图</button>'
       + '<button class="ag-btn ag-btn--ghost" id="ag-csv" ' + (locked ? 'disabled' : '') + '>导出当前月 CSV</button></div>'
+      + '<div class="ag-note">屏幕视图按应用容器宽度 2–3 列自适应，打印视图按 A4 纸面展开为 3 列全宽；金额为模拟测算，非税务意见，非实际代扣金额。</div>'
       + '<div class="ag-disc">' + (Tax && Tax.disclaimer ? Tax.disclaimer() : '模拟测算，非税务意见，非实际代扣金额') + '</div></section>'
       + '</div>';
+
+    /* S2-5：台账横滑遮罩提示绑定 */
+    bindLedgerScrollHints(el);
 
     /* P2-2 本地公告关闭（写 localStorage 记忆，刷新不再出现） */
     el.querySelectorAll('[data-notice-close]').forEach(function (btn) {
@@ -628,7 +658,8 @@
       var Es = esign();
       var c = latestContract(Es, s.id);
       var signed = s.signature && s.signature.status === 'completed';
-      /* P0-2 O4：发起/待签/已签/拒签真实接线（引擎 AgentEsign，独立键 engchain-agent-esign） */
+      /* P0-2 O4：发起/待签/已签/拒签真实接线（引擎 AgentEsign，独立键 engchain-agent-esign）
+         S2-6：主操作（发起/重新发起/去签署）用 primary 按钮，次级（补改比例/查看协议）ghost，文字链接（详情/团队）分组 */
       var sig;
       if (signed) {
         sig = '<span class="ag-sig">已签 ' + esc(s.signature.code || '') + '</span>'
@@ -637,10 +668,10 @@
         sig = '<span class="ag-badge ag-st-pending">待二级签署</span>';
       } else if (c && c.status === 'rejected') {
         sig = '<span class="ag-badge ag-st-terminated">已拒签</span>'
-          + (canAdmin && !locked ? '<button class="ag-btn ag-btn--sm ag-btn--ghost" data-send-contract="' + escAttr(s.id) + '">重新发起</button>' : '');
+          + (canAdmin && !locked ? '<button class="ag-btn ag-btn--sm ag-btn--primary" data-send-contract="' + escAttr(s.id) + '">重新发起</button>' : '');
       } else if (s.status === 'approved' && canAdmin && !locked) {
         sig = '<span class="ag-badge ag-st-pending">未签约</span>'
-          + '<button class="ag-btn ag-btn--sm ag-btn--ghost" data-send-contract="' + escAttr(s.id) + '">发起协议</button>';
+          + '<button class="ag-btn ag-btn--sm ag-btn--primary" data-send-contract="' + escAttr(s.id) + '">发起协议</button>';
       } else {
         sig = '<span class="ag-sig">协议待发起</span>';
       }
@@ -653,13 +684,14 @@
       } else {
         adminOps = '<span class="ag-sig">约定 ' + fmt((s.ratioToSub || 0) * 100) + '%</span>';
       }
-      /* P2-6 详情入口（仅 admin/非锁定）；T2 不自见 */
+      /* P2-6 详情入口（仅 admin/非锁定）；T2 不自见；S2-6 文字链接统一 .ag-card__links 组 */
       var detailLink = (canAdmin && !locked)
         ? '<a class="ag-link" href="javascript:void(0)" data-sub-profile="' + escAttr(s.id) + '">详情</a>' : '';
       return '<div class="ag-sub-card ag-rise">'
         + '<div class="ag-sub-card__top"><span class="ag-sub-card__name">' + emblemHtml('sub', true) + ' ' + esc((s.company && s.company.name) || s.id) + '</span>'
         + badge(s.status) + '</div>'
-        + '<div class="ag-sub-card__ops">' + adminOps + sig + detailLink
+        + '<div class="ag-sub-card__ops">' + adminOps + sig + '</div>'
+        + '<div class="ag-sub-card__links">' + detailLink
         + '<a class="ag-link" href="team.html?org=' + esc(me.orgId) + '">团队管理</a></div>'
         + '</div>';
     }
@@ -703,7 +735,7 @@
       });
     }
     function renderSubList() {
-      box.innerHTML = subs.map(subCardHtml).join('') || emptyState('暂无二级合作方', '发起并经审核通过后，二级公司将在此列出。');
+      box.innerHTML = subs.map(subCardHtml).join('') || emptyState('暂无二级合作方', '发起并经审核通过后，二级公司将在此列出。', 'subs');
       bindSubList();
     }
 
@@ -745,6 +777,7 @@
         var d = Es.contractById(pv.dataset.proto) || latestContract(Es, pv.dataset.proto);
         openDrawer({ title: '二级合作协议（O4）', bodyHtml: protoDetail(d) });
       };
+      bindLedgerScrollHints(box);
     }
 
     renderSubList();
@@ -800,9 +833,9 @@
           + '<div class="ag-clause__body">' + esc(cl.body) + '</div></div>';
       }).join('');
       var ev = c.evidence ? '<div class="ag-disc">存证模拟（非真实 CA）：' + esc(c.evidence.certNo || '') + ' · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
-      return '<div class="ag-card" style="margin-top:10px;">'
+      return '<div class="ag-card ag-mt-3">'
         + '<div class="ag-sub-card__name">《二级合作协议（O4）》' + esc(c.code || '') + '</div>'
-        + '<div class="ag-meta" style="margin-top:4px;">版本 ' + esc(c.version || '') + ' · 状态 ' + protoTxtOwner(c.status)
+        + '<div class="ag-meta ag-mt-1">版本 ' + esc(c.version || '') + ' · 状态 ' + protoTxtOwner(c.status)
         + (c.completedAt ? ' · 签署完成 ' + fmtDate(c.completedAt) : '') + '</div>'
         + parties + clauses + ev + '</div>';
     }
@@ -818,7 +851,7 @@
           + '<div class="ag-proto-row__meta">' + esc(c.version || '') + ' · ' + protoTxtOwner(c.status) + '</div></div>'
           + '<button class="ag-btn ag-btn--sm ag-btn--ghost" data-proto="' + escAttr(s.id) + '">查看</button></div>';
       }).join('');
-      list.innerHTML = rows || emptyState('暂无协议', '发起二级协议后在此集中查看。');
+      list.innerHTML = rows || emptyState('暂无协议', '发起二级协议后在此集中查看。', 'proto');
       if (detail) detail.innerHTML = '';
     }
     renderProtoCenter();
@@ -858,7 +891,7 @@
         ? '<div class="ag-member" style="flex-direction:column;align-items:stretch;gap:4px;">' + beh.map(function (b) {
             return '<div class="ag-meta">' + fmtDate(b.at) + ' · ' + esc(b.action || b.event || '记录') + (b.detail ? ' · ' + esc(b.detail) : '') + '</div>';
           }).join('') + '</div>'
-        : emptyState('暂无行为记录', '本地操作留痕将在此只读展示。');
+        : emptyState('暂无行为记录', '本地操作留痕将在此只读展示。', 'rec');
     }
 
     var csv = el.querySelector('#ag-csv');
@@ -980,7 +1013,7 @@
     var rec = null;
     (Store.listSubs() || []).forEach(function (s) { if (s.uid === U) rec = s; });
     if (!rec) {
-      el.innerHTML = '<div class="ag-wrap">' + emptyState('当前账号无二级合作记录', '与总代签署协议并通过审核后开通本视角。') + '</div>';
+      el.innerHTML = '<div class="ag-wrap">' + emptyState('当前账号无二级合作记录', '与总代签署协议并通过审核后开通本视角。', 'subs') + '</div>';
       return;
     }
     var allRows = (Store.listLedger() || []).filter(function (e) {
@@ -1011,10 +1044,14 @@
       return '<div class="ag-seg" id="ag-sub-seg">'
         + '<button data-mode="month" class="' + (mode === 'month' ? 'is-on' : '') + '">本月</button>'
         + '<button data-mode="cum" class="' + (mode === 'cum' ? 'is-on' : '') + '">累计</button></div>'
+        /* S2-7：主收益「本人约定所得」置顶大数字卡，辅助指标次级弱化 */
+        + '<div class="ag-hero ag-card--sub">'
+        + '<div class="ag-hero__lb">本人约定所得（' + (mode === 'month' ? '本月' : '累计') + '）</div>'
+        + '<div class="ag-big">¥' + fmt(a.agreed) + '</div>'
+        + '<div class="ag-hero__sub">不展示自留/自身线 · 模拟测算，非税务意见</div></div>'
         + '<div class="ag-board-grid">'
         + cell('本人合格消费', a.gross, mode === 'month' ? '本月已结算' : '累计已结算')
         + cell('总盘（×50%）', a.pool)
-        + cell('本人约定所得', a.agreed, '不展示自留/自身线')
         + '<div class="ag-board-cell ag-board-cell--frozen"><div class="ag-board-cell__lb">T+7 冻结待结算</div>'
         + '<div class="ag-board-cell__val">' + frozen.count + ' 笔</div>'
         + '<div class="ag-board-cell__sub">¥' + fmt(frozen.amount) + '</div></div>'
@@ -1064,7 +1101,7 @@
       + '<div class="ag-sub-profile__field"><span>约定比例</span><span>' + fmt((rec.ratioToSub || 0) * 100) + '%</span></div>'
       + '<div class="ag-sub-profile__field"><span>状态</span><span>' + badge(rec.status) + '</span></div>'
       + (parentCo ? '<div class="ag-sub-profile__field"><span>归属总代</span><span>' + esc(parentCo) + '</span></div>' : '')
-      + '<div class="ag-meta" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">协议：' + protoRow + '</div>'
+      + '<div class="ag-meta ag-mt-2" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">协议：' + protoRow + '</div>'
       + rejectPanel
       + '</section>'
 
@@ -1092,11 +1129,14 @@
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(rec.orgId || '') + '">本公司团队</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
       + '</div>'
-      + '<div class="ag-entry-row ag-entry-row--weak" style="margin-top:10px;">'
+      + '<div class="ag-entry-row ag-entry-row--weak ag-mt-3">'
       + '<a class="ag-link" href="../../pages/wallet/index.html">自身余额（钱包）›</a>'
       + '</div>'
       + '<div class="ag-disc">本视角不展示总代自留与总代自身收益线；金额为模拟测算，非税务意见，非实际代扣金额。</div></section>'
       + '</div>';
+
+    /* S2-5：台账横滑遮罩提示绑定 */
+    bindLedgerScrollHints(el);
 
     /* P1-1 二级看板本月/累计切换 */
     function rebindSubSeg() {
@@ -1136,8 +1176,8 @@
         return '<div class="ag-clause"><div class="ag-clause__no">第' + cl.no + '条 · ' + esc(cl.title) + '</div>'
           + '<div class="ag-clause__body">' + esc(cl.body) + '</div></div>';
       }).join('');
-      return '<div class="ag-card" style="margin-top:10px;"><div class="ag-sub-card__name">《二级合作协议（O4）》'
-        + esc(c.code || '') + '</div><div class="ag-meta" style="margin-top:4px;">版本 ' + esc(c.version || '')
+      return '<div class="ag-card ag-mt-3"><div class="ag-sub-card__name">《二级合作协议（O4）》'
+        + esc(c.code || '') + '</div><div class="ag-meta ag-mt-1">版本 ' + esc(c.version || '')
         + ' · 状态 ' + protoStatusTxt(c.status) + (c.completedAt ? ' · 完成 ' + fmtDate(c.completedAt) : '') + '</div>'
         + parties + clauses + '</div>';
     }
@@ -1321,7 +1361,7 @@
 
     /* P1-6：管理员邀请入口（R-2 移除内联常驻表单，统一走邀请抽屉；legalRep 只读不动） */
     var inviteBox = view.canManage
-      ? '<div style="margin-top:12px;"><button class="ag-btn ag-btn--primary ag-btn--sm" id="ag-invite-btn">邀请成员</button></div>'
+      ? '<div class="ag-mt-3"><button class="ag-btn ag-btn--primary ag-btn--sm" id="ag-invite-btn">邀请成员</button></div>'
       : '';
 
     el.innerHTML = '<div class="ag-wrap">'
@@ -1330,9 +1370,9 @@
       + inviteBox
       + '<div class="ag-note">法定代表人由执照登记派生，只读无操作按钮；管理员可邀请/审批/移除；成员只见日常，不见资金与成员管理。移除成员不删除企业订单与台账。角色调整留痕由平台后台承担，本期不在成员页改动法定代表人。</div></section>'
       + '<section class="ag-card"><h3>待处理邀请（' + invites.length + '）</h3>'
-      + (inviteRows || emptyState('无待处理邀请', '没有等待接受的邀请记录。')) + '</section>'
+      + (inviteRows || emptyState('无待处理邀请', '没有等待接受的邀请记录。', 'inv')) + '</section>'
       + '<section class="ag-card"><h3>加入申请（' + joins.length + '）</h3>'
-      + (joinRows || emptyState('无加入申请', '没有等待审批的加入申请。')) + '</section>'
+      + (joinRows || emptyState('无加入申请', '没有等待审批的加入申请。', 'inv')) + '</section>'
       + '</div>';
 
     /* openConfirm 居中确认弹窗：移除成员不可逆后果，遮罩不可点关 */

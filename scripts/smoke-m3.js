@@ -285,7 +285,7 @@ console.log('\n===== L. 阶段2 O4 闭环 + 新组件接线 =====');
   ok('P2-3 盾/六边形徽章 emblemHtml(pa/sub)', ui.indexOf('emblemHtml(\'pa\')') >= 0 && ui.indexOf('emblemHtml(\'sub\')') >= 0 && css.indexOf('ag-emblem--shield') >= 0 && css.indexOf('ag-emblem--hex') >= 0);
   const profHtml = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'index.html'), 'utf8');
   const entryHtml = fs.readFileSync(path.join(ROOT, 'pages', 'profile', 'entry.html'), 'utf8');
-  ok('P2-3 profile/entry 落盾/六边形徽章', profHtml.indexOf('clip-path:polygon(50% 0') >= 0 && entryHtml.indexOf('clip-path:polygon(50% 0') >= 0);
+  ok('P2-3 profile/entry 落盾/六边形徽章', profHtml.indexOf('ag-emblem ag-emblem--shield') >= 0 && entryHtml.indexOf('ag-emblem ag-emblem--shield') >= 0 && profHtml.indexOf('clip-path:polygon(50% 0') < 0 && entryHtml.indexOf('clip-path:polygon(50% 0') < 0);
   /* P2-6 二级档案详情视图：资料/比例时间线/协议/本人线台账，仅 admin，T2 不自见 */
   ok('P2-6 二级档案 renderSubProfile + 返回列表', ui.indexOf('renderSubProfile') >= 0 && ui.indexOf('data-sub-back') >= 0 && ui.indexOf('ag-sub-profile__field') >= 0);
   ok('P2-6 详情入口仅 admin(data-sub-profile) 且 T2 无入口', ui.indexOf('data-sub-profile') >= 0 && subHtml.indexOf('data-sub-profile') < 0);
