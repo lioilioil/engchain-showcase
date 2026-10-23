@@ -1885,7 +1885,16 @@ window.DataBus = (function () {
   function _ensureDemoAgentUser(uid, meta) {
     meta = meta || {};
     var existing = byId(uid);
-    if (existing) return existing;
+    if (existing) {
+      /* [R-15 兼任并集] u11 已存在时补 partner 标记（旧注入无 partner，ensureCurrentSynced 会用它覆盖播种） */
+      if (uid === 'u11' && existing.auth) {
+        if (!(existing.auth.partner && existing.auth.partner.ok)) {
+          existing.auth.partner = { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} };
+          _overwriteUser(existing);
+        }
+      }
+      return existing;
+    }
     var u = {
       id: uid, name: meta.name || '演示代理', company: meta.company || '',
       account: meta.account || (uid + '@engchain.demo'), pwd: 'demo8888',
@@ -1895,7 +1904,10 @@ window.DataBus = (function () {
       auth: {
         realname: { ok: true, ts: Date.now(), name: meta.name || '演示代理', idNo: '', mobile: meta.mobile || '', idMask: '' },
         enterprise: { ok: false, expireAt: 0 }, personalQual: { ok: false, list: [] },
-        enterpriseQual: { ok: false, list: [] }, qual: { ok: false, list: [] }, payment: { ok: false, ts: 0 }
+        enterpriseQual: { ok: false, list: [] }, qual: { ok: false, list: [] }, payment: { ok: false, ts: 0 },
+        /* [R-15 兼任并集] u11 省级总代演示账号兼任个人合伙人（union.individualPartner 同步语义；
+           并集独立不合并身份，个人合伙人 8%/2%/¥50 红线参数不动）。u12 二级不兼任。 */
+        partner: uid === 'u11' ? { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} } : { ok: false, status: '', submittedAt: 0 }
       },
       entry: { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0, note: '' },
       balance: { balance: 0, frozen: 0, totalIn: 0 },
@@ -1949,7 +1961,16 @@ window.DataBus = (function () {
     /* ---- 省级代理体系终态（数据走 AgentDemo.seed() 真实播种：两分区/T+7/税列/团队/O4，余额不动） ---- */
     province_agent_active: { label: '省级总代 · 已开通（四川 · active）', group: 'start', base: 'u11',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已开通' },
-      build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
+      build: function () {
+        if (window.AgentDemo) AgentDemo.seed();
+        /* [R-15 兼任并集] seed 后强制写 AuthStore.partner（u11 兼任个人合伙人），
+           防止 databus restore/login 用无 partner 的账号快照覆盖；u12 不兼任。 */
+        if (window.AuthStore) {
+          var _au = AuthStore.read();
+          _au.partner = { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} };
+          AuthStore.write(_au);
+        }
+      } },
     sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12',
       ensure: { name: '陈二级', company: '成都××合作公司', mobile: '139****0012', tag: '二级合作 · 已绑定' },
       build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
@@ -2100,6 +2121,12 @@ window.DataBus = (function () {
         === (!!(snapA && (snapA.qual && snapA.qual.ok || snapA.personalQual && snapA.personalQual.ok || snapA.personalEntry && snapA.personalEntry.ok)));
       var entryMatch = (!!(e && e.active && e.status === 'active')) === (!!(snapE.active && snapE.status === 'active'));
       if (authMatch && entryMatch) return;            /* 一致 → 尊重，不覆盖 */
+      /* [R-15 兼任并集] 对齐前：u11 省级总代演示账号补 partner 兼任标记（users 表旧快照无 partner，
+         防止对齐覆盖掉播种的并集身份；u12 二级不兼任） */
+      if (u && u.id === 'u11' && !(snapA.partner && snapA.partner.ok)) {
+        snapA = JSON.parse(JSON.stringify(snapA || {}));
+        snapA.partner = { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} };
+      }
       /* 不一致 → 按 L1 用户表重对齐 L2 */
       var st2 = statusOf(u);
       AuthStore.write(JSON.parse(JSON.stringify(snapA)));

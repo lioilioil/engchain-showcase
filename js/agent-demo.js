@@ -16,8 +16,11 @@
     var L = (typeof window !== 'undefined' && window.AgentLedger) || (typeof require === 'function' ? require('./agent-ledger.js') : null);
     var E = (typeof window !== 'undefined' && window.AgentEsign) || (typeof require === 'function' ? require('./agent-esign.js') : null);
     var T = (typeof window !== 'undefined' && window.AgentTax) || (typeof require === 'function' ? require('./agent-tax.js') : null);
-    return { S: S, L: L, E: E, T: T };
+    var A = (typeof window !== 'undefined' && window.AuthStore) || null;
+    return { S: S, L: L, E: E, T: T, A: A };
   }
+
+  var AUTH_BACKUP_KEY = 'engchain-agent-auth-backup';
 
   /* 重置：仅清代理体系键，不动 databus 用户种子 / BalanceStore / 既有 esign 合同 */
   function reset(opts) {
@@ -27,6 +30,11 @@
     var st = opts.store || (typeof window !== 'undefined' && window.localStorage);
     if (st) {
       ['engchain-agent-esign'].forEach(function (k) { try { st.removeItem(k); } catch (e) {} });
+      /* 恢复 seed 前的 auth 备份（u11 兼任个人合伙人标记还原，不覆盖 databus u9/u1 等种子） */
+      try {
+        var backup = st.getItem(AUTH_BACKUP_KEY);
+        if (backup) { st.setItem('engchain-auth', backup); st.removeItem(AUTH_BACKUP_KEY); }
+      } catch (e) {}
       /* 仅移除本阶段播种的演示组织，保留 M1/M2 既有 org1/org2/org3 与用户种子 */
       try {
         var orgs = JSON.parse(st.getItem('engchain-orgs') || '[]');
@@ -36,15 +44,30 @@
         }
       } catch (e) {}
     }
-    return { ok: true, cleared: ['province-agents', 'sub-agents', 'agent-ledger', 'agent-behavior', 'behavior-cleanup-log', 'agent-esign', 'org-a11', 'org-a12'] };
+    return { ok: true, cleared: ['province-agents', 'sub-agents', 'agent-ledger', 'agent-behavior', 'behavior-cleanup-log', 'agent-esign', 'org-a11', 'org-a12', AUTH_BACKUP_KEY] };
   }
 
   function seed(opts) {
     opts = opts || {};
-    var d = deps(), S = d.S, L = d.L, E = d.E, T = d.T;
+    var d = deps(), S = d.S, L = d.L, E = d.E, T = d.T, A = d.A;
     if (!S) return { error: 'E_DEPS_MISSING' };
     reset(opts);
     var now = Date.now();
+
+    /* ---- R-15 兼任并集播种：u11 总代叠加个人合伙人身份（备份原 auth，reset 还原） ----
+       仅浏览器环境有 AuthStore/localStorage；node 测试跳过。 */
+    if (A && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        if (!window.localStorage.getItem(AUTH_BACKUP_KEY)) {
+          window.localStorage.setItem(AUTH_BACKUP_KEY, window.localStorage.getItem('engchain-auth') || '');
+        }
+        var auth = A.read ? A.read() : {};
+        auth = JSON.parse(JSON.stringify(auth || {}));
+        auth.realname = auth.realname || { ok: true, name: '林总代' };
+        auth.partner = { ok: true, status: 'approved', approvedAt: now - 30 * DAY, profitConfig: {} };
+        A.write(auth);
+      } catch (e) {}
+    }
 
     /* ---- u11 四川总代（active，n/21） ---- */
     var pa = {
