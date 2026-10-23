@@ -256,8 +256,8 @@ ok('L E2-M-2 gate-bar 跳过 active/suspended 代理(!_gatePa)', /!qualified&&!_
 /* H-4：toast 三态单一实现，apply 委托 AgentUI.toast */
 ok('L H-4 toast 成功/失败/警告三态变体', uiSrcL.includes("'err'") && uiSrcL.includes("'warn'") && agCss.includes('ag-toast--warn') && agCss.includes('ag-toast--err'));
 ok('L H-4 applyToast 委托 AgentUI.toast 单一实现', /window\.AgentUI\s*&&\s*typeof window\.AgentUI\.toast\s*===\s*'function'/.test(applySrcL));
-/* E1-T1-07：approved 比例默认只读徽章，编辑框点按才展开，无常驻输入框 */
-ok('L 比例默认只读徽章(ag-ratio-view)，补改比例展开编辑框', uiSrcL.includes('ag-ratio-view') && uiSrcL.includes('ag-ratio-editbox') && agCss.includes('.ag-ratio-view'));
+/* E1-T1-07：approved 比例默认只读徽章，补改比例收抽屉，无常驻输入框 */
+ok('L 比例默认只读徽章(ag-ratio-view)，补改比例走抽屉入口', uiSrcL.includes('ag-ratio-view') && agCss.includes('.ag-ratio-view') && uiSrcL.includes('ag-ratio-edit'));
 /* E1-T2-01/03/04/06：T2 协议卡条件渲染、operator 隐藏、归属结构化、钱包弱出口 */
 ok('L T2 无协议不渲染空白协议卡(protoCard 条件)', /var protoCard = contract/.test(uiSrcL));
 ok('L T2 时间线隐藏内部 operator(hideOperator)', /timelineHtml\(rec\.statusLog, rec\.ratioLog, \{ hideOperator: true \}\)/.test(uiSrcL));
@@ -282,6 +282,19 @@ ok('M H-5 协议查看走 openDrawer（非内嵌 #ag-proto-detail 填充）', /o
 ok('M H-5 T2 待我签署抽屉底部操作区 去签署/拒签', uiSrcL.includes('data-drawer-sign') && uiSrcL.includes('data-drawer-reject'));
 ok('M H-5 授权证书改抽屉（删除内嵌 #ag-cert-card 折叠卡）', uiSrcL.includes("openDrawer({ title: '授权证书'") && !uiSrcL.includes('#ag-cert-card'));
 ok('M H-5 抽屉基元 CSS(.ag-drawer/.ag-drawer-mask) + 居中确认弹窗', agCss.includes('.ag-drawer-mask') && agCss.includes('.ag-drawer') && agCss.includes('.ag-modal-mask'));
+
+console.log('\n===== N. 抽屉化补齐 + 危险操作确认弹窗（只读源码断言） =====');
+/* 发起二级表单收进抽屉（入口按钮 + openDrawer 表单，不再内嵌 #ag-submit/#f-sub-co） */
+ok('N 发起二级收进抽屉(data-open-subform + openDrawer)', uiSrcL.includes('data-open-subform') && /openDrawer\(\{\s*title: '发起二级合作方'/.test(uiSrcL) && !uiSrcL.includes("id=\"ag-submit\""));
+/* 比例补改收进抽屉，删除常驻内联 ag-ratio-editbox */
+ok('N 比例补改收进抽屉(openDrawer 补改比例)，无常驻内联 editbox', /openDrawer\(\{\s*title: '补改约定比例'/.test(uiSrcL) && !uiSrcL.includes('ag-ratio-editbox'));
+/* 邀请成员收进抽屉 */
+ok('N 邀请成员收进抽屉(openDrawer 邀请成员)', /openDrawer\(\{\s*title: '邀请成员'/.test(uiSrcL));
+/* openConfirm 接线：移除成员 / 确认拒签 */
+ok('N openConfirm 接线移除成员(不可逆后果说明)', /data-remove[\s\S]{0,400}openConfirm\(\{\s*title: '移除成员'/.test(uiSrcL));
+ok('N openConfirm 接线确认拒签(回未签约后果说明)', /确认拒签协议[\s\S]{0,200}openConfirm/.test(uiSrcL) || /openConfirm\(\{\s*title: '确认拒签协议'/.test(uiSrcL));
+/* busy 防连点：发起提交按钮 disabled 守卫 */
+ok('N 发起二级提交 busy 防连点(save.disabled 守卫)', uiSrcL.includes('save.disabled = true') && uiSrcL.includes('save.disabled = false'));
 
 console.log('\n===== I. M1 回归：复跑 smoke-m1 =====');
 try {

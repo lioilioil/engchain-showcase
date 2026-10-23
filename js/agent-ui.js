@@ -537,25 +537,10 @@
       /* 二级合作方（H-01：两行卡片式；H-1 #/subs 视图） */
       + '<section class="ag-card" data-view="subs"><h3>二级合作方（' + subs.length + '）</h3><div id="ag-subs"></div></section>'
 
-      /* 发起二级（H-03：suspended 由 .ag-form-block 隐藏；P1-11 补执照/法人/联系人/意向省；H-1 #/subs） */
-      + '<section class="ag-card ag-form-block" data-view="subs"><h3>发起二级（约定比例选填 0–50%）</h3>'
-      + '<div class="ag-field" id="f-sub-co"><label>二级公司名称<span class="ag-req">*</span></label>'
-      + '<input id="ag-sub-co" class="ag-input" placeholder="二级公司全称"><div class="ag-field-err"></div></div>'
-      + '<div class="ag-field" id="f-sub-uscc"><label>统一社会信用代码</label>'
-      + '<input id="ag-sub-uscc" class="ag-input" placeholder="18 位统一社会信用代码（选填）"></div>'
-      + '<div class="ag-field" id="f-sub-license"><label>营业执照编号</label>'
-      + '<input id="ag-sub-license" class="ag-input" placeholder="营业执照编号（选填）"></div>'
-      + '<div class="ag-field" id="f-sub-legal"><label>法定代表人</label>'
-      + '<input id="ag-sub-legal" class="ag-input" placeholder="法定代表人姓名（选填）"></div>'
-      + '<div class="ag-field" id="f-sub-contact"><label>联系人</label>'
-      + '<input id="ag-sub-contact" class="ag-input" placeholder="联系人姓名（选填）"></div>'
-      + '<div class="ag-field" id="f-sub-prov"><label>意向授权省（同省约束，默认本省）</label>'
-      + '<input id="ag-sub-prov" class="ag-input" value="' + esc(me.province) + '" readonly></div>'
-      + '<div class="ag-field" id="f-sub-ratio"><label>约定比例（0–0.5，可空=全自留）</label>'
-      + '<input id="ag-sub-ratio" class="ag-input" type="number" min="0" max="0.5" step="0.01" placeholder="0–0.5，留空即 0% 全自留">'
-      + '<div class="ag-field-err"></div></div>'
-      + '<div class="ag-actions"><button class="ag-btn ag-btn--primary" id="ag-submit">提交申请 · 等待审核开通</button></div>'
-      + '<div id="ag-form-msg"></div></section>'
+      /* H-1 抽屉化：发起二级收进底部抽屉，#/subs 视图只留发起入口（suspended 由 ag-form-block 门控隐藏） */
+      + '<section class="ag-card ag-form-block" data-view="subs"><h3>发起二级合作方</h3>'
+      + '<p class="ag-meta">填写二级公司资料与约定比例，提交后进入平台审核队列。</p>'
+      + '<button class="ag-btn ag-btn--primary" data-open-subform>发起二级（约定比例选填 0–50%）</button></section>'
 
       /* H-1 #/ledger 视图：二级线台账（P2-1 月份切片，容器由 mountMonthLedger 填充） */
       + '<section class="ag-card" data-view="ledger"><h3>二级线台账（subLedger · 独立小计）</h3>'
@@ -626,12 +611,9 @@
       var adminOps;
       if (canAdmin && !locked) {
         var curPct = fmt((s.ratioToSub || 0) * 100) + '%';
+        /* H-1 抽屉化：比例补改收进底部抽屉，卡片只留只读徽章 + 入口 */
         adminOps = '<span class="ag-ratio-view ag-sig" data-sid="' + escAttr(s.id) + '">约定 ' + curPct + '</span>'
-          + '<button class="ag-btn ag-btn--sm ag-btn--ghost ag-ratio-edit" data-sid="' + escAttr(s.id) + '">补改比例</button>'
-          + '<span class="ag-ratio-editbox" data-sid="' + escAttr(s.id) + '" hidden>'
-          + '<input class="ag-ratio" data-sid="' + escAttr(s.id) + '" type="number" min="0" max="0.5" step="0.01" value="' + (s.ratioToSub || 0) + '">'
-          + '<button class="ag-btn ag-btn--sm ag-btn--primary ag-ratio-save" data-sid="' + escAttr(s.id) + '">保存</button>'
-          + '</span>';
+          + '<button class="ag-btn ag-btn--sm ag-btn--ghost ag-ratio-edit" data-sid="' + escAttr(s.id) + '">补改比例</button>';
       } else {
         adminOps = '<span class="ag-sig">约定 ' + fmt((s.ratioToSub || 0) * 100) + '%</span>';
       }
@@ -646,32 +628,38 @@
         + '</div>';
     }
 
-    /* M3-6 比例补改：仅 admin；0–50% 校验，超界拦截不留存；ratioLog 留痕重算（总盘不变） */
+    /* M3-6 比例补改：仅 admin；0–50% 校验，超界拦截不留存；ratioLog 留痕重算（总盘不变）；H-1 收进抽屉 */
     function bindSubList() {
-      /* 补改比例：默认只读徽章，点「补改比例」才展开内联编辑框（E1-T1-07） */
       box.querySelectorAll('.ag-ratio-edit').forEach(function (b) {
         b.onclick = function () {
           var sid = b.dataset.sid;
-          var view = box.querySelector('.ag-ratio-view[data-sid="' + sid + '"]');
-          var editbox = box.querySelector('.ag-ratio-editbox[data-sid="' + sid + '"]');
-          if (view) view.hidden = true;
-          b.hidden = true;
-          if (editbox) { editbox.hidden = false; var inp = editbox.querySelector('.ag-ratio'); if (inp) { inp.focus(); inp.select(); } }
-        };
-      });
-      box.querySelectorAll('.ag-ratio-save').forEach(function (b) {
-        b.onclick = function () {
-          var sid = b.dataset.sid;
-          var input = box.querySelector('.ag-ratio[data-sid="' + sid + '"]');
-          var rv = Ledger.validateRatio(input.value);
-          if (!rv.ok) { toast(rv.msg || '比例无效', 'warn'); return; }
           var rec = Store.getSub(sid); if (!rec) return;
-          rec.ratioLog = rec.ratioLog || [];
-          rec.ratioLog.push({ ratio: rv.value, at: Date.now(), operator: 'admin', reason: '比例补改' });
-          rec.ratioToSub = rv.value;
-          Store.saveSub(rec);
-          toast('已按新比例 ' + (rv.value * 100) + '% 留痕重算（总盘不变）', true);
-          mountWorkbench(el);
+          openDrawer({
+            title: '补改约定比例',
+            bodyHtml: '<div class="ag-field"><label>约定比例（0–0.5，留空即 0% 全自留）</label>'
+              + '<input class="ag-input ag-ratio-input" type="number" min="0" max="0.5" step="0.01" value="' + (rec.ratioToSub || 0) + '">'
+              + '<div class="ag-field-err"></div></div>'
+              + '<div class="ag-disc">比例仅影响约定所得分配，总盘 50% 与自身 10% 不变；变更写入比例历史留痕。</div>',
+            footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
+              + '<button class="ag-btn ag-btn--primary" data-drawer-save>保存留痕</button>',
+            onOpen: function (d) {
+              d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
+              var save = d.body.parentNode.querySelector('[data-drawer-save]');
+              save.onclick = function () {
+                var input = d.body.querySelector('.ag-ratio-input');
+                var err = d.body.querySelector('.ag-field-err');
+                var rv = Ledger.validateRatio(input.value);
+                if (!rv.ok) { if (err) { err.textContent = rv.msg || '比例无效'; err.style.display = 'block'; } return; }
+                rec.ratioLog = rec.ratioLog || [];
+                rec.ratioLog.push({ ratio: rv.value, at: Date.now(), operator: 'admin', reason: '比例补改' });
+                rec.ratioToSub = rv.value;
+                Store.saveSub(rec);
+                closeDrawer();
+                toast('已按新比例 ' + (rv.value * 100) + '% 留痕重算（总盘不变）', true);
+                mountWorkbench(el);
+              };
+            }
+          });
         };
       });
       box.querySelectorAll('[data-sub-profile]').forEach(function (a) {
@@ -843,58 +831,78 @@
       toast('已导出当前月两分区 CSV', true);
     };
 
-    var btn = el.querySelector('#ag-submit');
-    if (btn) btn.onclick = function () {
-      /* M-02：内联红框错误，保留原校验逻辑 */
-      function field(id, ok, msg) {
-        var f = el.querySelector('#' + id);
-        var wrap = f ? f.closest('.ag-field') : null;
-        if (!wrap) return;
-        wrap.classList.toggle('ag-field--error', !ok);
-        var e = wrap.querySelector('.ag-field-err');
-        if (e) e.textContent = ok ? '' : msg;
-      }
-      var co = el.querySelector('#ag-sub-co').value.trim();
-      var uscc = el.querySelector('#ag-sub-uscc').value.trim();
-      var license = (el.querySelector('#ag-sub-license') || {}).value.trim();
-      var legalRep = (el.querySelector('#ag-sub-legal') || {}).value.trim();
-      var contact = (el.querySelector('#ag-sub-contact') || {}).value.trim();
-      var subProv = ((el.querySelector('#ag-sub-prov') || {}).value || me.province).trim();
-      var rv = Ledger.validateRatio(el.querySelector('#ag-sub-ratio').value === '' ? 0 : Number(el.querySelector('#ag-sub-ratio').value));
-      field('f-sub-co', !!co, '请填写二级公司名称');
-      field('f-sub-ratio', rv.ok, rv.msg);
-      if (!co || !rv.ok) { toast('请检查标红项', false); return; }
-
-      /* D-1：先过规则校验（同省/自指/唯一绑定/名额），通过后落盘 pending 二级记录 */
-      var Rules = g('AgentRules');
-      var quotaCfg = (g('MOCK') && g('MOCK').business && g('MOCK').business.provinceAgentQuota) || {};
-      var v = Rules && Rules.validateSubAgent
-        ? Rules.validateSubAgent({ company: { name: co, uscc: uscc }, uscc: uscc, province: subProv, ratioToSub: rv.value, parent: me, isNaturalPerson: false },
-            { provinceAgents: Store.listProvinces(), subAgents: Store.listSubs(), quotaCfg: quotaCfg })
-        : { ok: true };
-      if (!v.ok) {
-        toast(v.msg || v.code || '发起失败', false);
-        field('f-sub-co', false, v.msg || '发起未通过校验');
-        return;
-      }
-      var rec = {
-        id: 'sb-' + Date.now().toString(36),
-        /* R-1：parentUid 口径与 seed/工作台过滤一致，存上级 uid（me.uid），回退记录 id */
-        parentUid: me.uid || me.id,
-        uid: '',
-        company: { name: co, uscc: uscc, license: license, legalRep: legalRep, contact: contact, phone: '' },
-        province: subProv || me.province,
-        ratioToSub: rv.value,
-        status: 'pending',
-        statusLog: [{ operator: U, at: Date.now(), reason: '发起二级申请', fromStatus: '', toStatus: 'pending' }],
-        rejects: [], ratioLog: [],
-        signature: { status: 'pending' },
-        sealedAt: 0
-      };
-      var saved = Store.saveSub(rec);
-      if (saved && saved.error) { toast(saved.msg || saved.error || '落盘失败', false); return; }
-      toast('已登记发起请求，待后台审核开通', true);
-      mountWorkbench(el);
+    /* H-1 抽屉化：发起二级表单收进底部抽屉，字段校验/落盘在抽屉作用域内完成，busy 防连点 */
+    var openSubformBtn = el.querySelector('[data-open-subform]');
+    if (openSubformBtn) openSubformBtn.onclick = function () {
+      var formBody = '<div class="ag-field" id="f-sub-co"><label>二级公司名称<span class="ag-req">*</span></label>'
+        + '<input class="ag-input" data-f="co" placeholder="二级公司全称"><div class="ag-field-err"></div></div>'
+        + '<div class="ag-field" id="f-sub-uscc"><label>统一社会信用代码</label>'
+        + '<input class="ag-input" data-f="uscc" placeholder="18 位统一社会信用代码（选填）"></div>'
+        + '<div class="ag-field" id="f-sub-license"><label>营业执照编号</label>'
+        + '<input class="ag-input" data-f="license" placeholder="营业执照编号（选填）"></div>'
+        + '<div class="ag-field" id="f-sub-legal"><label>法定代表人</label>'
+        + '<input class="ag-input" data-f="legalRep" placeholder="法定代表人姓名（选填）"></div>'
+        + '<div class="ag-field" id="f-sub-contact"><label>联系人</label>'
+        + '<input class="ag-input" data-f="contact" placeholder="联系人姓名（选填）"></div>'
+        + '<div class="ag-field" id="f-sub-prov"><label>意向授权省（同省约束，默认本省）</label>'
+        + '<input class="ag-input" data-f="prov" value="' + esc(me.province) + '" readonly></div>'
+        + '<div class="ag-field" id="f-sub-ratio"><label>约定比例（0–0.5，可空=全自留）</label>'
+        + '<input class="ag-input" data-f="ratio" type="number" min="0" max="0.5" step="0.01" placeholder="0–0.5，留空即 0% 全自留">'
+        + '<div class="ag-field-err"></div></div>';
+      openDrawer({
+        title: '发起二级合作方',
+        bodyHtml: formBody,
+        footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
+          + '<button class="ag-btn ag-btn--primary" data-drawer-save>提交申请 · 等待审核开通</button>',
+        onOpen: function (d) {
+          d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
+          var save = d.body.parentNode.querySelector('[data-drawer-save]');
+          save.onclick = function () {
+            if (save.disabled) return;
+            function fv(k) { var n = d.body.querySelector('[data-f="' + k + '"]'); return n ? n.value.trim() : ''; }
+            function mark(wrapSel, ok, msg) {
+              var wrap = d.body.querySelector(wrapSel); if (!wrap) return;
+              wrap.classList.toggle('ag-field--error', !ok);
+              var e = wrap.querySelector('.ag-field-err'); if (e) e.textContent = ok ? '' : msg;
+            }
+            var co = fv('co'), uscc = fv('uscc'), license = fv('license'), legalRep = fv('legalRep'), contact = fv('contact');
+            var subProv = fv('prov') || me.province;
+            var rv = Ledger.validateRatio(fv('ratio') === '' ? 0 : Number(fv('ratio')));
+            mark('#f-sub-co', !!co, '请填写二级公司名称');
+            mark('#f-sub-ratio', rv.ok, rv.msg);
+            if (!co || !rv.ok) { toast('请检查标红项', 'err'); return; }
+            /* D-1：先过规则校验（同省/自指/唯一绑定/名额），通过后落盘 pending 二级记录 */
+            var Rules = g('AgentRules');
+            var quotaCfg = (g('MOCK') && g('MOCK').business && g('MOCK').business.provinceAgentQuota) || {};
+            var v = Rules && Rules.validateSubAgent
+              ? Rules.validateSubAgent({ company: { name: co, uscc: uscc }, uscc: uscc, province: subProv, ratioToSub: rv.value, parent: me, isNaturalPerson: false },
+                  { provinceAgents: Store.listProvinces(), subAgents: Store.listSubs(), quotaCfg: quotaCfg })
+              : { ok: true };
+            if (!v.ok) { mark('#f-sub-co', false, v.msg || '发起未通过校验'); toast(v.msg || v.code || '发起失败', 'err'); return; }
+            save.disabled = true; /* busy 防连点 */
+            var rec = {
+              id: 'sb-' + Date.now().toString(36),
+              /* R-1：parentUid 口径与 seed/工作台过滤一致，存上级 uid（me.uid），回退记录 id */
+              parentUid: me.uid || me.id,
+              uid: '',
+              company: { name: co, uscc: uscc, license: license, legalRep: legalRep, contact: contact, phone: '' },
+              province: subProv || me.province,
+              ratioToSub: rv.value,
+              status: 'pending',
+              statusLog: [{ operator: U, at: Date.now(), reason: '发起二级申请', fromStatus: '', toStatus: 'pending' }],
+              rejects: [], ratioLog: [],
+              signature: { status: 'pending' },
+              sealedAt: 0
+            };
+            var saved = Store.saveSub(rec);
+            save.disabled = false;
+            if (saved && saved.error) { toast(saved.msg || saved.error || '落盘失败', 'err'); return; }
+            closeDrawer();
+            toast('已登记发起请求，待后台审核开通', true);
+            mountWorkbench(el);
+          };
+        }
+      });
     };
 
     /* H-1 hash 视图路由：home/subs/agreements/ledger/status；hashchange 历史栈切换，不整页 remount 丢滚动 */
@@ -1158,14 +1166,22 @@
           if (ta) ta.focus();
           return;
         }
-        var r = E.reject(contract.id, 'sub', reason, {
-          onRejected: function (subId, why) {
-            var r2 = Store.getSub(subId);
-            if (r2) { r2.signature = { status: 'rejected', rejectReason: why, completedAt: 0 }; Store.saveSub(r2); }
+        /* openConfirm 居中确认：拒签使协议回到未签约、需重新发起，遮罩不可点关 */
+        openConfirm({
+          title: '确认拒签协议',
+          desc: '拒签后本协议将回到未签约状态，需由总代重新发起；已填原因：' + reason + '。是否确认拒签？',
+          dangerLabel: '确认拒签',
+          onConfirm: function () {
+            var r = E.reject(contract.id, 'sub', reason, {
+              onRejected: function (subId, why) {
+                var r2 = Store.getSub(subId);
+                if (r2) { r2.signature = { status: 'rejected', rejectReason: why, completedAt: 0 }; Store.saveSub(r2); }
+              }
+            });
+            if (r.ok) { toast('已拒签', 'err'); mountSubView(el); }
+            else toast(r.msg || '拒签失败', 'err');
           }
         });
-        if (r.ok) { toast('已拒签', false); mountSubView(el); }
-        else toast(r.msg || '拒签失败', false);
       };
     }
 
@@ -1275,19 +1291,52 @@
       + (joinRows || emptyState('无加入申请', '没有等待审批的加入申请。')) + '</section>'
       + '</div>';
 
-    el.querySelectorAll('[data-remove]').forEach(function (b) { b.onclick = function () { var r = OrgsStore.removeMember(orgId, b.dataset.remove); toast(r.error || '已移除（不删除企业订单/台账）', !r.error); }; });
+    /* openConfirm 居中确认弹窗：移除成员不可逆后果，遮罩不可点关 */
+    el.querySelectorAll('[data-remove]').forEach(function (b) {
+      b.onclick = function () {
+        var nm = nameOf(b.dataset.remove) || b.dataset.remove;
+        openConfirm({
+          title: '移除成员',
+          desc: '将把「' + nm + '」移出本公司团队，不删除其历史订单与台账；此操作需要管理员确认，是否继续？',
+          dangerLabel: '确认移除',
+          onConfirm: function () {
+            var r = OrgsStore.removeMember(orgId, b.dataset.remove);
+            toast(r.error || '已移除（不删除企业订单/台账）', !r.error);
+            if (!r.error) mountTeam(rootEl, orgId);
+          }
+        });
+      };
+    });
     el.querySelectorAll('[data-rejecti]').forEach(function (b) { b.onclick = function () { var r = OrgsStore.rejectInvite(b.dataset.rejecti); toast(r.error || '已拒绝', !r.error); }; });
     el.querySelectorAll('[data-approve]').forEach(function (b) { b.onclick = function () { var r = OrgsStore.approveJoin(b.dataset.approve); toast(r.error || '已通过', !r.error); }; });
     el.querySelectorAll('[data-rejectj]').forEach(function (b) { b.onclick = function () { var r = OrgsStore.rejectJoin(b.dataset.rejectj); toast(r.error || '已拒绝', !r.error); }; });
+    /* H-1 抽屉化：邀请成员收进底部抽屉 */
     var invBtn = el.querySelector('#ag-invite-btn');
     if (invBtn) invBtn.onclick = function () {
-      var target = (el.querySelector('#ag-invite-uid') || {}).value || '';
-      var role = (el.querySelector('#ag-invite-role') || {}).value || 'member';
-      target = target.trim();
-      if (!target) { toast('请填写对方 uid', false); return; }
-      var r = OrgsStore.invite(orgId, target, role);
-      toast(r.error || '邀请已发送，待对方接受', !r.error);
-      if (!r.error) mountTeam(rootEl, orgId);
+      openDrawer({
+        title: '邀请成员',
+        bodyHtml: '<div class="ag-field"><label>对方 uid<span class="ag-req">*</span></label>'
+          + '<input class="ag-input" data-f="uid" placeholder="被邀请人 uid"><div class="ag-field-err"></div></div>'
+          + '<div class="ag-field"><label>角色</label>'
+          + '<select class="ag-input" data-f="role"><option value="member">成员</option><option value="admin">管理员</option></select></div>',
+        footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
+          + '<button class="ag-btn ag-btn--primary" data-drawer-save>发送邀请</button>',
+        onOpen: function (d) {
+          d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
+          d.body.parentNode.querySelector('[data-drawer-save]').onclick = function () {
+            var target = (d.body.querySelector('[data-f="uid"]') || {}).value || '';
+            var role = (d.body.querySelector('[data-f="role"]') || {}).value || 'member';
+            target = target.trim();
+            var err = d.body.querySelector('.ag-field-err');
+            if (!target) { if (err) { err.textContent = '请填写对方 uid'; err.style.display = 'block'; } return; }
+            var r = OrgsStore.invite(orgId, target, role);
+            if (r.error) { toast(r.error, 'err'); return; }
+            closeDrawer();
+            toast('邀请已发送，待对方接受', true);
+            mountTeam(rootEl, orgId);
+          };
+        }
+      });
     };
   }
 

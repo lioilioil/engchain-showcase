@@ -242,7 +242,7 @@ console.log('\n===== L. 阶段2 O4 闭环 + 新组件接线 =====');
   ok('L 二级视角归属总代主体', ui.indexOf('归属总代') >= 0 && ui.indexOf('parentCompanyOf') >= 0);
   ok('L 二级去签署/拒签写回', ui.indexOf('data-sub-sign') >= 0 && ui.indexOf('data-sub-reject') >= 0);
   ok('L 行为记录只读入口', ui.indexOf('listBehavior') >= 0);
-  ok('L 发起二级表单补执照/法人/联系人/意向省', ui.indexOf('ag-sub-license') >= 0 && ui.indexOf('ag-sub-legal') >= 0 && ui.indexOf('ag-sub-contact') >= 0 && ui.indexOf('ag-sub-prov') >= 0);
+  ok('L 发起二级表单补执照/法人/联系人/意向省（抽屉 data-f 字段）', ui.indexOf('data-f="license"') >= 0 && ui.indexOf('data-f="legalRep"') >= 0 && ui.indexOf('data-f="contact"') >= 0 && ui.indexOf('data-f="prov"') >= 0);
   const subHtml = fs.readFileSync(path.join(ROOT, 'pages', 'province-agent', 'sub.html'), 'utf8');
   ok('L sub.html 挂载 agent-esign.js', subHtml.indexOf('agent-esign.js') >= 0);
   const earn = fs.readFileSync(path.join(ROOT, 'pages', 'distribution', 'earnings.html'), 'utf8');
