@@ -535,3 +535,94 @@ ag-empty, .ag-empty { display: flex; flex-direction: column; align-items: center
 .ag-faq-item[open] summary::after { transform: translateY(-50%) rotate(45deg); }
 .ag-faq-body { padding: 0 14px 12px; font-size: var(--fs-sm, 12.5px); color: var(--text-2); line-height: 1.75; border-top: 1px dashed var(--line); padding-top: 10px; }
 .ag-tg-table td a.ag-link, .ag-tg-p a.ag-link { color: var(--primary-dim); font-weight: 600; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   UI2 深度优化层（2026-10-24 · 全页面视觉对齐 demo 暖金 Apple 原生规则）
+   ------------------------------------------------------------------------
+   只做视觉/交互层强化：同选择器后置覆盖既有规则，不触碰费率/税算/门控/数据结构。
+   六维签名：dark · sans-cool · graphic-abstract · grid · tri-role · slow-push
+   ============================================================================ */
+:root {
+  /* —— 圆角角色化：可点物=圆角 12，容器=16，条带/进度=4，标签=胶囊 —— */
+  --ag-r-ctl: 12px;            /* 按钮 / 输入 / 弹窗内控件 */
+  --ag-r-card: 16px;           /* 卡片容器 */
+  --ag-r-track: 4px;           /* 进度条 / 滑块轨 */
+  /* —— 字阶断崖（省代专属，高于全局默认；34/17/13/11 四级） —— */
+  --ag-fs-num-xl: 34px;        /* hero 主数字 */
+  --ag-fs-title: 17px;         /* 区块标题 */
+  --ag-fs-label: 13px;         /* 小节标签（字重 700） */
+  /* —— 动效令牌（slow-push：iOS 弹簧 + 缓推） —— */
+  --ag-ease-out: cubic-bezier(.22, .75, .3, 1);
+  --ag-ease-spring: cubic-bezier(.34, 1.4, .4, 1);
+  --ag-d-rise: .34s; --ag-d-swift: .22s; --ag-d-spring: .46s;
+  --ag-blur: saturate(1.4) blur(22px);
+}
+
+/* —— 卡片入场（stagger 由 JS 注入 animation-delay；reduced-motion 降级见尾部） —— */
+@keyframes ag-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.ag-card { animation: ag-rise var(--ag-d-rise) var(--ag-ease-out) both; }
+.ag-card--deep, .ag-card--sub, .ag-hero { animation-delay: 0ms; }
+
+/* —— 容器圆角收敛：卡片 16 / 可点控件 12 —— */
+.ag-card, .ag-hero, .ag-faq-item, .ag-drawer, .ag-modal, .ag-pager { border-radius: var(--ag-r-card); }
+.ag-btn, .ag-input, .ag-field select, .ag-field textarea, .ag-seg button { border-radius: var(--ag-r-ctl); }
+.ag-btn { transition: transform var(--ag-d-swift) var(--ag-ease-out), background var(--ag-d-swift) var(--ag-ease-out), box-shadow var(--ag-d-swift) var(--ag-ease-out); }
+.ag-btn:not([disabled]):active { transform: scale(.965); }
+
+/* —— hero 主数字断崖提级：36px 数字 + tabular 对齐 —— */
+.ag-hero .ag-big { font-size: var(--ag-fs-num-xl); letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.ag-card h3 { font-size: var(--ag-fs-title); letter-spacing: -.2px; display: flex; align-items: center; gap: 6px; }
+.ag-hero__lb { font-size: var(--ag-fs-label); }
+
+/* —— 身份卡玻璃质感：顶部高光 + 边缘金描边（Apple 原生轻玻璃） —— */
+.ag-card--deep { position: relative; box-shadow: 0 10px 30px rgba(31, 42, 68, .28), inset 0 1px 0 rgba(255, 255, 255, .09); }
+.ag-card--deep::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(231, 199, 126, .55), transparent); }
+[data-theme="dark"] .ag-card--deep { box-shadow: 0 12px 34px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .07); }
+
+/* —— 抽屉：iOS 底部弹层（mask 模糊 + 指示条 + spring 入场） —— */
+.ag-drawer-mask { backdrop-filter: var(--ag-blur); -webkit-backdrop-filter: var(--ag-blur); }
+.ag-drawer { border-radius: 20px 20px 0 0; transform: translateY(100%); animation: ag-drawer-in var(--ag-d-spring) var(--ag-ease-spring) forwards; box-shadow: 0 -12px 40px rgba(0, 0, 0, .22); }
+@keyframes ag-drawer-in { from { transform: translateY(100%); } to { transform: none; } }
+.ag-drawer__grab { width: 36px; height: 5px; border-radius: 3px; background: var(--text-3); margin: 8px auto 2px; opacity: .55; }
+.ag-drawer__head { padding: 10px 16px 12px; border-bottom: 1px solid var(--line-hairline, rgba(0,0,0,.04)); }
+.ag-drawer__title { font-size: var(--ag-fs-title); font-weight: 800; letter-spacing: -.2px; }
+
+/* —— 弹窗：scale 入场 + mask 模糊 —— */
+.ag-modal-mask { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.ag-modal { animation: ag-modal-in var(--ag-d-spring) var(--ag-ease-spring) forwards; }
+@keyframes ag-modal-in { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+
+/* —— toast：图标位 + 滑入（ok 用金勾 / err 用红） —— */
+.ag-toast { border-radius: var(--ag-r-ctl); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; gap: 7px; animation: ag-toast-in var(--ag-d-swift) var(--ag-ease-out) both; }
+@keyframes ag-toast-in { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.ag-toast--ok::before, .ag-toast--err::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px rgba(43, 107, 79, .6); }
+.ag-toast--err::before { background: var(--error); box-shadow: 0 0 8px rgba(179, 38, 30, .6); }
+
+/* —— seg 分段控件：胶囊滑块（is-on 金填充 + 轻投影） —— */
+.ag-seg { position: relative; box-shadow: 0 1px 2px rgba(22, 22, 22, .05) inset; }
+.ag-seg button { position: relative; z-index: 1; transition: color var(--ag-d-swift) var(--ag-ease-out); }
+.ag-seg button.is-on { background: var(--action, var(--primary)); color: var(--ag-on-primary-dark, #17130F); box-shadow: 0 2px 8px rgba(176, 138, 60, .35); font-weight: 800; }
+[data-theme="dark"] .ag-seg button.is-on { color: #17130F; }
+
+/* —— 分页器（行为记录等）：pill 页码 + 当前页金强调 —— */
+.ag-pager { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; }
+.ag-pager button { min-width: 36px; height: 36px; border-radius: var(--ag-r-ctl); border: 1px solid var(--line); background: var(--bg-card); color: var(--text-2); font-size: var(--fs-sm, 13px); font-family: var(--font-num); cursor: pointer; transition: all var(--ag-d-swift) var(--ag-ease-out); }
+.ag-pager button.on { background: var(--action, var(--primary)); border-color: transparent; color: #fff; font-weight: 800; box-shadow: 0 3px 10px rgba(176, 138, 60, .32); }
+[data-theme="dark"] .ag-pager button.on { color: #17130F; }
+
+/* —— 数据行 hover 提亮 + 焦点键盘可见 —— */
+.ag-rank li, .ag-tg-table tr, .ag-net-sub, .ag-faq-item { transition: background var(--ag-d-swift) var(--ag-ease-out), border-color var(--ag-d-swift) var(--ag-ease-out); }
+.ag-faq-item summary:focus-visible, .ag-btn:focus-visible, .ag-pager button:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+.ag-faq-item[open] { border-color: var(--accent-line); background: var(--bg-card); }
+
+/* —— FAQ 展开体过渡（配合 details 原生，页面 JS 已接管切换） —— */
+.ag-faq-item summary { min-height: 46px; }
+
+/* —— reduced-motion：入场/抽屉/toast 全部降为瞬时（对齐既有降级层） —— */
+@media (prefers-reduced-motion: reduce) {
+  .ag-card { animation: none; }
+  .ag-drawer { animation: none; transform: none; }
+  .ag-modal { animation: none; }
+  .ag-toast { animation: none; }
+  .ag-btn:not([disabled]):active { transform: none; }
+}

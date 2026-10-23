@@ -15,6 +15,50 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function $(sel) { return root.document ? root.document.querySelector(sel) : null; }
 
+  /* UI2：工作台入口网格 Phosphor 图标（regular 单一字重，fill=currentColor，viewBox 0 0 256 256） */
+  var ICONS = {
+    chart: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,200h-8V40a8,8,0,0,0-8-8H152a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H48a8,8,0,0,0-8,8v64H32a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16ZM160,48h40V200H160ZM104,96h40V200H104ZM56,144H88v56H56Z"/></svg>',
+    net: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M232,112H136V88h8a16,16,0,0,0,16-16V40a16,16,0,0,0-16-16H112A16,16,0,0,0,96,40V72a16,16,0,0,0,16,16h8v24H24a8,8,0,0,0,0,16H56v32H48a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16H80a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16H72V128H184v32h-8a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16h-8V128h32a8,8,0,0,0,0-16ZM112,40h32V72H112ZM80,208H48V176H80Zm128,0H176V176h32Z"/></svg>',
+    users: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.94-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z"/></svg>',
+    book: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208,24H72A32,32,0,0,0,40,56V224a8,8,0,0,0,8,8H192a8,8,0,0,0,0-16H56a16,16,0,0,1,16-16H208a8,8,0,0,0,8-8V32A8,8,0,0,0,208,24Zm-8,160H72a31.82,31.82,0,0,0-16,4.29V56A16,16,0,0,1,72,40H200Z"/></svg>',
+    receipt: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M72,104a8,8,0,0,1,8-8h96a8,8,0,0,1,0,16H80A8,8,0,0,1,72,104Zm8,40h96a8,8,0,0,0,0-16H80a8,8,0,0,0,0,16ZM232,56V208a8,8,0,0,1-11.58,7.15L192,200.94l-28.42,14.21a8,8,0,0,1-7.16,0L128,200.94,99.58,215.15a8,8,0,0,1-7.16,0L64,200.94,35.58,215.15A8,8,0,0,1,24,208V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56Zm-16,0H40V195.06l20.42-10.22a8,8,0,0,1,7.16,0L96,199.06l28.42-14.22a8,8,0,0,1,7.16,0L160,199.06l28.42-14.22a8,8,0,0,1,7.16,0L216,195.06Z"/></svg>',
+    flag: '<svg class="ic" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M42.76,50A8,8,0,0,0,40,56V224a8,8,0,0,0,16,0V179.77c26.79-21.16,49.87-9.75,76.45,3.41,16.4,8.11,34.06,16.85,53,16.85,13.93,0,28.54-4.75,43.82-18a8,8,0,0,0,2.76-6V56A8,8,0,0,0,218.76,50c-28,24.23-51.72,12.49-79.21-1.12C111.07,34.76,78.78,18.79,42.76,50ZM216,172.25c-26.79,21.16-49.87,9.74-76.45-3.41-25-12.35-52.81-26.13-83.55-8.4V59.79c26.79-21.16,49.87-9.75,76.45,3.4,25,12.35,52.82,26.13,83.55,8.4Z"/></svg>'
+  };
+
+  /* UI2：slow-push 公共动效 —— 卡片 stagger 入场 + hero 数字 count-up（reduced-motion 降级） */
+  function prefersReduced() {
+    try { return root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+  function agRise(scope) {
+    if (!root.document || prefersReduced()) return;
+    var cards = (scope || root.document).querySelectorAll('.ag-card');
+    cards.forEach(function (el, i) {
+      if (i <= 5) el.style.animationDelay = (i * 55) + 'ms';
+    });
+  }
+  function agCountUp(scope) {
+    if (!root.document || prefersReduced()) return;
+    var els = (scope || root.document).querySelectorAll('.ag-big');
+    els.forEach(function (el) {
+      if (el.dataset.agCounted) return;
+      el.dataset.agCounted = '1';
+      var txt = el.textContent, m = txt.match(/([\d,]+(?:\.\d+)?)/);
+      if (!m) return;
+      var target = parseFloat(m[1].replace(/,/g, ''));
+      var dec = (m[1].split('.')[1] || '').length;
+      var dur = 560, t0 = null;
+      function fmtv(v) { return v.toLocaleString('zh-CN', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+        el.textContent = txt.replace(m[1], fmtv(target * e));
+        if (p < 1) root.requestAnimationFrame(step);
+      }
+      root.requestAnimationFrame(step);
+    });
+  }
+  function agAnimate(scope) { agRise(scope); agCountUp(scope); }
+
   /* ---------- 状态词典（H-04：中文 + 语义色，禁止渲染英文枚举） ---------- */
   var STATUS_LABEL = {
     active: ['已生效', 'ag-st-active'],
@@ -68,6 +112,10 @@
     }
     t.className = 'ag-toast ag-toast--show' + variant;
     t.textContent = msg || '';
+    /* UI2：复用元素重启入场动画（慢推滑入） */
+    t.style.animation = 'none';
+    void t.offsetWidth;
+    t.style.animation = '';
     clearTimeout(t._timer);
     t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2400);
   }
@@ -650,13 +698,14 @@
       /* H-1 #/status 视图：行为记录只读（AgentStore.listBehavior，名下二级相关） */
       + '<section class="ag-card" data-view="status"><h3>行为记录（只读）</h3><div id="ag-behavior"></div></section>'
 
-      /* 入口行：数据中心/授权网络/团队/运营规则/规则税务（home 次级入口，内容不改仅补链；T3 授权网络、T4 数据中心、T5 运营规则） */
-      + '<section class="ag-card" data-view="home"><div class="ag-entry-row">'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="data-center.html">数据中心</a>'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="network.html">授权网络</a>'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(me.orgId || '') + '">团队管理</a>'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="rules.html">运营规则</a>'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
+      /* 入口网格：数据中心/授权网络/团队/运营规则/规则税务/招商中心（home 次级入口，2×3 图标卡片；T3-T6 补链） */
+      + '<section class="ag-card" data-view="home"><div class="ag-entry-grid">'
+      + '<a class="ag-entry" href="data-center.html"><span class="ag-entry__ic">' + ICONS.chart + '</span><b>数据中心</b><i>月度趋势 · 对账单</i></a>'
+      + '<a class="ag-entry" href="network.html"><span class="ag-entry__ic">' + ICONS.net + '</span><b>授权网络</b><i>名额 · 授权链</i></a>'
+      + '<a class="ag-entry" href="team.html?org=' + esc(me.orgId || '') + '"><span class="ag-entry__ic">' + ICONS.users + '</span><b>团队管理</b><i>成员与角色</i></a>'
+      + '<a class="ag-entry" href="rules.html"><span class="ag-entry__ic">' + ICONS.book + '</span><b>运营规则</b><i>资格 · 终止 · FAQ</i></a>'
+      + '<a class="ag-entry" href="tax-guide.html"><span class="ag-entry__ic">' + ICONS.receipt + '</span><b>规则与税务</b><i>台账 · 法定预扣</i></a>'
+      + '<a class="ag-entry" href="recruit.html"><span class="ag-entry__ic">' + ICONS.flag + '</span><b>招商中心</b><i>招商码 · 海报</i></a>'
       + '</div></section>'
 
       /* H-1 #/ledger 视图：打印/CSV 次级描边；H-03 suspended 置灰 */
@@ -669,6 +718,9 @@
 
     /* S2-5：台账横滑遮罩提示绑定 */
     bindLedgerScrollHints(el);
+
+    /* UI2：slow-push 入场（卡片 stagger + hero 数字 count-up） */
+    agAnimate(el);
 
     /* P2-2 本地公告关闭（写 localStorage 记忆，刷新不再出现） */
     el.querySelectorAll('[data-notice-close]').forEach(function (btn) {
@@ -1253,6 +1305,9 @@
     /* S2-5：台账横滑遮罩提示绑定 */
     bindLedgerScrollHints(el);
 
+    /* UI2：slow-push 入场（二级视角卡片 stagger + 数字 count-up） */
+    agAnimate(el);
+
     /* P1-1 二级看板本月/累计切换 */
     function rebindSubSeg() {
       var b = el.querySelector('#ag-sub-board'); if (!b) return;
@@ -1576,8 +1631,17 @@
     quotaCap: quotaCap,
     toast: toast,
     badge: badge,
-    nameOf: nameOf
+    nameOf: nameOf,
+    /* UI2：暴露动效入口供静态页（数据中心/网络/规则/税务/招商/申请）调用 */
+    animate: agAnimate
   };
+
+  /* UI2：静态页兜底 —— 首轮渲染完成后统一注入卡片入场 + 数字滚动 */
+  if (root.document && root.document.readyState !== 'loading') {
+    root.requestAnimationFrame(function () { agAnimate(root.document); });
+  } else if (root.document) {
+    root.document.addEventListener('DOMContentLoaded', function () { agAnimate(root.document); });
+  }
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AgentUI = api;
