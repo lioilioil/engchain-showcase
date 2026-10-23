@@ -28,7 +28,9 @@ python serve_nocache.py 8766
 | u1 / 13800000001 | 建筑企业（base，已入驻） | 主演示账号，有订单/钱包/旧返佣数据（base 12%/3% 保留） |
 | u2 / 13800000002 | 中介服务商（limited） | 演示中介撮合流程（limited 6% 保留） |
 | u3 / 13800000003 | 建筑企业（待入驻） | 演示入驻审核流程 |
+| u4 / 13900005678 | 认证个人人才（pro） | 个人专业认证（realname+personal-entry 已点亮） |
 | u5 / 13800000005 | 需求方 | 演示需求匹配 |
+| u6 / 13400005678 | 注册会员 | 已注册未认证（演示注册态） |
 | u8 / 13300008901 | 实名普通用户（M4-4 已回退） | 旧企业合伙人已定点清零，无旧返佣资格 |
 | u9 / 13200009012 | 个人合伙人（孙小美） | 8%/2%、最低提现 ¥50、T+1；返佣中心/提现正常 |
 | u10 / 13000000000 | 平台内部运营 | 全量审核/治理视角 |
@@ -36,6 +38,24 @@ python serve_nocache.py 8766
 | u12（代理演示场景，非独立登录） | 成都二级（approved，约定20%） | 本人约定所得、冻结退款、冲减、法定税、已签、自身余额、团队；由 agent-demo 播种/重置 |
 
 > 代理演示场景（u11/u12）通过页面「演示场景播种/重置」写入 `engchain-province-agents`/`engchain-sub-agents` 等代理键，硬刷新可还原；不覆盖 u9/u10 等既有种子。
+
+### 省级总代体系 · 完整旅程导览（9 节点）
+
+> 在 `preview.html` 左侧「完整旅程导览 · 省级总代体系」分组同步呈现；演示切换器按播种键选择场景后沿路径走查。
+
+| # | 旅程节点 | 目标路径 | 播种键（演示切换器） | 预期落点 |
+|---|---|---|---|---|
+| 1 | 游客 → 注册 | `index.html`（App 首页游客态） | `guest` | 游客未登录态 → 注册 → 登录态+账号建立（u6） |
+| 2 | 注册 → 个人实名认证 | `pages/profile/auth-personal.html` | `registered` | realname 轨道点亮 |
+| 3 | 实名 → 企业工商认证 | `pages/profile/auth-enterprise.html` | `realname` | enterprise 轨道点亮 |
+| 4 | 企业认证 → 入驻申请（省代 ¥0） | `pages/profile/entry-form.html?type=provinceAgent` | `enterprise` | 入驻资料·省代提交 → rev_province_pending 待初审 |
+| 5 | 后台审核开通 | `pages/province-agent/index.html` | `rev_province_pending` → 后台省代开通/审核通过 | province_agent_active（身份卡已生效） |
+| 6 | 总代工作台（身份/省/名额/看板） | `pages/province-agent/index.html` | `province_agent_active`（u11 四川总代） | 授权省四川省/名额 n·cap/约定所得 hero/二级列表 |
+| 7 | 发起二级合作（待平台审核） | `pages/province-agent/index.html` | `rev_sub_pending`（u11 发起） | 二级卡片待审核/协议未签约 |
+| 8 | 二级签署（总代→二级→签回） | `pages/province-agent/sub.html` | `sub_agent_active`（u12 陈二级） | 约定 20%·已签·本人约定所得/自身余额 |
+| 9 | 台账 / 税务 / 打印（商用闭环） | `pages/province-agent/tax-guide.html` | `province_agent_active` | 两分区台账（T+7 冻结/结算/冲减/税列）→ 税说明法定预扣 → 打印 A4 |
+
+> 红线说明：个人合伙人返佣/提现、base/limited、franchise ¥29,800、自身钱包等红线页仅作对照演示，不在本旅程主路径内操作。
 
 后台管理员：右上角用户菜单 → 切换身份 → 选对应角色
 

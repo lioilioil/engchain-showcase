@@ -265,9 +265,9 @@
       + '<div class="ag-certi__prov">授权省：' + esc(me.province || '—') + '</div>'
       + '<div class="ag-certi__field">被授权主体：' + esc((me.branchCompany && me.branchCompany.name) || '—') + '</div>'
       + '<div class="ag-certi__field">证书编号：<span class="ag-certi__no">' + esc(no) + '</span></div>'
-      + '<div class="ag-certi__field">有效期：以平台核发通知为准（演示静态展示）</div>'
+      + '<div class="ag-certi__field">有效期：以平台核发通知为准</div>'
       + '<div class="ag-mt-2">' + badge(me.status) + '</div>'
-      + '<div class="ag-disc">证书为演示静态展示，正式编号与签发以平台核发为准。</div></div>';
+      + '<div class="ag-disc">本平台演示环境证书，正式编号与签发以平台核发为准。</div></div>';
   }
 
   /* ---------- P2-3 正式徽章：总代盾 / 二级六边形（明度+形状双编码；不改既有五档用户徽章） ---------- */
@@ -832,7 +832,7 @@
         return '<div class="ag-clause"><div class="ag-clause__no">第' + cl.no + '条 · ' + esc(cl.title) + '</div>'
           + '<div class="ag-clause__body">' + esc(cl.body) + '</div></div>';
       }).join('');
-      var ev = c.evidence ? '<div class="ag-disc">存证模拟（非真实 CA）：' + esc(c.evidence.certNo || '') + ' · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
+      var ev = c.evidence ? '<div class="ag-disc">本平台演示环境存证（编号 ' + esc(c.evidence.certNo || '') + '），正式存证以第三方电子签服务为准 · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
       return '<div class="ag-card ag-mt-3">'
         + '<div class="ag-sub-card__name">《二级合作协议（O4）》' + esc(c.code || '') + '</div>'
         + '<div class="ag-meta ag-mt-1">版本 ' + esc(c.version || '') + ' · 状态 ' + protoTxtOwner(c.status)

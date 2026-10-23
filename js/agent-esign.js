@@ -10,7 +10,8 @@
 (function (root) {
   'use strict';
   var KEY = 'engchain-agent-esign';
-  var VERSION = 't-subagent@1.0.0';
+  /* S4-2 商用化：对外展示版本号 v1.0.0（不含内部模板模块名 t-subagent）；templateId 保留内部键 */
+  var VERSION = 'v1.0.0';
 
   /* O4《二级合作协议》八条条款（demo 文本，生产由律师定稿；仅书面展示） */
   var CLAUSES = [
@@ -97,7 +98,7 @@
     if (!pending.length) {
       c.status = 'completed';
       c.completedAt = Date.now();
-      c.evidence = { provider: 'e签宝(模拟)', certNo: certNo(), hash: hash(), timestamp: c.completedAt, note: 'demo 模拟存证，非真实 CA' };
+      c.evidence = { provider: 'e签宝(模拟)', certNo: certNo(), hash: hash(), timestamp: c.completedAt, note: '本平台演示环境存证，正式存证以第三方电子签服务为准' };
       writeAll(opts, data);
       var signature = {
         code: c.code, version: c.version, sentAt: c.sentAt, completedAt: c.completedAt,

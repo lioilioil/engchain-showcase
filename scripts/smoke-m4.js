@@ -201,7 +201,8 @@ console.log('\n===== M3-2/M3-3 台账复算（50%总盘/20%约定/充值排除/�
 /* ============ R-12 O4 独立键，既有 esign 键不动 ============ */
 console.log('\n===== R-12 O4 独立签署键，既有 esign 不变 =====');
 const esignSrc = read('js/agent-esign.js');
-ok('R-12 t-subagent 版本独立', esignSrc.indexOf("t-subagent@1.0.0") >= 0);
+ok('R-12 商用展示版本 v1.0.0 独立', esignSrc.indexOf("'v1.0.0'") >= 0);
+ok('R-12 内部模板键 t-subagent 保留（不外显）', esignSrc.indexOf("templateId: 't-subagent'") >= 0);
 ok('R-12 独立键 engchain-agent-esign', /engchain-agent-esign/.test(esignSrc));
 ok('R-12 不占用既有 engchain-esign', esignSrc.indexOf("'engchain-esign'") < 0);
 
