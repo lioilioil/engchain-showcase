@@ -137,11 +137,69 @@ var resetRes = demo.reset({ store: shim });
 ok(resetRes.ok === true, 'reset 执行成功');
 ok(!mem.data['engchain-agent-invites'] && !mem.data['engchain-agent-invite-logs'], 'reset 同步清理招商键');
 
+section('F. T2 二级自助申请（双轨路径②：招商码→申请→初审→终审→自动发起）');
+/* 复用 D 区环境：Rreal(Sreal) 已 init；reset 已清数据，重新播种总代 + 生成招商码 */
+Sreal.saveProvince({ id: 'pa-u11', uid: 'u11', province: '四川省', provinceCode: '510000', branchCompany: { name: '四川××省级代理有限公司', uscc: '91510000DEMO11X', legalRep: '林总代', contact: '林总代', phone: '139****0011' }, status: 'active', appointedAt: Date.now() - 30 * 864e5, appointedBy: 'admin', source: 'seed', rejects: [], statusLog: [], provinceHistory: [], sealedAt: 0, orgId: 'org-a11', legalRep: '林总代', admins: ['u11'], fee: 0, union: { individualPartner: true } });
+var t2code = Rreal.createCode('u11');
+ok(t2code.ok && t2code.code, '重新生成招商码供 T2 测试 ' + t2code.code);
+var t2subs = [];
+var t2store = {
+  listProvinces: function () { return Sreal.listProvinces(); },
+  listSubs: function () { return t2subs.slice(); },
+  getSub: function (id) { for (var i = 0; i < t2subs.length; i++) if (t2subs[i].id === id) return t2subs[i]; return null; },
+  saveSub: function (r) { var i = -1; for (var k = 0; k < t2subs.length; k++) if (t2subs[k].id === r.id) { i = k; break; } if (i > -1) t2subs[i] = r; else t2subs.push(r); return { ok: true }; },
+  saveProvince: function () { return { ok: true }; },
+  reset: function () { return { ok: true }; }
+};
+var AP = require(path.join(ROOT, 'js/agent-apply.js'));
+var pBase = { inviteCode: t2code.code, companyName: '蜀都建设工程有限公司', uscc: '91510100MA2T2TEST01', license: 'L-2026-0001', legalRep: '张建国', contact: '李维', phone: '13800000001', uid: 'u30' };
+
+var f1 = AP.submitSubApplication(pBase, { store: t2store });
+ok(f1.ok && f1.record.status === 'pending' && f1.record.appliedBy === 'self'
+  && f1.record.inviteCode === t2code.code && f1.record.ratioToSub === 0
+  && f1.record.firstReview === null && f1.record.province === '四川省',
+  'F-1 正路径：落盘 pending + appliedBy=self + 招商码 + 比例0 + firstReview null');
+ok(f1.record.id && t2subs.some(function (s) { return s.id === f1.record.id; }), 'F-1 记录进入子代理存储');
+ok(Rreal.getByCode(t2code.code).usedBy.length === 1 && Rreal.getByCode(t2code.code).usedBy[0] === f1.record.id, 'F-1 markUsed 绑定申请记录');
+
+var f2 = AP.submitSubApplication(Object.assign({}, pBase, { inviteCode: 'AGINVALID', uscc: '91510100MA2T2TEST02' }), { store: t2store });
+ok(f2.error === 'E_INVITE_INVALID', 'F-2 无效招商码拦截 E_INVITE_INVALID');
+
+var f3 = AP.submitSubApplication(Object.assign({}, pBase, { companyName: '', uscc: '91510100MA2T2TEST03' }), { store: t2store });
+ok(f3.error === 'E_COMPANY_EMPTY', 'F-3 公司名必填拦截 E_COMPANY_EMPTY');
+var f3b = AP.submitSubApplication(Object.assign({}, pBase, { license: '', uscc: '91510100MA2T2TEST03' }), { store: t2store });
+ok(f3b.error === 'E_LICENSE_REQUIRED', 'F-3 执照必填拦截 E_LICENSE_REQUIRED');
+
+var f4 = AP.submitSubApplication(Object.assign({}, pBase, { uid: '', uscc: '91510100MA2T2TEST04' }), { store: t2store });
+ok(f4.error === 'E_UID_REQUIRED', 'F-4 未登录拦截 E_UID_REQUIRED');
+
+var f5 = AP.submitSubApplication(Object.assign({}, pBase, { uscc: '91510100MA2T2TEST01', uid: 'u32' }), { store: t2store });
+ok(f5.error === 'E_USCC_DUPLICATE', 'F-5 uscc 唯一绑定拦截 E_USCC_DUPLICATE（在审占用）');
+
+for (var m = 0; m < 9; m++) { t2subs.push({ id: 'sb-q' + m, parentUid: 'u11', uid: 'uq' + m, company: { name: '占位' + m, uscc: '91510100MA2T2Q00' + m }, status: 'pending', province: '四川省' }); }
+var f6 = AP.submitSubApplication(Object.assign({}, pBase, { uscc: '91510100MA2T2TEST99', uid: 'u33' }), { store: t2store });
+ok(f6.error === 'E_QUOTA_EXCEEDED', 'F-6 名额已满拦截 E_QUOTA_EXCEEDED');
+t2subs.length = 0;
+
+var rej = AP.submitSubApplication(Object.assign({}, pBase, { uscc: '91510100MA2T2TEST01', uid: 'u30' }), { store: t2store });
+t2subs[0].status = 'rejected';
+t2subs[0].rejects = [{ at: Date.now(), operator: 'u11', reason: '初审驳回测试' }];
+t2store.saveSub(t2subs[0]);
+var f7 = AP.submitSubApplication(Object.assign({}, pBase, { uscc: '91510100MA2T2TEST01', uid: 'u30', companyName: '蜀都建设重提' }), { store: t2store });
+ok(f7.ok && f7.reused === true && f7.record.status === 'pending' && f7.record.company.name === '蜀都建设重提', 'F-7 驳回态复用回退 pending（一公司一记录）');
+ok(f7.record.rejects.length === 1, 'F-7 rejects 历史保留');
+
+t2subs.push({ id: 'sb-other', parentUid: 'u11', uid: 'u99', company: { name: '他人公司', uscc: '91510100MA2T2OTHER1' }, status: 'approved', province: '四川省' });
+var mine = AP.listSubApplications('u30', { store: t2store });
+ok(mine.length === 1 && mine[0].uid === 'u30' && mine[0].appliedBy === 'self', 'F-8 listSubApplications 只返回本人 self 申请（双轨并存不混入）');
+ok(!t2subs[t2subs.length - 1].appliedBy, 'F-9 现状路径记录无 appliedBy 标记（平台直审语义保留）');
+ok(!mem.data['engchain-referral-links'], 'F-10 二级申请不写 Referral 键（隔离铁律）');
+
 section('E. 回归 smoke-m1');
 var cp = require('child_process');
 var out = cp.execSync('node "' + path.join(ROOT, 'scripts/smoke-m1.js') + '"', { encoding: 'utf8' });
 ok(/FAIL=0/.test(out), 'smoke-m1 复跑 FAIL=0');
 
 console.log('\n========================================');
-console.log('M5(T1) 结果：PASS=' + PASS + '  FAIL=' + FAIL);
+console.log('M5(T1+T2) 结果：PASS=' + PASS + '  FAIL=' + FAIL);
 process.exit(FAIL ? 1 : 0);

@@ -14,7 +14,8 @@
     var R = (typeof window !== 'undefined' && window.AgentRules) || (typeof require === 'function' ? require('./agent-rules.js') : null);
     var S = (typeof window !== 'undefined' && window.AgentStore) || (typeof require === 'function' ? require('./agent-store.js') : null);
     var B = (typeof window !== 'undefined' && window.AgentBridge) || (typeof require === 'function' ? require('./agent-bridge.js') : null);
-    return { R: R, S: S, B: B };
+    var RF = (typeof window !== 'undefined' && window.AgentReferral) || (typeof require === 'function' ? require('./agent-referral.js') : null);
+    return { R: R, S: S, B: B, RF: RF };
   }
 
   function currentUid() {
@@ -137,6 +138,115 @@
     var d = deps(), B = d.B;
     if (!B) return { ok: false, error: 'E_DEPS_MISSING', msg: 'AgentBridge 未加载' };
     return B.applySeed(seedText, opts || {});
+  }
+
+  /* ========================================================================
+     T2 二级自助申请（双轨路径②：招商码 → 企业自助申请 → 总代初审 → 平台终审）
+     ------------------------------------------------------------------------
+     语义（执行计划 §0.5/§0.9-4）：招商绑定不写 Referral 键，仅经招商码关联
+     上级总代；落盘复用 sub-agents pending（appliedBy='self' + inviteCode 标记）；
+     比例由总代初审时确定（申请时不填）；驳回复用 rejects 数组。
+     ======================================================================== */
+  function submitSubApplication(payload, opts) {
+    opts = opts || {};
+    var d = deps(), R = d.R, S = opts.store || d.S, RF = d.RF;
+    if (!R || !S || !RF) return { error: 'E_DEPS_MISSING', msg: 'AgentRules/AgentStore/AgentReferral 未加载' };
+    payload = payload || {};
+
+    /* ① 招商码有效性：必须存在且 active（作废码不可申请） */
+    var code = String(payload.inviteCode || '').trim().toUpperCase();
+    var invite = RF.getByCode ? RF.getByCode(code) : null;
+    if (!invite || invite.status !== 'active') return { error: 'E_INVITE_INVALID', msg: '招商码无效或已作废，请联系总代重新获取' };
+
+    /* ② 上级总代在册（按招商码 uid 取，active/suspended 均可被申请） */
+    var parents = S.listProvinces() || [];
+    var parent = null;
+    for (var i = 0; i < parents.length; i++) if (parents[i].uid === invite.uid) { parent = parents[i]; break; }
+    if (!parent || (parent.status !== 'active' && parent.status !== 'suspended')) {
+      return { error: 'E_PARENT_NOT_ACTIVE', msg: '招商总代不在册或已终止，暂不可申请' };
+    }
+
+    /* ③ 必填主体信息（企业主体，自然人禁入在 validateSubAgent 内） */
+    if (!String(payload.companyName || '').trim()) return { error: 'E_COMPANY_EMPTY', msg: '请填写公司名称' };
+    if (!String(payload.uscc || '').trim()) return { error: 'E_USCC_EMPTY', msg: '请填写统一社会信用代码' };
+    if (!String(payload.license || '').trim()) return { error: 'E_LICENSE_REQUIRED', msg: '请填写营业执照编号' };
+    if (!String(payload.legalRep || '').trim()) return { error: 'E_LEGALREP_EMPTY', msg: '请填写法定代表人' };
+    if (!String(payload.contact || '').trim()) return { error: 'E_CONTACT_EMPTY', msg: '请填写联系人' };
+
+    var uid = payload.uid || currentUid();
+    if (!uid) return { error: 'E_UID_REQUIRED', msg: '请先登录后提交申请' };
+    var uscc = R.normalizeUscc(payload.uscc);
+
+    /* ④ 复用校验纯函数（零改）：自然人/上级在册/自指/双角色/同省/uscc 唯一/名额 */
+    var quotaCfg = opts.quotaCfg || {};
+    var ctx = { provinceAgents: S.listProvinces(), subAgents: S.listSubs(), quotaCfg: quotaCfg };
+    var v = R.validateSubAgent({
+      parent: parent, uid: uid, uscc: uscc, province: parent.province,
+      ratioToSub: 0, isNaturalPerson: false
+    }, ctx);
+    if (!v.ok) return { error: v.code, msg: v.msg };
+
+    /* ⑤ 一公司一记录：同 uscc 已绑定（approved/pending/suspended）拦截；rejected 释放复用回退 pending */
+    var existing = null;
+    for (var j = 0; j < ctx.subAgents.length; j++) {
+      var s0 = ctx.subAgents[j];
+      if (s0.parentUid !== parent.uid) continue;
+      if (R.normalizeUscc(s0.company && s0.company.uscc) === uscc) { existing = s0; break; }
+    }
+    if (existing) {
+      if (existing.status === 'approved' || existing.status === 'pending' || existing.status === 'suspended') {
+        return { error: 'E_USCC_DUPLICATE', msg: '该公司已在该总代下在审/在册，不可重复提交' };
+      }
+      if (existing.status === 'rejected') {
+        existing.status = 'pending';
+        existing.company = { name: payload.companyName, uscc: uscc, license: payload.license, legalRep: payload.legalRep, contact: payload.contact, phone: payload.phone || '' };
+        existing.appliedBy = 'self'; existing.inviteCode = code; existing.appliedAt = Date.now();
+        existing.firstReview = null;
+        existing.statusLog = existing.statusLog || [];
+        existing.statusLog.push({ operator: uid || 'self', at: Date.now(), reason: '驳回后企业重新申请', fromStatus: 'rejected', toStatus: 'pending' });
+        var r2 = S.saveSub(existing);
+        if (r2.error) return r2;
+        if (RF.markUsed) RF.markUsed(code, existing.id);
+        logBehavior(d.S, 'sub_apply_resubmitted', { subId: existing.id, uid: uid, inviteCode: code, uscc: uscc }, uid);
+        return { ok: true, reused: true, record: existing };
+      }
+    }
+
+    /* ⑥ 新记录落盘 pending（appliedBy='self' 标记双轨来源） */
+    var rec = {
+      id: 'sb-' + Date.now().toString(36),
+      parentUid: parent.uid,
+      uid: uid,
+      company: { name: payload.companyName, uscc: uscc, license: payload.license, legalRep: payload.legalRep, contact: payload.contact, phone: payload.phone || '' },
+      province: v.province || parent.province,
+      ratioToSub: 0,
+      status: 'pending',
+      appliedBy: 'self', inviteCode: code, appliedAt: Date.now(), firstReview: null,
+      statusLog: [{ operator: uid, at: Date.now(), reason: '企业自助申请二级合作', fromStatus: '', toStatus: 'pending' }],
+      rejects: [], ratioLog: [],
+      signature: { status: 'pending' },
+      sealedAt: 0
+    };
+    var r = S.saveSub(rec);
+    if (r.error) return r;
+    if (RF.markUsed) RF.markUsed(code, rec.id);
+    logBehavior(d.S, 'sub_apply_submitted', { subId: rec.id, uid: uid, inviteCode: code, uscc: uscc, company: payload.companyName }, uid);
+    return { ok: true, reused: false, record: rec };
+  }
+
+  /* 行为日志（D30，本地长期保留） */
+  function logBehavior(S, action, detail, operator) {
+    if (!S || typeof S.appendBehavior !== 'function') return;
+    try {
+      S.appendBehavior({ at: Date.now(), action: action, detail: JSON.stringify(detail || {}), operator: operator || '', subject: operator || '', uid: operator || '' });
+    } catch (e) {}
+  }
+
+  /* 查询当前用户的二级申请（含状态，供 apply.html 结果展示） */
+  function listSubApplications(uid, opts) {
+    var S = (opts && opts.store) || deps().S;
+    uid = uid || currentUid();
+    return (S.listSubs() || []).filter(function (s) { return s.uid === uid && s.appliedBy === 'self'; });
   }
 
   /* 34 省清单（与 editor.html:700 对齐；港澳台本期不纳入代理体系） */
@@ -352,6 +462,8 @@
     listMyApplications: listMyApplications,
     resubmit: resubmit,
     importSeed: importSeed,
+    submitSubApplication: submitSubApplication,
+    listSubApplications: listSubApplications,
     mountProvinceForm: mountProvinceForm,
     mountSeedImport: mountSeedImport,
     mountMyApplications: mountMyApplications,

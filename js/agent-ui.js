@@ -472,6 +472,27 @@
     var used = Store.countActiveSubAgents ? Store.countActiveSubAgents(me.id)
       : (Store.listSubs() || []).filter(function (s) { return s.parentUid === U && (s.status === 'approved' || s.status === 'suspended'); }).length;
     var subs = (Store.listSubs() || []).filter(function (s) { return s.parentUid === U; });
+    /* T2-4 自动发起 O4：平台终审已通过（approved）的企业自助申请（appliedBy==='self'），
+       未签约且无在途协议时自动发起合作协议（双轨路径②自动衔接；现状路径保留手动发起） */
+    var autoSend = [];
+    subs.forEach(function (s) {
+      if (s.status !== 'approved' || s.appliedBy !== 'self') return;
+      if (s.signature && s.signature.status === 'completed') return;
+      if (latestContract(E, s.id)) return;
+      var rr = E.sendContract({
+        subId: s.id, parentUid: U, subUid: s.uid || '',
+        parentName: (me.branchCompany && me.branchCompany.legalRep) || '总代',
+        parentCompany: (me.branchCompany && me.branchCompany.name) || me.province,
+        subName: (s.company && s.company.legalRep) || '',
+        subCompany: (s.company && s.company.name) || ''
+      });
+      if (rr.ok) {
+        autoSend.push(s.company && s.company.name || s.id);
+        s.statusLog = s.statusLog || [];
+        s.statusLog.push({ operator: 'platform', at: Date.now(), reason: '平台终审通过，自动发起合作协议', fromStatus: 'approved', toStatus: 'approved' });
+        Store.saveSub(s);
+      }
+    });
     var entries = Store.listLedger() || [];
     /* D-4：二级自身比例映射，台账按每条二级自身 ratioToSub 计算约定/自留 */
     var ratioByUid = {};
@@ -549,8 +570,10 @@
         + '<div><b>账号已暂停</b>：发起二级、比例补改、协议操作已锁定，台账只读保留；恢复生效后自动解锁。</div></div>'
       : '';
 
-    /* P0-5 本地代理通知位：pending 二级待审 / 已开通待签约（纯本地推导，不做真实推送） */
-    var pendSubs = subs.filter(function (s) { return s.status === 'pending'; });
+    /* P0-5 本地代理通知位：pending 二级待审 / 已开通待签约（纯本地推导，不做真实推送）
+       T2 双轨：appliedBy==='self' 走总代初审→平台终审；现状（无标记）走平台直接审核 */
+    var pendBySelf = subs.filter(function (s) { return s.status === 'pending' && s.appliedBy === 'self'; });
+    var pendByAdmin = subs.filter(function (s) { return s.status === 'pending' && !s.appliedBy; });
     var unsigned = subs.filter(function (s) {
       if (s.status !== 'approved') return false;
       var cs = s.signature && s.signature.status === 'completed';
@@ -558,7 +581,9 @@
       return !cs && !(c && c.status === 'pending_mine');
     });
     var noticeItems = [];
-    if (pendSubs.length) noticeItems.push(pendSubs.length + ' 个二级申请待平台审核开通');
+    if (autoSend.length) noticeItems.push('平台终审已通过，自动发起 ' + autoSend.length + ' 份合作协议（待二级签署）');
+    if (pendBySelf.length) noticeItems.push(pendBySelf.length + ' 个企业自助申请待总代初审');
+    if (pendByAdmin.length) noticeItems.push(pendByAdmin.length + ' 个二级申请待平台审核开通');
     if (unsigned.length) noticeItems.push(unsigned.length + ' 个已开通二级待发起合作协议');
     var noticeBar = noticeItems.length
       ? '<div class="ag-notice"><span class="ag-notice__dot"></span><div>' + noticeItems.map(esc).join('；') + '。审核结果与协议待签将在此同步（本地通知位，非真实推送）。</div></div>'
@@ -658,6 +683,24 @@
       var Es = esign();
       var c = latestContract(Es, s.id);
       var signed = s.signature && s.signature.status === 'completed';
+      /* T2 双轨初审：企业自助申请（appliedBy==='self'）pending 态由总代初审；
+         已初审（firstReview.passed）转平台终审；现状路径（无标记）直接平台审核 */
+      var statusBadge = badge(s.status);
+      var firstReviewOps = '';
+      var selfNote = '';
+      if (s.appliedBy === 'self' && s.status === 'pending') {
+        selfNote = '<div class="ag-note">企业自助申请 · 招商码 ' + esc(s.inviteCode || '') + '</div>';
+        if (s.firstReview && s.firstReview.passed) {
+          statusBadge = '<span class="ag-badge ag-st-pending">已初审 · 待平台终审</span>';
+          selfNote = '<div class="ag-note">企业自助申请 · 招商码 ' + esc(s.inviteCode || '') + ' · 总代初审已通过（约定 ' + fmt((s.firstReview.ratioToSub || 0) * 100) + '%）</div>';
+        } else {
+          statusBadge = '<span class="ag-badge ag-st-pending">待总代初审</span>';
+          if (canAdmin && !locked) {
+            firstReviewOps = '<button class="ag-btn ag-btn--sm ag-btn--primary" data-first-review="' + escAttr(s.id) + '">初审同意</button>'
+              + '<button class="ag-btn ag-btn--sm ag-btn--ghost" data-first-reject="' + escAttr(s.id) + '">初审驳回</button>';
+          }
+        }
+      }
       /* P0-2 O4：发起/待签/已签/拒签真实接线（引擎 AgentEsign，独立键 engchain-agent-esign）
          S2-6：主操作（发起/重新发起/去签署）用 primary 按钮，次级（补改比例/查看协议）ghost，文字链接（详情/团队）分组 */
       var sig;
@@ -689,8 +732,9 @@
         ? '<a class="ag-link" href="javascript:void(0)" data-sub-profile="' + escAttr(s.id) + '">详情</a>' : '';
       return '<div class="ag-sub-card ag-rise">'
         + '<div class="ag-sub-card__top"><span class="ag-sub-card__name">' + emblemHtml('sub', true) + ' ' + esc((s.company && s.company.name) || s.id) + '</span>'
-        + badge(s.status) + '</div>'
-        + '<div class="ag-sub-card__ops">' + adminOps + sig + '</div>'
+        + statusBadge + '</div>'
+        + selfNote
+        + '<div class="ag-sub-card__ops">' + adminOps + firstReviewOps + sig + '</div>'
         + '<div class="ag-sub-card__links">' + detailLink
         + '<a class="ag-link" href="team.html?org=' + esc(me.orgId) + '">团队管理</a></div>'
         + '</div>';
@@ -698,6 +742,73 @@
 
     /* M3-6 比例补改：仅 admin；0–50% 校验，超界拦截不留存；ratioLog 留痕重算（总盘不变）；H-1 收进抽屉 */
     function bindSubList() {
+      /* T2 双轨初审：企业自助申请由总代初审（同意填约定比例 / 驳回必填原因，写 rejects） */
+      box.querySelectorAll('[data-first-review]').forEach(function (b) {
+        b.onclick = function () {
+          var sid = b.dataset.firstReview;
+          var rec = Store.getSub(sid); if (!rec) return;
+          openDrawer({
+            title: '初审同意 · 确定约定比例',
+            bodyHtml: '<div class="ag-field"><label>约定比例（0–0.5）</label>'
+              + '<input class="ag-input ag-first-ratio" type="number" min="0" max="0.5" step="0.01" value="0">'
+              + '<div class="ag-field-err"></div></div>'
+              + '<div class="ag-disc">初审通过后转平台终审；平台通过后自动发起 O4 协议，由二级签署。比例进入 ratioLog 留痕。</div>',
+            footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
+              + '<button class="ag-btn ag-btn--primary" data-drawer-save>初审通过 · 转平台终审</button>',
+            onOpen: function (d) {
+              d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
+              var save = d.body.parentNode.querySelector('[data-drawer-save]');
+              save.onclick = function () {
+                var input = d.body.querySelector('.ag-first-ratio');
+                var err = d.body.querySelector('.ag-field-err');
+                var rv = Ledger.validateRatio(input.value === '' ? '0' : input.value);
+                if (!rv.ok) { if (err) { err.textContent = rv.msg || '比例无效'; err.style.display = 'block'; } return; }
+                rec.firstReview = { passed: true, at: Date.now(), operator: U, ratioToSub: rv.value };
+                rec.ratioToSub = rv.value;
+                rec.ratioLog = rec.ratioLog || [];
+                rec.ratioLog.push({ ratio: rv.value, at: Date.now(), operator: U, reason: '总代初审确定约定比例' });
+                rec.statusLog = rec.statusLog || [];
+                rec.statusLog.push({ operator: U, at: Date.now(), reason: '总代初审通过，转平台终审', fromStatus: 'pending', toStatus: 'pending' });
+                Store.saveSub(rec);
+                closeDrawer();
+                toast('初审通过，已转平台终审（约定 ' + (rv.value * 100) + '%）', true);
+                mountWorkbench(el);
+              };
+            }
+          });
+        };
+      });
+      box.querySelectorAll('[data-first-reject]').forEach(function (b) {
+        b.onclick = function () {
+          var sid = b.dataset.firstReject;
+          var rec = Store.getSub(sid); if (!rec) return;
+          openDrawer({
+            title: '初审驳回 · 必填原因',
+            bodyHtml: '<div class="ag-field"><label>驳回原因<span class="ag-req">*</span></label>'
+              + '<textarea class="ag-input ag-first-reason" rows="3" placeholder="请填写驳回原因（将写入 rejects 留痕并反馈企业）"></textarea>'
+              + '<div class="ag-field-err"></div></div>',
+            footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
+              + '<button class="ag-btn ag-btn--primary" data-drawer-save>确认驳回</button>',
+            onOpen: function (d) {
+              d.body.parentNode.querySelector('[data-drawer-cancel]').onclick = closeDrawer;
+              var save = d.body.parentNode.querySelector('[data-drawer-save]');
+              save.onclick = function () {
+                var reason = (d.body.querySelector('.ag-first-reason') || {}).value || '';
+                if (!String(reason).trim()) { toast('请填写驳回原因', 'err'); return; }
+                rec.status = 'rejected';
+                rec.rejects = rec.rejects || [];
+                rec.rejects.push({ at: Date.now(), operator: U, reason: String(reason).trim() });
+                rec.statusLog = rec.statusLog || [];
+                rec.statusLog.push({ operator: U, at: Date.now(), reason: '总代初审驳回', fromStatus: 'pending', toStatus: 'rejected' });
+                Store.saveSub(rec);
+                closeDrawer();
+                toast('已初审驳回，原因写入 rejects 留痕', false);
+                mountWorkbench(el);
+              };
+            }
+          });
+        };
+      });
       box.querySelectorAll('.ag-ratio-edit').forEach(function (b) {
         b.onclick = function () {
           var sid = b.dataset.sid;
