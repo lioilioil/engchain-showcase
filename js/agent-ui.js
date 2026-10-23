@@ -650,8 +650,9 @@
       /* H-1 #/status 视图：行为记录只读（AgentStore.listBehavior，名下二级相关） */
       + '<section class="ag-card" data-view="status"><h3>行为记录（只读）</h3><div id="ag-behavior"></div></section>'
 
-      /* 入口行：团队 / 规则税务（home 次级入口，内容不改仅补链） */
+      /* 入口行：团队 / 授权网络 / 规则税务（home 次级入口，内容不改仅补链；T3 新增授权网络） */
       + '<section class="ag-card" data-view="home"><div class="ag-entry-row">'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="network.html">授权网络</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(me.orgId || '') + '">团队管理</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
       + '</div></section>'

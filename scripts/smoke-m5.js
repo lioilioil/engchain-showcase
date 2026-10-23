@@ -195,11 +195,29 @@ ok(mine.length === 1 && mine[0].uid === 'u30' && mine[0].appliedBy === 'self', '
 ok(!t2subs[t2subs.length - 1].appliedBy, 'F-9 现状路径记录无 appliedBy 标记（平台直审语义保留）');
 ok(!mem.data['engchain-referral-links'], 'F-10 二级申请不写 Referral 键（隔离铁律）');
 
+section('G. T3 二级授权网络（network.html）');
+var netHtml = fs.readFileSync(path.join(ROOT, 'pages/province-agent/network.html'), 'utf8');
+ok(fs.existsSync(path.join(ROOT, 'pages/province-agent/network.html')), 'G-1 network.html 存在');
+ok(netHtml.indexOf('ag-net-root') > -1 && netHtml.indexOf('ag-net-sub') > -1, 'G-2 授权链树结构在位（总代根/二级子节点）');
+ok(netHtml.indexOf('ag-quota-track') > -1 && netHtml.indexOf('quotaCapOf') > -1, 'G-3 名额使用率进度条 + quotaCapOf 复算在位');
+ok(netHtml.indexOf('isEligibleConsumption') > -1, 'G-4 聚合复用 AgentLedger 纯函数（isEligibleConsumption 口径）不新造计算');
+ok(netHtml.indexOf('累计约定所得') > -1 && netHtml.indexOf('最近消费') > -1 && netHtml.indexOf('状态时间线') > -1, 'G-5 二级卡片字段：累计约定所得/最近消费/状态时间线');
+ok(netHtml.indexOf('分层说明') > -1 && netHtml.indexOf('team.html') > -1, 'G-6 分层声明：授权链 vs 公司团队语义隔离');
+ok(netHtml.indexOf('ag-st-terminated') > -1 && netHtml.indexOf('ag-st-pending') > -1 && netHtml.indexOf('ag-st-removed') > -1, 'G-7 状态感知样式映射（pending/terminated/removed 等）');
+var uiTxt = fs.readFileSync(path.join(ROOT, 'js/agent-ui.js'), 'utf8');
+ok(uiTxt.indexOf('href="network.html"') > -1, 'G-8 工作台入口补 network.html（授权网络）');
+var cssTxt = fs.readFileSync(path.join(ROOT, 'css/agent.css'), 'utf8');
+ok(cssTxt.indexOf('ag-net-root') > -1 && cssTxt.indexOf('ag-quota-bar') > -1, 'G-9 agent.css 补网络树/名额进度样式');
+/* G-10 聚合口径复算：与 AgentLedger.partitionSubtotals 一致（比例 20%、10000 消费 → 约定 1000） */
+var Lc = require(path.join(ROOT, 'js/agent-ledger.js'));
+var agg = Lc.partitionSubtotals([{ line: 'subLedger', frozenStatus: 'settled', type: 'order_paid_net', amount: 10000 }], Object.assign({}, Lc.DEFAULTS, { _ratio: 0.2 }));
+ok(agg.subLedger.pool === 5000 && agg.subLedger.agreed === 1000 && agg.subLedger.retained === 4000, 'G-10 聚合口径复算：10000×50%×20%=1000 约定 / 4000 自留');
+
 section('E. 回归 smoke-m1');
 var cp = require('child_process');
 var out = cp.execSync('node "' + path.join(ROOT, 'scripts/smoke-m1.js') + '"', { encoding: 'utf8' });
 ok(/FAIL=0/.test(out), 'smoke-m1 复跑 FAIL=0');
 
 console.log('\n========================================');
-console.log('M5(T1+T2) 结果：PASS=' + PASS + '  FAIL=' + FAIL);
+console.log('M5(T1+T2+T3) 结果：PASS=' + PASS + '  FAIL=' + FAIL);
 process.exit(FAIL ? 1 : 0);

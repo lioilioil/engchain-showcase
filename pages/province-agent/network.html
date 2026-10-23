@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script data-theme-fix="1">(function(){try{var t=localStorage.getItem('engchain-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
+<script data-engchain-basefix="2">
+(function(){
+function rm(){var a=document.querySelectorAll('base');for(var i=0;i<a.length;i++){if(!a[i].dataset.ef){a[i].parentNode.removeChild(a[i]);}}}
+var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/province-agent/";var base;
+if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
+rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
+})();
+</script><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>二级授权网络 · 工程链</title>
+<link rel="stylesheet" href="../../css/app.css">
+<link rel="stylesheet" href="../../css/agent.css">
+</head>
+<body>
+<div class="phone">
+  <div class="navbar">
+    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <div class="nav-title">二级授权网络</div>
+    <div class="nav-right"></div>
+  </div>
+  <div class="ag-wrap" id="ag-root"></div>
+</div>
+<script src="../../js/data.js"></script>
+<script src="../../js/common.js"></script>
+<script src="../../js/stores.js"></script>
+<script src="../../js/databus.js"></script>
+<script src="../../js/domain.js"></script>
+<script src="../../js/orgs.js"></script>
+<script src="../../js/agent-rules.js"></script>
+<script src="../../js/agent-store.js"></script>
+<script src="../../js/agent-ledger.js"></script>
+<script src="../../js/agent-esign.js"></script>
+<script>
+(function () {
+  'use strict';
+  var root = document.getElementById('ag-root');
+  var U = (window.DataBus && DataBus.current) ? DataBus.current().id : '';
+  var Store = window.AgentStore, Ledger = window.AgentLedger, Rules = window.AgentRules, E = window.AgentEsign;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function fmt(n) { n = Number(n) || 0; return '¥' + n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmtDate(ts) { if (!ts) return '—'; var d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function emptyState(title, note) { return '<div class="ag-empty"><div class="ag-empty__title">' + esc(title) + '</div><div class="ag-empty__note">' + esc(note) + '</div></div>'; }
+
+  /* 状态徽章：pending/approved/suspended/terminated/removed/rejected 各态样式（复用 agent.css ag-st-*） */
+  var ST = {
+    pending: ['待审核', 'ag-st-pending'],
+    approved: ['已开通', 'ag-st-approved'],
+    suspended: ['已暂停', 'ag-st-suspended'],
+    terminated: ['已终止', 'ag-st-terminated'],
+    removed: ['已解除', 'ag-st-removed'],
+    rejected: ['已驳回', 'ag-st-terminated']
+  };
+  function badge(st) { var t = ST[st] || [st, '']; return '<span class="ag-badge ' + t[1] + '">' + esc(t[0]) + '</span>'; }
+
+  /* 协议状态：签约完成 / 待签 / 已拒签 / 未签约 */
+  function protoState(sub) {
+    if (!E) return '协议待发起';
+    var c = E.contractById ? E.contractById(sub.id) : null;
+    if (sub.signature && sub.signature.status === 'completed') return '已签 ' + esc(sub.signature.code || '');
+    if (c && c.status === 'pending_mine') return '待二级签署';
+    if (c && c.status === 'rejected') return '已拒签';
+    return '协议待发起';
+  }
+
+  /* 单二级聚合：累计约定所得 / 最近消费（复用 AgentLedger 纯函数口径：settled 合格笔 × 总盘 × 约定比例） */
+  function subAgg(sub, entries, cfg) {
+    var mine = (entries || []).filter(function (e) {
+      return e.line === 'subLedger' && e.frozenStatus === 'settled' && !e.refunded && e.subject === sub.uid
+        && Ledger.isEligibleConsumption(e.type, cfg);
+    });
+    var gross = mine.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    var pool = Math.round(gross * cfg.grossShare * 100) / 100;
+    var agreed = Math.round(pool * (Number(sub.ratioToSub) || 0) * 100) / 100;
+    var last = mine.reduce(function (mx, e) { return Math.max(mx, Number(e.at) || 0); }, 0);
+    return { gross: gross, pool: pool, agreed: agreed, lastAt: last, count: mine.length };
+  }
+
+  function render() {
+    if (!Store) { root.innerHTML = emptyState('数据层未就绪', 'AgentStore 未加载。'); return; }
+    var me = null;
+    (Store.listProvinces() || []).forEach(function (p) { if (p.uid === U) me = p; });
+    if (!me || (me.status !== 'active' && me.status !== 'suspended')) {
+      root.innerHTML = emptyState('当前账号未开通省级总代', '网络视图仅对在册省级总代开放。');
+      return;
+    }
+    var locked = me.status === 'suspended';
+    var subs = (Store.listSubs() || []).filter(function (s) { return s.parentUid === me.uid; });
+    var entries = Store.listLedger() || [];
+    var MOCK = window.MOCK || {};
+    var quotaCfg = (MOCK.business && MOCK.business.provinceAgentQuota) || {};
+    var cap = Rules && Rules.quotaCapOf ? Rules.quotaCapOf(me.province, quotaCfg) : { ok: false };
+    /* 名额占用与规则层复算一致（D7）：approved/pending/suspended 均占名额，removed/terminated/rejected 释放 */
+    var used = Rules && Rules.countActiveSubAgents ? Rules.countActiveSubAgents(me.uid, subs)
+      : subs.filter(function (s) { return s.status === 'approved' || s.status === 'pending' || s.status === 'suspended'; }).length;
+    var capN = cap.quotaCap || 0;
+    var pct = capN ? Math.min(100, Math.round(used / capN * 100)) : 0;
+
+    /* 名额进度条 + 满额提示 */
+    var quotaHtml = '<div class="ag-card">'
+      + '<h3>授权名额使用率 <span class="ag-meta">' + used + ' / ' + capN + ' 省表核定</span></h3>'
+      + '<div class="ag-quota-track"><div class="ag-quota-bar" style="width:' + pct + '%;' + (pct >= 100 ? 'background:#e5484d;' : '') + '"></div></div>'
+      + '<div class="ag-note">' + (pct >= 100 ? '该省二级名额已满，新申请将触发 E_QUOTA_EXCEEDED 拦截。' : '仅计签约二级公司，成员不计入名额（D7）。') + '</div>'
+      + '</div>';
+
+    /* 总代根节点 */
+    var rootNode = '<div class="ag-net-node ag-net-root">'
+      + '<div class="ag-net-root__main"><div class="ag-sub-card__name">' + esc(me.branchCompany && me.branchCompany.name || me.province + '总代') + '</div>'
+      + '<div class="ag-meta">省级总代 · 授权省 ' + esc(me.province) + ' · ' + (me.orgId ? '组织 ' + esc(me.orgId) : '') + '</div>'
+      + '<div class="ag-net-ops">' + badge(me.status) + (locked ? '<span class="ag-sig">锁定：只读</span>' : '') + '</div></div>'
+      + '</div>';
+
+    /* 二级子节点卡片 */
+    var subNodes = subs.map(function (s) {
+      var a = subAgg(s, entries, Ledger.DEFAULTS);
+      var st = ST[s.status] || [s.status, ''];
+      var tl = (s.statusLog || []).slice(-3).reverse().map(function (l) {
+        return '<div class="ag-meta">' + fmtDate(l.at) + ' · ' + esc(l.reason || l.toStatus) + '</div>';
+      }).join('');
+      var isSelf = s.appliedBy === 'self';
+      return '<div class="ag-net-node ag-net-sub ag-net-sub--' + esc(s.status) + '">'
+        + '<div class="ag-net-sub__head"><span class="ag-sub-card__name">' + esc(s.company && s.company.name || s.id) + '</span>' + badge(s.status) + '</div>'
+        + (isSelf ? '<div class="ag-note">企业自助申请 · 招商码 ' + esc(s.inviteCode || '') + (s.firstReview && s.firstReview.passed ? ' · 已初审' : '') + '</div>' : '')
+        + '<div class="ag-net-sub__grid">'
+        + '<div><span class="ag-meta">归属省</span><b>' + esc(s.province || '—') + '</b></div>'
+        + '<div><span class="ag-meta">约定比例</span><b>' + Math.round((s.ratioToSub || 0) * 100) + '%</b></div>'
+        + '<div><span class="ag-meta">协议状态</span><b>' + esc(protoState(s)) + '</b></div>'
+        + '<div><span class="ag-meta">累计约定所得</span><b>' + fmt(a.agreed) + '</b></div>'
+        + '<div><span class="ag-meta">累计合格消费</span><b>' + fmt(a.gross) + '（' + a.count + ' 笔）</b></div>'
+        + '<div><span class="ag-meta">最近消费</span><b>' + fmtDate(a.lastAt) + '</b></div>'
+        + '</div>'
+        + (tl ? '<div class="ag-net-sub__tl"><div class="ag-meta">状态时间线</div>' + tl + '</div>' : '')
+        + '</div>';
+    }).join('');
+
+    /* 分层声明（T3-4：网络视图=授权链；公司团队=公司内三角色） */
+    var decl = '<div class="ag-card ag-note">'
+      + '<b>分层说明：</b>本页「二级授权网络」展示两层授权链（总代 → 二级公司）与分账数据；'
+      + '「公司团队」(' + '<a class="ag-link" href="team.html?org=' + esc(me.orgId || '') + '">team.html</a>' + ') 展示公司内部三角色（负责人/管理员/成员），两视图入口并列、语义隔离，不混为一层。'
+      + '</div>';
+
+    root.innerHTML = '<div class="ag-wrap">'
+      + quotaHtml
+      + '<div class="ag-card"><h3>授权链（总代 → 二级公司 · ' + subs.length + '）</h3>'
+      + '<div class="ag-net">' + rootNode
+      + (subs.length ? '<div class="ag-net-edge"></div><div class="ag-net-children">' + subNodes + '</div>' : '<div class="ag-note">暂无二级公司，通过「发起二级」或招商码企业自助申请接入。</div>')
+      + '</div></div>'
+      + decl
+      + '<div class="ag-card"><div class="ag-actions ag-actions--edit">'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="index.html">返回工作台</a>'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(me.orgId || '') + '">公司团队</a>'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
+      + '</div></div>'
+      + '</div>';
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
