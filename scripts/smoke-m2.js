@@ -296,6 +296,14 @@ ok('N openConfirm 接线确认拒签(回未签约后果说明)', /确认拒签�
 /* busy 防连点：发起提交按钮 disabled 守卫 */
 ok('N 发起二级提交 busy 防连点(save.disabled 守卫)', uiSrcL.includes('save.disabled = true') && uiSrcL.includes('save.disabled = false'));
 
+console.log('\n===== O. 复核残留 R-1/R-2/R-3 定点修复（只读源码断言） =====');
+/* R-1：T2 协议详情卡归属 home 视图，#/ledger 隐藏 */
+ok('O R-1 T2 协议详情卡标 data-view=home（#/ledger 不透出）', /var protoCard = contract[\s\S]{0,120}data-view="home"/.test(uiSrcL));
+/* R-2：团队页移除内联常驻邀请字段，统一走抽屉（无 ag-invite-uid/role 内联） */
+ok('O R-2 团队邀请无内联常驻 uid/role 字段，仅抽屉入口', !uiSrcL.includes('id="ag-invite-uid"') && !uiSrcL.includes('id="ag-invite-role"') && uiSrcL.includes('id="ag-invite-btn"'));
+/* R-3：closeDrawer 摘除旧节点，不累积隐藏 DOM */
+ok('O R-3 closeDrawer 摘除抽屉/遮罩节点(n.remove)', /closeDrawer[\s\S]{0,160}querySelectorAll\('\.ag-drawer-mask,\.ag-drawer'\)[\s\S]{0,80}n\.remove\(\)/.test(uiSrcL));
+
 console.log('\n===== I. M1 回归：复跑 smoke-m1 =====');
 try {
   const out = execSync('node scripts/smoke-m1.js', { cwd: ROOT, encoding: 'utf8' });

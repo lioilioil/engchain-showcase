@@ -62,10 +62,11 @@
     t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2400);
   }
 
-  /* ---------- H-1/H-5 统一底部抽屉（遮罩/×/Esc 三通道关闭，锁背景滚动） ---------- */
+  /* ---------- H-1/H-5 统一底部抽屉（遮罩/×/Esc 三通道关闭，锁背景滚动） ----------
+     R-3：关闭时摘除旧遮罩/抽屉节点，避免重复开关累积隐藏 DOM */
   function closeDrawer() {
     if (typeof document === 'undefined') return;
-    document.querySelectorAll('.ag-drawer-mask,.ag-drawer.is-open').forEach(function (n) { n.classList.remove('is-open'); });
+    document.querySelectorAll('.ag-drawer-mask,.ag-drawer').forEach(function (n) { n.remove(); });
     document.body.style.overflow = '';
   }
   function openDrawer(opts) {
@@ -1010,9 +1011,9 @@
         + '</div>';
     }
 
-    /* E1-T2-01：无协议记录时不渲染空白「协议详情」卡；有协议才出卡，面板默认统一空态 */
+    /* E1-T2-01：无协议记录时不渲染空白「协议详情」卡；有协议才出卡；R-1 归属 home 视图，#/ledger 隐藏 */
     var protoCard = contract
-      ? '<section class="ag-card"><h3>协议详情</h3><div id="ag-sub-proto-panel">'
+      ? '<section class="ag-card" data-view="home"><h3>协议详情</h3><div id="ag-sub-proto-panel">'
         + '<div class="ag-empty__sub">点「查看协议」阅读条款；已签协议可随时回看。</div></div></section>'
       : '';
 
@@ -1270,14 +1271,9 @@
         + '</div>';
     }).join('');
 
-    /* P1-6：管理员邀请入口（复用 OrgsStore.invite，角色 admin/member；legalRep 只读不动） */
+    /* P1-6：管理员邀请入口（R-2 移除内联常驻表单，统一走邀请抽屉；legalRep 只读不动） */
     var inviteBox = view.canManage
-      ? '<div class="ag-field" style="margin-top:12px;"><label>邀请成员（输入对方 uid）</label>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<input id="ag-invite-uid" class="ag-input" placeholder="对方 uid" style="flex:1;min-width:120px;">'
-        + '<select id="ag-invite-role" class="ag-input" style="width:110px;"><option value="member">成员</option><option value="admin">管理员</option></select>'
-        + '<button class="ag-btn ag-btn--primary ag-btn--sm" id="ag-invite-btn">发送邀请</button>'
-        + '</div><div class="ag-field-err"></div></div>'
+      ? '<div style="margin-top:12px;"><button class="ag-btn ag-btn--primary ag-btn--sm" id="ag-invite-btn">邀请成员</button></div>'
       : '';
 
     el.innerHTML = '<div class="ag-wrap">'
