@@ -17,7 +17,8 @@
     var E = (typeof window !== 'undefined' && window.AgentEsign) || (typeof require === 'function' ? require('./agent-esign.js') : null);
     var T = (typeof window !== 'undefined' && window.AgentTax) || (typeof require === 'function' ? require('./agent-tax.js') : null);
     var A = (typeof window !== 'undefined' && window.AuthStore) || null;
-    return { S: S, L: L, E: E, T: T, A: A };
+    var R = (typeof window !== 'undefined' && window.AgentReferral) || (typeof require === 'function' ? require('./agent-referral.js') : null);
+    return { S: S, L: L, E: E, T: T, A: A, R: R };
   }
 
   var AUTH_BACKUP_KEY = 'engchain-agent-auth-backup';
@@ -29,7 +30,7 @@
     if (S && typeof S.reset === 'function') S.reset();
     var st = opts.store || (typeof window !== 'undefined' && window.localStorage);
     if (st) {
-      ['engchain-agent-esign'].forEach(function (k) { try { st.removeItem(k); } catch (e) {} });
+      ['engchain-agent-esign', 'engchain-agent-invites', 'engchain-agent-invite-logs'].forEach(function (k) { try { st.removeItem(k); } catch (e) {} });
       /* 恢复 seed 前的 auth 备份（u11 兼任个人合伙人标记还原，不覆盖 databus u9/u1 等种子） */
       try {
         var backup = st.getItem(AUTH_BACKUP_KEY);
@@ -44,7 +45,7 @@
         }
       } catch (e) {}
     }
-    return { ok: true, cleared: ['province-agents', 'sub-agents', 'agent-ledger', 'agent-behavior', 'behavior-cleanup-log', 'agent-esign', 'org-a11', 'org-a12', AUTH_BACKUP_KEY] };
+    return { ok: true, cleared: ['province-agents', 'sub-agents', 'agent-ledger', 'agent-behavior', 'behavior-cleanup-log', 'agent-esign', 'agent-invites', 'agent-invite-logs', 'org-a11', 'org-a12', AUTH_BACKUP_KEY] };
   }
 
   function seed(opts) {
@@ -92,6 +93,11 @@
       signature: null, sealedAt: 0, orgId: 'org-a12'
     };
     S.saveSub(sub);
+
+    /* ---- T1 招商码播种：u11 生成招商码（独立键 engchain-agent-invites，与 Referral 隔离） ---- */
+    if (d.R && typeof d.R.createCode === 'function') {
+      try { d.R.createCode('u11'); } catch (e) {}
+    }
 
     /* ---- 台账样例：消费10000→总盘5000→20%→约定1000/自留4000 ---- */
     function entry(partial) { return Object.assign({ at: now - 10 * DAY, month: L.monthKey(now - 10 * DAY), line: 'subLedger', frozenStatus: 'settled', at: now - 10 * DAY }, partial); }
