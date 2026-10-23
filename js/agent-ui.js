@@ -650,11 +650,12 @@
       /* H-1 #/status 视图：行为记录只读（AgentStore.listBehavior，名下二级相关） */
       + '<section class="ag-card" data-view="status"><h3>行为记录（只读）</h3><div id="ag-behavior"></div></section>'
 
-      /* 入口行：数据中心/授权网络/团队/规则税务（home 次级入口，内容不改仅补链；T3 授权网络、T4 数据中心） */
+      /* 入口行：数据中心/授权网络/团队/运营规则/规则税务（home 次级入口，内容不改仅补链；T3 授权网络、T4 数据中心、T5 运营规则） */
       + '<section class="ag-card" data-view="home"><div class="ag-entry-row">'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="data-center.html">数据中心</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="network.html">授权网络</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(me.orgId || '') + '">团队管理</a>'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="rules.html">运营规则</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
       + '</div></section>'
 
@@ -1237,9 +1238,10 @@
 
       + '<section class="ag-card" data-view="home"><h3>状态中心</h3>' + timelineHtml(rec.statusLog, rec.ratioLog, { hideOperator: true }) + '</section>'
 
-      /* E1-T2-06：业务入口（团队/规则）与钱包弱出口分组，钱包视觉降级（home） */
+      /* E1-T2-06：业务入口（团队/运营规则/规则税务）与钱包弱出口分组，钱包视觉降级（home）；T5 补运营规则 */
       + '<section class="ag-card" data-view="home"><div class="ag-entry-row">'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="team.html?org=' + esc(rec.orgId || '') + '">本公司团队</a>'
+      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="rules.html">运营规则</a>'
       + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="tax-guide.html">规则与税务</a>'
       + '</div>'
       + '<div class="ag-entry-row ag-entry-row--weak ag-mt-3">'
