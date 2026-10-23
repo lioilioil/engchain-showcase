@@ -19,7 +19,7 @@ const columns = [
     key: 'name', dataKey: 'name', title: '姓名', width: 140, fixed: 'left',
     cellRenderer: ({ rowData }) => {
       const a = rowData.avatar || '?'
-      return `<span style="display:inline-flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:#67c23a;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">${a}</span>${rowData.name}</span>`
+      return `<span style="display:inline-flex;align-items:center;gap:8px"><span style="width:26px;height:26px;border-radius:50%;background:var(--color-success,#1f883d);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px">${a}</span>${rowData.name}</span>`
     }
   },
   { key: 'company', dataKey: 'company', title: '企业', minWidth: 220 },
