@@ -608,6 +608,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="k">演示场景</span>
           <span class="pv-state-right">
             <select class="pv-select" id="sel-scenario"></select>
+            <select class="pv-select" id="sel-v3scn" title="省代工作台 v3 演示场景（iframe 处于省代/二级页时生效）" style="margin-left:6px;max-width:156px">
+              <option value="">省代 v3</option>
+              <optgroup label="省代总代">
+                <option value="active">① 正常态</option>
+                <option value="suspended">② 暂停只读</option>
+                <option value="empty">③ 空态</option>
+                <option value="dark">④ 暗色主题</option>
+              </optgroup>
+              <optgroup label="二级企业">
+                <option value="sub-active">① 正常态</option>
+                <option value="sub-readonly">② 暂停只读</option>
+                <option value="sub-dark">③ 暗色主题</option>
+              </optgroup>
+            </select>
             <svg class="quick-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </span>
         </div>
@@ -1995,6 +2009,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     UI.toast('已切换场景：' + r.label + (r.balanceUnchanged ? '（余额保持种子值）' : ''), 'ok');
   });
   renderScenarioOptions();
+
+  /* 省代工作台 v3 演示场景（P0-3 收口：页内 ⚙ 演示浮层已移除，统一走预览台切换）
+     v3 场景是独立机制（applyV3Scenario 在 iframe 页内），需 iframe 处于省代/二级页时生效 */
+  var selV3 = document.getElementById('sel-v3scn');
+  if (selV3) {
+    selV3.addEventListener('change', function () {
+      var k = selV3.value; if (!k) return;
+      var iw = frame && frame.contentWindow;
+      if (!iw || !iw.applyV3Scenario) {
+        UI.toast('请先在预览台打开「省代工作台」或「二级企业工作台」页面');
+        selV3.value = '';
+        return;
+      }
+      iw.applyV3Scenario(k);
+      UI.toast('已切换省代 v3 场景：' + (selV3.options[selV3.selectedIndex] || {}).text || k, 'ok');
+    });
+  }
 
   function reloadFrame() {
     var _s = String(frame.src), _h = '';

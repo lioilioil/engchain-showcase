@@ -14,11 +14,10 @@
       roleOpt("boss", "老板 / 管理员", st.role === "boss") + roleOpt("staff", "员工", st.role === "staff") + "</div>" +
       '<div class="v3-xs v3-muted" style="margin-top:9px">员工可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div></section>';
 
-    /* 主题 */
+    /* 主题（演示场景切换统一在 preview.html 演示切换器） */
     h += '<div class="me-group">' +
       row("theme", "外观主题", st.theme === "dark" ? "深色" : "浅色") +
-      row("demo", "演示场景", "active / suspended / empty / dark") +
-      row("goto-sub", "进入二级企业视角", "sub.html 副本") +
+      row("goto-sub", "进入二级企业视角", "二级企业工作台") +
       "</div>";
 
     /* 授权与资料 */
@@ -65,8 +64,7 @@
       if (act === "theme") {
         V3.store.act("theme/set", { theme: ctx.state.theme === "dark" ? "light" : "dark" });
         V3.router.render();
-      } else if (act === "demo") { V3.router.openDemoSheet(); }
-      else if (act === "goto-sub") { location.href = "sub.html#/home"; }
+      } else if (act === "goto-sub") { location.href = "sub.html#/home"; }
       else if (act === "cert") certModal(ctx);
       else if (act === "logout") {
         ui.openModal({ title: "退出登录", icon: "warn", body: "原型演示：退出登录为 Mock，不会真实清除会话。", okText: "知道了", cancel: false });

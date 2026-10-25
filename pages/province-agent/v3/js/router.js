@@ -1,7 +1,9 @@
 /* ============================================================
-   router.js · hash 路由 / 外壳 / 主题 / 演示场景
-   省代：底部 4 Tab；二级：顶部胶囊导航
-   页面自注册到 window.V3PAGES / window.V3SUBPAGES
+   router.js · hash 路由 / 页内分段导航 / 主题
+   【视觉统一】不再自绘外壳（无 #device / 无自建顶栏 / 无自建 4-Tab）：
+   页面外壳 = App demo .phone + .navbar（HTML 静态，common.js 注入状态栏/灵动岛/首页钮）；
+   省代四视图 = 页内分段 .seg（App 语系）；二级 = .sub-tabs 横向分段 + 金色动画指示条。
+   演示场景：不再提供页内 ⚙ 浮层，统一由 preview.html 演示切换器播种。
    ============================================================ */
 (function () {
   "use strict";
@@ -45,36 +47,22 @@
 
   function isReadonly(d) { return d.profile.status !== "active"; }
 
-  function openDemoSheet() {
-    var ui = window.V3.ui, st = window.V3.store.getState();
-    var cur = st.scenario, isSub = st.mode === "sub";
-    function scn(k, label, tag) {
-      return '<button class="v3-scn ' + (cur === k || (k === "sub-dark" && st.theme === "dark") ? "on" : "") + '" style="margin:4px" data-scn="' + k + '">' +
-        (tag ? tag + " · " : "") + label + "</button>";
-    }
-    var body;
-    if (isSub) {
-      body = '<div class="v3-xs v3-muted" style="margin-bottom:6px">二级企业视角</div>' +
-        scn("sub-active", "正常态") + scn("sub-readonly", "暂停只读态") + scn("sub-dark", "暗色主题");
-    } else {
-      body = '<div class="v3-xs v3-muted" style="margin-bottom:6px">省代视角</div>' +
-        scn("active", "正常态") + scn("suspended", "暂停只读态") + scn("empty", "空态") + scn("dark", "暗色主题");
-    }
-    var ov = ui.openSheet({
-      title: "演示场景（Mock）",
-      body: body +
-        '<p class="v3-legal" style="margin-top:14px">所有金额均为 <b>模拟测算 · 非实际到账 · 不可提现</b>；' +
-        '也可在控制台执行 <b>applyV3Scenario("suspended")</b> 等切换。</p>',
-      onMount: function (wrap) {
-        Array.prototype.forEach.call(wrap.querySelectorAll("[data-scn]"), function (b) {
-          b.addEventListener("click", function () {
-            window.V3.ui.closeAll();
-            window.applyV3Scenario(b.getAttribute("data-scn"));
-          });
-        });
-      }
-    });
-    return ov;
+  /* 二级分段指示条：跟随激活项滑动（对齐 home.html 算法） */
+  function moveSubInd() {
+    var sc = root.querySelector(".v3-subnav .sub-scroll");
+    if (!sc) return;
+    var ind = root.querySelector(".v3-subnav .sub-ind");
+    var on = sc.querySelector(".sub-item.active");
+    if (!ind || !on) return;
+    var sr = sc.getBoundingClientRect(), ir = on.getBoundingClientRect();
+    ind.style.transform = "translateX(" + Math.round(ir.left - sr.left + sc.scrollLeft) + "px)";
+    ind.style.width = Math.round(ir.width) + "px";
+  }
+
+  function setNavTitle(title) {
+    var nt = document.querySelector(".navbar .nav-title");
+    if (nt) nt.textContent = title;
+    document.title = title + " · 工程链";
   }
 
   function render() {
@@ -97,46 +85,69 @@
       go: go
     };
 
-    var isTabbed = !isSub;
-    document.body.classList.toggle("has-subnav", false);
+    setNavTitle(page.title || TITLES[key] || (isSub ? "二级企业工作台" : "省级总代工作台"));
 
-    var header =
-      '<div class="v3-hdr">' +
-      (isSub ? "" : "") +
-      '<div class="v3-hdr__title">' + V3.ui.esc(page.title || TITLES[key] || "工作台") + "</div>" +
-      '<button class="v3-hdr__demo" id="v3-demo-btn" aria-label="演示场景">⚙</button></div>';
-
-    var subnavHtml = "";
-    if (isSub) {
-      subnavHtml = '<div class="v3-subnav">' + SUBNAV.map(function (n) {
-        return '<a href="#/' + n.key + '" class="' + (n.key === key ? "on" : "") + '">' + n.label + "</a>";
-      }).join("") + "</div>";
-    }
-
-    var tabbarHtml = "";
-    if (isTabbed) {
+    /* 省代四视图：页内分段 Tab（App .seg 语系，sticky）
+       ⚠ 不可用 <a href="#/key">：页面 base 为目录级，点击会按 base 解析成目录 URL 而整页换页；
+       改用 <button> + location.hash 赋值（App demo 同款模式）。 */
+    var segHtml = "";
+    if (!isSub) {
       var dotCount = d.payRegs1 ? d.payRegs1.filter(function (r) { return r.status === "pending_confirm" || r.status === "disputed"; }).length : 0;
       var l2c = d.payRegs2 ? d.payRegs2.filter(function (r) { return r.status === "pending_confirm"; }).length : 0;
       var todoN = dotCount + l2c + ((d.subApps || []).filter(function (a) { return a.status === "pending"; }).length);
-      tabbarHtml =
-        '<nav class="v3-tabbar">' + TABS.map(function (t) {
-          var dot = (t.key === "reconcile" && (dotCount + l2c) > 0) ? '<span class="v3-tab__dot">' + (dotCount + l2c) + "</span>"
-            : (t.key === "home" && todoN > 0) ? '<span class="v3-tab__dot">' + todoN + "</span>" : "";
-          return '<a class="v3-tab ' + (t.key === key ? "on" : "") + '" href="#/' + t.key + '">' +
-            dot + V3.ui.icon(t.icon, 22) + "<span>" + t.label + "</span></a>";
-        }).join("") + "</nav>";
+      segHtml = '<div class="v3-segbar"><div class="seg">' + TABS.map(function (t) {
+        var dot = (t.key === "reconcile" && (dotCount + l2c) > 0) ? '<span class="v3-tab__dot">' + (dotCount + l2c) + "</span>"
+          : (t.key === "home" && todoN > 0) ? '<span class="v3-tab__dot">' + todoN + "</span>" : "";
+        return '<button type="button" class="seg-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
+          "<span>" + t.label + "</span>" + dot + "</button>";
+      }).join("") + "</div></div>";
     }
 
-    root.innerHTML = header + subnavHtml +
-      '<div id="ag-view"><div class="v3-page ' + (isTabbed ? "" : "v3-page--notab") + '" id="v3-page-body"></div></div>' +
-      tabbarHtml;
+    /* 二级横向分段（App .sub-tabs 语系 + 金色动画指示条，sticky） */
+    var subnavHtml = "";
+    if (isSub) {
+      subnavHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
+        SUBNAV.map(function (n) {
+          return '<button type="button" class="sub-item ' + (n.key === key ? "active" : "") + '" data-key="' + n.key + '">' +
+            "<span>" + n.label + "</span></button>";
+        }).join("") +
+        '<span class="sub-ind" aria-hidden="true"></span>' +
+        "</div></div></div>";
+    }
+
+    root.innerHTML = segHtml + subnavHtml +
+      '<div id="ag-view"><div class="v3-page" id="v3-page-body"></div></div>';
 
     var bodyEl = document.getElementById("v3-page-body");
     bodyEl.innerHTML = page.render(ctx);
     if (page.mount) page.mount(bodyEl, ctx);
 
-    var demoBtn = document.getElementById("v3-demo-btn");
-    if (demoBtn) demoBtn.addEventListener("click", openDemoSheet);
+    /* 省代分段：点击切换 */
+    var segSc = root.querySelector(".v3-segbar .seg");
+    if (segSc) {
+      segSc.addEventListener("click", function (e) {
+        var btn = e.target.closest(".seg-item");
+        if (!btn) return;
+        root.querySelectorAll(".seg-item").forEach(function (x) { x.classList.toggle("active", x === btn); });
+        go("#/" + btn.getAttribute("data-key"));
+      });
+    }
+
+    /* 二级分段：点击切换 + 指示条 + 居中滚动 */
+    var subSc = root.querySelector(".v3-subnav .sub-scroll");
+    if (subSc) {
+      subSc.addEventListener("click", function (e) {
+        var btn = e.target.closest(".sub-item");
+        if (!btn) return;
+        root.querySelectorAll(".sub-item").forEach(function (x) { x.classList.toggle("active", x === btn); });
+        moveSubInd();
+        var targetLeft = btn.offsetLeft - (subSc.clientWidth - btn.offsetWidth) / 2;
+        var maxLeft = Math.max(0, subSc.scrollWidth - subSc.clientWidth);
+        subSc.scrollTo({ left: Math.max(0, Math.min(targetLeft, maxLeft)), behavior: "smooth" });
+        go("#/" + btn.getAttribute("data-key"));
+      });
+      moveSubInd();
+    }
 
     root.scrollTop = 0;
   }
@@ -145,9 +156,6 @@
   window.addEventListener("v3:scenario", render);
   document.addEventListener("DOMContentLoaded", function () {
     if (window.V3.store.getState()) { render(); return; }
-    // 初始化链（scenarios.js 从 localStorage 恢复 / 重新种子）若因脚本调度或刷新竞态
-    // 在本轮 DOMContentLoaded 尚未把状态放进内存，则短暂等待，就绪后立即补渲染，
-    // 避免任何启动 / 下拉刷新 / 多标签场景下命中一次性白屏。
     var n = 0;
     var t = setInterval(function () {
       if ((window.V3 && window.V3.store && window.V3.store.getState()) || ++n > 40) {
@@ -156,6 +164,5 @@
       }
     }, 50);
   });
-  // 暴露给页面用
-  window.V3.router = { render: render, go: go, currentKey: currentKey, openDemoSheet: openDemoSheet };
+  window.V3.router = { render: render, go: go, currentKey: currentKey };
 })();

@@ -115,7 +115,8 @@
       (opt.cancel !== false ? '<button class="v3-btn v3-btn--ghost" data-cancel>' + esc(opt.cancelText || "取消") + "</button>" : "") +
       '<button class="v3-btn ' + (opt.danger ? "v3-btn--danger" : "v3-btn--primary") + '" data-ok>' + esc(opt.okText || "确定") + "</button>" +
       "</div></div>";
-    ov.querySelector("[data-cancel]").addEventListener("click", function () { closeOverlay(ov); });
+    var cb = ov.querySelector("[data-cancel]");
+    if (cb) cb.addEventListener("click", function () { closeOverlay(ov); });
     ov.querySelector("[data-ok]").addEventListener("click", function () {
       if (!opt.onOk || opt.onOk(ov) !== false) closeOverlay(ov);
     });
