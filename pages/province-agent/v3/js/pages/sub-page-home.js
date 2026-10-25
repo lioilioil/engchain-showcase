@@ -57,7 +57,7 @@
       '<p class="v3-legal v3-mt9" style="color:var(--v3-on-navy-2)">' + V3.MONEY_NOTE + "</p></section>";
 
     /* 本人三项 */
-    h += '<div class="v3-sec-title">邀请获客</div><div class="v3-tiles" style="background:var(--v3-surface);border:1px solid var(--v3-line);border-radius:var(--v3-r-lg);padding:16px;box-shadow:var(--v3-sh-card)">' +
+    h += '<div class="v3-sec-title">邀请获客</div><div class="v3-tiles v3-pad16" style="background:var(--v3-surface);border:1px solid var(--v3-line);border-radius:var(--v3-r-lg);box-shadow:var(--v3-sh-card)">' +
       tile("invite", "邀请码·海报", "#/invite") + tile("user", "我的邀请用户", "#/invite-users") +
       tile("chart", "转化分佣统计", "#/invite-stats") + tile("receipt", "收款确认", "#/payments") +
       "</div>";
