@@ -23,7 +23,7 @@
     /* 暂停只读横幅 */
     if (ctx.readonly) {
       h += '<div class="v3-lockbanner">' + ui.icon("lock", 18) +
-        '<div><b>账号已暂停 · 仅可查看</b><div class="v3-xs" style="color:#B9C4D4;margin-top:2px">发起邀请、登记付款、确认平账等操作已锁定，历史数据仍可查阅。</div></div></div>';
+        '<div><b>账号已暂停 · 仅可查看</b><div class="v3-xs v3-mt2" style="color:#B9C4D4">发起邀请、登记付款、确认平账等操作已锁定，历史数据仍可查阅。</div></div></div>';
     }
 
     /* Hero 授权卡 */
@@ -37,11 +37,11 @@
       '<div class="v3-quota"><div class="qrow"><span>二级名额（已入驻 / 上限）</span><span><b class="num">' +
       d.profile.used + " / " + d.profile.cap + "</b></span></div>" +
       '<div class="bar"><i style="width:' + pct(d.profile.used, d.profile.cap) + '%"></i></div>' +
-      '<div class="qrow" style="margin-top:6px"><span>名额满后仍可继续邀请终端用户</span></div></div>' +
+      '<div class="qrow v3-mt6" ><span>名额满后仍可继续邀请终端用户</span></div></div>' +
       "</section>";
 
     /* 财务大数字卡（segment 切换：总盘 / 自身线） */
-    h += '<section class="v3-card v3-earn" style="margin-top:12px">' +
+    h += '<section class="v3-card v3-earn v3-mt12" >' +
       '<div class="seg"><button data-fin="gross" class="on">总盘 50%</button><button data-fin="self">自身线 10%</button></div>' +
       '<div class="v3-flex v3-between"><div><div class="big num" id="earn-big">' + ui.money(fin.gross) + '</div>' +
       '<div class="sub" id="earn-sub">本月总盘 = 合格消费 × 50%</div></div></div>' +
@@ -51,10 +51,10 @@
       dline("省代自留", ui.money(fin.selfKeep)) +
       dline("T+" + V3.store.CONST.frozenDays + " 在途冻结", ui.money(fin.frozen), "small") +
       "</div>" +
-      '<p class="v3-legal" style="margin-top:9px">' + V3.MONEY_NOTE + "</p></section>";
+      '<p class="v3-legal v3-mt9" >' + V3.MONEY_NOTE + "</p></section>";
 
     /* 金色主 CTA：邀请用户入驻（B 轨） */
-    h += '<button class="v3-cta-gold v3-press" id="cta-invite" style="margin-top:12px" ' + (ctx.readonly ? "data-locked" : "") + ">" +
+    h += '<button class="v3-cta-gold v3-press v3-mt12" id="cta-invite" ' + (ctx.readonly ? "data-locked" : "") + ">" +
       '<span style="font-size:24px">' + ui.icon("invite", 26) + "</span>" +
       "<span><div class=\"t\">邀请用户入驻</div><div class=\"s\">渠道码 · 海报 · 分享链接，直接绑定到你（B 轨获客）</div></span>" +
       '<span class="arrow">' + ui.icon("chev", 16) + "</span></button>";
@@ -62,7 +62,7 @@
     /* 待办带 */
     var todoN = pendApps.length + pendPay + disputes;
     if (todoN > 0) {
-      h += '<div class="v3-todoband" style="margin-top:12px" data-go="#/reconcile">' +
+      h += '<div class="v3-todoband v3-mt12" data-go="#/reconcile">' +
         '<span class="n">' + todoN + '</span><span class="txt"><b>' +
         (pendApps.length ? pendApps.length + " 条二级申请待初审 · " : "") +
         (pendPay ? pendPay + " 笔收款待确认 · " : "") +
@@ -72,10 +72,10 @@
 
     /* 异常预警条 */
     if (d.alerts && d.alerts.length) {
-      h += '<div style="margin-top:12px" class="v3-stack">';
+      h += '<div class="v3-stack v3-mt12">';
       d.alerts.forEach(function (a) {
         h += '<div class="v3-alert v3-alert--' + (a.type || "info") + '" ' + (a.to ? 'data-go="' + a.to + '"' : "") + ">" +
-          "<span>" + (a.icon || "ℹ") + '</span><div><b>' + ui.esc(a.title) + "</b><div class='v3-xs' style='margin-top:2px'>" +
+          "<span>" + (a.icon || "ℹ") + '</span><div><b>' + ui.esc(a.title) + "</b><div class='v3-xs v3-mt2' >" +
           ui.esc(a.desc) + "</div></div></div>";
       });
       h += "</div>";
@@ -90,10 +90,10 @@
       funnelBar(fn.onboarded, fn.direct, "已入驻", "") +
       funnelBar(fn.paid, fn.direct, "已消费", "alt") +
       "</div>" +
-      '<div class="v3-stat-money" style="margin-top:12px"><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4 · 只统计不发钱）</div>' +
-      '<div class="amt num" style="margin-top:3px">' + ui.money(fn.paidAmount) + '</div>' +
-      '<div class="v3-xs" style="margin-top:3px">来自你直接邀请用户的合格消费；' + V3.MONEY_NOTE + "</div></div>" +
-      (fn.ignored ? '<div class="v3-readnote" style="margin-top:10px">' + ui.icon("eye", 16) +
+      '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4 · 只统计不发钱）</div>' +
+      '<div class="amt num v3-mt3" >' + ui.money(fn.paidAmount) + '</div>' +
+      '<div class="v3-xs v3-mt3" >来自你直接邀请用户的合格消费；' + V3.MONEY_NOTE + "</div></div>" +
+      (fn.ignored ? '<div class="v3-readnote v3-mt10" >' + ui.icon("eye", 16) +
         "<span>另有 <b>" + fn.ignored + "</b> 位为终端用户再邀请，<b>不归属 · 不分佣 · 不传递</b>，不计入本漏斗。</span></div>" : "") +
       "</section>";
 
@@ -114,7 +114,7 @@
           '<span class="v3-badge v3-badge--active">生效</span>' + ui.icon("chev", 18) + "</button>";
       });
     } else if (!pendApps.length) {
-      h += '<div class="v3-empty" style="padding:26px 18px"><div class="t">还没有二级企业</div>' +
+      h += '<div class="v3-empty v3-ep26" ><div class="t">还没有二级企业</div>' +
         '<div class="d">名额 0 / ' + d.profile.cap + "，可通过 A 轨招商码发起合作；同时你始终可以直接邀请终端用户。</div>" +
         '<button class="v3-btn v3-btn--primary v3-btn--sm" data-go="#/invite">发起二级合作</button></div>';
     }
@@ -212,9 +212,9 @@
         kv("邀请终端用户", "允许（单层绑定）") + kv("发展下级企业", "永久禁止（两级封顶）") +
         kv("规模 / 费率", "由省代在平台配置 + 协议授权，App 只读") +
         "</div>" +
-        '<div class="sub-scope" style="margin-top:12px">D1：该二级可直接邀请终端用户并据此计本人线；' +
+        '<div class="sub-scope v3-mt12" >D1：该二级可直接邀请终端用户并据此计本人线；' +
         "终端用户再邀请不归属、不分佣、不向下传递；二级无招商码。</div>" +
-        '<p class="v3-legal" style="margin-top:10px">' + ctx.V3.MONEY_NOTE + "</p>",
+        '<p class="v3-legal v3-mt10" >' + ctx.V3.MONEY_NOTE + "</p>",
       footer: [{ t: "关闭", kind: "v3-btn--ghost", onClick: function (ov) { ctx.ui.closeAll(); } }]
     });
   }

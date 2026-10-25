@@ -76,6 +76,7 @@
     if (validKeys.indexOf(key) < 0) { location.replace("#/home"); key = "home"; }
 
     var page = registry[key] || registry.home;
+    if (!page) return; /* 防御：preview iframe 重载竞态下视图未注册时不炸 render 链 */
     var d = isSub ? s.sub : s.province;
     var readonly = isReadonly(d);
     var ctx = {

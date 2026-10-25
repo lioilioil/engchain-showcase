@@ -5,14 +5,14 @@
     var h = "";
     h += '<section class="v3-card me-profile"><span class="v3-avatar">' + ui.esc(d.profile.agentName.slice(0, 1)) + "</span>" +
       "<div><div class='v3-h-title'>" + ui.esc(d.profile.agentName) + "</div>" +
-      '<div class="v3-sm v3-muted" style="margin-top:3px">' + ui.esc(d.profile.authNo) + " · 有效期至 " + ui.esc(d.profile.validTill) + "</div>" +
-      '<div style="margin-top:6px"><span class="v3-badge ' + ui.ACCT_BADGE[d.profile.status] + '">' + ui.ACCT[d.profile.status] + "</span></div></div></section>";
+      '<div class="v3-sm v3-muted v3-mt3" >' + ui.esc(d.profile.authNo) + " · 有效期至 " + ui.esc(d.profile.validTill) + "</div>" +
+      '<div class="v3-mt6" ><span class="v3-badge ' + ui.ACCT_BADGE[d.profile.status] + '">' + ui.ACCT[d.profile.status] + "</span></div></div></section>";
 
     /* 演示：身份角色切换（D5） */
     h += '<div class="me-roleline">' + ui.icon("shield", 15) + "<span>原型演示身份（用于验证 D5 权限差异）：</span></div>";
     h += '<section class="v3-card"><div class="v3-radio" id="role-sel">' +
       roleOpt("boss", "老板 / 管理员", st.role === "boss") + roleOpt("staff", "员工", st.role === "staff") + "</div>" +
-      '<div class="v3-xs v3-muted" style="margin-top:9px">员工可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div></section>';
+      '<div class="v3-xs v3-muted v3-mt9" >员工可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div></section>';
 
     /* 主题（演示场景切换统一在 preview.html 演示切换器） */
     h += '<div class="me-group">' +
@@ -30,13 +30,13 @@
       "</div>";
 
     /* 合规口径 */
-    h += '<section class="v3-card" style="margin-top:14px"><div class="v3-sm v3-strong" style="margin-bottom:8px">财务口径（锁定 · 只读）</div>' +
+    h += '<section class="v3-card v3-mt14" ><div class="v3-sm v3-strong v3-mb8" >财务口径（锁定 · 只读）</div>' +
       '<div class="kv-mini">总盘 = 合格消费 × <b>50%</b>；自身线 = 自身合格消费 × <b>10%</b>（独立不相加）<br/>' +
       "约定给二级比例区间 <b>0–50%</b>（平台配置 + 协议）；在途冻结 <b>T+7</b><br/>" +
       "合格：订单净额 / 积分付费 / 增值付费；排除：充值 / 免费积分 / 报名费 / 退款冲回<br/>" +
       "名额 <b>1 / 21</b>；" + ui.esc(ctx.V3.MONEY_NOTE) + "</div></section>";
 
-    h += '<button class="v3-btn v3-btn--block v3-btn--ghost" style="margin-top:16px" data-me-act="logout">退出登录（Mock）</button>';
+    h += '<button class="v3-btn v3-btn--block v3-btn--ghost v3-mt16" data-me-act="logout">退出登录（Mock）</button>';
     h += '<div class="trust">润锦工程链 Engchain 3.0 · v3 高保真原型 · 数据均为本地 Mock</div>';
     return h;
   }
@@ -78,13 +78,13 @@
     var d = ctx.d;
     ctx.ui.openSheet({
       title: "授权证书",
-      body: '<div class="v3-hero" style="margin-bottom:12px"><div class="eyebrow">AUTHORIZATION</div>' +
+      body: '<div class="v3-hero v3-mb12" ><div class="eyebrow">AUTHORIZATION</div>' +
         '<div class="prov"><div class="name" style="font-size:20px">' + ctx.ui.esc(d.profile.agentName) + "</div></div>" +
         '<div class="meta"><div>授权编号<b>' + ctx.ui.esc(d.profile.authNo) + "</b></div>" +
         "<div>有效期至<b>" + ctx.ui.esc(d.profile.validTill) + "</b></div></div></div>" +
         '<div class="kv-mini">授权区域：<b>' + ctx.ui.esc(d.profile.province) + "</b><br/>" +
         "授权类型：<b>省级总代</b>，可在平台配置与 O4 协议范围内直接邀请终端用户、招募二级企业（两级封顶）。</div>" +
-        '<p class="v3-legal" style="margin-top:10px">证书信息以平台正式签发为准；本页为原型 Mock 展示。</p>',
+        '<p class="v3-legal v3-mt10" >证书信息以平台正式签发为准；本页为原型 Mock 展示。</p>',
       footer: [{ t: "关闭", kind: "v3-btn--ghost" }]
     });
   }

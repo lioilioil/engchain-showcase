@@ -9,7 +9,7 @@
     var ui = ctx.ui, d = ctx.d;
     var cur = d.calc[0];
     var curRegs = d.payRegs.filter(function (r) { return r.calcId === cur.id; });
-    var h = '<div class="v3-readnote" style="margin-bottom:12px">' + ui.icon("clock", 16) +
+    var h = '<div class="v3-readnote v3-mb12" >' + ui.icon("clock", 16) +
       "<span>省代在 <b>App 外</b> 线下付款后登记凭证；请你核对到账与凭证一致再确认。" +
       "出账后 <b>15 天内仅提醒，绝不自动确认到账</b>。</span></div>";
 
@@ -18,9 +18,9 @@
     var dueCls = dueDay >= 15 ? "danger" : dueDay >= 10 ? "warn" : "ok";
     h += '<section class="v3-card"><div class="v3-flex v3-between"><span class="v3-sm v3-strong">' + cur.month + " 省代应付款（测算）</span>" +
       '<span class="v3-due v3-due--' + dueCls + '">第 ' + dueDay + " / 15 天</span></div>" +
-      '<div class="v3-display num v3-goldtext" style="margin:8px 0 10px">' + ui.money(cur.calcAmount) + "</div>" +
+      '<div class="v3-display num v3-goldtext v3-mt8mb10" >' + ui.money(cur.calcAmount) + "</div>" +
       '<div class="v3-progress"><i class="' + (dueCls === "ok" ? "" : dueCls) + '" style="width:' + pct + '%"></i></div>' +
-      '<div class="v3-xs v3-muted" style="margin-top:7px">逾期仍只提醒省代与你，<b>系统不会自动确认、不会自动到账</b>。</div></section>';
+      '<div class="v3-xs v3-muted v3-mt7" >逾期仍只提醒省代与你，<b>系统不会自动确认、不会自动到账</b>。</div></section>';
 
     h += '<div class="v3-sec-title">付款登记与凭证</div>';
     if (!curRegs.length) {
@@ -34,7 +34,7 @@
     h += '<div class="v3-sec-title">' + prev.month + " 历史（已平账）</div>";
     prevRegs.forEach(function (r) { h += regCard(ctx, r, true); });
 
-    h += '<p class="v3-legal" style="margin-top:12px">' + ctx.V3.MONEY_NOTE + "</p>";
+    h += '<p class="v3-legal v3-mt12" >' + ctx.V3.MONEY_NOTE + "</p>";
     return h;
   }
 
@@ -46,13 +46,13 @@
       '<div class="kv-mini">方式 ' + methodName(r.method) + " · 付款日 " + ui.esc(r.date) + " · 登记人 " + ui.esc(r.registeredBy) + "</div>";
     (r.vouchers || []).forEach(function (v) {
       h += '<div class="rc-voucherline">' + ui.icon(v.kind === "image" ? "camera" : "file", 16) +
-        "<span>" + ui.esc(v.name) + "</span><span class='v3-badge v3-badge--active' style='margin-left:auto'>已附凭证</span></div>";
+        "<span>" + ui.esc(v.name) + "</span><span class='v3-badge v3-badge--active v3-mxa' >已附凭证</span></div>";
     });
     if (r.status === "confirmed") {
-      h += '<div class="rc-voucherline" style="margin-top:6px">' + ui.icon("shield", 16) +
+      h += '<div class="rc-voucherline v3-mt6" >' + ui.icon("shield", 16) +
         "<span>" + (r.signMethod === "esign" ? "确认 + 电子签留痕" : "双方确认记录") + "</span></div>";
     }
-    if (r.status === "disputed" && r.reason) h += '<div class="v3-alert v3-alert--warn" style="margin-top:8px">' + ui.esc(r.reason) + "</div>";
+    if (r.status === "disputed" && r.reason) h += '<div class="v3-alert v3-alert--warn v3-mt8" >' + ui.esc(r.reason) + "</div>";
 
     if (!history && r.status === "pending_confirm" && !ctx.readonly) {
       h += '<div class="rc-actions">' +
@@ -79,7 +79,7 @@
     var ui = ctx.ui;
     ui.openSheet({
       title: "确认省代线下到账",
-      body: '<div class="v3-alert v3-alert--warn" style="margin-bottom:12px">仅在你已<b>实际核对到账金额与凭证一致</b>后确认；确认后进入双方留痕。</div>' +
+      body: '<div class="v3-alert v3-alert--warn v3-mb12" >仅在你已<b>实际核对到账金额与凭证一致</b>后确认；确认后进入双方留痕。</div>' +
         '<div class="rc-voucherline">' + ui.icon("shield", 16) + "<span>确认方式：双方确认记录（电子签正式接入为 P1，现可模拟签署）</span></div>",
       footer: [
         { t: "确认到账（记录）", kind: "v3-btn--primary", onClick: function () {
@@ -115,13 +115,13 @@
   /* ---------------- 月度对账单（只读） ---------------- */
   function renderStatement(ctx) {
     var ui = ctx.ui, V3 = ctx.V3, d = ctx.d;
-    var h = '<div class="v3-readnote" style="margin-bottom:12px">' + ui.icon("receipt", 16) +
+    var h = '<div class="v3-readnote v3-mb12" >' + ui.icon("receipt", 16) +
       "<span>月度对账单由双方确认后由对账流程平账留痕；你在此<b>只读查看</b>测算、登记与差异。</span></div>";
     d.statements.forEach(function (st, i) {
       var calc = d.calc[i];
       var sum = V3.store.regsSum(d.payRegs, calc.id);
       var diff = calc.calcAmount - sum;
-      h += '<section class="rc-layer" style="margin-bottom:12px"><div class="rc-layer__hd">' + ui.icon("doc", 17) +
+      h += '<section class="rc-layer v3-mb12" ><div class="rc-layer__hd">' + ui.icon("doc", 17) +
         '<span class="t">' + calc.month + " 对账单</span>" +
         (st.status === "balanced" ? '<span class="v3-badge v3-badge--active">已平账</span>' : '<span class="v3-badge v3-badge--pending">对账中</span>') +
         "</div>" +
@@ -151,7 +151,7 @@
     if (!items.length) return '<div class="v3-empty"><div class="ic">' + ui.icon("check", 28) + '</div><div class="t">暂无待办</div><div class="d">所有收款均已确认，协议已签署。</div></div>';
     return '<div class="v3-stack">' + items.map(function (it) {
       return '<button class="v3-alert v3-alert--' + it.type + '" style="width:100%;text-align:left" data-go="' + it.go + '">' +
-        "<span>" + it.icon + "</span><div><b>" + ui.esc(it.t) + "</b><div class='v3-xs' style='margin-top:2px'>" + ui.esc(it.s) + "</div></div></button>";
+        "<span>" + it.icon + "</span><div><b>" + ui.esc(it.t) + "</b><div class='v3-xs v3-mt2' >" + ui.esc(it.s) + "</div></div></button>";
     }).join("") + "</div>";
   }
   function mountInbox(el, ctx) {

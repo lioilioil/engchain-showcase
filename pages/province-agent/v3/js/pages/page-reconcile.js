@@ -9,7 +9,7 @@
 
   function render(ctx) {
     var ui = ctx.ui;
-    var h = '<div class="v3-readnote" style="margin-bottom:12px">' + ui.icon("bank", 16) +
+    var h = '<div class="v3-readnote v3-mb12" >' + ui.icon("bank", 16) +
       "<span>线下付款在 App 外完成；此处只做<b>登记 · 凭证 · 确认 · 对账留痕</b>。" +
       "测算金额只读，恒等呈现 <b>测算应付 − 线下实付登记 = 差异</b>，差异为 0 且全部确认才可平账。</span></div>";
     h += layerCard(ctx, "1");
@@ -36,7 +36,7 @@
       '<div class="rc-layer__hd"><span>' + (isL2 ? ui.icon("user", 18) : ui.icon("bank", 18)) + "</span>" +
       '<span class="t">' + L.title + "</span>" +
       (balanced ? '<span class="v3-badge v3-badge--active">已平账</span>' : '<span class="v3-badge v3-badge--pending">对账中</span>') +
-      "</div><div style='padding:12px 14px 0'>" +
+      "</div><div class='v3-pad12-14-0'>" +
       '<div class="rc-dueline">' + ui.icon("clock", 15) + "<span>" + ui.esc(curCalc.dueLabel) + "</span></div></div>";
 
     /* 三行勾稽 */
@@ -66,10 +66,10 @@
       }).join("") + "</div>";
 
     /* 登记明细 */
-    h += '<div style="padding:0 14px"><div class="v3-flex v3-between" style="margin:2px 0 8px"><span class="v3-sm v3-strong">' + curCalc.month + " 登记明细</span>" +
+    h += '<div class="v3-px14" ><div class="v3-flex v3-between v3-mt2mb8" ><span class="v3-sm v3-strong">' + curCalc.month + " 登记明细</span>" +
       '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="add-reg">+ 登记线下付款</button></div>';
     if (!regs.length) {
-      h += '<div class="v3-placeholder" style="margin-bottom:10px">尚无登记。请在 App 外完成付款后，登记金额并上传凭证（凭证强制）。</div>';
+      h += '<div class="v3-placeholder v3-mb10" >尚无登记。请在 App 外完成付款后，登记金额并上传凭证（凭证强制）。</div>';
     } else {
       regs.forEach(function (r) { h += regCard(ctx, r, isL2); });
     }
@@ -77,17 +77,17 @@
     /* 平账 / 第二层提醒 */
     if (!balanced) {
       if (isL2) {
-        h += '<button class="v3-btn v3-btn--block v3-btn--ghost" data-act="remind" style="margin:4px 0 14px">' + ui.icon("bell", 17) + " 提醒二级确认（不自动到账）</button>";
+        h += '<button class="v3-btn v3-btn--block v3-btn--ghost v3-mt4mb14" data-act="remind" >' + ui.icon("bell", 17) + " 提醒二级确认（不自动到账）</button>";
       } else {
         var canBalance = diff === 0 && allConfirmed && ctx.canBoss && !ctx.readonly;
-        h += '<button class="v3-btn v3-btn--block ' + (canBalance ? "v3-btn--navy" : "is-disabled") + '" ' +
-          (canBalance ? 'data-act="balance"' : "") + ' style="margin:4px 0 14px">差异 0 且全部确认后 · 月度平账留痕</button>';
+        h += '<button class="v3-btn v3-btn--block v3-mt4mb14 ' + (canBalance ? "v3-btn--navy" : "is-disabled") + '" ' +
+     (canBalance ? 'data-act="balance"' : "") + ' >差异 0 且全部确认后 · 月度平账留痕</button>';
       }
     }
     h += "</div>"; // end padding
 
     /* 历史月份 */
-    h += '<div style="border-top:1px solid var(--v3-line);padding:10px 14px" class="v3-flex v3-between">' +
+    h += '<div style="border-top:1px solid var(--v3-line)" class="v3-flex v3-between v3-pad10-14">' +
       "<span class='v3-xs v3-muted'>" + prevCalc.month + " 月度对账单</span>" +
       '<span class="v3-badge v3-badge--active">已平账 ' + ui.money(prevCalc.calcAmount) + "</span></div>";
 
@@ -105,14 +105,14 @@
       "方式 " + methodName(r.method) + " · 付款日 " + ui.esc(r.date) + " · 登记人 " + ui.esc(r.registeredBy) + "</div>";
     (r.vouchers || []).forEach(function (v) {
       h += '<div class="rc-voucherline">' + ui.icon(v.kind === "image" ? "camera" : "file", 16) +
-        "<span>" + ui.esc(v.name) + "</span><span class='v3-badge v3-badge--active' style='margin-left:auto'>凭证</span></div>";
+        "<span>" + ui.esc(v.name) + "</span><span class='v3-badge v3-badge--active v3-mxa' >凭证</span></div>";
     });
     if (r.status === "confirmed" && r.signMethod) {
-      h += '<div class="rc-voucherline" style="margin-top:6px">' + ui.icon("shield", 16) +
+      h += '<div class="rc-voucherline v3-mt6" >' + ui.icon("shield", 16) +
         "<span>" + (r.signMethod === "esign" ? "确认 + 电子签留痕" : "双方确认记录") + "</span></div>";
     }
-    if (r.status === "disputed" && r.reason) h += '<div class="v3-alert v3-alert--warn" style="margin-top:8px">' + ui.esc(r.reason) + "</div>";
-    if (r.voidInfo) h += '<div class="v3-xs v3-faint" style="margin-top:6px">作废/红冲：' + ui.esc(r.voidInfo.reason) + " · " + ui.esc(r.voidInfo.at) + "</div>";
+    if (r.status === "disputed" && r.reason) h += '<div class="v3-alert v3-alert--warn v3-mt8" >' + ui.esc(r.reason) + "</div>";
+    if (r.voidInfo) h += '<div class="v3-xs v3-faint v3-mt6" >作废/红冲：' + ui.esc(r.voidInfo.reason) + " · " + ui.esc(r.voidInfo.at) + "</div>";
 
     if (!voided && !ctx.readonly) {
       h += '<div class="rc-actions">';
@@ -171,13 +171,13 @@
     var ov = ui.openSheet({
       title: "登记线下付款 · 第" + (layer === "1" ? "一" : "二") + "层",
       body:
-        '<div class="v3-alert v3-alert--info" style="margin-bottom:12px">请确认已在 <b>App 外</b> 完成线下付款，再据实登记；金额与凭证将进入只读勾稽。</div>' +
+        '<div class="v3-alert v3-alert--info v3-mb12" >请确认已在 <b>App 外</b> 完成线下付款，再据实登记；金额与凭证将进入只读勾稽。</div>' +
         '<div class="v3-field"><label>实付金额（元）</label><input class="v3-input" id="r-amt" type="number" inputmode="decimal" placeholder="0.00" /></div>' +
         '<div class="v3-field"><label>付款方式</label><select class="v3-select" id="r-method"><option value="bank">对公转账</option><option value="wechat">微信 / 支付宝</option><option value="cash">现金</option><option value="other">其他</option></select></div>' +
         '<div class="v3-field"><label>付款日期</label><input class="v3-input" id="r-date" type="date" /></div>' +
         '<div class="v3-field"><label>付款凭证（强制，至少 1 张）</label>' +
         '<label class="v3-upload" id="r-up"><span class="ic">' + ui.icon("camera", 24) + '</span>点击上传回单 / 截图（原型内本地读取，不上传服务器）<input type="file" id="r-file" accept="image/*,application/pdf" multiple style="display:none" /></label>' +
-        '<div id="r-vlist" style="margin-top:8px"></div><div class="v3-hint">缺凭证不可提交确认；支持多张。</div></div>',
+        '<div class="v3-mt8" id="r-vlist" ></div><div class="v3-hint">缺凭证不可提交确认；支持多张。</div></div>',
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
         { t: "提交登记", kind: "v3-btn--primary", onClick: function (wrap) {
@@ -218,8 +218,8 @@
     ui.openSheet({
       title: "确认到账",
       body:
-        '<div class="v3-alert v3-alert--warn" style="margin-bottom:12px">仅在你已<b>实际核对线下到账与凭证一致</b>后确认；确认进入双方留痕。</div>' +
-        (layer === "2" ? '<div class="v3-readnote" style="margin-bottom:12px">第二层出账后 15 天内仅提醒，<b>绝不自动确认到账</b>。</div>' : "") +
+        '<div class="v3-alert v3-alert--warn v3-mb12" >仅在你已<b>实际核对线下到账与凭证一致</b>后确认；确认进入双方留痕。</div>' +
+        (layer === "2" ? '<div class="v3-readnote v3-mb12" >第二层出账后 15 天内仅提醒，<b>绝不自动确认到账</b>。</div>' : "") +
         '<div class="rc-voucherline">' + ui.icon("shield", 16) + "<span>确认方式：双方确认记录（电子签正式接入为 P1）</span></div>",
       footer: [
         { t: "确认到账（确认记录）", kind: "v3-btn--primary", onClick: function () {
@@ -247,7 +247,7 @@
       title: "提出异议",
       body: '<div class="v3-field"><label>异议说明（必填）</label><textarea class="v3-textarea" id="d-reason" placeholder="如：金额不符 / 未收到该笔 / 凭证不清晰"></textarea>' +
         '<div class="v3-hint">第一层 T+5 工作日内提出并闭环线下核实；可补传凭证。</div></div>' +
-        '<label class="v3-upload" id="d-up"><span class="ic">' + ui.icon("camera", 22) + "</span>补充凭证（可选）<input type='file' id='d-file' accept='image/*,application/pdf' multiple style='display:none'/></label><div id='d-vlist' style='margin-top:8px'></div>",
+        '<label class="v3-upload" id="d-up"><span class="ic">' + ui.icon("camera", 22) + "</span>补充凭证（可选）<input type='file' id='d-file' accept='image/*,application/pdf' multiple style='display:none'/></label><div class="v3-mt8" id='d-vlist' ></div>",
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
         { t: "提交异议", kind: "v3-btn--danger", onClick: function (wrap) {
