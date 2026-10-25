@@ -39,7 +39,7 @@ python serve_nocache.py 8766
 | u11（代理演示场景，非独立登录） | 四川省级总代（active，n/21） | 两分区台账、充值不进、frozen/settled/冲减、法定税、自身余额、O4 已签、团队 admin+member、叠加个人合伙人示例、清理日志样例；由 agent-demo 播种/重置 |
 | u12（代理演示场景，非独立登录） | 成都二级（approved，约定20%） | 本人约定所得、冻结退款、冲减、法定税、已签、自身余额、团队；由 agent-demo 播种/重置 |
 
-> 代理演示场景（u11/u12）通过页面「演示场景播种/重置」写入 `engchain-province-agents`/`engchain-sub-agents` 等代理键，硬刷新可还原；不覆盖 u9/u10 等既有种子。
+> 代理演示场景（u11/u12）通过 preview.html 演示切换器播种写入 `engchain-province-agents`/`engchain-sub-agents` 等代理键（v3 工作台/二级页已并入 App 骨架，P0–P4 已完成，页内不再有 ⚙ 自绘演示浮层），硬刷新可还原；不覆盖 u9/u10 等既有种子。
 
 ### 省级总代体系 · 完整旅程导览（13 节点）
 
