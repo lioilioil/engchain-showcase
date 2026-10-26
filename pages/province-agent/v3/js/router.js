@@ -1,24 +1,26 @@
 /* ============================================================
    router.js · hash 路由 / 页内分段导航 / 主题
-   【S 壳层 · 深度重构】
-   - index：3 Tab（工作台/邀请获客/对账留痕），去「我的」→ 非 Tab 路由 #/profile（身份详情）
+   【S4-S2 壳层 · 信息架构升级】
+   - index：4 Tab（工作台/邀请获客/二级管理/对账留痕）；二级管理挂载 #/subs + #/share-config stub
    - sub：4 大类 Tab（工作台/邀请获客/收款与对账/台账税务）+ 大类内子导航（seg 子页签）
    - 顶栏标题跟随当前视图/子页；首页标题「工作台总览」消除与首个 Tab 重复
-   - 角标：工作台=待办总数；对账/收款与对账=未平·待确认数；不重复堆叠
+   - 角标：工作台=待办总数；对账=未平·待确认数；二级管理=二级申请待初审批数；不重复堆叠
+   - navbar 消息 icon 跳省代专属消息页 messages.html（不再直跳全局消息页）
    ============================================================ */
 (function () {
   "use strict";
   window.V3PAGES = {};
   window.V3SUBPAGES = {};
 
-  /* index 端 Tab（3 项，去「我的」） */
+  /* index 端 Tab（4 项：工作台/邀请获客/二级管理/对账留痕） */
   var TABS = [
     { key: "home", label: "工作台" },
     { key: "invite", label: "邀请获客" },
+    { key: "subs", label: "二级管理" },
     { key: "reconcile", label: "对账留痕" }
   ];
-  /* #/profile 为非 Tab 路由：不出现在 Tab 条，带返回，标题「身份详情」 */
-  var EXTRA_INDEX_ROUTES = ["profile"];
+  /* 非 Tab 路由：不出现在 Tab 条，带返回。profile=身份详情；share-config=二级管理·分成配置挂载点 */
+  var EXTRA_INDEX_ROUTES = ["profile", "share-config"];
 
   /* sub 端 4 大类层级结构：大类 -> 类内子页（E4：工作台大类移除「待办提醒」子页——待办收敛为
      navbar 右上角消息 icon + 消息中心「通知」分页；sub-page-inbox.js 文件保留不删，路由不再可达） */
@@ -38,8 +40,8 @@
 
   /* 顶栏标题（权威，优先于 page.title；消除「工作台」与首个 Tab 重复） */
   var INDEX_TITLES = {
-    home: "工作台总览", invite: "邀请获客", reconcile: "对账留痕",
-    profile: "身份详情", me: "我的"
+    home: "工作台总览", invite: "邀请获客", subs: "二级管理", "share-config": "分成配置",
+    reconcile: "对账留痕", profile: "身份详情", me: "我的"
   };
   var SUB_TITLES = {
     home: "工作台", inbox: "待办提醒",
@@ -91,9 +93,9 @@
 
   function badge(n) { return n > 0 ? '<span class="v3-tab__dot">' + n + "</span>" : ""; }
 
-  /* E4：navbar 右上角「消息」icon 角标（待办总数，tabular-nums；无待办不显示）+ 点击进消息中心。
+  /* E4：navbar 右上角「消息」icon 角标（待办总数，tabular-nums；无待办不显示）+ 点击进省代专属消息页。
      角标数据 = 省代/二级 store 待办数（与消息中心「通知」分页派生条目数一致）；navbar 在 #ag-root
-     之外，事件只绑一次。 */
+     之外，事件只绑一次。S4-S2：跳转目标由全局消息页改为同目录 messages.html（App 外壳语系专属页）。 */
   function renderNavMsg(n) {
     var b = document.getElementById("nav-msg-badge");
     if (b) {
@@ -104,7 +106,7 @@
     var btn = document.getElementById("nav-msg-btn");
     if (btn && !btn._e4Bound) {
       btn._e4Bound = true;
-      btn.addEventListener("click", function () { location.href = "../message/index.html"; });
+      btn.addEventListener("click", function () { location.href = "messages.html"; });
     }
   }
 
@@ -143,7 +145,7 @@
     setNavTitle(title);
 
     /* ---------- 角标计数 ---------- */
-    var homeBadge = "", reconcileBadge = "", catBadge = {};
+    var homeBadge = "", reconcileBadge = "", subsBadge = "", catBadge = {};
     var navTodoN = 0;   /* E4：navbar 消息 icon 角标 = 待办总数（与消息中心「通知」分页待办条目数一致） */
     if (!isSub) {
       var r1 = d.payRegs1 || [], r2 = d.payRegs2 || [];
@@ -156,6 +158,7 @@
       var reconcileN = pend1 + disp1 + pend2 + disp2;              /* 对账未平·待处理数 */
       homeBadge = badge(todoN);
       reconcileBadge = badge(reconcileN);
+      subsBadge = badge(subAppPending);                            /* S4-S2：二级管理=二级申请待初审批数 */
       navTodoN = todoN;
     } else {
       var regs = d.payRegs || [];
@@ -172,11 +175,12 @@
     /* ---------- 导航 HTML ---------- */
     var navHtml;
     if (!isSub) {
-      /* index：3 文字 Tab（App 语系）+ 金色滑动指示条 */
+      /* index：4 文字 Tab（App 语系）+ 金色滑动指示条；share-config 激活态归到「二级管理」 */
+      var effKey = (key === "share-config") ? "subs" : key;
       navHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
         TABS.map(function (t) {
-          var b = t.key === "home" ? homeBadge : t.key === "reconcile" ? reconcileBadge : "";
-          return '<button type="button" class="sub-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
+          var b = t.key === "home" ? homeBadge : t.key === "reconcile" ? reconcileBadge : (t.key === "subs" ? subsBadge : "");
+          return '<button type="button" class="sub-item ' + (t.key === effKey ? "active" : "") + '" data-key="' + t.key + '">' +
             "<span>" + t.label + "</span>" + b + "</button>";
         }).join("") +
         '<span class="sub-ind" aria-hidden="true"></span>' +
@@ -283,6 +287,51 @@
           ui.icon("receipt", 16) + "<span>查看完整税务指引</span></button></section>";
       },
       mount: function () {}
+    };
+  }
+
+  /* ============================================================
+     S4-S2 壳层 stub：二级管理（#/subs + #/share-config）
+     - 仅导航骨架与视图挂载点，不写业务数据；业务数据线后续填充。
+     - 类内子页签（seg）：二级列表 / 分成配置，复用 .v3-subseg/.v3-seg 语系。
+     ============================================================ */
+  function renderSubsStub(ctx, which) {
+    var ui = ctx.ui;
+    var seg = function (key, label) {
+      return '<button type="button" class="v3-seg' + (key === which ? " active" : "") + '" data-key="' + key + '">' + label + "</button>";
+    };
+    return '<div class="v3-subseg s2-subseg">' +
+      seg("subs", "二级列表") + seg("share-config", "分成配置") + "</div>" +
+      '<section class="v3-card s2-stub">' +
+      '<div class="s2-stub__icon">' + ui.icon("crown", 26) + "</div>" +
+      '<div class="s2-stub__t">' + (which === "subs" ? "二级列表 · 建设中" : "分成配置 · 建设中") + "</div>" +
+      '<div class="s2-stub__s">发起二级合作 / 二级列表 / 状态管理 / 分成配置将由业务数据线接入；此处仅为导航骨架与视图挂载点，不含业务数据。</div>' +
+      "</section>";
+  }
+  if (!window.V3PAGES.subs) {
+    window.V3PAGES.subs = {
+      title: "二级管理",
+      render: function (ctx) { return renderSubsStub(ctx, "subs"); },
+      mount: function (el) {
+        var bar = el.querySelector(".s2-subseg");
+        if (bar) bar.addEventListener("click", function (e) {
+          var b = e.target.closest(".v3-seg"); if (!b) return;
+          window.V3.router.go("#/" + b.getAttribute("data-key"));
+        });
+      }
+    };
+  }
+  if (!window.V3PAGES["share-config"]) {
+    window.V3PAGES["share-config"] = {
+      title: "分成配置",
+      render: function (ctx) { return renderSubsStub(ctx, "share-config"); },
+      mount: function (el) {
+        var bar = el.querySelector(".s2-subseg");
+        if (bar) bar.addEventListener("click", function (e) {
+          var b = e.target.closest(".v3-seg"); if (!b) return;
+          window.V3.router.go("#/" + b.getAttribute("data-key"));
+        });
+      }
     };
   }
 })();
