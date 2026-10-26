@@ -144,11 +144,11 @@
     var items = [];
     d.payRegs.forEach(function (r) {
       var calc = d.calc.filter(function (c) { return c.id === r.calcId; })[0];
-      if (r.status === "pending_confirm") items.push({ type: "warn", icon: "clock", t: "待确认收款 " + ui.money(r.amount), s: calc.month + " · 出账第 " + (r.dueDay || calc.dueDay || 0) + " / 15 天，仅提醒不自动到账", go: "#/payments" });
-      if (r.status === "disputed") items.push({ type: "danger", icon: "warn", t: "有异议的付款 " + ui.money(r.amount), s: r.reason || "待线下核实", go: "#/payments" });
+      if (r.status === "pending_confirm") items.push({ type: "warn", icon: "⏰", t: "待确认收款 " + ui.money(r.amount), s: calc.month + " · 出账第 " + (r.dueDay || calc.dueDay || 0) + " / 15 天，仅提醒不自动到账", go: "#/payments" });
+      if (r.status === "disputed") items.push({ type: "danger", icon: "⚠️", t: "有异议的付款 " + ui.money(r.amount), s: r.reason || "待线下核实", go: "#/payments" });
     });
     (d.alerts || []).forEach(function (a) { items.push({ type: a.type, icon: a.icon, t: a.title, s: a.desc, go: a.to || "#/payments" }); });
-    if (d.agreement && d.agreement.state === "pending_mine") items.push({ type: "info", icon: "doc", t: "O4 协议待签署", s: "请查看并完成签署 / 拒签", go: "#/home" });
+    if (d.agreement && d.agreement.state === "pending_mine") items.push({ type: "info", icon: "📄", t: "O4 协议待签署", s: "请查看并完成签署 / 拒签", go: "#/home" });
 
     if (!items.length) return '<div class="v3-empty">' + ui.emptyHtml("暂无待办", '<div>所有收款均已确认，协议已签署。</div>', "chart") + "</div>";
     return '<div class="v3-stack">' + items.map(function (it) {
