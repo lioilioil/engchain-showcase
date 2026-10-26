@@ -49,7 +49,7 @@
       fRow("已复购", fn.repaid, fn.direct, 4) +
       '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4）</div>' +
       '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + '</div>' +
-      '<div class="v3-xs v3-mt3" >只统计 · 不发起任何资金动作</div></div>" +
+      '<div class="v3-xs v3-mt3" >只统计 · 不发起任何资金动作</div></div>' +
       (fn.lost ? '<div class="v3-xs v3-muted v3-mt8" >已流失 ' + fn.lost + " 人；沉寂超 30 天线索建议回收（【假设】参数）。</div>" : "") +
       "</section>";
 

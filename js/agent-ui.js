@@ -1538,7 +1538,9 @@
       + '<section class="ag-card"><h3>成员（' + members.length + '，成员不计省名额）</h3>'
       + (rows || emptyState('暂无成员', '管理员可发送邀请，邀请经对方接受后加入。'))
       + inviteBox
-      + '<div class="ag-note">法定代表人由执照登记派生，只读无操作按钮；管理员可邀请/审批/移除；成员只见日常，不见资金与成员管理。移除成员不删除企业订单与台账。角色调整留痕由平台后台承担，本期不在成员页改动法定代表人。</div></section>'
+      + '<details class="v3-note-fold v3-mt12"><summary>'
+      + '<span class="sum">成员角色与移除规则说明 · 点击展开</span><span class="chev">›</span></summary>'
+      + '<div class="fold-body">法定代表人由执照登记派生，只读无操作按钮；管理员可邀请/审批/移除；成员只见日常，不见资金与成员管理。移除成员不删除企业订单与台账。角色调整留痕由平台后台承担，本期不在成员页改动法定代表人。</div></details></section>'
       + '<section class="ag-card"><h3>待处理邀请（' + invites.length + '）</h3>'
       + (inviteRows || emptyState('无待处理邀请', '没有等待接受的邀请记录。', 'inv')) + '</section>'
       + '<section class="ag-card"><h3>加入申请（' + joins.length + '）</h3>'
