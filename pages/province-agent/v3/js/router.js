@@ -1,35 +1,50 @@
 /* ============================================================
    router.js · hash 路由 / 页内分段导航 / 主题
-   【视觉统一】不再自绘外壳（无 #device / 无自建顶栏 / 无自建 4-Tab）：
-   页面外壳 = App demo .phone + .navbar（HTML 静态，common.js 注入状态栏/灵动岛/首页钮）；
-   省代四视图与二级八视图 = 统一 .sub-tabs 文字页签 + 金色动画指示条（App 语系）。
-   演示场景：不再提供页内 ⚙ 浮层，统一由 preview.html 演示切换器播种。
+   【S 壳层 · 深度重构】
+   - index：3 Tab（工作台/邀请获客/对账留痕），去「我的」→ 非 Tab 路由 #/profile（身份详情）
+   - sub：4 大类 Tab（工作台/邀请获客/收款与对账/台账税务）+ 大类内子导航（seg 子页签）
+   - 顶栏标题跟随当前视图/子页；首页标题「工作台总览」消除与首个 Tab 重复
+   - 角标：工作台=待办总数；对账/收款与对账=未平·待确认数；不重复堆叠
    ============================================================ */
 (function () {
   "use strict";
   window.V3PAGES = {};
   window.V3SUBPAGES = {};
 
+  /* index 端 Tab（3 项，去「我的」） */
   var TABS = [
-    { key: "home", label: "工作台", icon: "home" },
-    { key: "invite", label: "邀请获客", icon: "invite" },
-    { key: "reconcile", label: "对账留痕", icon: "reconcile" },
-    { key: "me", label: "我的", icon: "me" }
-  ];
-  var SUBNAV = [
     { key: "home", label: "工作台" },
-    { key: "invite", label: "邀请码·海报" },
-    { key: "invite-users", label: "我的邀请用户" },
-    { key: "invite-stats", label: "转化分佣统计" },
-    { key: "payments", label: "收款确认" },
-    { key: "statement", label: "月度对账单" },
-    { key: "inbox", label: "待办" },
-    { key: "ledger", label: "经营台账" }
+    { key: "invite", label: "邀请获客" },
+    { key: "reconcile", label: "对账留痕" }
   ];
-  var TITLES = {
-    home: "工作台", invite: "邀请获客", reconcile: "对账留痕", me: "我的",
-    "invite-users": "我的邀请用户", "invite-stats": "转化与分佣", payments: "收款确认",
-    statement: "月度对账单", inbox: "待办提醒", ledger: "经营台账"
+  /* #/profile 为非 Tab 路由：不出现在 Tab 条，带返回，标题「身份详情」 */
+  var EXTRA_INDEX_ROUTES = ["profile"];
+
+  /* sub 端 4 大类层级结构：大类 -> 类内子页 */
+  var SUBCATS = [
+    { key: "home", label: "工作台", subs: ["home", "inbox"] },
+    { key: "invite", label: "邀请获客", subs: ["invite", "invite-users", "invite-stats"] },
+    { key: "payments", label: "收款与对账", subs: ["payments", "statement"] },
+    { key: "ledger", label: "台账税务", subs: ["ledger", "tax"] }
+  ];
+  /* 类内子页签短标签 */
+  var SUBSEG_LABEL = {
+    home: "首页", inbox: "待办",
+    invite: "邀请码·海报", "invite-users": "邀请用户", "invite-stats": "转化分佣",
+    payments: "收款确认", statement: "月度对账单",
+    ledger: "经营台账", tax: "税务说明"
+  };
+
+  /* 顶栏标题（权威，优先于 page.title；消除「工作台」与首个 Tab 重复） */
+  var INDEX_TITLES = {
+    home: "工作台总览", invite: "邀请获客", reconcile: "对账留痕",
+    profile: "身份详情", me: "我的"
+  };
+  var SUB_TITLES = {
+    home: "工作台", inbox: "待办提醒",
+    invite: "邀请码·海报", "invite-users": "我的邀请用户", "invite-stats": "转化与分佣",
+    payments: "收款确认", statement: "月度对账单",
+    ledger: "经营台账", tax: "税务说明"
   };
 
   var root = document.getElementById("ag-root");
@@ -47,12 +62,20 @@
 
   function isReadonly(d) { return d.profile.status !== "active"; }
 
-  /* 二级分段指示条：跟随激活项滑动（对齐 home.html 算法） */
-  function moveSubInd() {
-    var sc = root.querySelector(".v3-subnav .sub-scroll");
+  /* 二级大类归属：根据当前子页 key 反查所属大类 */
+  function catOfSub(key) {
+    for (var i = 0; i < SUBCATS.length; i++) {
+      if (SUBCATS[i].subs.indexOf(key) >= 0) return SUBCATS[i];
+    }
+    return SUBCATS[0];
+  }
+
+  /* 指示条滑动（通用：容器 / 激活项 / 指示条） */
+  function moveInd(containerSel, activeSel, indSel) {
+    var sc = root.querySelector(containerSel);
     if (!sc) return;
-    var ind = root.querySelector(".v3-subnav .sub-ind");
-    var on = sc.querySelector(".sub-item.active");
+    var ind = root.querySelector(indSel);
+    var on = sc.querySelector(activeSel);
     if (!ind || !on) return;
     var sr = sc.getBoundingClientRect(), ir = on.getBoundingClientRect();
     ind.style.transform = "translateX(" + Math.round(ir.left - sr.left + sc.scrollLeft) + "px)";
@@ -65,6 +88,8 @@
     document.title = title + " · 工程链";
   }
 
+  function badge(n) { return n > 0 ? '<span class="v3-tab__dot">' + n + "</span>" : ""; }
+
   function render() {
     var V3 = window.V3, s = V3.store.getState();
     if (!s) return;
@@ -72,10 +97,19 @@
     var isSub = s.mode === "sub";
     var key = currentKey();
     var registry = isSub ? window.V3SUBPAGES : window.V3PAGES;
-    var validKeys = isSub ? SUBNAV.map(function (x) { return x.key; }) : TABS.map(function (x) { return x.key; });
+
+    var validKeys;
+    if (isSub) {
+      validKeys = SUBCATS.reduce(function (a, c) { return a.concat(c.subs); }, []);
+    } else {
+      validKeys = TABS.map(function (x) { return x.key; }).concat(EXTRA_INDEX_ROUTES);
+    }
     if (validKeys.indexOf(key) < 0) { location.replace("#/home"); key = "home"; }
 
-    var page = registry[key] || registry.home;
+    /* #/profile 暂挂 me 视图（E1 将把 page-me 改造为身份详情视图并注册 V3PAGES.profile） */
+    var pageKey = key;
+    if (!isSub && key === "profile" && !registry.profile) pageKey = "me";
+    var page = registry[pageKey] || registry.home;
     if (!page) return; /* 防御：preview iframe 重载竞态下视图未注册时不炸 render 链 */
     var d = isSub ? s.sub : s.province;
     var readonly = isReadonly(d);
@@ -86,28 +120,63 @@
       go: go
     };
 
-    setNavTitle(page.title || TITLES[key] || (isSub ? "二级企业工作台" : "省级总代工作台"));
+    /* 标题跟随：TITLES 权威 > page.title 兜底 */
+    var title = (isSub ? SUB_TITLES[key] : INDEX_TITLES[key]) || page.title || (isSub ? "二级企业工作台" : "省级总代工作台");
+    setNavTitle(title);
 
-    /* 统一导航语系（App .sub-tabs 文字页签 + 金色滑动指示条，sticky 于 navbar 之下）：
-       省代四视图与二级八视图同构，消除"独立 App 分段控件"观感。
-       ⚠ 不可用 <a href="#/key">：页面 base 为目录级，点击会按 base 解析成目录 URL 而整页换页；
-       改用 <button> + location.hash 赋值（App demo 同款模式）。 */
-    var navItems = isSub ? SUBNAV : TABS;
-    var navHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
-      navItems.map(function (t) {
-        var badge = "";
-        if (!isSub) {
-          var dotCount = d.payRegs1 ? d.payRegs1.filter(function (r) { return r.status === "pending_confirm" || r.status === "disputed"; }).length : 0;
-          var l2c = d.payRegs2 ? d.payRegs2.filter(function (r) { return r.status === "pending_confirm"; }).length : 0;
-          var todoN = dotCount + l2c + ((d.subApps || []).filter(function (a) { return a.status === "pending"; }).length);
-          badge = (t.key === "reconcile" && (dotCount + l2c) > 0) ? '<span class="v3-tab__dot">' + (dotCount + l2c) + "</span>"
-            : (t.key === "home" && todoN > 0) ? '<span class="v3-tab__dot">' + todoN + "</span>" : "";
-        }
-        return '<button type="button" class="sub-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
-          "<span>" + t.label + "</span>" + badge + "</button>";
-      }).join("") +
-      '<span class="sub-ind" aria-hidden="true"></span>' +
-      "</div></div></div>";
+    /* ---------- 角标计数 ---------- */
+    var homeBadge = "", reconcileBadge = "", catBadge = {};
+    if (!isSub) {
+      var r1 = d.payRegs1 || [], r2 = d.payRegs2 || [];
+      var pend1 = r1.filter(function (r) { return r.status === "pending_confirm"; }).length;
+      var disp1 = r1.filter(function (r) { return r.status === "disputed"; }).length;
+      var pend2 = r2.filter(function (r) { return r.status === "pending_confirm"; }).length;
+      var disp2 = r2.filter(function (r) { return r.status === "disputed"; }).length;
+      var subAppPending = (d.subApps || []).filter(function (a) { return a.status === "pending"; }).length;
+      var todoN = pend1 + disp1 + pend2 + disp2 + subAppPending;   /* 待办总数 */
+      var reconcileN = pend1 + disp1 + pend2 + disp2;              /* 对账未平·待处理数 */
+      homeBadge = badge(todoN);
+      reconcileBadge = badge(reconcileN);
+    } else {
+      var regs = d.payRegs || [];
+      var subPend = regs.filter(function (r) { return r.status === "pending_confirm"; }).length;
+      var subDisp = regs.filter(function (r) { return r.status === "disputed"; }).length;
+      var agreePending = (d.agreement && d.agreement.state === "pending_mine") ? 1 : 0;
+      var subTodoN = subPend + subDisp + (d.alerts || []).length + agreePending;
+      catBadge["home"] = badge(subTodoN);      /* 工作台大类 = 待办总数 */
+      catBadge["payments"] = badge(subPend);   /* 收款与对账大类 = 收款确认数（独立显示，不堆叠） */
+    }
+
+    /* ---------- 导航 HTML ---------- */
+    var navHtml;
+    if (!isSub) {
+      /* index：3 文字 Tab（App 语系）+ 金色滑动指示条 */
+      navHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
+        TABS.map(function (t) {
+          var b = t.key === "home" ? homeBadge : t.key === "reconcile" ? reconcileBadge : "";
+          return '<button type="button" class="sub-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
+            "<span>" + t.label + "</span>" + b + "</button>";
+        }).join("") +
+        '<span class="sub-ind" aria-hidden="true"></span>' +
+        "</div></div></div>";
+    } else {
+      /* sub：4 大类 Tab（L1）+ 大类内子页签（L2） */
+      var activeCat = catOfSub(key);
+      navHtml = '<div class="v3-subsplit">' +
+        '<div class="v3-cattabs"><div class="cat-scroll">' +
+        SUBCATS.map(function (c) {
+          return '<button type="button" class="v3-cat ' + (c.key === activeCat.key ? "active" : "") + '" data-cat="' + c.key + '" data-first="' + c.subs[0] + '">' +
+            "<span>" + c.label + "</span>" + (catBadge[c.key] || "") + "</button>";
+        }).join("") +
+        '<span class="v3-cat-ind" aria-hidden="true"></span>' +
+        "</div></div>" +
+        '<div class="v3-subseg">' +
+        activeCat.subs.map(function (k) {
+          return '<button type="button" class="v3-seg ' + (k === key ? "active" : "") + '" data-key="' + k + '">' +
+            (SUBSEG_LABEL[k] || k) + "</button>";
+        }).join("") +
+        "</div></div>";
+    }
 
     root.innerHTML = navHtml +
       '<div id="ag-view" class="v3-fade-enter"><div class="v3-page" id="v3-page-body"></div></div>';
@@ -127,21 +196,39 @@
       if (view) view.classList.remove("v3-fade-enter");
     });
 
-    /* 分段页签：点击切换 + 金色指示条 + 居中滚动 */
-    var subSc = root.querySelector(".v3-subnav .sub-scroll");
-    if (subSc) {
-      subSc.addEventListener("click", function (e) {
+    /* ---------- 事件绑定 ---------- */
+    /* index：3 Tab 点击（按钮 + location.hash，避免 base 解析整页换页） */
+    var idxSc = root.querySelector(".v3-subnav .sub-scroll");
+    if (idxSc) {
+      idxSc.addEventListener("click", function (e) {
         var btn = e.target.closest(".sub-item");
         if (!btn) return;
-        root.querySelectorAll(".sub-item").forEach(function (x) { x.classList.toggle("active", x === btn); });
-        moveSubInd();
-        var targetLeft = btn.offsetLeft - (subSc.clientWidth - btn.offsetWidth) / 2;
-        var maxLeft = Math.max(0, subSc.scrollWidth - subSc.clientWidth);
-        subSc.scrollTo({ left: Math.max(0, Math.min(targetLeft, maxLeft)), behavior: "smooth" });
         go("#/" + btn.getAttribute("data-key"));
       });
-      moveSubInd();
     }
+    /* sub：大类 Tab（跳类内首页）+ 子页签（切子页） */
+    var catSc = root.querySelector(".v3-cattabs .cat-scroll");
+    if (catSc) {
+      catSc.addEventListener("click", function (e) {
+        var btn = e.target.closest(".v3-cat");
+        if (!btn) return;
+        go("#/" + btn.getAttribute("data-first"));
+      });
+    }
+    var segBar = root.querySelector(".v3-subsplit .v3-subseg");
+    if (segBar) {
+      segBar.addEventListener("click", function (e) {
+        var btn = e.target.closest(".v3-seg");
+        if (!btn) return;
+        go("#/" + btn.getAttribute("data-key"));
+      });
+    }
+
+    /* 指示条 */
+    requestAnimationFrame(function () {
+      moveInd(".v3-subnav .sub-scroll", ".sub-item.active", ".v3-subnav .sub-ind");
+      moveInd(".v3-cattabs .cat-scroll", ".v3-cat.active", ".v3-cat-ind");
+    });
 
     try { root.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { root.scrollTop = 0; }
   }
@@ -159,4 +246,21 @@
     }, 50);
   });
   window.V3.router = { render: render, go: go, currentKey: currentKey };
+
+  /* shell 级 tax 子页 stub：摘要 + 完整指南外链（E2 可后续注册 V3SUBPAGES.tax 覆盖） */
+  if (!window.V3SUBPAGES.tax) {
+    window.V3SUBPAGES.tax = {
+      title: "税务说明",
+      render: function (ctx) {
+        var ui = ctx.ui;
+        return '<div class="v3-sec-title">税务说明（摘要）</div>' +
+          '<section class="v3-card"><p class="v3-legal">' +
+          "二级企业经营所得按主体性质分别申报：企业主体按企业所得税口径，个人 / 个体按经营所得口径；" +
+          "邀请分佣、收款确认均以平台留痕凭证为对账依据，具体税率与申报义务以税务机关口径为准。</p>" +
+          '<button class="v3-btn v3-btn--block v3-btn--navy v3-mt12" onclick="location.href=\'tax-guide.html\'">' +
+          ui.icon("receipt", 16) + "<span>查看完整税务指引</span></button></section>";
+      },
+      mount: function () {}
+    };
+  }
 })();

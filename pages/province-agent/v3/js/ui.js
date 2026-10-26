@@ -16,6 +16,11 @@
     return (neg ? "-¥" : "¥") + s;
   }
   function moneyPlain(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  /* 展示级大数字：¥ 符号弱化（小号 + 降透明度），对齐 App demo 数字排版口径 */
+  function moneyD(n) {
+    var v = Math.round(Number(n) || 0);
+    return (v < 0 ? "-" : "") + '<span class="cur">¥</span>' + moneyPlain(v);
+  }
 
   var P = {
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/>',
@@ -145,11 +150,39 @@
   var REG = { pending_confirm: "待确认", confirmed: "已确认", disputed: "有异议", void: "已作废" };
   var REG_BADGE = { pending_confirm: "v3-badge--pending", confirmed: "v3-badge--active", disputed: "v3-badge--suspended", void: "v3-badge--neutral" };
 
+  function emptySvg(theme) {
+    var base = '<circle cx="32" cy="32" r="28" class="bg-s" stroke-width=".8" fill="none"/>' +
+      '<circle cx="32" cy="32" r="20" class="bg-f" stroke="none"/>';
+    var inner = {
+      tray: '<path d="M22 30h20M24 35h16M27 40h10" class="ln" stroke-width="1.6" stroke-linecap="round" fill="none"/>' +
+        '<circle cx="42" cy="25" r="2.5" class="acf" opacity=".5"/>',
+      doc: '<rect x="24" y="21" width="16" height="22" rx="2.5" class="ac" stroke-width="1.3" fill="none"/>' +
+        '<path d="M28 28h8M28 33h6M28 38h3" class="ln" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
+      chart: '<path d="M22 42V22M22 42h20" class="ln" stroke-width="1.3" stroke-linecap="round" fill="none"/>' +
+        '<rect x="26" y="33" width="4" height="9" rx="1" class="acf" opacity=".35"/>' +
+        '<rect x="32" y="27" width="4" height="15" rx="1" class="acf" opacity=".55"/>' +
+        '<rect x="38" y="30" width="4" height="12" rx="1" class="acf" opacity=".25"/>',
+      user: '<circle cx="32" cy="27" r="5.5" class="ac" stroke-width="1.3" fill="none"/>' +
+        '<path d="M22 43c1.5-5 5.5-7.5 10-7.5s8.5 2.5 10 7.5" class="ln" stroke-width="1.3" stroke-linecap="round" fill="none"/>',
+      crown: '<path d="M22 37l5-10 5 6 5-6 5 10z" class="ac" stroke-width="1.3" stroke-linejoin="round" fill="none"/>' +
+        '<path d="M22 37h24" class="ac" stroke-width="1.3" stroke-linecap="round" fill="none"/>' +
+        '<circle cx="32" cy="28" r="1.5" class="acf" opacity=".4"/>'
+    };
+    return '<svg class="v3-empty-svg" viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">' +
+      base + (inner[theme] || inner.tray) + "</svg>";
+  }
+  function emptyHtml(title, desc, theme) {
+    return '<div class="t">' + emptySvg(theme) + "</div>" +
+      '<div class="t">' + esc(title) + "</div>" +
+      (desc ? '<div class="d">' + desc + "</div>" : "");
+  }
+
   window.V3 = window.V3 || {};
   window.V3.ui = {
-    esc: esc, money: money, moneyPlain: moneyPlain, icon: icon,
+    esc: esc, money: money, moneyD: moneyD, moneyPlain: moneyPlain, icon: icon,
     toast: toast, openSheet: openSheet, openModal: openModal, closeAll: closeAll,
     fileToVoucher: fileToVoucher,
+    emptySvg: emptySvg, emptyHtml: emptyHtml,
     STAGE: STAGE, STAGE_BADGE: STAGE_BADGE, ACCT: ACCT, ACCT_BADGE: ACCT_BADGE, REG: REG, REG_BADGE: REG_BADGE
   };
 })();
