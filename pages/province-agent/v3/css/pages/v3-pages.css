@@ -632,3 +632,232 @@ html[data-theme="dark"] .v3-note-fold--gold>summary{color:var(--v3-gold-bright)}
   background:color-mix(in srgb,var(--primary,#1F2A44) 10%,transparent);color:var(--primary,#1F2A44)}
 .s2-stub__t{font-size:15px;font-weight:700;color:var(--v3-ink-1,#1c2333)}
 .s2-stub__s{font-size:12.5px;line-height:1.6;color:var(--v3-ink-3,#6b7480);max-width:300px}
+
+/* ============================================================
+   S4-G-SUB：液态玻璃弹窗 / bottom-sheet 全量升级（sub 域 + 全局弹层）
+   依据：03-液态玻璃规范-需求包.md §二
+   遮罩 rgba(0,0,0,.45) z100 / 容器 z101 20px 顶圆角 translateY .35s
+   grab 手柄 40×5 / head-body-foot / 主钮 46px 暖墨 action 渐变 / safe-area
+   暗色深玻璃；颜色一律走 CSS 变量，不硬编码新色值
+   ============================================================ */
+
+/* 遮罩：.45 黑 + z100 + .3s 淡入（既有遮罩点击关闭逻辑保留） */
+.v3-overlay{z-index:100!important;background:rgba(0,0,0,.45);
+  transition:opacity .3s ease,visibility .3s ease}
+
+/* sheet 容器：液态玻璃双层渐变 + blur32 + 20px 顶圆角 + translateY .35s cubic-bezier */
+.v3-sheet{position:relative;z-index:101;background:
+    linear-gradient(90deg,rgba(255,255,255,.82) 0%,rgba(255,255,255,.96) 6%,rgba(255,255,255,.90) 50%,rgba(255,255,255,.96) 94%,rgba(255,255,255,.82) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.86) 35%,rgba(255,255,255,.78) 65%,rgba(255,255,255,.92) 100%);
+  -webkit-backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  border:1px solid rgba(255,255,255,.88);
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -8px 32px rgba(0,0,0,.14);
+  max-height:90vh;overflow:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .28s ease}
+
+/* grab 手柄 40×5（拖拽关闭由 sub-page-home.js 委托指针事件实现） */
+.v3-sheet__handle{width:40px;height:5px;border-radius:99px;
+  background:var(--v3-line-2,var(--v3-line));margin:10px auto 8px;padding:0;cursor:grab;
+  touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* head：标题 17/700 + 关闭钮 28×28 圆 */
+.v3-sheet__hd{padding:8px 20px 0;gap:10px}
+.v3-sheet__hd .t{font-size:17px;font-weight:700;color:var(--v3-ink)}
+.v3-sheet__hd .x{width:28px;height:28px;border-radius:50%;
+  background:var(--v3-surface-3,var(--v3-surface-2));color:var(--v3-ink-3);font-size:13px;
+  display:flex;align-items:center;justify-content:center;transition:transform .15s}
+.v3-sheet__hd .x:active{transform:scale(.9)}
+
+/* body：flex:1 滚动 */
+.v3-sheet__bd{flex:1;padding:10px 20px 0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* foot：safe-area + 主钮 46px 暖墨 action 渐变 pill */
+.v3-sheet__ft{padding:12px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--v3-line)}
+.v3-sheet__ft .v3-btn{height:46px;min-height:46px;border-radius:99px;font-size:14.5px;font-weight:600}
+.v3-sheet__ft .v3-btn--primary{background:linear-gradient(180deg,var(--action),var(--action-deep));
+  color:var(--on-action);border-color:transparent;box-shadow:var(--v3-sh-gold)}
+.v3-sheet__ft .v3-btn--navy{background:linear-gradient(180deg,var(--v3-navy),#0b1626);color:#fff}
+.v3-sheet__ft .v3-btn--ghost{background:var(--v3-surface-3,var(--v3-surface-2));color:var(--v3-ink-2);border-color:var(--v3-line)}
+.v3-sheet__ft .v3-btn--danger{background:linear-gradient(180deg,var(--v3-danger),#b71c1c);color:#fff;border-color:transparent}
+
+/* modal（确认类居中）：玻璃承载 + 52×52 金圆图标 */
+.v3-modal{background:
+    linear-gradient(90deg,rgba(255,255,255,.86) 0%,rgba(255,255,255,.96) 50%,rgba(255,255,255,.86) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.97) 0%,rgba(255,255,255,.88) 100%);
+  -webkit-backdrop-filter:blur(32px) saturate(200%);backdrop-filter:blur(32px) saturate(200%);
+  border:1px solid rgba(255,255,255,.88);border-radius:20px;
+  box-shadow:0 16px 48px rgba(22,22,22,.20),0 6px 20px rgba(22,22,22,.12)}
+.v3-modal .ic{width:52px;height:52px;border-radius:50%;margin:0 auto 11px;
+  background:linear-gradient(180deg,var(--primary,#B08A3C),var(--primary-deep,#8A6A28));
+  color:#fff;box-shadow:0 4px 14px -3px var(--v3-gold-dim,rgba(176,138,60,.4))}
+.v3-modal .t{text-align:center}
+.v3-modal .d{text-align:center}
+.v3-modal__ft .v3-btn{height:46px;min-height:46px;border-radius:99px;font-size:13.5px}
+.v3-modal__ft .v3-btn--primary{background:linear-gradient(180deg,var(--action),var(--action-deep));
+  color:var(--on-action);border-color:transparent}
+
+/* 暗色深玻璃 */
+[data-theme="dark"] .v3-sheet{background:
+    linear-gradient(180deg,rgba(32,32,36,.94) 0%,rgba(28,28,30,.88) 40%,rgba(24,24,28,.82) 62%,rgba(30,30,34,.90) 100%);
+  border-color:rgba(255,255,255,.16);box-shadow:0 -8px 32px rgba(0,0,0,.5)}
+[data-theme="dark"] .v3-modal{background:
+    linear-gradient(180deg,rgba(32,32,36,.96) 0%,rgba(30,30,34,.92) 100%);
+  border-color:rgba(255,255,255,.16);box-shadow:0 16px 48px rgba(0,0,0,.55)}
+[data-theme="dark"] .v3-sheet__ft{border-top-color:rgba(255,255,255,.1)}
+[data-theme="dark"] .v3-sheet__hd .x{background:rgba(255,255,255,.08);color:var(--v3-ink-2)}
+[data-theme="dark"] .v3-sheet__ft .v3-btn--ghost{background:rgba(255,255,255,.08);color:var(--v3-ink-2);border-color:rgba(255,255,255,.12)}
+
+/* A6/A7 收口后的新交互行：身份卡「授权范围 ›」+ 渠道码「说明 ›」 */
+.ic-row--link{cursor:pointer;transition:opacity .15s}
+.ic-row--link:active{opacity:.6}
+.ic-row--link .val{display:inline-flex;align-items:center;gap:2px;color:var(--v3-gold-dim,#B08A3C)}
+.section-head-row .act2{font-size:12.5px;font-weight:600;color:var(--v3-gold-dim,#B08A3C);cursor:pointer}
+.section-head-row .act2:active{opacity:.6}
+
+/* ============================================================
+   S4-B · 迭代四业务数据线（玻璃规范全量应用 + 二级管理/分成配置组件）
+   - 仅本段为本线新增；不改动既有任何行。
+   ============================================================ */
+
+/* ---------- §二 弹窗（sheet）液态玻璃承载升级（按玻璃规范 §二逐项对齐） ---------- */
+.v3-overlay{background:rgba(0,0,0,.45)}
+.v3-sheet{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.78) 0%,rgba(255,255,255,.94) 6%,rgba(255,255,255,.88) 50%,rgba(255,255,255,.94) 94%,rgba(255,255,255,.78) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,255,255,.84) 35%,rgba(255,255,255,.76) 65%,rgba(255,255,255,.90) 100%);
+  -webkit-backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  border:1px solid rgba(255,255,255,.88);
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -8px 32px rgba(0,0,0,.14)}
+[data-theme="dark"] .v3-sheet{
+  background:linear-gradient(180deg,rgba(32,32,36,.94) 0%,rgba(28,28,30,.88) 40%,rgba(24,24,28,.82) 62%,rgba(30,30,34,.90) 100%);
+  border-color:rgba(255,255,255,.16);
+  box-shadow:0 -8px 32px rgba(0,0,0,.5)}
+.v3-sheet__handle{width:40px;height:5px}
+.v3-sheet__hd .t{font-size:17px;font-weight:700;font-family:var(--v3-font-display,inherit)}
+.v3-sheet__hd .x{width:28px;height:28px;font-size:13px}
+.v3-sheet__hd .x:active,.v3-modal__ft .v3-btn:active,.v3-sheet__ft .v3-btn:active{transform:scale(.97)}
+
+/* 确认类 modal 玻璃承载（§2.8） */
+.v3-modal{
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.82) 0%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.82) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(255,255,255,.86) 100%);
+  -webkit-backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  backdrop-filter:blur(32px) saturate(200%) brightness(1.08) contrast(1.02);
+  border:1px solid rgba(255,255,255,.88)}
+[data-theme="dark"] .v3-modal{
+  background:linear-gradient(180deg,rgba(32,32,36,.94) 0%,rgba(28,28,30,.90) 100%);
+  border-color:rgba(255,255,255,.16)}
+
+/* ---------- §一 FAB 液态玻璃补缺（其余参数已在既有 .app-float-cta 段逐项对齐） ---------- */
+.app-float-cta .afc-item{font-family:var(--v3-font-display,var(--font-display,inherit))}
+.app-float-cta .afc-item.flash,.app-float-cta .afc-item.is-submitted{color:var(--primary,#B08A3C);font-weight:700}
+.app-float-cta .afc-item.flash svg,.app-float-cta .afc-item.is-submitted svg{stroke-width:2.4}
+
+/* G5：FAB 避让 padding 复核（FAB 高 52 + 底距 14 = 66；留 34 余量） */
+.v3-page{padding-bottom:100px}
+
+/* G1：邀请速览标签合并为单行文字流 */
+.v3-note-line{font-size:10px;color:var(--v3-ink-3);line-height:1.5;opacity:.85}
+
+/* ---------- #/invite 顶部自身获客说明条（F4 拆分导航） ---------- */
+.iv-note{font-size:11.5px;line-height:1.6;color:var(--v3-ink-2);
+  background:var(--v3-surface-2);border:1px solid var(--v3-line);
+  border-radius:var(--v3-r-m);padding:8px 11px;margin:2px 0 4px}
+
+/* ---------- #/subs 二级管理视图组件 ---------- */
+.s4b-subseg{display:flex;gap:8px;padding:2px 2px 14px}
+.s4b-summary{display:flex;gap:10px;padding:14px 16px;border-radius:17px;margin-bottom:14px;
+  background:var(--v3-surface);border:1px solid var(--v3-line);box-shadow:var(--v3-sh-card)}
+.s4b-summary>div{flex:1;min-width:0;text-align:center}
+.s4b-summary .n{font-size:20px;font-weight:700;line-height:1.2}
+.s4b-summary .k{font-size:11px;color:var(--v3-ink-3);margin-top:3px}
+
+/* ---------- #/share-config 分成配置组件 ---------- */
+.s4b-cfg-note{padding:12px 14px;margin-bottom:12px}
+.s4b-cfg-note .t{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.s4b-cfg-note .d{font-size:12px;line-height:1.65;color:var(--v3-ink-2)}
+.s4b-cfg{margin-bottom:12px}
+.s4b-cfg__hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.s4b-cfg__name{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.s4b-slider{display:flex;align-items:center;gap:12px;padding:4px 2px 8px}
+.s4b-slider input[type=range]{flex:1;accent-color:var(--primary,#B08A3C)}
+.s4b-slider .val{flex:none;min-width:44px;text-align:right;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.s4b-est{font-size:11.5px;line-height:1.6;color:var(--v3-ink-3);
+  background:var(--v3-surface-2);border:1px solid var(--v3-line);border-radius:10px;padding:7px 11px}
+.s4b-est b{color:var(--v3-ink-1)}
+.s4b-log{margin-top:10px;border-top:1px solid var(--v3-line-hairline,rgba(0,0,0,.06));padding-top:8px}
+.s4b-log .t{font-size:11px;color:var(--v3-ink-3);margin-bottom:5px}
+.s4b-log .li{display:flex;gap:8px;font-size:11.5px;line-height:1.9;color:var(--v3-ink-2)}
+.s4b-log .li .at{flex:none;width:82px;color:var(--v3-ink-3)}
+.s4b-log .li .ch{flex:1}
+.s4b-log .li .by{flex:none;color:var(--v3-ink-3)}
+.s4b-log .li.faint{color:var(--v3-ink-3);opacity:.8}
+
+/* ============================================================
+   S4-C：对账留痕深度重构（行级勾稽网）
+   ① 行级匹配勾稽条 ② 差异分解卡 ③ 证据链/说明/分解弹层内容 ④ 微阶段状态机条
+   弹窗本身复用 v3-sheet/v3-modal 液态玻璃承载（不新增第三种样式）
+   ============================================================ */
+.rc-headrow{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 10px}
+.rc-sec{font-size:12px;font-weight:700;color:var(--v3-ink-3);letter-spacing:.3px}
+.rc-rules-entry{flex:none;border:0;background:transparent;color:var(--v3-gold-dim);font-size:12.5px;font-weight:600;
+  display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:6px 8px;border-radius:9px}
+.rc-rules-entry:active{transform:scale(.96)}
+
+/* ① 行级匹配勾稽条：测算 = 已勾稽 + 未勾稽差额 */
+.rc-tie{display:flex;align-items:stretch;gap:6px;background:var(--v3-surface);border:1px solid var(--v3-line);
+  border-radius:var(--v3-r-lg);box-shadow:var(--v3-sh-card);padding:12px 10px;margin-bottom:10px}
+.rc-tie__seg{flex:1;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center}
+.rc-tie__seg b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.rc-tie__seg span{font-size:10.5px;color:var(--v3-ink-3)}
+.rc-tie__seg.is-gap b{color:var(--v3-warn)}
+.rc-tie__eq,.rc-tie__plus{display:flex;align-items:center;color:var(--v3-ink-3);font-size:13px;font-weight:600}
+
+/* ② 差异分解卡 */
+.rc-diff{background:var(--v3-surface);border:1px solid var(--v3-line);border-left:3px solid var(--v3-warn);
+  border-radius:var(--v3-r-lg);box-shadow:var(--v3-sh-card);padding:10px 14px;margin-bottom:12px}
+.rc-diff__t{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--v3-ink);margin-bottom:6px}
+.rc-diff__more{border:0;background:transparent;color:var(--v3-ink-3);font-size:12px;cursor:pointer;padding:2px 0}
+.rc-diff__more:active{opacity:.6}
+.rc-diff__row{display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:4px 0;
+  border-top:1px solid var(--v3-line);color:var(--v3-ink-2)}
+.rc-diff__row b{font-variant-numeric:tabular-nums}
+
+/* 行级匹配徽章 */
+.rc-match{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px}
+.rc-match--pending_confirm{background:var(--v3-warn-bg);color:var(--v3-warn)}
+.rc-match--confirmed{background:var(--v3-success-bg);color:var(--v3-success)}
+.rc-match--disputed{background:var(--v3-danger-bg);color:var(--v3-danger)}
+.rc-match--void{background:var(--v3-surface-2);color:var(--v3-ink-3)}
+.rc-row__hd .amt.is-neg{color:var(--v3-danger)}
+
+/* ④ 状态机微阶段条 */
+.rc-lifecycle{display:flex;align-items:center;gap:4px;margin-top:8px}
+.rc-lifecycle .ld{font-size:10px;color:var(--v3-ink-4);display:inline-flex;align-items:center;gap:4px}
+.rc-lifecycle .ld i{width:6px;height:6px;border-radius:50%;background:var(--v3-line-2)}
+.rc-lifecycle .ld.on{color:var(--v3-ink-2);font-weight:600}
+.rc-lifecycle .ld.on i{background:var(--v3-navy)}
+.rc-lifecycle .ld.bad i{background:var(--v3-danger)}
+.rc-lifecycle .ll{flex:1;height:1px;background:var(--v3-line)}
+
+/* 弹层内容：说明（A1）/ 差异明细 / 证据链时间线 */
+.rc-prose{font-size:12.5px;line-height:1.7;color:var(--v3-ink-2)}
+.rc-prose p{margin:0 0 10px}
+.rc-prose .lab{font-size:11px;font-weight:700;color:var(--v3-ink-3);letter-spacing:.3px;margin-bottom:3px}
+.rc-kv{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--v3-line);font-size:12.5px;line-height:1.55}
+.rc-kv:last-child{border-bottom:0}
+.rc-kv .k{flex:none;width:76px;color:var(--v3-ink-3)}
+.rc-kv .v{flex:1;color:var(--v3-ink)}
+.rc-tl{padding:4px 0}
+.rc-tl__item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--v3-line)}
+.rc-tl__item:last-child{border-bottom:0}
+.rc-tl__dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--v3-navy);margin-top:5px}
+.rc-tl__item.is-bad .rc-tl__dot{background:var(--v3-danger)}
+.rc-tl__bd b{font-size:12.5px;font-weight:700;color:var(--v3-ink)}
+.rc-tl__bd p{font-size:12px;color:var(--v3-ink-2);line-height:1.5;margin:2px 0 0;word-break:break-all}

@@ -23,6 +23,7 @@
     }
 
     /* L1 身份色带（壳层 .s-idcard 骨架；结构化两行：上级总代 / 合作编号） */
+    /* S4-G：A6 授权范围说明由常驻金边框 fold 收为身份卡弹层（玻璃规范），正文区不再常驻 */
     var stCls = d.profile.status === "active" ? "on" : "warn";
     var stLabel = ui.ACCT[d.profile.status] || d.profile.status;
     h += '<section class="s-idcard">' +
@@ -32,13 +33,8 @@
       '<div class="ic-rows">' +
         '<div class="ic-row"><span class="lab">上级总代</span><span class="val">' + ui.esc(d.profile.parent) + "</span></div>" +
         '<div class="ic-row"><span class="lab">合作编号</span><span class="val">' + ui.esc(d.profile.authNo) + "</span></div>" +
+        '<div class="ic-row ic-row--link" data-act="auth"><span class="lab">授权范围</span><span class="val">' + ui.icon("chev", 13) + "</span></div>" +
       "</div></section>";
-
-    /* 授权范围（D1 只读）：75 字长段 → 折叠摘要（保留入口） */
-    h += '<details class="v3-note-fold v3-note-fold--gold v3-mt12"><summary>' + ui.icon("shield", 15) +
-      '<span class="sum">授权范围说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">你可<b>直接邀请终端用户</b>并据本人线计经营所得；<b>不能发展下级企业</b>（两级封顶），' +
-      "邀请规模 / 范围 / 费率由省代在平台配置 + O4 协议授权，App 内<b>只读</b>、无自助改费率入口。</div></details>";
 
     /* L2 协议面板：卡内嵌 kv + 按钮组 → 面板内通栏行（L3） */
     var ag = d.agreement || {};
@@ -97,6 +93,7 @@
       var b = e.target.closest("[data-act]"); if (!b) return;
       var act = b.getAttribute("data-act");
       if (act === "agree-view") agreeSheet(ctx);
+      else if (act === "auth") authSheet(ctx);
       else if (act === "agree-sign" && !ctx.readonly) {
         V3.store.act("agree/sign", {}); ui.toast("协议已签署", "ok"); V3.router.render();
       } else if (act === "agree-reject" && !ctx.readonly) {
@@ -127,6 +124,16 @@
         }).join("") + "</div>" +
         '<p class="v3-legal v3-mt8">' + ctx.V3.MONEY_NOTE + "；正式协议以平台电子签文本为准。</p>",
       footer: [{ t: "我已阅读", kind: "v3-btn--ghost" }]
+    });
+  }
+  /* S4-G：A6 授权范围说明收为身份卡弹层（玻璃承载），合规原文不删只改承载 */
+  function authSheet(ctx) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "授权范围说明",
+      body: '<p class="v3-legal">你可<b>直接邀请终端用户</b>并据本人线计经营所得；<b>不能发展下级企业</b>（两级封顶），' +
+        "邀请规模 / 范围 / 费率由省代在平台配置 + O4 协议授权，App 内<b>只读</b>、无自助改费率入口。</p>",
+      footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
     });
   }
   function certSheet(ctx) {
@@ -167,4 +174,34 @@
 
   window.V3SUBPAGES.home = { title: "二级企业 · 工作台", render: renderHome, mount: mountHome };
   window.V3SUBPAGES.ledger = { title: "经营台账", render: renderLedger, mount: function () {} };
+
+  /* S4-G：grab 手柄拖拽关闭（§二.2.3）。遮罩点击关闭由 ui.js 既有逻辑提供；
+     ui.js 禁改，故以文档级指针委托实现拖拽跟随 + 阈值松手关闭（>100px）。 */
+  (function () {
+    var sheet = null, startY = 0, curY = 0, dragging = false;
+    document.addEventListener("pointerdown", function (e) {
+      var h = e.target && e.target.closest ? e.target.closest(".v3-sheet__handle") : null;
+      if (!h) return;
+      sheet = h.closest(".v3-sheet");
+      if (!sheet) return;
+      startY = e.clientY; curY = 0; dragging = true;
+      sheet.style.transition = "none";
+      try { sheet.setPointerCapture(e.pointerId); } catch (_) {}
+    }, { passive: true });
+    document.addEventListener("pointermove", function (e) {
+      if (!dragging || !sheet) return;
+      curY = Math.max(0, e.clientY - startY);
+      sheet.style.transform = "translateY(" + curY + "px)";
+    }, { passive: true });
+    function endDrag() {
+      if (!dragging || !sheet) return;
+      dragging = false;
+      sheet.style.transition = "";
+      if (curY > 100) { var ov = sheet.closest(".v3-overlay"); if (ov) ov.classList.remove("show"); }
+      else sheet.style.transform = "";
+      sheet = null; curY = 0;
+    }
+    document.addEventListener("pointerup", endDrag);
+    document.addEventListener("pointercancel", endDrag);
+  })();
 })();

@@ -6,11 +6,9 @@
   function renderInvite(ctx) {
     var ui = ctx.ui, d = ctx.d;
     var chans = (d.channels || []).filter(function (c) { return c.status === "active"; });
-    /* 顶部说明（~55 字）→ 折叠摘要 */
-    var h = '<details class="v3-note-fold v3-mb12"><summary>' + ui.icon("shield", 15) +
-      '<span class="sum">渠道码使用说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">你的渠道码（<b>CH-S</b>）仅用于<b>直接邀请终端用户</b>；你没有招商码、不能发展下级。用户再邀请不归属、不分佣、不传递。</div></details>';
-    h += '<div class="section-head-row"><span class="t">我的渠道码</span>' +
+    /* S4-G：A7 渠道码使用说明 + 授权范围（只读）两处 details 三处合一 → 渠道码卡旁「说明 ›」玻璃弹层 */
+    var h = '<div class="section-head-row"><span class="t">我的渠道码</span>' +
+      '<span class="act2" data-act="chan-help">说明 ›</span>' +
       (ctx.readonly ? "" : '<span class="act" data-act="gen">+ 生成渠道码</span>') + "</div>";
     if (chans.length) {
       h += '<div class="v3-stack">' + chans.map(function (c) {
@@ -22,9 +20,6 @@
     } else {
       h += '<div class="v3-placeholder">暂无生效渠道码，点击右上角生成。</div>';
     }
-    h += '<details class="v3-note-fold v3-mt12"><summary>' + ui.icon("lock", 15) +
-      '<span class="sum">授权范围（只读）</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，App 只读、无自助改费率入口。</div></details>';
     /* 导航职责单一化：去 #/invite-users 的 data-go CTA（邀请获客大类子导航已含「邀请用户」页签，不重复切页） */
     return h;
   }
@@ -32,10 +27,21 @@
     el.addEventListener("click", function (e) {
       var b = e.target.closest("[data-act]"); if (!b) return;
       if (b.getAttribute("data-act") === "gen") genSheet(ctx);
+      else if (b.getAttribute("data-act") === "chan-help") chanHelpSheet(ctx);
       else if (b.getAttribute("data-act") === "poster") {
         var c = ctx.d.channels.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
         poster(ctx, c);
       }
+    });
+  }
+  /* S4-G：A7 三处合一弹层（渠道码使用说明 + 授权范围只读），合规原文不删只改承载 */
+  function chanHelpSheet(ctx) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "渠道码与授权范围",
+      body: '<p class="v3-legal">你的渠道码（<b>CH-S</b>）仅用于<b>直接邀请终端用户</b>；你没有招商码、不能发展下级。用户再邀请不归属、不分佣、不传递。</p>' +
+        '<p class="v3-legal v3-mt8">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，App 只读、无自助改费率入口。</p>',
+      footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
     });
   }
   function genSheet(ctx) {
@@ -171,7 +177,7 @@
     var h = '<section class="s-l2 iv-funnel"><div class="v3-sm v3-strong v3-mb10">邀请转化漏斗（仅直接邀请用户）</div>' +
       row("直接邀请", fn.direct, fn.direct, 0) + row("已注册", fn.registered, fn.direct, 1) +
       row("已入驻", fn.onboarded, fn.direct, 2) + row("已消费", fn.paid, fn.direct, 3) + row("已复购", fn.repaid, fn.direct, 4) +
-      '<div class="s-prow s-prow--div v3-mt12"><span class="k">邀请已产生付费金额（D4 · 只统计不发钱）</span>' +
+      '<div class="s-prow s-prow--div v3-mt12"><span class="k">邀请已产生付费金额 · 仅统计不发钱</span>' +
       '<span class="v num v3-goldtext">' + ui.moneyD(fn.paidAmount) + "</span></div></section>";
 
     h += '<section class="sub-finance v3-mt12" ><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
@@ -180,7 +186,7 @@
       '<div class="v3-dline"><span class="k">总盘 ×50%</span><span class="v num">' + ui.money(fin.gross) + "</span></div>" +
       '<div class="v3-dline"><span class="k">约定比例</span><span class="v num">' + Math.round(fin.ratioToSub * 100) + "%（只读）</span></div></div></section>";
 
-    if (fn.ignored) h += '<div class="v3-note-tags v3-mt12"><span class="t">另有 ' + fn.ignored + " 位用户再邀请，已自动排除</span><span class=\"t\">不归属</span><span class=\"t\">不分佣</span><span class=\"t\">不传递</span></div>";
+    if (fn.ignored) h += '<div class="v3-xs v3-muted v3-mt12">另有 ' + fn.ignored + " 位用户再邀请，已自动排除 · 不归属不分佣不传递</div>";
     return h;
   }
 
