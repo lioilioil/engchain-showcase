@@ -32,6 +32,19 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 .ag-tags{display:inline-flex;flex-wrap:wrap;gap:5px;align-items:center;vertical-align:middle}
 .sub-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px}
 .sub-tags .v3-badge{font-size:10.5px}
+/* T1c 精修：名额短注收进折叠（文案不增删字）+ 授权节点头像/名称/徽章排版对齐、标签组节奏、树形连线层次 */
+.ag-disc--mini{margin:2px 0 0;border:none;background:transparent;border-radius:0;overflow:visible}
+.ag-disc--mini>summary{padding:1px 0 0;min-height:0;gap:5px;font-size:11.5px;font-weight:500;color:var(--v3-ink-3)}
+.ag-disc--mini>summary::after{width:6px;height:6px;border-width:1.2px}
+.ag-disc--mini .ag-disc__bd{padding:6px 0 1px;border-top:1px dashed var(--v3-line);font-size:11.5px;color:var(--v3-ink-3)}
+.net-node .v3-row__t{align-items:flex-start;gap:8px}
+.net-node .net-name{flex:1;min-width:0;line-height:1.45}
+.net-node .v3-row__t>.v3-badge{flex:none;margin-top:1px}
+.net-node .sub-tags{gap:6px;margin-top:5px}
+.net-node .sub-tags .v3-badge{font-size:11px;padding:2px 8px}
+.net-node .v3-row__amt{font-variant-numeric:tabular-nums}
+.net-tree--on{position:relative;margin-top:2px}
+.net-tree--on::before{content:"";position:absolute;left:33px;top:-12px;bottom:0;width:2px;background:var(--v3-gold-line);opacity:.55}
 </style>
 </head>
 <body>
@@ -131,7 +144,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var quotaHtml = '<section class="v3-card v3-mb12">'
       + '<div class="v3-card__hd"><span class="t">授权名额使用率</span><span class="v3-badge v3-badge--gold num">' + used + ' / ' + capN + '</span></div>'
       + '<div class="v3-progress v3-mb8"><i class="' + (pct >= 100 ? 'danger' : '') + '" style="width:' + pct + '%"></i></div>'
-      + '<div class="v3-readnote">' + (pct >= 100 ? '该省二级名额已满，新申请将触发 E_QUOTA_EXCEEDED 拦截。' : '仅计签约二级公司，成员不计入名额（D7）。') + '</div></section>';
+      + (pct >= 100
+        ? '<div class="v3-readnote">该省二级名额已满，新申请将触发 E_QUOTA_EXCEEDED 拦截。</div>'
+        : '<details class="ag-disc ag-disc--mini"><summary>名额口径 · 点击展开</summary><div class="ag-disc__bd">仅计签约二级公司，成员不计入名额（D7）。</div></details>')
+      + '</section>';
 
     /* 总代根节点（v3-hero 藏青身份面） */
     var rootNode = '<div class="v3-hero v3-mb12">'
@@ -150,10 +166,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var sline = '<span class="sub-tags"><span class="v3-badge v3-badge--neutral">比例 ' + Math.round((s.ratioToSub || 0) * 100) + '%</span><span class="v3-badge v3-badge--neutral">' + esc(protoState(s)) + '</span>'
         + (a.count ? '<span class="v3-badge v3-badge--neutral">近 ' + fmtDate(a.lastAt) + '</span>' : '<span class="v3-badge v3-badge--neutral">暂无合格消费</span>')
         + (isSelf ? '<span class="v3-badge v3-badge--neutral">招商码自助申请</span>' : '') + '</span>';
-      return '<div class="v3-row">'
+      return '<div class="v3-row net-node">'
         + '<span class="v3-avatar v3-avatar--sub">' + esc((s.company && s.company.shortName || s.company && s.company.name || '二').slice(0, 1)) + '</span>'
         + '<span class="v3-row__main">'
-        + '<span class="v3-row__t">' + esc(s.company && s.company.name || s.id) + ' ' + badge(s.status) + '</span>'
+        + '<span class="v3-row__t"><span class="net-name">' + esc(s.company && s.company.name || s.id) + '</span>' + badge(s.status) + '</span>'
         + '<span class="v3-row__s">' + sline + '</span>'
         + '</span>'
         + '<span class="v3-row__right"><span class="v3-row__amt num">' + fmt(a.agreed) + '</span>'
@@ -181,10 +197,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     root.innerHTML = '<div class="v3-page">'
       + quotaHtml
       + rootNode
+      + '<div class="net-tree' + (subs.length ? ' net-tree--on' : '') + '">'
       + '<div class="v3-sec-title">授权链 · 二级公司 <span class="v3-badge v3-badge--gold">' + subs.length + ' 家</span></div>'
       + (subs.length
         ? '<section class="v3-list v3-mb12">' + subNodes + '</section>'
         : '<div class="v3-empty" style="padding:34px 12px"><div class="ic">＋</div><div class="t">暂无二级公司</div><div class="d">通过「发起二级」或招商码企业自助申请接入。</div></div>')
+      + '</div>'
       + '<div class="v3-sec-title">状态流转记录</div>'
       + '<section class="v3-card v3-mb12">' + tlHtml + '</section>'
       + decl
