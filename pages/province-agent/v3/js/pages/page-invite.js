@@ -64,10 +64,10 @@
   }
 
   function fRow(lab, n, max, idx) {
-    var w = max ? Math.max(6, Math.round(n / max * 100)) : 0;
+    /* 装饰轨道条 DOM 已删（V1 无功能，纯数字行保留；T2-B CSS 已 display:none，js 域删除） */
     return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span>' +
       '<span class="lab">' + lab + '</span>' +
-      '<span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
+      '<span class="val num">' + n + "</span></div>";
   }
 
   function leadRows(ctx, filter) {
@@ -178,20 +178,14 @@
         '<div class="pq"><div class="v3-qr"></div></div>' +
         '<div class="pc">' + ui.esc(code) + "</div></div>" +
         '<div class="iv-codeline v3-mt12" >' + ui.esc(code) + "</div>" +
-        '<div class="iv-sharegrid">' +
-        shareBtn("share", "微信好友") + shareBtn("link", "复制链接") + shareBtn("qr", "保存图片") +
-        "</div>" +
+        '<button type="button" class="v3-btn v3-btn--ghost v3-btn--block v3-mt12" id="iv-share-btn">' + window.V3.ui.icon("share", 16) + " 分享渠道码</button>" +
         '<p class="v3-legal v3-mt12" style="text-align:center">二维码为原型占位；分享 / 复制为 Mock 演示。</p>',
       footer: [{ t: "完成", kind: "v3-btn--primary", onClick: function () { ctx.ui.closeAll(); } }],
       onMount: function (wrap) {
-        wrap.querySelectorAll(".iv-sharegrid button").forEach(function (bt) {
-          bt.addEventListener("click", function () { ui.toast("已触发分享（Mock）", "ok"); });
-        });
+        var bt = wrap.querySelector("#iv-share-btn");
+        if (bt) bt.addEventListener("click", function () { ui.toast("已复制渠道链接（Mock）", "ok"); });
       }
     });
-  }
-  function shareBtn(ic, t) {
-    return '<button>' + window.V3.ui.icon(ic, 22) + "<span>" + t + "</span></button>";
   }
 
   /* ---- 线索详情 ---- */

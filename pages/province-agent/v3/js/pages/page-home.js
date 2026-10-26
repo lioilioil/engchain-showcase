@@ -43,7 +43,7 @@
     /* 财务大数字卡（segment 切换：总盘 / 自身线；明细静态呈现——【S4-B·F1】删除展开/收起动效） */
     var ratioPct = Math.round(fin.ratioToSub * 100);
     h += '<section class="v3-card v3-earn v3-mt12" >' +
-      '<div class="seg"><button data-fin="gross" class="on">总盘 50%</button><button data-fin="self">自身线 50%</button></div>' +
+      '<div class="seg"><button data-fin="gross" class="on">总盘</button><button data-fin="self">自身线</button></div>' +
       '<div class="v3-flex v3-between"><div><div class="big num" id="earn-big">' + ui.moneyD(fin.gross) + '</div>' +
       '<div class="sub" id="earn-sub">本月总盘 = 合格消费 × 50%</div></div></div>' +
       '<div class="rows" id="earn-rows">' +
@@ -74,9 +74,8 @@
       d.subs.forEach(function (s) {
         h += '<button class="v3-sub-row" data-sub="' + s.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + '</span>' +
           '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
-          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "") + "</span></span>" +
-          '<span class="v3-row__right"><span class="v3-badge v3-badge--gold">比例 ' + Math.round((s.ratioToSub || 0) * 100) + '%</span>' +
-          '<span class="v3-badge v3-badge--active">生效</span></span>' + ui.icon("chev", 18) + "</button>";
+          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "") + " · 比例 " + Math.round((s.ratioToSub || 0) * 100) + '%</span></span>' +
+          '<span class="v3-row__right"><span class="v3-badge v3-badge--active">生效</span></span>' + ui.icon("chev", 18) + "</button>";
       });
     } else {
       h += '<div class="v3-empty v3-ep26" >' + ui.emptyHtml("还没有二级企业",
@@ -85,14 +84,7 @@
     }
     h += "</section>";
 
-    /* 工作台导航 — 单列 L3 通栏行 */
-    h += '<div class="section-head-row"><span class="t">工作台导航</span></div>';
-    h += '<section class="v3-sub-list">' +
-      navItem("doc", "运营规则", "O4 协议与招募口径", "rules.html") +
-      navItem("receipt", "税务指引", "个人/企业分表", "tax-guide.html") +
-      navItem("users", "招商中心", "A 轨招商码与海报", "recruit.html") +
-      navItem("shield", "授权徽章", "五档徽章样例", "badge.html") +
-      "</section>";
+    /* 工作台导航已删除（运营规则/税务指引/授权徽章与 #/profile 重复 → profile 保留，home 删除；V1） */
 
     h += '<div class="trust">润锦工程链 Engchain 3.0 · 原型数据均为 Mock</div>';
 
@@ -106,12 +98,6 @@
 
   function dline(k, v, cls) {
     return '<div class="v3-dline"><span class="k">' + k + '</span><span class="v ' + (cls || "") + ' num">' + v + "</span></div>";
-  }
-  function navItem(ic, t, s, href) {
-    return '<a class="v3-sub-row v3-nav-item" href="' + href + '"><span class="v3-nav-ic">' + ui.icon(ic, 20) + "</span>" +
-      '<span class="v3-row__main"><span class="v3-row__t">' + t + "</span>" +
-      '<span class="v3-row__s">' + s + "</span></span>" +
-      ui.icon("chev", 16) + "</a>";
   }
   function fstep(k, v) {
     return '<div class="fs"><span class="fv num">' + v + '</span><span class="fk">' + k + "</span></div>";
@@ -285,8 +271,8 @@
       h += d.subs.map(function (s) {
         return '<button class="v3-sub-row" data-s4b="sub" data-id="' + s.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + "</span>" +
           '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
-          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + "</span></span>" +
-          '<span class="v3-row__right"><span class="v3-badge v3-badge--gold">比例 ' + Math.round((s.ratioToSub || 0) * 100) + '%</span>' +
+          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + " · 比例 " + Math.round((s.ratioToSub || 0) * 100) + '%</span></span>' +
+          '<span class="v3-row__right">' +
           (s.status === "active" ? '<span class="v3-badge v3-badge--active">生效</span>' : '<span class="v3-badge v3-badge--suspended">' + ui.ACCT[s.status] + "</span>") +
           "</span>" + ui.icon("chev", 18) + "</button>";
       }).join("");
@@ -342,8 +328,10 @@
     var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
     var fin = V3.store.calcFinance(d.financeBase);
     var h = segBar("share-config");
-    h += '<section class="v3-card s4b-cfg-note"><div class="t">' + ui.icon("shield", 15) + " 约定所得比例说明</div>" +
-      '<div class="d">区间 <b>0–50%</b>（平台配置 + O4 协议内）；比例按二级逐个配置，保存后立即联动财务测算与留痕；历史协议条款为签署只读，变更后建议与二级补签约定。</div></section>';
+    /* C-02 常驻说明卡 → 页尾折叠（V1 同一说明只占一处、默认收起；内容不删只改承载） */
+    h += '<details class="v3-note-fold v3-my12"><summary>' + ui.icon("shield", 15) +
+      '<span class="sum">约定所得比例说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body">区间 <b>0–50%</b>（平台配置 + O4 协议内）；比例按二级逐个配置，保存后立即联动财务测算与留痕；历史协议条款为签署只读，变更后建议与二级补签约定。</div></details>';
     if (ctx.readonly) h += '<div class="v3-alert v3-alert--warn v3-mb12" >账号暂停中：仅可查看，不可配置。</div>';
     if (!ctx.canBoss) h += '<div class="v3-alert v3-alert--warn v3-mb12" >仅老板 / 管理员可配置二级比例。</div>';
 

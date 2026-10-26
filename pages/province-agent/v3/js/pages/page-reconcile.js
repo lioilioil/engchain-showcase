@@ -91,45 +91,32 @@
       if (!isL2 && canAct) primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="add-reg">登记线下付款</button>';
     }
 
+    /* ---------- 步骤降级：3 步条不再独立成卡，并入 band 副标一行小灰字（V4 唯一焦点） ---------- */
+    var stepNum = activeRegs.length ? ((allConfirmed || disputedRegs.length) ? 3 : 2) : 1;
     var h = '<div class="rc-band rc-band--' + bandCls + '" data-layer="' + layer + '">' +
       '<div class="rc-band__txt">' + bandTxt + "</div>" +
+      '<div class="rc-band__sub">第 ' + stepNum + " 步 / 共 3 步（补登记 → 核对 → 确认/异议）</div>" +
       (primary ? '<div class="rc-band__op">' + primary + "</div>" : "") +
       "</div>";
 
-    /* ---------- 3 步条（补登记 → 核对 → 确认/异议） ---------- */
-    var s1c = activeRegs.length ? "done" : "cur";
-    var s2c = activeRegs.length === 0 ? "" : (allConfirmed || disputedRegs.length) ? "done" : "cur";
-    var s3c = allConfirmed ? "done" : (activeRegs.length ? "cur" : "");
-    h += '<div class="s-stepbar">' +
-      '<div class="st ' + s1c + '"><span class="sdot">1</span><span class="slab">补登记<br/>登记线下付款+凭证</span></div>' +
-      '<div class="st ' + s2c + '"><span class="sdot">2</span><span class="slab">核对<br/>测算 vs 实付</span></div>' +
-      '<div class="st ' + s3c + '"><span class="sdot">3</span><span class="slab">确认/异议<br/>确认到账 · 提异议</span></div></div>';
-
-    /* ---------- 测算 vs 实付 双数字面板 ---------- */
-    h += '<section class="rc-calcpanel">' +
-      '<div class="cp-box"><div class="cp-n num">' + ui.money(curCalc.calcAmount) + '</div><div class="cp-k">平台测算应付（只读）</div></div>' +
-      '<div class="cp-op">−</div>' +
-      '<div class="cp-box"><div class="cp-n num">' + ui.money(sum) + '</div><div class="cp-k">线下实付登记</div></div></section>';
-
-    /* ---------- ① 行级匹配：勾稽条 ---------- */
-    h += '<section class="rc-tie">' +
-      '<div class="rc-tie__seg"><b class="num">' + ui.money(curCalc.calcAmount) + '</b><span>测算应付</span></div>' +
-      '<div class="rc-tie__eq">=</div>' +
-      '<div class="rc-tie__seg"><b class="num">' + ui.money(sum) + '</b><span>已勾稽登记</span></div>';
+    /* ---------- 测算摘要卡：双数字面板 + 勾稽等式合并为一行（① 行级匹配勾稽恒等式保留，不再双底色两 box） ---------- */
+    h += '<section class="rc-summary">' +
+      '<div class="rc-summary__cell"><b class="num">' + ui.money(curCalc.calcAmount) + "</b><span>测算应付（只读）</span></div>" +
+      '<i class="rc-summary__op">=</i>' +
+      '<div class="rc-summary__cell"><b class="num">' + ui.money(sum) + "</b><span>已登记</span></div>";
     if (diff !== 0) {
-      h += '<div class="rc-tie__plus">+</div>' +
-        '<div class="rc-tie__seg is-gap"><b class="num">' + ui.money(Math.abs(diff)) + '</b><span>未勾稽差额</span></div>';
+      h += '<i class="rc-summary__op">+</i>' +
+        '<div class="rc-summary__cell is-gap"><b class="num">' + ui.money(Math.abs(diff)) + "</b><span>未登记差额</span></div>";
     }
     h += "</section>";
 
-    /* ---------- ② 差异分解卡（条件出现：有差额或有异议） ---------- */
+    /* ---------- ② 差异分解：独立卡降级为列表上方一行提示（明细弹层 diffDetailSheet 保留，功能不减） ---------- */
     if (diff !== 0 || disputedRegs.length) {
-      h += '<section class="rc-diff">' +
-        '<div class="rc-diff__t"><span>差异分解</span>' +
-        '<button type="button" data-act="diff-detail" class="rc-diff__more">明细 ›</button></div>';
-      if (diff !== 0) h += '<div class="rc-diff__row"><span>漏登差额（待补登记）</span><b class="num">' + ui.money(diff) + "</b></div>";
-      if (disputedRegs.length) h += '<div class="rc-diff__row"><span>异议挂起（' + disputedRegs.length + " 笔 · 线下核实中）</span><b class=\"num\">" + ui.money(disputedSum) + "</b></div>";
-      h += '<div class="rc-diff__row"><span>冲销红字留痕</span><span>' + redCount + " 笔</span></div></section>";
+      var diffHintTxt = disputedRegs.length
+        ? ui.money(diff) + " 差额 · " + disputedRegs.length + " 笔异议待线下核实"
+        : ui.money(diff) + " 差额 · 漏登待补登记";
+      h += '<button type="button" class="rc-diffhint" data-act="diff-detail">' +
+        "<span>差异分解：" + diffHintTxt + "</span><span class=\"rc-diffhint__more\">明细 ›</span></button>";
     }
 
     /* ---------- 明细行头（B1：只留月份，时限说明收进说明弹层） ---------- */
@@ -197,7 +184,7 @@
           h += '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="remind">等待二级确认</button>';
         } else if (ctx.canBoss) {
           h += '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="confirm">确认到账</button>' +
-               '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="dispute">提异议</button>' +
+               '<button class="v3-btn v3-btn--link v3-btn--sm" data-act="dispute">提异议</button>' +
                '<button class="v3-btn v3-btn--link v3-btn--sm" data-act="redflush">冲销</button>';
         } else {
           h += '<button class="v3-btn v3-btn--ghost v3-btn--sm is-disabled">待管理员确认</button>';
@@ -395,20 +382,23 @@
       body:
         '<div class="v3-alert v3-alert--warn v3-mb12" >仅在你已<b>实际核对线下到账与凭证一致</b>后确认；确认进入双方留痕。</div>' +
         (layer === "2" ? '<div class="v3-readnote v3-mb12" >第二层出账后 15 天内仅提醒，<b>绝不自动确认到账</b>。</div>' : "") +
-        '<div class="rc-row__vch">' + ui.icon("shield", 16) + "<span>确认方式：双方确认记录（电子签正式接入为 P1）</span></div>",
+        '<div class="rc-row__vch">' + ui.icon("shield", 16) + "<span>确认方式：双方确认记录</span>" +
+        '<button type="button" class="v3-btn v3-btn--link v3-btn--sm" id="rc-esign-link">电子签（P1 占位）›</button></div>',
       footer: [
         { t: "确认到账（确认记录）", kind: "v3-btn--primary", onClick: function () {
           ctx.V3.store.act("pay/confirm", { layer: layer, id: rid, signMethod: "record" }); ui.toast("已确认", "ok"); ctx.V3.router.render();
-        } },
-        { t: "确认并电子签", kind: "v3-btn--navy", onClick: function () {
+        } }
+      ],
+      onMount: function (wrap) {
+        var lk = wrap.querySelector("#rc-esign-link");
+        if (lk) lk.addEventListener("click", function () {
           esignMock(ctx, function () {
             ctx.V3.ui.closeAll();
             ctx.V3.store.act("pay/confirm", { layer: layer, id: rid, signMethod: "esign" });
             ui.toast("电子签完成（Mock，正式 P1）", "ok"); ctx.V3.router.render();
           });
-          return false;
-        } }
-      ]
+        });
+      }
     });
   }
   function esignMock(ctx, done) {
