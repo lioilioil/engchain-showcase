@@ -9,7 +9,7 @@
   /* ---------- 锁定只读常量（来自 agent-ledger.js DEFAULTS，原型零改动） ---------- */
   var CONST = {
     grossShare: 0.50,
-    selfRate: 0.10,
+    selfRate: 0.50, /* 【S4-B】自身线系数 0.10→0.50（用户指令授权；独立分区、仅测算不入对账层） */
     frozenDays: 7,
     ratioMin: 0, ratioMax: 0.50,
     cap: 21,
@@ -17,7 +17,7 @@
     excludedTypes: ["recharge", "free_points", "entry_fee", "refund_reversal"],
     // 演示 T1
     demo: { eligible: 10000, gross: 5000, agreedToSub: 1000, ratioToSub: 0.20,
-            selfKeep: 4000, frozen: 3000, selfLine: 800, selfLineBase: 8000 },
+            selfKeep: 4000, frozen: 3000, selfLine: 4000, selfLineBase: 8000 }, /* selfLine=8000×0.5=4000 */
     // 【假设】营销参数，待真实埋点/合规回填（R6）
     bindWindowDays: 30, reassignOnce: 1, idleRecycleDays: 30
   };
@@ -42,14 +42,24 @@
 
   /* ---------- 纯函数口径（只读复算，任何 action 不得改写） ---------- */
   function calcFinance(base) {
-    // base: { eligible, frozen, subEligible(selfbase) }
+    // base: { eligible, frozen, ratioToSub, selfBase, subsList?(多二级聚合,可选) }
     var eligible = base.eligible || 0;
     var gross = Math.round(eligible * CONST.grossShare);            // 总盘 = 合格消费 ×50%
-    var agreed = Math.round(gross * (base.ratioToSub || 0));         // 约定给二级（省代视角演示）
+    var ratio = base.ratioToSub || 0;
+    var agreed = Math.round(gross * ratio);                         // 约定给二级（省代视角演示）
     var selfKeep = gross - agreed;                                  // 自留 = 总盘 − 约定
-    var selfLine = Math.round((base.selfBase || 0) * CONST.selfRate);// 自身线 = 自身合格消费×10%（独立）
-    return { eligible: eligible, gross: gross, agreed: agreed, ratioToSub: base.ratioToSub || 0,
+    var selfLine = Math.round((base.selfBase || 0) * CONST.selfRate);// 自身线 = 自身合格消费×50%（独立）
+    var out = { eligible: eligible, gross: gross, agreed: agreed, ratioToSub: ratio,
              selfKeep: selfKeep, frozen: base.frozen || 0, selfLine: selfLine };
+    /* 【S4-B】可选多二级聚合：传入 subsList 时按各自 ratioToSub 汇总约定所得。
+       eligible 暂取 demo 单值（多二级消费基数埋点为后续）；不传则维持单值聚合（向后兼容）。 */
+    if (base.subsList && base.subsList.length) {
+      out.agreedAll = base.subsList.reduce(function (s, x) {
+        return s + Math.round(gross * (Number(x.ratioToSub) || 0));
+      }, 0);
+      out.selfKeepAll = gross * base.subsList.length - out.agreedAll;
+    }
+    return out;
   }
   function subSettle(base) {
     // 二级本人：settleAgg = 总盘×50%×ratioToSub 纯展示
@@ -179,9 +189,30 @@
           d.profile.subsCount = (d.profile.subsCount || 0) + 1;
           d.subs = d.subs || [];
           d.subs.push({ id: uid("sub"), name: a.entName, status: "active", ratioToSub: a.ratioToSub,
-                       inviteScope: "标准授权（平台配置 + O4 协议内）", inviteRate: null, inviteRateReadonly: true });
+                       inviteScope: "标准授权（平台配置 + O4 协议内）", inviteRate: null, inviteRateReadonly: true,
+                       /* 【S4-B】分成配置留痕字段 */
+                       ratioUpdatedAt: todayStr(),
+                       ratioLog: [{ at: todayStr(), from: 0, to: a.ratioToSub, by: "boss" }] });
         } else { a.status = "rejected"; a.rejectReason = p.reason || "资料不全"; }
         behavior("subapp-review", { id: p.id, pass: !!p.pass });
+        break;
+      }
+
+      /* 【S4-B】二级分成配置：获批后修改约定所得比例（boss 权限 / 账号生效 / 0–50% 校验 / 留痕） */
+      case "sub/setRatio": {
+        if (state.mode !== "province" || state.role !== "boss") break;
+        if (d.profile.status !== "active") break; /* 暂停/非生效账号拦截 */
+        var s2 = find(d.subs, p.id); if (!s2 || s2.status !== "active") break;
+        var nr = Math.round((Number(p.ratio) || 0) * 100) / 100;
+        if (isNaN(nr) || nr < CONST.ratioMin || nr > CONST.ratioMax) break; /* 超界拒绝 */
+        var oldR = Number(s2.ratioToSub) || 0;
+        if (nr === oldR) break;
+        s2.ratioToSub = nr;
+        s2.ratioLog = s2.ratioLog || [];
+        s2.ratioLog.push({ at: todayStr(), from: oldR, to: nr, by: state.role });
+        if (s2.ratioLog.length > 50) s2.ratioLog = s2.ratioLog.slice(-50);
+        s2.ratioUpdatedAt = todayStr();
+        behavior("sub-ratio-change", { id: p.id, from: oldR, to: nr });
         break;
       }
 

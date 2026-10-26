@@ -40,7 +40,7 @@
     /* 财务口径：折叠摘要（渐进披露） */
     h += '<details class="v3-note-fold v3-mt14"><summary>' + ui.icon("receipt", 15) +
       '<span class="sum">财务口径（锁定 · 只读）</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">总盘 = 合格消费 × <b>50%</b>；自身线 = 自身合格消费 × <b>10%</b>（独立不相加）<br/>' +
+      '<div class="fold-body">总盘 = 合格消费 × <b>50%</b>；自身线 = 自身合格消费 × <b>50%</b>（独立不相加）<br/>' +
       "约定给二级比例区间 <b>0–50%</b>（平台配置 + 协议）；在途冻结 <b>T+7</b><br/>" +
       "合格：订单净额 / 积分付费 / 增值付费；排除：充值 / 免费积分 / 报名费 / 退款冲回<br/>" +
       "名额 <b>" + d.profile.used + " / " + d.profile.cap + "</b>。</div></details>";
