@@ -861,3 +861,107 @@ html[data-theme="dark"] .v3-note-fold--gold>summary{color:var(--v3-gold-bright)}
 .rc-tl__item.is-bad .rc-tl__dot{background:var(--v3-danger)}
 .rc-tl__bd b{font-size:12.5px;font-weight:700;color:var(--v3-ink)}
 .rc-tl__bd p{font-size:12px;color:var(--v3-ink-2);line-height:1.5;margin:2px 0 0;word-break:break-all}
+/* ============================================================
+   ============================================================
+   T2-B · 迭代五 卡片模型与令牌覆盖（2026-10-26，§6 全流程）
+   依据：02-整体布局重构方案.md §二 文字阶梯/§三 唯一卡片模型/§四 徽章/§五 动效/§七 空态
+   铁律：V4 文件（v3-tokens.css / v3-components.css / v3-base / ui.js）零回退——
+        本段为纯覆盖层；所有新色/新字号一律走本段新增 :root 变量，不写硬编码色值与字号。
+   V4 成果保留（不覆盖）：
+     · 噪点移除 body:has(#ag-root)::before  · 毛玻璃 blur32 补包豁免
+     · 大数字 weight600（.v3-earn .big）  · ¥弱化 .cur(.6em/opacity.55)
+     · eyebrow 中文标签  · 去卡片化 v3-sub-list/spring 动效
+     · 墨金双轨：navy 身份带 --v3-navy #1F2A44 / 品牌金 --primary
+   ============================================================ */
+
+/* ---------- T2-B-01 新增令牌：5 级文字阶梯 + 4 档间距 ---------- */
+:root{
+  /* 5 级文字阶梯（废除现状 13/15/12 foot 三档混乱；旧变量向后兼容不删） */
+  --t2b-t1-fs:30px;  --t2b-t1-w:600; --t2b-t1-lh:1.2;   /* Display：唯一大数字 */
+  --t2b-t2-fs:17px;  --t2b-t2-w:700; --t2b-t2-lh:1.3;   /* Title：视图标题 */
+  --t2b-t3-fs:14px;  --t2b-t3-w:600; --t2b-t3-lh:1.4;   /* H3：分区标题 */
+  --t2b-t4-fs:14px;  --t2b-t4-w:400; --t2b-t4-lh:1.5;   /* Body：列表主行/卡正文 */
+  --t2b-t5-fs:12px;  --t2b-t5-w:400; --t2b-t5-lh:1.5;   /* Caption：副标/元信息 */
+  /* 4 档间距（8px 网格；废除 24/16/8 混用） */
+  --t2b-sp1:4px; --t2b-sp2:8px; --t2b-sp3:16px; --t2b-sp4:24px;
+}
+
+/* ---------- T2-B-02 唯一卡片模型：L2 财务卡改白底（消灭连续两深色卡堆叠） ----------
+   L1 navy 身份带（.pa2-hero/.s-idcard）为 V4 墨金成果，保持不动。
+   二级 home「身份带 navy + 财务卡 navy」连续两深色面 → 财务卡降为白底 L2。 */
+.sub-finance{background:var(--v3-surface);border:1px solid var(--v3-line);
+  color:var(--v3-ink);box-shadow:var(--v3-sh-card)}
+.sub-finance .big{color:var(--v3-ink)}
+.sub-finance .rows{border-top-color:var(--v3-line)}
+.sub-finance .v3-dline .k{color:var(--v3-ink-3)}
+.sub-finance .v3-dline .v{color:var(--v3-ink)}
+/* L2 卡内嵌灰盒（sharecfg 测算行）降级为无边框 L3 行（V2 禁卡套卡）；js 折叠化交 C 线 */
+.s4b-est{background:transparent;border:0;padding:0;color:var(--v3-ink-3)}
+.s4b-est b{color:var(--v3-ink-2)}
+
+/* ---------- T2-B-03 金额颜色裁决（关键风险：甄别 V4 墨金双轨 vs 金色滥用） ----------
+   V4 保留：navy 身份带 / 金品牌位（导航激活下划线、FAB、主按钮渐变、角标）/ ¥弱化 .cur。
+   调整：金额一律 T1 text-1，不用品牌金——payments 大数字金与付费金额行金改为主文字色。 */
+.v3-goldtext{color:var(--v3-ink)}
+
+/* ---------- T2-B-04 徽章 8→4 收敛（active 绿 / pending 灰 / warn 橙 / danger 红） ---------- */
+/* 比例金徽章（v3-badge--gold）废除：去金底金边，降为中性灰文字（比例并入副标文案，js 改文案交 C/D 线） */
+.v3-badge--gold{background:transparent;border:0;padding:0;color:var(--v3-ink-3);
+  font-weight:500;font-size:var(--t2b-t5-fs)}
+/* suspended→warn 语义对齐（components 原即 warn-bg，显式锁定防漂移） */
+.v3-badge--suspended{background:var(--v3-warn-bg);color:var(--v3-warn)}
+/* terminated / sealed / void → 统一中性灰（作废类不再各占一色） */
+.v3-badge--terminated,.v3-badge--sealed,.v3-badge--void{
+  background:var(--v3-surface-3);color:var(--v3-ink-3)}
+/* revoked → danger 红 */
+.v3-badge--revoked{background:var(--v3-danger-bg);color:var(--v3-danger)}
+/* neutral → pending 灰语义（不归属类轻信息） */
+.v3-badge--neutral{background:var(--v3-surface-3);color:var(--v3-ink-3)}
+/* 临期 due 标并入 warn 徽章体系：ok→灰 / warn→橙 / danger→红（不再独立第四色阶） */
+.v3-due--ok{background:var(--v3-surface-3);color:var(--v3-ink-3)}
+.v3-due--warn{background:var(--v3-warn-bg);color:var(--v3-warn)}
+.v3-due--danger{background:var(--v3-danger-bg);color:var(--v3-danger)}
+
+/* ---------- T2-B-05 动效 3 类（snap150/smooth280/spring350），禁装饰动效 ---------- */
+/* ① 禁页面进入整体 fade：v3-base 的 #ag-view.v3-fade-enter{opacity:0} 覆盖为硬切（路由类名由 router.js 挂载） */
+#ag-view.v3-fade-enter{opacity:1 !important;transition:none !important}
+/* ② 禁漏斗装饰轨道条生长动画：轨道 DOM 隐藏，纯数字行保留（V1；js 删 DOM 交 C 线） */
+.iv-funnel-row .track{display:none}
+/* ③ 可点元素统一 :active scale(.97) 150ms snap（不覆盖 sheet/FAB 既有按压值） */
+.v3-btn{transition:transform var(--v3-d-snap) var(--v3-ease-snap)}
+.v3-btn:not(.v3-sheet__ft .v3-btn):not(.v3-modal__ft .v3-btn):active{transform:scale(.97)}
+.v3-sub-row,.s-l3,.s-todorow,.s-enter,.v3-todos button.row{
+  transition:transform var(--v3-d-snap) var(--v3-ease-snap)}
+.v3-sub-row:active,.s-l3:active,.s-todorow:active,.s-enter:active,.v3-todos button.row:active{
+  transform:scale(.99)}
+/* ④ prefers-reduced-motion 全量降级（V3 否决项） */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important}
+}
+
+/* ---------- T2-B-06 空态/加载态/错误态规范 ---------- */
+/* v3-placeholder 单行灰文 → 统一为居中宽松面（对齐 v3-empty 上图下文模型；图标注入交 C/D 线 js） */
+.v3-placeholder{border:0;background:transparent;border-radius:0;
+  padding:var(--t2b-sp4) var(--t2b-sp3);font-size:var(--t2b-t5-fs);
+  line-height:1.6;color:var(--v3-ink-3);text-align:center}
+/* 预留骨架屏（demo 无真实异步，本版仅占位类） */
+.v3-skeleton{border-radius:var(--v3-r-md);background:var(--v3-surface-2);
+  background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);
+  background-size:200% 100%;animation:t2b-shimmer 1s linear infinite}
+@keyframes t2b-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+/* 预留错误态 toast 容器 */
+.v3-error{display:inline-flex;align-items:center;gap:var(--t2b-sp1);
+  padding:var(--t2b-sp1) var(--t2b-sp2);border-radius:var(--v3-r-xs);
+  background:var(--v3-danger-bg);color:var(--v3-danger);
+  font-size:var(--t2b-t5-fs);line-height:1.5}
+
+/* ---------- T2-B-07 文字阶梯覆盖：分区标题归 T3，废除字号混乱 ---------- */
+.section-head-row .t{font-size:var(--t2b-t3-fs);font-weight:var(--t2b-t3-w);line-height:var(--t2b-t3-lh)}
+.s-sec-title,.sh-sec,.rc-sec{font-size:var(--t2b-t3-fs);font-weight:var(--t2b-t3-w);
+  line-height:var(--t2b-t3-lh);color:var(--v3-ink-3)}
+/* 分区标题与卡片间距 16px（sp-3），标题上方不留 24px 大留白 */
+.section-head-row{margin:var(--t2b-sp3) 2px var(--t2b-sp2)}
+.s-sec-title{margin:var(--t2b-sp3) 2px var(--t2b-sp2)}
+/* 大数字统一 T1（payments display / 财务卡 big 已经 600，仅锁字号走令牌） */
+.v3-display{font-size:var(--t2b-t1-fs);font-weight:var(--t2b-t1-w);line-height:var(--t2b-t1-lh)}
