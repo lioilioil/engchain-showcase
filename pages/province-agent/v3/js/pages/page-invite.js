@@ -13,8 +13,9 @@
 
     /* ============ B 轨 ============ */
     h += '<div id="track-B">' +
-      '<div class="v3-readnote v3-my12" >' + ui.icon("shield", 16) +
-      "<span><b>单层扁平绑定：</b>仅「企业 → 你直接邀请的用户」归属计佣；用户再邀请<b>不归属 · 不分佣 · 不传递</b>。终端用户无分佣码、无下线。</span></div>";
+      '<details class="v3-note-fold v3-my12"><summary>' + ui.icon("shield", 15) +
+      '<span class="sum">单层绑定说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body"><b>单层扁平绑定：</b>仅「企业 → 你直接邀请的用户」归属计佣；用户再邀请<b>不归属、不分佣、不传递</b>。终端用户无分佣码、无下线。</div></details>';
 
     /* 渠道码 */
     h += '<div class="section-head-row"><span class="t">我的渠道码</span>' +
@@ -22,11 +23,11 @@
     var chans = (d.channels || []).filter(function (c) { return c.status === "active"; });
     if (chans.length) {
       h += '<div class="v3-stack">';
-      chans.forEach(function (c) {
-        h += '<div class="v3-codecard"><div class="v3-qr"></div><div style="flex:1;min-width:0">' +
+      chans.forEach(function (c, ci) {
+        h += '<div class="v3-codecard' + (ci > 0 ? " v3-codecard--plain" : "") + '"><div class="v3-qr"></div><div style="flex:1;min-width:0">' +
           '<div class="v3-codebig v3-ellipsis">' + ui.esc(c.code) + '</div>' +
           '<div class="v3-xs v3-muted v3-mt3" >' + ui.esc(c.ownerName) + " · " +
-          (c.src === "offline" ? "线下场景" : "微信场景") + " · " + ui.esc(c.createdAt) + "</div></div>" +
+          (c.src === "offline" ? "线下场景" : "微信场景") + '<br><span class="v3-nowrap">' + ui.esc(c.createdAt) + "</span></div></div>" +
           '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="poster" data-id="' + c.id + '">海报/分享</button></div>';
       });
       h += "</div>";
@@ -40,15 +41,15 @@
     }
 
     /* 转化漏斗 + D4 */
-    h += '<div class="v3-sec-title">转化漏斗 · 邀请已产生付费金额</div><section class="v3-card">' +
-      fRow("直接邀请", fn.direct, fn.direct) +
-      fRow("已注册", fn.registered, fn.direct) +
-      fRow("已入驻", fn.onboarded, fn.direct) +
-      fRow("已消费", fn.paid, fn.direct) +
-      fRow("已复购", fn.repaid, fn.direct) +
+    h += '<div class="v3-sec-title">转化漏斗 · 邀请已产生付费金额</div><section class="v3-card iv-funnel">' +
+      fRow("直接邀请", fn.direct, fn.direct, 0) +
+      fRow("已注册", fn.registered, fn.direct, 1) +
+      fRow("已入驻", fn.onboarded, fn.direct, 2) +
+      fRow("已消费", fn.paid, fn.direct, 3) +
+      fRow("已复购", fn.repaid, fn.direct, 4) +
       '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4）</div>' +
-      '<div class="amt num v3-mt3" >' + ui.money(fn.paidAmount) + '</div>' +
-      '<div class="v3-xs v3-mt3" >只统计 · 不发起任何资金动作 · ' + V3.MONEY_NOTE + "</div></div>" +
+      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + '</div>' +
+      '<div class="v3-xs v3-mt3" >只统计 · 不发起任何资金动作</div></div>" +
       (fn.lost ? '<div class="v3-xs v3-muted v3-mt8" >已流失 ' + fn.lost + " 人；沉寂超 30 天线索建议回收（【假设】参数）。</div>" : "") +
       "</section>";
 
@@ -57,16 +58,17 @@
     h += '<div class="v3-chips" id="lead-chips"><button class="v3-chip on" data-f="all">全部</button>' +
       '<button class="v3-chip" data-f="registered">已注册</button><button class="v3-chip" data-f="onboarded">已入驻</button>' +
       '<button class="v3-chip" data-f="paid">已消费</button><button class="v3-chip" data-f="lost">已流失</button></div>';
-    h += '<div id="lead-list" class="v3-list v3-card--pad0" style="border-radius:17px"></div>';
+    h += '<div id="lead-list" class="v3-sub-list" style="border-radius:17px"></div>';
     h += '<div id="lead-reinvite"></div>';
     h += "</div>"; // /track-B
 
     /* ============ A 轨 ============ */
     var quotaFull = d.profile.used >= d.profile.cap;
-    h += '<div id="track-A" style="display:none">' +
-      '<div class="v3-readnote v3-my12" >' + ui.icon("crown", 16) +
-      "<span><b>仅省级总代可用</b>：招商码只用于招募二级企业；二级永久封顶、不可再发展下级。渠道码（B）与招商码（A）两表两菜单硬隔离。</span></div>" +
-      '<div class="v3-sec-title">招商码（AG）</div><section class="v3-list v3-card--pad0" style="border-radius:17px" id="ag-list"></section>' +
+    h += '<div id="track-A" class="v3-track-panel">' +
+      '<details class="v3-note-fold v3-my12"><summary>' + ui.icon("crown", 15) +
+      '<span class="sum">招商轨说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body"><b>仅省级总代可用</b>：招商码只用于招募二级企业；二级永久封顶、不可再发展下级。渠道码（B）与招商码（A）两表两菜单硬隔离。</div></details>' +
+      '<div class="v3-sec-title">招商码（AG）</div><section class="v3-sub-list" style="border-radius:17px" id="ag-list"></section>' +
       '<div class="v3-sec-title">发起二级合作</div><section class="v3-card">' +
       '<div class="v3-flex v3-between v3-mb8" ><span class="v3-sm v3-muted">名额（已入驻 / 上限）</span>' +
       '<span class="v3-strong num">' + d.profile.used + " / " + d.profile.cap + "</span></div>" +
@@ -86,7 +88,7 @@
     /* 待初审 */
     var pend = (d.subApps || []).filter(function (a) { return a.status === "pending"; });
     h += '<div class="v3-sec-title">二级申请 · 待初审 ' + pend.length + "</div>";
-    h += '<div class="v3-list v3-card--pad0" style="border-radius:17px" id="app-list"></div>';
+    h += '<div class="v3-sub-list" style="border-radius:17px" id="app-list"></div>';
     var rejected = (d.subApps || []).filter(function (a) { return a.status === "rejected" });
     if (rejected.length) {
       h += '<div class="v3-xs v3-faint v3-mh10" >已驳回 ' + rejected.length +
@@ -97,9 +99,10 @@
     return h;
   }
 
-  function fRow(lab, n, max) {
-    var w = max ? Math.max(4, Math.round(n / max * 100)) : 0;
-    return '<div class="iv-funnel-row"><span class="lab">' + lab + '</span>' +
+  function fRow(lab, n, max, idx) {
+    var w = max ? Math.max(6, Math.round(n / max * 100)) : 0;
+    return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span>' +
+      '<span class="lab">' + lab + '</span>' +
       '<span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
   }
 
@@ -107,14 +110,14 @@
     var ui = ctx.ui, d = ctx.d;
     var list = (d.leads || []).filter(function (l) { return !l.viaUserReinvite; });
     if (filter && filter !== "all") list = list.filter(function (l) { return l.stage === filter; });
-    if (!list.length) return '<div class="v3-empty v3-ep28" ><div class="t">该状态暂无用户</div></div>';
+    if (!list.length) return '<div class="v3-empty v3-ep28" >' + ui.emptyHtml("该状态暂无用户", "", "user") + "</div>";
     return list.map(function (l) {
-      return '<button class="v3-row" data-act="lead" data-id="' + l.id + '">' +
+      return '<button class="v3-sub-row" data-act="lead" data-id="' + l.id + '">' +
         '<span class="v3-avatar">' + ui.esc(l.name.slice(0, 1)) + '</span>' +
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) +
         ' <span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></span>" +
-        '<span class="v3-row__s">' + ui.esc(l.phone) + " · 直接邀请 · " +
-        (l.paidAmount ? "已产生 " + ui.money(l.paidAmount) : ("来自 " + l.channelCode)) + "</span></span>" +
+        '<span class="v3-row__s">' + ui.esc(l.phone) +
+        (l.paidAmount ? " · 已产生 " + ui.money(l.paidAmount) : (" · 来自 " + l.channelCode)) + "</span></span>" +
         (l.idleDays >= 30 ? '<span class="v3-due v3-due--warn">沉寂' + l.idleDays + "天</span>" : "") +
         ui.icon("chev", 17) + "</button>";
     }).join("");
@@ -123,21 +126,22 @@
     var ui = ctx.ui;
     var xs = (ctx.d.leads || []).filter(function (l) { return l.viaUserReinvite; });
     if (!xs.length) return "";
-    return '<div class="v3-sec-title">用户再邀请（不归属）</div><div class="v3-list v3-card--pad0 iv-reinvite" style="border-radius:17px">' +
+    return '<div class="v3-sec-title">用户再邀请（不归属）</div><div class="v3-sub-list iv-reinvite" style="border-radius:17px">' +
       xs.map(function (l) {
-        return '<div class="v3-row" style="opacity:.85"><span class="v3-avatar">' + ui.esc(l.name.slice(-1)) + "</span>" +
+        return '<div class="v3-sub-row" style="opacity:.85"><span class="v3-avatar">' + ui.esc(l.name.slice(-1)) + "</span>" +
           '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) +
           ' <span class="v3-badge v3-badge--neutral">不归属</span></span>' +
-          '<span class="v3-row__s">终端用户再邀请 · 不分佣 · 不向下传递 · 不计入统计</span></span></div>';
+          '<span class="v3-row__s">再邀请用户 · 不归属不计佣</span></span></div>';
       }).join("") + "</div>";
   }
   function agListHtml(ctx) {
     var ui = ctx.ui, d = ctx.d;
     var codes = d.agentCodes || [];
-    if (!codes.length) return '<div class="v3-empty v3-ep26" ><div class="t">暂无招商码</div>' +
-      (ctx.canBoss ? '<div class="d">账号生效时可生成一枚招商码（AG）。</div><button class="v3-btn v3-btn--navy v3-btn--sm" data-act="gen-ag">生成招商码</button>' : "") + "</div>";
+    if (!codes.length) return '<div class="v3-empty v3-ep26" >' + ui.emptyHtml("暂无招商码",
+      ctx.canBoss ? '<button class="v3-btn v3-btn--navy v3-btn--sm" data-act="gen-ag">生成招商码</button>' : "",
+      "crown") + "</div>";
     return codes.map(function (c) {
-      return '<div class="v3-row"><span class="v3-avatar v3-avatar--sub">' + ui.icon("crown", 19) + "</span>" +
+      return '<div class="v3-sub-row"><span class="v3-avatar v3-avatar--sub">' + ui.icon("crown", 19) + "</span>" +
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(c.code) +
         (c.status === "active" ? ' <span class="v3-badge v3-badge--active">生效</span>' : ' <span class="v3-badge v3-badge--void">已作废</span>') +
         "</span><span class='v3-row__s'>招商专用 · 创建 " + ui.esc(c.createdAt) + "</span></span>" +
@@ -145,14 +149,14 @@
         (c.status === "active" && ctx.canBoss ? '<button class="v3-btn v3-btn--navy v3-btn--sm" data-act="ag-share" data-id="' + c.id + '">分享</button>' : "") +
         "</div>";
     }).join("") + (ctx.canBoss && !codes.some(function (c) { return c.status === "active"; })
-      ? '<button class="v3-row" data-act="gen-ag"><span class="v3-row__main"><span class="v3-row__t v3-goldtext">+ 生成新招商码</span></span>' + ui.icon("chev", 17) + "</button>" : "");
+      ? '<button class="v3-sub-row" data-act="gen-ag"><span class="v3-row__main"><span class="v3-row__t v3-goldtext">+ 生成新招商码</span></span>' + ui.icon("chev", 17) + "</button>" : "");
   }
   function appListHtml(ctx) {
     var ui = ctx.ui, d = ctx.d;
     var pend = (d.subApps || []).filter(function (a) { return a.status === "pending"; });
-    if (!pend.length) return '<div class="v3-empty v3-ep24" ><div class="t">暂无待初审申请</div></div>';
+    if (!pend.length) return '<div class="v3-empty v3-ep24" >' + ui.emptyHtml("暂无待初审申请", "", "doc") + "</div>";
     return pend.map(function (a) {
-      return '<button class="v3-row" data-act="app" data-id="' + a.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(a.entName.slice(0, 1)) + "</span>" +
+      return '<button class="v3-sub-row" data-act="app" data-id="' + a.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(a.entName.slice(0, 1)) + "</span>" +
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(a.entName) +
         ' <span class="v3-badge v3-badge--pending">待初审</span></span>' +
         '<span class="v3-row__s">' + ui.esc(a.contact) + " " + ui.esc(a.phone) + " · 申请比例 " + Math.round(a.ratioToSub * 100) + "%</span></span>" +
@@ -175,8 +179,14 @@
       b.addEventListener("click", function () {
         var t = b.getAttribute("data-t");
         el.querySelectorAll(".iv-track button").forEach(function (x) { x.classList.toggle("on", x === b); });
-        el.querySelector("#track-B").style.display = t === "B" ? "" : "none";
-        el.querySelector("#track-A").style.display = t === "A" ? "" : "none";
+        var trackB = el.querySelector("#track-B"), trackA = el.querySelector("#track-A");
+        if (t === "B") {
+          trackA.style.visibility = "hidden"; trackA.style.opacity = "0"; trackA.style.pointerEvents = "none";
+          trackB.style.visibility = "visible"; trackB.style.opacity = "1"; trackB.style.pointerEvents = "";
+        } else {
+          trackB.style.visibility = "hidden"; trackB.style.opacity = "0"; trackB.style.pointerEvents = "none";
+          trackA.style.visibility = "visible"; trackA.style.opacity = "1"; trackA.style.pointerEvents = "";
+        }
       });
     });
     /* 线索筛选 */
@@ -431,12 +441,13 @@
         '<span class="k">申请比例</span><span class="v v3-goldtext">' + Math.round(a.ratioToSub * 100) + "%（可调，需在 0–50% 与平台配置内）</span></span>" +
         "</div>" +
         '<div class="sh-sec">审批结论</div>' +
-        '<div class="v3-field" id="rej-box" style="display:none"><label>驳回原因（必填）</label>' +
+        '<div class="v3-field v3-reveal" id="rej-box"><label>驳回原因（必填）</label>' +
         '<textarea class="v3-textarea" id="a-reason" placeholder="如：资质材料不完整，请补充建筑业相关资质"></textarea></div>' +
         '<div class="v3-xs v3-muted">通过后名额 +1，系统生成二级账号与 O4 协议；二级可直接邀终端用户，但不能再发展下级。</div>',
       footer: [
         { t: "驳回", kind: "v3-btn--danger", onClick: function (wrap) {
-          var box = wrap.querySelector("#rej-box"); box.style.display = "";
+          var box = wrap.querySelector("#rej-box");
+          box.style.gridTemplateRows = "1fr"; box.style.opacity = "1"; box.style.marginTop = "";
           var reason = wrap.querySelector("#a-reason").value.trim();
           if (!reason) { ui.toast("请填写驳回原因", "err"); return false; }
           ctx.V3.store.act("app/review", { id: a.id, pass: false, reason: reason }); ui.toast("已驳回", "ok"); done();

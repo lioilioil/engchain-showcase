@@ -2,7 +2,7 @@
    router.js · hash 路由 / 页内分段导航 / 主题
    【视觉统一】不再自绘外壳（无 #device / 无自建顶栏 / 无自建 4-Tab）：
    页面外壳 = App demo .phone + .navbar（HTML 静态，common.js 注入状态栏/灵动岛/首页钮）；
-   省代四视图 = 页内分段 .seg（App 语系）；二级 = .sub-tabs 横向分段 + 金色动画指示条。
+   省代四视图与二级八视图 = 统一 .sub-tabs 文字页签 + 金色动画指示条（App 语系）。
    演示场景：不再提供页内 ⚙ 浮层，统一由 preview.html 演示切换器播种。
    ============================================================ */
 (function () {
@@ -88,53 +88,46 @@
 
     setNavTitle(page.title || TITLES[key] || (isSub ? "二级企业工作台" : "省级总代工作台"));
 
-    /* 省代四视图：页内分段 Tab（App .seg 语系，sticky）
+    /* 统一导航语系（App .sub-tabs 文字页签 + 金色滑动指示条，sticky 于 navbar 之下）：
+       省代四视图与二级八视图同构，消除"独立 App 分段控件"观感。
        ⚠ 不可用 <a href="#/key">：页面 base 为目录级，点击会按 base 解析成目录 URL 而整页换页；
        改用 <button> + location.hash 赋值（App demo 同款模式）。 */
-    var segHtml = "";
-    if (!isSub) {
-      var dotCount = d.payRegs1 ? d.payRegs1.filter(function (r) { return r.status === "pending_confirm" || r.status === "disputed"; }).length : 0;
-      var l2c = d.payRegs2 ? d.payRegs2.filter(function (r) { return r.status === "pending_confirm"; }).length : 0;
-      var todoN = dotCount + l2c + ((d.subApps || []).filter(function (a) { return a.status === "pending"; }).length);
-      segHtml = '<div class="v3-segbar"><div class="seg">' + TABS.map(function (t) {
-        var dot = (t.key === "reconcile" && (dotCount + l2c) > 0) ? '<span class="v3-tab__dot">' + (dotCount + l2c) + "</span>"
-          : (t.key === "home" && todoN > 0) ? '<span class="v3-tab__dot">' + todoN + "</span>" : "";
-        return '<button type="button" class="seg-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
-          "<span>" + t.label + "</span>" + dot + "</button>";
-      }).join("") + "</div></div>";
-    }
+    var navItems = isSub ? SUBNAV : TABS;
+    var navHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
+      navItems.map(function (t) {
+        var badge = "";
+        if (!isSub) {
+          var dotCount = d.payRegs1 ? d.payRegs1.filter(function (r) { return r.status === "pending_confirm" || r.status === "disputed"; }).length : 0;
+          var l2c = d.payRegs2 ? d.payRegs2.filter(function (r) { return r.status === "pending_confirm"; }).length : 0;
+          var todoN = dotCount + l2c + ((d.subApps || []).filter(function (a) { return a.status === "pending"; }).length);
+          badge = (t.key === "reconcile" && (dotCount + l2c) > 0) ? '<span class="v3-tab__dot">' + (dotCount + l2c) + "</span>"
+            : (t.key === "home" && todoN > 0) ? '<span class="v3-tab__dot">' + todoN + "</span>" : "";
+        }
+        return '<button type="button" class="sub-item ' + (t.key === key ? "active" : "") + '" data-key="' + t.key + '">' +
+          "<span>" + t.label + "</span>" + badge + "</button>";
+      }).join("") +
+      '<span class="sub-ind" aria-hidden="true"></span>' +
+      "</div></div></div>";
 
-    /* 二级横向分段（App .sub-tabs 语系 + 金色动画指示条，sticky） */
-    var subnavHtml = "";
-    if (isSub) {
-      subnavHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
-        SUBNAV.map(function (n) {
-          return '<button type="button" class="sub-item ' + (n.key === key ? "active" : "") + '" data-key="' + n.key + '">' +
-            "<span>" + n.label + "</span></button>";
-        }).join("") +
-        '<span class="sub-ind" aria-hidden="true"></span>' +
-        "</div></div></div>";
-    }
-
-    root.innerHTML = segHtml + subnavHtml +
-      '<div id="ag-view"><div class="v3-page" id="v3-page-body"></div></div>';
+    root.innerHTML = navHtml +
+      '<div id="ag-view" class="v3-fade-enter"><div class="v3-page" id="v3-page-body"></div></div>';
 
     var bodyEl = document.getElementById("v3-page-body");
-    bodyEl.innerHTML = page.render(ctx);
+    /* 文字密度专项：合规免责（MONEY_NOTE）统一收为页尾折叠脚注，首屏只留摘要行，不删文案只改承载形态 */
+    var _ui = window.V3.ui;
+    var legalNote = '<details class="v3-note-fold v3-legal-note"><summary>' + _ui.icon("shield", 14) +
+      '<span class="sum">合规与测算说明</span><span class="chev">' + _ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body">' + _ui.esc(window.V3.MONEY_NOTE) +
+      "<br/>本页为高保真原型演示，数据均为本地 Mock；不构成任何资金 / 税务指令。</div></details>";
+    bodyEl.innerHTML = page.render(ctx) + legalNote;
     if (page.mount) page.mount(bodyEl, ctx);
 
-    /* 省代分段：点击切换 */
-    var segSc = root.querySelector(".v3-segbar .seg");
-    if (segSc) {
-      segSc.addEventListener("click", function (e) {
-        var btn = e.target.closest(".seg-item");
-        if (!btn) return;
-        root.querySelectorAll(".seg-item").forEach(function (x) { x.classList.toggle("active", x === btn); });
-        go("#/" + btn.getAttribute("data-key"));
-      });
-    }
+    requestAnimationFrame(function () {
+      var view = document.getElementById("ag-view");
+      if (view) view.classList.remove("v3-fade-enter");
+    });
 
-    /* 二级分段：点击切换 + 指示条 + 居中滚动 */
+    /* 分段页签：点击切换 + 金色指示条 + 居中滚动 */
     var subSc = root.querySelector(".v3-subnav .sub-scroll");
     if (subSc) {
       subSc.addEventListener("click", function (e) {
@@ -150,7 +143,7 @@
       moveSubInd();
     }
 
-    root.scrollTop = 0;
+    try { root.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { root.scrollTop = 0; }
   }
 
   window.addEventListener("hashchange", render);

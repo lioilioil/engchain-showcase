@@ -6,8 +6,10 @@
   function renderInvite(ctx) {
     var ui = ctx.ui, d = ctx.d;
     var chans = (d.channels || []).filter(function (c) { return c.status === "active"; });
-    var h = '<div class="v3-readnote v3-mb12" >' + ui.icon("shield", 16) +
-      "<span>你的渠道码（<b>CH-S</b>）仅用于<b>直接邀请终端用户</b>；你没有招商码、不能发展下级。用户再邀请不归属、不分佣、不传递。</span></div>";
+    /* 顶部说明（~55 字）→ 折叠摘要 */
+    var h = '<details class="v3-note-fold v3-mb12"><summary>' + ui.icon("shield", 15) +
+      '<span class="sum">渠道码使用说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body">你的渠道码（<b>CH-S</b>）仅用于<b>直接邀请终端用户</b>；你没有招商码、不能发展下级。用户再邀请不归属、不分佣、不传递。</div></details>';
     h += '<div class="section-head-row"><span class="t">我的渠道码</span>' +
       (ctx.readonly ? "" : '<span class="act" data-act="gen">+ 生成渠道码</span>') + "</div>";
     if (chans.length) {
@@ -20,8 +22,9 @@
     } else {
       h += '<div class="v3-placeholder">暂无生效渠道码，点击右上角生成。</div>';
     }
-    h += '<section class="v3-card v3-mt12" ><div class="v3-sm v3-strong v3-mb6" >授权范围（只读）</div>' +
-      '<div class="kv-mini">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，App 只读、无自助改费率入口。</div></section>';
+    h += '<details class="v3-note-fold v3-mt12"><summary>' + ui.icon("lock", 15) +
+      '<span class="sum">授权范围（只读）</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，App 只读、无自助改费率入口。</div></details>';
     h += '<button class="v3-btn v3-btn--block v3-btn--navy v3-mt12" data-go="#/invite-users">查看我的邀请用户</button>';
     return h;
   }
@@ -84,13 +87,13 @@
     var h = '<div class="v3-chips" id="u-chips"><button class="v3-chip on" data-f="all">全部</button>' +
       '<button class="v3-chip" data-f="registered">已注册</button><button class="v3-chip" data-f="onboarded">已入驻</button>' +
       '<button class="v3-chip" data-f="paid">已消费</button></div>';
-    h += '<div id="u-list" class="v3-list v3-card--pad0" style="border-radius:17px"></div>';
+    h += '<div id="u-list" class="v3-sub-list" style="border-radius:17px"></div>';
     if (xs.length) {
-      h += '<div class="v3-sec-title">用户再邀请（不归属）</div><div class="v3-list v3-card--pad0 iv-reinvite" style="border-radius:17px">' +
+      h += '<div class="v3-sec-title">用户再邀请（不归属）</div><div class="v3-sub-list iv-reinvite" style="border-radius:17px">' +
         xs.map(function (l) {
-          return '<div class="v3-row"><span class="v3-avatar">' + ui.esc(l.name.slice(-1)) + "</span>" +
+          return '<div class="v3-sub-row"><span class="v3-avatar">' + ui.esc(l.name.slice(-1)) + "</span>" +
             '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) + ' <span class="v3-badge v3-badge--neutral">不归属</span></span>' +
-            '<span class="v3-row__s">不分佣 · 不传递 · 不计入统计</span></span></div>';
+            '<span class="v3-row__s">再邀请用户 · 不归属不计佣</span></span></div>';
         }).join("") + "</div>";
     }
     return h;
@@ -98,12 +101,12 @@
   function userRows(ctx, f) {
     var ui = ctx.ui;
     var list = ctx.d.leads.filter(function (l) { return !l.viaUserReinvite && (f === "all" || l.stage === f); });
-    if (!list.length) return '<div class="v3-empty v3-ep26" ><div class="t">该状态暂无用户</div></div>';
+    if (!list.length) return '<div class="v3-empty v3-ep26" >' + ui.emptyHtml("该状态暂无用户", "", "user") + "</div>";
     return list.map(function (l) {
-      return '<button class="v3-row" data-uid="' + l.id + '"><span class="v3-avatar">' + ui.esc(l.name.slice(0, 1)) + "</span>" +
+      return '<button class="v3-sub-row" data-uid="' + l.id + '"><span class="v3-avatar">' + ui.esc(l.name.slice(0, 1)) + "</span>" +
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) +
         ' <span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></span>" +
-        '<span class="v3-row__s">' + ui.esc(l.phone) + " · 直接邀请 · 单层绑定</span></span>" +
+        '<span class="v3-row__s">' + ui.esc(l.phone) + "</span></span>" +
         (l.paidAmount ? '<span class="v3-row__amt v3-goldtext num">' + ui.money(l.paidAmount) + "</span>" : "") +
         ui.icon("chev", 17) + "</button>";
     }).join("");
@@ -162,26 +165,24 @@
   function renderStats(ctx) {
     var ui = ctx.ui, V3 = ctx.V3, fn = V3.store.funnelOf(ctx.d.leads);
     var fin = V3.store.subSettle(ctx.d.financeBase);
-    function row(lab, n, max) {
-      var w = max ? Math.max(4, Math.round(n / max * 100)) : 0;
-      return '<div class="iv-funnel-row"><span class="lab">' + lab + '</span><span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
+    function row(lab, n, max, idx) {
+      var w = max ? Math.max(6, Math.round(n / max * 100)) : 0;
+      return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span><span class="lab">' + lab + '</span><span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
     }
-    var h = '<section class="v3-card"><div class="v3-sm v3-strong v3-mb10" >邀请转化漏斗（仅直接邀请用户）</div>' +
-      row("直接邀请", fn.direct, fn.direct) + row("已注册", fn.registered, fn.direct) +
-      row("已入驻", fn.onboarded, fn.direct) + row("已消费", fn.paid, fn.direct) + row("已复购", fn.repaid, fn.direct) +
+    var h = '<section class="v3-card iv-funnel"><div class="v3-sm v3-strong v3-mb10" >邀请转化漏斗（仅直接邀请用户）</div>' +
+      row("直接邀请", fn.direct, fn.direct, 0) + row("已注册", fn.registered, fn.direct, 1) +
+      row("已入驻", fn.onboarded, fn.direct, 2) + row("已消费", fn.paid, fn.direct, 3) + row("已复购", fn.repaid, fn.direct, 4) +
       '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4）</div>' +
-      '<div class="amt num v3-mt3" >' + ui.money(fn.paidAmount) + "</div>" +
-      '<div class="v3-xs v3-mt3" >只统计不发钱 · ' + V3.MONEY_NOTE + "</div></div></section>";
+      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + "</div>" +
+      '<div class="v3-xs v3-mt3" >只统计不发钱</div></div></section>';
 
     h += '<section class="sub-finance v3-mt12" ><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
-      '<div class="big num v3-mt2" >' + ui.money(fin.agreed) + "</div>" +
+      '<div class="big num v3-mt2" >' + ui.moneyD(fin.agreed) + "</div>" +
       '<div class="rows"><div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +
       '<div class="v3-dline"><span class="k">总盘 ×50%</span><span class="v num">' + ui.money(fin.gross) + "</span></div>" +
-      '<div class="v3-dline"><span class="k">约定比例</span><span class="v num">' + Math.round(fin.ratioToSub * 100) + "%（只读）</span></div></div>" +
-      '<p class="v3-legal v3-mt9" style="color:var(--v3-on-navy-2)">' + V3.MONEY_NOTE + "</p></section>";
+      '<div class="v3-dline"><span class="k">约定比例</span><span class="v num">' + Math.round(fin.ratioToSub * 100) + "%（只读）</span></div></div></section>";
 
-    if (fn.ignored) h += '<div class="v3-readnote v3-mt12" >' + ui.icon("eye", 16) +
-      "<span>另有 " + fn.ignored + " 位为用户再邀请，<b>不归属 / 不分佣 / 不传递</b>，已自动排除。</span></div>";
+    if (fn.ignored) h += '<div class="v3-note-tags v3-mt12"><span class="t">另有 ' + fn.ignored + " 位用户再邀请，已自动排除</span><span class=\"t\">不归属</span><span class=\"t\">不分佣</span><span class=\"t\">不传递</span></div>";
     return h;
   }
 

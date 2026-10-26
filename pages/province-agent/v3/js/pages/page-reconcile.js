@@ -9,13 +9,15 @@
 
   function render(ctx) {
     var ui = ctx.ui;
-    var h = '<div class="v3-readnote v3-mb12" >' + ui.icon("bank", 16) +
-      "<span>线下付款在 App 外完成；此处只做<b>登记 · 凭证 · 确认 · 对账留痕</b>。" +
-      "测算金额只读，恒等呈现 <b>测算应付 − 线下实付登记 = 差异</b>，差异为 0 且全部确认才可平账。</span></div>";
+    /* 顶部长说明（~70 字）→ 折叠摘要（渐进披露） */
+    var h = '<details class="v3-note-fold v3-mb12"><summary>' + ui.icon("bank", 15) +
+      '<span class="sum">对账口径说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body">线下付款在 App 外完成；此处只做<b>登记、凭证、确认、对账留痕</b>。' +
+      "测算金额只读，恒等呈现 <b>测算应付 − 线下实付登记 = 差异</b>，差异为 0 且全部确认才可平账。</div></details>";
     h += layerCard(ctx, "1");
     h += '<div style="height:12px"></div>';
     h += layerCard(ctx, "2");
-    h += '<div class="trust">全程为 ' + ctx.V3.MONEY_NOTE + "<br/>红冲只追加红字记录，不物理删除任何凭证。</div>";
+    h += '<div class="trust">红冲只追加红字记录，不物理删除任何凭证</div>';
     return h;
   }
 
@@ -101,8 +103,11 @@
     var h = '<div class="rc-reg" style="' + (voided ? "opacity:.6" : "") + '" data-rid="' + r.id + '">' +
       '<div class="rc-reg__hd"><span class="amt num">' + ui.money(r.amount) + "</span>" +
       '<span class="v3-badge ' + ui.REG_BADGE[r.status] + '">' + ui.REG[r.status] + "</span></div>" +
-      '<div class="kv-mini">' + (r.redFlushOf ? "<b>红字冲销原登记笔</b> · " : "") +
-      "方式 " + methodName(r.method) + " · 付款日 " + ui.esc(r.date) + " · 登记人 " + ui.esc(r.registeredBy) + "</div>";
+      '<div class="v3-kvrow' + (r.redFlushOf ? ' v3-kvrow--flush"' : '"') + '>' +
+      (r.redFlushOf ? '<div class="cell" style="flex:1.4"><div class="k">冲销</div><div class="v">红字冲销原登记笔</div></div>' : "") +
+      '<div class="cell"><div class="k">方式</div><div class="v">' + methodName(r.method) + "</div></div>" +
+      '<div class="cell"><div class="k">付款日</div><div class="v">' + ui.esc(r.date) + "</div></div>" +
+      '<div class="cell"><div class="k">登记人</div><div class="v">' + ui.esc(r.registeredBy) + "</div></div></div>";
     (r.vouchers || []).forEach(function (v) {
       h += '<div class="rc-voucherline">' + ui.icon(v.kind === "image" ? "camera" : "file", 16) +
         "<span>" + ui.esc(v.name) + "</span><span class='v3-badge v3-badge--active v3-mxa' >凭证</span></div>";
@@ -247,7 +252,7 @@
       title: "提出异议",
       body: '<div class="v3-field"><label>异议说明（必填）</label><textarea class="v3-textarea" id="d-reason" placeholder="如：金额不符 / 未收到该笔 / 凭证不清晰"></textarea>' +
         '<div class="v3-hint">第一层 T+5 工作日内提出并闭环线下核实；可补传凭证。</div></div>' +
-        '<label class="v3-upload" id="d-up"><span class="ic">' + ui.icon("camera", 22) + "</span>补充凭证（可选）<input type='file' id='d-file' accept='image/*,application/pdf' multiple style='display:none'/></label><div class="v3-mt8" id='d-vlist' ></div>",
+        '<label class="v3-upload" id="d-up"><span class="ic">' + ui.icon("camera", 22) + '</span>补充凭证（可选）<input type="file" id="d-file" accept="image/*,application/pdf" multiple style="display:none"/></label><div class="v3-mt8" id="d-vlist"></div>',
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
         { t: "提交异议", kind: "v3-btn--danger", onClick: function (wrap) {
