@@ -9,21 +9,31 @@ var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/
 if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
 rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
 })();
-</script><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1F2A44">
 <title>二级合作申请 · 工程链</title>
+<!-- 视觉统一：App 权威设计系统（app.css V3.4 墨金双轨）+ v3 令牌/组件库；申请字段与提交逻辑保真 -->
 <link rel="stylesheet" href="../../css/app.css">
-<link rel="stylesheet" href="../../css/agent.css">
 <link rel="stylesheet" href="../../css/guest-gate.css">
+<link rel="stylesheet" href="v3/css/v3-tokens.css">
+<link rel="stylesheet" href="v3/css/v3-base.css">
+<link rel="stylesheet" href="v3/css/v3-components.css">
+<link rel="stylesheet" href="v3/css/pages/v3-pages.css">
+<style>
+/* 文字密度专项：间隔号链拆独立标签（引用 v3 令牌） */
+.ag-tags{display:inline-flex;flex-wrap:wrap;gap:5px;align-items:center;vertical-align:middle}
+</style>
 </head>
-<body class="pa-page">
+<body>
 <div class="phone">
   <div class="navbar">
-    <button class="nav-back" onclick="agBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <button class="nav-back" onclick="agBack()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">二级合作申请</div>
     <div class="nav-right"></div>
   </div>
-  <div class="ag-wrap" id="ap-root"></div>
+  <div id="ag-root" aria-live="polite"></div>
 </div>
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
@@ -40,7 +50,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 'use strict';
 function agBack(){ if(history.length>1){history.back();} else {location.href='recruit.html';} }
 window.agBack=agBack;
-var root=document.getElementById('ap-root');
+var root=document.getElementById('ag-root');
 
 /* ---------- 参数与登录态 ---------- */
 var q={};location.search.replace(/[?&]([^=&]+)=([^&]*)/g,function(_,k,v){q[decodeURIComponent(k)]=decodeURIComponent(v);});
@@ -60,48 +70,53 @@ if(inviteRec && inviteRec.status==='active' && window.AgentStore){
 
 /* ---------- 渲染 ---------- */
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function card(html){ return '<div class="ag-card">'+html+'</div>'; }
+function card(hd, body){ return '<section class="v3-card v3-mb12">' + (hd ? '<div class="v3-card__hd"><span class="t">' + hd + '</span></div>' : '') + body + '</section>'; }
 function toast(m, ok) {
   if (window.AgentUI && AgentUI.toast) { AgentUI.toast(m, ok); return; }
-  /* 自绘轻提示（不阻塞；避免 alert 打断演示流程） */
   var t = document.createElement('div');
   t.textContent = m;
-  t.style.cssText = 'position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:9999;padding:10px 16px;border-radius:10px;background:' + (ok === false ? '#e5484d' : '#2f6f4f') + ';color:#fff;font-size:14px;line-height:1.5;max-width:88%;box-shadow:0 8px 24px rgba(0,0,0,.18);';
+  t.className = 'v3-toast' + (ok === false ? ' v3-toast--err' : ' v3-toast--ok');
+  t.style.cssText = 'position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:9999;';
   document.body.appendChild(t);
-  setTimeout(function () { t.remove(); }, 2600);
+  requestAnimationFrame(function(){ t.classList.add('show'); });
+  setTimeout(function () { t.classList.remove('show'); setTimeout(function(){ t.remove(); }, 300); }, 2600);
+}
+/* 申请状态徽章 → v3-badge 七态 */
+function appBadge(st){
+  var map = { pending:['待总代初审 / 平台终审','v3-badge--pending'], approved:['已开通（等待/完成协议签署）','v3-badge--active'], rejected:['已驳回（原因见平台反馈）','v3-badge--revoked'] };
+  var t = map[st] || [st,'v3-badge--neutral'];
+  return '<span class="v3-badge ' + t[1] + '">' + esc(t[0]) + '</span>';
 }
 
 function render(){
   /* 未携带/无效招商码 → 说明页 */
   if(!CODE || !inviteRec || inviteRec.status!=='active' || !parentRec){
-    root.innerHTML=card(
-      '<h3>申请通道需招商码</h3>'
-      +'<p class="ag-note">二级合作申请需持有在册总代的招商码（来源：省代招商海报/话术）。招商码无效、已作废或总代不在册时无法发起申请。</p>'
-      +'<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary" href="recruit.html">返回招商中心</a></div>'
-    );
+    root.innerHTML='<div class="v3-page">'
+      + card('申请通道需招商码',
+        '<div class="v3-readnote v3-mb10">二级合作申请需持有在册总代的招商码（来源：省代招商海报/话术）。招商码无效、已作废或总代不在册时无法发起申请。</div>'
+        + '<a class="v3-btn v3-btn--primary v3-btn--block" href="recruit.html">返回招商中心</a>')
+      + '<div class="trust">润锦工程链 Engchain 3.0</div></div>';
     return;
   }
   /* 未登录 → 引导登录 */
   if(!uid){
     if(window.GuestGate) GuestGate.open({mode:'replace',icon:'shield',badge:'需登录',title:'登录后提交二级申请',note:'企业主体身份申请二级合作，请先登录。',btnText:'去登录',btnHref:'../auth/login.html',altText:'返回招商中心 ›',altHref:'recruit.html'});
-    else root.innerHTML=card('<h3>请先登录</h3><p class="ag-note">登录后提交二级合作申请。</p>');
+    else root.innerHTML='<div class="v3-page">' + card('请先登录','<div class="v3-readnote">登录后提交二级合作申请。</div>') + '</div>';
     return;
   }
   /* 已有在途申请 → 结果卡 */
   var mine=(window.AgentApply?AgentApply.listSubApplications(uid):[]);
   if(mine.length){
     var last=mine[mine.length-1];
-    var stText={pending:'待总代初审 / 平台终审',approved:'已开通（等待/完成协议签署）',rejected:'已驳回（原因见平台反馈）'}[last.status]||last.status;
-    root.innerHTML=card(
-      '<h3>我的二级申请</h3>'
-      +'<div class="ag-sub-card__top"><span class="ag-sub-card__name">'+esc(last.company&&last.company.name||'—')+'</span>'
-      +'<span class="ag-badge ag-st-'+last.status+'">'+esc(stText)+'</span></div>'
-      +'<div class="ag-note">招商码 '+esc(last.inviteCode||CODE)+' · 上级 '+esc(parentRec.branchCompany&&parentRec.branchCompany.name||parentRec.province)+'（'+esc(parentRec.province)+'）</div>'
-      +'<div class="ag-note">审批流：总代初审 → 平台终审 → 自动发起 O4 协议 → 签署后开通测算视图。审核进度以总代/平台为准。</div>'
-      +(last.status==='rejected'
-        ? '<div class="ag-actions" style="margin-top:8px;"><button class="ag-btn ag-btn--primary" onclick="reapply()">驳回后重新申请</button></div>'
-        : '')
-    );
+    root.innerHTML='<div class="v3-page">'
+      + card('我的二级申请',
+        '<div class="v3-flex v3-between v3-mb8"><b class="v3-strong">'+esc(last.company&&last.company.name||'—')+'</b>'+appBadge(last.status)+'</div>'
+        + '<div class="v3-readnote v3-mb8">招商码 <b class="num">'+esc(last.inviteCode||CODE)+'</b> · 上级 '+esc(parentRec.branchCompany&&parentRec.branchCompany.name||parentRec.province)+'（'+esc(parentRec.province)+'）</div>'
+        + '<div class="v3-readnote">审批流：总代初审 → 平台终审 → 自动发起 O4 协议 → 签署后开通测算视图。审核进度以总代/平台为准。</div>'
+        + (last.status==='rejected'
+          ? '<button type="button" class="v3-btn v3-btn--primary v3-btn--block v3-mt10" onclick="reapply()">驳回后重新申请</button>'
+          : ''))
+      + '<div class="trust"><span class="ag-tags" style="justify-content:center;margin-bottom:6px"><span class="v3-badge">模拟测算</span><span class="v3-badge">非税务意见</span><span class="v3-badge">分账口径以 O4 合作协议为准</span></span></div>';
     window.reapply=function(){ renderForm(); };
     return;
   }
@@ -112,22 +127,24 @@ function render(){
 
 function renderForm(){
   var pv=parentRec.province||'';
-  root.innerHTML=
-    card('<h3>二级合作申请</h3>'
-      +'<div class="ag-sub-card"><div class="ag-sub-card__top"><span class="ag-sub-card__name">招商主体</span>'
-      +'<span class="ag-badge ag-chip--pa">'+esc(inviteRec.code)+'</span></div>'
-      +'<div class="ag-note">'+esc(parentRec.branchCompany&&parentRec.branchCompany.name||'—')+' · '+esc(pv)+' 省级总代 · 同省合作</div>'
-      +'<div class="ag-note">招商关系与分销邀请完全隔离，不触发任何分销返佣；本申请不涉及任何费用。</div></div>'
-      +'<div class="ag-field"><label>公司名称<span class="ag-req">*</span></label><input class="ag-input" id="f-co" placeholder="企业全称（与营业执照一致）"></div>'
-      +'<div class="ag-field"><label>统一社会信用代码<span class="ag-req">*</span></label><input class="ag-input" id="f-uscc" placeholder="18 位统一社会信用代码"></div>'
-      +'<div class="ag-field"><label>营业执照编号<span class="ag-req">*</span></label><input class="ag-input" id="f-license" placeholder="营业执照编号"></div>'
-      +'<div class="ag-field"><label>法定代表人<span class="ag-req">*</span></label><input class="ag-input" id="f-legal" placeholder="法定代表人姓名"></div>'
-      +'<div class="ag-field"><label>联系人<span class="ag-req">*</span></label><input class="ag-input" id="f-contact" placeholder="联系人姓名"></div>'
-      +'<div class="ag-field"><label>联系电话</label><input class="ag-input" id="f-phone" placeholder="手机号（选填）"></div>'
-      +'<div class="ag-field"><label>合作省（同省约束）</label><input class="ag-input" value="'+esc(pv)+'" readonly></div>'
-      +'<div class="ag-note">约定比例由总代初审时与贵司协商确定（0–50%），本表不填写。</div>')
-    +card('<button class="ag-btn ag-btn--primary" id="f-submit" style="width:100%;">提交申请 · 待总代初审</button>'
-      +'<div class="ag-note">提交即代表：贵司为企业主体，理解分账为内部测算口径（O4 条款三），平台不承诺任何收益。</div>');
+  root.innerHTML='<div class="v3-page">'
+    + card('招商主体',
+      '<div class="v3-flex v3-between v3-mb8"><b class="v3-strong">'+esc(parentRec.branchCompany&&parentRec.branchCompany.name||'—')+'</b>'
+      + '<span class="v3-badge v3-badge--gold num">'+esc(inviteRec.code)+'</span></div>'
+      + '<div class="v3-xs v3-muted v3-mb8">'+esc(pv)+' 省级总代 · 同省合作</div>'
+      + '<div class="v3-readnote">招商关系与分销邀请完全隔离，不触发任何分销返佣；本申请不涉及任何费用。</div>')
+    + card('企业信息（与营业执照一致）',
+      '<div class="v3-field"><label>公司名称 <span style="color:var(--v3-danger)">*</span></label><input class="v3-input" id="f-co" placeholder="企业全称（与营业执照一致）"></div>'
+      + '<div class="v3-field"><label>统一社会信用代码 <span style="color:var(--v3-danger)">*</span></label><input class="v3-input" id="f-uscc" placeholder="18 位统一社会信用代码"></div>'
+      + '<div class="v3-field"><label>营业执照编号 <span style="color:var(--v3-danger)">*</span></label><input class="v3-input" id="f-license" placeholder="营业执照编号"></div>'
+      + '<div class="v3-field"><label>法定代表人 <span style="color:var(--v3-danger)">*</span></label><input class="v3-input" id="f-legal" placeholder="法定代表人姓名"></div>'
+      + '<div class="v3-field"><label>联系人 <span style="color:var(--v3-danger)">*</span></label><input class="v3-input" id="f-contact" placeholder="联系人姓名"></div>'
+      + '<div class="v3-field"><label>联系电话</label><input class="v3-input" id="f-phone" placeholder="手机号（选填）"></div>'
+      + '<div class="v3-field"><label>合作省（同省约束）</label><input class="v3-input" id="f-prov" value="'+esc(pv)+'" readonly></div>'
+      + '<div class="v3-hint">约定比例由总代初审时与贵司协商确定（0–50%），本表不填写。</div>')
+    + '<button type="button" class="v3-btn v3-btn--primary v3-btn--block v3-mb8" id="f-submit">提交申请 · 待总代初审</button>'
+    + '<div class="v3-legal v3-mb12">提交即代表：贵司为企业主体，理解分账为内部测算口径（O4 条款三），平台不承诺任何收益。</div>'
+    + '<div class="trust"><span class="ag-tags" style="justify-content:center;margin-bottom:6px"><span class="v3-badge">模拟测算</span><span class="v3-badge">非税务意见</span><span class="v3-badge">分账口径以 O4 合作协议为准</span></span><br/>润锦工程链 Engchain 3.0</div>';
   document.getElementById('f-submit').onclick=function(){
     var btn=this; if(btn.disabled) return;
     var payload={
@@ -141,16 +158,16 @@ function renderForm(){
       uid: uid
     };
     if(!payload.companyName||!payload.uscc||!payload.license||!payload.legalRep||!payload.contact){
-      toast('请填写全部必填项','err'); return;
+      toast('请填写全部必填项', false); return;
     }
     btn.disabled=true; btn.textContent='提交中…';
     var r=window.AgentApply?AgentApply.submitSubApplication(payload):{error:'E_DEPS_MISSING'};
     if(r&&r.ok){
-      toast('申请已提交，等待总代初审与平台终审','ok');
+      toast('申请已提交，等待总代初审与平台终审', true);
       render();
     }else{
       btn.disabled=false; btn.textContent='提交申请 · 待总代初审';
-      toast((r&&r.msg)||(r&&r.error)||'提交失败','err');
+      toast((r&&r.msg)||(r&&r.error)||'提交失败', false);
     }
   };
 }
@@ -158,6 +175,5 @@ function renderForm(){
 render();
 })();
 </script>
-<script src="../../js/agent-motion.js"></script>
 </body>
 </html>

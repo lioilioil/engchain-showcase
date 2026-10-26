@@ -9,20 +9,38 @@ var p=location.pathname,m=/^(\/app\/[^/]+)/.exec(p),pf=m?m[1]:"";var dir="pages/
 if(pf){base=pf+"/"+dir;}else{var q=p.indexOf("?")>-1?p.slice(0,p.indexOf("?")):p;base=q.slice(0,q.lastIndexOf("/")+1);}
 rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","1");document.head.insertBefore(b,document.head.firstChild);
 })();
-</script><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1F2A44">
 <title>经营数据中心 · 工程链</title>
+<!-- 视觉统一：App 权威设计系统（app.css V3.4 墨金双轨）+ v3 令牌/组件库；台账计算逻辑保真 -->
 <link rel="stylesheet" href="../../css/app.css">
-<link rel="stylesheet" href="../../css/agent.css">
+<link rel="stylesheet" href="v3/css/v3-tokens.css">
+<link rel="stylesheet" href="v3/css/v3-base.css">
+<link rel="stylesheet" href="v3/css/v3-components.css">
+<link rel="stylesheet" href="v3/css/pages/v3-pages.css">
+<style>
+/* 文字密度专项：seg 热区≥44px + 间隔号链拆独立标签 + 长说明折叠（引用 v3 令牌） */
+.v3-earn .seg button{min-height:44px}
+.ag-tags{display:inline-flex;flex-wrap:wrap;gap:5px;align-items:center;vertical-align:middle}
+.ag-disc{border:1px solid var(--v3-line);border-radius:var(--v3-r-md);background:var(--v3-surface);overflow:hidden;margin:0 0 10px}
+.ag-disc>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:9px 13px;min-height:40px;font-size:13.5px;font-weight:600;color:var(--v3-ink-2);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ag-disc>summary::-webkit-details-marker{display:none}
+.ag-disc>summary::after{content:"";margin-left:auto;flex:none;width:8px;height:8px;border-right:1.6px solid var(--v3-ink-3);border-bottom:1.6px solid var(--v3-ink-3);transform:rotate(45deg)}
+.ag-disc[open]>summary::after{transform:rotate(225deg)}
+.ag-disc__bd{padding:2px 13px 11px;font-size:12px;color:var(--v3-ink-2);line-height:1.7;border-top:1px dashed var(--v3-line)}
+.ag-disc:not([open])>.ag-disc__bd{display:none}
+</style>
 </head>
-<body class="pa-page">
+<body>
 <div class="phone">
   <div class="navbar">
-    <button class="nav-back" onclick="history.back()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <button class="nav-back" onclick="agBack()" aria-label="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
     <div class="nav-title">经营数据中心</div>
     <div class="nav-right"></div>
   </div>
-  <div class="ag-wrap" id="ag-root"></div>
+  <div id="ag-root" aria-live="polite"></div>
 </div>
 <script src="../../js/data.js"></script>
 <script src="../../js/common.js"></script>
@@ -51,10 +69,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     a.download = name; document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
-  function emptyState(title, note) { return '<div class="ag-empty"><div class="ag-empty__title">' + esc(title) + '</div><div class="ag-empty__note">' + esc(note) + '</div></div>'; }
-  function calcTag() { return '<span class="ag-sig">模拟测算 · 非税务意见</span>'; }
+  function emptyState(title, note, action) {
+    return '<div class="v3-empty"><div class="ic">∅</div><div class="t">' + esc(title) + '</div><div class="d">' + esc(note) + '</div>' + (action || '<a class="v3-btn v3-btn--ghost" href="index.html" style="margin:0 auto">返回工作台</a>') + '</div>';
+  }
+  function calcTag() { return '<span class="v3-badge v3-badge--neutral">模拟测算 · 非税务意见</span>'; }
 
-  /* ---- 自绘 SVG 柱线图（近 N 月：柱=合格消费，线=约定所得；无外部依赖） ---- */
+  /* ---- 自绘 SVG 柱线图（近 N 月：柱=合格消费，线=约定所得；令牌色：金柱 + 绿线） ---- */
   function trendSvg(trend) {
     var W = 340, H = 150, padL = 34, padB = 22, padT = 12;
     var innerW = W - padL - 8, innerH = H - padT - padB;
@@ -64,32 +84,32 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var yAt = function (v) { return padT + innerH - (v / maxV) * innerH; };
     var bars = trend.map(function (m, i) {
       var x = xAt(i) - bw / 2, y = yAt(m.gross), h = padT + innerH - y;
-      return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="2" fill="var(--ag-province-gold, #c7a55a)" opacity=".82"/>';
+      return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, h).toFixed(1) + '" rx="2" fill="var(--v3-gold)" opacity=".82"/>';
     }).join('');
     var linePts = trend.map(function (m, i) { return xAt(i).toFixed(1) + ',' + yAt(m.agreed).toFixed(1); }).join(' ');
-    var dots = trend.map(function (m, i) { return '<circle cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(m.agreed).toFixed(1) + '" r="2.4" fill="#2f9e44"/>'; }).join('');
+    var dots = trend.map(function (m, i) { return '<circle cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(m.agreed).toFixed(1) + '" r="2.4" fill="var(--v3-success)"/>'; }).join('');
     var xl = trend.map(function (m, i) {
       var short = m.month.slice(5);
-      return '<text x="' + xAt(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="8" fill="var(--text-3)">' + esc(short) + '</text>';
+      return '<text x="' + xAt(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" font-size="8" fill="var(--v3-ink-3)">' + esc(short) + '</text>';
     }).join('');
     var gl = [0, 0.5, 1].map(function (f) {
       var y = padT + innerH - f * innerH;
-      return '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - 8) + '" y2="' + y.toFixed(1) + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/>'
-        + '<text x="' + (padL - 4) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="8" fill="var(--text-3)">' + Math.round(maxV * f) + '</text>';
+      return '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - 8) + '" y2="' + y.toFixed(1) + '" stroke="var(--v3-line-2)" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/>'
+        + '<text x="' + (padL - 4) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" font-size="8" fill="var(--v3-ink-3)">' + Math.round(maxV * f) + '</text>';
     }).join('');
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;">' + gl + bars + '<polyline points="' + linePts + '" fill="none" stroke="#2f9e44" stroke-width="1.6" stroke-linejoin="round"/>' + dots + xl + '</svg>'
-      + '<div class="ag-meta">柱：合格消费 · 线：约定所得（近 ' + trend.length + ' 个月，数据源 = 台账 entries）</div>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;">' + gl + bars + '<polyline points="' + linePts + '" fill="none" stroke="var(--v3-success)" stroke-width="1.6" stroke-linejoin="round"/>' + dots + xl + '</svg>'
+      + '<details class="ag-disc v3-mt8"><summary>图表图例与数据源 · 点击展开</summary><div class="ag-disc__bd">柱：合格消费；线：约定所得（近 ' + trend.length + ' 个月，数据源 = 台账 entries）。</div></details>';
   }
 
-  /* ---- 月度对账单（复用 monthStatement + Ledger.toCsv） ---- */
+  /* ---- 月度对账单（复用 monthStatement + Ledger.toCsv；v3-table 横向滚动） ---- */
   function renderStatement(entries, month, cfg) {
     var st = Insight.monthStatement(entries, month, cfg);
     var rows = '<tr><th>分区</th><th>合格消费</th><th>总盘(×50%)</th><th>约定所得</th><th>自留/自身</th><th>笔数</th></tr>'
-      + '<tr><td>二级线 subLedger</td><td>' + fmt(st.subLedger.settledGross) + '</td><td>' + fmt(st.subLedger.pool) + '</td><td>' + fmt(st.subLedger.agreed) + '</td><td>' + fmt(st.subLedger.retained) + '</td><td>' + st.subLedger.count + '</td></tr>'
-      + '<tr><td>自身线 selfLedger</td><td>' + fmt(st.selfLedger.settledBase) + '</td><td>—</td><td>' + fmt(st.selfLedger.amount) + '</td><td>自身 ×10%</td><td>' + st.selfLedger.count + '</td></tr>';
-    var taxRows = st.taxes.length ? '<tr><th colspan="3">税列（方案A 预扣，模拟）</th><td colspan="3">' + st.taxes.map(function (t) { return esc(t.scheme || 'labor') + ' 率 ' + (Number(t.rate) * 100) + '% · 预扣 ' + fmt(t.tax) + ' · 税后 ' + fmt(t.net); }).join('；') + '</td></tr>' : '';
-    return '<table class="ag-ledger-table"><tbody>' + rows + taxRows + '</tbody></table>'
-      + '<div class="ag-meta">对账单合计：约定所得 ' + fmt(st.subLedger.agreed) + ' · 自留 ' + fmt(st.subLedger.retained) + ' · 自身线 ' + fmt(st.selfLedger.amount) + ' · 税列合计 ' + fmt(st.taxTotal) + '</div>';
+      + '<tr><td>二级线 subLedger</td><td class="num">' + fmt(st.subLedger.settledGross) + '</td><td class="num">' + fmt(st.subLedger.pool) + '</td><td class="num"><b>' + fmt(st.subLedger.agreed) + '</b></td><td class="num">' + fmt(st.subLedger.retained) + '</td><td class="num">' + st.subLedger.count + '</td></tr>'
+      + '<tr><td>自身线 selfLedger</td><td class="num">' + fmt(st.selfLedger.settledBase) + '</td><td>—</td><td class="num"><b>' + fmt(st.selfLedger.amount) + '</b></td><td>自身 ×10%</td><td class="num">' + st.selfLedger.count + '</td></tr>';
+    var taxRows = st.taxes.length ? '<tr><th colspan="3">税列（方案A 预扣，模拟）</th><td colspan="3" class="num">' + st.taxes.map(function (t) { return esc(t.scheme || 'labor') + ' 率 ' + (Number(t.rate) * 100) + '% · 预扣 ' + fmt(t.tax) + ' · 税后 ' + fmt(t.net); }).join('；') + '</td></tr>' : '';
+    return '<div class="v3-table-wrap"><table class="v3-table"><tbody>' + rows + taxRows + '</tbody></table></div>'
+      + '<div class="v3-legal v3-mt8">对账单合计：约定所得 ' + fmt(st.subLedger.agreed) + ' · 自留 ' + fmt(st.subLedger.retained) + ' · 自身线 ' + fmt(st.selfLedger.amount) + ' · 税列合计 ' + fmt(st.taxTotal) + '</div>';
   }
 
   /* ================= 总代视角 ================= */
@@ -120,16 +140,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     ratioEvents.sort(function (a, b) { return b.at - a.at; });
 
     var ratioHtml = ratioEvents.length
-      ? '<div class="ag-timeline">' + ratioEvents.slice(0, 8).map(function (r) {
-          return '<div class="ag-timeline__item"><div class="ag-timeline__dot"></div><div class="ag-timeline__body"><b>' + esc(r.name) + ' → ' + Math.round(r.ratio * 100) + '%</b><div class="ag-meta">' + fmtDate(r.at) + ' · ' + esc(r.reason) + '</div></div></div>';
+      ? '<div class="v3-timeline">' + ratioEvents.slice(0, 8).map(function (r) {
+          return '<div class="v3-tl"><div class="t">' + esc(r.name) + ' → <b class="num">' + Math.round(r.ratio * 100) + '%</b></div><div class="time">' + fmtDate(r.at) + '</div><div class="d">' + esc(r.reason) + '</div></div>';
         }).join('') + '</div>'
-      : '<div class="ag-note">暂无比例变更记录。</div>';
+      : '<div class="v3-readnote">暂无比例变更记录。</div>';
 
     var rankHtml = rank.length
       ? rank.map(function (r, i) {
-          return '<div class="ag-rank-row"><span class="ag-rank__no">' + (i + 1) + '</span><div class="ag-rank__main"><b>' + esc(r.name) + '</b><div class="ag-meta">' + Math.round(r.ratioToSub * 100) + '% · ' + fmt(r.gross) + ' 合格消费（' + r.count + ' 笔）</div></div><b class="ag-rank__val">' + fmt(r.agreed) + '</b></div>';
+          return '<div class="v3-row"><span class="v3-avatar">' + (i + 1) + '</span><span class="v3-row__main"><span class="v3-row__t">' + esc(r.name) + '</span><span class="v3-row__s">' + Math.round(r.ratioToSub * 100) + '% · ' + fmt(r.gross) + ' 合格消费（' + r.count + ' 笔）</span></span><span class="v3-row__right"><span class="v3-row__amt num">' + fmt(r.agreed) + '</span></span></div>';
         }).join('')
-      : '<div class="ag-note">暂无二级合作方数据。</div>';
+      : '<div class="v3-empty" style="padding:26px 12px"><div class="t">暂无二级合作方数据</div><div class="d">开通二级后，贡献排行将展示在这里。</div></div>';
 
     /* 本月 / 累计切换：本月=最后一月；累计=近 N 月合计（同一趋势数组，不新造计算） */
     var isCum = false;
@@ -140,47 +160,59 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         return a;
       }, { gross: 0, agreed: 0, retained: 0, selfAmount: 0 });
       var k = isCum ? sums : last;
-      return '<div class="ag-amount-block">'
-        + '<div class="ag-amount-row"><span>约定所得（' + (isCum ? '累计' : '本月') + '）</span><b>' + fmt(k.agreed) + '</b></div>'
-        + '<div class="ag-amount-row"><span>合格消费（' + (isCum ? '累计' : '本月') + '）</span><b>' + fmt(k.gross) + '</b></div>'
-        + '<div class="ag-amount-row"><span>自留（' + (isCum ? '累计' : '本月') + '）</span><b>' + fmt(k.retained) + '</b></div>'
-        + '<div class="ag-amount-row"><span>自身线 ×10%</span><b>' + fmt(k.selfAmount) + '</b></div></div>';
+      return '<div class="v3-earn">'
+        + '<div class="seg"><button type="button" class="' + (!isCum ? 'on' : '') + '" id="ag-seg-month">本月</button><button type="button" class="' + (isCum ? 'on' : '') + '" id="ag-seg-cum">累计</button></div>'
+        + '<div class="big num">' + fmt(k.agreed) + '</div>'
+        + '<div class="sub">约定所得（' + (isCum ? '累计' : '本月') + '）· 模拟测算</div>'
+        + '<div class="rows">'
+        + '<div class="v3-dline"><span class="k">合格消费（' + (isCum ? '累计' : '本月') + '）</span><span class="v num">' + fmt(k.gross) + '</span></div>'
+        + '<div class="v3-dline"><span class="k">自留（' + (isCum ? '累计' : '本月') + '）</span><span class="v num">' + fmt(k.retained) + '</span></div>'
+        + '<div class="v3-dline"><span class="k">自身线 ×10%</span><span class="v num">' + fmt(k.selfAmount) + '</span></div>'
+        + '</div></div>';
     }
 
-    var stmtSelect = '<select class="ag-input ag-month-select" style="max-width:180px;">' + months.map(function (m) { return '<option value="' + esc(m) + '"' + (m === curMonth ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') + '</select>';
+    var stmtSelect = '<select class="v3-select" style="flex:1;min-width:0;" id="ag-month-select">' + months.map(function (m) { return '<option value="' + esc(m) + '"' + (m === curMonth ? ' selected' : '') + '>' + esc(m) + '</option>'; }).join('') + '</select>';
 
-    root.innerHTML = '<div class="ag-wrap">'
-      + '<section class="ag-card"><h3>经营数据中心 <span class="ag-chip ag-chip--pa">省级总代 · ' + esc(me.province) + '</span></h3>'
-      + '<div class="ag-note">' + esc(me.branchCompany && me.branchCompany.name || '—') + ' · 全部口径复用台账纯函数复算 · 平台零支出、不付款、不开票 · ' + calcTag() + '</div>'
-      + '<div class="ag-seg ag-amount-seg"><button class="' + (!isCum ? 'on' : '') + '" id="ag-seg-month">本月</button><button class="' + (isCum ? 'on' : '') + '" id="ag-seg-cum">累计</button></div>'
-      + '<div id="ag-key-block">' + keyBlock() + '</div>'
-      + '</section>'
+    root.innerHTML = '<div class="v3-page">'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-card__hd"><span class="t">经营数据中心</span><span class="v3-badge v3-badge--gold">省级总代 · ' + esc(me.province) + '</span></div>'
+      + '<details class="ag-disc"><summary>代理主体与口径说明 · 点击展开</summary><div class="ag-disc__bd">' + esc(me.branchCompany && me.branchCompany.name || '—') + '；全部口径复用台账纯函数复算；平台零支出、不付款、不开票。</div></details>'
+      + '<div id="ag-key-block">' + keyBlock() + '</div></section>'
 
-      + '<section class="ag-card"><h3>月度趋势（近 12 月）</h3>' + trendSvg(trend) + '</section>'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-card__hd"><span class="t">月度趋势</span><span class="v3-badge v3-badge--neutral">近 12 月</span></div>'
+      + trendSvg(trend) + '</section>'
 
-      + '<section class="ag-card"><h3>二级贡献排行</h3>' + rankHtml + '</section>'
+      + '<div class="v3-sec-title">二级贡献排行</div>'
+      + '<section class="v3-list v3-mb12">' + rankHtml + '</section>'
 
-      + '<section class="ag-card"><h3>比例变更历史（ratioLog 时间轴）</h3>' + ratioHtml + '</section>'
+      + '<div class="v3-sec-title">比例变更历史 <span class="v3-badge v3-badge--gold">ratioLog 留痕</span></div>'
+      + '<section class="v3-card v3-mb12">' + ratioHtml + '</section>'
 
-      + '<section class="ag-card"><h3>退款 / 冲减统计</h3>'
-      + '<div class="ag-amount-block"><div class="ag-amount-row"><span>退款笔数（含冻结期剔除）</span><b>' + rs.refunded + ' 笔 · ' + fmt(rs.refundAmount) + '</b></div>'
-      + '<div class="ag-amount-row"><span>特殊冲减（clawbackRef）</span><b>' + rs.clawed + ' 笔 · ' + fmt(rs.clawedAmount) + '</b></div>'
-      + '<div class="ag-amount-row"><span>红字冲减（redOffset）</span><b>' + rs.redOffset + ' 笔 · ' + fmt(rs.redOffsetAmount) + '</b></div></div>'
-      + '<div class="ag-note">冻结期退款直接剔除（不计入基数）；出冻结按「当月红字→次月」规则冲减，两线独立不交叉。</div></section>'
+      + '<div class="v3-sec-title">退款 / 冲减统计</div>'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-dline"><span class="k">退款笔数（含冻结期剔除）</span><span class="v num">' + rs.refunded + ' 笔 · ' + fmt(rs.refundAmount) + '</span></div>'
+      + '<div class="v3-dline"><span class="k">特殊冲减（clawbackRef）</span><span class="v num">' + rs.clawed + ' 笔 · ' + fmt(rs.clawedAmount) + '</span></div>'
+      + '<div class="v3-dline"><span class="k">红字冲减（redOffset）</span><span class="v num">' + rs.redOffset + ' 笔 · ' + fmt(rs.redOffsetAmount) + '</span></div>'
+      + '<div class="v3-readnote v3-mt8">冻结期退款直接剔除（不计入基数）；出冻结按「当月红字→次月」规则冲减，两线独立不交叉。</div></section>'
 
-      + '<section class="ag-card"><h3>月度对账单</h3><div class="ag-actions" style="gap:8px;align-items:center;">' + stmtSelect
-      + '<button class="ag-btn ag-btn--ghost ag-btn--sm" id="ag-stmt-print" ' + (me.status === 'suspended' ? 'disabled' : '') + '>打印</button>'
-      + '<button class="ag-btn ag-btn--ghost ag-btn--sm" id="ag-stmt-csv" ' + (me.status === 'suspended' ? 'disabled' : '') + '>下载 CSV</button></div>'
+      + '<div class="v3-sec-title">月度对账单</div>'
+      + '<section class="v3-card v3-mb12"><div class="v3-flex v3-gap2 v3-mb10">' + stmtSelect
+      + '<button type="button" class="v3-btn v3-btn--ghost v3-btn--sm" id="ag-stmt-print" style="flex:none" ' + (me.status === 'suspended' ? 'disabled' : '') + '>打印</button>'
+      + '<button type="button" class="v3-btn v3-btn--ghost v3-btn--sm" id="ag-stmt-csv" style="flex:none" ' + (me.status === 'suspended' ? 'disabled' : '') + '>CSV</button></div>'
       + '<div id="ag-stmt-body">' + renderStatement(entries, curMonth, cfg) + '</div>'
-      + '<div class="ag-disc">对账单首行免责：' + calcTag() + '，非实际代扣金额。</div></section>'
+      + '<div class="v3-legal v3-mt8">对账单口径：' + calcTag() + '，非实际代扣金额。</div></section>'
 
-      + '<div class="ag-card"><div class="ag-actions ag-actions--edit">'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="index.html">返回工作台</a>'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="network.html">授权网络</a>'
-      + '</div></div></div>';
+      + '<div class="v3-flex v3-gap2 v3-mb12">'
+      + '<a class="v3-btn v3-btn--ghost v3-takeall" href="index.html">返回工作台</a>'
+      + '<a class="v3-btn v3-btn--ghost v3-takeall" href="network.html">授权网络</a>'
+      + '</div>'
+
+      + '<div class="trust"><span class="ag-tags" style="justify-content:center;margin-bottom:6px"><span class="v3-badge">模拟测算</span><span class="v3-badge">非税务意见</span><span class="v3-badge">非实际代扣金额</span><span class="v3-badge">非完税凭证</span></span><br/>润锦工程链 Engchain 3.0</div>'
+      + '</div>';
 
     /* 对账单月份切换 / 打印 / 下载 / 本月累计切换 */
-    var sel = root.querySelector('.ag-month-select');
+    var sel = root.querySelector('#ag-month-select');
     var stmtBody = root.querySelector('#ag-stmt-body');
     if (sel) sel.onchange = function () { stmtBody.innerHTML = renderStatement(entries, sel.value, cfg); };
     var mBtn = root.querySelector('#ag-seg-month'), cBtn = root.querySelector('#ag-seg-cum'), keyBlockEl = root.querySelector('#ag-key-block');
@@ -193,8 +225,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (cBtn) cBtn.onclick = function () { isCum = true; refreshSeg(); };
     var pBtn = root.querySelector('#ag-stmt-print');
     if (pBtn) pBtn.onclick = function () { window.print(); };
-    var cBtn = root.querySelector('#ag-stmt-csv');
-    if (cBtn) cBtn.onclick = function () {
+    var csvBtn = root.querySelector('#ag-stmt-csv');
+    if (csvBtn) csvBtn.onclick = function () {
       var csvText = Ledger.toCsv(entries, sel ? sel.value : curMonth);
       download('agent-statement-' + (sel ? sel.value : curMonth) + '.csv', '\ufeff' + csvText);
     };
@@ -220,43 +252,54 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     });
 
     var dueHtml = due.length
-      ? due.map(function (e) { return '<div class="ag-timeline__item"><div class="ag-timeline__dot"></div><div class="ag-timeline__body"><b>' + fmt(e.amount) + ' · ' + esc(e.orderNo || e.serialNo) + '</b><div class="ag-meta">' + fmtDate(e.at) + ' · 冻结到期将结算</div></div></div>'; }).join('')
-      : '<div class="ag-note">无已到期冻结笔（T+7 内仍冻结中）。</div>';
+      ? '<div class="v3-timeline">' + due.map(function (e) { return '<div class="v3-tl"><div class="t num">' + fmt(e.amount) + ' · ' + esc(e.orderNo || e.serialNo) + '</div><div class="time">' + fmtDate(e.at) + '</div><div class="d">冻结到期将结算</div></div>'; }).join('') + '</div>'
+      : '<div class="v3-readnote">无已到期冻结笔（T+7 内仍冻结中）。</div>';
 
-    root.innerHTML = '<div class="ag-wrap">'
-      + '<section class="ag-card"><h3>我的数据中心 <span class="ag-chip ag-chip--sub">二级 · ' + esc(rec.province || '') + '</span></h3>'
-      + '<div class="ag-note">' + esc(rec.company && rec.company.name || '—') + ' · 约定 ' + Math.round((rec.ratioToSub || 0) * 100) + '% · 仅见本人约定所得，' + calcTag() + '</div>'
-      + '<div class="ag-amount-block"><div class="ag-amount-row"><span>本月约定所得</span><b>' + fmt(trend[trend.length - 1].agreed) + '</b></div>'
-      + '<div class="ag-amount-row"><span>本月合格消费</span><b>' + fmt(trend[trend.length - 1].gross) + '</b></div></div></section>'
+    root.innerHTML = '<div class="v3-page">'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-card__hd"><span class="t">我的数据中心</span><span class="v3-badge v3-badge--neutral">二级 · ' + esc(rec.province || '') + '</span></div>'
+      + '<div class="v3-readnote v3-mb10">' + esc(rec.company && rec.company.name || '—') + ' · 约定 ' + Math.round((rec.ratioToSub || 0) * 100) + '% · 仅见本人约定所得</div>'
+      + '<div class="v3-earn">'
+      + '<div class="big num">' + fmt(trend[trend.length - 1].agreed) + '</div>'
+      + '<div class="sub">本月约定所得 · 模拟测算</div>'
+      + '<div class="rows"><div class="v3-dline"><span class="k">本月合格消费</span><span class="v num">' + fmt(trend[trend.length - 1].gross) + '</span></div></div>'
+      + '</div></section>'
 
-      + '<section class="ag-card"><h3>本人约定所得月度趋势（近 12 月）</h3>' + trendSvg(trend) + '</section>'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-card__hd"><span class="t">本人约定所得月度趋势</span><span class="v3-badge v3-badge--neutral">近 12 月</span></div>'
+      + trendSvg(trend) + '</section>'
 
-      + '<section class="ag-card"><h3>本人消费构成</h3>'
-      + '<div class="ag-amount-block"><div class="ag-amount-row"><span>合格消费（计入基数）</span><b>' + fmt(quals) + '</b></div>'
-      + '<div class="ag-amount-row"><span>不计入（充值/非合格）</span><b>' + fmt(others) + '</b></div>'
-      + '<div class="ag-amount-row"><span>冻结中（T+7 未到期）</span><b>' + fmt(frozen) + '</b></div></div></section>'
+      + '<div class="v3-sec-title">本人消费构成</div>'
+      + '<section class="v3-card v3-mb12">'
+      + '<div class="v3-dline"><span class="k">合格消费（计入基数）</span><span class="v num">' + fmt(quals) + '</span></div>'
+      + '<div class="v3-dline"><span class="k">不计入（充值/非合格）</span><span class="v num">' + fmt(others) + '</span></div>'
+      + '<div class="v3-dline"><span class="k">冻结中（T+7 未到期）</span><span class="v num">' + fmt(frozen) + '</span></div></section>'
 
-      + '<section class="ag-card"><h3>冻结到期列表</h3>' + dueHtml + '</section>'
+      + '<div class="v3-sec-title">冻结到期列表</div>'
+      + '<section class="v3-card v3-mb12">' + dueHtml + '</section>'
 
-      + '<div class="ag-card"><div class="ag-actions ag-actions--edit">'
-      + '<a class="ag-btn ag-btn--ghost ag-btn--sm" href="sub.html">返回二级工作台</a>'
-      + '</div></div></div>';
+      + '<div class="v3-flex v3-gap2 v3-mb12">'
+      + '<a class="v3-btn v3-btn--ghost v3-takeall" href="sub.html">返回二级工作台</a></div>'
+
+      + '<div class="trust"><span class="ag-tags" style="justify-content:center;margin-bottom:6px"><span class="v3-badge">模拟测算</span><span class="v3-badge">非税务意见</span><span class="v3-badge">非实际代扣金额</span><span class="v3-badge">非完税凭证</span></span><br/>润锦工程链 Engchain 3.0</div>'
+      + '</div>';
   }
 
   function render() {
-    if (!Store || !Insight || !Ledger) { root.innerHTML = emptyState('数据层未就绪', 'AgentStore/AgentInsight/AgentLedger 未加载。'); return; }
+    if (!Store || !Insight || !Ledger) { root.innerHTML = '<div class="v3-page">' + emptyState('数据层未就绪', 'AgentStore/AgentInsight/AgentLedger 未加载。') + '</div>'; return; }
     var me = null;
     (Store.listProvinces() || []).forEach(function (p) { if (p.uid === U) me = p; });
     if (me) { renderProvince(me); return; }
     var subRec = null;
     (Store.listSubs() || []).forEach(function (s) { if (s.uid === U && (s.status === 'approved' || s.status === 'suspended')) subRec = s; });
     if (subRec) { renderSub(subRec); return; }
-    root.innerHTML = emptyState('无经营数据权限', '数据中心仅对在册省级总代 / 已开通二级开放。');
+    root.innerHTML = '<div class="v3-page">' + emptyState('无经营数据权限', '数据中心仅对在册省级总代 / 已开通二级开放。') + '</div>';
   }
 
   render();
 })();
 </script>
-<script src="../../js/agent-motion.js"></script>
+<script>/* 深链返回兜底：无历史时回工作台 */
+function agBack(){ if (history.length>1){ history.back(); } else { location.href='index.html'; } }</script>
 </body>
 </html>
