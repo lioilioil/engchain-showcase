@@ -20,9 +20,10 @@
   /* #/profile 为非 Tab 路由：不出现在 Tab 条，带返回，标题「身份详情」 */
   var EXTRA_INDEX_ROUTES = ["profile"];
 
-  /* sub 端 4 大类层级结构：大类 -> 类内子页 */
+  /* sub 端 4 大类层级结构：大类 -> 类内子页（E4：工作台大类移除「待办提醒」子页——待办收敛为
+     navbar 右上角消息 icon + 消息中心「通知」分页；sub-page-inbox.js 文件保留不删，路由不再可达） */
   var SUBCATS = [
-    { key: "home", label: "工作台", subs: ["home", "inbox"] },
+    { key: "home", label: "工作台", subs: ["home"] },
     { key: "invite", label: "邀请获客", subs: ["invite", "invite-users", "invite-stats"] },
     { key: "payments", label: "收款与对账", subs: ["payments", "statement"] },
     { key: "ledger", label: "台账税务", subs: ["ledger", "tax"] }
@@ -90,6 +91,23 @@
 
   function badge(n) { return n > 0 ? '<span class="v3-tab__dot">' + n + "</span>" : ""; }
 
+  /* E4：navbar 右上角「消息」icon 角标（待办总数，tabular-nums；无待办不显示）+ 点击进消息中心。
+     角标数据 = 省代/二级 store 待办数（与消息中心「通知」分页派生条目数一致）；navbar 在 #ag-root
+     之外，事件只绑一次。 */
+  function renderNavMsg(n) {
+    var b = document.getElementById("nav-msg-badge");
+    if (b) {
+      b.textContent = n > 99 ? "99+" : String(n);
+      b.hidden = !(n > 0);
+      b.style.display = n > 0 ? "" : "none";
+    }
+    var btn = document.getElementById("nav-msg-btn");
+    if (btn && !btn._e4Bound) {
+      btn._e4Bound = true;
+      btn.addEventListener("click", function () { location.href = "../message/index.html"; });
+    }
+  }
+
   function render() {
     var V3 = window.V3, s = V3.store.getState();
     if (!s) return;
@@ -126,6 +144,7 @@
 
     /* ---------- 角标计数 ---------- */
     var homeBadge = "", reconcileBadge = "", catBadge = {};
+    var navTodoN = 0;   /* E4：navbar 消息 icon 角标 = 待办总数（与消息中心「通知」分页待办条目数一致） */
     if (!isSub) {
       var r1 = d.payRegs1 || [], r2 = d.payRegs2 || [];
       var pend1 = r1.filter(function (r) { return r.status === "pending_confirm"; }).length;
@@ -137,6 +156,7 @@
       var reconcileN = pend1 + disp1 + pend2 + disp2;              /* 对账未平·待处理数 */
       homeBadge = badge(todoN);
       reconcileBadge = badge(reconcileN);
+      navTodoN = todoN;
     } else {
       var regs = d.payRegs || [];
       var subPend = regs.filter(function (r) { return r.status === "pending_confirm"; }).length;
@@ -145,7 +165,9 @@
       var subTodoN = subPend + subDisp + (d.alerts || []).length + agreePending;
       catBadge["home"] = badge(subTodoN);      /* 工作台大类 = 待办总数 */
       catBadge["payments"] = badge(subPend);   /* 收款与对账大类 = 收款确认数（独立显示，不堆叠） */
+      navTodoN = subTodoN;
     }
+    renderNavMsg(navTodoN);
 
     /* ---------- 导航 HTML ---------- */
     var navHtml;

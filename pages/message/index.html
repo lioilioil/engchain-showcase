@@ -281,7 +281,90 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return out;
   }
 
-  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 匹配推荐 + 本地代理事件），按时间倒序 */
+  /* E4 数据桥：省代/二级工作台待办 → 消息中心「通知」条目（kind 'pa'）。
+     数据源 = V3.store 持久化 localStorage 键 engchain-v3-demo-state-v1（与 pages/province-agent
+     同 origin 共享；直接读原始 JSON，不引入 store.js 避免副作用）。口径与省代 router.js 角标公式严格一致：
+     - province：payRegs1/2(pending_confirm/disputed) + subApps(pending)
+     - sub：payRegs(pending_confirm/disputed) + alerts[] + agreement(pending_mine)
+     已读键独立 engchain-pa-todo-read；条目契约复用现有 n-item 渲染（cat/title/body/time/ts/unread/actions）。 */
+  var PA_TODO_READ_KEY = 'engchain-pa-todo-read';
+  function paTodoReadIds() { try { return JSON.parse(localStorage.getItem(PA_TODO_READ_KEY) || '[]'); } catch (e) { return []; } }
+  function paMarkRead(id) { var ids = paTodoReadIds(); if (ids.indexOf(id) < 0) { ids.push(id); try { localStorage.setItem(PA_TODO_READ_KEY, JSON.stringify(ids)); } catch (e) {} } }
+  function paTodoUnread() { try { return paTodoNoticeItems().filter(function (x) { return x.unread; }).length; } catch (e) { return 0; } }
+  function paTodoNoticeItems() {
+    var out = [];
+    try {
+      var st = JSON.parse(localStorage.getItem('engchain-v3-demo-state-v1') || 'null');
+      if (!st) return out;
+      var read = paTodoReadIds();
+      function unreadOf(id) { return read.indexOf(id) < 0; }
+      var isSub = st.mode === 'sub';
+      var d = isSub ? st.sub : st.province;
+      if (!d) return out;
+      var base = isSub ? '../province-agent/sub.html' : '../province-agent/index.html';
+      function push(id, cat, title, body, ts, hash, label) {
+        out.push({ kind: 'pa', cat: cat, id: id, title: title, body: body,
+          time: fmtTs(ts), ts: tsNum(ts), unread: unreadOf(id),
+          actions: [{ label: label, href: base + (hash || '#/home') }] });
+      }
+      if (!isSub) {
+        /* 二级申请待初审 → 邀请获客页 */
+        (d.subApps || []).forEach(function (a) {
+          if (a.status !== 'pending') return;
+          push('pa-app-' + a.id, '代理', '二级申请待初审：' + (a.entName || ''),
+            '联系人 ' + (a.contact || '') + '（' + (a.phone || '') + '）· 约定比例 ' +
+            (a.ratioToSub != null ? Math.round(a.ratioToSub * 100) + '%' : '') + ' · 申请于 ' + (a.createdAt || ''),
+            a.createdAt, '#/invite', '去初审');
+        });
+        /* 对账登记：收款待确认 / 对账异议 → 对账留痕页 */
+        function regLayer(regs, layer) {
+          (regs || []).forEach(function (r) {
+            var amt = '¥' + (Number(r.amount) || 0).toLocaleString();
+            if (r.status === 'pending_confirm') {
+              push('pa-reg-' + r.id, '资金', '收款待确认：' + amt,
+                (layer === 1 ? '与平台' : '与二级企业') + '对账 · ' + (r.date || '') + ' 登记的付款待你确认',
+                r.createdAt || r.date, '#/reconcile', '去确认');
+            } else if (r.status === 'disputed') {
+              push('pa-reg-' + r.id, '资金', '对账异议待处理：' + amt,
+                (layer === 1 ? '与平台' : '与二级企业') + '对账 · ' + (r.reason || '登记存在差异，待线下核实'),
+                r.createdAt || r.date, '#/reconcile', '处理异议');
+            }
+          });
+        }
+        regLayer(d.payRegs1, 1);
+        regLayer(d.payRegs2, 2);
+      } else {
+        /* sub：收款待确认 / 对账异议 → 收款确认页 */
+        (d.payRegs || []).forEach(function (r) {
+          var amt = '¥' + (Number(r.amount) || 0).toLocaleString();
+          if (r.status === 'pending_confirm') {
+            push('pa-reg-' + r.id, '资金', '收款待确认：' + amt,
+              '省代转款 · ' + (r.date || '') + ' 登记，仅提醒，逾期不会自动确认到账',
+              r.createdAt || r.date, '#/payments', '去确认');
+          } else if (r.status === 'disputed') {
+            push('pa-reg-' + r.id, '资金', '对账异议待处理：' + amt,
+              r.reason || '对账登记存在差异，待处理',
+              r.createdAt || r.date, '#/payments', '处理异议');
+          }
+        });
+        /* sub：待办提醒 alerts（与 router 角标同口径，去 alert.to 指向的子页） */
+        (d.alerts || []).forEach(function (a, i) {
+          push('pa-subalert-' + i, '资金', '待办提醒：' + (a.title || ''),
+            a.desc || '', Date.now() - (i + 1) * 3600e3,
+            (a.to && a.to.indexOf('#/') === 0) ? a.to : '#/home', '去处理');
+        });
+        /* sub：O4 协议待签 → 工作台（合作协议卡） */
+        if (d.agreement && d.agreement.state === 'pending_mine') {
+          push('pa-agreement-pending', '代理', 'O4 二级合作协议待签署',
+            (d.agreement.code || '') + ' ' + (d.agreement.version || '') + ' · 待你签署后合作生效',
+            Date.now(), '#/home', '去签署');
+        }
+      }
+    } catch (e) {}
+    return out;
+  }
+
+  /* 合并全部通知项（运营消息 + 系统消息 + 企业邀请 + 匹配推荐 + 本地代理事件 + 省代/二级待办桥），按时间倒序 */
   function buildNoticeItems() {
     var items = [];
     readMsgs().slice().sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); }).forEach(function (m) {
@@ -332,15 +415,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     } catch (e) {}
     /* M-1：本地代理事件队列（审核结果/协议待签/状态变更） */
     try { agentNoticeItems().forEach(function (a) { items.push(a); }); } catch (e) {}
+    /* E4：省代/二级工作台待办桥（v3 store localStorage 派生） */
+    try { paTodoNoticeItems().forEach(function (a) { items.push(a); }); } catch (e) {}
     return items.sort(function (a, b) { return b.ts - a.ts; });
   }
 
-  /* 通知未读角标 = 运营 + 系统 + 邀请 + 推荐 */
+  /* 通知未读角标 = 运营 + 系统 + 邀请 + 推荐 + 本地代理事件 + 省代/二级待办桥（E4） */
   function agentNoticeUnread() {
     try { return agentNoticeItems().filter(function (x) { return x.unread; }).length; } catch (e) { return 0; }
   }
   function renderNoticeBadge() {
-    var n = sysUnreadCount() + sysMsgUnreadCount() + inviteUnreadCount() + agentNoticeUnread();
+    var n = sysUnreadCount() + sysMsgUnreadCount() + inviteUnreadCount() + agentNoticeUnread() + paTodoUnread();
     try { if (matchNotifyOn()) n += (MatchStore.listUnread ? MatchStore.listUnread().length : 0); } catch (e) {}
     var bn = document.getElementById('badge-notice');
     if (!bn) return;
@@ -362,6 +447,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (x.kind === 'msg') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
       if (x.kind === 'sys') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
       if (x.kind === 'agent') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'agent\')"';
+      if (x.kind === 'pa') click = ' onclick="openNotice(\'' + esc(x.id) + '\',\'pa\')"';
       if (x.kind === 'match') click = ' onclick="showMatchFeed();return false;"';
       var acts = '';
       if (x.kind === 'inv') {
@@ -372,8 +458,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             '</div>'
           : '<span class="inv-act-state ' + (x.invite.status === 'accepted' ? 'done' : 'no') + '">' + (x.invite.status === 'accepted' ? '已加入' : '已拒绝') + '</span>';
       }
-      if ((x.kind === 'msg' || x.kind === 'sys' || x.kind === 'agent') && x.actions && x.actions.length) {
-        var needAct = /待处理|待确认|尽快|逾期|待办|待签署|待我签署|待审核/.test((x.title || '') + (x.body || ''));
+      if ((x.kind === 'msg' || x.kind === 'sys' || x.kind === 'agent' || x.kind === 'pa') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办|待签|待我签署|待审核|待初审/.test((x.title || '') + (x.body || ''));
         acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
           /* S1-1：readNotice 内 refreshAll 重渲染列表使被点击 <a> 脱离 DOM，默认导航丢失；
              改为 setTimeout 0 先完成已读持久化，再显式跳转动作落点 */
@@ -415,6 +501,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
     else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
     else if (kind === 'agent') { agentMarkRead(id); refreshAll(); }
+    else if (kind === 'pa') { paMarkRead(id); refreshAll(); }
     var it = noticeItemById(id, kind);
     if (!it) return;
     /* 有明确业务落点：直接进入主操作 */
@@ -441,6 +528,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (kind === 'msg' && !isMsgRead(id)) { markMsgRead(id); refreshAll(); }
     else if (kind === 'sys' && !isSysRead(id)) { markSysRead(id); refreshAll(); }
     else if (kind === 'agent') { agentMarkRead(id); refreshAll(); }
+    else if (kind === 'pa') { paMarkRead(id); refreshAll(); }
   };
   function bindSubbar() {
     var bar = document.getElementById('notice-subbar');
@@ -594,6 +682,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (x.kind === 'msg') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'msg\')"';
       if (x.kind === 'sys') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'sys\')"';
       if (x.kind === 'agent') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'agent\')"';
+      if (x.kind === 'pa') open = ' onclick="openNotice(\'' + esc(x.id) + '\',\'pa\')"';
       if (x.kind === 'match') open = ' onclick="showMatchFeed();return false;"';
       var acts = '';
       if (x.kind === 'inv' && x.invite && x.invite.status === 'pending') {
@@ -602,8 +691,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           '<button class="inv-act no" onclick="omInviteAct(\'' + x.invite.inviteId + '\',\'reject\',this)">拒绝</button>' +
           '</div>';
       }
-      if ((x.kind === 'msg' || x.kind === 'sys' || x.kind === 'agent') && x.actions && x.actions.length) {
-        var needAct = /待处理|待确认|尽快|逾期|待办|待签署|待我签署|待审核/.test((x.title || '') + (x.body || ''));
+      if ((x.kind === 'msg' || x.kind === 'sys' || x.kind === 'agent' || x.kind === 'pa') && x.actions && x.actions.length) {
+        var needAct = /待处理|待确认|尽快|逾期|待办|待签|待我签署|待审核|待初审/.test((x.title || '') + (x.body || ''));
         acts += '<div class="n-acts">' + x.actions.map(function (a, ai) {
           /* S1-1：readNotice 内 refreshAll 重渲染列表使被点击 <a> 脱离 DOM，默认导航丢失；
              改为 setTimeout 0 先完成已读持久化，再显式跳转动作落点 */
@@ -758,7 +847,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
   /* 通知分页统一渲染（不再跳转 system.html） */
   renderNoticeBadge(); renderNoticeList(); bindSubbar(); bindSearch(); bindNoticeFilter(); bindSettings();
-  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY) refreshAll(); });
+  window.addEventListener('storage', function (e) { if (e.key === 'engchain-messages' || e.key === SYS_READ_KEY || e.key === PA_TODO_READ_KEY) refreshAll(); });
   window.addEventListener('engchain:messages', function () { refreshAll(); });
 
   /* [FEAT 9.2-3] 进入消息中心时生成/更新匹配推荐 */
@@ -845,7 +934,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var bc = document.getElementById('badge-conv');
     bc.textContent = convUnread; bc.style.display = convUnread ? '' : 'none';
     var bn = document.getElementById('badge-notice');
-    var noticeUnread = sysUnread + sysMsgUnread + matchUnread + inviteUnread + agentNoticeUnread();
+    var noticeUnread = sysUnread + sysMsgUnread + matchUnread + inviteUnread + agentNoticeUnread() + paTodoUnread();
     bn.textContent = noticeUnread; bn.style.display = noticeUnread ? '' : 'none';
     renderNoticeBadge(); renderNoticeList();
   }
@@ -1042,7 +1131,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   }, true);
   window.addEventListener('engchain:org', refreshAll);
   window.addEventListener('storage', function (e) {
-    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages' || e.key === 'engchain-orgs') refreshAll();
+    if (e.key === CONV_DEMO_KEY || e.key === 'engchain-messages' || e.key === 'engchain-orgs' || e.key === PA_TODO_READ_KEY || e.key === 'engchain-v3-demo-state-v1') refreshAll();
   });
 })();
 </script>
