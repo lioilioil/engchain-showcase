@@ -49,18 +49,20 @@
       '<div class="s-prow"><span class="k">版本</span><span class="v">' + ui.esc(ag.version || "") + "</span></div>" +
       '<div class="s-prow"><span class="k">状态</span><span class="v">' + (ag.state === "signed" ? "已签署" : "待签署") + "</span></div>";
     if (ag.state === "pending_mine" && !ctx.readonly) {
-      h += '<div class="s-actions">' +
+      /* T2-D：3 并列按钮 → 1 主（签署）+ 2 次（查看 ghost / 拒签 文字链），一屏唯一主焦点（V4） */
+      h += '<div class="s-actions s-actions--main">' +
+        '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="agree-sign">签署协议</button></div>' +
+        '<div class="s-actions s-actions--sub">' +
         '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="agree-view">查看协议</button>' +
-        '<button class="v3-btn v3-btn--danger v3-btn--sm" data-act="agree-reject">拒签</button>' +
-        '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="agree-sign">签署协议</button></div>';
+        '<button class="v3-btn v3-btn--link t2d-link-danger" data-act="agree-reject">拒签</button></div>';
     } else {
       h += '<div class="s-actions"><button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="agree-view">查看协议条款</button></div>';
       if (ag.state === "rejected" && ag.rejectReason) h += '<div class="v3-alert v3-alert--warn v3-mt9">' + ui.esc(ag.rejectReason) + "</div>";
     }
     h += "</section>";
 
-    /* 财务卡（深色 L2，主指标唯一突出；明细 L3 通栏行） */
-    h += '<section class="sub-finance v3-mt12"><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
+    /* 财务卡（T2-B 已改白底 L2，主指标唯一突出；明细 L3 通栏行） */
+    h += '<section class="sub-finance v3-mt12"><div class="v3-xs t2d-fin-x">本月本人经营所得（测算）</div>' +
       '<div class="big num v3-mt2">' + ui.moneyD(fin.agreed) + '</div>' +
       '<div class="rows">' +
       '<div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +

@@ -72,17 +72,16 @@
         '<div class="ps">企业直接邀请 · 单层绑定 · 服务有保障</div>' +
         '<div class="pq"><div class="v3-qr"></div></div><div class="pc">' + ui.esc(code) + "</div></div>" +
         '<div class="iv-codeline v3-mt12" >' + ui.esc(code) + "</div>" +
-        '<div class="iv-sharegrid">' + share("share", "微信好友") + share("link", "复制链接") + share("qr", "保存图片") + "</div>" +
+        /* T2-D（V7）：3 分享 Mock 按钮合并为 1 个「分享」，点击 toast */
+        '<button type="button" class="v3-btn v3-btn--primary v3-btn--block v3-mt12 t2d-share">分享</button>' +
         '<p class="v3-legal v3-mt12" style="text-align:center">二维码为原型占位；分享为 Mock。</p>',
       footer: [{ t: "完成", kind: "v3-btn--primary" }],
       onMount: function (wrap) {
-        wrap.querySelectorAll(".iv-sharegrid button").forEach(function (x) {
-          x.addEventListener("click", function () { ui.toast("已触发分享（Mock）", "ok"); });
-        });
+        var sh = wrap.querySelector(".t2d-share");
+        if (sh) sh.addEventListener("click", function () { ui.toast("已复制（Mock）", "ok"); });
       }
     });
   }
-  function share(ic, t) { return '<button>' + window.V3.ui.icon(ic, 22) + "<span>" + t + "</span></button>"; }
 
   /* ---------------- 我的邀请用户 ---------------- */
   function renderUsers(ctx) {
@@ -171,8 +170,8 @@
     var ui = ctx.ui, V3 = ctx.V3, fn = V3.store.funnelOf(ctx.d.leads);
     var fin = V3.store.subSettle(ctx.d.financeBase);
     function row(lab, n, max, idx) {
-      var w = max ? Math.max(6, Math.round(n / max * 100)) : 0;
-      return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span><span class="lab">' + lab + '</span><span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
+      /* T2-D：删装饰性轨道条（V1），纯数字行 */
+      return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span><span class="lab">' + lab + '</span><span class="val num">' + n + "</span></div>";
     }
     var h = '<section class="s-l2 iv-funnel"><div class="v3-sm v3-strong v3-mb10">邀请转化漏斗（仅直接邀请用户）</div>' +
       row("直接邀请", fn.direct, fn.direct, 0) + row("已注册", fn.registered, fn.direct, 1) +
@@ -180,7 +179,7 @@
       '<div class="s-prow s-prow--div v3-mt12"><span class="k">邀请已产生付费金额 · 仅统计不发钱</span>' +
       '<span class="v num v3-goldtext">' + ui.moneyD(fn.paidAmount) + "</span></div></section>";
 
-    h += '<section class="sub-finance v3-mt12" ><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
+    h += '<section class="sub-finance v3-mt12" ><div class="v3-xs t2d-fin-x">本月本人经营所得（测算）</div>' +
       '<div class="big num v3-mt2" >' + ui.moneyD(fin.agreed) + "</div>" +
       '<div class="rows"><div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +
       '<div class="v3-dline"><span class="k">总盘 ×50%</span><span class="v num">' + ui.money(fin.gross) + "</span></div>" +

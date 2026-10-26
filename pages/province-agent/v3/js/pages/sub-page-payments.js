@@ -64,8 +64,9 @@
     if (r.status === "disputed" && r.reason) h += '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.esc(r.reason) + "</div>";
 
     if (!history && r.status === "pending_confirm" && !ctx.readonly) {
+      /* T2-D：双按钮 → 1 主（核对无误·确认 primary）+ 1 次（未收到/提异议 ghost，danger 视觉降级 V4） */
       h += '<div class="s-actions s-actions--2">' +
-        '<button class="v3-btn v3-btn--danger v3-btn--sm" data-act="dispute" data-id="' + r.id + '">未收到 / 提异议</button>' +
+        '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="dispute" data-id="' + r.id + '">未收到 / 提异议</button>' +
         '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="confirm" data-id="' + r.id + '">核对无误 · 确认</button></div>';
     }
     if (!history && r.status === "disputed" && !ctx.readonly) {
@@ -94,7 +95,8 @@
         { t: "确认到账（记录）", kind: "v3-btn--primary", onClick: function () {
           V3.store.act("pay/confirm", { layer: "2", id: id, signMethod: "record" }); ui.toast("已确认", "ok"); V3.router.render();
         } },
-        { t: "确认并电子签", kind: "v3-btn--navy", onClick: function () {
+        /* T2-D（§6.3）：双主按钮 → 1 主（确认到账）+ 1 次（电子签 ghost，点主按钮默认走 record） */
+        { t: "电子签签署", kind: "v3-btn--ghost", onClick: function () {
           ui.openModal({
             title: "电子签署（Mock）", icon: "shield",
             body: "此处为电子签能力演示占位，正式环境接入可信电子签并留存证书。", okText: "同意并签署",
