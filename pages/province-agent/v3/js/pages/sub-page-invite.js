@@ -25,12 +25,11 @@
     h += '<details class="v3-note-fold v3-mt12"><summary>' + ui.icon("lock", 15) +
       '<span class="sum">授权范围（只读）</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
       '<div class="fold-body">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，App 只读、无自助改费率入口。</div></details>';
-    h += '<button class="v3-btn v3-btn--block v3-btn--navy v3-mt12" data-go="#/invite-users">查看我的邀请用户</button>';
+    /* 导航职责单一化：去 #/invite-users 的 data-go CTA（邀请获客大类子导航已含「邀请用户」页签，不重复切页） */
     return h;
   }
   function mountInvite(el, ctx) {
     el.addEventListener("click", function (e) {
-      var g = e.target.closest("[data-go]"); if (g) return ctx.go(g.getAttribute("data-go"));
       var b = e.target.closest("[data-act]"); if (!b) return;
       if (b.getAttribute("data-act") === "gen") genSheet(ctx);
       else if (b.getAttribute("data-act") === "poster") {
@@ -169,12 +168,11 @@
       var w = max ? Math.max(6, Math.round(n / max * 100)) : 0;
       return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span><span class="lab">' + lab + '</span><span class="track"><i style="width:' + w + '%"></i></span><span class="val num">' + n + "</span></div>";
     }
-    var h = '<section class="v3-card iv-funnel"><div class="v3-sm v3-strong v3-mb10" >邀请转化漏斗（仅直接邀请用户）</div>' +
+    var h = '<section class="s-l2 iv-funnel"><div class="v3-sm v3-strong v3-mb10">邀请转化漏斗（仅直接邀请用户）</div>' +
       row("直接邀请", fn.direct, fn.direct, 0) + row("已注册", fn.registered, fn.direct, 1) +
       row("已入驻", fn.onboarded, fn.direct, 2) + row("已消费", fn.paid, fn.direct, 3) + row("已复购", fn.repaid, fn.direct, 4) +
-      '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4）</div>' +
-      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + "</div>" +
-      '<div class="v3-xs v3-mt3" >只统计不发钱</div></div></section>';
+      '<div class="s-prow s-prow--div v3-mt12"><span class="k">邀请已产生付费金额（D4 · 只统计不发钱）</span>' +
+      '<span class="v num v3-goldtext">' + ui.moneyD(fn.paidAmount) + "</span></div></section>";
 
     h += '<section class="sub-finance v3-mt12" ><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
       '<div class="big num v3-mt2" >' + ui.moneyD(fin.agreed) + "</div>" +

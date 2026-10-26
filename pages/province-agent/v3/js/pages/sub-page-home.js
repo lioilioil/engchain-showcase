@@ -1,4 +1,12 @@
-/* sub-page-home.js · 二级 工作台 #/home + 经营台账 #/ledger */
+/* sub-page-home.js · 二级 工作台 #/home + 经营台账 #/ledger
+   【S3-E2-SUB 深度重构】
+   - 身份卡：切换到 .s-idcard 骨架；上级总代 / 合作编号 结构化分行（消灭"·合作编号"换行纠缠）
+   - O4 协议：卡内嵌 kv + 按钮组 → L2 面板内通栏行（.s-prow）+ 按钮行（.s-actions）
+   - 财务卡：保持深色 L2，主指标唯一突出（本人经营所得），明细 L3 通栏行
+   - 邀请速览：L2 面板内 3 格数字 + 付费额通栏行（去 v3-stat-money 嵌套盒）
+   - 移除：邀请获客 tiles / 快捷入口列表（壳层 4 大类 + 子导航已承担，避免重复导航）
+   - 待办：E4 消息中心统一接管（navbar 右上角「消息」icon），工作台不再行内渲染待办列表
+*/
 (function () {
   "use strict";
 
@@ -14,45 +22,50 @@
         '<div><b>合作已暂停 · 仅可查看</b><div class="v3-xs v3-mt2" style="color:#B9C4D4">邀请、收款确认等操作已锁定，台账与协议仍可查阅。</div></div></div>';
     }
 
-    /* 身份卡（与省代 pa2-hero 统一语系：深色全宽） */
+    /* L1 身份色带（壳层 .s-idcard 骨架；结构化两行：上级总代 / 合作编号） */
     var stCls = d.profile.status === "active" ? "on" : "warn";
     var stLabel = ui.ACCT[d.profile.status] || d.profile.status;
-    h += '<section class="pa2-hero">' +
-      '<span class="pa2-hbadge ' + stCls + '"><span class="pa2-hdot"></span>' + ui.esc(stLabel) + "</span>" +
-      '<div class="pa2-eyebrow"><span class="tag">合作</span>二级企业</div>' +
-      '<h2 class="pa2-hero-title">' + ui.esc(d.profile.name) + "</h2>" +
-      '<p class="pa2-hero-desc">上级总代 <b>' + ui.esc(d.profile.parent) + "</b> · 合作编号 <b>" + ui.esc(d.profile.authNo) + "</b></p>" +
-      "</section>";
+    h += '<section class="s-idcard">' +
+      '<span class="ic-status ' + stCls + '"><span class="pa2-hdot"></span>' + ui.esc(stLabel) + "</span>" +
+      '<div class="ic-eyebrow"><span class="tag">合作</span>二级企业</div>' +
+      '<h2 class="ic-name">' + ui.esc(d.profile.name) + "</h2>" +
+      '<div class="ic-rows">' +
+        '<div class="ic-row"><span class="lab">上级总代</span><span class="val">' + ui.esc(d.profile.parent) + "</span></div>" +
+        '<div class="ic-row"><span class="lab">合作编号</span><span class="val">' + ui.esc(d.profile.authNo) + "</span></div>" +
+      "</div></section>";
 
-    /* 授权范围（D1 只读）：75 字长段 → 折叠摘要（渐进披露，首屏只留一行） */
+    /* 授权范围（D1 只读）：75 字长段 → 折叠摘要（保留入口） */
     h += '<details class="v3-note-fold v3-note-fold--gold v3-mt12"><summary>' + ui.icon("shield", 15) +
       '<span class="sum">授权范围说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
       '<div class="fold-body">你可<b>直接邀请终端用户</b>并据本人线计经营所得；<b>不能发展下级企业</b>（两级封顶），' +
       "邀请规模 / 范围 / 费率由省代在平台配置 + O4 协议授权，App 内<b>只读</b>、无自助改费率入口。</div></details>";
 
-    /* O4 协议 */
+    /* L2 协议面板：卡内嵌 kv + 按钮组 → 面板内通栏行（L3） */
     var ag = d.agreement || {};
-    h += '<section class="v3-card v3-mt12" ><div class="v3-card__hd"><span class="t">O4 合作协议</span>' +
-      (ag.state === "signed" ? '<span class="v3-badge v3-badge--active">已签署 ' + ui.esc(ag.completedAt || "") + "</span>"
-        : ag.state === "rejected" ? '<span class="v3-badge v3-badge--revoked">已拒签</span>'
-        : '<span class="v3-badge v3-badge--pending">待我签署</span>') + "</div>" +
-      '<div class="v3-kvrow"><div class="cell"><div class="k">协议编号</div><div class="v">' + ui.esc(ag.code || "") + "</div></div>" +
-      '<div class="cell"><div class="k">版本</div><div class="v">' + ui.esc(ag.version || "") + "</div></div>" +
-      '<div class="cell"><div class="k">状态</div><div class="v">' + (ag.state === "signed" ? "已签署" : "待签署") + "</div></div></div>";
+    var agBadge = ag.state === "signed"
+      ? '<span class="v3-badge v3-badge--active">已签署 ' + ui.esc(ag.completedAt || "") + "</span>"
+      : ag.state === "rejected"
+        ? '<span class="v3-badge v3-badge--revoked">已拒签</span>'
+        : '<span class="v3-badge v3-badge--pending">待我签署</span>';
+    h += '<section class="s-l2 v3-mt12 s-agree">' +
+      '<div class="s-panel-hd"><span class="t">O4 合作协议</span>' + agBadge + "</div>" +
+      '<div class="s-prow"><span class="k">协议编号</span><span class="v num">' + ui.esc(ag.code || "") + "</span></div>" +
+      '<div class="s-prow"><span class="k">版本</span><span class="v">' + ui.esc(ag.version || "") + "</span></div>" +
+      '<div class="s-prow"><span class="k">状态</span><span class="v">' + (ag.state === "signed" ? "已签署" : "待签署") + "</span></div>";
     if (ag.state === "pending_mine" && !ctx.readonly) {
-      h += '<div class="v3-flex v3-mt11" style="gap:8px">' +
-        '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="agree-view" style="flex:1">查看协议</button>' +
-        '<button class="v3-btn v3-btn--danger v3-btn--sm" data-act="agree-reject" style="flex:1">拒签</button>' +
-        '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="agree-sign" style="flex:1">签署协议</button></div>';
+      h += '<div class="s-actions">' +
+        '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="agree-view">查看协议</button>' +
+        '<button class="v3-btn v3-btn--danger v3-btn--sm" data-act="agree-reject">拒签</button>' +
+        '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="agree-sign">签署协议</button></div>';
     } else {
-      h += '<button class="v3-btn v3-btn--ghost v3-btn--sm v3-mt11" data-act="agree-view" >查看协议条款</button>';
-      if (ag.state === "rejected" && ag.rejectReason) h += '<div class="v3-alert v3-alert--warn v3-mt9" >' + ui.esc(ag.rejectReason) + "</div>";
+      h += '<div class="s-actions"><button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="agree-view">查看协议条款</button></div>';
+      if (ag.state === "rejected" && ag.rejectReason) h += '<div class="v3-alert v3-alert--warn v3-mt9">' + ui.esc(ag.rejectReason) + "</div>";
     }
     h += "</section>";
 
-    /* 财务卡（hideRetained：不见总代自留 / 自身线） */
-    h += '<section class="sub-finance v3-mt12" ><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
-      '<div class="big num v3-mt2" >' + ui.moneyD(fin.agreed) + '</div>' +
+    /* 财务卡（深色 L2，主指标唯一突出；明细 L3 通栏行） */
+    h += '<section class="sub-finance v3-mt12"><div class="v3-xs" style="color:var(--v3-on-navy-2)">本月本人经营所得（测算）</div>' +
+      '<div class="big num v3-mt2">' + ui.moneyD(fin.agreed) + '</div>' +
       '<div class="rows">' +
       '<div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +
       '<div class="v3-dline"><span class="k">总盘（合格消费 × 50%）</span><span class="v num">' + ui.money(fin.gross) + "</span></div>" +
@@ -60,52 +73,27 @@
       '<div class="v3-dline"><span class="k">T+7 在途冻结</span><span class="v num">' + ui.money(fin.frozen) + "</span></div>" +
       "</div></section>";
 
-    /* 本人三项 */
-    h += '<div class="v3-sec-title">邀请获客</div><div class="v3-tiles v3-pad16" style="background:var(--v3-surface);border:1px solid var(--v3-line);border-radius:var(--v3-r-lg);box-shadow:var(--v3-sh-card)">' +
-      tile("invite", "邀请码·海报", "#/invite") + tile("user", "我的邀请用户", "#/invite-users") +
-      tile("chart", "转化分佣统计", "#/invite-stats") + tile("receipt", "收款确认", "#/payments") +
-      "</div>";
-
-    /* 待办 / 预警 */
-    if (d.alerts && d.alerts.length) {
-      h += '<div class="v3-stack v3-mt12">';
-      d.alerts.forEach(function (a) {
-        h += '<button class="v3-alert v3-alert--' + (a.type || "info") + '" style="width:100%;text-align:left" data-go="' + (a.to || "#/payments") + '">' +
-          "<span>" + (a.icon || "ℹ") + '</span><div><b>' + ui.esc(a.title) + "</b><div class='v3-xs v3-mt2' >" + ui.esc(a.desc) + "</div></div></button>";
-      });
-      h += "</div>";
-    }
-
-    /* 速览 + 入口 */
-    h += '<section class="v3-card v3-mt12" ><div class="v3-tri">' +
-      tri("直接邀请", fn.direct) + tri("已入驻", fn.onboarded) + tri("已消费", fn.paid) + "</div>" +
-      '<div class="v3-stat-money v3-mt11" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额（D4）</div>' +
-      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + "</div></div></section>";
-
-    h += '<div class="section-head-row"><span class="t">快捷入口</span></div>';
-    h += '<section class="v3-sub-list v3-mt2">' +
-      srow("收款确认", "#/payments", "确认省代线下到账 · 15 天只提醒") +
-      srow("月度对账单", "#/statement", "按月查看测算与留痕") +
-      srow("待办提醒", "#/inbox", "待确认 / 临期事项") +
-      srow("经营台账", "#/ledger", "合格消费 / 冻结 / 规则口径") +
+    /* 邀请速览（L2 面板：3 格数字 + 付费额通栏行；原 v3-stat-money 嵌套盒拍平） */
+    h += '<section class="s-l2 v3-mt12">' +
+      '<div class="v3-sm v3-strong v3-mb10">邀请获客速览</div>' +
+      '<div class="s-tris">' +
+        tri("直接邀请", fn.direct) + tri("已入驻", fn.onboarded) + tri("已消费", fn.paid) +
+      "</div>" +
+      '<div class="s-prow s-prow--div"><span class="k">邀请已产生付费金额</span>' +
+        '<span class="v num v3-goldtext">' + ui.moneyD(fn.paidAmount) + "</span></div>" +
       "</section>";
+
+    /* 待办提醒：E4 消息中心统一接管（navbar 右上角「消息」icon），工作台不再行内渲染待办列表。
+       壳层工作台大类角标数字 = 待办总数（router.js 计算），与消息中心通知数一致。 */
 
     h += '<div class="trust">二级企业视角 · 原型数据均为 Mock</div>';
     return h;
   }
   function tri(k, n) { return '<div class="cell"><div class="num">' + n + '</div><div class="k">' + k + "</div></div>"; }
-  function tile(ic, t, go) {
-    return '<button class="v3-tile v3-tap" data-go="' + go + '"><span class="ic">' + window.V3.ui.icon(ic, 23) + "</span><span>" + t + "</span></button>";
-  }
-  function srow(t, go, s) {
-    return '<button class="v3-sub-row" data-go="' + go + '"><span class="v3-row__main"><span class="v3-row__t">' + t + "</span>" +
-      '<span class="v3-row__s">' + s + "</span></span>" + window.V3.ui.icon("chev", 17) + "</button>";
-  }
 
   function mountHome(el, ctx) {
     var V3 = ctx.V3, ui = ctx.ui;
     el.addEventListener("click", function (e) {
-      var g = e.target.closest("[data-go]"); if (g) { ctx.go(g.getAttribute("data-go")); return; }
       var b = e.target.closest("[data-act]"); if (!b) return;
       var act = b.getAttribute("data-act");
       if (act === "agree-view") agreeSheet(ctx);
@@ -133,11 +121,11 @@
     var ui = ctx.ui, c = ctx.d.agreement || {};
     ctx.ui.openSheet({
       title: "O4 合作协议条款",
-      body: '<div class="kv-mini v3-mb10" >协议编号 <b>' + ui.esc(c.code) + "</b> · 版本 <b>" + ui.esc(c.version) + "</b></div>" +
+      body: '<div class="kv-mini v3-mb10">协议编号 <b>' + ui.esc(c.code) + "</b> · 版本 <b>" + ui.esc(c.version) + "</b></div>" +
         '<div class="v3-timeline">' + (c.clauses || []).map(function (cl, i) {
           return '<div class="v3-tl"><div class="t">' + (i + 1) + ". " + ui.esc(cl) + "</div></div>";
         }).join("") + "</div>" +
-        '<p class="v3-legal v3-mt8" >' + ctx.V3.MONEY_NOTE + "；正式协议以平台电子签文本为准。</p>",
+        '<p class="v3-legal v3-mt8">' + ctx.V3.MONEY_NOTE + "；正式协议以平台电子签文本为准。</p>",
       footer: [{ t: "我已阅读", kind: "v3-btn--ghost" }]
     });
   }
@@ -169,7 +157,6 @@
     }).join("");
     h += '<div class="v3-table-wrap"><table class="v3-table"><thead><tr><th>月份</th><th>合格消费</th><th>总盘50%</th><th>比例</th><th>本人所得</th></tr></thead><tbody>' +
       rows + "</tbody></table></div>";
-    /* 计入/排除口径长块 → 折叠 */
     h += '<details class="v3-note-fold v3-mt12"><summary>' + ctx.ui.icon("filter", 15) +
       '<span class="sum">计入 / 排除口径</span><span class="chev">' + ctx.ui.icon("chev", 14) + "</span></summary>" +
       '<div class="fold-body">计入：<b>订单净额 / 积分解锁付费 / 增值服务付费</b><br/>' +
