@@ -45,6 +45,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/agent-store.js"></script>
 <script src="../../js/agent-referral.js"></script>
 <script src="../../js/agent-apply.js"></script>
+<script src="../../js/guest-gate.js"></script>
+<script src="../../js/agent-ledger.js"></script>
+<script src="../../js/agent-demo.js"></script>
+<script>/* B5 preview 演示上下文注入：仅 ?demo=province 时生效（复用 DataBus.applyDemoScenario 真实播种 u11 四川总代）；无参数时保持原业务空态 */
+(function(){
+'use strict';
+if (new URLSearchParams(location.search||'').get('demo') !== 'province') return;
+try { if (window.DataBus && DataBus.applyDemoScenario) DataBus.applyDemoScenario('province_agent_active'); } catch(e){}
+})();</script>
 <script>
 (function(){
 'use strict';
@@ -57,6 +66,8 @@ var q={};location.search.replace(/[?&]([^=&]+)=([^&]*)/g,function(_,k,v){q[decod
 var me=(window.DataBus?DataBus.current():null)||{};
 var uid=me.id||'';
 var invite=q.invite||'';
+/* B5 preview 演示上下文：?demo=province 且未显式带招商码时，自动取 u11 在册招商码；无参数保持原业务逻辑 */
+if(!invite && q.demo==='province' && window.AgentReferral){ var _dc=AgentReferral.activeCodeFor('u11'); if(_dc && _dc.code) invite=_dc.code; }
 var CODE=String(invite||'').trim().toUpperCase();
 
 /* 招商码校验：有效且 active */

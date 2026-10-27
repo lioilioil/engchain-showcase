@@ -186,7 +186,7 @@
       h += '<div class="v3-card v3-card--pad"><div class="v3-sub-row v3-sub-row--plain">' +
         '<span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 18) + "</span>" +
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(a.name) + "</span>" +
-        '<span class="v3-row__s">' + ui.esc(a.contact || "—") + " " + ui.esc(a.phone || "") + " · 提交于 " + ui.esc(a.submittedAt) + "</span>" +
+        '<span class="v3-row__s">' + ui.esc(a.contact || "—") + " " + ui.esc(a.phone || "") + ' · <span class="v3-nowrap">提交于 ' + ui.esc(a.submittedAt) + "</span></span>" +
         '<span class="v3-row__s">申请比例 ' + pct(a.ratio) + "</span></span>" +
         '<span class="v3-badge v3-badge--pending">待审批</span></div>' +
         '<div class="v3-kv v3-mt8"><span class="k">统一社会信用代码</span><span class="v num">' + ui.esc(a.uscc) + "</span></div>" +

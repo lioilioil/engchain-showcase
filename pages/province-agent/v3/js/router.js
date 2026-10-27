@@ -32,7 +32,7 @@
       { key: "invite-stats", label: "转化分佣" }
     ],
     ledger: [
-      { key: "ledger", label: "经营台账" },
+      { key: "ledger", label: "台账总览" },
       { key: "payments", label: "收款确认" },
       { key: "statement", label: "月度对账单" },
       { key: "tax", label: "税务说明" }
@@ -190,13 +190,13 @@
     var h = '<div class="v3-page-head"><div class="v3-page-title">税务说明</div>' +
       '<div class="v3-page-sub">结算、发票与税费的演示口径说明</div></div>';
     h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ctx.ui.icon("receipt", 16) + "<span>税费与发票</span></div>" +
-      '<div class="v3-legal-body"><p>1. 各合作主体依法各自承担税费，平台与省代不代扣代缴经营所得税。</p>' +
+      '<div class="v3-info-card__body"><div class="v3-legal-body"><p>1. 各合作主体依法各自承担税费，平台与省代不代扣代缴经营所得税。</p>' +
       '<p>2. 月度对账单仅作为结算对账依据，发票按实际结算金额另行开具。</p>' +
       '<p>3. 本页仅展示约定所得（平台测算），<b>不构成可提现余额</b>；实际款项以 App 外公对公转账及双方确认记录为准。</p>' +
       '<p>4. 退货、退款、取消订单不计入合格消费口径。</p>' +
       (isSub ? '<p>5. 二级合作企业向省代开具发票的类型与时点，以双方协议约定为准。</p>' :
         '<p>5. 省代对平台开具发票的规则，以平台合作协议约定为准。</p>') +
-      "</div></div>";
+      "</div></div></div>";
     h += '<div class="v3-readnote">' + ctx.ui.icon("shield", 13) +
       "<span>正式发票与税务规则以平台财务中心上线后公示为准，本页为演示说明。</span></div>";
     return h;

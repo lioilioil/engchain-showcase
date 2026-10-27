@@ -129,8 +129,9 @@
     } else if (st.disputed.length) {
       cls = "rc-band--warn";
       txt = ui.icon("warn", 15) + "<span><b>" + st.disputed.length + " 笔异议待闭环</b>（" + L.deadline + "），请线下核实；核实后可确认或冲销重登。</span>";
+      /* A19：异议未闭环时不出「平账」按钮——即使 diff 恰好为 0，守卫 stmt/balance 也会因
+         "存在未闭环异议" 拦截。渲染层与守卫对齐：异议态仅保留"登记线下付款"（差额>0 时）。 */
       if (can && st.diff > 0) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="register">登记线下付款</button>';
-      if (can && st.diff === 0 && st.pending.length === 0) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="balance">平账留痕</button>';
     } else if (st.diff !== 0) {
       cls = "rc-band--bad";
       txt = ui.icon("bank", 15) + "<span>差异 <b>" + ui.money(st.diff) + "</b>（平台测算 − 已确认登记）；线下付款完成后请先<b>登记并上传凭证</b>。</span>";
@@ -215,7 +216,7 @@
         '<div class="v3-field v3-mt12"><label>本次登记金额（元）</label><input class="v3-input" id="rg-amount" type="number" min="0" value="' + Math.max(remain, 0) + '"></div>' +
         '<div class="v3-field"><label>付款方式</label><select class="v3-select" id="rg-method">' +
         '<option value="bank">对公转账</option><option value="wechat">微信/支付宝</option><option value="cash">现金</option><option value="other">其他</option></select></div>' +
-        '<div class="v3-field"><label>付款日期</label><input class="v3-input" id="rg-date" type="date" value="2026-10-27"></div>' +
+        '<div class="v3-field"><label>付款日期</label><input class="v3-input" id="rg-date" type="date" value="2026-10-27" max="2026-10-31"></div>' +
         '<div class="v3-field"><label>付款凭证（必填，支持图片/PDF）</label>' +
         '<label class="v3-upload" id="rg-up"><span class="ic">' + ui.icon("camera", 22) + "</span>点击上传回单 / 截图" +
         '<input type="file" id="rg-file" accept="image/*,application/pdf" multiple style="display:none"></label>' +
