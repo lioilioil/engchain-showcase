@@ -281,6 +281,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
 
 /* ---------- 白色卡片 ---------- */
 .wb-card { background:var(--wb-card); border-radius:16px; padding:14px 16px; margin-bottom:10px; border:1px solid var(--wb-line); box-shadow:0 1px 2px rgba(0,0,0,.02); }
+/* 常用服务卡片挂载 WebGL 液态玻璃后：隐藏自身 CSS 底，由玻璃层呈现折射/磨砂；fallback 保留原样式 */
+.lg-card[data-liquid-glass="webgl"] { background:transparent; border-color:transparent; box-shadow:none; }
 .wb-card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
 .wb-card-title { font-size:15px; font-weight:700; color:var(--wb-text-1); display:flex; align-items:center; gap:6px; }
 .wb-t-ic { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
@@ -516,8 +518,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
       <div id="pf-notify-list"></div>
     </div>
 
-    <!-- ═══ 常用服务（4×2 网格） ═══ -->
-    <div class="wb-card">
+    <!-- ═══ 常用服务（4×2 网格，Liquid Glass 折射玻璃卡片） ═══ -->
+    <div class="wb-card lg-card" id="pf-quick-card">
       <div class="v12-tool-grid" id="pf-quick-scroll"></div>
     </div>
 
@@ -1046,7 +1048,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
       if (_acc && _acc.agent && _acc.agent.active) {
         items.push({
           href: _acc.agent.isProvinceAgent ? '../province-agent/index.html' : '../province-agent/sub.html',
-          ic: 'i-grid', title: '代理工作台'
+          n: '53', title: '代理工作台'
         });
       }
     } catch (e) {}
@@ -1531,7 +1533,51 @@ html, body { margin:0; padding:0; background:var(--bg); }
     renderEntryRenew(); /* [FEAT 9.2-2] */
     refreshTaskCenter(); /* 业务通知空态整卡隐藏 */
     renderFooterUid();  /* P3-2 页脚 UID 动态化 */
+    mountQuickGlass();  /* 常用服务卡片 WebGL 液态玻璃 */
   }
+
+  /* ---------- 常用服务卡片：WebGL 液态玻璃（代理工作台所在快捷工具卡片） ----------
+     参数对齐 search 页折射体系（frost/tint/tintTone + material 4 键）；
+     WebGL2 不可用 → 库打 data-liquid-glass=fallback，保留 .wb-card 原 CSS 毛玻璃，保证可读。 */
+  var quickGlass = null, quickGlassEl = null;
+  function quickGlassParams() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return { tint: dark ? 0.68 : 0.55, tintTone: dark ? 'dark' : 'light', frost: dark ? 0.42 : 0.35 };
+  }
+  function mountQuickGlass() {
+    var el = document.getElementById('pf-quick-card');
+    if (!el) return;
+    if (quickGlass && quickGlassEl === el) {
+      try { quickGlass.update(quickGlassParams()); window.LiquidGlass.refreshAll(); } catch (e) {}
+      return;
+    }
+    if (!window.LiquidGlass || !window.LiquidGlass.isSupported || !window.LiquidGlass.isSupported()) {
+      el.setAttribute('data-liquid-glass', 'fallback');
+      return;
+    }
+    try {
+      quickGlass = new window.LiquidGlass(el, Object.assign({
+        live: 'auto',
+        material: { refraction: 72, edgeReach: 0.16, edgeWidth: 0.28, dispersion: 2.4, absorption: 0.12 }
+      }, quickGlassParams()));
+      quickGlassEl = el;
+      /* 网格重渲染（身份/状态变化）后强制重建一次 backdrop，兜底首帧采样竞态 */
+      setTimeout(function () { try { window.LiquidGlass.refreshAll(); } catch (e) {} }, 200);
+    } catch (e) {
+      el.setAttribute('data-liquid-glass', 'fallback');
+      quickGlass = null; quickGlassEl = null;
+    }
+  }
+  /* 主题切换时同步玻璃 tint/tintTone */
+  try {
+    new MutationObserver(function () { mountQuickGlass(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  } catch (e) {}
+  /* 库在 body 末尾 IIFE 加载：DOMContentLoaded 时已就绪，保险轮询兜底（前 6s） */
+  var _qgTries = 0;
+  var _qgTimer = setInterval(function () {
+    if (window.LiquidGlass || ++_qgTries > 40) { clearInterval(_qgTimer); mountQuickGlass(); }
+  }, 150);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
