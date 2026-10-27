@@ -99,16 +99,19 @@
       (primary ? '<div class="rc-band__op">' + primary + "</div>" : "") +
       "</div>";
 
-    /* ---------- 测算摘要卡：双数字面板 + 勾稽等式合并为一行（① 行级匹配勾稽恒等式保留，不再双底色两 box） ---------- */
-    h += '<section class="rc-summary">' +
-      '<div class="rc-summary__cell"><b class="num">' + ui.money(curCalc.calcAmount) + "</b><span>测算应付（只读）</span></div>" +
-      '<i class="rc-summary__op">=</i>' +
-      '<div class="rc-summary__cell"><b class="num">' + ui.money(sum) + "</b><span>已登记</span></div>";
-    if (diff !== 0) {
-      h += '<i class="rc-summary__op">+</i>' +
-        '<div class="rc-summary__cell is-gap"><b class="num">' + ui.money(Math.abs(diff)) + "</b><span>未登记差额</span></div>";
-    }
-    h += "</section>";
+    /* ---------- 数字区唯一焦点（G-A P0-1）：未清差异 T1 大字为唯一主焦点；
+       测算应付 / 已登记降为次级一行灰小字；勾稽关系人话一句引导。
+       ① 行级勾稽恒等式完整保留在「说明 ›」弹层与差异分解弹层 kv 内，功能不减。 ---------- */
+    var diffAbs = Math.abs(diff);
+    h += '<section class="rc-summary' + (diff !== 0 ? " is-open" : " is-clear") + '">' +
+      '<div class="rc-focus"><span class="rc-focus__lab">未清差异</span>' +
+      '<b class="rc-focus__num num">' + ui.money(diffAbs) + "</b></div>" +
+      '<div class="rc-subline">测算应付 <span class="num">' + ui.money(curCalc.calcAmount) +
+      '</span> · 已登记 <span class="num">' + ui.money(sum) + "</span></div>" +
+      '<div class="rc-guide">' + (diff !== 0
+        ? "还有 " + ui.money(diffAbs) + " 未对上——多来自漏登、异议或冲销，补登记或提异议即可冲抵"
+        : "测算与实付已对上，确认凭证后即可平账") + "</div>" +
+      "</section>";
 
     /* ---------- ② 差异分解：独立卡降级为列表上方一行提示（明细弹层 diffDetailSheet 保留，功能不减） ---------- */
     if (diff !== 0 || disputedRegs.length) {

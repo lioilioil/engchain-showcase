@@ -33,11 +33,11 @@
       '<span class="ic-status ' + stCls + '"><span class="pa2-hdot"></span>' + ui.esc(stLabel) + "</span>" +
       '<span class="ic-eyebrow"><span class="tag">授权</span>省级总代</span>' +
       '<h2 class="ic-name">' + ui.esc(d.profile.agentName) + "</h2>" +
-      '<p class="ic-desc">授权编号 <b>' + ui.esc(d.profile.authNo) + "</b> · 有效期至 <b>" + ui.esc(d.profile.validTill) + "</b></p>" +
+      '<p class="ic-desc">授权编号 <b>' + ui.esc(d.profile.authNo) + "<br/>有效期至 <b>" + ui.esc(d.profile.validTill) + "</b></p>" +
       '<button type="button" class="ic-role" data-act="role">' +
         '<span class="rb">' + ui.esc(roleLabel) + "</span><span class=\"rk\">权限说明</span>" + ui.icon("chev", 14) + "</button>" +
       '<button type="button" class="ic-detail" data-go="#/profile">' +
-        "<span>身份详情 · 授权证书 / 团队 / 规则</span>" + ui.icon("chev", 16) + "</button>" +
+        "<span>身份详情</span>" + ui.icon("chev", 16) + "</button>" +
       "</section>";
 
     /* 财务大数字卡（segment 切换：总盘 / 自身线；明细静态呈现——【S4-B·F1】删除展开/收起动效） */
@@ -246,14 +246,19 @@
     var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
     var h = segBar("subs");
     var pend = (d.subApps || []).filter(function (a) { return a.status === "pending"; });
-    h += '<section class="s4b-summary"><div><div class="n num">' + (d.subs || []).length + '</div><div class="k">在管二级企业</div></div>' +
-      '<div><div class="n num">' + d.profile.used + ' / ' + d.profile.cap + '</div><div class="k">名额使用</div></div>' +
-      (pend.length ? '<div><div class="n num">' + pend.length + '</div><div class="k">待初审申请</div></div>' : "") + "</section>";
+    /* G-A P0-2：三列统计大数字卡收敛为一行「在管总览」——每个数字都带上下文标签（V5 数据克制、无孤立数字） */
+    var curMonth = (d.calc1 && d.calc1[0] && d.calc1[0].month) || "";
+    var newThisMonth = (d.subApps || []).filter(function (a) {
+      return !!curMonth && String(a.createdAt || "").indexOf(curMonth) === 0;
+    }).length;
+    h += '<div class="section-head-row"><span class="t">在管总览</span>' +
+      '<span class="s4b-overv num">在管 ' + (d.subs || []).length + " 家 · 待初审 " + pend.length +
+      " · 本月新增 " + newThisMonth + "</span></div>";
 
-    /* 待初审（置顶） */
+    /* 待办型分区（待初审，操作态样式）置顶 */
     if (pend.length) {
-      h += '<div class="section-head-row"><span class="t">二级申请 · 待初审 ' + pend.length + "</span></div>";
-      h += '<div class="v3-sub-list" style="border-radius:17px" id="s4b-apps">';
+      h += '<div class="section-head-row"><span class="t">待办 · 二级申请初审 ' + pend.length + "</span></div>";
+      h += '<div class="v3-sub-list s4b-board--todo" style="border-radius:17px" id="s4b-apps">';
       h += pend.map(function (a) {
         return '<button class="v3-sub-row" data-s4b="app" data-id="' + a.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(a.entName.slice(0, 1)) + "</span>" +
           '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(a.entName) +
@@ -264,9 +269,9 @@
       h += "</div>";
     }
 
-    /* 二级列表 */
-    h += '<div class="section-head-row"><span class="t">已合作二级企业</span></div>';
-    h += '<div class="v3-sub-list" style="border-radius:17px" id="s4b-sublist">';
+    /* 信息型分区（已合作，信息态样式，与待办型视觉区分） */
+    h += '<div class="section-head-row"><span class="t">信息 · 已合作二级企业</span></div>';
+    h += '<div class="v3-sub-list s4b-board--info" style="border-radius:17px" id="s4b-sublist">';
     if (d.subs && d.subs.length) {
       h += d.subs.map(function (s) {
         return '<button class="v3-sub-row" data-s4b="sub" data-id="' + s.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + "</span>" +
@@ -281,10 +286,12 @@
     }
     h += "</div>";
 
-    /* 招商码 */
-    h += '<div class="section-head-row"><span class="t">招商码（AG · 仅招二级）</span></div>';
-    h += '<section class="v3-sub-list" style="border-radius:17px" id="s4b-aglist">';
+    /* 招商码（G-A P0-2：首屏常驻卡收敛为折叠条，默认收起不占首屏；展开后生成/作废/分享功能不变） */
     var codes = d.agentCodes || [];
+    var activeCodes = codes.filter(function (c) { return c.status === "active"; }).length;
+    h += '<details class="v3-note-fold s4b-agfold"><summary>' + ui.icon("crown", 14) +
+      '<span class="sum">招商码（仅招二级）· 生效 ' + activeCodes + " / 共 " + codes.length + '</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
+      '<div class="fold-body" id="s4b-aglist">';
     if (!codes.length) {
       h += '<div class="v3-empty v3-ep24" >' + ui.emptyHtml("暂无招商码",
         ctx.canBoss ? '<button class="v3-btn v3-btn--navy v3-btn--sm" data-s4b="gen-ag">生成招商码</button>' : "", "crown") + "</div>";
@@ -301,7 +308,7 @@
       if (ctx.canBoss && !codes.some(function (c) { return c.status === "active"; }))
         h += '<button class="v3-sub-row" data-s4b="gen-ag"><span class="v3-row__main"><span class="v3-row__t v3-goldtext">+ 生成新招商码</span></span>' + ui.icon("chev", 17) + "</button>";
     }
-    h += "</section>";
+    h += "</div></details>";
 
     /* 发起二级合作 */
     var quotaFull = d.profile.used >= d.profile.cap;
@@ -345,10 +352,11 @@
     subs.forEach(function (s) {
       var cur = Math.round((s.ratioToSub || 0) * 100);
       var log = s.ratioLog || [];
+      /* G-A P1-5：进度条（滑块填充位）与头部金色"当前 X%"徽章重复 → 删徽章，保留滑块右侧实时数值（拖动联动反馈必需） */
       h += '<section class="v3-card s4b-cfg" data-id="' + s.id + '">' +
         '<div class="s4b-cfg__hd"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + "</span>" +
         '<span class="s4b-cfg__name">' + ui.esc(s.name) + "</span>" +
-        '<span class="v3-badge v3-badge--gold">当前 ' + cur + '%</span></div>' +
+        '<span class="v3-badge v3-badge--pending">约定所得</span></div>' +
         '<div class="v3-stepper s4b-slider"><input type="range" min="0" max="50" step="1" value="' + cur + '"' + (ctx.canBoss && !ctx.readonly ? "" : " disabled") + ' /><span class="val" data-v>' + cur + '%</span></div>' +
         '<div class="s4b-est">本月总盘（测算）<b class="num">' + ui.money(fin.gross) + "</b> → 该二级约定所得 ≈ <b class='num' data-est>" + ui.money(Math.round(fin.gross * cur / 100)) + "</b>（仅测算 · 不发钱）</div>" +
         (ctx.canBoss && !ctx.readonly
