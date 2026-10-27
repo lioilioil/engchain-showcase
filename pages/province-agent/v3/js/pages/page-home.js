@@ -1,521 +1,475 @@
-/* page-home.js · 省代工作台 #/home
-   【S3-E1-INDEX】身份卡只留 身份·公司·编号·有效期·状态徽章 + 角色徽章弹层 + 详情入口→#/profile；
-   待办列表条与三入口卡（对账差异/在途冻结/线索沉寂）已收口至消息中心（E4 接入），home 不重复渲染；
-   「邀请用户入驻」改为底部悬浮按钮（复刻 franchise .app-float-cta 视觉）。 */
+/* page-home.js · 省代工作台首页 / 合作管理(#/subs) / 分佣设置(#/share-config)
+   数据全部来自 store 种子；写操作经 act 守卫；演示数据统一标注"模拟测算"。 */
 (function () {
   "use strict";
-  var ui;
-  var fabWire = false;   /* hashchange 离场摘除监听仅挂一次 */
+  var P = window.V3PAGES = window.V3PAGES || {};
 
-  function render(ctx) {
-    ui = ctx.ui;
-    var V3 = ctx.V3, d = ctx.d, st = ctx.state;
-    /* 【S4-B】展示口径联动：比例显示值跟随 subs[0].ratioToSub（单二级 demo），
-       传入 subsList 启用多二级聚合；无二级时回退 financeBase 种子值。 */
-    var ratioDisp = (d.subs && d.subs.length) ? (d.subs[0].ratioToSub || 0) : d.financeBase.ratioToSub;
-    var fin = V3.store.calcFinance(Object.assign({}, d.financeBase, { ratioToSub: ratioDisp, subsList: d.subs }));
-    var fn = V3.store.funnelOf(d.leads);
-    var isEmpty = st.scenario === "empty";
+  function pct(r) { return Math.round(Number(r) * 100) + "%"; }
+  function roleName(by) { return by === "boss" ? "老板" : by === "staff" ? "员工" : by || "管理员"; }
+
+  /* ================= 首页 ================= */
+  function renderHome(ctx) {
+    var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
+    var fin = V3.store.calcFinance(d.financeBase, d.subs);
+    var todo = V3.store.todoOf(ctx.s);
+    var isEmpty = d.financeBase.gross === 0 && !d.subs.length && !d.subApps.length;
+
     var h = "";
-
-    /* 暂停只读横幅 */
+    /* 暂停条 */
     if (ctx.readonly) {
       h += '<div class="v3-lockbanner">' + ui.icon("lock", 18) +
-        '<div><b>账号已暂停 · 仅可查看</b><div class="v3-xs v3-mt2" style="color:#B9C4D4">发起邀请、登记付款、确认平账等操作已锁定，历史数据仍可查阅。</div></div></div>';
+        "<div><b>合作权限已暂停（仅可查看）</b><div class=\"v3-xs\">数据、审批、发码与登记动作均已锁定，请联系平台处理</div></div></div>";
     }
 
-    /* 身份卡（L1 深色全宽色带）：只留 身份·公司·编号·有效期·状态徽章；
-       角色徽章点击弹层说明权限边界；「身份详情 ›」→ #/profile */
-    var stCls = d.profile.status === "active" ? "on" : "warn";
-    var stLabel = ui.ACCT[d.profile.status] || d.profile.status;
-    var roleLabel = ctx.role === "staff" ? "员工" : "老板 / 管理员";
-    h += '<section class="s-idcard">' +
-      '<span class="ic-status ' + stCls + '"><span class="pa2-hdot"></span>' + ui.esc(stLabel) + "</span>" +
-      '<span class="ic-eyebrow"><span class="tag">授权</span>省级总代</span>' +
-      '<h2 class="ic-name">' + ui.esc(d.profile.agentName) + "</h2>" +
-      '<p class="ic-desc">授权编号 <b>' + ui.esc(d.profile.authNo) + "<br/>有效期至 <b>" + ui.esc(d.profile.validTill) + "</b></p>" +
-      '<button type="button" class="ic-role" data-act="role">' +
-        '<span class="rb">' + ui.esc(roleLabel) + "</span><span class=\"rk\">权限说明</span>" + ui.icon("chev", 14) + "</button>" +
-      '<button type="button" class="ic-detail" data-go="#/profile">' +
-        "<span>身份详情</span>" + ui.icon("chev", 16) + "</button>" +
-      "</section>";
-
-    /* 财务大数字卡（segment 切换：总盘 / 自身线；明细静态呈现——【S4-B·F1】删除展开/收起动效） */
-    var ratioPct = Math.round(fin.ratioToSub * 100);
-    h += '<section class="v3-card v3-earn v3-mt12" >' +
-      '<div class="seg"><button data-fin="gross" class="on">总盘</button><button data-fin="self">自身线</button></div>' +
-      '<div class="v3-flex v3-between"><div><div class="big num" id="earn-big">' + ui.moneyD(fin.gross) + '</div>' +
-      '<div class="sub" id="earn-sub">本月总盘 = 合格消费 × 50%</div></div></div>' +
-      '<div class="rows" id="earn-rows">' +
-      dline("合格消费", ui.money(fin.eligible)) +
-      dline("约定给二级（" + ratioPct + "%）", ui.money(fin.agreed)) +
-      dline("省代自留", ui.money(fin.selfKeep)) +
-      dline("T+" + V3.store.CONST.frozenDays + " 在途冻结", ui.money(fin.frozen), "small") +
-      "</div></section>";
-
-    /* 邀请速览（一行横向数字流，纯展示；邀请动作唯一主入口 = 底部悬浮按钮 FAB） */
-    h += '<div class="section-head-row"><span class="t">邀请速览</span></div>';
-    h += '<section class="v3-card">' +
-      '<div class="pa2-funnel-line">' +
-        fstep("直接邀请", fn.direct) + farrow() +
-        fstep("已注册", fn.registered) + farrow() +
-        fstep("已入驻", fn.onboarded) + farrow() +
-        fstep("已消费", fn.paid) +
-      "</div>" +
-      '<div class="v3-stat-money v3-mt10" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额 · 仅统计不发钱</div>' +
-      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + '</div>' +
-      (fn.ignored ? '<div class="v3-note-line v3-mt9" >另有 ' + fn.ignored + " 位再邀请用户 · 不归属不分佣不传递</div>" : "") +
-      "</section>";
-
-    /* 合作管理（二级）— L3 通栏行；行内 chip 已并入详情 sheet（清单 B8） */
-    h += '<div class="section-head-row"><span class="t">合作管理 · 二级企业</span><span class="act" data-go="#/subs">全部 ›</span></div>';
-    h += '<section class="v3-sub-list">';
-    if (d.subs && d.subs.length) {
-      d.subs.forEach(function (s) {
-        h += '<button class="v3-sub-row" data-sub="' + s.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + '</span>' +
-          '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
-          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "") + " · 比例 " + Math.round((s.ratioToSub || 0) * 100) + '%</span></span>' +
-          '<span class="v3-row__right"><span class="v3-badge v3-badge--active">生效</span></span>' + ui.icon("chev", 18) + "</button>";
-      });
-    } else {
-      h += '<div class="v3-empty v3-ep26" >' + ui.emptyHtml("还没有二级企业",
-        '<div>名额 0 / ' + d.profile.cap + "，可在「二级管理」发起合作或邀请终端用户入驻。</div>",
-        "crown") + "</div>";
+    /* 身份条 */
+    if (ctx.isStaff) {
+      var me = (d.team || []).filter(function (m) { return m.name === ctx.s.roleStaffName; })[0] || { title: "渠道专员", name: ctx.s.roleStaffName };
+      h += '<div class="v3-idbar" data-go="#/settings" role="button"><div class="v3-idbar__main">' +
+        '<span class="v3-avatar v3-avatar--staff"><span class="v3-avatar__txt">' + ui.esc(me.name.slice(0, 1)) + "</span></span>" +
+        '<div class="v3-idbar__txt"><div class="v3-idbar__name">' + ui.esc(me.name) + '<span class="v3-badge v3-badge--active v3-ml6">员工</span></div>' +
+        '<div class="v3-idbar__sub">' + ui.esc(me.title || "渠道专员") + " · 所属 " + ui.esc(d.profile.name) + "</div></div></div>" +
+        '<div class="v3-idbar__right"><span class="v3-badge ' + ui.ACCT_BADGE[d.profile.status] + '">' + ui.ACCT[d.profile.status] + "</span>" +
+        ui.icon("chev", 14) + "</div></div>";
+      return h + staffHome(ctx, me);
     }
-    h += "</section>";
+    h += '<div class="v3-idbar" data-go="#/settings" role="button"><div class="v3-idbar__main">' +
+      '<span class="v3-avatar v3-avatar--boss">' + ui.icon("crown", 18) + "</span>" +
+      '<div class="v3-idbar__txt"><div class="v3-idbar__name">' + ui.esc(d.profile.name) + "</div>" +
+      '<div class="v3-idbar__sub">省级总代 · 编号 ' + ui.esc(d.profile.authNo) + "</div></div></div>" +
+      '<div class="v3-idbar__right"><span class="v3-badge ' + ui.ACCT_BADGE[d.profile.status] + '">' + ui.ACCT[d.profile.status] + "</span>" +
+      ui.icon("chev", 14) + "</div></div>";
 
-    /* 工作台导航已删除（运营规则/税务指引/授权徽章与 #/profile 重复 → profile 保留，home 删除；V1） */
-
-    h += '<div class="trust">润锦工程链 Engchain 3.0 · 原型数据均为 Mock</div>';
-
+    /* 空态 */
     if (isEmpty) {
-      // empty 场景：数据为 0 时仍正常渲染骨架，额外空态提示（邀请动作统一走底部悬浮按钮）
-      h = '<div class="v3-empty">' + ui.emptySvg("tray") +
-        '<div class="t">还没有任何邀请数据</div><div class="d">点击底部「邀请获客」悬浮按钮，生成你的第一个渠道码；也可发起二级合作。</div></div>' + h;
+      h += '<div class="v3-empty v3-empty--hero">' +
+        ui.emptyHtml("暂无经营数据", "<div>完成第一家二级合作或生成渠道码后，<br>这里将展示测算、待办与合作动态。</div>", "tray") +
+        (ctx.canBoss ? '<button class="v3-btn v3-btn--primary v3-btn--block" data-act="quick-apply">发起新二级合作</button>' : "") +
+        "</div>";
+      return h;
     }
-    return h;
-  }
 
-  function dline(k, v, cls) {
-    return '<div class="v3-dline"><span class="k">' + k + '</span><span class="v ' + (cls || "") + ' num">' + v + "</span></div>";
-  }
-  function fstep(k, v) {
-    return '<div class="fs"><span class="fv num">' + v + '</span><span class="fk">' + k + "</span></div>";
-  }
-  function farrow() { return '<span class="fa">' + ui.icon("chev", 12) + "</span>"; }
+    /* 财务卡（总盘 / 自身线；无时间 tabs） */
+    h += '<div class="v3-fin v3-fin--gold"><div class="v3-fin__top">' +
+      '<div class="v3-seg v3-seg--mini"><button class="on" data-fin="total">省代总盘</button>' +
+      '<button data-fin="self">自留测算</button></div>' +
+      '<span class="v3-fin__tag">2026-10 · 模拟测算</span></div>' +
+      '<div class="v3-fin__main"><span class="v3-fin__k">省代总盘（平台合格消费 50%）</span>' +
+      '<div class="v3-fin__num num" data-fin-num="total">' + ui.moneyD(fin.gross) + "</div>" +
+      '<div class="v3-fin__num num v3-fin__num--hide" data-fin-num="self">' + ui.moneyD(fin.selfKeepAll || 0) + "</div>" +
+      '<div class="v3-fin__rows">' +
+      '<div class="v3-fin__row"><span>约定给二级</span><b class="num">' + (fin.agreedAll == null ? "逐二级配置" : ui.money(fin.agreedAll)) + "</b></div>" +
+      '<div class="v3-fin__row"><span>T+7 冻结</span><b class="num">' + ui.money(fin.frozen) + "</b></div>" +
+      "</div></div>" +
+      '<div class="v3-fin__note">单盘模拟测算，最终以平台月度对账与双方确认数据为准</div></div>';
 
-  function mount(el, ctx) {
-    var V3 = ctx.V3, ui = ctx.ui, d = ctx.d;
-    var ratioDisp = (d.subs && d.subs.length) ? (d.subs[0].ratioToSub || 0) : d.financeBase.ratioToSub;
-    var fin = V3.store.calcFinance(Object.assign({}, d.financeBase, { ratioToSub: ratioDisp, subsList: d.subs }));
-
-    el.addEventListener("click", function (e) {
-      var goEl = e.target.closest("[data-go]");
-      if (goEl) { ctx.go(goEl.getAttribute("data-go")); return; }
-      if (e.target.closest("[data-act='role']")) { permSheet(ctx); return; }
-      var sub = e.target.closest("[data-sub]");
-      if (sub) {
-        var id = sub.getAttribute("data-sub");
-        var s = d.subs.filter(function (x) { return x.id === id; })[0];
-        if (s) openSub(s, ctx);
-      }
-    });
-
-    /* 【S4-B·F1】删除「查看明细/收起明细」展开收起动效——明细静态呈现，无 toggle */
-
-    /* 财务 segment */
-    var big = el.querySelector("#earn-big"), sub = el.querySelector("#earn-sub"), rows = el.querySelector("#earn-rows");
-    Array.prototype.forEach.call(el.querySelectorAll("[data-fin]"), function (b) {
-      b.addEventListener("click", function () {
-        if (b.classList.contains("on")) return;
-        el.querySelectorAll("[data-fin]").forEach(function (x) { x.classList.remove("on"); });
-        b.classList.add("on");
-        if (b.getAttribute("data-fin") === "self") {
-          big.innerHTML = ui.moneyD(fin.selfLine);
-          sub.textContent = "自身线 = 自身合格消费 × 50%（独立，不与总盘相加）";
-          rows.innerHTML = dline("自身合格消费", ui.money(d.financeBase.selfBase || 0)) +
-            dline("自身线比例", "50%") + dline("自身线经营所得", ui.money(fin.selfLine)) +
-            dline("T+" + V3.store.CONST.frozenDays + " 在途冻结", ui.money(fin.frozen), "small");
-        } else {
-          big.innerHTML = ui.moneyD(fin.gross);
-          sub.textContent = "本月总盘 = 合格消费 × 50%";
-          rows.innerHTML = dline("合格消费", ui.money(fin.eligible)) +
-            dline("约定给二级（" + Math.round(fin.ratioToSub * 100) + "%）", ui.money(fin.agreed)) +
-            dline("省代自留", ui.money(fin.selfKeep)) +
-            dline("T+" + V3.store.CONST.frozenDays + " 在途冻结", ui.money(fin.frozen), "small");
-        }
+    /* 待办（单源派生，可直达） */
+    if (todo.items.length) {
+      h += '<div class="v3-sec-title">待办</div><div class="v3-stack">';
+      todo.items.forEach(function (it) {
+        h += '<div class="v3-msg v3-msg--link" data-go="' + it.to + '">' +
+          '<span class="v3-msg__ic v3-msg__ic--' + it.type + '">' + ui.icon(it.icon, 16) + "</span>" +
+          '<div class="v3-msg__bd"><div class="v3-msg__t">' + ui.esc(it.t) + "</div>" +
+          '<div class="v3-msg__d">' + ui.esc(it.s) + "</div></div>" +
+          '<span class="v3-msg__go">' + ui.icon("chev", 14) + "</span></div>";
       });
-    });
-
-    mountFab(ctx);
-  }
-
-  /* 底部悬浮按钮（复刻 franchise .app-float-cta：玻璃容器 + 图标 + 短文案） */
-  function mountFab(ctx) {
-    var ui = ctx.ui;
-    var phone = document.querySelector(".phone");
-    if (!phone) return;
-    var old = document.getElementById("e1-fab");
-    if (old) old.remove();
-    var fab = document.createElement("div");
-    fab.className = "app-float-cta";
-    fab.id = "e1-fab";
-    fab.setAttribute("data-lg-glass", "");
-    fab.innerHTML =
-      '<button type="button" class="afc-item" id="e1-fab-btn">' + ui.icon("invite", 18) +
-      '<span class="afc-label">邀请获客</span></button>';
-    phone.appendChild(fab);
-    fab.querySelector("#e1-fab-btn").addEventListener("click", function () {
-      if (ctx.readonly) { ui.toast("账号暂停中，仅可查看", "err"); return; }
-      ctx.go("#/invite");
-    });
-    /* 离场摘除：离开 home 即移除悬浮按钮（只挂一次 hashchange） */
-    if (!fabWire) {
-      fabWire = true;
-      window.addEventListener("hashchange", function () {
-        var k = (location.hash || "#/home").replace(/^#\/?/, "").split("?")[0];
-        if (k !== "home") { var f = document.getElementById("e1-fab"); if (f) f.remove(); }
-      });
-    }
-  }
-
-  /* 权限说明弹层（角色徽章 → 权限边界说明） */
-  function permSheet(ctx) {
-    var isStaff = ctx.role === "staff";
-    ctx.ui.openSheet({
-      title: "权限说明 · " + (isStaff ? "员工" : "老板 / 管理员"),
-      body: isStaff
-        ? '<div class="dl">' +
-          kv("可操作", "生成邀请码、跟进线索、登记线下付款并上传凭证") +
-          kv("不可操作", "确认到账 / 月度平账、配置二级比例、签署协议、查看自留收益、全量导出") +
-          kv("可见范围", "仅本人名下线索") + "</div>"
-        : '<div class="dl">' +
-          kv("可操作", "邀请获客、发起二级合作与初审、登记付款、确认到账、月度平账留痕") +
-          kv("收益可见", "总盘 / 自身线 / 自留收益全量可见") +
-          kv("配置范围", "二级比例在平台配置 + O4 协议范围内设定") + "</div>",
-      footer: [{ t: "关闭", kind: "v3-btn--ghost" }]
-    });
-  }
-
-  function openSub(s, ctx) {
-    var ui = ctx.ui;
-    var fin = ctx.V3.store.calcFinance(ctx.d.financeBase);
-    ui.openSheet({
-      title: "二级企业 · 授权详情",
-      body: '<div class="dl">' +
-        kv("企业名称", ui.esc(s.name)) + kv("合作起始", ui.esc(s.since || "—")) +
-        kv("约定所得比例", Math.round((s.ratioToSub || 0) * 100) + "%（平台配置 + O4 协议）") +
-        kv("本月该二级总盘（测算）", ui.money(fin.gross)) +
-        kv("本月约定所得（测算）", ui.money(Math.round(fin.gross * (s.ratioToSub || 0)))) +
-        kv("邀请终端用户", "允许（单层绑定）") + kv("发展下级企业", "永久禁止（两级封顶）") +
-        "</div>" +
-        '<div class="sub-scope v3-mt12" >该二级可直接邀请终端用户并据此计本人线；' +
-        "终端用户再邀请不归属、不分佣、不向下传递；二级无招商码。</div>" +
-        '<p class="v3-legal v3-mt10" >' + ctx.V3.MONEY_NOTE + "</p>",
-      footer: ctx.canBoss
-        ? [{ t: "关闭", kind: "v3-btn--ghost" },
-           { t: "分成配置 ›", kind: "v3-btn--primary", onClick: function () { ctx.go("#/share-config"); } }]
-        : [{ t: "关闭", kind: "v3-btn--ghost", onClick: function (ov) { ctx.ui.closeAll(); } }]
-    });
-  }
-  function kv(k, v) { return '<span class="k">' + k + '</span><span class="v">' + v + "</span>"; }
-
-  window.V3PAGES.home = { title: "工作台", render: render, mount: mount };
-
-  /* ============================================================
-     【S4-B·F4】二级管理 #/subs + 分成配置 #/share-config
-     - 由「邀请获客」拆分迁入：发展二级企业 / 二级列表 / 状态管理 / 分成配置统一在此；
-       #/invite 仅保留自身获客（终端用户邀请、线索、转化、交易跟踪）。
-     - 注册时机：page-home.js 晚于 router.js 加载，可覆盖 S2 stub 占位。
-     ============================================================ */
-  function segBar(active) {
-    return '<div class="v3-subseg s4b-subseg">' +
-      '<button type="button" class="v3-seg' + (active === "subs" ? " active" : "") + '" data-key="subs">二级列表</button>' +
-      '<button type="button" class="v3-seg' + (active === "share-config" ? " active" : "") + '" data-key="share-config">分成配置</button></div>';
-  }
-  function wireSegBar(el) {
-    var bar = el.querySelector(".s4b-subseg");
-    if (bar) bar.addEventListener("click", function (e) {
-      var b = e.target.closest(".v3-seg"); if (!b) return;
-      window.V3.router.go("#/" + b.getAttribute("data-key"));
-    });
-  }
-
-  /* ---------- #/subs 二级列表（含招商码 / 发起二级 / 待初审） ---------- */
-  function renderSubs(ctx) {
-    var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
-    var h = segBar("subs");
-    var pend = (d.subApps || []).filter(function (a) { return a.status === "pending"; });
-    /* G-A P0-2：三列统计大数字卡收敛为一行「在管总览」——每个数字都带上下文标签（V5 数据克制、无孤立数字） */
-    var curMonth = (d.calc1 && d.calc1[0] && d.calc1[0].month) || "";
-    var newThisMonth = (d.subApps || []).filter(function (a) {
-      return !!curMonth && String(a.createdAt || "").indexOf(curMonth) === 0;
-    }).length;
-    h += '<div class="section-head-row"><span class="t">在管总览</span>' +
-      '<span class="s4b-overv num">在管 ' + (d.subs || []).length + " 家 · 待初审 " + pend.length +
-      " · 本月新增 " + newThisMonth + "</span></div>";
-
-    /* 待办型分区（待初审，操作态样式）置顶 */
-    if (pend.length) {
-      h += '<div class="section-head-row"><span class="t">待办 · 二级申请初审 ' + pend.length + "</span></div>";
-      h += '<div class="v3-sub-list s4b-board--todo" style="border-radius:17px" id="s4b-apps">';
-      h += pend.map(function (a) {
-        return '<button class="v3-sub-row" data-s4b="app" data-id="' + a.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(a.entName.slice(0, 1)) + "</span>" +
-          '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(a.entName) +
-          ' <span class="v3-badge v3-badge--pending">待初审</span></span>' +
-          '<span class="v3-row__s">' + ui.esc(a.contact) + " " + ui.esc(a.phone) + " · 申请比例 " + Math.round(a.ratioToSub * 100) + "%</span></span>" +
-          ui.icon("chev", 17) + "</button>";
-      }).join("");
       h += "</div>";
     }
 
-    /* 信息型分区（已合作，信息态样式，与待办型视觉区分） */
-    h += '<div class="section-head-row"><span class="t">信息 · 已合作二级企业</span></div>';
-    h += '<div class="v3-sub-list s4b-board--info" style="border-radius:17px" id="s4b-sublist">';
-    if (d.subs && d.subs.length) {
-      h += d.subs.map(function (s) {
-        return '<button class="v3-sub-row" data-s4b="sub" data-id="' + s.id + '"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + "</span>" +
+    /* 合作管理预览 */
+    h += '<div class="v3-sec-title v3-sec-title--bar"><span>合作管理</span>' +
+      '<button class="v3-textbtn" data-go="#/subs">全部 ›</button></div>';
+    h += '<div class="v3-card v3-card--pad v3-stack-narrow">';
+    if (!d.subs.length) {
+      h += '<div class="v3-placeholder">暂无生效中的二级合作</div>';
+    } else {
+      d.subs.slice(0, 2).forEach(function (s) {
+        h += '<button class="v3-sub-row" data-act="open-sub" data-id="' + s.id + '">' +
+          '<span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 19) + "</span>" +
           '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
-          '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + " · 比例 " + Math.round((s.ratioToSub || 0) * 100) + '%</span></span>' +
-          '<span class="v3-row__right">' +
-          (s.status === "active" ? '<span class="v3-badge v3-badge--active">生效</span>' : '<span class="v3-badge v3-badge--suspended">' + ui.ACCT[s.status] + "</span>") +
-          "</span>" + ui.icon("chev", 18) + "</button>";
-      }).join("");
-    } else {
-      h += '<div class="v3-empty v3-ep26" >' + ui.emptyHtml("还没有二级企业", "通过下方「发起新的二级合作」提交申请，审核通过后成为在管二级。", "crown") + "</div>";
+          '<span class="v3-row__s">约定比例 ' + pct(s.ratioToSub) + " · 合作自 " + ui.esc(s.since || "—") + "</span></span>" +
+          '<span class="v3-row__right"><span class="v3-badge ' + ui.ACCT_BADGE[s.status] + '">' + ui.ACCT[s.status] + "</span>" +
+          ui.icon("chev", 16) + "</span></button>";
+      });
     }
     h += "</div>";
 
-    /* 招商码（G-A P0-2：首屏常驻卡收敛为折叠条，默认收起不占首屏；展开后生成/作废/分享功能不变） */
-    var codes = d.agentCodes || [];
-    var activeCodes = codes.filter(function (c) { return c.status === "active"; }).length;
-    h += '<details class="v3-note-fold s4b-agfold"><summary>' + ui.icon("crown", 14) +
-      '<span class="sum">招商码（仅招二级）· 生效 ' + activeCodes + " / 共 " + codes.length + '</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body" id="s4b-aglist">';
-    if (!codes.length) {
-      h += '<div class="v3-empty v3-ep24" >' + ui.emptyHtml("暂无招商码",
-        ctx.canBoss ? '<button class="v3-btn v3-btn--navy v3-btn--sm" data-s4b="gen-ag">生成招商码</button>' : "", "crown") + "</div>";
-    } else {
-      h += codes.map(function (c) {
-        return '<div class="v3-sub-row"><span class="v3-avatar v3-avatar--sub">' + ui.icon("crown", 19) + "</span>" +
-          '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(c.code) +
-          (c.status === "active" ? ' <span class="v3-badge v3-badge--active">生效</span>' : ' <span class="v3-badge v3-badge--void">已作废</span>') +
-          '</span><span class="v3-row__s">招商专用 · 创建 ' + ui.esc(c.createdAt) + "</span></span>" +
-          (c.status === "active" && ctx.canBoss ? '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-s4b="void-ag" data-id="' + c.id + '">作废</button>' : "") +
-          (c.status === "active" && ctx.canBoss ? '<button class="v3-btn v3-btn--navy v3-btn--sm" data-s4b="ag-share" data-id="' + c.id + '">分享</button>' : "") +
-          "</div>";
-      }).join("");
-      if (ctx.canBoss && !codes.some(function (c) { return c.status === "active"; }))
-        h += '<button class="v3-sub-row" data-s4b="gen-ag"><span class="v3-row__main"><span class="v3-row__t v3-goldtext">+ 生成新招商码</span></span>' + ui.icon("chev", 17) + "</button>";
-    }
-    h += "</div></details>";
+    /* 最近动态（真实派生） */
+    h += '<div class="v3-sec-title">最近动态</div><div class="v3-card v3-card--pad v3-stack-narrow">' +
+      activityRows(ctx).join("") + "</div>";
 
-    /* 发起二级合作 */
-    var quotaFull = d.profile.used >= d.profile.cap;
-    h += '<div class="section-head-row"><span class="t">发起二级合作</span></div>';
-    h += '<section class="v3-card"><div class="v3-flex v3-between v3-mb8" ><span class="v3-sm v3-muted">名额（已入驻 / 上限）</span>' +
-      '<span class="v3-strong num">' + d.profile.used + " / " + d.profile.cap + "</span></div>" +
-      '<div class="v3-progress v3-mb12" ><i style="width:' + Math.round(d.profile.used / d.profile.cap * 100) + '%"></i></div>';
-    if (ctx.readonly) {
-      h += '<button class="v3-btn v3-btn--block is-disabled">账号暂停中，不可发起</button>';
-    } else if (!ctx.canBoss) {
-      h += '<button class="v3-btn v3-btn--block is-disabled">仅法人 / 管理员可发起二级</button>';
-    } else if (quotaFull) {
-      h += '<button class="v3-btn v3-btn--block is-disabled">名额已满</button>' +
-        '<div class="v3-alert v3-alert--warn v3-mt10" >名额已满；仍可继续邀请终端用户入驻（获客不限名额）。</div>';
-    } else {
-      h += '<button class="v3-btn v3-btn--navy v3-btn--block" data-s4b="new-app">+ 发起新的二级合作</button>';
-    }
-    h += "</section>";
     return h;
   }
 
-  /* ---------- #/share-config 分成配置（可操作 UI + 落 store + 联动测算） ---------- */
-  function renderShareConfig(ctx) {
-    var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
-    var fin = V3.store.calcFinance(d.financeBase);
-    var h = segBar("share-config");
-    /* C-02 常驻说明卡 → 页尾折叠（V1 同一说明只占一处、默认收起；内容不删只改承载） */
-    h += '<details class="v3-note-fold v3-my12"><summary>' + ui.icon("shield", 15) +
-      '<span class="sum">约定所得比例说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">区间 <b>0–50%</b>（平台配置 + O4 协议内）；比例按二级逐个配置，保存后立即联动财务测算与留痕；历史协议条款为签署只读，变更后建议与二级补签约定。</div></details>';
-    if (ctx.readonly) h += '<div class="v3-alert v3-alert--warn v3-mb12" >账号暂停中：仅可查看，不可配置。</div>';
-    if (!ctx.canBoss) h += '<div class="v3-alert v3-alert--warn v3-mb12" >仅老板 / 管理员可配置二级比例。</div>';
-
-    var subs = d.subs || [];
-    if (!subs.length) {
-      h += '<div class="v3-empty v3-ep28" >' + ui.emptyHtml("暂无可配置的二级企业", "先在「二级列表」发起并通过初审后，再在此配置约定所得比例。", "crown") + "</div>";
-      return h;
-    }
-    h += '<div class="section-head-row"><span class="t">逐个配置约定所得比例</span></div>';
-    h += '<div id="s4b-cards">';
-    subs.forEach(function (s) {
-      var cur = Math.round((s.ratioToSub || 0) * 100);
-      var log = s.ratioLog || [];
-      /* G-A P1-5：进度条（滑块填充位）与头部金色"当前 X%"徽章重复 → 删徽章，保留滑块右侧实时数值（拖动联动反馈必需） */
-      h += '<section class="v3-card s4b-cfg" data-id="' + s.id + '">' +
-        '<div class="s4b-cfg__hd"><span class="v3-avatar v3-avatar--sub">' + ui.esc(s.name.slice(0, 1)) + "</span>" +
-        '<span class="s4b-cfg__name">' + ui.esc(s.name) + "</span>" +
-        '<span class="v3-badge v3-badge--pending">约定所得</span></div>' +
-        '<div class="v3-stepper s4b-slider"><input type="range" min="0" max="50" step="1" value="' + cur + '"' + (ctx.canBoss && !ctx.readonly ? "" : " disabled") + ' /><span class="val" data-v>' + cur + '%</span></div>' +
-        '<div class="s4b-est">本月总盘（测算）<b class="num">' + ui.money(fin.gross) + "</b> → 该二级约定所得 ≈ <b class='num' data-est>" + ui.money(Math.round(fin.gross * cur / 100)) + "</b>（仅测算 · 不发钱）</div>" +
-        (ctx.canBoss && !ctx.readonly
-          ? '<button class="v3-btn v3-btn--navy v3-btn--block v3-mt10" data-s4b="save-ratio">保存该二级比例</button>'
-          : "") +
-        '<div class="s4b-log"><div class="t">变更留痕' + (s.ratioUpdatedAt ? "（最近 " + ui.esc(s.ratioUpdatedAt) + "）" : "") + '</div>' +
-        (log.length
-          ? log.slice().reverse().slice(0, 6).map(function (r) {
-              return '<div class="li"><span class="at">' + ui.esc(r.at) + '</span><span class="ch num">' + Math.round(r.from * 100) + '% → ' + Math.round(r.to * 100) + '%</span><span class="by">' + (r.by === "staff" ? "员工" : "管理员") + '</span></div>';
-            }).join("")
-          : '<div class="li faint">暂无变更记录（沿用发起时约定比例）</div>') + "</div></section>";
+  /* ================= 员工视角首页（仅本人渠道数据） ================= */
+  function staffHome(ctx, me) {
+    var ui = ctx.ui, d = ctx.d, name = me.name;
+    var ownCodes = [];
+    ["direct", "agent"].forEach(function (ch) {
+      (d.channels[ch] || []).forEach(function (c) {
+        if (c.ownerType === "staff" && c.ownerName === name) ownCodes.push(c);
+      });
     });
-    h += "</div>";
+    var ownLeads = [];
+    ["direct", "agent"].forEach(function (ch) {
+      (d.leads[ch] || []).forEach(function (l) { if (l.owner === name) ownLeads.push(l); });
+    });
+    var users = ownCodes.reduce(function (s, c) { return s + (c.users || 0); }, 0);
+    var paid = ownLeads.filter(function (l) { return l.stage === "paid" || l.stage === "repaid"; }).length;
+    var amount = ownLeads.reduce(function (s, l) { return s + (l.amount || 0); }, 0);
+    var activeCode = ownCodes.filter(function (c) { return c.status === "active"; })[0];
+
+    var h = "";
+    h += '<div class="v3-sec-title">我的获客</div>';
+    h += '<div class="v3-card v3-card--pad v3-staff-card">' +
+      '<div class="v3-stats"><div class="v3-stat"><b class="num">' + users + "</b><span>已注册用户</span></div>" +
+      '<div class="v3-stat"><b class="num">' + ownLeads.length + "</b><span>已跟进线索</span></div>" +
+      '<div class="v3-stat"><b class="num">' + paid + "</b><span>已消费</span></div></div>" +
+      '<div class="v3-kv"><span class="k">名下合格消费</span><span class="v num">' + ui.money(amount) + "</span></div>" +
+      (activeCode ? '<div class="v3-kv"><span class="k">本人渠道码</span><span class="v num">' + ui.esc(activeCode.code) + "</span></div>" : "") +
+      '<div class="v3-actions v3-mt12"><button class="v3-btn v3-btn--primary v3-btn--block" data-go="#/invite">' +
+      ui.icon("qr", 16) + " 进入我的获客</button></div></div>";
+
+    h += '<div class="v3-sec-title">快捷入口</div><div class="v3-card v3-card--pad v3-stack-narrow">' +
+      '<button class="v3-row" data-go="#/invite"><span class="v3-row__main">' + ui.icon("qr", 18) + "<span>渠道码与海报</span></span>" + ui.icon("chev", 15) + "</button>" +
+      '<button class="v3-row" data-go="#/team"><span class="v3-row__main">' + ui.icon("users", 18) + "<span>团队成员</span></span>" + ui.icon("chev", 15) + "</button></div>";
+
+    h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ui.icon("shield", 15) + "<span>员工权限说明</span></div>" +
+      '<div class="v3-legal-body"><p>员工仅可操作<b>本人渠道码</b>与<b>本人渠道线索</b>（发码、跟进、更新阶段）。</p>' +
+      "<p>付款登记、对账确认、平账、合作审批、协议签署与分佣配置仅老板可执行；页面不展示全量财务数据。</p></div></div>";
     return h;
   }
 
-  /* ---------- subs / share-config 共用 sheet（自邀请获客页迁入） ---------- */
-  function subsPosterSheet(ctx, c, isAg) {
-    var ui = ctx.ui, code = (c && c.code) || "——";
-    ctx.ui.openSheet({
-      title: isAg ? "招商码海报" : "渠道码海报 · 分享",
-      body: '<div class="v3-poster"><div class="pt">入驻润锦工程链<br/>工程信息 · 一站直达</div>' +
-        '<div class="ps">' + (isAg ? "诚邀优质工程服务企业成为区域合作伙伴" : "服务与权益有保障") + "</div>" +
-        '<div class="pq"><div class="v3-qr"></div></div><div class="pc">' + ui.esc(code) + "</div></div>" +
-        '<div class="iv-codeline v3-mt12" >' + ui.esc(code) + "</div>" +
-        '<p class="v3-legal v3-mt12" style="text-align:center">二维码为原型占位；分享 / 复制为 Mock 演示。</p>',
-      footer: [{ t: "完成", kind: "v3-btn--primary", onClick: function () { ctx.ui.closeAll(); } }]
-    });
-  }
-  function subsNewAppSheet(ctx, done) {
+  function activityRows(ctx) {
     var ui = ctx.ui, d = ctx.d;
-    ctx.ui.openSheet({
-      title: "发起二级合作",
+    var rows = [];
+    d.subApps.forEach(function (a) {
+      if (a.status === "pending") rows.push({ at: a.submittedAt, ic: "file-text", type: "info", t: a.name + " 提交合作申请", s: "约定比例 " + pct(a.ratio) + "，待审批", to: "#/subs" });
+      if (a.status === "rejected") rows.push({ at: a.handledAt || "", ic: "x-circle", type: "danger", t: a.name + " 合作申请已驳回", s: a.rejectReason || "", to: "#/subs" });
+      if (a.status === "approved") rows.push({ at: a.handledAt || "", ic: "check-circle", type: "ok", t: a.name + " 已成为二级合作", s: "合作自 " + a.handledAt, to: "#/subs" });
+    });
+    d.subs.forEach(function (s) {
+      rows.push({ at: s.since, ic: "badge", type: "info", t: s.name + " 开始合作", s: "约定比例 " + pct(s.ratioToSub), to: "#/subs" });
+    });
+    d.payRegs1.forEach(function (r) {
+      if (r.status === "disputed") rows.push({ at: r.disputedAt || "", ic: "warn", type: "danger", t: "与平台对账存在异议", s: r.reason || "待核实", to: "#/reconcile" });
+    });
+    d.payRegs2.forEach(function (r) {
+      if (r.status === "pending_confirm") rows.push({ at: r.createdAt || "", ic: "clock", type: "warn", t: "二级收款待确认", s: ui.money(r.amount) + " · 出账第 " + (r.dueDay || 0) + " / 15 天", to: "#/reconcile" });
+    });
+    rows.sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); });
+    return rows.slice(0, 5).map(function (r) {
+      return '<div class="v3-actrow" data-go="' + r.to + '">' +
+        '<span class="v3-actrow__ic v3-msg__ic--' + r.type + '">' + ui.icon(r.ic, 15) + "</span>" +
+        '<div class="v3-actrow__bd"><div class="v3-actrow__t">' + ui.esc(r.t) + "</div>" +
+        '<div class="v3-actrow__s">' + ui.esc(r.s) + "</div></div>" +
+        '<span class="v3-actrow__time">' + ui.esc(String(r.at || "").slice(5)) + "</span></div>";
+    });
+  }
+
+  /* ================= 合作管理 #/subs ================= */
+  function renderSubs(ctx) {
+    var ui = ctx.ui, d = ctx.d;
+    var h = '<div class="v3-page-head"><div class="v3-page-title">二级合作管理</div>' +
+      '<div class="v3-page-sub">合作申请、生效主体与约定比例配置</div></div>';
+    if (ctx.canBoss) {
+      h += '<button class="v3-btn v3-btn--primary v3-btn--block" data-act="create-app">' +
+        ui.icon("plus", 16) + " 发起新二级合作</button>";
+    }
+
+    var pending = d.subApps.filter(function (a) { return a.status === "pending"; });
+    var rejected = d.subApps.filter(function (a) { return a.status === "rejected"; });
+
+    h += '<div class="v3-sec-title">待审批（' + pending.length + "）</div>";
+    h += '<div class="v3-stack">';
+    if (!pending.length) h += '<div class="v3-placeholder">暂无待审批申请</div>';
+    pending.forEach(function (a) {
+      h += '<div class="v3-card v3-card--pad"><div class="v3-sub-row v3-sub-row--plain">' +
+        '<span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 18) + "</span>" +
+        '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(a.name) + "</span>" +
+        '<span class="v3-row__s">' + ui.esc(a.contact || "—") + " " + ui.esc(a.phone || "") + " · 提交于 " + ui.esc(a.submittedAt) + "</span>" +
+        '<span class="v3-row__s">申请比例 ' + pct(a.ratio) + "</span></span>" +
+        '<span class="v3-badge v3-badge--pending">待审批</span></div>' +
+        '<div class="v3-kv v3-mt8"><span class="k">统一社会信用代码</span><span class="v num">' + ui.esc(a.uscc) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(a.address || "—") + "</span></div>" +
+        (ctx.canBoss ? '<div class="v3-actions v3-actions--2 v3-mt12">' +
+          '<button class="v3-btn v3-btn--ghost v3-btn--danger" data-act="reject-app" data-id="' + a.id + '">驳回</button>' +
+          '<button class="v3-btn v3-btn--primary" data-act="approve-app" data-id="' + a.id + '">通过</button></div>' : "") +
+        "</div>";
+    });
+    h += "</div>";
+
+    h += '<div class="v3-sec-title">生效中（' + d.subs.length + "）</div><div class=\"v3-stack\">";
+    if (!d.subs.length) h += '<div class="v3-placeholder">暂无生效中合作</div>';
+    d.subs.forEach(function (s) {
+      h += '<div class="v3-card v3-card--pad"><button class="v3-sub-row v3-sub-row--plain" data-act="open-sub" data-id="' + s.id + '">' +
+        '<span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 18) + "</span>" +
+        '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
+        '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + " · 约定 " + pct(s.ratioToSub) + "</span></span>" +
+        '<span class="v3-row__right"><span class="v3-badge ' + ui.ACCT_BADGE[s.status] + '">' + ui.ACCT[s.status] + "</span>" +
+        ui.icon("chev", 16) + "</span></button>" +
+        (ctx.canBoss ? '<div class="v3-actions v3-mt12">' +
+          '<button class="v3-btn v3-btn--ghost v3-btn--block" data-act="set-ratio" data-id="' + s.id + '">配置约定比例</button>' +
+          '<button class="v3-btn v3-btn--ghost v3-btn--block" data-act="resend-ag" data-id="' + s.id + '">重新发起协议</button></div>' : "") +
+        "</div>";
+    });
+    h += "</div>";
+
+    if (rejected.length) {
+      h += '<div class="v3-sec-title">已驳回（' + rejected.length + "）</div><div class=\"v3-stack\">";
+      rejected.forEach(function (a) {
+        h += '<div class="v3-card v3-card--pad"><div class="v3-sub-row v3-sub-row--plain">' +
+          '<span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 18) + "</span>" +
+          '<span class="v3-row__main"><span class="v3-row__t v3-row__t--mute">' + ui.esc(a.name) + "</span>" +
+          '<span class="v3-row__s">驳回原因：' + ui.esc(a.rejectReason || "—") + "</span></span>" +
+          '<span class="v3-badge v3-badge--terminated">已驳回</span></div></div>';
+      });
+      h += "</div>";
+    }
+    return h;
+  }
+
+  /* ================= 分佣设置 #/share-config ================= */
+  function renderShareConfig(ctx) {
+    var ui = ctx.ui, d = ctx.d;
+    var h = '<div class="v3-page-head"><div class="v3-page-title">约定比例配置</div>' +
+      '<div class="v3-page-sub">省代与二级企业的月度所得约定比例（0–50%）</div></div>';
+    h += '<div class="v3-stack">';
+    if (!d.subs.length) h += '<div class="v3-placeholder">暂无可配置的二级合作</div>';
+    d.subs.forEach(function (s) {
+      h += '<div class="v3-card v3-card--pad">' +
+        '<div class="v3-sub-row v3-sub-row--plain"><span class="v3-avatar v3-avatar--sub">' + ui.icon("building", 18) + "</span>" +
+        '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
+        '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + "</span></span></div>" +
+        '<div class="v3-share-num"><span class="num">' + pct(s.ratioToSub) + "</span><span>月度合格消费约定比例</span></div>" +
+        '<div class="v3-fin__note v3-mt8">按全省单盘测算口径，逐二级月度金额以平台对账为准。</div>' +
+        (ctx.canBoss ? '<button class="v3-btn v3-btn--ghost v3-btn--block v3-mt12" data-act="set-ratio" data-id="' + s.id + '">调整比例</button>' : "") +
+        "</div>";
+    });
+    h += "</div>";
+
+    h += '<div class="v3-sec-title">变更记录</div><div class="v3-card v3-card--pad v3-stack-narrow">';
+    if (!d.ratioLog || !d.ratioLog.length) h += '<div class="v3-placeholder">暂无变更记录</div>';
+    (d.ratioLog || []).slice(0, 8).forEach(function (l) {
+      h += '<div class="v3-actrow"><span class="v3-actrow__ic v3-msg__ic--info">' + ui.icon("history", 15) + "</span>" +
+        '<div class="v3-actrow__bd"><div class="v3-actrow__t">' + ui.esc(l.sub) + " · " + pct(l.from) + " → " + pct(l.to) + "</div>" +
+        '<div class="v3-actrow__s">' + ui.esc(l.note || "") + " · " + roleName(l.by) + "</div></div>" +
+        '<span class="v3-actrow__time">' + ui.esc(String(l.at || "").slice(5, 10)) + "</span></div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  /* ================= 弹层 ================= */
+  function createAppSheet(ctx) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "发起新二级合作",
       body:
-        '<div class="v3-field"><label>企业名称</label><input class="v3-input" id="a-name" placeholder="营业执照全称" /></div>' +
-        '<div class="v3-field"><label>统一社会信用代码</label><input class="v3-input" id="a-uscc" placeholder="18 位" /></div>' +
-        '<div class="v3-field"><label>联系人</label><input class="v3-input" id="a-contact" placeholder="姓名" /></div>' +
-        '<div class="v3-field"><label>联系手机</label><input class="v3-input" id="a-phone" type="tel" placeholder="11 位手机号" /></div>' +
-        '<div class="v3-field"><label>约定所得比例（0–50%，平台配置 + 协议内）</label>' +
-        '<div class="v3-stepper"><input type="range" id="a-ratio" min="0" max="50" step="1" value="20" /><span class="val" id="a-ratio-v">20%</span></div>' +
-        '<div class="v3-hint">获批后可在「分成配置」页逐个调整该比例。</div></div>' +
-        '<div class="v3-xs v3-muted">提交后进入待初审，名额占用将在审核通过后 +1（当前 ' + d.profile.used + "/" + d.profile.cap + "）。</div>",
+        '<div class="v3-field"><label>企业名称（必填）</label><input class="v3-input" id="ca-name" placeholder="如：成都某某工程有限公司"></div>' +
+        '<div class="v3-field"><label>统一社会信用代码（必填，18 位）</label><input class="v3-input" id="ca-uscc" maxlength="18" placeholder="18 位统一社会信用代码"></div>' +
+        '<div class="v3-field"><label>联系人</label><input class="v3-input" id="ca-contact" placeholder="联系人姓名"></div>' +
+        '<div class="v3-field"><label>联系电话</label><input class="v3-input" id="ca-phone" type="tel" maxlength="11" placeholder="11 位手机号"></div>' +
+        '<div class="v3-field"><label>企业地址</label><input class="v3-input" id="ca-address" placeholder="企业注册/经营地址"></div>' +
+        '<div class="v3-field"><label>约定比例（0–50%）</label>' +
+        '<div class="v3-ratio-pick"><input class="v3-input" id="ca-ratio" type="number" min="0" max="50" step="1" value="20"><span class="v3-ratio-pick__u">%</span></div></div>' +
+        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>提交后进入双方资质审核；合作以签署 O4 协议为准。</span></div>",
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
-        { t: "提交申请", kind: "v3-btn--navy", onClick: function (wrap) {
-          var name = wrap.querySelector("#a-name").value.trim(), uscc = wrap.querySelector("#a-uscc").value.trim(),
-              contact = wrap.querySelector("#a-contact").value.trim(), phone = wrap.querySelector("#a-phone").value.trim(),
-              ratio = Number(wrap.querySelector("#a-ratio").value) / 100;
-          if (!name || !uscc || !contact || !/^1\d{10}$/.test(phone)) { ui.toast("请完整填写企业与联系人信息", "err"); return false; }
-          if (d.profile.used >= d.profile.cap) { ui.toast("名额已满，不可再招二级", "err"); return false; }
-          ctx.V3.store.act("app/create", { entName: name, uscc: uscc, contact: contact, phone: phone, ratioToSub: ratio });
-          ui.toast("已提交，待初审", "ok"); done && done();
-        } }
-      ],
-      onMount: function (wrap) {
-        var r = wrap.querySelector("#a-ratio"), rv = wrap.querySelector("#a-ratio-v");
-        r.addEventListener("input", function () { rv.textContent = r.value + "%"; });
-      }
-    });
-  }
-  function subsAppSheet(ctx, a, done) {
-    if (!a) return;
-    var ui = ctx.ui;
-    if (!ctx.canBoss) {
-      ui.openSheet({ title: a.entName, body: "<div class='dl'>" +
-        '<span class="k">联系人</span><span class="v">' + ui.esc(a.contact) + " " + ui.esc(a.phone) + "</span>" +
-        '<span class="k">申请比例</span><span class="v">' + Math.round(a.ratioToSub * 100) + "%</span>" +
-        '<span class="k">状态</span><span class="v">待管理员初审</span></div>' +
-        '<div class="v3-readnote v3-mt12" >员工仅有查看权限，不能审批、不能配置比例。</div>',
-        footer: [{ t: "关闭", kind: "v3-btn--ghost" }] });
-      return;
-    }
-    ui.openSheet({
-      title: "二级申请 · 初审",
-      body: '<div class="dl">' +
-        '<span class="k">企业名称</span><span class="v">' + ui.esc(a.entName) + "</span>" +
-        '<span class="k">信用代码</span><span class="v">' + ui.esc(a.uscc) + "</span>" +
-        '<span class="k">联系人</span><span class="v">' + ui.esc(a.contact) + " " + ui.esc(a.phone) + "</span>" +
-        '<span class="k">申请比例</span><span class="v v3-goldtext">' + Math.round(a.ratioToSub * 100) + "%（需在 0–50% 与平台配置内）</span></span>" +
-        "</div>" +
-        '<div class="sh-sec">审批结论</div>' +
-        '<div class="v3-field v3-reveal" id="rej-box"><label>驳回原因（必填）</label>' +
-        '<textarea class="v3-textarea" id="a-reason" placeholder="如：资质材料不完整，请补充建筑业相关资质"></textarea></div>' +
-        '<div class="v3-xs v3-muted">通过后名额 +1，系统生成二级账号与 O4 协议；二级可直接邀终端用户，但不能再发展下级。</div>',
-      footer: [
-        { t: "驳回", kind: "v3-btn--danger", onClick: function (wrap) {
-          var reason = wrap.querySelector("#a-reason").value.trim();
-          if (!reason) { ui.toast("请填写驳回原因", "err"); return false; }
-          ctx.V3.store.act("app/review", { id: a.id, pass: false, reason: reason }); ui.toast("已驳回", "ok"); done && done();
-        } },
-        { t: "通过并生成协议", kind: "v3-btn--primary", onClick: function () {
-          ctx.V3.store.act("app/review", { id: a.id, pass: true }); ui.toast("已通过，名额 +1", "ok"); done && done();
+        { t: "提交申请", kind: "v3-btn--primary", onClick: function (wrap) {
+          var get = function (id) { return wrap.querySelector(id).value.trim(); };
+          var data = {
+            name: get("#ca-name"), uscc: get("#ca-uscc"), contact: get("#ca-contact"),
+            phone: get("#ca-phone"), address: get("#ca-address"), ratio: Number(get("#ca-ratio")) / 100
+          };
+          if (!data.name) { ui.toast("请填写企业名称", "err"); return false; }
+          if (!/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(data.uscc.toUpperCase())) { ui.toast("统一社会信用代码应为 18 位", "err"); return false; }
+          if (data.phone && !/^1\d{10}$/.test(data.phone)) { ui.toast("请输入正确的手机号", "err"); return false; }
+          var r = ctx.V3.store.act("app/create", { channel: "direct", data: data });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已提交合作申请", "ok");
+          ctx.V3.router.render();
         } }
       ]
     });
   }
 
-  /* ---------- 两个视图的 mount ---------- */
-  function mountSubs(el, ctx) {
-    var V3 = ctx.V3, ui = ctx.ui, d = ctx.d;
-    function refresh() { V3.router.render(); }
-    el.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-s4b]"); if (!b) return;
-      var act = b.getAttribute("data-s4b"), id = b.getAttribute("data-id");
-      if (act === "gen-ag") {
-        if (!ctx.canBoss) return ui.toast("仅管理员可生成招商码", "err");
-        V3.store.act("agent/gen", {}); ui.toast("招商码已生成", "ok"); refresh();
-      } else if (act === "ag-share") {
-        subsPosterSheet(ctx, (d.agentCodes || []).filter(function (c) { return c.id === id; })[0] || {}, true);
-      } else if (act === "void-ag") {
-        ctx.ui.openModal({
-          title: "作废该招商码？", icon: "warn", danger: true,
-          body: "作废后该码立即失效且不可恢复（仅留痕）。已通过该码进入审批流的申请不受影响。", okText: "确认作废",
-          onOk: function () { V3.store.act("agent/void", { id: id, reason: "主动作废" }); ui.toast("已作废", "ok"); refresh(); }
-        });
-      } else if (act === "new-app") {
-        if (ctx.readonly) return ui.toast("账号暂停中，仅可查看", "err");
-        subsNewAppSheet(ctx, refresh);
-      } else if (act === "app") {
-        subsAppSheet(ctx, (d.subApps || []).filter(function (x) { return x.id === id; })[0], refresh);
-      } else if (act === "sub") {
-        var s = (d.subs || []).filter(function (x) { return x.id === id; })[0];
-        if (s) openSub(s, ctx);
-      }
+  function reviewSheet(ctx, app) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "合作申请审批",
+      body:
+        '<div class="v3-kv"><span class="k">企业名称</span><span class="v">' + ui.esc(app.name) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">信用代码</span><span class="v num">' + ui.esc(app.uscc) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">联系人</span><span class="v">' + ui.esc(app.contact || "—") + " " + ui.esc(app.phone || "") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(app.address || "—") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">申请比例</span><span class="v">' + pct(app.ratio) + "</span></div>" +
+        '<div class="v3-readnote v3-mt8">' + ui.icon("shield", 13) + "<span>通过后自动生成合作协议，待二级企业登录后签署。</span></div>",
+      footer: [
+        { t: "驳回", kind: "v3-btn--danger", onClick: function (wrap) {
+          rejectReasonSheet(ctx, app);
+          return false;
+        } },
+        { t: "通过", kind: "v3-btn--primary", onClick: function () {
+          var r = ctx.V3.store.act("app/review", { id: app.id, pass: true });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已通过，协议已生成", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
     });
-    wireSegBar(el);
   }
-  function mountShareConfig(el, ctx) {
-    var V3 = ctx.V3, ui = ctx.ui, d = ctx.d;
-    var fin = V3.store.calcFinance(d.financeBase);
-    el.addEventListener("input", function (e) {
-      var r = e.target.closest(".s4b-slider input[type=range]"); if (!r) return;
-      var card = r.closest(".s4b-cfg");
-      if (card) {
-        var est = card.querySelector("[data-est]"), v = card.querySelector("[data-v]");
-        var pct = Number(r.value) / 100;
-        if (v) v.textContent = r.value + "%";
-        if (est) est.innerHTML = ui.money(Math.round(fin.gross * pct));
-      }
+  function rejectReasonSheet(ctx, app) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "驳回合作申请",
+      body: '<div class="v3-field"><label>驳回原因（必填，将对企业可见）</label>' +
+        '<textarea class="v3-textarea" id="rj-reason" placeholder="如：资质不符 / 经营范围不符"></textarea></div>' +
+        '<button class="v3-btn v3-btn--ghost v3-btn--block" data-quick="资质不符">资质不符（快捷填入）</button>',
+      onMount: function (wrap) {
+        var q = wrap.querySelector("[data-quick]");
+        if (q) q.addEventListener("click", function () { wrap.querySelector("#rj-reason").value = "资质不符"; });
+      },
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "确认驳回", kind: "v3-btn--danger", onClick: function (wrap) {
+          var reason = wrap.querySelector("#rj-reason").value.trim();
+          if (!reason) { ui.toast("请填写驳回原因", "err"); return false; }
+          var r = ctx.V3.store.act("app/review", { id: app.id, pass: false, reason: reason });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已驳回", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
     });
-    el.addEventListener("click", function (e) {
-      var save = e.target.closest('[data-s4b="save-ratio"]');
-      if (!save) return;
-      var card = save.closest(".s4b-cfg");
-      if (!card) return;
-      var id = card.getAttribute("data-id");
-      var ratio = Number(card.querySelector(".s4b-slider input").value) / 100;
-      if (isNaN(ratio) || ratio < V3.store.CONST.ratioMin || ratio > V3.store.CONST.ratioMax) {
-        ui.toast("比例需在 0–50% 区间", "err"); return;
-      }
-      var before = Math.round((((d.subs || []).filter(function (x) { return x.id === id; })[0] || {}).ratioToSub || 0) * 100);
-      V3.store.act("sub/setRatio", { id: id, ratio: ratio });
-      var after = Math.round(ratio * 100);
-      ui.toast("比例已保存 " + before + "% → " + after + "%，测算已联动", "ok");
-      V3.router.render();
-    });
-    wireSegBar(el);
   }
 
-  window.V3PAGES.subs = { title: "二级管理", render: renderSubs, mount: mountSubs };
-  window.V3PAGES["share-config"] = { title: "分成配置", render: renderShareConfig, mount: mountShareConfig };
+  function openSubSheet(ctx, s) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "合作企业详情",
+      body:
+        '<div class="v3-idcard"><div class="v3-idcard__hd">' +
+        '<span class="v3-avatar v3-avatar--sub v3-avatar--lg">' + ui.icon("building", 24) + "</span>" +
+        '<div><div class="v3-idcard__name">' + ui.esc(s.name) + "</div>" +
+        '<span class="v3-badge ' + ui.ACCT_BADGE[s.status] + '">' + ui.ACCT[s.status] + "</span></div></div>" +
+        '<div class="v3-kv v3-mt12"><span class="k">统一社会信用代码</span><span class="v num">' + ui.esc(s.uscc || "—") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">联系人</span><span class="v">' + ui.esc(s.contact || "—") + " " + ui.esc(s.phone || "") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(s.address || "—") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">合作起始</span><span class="v">' + ui.esc(s.since || "—") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">约定比例</span><span class="v">' + pct(s.ratioToSub) + "</span></div>" +
+        '<div class="v3-fin__note v3-mt8">该主体月度金额按全省单盘模拟测算，逐二级明细以平台月度对账为准。</div></div>',
+      footer: [
+        { t: "关闭", kind: "v3-btn--ghost" },
+        { t: "配置约定比例", kind: "v3-btn--primary", onClick: function () {
+          ui.closeAll();
+          ratioSheet(ctx, s);
+          return false;
+        } }
+      ]
+    });
+  }
+
+  function ratioSheet(ctx, s) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "调整约定比例 · " + s.name,
+      body:
+        '<div class="v3-field"><label>新约定比例（0–50%）</label>' +
+        '<div class="v3-ratio-pick"><input class="v3-input" id="rt-val" type="number" min="0" max="50" value="' + Math.round(s.ratioToSub * 100) + '"><span class="v3-ratio-pick__u">%</span></div></div>' +
+        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>比例变更后需与二级企业补签合作协议，演示将生成一条待办。</span></div>",
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "确认调整", kind: "v3-btn--primary", onClick: function (wrap) {
+          var v = Number(wrap.querySelector("#rt-val").value);
+          if (isNaN(v) || v < 0 || v > 50) { ui.toast("比例须在 0–50% 之间", "err"); return false; }
+          var r = ctx.V3.store.act("sub/setRatio", { id: s.id, ratio: v / 100, from: s.ratioToSub });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已调整，待补签协议", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
+    });
+  }
+
+  /* ================= 挂载 ================= */
+  function mountHome(el, ctx) {
+    el.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-act]");
+      if (!b) return;
+      var act = b.getAttribute("data-act");
+      if (act === "quick-apply" || act === "create-app") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可发起合作", "err");
+        createAppSheet(ctx);
+      } else if (act === "open-sub") {
+        var s = ctx.d.subs.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (s) openSubSheet(ctx, s);
+      } else if (act === "approve-app") {
+        var a = ctx.d.subApps.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (a) reviewSheet(ctx, a);
+      } else if (act === "reject-app") {
+        var ar = ctx.d.subApps.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (ar) rejectReasonSheet(ctx, ar);
+      } else if (act === "set-ratio") {
+        var sr = ctx.d.subs.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (sr) ratioSheet(ctx, sr);
+      } else if (act === "resend-ag") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可重新发起协议", "err");
+        resendAgreement(ctx);
+      }
+    });
+    /* 财务卡 seg */
+    var seg = el.querySelector("[data-fin]");
+    if (seg) {
+      el.querySelector(".v3-fin .v3-seg").addEventListener("click", function (ev) {
+        var btn = ev.target.closest("[data-fin]");
+        if (!btn) return;
+        Array.prototype.forEach.call(el.querySelectorAll("[data-fin]"), function (x) { x.classList.remove("on"); });
+        btn.classList.add("on");
+        var k = btn.getAttribute("data-fin");
+        el.querySelectorAll("[data-fin-num]").forEach(function (n) {
+          n.classList.toggle("v3-fin__num--hide", n.getAttribute("data-fin-num") !== k);
+        });
+        el.querySelector(".v3-fin__k").textContent = k === "total" ? "省代总盘（平台合格消费 50%）" : "自留测算（扣除约定给二级）";
+      });
+    }
+  }
+
+  function resendAgreement(ctx) {
+    var ui = ctx.ui;
+    ui.openModal({
+      icon: "file-text", title: "重新发起合作协议？",
+      body: "用于二级企业拒签或修订约定后重新发起；演示将生成一条留痕并通知二级企业重新查阅签署。",
+      okText: "确认重新发起",
+      onOk: function () {
+        var r = ctx.V3.store.act("agree/resend", {});
+        if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+        ui.toast("协议已重新发起（演示）", "ok");
+        ctx.V3.router.render();
+      }
+    });
+  }
+
+  function mountSubs(el, ctx) {
+    mountHome(el, ctx);
+  }
+
+  P.home = {
+    title: "工作台",
+    render: renderHome,
+    mount: mountHome,
+    fab: function (ctx) {
+      if (ctx.isStaff) {
+        ctx.fab([{ icon: "invite", label: "邀请用户", onClick: function (c) { c.go("#/invite"); } }]);
+        return;
+      }
+      ctx.fab([
+        { icon: "invite", label: "邀请用户", onClick: function (c) { c.go("#/invite"); } },
+        { icon: "plus", label: "招二级", onClick: function (c) { if (c.canBoss) c.go("#/subs"); else c.ui.toast("仅老板可发起合作", "err"); } }
+      ]);
+    }
+  };
+  P.subs = { title: "二级合作", render: renderSubs, mount: mountSubs, fab: function (ctx) {
+    if (ctx.canBoss) ctx.fab([{ icon: "plus", label: "发起合作", onClick: function () { createAppSheet(ctx); } }]);
+  } };
+  P["share-config"] = { title: "分佣设置", render: renderShareConfig, mount: mountSubs };
 })();

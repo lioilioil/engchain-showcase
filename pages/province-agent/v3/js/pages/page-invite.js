@@ -1,285 +1,369 @@
-/* page-invite.js · 邀请获客 #/invite
-   【S4-B·F4 职责拆分】本页 = 省代自身获客：邀请终端用户 / 渠道码 / 线索 / 转化与交易跟踪。
-   「发展二级企业 / 招商码 / 发起二级 / 初审 / 二级管理与分成配置」已迁至 #/subs 与 #/share-config。 */
+/* page-invite.js · 省代 邀请获客（渠道码·海报 / 邀请用户 / 转化分佣）
+   内部 seg 切换；员工（王敏）仅见本人渠道码与线索；写操作经 act 守卫。 */
 (function () {
   "use strict";
+  var P = window.V3PAGES = window.V3PAGES || {};
+  var curTab = "codes";
+  var curCh = null; /* 首次渲染按角色定：员工渠道码在招商分组 */
+  var roleSeen = null;
+  function chInit(ctx) {
+    if (roleSeen !== ctx.s.role) { roleSeen = ctx.s.role; curCh = ctx.isStaff ? "agent" : "direct"; }
+  }
+  function chipsHtml(ctx) {
+    return '<div class="v3-seg v3-seg--wrap"><button class="' + (curCh === "direct" ? "on" : "") + '" data-ch="direct">直接合作渠道</button><button class="' + (curCh === "agent" ? "on" : "") + '" data-ch="agent">招商渠道</button></div>';
+  }
 
-  function render(ctx) {
-    var ui = ctx.ui, d = ctx.d, V3 = ctx.V3;
-    var fn = V3.store.funnelOf(d.leads);
-    var h = "";
-
-    h += '<div class="iv-note">仅展示自身获客数据：渠道码、线索、转化与交易跟踪；发展二级企业请到「二级管理」。</div>';
-
-    /* 单层绑定说明 */
-    h += '<details class="v3-note-fold v3-my12"><summary>' + ui.icon("shield", 15) +
-      '<span class="sum">单层绑定说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body"><b>单层扁平绑定：</b>仅「企业 → 你直接邀请的用户」归属计佣；用户再邀请<b>不归属、不分佣、不传递</b>。终端用户无分佣码、无下线。</div></details>';
-
-    /* 渠道码 */
-    h += '<div class="section-head-row"><span class="t">我的渠道码</span>' +
-      '<span class="act" data-act="gen-channel">+ 生成渠道码</span></div>';
-    var chans = (d.channels || []).filter(function (c) { return c.status === "active"; });
-    if (chans.length) {
-      h += '<div class="v3-stack">';
-      chans.forEach(function (c, ci) {
-        h += '<div class="v3-codecard' + (ci > 0 ? " v3-codecard--plain" : "") + '"><div class="v3-qr"></div><div style="flex:1;min-width:0">' +
-          '<div class="v3-codebig v3-ellipsis">' + ui.esc(c.code) + '</div>' +
-          '<div class="v3-xs v3-muted v3-mt3" >' + ui.esc(c.ownerName) + " · " +
-          (c.src === "offline" ? "线下场景" : "微信场景") + '<br><span class="v3-nowrap">' + ui.esc(c.createdAt) + "</span></div></div>" +
-          '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="poster" data-id="' + c.id + '">海报/分享</button></div>';
+  function visibleChannels(ctx) {
+    var d = ctx.d;
+    var out = { direct: [], agent: [] };
+    ["direct", "agent"].forEach(function (ch) {
+      out[ch] = (d.channels[ch] || []).filter(function (c) {
+        if (ctx.isStaff) return c.ownerType === "staff" && c.ownerName === ctx.s.roleStaffName;
+        return true;
       });
+    });
+    return out;
+  }
+  function visibleLeads(ctx, ch) {
+    var list = (ctx.d.leads[ch] || []).filter(function (l) {
+      return ctx.isStaff ? l.owner === ctx.s.roleStaffName : true;
+    });
+    return list;
+  }
+  function copyText(text, ui) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { ui.toast("已复制", "ok"); }, function () { fallback(); });
+    } else fallback();
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); ui.toast("已复制", "ok"); } catch (e) { ui.toast("复制失败，请手动复制", "err"); }
+      document.body.removeChild(ta);
+    }
+  }
+
+  /* ---------- 段 1：渠道码 · 海报 ---------- */
+  function renderCodes(ctx) {
+    var ui = ctx.ui, d = ctx.d;
+    chInit(ctx);
+    var h = chipsHtml(ctx);
+
+    /* 招商码（招二级，仅 boss） */
+    if (!ctx.isStaff) {
+      var ag = d.agentCodes[curCh];
+      h += '<div class="v3-card v3-card--pad"><div class="v3-codehd">' +
+        '<span class="v3-codehd__t">招商码（招二级企业）</span>' +
+        '<span class="v3-badge ' + (ag.status === "active" ? "v3-badge--active" : "v3-badge--neutral") + '">' +
+        (ag.status === "active" ? "生效中" : ag.status === "void" ? "已作废" : "未生成") + "</span></div>";
+      if (ag.code) {
+        h += '<div class="v3-codenum num">' + ag.code + "</div>";
+        h += '<div class="v3-codeactions"><button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="copy" data-code="' + ag.code + '">' + ui.icon("link", 15) + " 复制链接</button>" +
+          '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="poster" data-code="' + ag.code + '">' + ui.icon("image", 15) + " 海报</button>";
+        if (ag.status === "active" && ctx.canBoss) h += '<button class="v3-btn v3-btn--ghost v3-btn--sm v3-btn--danger" data-act="void-agent" data-code="' + ag.code + '">作废</button>';
+        h += "</div>";
+      } else if (ctx.canBoss) {
+        h += '<div class="v3-placeholder">尚未生成招商码</div>' +
+          '<button class="v3-btn v3-btn--primary v3-btn--block" data-act="gen-agent">生成招商码</button>';
+      }
       h += "</div>";
-    } else {
-      h += '<div class="v3-placeholder">暂无生效渠道码，点击右上角生成（员工可生成挂在本人名下的 CH-E 子码）。</div>';
-    }
-    var voidChans = (d.channels || []).filter(function (c) { return c.status === "void"; });
-    if (voidChans.length) {
-      h += '<div class="v3-xs v3-faint v3-mh10" >已作废 ' + voidChans.length + " 个（仅留痕不可用）：" +
-        voidChans.map(function (c) { return ui.esc(c.code); }).join("、") + "</div>";
     }
 
-    /* 转化漏斗 */
-    h += '<div class="v3-sec-title">转化漏斗 · 邀请已产生付费金额</div><section class="v3-card iv-funnel">' +
-      fRow("直接邀请", fn.direct, fn.direct, 0) +
-      fRow("已注册", fn.registered, fn.direct, 1) +
-      fRow("已入驻", fn.onboarded, fn.direct, 2) +
-      fRow("已消费", fn.paid, fn.direct, 3) +
-      fRow("已复购", fn.repaid, fn.direct, 4) +
-      '<div class="v3-stat-money v3-mt12" ><div class="v3-xs" style="opacity:.85">邀请已产生付费金额 · 仅统计不发钱</div>' +
-      '<div class="amt num v3-mt3" >' + ui.moneyD(fn.paidAmount) + '</div>' +
-      '<div class="v3-xs v3-mt3" >只统计 · 不发起任何资金动作</div></div>' +
-      (fn.lost ? '<div class="v3-xs v3-muted v3-mt8" >已流失 ' + fn.lost + " 人；沉寂超 30 天线索建议回收。</div>" : "") +
-      "</section>";
-
-    /* 我的邀请用户 */
-    h += '<div class="section-head-row"><span class="t">我的邀请用户（单层绑定）</span></div>';
-    h += '<div class="v3-chips" id="lead-chips"><button class="v3-chip on" data-f="all">全部</button>' +
-      '<button class="v3-chip" data-f="registered">已注册</button><button class="v3-chip" data-f="onboarded">已入驻</button>' +
-      '<button class="v3-chip" data-f="paid">已消费</button><button class="v3-chip" data-f="lost">已流失</button></div>';
-    h += '<div id="lead-list" class="v3-sub-list" style="border-radius:17px"></div>';
-    h += '<div id="lead-reinvite"></div>';
-
+    /* 渠道码（招用户） */
+    var codes = visibleChannels(ctx)[curCh];
+    h += '<div class="v3-sec-title">渠道码（邀请用户）' + (ctx.isStaff ? " · 仅本人" : "") + "</div><div class='v3-stack'>";
+    if (!codes.length) {
+      h += '<div class="v3-placeholder">暂无' + (ctx.isStaff ? "本人渠道码" : "渠道码") + "</div>";
+    }
+    codes.forEach(function (c) {
+      h += '<div class="v3-card v3-card--pad"><div class="v3-codehd">' +
+        '<span class="v3-codenum num">' + c.code + "</span>" +
+        '<span class="v3-badge ' + (c.status === "active" ? "v3-badge--active" : "v3-badge--neutral") + '">' +
+        (c.status === "active" ? "生效中" : "已作废") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">归属</span><span class="v">' + ui.esc(c.ownerName) +
+        (c.ownerType === "staff" ? "（员工）" : c.ownerType === "sub" ? "（二级）" : "（老板）") + "</span></div>" +
+        '<div class="v3-kv"><span class="k">已注册用户</span><span class="v num">' + c.users + " 人</span></div>" +
+        '<div class="v3-kv"><span class="k">有效期至</span><span class="v">' + ui.esc(c.validUntil) + "</span></div>";
+      if (c.status === "active") {
+        h += '<div class="v3-codeactions"><button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="copy" data-code="' + c.code + '">' + ui.icon("link", 15) + " 复制链接</button>" +
+          '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="poster" data-code="' + c.code + '">' + ui.icon("image", 15) + " 海报</button>" +
+          ((ctx.canBoss || (ctx.isStaff && c.ownerName === ctx.s.roleStaffName)) ? '<button class="v3-btn v3-btn--ghost v3-btn--sm v3-btn--danger" data-act="void-channel" data-code="' + c.code + '">作废</button>' : "") +
+          "</div>";
+      }
+      h += "</div>";
+    });
+    h += "</div>";
     return h;
   }
 
-  function fRow(lab, n, max, idx) {
-    /* 装饰轨道条 DOM 已删（V1 无功能，纯数字行保留；T2-B CSS 已 display:none，js 域删除） */
-    return '<div class="iv-funnel-row"><span class="iv-step">' + (idx + 1) + '</span>' +
-      '<span class="lab">' + lab + '</span>' +
-      '<span class="val num">' + n + "</span></div>";
-  }
-
-  function leadRows(ctx, filter) {
-    var ui = ctx.ui, d = ctx.d;
-    var list = (d.leads || []).filter(function (l) { return !l.viaUserReinvite; });
-    if (filter && filter !== "all") list = list.filter(function (l) { return l.stage === filter; });
-    if (!list.length) return '<div class="v3-empty v3-ep28" >' + ui.emptyHtml("该状态暂无用户", "", "user") + "</div>";
-    return list.map(function (l) {
-      return '<button class="v3-sub-row" data-act="lead" data-id="' + l.id + '">' +
-        '<span class="v3-avatar">' + ui.esc(l.name.slice(0, 1)) + '</span>' +
-        '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) +
-        ' <span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></span>" +
-        '<span class="v3-row__s">' + ui.esc(l.phone) +
-        (l.paidAmount ? " · 已产生 " + ui.money(l.paidAmount) : (" · 来自 " + l.channelCode)) + "</span></span>" +
-        (l.idleDays >= 30 ? '<span class="v3-due v3-due--warn">沉寂' + l.idleDays + "天</span>" : "") +
-        ui.icon("chev", 17) + "</button>";
-    }).join("");
-  }
-  function reinviteBlock(ctx) {
+  /* ---------- 段 2：邀请用户（线索） ---------- */
+  function renderUsers(ctx) {
     var ui = ctx.ui;
-    var xs = (ctx.d.leads || []).filter(function (l) { return l.viaUserReinvite; });
-    if (!xs.length) return "";
-    return '<div class="v3-sec-title">用户再邀请（不归属）</div><div class="v3-sub-list iv-reinvite" style="border-radius:17px">' +
-      xs.map(function (l) {
-        return '<div class="v3-sub-row" style="opacity:.85"><span class="v3-avatar">' + ui.esc(l.name.slice(-1)) + "</span>" +
-          '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) +
-          ' <span class="v3-badge v3-badge--neutral">不归属</span></span>' +
-          '<span class="v3-row__s">再邀请用户 · 不归属不计佣</span></span></div>';
-      }).join("") + "</div>";
-  }
-
-  function mount(el, ctx) {
-    var V3 = ctx.V3, ui = ctx.ui, d = ctx.d;
-    var curFilter = "all";
-    function refreshLeads() {
-      el.querySelector("#lead-list").innerHTML = leadRows(ctx, curFilter);
-      el.querySelector("#lead-reinvite").innerHTML = reinviteBlock(ctx);
-    }
-    refreshLeads();
-
-    /* 线索筛选 */
-    el.querySelector("#lead-chips").addEventListener("click", function (e) {
-      var b = e.target.closest("[data-f]"); if (!b) return;
-      curFilter = b.getAttribute("data-f");
-      el.querySelectorAll("#lead-chips .v3-chip").forEach(function (x) { x.classList.toggle("on", x === b); });
-      refreshLeads();
-    });
-
-    el.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-act]"); if (!b) return;
-      var act = b.getAttribute("data-act"), id = b.getAttribute("data-id");
-      if (act === "gen-channel") genChannelSheet(ctx, function () { V3.router.render(); });
-      else if (act === "poster") posterSheet(ctx, (d.channels || []).filter(function (c) { return c.id === id; })[0]);
-      else if (act === "lead") leadSheet(ctx, (d.leads || []).filter(function (x) { return x.id === id; })[0], refreshLeads);
-    });
-  }
-
-  /* ---- 生成渠道码 ---- */
-  function genChannelSheet(ctx, done) {
-    var ui = ctx.ui, isStaff = ctx.role === "staff";
-    ui.openSheet({
-      title: "生成 B 轨渠道码",
-      body:
-        '<div class="sh-sec">归属</div>' +
-        '<div class="iv-lead-flat">' + ui.icon("user", 16) +
-        "<span>" + (isStaff ? "员工子码（CH-E）· 挂在你本人名下，线索计入你的名下" : "企业总码（" + (ctx.mode === "sub" ? "CH-S" : "CH-P") + "）") + "</span></div>" +
-        '<div class="sh-sec">海报模板</div><div class="v3-radio" id="tpl-sel">' +
-        tplOpt("tpl1", "工程服务蓝金版", true) + tplOpt("tpl2", "线下合作版", false) + "</div>" +
-        '<div class="sh-sec">主要投放场景</div><div class="v3-radio" id="src-sel">' +
-        tplOpt("wechat", "微信 / 线上", true) + tplOpt("offline", "线下展会 / 名片", false) + "</div>" +
-        '<p class="v3-legal v3-mt12" >渠道码仅用于邀请终端用户；终端用户无分佣码，分享不计佣。</p>',
-      footer: [
-        { t: "取消", kind: "v3-btn--ghost" },
-        { t: "生成并查看海报", kind: "v3-btn--primary", onClick: function (wrap) {
-          var tpl = wrap.querySelector('#tpl-sel .on input').value;
-          var src = wrap.querySelector('#src-sel .on input').value;
-          ctx.V3.store.act("channel/gen", { tpl: tpl, src: src, ownerType: isStaff ? "staff" : (ctx.mode === "sub" ? "sub" : "province") });
-          ui.toast("渠道码已生成", "ok"); ui.closeAll();
-          setTimeout(function () { var nd = ctx.V3.store.domain().channels[0]; posterSheet(ctx, nd); }, 60);
-          done && done();
-        } }
-      ],
-      onMount: function (wrap) {
-        wireRadio(wrap, "#tpl-sel"); wireRadio(wrap, "#src-sel");
-      }
-    });
-  }
-  function tplOpt(v, label, on) {
-    return '<label class="' + (on ? "on" : "") + '"><input type="radio" name="g" value="' + v + '" ' + (on ? "checked" : "") + '><span>' + label + "</span></label>";
-  }
-  function wireRadio(wrap, sel) {
-    wrap.querySelectorAll(sel + " label").forEach(function (lb) {
-      lb.addEventListener("click", function () {
-        wrap.querySelectorAll(sel + " label").forEach(function (x) { x.classList.remove("on"); });
-        lb.classList.add("on"); lb.querySelector("input").checked = true;
+    chInit(ctx);
+    var leads = visibleLeads(ctx, curCh);
+    var h = chipsHtml(ctx);
+    h += '<div class="v3-sec-title">邀请用户（' + leads.length + "）</div>";
+    if (!leads.length) {
+      h += '<div class="v3-empty">' + ui.emptyHtml("暂无邀请用户", "<div>生成渠道码并分享后，注册用户将出现在这里。</div>", "user") + "</div>";
+    } else {
+      h += '<div class="v3-stack">';
+      leads.forEach(function (l) {
+        h += '<div class="v3-card v3-card--pad"><button class="v3-sub-row v3-sub-row--plain" data-act="lead" data-id="' + l.id + '">' +
+          '<span class="v3-avatar"><span class="v3-avatar__txt">' + ui.esc(l.name.slice(0, 1)) + "</span></span>" +
+          '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(l.name) + " <span class=\"v3-xs\">" + ui.esc(l.phone) + "</span></span>" +
+          '<span class="v3-row__s">' + ui.esc(l.boundAt || l.createdAt) + (l.owner === "王敏" ? " · 员工渠道" : "") + "</span></span>" +
+          '<span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></button>" +
+          (l.amount ? '<div class="v3-kv v3-mt8"><span class="k">合格消费</span><span class="v num">' + ui.money(l.amount) + "</span></div>" : "") +
+          (l.stage === "lost" ? '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("clock", 13) + "<span>超过 30 天未活跃，演示仅作提示（暂不支持回收/换绑）。</span></div>" : "") +
+          "</div>";
       });
-    });
+      h += "</div>";
+    }
+    return h;
   }
 
-  /* ---- 海报 / 分享 ---- */
-  function posterSheet(ctx, c) {
-    var ui = ctx.ui, code = (c && c.code) || "——";
-    ui.openSheet({
-      title: "渠道码海报 · 分享",
-      body:
-        '<div class="v3-poster"><div class="pt">入驻润锦工程链<br/>工程信息 · 一站直达</div>' +
-        '<div class="ps">省级总代直接邀请 · 服务与权益有保障</div>' +
-        '<div class="pq"><div class="v3-qr"></div></div>' +
-        '<div class="pc">' + ui.esc(code) + "</div></div>" +
-        '<div class="iv-codeline v3-mt12" >' + ui.esc(code) + "</div>" +
-        '<button type="button" class="v3-btn v3-btn--ghost v3-btn--block v3-mt12" id="iv-share-btn">' + window.V3.ui.icon("share", 16) + " 分享渠道码</button>" +
-        '<p class="v3-legal v3-mt12" style="text-align:center">二维码为原型占位；分享 / 复制为 Mock 演示。</p>',
-      footer: [{ t: "完成", kind: "v3-btn--primary", onClick: function () { ctx.ui.closeAll(); } }],
-      onMount: function (wrap) {
-        var bt = wrap.querySelector("#iv-share-btn");
-        if (bt) bt.addEventListener("click", function () { ui.toast("已复制渠道链接（Mock）", "ok"); });
-      }
-    });
+  /* ---------- 段 3：转化分佣 ---------- */
+  function renderStats(ctx) {
+    var ui = ctx.ui;
+    var leads = visibleLeads(ctx, "direct").concat(visibleLeads(ctx, "agent"));
+    var c = {
+      registered: leads.length,
+      onboarded: leads.filter(function (l) { return ["onboarded", "paid", "repaid"].indexOf(l.stage) >= 0; }).length,
+      paid: leads.filter(function (l) { return l.stage === "paid" || l.stage === "repaid"; }).length,
+      lost: leads.filter(function (l) { return l.stage === "lost"; }).length,
+      amount: leads.reduce(function (s, l) { return s + (l.amount || 0); }, 0)
+    };
+    var h = '<div class="v3-sec-title">转化漏斗（当前演示数据）</div>' +
+      '<div class="v3-card v3-card--pad v3-stack-narrow">' +
+      funnelRow("注册用户", c.registered, 1) +
+      funnelRow("完成入驻", c.onboarded, c.registered ? c.onboarded / c.registered : 0) +
+      funnelRow("产生合格消费", c.paid, c.registered ? c.paid / c.registered : 0) +
+      funnelRow("沉寂 / 流失", c.lost, c.registered ? c.lost / c.registered : 0, true) +
+      '</div><div class="v3-stat-card"><span class="v3-stat-card__k">已转化合格消费合计</span>' +
+      '<span class="v3-stat-card__n num">' + ui.money(c.amount) + "</span></div>";
+    h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ui.icon("shield", 15) + "<span>分佣口径说明</span></div>" +
+      '<div class="v3-legal-body"><p>1. 省代与二级企业的月度所得按<b>约定比例</b>配置，见「二级合作 → 配置约定比例」。</p>' +
+      "<p>2. 本页只展示用户转化数据，不展示可提现金额；不存在钱包与自动提现。</p>" +
+      "<p>3. 所有金额为模拟测算，以平台月度合格消费账单与双方确认记录为准。</p></div></div>";
+    return h;
+  }
+  function funnelRow(label, n, ratio, muted) {
+    var pctN = Math.round(ratio * 100);
+    return '<div class="v3-frow"><div class="v3-frow__hd"><span class="v3-frow__t' + (muted ? " v3-frow__t--mute" : "") + '">' + label + "</span>" +
+      '<span class="v3-frow__n num">' + n + " 人 · " + pctN + "%</span></div>" +
+      '<div class="v3-frow__bar"><i class="' + (muted ? "mute" : "") + '" style="width:' + Math.max(pctN, 4) + '%"></i></div></div>';
   }
 
-  /* ---- 线索详情 ---- */
-  var NEXT = { registered: "onboarded", onboarded: "paid", paid: "repaid" };
-  function leadSheet(ctx, l, done) {
-    if (!l) return;
-    var ui = ctx.ui, V3 = ctx.V3;
-    if (l.viaUserReinvite) {
-      ui.openModal({ title: "该用户不归属你", icon: "eye", body: "此为终端用户再邀请进入：<b>不归属 · 不分佣 · 不向下传递</b>，不进入你的线索与分佣统计。", cancel: false, okText: "我知道了" });
+  /* ---------- 弹层 ---------- */
+  function genChannelSheet(ctx) {
+    var ui = ctx.ui;
+    if (ctx.isStaff) {
+      doGen(ctx, "agent");
       return;
     }
-    var stages = ["registered", "onboarded", "paid", "repaid"];
     ui.openSheet({
-      title: l.name + " · 线索详情",
-      body:
-        '<div class="iv-lead-flat v3-mb10" >' + ui.icon("link", 16) +
-        "<span><b>直接邀请 · 单层绑定 · 无下线</b>（来源 " + ui.esc(l.channelCode) + "）</span></div>" +
-        '<div class="dtl-stages">' + stages.map(function (s) {
-          var idx = stages.indexOf(l.stage) >= stages.indexOf(s) || l.stage === "repaid";
-          return '<div class="s ' + (idx ? "on" : "") + '">' + ui.STAGE[s] + "</div>";
-        }).join("") + "</div>" +
-        '<div class="dl">' +
-        '<span class="k">联系方式</span><span class="v">' + ui.esc(l.phone) + "</span>" +
-        '<span class="k">当前阶段</span><span class="v"><span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></span>" +
-        (l.paidAmount ? '<span class="k">已产生付费</span><span class="v v3-goldtext num">' + ui.money(l.paidAmount) + "</span>" : "") +
-        '<span class="k">沉寂天数</span><span class="v">' + l.idleDays + " 天</span>" +
-        '<span class="k">改绑机会</span><span class="v">' + (l.rebound ? "已使用（仅 1 次）" : "未使用") + "</span>" +
-        "</div>" +
-        '<div class="sh-sec">跟进记录</div><div class="v3-timeline" id="follow-tl">' +
-        ((l.follows && l.follows.length) ? l.follows.map(function (f) {
-          return '<div class="v3-tl"><div class="t">' + ui.esc(f.text) + '</div><div class="time">' + ui.esc(f.at) + " · " + (f.by === "staff" ? "员工" : "管理员") + "</div></div>";
-        }).join("") : '<div class="v3-xs v3-faint">暂无跟进记录</div>') + "</div>" +
-        (l.stage === "lost" ? '<div class="v3-alert v3-alert--warn v3-mt8" >该线索已标记流失。</div>' : ""),
-      footer: [
-        { t: "新增跟进", kind: "v3-btn--ghost", onClick: function () { followSheet(ctx, l, function () { ui.closeAll(); done(); after(); }); } },
-        { t: NEXT[l.stage] ? "推进到「" + ui.STAGE[NEXT[l.stage]] + "」" : "已复购", kind: "v3-btn--primary",
-          onClick: function () {
-            if (ctx.readonly) { ui.toast("账号暂停中", "err"); return false; }
-            if (NEXT[l.stage]) advanceSheet(ctx, l, done, function () { ui.closeAll(); after(); });
-            else { ui.toast("已是最终阶段"); }
-            return false;
-          } }
-      ],
+      title: "生成渠道码",
+      body: '<div class="v3-list"><button class="v3-row" data-gch="direct"><span class="v3-row__main"><span class="v3-row__t">直接合作渠道</span>' +
+        '<span class="v3-row__s">企业线下合作场景的用户邀请</span></span>' + ui.icon("chev", 16) + "</button>" +
+        '<button class="v3-row" data-gch="agent"><span class="v3-row__main"><span class="v3-row__t">招商渠道</span>' +
+        '<span class="v3-row__s">通过招商合作发展用户</span></span>' + ui.icon("chev", 16) + "</button></div>",
+      footer: [{ t: "取消", kind: "v3-btn--ghost" }],
       onMount: function (wrap) {
-        if (ctx.canBoss && !l.rebound && l.stage !== "lost") {
-          var rb = document.createElement("button");
-          rb.className = "v3-btn v3-btn--link v3-btn--sm v3-mt10";
-          rb.textContent = "申诉改绑（每用户仅 1 次）";
-          rb.addEventListener("click", function () {
-            ui.openModal({ title: "确认改绑？", icon: "edit", body: "每个用户仅允许 <b>1 次</b>归属改绑（以正式合规规则为准）。", okText: "确认改绑", onOk: function () { V3.store.act("lead/rebind", { id: l.id }); ui.toast("已提交改绑", "ok"); ui.closeAll(); after(); } });
+        Array.prototype.forEach.call(wrap.querySelectorAll("[data-gch]"), function (b) {
+          b.addEventListener("click", function () {
+            ui.closeAll();
+            doGen(ctx, b.getAttribute("data-gch"));
           });
-          wrap.querySelector(".v3-sheet__bd").appendChild(rb);
-        }
+        });
       }
     });
-    function after() {
-      var fresh = ctx.V3.store.domain().leads.filter(function (x) { return x.id === l.id; })[0];
-      if (fresh) leadSheet(ctx, fresh, done);
-    }
   }
-  function followSheet(ctx, l, done) {
+  function doGen(ctx, ch) {
+    var ui = ctx.ui;
+    var r = ctx.V3.store.act("channel/gen", { channel: ch });
+    if (!r.ok) { ui.toast(r.reason, "err"); return; }
+    ui.toast("渠道码已生成", "ok");
+    ctx.V3.router.render();
+    codeSheet(ctx, r.code, ch);
+  }
+  function codeSheet(ctx, code, ch) {
     var ui = ctx.ui;
     ui.openSheet({
-      title: "新增跟进记录",
-      body: '<div class="v3-field"><label>跟进内容</label><textarea class="v3-textarea" id="f-text" placeholder="如：已电话沟通，意向开通增值包，下周三再联系"></textarea></div>',
+      title: "我的渠道码",
+      body: '<div class="v3-invite-qr"><div class="v3-qr" data-code="' + code + '"></div>' +
+        '<div class="v3-invite-qr__code num">' + code + "</div>" +
+        '<div class="v3-invite-qr__tip">演示二维码（非真实可扫码）</div>' +
+        '<div class="v3-invite-qr__logo">' + ui.icon("shield", 16) + "</div></div>" +
+        '<div class="v3-list v3-mt12">' +
+        '<button class="v3-row" data-act="copy" data-code="' + code + '"><span class="v3-row__main">' + ui.icon("link", 18) + " 复制链接</span>" + ui.icon("chev", 14) + "</button>" +
+        '<button class="v3-row" data-act="poster" data-code="' + code + '"><span class="v3-row__main">' + ui.icon("image", 18) + " 生成海报</span>" + ui.icon("chev", 14) + "</button>" +
+        '<button class="v3-row" data-share="wx"><span class="v3-row__main">' + ui.icon("wechat", 18) + " 微信好友 / 朋友圈</span>" + ui.icon("chev", 14) + "</button>" +
+        "</div>" +
+        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>演示环境不调起微信，分享请复制链接后转发。</span></div>",
+      footer: [{ t: "完成", kind: "v3-btn--primary" }],
+      onMount: function (wrap) {
+        /* 弹层挂在 body 下，页面级委托覆盖不到，必须在 onMount 内绑定 */
+        Array.prototype.forEach.call(wrap.querySelectorAll("[data-act]"), function (b) {
+          b.addEventListener("click", function () {
+            var act = b.getAttribute("data-act");
+            var c = b.getAttribute("data-code");
+            if (act === "copy") {
+              copyText("https://engchain.com/invite?code=" + c, ui);
+            } else if (act === "poster") {
+              ui.closeAll();
+              setTimeout(function () { posterSheet(ctx, c); }, 120);
+            }
+          });
+        });
+        var wx = wrap.querySelector("[data-share]");
+        if (wx) wx.addEventListener("click", function () { ui.toast("演示环境：请复制链接后转发", ""); });
+      }
+    });
+  }
+  function posterSheet(ctx, code) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "渠道海报",
+      body: '<div class="v3-poster"><div class="v3-poster__hd"><b>工程服务合作平台</b><span>官方合作邀请</span></div>' +
+        '<div class="v3-poster__tit">扫码注册 · 享工程服务合作权益</div>' +
+        '<div class="v3-poster__qr"><div class="v3-qr" data-code="' + code + '"></div><span class="num">' + code + "</span></div>" +
+        '<div class="v3-poster__ft">演示二维码 · 非真实可扫码</div></div>',
       footer: [
-        { t: "取消", kind: "v3-btn--ghost" },
-        { t: "保存", kind: "v3-btn--primary", onClick: function (wrap) {
-          var txt = wrap.querySelector("#f-text").value.trim();
-          if (!txt) { ui.toast("请填写跟进内容", "err"); return false; }
-          ctx.V3.store.act("lead/follow", { id: l.id, text: txt }); ui.toast("跟进已保存", "ok"); done();
+        { t: "复制邀请码", kind: "v3-btn--ghost", onClick: function () { copyText(code, ui); return false; } },
+        { t: "保存海报（演示）", kind: "v3-btn--primary", onClick: function () { ui.toast("演示环境：海报可截图保存", "ok"); } }
+      ]
+    });
+  }
+  function leadSheet(ctx, l) {
+    var ui = ctx.ui;
+    var notes = (l.notes || []).map(function (n) {
+      return '<div class="v3-note"><div class="v3-note__hd">' + ui.esc(n.by) + " <span>" + ui.esc(n.at) + "</span></div>" +
+        '<div class="v3-note__bd">' + ui.esc(n.text) + "</div></div>";
+    }).join("") || '<div class="v3-placeholder">暂无跟进记录</div>';
+    var stages = [["registered", "标记已注册"], ["onboarded", "标记已入驻"], ["paid", "标记已消费"]];
+    ui.openSheet({
+      title: "线索详情 · " + l.name,
+      body: '<div class="v3-kv"><span class="k">手机</span><span class="v">' + ui.esc(l.phone) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">绑定时间</span><span class="v">' + ui.esc(l.boundAt || l.createdAt) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">当前阶段</span><span class="v"><span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></span></div>" +
+        (l.amount ? '<div class="v3-kv"><span class="k">合格消费</span><span class="v num">' + ui.money(l.amount) + "</span></div>" : "") +
+        '<div class="v3-sec-title v3-mt12">跟进记录</div>' + notes +
+        '<div class="v3-field v3-mt12"><textarea class="v3-textarea" id="lf-note" placeholder="新增跟进记录…"></textarea></div>',
+      footer: [
+        { t: "保存跟进", kind: "v3-btn--ghost", onClick: function (wrap) {
+          var note = wrap.querySelector("#lf-note").value.trim();
+          if (!note) { ui.toast("请填写跟进内容", "err"); return false; }
+          var r = ctx.V3.store.act("lead/follow", { channel: curCh, id: l.id, note: note });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已保存", "ok");
+          ctx.V3.router.render();
+        } },
+        { t: "更新阶段", kind: "v3-btn--primary", onClick: function (wrap) {
+          stageSheet(ctx, l);
+          return false;
         } }
       ]
     });
   }
-  function advanceSheet(ctx, l, doneList, done) {
-    var ui = ctx.ui, target = NEXT[l.stage];
-    if (target === "paid") {
-      ui.openSheet({
-        title: "标记为「已消费」",
-        body: '<div class="v3-field"><label>本笔合格消费金额（元）</label><input class="v3-input inputmode" id="p-amt" type="number" inputmode="decimal" placeholder="如 2800" /><div class="v3-hint">将计入「邀请已产生付费金额」，仅统计、不发钱。</div></div>',
-        footer: [
-          { t: "取消", kind: "v3-btn--ghost" },
-          { t: "确认已消费", kind: "v3-btn--primary", onClick: function (wrap) {
-            var amt = Number(wrap.querySelector("#p-amt").value);
-            if (!(amt > 0)) { ui.toast("请输入有效金额", "err"); return false; }
-            ctx.V3.store.act("lead/stage", { id: l.id, stage: "paid", paidAmount: amt }); ui.toast("阶段已更新", "ok"); done();
-          } }
-        ]
-      });
-    } else {
-      ctx.V3.store.act("lead/stage", { id: l.id, stage: target }); ui.toast("已推进到「" + ui.STAGE[target] + "」", "ok"); done();
-    }
+  function stageSheet(ctx, l) {
+    var ui = ctx.ui;
+    var stages = [["registered", "已注册"], ["onboarded", "已入驻"], ["paid", "已消费"]];
+    ui.openSheet({
+      title: "更新用户阶段",
+      body: '<div class="v3-list">' + stages.map(function (s) {
+        return '<button class="v3-row" data-stage="' + s[0] + '"><span class="v3-row__main">' + s[1] + "</span>" +
+          (l.stage === s[0] ? ui.icon("check", 16) : ui.icon("chev", 14)) + "</button>";
+      }).join("") + "</div>",
+      footer: [{ t: "关闭", kind: "v3-btn--ghost" }],
+      onMount: function (wrap) {
+        Array.prototype.forEach.call(wrap.querySelectorAll("[data-stage]"), function (b) {
+          b.addEventListener("click", function () {
+            var r = ctx.V3.store.act("lead/stage", { channel: curCh, id: l.id, stage: b.getAttribute("data-stage") });
+            if (!r.ok) { ui.toast(r.reason, "err"); return; }
+            ui.closeAll();
+            ui.toast("阶段已更新", "ok");
+            ctx.V3.router.render();
+          });
+        });
+      }
+    });
   }
 
-  window.V3PAGES.invite = { title: "邀请获客", render: render, mount: mount };
+  function render(ctx) {
+    var ui = ctx.ui;
+    var h = '<div class="v3-page-head"><div class="v3-page-title">邀请获客</div>' +
+      '<div class="v3-page-sub">渠道码、注册用户与转化数据（单层绑定，不发展下级分润）</div></div>';
+    h += '<div class="v3-seg v3-seg--wrap v3-seg--top">' +
+      '<button class="' + (curTab === "codes" ? "on" : "") + '" data-tab="codes">渠道码·海报</button>' +
+      '<button class="' + (curTab === "users" ? "on" : "") + '" data-tab="users">邀请用户</button>' +
+      '<button class="' + (curTab === "stats" ? "on" : "") + '" data-tab="stats">转化分佣</button></div>';
+    h += curTab === "codes" ? renderCodes(ctx) : curTab === "users" ? renderUsers(ctx) : renderStats(ctx);
+    return h;
+  }
+
+  function mount(el, ctx) {
+    el.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-act],[data-tab],[data-ch],[data-share]");
+      if (!b) return;
+      var act = b.getAttribute("data-act");
+      if (b.hasAttribute("data-tab")) {
+        curTab = b.getAttribute("data-tab");
+        ctx.V3.router.render();
+        return;
+      }
+      if (b.hasAttribute("data-ch")) {
+        curCh = b.getAttribute("data-ch");
+        ctx.V3.router.render();
+        return;
+      }
+      if (b.hasAttribute("data-share")) {
+        ctx.ui.toast("演示环境：请复制链接后转发", "");
+        return;
+      }
+      if (act === "gen-agent") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可生成招商码", "err");
+        var r = ctx.V3.store.act("agent/gen", { channel: curCh });
+        if (!r.ok) { ctx.ui.toast(r.reason, "err"); return; }
+        ctx.ui.toast("招商码已生成", "ok");
+        ctx.V3.router.render();
+      } else if (act === "void-agent") {
+        confirmVoid(ctx, "agent", b.getAttribute("data-code"));
+      } else if (act === "void-channel") {
+        confirmVoid(ctx, "channel", b.getAttribute("data-code"));
+      } else if (act === "copy") {
+        copyText(b.getAttribute("data-code"), ctx.ui);
+      } else if (act === "poster") {
+        posterSheet(ctx, b.getAttribute("data-code"));
+      } else if (act === "lead") {
+        var l = visibleLeads(ctx, curCh).filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
+        if (l) leadSheet(ctx, l);
+      }
+    });
+  }
+
+  function confirmVoid(ctx, type, code) {
+    var ui = ctx.ui;
+    ui.openModal({
+      danger: true, icon: "warn", title: "作废「" + code + "」？",
+      body: "作废后旧码立即失效，已绑定用户不受影响，可生成新码继续使用。",
+      okText: "确认作废",
+      onOk: function () {
+        var r = type === "agent"
+          ? ctx.V3.store.act("agent/void", { channel: curCh, code: code })
+          : ctx.V3.store.act("channel/void", { channel: curCh, code: code });
+        if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+        ui.toast("已作废", "ok");
+        ctx.V3.router.render();
+      }
+    });
+  }
+
+  P.invite = {
+    title: "邀请获客",
+    render: render,
+    mount: mount,
+    fab: function (ctx) {
+      ctx.fab([{ icon: "qr", label: "生成渠道码", onClick: function (c) { genChannelSheet(c); } }]);
+    }
+  };
 })();

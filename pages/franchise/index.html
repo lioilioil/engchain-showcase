@@ -383,10 +383,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .fc-demand-tag { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: var(--r-full); font-size: 11px; font-weight: 700; }
   #fullList .sk-list { padding: 0 16px; }
 
-  /* ===== [C片] 供应/需求双态卡片 + 热门位中性对齐（页内作用域，不改数据/链接/状态） ===== */
-  /* 热门轨：横向横滑改视口内两列网格，避免后续卡片超出 390 视口右缘 */
-  .hot-scroll { display: flex; flex-wrap: wrap; gap: 10px; overflow: visible; padding: 0 16px !important; scroll-snap-type: none; }
-  .hcard { flex: 1 1 calc(50% - 5px); width: auto; min-width: 0; }
+  /* ===== [C片] 供应/需求双态卡片 + 热门位连续滚动（页内作用域，不改数据/链接/状态） ===== */
+  /* 热门轨：单行 1.5 卡视口 + 无缝连续滚动（marquee：轨道双份复制，translateX(-50%) 精确回环） */
+  .hot-scroll { display: block; overflow: hidden; padding: 0 16px 4px !important; margin: 0; scroll-snap-type: none; }
+  .hot-track { display: flex; width: max-content; will-change: transform; animation: hs-marquee 32s linear infinite; }
+  .hs-set { display: flex; gap: 10px; padding-right: 10px; }
+  .hcard { flex: none; width: var(--hs-w, 232px); min-width: 0; scroll-snap-align: none; }
+  .hot-scroll:hover .hot-track { animation-play-state: paused; }
+  @media (prefers-reduced-motion: reduce) { .hot-track { animation: none; } }
+  @keyframes hs-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   /* 供应态卡片：16 内距 / 14 圆角 / shadow-card / 防横向溢出 */
   .franchise-card { overflow: hidden; padding: 16px; border-radius: 14px; box-shadow: var(--shadow-card); }
   .fc-top { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 9px; }
@@ -922,11 +927,36 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     '</a>';
   }
 
+  /* ---- 热门区：单行 1.5 卡无缝连续滚动（marquee） ---- */
+  function setupHotMarquee(el) {
+    if (!el) return;
+    var w = Math.max(180, Math.round((el.clientWidth - 42) / 1.5));
+    el.style.setProperty('--hs-w', w + 'px');
+    var track = el.querySelector('.hot-track');
+    if (track) return;
+    if (!el.querySelector('.hcard, .hot-card')) return;
+    track = document.createElement('div');
+    track.className = 'hot-track';
+    var set1 = document.createElement('div');
+    set1.className = 'hs-set';
+    while (el.firstChild) set1.appendChild(el.firstChild);
+    var set2 = document.createElement('div');
+    set2.className = 'hs-set';
+    set2.innerHTML = set1.innerHTML;
+    track.appendChild(set1);
+    track.appendChild(set2);
+    el.appendChild(track);
+    /* 动画时长按内容宽度折算（约 40px/s，下限 12s），保证不同条数速度观感一致 */
+    var dur = Math.max(12, set1.scrollWidth / 40);
+    track.style.animationDuration = dur + 's';
+  }
+
   /* ---- 热门列表（全局热点，不受分类过滤） ---- */
   (function () {
     var hot = all.filter(function (f) { return f.hot; });
     var el = document.getElementById('hotList');
     el.innerHTML = hot.length ? hot.map(hotCard).join('') : '<div style="width:100%;text-align:center;">暂无热门企业</div>';
+    setupHotMarquee(el);
   })();
 
   /* ---- 查看全部 — 滚动到全部招商企业列表（仅滚动 .scroll，避免带动整屏） ---- */

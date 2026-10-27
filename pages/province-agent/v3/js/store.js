@@ -1,305 +1,585 @@
 /* ============================================================
-   store.js · v3 原型数据引擎（Mock）
-   - 锁定口径常量只读；测算口径永不被登记改写
-   - 所有写操作只改 Mock state + appendBehavior 留痕；不触发任何资金动作
+   store.js · 省级总代 / 二级合作 · 演示数据模型（单一数据源）
+   规则：
+   - 所有写操作统一走 act(type, payload)，返回 { ok:true } 或 { ok:false, reason }
+   - 角色：boss（省代老板）/ staff（省代员工，仅本人渠道数据）/ sub_owner（二级老板）
+   - 暂停态 profile.status !== 'active' 时所有写操作拒绝（只读）
+   - 测算均为演示口径，页面须标注"模拟测算，以平台月度对账为准"
    ============================================================ */
 (function () {
   "use strict";
 
-  /* ---------- 锁定只读常量（来自 agent-ledger.js DEFAULTS，原型零改动） ---------- */
-  var CONST = {
-    grossShare: 0.50,
-    selfRate: 0.50, /* 【S4-B】自身线系数 0.10→0.50（用户指令授权；独立分区、仅测算不入对账层） */
-    frozenDays: 7,
-    ratioMin: 0, ratioMax: 0.50,
-    cap: 21,
-    eligibleTypes: ["order_paid_net", "points_unlock_paid", "value_added_paid"],
-    excludedTypes: ["recharge", "free_points", "entry_fee", "refund_reversal"],
-    // 演示 T1
-    demo: { eligible: 10000, gross: 5000, agreedToSub: 1000, ratioToSub: 0.20,
-            selfKeep: 4000, frozen: 3000, selfLine: 4000, selfLineBase: 8000 }, /* selfLine=8000×0.5=4000 */
-    // 【假设】营销参数，待真实埋点/合规回填（R6）
-    bindWindowDays: 30, reassignOnce: 1, idleRecycleDays: 30
-  };
-  var MONEY_NOTE = "模拟测算 · 非税务意见 · 非实际代扣 / 非实际到账 · 不可提现";
-
-  var CH_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  function rndCode(n) {
-    var s = "";
-    for (var i = 0; i < (n || 6); i++) s += CH_CODE_CHARS[Math.floor(Math.random() * CH_CODE_CHARS.length)];
-    return s;
-  }
-  function genChannelCode(ownerType) {
-    var seg = ownerType === "sub" ? "CH-S" : ownerType === "staff" ? "CH-E" : "CH-P";
-    return seg + "-" + rndCode(6);
-  }
-  function genAgentCode() { return "AG-" + rndCode(6); }
-
   var LS_KEY = "engchain-v3-demo-state-v1";
-  function clone(o) { return JSON.parse(JSON.stringify(o)); }
-  function uid(p) { return (p || "id") + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6); }
-  function todayStr() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  var STATE_KEY = "engchain-v3-demo-scenario";
 
-  /* ---------- 纯函数口径（只读复算，任何 action 不得改写） ---------- */
-  function calcFinance(base) {
-    // base: { eligible, frozen, ratioToSub, selfBase, subsList?(多二级聚合,可选) }
-    var eligible = base.eligible || 0;
-    var gross = Math.round(eligible * CONST.grossShare);            // 总盘 = 合格消费 ×50%
-    var ratio = base.ratioToSub || 0;
-    var agreed = Math.round(gross * ratio);                         // 约定给二级（省代视角演示）
-    var selfKeep = gross - agreed;                                  // 自留 = 总盘 − 约定
-    var selfLine = Math.round((base.selfBase || 0) * CONST.selfRate);// 自身线 = 自身合格消费×50%（独立）
-    var out = { eligible: eligible, gross: gross, agreed: agreed, ratioToSub: ratio,
-             selfKeep: selfKeep, frozen: base.frozen || 0, selfLine: selfLine };
-    /* 【S4-B】可选多二级聚合：传入 subsList 时按各自 ratioToSub 汇总约定所得。
-       eligible 暂取 demo 单值（多二级消费基数埋点为后续）；不传则维持单值聚合（向后兼容）。 */
-    if (base.subsList && base.subsList.length) {
-      out.agreedAll = base.subsList.reduce(function (s, x) {
-        return s + Math.round(gross * (Number(x.ratioToSub) || 0));
-      }, 0);
-      out.selfKeepAll = gross * base.subsList.length - out.agreedAll;
+  /* 业务常量（演示口径） */
+  var CONST = {
+    grossShare: 0.50,          // 省代总盘 = 平台总合格消费 × 50%
+    selfRate: 0.50,            // 省代默认自留 50%
+    frozenDays: 7,             // T+7 冻结
+    ratioMin: 0, ratioMax: 0.50, // 约定比例 0–50%
+    cap: 21,
+    bindWindowDays: 30,        // 注册后 30 天内必须绑定上级
+    reassignOnce: 1,           // 每个用户最多换绑 1 次
+    idleRecycleDays: 30,       // 渠道沉寂 30 天提示回收（本期仅提示，不做回收动作）
+    l1DisputeDays: 5,          // 第一层：T+5 工作日内可提异议
+    l2DisputeDays: 15          // 第二层：出账后 15 天内仅提醒，不自动确认
+  };
+
+  /* ---------------- 编号 ---------------- */
+  var pad = function (n) { return String(n < 10 ? "0" + n : n); };
+  var rnd6 = function () { return Math.random().toString(36).slice(2, 8).toUpperCase(); };
+  function genAgentCode() {
+    return "AG-" + rnd6();
+  }
+  function genChannelCode(state, ownerType) {
+    /* ownerType: CH-P 省代招商（老板）/ CH-E 省代员工 / CH-S 二级 */
+    var prefix = "CH-P";
+    if (ownerType === "staff" || state.role === "staff") prefix = "CH-E";
+    if (state.mode === "sub" || ownerType === "sub") prefix = "CH-S";
+    return prefix + "-" + rnd6();
+  }
+  function genId(prefix) { return prefix + "-" + Date.now().toString(36).slice(-4) + Math.floor(Math.random() * 90 + 10); }
+
+  /* ---------------- 汇总（省代） ---------------- */
+  /* 多二级口径（决策 9）：演示为"全省单盘测算"，不做 N×gross 合计；
+     仅当生效中二级为 1 家时输出约定合计与自留合计，多家时返回 null 并由 UI 标注口径 */
+  function calcFinance(fin, subs) {
+    if (!fin) return null;
+    var gross = Math.round(fin.gross * CONST.grossShare);
+    var eligible = gross;
+    var selfRate = fin.selfRate == null ? CONST.selfRate : fin.selfRate;
+    var activeSubs = (subs || []).filter(function (s) { return s.status === "active"; });
+    var agreedAll = null, selfKeepAll = null;
+    if (activeSubs.length === 1) {
+      agreedAll = Math.round(gross * activeSubs[0].ratioToSub);
+      selfKeepAll = gross - agreedAll;
     }
-    return out;
-  }
-  function subSettle(base) {
-    // 二级本人：settleAgg = 总盘×50%×ratioToSub 纯展示
-    var gross = Math.round((base.eligible || 0) * CONST.grossShare);
-    return { eligible: base.eligible || 0, gross: gross,
-             agreed: Math.round(gross * (base.ratioToSub || 0)), ratioToSub: base.ratioToSub || 0,
-             frozen: base.frozen || 0 };
-  }
-  function regsSum(payRegs, calcId) {
-    return (payRegs || [])
-      .filter(function (r) { return r.calcId === calcId && r.status !== "void"; })
-      .reduce(function (s, r) { return s + (Number(r.amount) || 0); }, 0);
-  }
-  function diffOf(calc, payRegs) {
-    return calc.calcAmount - regsSum(payRegs, calc.id);
+    return {
+      gross: gross,
+      eligible: eligible,
+      grossShare: CONST.grossShare,
+      selfRate: selfRate,
+      selfKeep: Math.round(gross * selfRate),
+      agreedAll: agreedAll,
+      selfKeepAll: selfKeepAll,
+      multiSub: activeSubs.length > 1,
+      frozen: Math.round(0.05 * gross),
+      cap: CONST.cap
+    };
   }
 
-  /* ---------- store ---------- */
+  /* ---------------- 二级经营测算（只读） ---------------- */
+  function subSettle(calc) {
+    var eligible = calc.eligibleBase || 0;
+    var gross = Math.round(eligible * CONST.grossShare);
+    var ratio = calc.ratioToSub == null ? 0 : calc.ratioToSub;
+    var agreed = Math.round(gross * ratio);
+    return {
+      eligible: eligible,
+      gross: gross,
+      ratioToSub: ratio,
+      agreed: agreed,
+      frozen: Math.round(agreed * 0.05)
+    };
+  }
+  function funnelOf(leads) {
+    var all = [];
+    Object.keys(leads || {}).forEach(function (ch) {
+      all = all.concat(leads[ch]);
+    });
+    return {
+      registered: all.length,
+      onboarded: all.filter(function (l) { return ["onboarded", "paid", "repaid"].indexOf(l.stage) >= 0; }).length,
+      paid: all.filter(function (l) { return l.stage === "paid" || l.stage === "repaid"; }).length,
+      lost: all.filter(function (l) { return l.stage === "lost"; }).length,
+      paidAmount: all.reduce(function (s, l) { return s + (l.amount || 0); }, 0)
+    };
+  }
+
+  /* ---------------- 登记勾稽 ---------------- */
+  /* 勾稽口径：仅确认计入；异议/作废不计入"已确认到账" */
+  function regsOf(d, layer, calcId) {
+    var list = layer === "1" ? d.payRegs1 : d.payRegs2;
+    if (layer === "2" && d.payRegs) list = d.payRegs; // 二级域
+    if (!list) return [];
+    return list.filter(function (r) { return r.calcId === calcId; });
+  }
+  function regsSum(list, calcId) {
+    return list.filter(function (r) { return r.calcId === calcId && r.status !== "void" && r.status !== "disputed"; })
+      .reduce(function (s, r) { return s + r.amount; }, 0);
+  }
+  function regsAllSum(list, calcId) {
+    return list.filter(function (r) { return r.calcId === calcId && r.status !== "void"; })
+      .reduce(function (s, r) { return s + r.amount; }, 0);
+  }
+  function monthlyStatement(calc, regs) {
+    var sum = regsSum(regs, calc.id);
+    var diff = calc.calcAmount - sum;
+    return {
+      id: "st-" + calc.id,
+      calcId: calc.id,
+      month: calc.month,
+      calcAmount: calc.calcAmount,
+      registered: sum,
+      diff: diff,
+      status: diff === 0 ? "balanced" : "open"
+    };
+  }
+
+  /* ---------------- 待办 / 消息（单源派生） ---------------- */
+  function todoOf(state) {
+    var d = state.state;
+    var items = [];
+    var count = function (regList, calcId) {
+      var regs = regList.filter(function (r) { return r.calcId === calcId; });
+      return {
+        pending: regs.filter(function (r) { return r.status === "pending_confirm"; }).length,
+        disputed: regs.filter(function (r) { return r.status === "disputed"; }).length
+      };
+    };
+    if (state.mode === "province") {
+      /* 员工无审批/平账/对账处理职责，不派生 boss 待办与角标 */
+      if (state.role === "staff") {
+        return { reconcile: 0, invite: 0, subs: 0, total: 0,
+          l1: { pending: 0, disputed: 0 }, l2: { pending: 0, disputed: 0 }, items: [] };
+      }
+      var l1 = count(d.payRegs1, "c1-l1");
+      var l2 = count(d.payRegs2, "c1-l2");
+      var subPending = d.subApps.filter(function (a) { return a.status === "pending"; }).length;
+      var reconcile = l1.pending + l1.disputed + l2.pending + l2.disputed;
+      if (l1.disputed) items.push({ type: "danger", icon: "warn", t: "与平台对账有异议待处理", s: "第一层 ¥240 差异，T+5 工作日内核实", to: "#/reconcile" });
+      if (l1.pending) items.push({ type: "warn", icon: "clock", t: "平台对账有付款待确认", s: "第一层待确认 " + l1.pending + " 笔", to: "#/reconcile" });
+      if (l2.disputed) items.push({ type: "danger", icon: "warn", t: "二级提出收款异议", s: "第二层异议待线下核实", to: "#/reconcile" });
+      if (l2.pending) items.push({ type: "warn", icon: "clock", t: "二级收款待确认", s: "第二层 ¥1,000 待二级确认", to: "#/reconcile" });
+      if (subPending) items.push({ type: "info", icon: "file-text", t: "有二级合作申请待审批", s: subPending + " 家企业等待处理", to: "#/subs" });
+      return {
+        reconcile: reconcile,
+        invite: 0,
+        subs: subPending,
+        total: reconcile + subPending,
+        l1: l1, l2: l2,
+        items: items
+      };
+    }
+    var pend = d.payRegs.filter(function (r) { return r.status === "pending_confirm"; }).length;
+    var disp = d.payRegs.filter(function (r) { return r.status === "disputed"; }).length;
+    var agreePending = d.agreement && (d.agreement.state === "pending_mine" || d.agreement.state === "rejected") ? 1 : 0;
+    if (pend) items.push({ type: "warn", icon: "clock", t: "有省代付款待你确认", s: "请核对到账与凭证后确认", to: "#/payments" });
+    if (disp) items.push({ type: "danger", icon: "warn", t: "有异议的付款待核实", s: "线下核实后可确认", to: "#/payments" });
+    if (d.agreement && d.agreement.state === "pending_mine") items.push({ type: "info", icon: "file-text", t: "O4 合作协议待签署", s: "请阅读条款后完成签署", to: "#/home" });
+    if (d.agreement && d.agreement.state === "rejected") items.push({ type: "info", icon: "file-text", t: "合作协议已拒签，待省代重新发起", s: "可查看拒签原因", to: "#/home" });
+    return {
+      payments: pend + disp,
+      agreement: agreePending,
+      total: pend + disp + agreePending,
+      items: items
+    };
+  }
+
+  /* 消息列表：派生待办 + 手动动作留痕（msgLog）+ 静态运营提示 */
+  function messagesOf(state) {
+    var todo = todoOf(state);
+    var msgs = [];
+    var d = state.state;
+    todo.items.forEach(function (it) {
+      msgs.push({ icon: it.icon, type: it.type, title: it.t, desc: it.s, to: it.to, time: "今天", source: "todo" });
+    });
+    if (d.profile.status === "suspended") {
+      msgs.push({ icon: "lock", type: "danger", title: "账号已暂停（仅可查看）", desc: "全部经营动作锁定，请联系平台或上级处理", to: state.mode === "sub" ? "#/home" : "#/home", time: "今天", source: "state" });
+    }
+    (d.msgLog || []).forEach(function (m) {
+      msgs.push({ icon: m.icon || "bell", type: m.type || "info", title: m.title, desc: m.desc, to: m.to || "", time: m.time || "刚刚", source: "log" });
+    });
+    return msgs;
+  }
+
+  /* ---------------- store 主体 ---------------- */
   var state = null;
-  var listeners = [];
-  function emit() { listeners.forEach(function (f) { try { f(state); } catch (e) {} }); }
-  function hydrate(data, meta) {
-    state = clone(data);
-    state.mode = (meta && meta.mode) || data.mode || "province";
-    state.theme = (meta && meta.theme) || data.theme || "light";
-    state.role = (meta && meta.role) || data.role || "boss";
-    state.scenario = (meta && meta.scenario) || data.scenario || "active";
-    if (!state.behavior) state.behavior = [];
-    persist(); emit();
+
+  function seed(initial, scenarioKey) {
+    /* 深拷贝种子，防止重置不彻底 */
+    state = JSON.parse(JSON.stringify(initial));
+    state.scenarioKey = scenarioKey || (state.mode === "sub" ? "sub-active" : "active");
+    if (!state.state.msgLog) state.state.msgLog = [];
+    save();
+    return state;
   }
   function getState() { return state; }
-  function domain() { return state.mode === "sub" ? state.sub : state.province; }
-  function subscribe(f) { listeners.push(f); return function () {
-    listeners = listeners.filter(function (x) { return x !== f; });
-  }; }
-  function persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
-  function behavior(act, detail) {
-    state.behavior.unshift({ at: new Date().toISOString(), act: act, detail: detail || {} });
-    if (state.behavior.length > 200) state.behavior.length = 200;
+  function reset(initial, scenarioKey) { return seed(initial, scenarioKey); }
+  function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {} }
+  function appMode() { return window.V3_APP === "sub" ? "sub" : "province"; }
+  function defaultScenario() { return appMode() === "sub" ? "sub-active" : "active"; }
+  function load() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        /* 双壳共用 LS 键：模式不匹配时强制重新播种，避免省代/二级串数据 */
+        state = parsed && parsed.mode === appMode() ? parsed : null;
+      }
+    } catch (e) { state = null; }
+    return state;
   }
-  function find(arr, id) { for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i]; return null; }
-
-  /* ---------- 对账层取数（省代两层 / 二级取 layer2 本企业） ---------- */
-  function layerBox(layer) {
-    var d = domain();
-    if (state.mode === "sub") return { calc: d.calc, regs: d.payRegs, stmts: d.statements };
-    var k = String(layer) === "2" ? "2" : "1";
-    return { calc: d["calc" + k], regs: d["payRegs" + k], stmts: d["statements" + k] };
+  function currentScenario() {
+    try {
+      var k = localStorage.getItem(STATE_KEY);
+      if (k && window.V3.scenarios && window.V3.scenarios.seedByScenario(k)) {
+        var seed = window.V3.scenarios.seedByScenario(k);
+        if (seed.mode === appMode()) return k;
+      }
+    } catch (e) {}
+    return defaultScenario();
   }
 
-  /* ---------- actions ---------- */
-  function act(type, p) {
-    p = p || {};
-    var d = domain();
+  /* ---------------- 守卫 ---------------- */
+  function ctxInfo() {
+    var d = state.state;
+    var role = state.role;
+    var mode = state.mode;
+    var readonly = d.profile.status !== "active";
+    return {
+      mode: mode, role: role, readonly: readonly,
+      isBoss: mode === "province" && role === "boss",
+      isStaff: mode === "province" && role === "staff",
+      isOwner: mode === "sub" && role === "sub_owner",
+      staffName: state.roleStaffName || "王敏"
+    };
+  }
+  function fail(reason) { return { ok: false, reason: reason }; }
+  var ok = function () { return { ok: true }; };
+
+  function act(type, payload) {
+    payload = payload || {};
+    var d = state.state, c = ctxInfo();
+    var p = payload;
+
+    /* 只读：除主题/角色演示切换外一律拒绝 */
+    if (c.readonly && type !== "theme/set" && type !== "role/set") {
+      return fail("账号已暂停，仅可查看");
+    }
+
     switch (type) {
       case "theme/set":
-        state.theme = p.theme; break;
+        state.theme = p.theme; save(); return ok();
+
       case "role/set":
-        state.role = p.role; break;
+        /* 演示身份切换（非真实业务动作） */
+        state.role = p.role;
+        if (p.role === "staff" && !state.roleStaffName) state.roleStaffName = "王敏";
+        save(); return ok();
 
-      /* B 轨 渠道码 */
+      /* ---------- 渠道码 ---------- */
       case "channel/gen": {
-        var ownerType = p.ownerType || (state.mode === "sub" ? "sub" : "province");
-        d.channels.unshift({ id: uid("ch"), code: genChannelCode(ownerType), ownerType: ownerType,
-          ownerName: p.ownerName || (ownerType === "sub" ? d.profile.name : "本公司"),
-          tpl: p.tpl || "tpl1", src: p.src || "wechat", status: "active",
-          createdAt: todayStr(), voidInfo: null });
-        behavior("channel-gen", { tpl: p.tpl, src: p.src });
-        break;
+        if (c.mode === "province" && !c.isBoss && !c.isStaff) return fail("仅老板或员工可生成渠道码");
+        if (c.mode === "sub" && !c.isOwner) return fail("仅二级负责人可生成渠道码");
+        var list = d.channels, ch = p.channel;
+        if (!list[ch]) return fail("渠道不存在");
+        var ownerType = p.ownerType || (c.isStaff ? "staff" : (c.mode === "sub" ? "sub" : "province"));
+        var code = genChannelCode(state, ownerType);
+        var ownerName = c.isStaff ? c.staffName : (c.isOwner ? d.profile.contact : "王建国");
+        list[ch].push({
+          code: code,
+          channel: ch,
+          ownerType: ownerType,
+          ownerName: ownerName,
+          createdAt: "2026-10",
+          users: 0,
+          validUntil: "2026-12-31",
+          status: "active"
+        });
+        save(); return { ok: true, code: code };
       }
+
       case "channel/void": {
-        var c = find(d.channels, p.id); if (c && c.status === "active") { c.status = "void"; c.voidInfo = { reason: p.reason || "主动作废", at: todayStr() }; }
-        behavior("channel-void", { id: p.id });
-        break;
+        if (c.mode === "province" && !c.isBoss && !c.isStaff) return fail("无权限作废旧码");
+        if (c.mode === "sub" && !c.isOwner) return fail("无权限作废旧码");
+        var arr = d.channels[p.channel] || [];
+        var rec = arr.filter(function (x) { return x.code === p.code; })[0];
+        if (!rec) return fail("渠道码不存在");
+        if (c.isStaff && rec.ownerName !== c.staffName) return fail("员工仅可作废本人渠道码");
+        rec.status = "void";
+        rec.voidAt = "2026-10";
+        save(); return ok();
       }
 
-      /* 线索 */
+      /* ---------- 线索（员工仅本人） ---------- */
       case "lead/follow": {
-        var l = find(d.leads, p.id);
-        if (l) { l.follows = l.follows || []; l.follows.unshift({ at: todayStr(), text: p.text, by: state.role });
-                 l.nextFollowAt = p.nextFollowAt || l.nextFollowAt; }
-        behavior("lead-follow", { id: p.id });
-        break;
+        if (!c.isBoss && !c.isStaff) return fail("无权限跟进线索");
+        var lf = d.leads[p.channel].filter(function (x) { return x.id === p.id; })[0];
+        if (!lf) return fail("线索不存在");
+        if (c.isStaff && lf.owner !== c.staffName) return fail("仅可跟进本人渠道线索");
+        lf.notes = lf.notes || [];
+        lf.notes.push({ at: "今天", by: c.isStaff ? c.staffName : "王建国", text: p.note });
+        save(); return ok();
       }
+
       case "lead/stage": {
-        var ld = find(d.leads, p.id);
-        if (ld) { var old = ld.stage; ld.stage = p.stage;
-                  if ((p.stage === "paid" || p.stage === "repaid") && !ld.paidAmount) ld.paidAmount = p.paidAmount || 0; }
-        behavior("lead-stage", { id: p.id, from: old, to: p.stage });
-        break;
+        if (!c.isBoss && !c.isStaff) return fail("无权限更新线索");
+        var ls = d.leads[p.channel].filter(function (x) { return x.id === p.id; })[0];
+        if (!ls) return fail("线索不存在");
+        if (c.isStaff && ls.owner !== c.staffName) return fail("仅可更新本人渠道线索");
+        ls.stage = p.stage;
+        save(); return ok();
       }
+
       case "lead/rebind": {
-        var lx = find(d.leads, p.id);
-        if (lx && !lx.rebound) { lx.rebound = true; behavior("lead-rebind", { id: p.id }); }
-        break;
+        /* 本期不做回收/换绑动作（决策 10） */
+        return fail("沉寂线索回收为静态提示，演示暂不支持换绑");
       }
 
-      /* A 轨 招商码 / 发起二级 / 初审（仅省代 boss） */
+      /* ---------- 招商码 ---------- */
       case "agent/gen": {
-        if (state.mode !== "province" || state.role !== "boss") break;
-        var hasActive = d.agentCodes.some(function (x) { return x.status === "active"; });
-        if (!hasActive) d.agentCodes.unshift({ id: uid("ag"), code: genAgentCode(), status: "active", createdAt: todayStr(), voidInfo: null });
-        behavior("agent-gen", {});
-        break;
+        if (!c.isBoss) return fail("仅老板可生成招商码");
+        var a = d.agentCodes[p.channel];
+        if (a.status !== "active" || a.code) return fail("当前招商码有效，无需重复生成");
+        a.code = genAgentCode();
+        a.status = "active";
+        a.createdAt = "2026-10";
+        save(); return { ok: true, code: a.code };
       }
+
       case "agent/void": {
-        if (state.mode !== "province" || state.role !== "boss") break;
-        var ag = find(d.agentCodes, p.id); if (ag) { ag.status = "void"; ag.voidInfo = { reason: p.reason || "主动作废", at: todayStr() }; }
-        behavior("agent-void", { id: p.id });
-        break;
+        if (!c.isBoss) return fail("仅老板可作废招商码");
+        var av = d.agentCodes[p.channel];
+        if (!av.code) return fail("尚无招商码");
+        av.status = "void";
+        av.voidAt = "2026-10";
+        save(); return ok();
       }
+
+      /* ---------- 二级合作 ---------- */
       case "app/create": {
-        if (state.mode !== "province" || state.role !== "boss") break;
-        var used = d.profile.used, cap = d.profile.cap;
-        if (used >= cap) { break; } // 名额满：拦截（UI 也禁用）
-        d.subApps.unshift({ id: uid("app"), entName: p.entName, uscc: p.uscc, contact: p.contact,
-          phone: p.phone, ratioToSub: p.ratioToSub, status: "pending", rejectReason: null, createdAt: todayStr() });
-        behavior("subapp-create", { ent: p.entName, ratio: p.ratioToSub });
-        break;
+        if (!c.isBoss) return fail("仅老板可发起二级合作");
+        if (!p.data || !p.data.name || !p.data.uscc) return fail("请填写企业名称与统一社会信用代码");
+        if (!/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(String(p.data.uscc).trim())) return fail("统一社会信用代码应为 18 位");
+        if (p.data.phone && !/^1\d{10}$/.test(p.data.phone)) return fail("请输入正确的手机号");
+        d.subApps.push({
+          id: genId("app"),
+          name: p.data.name, uscc: p.data.uscc, contact: p.data.contact || "", phone: p.data.phone || "",
+          address: p.data.address || "",
+          ratio: p.data.ratio || 0.20,
+          channel: p.channel,
+          status: "pending",
+          submittedAt: "2026-10-27"
+        });
+        save(); return ok();
       }
+
       case "app/review": {
-        if (state.mode !== "province" || state.role !== "boss") break;
-        var a = find(d.subApps, p.id); if (!a || a.status !== "pending") break;
+        if (!c.isBoss) return fail("仅老板可审批");
+        var app = d.subApps.filter(function (x) { return x.id === p.id; })[0];
+        if (!app || app.status !== "pending") return fail("申请不存在或已处理");
         if (p.pass) {
-          a.status = "approved";
-          d.profile.used = Math.min(d.profile.cap, d.profile.used + 1);
-          d.profile.subsCount = (d.profile.subsCount || 0) + 1;
-          d.subs = d.subs || [];
-          d.subs.push({ id: uid("sub"), name: a.entName, status: "active", ratioToSub: a.ratioToSub,
-                       inviteScope: "标准授权（平台配置 + O4 协议内）", inviteRate: null, inviteRateReadonly: true,
-                       /* 【S4-B】分成配置留痕字段 */
-                       ratioUpdatedAt: todayStr(),
-                       ratioLog: [{ at: todayStr(), from: 0, to: a.ratioToSub, by: "boss" }] });
-        } else { a.status = "rejected"; a.rejectReason = p.reason || "资料不全"; }
-        behavior("subapp-review", { id: p.id, pass: !!p.pass });
-        break;
-      }
-
-      /* 【S4-B】二级分成配置：获批后修改约定所得比例（boss 权限 / 账号生效 / 0–50% 校验 / 留痕） */
-      case "sub/setRatio": {
-        if (state.mode !== "province" || state.role !== "boss") break;
-        if (d.profile.status !== "active") break; /* 暂停/非生效账号拦截 */
-        var s2 = find(d.subs, p.id); if (!s2 || s2.status !== "active") break;
-        var nr = Math.round((Number(p.ratio) || 0) * 100) / 100;
-        if (isNaN(nr) || nr < CONST.ratioMin || nr > CONST.ratioMax) break; /* 超界拒绝 */
-        var oldR = Number(s2.ratioToSub) || 0;
-        if (nr === oldR) break;
-        s2.ratioToSub = nr;
-        s2.ratioLog = s2.ratioLog || [];
-        s2.ratioLog.push({ at: todayStr(), from: oldR, to: nr, by: state.role });
-        if (s2.ratioLog.length > 50) s2.ratioLog = s2.ratioLog.slice(-50);
-        s2.ratioUpdatedAt = todayStr();
-        behavior("sub-ratio-change", { id: p.id, from: oldR, to: nr });
-        break;
-      }
-
-      /* 线下付款登记（凭证强制由 UI 校验） */
-      case "pay/addReg": {
-        var box = layerBox(p.layer);
-        box.regs.unshift({ id: uid("reg"), calcId: p.calcId, amount: Number(p.amount) || 0,
-          method: p.method || "bank", date: p.date || todayStr(),
-          vouchers: p.vouchers || [], registeredBy: state.role,
-          status: "pending_confirm", createdAt: todayStr(), voidInfo: null });
-        behavior("pay-register", { calcId: p.calcId, amount: p.amount, vouchers: (p.vouchers || []).length });
-        break;
-      }
-      case "pay/confirm": {
-        var b2 = layerBox(p.layer); var r = find(b2.regs, p.id);
-        if (r && r.status !== "void") { r.status = "confirmed"; r.confirmedAt = todayStr(); r.signMethod = p.signMethod || "record"; }
-        behavior("pay-confirm", { id: p.id, signMethod: p.signMethod || "record" });
-        break;
-      }
-      case "pay/dispute": {
-        var b3 = layerBox(p.layer); var r3 = find(b3.regs, p.id);
-        if (r3 && r3.status !== "void") { r3.status = "disputed"; r3.reason = p.reason || "";
-          if (p.vouchers && p.vouchers.length) r3.vouchers = (r3.vouchers || []).concat(p.vouchers); }
-        behavior("pay-dispute", { id: p.id, reason: p.reason });
-        break;
-      }
-      case "pay/void": { // 作废 = 红冲，只追加不可物理删
-        var b4 = layerBox(p.layer); var r4 = find(b4.regs, p.id);
-        if (r4 && r4.status !== "void") {
-          r4.status = "void"; r4.voidInfo = { reason: p.reason, at: todayStr(), by: state.role };
-          b4.regs.unshift({ id: uid("red"), calcId: r4.calcId, amount: -Math.abs(r4.amount), method: r4.method,
-            date: todayStr(), vouchers: [], registeredBy: state.role, status: "void",
-            createdAt: todayStr(), redFlushOf: r4.id, voidInfo: { reason: "红字冲销原登记笔", at: todayStr() } });
+          app.status = "approved";
+          app.handledAt = "2026-10-27";
+          d.subs.push({
+            id: genId("sub"),
+            name: app.name,
+            uscc: app.uscc,
+            contact: app.contact || "负责人",
+            phone: app.phone || "",
+            address: app.address || "",
+            ratioToSub: app.ratio,
+            since: "2026-10-27",
+            status: "active",
+            channel: app.channel
+          });
+          pushMsg(d, { icon: "file-text", type: "info", title: "合作已通过：" + app.name, desc: "合作协议已生成，待二级企业登录后签署", to: "#/subs" });
+        } else {
+          app.status = "rejected";
+          app.rejectReason = p.reason || "资质不符";
+          app.handledAt = "2026-10-27";
         }
-        behavior("pay-redflush", { id: p.id, reason: p.reason });
-        break;
-      }
-      case "stmt/balance": {
-        var b5 = layerBox(p.layer); var st = find(b5.stmts, p.id);
-        if (!st) break;
-        var calc = find(b5.calc, st.calcId);
-        var diff = diffOf(calc, b5.regs);
-        if (diff === 0 && st.status === "open") { st.status = "balanced"; st.balancedAt = todayStr(); }
-        behavior("stmt-balance", { id: p.id, diff: diff });
-        break;
+        save(); return ok();
       }
 
-      /* 二级 O4 协议 */
+      case "sub/setRatio": {
+        if (!c.isBoss) return fail("仅老板可配置约定比例");
+        var s = d.subs.filter(function (x) { return x.id === p.id; })[0];
+        if (!s || s.status !== "active") return fail("二级合作不可用");
+        var ratio = Number(p.ratio);
+        if (isNaN(ratio) || ratio < CONST.ratioMin || ratio > CONST.ratioMax) return fail("约定比例须在 0–50% 之间");
+        s.ratioToSub = ratio;
+        d.ratioLog = d.ratioLog || [];
+        d.ratioLog.unshift({
+          id: genId("rl"), subId: s.id, sub: s.name,
+          from: p.from == null ? ratio : p.from,
+          to: ratio,
+          by: "boss",
+          at: "2026-10-27 15:20",
+          note: "比例变更后需双方补签合作协议（演示）"
+        });
+        pushMsg(d, { icon: "file-text", type: "warn", title: "比例已变更，待补签协议：" + s.name, desc: "新约定比例 " + Math.round(ratio * 100) + "%，需与二级补签后生效", to: "#/subs" });
+        save(); return ok();
+      }
+
+      /* ---------- 付款登记 / 确认 / 异议 / 冲销 ---------- */
+      case "pay/addReg": {
+        if (!c.isBoss) return fail("仅老板可登记线下付款");
+        var regs = p.layer === "1" ? d.payRegs1 : d.payRegs2;
+        var calc = (p.layer === "1" ? d.calc1 : d.calc2);
+        if (!p.data || !p.data.amount || Number(p.data.amount) <= 0) return fail("请填写正确金额");
+        if (!p.data.vouchers || !p.data.vouchers.length) return fail("请上传付款凭证（凭证强制）");
+        var confirmed = regsSum(regs, calc.id);
+        var remain = calc.calcAmount - confirmed;
+        if (Number(p.data.amount) > remain + 0.01) {
+          return fail("登记金额 ¥" + Number(p.data.amount).toLocaleString() + " 超过未登记差额 ¥" + remain.toLocaleString() + "，请先冲销更正后再登记");
+        }
+        regs.push({
+          id: genId("r"),
+          calcId: calc.id,
+          amount: Number(p.data.amount),
+          method: p.data.method || "bank",
+          date: p.data.date || "2026-10-27",
+          vouchers: p.data.vouchers,
+          registeredBy: "王建国",
+          status: "pending_confirm",
+          dueDay: p.layer === "1" ? 3 : 12,
+          createdAt: "2026-10-27"
+        });
+        save(); return ok();
+      }
+
+      case "pay/confirm": {
+        if (p.layer === "2") {
+          if (!c.isOwner) return fail("仅二级负责人可确认");
+          var r2 = d.payRegs.filter(function (x) { return x.id === p.id; })[0];
+          if (!r2 || r2.status === "void") return fail("付款记录不存在");
+          if (r2.status === "confirmed") return fail("该登记已确认，无需重复确认");
+          if (r2.status === "disputed" && !p.verifiedNote) return fail("异议记录须填写线下核实说明后再确认");
+          r2.status = "confirmed";
+          r2.confirmedAt = "2026-10-27";
+          r2.signMethod = p.signMethod || "record";
+          r2.verifiedNote = p.verifiedNote || "";
+          save(); return ok();
+        }
+        if (!c.isBoss) return fail("仅老板可确认平台对账");
+        var r1 = (p.layer === "1" ? d.payRegs1 : d.payRegs2).filter(function (x) { return x.id === p.id; })[0];
+        if (!r1 || r1.status === "void") return fail("付款记录不存在");
+        if (r1.status === "confirmed") return fail("该登记已确认，无需重复确认");
+        if (r1.status === "disputed" && !p.verifiedNote) return fail("异议记录须填写线下核实说明后再确认");
+        r1.status = "confirmed";
+        r1.confirmedAt = "2026-10-27";
+        r1.signMethod = p.signMethod || "record";
+        r1.verifiedNote = p.verifiedNote || "";
+        save(); return ok();
+      }
+
+      case "pay/dispute": {
+        if (p.layer === "2") {
+          if (!c.isOwner) return fail("仅二级负责人可提异议");
+        } else if (!c.isBoss) return fail("仅老板可对平台对账提异议");
+        if (!p.reason) return fail("请填写异议说明");
+        var rd = (p.layer === "2" ? d.payRegs : (p.layer === "1" ? d.payRegs1 : d.payRegs2))
+          .filter(function (x) { return x.id === p.id; })[0];
+        if (!rd || rd.status === "void") return fail("付款记录不存在");
+        rd.status = "disputed";
+        rd.reason = p.reason;
+        rd.disputedAt = "2026-10-27";
+        save(); return ok();
+      }
+
+      case "pay/void": {
+        if (!c.isBoss) return fail("仅老板可冲销/作废登记");
+        var rv = (p.layer === "1" ? d.payRegs1 : d.payRegs2).filter(function (x) { return x.id === p.id; })[0];
+        if (!rv) return fail("付款记录不存在");
+        if (rv.status === "confirmed") return fail("已确认记录不可冲销（演示口径）");
+        rv.status = "void";
+        rv.voidInfo = { reason: p.reason || "信息登记错误，冲销后重登", at: "2026-10-27", by: "王建国" };
+        save(); return ok();
+      }
+
+      case "stmt/balance": {
+        if (!c.isBoss) return fail("仅老板可月度平账");
+        var regsB = p.layer === "1" ? d.payRegs1 : d.payRegs2;
+        var calcB = p.layer === "1" ? d.calc1 : d.calc2;
+        var stmts = d.statements;
+        var st = stmts.filter(function (x) { return x.calcId === calcB.id; })[0];
+        if (!st || st.status !== "open") return fail("对账单不存在或已平账");
+        var rel = regsB.filter(function (r) { return r.calcId === calcB.id; });
+        if (rel.some(function (r) { return r.status === "disputed"; })) return fail("存在未闭环异议，不能平账");
+        if (rel.some(function (r) { return r.status === "pending_confirm"; })) return fail("存在待确认登记，不能平账");
+        var sum = regsSum(regsB, calcB.id);
+        if (calcB.calcAmount - sum !== 0) return fail("差异未清零，不能平账");
+        st.status = "balanced";
+        st.balancedAt = "2026-10-27";
+        st.balancedBy = "王建国";
+        save(); return ok();
+      }
+
+      /* ---------- 协议（二级） ---------- */
       case "agree/sign": {
-        if (state.mode === "sub" && d.agreement) { d.agreement.state = "signed"; d.agreement.completedAt = todayStr(); }
-        behavior("agree-sign", {});
-        break;
+        if (!c.isOwner) return fail("仅二级负责人可签署");
+        var ag = d.agreement;
+        if (!ag || (ag.state !== "pending_mine")) return fail("当前协议无需签署");
+        if (!p.confirmed) return fail("请先完整阅读并勾选确认");
+        ag.state = "signed";
+        ag.signedAt = "2026-10-27";
+        ag.signerName = d.profile.contact || "负责人";
+        save(); return ok();
       }
+
       case "agree/reject": {
-        if (state.mode === "sub" && d.agreement) { d.agreement.state = "rejected"; d.agreement.rejectReason = p.reason; }
-        behavior("agree-reject", { reason: p.reason });
-        break;
+        if (!c.isOwner) return fail("仅二级负责人可拒签");
+        if (!p.reason) return fail("请填写拒签原因");
+        var ar = d.agreement;
+        if (!ar || ar.state !== "pending_mine") return fail("当前协议不可拒签");
+        ar.state = "rejected";
+        ar.rejectReason = p.reason;
+        ar.rejectedAt = "2026-10-27";
+        save(); return ok();
       }
+
+      case "agree/resend": {
+        if (!c.isBoss) return fail("仅省代老板可重新发起协议");
+        /* 省代域：演示中对最近一家二级重新发起（实际应由二级域接收） */
+        var target = d.subs.filter(function (x) { return x.status === "active"; })[0];
+        if (!target) return fail("没有可重新发起协议的二级企业");
+        pushMsg(d, { icon: "file-text", type: "info", title: "协议已重新发起：" + target.name, desc: "已通知二级企业重新查阅并签署", to: "#/subs" });
+        d.ratioLog = d.ratioLog || [];
+        d.ratioLog.unshift({ id: genId("rl"), subId: target.id, sub: target.name, from: target.ratioToSub, to: target.ratioToSub, by: "boss", at: "2026-10-27 15:40", note: "协议重新发起（拒签后修订）" });
+        save(); return ok();
+      }
+
+      /* ---------- 提醒（落消息留痕） ---------- */
+      case "msg/add": {
+        if (!c.isBoss && !c.isOwner) return fail("无权限发送提醒");
+        pushMsg(d, p.msg || { icon: "bell", type: "info", title: "提醒", desc: "" });
+        save(); return ok();
+      }
+
       default:
-        break;
+        return fail("未知动作：" + type);
     }
-    persist(); emit();
   }
 
-  /* ---------- 聚合 selectors ---------- */
-  function funnelOf(leads) {
-    var c = { direct: 0, registered: 0, onboarded: 0, paid: 0, repaid: 0, lost: 0, ignored: 0, paidAmount: 0 };
-    (leads || []).forEach(function (l) {
-      if (l.viaUserReinvite) { c.ignored++; return; } // 用户再邀请：不归属不计佣
-      c.direct++;
-      if (["registered", "onboarded", "paid", "repaid"].indexOf(l.stage) >= 0) c.registered++;
-      if (["onboarded", "paid", "repaid"].indexOf(l.stage) >= 0) c.onboarded++;
-      if (["paid", "repaid"].indexOf(l.stage) >= 0) { c.paid++; c.paidAmount += Number(l.paidAmount) || 0; }
-      if (l.stage === "repaid") c.repaid++;
-      if (l.stage === "lost") c.lost++;
-    });
-    return c;
+  function pushMsg(d, m) {
+    d.msgLog = d.msgLog || [];
+    d.msgLog.unshift(Object.assign({ time: "刚刚" }, m));
+    if (d.msgLog.length > 20) d.msgLog.length = 20;
   }
 
   window.V3 = window.V3 || {};
-  window.V3.MONEY_NOTE = MONEY_NOTE;
   window.V3.store = {
-    CONST: CONST, MONEY_NOTE: MONEY_NOTE,
-    hydrate: hydrate, getState: getState, subscribe: subscribe, act: act,
-    domain: domain, behavior: behavior,
-    calcFinance: calcFinance, subSettle: subSettle, regsSum: regsSum, diffOf: diffOf, funnelOf: funnelOf,
-    genChannelCode: genChannelCode, genAgentCode: genAgentCode,
-    _lsKey: LS_KEY, resetStorage: function () { try { localStorage.removeItem(LS_KEY); } catch (e) {} }
+    LS_KEY: LS_KEY,
+    CONST: CONST,
+    genAgentCode: genAgentCode,
+    genChannelCode: genChannelCode,
+    calcFinance: calcFinance,
+    subSettle: subSettle,
+    funnelOf: funnelOf,
+    regsSum: regsSum,
+    regsAllSum: regsAllSum,
+    monthlyStatement: monthlyStatement,
+    todoOf: todoOf,
+    messagesOf: messagesOf,
+    seed: seed,
+    getState: getState,
+    reset: reset,
+    save: save,
+    load: load,
+    currentScenario: currentScenario,
+    act: act
   };
 })();

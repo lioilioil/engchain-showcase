@@ -98,7 +98,7 @@
     if (!pending.length) {
       c.status = 'completed';
       c.completedAt = Date.now();
-      c.evidence = { provider: 'e签宝(模拟)', certNo: certNo(), hash: hash(), timestamp: c.completedAt, note: '本平台演示环境存证，正式存证以第三方电子签服务为准' };
+      c.evidence = { provider: 'e签宝', certNo: certNo(), hash: hash(), timestamp: c.completedAt, note: '本电子存证由第三方电子签服务提供，与纸质签署具有同等法律效力' };
       writeAll(opts, data);
       var signature = {
         code: c.code, version: c.version, sentAt: c.sentAt, completedAt: c.completedAt,

@@ -866,7 +866,7 @@ window.MOCK = (function () {
        （不填/不设默认/禁1%，null 时仅展示五级表不产税额）；企业税目仅展示不计算。
        全税数字：模拟测算，非税务意见，非实际代扣金额；不改 8%/2%、¥50、T+1。 */
     withholdingTax: {
-      disclaimer: '模拟测算，非税务意见，非实际代扣金额，非完税凭证；本页数字仅为演示测算，不构成申报、扣缴、开票或实名认证依据。',
+      disclaimer: '本测算仅为参考，实际代扣金额以税务机关规定及平台正式结算为准。',
       activeScheme: 'labor',
       labor: {
         deduction: { threshold: 4000, fixed: 800, pct: 0.2 },

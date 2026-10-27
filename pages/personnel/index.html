@@ -104,11 +104,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .sec-head .sh-more:active { opacity:.6; }
   .sec-head .sh-more svg { width:12px; height:12px; }
 
-  /* ===== 急聘/急寻横向滚动区 ===== */
+  /* ===== 急聘/急寻连续滚动区（单行 1.5 卡 + 无缝 marquee） ===== */
   .hot-section { margin-bottom:10px; }
-  .hot-scroll { display:flex; gap:10px; overflow-x:auto; padding:0 16px 4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .hot-scroll { display:block; overflow:hidden; padding:0 16px 4px; margin:0; scroll-snap-type:none; }
   .hot-scroll::-webkit-scrollbar { display:none; }
-  .hot-card { flex:none; width:224px; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l); padding:12px 14px; cursor:pointer; transition:transform var(--d-fast),border-color var(--d-fast); }
+  .hot-track { display:flex; width:max-content; will-change:transform; animation:hs-marquee 32s linear infinite; }
+  .hs-set { display:flex; gap:10px; padding-right:10px; }
+  .hot-card { flex:none; width:var(--hs-w,232px); min-width:0; background:var(--bg-card); border:1px solid var(--line); border-radius:var(--r-l); padding:12px 14px; cursor:pointer; transition:transform var(--d-fast),border-color var(--d-fast); }
+  .hot-scroll:hover .hot-track { animation-play-state:paused; }
+  @media (prefers-reduced-motion: reduce) { .hot-track { animation:none; } }
+  @keyframes hs-marquee { from { transform:translateX(0); } to { transform:translateX(-50%); } }
   .hot-card:active { transform:scale(.98); border-color:var(--primary); }
   .hot-card .hc-tags { display:flex; gap:5px; margin-bottom:6px; flex-wrap:wrap; }
   .hot-card .hc-title { font-size:13px; font-weight:700; color:var(--text-1); line-height:1.35; margin-bottom:5px; }
@@ -979,7 +984,31 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }, 180);
   }
 
-  /* ===== 渲染急聘/急寻横向滚动区 ===== */
+  /* ===== 热门区：单行 1.5 卡无缝连续滚动（marquee） ===== */
+  function setupHotMarquee(el) {
+    if (!el) return;
+    var w = Math.max(180, Math.round((el.clientWidth - 42) / 1.5));
+    el.style.setProperty('--hs-w', w + 'px');
+    var track = el.querySelector('.hot-track');
+    if (track) return;
+    if (!el.querySelector('.hcard, .hot-card')) return;
+    track = document.createElement('div');
+    track.className = 'hot-track';
+    var set1 = document.createElement('div');
+    set1.className = 'hs-set';
+    while (el.firstChild) set1.appendChild(el.firstChild);
+    var set2 = document.createElement('div');
+    set2.className = 'hs-set';
+    set2.innerHTML = set1.innerHTML;
+    track.appendChild(set1);
+    track.appendChild(set2);
+    el.appendChild(track);
+    /* 动画时长按内容宽度折算（约 40px/s，下限 12s），保证不同条数速度观感一致 */
+    var dur = Math.max(12, set1.scrollWidth / 40);
+    track.style.animationDuration = dur + 's';
+  }
+
+  /* ===== 渲染急聘/急寻连续滚动区 ===== */
   function renderHot() {
     var list = currentData().filter(function (r) { return r.urgent; }).slice(0, 4);
     var scroll = document.getElementById('hotScroll');
@@ -1009,6 +1038,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="hc-bottom"><div class="hc-price">' + priceText + '</div><span class="hc-btn">查看</span></div>' +
       '</a>';
     }).join('');
+    setupHotMarquee(scroll);
   }
 
   /* ===== 筛选按钮状态 ===== */

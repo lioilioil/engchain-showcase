@@ -53,7 +53,25 @@
     doc: '<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 7.8-7.5 9.5C7.7 19.3 4.5 16.1 4.5 11.5V6z"/><path d="M8.8 12l2.3 2.3 4.2-4.4"/>',
     chart: '<path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 16v-4M12.5 16V8M17 16v-7"/>',
-    receipt: '<path d="M5 3.5h14v17l-2.5-1.5L14 20.5l-2-1.5-2 1.5L7.5 19 5 20.5z"/><path d="M9 8h6M9 12h6M9 16h3"/>'
+    receipt: '<path d="M5 3.5h14v17l-2.5-1.5L14 20.5l-2-1.5-2 1.5L7.5 19 5 20.5z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    building: '<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8 7h2M11 7h2M14 7h2M8 10.5h2M11 10.5h2M14 10.5h2M8 14h2M11 14h2M14 14h2"/><path d="M10 20.5v-3.5h4v3.5"/>',
+    "check-circle": '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/>',
+    "x-circle": '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/>',
+    wechat: '<path d="M4 9.5C4 6.5 7.2 4 11.2 4c3.8 0 6.8 2.3 7.1 5.3"/><path d="M18.3 9.6c2.6.4 4.2 2.2 4.2 4.4 0 1.4-.8 2.7-2 3.5l.4 1.8-2.2-1.1c-.6.2-1.2.2-1.9.2-2.8 0-5.2-1.7-5.6-4"/><path d="M7.1 18.5C4.6 17.9 2.8 15.8 2.8 13.3 2.8 10.4 5.5 8 9 8c3.6 0 6.5 2.4 6.5 5.3 0 3-3 5.3-6.7 5.3-.7 0-1.3-.1-1.9-.2l-2.3 1.1.5-1.8z"/><circle cx="7" cy="12.6" r=".7" fill="currentColor" stroke="none"/><circle cx="11" cy="12.6" r=".7" fill="currentColor" stroke="none"/><circle cx="15.2" cy="13.4" r=".6" fill="currentColor" stroke="none"/><circle cx="18.4" cy="13.4" r=".6" fill="currentColor" stroke="none"/>',
+    image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5L20 17"/>',
+    wallet: '<rect x="3.5" y="5.5" width="17" height="13.5" rx="2.5"/><path d="M3.5 9.5h17"/><circle cx="16.5" cy="13.5" r="1.1" fill="currentColor" stroke="none"/>',
+    settings: '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8l1.1 2.3 2.5-.5 1.1 2.2-1.7 1.9.5 2.5-2.5.5L12 16.4l-2.5-.5-1.1-2.2 1.7-1.9-.5-2.5 2.5-.5z" stroke-width="1.4"/>',
+    "file-text": '<path d="M6 3.5h7.5L19 9V20.5H6z"/><path d="M13.5 3.5V9.5H19"/><path d="M9 13h6M9 16.5h4.5"/>',
+    "user-plus": '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c.7-3.2 2.9-4.8 5.5-4.8 1 0 1.9.2 2.7.6"/><path d="M17 10v6M14 13h6"/>',
+    info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor" stroke="none"/>',
+    "help-circle": '<circle cx="12" cy="12" r="8.5"/><path d="M9.4 9.2c.3-1.4 1.4-2.2 2.7-2.2 1.5 0 2.6.9 2.6 2.2 0 1.2-.7 1.8-1.8 2.5-.8.5-1 .9-1 1.8"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/>',
+    users: '<circle cx="8.5" cy="8.5" r="3"/><path d="M3 19c.6-2.9 2.6-4.3 5.5-4.3s4.9 1.4 5.5 4.3"/><path d="M15 5.7a3 3 0 0 1 0 5.6"/><path d="M17.5 14.9c1.6.6 2.7 2 2.9 4.1"/>',
+    badge: '<circle cx="12" cy="9" r="5"/><path d="M8.5 13.2 7 20.5l5-2.8 5 2.8-1.5-7.3"/><path d="M10.2 9.1l1.2 1.2 2.3-2.5"/>',
+    logout: '<path d="M14 4h4.5a1.5 1.5 0 0 1 1.5 1.5v13a1.5 1.5 0 0 1-1.5 1.5H14"/><path d="M9 16.5 4.5 12 9 7.5"/><path d="M4.5 12H15"/>',
+    clipboard: '<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 4.5v.5H9z"/><path d="M8.5 11h7M8.5 14.5h5"/>',
+    send: '<path d="M21 3 10.5 13.5"/><path d="M21 3 14 21l-3.5-7.5L3 10z"/>',
+    refresh: '<path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.5"/><path d="M4 20v-4.5h4.5"/>',
+    "alert-circle": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16.3" r=".6" fill="currentColor" stroke="none"/>'
   };
   function icon(name, size) {
     var body = P[name] || P.doc;
@@ -94,7 +112,7 @@
       '<div class="v3-sheet" role="dialog" aria-modal="true">' +
       '<div class="v3-sheet__handle"></div>' +
       '<div class="v3-sheet__hd"><div class="t">' + esc(opt.title || "") + '</div>' +
-      '<button class="x" data-close>×</button></div>' +
+      '<button class="x" data-close aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button></div>' +
       '<div class="v3-sheet__bd">' + (opt.body || "") + '</div>' +
       (ft ? '<div class="v3-sheet__ft">' + ft + "</div>" : "") +
       "</div>";
@@ -112,8 +130,8 @@
   function openModal(opt) {
     var ov = ensureOverlay("v3-modal-wrap");
     ov.innerHTML =
-      '<div class="v3-modal" role="alertdialog">' +
-      '<div class="ic">' + (opt.icon ? icon(opt.icon, 24) : "!") + "</div>" +
+      '<div class="v3-modal' + (opt.danger ? " v3-modal--danger" : "") + '" role="alertdialog">' +
+      '<div class="ic' + (opt.danger ? " ic-danger" : "") + '">' + (opt.icon ? icon(opt.icon || "warn", 24) : "!") + "</div>" +
       '<div class="t">' + esc(opt.title || "") + "</div>" +
       '<div class="d">' + (opt.body || "") + "</div>" +
       '<div class="v3-modal__ft">' +
@@ -140,6 +158,24 @@
         rd.readAsDataURL(file);
       } else { resolve(v); }
     });
+  }
+
+  /* 凭证全屏预览（图片显大图；非图片显文件名与演示说明） */
+  function previewVoucher(v) {
+    var ov = ensureOverlay("v3-viewer-wrap");
+    var inner = (v && v.thumb)
+      ? '<img class="v3-viewer__img" src="' + v.thumb + '" alt="' + esc(v.name || "凭证") + '">'
+      : '<div class="v3-viewer__file">' + icon("file", 44) +
+        '<div class="v3-viewer__name">' + esc((v && v.name) || "凭证") + "</div>" +
+        '<div class="v3-viewer__tip">非图片凭证或原件未随演示数据提供，此处仅展示文件名</div></div>';
+    ov.innerHTML =
+      '<div class="v3-viewer" role="dialog" aria-modal="true">' +
+      '<div class="v3-viewer__bar"><span class="v3-viewer__title">' + esc((v && v.name) || "凭证预览") + "</span>" +
+      '<button class="v3-viewer__x" data-close aria-label="关闭">' + icon("close", 18) + "</button></div>" +
+      inner + "</div>";
+    ov.querySelector("[data-close]").addEventListener("click", function () { closeOverlay(ov); });
+    requestAnimationFrame(function () { ov.classList.add("show"); });
+    return ov;
   }
 
   /* 文案映射 */
@@ -181,7 +217,7 @@
   window.V3.ui = {
     esc: esc, money: money, moneyD: moneyD, moneyPlain: moneyPlain, icon: icon,
     toast: toast, openSheet: openSheet, openModal: openModal, closeAll: closeAll,
-    fileToVoucher: fileToVoucher,
+    fileToVoucher: fileToVoucher, previewVoucher: previewVoucher,
     emptySvg: emptySvg, emptyHtml: emptyHtml,
     STAGE: STAGE, STAGE_BADGE: STAGE_BADGE, ACCT: ACCT, ACCT_BADGE: ACCT_BADGE, REG: REG, REG_BADGE: REG_BADGE
   };

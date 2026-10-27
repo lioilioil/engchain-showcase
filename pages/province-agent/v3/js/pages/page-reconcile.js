@@ -1,469 +1,437 @@
-/* page-reconcile.js · 对账留痕 #/reconcile
-   【S4-C 深度重构】从 3 步任务流升级为「行级勾稽网」：
-   ① 行级匹配（登记行 ↔ 测算池勾稽：已勾稽/待核对/勾稽挂起/已冲销 + 勾稽条）
-   ② 差异分解卡（漏登差额 / 异议挂起 / 冲销红字，纯视图归集不改数）
-   ③ 证据链（每行玻璃 bottom sheet 时间线：登记→凭证→异议→确认→冲销）
-   ④ 状态机（每行微阶段条：登记→待核对→确认/异议→平账，迁移沿用 store 原 actions）
-   弹窗：统一走 ui.openSheet / ui.openModal（v3-sheet/v3-modal 液态玻璃承载，§二规范），不新增第三种样式。
-   A1 对账规则收为页内「说明 ›」玻璃弹层（合规原文不删字）；B2 登记人角色中文化。
-   口径：diff = calcAmount − regsSum（regsSum=该 calcId 下 status≠void 金额求和）；不读 calcFinance、不引入 selfRate。 */
+/* page-reconcile.js · 省代对账中心
+   L1 我与平台（T+5 异议） / L2 我与二级（15 天仅提醒）
+   修复：L2 异议/补登记/平账闭环、超登校验、凭证预览、真实状态、单源数字、去法律效力承诺。 */
 (function () {
   "use strict";
+  var P = window.V3PAGES = window.V3PAGES || {};
+  var curLayer = "1";
 
-  function layerData(d, layer) {
-    if (String(layer) === "1") return { calc: d.calc1, regs: d.payRegs1, stmts: d.statements1,
-      title: "我与平台的对账", side: "你确认平台线下到账", counter: "平台 · 润锦工程链" };
-    return { calc: d.calc2, regs: d.payRegs2, stmts: d.statements2,
-      title: "我与二级企业的对账", side: "二级确认后才到账 · 15 天只提醒", counter: "成都蓉建科贸有限公司" };
+  function layerData(ctx) {
+    var d = ctx.d;
+    if (curLayer === "1") {
+      return {
+        layer: "1",
+        title: "我与平台",
+        sub: "平台 → 省代总代 · T+5 工作日异议",
+        calc: d.calc1, regs: d.payRegs1,
+        party: "平台",
+        deadline: "T+5 工作日内",
+        deadlineNote: "与平台对账：请在 T+5 工作日内完成核实与异议。"
+      };
+    }
+    var sub = d.subs[0];
+    return {
+      layer: "2",
+      title: "我与二级企业",
+      sub: "省代 → 二级合作 · 出账后 15 天仅提醒",
+      calc: d.calc2, regs: d.payRegs2,
+      party: sub ? sub.name : "二级合作企业",
+      deadline: "出账后 15 天内",
+      deadlineNote: "出账后 15 天内仅提醒，系统不会自动确认、不会自动到账。"
+    };
   }
 
-  /* 角色名中文化（B2：登记人 boss → 老板） */
-  function roleName(r) {
-    return ({ boss: "老板", admin: "管理员", staff: "员工" })[r] || r || "—";
+  function stats(regs, calc) {
+    var cur = regs.filter(function (r) { return r.calcId === calc.id; });
+    var confirmed = cur.filter(function (r) { return r.status === "confirmed"; });
+    var pending = cur.filter(function (r) { return r.status === "pending_confirm"; });
+    var disputed = cur.filter(function (r) { return r.status === "disputed"; });
+    var sum = window.V3.store.regsSum(regs, calc.id);
+    return {
+      cur: cur, confirmed: confirmed, pending: pending, disputed: disputed,
+      sum: sum, diff: calc.calcAmount - sum,
+      stmt: window.V3.store.getState().state.statements.filter(function (s) { return s.calcId === calc.id; })[0]
+    };
   }
 
   function render(ctx) {
     var ui = ctx.ui;
-    /* A1：正文区不再常驻规则折叠条 → 页内首行「说明 ›」玻璃弹层承载 */
-    var h = '<div class="rc-headrow"><span class="rc-sec">本月对账进度</span>' +
-      '<button type="button" class="rc-rules-entry" data-act="show-rules">' + ui.icon("bank", 13) + "<span>说明 ›</span></button></div>";
-    h += '<div class="rc-seg" id="rc-seg">' +
-      '<button type="button" data-l="1" class="on"></button>' +
-      '<button type="button" data-l="2"></button></div>';
-    h += '<div id="rc-body"></div>';
-    return h;
-  }
+    var L = layerData(ctx);
+    var st = stats(L.regs, L.calc);
+    var balanced = st.stmt && st.stmt.status === "balanced";
+    var h = "";
 
-  /* 层内未处理数（段切换小徽章） */
-  function layerOpen(ctx, layer) {
-    var V3 = ctx.V3, d = ctx.d, L = layerData(d, layer);
-    var curCalc = L.calc[0];
-    var regs = L.regs.filter(function (r) { return r.calcId === curCalc.id && r.status !== "void"; });
-    return regs.filter(function (r) { return r.status !== "confirmed"; }).length;
-  }
+    h += '<div class="v3-page-head"><div class="v3-page-title">对账中心</div>' +
+      '<div class="v3-page-sub">平台账单、线下付款登记与月度平账留痕</div></div>';
+    if (ctx.isStaff) {
+      h += '<div class="v3-readnote v3-mb12">' + ui.icon("lock", 14) +
+        "<span>员工视角：对账数据仅可查看；付款登记、异议、确认与平账留痕仅老板可操作。</span></div>";
+    }
 
-  function renderLayer(ctx, layer) {
-    var ui = ctx.ui, V3 = ctx.V3, d = ctx.d;
-    var L = layerData(d, layer);
-    var isL2 = String(layer) === "2";
-    var curCalc = L.calc[0], prevCalc = L.calc[1];
-    var curStmt = L.stmts[0];
-    var regs = L.regs.filter(function (r) { return r.calcId === curCalc.id; });
-    var sum = V3.store.regsSum(L.regs, curCalc.id);
-    var diff = curCalc.calcAmount - sum;
-    var activeRegs = regs.filter(function (r) { return r.status !== "void"; });
-    var disputedRegs = activeRegs.filter(function (r) { return r.status === "disputed"; });
-    var pendingRegs = activeRegs.filter(function (r) { return r.status === "pending_confirm"; });
-    var disputedSum = disputedRegs.reduce(function (s, r) { return s + r.amount; }, 0);
-    var redCount = regs.filter(function (r) { return r.redFlushOf; }).length;
-    var allConfirmed = activeRegs.length > 0 && activeRegs.every(function (r) { return r.status === "confirmed"; });
-    var balanced = curStmt.status === "balanced";
-    var canAct = ctx.canBoss && !ctx.readonly;
+    /* 层切换 */
+    h += '<div class="rc-seg"><button class="' + (curLayer === "1" ? "on" : "") + '" data-layer="1">' +
+      "我与平台" + (ctx.V3.store.todoOf(ctx.s).l1 && (ctx.V3.store.todoOf(ctx.s).l1.pending + ctx.V3.store.todoOf(ctx.s).l1.disputed) ? '<span class="rc-seg__n">' + (ctx.V3.store.todoOf(ctx.s).l1.pending + ctx.V3.store.todoOf(ctx.s).l1.disputed) + "</span>" : "") + "</button>" +
+      '<button class="' + (curLayer === "2" ? "on" : "") + '" data-layer="2">我与二级企业' +
+      (ctx.V3.store.todoOf(ctx.s).l2 && (ctx.V3.store.todoOf(ctx.s).l2.pending + ctx.V3.store.todoOf(ctx.s).l2.disputed) ? '<span class="rc-seg__n">' + (ctx.V3.store.todoOf(ctx.s).l2.pending + ctx.V3.store.todoOf(ctx.s).l2.disputed) + "</span>" : "") + "</button></div>";
 
-    /* ---------- 顶部一句话状态行 + 唯一主操作（继承迭代三口径） ---------- */
-    var bandCls = "ok", bandTxt = "", primary = "";
+    /* 焦点卡：唯一大数字 */
+    h += '<div class="rc-focus"><div class="rc-focus__k">' + L.calc.month + " · " + L.title + "（" + L.party + "）</div>";
     if (balanced) {
-      bandCls = "ok";
-      bandTxt = ui.icon("check", 15) + "<span>本月已平账留痕（" + ui.esc(curStmt.balancedAt || prevCalc.balancedAt || "") + "）</span>";
-    } else if (disputedRegs.length) {
-      bandCls = "bad";
-      bandTxt = ui.icon("warn", 15) + "<span>差异 " + ui.money(diff) + "，<b>" + disputedRegs.length +
-        " 笔异议待线下核实</b>，暂不能平账（差异未清）</span>";
-      if (!isL2 && canAct) primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="first-dispute">处理异议</button>';
-    } else if (diff !== 0) {
-      bandCls = "bad";
-      bandTxt = ui.icon("warn", 15) + "<span>差异 " + ui.money(diff) + "（平台测算 − 你的实付登记），<b>暂不能平账</b>（差异未清）</span>";
-      primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="add-reg">登记线下付款</button>';
-    } else if (pendingRegs.length) {
-      bandCls = "warn";
-      bandTxt = ui.icon("clock", 15) + "<span>金额已对齐，<b>" + pendingRegs.length +
-        " 笔待确认</b>" + (isL2 ? "（等待二级，仅提醒不自动到账）" : "") + "</span>";
-      if (!isL2 && canAct) primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="first-confirm">确认到账</button>';
-      else if (isL2) primary = '<button type="button" class="v3-btn v3-btn--ghost v3-btn--sm" data-act="remind">' + ui.icon("bell", 15) + " 提醒二级确认</button>";
-      else primary = '<button type="button" class="v3-btn v3-btn--ghost v3-btn--sm is-disabled">待管理员确认</button>';
-    } else if (allConfirmed) {
-      bandCls = "ok";
-      bandTxt = ui.icon("check", 15) + "<span>差异 ¥0，凭证齐全，<b>可月度平账留痕</b></span>";
-      if (!isL2 && canAct) primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="balance">月度平账留痕</button>';
+      h += '<div class="rc-focus__n rc-focus__n--ok num">' + ui.moneyD(0) + "</div><div class=\"rc-focus__s\">差异已清零 · 已平账留痕</div>";
     } else {
-      bandCls = "warn";
-      bandTxt = ui.icon("bank", 15) + "<span>本月线下付款完成后，请先<b>登记并上传凭证</b>（凭证强制）。</span>";
-      if (!isL2 && canAct) primary = '<button type="button" class="v3-btn v3-btn--navy v3-btn--sm" data-act="add-reg">登记线下付款</button>';
+      h += '<div class="rc-focus__n' + (st.diff ? " rc-focus__n--bad" : "") + ' num">' + ui.moneyD(st.diff) + "</div>" +
+        '<div class="rc-focus__s">未清差异（平台测算 ¥' + ui.moneyPlain(L.calc.calcAmount) + " − 已确认 ¥" + ui.moneyPlain(st.sum) + "）</div>";
     }
+    h += '<div class="rc-focus__meta">登记 ' + st.cur.length + " 笔 · 已确认 " + st.confirmed.length + " 笔 · 异议 " + st.disputed.length + " 笔</div>";
 
-    /* ---------- 步骤降级：3 步条不再独立成卡，并入 band 副标一行小灰字（V4 唯一焦点） ---------- */
-    var stepNum = activeRegs.length ? ((allConfirmed || disputedRegs.length) ? 3 : 2) : 1;
-    var h = '<div class="rc-band rc-band--' + bandCls + '" data-layer="' + layer + '">' +
-      '<div class="rc-band__txt">' + bandTxt + "</div>" +
-      '<div class="rc-band__sub">第 ' + stepNum + " 步 / 共 3 步（补登记 → 核对 → 确认/异议）</div>" +
-      (primary ? '<div class="rc-band__op">' + primary + "</div>" : "") +
-      "</div>";
+    /* lifeBar */
+    h += '<div class="rc-life">' + lifeNodes(balanced, st) + "</div>";
 
-    /* ---------- 数字区唯一焦点（G-A P0-1）：未清差异 T1 大字为唯一主焦点；
-       测算应付 / 已登记降为次级一行灰小字；勾稽关系人话一句引导。
-       ① 行级勾稽恒等式完整保留在「说明 ›」弹层与差异分解弹层 kv 内，功能不减。 ---------- */
-    var diffAbs = Math.abs(diff);
-    h += '<section class="rc-summary' + (diff !== 0 ? " is-open" : " is-clear") + '">' +
-      '<div class="rc-focus"><span class="rc-focus__lab">未清差异</span>' +
-      '<b class="rc-focus__num num">' + ui.money(diffAbs) + "</b></div>" +
-      '<div class="rc-subline">测算应付 <span class="num">' + ui.money(curCalc.calcAmount) +
-      '</span> · 已登记 <span class="num">' + ui.money(sum) + "</span></div>" +
-      '<div class="rc-guide">' + (diff !== 0
-        ? "还有 " + ui.money(diffAbs) + " 未对上——多来自漏登、异议或冲销，补登记或提异议即可冲抵"
-        : "测算与实付已对上，确认凭证后即可平账") + "</div>" +
-      "</section>";
+    /* band */
+    h += renderBand(ctx, L, st, balanced);
 
-    /* ---------- ② 差异分解：独立卡降级为列表上方一行提示（明细弹层 diffDetailSheet 保留，功能不减） ---------- */
-    if (diff !== 0 || disputedRegs.length) {
-      var diffHintTxt = disputedRegs.length
-        ? ui.money(diff) + " 差额 · " + disputedRegs.length + " 笔异议待线下核实"
-        : ui.money(diff) + " 差额 · 漏登待补登记";
-      h += '<button type="button" class="rc-diffhint" data-act="diff-detail">' +
-        "<span>差异分解：" + diffHintTxt + "</span><span class=\"rc-diffhint__more\">明细 ›</span></button>";
+    /* 规则入口 */
+    h += '<div class="rc-rules"><button class="rc-rules-entry" data-act="show-rules">' + ui.icon("bank", 13) +
+      "<span>结算口径与时限说明 ›</span></button></div>";
+
+    /* 本月登记行 */
+    h += '<div class="v3-sec-title">付款登记与凭证</div><div class="v3-stack">';
+    if (!st.cur.length) {
+      h += '<div class="v3-placeholder">本月暂无付款登记' + (ctx.canBoss ? "，线下付款后请登记并上传凭证" : "") + "</div>";
     }
-
-    /* ---------- 明细行头（B1：只留月份，时限说明收进说明弹层） ---------- */
-    h += '<div class="rc-rows-head"><span class="v3-sm v3-strong">' + curCalc.month + " 登记明细</span></div>";
-    h += '<section class="rc-rows">';
-    if (!regs.length) {
-      h += '<div class="v3-placeholder" >尚无登记。请在 App 外完成付款后，登记金额并上传凭证（凭证强制）。</div>';
-    } else {
-      regs.forEach(function (r) { h += regRow(ctx, r, isL2, canAct); });
-    }
-    h += "</section>";
-
-    /* 历史月份 */
-    h += '<div class="rc-prev"><span class="v3-xs v3-muted">' + prevCalc.month + " 月度对账单</span>" +
-      '<span class="v3-badge v3-badge--active">已平账 ' + ui.money(prevCalc.calcAmount) + "</span></div>";
-    return h;
-  }
-
-  /* ④ 状态机微阶段条：登记 → 待核对 → 确认/异议 → 平账 */
-  function lifeBar(r) {
-    var st = r.status, voided = st === "void";
-    var stage = [
-      { t: "登记", cls: voided ? "" : "on" },
-      { t: "待核对", cls: (st === "pending_confirm" || st === "confirmed" || st === "disputed") ? "on" : "" },
-      { t: st === "disputed" ? "有异议" : "确认", cls: st === "confirmed" ? "on" : (st === "disputed" ? "on bad" : "") },
-      { t: "平账", cls: "" }
-    ];
-    var h = '<div class="rc-lifecycle">';
-    stage.forEach(function (s, i) {
-      if (i) h += '<span class="ll"></span>';
-      h += '<span class="ld ' + s.cls + '"><i></i>' + s.t + "</span>";
-    });
+    st.cur.forEach(function (r) { h += rowCard(ctx, L, r); });
     h += "</div>";
+
+    /* 历史（已平账月份） */
+    var prev = L.regs.filter(function (r) { return r.calcId !== L.calc.id; });
+    if (prev.length) {
+      h += '<div class="v3-sec-title">历史（已平账）</div><div class="v3-stack">';
+      prev.forEach(function (r) { h += rowCard(ctx, L, r, true); });
+      h += "</div>";
+    }
+    h += '<div class="gb-pay-end"></div>';
     return h;
   }
 
-  function regRow(ctx, r, isL2, canAct) {
+  function lifeNodes(balanced, st) {
+    /* 阶段语义：无登记→测算出账；有登记（含待确认/异议）→付款登记；
+       已确认且差异为零→双方确认；已平账→平账留痕 */
+    var step = 1;
+    if (balanced) step = 4;
+    else if (st.cur.length && st.sum > 0 && st.pending.length + st.disputed.length === 0 && st.diff === 0) step = 3;
+    else if (st.cur.length) step = 2;
+    var nodes = ["测算出账", "付款登记", "双方确认", "平账留痕"];
+    return nodes.map(function (n, i) {
+      var idx = i + 1;
+      var cls = balanced ? "done" : (idx < step ? "done" : idx === step ? "cur" : "");
+      return '<div class="rc-life__n ' + cls + '"><span class="rc-life__dot">' + (idx < step ? "✓" : idx) + "</span>" +
+        "<span>" + n + "</span></div>";
+    }).join('<div class="rc-life__line"></div>');
+  }
+
+  function renderBand(ctx, L, st, balanced) {
     var ui = ctx.ui;
-    var voided = r.status === "void";
-    var isRed = !!r.redFlushOf;
-    var matchChip = ({ pending_confirm: "待核对", confirmed: "已勾稽", disputed: "勾稽挂起", void: "已冲销" })[r.status];
-    var h = '<div class="rc-row' + (voided ? " is-void" : "") + '" data-rid="' + r.id + '">' +
-      '<div class="rc-row__hd"><span class="amt num' + (isRed ? " is-neg" : "") + '">' + ui.money(r.amount) + "</span>" +
-      '<span class="v3-badge ' + ui.REG_BADGE[r.status] + '">' + ui.REG[r.status] + "</span>" +
-      '<span class="rc-match rc-match--' + r.status + '">' + matchChip + "</span></div>" +
-      lifeBar(r) +
-      '<div class="rc-row__meta"><span>' + ui.esc(r.date) + "</span><span>" + methodName(r.method) + "</span><span>登记人 " + ui.esc(roleName(r.registeredBy)) + "</span></div>";
-    (r.vouchers || []).forEach(function (v) {
-      h += '<div class="rc-row__vch">' + ui.icon(v.kind === "image" ? "camera" : "file", 14) +
-        "<span>" + ui.esc(v.name) + '</span><span class="v3-badge v3-badge--active">凭证</span></div>';
-    });
-    if (r.status === "confirmed" && r.signMethod) {
-      h += '<div class="rc-row__vch" >' + ui.icon("shield", 14) +
-        "<span>" + (r.signMethod === "esign" ? "确认 + 电子签留痕" : "双方确认记录") + "</span></div>";
+    var can = ctx.canBoss;
+    var cls, txt, primary = "";
+    if (balanced) {
+      cls = "rc-band--ok";
+      txt = ui.icon("check", 15) + "<span>本月已平账留痕（" + ui.esc(st.stmt.balancedAt || "") + "）</span>";
+    } else if (st.disputed.length) {
+      cls = "rc-band--warn";
+      txt = ui.icon("warn", 15) + "<span><b>" + st.disputed.length + " 笔异议待闭环</b>（" + L.deadline + "），请线下核实；核实后可确认或冲销重登。</span>";
+      if (can && st.diff > 0) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="register">登记线下付款</button>';
+      if (can && st.diff === 0 && st.pending.length === 0) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="balance">平账留痕</button>';
+    } else if (st.diff !== 0) {
+      cls = "rc-band--bad";
+      txt = ui.icon("bank", 15) + "<span>差异 <b>" + ui.money(st.diff) + "</b>（平台测算 − 已确认登记）；线下付款完成后请先<b>登记并上传凭证</b>。</span>";
+      if (can) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="register">登记线下付款</button>';
+    } else if (st.pending.length) {
+      cls = "rc-band--warn";
+      if (L.layer === "1") {
+        txt = ui.icon("clock", 15) + "<span>金额已对齐，<b>" + st.pending.length + " 笔待你核对确认</b>，确认后进入双方留痕。</span>";
+      } else {
+        txt = ui.icon("clock", 15) + "<span>金额已对齐，<b>" + st.pending.length + " 笔待二级企业确认</b>；15 天内仅提醒，不自动确认。</span>";
+        if (can) primary = '<button type="button" class="v3-btn v3-btn--ghost v3-btn--sm" data-act="remind">' + ui.icon("bell", 15) + " 提醒二级确认</button>";
+      }
+    } else {
+      cls = "rc-band--ok";
+      txt = ui.icon("check", 15) + "<span>差异 ¥0、凭证齐全，<b>可月度平账留痕</b>。</span>";
+      if (can) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="balance">平账留痕</button>';
     }
-    if (r.status === "disputed" && r.reason) h += '<div class="rc-row__reason" >' + ui.esc(r.reason) + "</div>";
-    if (r.voidInfo) h += '<div class="v3-xs v3-faint v3-mt6" >冲销：' + ui.esc(r.voidInfo.reason) + " · " + ui.esc(r.voidInfo.at) + "</div>";
+    return '<div class="rc-band ' + cls + '"><div class="rc-band__txt">' + txt + "</div>" + (primary ? '<div class="rc-band__act">' + primary + "</div>" : "") + "</div>";
+  }
 
-    /* ③ 证据链入口（每行可展开留痕时间线）+ 行内操作按状态显隐（主操作 ≤2） */
-    h += '<div class="rc-row__ops">';
-    h += '<button type="button" class="v3-btn v3-btn--link v3-btn--sm" data-act="evidence">证据链 ›</button>';
-    if (!voided && !ctx.readonly) {
-      if (r.status === "pending_confirm") {
-        if (isL2) {
-          h += '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="remind">等待二级确认</button>';
-        } else if (ctx.canBoss) {
-          h += '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="confirm">确认到账</button>' +
-               '<button class="v3-btn v3-btn--link v3-btn--sm" data-act="dispute">提异议</button>' +
-               '<button class="v3-btn v3-btn--link v3-btn--sm" data-act="redflush">冲销</button>';
-        } else {
-          h += '<button class="v3-btn v3-btn--ghost v3-btn--sm is-disabled">待管理员确认</button>';
-        }
-      }
-      if (r.status === "disputed" && !isL2 && ctx.canBoss) {
-        h += '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="confirm">线下核实后确认</button>' +
-             '<button class="v3-btn v3-btn--link v3-btn--sm" data-act="redflush">冲销</button>';
+  function rowCard(ctx, L, r, history) {
+    var ui = ctx.ui;
+    var h = '<div class="rc-row' + (r.status === "void" ? " rc-row--void" : "") + '">' +
+      '<div class="rc-row__hd"><span class="rc-row__amt num">' + ui.money(r.amount) + "</span>" +
+      '<span class="v3-badge ' + ui.REG_BADGE[r.status] + '">' + ui.REG[r.status] + "</span></div>" +
+      '<div class="s-prow"><span class="k">方式</span><span class="v">' + methodName(r.method) + "</span></div>" +
+      '<div class="s-prow"><span class="k">付款日</span><span class="v">' + ui.esc(r.date) + "</span></div>" +
+      '<div class="s-prow"><span class="k">登记人</span><span class="v">' + ui.esc(r.registeredBy) + "</span></div>";
+    (r.vouchers || []).forEach(function (v, i) {
+      h += '<button type="button" class="s-prow s-prow--voucher s-prow--btn" data-act="voucher" data-id="' + r.id + '" data-i="' + i + '">' +
+        '<span class="k">' + ui.icon(v.kind === "image" ? "image" : "file-text", 15) + '<span class="v3-ml6">' + ui.esc(v.name) + "</span></span>" +
+        '<span class="v"><span class="v3-badge v3-badge--active">查看凭证</span></span></button>';
+    });
+    if (r.status === "confirmed") {
+      h += '<div class="s-prow"><span class="k">' + ui.icon("shield", 14) + '<span class="v3-ml6">' +
+        (r.signMethod === "esign" ? "电子签留痕（演示）" : "双方确认记录") + "</span></span></div>";
+    }
+    if (r.status === "disputed" && r.reason) {
+      h += '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("warn", 13) + "<span>" + ui.esc(r.reason) + "</span></div>";
+      if (r.verifiedNote) h += '<div class="v3-alert v3-alert--ok v3-mt8">' + ui.icon("check-circle", 13) + "<span>核实说明：" + ui.esc(r.verifiedNote) + "</span></div>";
+    }
+    if (r.status === "void" && r.voidInfo) {
+      h += '<div class="v3-alert v3-alert--mute v3-mt8">' + ui.icon("x-circle", 13) + "<span>已冲销：" + ui.esc(r.voidInfo.reason) + "</span></div>";
+    }
+    if (history) { h += "</div>"; return h; }
+
+    if (!history && r.status === "pending_confirm" && ctx.canBoss) {
+      if (L.layer === "1") {
+        h += '<div class="s-actions s-actions--2">' +
+          '<button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="dispute" data-id="' + r.id + '">提出异议</button>' +
+          '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="confirm" data-id="' + r.id + '">核对无误 · 确认</button></div>';
+      } else {
+        h += '<div class="s-actions"><button class="v3-btn v3-btn--ghost v3-btn--sm" data-act="remind">' + ui.icon("bell", 15) + " 提醒二级确认</button></div>";
       }
     }
-    h += "</div>";
+    if (!history && r.status === "disputed" && ctx.canBoss) {
+      h += '<div class="s-actions s-actions--2">' +
+        '<button class="v3-btn v3-btn--ghost v3-btn--sm v3-btn--danger" data-act="void" data-id="' + r.id + '">冲销作废</button>' +
+        '<button class="v3-btn v3-btn--primary v3-btn--sm" data-act="verify" data-id="' + r.id + '">线下核实后确认</button></div>';
+    }
     h += "</div>";
     return h;
   }
+
   function methodName(m) { return { bank: "对公转账", wechat: "微信/支付宝", cash: "现金", other: "其他" }[m] || "线下"; }
 
-  function mount(el, ctx) {
-    var V3 = ctx.V3, ui = ctx.ui;
-    var curLayer = "1";
-    var bodyEl = el.querySelector("#rc-body");
-
-    function paintSeg() {
-      var seg = el.querySelector("#rc-seg");
-      seg.querySelectorAll("button").forEach(function (b) {
-        var l = b.getAttribute("data-l");
-        var L = layerData(ctx.d, l);
-        var n = layerOpen(ctx, l);
-        b.innerHTML = "<span>" + L.title + "</span>" + (n ? '<span class="rc-seg__n">' + n + "</span>" : "");
-        b.classList.toggle("on", l === curLayer);
-      });
-      bodyEl.innerHTML = renderLayer(ctx, curLayer);
-    }
-    paintSeg();
-
-    el.querySelector("#rc-seg").addEventListener("click", function (e) {
-      var b = e.target.closest("button[data-l]"); if (!b) return;
-      curLayer = b.getAttribute("data-l");
-      paintSeg();
+  /* ---------- 弹层 ---------- */
+  function registerSheet(ctx) {
+    var L = layerData(ctx);
+    var st = stats(L.regs, L.calc);
+    var remain = st.diff;
+    var ui = ctx.ui;
+    var vouchers = [];
+    ui.openSheet({
+      title: "登记线下付款 · " + L.title,
+      body:
+        '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
+        "<span>请在实际付款并取得凭证后登记；<b>上传凭证为必填</b>，金额不可超过未登记差额。</span></div>" +
+        '<div class="v3-kv"><span class="k">测算金额</span><span class="v num">' + ui.money(L.calc.calcAmount) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">已确认登记</span><span class="v num">' + ui.money(st.sum) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">未登记差额</span><span class="v num"><b>' + ui.money(remain) + "</b></span></div>" +
+        '<div class="v3-field v3-mt12"><label>本次登记金额（元）</label><input class="v3-input" id="rg-amount" type="number" min="0" value="' + Math.max(remain, 0) + '"></div>' +
+        '<div class="v3-field"><label>付款方式</label><select class="v3-select" id="rg-method">' +
+        '<option value="bank">对公转账</option><option value="wechat">微信/支付宝</option><option value="cash">现金</option><option value="other">其他</option></select></div>' +
+        '<div class="v3-field"><label>付款日期</label><input class="v3-input" id="rg-date" type="date" value="2026-10-27"></div>' +
+        '<div class="v3-field"><label>付款凭证（必填，支持图片/PDF）</label>' +
+        '<label class="v3-upload" id="rg-up"><span class="ic">' + ui.icon("camera", 22) + "</span>点击上传回单 / 截图" +
+        '<input type="file" id="rg-file" accept="image/*,application/pdf" multiple style="display:none"></label>' +
+        '<div class="v3-vlist v3-mt8" id="rg-vlist"></div></div>',
+      onMount: function (wrap) {
+        var inp = wrap.querySelector("#rg-file");
+        inp.addEventListener("change", function () {
+          Array.prototype.forEach.call(inp.files, function (file) {
+            ui.fileToVoucher(file).then(function (v) {
+              vouchers.push(v);
+              renderVList(wrap, vouchers);
+            });
+          });
+        });
+      },
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "提交登记", kind: "v3-btn--primary", onClick: function (wrap) {
+          var amount = Number(wrap.querySelector("#rg-amount").value);
+          if (!amount || amount <= 0) { ui.toast("请填写正确金额", "err"); return false; }
+          if (!vouchers.length) { ui.toast("请上传付款凭证", "err"); return false; }
+          var r = ctx.V3.store.act("pay/addReg", {
+            layer: L.layer,
+            data: {
+              amount: amount,
+              method: wrap.querySelector("#rg-method").value,
+              date: wrap.querySelector("#rg-date").value,
+              vouchers: vouchers
+            }
+          });
+          if (!r.ok) { ui.toast(r.reason, "err"); return false; }
+          ui.toast("已登记，等待确认", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
     });
+  }
+  function renderVList(wrap, vouchers) {
+    var box = wrap.querySelector("#rg-vlist");
+    if (!box) return;
+    box.innerHTML = vouchers.map(function (v, i) {
+      return '<div class="v3-vchip">' + (v.thumb ? '<img src="' + v.thumb + '">' : "") +
+        '<span>' + window.V3.ui.esc(v.name) + "</span></div>";
+    }).join("");
+  }
 
-    el.addEventListener("click", function (e) {
-      var b = e.target.closest("[data-act]"); if (!b) return;
-      var layer = curLayer;
-      var act = b.getAttribute("data-act");
-      if (act === "add-reg") registerSheet(ctx, layer);
-      else if (act === "show-rules") rulesSheet(ctx, layer);
-      else if (act === "diff-detail") diffDetailSheet(ctx, layer);
-      else if (act === "evidence") evidenceSheet(ctx, layer, b.closest("[data-rid]").getAttribute("data-rid"));
-      else if (act === "first-dispute") {
-        var d1 = ctx.d, L1 = layerData(d1, layer);
-        var rg = L1.regs.filter(function (r) { return r.calcId === L1.calc[0].id && r.status === "disputed"; })[0];
-        if (rg) confirmSheet(ctx, layer, rg.id);
-      } else if (act === "first-confirm") {
-        var d2 = ctx.d, L2 = layerData(d2, layer);
-        var rp = L2.regs.filter(function (r) { return r.calcId === L2.calc[0].id && r.status === "pending_confirm"; })[0];
-        if (rp) confirmSheet(ctx, layer, rp.id);
-      }
-      else if (act === "confirm") confirmSheet(ctx, layer, b.closest("[data-rid]").getAttribute("data-rid"));
-      else if (act === "dispute") disputeSheet(ctx, layer, b.closest("[data-rid]").getAttribute("data-rid"));
-      else if (act === "redflush") redFlushSheet(ctx, layer, b.closest("[data-rid]").getAttribute("data-rid"));
-      else if (act === "balance") balanceSheet(ctx, layer);
-      else if (act === "remind") { ui.toast("已发送提醒 · 仅提醒不自动到账", "ok"); }
+  function disputeSheet(ctx, L, r) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "提出异议 · " + L.title,
+      body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("clock", 14) +
+      "<span>" + L.deadlineNote + "</span></div>" +
+      '<div class="v3-field"><label>异议说明（必填）</label>' +
+      '<textarea class="v3-textarea" id="dp-reason" placeholder="如：未到账 / 金额不符 / 凭证不清"></textarea></div>' +
+      '<div class="v3-field"><label>补充凭证（可选）</label>' +
+      '<label class="v3-upload" id="dp-up"><span class="ic">' + ui.icon("camera", 22) + "</span>上传补充凭证" +
+      '<input type="file" id="dp-file" accept="image/*,application/pdf" multiple style="display:none"></label>' +
+      '<div class="v3-vlist v3-mt8" id="dp-vlist"></div></div>',
+      onMount: function (wrap) {
+        var vs = [];
+        wrap.querySelector("#dp-file").addEventListener("change", function (e) {
+          Array.prototype.forEach.call(e.target.files, function (file) {
+            ui.fileToVoucher(file).then(function (v) { vs.push(v); renderVList(wrap, vs); });
+          });
+        });
+      },
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "提交异议", kind: "v3-btn--danger", onClick: function (wrap) {
+          var reason = wrap.querySelector("#dp-reason").value.trim();
+          if (!reason) { ui.toast("请填写异议说明", "err"); return false; }
+          var r2 = ctx.V3.store.act("pay/dispute", { layer: L.layer, id: r.id, reason: reason });
+          if (!r2.ok) { ui.toast(r2.reason, "err"); return false; }
+          ui.toast("已提交异议", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
     });
   }
 
-  /* ---- A1：对账规则「说明 ›」玻璃弹层（合规原文不删字） ---- */
-  function rulesSheet(ctx, layer) {
-    var L = layerData(ctx.d, layer);
-    var curCalc = L.calc[0];
-    var moneyNote = (window.V3.store && window.V3.store.MONEY_NOTE) || "";
-    ctx.ui.openSheet({
-      title: "对账说明",
-      body:
-        '<div class="rc-prose">' +
-        '<p class="lab">勾稽口径</p>' +
-        '<p>线下付款在 App 外完成；此处只做<b>登记、凭证、确认、对账留痕</b>。' +
-        "测算金额只读，恒等呈现 <b>平台测算应付 − 你的实付登记 = 差异</b>，差异为 0 且全部确认才可平账。</p>" +
-        '<p class="lab">时限（' + curCalc.month + '）</p>' +
-        "<p>" + ctx.ui.esc(curCalc.dueLabel) + "。</p>" +
-        '<p class="lab">在途冻结（T+7）</p>' +
-        "<p>新发生消费满 7 日无退款才转合格基数；在途冻结不进当月对账数字，到期入下月。</p>" +
-        '<p class="lab">资金边界</p>' +
-        "<p>" + ctx.ui.esc(moneyNote) + "。</p>" +
-        "</div>",
+  function confirmSheet(ctx, L, r) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "确认付款 · " + L.title,
+      body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
+      "<span>仅在实际核对到账金额与凭证一致后确认；确认后进入双方留痕。</span></div>" +
+      '<div class="v3-kv"><span class="k">确认金额</span><span class="v num">' + ui.money(r.amount) + "</span></div>" +
+      '<div class="v3-kv"><span class="k">确认方式</span><span class="v">双方确认记录（电子签为演示留痕）</span></div>',
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "电子签留痕（演示）", kind: "v3-btn--ghost", onClick: function () {
+          esignModal(ctx, L, r);
+          return false;
+        } },
+        { t: "确认到账（记录）", kind: "v3-btn--primary", onClick: function () {
+          var res = ctx.V3.store.act("pay/confirm", { layer: L.layer, id: r.id, signMethod: "record" });
+          if (!res.ok) { ui.toast(res.reason, "err"); return false; }
+          ui.toast("已确认", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
+    });
+  }
+
+  function verifySheet(ctx, L, r) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "线下核实后确认",
+      body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
+      "<span>该笔存在异议，确认前必须填写线下核实说明并留痕。</span></div>" +
+      '<div class="v3-alert v3-alert--mute v3-mb12">' + ui.esc(r.reason || "") + "</div>" +
+      '<div class="v3-field"><label>核实说明（必填）</label><textarea class="v3-textarea" id="vf-note" placeholder="如：已与对方核对回单，差异为信息服务费…"></textarea></div>',
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "确认闭环", kind: "v3-btn--primary", onClick: function (wrap) {
+          var note = wrap.querySelector("#vf-note").value.trim();
+          if (!note) { ui.toast("请填写核实说明", "err"); return false; }
+          var res = ctx.V3.store.act("pay/confirm", { layer: L.layer, id: r.id, signMethod: "record", verifiedNote: note });
+          if (!res.ok) { ui.toast(res.reason, "err"); return false; }
+          ui.toast("异议已闭环", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
+    });
+  }
+
+  function voidSheet(ctx, L, r) {
+    var ui = ctx.ui;
+    ui.openModal({
+      danger: true, icon: "warn", title: "冲销该笔登记？",
+      body: "冲销后该笔标记为作废并留痕，可重新登记正确金额。已确认记录不可冲销。",
+      okText: "确认冲销",
+      onOk: function () {
+        var res = ctx.V3.store.act("pay/void", { layer: L.layer, id: r.id });
+        if (!res.ok) { ui.toast(res.reason, "err"); return false; }
+        ui.toast("已冲销", "ok");
+        ctx.V3.router.render();
+      }
+    });
+  }
+
+  function esignModal(ctx, L, r) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "电子签署（演示留痕）",
+      body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("info", 14) +
+      "<span>当前为演示环境，电子签为模拟留痕，正式电子签以平台接入第三方服务为准。</span></div>" +
+      '<div class="v3-kv"><span class="k">签署金额</span><span class="v num">' + ui.money(r.amount) + "</span></div>" +
+      '<div class="v3-kv"><span class="k">层级</span><span class="v">' + L.title + "</span></div>",
+      footer: [
+        { t: "取消", kind: "v3-btn--ghost" },
+        { t: "同意并签署（演示）", kind: "v3-btn--primary", onClick: function () {
+          var res = ctx.V3.store.act("pay/confirm", { layer: L.layer, id: r.id, signMethod: "esign" });
+          if (!res.ok) { ui.toast(res.reason, "err"); return false; }
+          ui.toast("电子签留痕完成（演示）", "ok");
+          ctx.V3.router.render();
+        } }
+      ]
+    });
+  }
+
+  function rulesSheet(ctx) {
+    var ui = ctx.ui;
+    ui.openSheet({
+      title: "结算口径与时限",
+      body: '<div class="v3-legal-body"><p><b>合格消费：</b>平台月度账单中实际完成的合格消费，退货、退款、取消订单不计入。</p>' +
+      '<p><b>第一层（平台 → 省代）：</b>T+5 工作日内完成核对与异议。</p>' +
+      '<p><b>第二层（省代 → 二级）：</b>出账后 15 天内仅提醒，系统不自动确认、不自动到账。</p>' +
+      '<p><b>平账：</b>登记全部确认、无未闭环异议、差异为 ¥0 后，由省代月度平账留痕。</p>' +
+      '<p><b>凭证：</b>所有线下付款必须登记凭证，金额不可超过未登记差额。</p></div>',
       footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
     });
   }
 
-  /* ---- 差异分解明细弹层 ---- */
-  function diffDetailSheet(ctx, layer) {
-    var L = layerData(ctx.d, layer);
-    var curCalc = L.calc[0];
-    var regs = L.regs.filter(function (r) { return r.calcId === curCalc.id; });
-    var sum = ctx.V3.store.regsSum(L.regs, curCalc.id);
-    var diff = curCalc.calcAmount - sum;
-    var disputed = regs.filter(function (r) { return r.status === "disputed"; });
-    var disputedSum = disputed.reduce(function (s, r) { return s + r.amount; }, 0);
-    var redCount = regs.filter(function (r) { return r.redFlushOf; }).length;
-    var rows = "";
-    if (diff !== 0) rows += kv("漏登差额", ctx.ui.money(diff) + " · 测算应付中尚未登记的部分，补登记后自动冲抵");
-    if (disputed.length) rows += kv("异议挂起", ctx.ui.money(disputedSum) + " · " + disputed.length + " 笔登记线下核实中，不进平账");
-    rows += kv("冲销红字", redCount + " 笔 · 追加的等额负数留痕，不物理删除原凭证");
-    rows += kv("勾稽恒等式", ctx.ui.money(curCalc.calcAmount) + " = 已勾稽 " + ctx.ui.money(sum) + " + 未勾稽 " + ctx.ui.money(Math.abs(diff)));
-    ctx.ui.openSheet({
-      title: "差异分解明细",
-      body: '<div class="rc-kvs">' + rows + "</div>",
-      footer: [{ t: "关闭", kind: "v3-btn--ghost" }]
-    });
-  }
-  function kv(k, v) {
-    return '<div class="rc-kv"><span class="k">' + k + '</span><span class="v">' + v + "</span></div>";
-  }
-
-  /* ---- ③ 证据链：单笔登记留痕时间线 ---- */
-  function evidenceSheet(ctx, layer, rid) {
-    var L = layerData(ctx.d, layer);
-    var r = null;
-    L.regs.forEach(function (x) { if (x.id === rid) r = x; });
-    if (!r) return;
-    var ui = ctx.ui, items = [];
-    items.push({ t: "登记", bad: false, p: (r.date || "") + " · " + methodName(r.method) + " · 登记人 " + roleName(r.registeredBy) + " · 金额 " + ui.money(r.amount) });
-    (r.vouchers || []).forEach(function (v) {
-      items.push({ t: "凭证", bad: false, p: v.name + "（" + (v.kind === "image" ? "图片" : "文件") + "）" + (r.redFlushOf ? "" : " · 凭证强制校验通过") });
-    });
-    if (r.status === "disputed" && r.reason) items.push({ t: "异议挂起", bad: true, p: r.reason });
-    if (r.status === "confirmed") items.push({ t: "确认一致", bad: false, p: (r.confirmedAt || "") + " · " + (r.signMethod === "esign" ? "双方确认 + 电子签留痕" : "双方确认记录") });
-    if (r.voidInfo) items.push({ t: "冲销", bad: true, p: r.voidInfo.reason + " · " + (r.voidInfo.at || "") + (r.redFlushOf ? " · 本行为红字记录" : "") });
-    if (r.redFlushOf) items.push({ t: "红字关联", bad: true, p: "本笔为冲销红字记录，勾稽原登记笔（不物理删除原凭证）" });
-    var body = '<div class="rc-tl">' + items.map(function (it) {
-      return '<div class="rc-tl__item' + (it.bad ? " is-bad" : "") + '"><span class="rc-tl__dot"></span>' +
-        '<div class="rc-tl__bd"><b>' + it.t + "</b><p>" + ui.esc(it.p) + "</p></div></div>";
-    }).join("") + "</div>";
-    ctx.ui.openSheet({
-      title: "证据链 · " + ui.money(r.amount),
-      body: body,
-      footer: [{ t: "关闭", kind: "v3-btn--ghost" }]
-    });
-  }
-
-  /* ---- 登记线下付款（凭证强制） ---- */
-  var pendingVouchers = [];
-  function registerSheet(ctx, layer) {
+  function mount(el, ctx) {
     var ui = ctx.ui;
-    if (ctx.readonly) { ui.toast("账号暂停中，不可登记", "err"); return; }
-    pendingVouchers = [];
-    ui.openSheet({
-      title: "登记线下付款 · " + (layer === "1" ? "我与平台" : "我与二级企业"),
-      body:
-        '<div class="v3-alert v3-alert--info v3-mb12" >请确认已在 <b>App 外</b> 完成线下付款，再据实登记；金额与凭证将进入只读勾稽。</div>' +
-        '<div class="v3-field"><label>实付金额（元）</label><input class="v3-input" id="r-amt" type="number" inputmode="decimal" placeholder="0.00" /></div>' +
-        '<div class="v3-field"><label>付款方式</label><select class="v3-select" id="r-method"><option value="bank">对公转账</option><option value="wechat">微信 / 支付宝</option><option value="cash">现金</option><option value="other">其他</option></select></div>' +
-        '<div class="v3-field"><label>付款日期</label><input class="v3-input" id="r-date" type="date" /></div>' +
-        '<div class="v3-field"><label>付款凭证（强制，至少 1 张）</label>' +
-        '<label class="v3-upload" id="r-up"><span class="ic">' + ui.icon("camera", 24) + '</span>点击上传回单 / 截图（原型内本地读取，不上传服务器）<input type="file" id="r-file" accept="image/*,application/pdf" multiple style="display:none" /></label>' +
-        '<div class="v3-mt8" id="r-vlist" ></div><div class="v3-hint">缺凭证不可提交确认；支持多张。</div></div>',
-      footer: [
-        { t: "取消", kind: "v3-btn--ghost" },
-        { t: "提交登记", kind: "v3-btn--primary", onClick: function (wrap) {
-          var amt = Number(wrap.querySelector("#r-amt").value), method = wrap.querySelector("#r-method").value,
-              date = wrap.querySelector("#r-date").value;
-          if (!(amt > 0)) { ui.toast("请填写有效实付金额", "err"); return false; }
-          if (!date) { ui.toast("请选择付款日期", "err"); return false; }
-          if (!pendingVouchers.length) { ui.toast("凭证为强制项，请至少上传 1 张", "err"); return false; }
-          var L = layerData(ctx.d, layer);
-          ctx.V3.store.act("pay/addReg", { layer: layer, calcId: L.calc[0].id, amount: amt, method: method, date: date, vouchers: pendingVouchers });
-          ui.toast("已登记，等待核对", "ok"); ctx.V3.router.render();
-        } }
-      ],
-      onMount: function (wrap) {
-        wrap.querySelector("#r-date").value = new Date().toISOString().slice(0, 10);
-        wrap.querySelector("#r-file").addEventListener("change", function (ev) {
-          var files = Array.prototype.slice.call(ev.target.files || []);
-          Promise.all(files.map(ui.fileToVoucher)).then(function (vs) {
-            pendingVouchers = pendingVouchers.concat(vs); renderVList(wrap);
-          });
-        });
-      }
-    });
-  }
-  function renderVList(wrap) {
-    wrap.querySelector("#r-vlist").innerHTML = pendingVouchers.map(function (v, i) {
-      return '<div class="rc-row__vch">' + (window.V3.ui.icon(v.kind === "image" ? "camera" : "file", 16)) +
-        "<span>" + window.V3.ui.esc(v.name) + "</span><button class='v3-btn v3-btn--link v3-btn--sm' data-rmv='" + i + "'>移除</button></div>";
-    }).join("");
-    Array.prototype.forEach.call(wrap.querySelectorAll("[data-rmv]"), function (b) {
-      b.addEventListener("click", function () { pendingVouchers.splice(Number(b.getAttribute("data-rmv")), 1); renderVList(wrap); });
-    });
-  }
-
-  /* ---- 确认 ---- */
-  function confirmSheet(ctx, layer, rid) {
-    var ui = ctx.ui;
-    ui.openSheet({
-      title: "确认到账",
-      body:
-        '<div class="v3-alert v3-alert--warn v3-mb12" >仅在你已<b>实际核对线下到账与凭证一致</b>后确认；确认进入双方留痕。</div>' +
-        (layer === "2" ? '<div class="v3-readnote v3-mb12" >第二层出账后 15 天内仅提醒，<b>绝不自动确认到账</b>。</div>' : "") +
-        '<div class="rc-row__vch">' + ui.icon("shield", 16) + "<span>确认方式：双方确认记录</span>" +
-        '<button type="button" class="v3-btn v3-btn--link v3-btn--sm" id="rc-esign-link">电子签（P1 占位）›</button></div>',
-      footer: [
-        { t: "确认到账（确认记录）", kind: "v3-btn--primary", onClick: function () {
-          ctx.V3.store.act("pay/confirm", { layer: layer, id: rid, signMethod: "record" }); ui.toast("已确认", "ok"); ctx.V3.router.render();
-        } }
-      ],
-      onMount: function (wrap) {
-        var lk = wrap.querySelector("#rc-esign-link");
-        if (lk) lk.addEventListener("click", function () {
-          esignMock(ctx, function () {
-            ctx.V3.ui.closeAll();
-            ctx.V3.store.act("pay/confirm", { layer: layer, id: rid, signMethod: "esign" });
-            ui.toast("电子签完成（Mock，正式 P1）", "ok"); ctx.V3.router.render();
-          });
-        });
-      }
-    });
-  }
-  function esignMock(ctx, done) {
-    ctx.ui.openModal({
-      title: "电子签署（Mock）", icon: "shield",
-      body: "此处为电子签能力演示占位：正式环境将接入可信电子签并留存签署证书。点击同意即模拟完成签署。",
-      okText: "同意并签署", onOk: function () { done(); }
-    });
-  }
-
-  /* ---- 异议 ---- */
-  var disVouchers = [];
-  function disputeSheet(ctx, layer, rid) {
-    var ui = ctx.ui;
-    ui.openSheet({
-      title: "提出异议",
-      body: '<div class="v3-field"><label>异议说明（必填）</label><textarea class="v3-textarea" id="d-reason" placeholder="如：金额不符 / 未收到该笔 / 凭证不清晰"></textarea>' +
-        '<div class="v3-hint">第一层 T+5 工作日内提出并闭环线下核实；可补传凭证。</div></div>' +
-        '<label class="v3-upload" id="d-up"><span class="ic">' + ui.icon("camera", 22) + '</span>补充凭证（可选）<input type="file" id="d-file" accept="image/*,application/pdf" multiple style="display:none"/></label><div class="v3-mt8" id="d-vlist"></div>',
-      footer: [
-        { t: "取消", kind: "v3-btn--ghost" },
-        { t: "提交异议", kind: "v3-btn--danger", onClick: function (wrap) {
-          var reason = wrap.querySelector("#d-reason").value.trim();
-          if (!reason) { ui.toast("请填写异议说明", "err"); return false; }
-          ctx.V3.store.act("pay/dispute", { layer: layer, id: rid, reason: reason, vouchers: disVouchers });
-          disVouchers = []; ui.toast("已提异议，暂不能平账", "ok"); ctx.V3.router.render();
-        } }
-      ],
-      onMount: function (wrap) {
-        disVouchers = [];
-        wrap.querySelector("#d-file").addEventListener("change", function (ev) {
-          Promise.all(Array.prototype.slice.call(ev.target.files || []).map(ui.fileToVoucher)).then(function (vs) {
-            disVouchers = disVouchers.concat(vs);
-            wrap.querySelector("#d-vlist").innerHTML = disVouchers.map(function (v) { return '<div class="rc-row__vch">' + ui.icon(v.kind === "image" ? "camera" : "file", 16) + "<span>" + ui.esc(v.name) + "</span></div>"; }).join("");
-          });
-        });
+    el.addEventListener("click", function (e) {
+      var layerBtn = e.target.closest("[data-layer]");
+      if (layerBtn) { curLayer = layerBtn.getAttribute("data-layer"); ctx.V3.router.render(); return; }
+      var b = e.target.closest("[data-act]");
+      if (!b) return;
+      var act = b.getAttribute("data-act");
+      var L = layerData(ctx);
+      var find = function (id) { return L.regs.filter(function (x) { return x.id === id; })[0]; };
+      if (act === "register") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可登记", "err");
+        registerSheet(ctx);
+      } else if (act === "balance") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可平账", "err");
+        var res = ctx.V3.store.act("stmt/balance", { layer: L.layer });
+        if (!res.ok) { ctx.ui.toast(res.reason, "err"); return; }
+        ctx.ui.toast("已月度平账留痕", "ok");
+        ctx.V3.router.render();
+      } else if (act === "remind") {
+        if (!ctx.canBoss) return ctx.ui.toast("仅老板可发送提醒", "err");
+        var r = ctx.V3.store.act("msg/add", { msg: { icon: "bell", type: "warn", title: "已提醒二级企业确认收款", desc: L.calc.month + " " + ui.money(L.calc.calcAmount) + "，15 天内仅提醒不自动到账", to: "#/reconcile" } });
+        if (!r.ok) { ctx.ui.toast(r.reason, "err"); return; }
+        ctx.ui.toast("已提醒二级企业", "ok");
+        ctx.V3.router.render();
+      } else if (act === "show-rules") {
+        rulesSheet(ctx);
+      } else if (act === "voucher") {
+        var reg = find(b.getAttribute("data-id"));
+        var v = reg && reg.vouchers[Number(b.getAttribute("data-i"))];
+        if (v) ui.previewVoucher(v);
+      } else if (act === "confirm") {
+        confirmSheet(ctx, L, find(b.getAttribute("data-id")));
+      } else if (act === "verify") {
+        verifySheet(ctx, L, find(b.getAttribute("data-id")));
+      } else if (act === "dispute") {
+        disputeSheet(ctx, L, find(b.getAttribute("data-id")));
+      } else if (act === "void") {
+        voidSheet(ctx, L, find(b.getAttribute("data-id")));
       }
     });
   }
 
-  /* ---- 冲销（原红冲；trust 页尾原文并入本弹层正文） ---- */
-  function redFlushSheet(ctx, layer, rid) {
-    ctx.ui.openModal({
-      title: "确认冲销该笔登记？", icon: "warn", danger: true,
-      body: "冲销将追加一笔等额<b>负数记录</b>，<b>冲销只追加红字记录，不物理删除任何凭证</b>；冲销后差异会相应变化。", okText: "确认冲销",
-      onOk: function () { ctx.V3.store.act("pay/void", { layer: layer, id: rid, reason: "登记有误，冲销更正" }); ctx.ui.toast("已冲销（留痕）", "ok"); ctx.V3.router.render(); }
-    });
-  }
-
-  /* ---- 平账 ---- */
-  function balanceSheet(ctx, layer) {
-    var ui = ctx.ui;
-    ui.openModal({
-      title: "月度平账留痕", icon: "check",
-      body: "平台测算应付与你的实付登记<b>差异为 ¥0</b> 且全部凭证已确认。平账后本月对账单封存留痕，后续更正只能冲销。",
-      okText: "确认平账", onOk: function () {
-        var L = layerData(ctx.d, layer);
-        ctx.V3.store.act("stmt/balance", { layer: layer, id: L.stmts[0].id });
-        ui.toast("已平账留痕", "ok"); ctx.V3.router.render();
-      }
-    });
-  }
-
-  window.V3PAGES.reconcile = { title: "对账留痕", render: render, mount: mount };
+  P.reconcile = { title: "对账中心", render: render, mount: mount };
 })();

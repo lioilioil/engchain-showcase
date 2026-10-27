@@ -636,7 +636,29 @@ window.renderList=function(){
 }
 window.renderList=renderList;
 
-/* 热门服务横滑：金V机构优先，取 Top 6 */
+/* 热门服务连续滚动：金V机构优先，取 Top 6（单行 1.5 卡 + 无缝 marquee） */
+function setupHotMarquee(el) {
+  if (!el) return;
+  var w = Math.max(180, Math.round((el.clientWidth - 42) / 1.5));
+  el.style.setProperty('--hs-w', w + 'px');
+  var track = el.querySelector('.hot-track');
+  if (track) return;
+  if (!el.querySelector('.hcard, .hot-card')) return;
+  track = document.createElement('div');
+  track.className = 'hot-track';
+  var set1 = document.createElement('div');
+  set1.className = 'hs-set';
+  while (el.firstChild) set1.appendChild(el.firstChild);
+  var set2 = document.createElement('div');
+  set2.className = 'hs-set';
+  set2.innerHTML = set1.innerHTML;
+  track.appendChild(set1);
+  track.appendChild(set2);
+  el.appendChild(track);
+  /* 动画时长按内容宽度折算（约 40px/s，下限 12s），保证不同条数速度观感一致 */
+  var dur = Math.max(12, set1.scrollWidth / 40);
+  track.style.animationDuration = dur + 's';
+}
 window.renderHotAgency=function(){
   var box=document.getElementById('hotAgencyList');
   if(!box||typeof SVCS==='undefined')return;
@@ -668,6 +690,7 @@ window.renderHotAgency=function(){
       '</div>'+
     '</div>';
   }).join('');
+  setupHotMarquee(box);
 };
 /* 查看全部：滚动到列表 */
 (function(){
@@ -1588,7 +1611,7 @@ window.confirmFilter=function(){
 }
 .trust-row .ti span { font-size: 9.5px; color: var(--text-3); }
 
-/* ===== 热门服务横滑 ===== */
+/* ===== 热门服务连续滚动（单行 1.5 卡 + 无缝 marquee） ===== */
 .pad-x { padding-left: 16px; padding-right: 16px; }
 .section-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1609,15 +1632,21 @@ window.confirmFilter=function(){
 }
 .section-head .sh-more svg { width: 12px; height: 12px; }
 .hot-scroll {
-  display: flex; gap: 10px; overflow-x: auto;
-  padding: 0 16px 4px; margin: 0;
-  -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  scroll-snap-type: x mandatory;
-  scroll-padding-left: 16px; scroll-padding-right: 16px;
+  display: block; overflow: hidden; margin: 0;
+  padding: 0 16px 4px;
+  scroll-snap-type: none;
 }
 .hot-scroll::-webkit-scrollbar { display: none; }
+.hot-track {
+  display: flex; width: max-content; will-change: transform;
+  animation: hs-marquee 32s linear infinite;
+}
+.hs-set { display: flex; gap: 10px; padding-right: 10px; }
+.hot-scroll:hover .hot-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .hot-track { animation: none; } }
+@keyframes hs-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .hcard {
-  flex: none; width: 224px; scroll-snap-align: start;
+  flex: none; width: var(--hs-w, 232px); min-width: 0; scroll-snap-align: none;
   background: var(--bg-card); border: 1px solid var(--line);
   border-radius: var(--r-l); padding: 13px 14px;
   display: flex; flex-direction: column;

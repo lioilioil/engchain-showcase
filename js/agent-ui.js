@@ -304,18 +304,51 @@
     }).join('') + '</ul>';
   }
 
-  /* C4 授权证书静态卡（demo 静态；suspended/terminated 同步置灰） */
+  /* C4 授权证书 —— 高保真实物效果 */
   function certiHtml(me) {
-    var off = me.status === 'terminated' || me.status === 'revoked' || me.sealedAt;
-    var no = 'DEMO-AG-' + (me.uid || me.id || '').toUpperCase();
-    return '<div class="ag-certi ' + (off ? 'is-off' : '') + '">'
-      + '<svg class="ag-certi__shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z"/><path d="M9 12l2 2 4-4"/></svg>'
-      + '<div class="ag-certi__prov">授权省：' + esc(me.province || '—') + '</div>'
-      + '<div class="ag-certi__field">被授权主体：' + esc((me.branchCompany && me.branchCompany.name) || '—') + '</div>'
-      + '<div class="ag-certi__field">证书编号：<span class="ag-certi__no">' + esc(no) + '</span></div>'
-      + '<div class="ag-certi__field">有效期：以平台核发通知为准</div>'
-      + '<div class="ag-mt-2">' + badge(me.status) + '</div>'
-      + '<div class="ag-disc">本平台演示环境证书，正式编号与签发以平台核发为准。</div></div>';
+    var off = me.status === 'terminated' || me.status === 'revoked';
+    var no = 'AG-' + (me.province || 'SC').toUpperCase().slice(0, 2) + '-2026-' + (me.uid || '0001').toUpperCase().slice(-4);
+    var company = (me.branchCompany && me.branchCompany.name) || '四川某某工程科技有限公司';
+    var province = me.province || '四川省';
+    return '<div class="ag-cert-paper ' + (off ? 'is-off' : '') + '">'
+      + '<div class="ag-cert-frame">'
+      + '<div class="ag-cert-inner">'
+      + '<div class="ag-cert-badge">'
+      + '<svg viewBox="0 0 100 120" fill="none">'
+      + '<defs><linearGradient id="agCertGold2" x1="0%" y1="0%" x2="0%" y2="100%">'
+      + '<stop offset="0%" style="stop-color:#d4af37;stop-opacity:1"/>'
+      + '<stop offset="100%" style="stop-color:#b8860b;stop-opacity:1"/>'
+      + '</linearGradient></defs>'
+      + '<path d="M50 5 L90 20 V60 C90 90 70 108 50 115 C30 108 10 90 10 60 V20 Z" fill="url(#agCertGold2)" stroke="#8b6914" stroke-width="1"/>'
+      + '<path d="M50 25 L70 35 V58 C70 78 58 90 50 94 C42 90 30 78 30 58 V35 Z" fill="#fff" opacity="0.9"/>'
+      + '<path d="M38 58 L47 67 L65 48" stroke="#b8860b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '</svg>'
+      + '</div>'
+      + '<div class="ag-cert-title">授权证书</div>'
+      + '<div class="ag-cert-subtitle">PROVINCIAL MASTER AGENT AUTHORIZATION</div>'
+      + '<div class="ag-cert-divider"><span></span><i>❖</i><span></span></div>'
+      + '<div class="ag-cert-body">'
+      + '<p class="ag-cert-line">兹授权以下企业为 <strong>' + esc(province) + '</strong> 省级总代理商</p>'
+      + '<div class="ag-cert-company">' + esc(company) + '</div>'
+      + '<p class="ag-cert-line sm">授权范围：' + esc(province) + '全域工程服务渠道拓展与运营</p>'
+      + '</div>'
+      + '<div class="ag-cert-footer">'
+      + '<div class="ag-cert-left">'
+      + '<div class="ag-cert-no">证书编号：' + esc(no) + '</div>'
+      + '<div class="ag-cert-date">签发日期：2026年10月26日</div>'
+      + '<div class="ag-cert-sign">授权代表：__________</div>'
+      + '</div>'
+      + '<div class="ag-cert-seal">'
+      + '<div class="ag-cert-seal-inner">'
+      + '<div class="ag-cert-seal-text">润锦工程链<br>专用章</div>'
+      + '<div class="ag-cert-seal-star">★</div>'
+      + '</div>'
+      + '</div>'
+      + '</div>'
+      + '<div class="ag-cert-note">本证书由润锦工程链平台核发，具有法律效力</div>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
   }
 
   /* ---------- P2-3 正式徽章：总代盾 / 二级六边形（明度+形状双编码；不改既有五档用户徽章） ---------- */
@@ -488,10 +521,11 @@
         termTitle = '账号已封存 · 只读';
         termDesc = '封存仅标记只读，原始记录完整保留；台账与协议可查阅，不再产生新的约定/自留分成。';
       }
-      /* D-10：终止/封存独立块内提供封存台账只读折叠区（复用现有只读表，不产生新操作） */
+      /* D-10：终止/封存独立块内提供封存台账只读区（静态直接展示，禁止折叠交互） */
       var sealedEntries = (Store.listLedger() || []).filter(function (e) { return e.line === 'subLedger' || e.line === 'selfLedger'; });
-      var ledgerFold = '<details class="ag-card ag-mt-3"><summary class="ag-ledger-fold__summary">查看封存台账（只读）</summary>'
-        + ledgerTable(sealedEntries, 0, Ledger) + '</details>';
+      var ledgerFold = '<div class="ag-card ag-mt-3">'
+        + '<h3>封存台账（只读）</h3>'
+        + ledgerTable(sealedEntries, 0, Ledger) + '</div>';
       el.innerHTML = '<div class="ag-wrap">'
         + '<div class="ag-terminal ag-card">'
         + '<svg class="ag-terminal__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'
@@ -998,7 +1032,7 @@
         return '<div class="ag-clause"><div class="ag-clause__no">第' + cl.no + '条 · ' + esc(cl.title) + '</div>'
           + '<div class="ag-clause__body">' + esc(cl.body) + '</div></div>';
       }).join('');
-      var ev = c.evidence ? '<div class="ag-disc">本平台演示环境存证（编号 ' + esc(c.evidence.certNo || '') + '），正式存证以第三方电子签服务为准 · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
+      var ev = c.evidence ? '<div class="ag-disc">电子存证编号：' + esc(c.evidence.certNo || '') + ' · ' + fmtDate(c.evidence.timestamp || c.completedAt) + '</div>' : '';
       return '<div class="ag-card ag-mt-3">'
         + '<div class="ag-sub-card__name">《二级合作协议（O4）》' + esc(c.code || '') + '</div>'
         + '<div class="ag-meta ag-mt-1">版本 ' + esc(c.version || '') + ' · 状态 ' + protoTxtOwner(c.status)
@@ -1538,9 +1572,10 @@
       + '<section class="ag-card"><h3>成员（' + members.length + '，成员不计省名额）</h3>'
       + (rows || emptyState('暂无成员', '管理员可发送邀请，邀请经对方接受后加入。'))
       + inviteBox
-      + '<details class="v3-note-fold v3-mt12"><summary>'
-      + '<span class="sum">成员角色与移除规则说明 · 点击展开</span><span class="chev">›</span></summary>'
-      + '<div class="fold-body">法定代表人由执照登记派生，只读无操作按钮；管理员可邀请/审批/移除；成员只见日常，不见资金与成员管理。移除成员不删除企业订单与台账。角色调整留痕由平台后台承担，本期不在成员页改动法定代表人。</div></details></section>'
+      + '<div class="ag-info-block ag-mt12">'
+      + '<div class="ag-info-block__title">成员角色与移除规则说明</div>'
+      + '<div class="ag-info-block__body">法定代表人由执照登记派生，只读无操作按钮；管理员可邀请/审批/移除；成员只见日常，不见资金与成员管理。移除成员不删除企业订单与台账。角色调整留痕由平台后台承担，本期不在成员页改动法定代表人。</div>'
+      + '</div></section>'
       + '<section class="ag-card"><h3>待处理邀请（' + invites.length + '）</h3>'
       + (inviteRows || emptyState('无待处理邀请', '没有等待接受的邀请记录。', 'inv')) + '</section>'
       + '<section class="ag-card"><h3>加入申请（' + joins.length + '）</h3>'

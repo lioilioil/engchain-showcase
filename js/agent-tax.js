@@ -14,7 +14,7 @@
 
   /* 法定出厂默认（与 data.js MOCK.business.withholdingTax 同值；data.js 缺失时回退本默认） */
   var DEFAULTS = {
-    disclaimer: '模拟测算，非税务意见，非实际代扣金额，非完税凭证；本页数字仅为演示测算，不构成申报、扣缴、开票或实名认证依据。',
+    disclaimer: '本测算仅为参考，实际代扣金额以税务机关规定及平台正式结算为准。',
     activeScheme: 'labor',
     labor: {
       /* 61号公告第八条：每次收入 ≤4000 减 800；>4000 减 20%（法定固定值） */

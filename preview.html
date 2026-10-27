@@ -23,7 +23,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .pv-wrap { display: flex; min-height: 100vh; }
 
   /* ---- 左侧导航 / 控制台 ---- */
-  .pv-side { width: 320px; flex: 0 0 320px; border-right: 1px solid var(--line); background: var(--bg-elev); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  .pv-side { width: 240px; flex: 0 0 240px; border-right: 1px solid var(--line); background: var(--bg-elev); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
   /* 侧边栏宽度拖拽：右侧边缘整条手柄（可拖）；完全置于栏内（overflow:hidden 会裁剪越界部分） */
   .pv-resizer { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; cursor: col-resize; z-index: 70; background: transparent; transition: background var(--d-fast); }
   .pv-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: var(--primary-dim); opacity: 0; transition: opacity var(--d-fast); }
@@ -33,9 +33,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   body.resizing iframe { pointer-events: none; }
   /* BUG-COMP-001 修复：≤812px 区间（768 平板）收窄左侧控制台栏并减小舞台横向 padding，
      避免手机壳（.device 固有布局宽 ~402px）+ 左栏 320px 把 .pv-stage 撑出 812px 导致右侧 FAB 被裁。
-     ≥1280 桌面保持 320px 不变；≤640 移动视口本就由 body 横向裁剪接管，不受影响。 */
+     ≥1280 桌面保持 240px 不变（默认已为最小宽度，见 sideResizer）；≤640 移动视口本就由 body 横向裁剪接管，不受影响。 */
   @media (max-width: 812px) {
-    .pv-side { width: 260px; flex: 0 0 260px; }
+    .pv-side { width: 240px; flex: 0 0 240px; }
     .pv-stage { padding-left: 24px; padding-right: 24px; }
   }
   .pv-side-hd { padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
@@ -465,13 +465,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     .fs-dialog-hd { padding: 16px 16px 12px; }
     .fs-body { padding: 14px 16px 18px; }
   }
-/* preview 专属：回到顶部按钮固定于左侧边栏（.pv-side 320px）中间位置；
-     覆盖全局 back-to-top.js 的视口底部居中定位；显示/消失与点击逻辑保持不变 */
+/* preview 专属：回到顶部按钮固定于左侧边栏（默认 240px）中间位置，拖拽展开时由 sideResizer 动态同步中心；
+   覆盖全局 back-to-top.js 的视口底部居中定位；显示/消失与点击逻辑保持不变 */
   body > .engchain-backtop,
   body > .engchain-backtop.is-show,
   body > .engchain-backtop:hover,
   body > .engchain-backtop:active {
-    left: 160px !important;   /* 边栏宽度 320px 的水平中心 */
+    left: 120px !important;   /* 边栏默认宽度 240px 的水平中心（兜底，拖拽后由 JS 覆盖） */
     top: 50% !important;      /* 边栏垂直居中 */
     bottom: auto !important;  /* 覆盖 JS 动态写入的 bottom 内联值 */
     transform: translate(-50%, -50%) scale(1) !important;
@@ -608,26 +608,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="k">演示场景</span>
           <span class="pv-state-right">
             <select class="pv-select" id="sel-scenario"></select>
-            <select class="pv-select" id="sel-v3scn" title="省代工作台 v3 演示场景（iframe 处于省代/二级页时生效）" style="margin-left:6px;max-width:156px">
-              <option value="">省代 v3</option>
-              <optgroup label="省代总代">
-                <option value="active">① 正常态</option>
-                <option value="suspended">② 暂停只读</option>
-                <option value="empty">③ 空态</option>
-                <option value="dark">④ 暗色主题</option>
-              </optgroup>
-              <optgroup label="二级企业">
-                <option value="sub-active">① 正常态</option>
-                <option value="sub-readonly">② 暂停只读</option>
-                <option value="sub-dark">③ 暗色主题</option>
-              </optgroup>
-            </select>
             <svg class="quick-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </span>
         </div>
         <div class="pv-note" id="status-note"></div>
         <!-- 原型演示身份（D5 权限差异演示）落位说明：自「我的」移出的演示能力，仅在本播种区说明，省代成品页面零 dev 文案 -->
-        <div class="pv-note" id="demo-identity-note"><b>原型演示身份（D5 权限差异演示）：</b>在右侧「省代 v3」下拉选择 <b>省代总代 · 正常态</b>（u11 四川省级总代）或 <b>二级企业 · 正常态</b>（u12 成都二级）后，于演示窗口内进入「身份详情」视图，可在 <b>老板/管理员 ↔ 员工</b> 之间切换演示角色，验证 D5 权限差异：员工仅可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div>
+        <div class="pv-note" id="demo-identity-note"><b>原型演示身份（D5 权限差异演示）：</b>在上方「演示场景」下拉选择 <b>省级总代 · 已开通</b>（u11 四川华建）或 <b>二级合作 · 已绑定</b>（u12 成都成达）后，于演示窗口内进入「身份详情」视图，可在 <b>老板/管理员 ↔ 员工</b> 之间切换演示角色，验证 D5 权限差异：员工仅可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div>
       </div>
     </div>
 
@@ -1202,22 +1188,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/province-agent/data-center.html', '经营数据中心（T4）', '经营数据中心 · 月度趋势/二级贡献排行/比例变更历史/退款冲减/月度对账单（总代+二级双视角）'],
         ['pages/province-agent/rules.html', '运营规则与 FAQ（T5）', '运营规则与 FAQ · 招募资格/比例变更/签约八条/终止清退状态机/合规边界/测算免责 + 10 条 FAQ（与税务说明互链）'],
       ]},
-      /* S4-1 完整用户旅程导览（13 节点）：路径 → 播种键（演示切换器选择）→ 预期落点 */
-      { name:'完整旅程导览 · 省级总代体系（13 节点）', isGroup:true, children:[
-        { name:'1 游客 → 注册', isState:true, src:'index.html', desc:'播种键 guest（游客/未登录）→ 首页游客态 → 注册 → 落点：登录态+账号建立（u6 registered）' },
-        { name:'2 注册 → 个人实名认证', isState:true, src:'pages/profile/auth-personal.html', desc:'播种键 registered → 个人实名（u5 realname）→ 落点：realname 轨道点亮' },
-        { name:'3 实名 → 企业工商认证', isState:true, src:'pages/profile/auth-enterprise.html', desc:'播种键 realname → 企业认证（u3 enterprise）→ 落点：enterprise 轨道点亮' },
-        { name:'4 企业认证 → 入驻申请（省代 ¥0）', isState:true, src:'pages/profile/entry-form.html?type=provinceAgent', desc:'播种键 enterprise → 入驻资料·省代（type=provinceAgent，¥0 人工审核）→ 落点：rev_province_pending 待初审' },
-        { name:'5 后台审核开通', isState:true, src:'pages/province-agent/index.html', desc:'播种键 rev_province_pending → 后台省代开通/审核通过 → 落点：province_agent_active（身份卡已生效）' },
-        { name:'6 总代工作台（身份/省/名额/看板）', isState:true, src:'pages/province-agent/index.html', desc:'播种键 province_agent_active（u11 四川总代）→ 落点：授权省四川省/名额 n·cap/约定所得 hero/二级列表' },
-        { name:'7 发起二级合作（待平台审核）', isState:true, src:'pages/province-agent/index.html', desc:'播种键 rev_sub_pending（u11 发起）→ 落点：二级卡片待审核/协议未签约' },
-        { name:'8 二级签署（总代→二级→签回）', isState:true, src:'pages/province-agent/sub.html', desc:'播种键 sub_agent_active（u12 陈二级）→ 落点：约定 20%·已签·本人约定所得/自身余额' },
-        { name:'9 台账 / 税务 / 打印（商用闭环）', isState:true, src:'pages/province-agent/tax-guide.html', desc:'播种键 province_agent_active → 两分区台账（T+7 冻结/结算/冲减/税列）→ 税说明法定预扣 → 打印 A4' },
-        { name:'10 招商中心（招商码/海报导出）', isState:true, src:'pages/province-agent/recruit.html', desc:'播种键 province_agent_active → 招商码展示（一总代一有效码）+ 省独家海报 3 主题 + 话术包（合规硬门）→ Canvas 导出' },
-        { name:'11 企业自助申请（双轨路径②）', isState:true, src:'pages/province-agent/apply.html', desc:'播种键 province_agent_active → 招商码→企业申请（同省锁定/隔离声明）→ 总代初审 20% → 平台终审 → 自动发起 O4 → 二级签署' },
-        { name:'12 二级授权网络（名额/授权链）', isState:true, src:'pages/province-agent/network.html', desc:'播种键 province_agent_active → 两层授权链（总代根→二级公司）+ 名额使用率（含 pending 占用）+ 多态状态 + 聚合约定所得' },
-        { name:'13 经营数据中心（总代/二级）', isState:true, src:'pages/province-agent/data-center.html', desc:'播种键 province_agent_active → 月度趋势（近12月柱线）/二级贡献排行/比例变更历史/退款冲减统计/月度对账单（打印+CSV）；二级视角：本人趋势/消费构成/冻结到期' },
-      ]},
     ]},
     { name:'订单', pages:[
       { name:'我的订单', src:'pages/order/index.html', desc:'我的订单', children:[
@@ -1448,7 +1418,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '<div class="pv-group" data-group="' + escAttr(m.name) + '"><button type="button" class="g-name" data-group="' + escAttr(m.name) + '" title="点击折叠 / 展开整组">' + NAV_ICONS.cat + '<span class="g-label">' + escAttr(m.name) + '</span><span class="g-count"></span><svg class="g-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="links">' + links + '</div></div>';
   }).join('');
 
-  /* ---- 侧边栏宽度拖拽：右侧边缘手柄；240px 起，上限取视口一半；localStorage 记忆；收窄切 narrow 自适应 ---- */
+  /* ---- 侧边栏宽度拖拽：右侧边缘手柄；240px 起，上限取视口一半；localStorage 记忆；收窄切 narrow 自适应；
+     默认自适应至最小宽度（240px + narrow 模式），无记忆或记忆无效时直接收敛最小，用户拖拽展开后记忆，下次沿用 ---- */
   (function sideResizer() {
     var side = document.querySelector('.pv-side');
     var rz = document.querySelector('.pv-resizer');
@@ -1456,14 +1427,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var KEY = 'engchain-side-w';
     var MIN = 240;
     function maxW() { return Math.min(560, Math.max(MIN, Math.floor(window.innerWidth / 2))); }
+    function syncBacktop() {
+      var bt = document.querySelector('.engchain-backtop');
+      if (bt) bt.style.setProperty('left', Math.round(side.getBoundingClientRect().width / 2) + 'px', 'important');
+    }
     function apply(w, save) {
       w = Math.max(MIN, Math.min(maxW(), Math.round(w)));
       side.style.width = w + 'px';
       side.style.flexBasis = w + 'px';
       side.classList.toggle('narrow', w < 300);
+      syncBacktop();
       if (save) { try { localStorage.setItem(KEY, String(w)); } catch (e) {} }
     }
-    try { var saved = parseInt(localStorage.getItem(KEY), 10); if (saved && saved >= MIN) apply(saved, false); } catch (e) {}
+    /* 有记忆且 >= MIN 时沿用记忆宽度，否则默认收敛至最小宽度 */
+    try { var saved = parseInt(localStorage.getItem(KEY), 10); if (saved && saved >= MIN) apply(saved, false); else apply(MIN, false); } catch (e) { apply(MIN, false); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncBacktop);
+    else syncBacktop();
     rz.addEventListener('mousedown', function (e) {
       e.preventDefault();
       var startX = e.clientX;
@@ -2011,23 +1990,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     UI.toast('已切换场景：' + r.label + (r.balanceUnchanged ? '（余额保持种子值）' : ''), 'ok');
   });
   renderScenarioOptions();
-
-  /* 省代工作台 v3 演示场景（P0-3 收口：页内 ⚙ 演示浮层已移除，统一走预览台切换）
-     v3 场景是独立机制（applyV3Scenario 在 iframe 页内），需 iframe 处于省代/二级页时生效 */
-  var selV3 = document.getElementById('sel-v3scn');
-  if (selV3) {
-    selV3.addEventListener('change', function () {
-      var k = selV3.value; if (!k) return;
-      var iw = frame && frame.contentWindow;
-      if (!iw || !iw.applyV3Scenario) {
-        UI.toast('请先在预览台打开「省代工作台」或「二级企业工作台」页面');
-        selV3.value = '';
-        return;
-      }
-      iw.applyV3Scenario(k);
-      UI.toast('已切换省代 v3 场景：' + (selV3.options[selV3.selectedIndex] || {}).text || k, 'ok');
-    });
-  }
 
   function reloadFrame() {
     var _s = String(frame.src), _h = '';

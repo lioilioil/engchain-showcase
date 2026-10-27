@@ -70,6 +70,22 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 /* 页内覆写：同城标签/查看详情链接的浅金 --primary 改 --primary-dim（共享模板内联注入，此处覆盖，不改共享/js） */
 #list a.job-card span[style*="color:var(--primary)"],
 #list a.job-card > div[style*="color:var(--primary)"] { color: var(--primary-dim) !important; }
+
+/* 卡片布局调整（本页作用域）：企业简称右移 meta 行右侧；价格/交易城市移入底部 CTA 行；删除联系方式提示 */
+#list .job-card .jc-meta { justify-content: space-between; }
+#list .job-card .jc-meta .jc-company {
+  flex: none; min-width: 0; margin-left: auto; padding-left: 8px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-3);
+}
+#list .job-card .jc-meta .jc-company svg { width: 11px; height: 11px; flex: none; }
+#list .job-card .sc-card-foot .jc-price {
+  font-family: var(--font-num); font-size: 15px; font-weight: 700; color: var(--text-1);
+  white-space: nowrap; display: inline-flex; align-items: baseline; gap: 2px;
+}
+#list .job-card .sc-card-foot .jc-price .unit { font-size: 10px; color: var(--text-3); font-weight: 400; margin-left: 2px; }
+#list .job-card .sc-card-foot .sc-geo { margin: 0; }
+#list .sc-foot-row:empty { display: none; }
 </style>
 </head>
 <body data-tab="discover">
@@ -532,6 +548,31 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return val >= r[0] && val < r[1];
   }
 
+  /* ---- 卡片布局（本页作用域）：企业简称→meta 行右侧；价格/交易城市→底部 CTA 行；删除联系方式提示 ---- */
+  function patchSupplyCards() {
+    document.querySelectorAll('#list .job-card').forEach(function (card) {
+      var meta = card.querySelector('.jc-meta');
+      var company = card.querySelector('.jc-company');
+      var footRow = card.querySelector('.sc-foot-row');
+      var price = card.querySelector('.jc-price');
+      var geo = card.querySelector('.sc-geo');
+      var cardFoot = card.querySelector('.sc-card-foot');
+      /* 1) 企业简称 → meta 行右侧（appendChild 移动节点，原底行位置随之清空） */
+      if (meta && company) meta.appendChild(company);
+      /* 2) 价格 + 交易城市（同城/省内/跨省）→ 底部 CTA 行左侧（原「联系方式查看详情后可见」位置） */
+      if (cardFoot) {
+        var cta = cardFoot.querySelector('.sc-foot-cta');
+        if (price) cardFoot.insertBefore(price, cta);
+        if (geo) cardFoot.insertBefore(geo, cta);
+        /* 3) 删除「联系方式查看详情后可见」 */
+        var hint = cardFoot.querySelector('.sc-foot-hint');
+        if (hint) hint.parentNode.removeChild(hint);
+      }
+      /* 4) 价格与企业均移出后的空底行移除 */
+      if (footRow && !footRow.childElementCount) footRow.parentNode.removeChild(footRow);
+    });
+  }
+
   /* ---- 主渲染 ---- */
   function render() {
     try {
@@ -671,6 +712,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         }
       });
     } catch (e) {}
+    /* 卡片布局（本页作用域）：企业简称→meta 行右侧；价格/交易城市→底部 CTA 行；删除联系方式提示 */
+    patchSupplyCards();
     } catch (e) {
       console.error('render() error:', e);
       var listEl = document.getElementById('list');

@@ -1,337 +1,329 @@
 /* ============================================================
-   router.js · hash 路由 / 页内分段导航 / 主题
-   【S4-S2 壳层 · 信息架构升级】
-   - index：4 Tab（工作台/邀请获客/二级管理/对账留痕）；二级管理挂载 #/subs + #/share-config stub
-   - sub：4 大类 Tab（工作台/邀请获客/收款与对账/台账税务）+ 大类内子导航（seg 子页签）
-   - 顶栏标题跟随当前视图/子页；首页标题「工作台总览」消除与首个 Tab 重复
-   - 角标：工作台=待办总数；对账=未平·待确认数；二级管理=二级申请待初审批数；不重复堆叠
-   - navbar 消息 icon 跳省代专属消息页 messages.html（不再直跳全局消息页）
+   router.js · 路由 / 导航 / 页脚（顶部 sticky 页签，非底部 Tab）
+   省代：home / invite / reconcile / me（设置）
+   二级：home / invite / ledger / me（我的），含子 seg
    ============================================================ */
 (function () {
   "use strict";
-  window.V3PAGES = {};
-  window.V3SUBPAGES = {};
 
-  /* index 端 Tab（4 项：工作台/邀请获客/二级管理/对账留痕） */
+  var root = null;
+  var store = null;
+  var ui = null;
+  var themeApplied = false;
+
   var TABS = [
-    { key: "home", label: "工作台" },
-    { key: "invite", label: "邀请获客" },
-    { key: "subs", label: "二级管理" },
-    { key: "reconcile", label: "对账留痕" }
+    { key: "home", label: "工作台", icon: "home" },
+    { key: "invite", label: "获客", icon: "invite" },
+    { key: "reconcile", label: "对账", icon: "reconcile" },
+    { key: "me", label: "我的", icon: "me" }
   ];
-  /* 非 Tab 路由：不出现在 Tab 条，带返回。profile=身份详情；share-config=二级管理·分成配置挂载点 */
-  var EXTRA_INDEX_ROUTES = ["profile", "share-config"];
-
-  /* sub 端 4 大类层级结构：大类 -> 类内子页（E4：工作台大类移除「待办提醒」子页——待办收敛为
-     navbar 右上角消息 icon + 消息中心「通知」分页；sub-page-inbox.js 文件保留不删，路由不再可达） */
-  var SUBCATS = [
-    { key: "home", label: "工作台", subs: ["home"] },
-    { key: "invite", label: "邀请获客", subs: ["invite", "invite-users", "invite-stats"] },
-    { key: "payments", label: "收款与对账", subs: ["payments", "statement"] },
-    { key: "ledger", label: "台账税务", subs: ["ledger", "tax"] }
+  var SUB_TABS = [
+    { key: "home", label: "工作台", icon: "home" },
+    { key: "invite", label: "邀请获客", icon: "invite" },
+    { key: "ledger", label: "经营台账", icon: "chart" },
+    { key: "me", label: "我的", icon: "me" }
   ];
-  /* 类内子页签短标签 */
-  var SUBSEG_LABEL = {
-    home: "首页", inbox: "待办",
-    invite: "邀请码·海报", "invite-users": "邀请用户", "invite-stats": "转化分佣",
-    payments: "收款确认", statement: "月度对账单",
-    ledger: "经营台账", tax: "税务说明"
+
+  /* 二级子 seg（合法路由同步登记） */
+  var SUBCATS = {
+    invite: [
+      { key: "invite", label: "邀请码·海报" },
+      { key: "invite-users", label: "邀请用户" },
+      { key: "invite-stats", label: "转化分佣" }
+    ],
+    ledger: [
+      { key: "ledger", label: "经营台账" },
+      { key: "payments", label: "收款确认" },
+      { key: "statement", label: "月度对账单" },
+      { key: "tax", label: "税务说明" }
+    ]
   };
 
-  /* 顶栏标题（权威，优先于 page.title；消除「工作台」与首个 Tab 重复） */
-  var INDEX_TITLES = {
-    home: "工作台总览", invite: "邀请获客", subs: "二级管理", "share-config": "分成配置",
-    reconcile: "对账留痕", profile: "身份详情", me: "我的"
-  };
-  var SUB_TITLES = {
-    home: "工作台", inbox: "待办提醒",
-    invite: "邀请码·海报", "invite-users": "我的邀请用户", "invite-stats": "转化与分佣",
-    payments: "收款确认", statement: "月度对账单",
-    ledger: "经营台账", tax: "税务说明"
-  };
+  var PROV_EXTRA = ["settings", "subs", "share-config", "team", "messages", "tax"];
+  var SUB_EXTRA = ["settings", "invite-users", "invite-stats", "payments", "statement", "messages", "tax"];
 
-  var root = document.getElementById("ag-root");
-
-  function currentKey() {
-    var h = (location.hash || "#/home").replace(/^#\/?/, "").split("?")[0].split("/");
-    return h[0] || "home";
-  }
-  function go(hash) { if (location.hash === hash) { render(); } else { location.hash = hash; } }
-
-  function applyTheme() {
-    var s = window.V3.store.getState();
-    document.documentElement.setAttribute("data-theme", s.theme === "dark" ? "dark" : "light");
-  }
-
-  function isReadonly(d) { return d.profile.status !== "active"; }
-
-  /* 二级大类归属：根据当前子页 key 反查所属大类 */
-  function catOfSub(key) {
-    for (var i = 0; i < SUBCATS.length; i++) {
-      if (SUBCATS[i].subs.indexOf(key) >= 0) return SUBCATS[i];
-    }
-    return SUBCATS[0];
-  }
-
-  /* 指示条滑动（通用：容器 / 激活项 / 指示条） */
-  function moveInd(containerSel, activeSel, indSel) {
-    var sc = root.querySelector(containerSel);
-    if (!sc) return;
-    var ind = root.querySelector(indSel);
-    var on = sc.querySelector(activeSel);
-    if (!ind || !on) return;
-    var sr = sc.getBoundingClientRect(), ir = on.getBoundingClientRect();
-    ind.style.transform = "translateX(" + Math.round(ir.left - sr.left + sc.scrollLeft) + "px)";
-    ind.style.width = Math.round(ir.width) + "px";
-  }
-
-  function setNavTitle(title) {
-    var nt = document.querySelector(".navbar .nav-title");
-    if (nt) nt.textContent = title;
-    document.title = title + " · 工程链";
-  }
-
-  function badge(n) { return n > 0 ? '<span class="v3-tab__dot">' + n + "</span>" : ""; }
-
-  /* E4：navbar 右上角「消息」icon 角标（待办总数，tabular-nums；无待办不显示）+ 点击进省代专属消息页。
-     角标数据 = 省代/二级 store 待办数（与消息中心「通知」分页派生条目数一致）；navbar 在 #ag-root
-     之外，事件只绑一次。S4-S2：跳转目标由全局消息页改为同目录 messages.html（App 外壳语系专属页）。 */
-  function renderNavMsg(n) {
-    var b = document.getElementById("nav-msg-badge");
-    if (b) {
-      b.textContent = n > 99 ? "99+" : String(n);
-      b.hidden = !(n > 0);
-      b.style.display = n > 0 ? "" : "none";
-    }
-    var btn = document.getElementById("nav-msg-btn");
-    if (btn && !btn._e4Bound) {
-      btn._e4Bound = true;
-      btn.addEventListener("click", function () { location.href = "messages.html"; });
-    }
-  }
-
-  function render() {
-    var V3 = window.V3, s = V3.store.getState();
-    if (!s) return;
-    applyTheme();
-    var isSub = s.mode === "sub";
-    var key = currentKey();
-    var registry = isSub ? window.V3SUBPAGES : window.V3PAGES;
-
-    var validKeys;
+  function currentTab(isSub) {
+    var key = (location.hash || "#/home").replace("#/", "").split("?")[0];
+    var tabs = isSub ? SUB_TABS : TABS;
+    var found = tabs.filter(function (t) { return t.key === key; })[0];
+    if (found) return found.key;
     if (isSub) {
-      validKeys = SUBCATS.reduce(function (a, c) { return a.concat(c.subs); }, []);
-    } else {
-      validKeys = TABS.map(function (x) { return x.key; }).concat(EXTRA_INDEX_ROUTES);
+      if (SUBCATS.invite.some(function (s) { return s.key === key; })) return "invite";
+      if (SUBCATS.ledger.some(function (s) { return s.key === key; })) return "ledger";
     }
-    if (validKeys.indexOf(key) < 0) { location.replace("#/home"); key = "home"; }
-
-    /* #/profile 暂挂 me 视图（E1 将把 page-me 改造为身份详情视图并注册 V3PAGES.profile） */
-    var pageKey = key;
-    if (!isSub && key === "profile" && !registry.profile) pageKey = "me";
-    var page = registry[pageKey] || registry.home;
-    if (!page) return; /* 防御：preview iframe 重载竞态下视图未注册时不炸 render 链 */
-    var d = isSub ? s.sub : s.province;
-    var readonly = isReadonly(d);
-    var ctx = {
-      state: s, d: d, ui: V3.ui, V3: V3, key: key,
-      mode: s.mode, role: s.role, readonly: readonly,
-      canBoss: !isSub && s.role === "boss" && !readonly,
-      go: go
-    };
-
-    /* 标题跟随：TITLES 权威 > page.title 兜底 */
-    var title = (isSub ? SUB_TITLES[key] : INDEX_TITLES[key]) || page.title || (isSub ? "二级企业工作台" : "省级总代工作台");
-    setNavTitle(title);
-
-    /* ---------- 角标计数 ---------- */
-    var homeBadge = "", reconcileBadge = "", subsBadge = "", catBadge = {};
-    var navTodoN = 0;   /* E4：navbar 消息 icon 角标 = 待办总数（与消息中心「通知」分页待办条目数一致） */
-    if (!isSub) {
-      var r1 = d.payRegs1 || [], r2 = d.payRegs2 || [];
-      var pend1 = r1.filter(function (r) { return r.status === "pending_confirm"; }).length;
-      var disp1 = r1.filter(function (r) { return r.status === "disputed"; }).length;
-      var pend2 = r2.filter(function (r) { return r.status === "pending_confirm"; }).length;
-      var disp2 = r2.filter(function (r) { return r.status === "disputed"; }).length;
-      var subAppPending = (d.subApps || []).filter(function (a) { return a.status === "pending"; }).length;
-      var todoN = pend1 + disp1 + pend2 + disp2 + subAppPending;   /* 待办总数 */
-      var reconcileN = pend1 + disp1 + pend2 + disp2;              /* 对账未平·待处理数 */
-      homeBadge = badge(todoN);
-      reconcileBadge = badge(reconcileN);
-      subsBadge = badge(subAppPending);                            /* S4-S2：二级管理=二级申请待初审批数 */
-      navTodoN = todoN;
-    } else {
-      var regs = d.payRegs || [];
-      var subPend = regs.filter(function (r) { return r.status === "pending_confirm"; }).length;
-      var subDisp = regs.filter(function (r) { return r.status === "disputed"; }).length;
-      var agreePending = (d.agreement && d.agreement.state === "pending_mine") ? 1 : 0;
-      var subTodoN = subPend + subDisp + (d.alerts || []).length + agreePending;
-      catBadge["home"] = badge(subTodoN);      /* 工作台大类 = 待办总数 */
-      catBadge["payments"] = badge(subPend);   /* 收款与对账大类 = 收款确认数（独立显示，不堆叠） */
-      navTodoN = subTodoN;
-    }
-    renderNavMsg(navTodoN);
-
-    /* ---------- 导航 HTML ---------- */
-    var navHtml;
-    if (!isSub) {
-      /* index：4 文字 Tab（App 语系）+ 金色滑动指示条；share-config 激活态归到「二级管理」 */
-      var effKey = (key === "share-config") ? "subs" : key;
-      navHtml = '<div class="v3-subnav"><div class="sub-tabs"><div class="sub-scroll">' +
-        TABS.map(function (t) {
-          var b = t.key === "home" ? homeBadge : t.key === "reconcile" ? reconcileBadge : (t.key === "subs" ? subsBadge : "");
-          return '<button type="button" class="sub-item ' + (t.key === effKey ? "active" : "") + '" data-key="' + t.key + '">' +
-            "<span>" + t.label + "</span>" + b + "</button>";
-        }).join("") +
-        '<span class="sub-ind" aria-hidden="true"></span>' +
-        "</div></div></div>";
-    } else {
-      /* sub：4 大类 Tab（L1）+ 大类内子页签（L2） */
-      var activeCat = catOfSub(key);
-      navHtml = '<div class="v3-subsplit">' +
-        '<div class="v3-cattabs"><div class="cat-scroll">' +
-        SUBCATS.map(function (c) {
-          return '<button type="button" class="v3-cat ' + (c.key === activeCat.key ? "active" : "") + '" data-cat="' + c.key + '" data-first="' + c.subs[0] + '">' +
-            "<span>" + c.label + "</span>" + (catBadge[c.key] || "") + "</button>";
-        }).join("") +
-        '<span class="v3-cat-ind" aria-hidden="true"></span>' +
-        "</div></div>" +
-        '<div class="v3-subseg">' +
-        activeCat.subs.map(function (k) {
-          return '<button type="button" class="v3-seg ' + (k === key ? "active" : "") + '" data-key="' + k + '">' +
-            (SUBSEG_LABEL[k] || k) + "</button>";
-        }).join("") +
-        "</div></div>";
-    }
-
-    root.innerHTML = navHtml +
-      '<div id="ag-view" class="v3-fade-enter"><div class="v3-page" id="v3-page-body"></div></div>';
-
-    var bodyEl = document.getElementById("v3-page-body");
-    /* 文字密度专项：合规免责（MONEY_NOTE）统一收为页尾折叠脚注，首屏只留摘要行，不删文案只改承载形态 */
-    var _ui = window.V3.ui;
-    var legalNote = '<details class="v3-note-fold v3-legal-note"><summary>' + _ui.icon("shield", 14) +
-      '<span class="sum">合规与测算说明</span><span class="chev">' + _ui.icon("chev", 14) + "</span></summary>" +
-      '<div class="fold-body">' + _ui.esc(window.V3.MONEY_NOTE) +
-      "<br/>本页为高保真原型演示，数据均为本地 Mock；不构成任何资金 / 税务指令。</div></details>";
-    bodyEl.innerHTML = page.render(ctx) + legalNote;
-    if (page.mount) page.mount(bodyEl, ctx);
-
-    requestAnimationFrame(function () {
-      var view = document.getElementById("ag-view");
-      if (view) view.classList.remove("v3-fade-enter");
-    });
-
-    /* ---------- 事件绑定 ---------- */
-    /* index：3 Tab 点击（按钮 + location.hash，避免 base 解析整页换页） */
-    var idxSc = root.querySelector(".v3-subnav .sub-scroll");
-    if (idxSc) {
-      idxSc.addEventListener("click", function (e) {
-        var btn = e.target.closest(".sub-item");
-        if (!btn) return;
-        go("#/" + btn.getAttribute("data-key"));
-      });
-    }
-    /* sub：大类 Tab（跳类内首页）+ 子页签（切子页） */
-    var catSc = root.querySelector(".v3-cattabs .cat-scroll");
-    if (catSc) {
-      catSc.addEventListener("click", function (e) {
-        var btn = e.target.closest(".v3-cat");
-        if (!btn) return;
-        go("#/" + btn.getAttribute("data-first"));
-      });
-    }
-    var segBar = root.querySelector(".v3-subsplit .v3-subseg");
-    if (segBar) {
-      segBar.addEventListener("click", function (e) {
-        var btn = e.target.closest(".v3-seg");
-        if (!btn) return;
-        go("#/" + btn.getAttribute("data-key"));
-      });
-    }
-
-    /* 指示条 */
-    requestAnimationFrame(function () {
-      moveInd(".v3-subnav .sub-scroll", ".sub-item.active", ".v3-subnav .sub-ind");
-      moveInd(".v3-cattabs .cat-scroll", ".v3-cat.active", ".v3-cat-ind");
-    });
-
-    try { root.scrollTo({ top: 0, behavior: "smooth" }); } catch (_) { root.scrollTop = 0; }
+    return tabs[0].key;
   }
 
-  window.addEventListener("hashchange", render);
-  window.addEventListener("v3:scenario", render);
-  document.addEventListener("DOMContentLoaded", function () {
-    if (window.V3.store.getState()) { render(); return; }
-    var n = 0;
-    var t = setInterval(function () {
-      if ((window.V3 && window.V3.store && window.V3.store.getState()) || ++n > 40) {
-        clearInterval(t);
-        if (window.V3 && window.V3.store && window.V3.store.getState()) render();
-      }
-    }, 50);
+  function isValidKey(key, isSub) {
+    var tabs = isSub ? SUB_TABS : TABS;
+    if (tabs.some(function (t) { return t.key === key; })) return true;
+    if ((isSub ? SUB_EXTRA : PROV_EXTRA).indexOf(key) >= 0) return true;
+    return false;
+  }
+
+  /* ---------------- 主题：仅初始化时同步一次（全局→SPA） ---------------- */
+  function applyTheme(s) {
+    if (themeApplied) {
+      document.documentElement.setAttribute("data-theme", s.theme || "light");
+      return;
+    }
+    try {
+      var t = localStorage.getItem("engchain-theme") || "light";
+      if (t !== s.theme) store.act("theme/set", { theme: t });
+      document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", s.theme || "light");
+    }
+    themeApplied = true;
+  }
+
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (d && d.type === "theme" && d.theme) {
+      store.act("theme/set", { theme: d.theme });
+      document.documentElement.setAttribute("data-theme", d.theme);
+    }
+    if (d && d.type === "role" && d.role) {
+      store.act("role/set", { role: d.role });
+      render();
+    }
+    if (d && d.type === "scenario") {
+      var s = window.V3.scenarios.seedByScenario(d.key);
+      store.seed(s, d.key);
+      render();
+    }
   });
-  window.V3.router = { render: render, go: go, currentKey: currentKey };
 
-  /* shell 级 tax 子页 stub：摘要 + 完整指南外链（E2 可后续注册 V3SUBPAGES.tax 覆盖） */
-  if (!window.V3SUBPAGES.tax) {
-    window.V3SUBPAGES.tax = {
-      title: "税务说明",
-      render: function (ctx) {
-        var ui = ctx.ui;
-        return '<div class="v3-sec-title">税务说明（摘要）</div>' +
-          '<section class="v3-card"><p class="v3-legal">' +
-          "二级企业经营所得按主体性质分别申报：企业主体按企业所得税口径，个人 / 个体按经营所得口径；" +
-          "邀请分佣、收款确认均以平台留痕凭证为对账依据，具体税率与申报义务以税务机关口径为准。</p>" +
-          '<button class="v3-btn v3-btn--block v3-btn--navy v3-mt12" onclick="location.href=\'tax-guide.html\'">' +
-          ui.icon("receipt", 16) + "<span>查看完整税务指引</span></button></section>";
-      },
-      mount: function () {}
+  /* ---------------- 导航栏 ---------------- */
+  function renderTabs(ctx) {
+    var s = ctx.s, isSub = ctx.isSub, d = ctx.d;
+    var tabs = isSub ? SUB_TABS : TABS;
+    var active = currentTab(isSub);
+    var todo = store.todoOf(s);
+
+    var badge = function (key) {
+      var n = 0;
+      if (isSub) {
+        if (key === "ledger") n = todo.payments || 0;
+        if (key === "home") n = todo.agreement || 0;
+      } else {
+        if (key === "reconcile") n = todo.reconcile || 0;
+        if (key === "home") n = todo.subs || 0;
+      }
+      return n ? '<span class="v3-tab__dot">' + n + "</span>" : "";
     };
+
+    return '<nav class="v3-subnav"><div class="sub-scroll">' + tabs.map(function (t) {
+      return '<button class="sub-item' + (t.key === active ? " active" : "") +
+        '" data-go="#/' + t.key + '">' +
+        '<span class="sub-ico">' + ui.icon(t.icon, 18) + badge(t.key) + "</span>" +
+        '<span class="sub-label">' + t.label + "</span></button>";
+    }).join("") + "</div></nav>" + renderSubseg(ctx, active);
   }
 
-  /* ============================================================
-     S4-S2 壳层 stub：二级管理（#/subs + #/share-config）
-     - 仅导航骨架与视图挂载点，不写业务数据；业务数据线后续填充。
-     - 类内子页签（seg）：二级列表 / 分成配置，复用 .v3-subseg/.v3-seg 语系。
-     ============================================================ */
-  function renderSubsStub(ctx, which) {
-    var ui = ctx.ui;
-    var seg = function (key, label) {
-      return '<button type="button" class="v3-seg' + (key === which ? " active" : "") + '" data-key="' + key + '">' + label + "</button>";
-    };
-    return '<div class="v3-subseg s2-subseg">' +
-      seg("subs", "二级列表") + seg("share-config", "分成配置") + "</div>" +
-      '<section class="v3-card s2-stub">' +
-      '<div class="s2-stub__icon">' + ui.icon("crown", 26) + "</div>" +
-      '<div class="s2-stub__t">' + (which === "subs" ? "二级列表 · 建设中" : "分成配置 · 建设中") + "</div>" +
-      '<div class="s2-stub__s">发起二级合作 / 二级列表 / 状态管理 / 分成配置将由业务数据线接入；此处仅为导航骨架与视图挂载点，不含业务数据。</div>' +
-      "</section>";
+  /* 二级子 seg */
+  function renderSubseg(ctx, activeTab) {
+    if (!ctx.isSub) return "";
+    if (activeTab !== "invite" && activeTab !== "ledger") return "";
+    var key = (location.hash || "").replace("#/", "").split("?")[0];
+    var cats = SUBCATS[activeTab];
+    var todo = store.todoOf(ctx.s);
+    return '<div class="v3-subseg"><div class="sub-scroll">' + cats.map(function (c) {
+      var n = c.key === "payments" ? (todo.payments || 0) : 0;
+      return '<button class="v3-subseg__item' + (c.key === key ? " active" : "") + '" data-go="#/' + c.key + '">' +
+        c.label + (n ? '<span class="v3-subseg__n">' + n + "</span>" : "") + "</button>";
+    }).join("") + "</div></div>";
   }
-  if (!window.V3PAGES.subs) {
-    window.V3PAGES.subs = {
-      title: "二级管理",
-      render: function (ctx) { return renderSubsStub(ctx, "subs"); },
-      mount: function (el) {
-        var bar = el.querySelector(".s2-subseg");
-        if (bar) bar.addEventListener("click", function (e) {
-          var b = e.target.closest(".v3-seg"); if (!b) return;
-          window.V3.router.go("#/" + b.getAttribute("data-key"));
-        });
-      }
-    };
+
+  /* ---------------- 标题栏（齿轮进 v3 设置） ---------------- */
+  function renderNavbar(ctx) {
+    var isSub = ctx.isSub;
+    var title = isSub ? "二级合作工作台" : "省级总代工作台";
+    var todo = store.todoOf(ctx.s);
+    return '<div class="v3-navbar">' +
+      '<button class="v3-iconbtn v3-navbar__back" id="v3-nav-back" title="返回" aria-label="返回">' + ui.icon("back", 20) + "</button>" +
+      '<div class="v3-navbar__t">' + title + "</div>" +
+      '<button class="v3-iconbtn" id="v3-nav-msgs" title="消息中心">' + ui.icon("bell", 18) +
+      (todo.total ? '<span class="v3-tab__dot v3-tab__dot--nav">' + todo.total + "</span>" : "") +
+      "</button>" +
+      '<button class="v3-iconbtn" id="v3-nav-settings" title="设置">' + ui.icon("settings", 18) + "</button>" +
+      "</div>";
   }
-  if (!window.V3PAGES["share-config"]) {
-    window.V3PAGES["share-config"] = {
-      title: "分成配置",
-      render: function (ctx) { return renderSubsStub(ctx, "share-config"); },
-      mount: function (el) {
-        var bar = el.querySelector(".s2-subseg");
-        if (bar) bar.addEventListener("click", function (e) {
-          var b = e.target.closest(".v3-seg"); if (!b) return;
-          window.V3.router.go("#/" + b.getAttribute("data-key"));
-        });
-      }
-    };
+
+  /* ---------------- 统一小字页脚（替代大卡 legalNote） ---------------- */
+  function footerNote() {
+    return '<div class="v3-footer-note">页面所有金额为平台月度账单的<b>模拟测算</b>，仅用于流程演示，' +
+      "以平台正式月度对账与实际结算为准。</div>";
   }
+
+  /* ---------------- 消息中心（v3 内只读列表，单源派生） ---------------- */
+  function messagesView(ctx) {
+    var msgs = store.messagesOf(ctx.s);
+    var h = '<div class="v3-page-head"><div class="v3-page-title">消息中心</div>' +
+      '<div class="v3-page-sub">待办、协议、对账与系统通知统一在此查看</div></div>';
+    if (!msgs.length) {
+      h += '<div class="v3-empty">' + ctx.ui.emptyHtml("暂无新消息", "<div>当前没有待处理事项。</div>", "bell") + "</div>";
+    } else {
+      h += '<div class="v3-stack">' + msgs.map(function (m) {
+        var click = m.to ? ' data-go="' + m.to + '" role="button"' : "";
+        return '<div class="v3-msg' + (m.to ? " v3-msg--link" : "") + '"' + click + '>' +
+          '<span class="v3-msg__ic v3-msg__ic--' + (m.type || "info") + '">' + ctx.ui.icon(m.icon || "bell", 16) + "</span>" +
+          '<div class="v3-msg__bd"><div class="v3-msg__t">' + ctx.ui.esc(m.title) + "</div>" +
+          '<div class="v3-msg__d">' + ctx.ui.esc(m.desc || "") + "</div>" +
+          '<div class="v3-msg__time">' + ctx.ui.esc(m.time || "刚刚") + "</div></div>" +
+          (m.to ? '<span class="v3-msg__go">' + ctx.ui.icon("chev", 14) + "</span>" : "") +
+          "</div>";
+      }).join("") + "</div>";
+    }
+    return h;
+  }
+  function mountMessages(el, ctx) {
+    el.addEventListener("click", function (e) {
+      var g = e.target.closest("[data-go]");
+      if (g) ctx.go(g.getAttribute("data-go"));
+    });
+  }
+
+  /* ---------------- 税务说明（v3 内只读卡，不跳 legacy） ---------------- */
+  function taxView(ctx) {
+    var isSub = ctx.isSub;
+    var h = '<div class="v3-page-head"><div class="v3-page-title">税务说明</div>' +
+      '<div class="v3-page-sub">结算、发票与税费的演示口径说明</div></div>';
+    h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ctx.ui.icon("receipt", 16) + "<span>税费与发票</span></div>" +
+      '<div class="v3-legal-body"><p>1. 各合作主体依法各自承担税费，平台与省代不代扣代缴经营所得税。</p>' +
+      '<p>2. 月度对账单仅作为结算对账依据，发票按实际结算金额另行开具。</p>' +
+      '<p>3. 本页仅展示约定所得（平台测算），<b>不构成可提现余额</b>；实际款项以 App 外公对公转账及双方确认记录为准。</p>' +
+      '<p>4. 退货、退款、取消订单不计入合格消费口径。</p>' +
+      (isSub ? '<p>5. 二级合作企业向省代开具发票的类型与时点，以双方协议约定为准。</p>' :
+        '<p>5. 省代对平台开具发票的规则，以平台合作协议约定为准。</p>') +
+      "</div></div>";
+    h += '<div class="v3-readnote">' + ctx.ui.icon("shield", 13) +
+      "<span>正式发票与税务规则以平台财务中心上线后公示为准，本页为演示说明。</span></div>";
+    return h;
+  }
+
+  /* ---------------- FAB（每页自描述；路由统一清除/重建，修复离场 bug） ---------------- */
+  function clearFab() {
+    var old = document.querySelector(".app-float-cta");
+    if (old) old.remove();
+  }
+  function renderFab(items, ctx) {
+    clearFab();
+    if (!items || !items.length) return;
+    var host = document.querySelector(".phone") || document.body;
+    var bar = document.createElement("div");
+    bar.className = "app-float-cta";
+    bar.setAttribute("data-lg-glass", "");
+    bar.innerHTML = items.map(function (it, i) {
+      return (i ? '<span class="afc-sep">·</span>' : "") +
+        '<button type="button" class="afc-item" data-fab="' + i + '">' + ui.icon(it.icon, 18) + "<span>" + it.label + "</span></button>";
+    }).join("");
+    Array.prototype.forEach.call(bar.querySelectorAll("[data-fab]"), function (b) {
+      b.addEventListener("click", function () {
+        var it = items[Number(b.getAttribute("data-fab"))];
+        if (it && it.onClick) it.onClick(ctx);
+      });
+    });
+    host.appendChild(bar);
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  function render() {
+    clearFab();
+    var s = store.getState();
+    if (!s) {
+      var sk = store.currentScenario();
+      var seeded = window.V3.scenarios.seedByScenario(sk);
+      s = store.seed(seeded, sk);
+    }
+    var isSub = s.mode === "sub";
+    var d = s.state;
+    applyTheme(s);
+
+    var pages = isSub ? window.V3SUBPAGES : window.V3PAGES;
+    /* 内建只读页（消息 / 税务） */
+    pages.messages = { title: "消息中心", render: messagesView, mount: mountMessages };
+    pages.tax = { title: "税务说明", render: taxView, mount: function () {} };
+
+    var key = (location.hash || "#/home").replace("#/", "").split("?")[0];
+    if (!isValidKey(key, isSub)) key = "home";
+    var view = pages[key];
+    if (!view) key = "home", view = pages[key];
+
+    var ctx = {
+      V3: window.V3, s: s, d: d, isSub: isSub,
+      ui: ui,
+      role: s.role,
+      readonly: d.profile.status !== "active",
+      isBoss: s.mode === "province" && s.role === "boss",
+      isStaff: s.mode === "province" && s.role === "staff",
+      isOwner: s.mode === "sub" && s.role === "sub_owner",
+      canBoss: s.mode === "province" && s.role === "boss" && d.profile.status === "active",
+      canOwner: s.mode === "sub" && s.role === "sub_owner" && d.profile.status === "active"
+    };
+    ctx.go = function (hash) {
+      if (location.hash === hash) render(); else location.hash = hash;
+    };
+    ctx.fab = function (items) {
+      /* 账号暂停/只读：不渲染任何写操作入口 FAB（含视觉层） */
+      if (ctx.readonly) return;
+      renderFab(items, ctx);
+    };
+
+    root = document.getElementById("ag-root");
+    root.innerHTML =
+      '<div class="v3-chrome">' + renderNavbar(ctx) + renderTabs(ctx) + "</div>" +
+      '<div class="v3-page" id="v3-page"><div class="v3-page__in" id="v3-page-in">' +
+      view.render(ctx) + footerNote() + "</div></div>";
+
+    var pageEl = document.getElementById("v3-page-in");
+    if (view.mount) view.mount(pageEl, ctx);
+    if (view.fab) view.fab(ctx);
+
+    /* 标题栏：返回 / 设置 / 消息 */
+    var backBtn = document.getElementById("v3-nav-back");
+    if (backBtn) backBtn.addEventListener("click", function () {
+      if (history.length > 1) history.back();
+      else location.href = "../../index.html";
+    });
+    var gear = document.getElementById("v3-nav-settings");
+    if (gear) gear.addEventListener("click", function () { ctx.go("#/settings"); });
+    var bellBtn = document.getElementById("v3-nav-msgs");
+    if (bellBtn) bellBtn.addEventListener("click", function () { ctx.go("#/messages"); });
+
+    /* 统一 data-go（弹层内连接除外） */
+    Array.prototype.forEach.call(root.querySelectorAll("[data-go]"), function (b) {
+      if (b.closest(".v3-overlay")) return;
+      b.addEventListener("click", function () { ctx.go(b.getAttribute("data-go")); });
+    });
+
+    scrollTop();
+  }
+
+  function scrollTop() {
+    try { window.scrollTo(0, 0); } catch (e) {}
+    ["#ag-root", ".phone", ".v3-page"].forEach(function (sel) {
+      var el = document.querySelector(sel);
+      if (el) el.scrollTop = 0;
+    });
+  }
+
+  function init() {
+    store = window.V3.store;
+    ui = window.V3.ui;
+    var loaded = store.load();
+    var scenarioKey = store.currentScenario();
+    if (!loaded) {
+      var seeded = window.V3.scenarios.seedByScenario(scenarioKey);
+      store.seed(seeded, scenarioKey);
+    }
+    render();
+    window.addEventListener("hashchange", render);
+  }
+
+  window.V3 = window.V3 || {};
+  window.V3.router = { render: render, init: init, currentTab: currentTab };
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();

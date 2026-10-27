@@ -64,7 +64,7 @@
         }
         var auth = A.read ? A.read() : {};
         auth = JSON.parse(JSON.stringify(auth || {}));
-        auth.realname = auth.realname || { ok: true, name: '林总代' };
+        auth.realname = auth.realname || { ok: true, name: '林振华' };
         auth.partner = { ok: true, status: 'approved', approvedAt: now - 30 * DAY, profitConfig: {} };
         A.write(auth);
       } catch (e) {}
@@ -73,10 +73,10 @@
     /* ---- u11 四川总代（active，n/21） ---- */
     var pa = {
       id: 'pa-u11', uid: 'u11', province: '四川省', provinceCode: '510000',
-      branchCompany: { name: '四川××省级代理有限公司', uscc: '91510000DEMO11X', license: '营业执照(示例)', legalRep: '林总代', contact: '林总代', phone: '139****0011' },
+      branchCompany: { name: '四川华建工程管理有限公司', uscc: '91510000DEMO11X', license: '营业执照(示例)', legalRep: '林振华', contact: '林振华', phone: '139****0011' },
       status: 'active', appointedAt: now - 30 * DAY, appointedBy: 'admin', source: 'seed',
       rejects: [], statusLog: [{ operator: 'admin', at: now - 30 * DAY, reason: '播种开通', fromStatus: '', toStatus: 'active' }],
-      provinceHistory: [], sealedAt: 0, orgId: 'org-a11', legalRep: '林总代',
+      provinceHistory: [], sealedAt: 0, orgId: 'org-a11', legalRep: '林振华',
       admins: ['u11'], materials: ['示例资质材料'], fee: 0,
       /* 叠加个人合伙人示例（并集，独立布尔，不合并身份） */
       union: { individualPartner: true }
@@ -86,7 +86,7 @@
     /* ---- u12 成都二级（approved，约定20%，已签） ---- */
     var sub = {
       id: 'sb-u12', parentUid: 'u11', uid: 'u12',
-      company: { name: '成都××合作公司', uscc: '91510100DEMO12Y', license: '营业执照(示例)', legalRep: '陈二级', contact: '陈二级' },
+      company: { name: '成都成达建设工程有限公司', uscc: '91510100DEMO12Y', license: '营业执照(示例)', legalRep: '陈志远', contact: '陈志远' },
       province: '四川省', ratioToSub: 0.20, status: 'approved',
       statusLog: [{ operator: 'admin', at: now - 20 * DAY, reason: '播种通过', fromStatus: 'pending', toStatus: 'approved' }],
       rejects: [], ratioLog: [{ ratio: 0.20, at: now - 20 * DAY, operator: 'admin', reason: '初始约定20%' }],
@@ -117,7 +117,7 @@
 
     /* ---- O4 签署：u12 已签（写回 signature） ---- */
     if (E) {
-      var sc = E.sendContract({ subId: 'sb-u12', parentUid: 'u11', subUid: 'u12', parentName: '林总代', parentCompany: '四川××省级代理有限公司', subName: '陈二级', subCompany: '成都××合作公司' }, opts);
+      var sc = E.sendContract({ subId: 'sb-u12', parentUid: 'u11', subUid: 'u12', parentName: '林振华', parentCompany: '四川华建工程管理有限公司', subName: '陈志远', subCompany: '成都成达建设工程有限公司' }, opts);
       if (sc.ok) {
         E.sign(sc.contract.id, 'sub', '企业公章', Object.assign({}, opts, {
           onSigned: function (subId, signature) {
@@ -139,8 +139,8 @@
         if (!Array.isArray(raw)) raw = [];
         var exists = {}; raw.forEach(function (o) { exists[o.orgId] = true; });
         if (!exists['org-a11']) raw.push({
-          orgId: 'org-a11', co: '四川××省级代理有限公司', shortName: '川总代',
-          code: pa.branchCompany.uscc, legal: '林总代', entryTypes: ['province_agent'],
+          orgId: 'org-a11', co: '四川华建工程管理有限公司', shortName: '华建管理',
+          code: pa.branchCompany.uscc, legal: '林振华', entryTypes: ['province_agent'],
           entStatus: 'active', expireAt: now + 365 * DAY, ownerUid: 'u11', memberLimit: 10,
           members: [
             { uid: 'u11', role: 'owner', status: 'active', joinedAt: now - 30 * DAY },
@@ -149,8 +149,8 @@
           invites: [], joins: [], ownerClaims: []
         });
         if (!exists['org-a12']) raw.push({
-          orgId: 'org-a12', co: '成都××合作公司', shortName: '成二级',
-          code: sub.company.uscc, legal: '陈二级', entryTypes: ['sub_agent'],
+          orgId: 'org-a12', co: '成都成达建设工程有限公司', shortName: '成达建设',
+          code: sub.company.uscc, legal: '陈志远', entryTypes: ['sub_agent'],
           entStatus: 'active', expireAt: now + 365 * DAY, ownerUid: 'u12', memberLimit: 10,
           members: [
             { uid: 'u12', role: 'owner', status: 'active', joinedAt: now - 20 * DAY },

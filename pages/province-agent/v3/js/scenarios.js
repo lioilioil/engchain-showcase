@@ -1,173 +1,340 @@
 /* ============================================================
-   scenarios.js · v3 演示种子 + window.applyV3Scenario(key)
-   active / suspended / empty / dark / sub-active / sub-readonly
+   scenarios.js · 演示场景种子（无外部依赖；数据全部与 UI 口径一致）
+   场景：active / suspended / empty / dark / sub-active / sub-readonly / sub-dark
+   说明：
+   - 待办与消息由 store.todoOf / messagesOf 派生，种子不写 alerts 假数据
+   - 线索 owner 字段用于员工（王敏）数据隔离演示
+   - 所有金额为演示模拟数据，页面统一标注"模拟测算"
    ============================================================ */
 (function () {
   "use strict";
 
+  /* ---------------- 省代（老板 / 员工） ---------------- */
   function provinceSeed(status, isEmpty) {
     var z = !!isEmpty;
+    var zero = function (v) { return z ? 0 : v; };
+    var arr = function (a) { return z ? [] : a; };
+
+    var calc1 = {
+      id: "c1-l1",
+      month: "2026-10",
+      layer: "平台→省代",
+      eligibleBase: 10000,
+      grossShare: 0.5,
+      calcAmount: z ? 0 : 5000,
+      frozenDays: 7,
+      disputeDeadline: "T+5 工作日",
+      dueDay: 3
+    };
+    var calc2 = {
+      id: "c1-l2",
+      layer: "省代→二级",
+      month: "2026-10",
+      eligibleBase: 10000,
+      ratioToSub: 0.20,
+      calcAmount: z ? 0 : 1000,
+      disputeDeadline: "出账后 15 天",
+      dueDay: 12
+    };
+
+    var payRegs1 = z ? [] : [
+      {
+        id: "r0-l1", calcId: "c0-l1", amount: 4600, method: "bank",
+        date: "2026-09-10",
+        vouchers: [{ name: "9月转款回单.jpg", kind: "image", thumb: "" }],
+        registeredBy: "王建国", status: "confirmed",
+        confirmedAt: "2026-09-11", signMethod: "esign", createdAt: "2026-09-10", voidInfo: null
+      },
+      {
+        id: "r1-l1", calcId: "c1-l1", amount: 4760, method: "bank",
+        date: "2026-10-09",
+        vouchers: [{ name: "10月转款回单.jpg", kind: "image", thumb: "" }],
+        registeredBy: "王建国", status: "disputed",
+        reason: "平台回单金额与测算口径差 ¥240（信息服务费），待双方核实",
+        disputedAt: "2026-10-10", dueDay: 3, createdAt: "2026-10-09"
+      }
+    ];
+    var payRegs2 = z ? [] : [
+      {
+        id: "r0-l2", calcId: "c0-l2", amount: 920, method: "bank",
+        date: "2026-09-12",
+        vouchers: [{ name: "9月二级回单.jpg", kind: "image", thumb: "" }],
+        registeredBy: "王建国", status: "confirmed",
+        confirmedAt: "2026-09-13", signMethod: "esign", createdAt: "2026-09-12"
+      },
+      {
+        id: "r1-l2", calcId: "c1-l2", amount: 1000, method: "bank",
+        date: "2026-10-11",
+        vouchers: [{ name: "10月二级回单.jpg", kind: "image", thumb: "" }],
+        registeredBy: "王建国", status: "pending_confirm",
+        dueDay: 12, createdAt: "2026-10-11"
+      }
+    ];
+
     return {
       mode: "province",
-      province: {
+      role: "boss",
+      roleStaffName: "王敏",
+      theme: "light",
+      state: {
         profile: {
-          agentName: "四川润锦工程服务有限公司", province: "四川省",
-          status: status, used: z ? 0 : 1, cap: 21, subsCount: z ? 0 : 1,
-          authNo: "RJ-PA-2026-SC-018", validTill: "2027-09-30"
+          role: "province_master",
+          name: "四川锦程工程供应链有限公司",
+          authNo: "51010020260812001",
+          status: status || "active",
+          since: "2026-08-12",
+          uscc: "91510100MA6C8X2K4P",
+          contact: "王建国",
+          phone: "138****8021",
+          legalPerson: "王建国",
+          address: "中国（四川）自由贸易试验区成都高新区天府大道中段 666 号"
         },
-        financeBase: { eligible: z ? 0 : 10000, frozen: z ? 0 : 3000, ratioToSub: 0.20, selfBase: z ? 0 : 8000 },
-        subs: z ? [] : [
-          { id: "sub-rongjian", name: "成都蓉建科贸有限公司", status: "active", ratioToSub: 0.20,
-            inviteScope: "标准授权（平台配置 + O4 协议约定范围内）", inviteRate: null, inviteRateReadonly: true,
-            scopeText: "可邀终端用户；规模/费率只读", since: "2026-08-12" }
+        financeBase: {
+          gross: z ? 0 : 10000,
+          selfRate: 0.5
+        },
+        calc1: calc1,
+        calc2: calc2,
+        payRegs1: payRegs1,
+        payRegs2: payRegs2,
+        statements: z ? [
+          { id: "st-l1", calcId: "c1-l1", month: "2026-10", status: "open", balancedAt: "" },
+          { id: "st-l2", calcId: "c1-l2", month: "2026-10", status: "open", balancedAt: "" }
+        ] : [
+          { id: "st-l1-prev", calcId: "c0-l1", month: "2026-09", status: "balanced", balancedAt: "2026-09-12", balancedBy: "王建国" },
+          { id: "st-l2-prev", calcId: "c0-l2", month: "2026-09", status: "balanced", balancedAt: "2026-09-14", balancedBy: "王建国" },
+          { id: "st-l1", calcId: "c1-l1", month: "2026-10", status: "open", balancedAt: "" },
+          { id: "st-l2", calcId: "c1-l2", month: "2026-10", status: "open", balancedAt: "" }
         ],
-        agentCodes: z ? [] : [
-          { id: "ag-1", code: "AG-7KQ2TZ", status: "active", createdAt: "2026-08-10", voidInfo: null },
-          { id: "ag-0", code: "AG-3MN9WP", status: "void", createdAt: "2026-05-02",
-            voidInfo: { reason: "换发新码", at: "2026-08-09" } }
+        ratioLog: z ? [] : [
+          { id: "rl-1", subId: "sub-rongjian", sub: "成都蓉建科贸有限公司", from: 0.15, to: 0.20, by: "boss", at: "2026-09-28 14:02", note: "首次合作约定" }
+        ],
+        subs: z ? [] : [
+          {
+            id: "sub-rongjian",
+            name: "成都蓉建科贸有限公司",
+            uscc: "91510107MA6XR4TQ8L",
+            contact: "陈志远",
+            phone: "139****6620",
+            address: "成都市武侯区武科西一路 88 号",
+            ratioToSub: 0.20,
+            since: "2026-08-12",
+            status: "active",
+            channel: "agent"
+          }
         ],
         subApps: z ? [] : [
-          { id: "app-1", entName: "德阳恒基建设咨询有限公司", uscc: "91510600MA6XXXX3K2", contact: "周恒",
-            phone: "138****6021", ratioToSub: 0.18, status: "pending", rejectReason: null, createdAt: "2026-10-21" },
-          { id: "app-2", entName: "绵阳顺达工程服务有限公司", uscc: "91510700MAXXXX8D7", contact: "李达",
-            phone: "139****1182", ratioToSub: 0.25, status: "pending", rejectReason: null, createdAt: "2026-10-22" },
-          { id: "app-3", entName: "南充某工程咨询行", uscc: "91511300MAXXXX0Q9", contact: "赵某",
-            phone: "137****4460", ratioToSub: 0.30, status: "rejected", rejectReason: "资质材料不完整，补齐后可重新申请", createdAt: "2026-10-09" }
+          {
+            id: "app-1", name: "德阳恒基建材有限公司",
+            uscc: "91510600MA65K2B71N", contact: "刘芳", phone: "138****2245",
+            address: "四川省德阳市旌阳区泰山北路 19 号",
+            ratio: 0.18, channel: "agent", status: "pending", submittedAt: "2026-10-25"
+          },
+          {
+            id: "app-2", name: "绵阳顺达工程服务有限公司",
+            uscc: "91510703MA69H8P52R", contact: "周明", phone: "137****7710",
+            address: "四川省绵阳市涪城区临园路西段 24 号",
+            ratio: 0.25, channel: "direct", status: "pending", submittedAt: "2026-10-26"
+          },
+          {
+            id: "app-3", name: "南充宏远物资有限公司",
+            uscc: "91511302MA6B4X7Q9D", contact: "赵伟", phone: "136****3308",
+            address: "四川省南充市顺庆区模范街 72 号",
+            ratio: 0.20, channel: "direct", status: "rejected",
+            rejectReason: "营业执照经营范围与工程服务类目不符", handledAt: "2026-10-20", submittedAt: "2026-10-18"
+          }
         ],
-        channels: z ? [] : [
-          { id: "ch-1", code: "CH-P-8KQ2TV", ownerType: "province", ownerName: "本公司总码", tpl: "tpl1", src: "wechat", status: "active", createdAt: "2026-10-01", voidInfo: null },
-          { id: "ch-2", code: "CH-P-4HN7MW", ownerType: "province", ownerName: "线下展会码", tpl: "tpl2", src: "offline", status: "active", createdAt: "2026-10-12", voidInfo: null },
-          { id: "ch-3", code: "CH-E-2QP6ZK", ownerType: "staff", ownerName: "员工·王敏", tpl: "tpl1", src: "wechat", status: "active", createdAt: "2026-10-05", voidInfo: null },
-          { id: "ch-0", code: "CH-P-9WT1XC", ownerType: "province", ownerName: "旧版总码", tpl: "tpl1", src: "wechat", status: "void", createdAt: "2026-09-01", voidInfo: { reason: "版本更换", at: "2026-09-30" } }
+        agentCodes: z ? {
+          direct: { code: "", status: "inactive", channel: "direct", validUntil: "2026-12-31" },
+          agent: { code: "", status: "inactive", channel: "agent", validUntil: "2026-12-31" }
+        } : {
+          direct: { code: "AG-7KQ2TZ", status: "active", channel: "direct", createdAt: "2026-08", validUntil: "2026-12-31" },
+          agent: { code: "AG-3MN9WP", status: "void", channel: "agent", voidAt: "2026-09", validUntil: "2026-05-31" }
+        },
+        channels: z ? { direct: [], agent: [] } : {
+          direct: [
+            { code: "CH-P-8KQ2TV", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 8, validUntil: "2026-12-31", status: "active" },
+            { code: "CH-P-9WT1XC", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-07", users: 3, validUntil: "2026-09-30", status: "void" }
+          ],
+          agent: [
+            { code: "CH-P-4HN7MW", channel: "agent", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 6, validUntil: "2026-12-31", status: "active" },
+            { code: "CH-E-2QP6ZK", channel: "agent", ownerType: "staff", ownerName: "王敏", createdAt: "2026-09", users: 4, validUntil: "2026-12-31", status: "active" }
+          ]
+        },
+        team: z ? [] : [
+          { name: "王建国", role: "boss", title: "法定代表人 / 总经理", phone: "138****8021", since: "2026-08-12", leads: 0, isLegal: true },
+          { name: "王敏", role: "staff", title: "渠道专员", phone: "135****4902", since: "2026-09-02", leads: 4, isLegal: false, channel: "CH-E-2QP6ZK" }
         ],
-        leads: z ? [] : [
-          { id: "ld-1", name: "张*", phone: "138****2210", stage: "repaid", channelCode: "CH-P-8KQ2TV", viaUserReinvite: false, paidAmount: 3600, src: "wechat", nextFollowAt: "", idleDays: 2, createdAt: "2026-10-06",
-            follows: [{ at: "2026-10-12", text: "已解锁会员+增值包，复购一次", by: "boss" }] },
-          { id: "ld-2", name: "刘**", phone: "139****8834", stage: "paid", channelCode: "CH-P-8KQ2TV", viaUserReinvite: false, paidAmount: 2800, src: "wechat", nextFollowAt: "2026-10-26", idleDays: 4, createdAt: "2026-10-09", follows: [] },
-          { id: "ld-3", name: "陈工", phone: "137****5120", stage: "paid", channelCode: "CH-E-2QP6ZK", viaUserReinvite: false, paidAmount: 1980, src: "wechat", nextFollowAt: "", idleDays: 9, createdAt: "2026-10-08", follows: [] },
-          { id: "ld-4", name: "王*", phone: "186****3077", stage: "onboarded", channelCode: "CH-P-4HN7MW", viaUserReinvite: false, paidAmount: 0, src: "offline", nextFollowAt: "2026-10-25", idleDays: 3, createdAt: "2026-10-15", follows: [] },
-          { id: "ld-5", name: "赵*", phone: "135****9921", stage: "onboarded", channelCode: "CH-P-8KQ2TV", viaUserReinvite: false, paidAmount: 0, src: "wechat", nextFollowAt: "", idleDays: 31, createdAt: "2026-09-20", follows: [] },
-          { id: "ld-6", name: "孙**", phone: "158****0456", stage: "registered", channelCode: "CH-P-4HN7MW", viaUserReinvite: false, paidAmount: 0, src: "offline", nextFollowAt: "2026-10-24", idleDays: 1, createdAt: "2026-10-20", follows: [] },
-          { id: "ld-7", name: "周*", phone: "177****6630", stage: "registered", channelCode: "CH-E-2QP6ZK", viaUserReinvite: false, paidAmount: 0, src: "wechat", nextFollowAt: "", idleDays: 6, createdAt: "2026-10-18", follows: [] },
-          { id: "ld-8", name: "吴*", phone: "152****7788", stage: "lost", channelCode: "CH-P-8KQ2TV", viaUserReinvite: false, paidAmount: 0, src: "wechat", nextFollowAt: "", idleDays: 40, createdAt: "2026-09-10", follows: [] },
-          { id: "ld-x", name: "（他人邀请）钱*", phone: "131****0000", stage: "onboarded", channelCode: "—", viaUserReinvite: true, paidAmount: 0, src: "—", nextFollowAt: "", idleDays: 0, createdAt: "2026-10-17", follows: [] }
-        ],
-
-        calc1: [
-          { id: "c1-l1", month: "2026-10", level: 1, counterparty: "平台 · 润锦工程链", calcAmount: 5000, issuedAt: "2026-10-31", dueLabel: "T+3 工作日内确认 · 异议 T+5 工作日闭环" },
-          { id: "c0-l1", month: "2026-09", level: 1, counterparty: "平台 · 润锦工程链", calcAmount: 4600, issuedAt: "2026-09-30", dueLabel: "已平账" }
-        ],
-        payRegs1: [
-          { id: "r1-l1", calcId: "c1-l1", amount: 4760, method: "bank", date: "2026-11-03",
-            vouchers: [{ name: "对公转账回单-1103.jpg", kind: "image" }], registeredBy: "boss", status: "disputed",
-            reason: "平台反馈本月还差 ¥240 未到账，待线下核实", createdAt: "2026-11-03", voidInfo: null },
-          { id: "r0-l1", calcId: "c0-l1", amount: 4600, method: "bank", date: "2026-10-09",
-            vouchers: [{ name: "9月对公转款回单.jpg", kind: "image" }], registeredBy: "boss", status: "confirmed", confirmedAt: "2026-10-10", signMethod: "record", createdAt: "2026-10-09", voidInfo: null }
-        ],
-        statements1: [
-          { id: "st-cur-1", calcId: "c1-l1", month: "2026-10", status: "open" },
-          { id: "st-prev-1", calcId: "c0-l1", month: "2026-09", status: "balanced", balancedAt: "2026-10-11" }
-        ],
-
-        calc2: [
-          { id: "c1-l2", month: "2026-10", level: 2, counterparty: "成都蓉建科贸有限公司", calcAmount: 1000, issuedAt: "2026-10-31", dueLabel: "出账后 15 天内确认 · 仅提醒不自动到账", dueDay: 12 },
-          { id: "c0-l2", month: "2026-09", level: 2, counterparty: "成都蓉建科贸有限公司", calcAmount: 920, issuedAt: "2026-09-30", dueLabel: "已平账" }
-        ],
-        payRegs2: [
-          { id: "r1-l2", calcId: "c1-l2", amount: 1000, method: "bank", date: "2026-11-02",
-            vouchers: [{ name: "转给蓉建科贸回单.jpg", kind: "image" }], registeredBy: "boss", status: "pending_confirm",
-            createdAt: "2026-11-02", dueDay: 12, voidInfo: null },
-          { id: "r0-l2", calcId: "c0-l2", amount: 920, method: "bank", date: "2026-10-08",
-            vouchers: [{ name: "9月转款回单.jpg", kind: "image" }], registeredBy: "boss", status: "confirmed", confirmedAt: "2026-10-09", signMethod: "esign", createdAt: "2026-10-08", voidInfo: null }
-        ],
-        statements2: [
-          { id: "st-cur-2", calcId: "c1-l2", month: "2026-10", status: "open" },
-          { id: "st-prev-2", calcId: "c0-l2", month: "2026-09", status: "balanced", balancedAt: "2026-10-10" }
-        ],
-
-        alerts: [
-          { type: "danger", icon: "⚠", title: "平台⇄省代对账差异 ¥240", desc: "10 月测算 ¥5,000 − 已登记 ¥4,760，差异未清零，平账已锁定，请先处理异议。", to: "#/reconcile" },
-          { type: "info", icon: "⏱", title: "T+7 冻结 ¥3,000", desc: "本月在途冻结金额，到期后入下月总盘（模拟测算）。" },
-          { type: "warn", icon: "🔔", title: "1 条线索 31 天未跟进", desc: "赵* 已超沉寂阈值，建议回收或重新分配。", to: "#/invite" }
-        ]
+        leads: z ? { direct: [], agent: [] } : {
+          direct: [
+            { id: "L001", name: "张磊", phone: "139****1123", stage: "paid", owner: "王建国", createdAt: "2026-09-15", boundAt: "2026-09-15", amount: 3600, notes: [{ at: "2026-09-15", by: "王建国", text: "扫码注册，当日完成首单" }] },
+            { id: "L002", name: "李婷", phone: "138****7745", stage: "onboarded", owner: "王建国", createdAt: "2026-09-20", boundAt: "2026-09-20", notes: [{ at: "2026-09-20", by: "王建国", text: "已提交资质，待首单" }] },
+            { id: "L003", name: "王浩", phone: "137****6688", stage: "registered", owner: "王建国", createdAt: "2026-10-03", boundAt: "2026-10-03", notes: [] },
+            { id: "L005", name: "陈静", phone: "135****0211", stage: "paid", owner: "王建国", createdAt: "2026-09-08", boundAt: "2026-09-08", amount: 2800, notes: [{ at: "2026-09-08", by: "王建国", text: "复购 2 次" }] },
+            { id: "L006", name: "赵强", phone: "136****8834", stage: "lost", owner: "王建国", createdAt: "2026-08-21", boundAt: "2026-08-21", notes: [{ at: "2026-10-01", by: "王建国", text: "超过 30 天未活跃，建议关注（演示仅提示）" }] }
+          ],
+          agent: [
+            { id: "L101", name: "孙丽", phone: "139****2267", stage: "paid", owner: "王建国", createdAt: "2026-09-11", boundAt: "2026-09-11", amount: 1980, notes: [{ at: "2026-09-11", by: "王建国", text: "招商渠道导流" }] },
+            { id: "L102", name: "周杰", phone: "138****5590", stage: "onboarded", owner: "王建国", createdAt: "2026-09-18", boundAt: "2026-09-18", notes: [] },
+            { id: "L103", name: "吴敏", phone: "137****3318", stage: "registered", owner: "王敏", createdAt: "2026-09-25", boundAt: "2026-09-25", notes: [{ at: "2026-09-25", by: "王敏", text: "本人渠道码注册" }] },
+            { id: "L104", name: "郑凯", phone: "136****7742", stage: "paid", owner: "王敏", createdAt: "2026-10-02", boundAt: "2026-10-02", amount: 1600, notes: [{ at: "2026-10-02", by: "王敏", text: "首单完成" }] },
+            { id: "L105", name: "冯雪", phone: "135****9961", stage: "registered", owner: "王敏", createdAt: "2026-10-08", boundAt: "2026-10-08", notes: [] }
+          ]
+        },
+        msgLog: []
       }
     };
   }
 
-  function subSeed(readonly) {
-    var status = readonly ? "suspended" : "active";
+  /* ---------------- 协议条款（O4 正式演示文本） ---------------- */
+  function agreementTerms() {
+    return [
+      { no: "第一条", t: "合作主体", c: "甲方为省级总代四川锦程工程供应链有限公司，乙方为经甲方审核通过的二级合作企业；双方均为合法存续的市场主体，独立经营、自负盈亏。" },
+      { no: "第二条", t: "合作内容与区域", c: "甲方授权乙方在约定区域内开展工程服务用户推广与转化，乙方不得跨区域恶性竞争，不得转授权、不得发展下级分润主体。" },
+      { no: "第三条", t: "约定所得比例", c: "乙方按其名下合格消费额的约定比例（见合作配置单，初始 20%）取得合作所得；比例可经双方书面（含本协议电子流程）确认后调整，调整后以补签版本为准。" },
+      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过收款确认与月度对账单留痕。" },
+      { no: "第五条", t: "付款与确认", c: "甲方在 App 外通过对公转账等线下方式付款并登记凭证；乙方核对到账金额与凭证一致后在系统内确认。出账后 15 天内仅提醒，系统不自动确认、不自动到账。" },
+      { no: "第六条", t: "异议处理", c: "乙方发现未到账、金额不符或凭证不清，可提出异议；双方线下核实并补充凭证，异议闭环前不进行月度平账。" },
+      { no: "第七条", t: "发票与税费", c: "各方依法各自承担税费；如需开票，按实际结算金额与发票管理规则另行办理。" },
+      { no: "第八条", t: "合规经营", c: "双方不得虚假交易、刷单套利、违规承诺收益；不得利用本合作从事违法活动。违反者甲方有权暂停或终止合作。" },
+      { no: "第九条", t: "协议期限与续签", c: "本协议自双方签署之日起生效，有效期一年；到期前 30 日双方无异议则按届时规则续签。" },
+      { no: "第十条", t: "暂停与终止", c: "乙方违规或资质失效的，甲方可暂停其经营权限（仅可查看）；终止后渠道码失效、未结算款项按已确认数据继续结清。" }
+    ];
+  }
+
+  /* ---------------- 二级合作 ---------------- */
+  function subSeed(status, isEmpty) {
+    var z = !!isEmpty;
+    var calcCur = {
+      id: "sc-1", month: "2026-10",
+      eligibleBase: 10000,
+      ratioToSub: 0.20,
+      calcAmount: z ? 0 : 1000,
+      dueDay: 12
+    };
+    var calcPrev = {
+      id: "sc-0", month: "2026-09",
+      eligibleBase: 9200,
+      ratioToSub: 0.20,
+      calcAmount: z ? 0 : 920
+    };
     return {
       mode: "sub",
-      sub: {
-        profile: { name: "成都蓉建科贸有限公司", parent: "四川润锦工程服务有限公司（省级总代）", province: "四川省",
-          status: status, ratioToSub: 0.20, authNo: "O4-2026-10", since: "2026-08-12",
-          inviteScope: "标准授权（平台配置 + O4 协议内）", inviteRateReadonly: true },
-        financeBase: { eligible: 10000, frozen: 3000, ratioToSub: 0.20 },
-        agreement: { state: readonly ? "signed" : "pending_mine", code: "O4-2026-10", version: "v2026.10",
-          rejectReason: null, completedAt: readonly ? "2026-08-12" : null,
-          clauses: ["合作期限与授权范围", "约定所得比例 20%（平台配置 + 协议约定）", "终端用户单层绑定，不发展下级企业", "线下结算与对账、凭证与电子签留痕", "模拟测算口径与免责条款"] },
-        channels: [
-          { id: "sch-1", code: "CH-S-5KQ8TN", ownerType: "sub", ownerName: "本企业渠道码", tpl: "tpl1", src: "wechat", status: "active", createdAt: "2026-10-03", voidInfo: null }
+      role: "sub_owner",
+      theme: "light",
+      state: {
+        profile: {
+          role: "sub_partner",
+          name: "成都蓉建科贸有限公司",
+          authNo: "51010720260812007",
+          status: status || "active",
+          since: "2026-08-12",
+          uscc: "91510107MA6XR4TQ8L",
+          contact: "陈志远",
+          phone: "139****6620",
+          legalPerson: "陈志远",
+          address: "成都市武侯区武科西一路 88 号"
+        },
+        parent: {
+          name: "四川锦程工程供应链有限公司（省级总代）",
+          uscc: "91510100MA6C8X2K4P",
+          contact: "王建国",
+          phone: "138****8021",
+          legalPerson: "王建国",
+          address: "中国（四川）自由贸易试验区成都高新区天府大道中段 666 号",
+          ratioToSub: 0.20,
+          since: "2026-08-12"
+        },
+        calc: [calcCur, calcPrev],
+        payRegs: z ? [] : [
+          {
+            id: "sr-0", calcId: "sc-0", amount: 920, method: "bank",
+            date: "2026-09-12",
+            vouchers: [{ name: "9月回单.jpg", kind: "image", thumb: "" }],
+            registeredBy: "省代（王建国）", status: "confirmed",
+            confirmedAt: "2026-09-13", signMethod: "esign", createdAt: "2026-09-12"
+          },
+          {
+            id: "sr-1", calcId: "sc-1", amount: 1000, method: "bank",
+            date: "2026-10-11",
+            vouchers: [{ name: "10月回单.jpg", kind: "image", thumb: "" }],
+            registeredBy: "省代（王建国）", status: "pending_confirm",
+            dueDay: 12, createdAt: "2026-10-11"
+          }
         ],
-        leads: [
-          { id: "sld-1", name: "林*", phone: "139****2014", stage: "paid", channelCode: "CH-S-5KQ8TN", viaUserReinvite: false, paidAmount: 2400, src: "wechat", idleDays: 3, follows: [], nextFollowAt: "" },
-          { id: "sld-2", name: "郭**", phone: "137****8852", stage: "onboarded", channelCode: "CH-S-5KQ8TN", viaUserReinvite: false, paidAmount: 0, src: "wechat", idleDays: 5, follows: [], nextFollowAt: "2026-10-27" },
-          { id: "sld-3", name: "何*", phone: "186****3301", stage: "registered", channelCode: "CH-S-5KQ8TN", viaUserReinvite: false, paidAmount: 0, src: "wechat", idleDays: 2, follows: [], nextFollowAt: "" },
-          { id: "sld-x", name: "（用户再邀请）高*", phone: "130****0000", stage: "registered", channelCode: "—", viaUserReinvite: true, paidAmount: 0, src: "—", idleDays: 0, follows: [], nextFollowAt: "" }
+        statements: z ? [
+          { id: "sst-1", calcId: "sc-1", month: "2026-10", status: "open", balancedAt: "" }
+        ] : [
+          { id: "sst-0", calcId: "sc-0", month: "2026-09", status: "balanced", balancedAt: "2026-09-14", balancedBy: "省代" },
+          { id: "sst-1", calcId: "sc-1", month: "2026-10", status: "open", balancedAt: "" }
         ],
-        calc: [
-          { id: "sc-1", month: "2026-10", level: 2, counterparty: "四川润锦工程服务有限公司", calcAmount: 1000, issuedAt: "2026-10-31", dueLabel: "出账后 15 天内确认 · 仅提醒不自动到账", dueDay: 12 },
-          { id: "sc-0", month: "2026-09", level: 2, counterparty: "四川润锦工程服务有限公司", calcAmount: 920, issuedAt: "2026-09-30", dueLabel: "已平账" }
-        ],
-        payRegs: [
-          { id: "sr-1", calcId: "sc-1", amount: 1000, method: "bank", date: "2026-11-02",
-            vouchers: [{ name: "省代转款回单.jpg", kind: "image" }], registeredBy: "省代", status: "pending_confirm", createdAt: "2026-11-02", dueDay: 12, voidInfo: null },
-          { id: "sr-0", calcId: "sc-0", amount: 920, method: "bank", date: "2026-10-08",
-            vouchers: [{ name: "9月回单.jpg", kind: "image" }], registeredBy: "省代", status: "confirmed", confirmedAt: "2026-10-09", signMethod: "esign", createdAt: "2026-10-08", voidInfo: null }
-        ],
-        statements: [
-          { id: "sst-1", calcId: "sc-1", month: "2026-10", status: "open" },
-          { id: "sst-0", calcId: "sc-0", month: "2026-09", status: "balanced", balancedAt: "2026-10-10" }
-        ],
-        alerts: [
-          { type: "warn", icon: "🔔", title: "1 笔省代线下付款待你确认", desc: "出账第 12 天 / 15 天，仅提醒，逾期不会自动确认到账。", to: "#/payments" }
-        ]
+        agreement: {
+          id: "O4-2026-10",
+          version: "v2026.10",
+          state: z ? "signed" : (status === "suspended" ? "signed" : "pending_mine"),
+          province: {
+            name: "四川锦程工程供应链有限公司",
+            uscc: "91510100MA6C8X2K4P",
+            legalPerson: "王建国",
+            contact: "王建国",
+            phone: "138****8021",
+            address: "中国（四川）自由贸易试验区成都高新区天府大道中段 666 号"
+          },
+          sub: {
+            name: "成都蓉建科贸有限公司",
+            uscc: "91510107MA6XR4TQ8L",
+            legalPerson: "陈志远",
+            contact: "陈志远",
+            phone: "139****6620",
+            address: "成都市武侯区武科西一路 88 号"
+          },
+          sentAt: "2026-10-27",
+          expireAt: "2027-10-26",
+          terms: agreementTerms(),
+          signedAt: z || status === "suspended" ? "2026-10-15" : "",
+          signerName: z || status === "suspended" ? "陈志远" : "",
+          rejectReason: "",
+          rejectedAt: ""
+        },
+        channels: z ? { school: [] } : {
+          school: [
+            { code: "CH-S-5KQ8TN", channel: "school", ownerType: "sub", ownerName: "陈志远", createdAt: "2026-08", users: 5, validUntil: "2026-12-31", status: "active" }
+          ]
+        },
+        leads: z ? { school: [] } : {
+          school: [
+            { id: "U001", name: "黄磊", phone: "139****8820", stage: "paid", owner: "陈志远", createdAt: "2026-09-05", boundAt: "2026-09-05", amount: 5200 },
+            { id: "U002", name: "许静", phone: "138****4412", stage: "onboarded", owner: "陈志远", createdAt: "2026-09-19", boundAt: "2026-09-19" },
+            { id: "U003", name: "邓涛", phone: "137****6609", stage: "registered", owner: "陈志远", createdAt: "2026-10-09", boundAt: "2026-10-09" }
+          ]
+        },
+        msgLog: []
       }
     };
   }
 
-  function applyV3Scenario(key) {
-    var V3 = window.V3;
-    if (key === "sub-active" || key === "sub-readonly" || key === "sub-dark") {
-      V3.store.hydrate(subSeed(key === "sub-readonly"),
-        { mode: "sub", theme: key === "sub-dark" ? "dark" : null, scenario: key === "sub-dark" ? "sub-active" : key, role: "sub_owner" });
-    } else if (key === "dark") {
-      V3.store.hydrate(provinceSeed("active", false), { mode: "province", theme: "dark", scenario: "active", role: "boss" });
-    } else if (key === "active" || key === "suspended") {
-      V3.store.hydrate(provinceSeed(key, false), { mode: "province", theme: "light", scenario: key, role: "boss" });
-    } else if (key === "empty") {
-      V3.store.hydrate(provinceSeed("active", true), { mode: "province", theme: "light", scenario: "empty", role: "boss" });
-    } else {
-      return;
-    }
-    window.dispatchEvent(new Event("v3:scenario"));
+  var SCENARIOS = {
+    active: function () { return provinceSeed("active"); },
+    suspended: function () { return provinceSeed("suspended"); },
+    empty: function () { return provinceSeed("active", true); },
+    dark: function () { var s = provinceSeed("active"); s.theme = "dark"; return s; },
+    "sub-active": function () { return subSeed("active"); },
+    "sub-readonly": function () { return subSeed("suspended"); },
+    "sub-dark": function () { var s = subSeed("active"); s.theme = "dark"; return s; },
+    "sub-empty": function () { return subSeed("active", true); }
+  };
+
+  function seedByScenario(key) {
+    var fn = SCENARIOS[key] || SCENARIOS.active;
+    return fn();
   }
 
-  window.applyV3Scenario = applyV3Scenario;
-  // 默认装载（按所在文件判定视角；同一目录 localStorage 共享，跨文件打开时强制纠偏）
-  document.addEventListener("DOMContentLoaded", function () {
-    if (!window.V3 || !window.V3.store) return;
-    var isSubFile = window.V3_APP === "sub";
-    var st = null;
-    try { st = JSON.parse(localStorage.getItem(window.V3.store._lsKey) || "null"); } catch (e) {}
-    var needSeed = !st || (isSubFile ? st.mode !== "sub" : st.mode !== "province");
-    if (needSeed) {
-      applyV3Scenario(isSubFile ? "sub-active" : "active");
-    } else {
-      // LS 已存在且视角匹配（刷新 / 二次打开 / 多标签）：必须先把持久化状态恢复进内存，
-      // 否则 store.state 仍为 null，router 命中 if(!s) return 会白屏。
-      window.V3.store.hydrate(st, null);
-      window.dispatchEvent(new Event("v3:scenario"));
-    }
-  });
+  window.V3 = window.V3 || {};
+  window.V3.scenarios = {
+    seedByScenario: seedByScenario,
+    provinceSeed: provinceSeed,
+    subSeed: subSeed,
+    agreementTerms: agreementTerms,
+    keys: Object.keys(SCENARIOS)
+  };
 })();
