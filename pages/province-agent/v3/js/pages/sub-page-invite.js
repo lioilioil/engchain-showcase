@@ -6,9 +6,10 @@
   function renderInvite(ctx) {
     var ui = ctx.ui, d = ctx.d;
     var chans = (d.channels || []).filter(function (c) { return c.status === "active"; });
-    /* S4-G：A7 渠道码使用说明 + 授权范围（只读）两处 details 三处合一 → 渠道码卡旁「说明 ›」玻璃弹层 */
-    var h = '<div class="section-head-row"><span class="t">我的渠道码</span>' +
-      '<span class="act2" data-act="chan-help">说明 ›</span>' +
+    /* S4-G：A7 渠道码使用说明 + 授权范围（只读）两处 details 三处合一 → 渠道码卡旁「说明 ›」玻璃弹层
+       G-B（P1-7）：说明入口由独立 act2 文字链降级为标题内小灰字 .gb-help，不与「+ 生成渠道码」主操作同排争焦点（V4 一屏唯一焦点） */
+    var h = '<div class="section-head-row"><span class="t">我的渠道码' +
+      '<span class="gb-help" data-act="chan-help">说明</span></span>' +
       (ctx.readonly ? "" : '<span class="act" data-act="gen">+ 生成渠道码</span>') + "</div>";
     if (chans.length) {
       h += '<div class="v3-stack">' + chans.map(function (c) {
@@ -66,11 +67,23 @@
   }
   function poster(ctx, c) {
     var ui = ctx.ui, code = (c && c.code) || "——";
+    /* G-B（P1-7）：二维码下补数据概览行（线索/已消费/今日新增），消除大面积空白；
+       数据全部取 store 真实漏斗与 leads，不发明新字段；今日新增 = leads[].createdAt === 今天 */
+    var fn = ctx.V3.store.funnelOf(ctx.d.leads || []);
+    var _t = new Date();
+    var _ts = _t.getFullYear() + "-" + ("0" + (_t.getMonth() + 1)).slice(-2) + "-" + ("0" + _t.getDate()).slice(-2);
+    var todayN = (ctx.d.leads || []).filter(function (l) { return l.createdAt === _ts; }).length;
     ui.openSheet({
       title: "渠道码海报",
       body: '<div class="v3-poster"><div class="pt">入驻润锦工程链<br/>本地企业服务直达</div>' +
         '<div class="ps">企业直接邀请 · 单层绑定 · 服务有保障</div>' +
-        '<div class="pq"><div class="v3-qr"></div></div><div class="pc">' + ui.esc(code) + "</div></div>" +
+        '<div class="pq"><div class="v3-qr"></div></div><div class="pc">' + ui.esc(code) + "</div>" +
+        /* G-B（P1-7）：数据概览三列，tabular-nums，浅分隔，不抢海报主视觉 */
+        '<div class="gb-pstats">' +
+          '<div class="it"><div class="n num">' + fn.direct + '</div><div class="k">线索</div></div>' +
+          '<div class="it"><div class="n num">' + fn.paid + '</div><div class="k">已消费</div></div>' +
+          '<div class="it"><div class="n num">' + todayN + '</div><div class="k">今日新增</div></div>' +
+        '</div></div>' +
         '<div class="iv-codeline v3-mt12" >' + ui.esc(code) + "</div>" +
         /* T2-D（V7）：3 分享 Mock 按钮合并为 1 个「分享」，点击 toast */
         '<button type="button" class="v3-btn v3-btn--primary v3-btn--block v3-mt12 t2d-share">分享</button>' +

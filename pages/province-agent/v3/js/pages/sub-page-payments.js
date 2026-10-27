@@ -14,11 +14,13 @@
     var ui = ctx.ui, d = ctx.d;
     var cur = d.calc[0];
     var curRegs = d.payRegs.filter(function (r) { return r.calcId === cur.id; });
-    /* 顶部说明（~52 字）→ 折叠摘要 */
+    /* 顶部说明（~52 字）→ 折叠摘要
+       G-B（P1-8）：临期面板内联「逾期仍只提醒省代与你…」11px 小字横贯收口并入此折叠 body，
+       合规原文逐字不删，只改承载（正文 → 折叠说明） */
     var h = '<details class="v3-note-fold v3-mb12"><summary>' + ui.icon("clock", 15) +
       '<span class="sum">收款确认说明</span><span class="chev">' + ui.icon("chev", 14) + "</span></summary>" +
       '<div class="fold-body">省代在 <b>App 外</b> 线下付款后登记凭证；请你核对到账与凭证一致再确认。' +
-      "出账后 <b>15 天内仅提醒，绝不自动确认到账</b>。</div></details>";
+      "出账后 <b>15 天内仅提醒，绝不自动确认到账</b>；逾期仍只提醒省代与你，系统不会自动确认、不会自动到账。</div></details>";
 
     /* 临期进度（L2 面板） */
     var dueDay = cur.dueDay || 0, pct = Math.round(dueDay / 15 * 100);
@@ -26,8 +28,7 @@
     h += '<section class="s-l2"><div class="v3-flex v3-between"><span class="v3-sm v3-strong">' + cur.month + " 省代应付款（测算）</span>" +
       '<span class="v3-due v3-due--' + dueCls + '">第 ' + dueDay + " / 15 天</span></div>" +
       '<div class="v3-display num v3-goldtext v3-mt8mb10">' + ui.moneyD(cur.calcAmount) + "</div>" +
-      '<div class="v3-progress"><i class="' + (dueCls === "ok" ? "" : dueCls) + '" style="width:' + pct + '%"></i></div>' +
-      '<div class="v3-xs v3-muted v3-mt7">逾期仍只提醒省代与你，<b>系统不会自动确认、不会自动到账</b>。</div></section>';
+      '<div class="v3-progress"><i class="' + (dueCls === "ok" ? "" : dueCls) + '" style="width:' + pct + '%"></i></div></section>';
 
     h += '<div class="v3-sec-title">付款登记与凭证</div>';
     if (!curRegs.length) {
@@ -40,6 +41,8 @@
     var prevRegs = d.payRegs.filter(function (r) { return r.calcId === prev.id; });
     h += '<div class="v3-sec-title">' + prev.month + " 历史（已平账）</div>";
     prevRegs.forEach(function (r) { h += regPanel(ctx, r, true); });
+    /* G-B（P1-8）：历史区收尾留白，避免最后一张卡片贴底被截 */
+    h += '<div class="gb-pay-end"></div>';
     return h;
   }
 
