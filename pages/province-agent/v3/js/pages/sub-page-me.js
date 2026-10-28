@@ -20,14 +20,6 @@
       '<div class="v3-kv"><span class="k">约定比例</span><span class="v">' + Math.round(par.ratioToSub * 100) + "%（只读）</span></div>" +
       '<div class="v3-kv"><span class="k">合作起始</span><span class="v">' + ui.esc(par.since) + "</span></div></div>";
 
-    /* 演示控制：仅主题（本期不支持成员角色） */
-    h += '<div class="v3-sec-title">外观</div>';
-    h += '<div class="v3-card v3-card--pad">' +
-      '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
-      '<div class="v3-seg v3-seg--mini">' +
-      '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
-      '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
-
     /* 合作与账务 */
     h += '<div class="v3-sec-title">合作与账务</div><div class="v3-card v3-card--pad v3-list">' +
       menuRow(ui, "file-text", "合作协议", "agree") +
@@ -111,16 +103,6 @@
 
   function mount(el, ctx) {
     el.addEventListener("click", function (e) {
-      /* 仅匹配按钮本身：html 上也带 data-theme，closest 会误中祖先导致全页点击被吞 */
-      var th = e.target.closest && e.target.closest("button[data-theme]");
-      if (th) {
-        var theme = th.getAttribute("data-theme");
-        ctx.V3.store.act("theme/set", { theme: theme });
-        document.documentElement.setAttribute("data-theme", theme);
-        try { localStorage.setItem("engchain-theme", theme); } catch (err) {}
-        ctx.V3.router.render();
-        return;
-      }
       var b = e.target.closest("[data-act]");
       if (!b) return;
       var act = b.getAttribute("data-act");

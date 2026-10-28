@@ -44,5 +44,48 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
 <script src="../../js/common.js"></script>
 <script>window.__ROOT__='../../';</script>
+<script>
+/* 主题外观：深色模式 / 跟随系统（互斥），写 engchain-theme 权威值并经 storage 事件联动全站 */
+(function () {
+  var KEY = 'engchain-theme';
+  var toggles = document.querySelectorAll('.group .row .switch input');
+  var darkEl = toggles[0], sysEl = toggles[1];
+  if (!darkEl || !sysEl) return;
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function apply(theme) {
+    try { localStorage.setItem(KEY, theme); } catch (e) {}
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  function systemTheme() { return (mq && mq.matches) ? 'dark' : 'light'; }
+  function syncSwitches() {
+    var cur = 'light';
+    try { cur = localStorage.getItem(KEY) || 'light'; } catch (e) {}
+    darkEl.disabled = sysEl.checked;
+    if (sysEl.checked) darkEl.checked = (systemTheme() === 'dark');
+    else darkEl.checked = (cur === 'dark');
+  }
+  darkEl.addEventListener('change', function () {
+    sysEl.checked = false;
+    apply(darkEl.checked ? 'dark' : 'light');
+    syncSwitches();
+  });
+  sysEl.addEventListener('change', function () {
+    if (sysEl.checked) {
+      apply(systemTheme());
+      darkEl.checked = (systemTheme() === 'dark');
+    } else {
+      apply(darkEl.checked ? 'dark' : 'light');
+    }
+    syncSwitches();
+  });
+  if (mq && mq.addEventListener) {
+    mq.addEventListener('change', function () {
+      if (sysEl.checked) { apply(systemTheme()); darkEl.checked = (systemTheme() === 'dark'); }
+    });
+  }
+  syncSwitches();
+})();
+</script>
 </body>
 </html>

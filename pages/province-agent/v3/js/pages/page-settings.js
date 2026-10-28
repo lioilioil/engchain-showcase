@@ -19,18 +19,6 @@
       '<div class="v3-kv"><span class="k">合作自</span><span class="v">' + ui.esc(p.since) + "</span></div>" +
       '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(p.address) + "</span></div></div>";
 
-    /* 演示控制 */
-    h += '<div class="v3-sec-title">偏好设置</div>';
-    h += '<div class="v3-card v3-card--pad">' +
-      '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("users", 16) + "<span>身份视角</span></span>" +
-      '<div class="v3-seg v3-seg--mini">' +
-      '<button class="' + (ctx.s.role === "boss" ? "on" : "") + '" data-role="boss">老板</button>' +
-      '<button class="' + (ctx.s.role === "staff" ? "on" : "") + '" data-role="staff">员工</button></div></div>' +
-      '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
-      '<div class="v3-seg v3-seg--mini">' +
-      '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
-      '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
-
     /* 菜单 */
     h += '<div class="v3-sec-title">企业与规则</div><div class="v3-card v3-card--pad v3-list">' +
       menuRow(ui, "badge", "资质证书", "cert") +
@@ -107,22 +95,6 @@
 
   function mount(el, ctx) {
     el.addEventListener("click", function (e) {
-      /* 仅匹配按钮本身：html 元素上也带 data-theme，closest 会误中祖先导致全页点击被吞 */
-      var role = e.target.closest && e.target.closest("button[data-role]");
-      if (role) {
-        ctx.V3.store.act("role/set", { role: role.getAttribute("data-role") });
-        ctx.V3.router.render();
-        return;
-      }
-      var th = e.target.closest && e.target.closest("button[data-theme]");
-      if (th) {
-        var theme = th.getAttribute("data-theme");
-        ctx.V3.store.act("theme/set", { theme: theme });
-        document.documentElement.setAttribute("data-theme", theme);
-        try { localStorage.setItem("engchain-theme", theme); } catch (err) {}
-        ctx.V3.router.render();
-        return;
-      }
       var b = e.target.closest("[data-act]");
       if (!b) return;
       var act = b.getAttribute("data-act");

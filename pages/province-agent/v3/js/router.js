@@ -228,11 +228,6 @@
     var subs = (pages.me && pages.me.subSheets) || {};
     var body = "";
     if (isSub) {
-      body += '<div class="v3-sec-title">外观</div><div class="v3-card v3-card--pad">' +
-        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
-        '<div class="v3-seg v3-seg--mini">' +
-        '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
-        '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
       body += '<div class="v3-sec-title">合作与账务</div><div class="v3-card v3-card--pad v3-list">' +
         setRow(ui, "file-text", "合作协议", "sub", "agree") +
         setRow(ui, "shield", "授权范围", "sub", "auth") +
@@ -243,15 +238,6 @@
         setRow(ui, "bell", "消息中心", "go", "#/messages") +
         setRow(ui, "file-text", "税务说明", "go", "#/tax") + "</div>";
     } else {
-      body += '<div class="v3-sec-title">偏好设置</div><div class="v3-card v3-card--pad">' +
-        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("users", 16) + "<span>身份视角</span></span>" +
-        '<div class="v3-seg v3-seg--mini">' +
-        '<button class="' + (ctx.s.role === "boss" ? "on" : "") + '" data-role="boss">老板</button>' +
-        '<button class="' + (ctx.s.role === "staff" ? "on" : "") + '" data-role="staff">员工</button></div></div>' +
-        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
-        '<div class="v3-seg v3-seg--mini">' +
-        '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
-        '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
       body += '<div class="v3-sec-title">企业与规则</div><div class="v3-card v3-card--pad v3-list">' +
         setRow(ui, "badge", "资质证书", "sub", "cert") +
         setRow(ui, "shield", "角色与权限说明", "sub", "perm") +
@@ -266,21 +252,6 @@
       body: body,
       onMount: function (ov) {
         ov.addEventListener("click", function (e) {
-          var role = e.target.closest("button[data-role]");
-          if (role) {
-            ctx.V3.store.act("role/set", { role: role.getAttribute("data-role") });
-            ctx.V3.router.render();
-            return;
-          }
-          var th = e.target.closest("button[data-theme]");
-          if (th) {
-            var theme = th.getAttribute("data-theme");
-            ctx.V3.store.act("theme/set", { theme: theme });
-            document.documentElement.setAttribute("data-theme", theme);
-            try { localStorage.setItem("engchain-theme", theme); } catch (err) {}
-            ctx.V3.router.render();
-            return;
-          }
           var b = e.target.closest("[data-act]");
           if (!b) return;
           var act = b.getAttribute("data-act");
@@ -441,6 +412,12 @@
     }
     render();
     window.addEventListener("hashchange", render);
+    /* 主题跨页实时联动：通用设置 / preview 写入 engchain-theme 后，已打开的工作台即时跟随（同源 storage 事件） */
+    window.addEventListener("storage", function (e) {
+      if (e.key !== "engchain-theme" || !e.newValue) return;
+      try { store.act("theme/set", { theme: e.newValue }); } catch (err) {}
+      document.documentElement.setAttribute("data-theme", e.newValue);
+    });
   }
 
   window.V3 = window.V3 || {};
