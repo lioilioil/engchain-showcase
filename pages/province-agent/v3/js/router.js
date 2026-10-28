@@ -143,10 +143,10 @@
     return '<div class="v3-navbar">' +
       '<button class="v3-iconbtn v3-navbar__back" id="v3-nav-back" title="返回" aria-label="返回">' + ui.icon("back", 20) + "</button>" +
       '<div class="v3-navbar__t">' + title + "</div>" +
-      '<button class="v3-iconbtn" id="v3-nav-msgs" title="消息中心">' + ui.icon("bell", 18) +
+      '<button class="v3-iconbtn" id="v3-nav-msgs" title="消息中心">' + ui.icon("bell", 20) +
       (todo.total ? '<span class="v3-tab__dot v3-tab__dot--nav">' + todo.total + "</span>" : "") +
       "</button>" +
-      '<button class="v3-iconbtn" id="v3-nav-settings" title="设置">' + ui.icon("settings", 18) + "</button>" +
+      '<button class="v3-iconbtn" id="v3-nav-settings" title="设置">' + ui.icon("settings", 20) + "</button>" +
       "</div>";
   }
 
