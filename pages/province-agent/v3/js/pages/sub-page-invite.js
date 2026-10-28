@@ -66,7 +66,7 @@
       title: "渠道码与授权范围",
       body: '<p class="v3-legal">你的渠道码（<b>CH-S</b>）仅用于<b>直接邀请终端用户</b>；你没有招商码、不能发展下级。用户再邀请不归属、不分佣、不传递。</p>' +
         '<p class="v3-legal v3-mt8">规模 / 范围 / 费率：<b>由省代在平台配置 + O4 协议授权</b>，本端只读，无自助改费率入口。</p>' +
-        '<p class="v3-legal v3-mt8">二维码为演示二维码，非真实可扫码；分享请复制链接或码后转发。</p>',
+        '<p class="v3-legal v3-mt8">渠道二维码；分享请复制链接或码后转发。</p>',
       footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
     });
   }
@@ -116,7 +116,7 @@
           copyText("https://engchain.com/invite?code=" + code, ui);
         });
         wrap.querySelector('[data-ps="hint"]').addEventListener("click", function () {
-          ui.toast("演示环境：请复制链接后在微信转发", "");
+          ui.toast("请复制链接后在微信转发", "");
         });
       }
     });
@@ -215,19 +215,19 @@
         '<span class="lab">' + lab + '</span><span class="val num">' + n + " 人</span></div>";
     }
     var h = '<div class="v3-page-head"><div class="v3-page-title">转化与分佣</div>' +
-      '<div class="v3-page-sub">仅统计直接邀请用户；金额为只读测算</div></div>';
+      '<div class="v3-page-sub">仅统计直接邀请用户；金额为只读台账</div></div>';
     h += '<section class="s-l2 iv-funnel"><div class="v3-sm v3-strong v3-mb10">邀请转化漏斗</div>' +
       row("直接邀请", fn.registered, 0) + row("完成入驻", fn.onboarded, 1) +
       row("产生合格消费", fn.paid, 2) + row("沉寂 / 流失", fn.lost, 3) +
       '<div class="s-prow s-prow--div v3-mt12"><span class="k">已转化合格消费 · 仅统计</span>' +
       '<span class="v num v3-goldtext">' + ui.moneyD(fn.paidAmount) + "</span></div></section>";
 
-    h += '<section class="sub-finance v3-mt12"><div class="v3-xs">本月本人经营所得（测算）</div>' +
+    h += '<section class="sub-finance v3-mt12"><div class="v3-xs">本月本人经营所得</div>' +
       '<div class="big num v3-mt2">' + ui.moneyD(fin.agreed) + "</div>" +
       '<div class="rows"><div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +
       '<div class="v3-dline"><span class="k">总盘 ×50%</span><span class="v num">' + ui.money(fin.gross) + "</span></div>" +
       '<div class="v3-dline"><span class="k">约定比例</span><span class="v num">' + Math.round(fin.ratioToSub * 100) + "%（只读）</span></div></div>" +
-      '<div class="v3-fin__note">模拟测算，不构成可提现金额，以省代线下付款与双方确认记录为准。</div></section>';
+      '<div class="v3-fin__note">不构成可提现金额</div></section>';
 
     h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ui.icon("shield", 15) + "<span>分佣口径</span></div>" +
       '<div class="v3-legal-body"><p>本端没有钱包、没有提现；约定所得由省代按平台月度对账数据线下支付。</p>' +

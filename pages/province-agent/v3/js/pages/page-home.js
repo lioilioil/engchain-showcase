@@ -42,7 +42,7 @@
     /* 空态 */
     if (isEmpty) {
       h += '<div class="v3-empty v3-empty--hero">' +
-        ui.emptyHtml("暂无经营数据", "<div>完成第一家二级合作或生成渠道码后，<br>这里将展示测算、待办与合作动态。</div>", "tray") +
+        ui.emptyHtml("暂无经营数据", "<div>完成第一家二级合作或生成渠道码后，<br>这里将展示经营数据、待办与合作动态。</div>", "tray") +
         (ctx.canBoss ? '<button class="v3-btn v3-btn--primary v3-btn--block" data-act="quick-apply">发起新二级合作</button>' : "") +
         "</div>";
       return h;
@@ -51,16 +51,15 @@
     /* 财务卡（总盘 / 自身线；无时间 tabs） */
     h += '<div class="v3-fin v3-fin--gold"><div class="v3-fin__top">' +
       '<div class="v3-seg v3-seg--mini"><button class="on" data-fin="total">省代总盘</button>' +
-      '<button data-fin="self">自留测算</button></div>' +
-      '<span class="v3-fin__tag">2026-10 · 模拟测算</span></div>' +
+      '<button data-fin="self">自留所得</button></div>' +
+      '</div>' +
       '<div class="v3-fin__main"><span class="v3-fin__k">省代总盘（平台合格消费 50%）</span>' +
       '<div class="v3-fin__num num" data-fin-num="total">' + ui.moneyD(fin.gross) + "</div>" +
       '<div class="v3-fin__num num v3-fin__num--hide" data-fin-num="self">' + ui.moneyD(fin.selfKeepAll || 0) + "</div>" +
       '<div class="v3-fin__rows">' +
       '<div class="v3-fin__row"><span>约定给二级</span><b class="num">' + (fin.agreedAll == null ? "逐二级配置" : ui.money(fin.agreedAll)) + "</b></div>" +
       '<div class="v3-fin__row"><span>T+7 冻结</span><b class="num">' + ui.money(fin.frozen) + "</b></div>" +
-      "</div></div>" +
-      '<div class="v3-fin__note">单盘模拟测算，最终以平台月度对账与双方确认数据为准</div></div>';
+      "</div></div></div>";
 
     /* 待办（单源派生，可直达） */
     if (todo.items.length) {
@@ -241,7 +240,6 @@
         '<span class="v3-row__main"><span class="v3-row__t">' + ui.esc(s.name) + "</span>" +
         '<span class="v3-row__s">合作自 ' + ui.esc(s.since || "—") + "</span></span></div>" +
         '<div class="v3-share-num"><span class="num">' + pct(s.ratioToSub) + "</span><span>月度合格消费约定比例</span></div>" +
-        '<div class="v3-fin__note v3-mt8">按全省单盘测算口径，逐二级月度金额以平台对账为准。</div>' +
         (ctx.canBoss ? '<button class="v3-btn v3-btn--ghost v3-btn--block v3-mt12" data-act="set-ratio" data-id="' + s.id + '">调整比例</button>' : "") +
         "</div>";
     });
@@ -356,8 +354,7 @@
         '<div class="v3-kv"><span class="k">联系人</span><span class="v">' + ui.esc(s.contact || "—") + " " + ui.esc(s.phone || "") + "</span></div>" +
         '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(s.address || "—") + "</span></div>" +
         '<div class="v3-kv"><span class="k">合作起始</span><span class="v">' + ui.esc(s.since || "—") + "</span></div>" +
-        '<div class="v3-kv"><span class="k">约定比例</span><span class="v">' + pct(s.ratioToSub) + "</span></div>" +
-        '<div class="v3-fin__note v3-mt8">该主体月度金额按全省单盘模拟测算，逐二级明细以平台月度对账为准。</div></div>',
+        '<div class="v3-kv"><span class="k">约定比例</span><span class="v">' + pct(s.ratioToSub) + "</span></div></div>",
       footer: [
         { t: "关闭", kind: "v3-btn--ghost" },
         { t: "配置约定比例", kind: "v3-btn--primary", onClick: function () {
@@ -376,7 +373,7 @@
       body:
         '<div class="v3-field"><label>新约定比例（0–50%）</label>' +
         '<div class="v3-ratio-pick"><input class="v3-input" id="rt-val" type="number" min="0" max="50" value="' + Math.round(s.ratioToSub * 100) + '"><span class="v3-ratio-pick__u">%</span></div></div>' +
-        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>比例变更后需与二级企业补签合作协议，演示将生成一条待办。</span></div>",
+        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>比例变更后需与二级企业补签合作协议，将生成一条待办。</span></div>",
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
         { t: "确认调整", kind: "v3-btn--primary", onClick: function (wrap) {
@@ -429,7 +426,7 @@
         el.querySelectorAll("[data-fin-num]").forEach(function (n) {
           n.classList.toggle("v3-fin__num--hide", n.getAttribute("data-fin-num") !== k);
         });
-        el.querySelector(".v3-fin__k").textContent = k === "total" ? "省代总盘（平台合格消费 50%）" : "自留测算（扣除约定给二级）";
+        el.querySelector(".v3-fin__k").textContent = k === "total" ? "省代总盘（平台合格消费 50%）" : "自留所得";
       });
     }
   }
@@ -438,12 +435,12 @@
     var ui = ctx.ui;
     ui.openModal({
       icon: "file-text", title: "重新发起合作协议？",
-      body: "用于二级企业拒签或修订约定后重新发起；演示将生成一条留痕并通知二级企业重新查阅签署。",
+      body: "用于二级企业拒签或修订约定后重新发起；将生成一条留痕并通知二级企业重新查阅签署。",
       okText: "确认重新发起",
       onOk: function () {
         var r = ctx.V3.store.act("agree/resend", {});
         if (!r.ok) { ui.toast(r.reason, "err"); return false; }
-        ui.toast("协议已重新发起（演示）", "ok");
+        ui.toast("协议已重新发起", "ok");
         ctx.V3.router.render();
       }
     });

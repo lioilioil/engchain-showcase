@@ -42,7 +42,7 @@
     }
 
     /* 业绩概览（首屏主角，无时间 tabs） */
-    h += '<section class="sub-finance"><div class="v3-xs">' + calc.month + " 本人经营所得（测算）</div>" +
+    h += '<section class="sub-finance"><div class="v3-xs">' + calc.month + " 本人经营所得</div>" +
       '<div class="big num v3-mt2">' + ui.moneyD(fin.agreed) + "</div>" +
       '<div class="rows">' +
       '<div class="v3-dline"><span class="k">合格消费</span><span class="v num">' + ui.money(fin.eligible) + "</span></div>" +
@@ -50,7 +50,7 @@
       '<div class="v3-dline"><span class="k">约定所得比例</span><span class="v num">' + Math.round(fin.ratioToSub * 100) + "%</span></div>" +
       '<div class="v3-dline"><span class="k">T+7 在途冻结</span><span class="v num">' + ui.money(fin.frozen) + "</span></div>" +
       "</div>" +
-      '<div class="v3-fin__note">模拟测算，不构成可提现金额；以省代线下付款与双方确认记录为准。</div></section>';
+      '<div class="v3-fin__note">不构成可提现金额</div></section>';
 
     /* 协议 */
     var agState = ag.state === "signed" ? "已签署" : ag.state === "rejected" ? "已拒签" : "待我签署";
@@ -90,7 +90,7 @@
       ui.icon("chev", 16) + "</button>" +
       '<button class="v3-sub-row v3-sub-row--plain" data-go="#/statement"><span class="v3-avatar v3-avatar--sub">' +
       ui.icon("receipt", 19) + "</span><span class=\"v3-row__main\"><span class=\"v3-row__t\">月度对账单</span>" +
-      '<span class="v3-row__s">只读查看测算、登记与差异</span></span>' + ui.icon("chev", 16) + "</button></section>";
+      '<span class="v3-row__s">只读查看台账、登记与差异</span></span>' + ui.icon("chev", 16) + "</button></section>";
 
     return h;
   }
@@ -120,7 +120,7 @@
         return '<div class="v3-ag-clause"><div class="v3-ag-clause__title">' + cl.no + " · " + cl.t + "</div>" +
           '<div class="v3-ag-clause__body">' + cl.c + "</div></div>";
       }).join("") + "</div></div>";
-    var footer = '<div class="v3-ag-footer"><p class="v3-ag-footer__dim">演示协议文本，正式协议以平台电子签服务签署版本为准。</p></div>';
+    var footer = '<div class="v3-ag-footer"><p class="v3-ag-footer__dim">协议经电子签签署后生效。</p></div>';
 
     var footerBtns = [];
     if (signable && c.state === "pending_mine" && !ctx.readonly) {
@@ -131,7 +131,7 @@
           if (!read) { ui.toast("请先勾选并阅读全部条款", "err"); return false; }
           var r = ctx.V3.store.act("agree/sign", { confirmed: true });
           if (!r.ok) { ui.toast(r.reason, "err"); return false; }
-          ui.toast("协议已签署（演示）", "ok");
+          ui.toast("协议已签署", "ok");
           ctx.V3.router.render();
         }
       });
@@ -184,7 +184,7 @@
         '<div class="v3-perm-hero-desc">由省级总代直接授权，在约定范围内开展业务</div></div></div>' +
         '<div class="v3-perm-section"><div class="v3-perm-section__title">' + ui.icon("check-circle", 14) + "<span>可开展业务</span></div>" +
         '<div class="v3-perm-list"><div class="v3-perm-item">直接邀请终端用户注册</div>' +
-        '<div class="v3-perm-item">按约定比例取得经营所得（只读测算）</div>' +
+        '<div class="v3-perm-item">按约定比例取得经营所得（只读）</div>' +
         '<div class="v3-perm-item">跟进自有渠道线索与转化</div></div></div>' +
         '<div class="v3-perm-section"><div class="v3-perm-section__title v3-perm-section__title--no">' + ui.icon("x-circle", 14) + "<span>禁止事项</span></div>" +
         '<div class="v3-perm-list"><div class="v3-perm-item">不得发展下级企业（两级封顶）</div>' +
@@ -222,7 +222,7 @@
     var months = d.calc.slice().reverse();
     var vals = months.map(function (c) { return V3.store.subSettle(c).agreed; });
     var maxV = Math.max.apply(null, vals.concat([1]));
-    h += '<div class="v3-trend-card"><div class="v3-trend-title">月度经营所得（演示数据）</div><div class="v3-trend-chart">';
+    h += '<div class="v3-trend-card"><div class="v3-trend-title">月度经营所得</div><div class="v3-trend-chart">';
     vals.forEach(function (v, i) {
       var height = Math.round(v / maxV * 100);
       h += '<div class="v3-trend-col"><div class="v3-trend-bar' + (i === vals.length - 1 ? " v3-trend-bar--active" : "") +

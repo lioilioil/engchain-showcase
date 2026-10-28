@@ -20,7 +20,7 @@
       '<div class="v3-kv"><span class="k">地址</span><span class="v">' + ui.esc(p.address) + "</span></div></div>";
 
     /* 演示控制 */
-    h += '<div class="v3-sec-title">演示控制（仅演示环境可见）</div>';
+    h += '<div class="v3-sec-title">偏好设置</div>';
     h += '<div class="v3-card v3-card--pad">' +
       '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("users", 16) + "<span>身份视角</span></span>" +
       '<div class="v3-seg v3-seg--mini">' +
@@ -33,7 +33,7 @@
 
     /* 菜单 */
     h += '<div class="v3-sec-title">企业与规则</div><div class="v3-card v3-card--pad v3-list">' +
-      menuRow(ui, "badge", "资质证书（演示样张）", "cert") +
+      menuRow(ui, "badge", "资质证书", "cert") +
       menuRow(ui, "shield", "角色与权限说明", "perm") +
       menuRow(ui, "users", "团队成员", "team", true) +
       menuRow(ui, "crown", "分佣与约定比例", "share", true) +
@@ -43,10 +43,8 @@
 
     h += '<div class="v3-card v3-card--pad v3-list">' +
       menuRow(ui, "info", "关于工作台", "about") +
-      menuRow(ui, "logout", "退出演示", "exit") +
       "</div>";
 
-    h += '<div class="v3-footer-note">演示版本：v3 双视角工作台 · 所有数据均为模拟数据</div>';
     return h;
   }
   function menuRow(ui, icon, label, act, go) {
@@ -58,16 +56,15 @@
   function certSheet(ctx) {
     var ui = ctx.ui, p = ctx.d.profile;
     ui.openSheet({
-      title: "资质证书 · 演示样张",
+      title: "资质证书",
       body: '<div class="v3-cert-paper">' +
-        '<div class="v3-cert-paper__tt">省级总代授权书（演示样张）</div>' +
-        '<div class="v3-cert-paper__demo">演示文档 · 非正式证书</div>' +
+        '<div class="v3-cert-paper__tt">省级总代授权书</div>' +
         '<div class="v3-cert-paper__bd">' +
         '<p>兹授权 <b>' + ui.esc(p.name) + "</b>（统一社会信用代码 " + ui.esc(p.uscc) + "）</p>" +
         "<p>作为工程服务合作平台省级总代，在授权区域内开展合作业务。</p>" +
         '<p>授权编号：<b class="num">' + ui.esc(p.authNo) + "</b></p>" +
         '<p>合作自 ' + ui.esc(p.since) + " 起。</p>" +
-        '<p class="v3-cert-paper__tip">正式授权书以平台盖章签发版本为准，本样张仅用于界面演示。</p>' +
+        '<p class="v3-cert-paper__tip">授权书以平台盖章签发版本为准。</p>' +
         "</div></div>",
       footer: [{ t: "关闭", kind: "v3-btn--primary" }]
     });
@@ -103,8 +100,7 @@
       body: '<div class="v3-legal-body"><p>1. 省代总盘 = 平台合格消费 × 50%；二级约定比例 0–50%，逐二级配置。</p>' +
       "<p>2. 第一层 T+5 工作日异议；第二层出账后 15 天仅提醒，不自动确认。</p>" +
       "<p>3. 无钱包、无自动提现；线下对公转账 + 双方确认留痕。</p>" +
-      "<p>4. 退货、退款、取消订单不计入合格消费。</p>" +
-      "<p>5. 所有金额为模拟测算，以平台月度对账为准。</p></div>",
+      "<p>4. 退货、退款、取消订单不计入合格消费。</p></div>",
       footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
     });
   }
@@ -134,9 +130,7 @@
       else if (act === "perm") permSheet(ctx);
       else if (act === "rules") rulesSheet(ctx);
       else if (act === "about") {
-        ctx.ui.openModal({ icon: "info", title: "关于工作台", body: "省级总代与二级合作双视角工作台演示（v3）。全部数据为模拟数据，用于流程与界面演示，不构成任何交易或结算依据。", cancel: false, okText: "知道了" });
-      } else if (act === "exit") {
-        ctx.ui.toast("演示环境无需退出", "");
+        ctx.ui.openModal({ icon: "info", title: "关于工作台", body: "省级总代与二级合作双视角工作台，提供经营数据查看、月度对账与电子签留痕。", cancel: false, okText: "知道了" });
       }
     });
   }

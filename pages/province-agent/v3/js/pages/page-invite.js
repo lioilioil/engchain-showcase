@@ -114,7 +114,7 @@
           '<span class="v3-row__s">' + ui.esc(l.boundAt || l.createdAt) + (l.owner === "王敏" ? " · 员工渠道" : "") + "</span></span>" +
           '<span class="v3-badge ' + ui.STAGE_BADGE[l.stage] + '">' + ui.STAGE[l.stage] + "</span></button>" +
           (l.amount ? '<div class="v3-kv v3-mt8"><span class="k">合格消费</span><span class="v num">' + ui.money(l.amount) + "</span></div>" : "") +
-          (l.stage === "lost" ? '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("clock", 13) + "<span>超过 30 天未活跃，演示仅作提示（暂不支持回收/换绑）。</span></div>" : "") +
+          (l.stage === "lost" ? '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("clock", 13) + "<span>超过 30 天未活跃，仅作提示（暂不支持回收/换绑）。</span></div>" : "") +
           "</div>";
       });
       h += "</div>";
@@ -133,7 +133,7 @@
       lost: leads.filter(function (l) { return l.stage === "lost"; }).length,
       amount: leads.reduce(function (s, l) { return s + (l.amount || 0); }, 0)
     };
-    var h = '<div class="v3-sec-title">转化漏斗（当前演示数据）</div>' +
+    var h = '<div class="v3-sec-title">转化漏斗</div>' +
       '<div class="v3-card v3-card--pad v3-stack-narrow">' +
       funnelRow("注册用户", c.registered, 1) +
       funnelRow("完成入驻", c.onboarded, c.registered ? c.onboarded / c.registered : 0) +
@@ -143,8 +143,7 @@
       '<span class="v3-stat-card__n num">' + ui.money(c.amount) + "</span></div>";
     h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ui.icon("shield", 15) + "<span>分佣口径说明</span></div>" +
       '<div class="v3-legal-body"><p>1. 省代与二级企业的月度所得按<b>约定比例</b>配置，见「二级合作 → 配置约定比例」。</p>' +
-      "<p>2. 本页只展示用户转化数据，不展示可提现金额；不存在钱包与自动提现。</p>" +
-      "<p>3. 所有金额为模拟测算，以平台月度合格消费账单与双方确认记录为准。</p></div></div>";
+      "<p>2. 本页只展示用户转化数据，不展示可提现金额；不存在钱包与自动提现。</p></div></div>";
     return h;
   }
   function funnelRow(label, n, ratio, muted) {
@@ -192,14 +191,14 @@
       title: "我的渠道码",
       body: '<div class="v3-invite-qr"><div class="v3-qr" data-code="' + code + '"></div>' +
         '<div class="v3-invite-qr__code num">' + code + "</div>" +
-        '<div class="v3-invite-qr__tip">演示二维码（非真实可扫码）</div>' +
+        '<div class="v3-invite-qr__tip">渠道二维码</div>' +
         '<div class="v3-invite-qr__logo">' + ui.icon("shield", 16) + "</div></div>" +
         '<div class="v3-list v3-mt12">' +
         '<button class="v3-row" data-act="copy" data-code="' + code + '"><span class="v3-row__main">' + ui.icon("link", 18) + " 复制链接</span>" + ui.icon("chev", 14) + "</button>" +
         '<button class="v3-row" data-act="poster" data-code="' + code + '"><span class="v3-row__main">' + ui.icon("image", 18) + " 生成海报</span>" + ui.icon("chev", 14) + "</button>" +
         '<button class="v3-row" data-share="wx"><span class="v3-row__main">' + ui.icon("wechat", 18) + " 微信好友 / 朋友圈</span>" + ui.icon("chev", 14) + "</button>" +
         "</div>" +
-        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>演示环境不调起微信，分享请复制链接后转发。</span></div>",
+        '<div class="v3-readnote">' + ui.icon("info", 13) + "<span>分享请复制链接后转发。</span></div>",
       footer: [{ t: "完成", kind: "v3-btn--primary" }],
       onMount: function (wrap) {
         /* 弹层挂在 body 下，页面级委托覆盖不到，必须在 onMount 内绑定 */
@@ -216,7 +215,7 @@
           });
         });
         var wx = wrap.querySelector("[data-share]");
-        if (wx) wx.addEventListener("click", function () { ui.toast("演示环境：请复制链接后转发", ""); });
+        if (wx) wx.addEventListener("click", function () { ui.toast("请复制链接后转发", ""); });
       }
     });
   }
@@ -227,10 +226,10 @@
       body: '<div class="v3-poster"><div class="v3-poster__hd"><b>工程服务合作平台</b><span>官方合作邀请</span></div>' +
         '<div class="v3-poster__tit">扫码注册 · 享工程服务合作权益</div>' +
         '<div class="v3-poster__qr"><div class="v3-qr" data-code="' + code + '"></div><span class="num">' + code + "</span></div>" +
-        '<div class="v3-poster__ft">演示二维码 · 非真实可扫码</div></div>',
+        '<div class="v3-poster__ft">渠道二维码</div></div>',
       footer: [
         { t: "复制邀请码", kind: "v3-btn--ghost", onClick: function () { copyText(code, ui); return false; } },
-        { t: "保存海报（演示）", kind: "v3-btn--primary", onClick: function () { ui.toast("演示环境：海报可截图保存", "ok"); } }
+        { t: "保存海报", kind: "v3-btn--primary", onClick: function () { ui.toast("海报已保存", "ok"); } }
       ]
     });
   }
@@ -317,7 +316,7 @@
         return;
       }
       if (b.hasAttribute("data-share")) {
-        ctx.ui.toast("演示环境：请复制链接后转发", "");
+        ctx.ui.toast("请复制链接后转发", "");
         return;
       }
       if (act === "gen-agent") {

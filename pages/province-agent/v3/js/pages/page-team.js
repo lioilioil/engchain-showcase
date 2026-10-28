@@ -35,7 +35,7 @@
     h += "</div>";
     h += '<div class="v3-info-card"><div class="v3-info-card__title">' + ui.icon("info", 15) + "<span>成员管理说明</span></div>" +
       '<div class="v3-legal-body"><p>员工仅可操作本人渠道码与本人渠道线索，付款、审批、平账、协议等动作仅老板可执行。</p>' +
-      "<p>新增成员与角色权限配置为后续版本能力，演示暂不开放。</p></div></div>";
+      "<p>新增成员与角色权限配置为后续版本能力，暂不开放。</p></div></div>";
     return h;
   }
 

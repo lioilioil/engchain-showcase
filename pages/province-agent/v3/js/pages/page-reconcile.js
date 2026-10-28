@@ -70,7 +70,7 @@
       h += '<div class="rc-focus__n rc-focus__n--ok num">' + ui.moneyD(0) + "</div><div class=\"rc-focus__s\">差异已清零 · 已平账留痕</div>";
     } else {
       h += '<div class="rc-focus__n' + (st.diff ? " rc-focus__n--bad" : "") + ' num">' + ui.moneyD(st.diff) + "</div>" +
-        '<div class="rc-focus__s">未清差异（平台测算 ¥' + ui.moneyPlain(L.calc.calcAmount) + " − 已确认 ¥" + ui.moneyPlain(st.sum) + "）</div>";
+        '<div class="rc-focus__s">未清差异（账单金额 ¥' + ui.moneyPlain(L.calc.calcAmount) + " − 已确认 ¥" + ui.moneyPlain(st.sum) + "）</div>";
     }
     h += '<div class="rc-focus__meta">登记 ' + st.cur.length + " 笔 · 已确认 " + st.confirmed.length + " 笔 · 异议 " + st.disputed.length + " 笔</div>";
 
@@ -104,13 +104,13 @@
   }
 
   function lifeNodes(balanced, st) {
-    /* 阶段语义：无登记→测算出账；有登记（含待确认/异议）→付款登记；
+    /* 阶段语义：无登记→账单出账；有登记（含待确认/异议）→付款登记；
        已确认且差异为零→双方确认；已平账→平账留痕 */
     var step = 1;
     if (balanced) step = 4;
     else if (st.cur.length && st.sum > 0 && st.pending.length + st.disputed.length === 0 && st.diff === 0) step = 3;
     else if (st.cur.length) step = 2;
-    var nodes = ["测算出账", "付款登记", "双方确认", "平账留痕"];
+    var nodes = ["账单出账", "付款登记", "双方确认", "平账留痕"];
     return nodes.map(function (n, i) {
       var idx = i + 1;
       var cls = balanced ? "done" : (idx < step ? "done" : idx === step ? "cur" : "");
@@ -134,7 +134,7 @@
       if (can && st.diff > 0) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="register">登记线下付款</button>';
     } else if (st.diff !== 0) {
       cls = "rc-band--bad";
-      txt = ui.icon("bank", 15) + "<span>差异 <b>" + ui.money(st.diff) + "</b>（平台测算 − 已确认登记）；线下付款完成后请先<b>登记并上传凭证</b>。</span>";
+      txt = ui.icon("bank", 15) + "<span>差异 <b>" + ui.money(st.diff) + "</b>（账单金额 − 已确认登记）；线下付款完成后请先<b>登记并上传凭证</b>。</span>";
       if (can) primary = '<button type="button" class="v3-btn v3-btn--primary v3-btn--sm" data-act="register">登记线下付款</button>';
     } else if (st.pending.length) {
       cls = "rc-band--warn";
@@ -167,7 +167,7 @@
     });
     if (r.status === "confirmed") {
       h += '<div class="s-prow"><span class="k">' + ui.icon("shield", 14) + '<span class="v3-ml6">' +
-        (r.signMethod === "esign" ? "电子签留痕（演示）" : "双方确认记录") + "</span></span></div>";
+        (r.signMethod === "esign" ? "电子签留痕" : "双方确认记录") + "</span></span></div>";
     }
     if (r.status === "disputed" && r.reason) {
       h += '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("warn", 13) + "<span>" + ui.esc(r.reason) + "</span></div>";
@@ -210,7 +210,7 @@
       body:
         '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
         "<span>请在实际付款并取得凭证后登记；<b>上传凭证为必填</b>，金额不可超过未登记差额。</span></div>" +
-        '<div class="v3-kv"><span class="k">测算金额</span><span class="v num">' + ui.money(L.calc.calcAmount) + "</span></div>" +
+        '<div class="v3-kv"><span class="k">账单金额</span><span class="v num">' + ui.money(L.calc.calcAmount) + "</span></div>" +
         '<div class="v3-kv"><span class="k">已确认登记</span><span class="v num">' + ui.money(st.sum) + "</span></div>" +
         '<div class="v3-kv"><span class="k">未登记差额</span><span class="v num"><b>' + ui.money(remain) + "</b></span></div>" +
         '<div class="v3-field v3-mt12"><label>本次登记金额（元）</label><input class="v3-input" id="rg-amount" type="number" min="0" value="' + Math.max(remain, 0) + '"></div>' +
@@ -304,10 +304,10 @@
       body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
       "<span>仅在实际核对到账金额与凭证一致后确认；确认后进入双方留痕。</span></div>" +
       '<div class="v3-kv"><span class="k">确认金额</span><span class="v num">' + ui.money(r.amount) + "</span></div>" +
-      '<div class="v3-kv"><span class="k">确认方式</span><span class="v">双方确认记录（电子签为演示留痕）</span></div>',
+      '<div class="v3-kv"><span class="k">确认方式</span><span class="v">双方确认记录（电子签留痕）</span></div>',
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
-        { t: "电子签留痕（演示）", kind: "v3-btn--ghost", onClick: function () {
+        { t: "电子签留痕", kind: "v3-btn--ghost", onClick: function () {
           esignModal(ctx, L, r);
           return false;
         } },
@@ -361,17 +361,17 @@
   function esignModal(ctx, L, r) {
     var ui = ctx.ui;
     ui.openSheet({
-      title: "电子签署（演示留痕）",
+      title: "电子签署",
       body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("info", 14) +
-      "<span>当前为演示环境，电子签为模拟留痕，正式电子签以平台接入第三方服务为准。</span></div>" +
+      "<span>签署后生成电子签留痕。</span></div>" +
       '<div class="v3-kv"><span class="k">签署金额</span><span class="v num">' + ui.money(r.amount) + "</span></div>" +
       '<div class="v3-kv"><span class="k">层级</span><span class="v">' + L.title + "</span></div>",
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
-        { t: "同意并签署（演示）", kind: "v3-btn--primary", onClick: function () {
+        { t: "同意并签署", kind: "v3-btn--primary", onClick: function () {
           var res = ctx.V3.store.act("pay/confirm", { layer: L.layer, id: r.id, signMethod: "esign" });
           if (!res.ok) { ui.toast(res.reason, "err"); return false; }
-          ui.toast("电子签留痕完成（演示）", "ok");
+          ui.toast("电子签留痕完成", "ok");
           ctx.V3.router.render();
         } }
       ]

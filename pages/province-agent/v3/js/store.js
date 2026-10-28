@@ -325,7 +325,7 @@
 
       case "lead/rebind": {
         /* 本期不做回收/换绑动作（决策 10） */
-        return fail("沉寂线索回收为静态提示，演示暂不支持换绑");
+        return fail("线索已进入沉寂期，暂不支持换绑");
       }
 
       /* ---------- 招商码 ---------- */
@@ -408,7 +408,7 @@
           to: ratio,
           by: "boss",
           at: "2026-10-27 15:20",
-          note: "比例变更后需双方补签合作协议（演示）"
+          note: "比例变更后需双方补签合作协议"
         });
         pushMsg(d, { icon: "file-text", type: "warn", title: "比例已变更，待补签协议：" + s.name, desc: "新约定比例 " + Math.round(ratio * 100) + "%，需与二级补签后生效", to: "#/subs" });
         save(); return ok();
@@ -484,7 +484,7 @@
         if (!c.isBoss) return fail("仅老板可冲销/作废登记");
         var rv = (p.layer === "1" ? d.payRegs1 : d.payRegs2).filter(function (x) { return x.id === p.id; })[0];
         if (!rv) return fail("付款记录不存在");
-        if (rv.status === "confirmed") return fail("已确认记录不可冲销（演示口径）");
+        if (rv.status === "confirmed") return fail("已确认记录不可冲销");
         rv.status = "void";
         rv.voidInfo = { reason: p.reason || "信息登记错误，冲销后重登", at: "2026-10-27", by: "王建国" };
         save(); return ok();

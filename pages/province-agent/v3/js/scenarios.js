@@ -50,7 +50,7 @@
         date: "2026-10-09",
         vouchers: [{ name: "10月转款回单.jpg", kind: "image", thumb: "" }],
         registeredBy: "王建国", status: "disputed",
-        reason: "平台回单金额与测算口径差 ¥240（信息服务费），待双方核实",
+        reason: "平台回单金额与账单相差 ¥240（信息服务费），待双方核实",
         disputedAt: "2026-10-10", dueDay: 3, createdAt: "2026-10-09"
       }
     ];
@@ -171,7 +171,7 @@
             { id: "L002", name: "李婷", phone: "138****7745", stage: "onboarded", owner: "王建国", createdAt: "2026-09-20", boundAt: "2026-09-20", notes: [{ at: "2026-09-20", by: "王建国", text: "已提交资质，待首单" }] },
             { id: "L003", name: "王浩", phone: "137****6688", stage: "registered", owner: "王建国", createdAt: "2026-10-03", boundAt: "2026-10-03", notes: [] },
             { id: "L005", name: "陈静", phone: "135****0211", stage: "paid", owner: "王建国", createdAt: "2026-09-08", boundAt: "2026-09-08", amount: 2800, notes: [{ at: "2026-09-08", by: "王建国", text: "复购 2 次" }] },
-            { id: "L006", name: "赵强", phone: "136****8834", stage: "lost", owner: "王建国", createdAt: "2026-08-21", boundAt: "2026-08-21", notes: [{ at: "2026-10-01", by: "王建国", text: "超过 30 天未活跃，建议关注（演示仅提示）" }] }
+            { id: "L006", name: "赵强", phone: "136****8834", stage: "lost", owner: "王建国", createdAt: "2026-08-21", boundAt: "2026-08-21", notes: [{ at: "2026-10-01", by: "王建国", text: "超过 30 天未活跃，建议关注" }] }
           ],
           agent: [
             { id: "L101", name: "孙丽", phone: "139****2267", stage: "paid", owner: "王建国", createdAt: "2026-09-11", boundAt: "2026-09-11", amount: 1980, notes: [{ at: "2026-09-11", by: "王建国", text: "招商渠道导流" }] },

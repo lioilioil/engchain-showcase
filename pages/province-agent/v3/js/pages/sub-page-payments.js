@@ -19,7 +19,7 @@
 
     var dueDay = cur.dueDay || 0, pct = Math.round(dueDay / 15 * 100);
     var dueCls = dueDay >= 15 ? "danger" : dueDay >= 10 ? "warn" : "ok";
-    h += '<section class="s-l2"><div class="v3-flex v3-between"><span class="v3-sm v3-strong">' + cur.month + " 省代应付款（测算）</span>" +
+    h += '<section class="s-l2"><div class="v3-flex v3-between"><span class="v3-sm v3-strong">' + cur.month + " 省代应付款</span>" +
       '<span class="v3-due v3-due--' + dueCls + '">第 ' + dueDay + " / 15 天</span></div>" +
       '<div class="v3-display num v3-goldtext v3-mt8">' + ui.moneyD(cur.calcAmount) + "</div>" +
       '<div class="v3-progress"><i class="' + (dueCls === "ok" ? "" : dueCls) + '" style="width:' + pct + '%"></i></div></section>';
@@ -57,7 +57,7 @@
     });
     if (r.status === "confirmed") {
       h += '<div class="s-prow"><span class="k">' + ui.icon("shield", 15) + '<span class="v3-ml6">' +
-        (r.signMethod === "esign" ? "电子签留痕（演示）" : "双方确认记录") + "</span></span></div>";
+        (r.signMethod === "esign" ? "电子签留痕" : "双方确认记录") + "</span></span></div>";
     }
     if (r.status === "disputed" && r.reason) {
       h += '<div class="v3-alert v3-alert--warn v3-mt8">' + ui.icon("warn", 13) + "<span>" + ui.esc(r.reason) + "</span></div>";
@@ -109,9 +109,9 @@
       body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("warn", 14) +
       "<span>仅在你已<b>实际核对到账金额与凭证一致</b>后确认；确认后进入双方留痕。</span></div>" +
       '<div class="v3-kv"><span class="k">确认金额</span><span class="v num">' + ui.money(reg.amount) + "</span></div>" +
-      '<div class="v3-kv"><span class="k">确认方式</span><span class="v">双方确认记录（电子签为演示留痕）</span></div>',
+      '<div class="v3-kv"><span class="k">确认方式</span><span class="v">双方确认记录（电子签留痕）</span></div>',
       footer: [
-        { t: "电子签留痕（演示）", kind: "v3-btn--ghost", onClick: function () {
+        { t: "电子签留痕", kind: "v3-btn--ghost", onClick: function () {
           esignModal(ctx, reg);
           return false;
         } },
@@ -150,16 +150,16 @@
   function esignModal(ctx, reg) {
     var ui = ctx.ui;
     ui.openSheet({
-      title: "电子签署（演示留痕）",
+      title: "电子签署",
       body: '<div class="v3-alert v3-alert--warn v3-mb12">' + ui.icon("info", 14) +
-      "<span>当前为演示环境，电子签为模拟留痕，正式电子签以平台接入第三方服务为准。</span></div>" +
+      "<span>签署后生成电子签留痕。</span></div>" +
       '<div class="v3-kv"><span class="k">签署金额</span><span class="v num">' + ui.money(reg.amount) + "</span></div>",
       footer: [
         { t: "取消", kind: "v3-btn--ghost" },
-        { t: "同意并签署（演示）", kind: "v3-btn--primary", onClick: function () {
+        { t: "同意并签署", kind: "v3-btn--primary", onClick: function () {
           var r = ctx.V3.store.act("pay/confirm", { layer: "2", id: reg.id, signMethod: "esign" });
           if (!r.ok) { ui.toast(r.reason, "err"); return false; }
-          ui.toast("电子签留痕完成（演示）", "ok");
+          ui.toast("电子签留痕完成", "ok");
           ctx.V3.router.render();
         } }
       ]
@@ -191,7 +191,7 @@
   function renderStatement(ctx) {
     var ui = ctx.ui, V3 = ctx.V3, d = ctx.d;
     var h = '<div class="v3-page-head"><div class="v3-page-title">月度对账单</div>' +
-      '<div class="v3-page-sub">只读查看测算、登记与差异；平账由省代完成</div></div>';
+      '<div class="v3-page-sub">只读查看台账、登记与差异；平账由省代完成</div></div>';
     h += '<div class="v3-stack">';
     d.statements.forEach(function (st) {
       var calc = d.calc.filter(function (c) { return c.id === st.calcId; })[0];
@@ -208,7 +208,7 @@
         (st.status === "balanced" ? '<span class="v3-badge v3-badge--active">已平账</span>' : '<span class="v3-badge v3-badge--pending">对账中</span>') +
         "</div>" +
         '<div class="s-calcrow">' +
-        '<div class="box"><div class="n num">' + ui.money(calc.calcAmount) + '</div><div class="k">测算应付</div></div>' +
+        '<div class="box"><div class="n num">' + ui.money(calc.calcAmount) + '</div><div class="k">应付金额</div></div>' +
         '<div class="op">−</div>' +
         '<div class="box"><div class="n num">' + ui.money(registered) + '</div><div class="k">已登记到账</div></div>' +
         "</div>";

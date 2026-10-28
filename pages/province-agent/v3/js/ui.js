@@ -167,7 +167,7 @@
       ? '<img class="v3-viewer__img" src="' + v.thumb + '" alt="' + esc(v.name || "凭证") + '">'
       : '<div class="v3-viewer__file">' + icon("file", 44) +
         '<div class="v3-viewer__name">' + esc((v && v.name) || "凭证") + "</div>" +
-        '<div class="v3-viewer__tip">非图片凭证或原件未随演示数据提供，此处仅展示文件名</div></div>';
+        '<div class="v3-viewer__tip">非图片凭证，此处仅展示文件名</div></div>';
     ov.innerHTML =
       '<div class="v3-viewer" role="dialog" aria-modal="true">' +
       '<div class="v3-viewer__bar"><span class="v3-viewer__title">' + esc((v && v.name) || "凭证预览") + "</span>" +
