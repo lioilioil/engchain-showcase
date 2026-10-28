@@ -24,7 +24,7 @@
     /* 身份条 */
     if (ctx.isStaff) {
       var me = (d.team || []).filter(function (m) { return m.name === ctx.s.roleStaffName; })[0] || { title: "渠道专员", name: ctx.s.roleStaffName };
-      h += '<div class="v3-idbar" data-go="#/settings" role="button"><div class="v3-idbar__main">' +
+      h += '<div class="v3-idbar" data-act="idcard" role="button"><div class="v3-idbar__main">' +
         '<span class="v3-avatar v3-avatar--staff"><span class="v3-avatar__txt">' + ui.esc(me.name.slice(0, 1)) + "</span></span>" +
         '<div class="v3-idbar__txt"><div class="v3-idbar__name">' + ui.esc(me.name) + '<span class="v3-badge v3-badge--active v3-ml6">员工</span></div>' +
         '<div class="v3-idbar__sub">' + ui.esc(me.title || "渠道专员") + " · 所属 " + ui.esc(d.profile.name) + "</div></div></div>" +
@@ -32,7 +32,7 @@
         ui.icon("chev", 14) + "</div></div>";
       return h + staffHome(ctx, me);
     }
-    h += '<div class="v3-idbar" data-go="#/settings" role="button"><div class="v3-idbar__main">' +
+    h += '<div class="v3-idbar" data-act="idcard" role="button"><div class="v3-idbar__main">' +
       '<span class="v3-avatar v3-avatar--boss">' + ui.icon("crown", 18) + "</span>" +
       '<div class="v3-idbar__txt"><div class="v3-idbar__name">' + ui.esc(d.profile.name) + "</div>" +
       '<div class="v3-idbar__sub">省级总代 · 编号 ' + ui.esc(d.profile.authNo) + "</div></div></div>" +
@@ -91,6 +91,11 @@
       });
     }
     h += "</div>";
+
+    /* 常用功能（老板视角；独立页面入口，非分页/状态页） */
+    h += '<div class="v3-sec-title">常用功能</div><div class="v3-card v3-card--pad v3-stack-narrow">' +
+      '<button class="v3-row" data-go="#/team"><span class="v3-row__main">' + ui.icon("users", 18) + "<span>团队成员</span></span>" + ui.icon("chev", 15) + "</button>" +
+      '<button class="v3-row" data-go="#/share-config"><span class="v3-row__main">' + ui.icon("crown", 18) + "<span>分佣与约定比例</span></span>" + ui.icon("chev", 15) + "</button></div>";
 
     /* 最近动态（真实派生） */
     h += '<div class="v3-sec-title">最近动态</div><div class="v3-card v3-card--pad v3-stack-narrow">' +
@@ -397,6 +402,9 @@
       if (act === "quick-apply" || act === "create-app") {
         if (!ctx.canBoss) return ctx.ui.toast("仅老板可发起合作", "err");
         createAppSheet(ctx);
+      } else if (act === "idcard") {
+        var sheets = window.V3PAGES.infoSheets;
+        if (ctx.isStaff) sheets.identityStaff(ctx); else sheets.identityBoss(ctx);
       } else if (act === "open-sub") {
         var s = ctx.d.subs.filter(function (x) { return x.id === b.getAttribute("data-id"); })[0];
         if (s) openSubSheet(ctx, s);

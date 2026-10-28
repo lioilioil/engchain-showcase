@@ -20,7 +20,7 @@
     }
 
     /* 上级总代信息条 */
-    h += '<div class="s-infobar" data-go="#/me">' +
+    h += '<div class="s-infobar" data-act="idcard" role="button">' +
       '<div class="s-infobar__row"><span class="s-infobar__label">上级总代</span>' +
       '<span class="s-infobar__value">' + ui.esc(d.parent.name) + "</span></div>" +
       '<div class="s-infobar__row"><span class="s-infobar__label">约定比例</span>' +
@@ -174,44 +174,6 @@
     });
   }
 
-  function authSheet(ctx) {
-    var ui = ctx.ui;
-    ui.openSheet({
-      title: "授权范围说明",
-      body:
-        '<div class="v3-perm-hero"><div class="v3-perm-hero-icon">' + ui.icon("shield", 28) + "</div>" +
-        '<div class="v3-perm-hero-info"><div class="v3-perm-hero-name">二级企业授权</div>' +
-        '<div class="v3-perm-hero-desc">由省级总代直接授权，在约定范围内开展业务</div></div></div>' +
-        '<div class="v3-perm-section"><div class="v3-perm-section__title">' + ui.icon("check-circle", 14) + "<span>可开展业务</span></div>" +
-        '<div class="v3-perm-list"><div class="v3-perm-item">直接邀请终端用户注册</div>' +
-        '<div class="v3-perm-item">按约定比例取得经营所得（只读）</div>' +
-        '<div class="v3-perm-item">跟进自有渠道线索与转化</div></div></div>' +
-        '<div class="v3-perm-section"><div class="v3-perm-section__title v3-perm-section__title--no">' + ui.icon("x-circle", 14) + "<span>禁止事项</span></div>" +
-        '<div class="v3-perm-list"><div class="v3-perm-item">不得发展下级企业（两级封顶）</div>' +
-        '<div class="v3-perm-item">不得自行调整费率与约定比例</div>' +
-        '<div class="v3-perm-item">不得跨区域开展授权范围外业务</div></div></div>',
-      footer: [{ t: "我知道了", kind: "v3-btn--primary" }]
-    });
-  }
-
-  function certSheet(ctx) {
-    var ui = ctx.ui, d = ctx.d;
-    ui.openSheet({
-      title: "合作信息",
-      body:
-        '<div class="v3-perm-hero"><div class="v3-perm-hero-icon">' + ui.icon("building", 28) + "</div>" +
-        '<div class="v3-perm-hero-info"><div class="v3-perm-hero-name">' + ui.esc(d.profile.name) + "</div>" +
-        '<div class="v3-perm-hero-desc">合作编号：' + ui.esc(d.profile.authNo) + "</div></div></div>" +
-        '<div class="v3-perm-section"><div class="v3-perm-section__title">' + ui.icon("info", 14) + "<span>合作基本信息</span></div>" +
-        '<div class="v3-ag-period">' +
-        '<div class="v3-ag-period__row"><span>上级总代</span><span>' + ui.esc(d.parent.name) + "</span></div>" +
-        '<div class="v3-ag-period__row"><span>合作起始</span><span>' + ui.esc(d.parent.since) + "</span></div>" +
-        '<div class="v3-ag-period__row"><span>约定比例</span><span>' + Math.round(d.parent.ratioToSub * 100) + "%（只读）</span></div>" +
-        '<div class="v3-ag-period__row"><span>发展下级</span><span>永久禁止</span></div></div></div>',
-      footer: [{ t: "关闭", kind: "v3-btn--ghost" }]
-    });
-  }
-
   /* ---------------- 经营台账 ---------------- */
   function renderLedger(ctx) {
     var ui = ctx.ui, V3 = ctx.V3, d = ctx.d;
@@ -255,10 +217,8 @@
         agreeSheet(ctx, ag.state === "pending_mine");
       } else if (act === "agree-reject") {
         rejectSheet(ctx);
-      } else if (act === "auth") {
-        authSheet(ctx);
-      } else if (act === "cert") {
-        certSheet(ctx);
+      } else if (act === "idcard") {
+        window.V3SUBPAGES.infoSheets.identity(ctx);
       }
     });
   }

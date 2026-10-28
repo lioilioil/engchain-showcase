@@ -147,6 +147,32 @@
     return ov;
   }
 
+  /* 说明型居中弹窗：标题 + 关闭 + body 滚动 + 底部按钮（规则/说明/协议等只读内容） */
+  function openCenter(opt) {
+    var ov = ensureOverlay("v3-modal-wrap");
+    var ft = (opt.footer || [{ t: "关闭", kind: "v3-btn--primary" }]).map(function (b, i) {
+      return '<button class="v3-btn ' + (b.kind || "v3-btn--ghost") + '" data-ci="' + i + '">' + esc(b.t) + "</button>";
+    }).join("");
+    ov.innerHTML =
+      '<div class="v3-center" role="dialog" aria-modal="true">' +
+      '<div class="v3-center__hd"><div class="t">' + esc(opt.title || "") + "</div>" +
+      '<button class="x" data-close aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button></div>' +
+      '<div class="v3-center__bd">' + (opt.body || "") + "</div>" +
+      (ft ? '<div class="v3-center__ft">' + ft + "</div>" : "") +
+      "</div>";
+    ov.querySelector("[data-close]").addEventListener("click", function () { closeOverlay(ov); });
+    Array.prototype.forEach.call(ov.querySelectorAll("[data-ci]"), function (btn) {
+      btn.addEventListener("click", function () {
+        var b = opt.footer[Number(btn.getAttribute("data-ci"))];
+        if (b && b.onClick) { var ret = b.onClick(ov); if (ret !== false) closeOverlay(ov); }
+        else closeOverlay(ov);
+      });
+    });
+    requestAnimationFrame(function () { ov.classList.add("show"); });
+    if (opt.onMount) opt.onMount(ov);
+    return ov;
+  }
+
   /* 凭证：真实读取文件；图片压缩为缩略 dataURL，其余仅留名（原型） */
   function fileToVoucher(file) {
     return new Promise(function (resolve) {
@@ -216,7 +242,7 @@
   window.V3 = window.V3 || {};
   window.V3.ui = {
     esc: esc, money: money, moneyD: moneyD, moneyPlain: moneyPlain, icon: icon,
-    toast: toast, openSheet: openSheet, openModal: openModal, closeAll: closeAll,
+    toast: toast, openSheet: openSheet, openModal: openModal, openCenter: openCenter, closeAll: closeAll,
     fileToVoucher: fileToVoucher, previewVoucher: previewVoucher,
     emptySvg: emptySvg, emptyHtml: emptyHtml,
     STAGE: STAGE, STAGE_BADGE: STAGE_BADGE, ACCT: ACCT, ACCT_BADGE: ACCT_BADGE, REG: REG, REG_BADGE: REG_BADGE
