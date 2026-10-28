@@ -183,6 +183,129 @@
     });
   }
 
+  /* ---------------- navbar 弹层：消息中心 / 设置（自下而上 bottom sheet） ---------------- */
+  function setRow(ui, icon, label, kind, target) {
+    var attr = kind === "go" ? 'data-goto="' + target + '"' : 'data-act="' + target + '"';
+    return '<button class="v3-row" ' + attr + '>' +
+      '<span class="v3-row__main">' + ui.icon(icon, 17) + "<span>" + label + "</span></span>" +
+      ui.icon("chev", 14) + "</button>";
+  }
+
+  function openMessagesSheet(ctx) {
+    var ui = ctx.ui, msgs = store.messagesOf(ctx.s);
+    var body = '<div class="v3-sheet__sub">待办、协议、对账与系统通知统一在此查看</div>';
+    if (!msgs.length) {
+      body += '<div class="v3-sheet-empty">' + ui.emptyHtml("暂无新消息", "<div>当前没有待处理事项。</div>", "bell") + "</div>";
+    } else {
+      body += '<div class="v3-stack">' + msgs.map(function (m) {
+        var click = m.to ? ' data-go="' + m.to + '" role="button"' : "";
+        return '<div class="v3-msg' + (m.to ? " v3-msg--link" : "") + '"' + click + '>' +
+          '<span class="v3-msg__ic v3-msg__ic--' + (m.type || "info") + '">' + ui.icon(m.icon || "bell", 16) + "</span>" +
+          '<div class="v3-msg__bd"><div class="v3-msg__t">' + ui.esc(m.title) + "</div>" +
+          '<div class="v3-msg__d">' + ui.esc(m.desc || "") + "</div>" +
+          '<div class="v3-msg__time">' + ui.esc(m.time || "刚刚") + "</div></div>" +
+          (m.to ? '<span class="v3-msg__go">' + ui.icon("chev", 14) + "</span>" : "") +
+          "</div>";
+      }).join("") + "</div>";
+    }
+    ui.openSheet({
+      title: "消息中心",
+      body: body,
+      onMount: function (ov) {
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-go]"), function (b) {
+          b.addEventListener("click", function () {
+            ui.closeAll();
+            ctx.go(b.getAttribute("data-go"));
+          });
+        });
+      }
+    });
+  }
+
+  function openSettingsSheet(ctx) {
+    var ui = ctx.ui, isSub = ctx.isSub;
+    var pages = isSub ? window.V3SUBPAGES : window.V3PAGES;
+    var subs = (pages.me && pages.me.subSheets) || {};
+    var body = "";
+    if (isSub) {
+      body += '<div class="v3-sec-title">外观</div><div class="v3-card v3-card--pad">' +
+        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
+        '<div class="v3-seg v3-seg--mini">' +
+        '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
+        '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
+      body += '<div class="v3-sec-title">合作与账务</div><div class="v3-card v3-card--pad v3-list">' +
+        setRow(ui, "file-text", "合作协议", "sub", "agree") +
+        setRow(ui, "shield", "授权范围", "sub", "auth") +
+        setRow(ui, "building", "合作信息", "sub", "info") +
+        setRow(ui, "bank", "收款确认", "go", "#/payments") +
+        setRow(ui, "receipt", "月度对账单", "go", "#/statement") +
+        setRow(ui, "receipt", "经营台账（只读）", "go", "#/ledger") +
+        setRow(ui, "bell", "消息中心", "go", "#/messages") +
+        setRow(ui, "file-text", "税务说明", "go", "#/tax") + "</div>";
+    } else {
+      body += '<div class="v3-sec-title">偏好设置</div><div class="v3-card v3-card--pad">' +
+        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("users", 16) + "<span>身份视角</span></span>" +
+        '<div class="v3-seg v3-seg--mini">' +
+        '<button class="' + (ctx.s.role === "boss" ? "on" : "") + '" data-role="boss">老板</button>' +
+        '<button class="' + (ctx.s.role === "staff" ? "on" : "") + '" data-role="staff">员工</button></div></div>' +
+        '<div class="v3-setrow"><span class="v3-setrow__t">' + ui.icon("eye", 16) + "<span>主题外观</span></span>" +
+        '<div class="v3-seg v3-seg--mini">' +
+        '<button class="' + (ctx.s.theme === "light" ? "on" : "") + '" data-theme="light">浅色</button>' +
+        '<button class="' + (ctx.s.theme === "dark" ? "on" : "") + '" data-theme="dark">深色</button></div></div></div>';
+      body += '<div class="v3-sec-title">企业与规则</div><div class="v3-card v3-card--pad v3-list">' +
+        setRow(ui, "badge", "资质证书", "sub", "cert") +
+        setRow(ui, "shield", "角色与权限说明", "sub", "perm") +
+        setRow(ui, "users", "团队成员", "go", "#/team") +
+        setRow(ui, "crown", "分佣与约定比例", "go", "#/share-config") +
+        setRow(ui, "receipt", "税务说明", "go", "#/tax") +
+        setRow(ui, "bank", "结算口径", "sub", "rules") + "</div>";
+    }
+    body += '<div class="v3-card v3-card--pad v3-list">' + setRow(ui, "info", "关于工作台", "about", "") + "</div>";
+    ui.openSheet({
+      title: "设置",
+      body: body,
+      onMount: function (ov) {
+        ov.addEventListener("click", function (e) {
+          var role = e.target.closest("button[data-role]");
+          if (role) {
+            ctx.V3.store.act("role/set", { role: role.getAttribute("data-role") });
+            ctx.V3.router.render();
+            return;
+          }
+          var th = e.target.closest("button[data-theme]");
+          if (th) {
+            var theme = th.getAttribute("data-theme");
+            ctx.V3.store.act("theme/set", { theme: theme });
+            document.documentElement.setAttribute("data-theme", theme);
+            try { localStorage.setItem("engchain-theme", theme); } catch (err) {}
+            ctx.V3.router.render();
+            return;
+          }
+          var b = e.target.closest("[data-act]");
+          if (!b) return;
+          var act = b.getAttribute("data-act");
+          if (act === "about") {
+            ui.openModal({
+              icon: "info", title: "关于工作台",
+              body: isSub
+                ? "二级合作企业工作台，无钱包、无提现，经营所得由省代线下付款并双方确认。"
+                : "省级总代与二级合作双视角工作台，提供经营数据查看、月度对账与电子签留痕。",
+              cancel: false, okText: "知道了"
+            });
+            return;
+          }
+          if (subs[act]) { ui.closeAll(); subs[act](ctx); }
+        });
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-goto]"), function (b) {
+          b.addEventListener("click", function () {
+            ui.closeAll();
+            ctx.go(b.getAttribute("data-goto"));
+          });
+        });
+      }
+    });
+  }
+
   /* ---------------- 税务说明（v3 内只读卡，不跳 legacy） ---------------- */
   function taxView(ctx) {
     var isSub = ctx.isSub;
@@ -286,9 +409,9 @@
       else location.href = "../../index.html";
     });
     var gear = document.getElementById("v3-nav-settings");
-    if (gear) gear.addEventListener("click", function () { ctx.go("#/settings"); });
+    if (gear) gear.addEventListener("click", function () { openSettingsSheet(ctx); });
     var bellBtn = document.getElementById("v3-nav-msgs");
-    if (bellBtn) bellBtn.addEventListener("click", function () { ctx.go("#/messages"); });
+    if (bellBtn) bellBtn.addEventListener("click", function () { openMessagesSheet(ctx); });
 
     /* 统一 data-go（弹层内连接除外） */
     Array.prototype.forEach.call(root.querySelectorAll("[data-go]"), function (b) {

@@ -133,7 +133,10 @@
     });
   }
 
-  var view = { title: "我的", render: render, mount: mount };
+  var view = {
+    title: "我的", render: render, mount: mount,
+    subSheets: { agree: agreementView, auth: authView, info: infoView }
+  };
   SP.me = view;
   SP.settings = view;
 })();

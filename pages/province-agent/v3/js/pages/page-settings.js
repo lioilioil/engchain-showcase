@@ -135,7 +135,10 @@
     });
   }
 
-  var view = { title: "我的", render: render, mount: mount };
+  var view = {
+    title: "我的", render: render, mount: mount,
+    subSheets: { cert: certSheet, perm: permSheet, rules: rulesSheet }
+  };
   P.me = view;
   P.settings = view;
 })();
