@@ -9,7 +9,7 @@
    - 拆分：二级约定所得=总盘×约定比例(0–50%)；总代自留=总盘−约定所得；0%=全自留。
    - 退款三层：①冻结期退款剔除；②出冻结正常退款先冲当月红字、不足转次月、部分按比例、无挂账；
      ③后台特殊退款 clawbackRef 等额冲减。两线独立冲减不交叉。
-   - 自身收益线（D26 10%）：总代自身 settled 消费 × selfRate(0.10)，独立分区，不与二级线相加。
+   - 自营线（决策1 定稿）：省代直营获客用户（渠道归省代侧、不归属任何二级企业）settled 消费 × grossShare(0.5) 全额归省代，独立分区，不与二级线相加；不存在"总代自身消费"收益线。
    - 比例 0–50% 校验，超界拦截不留存；ratioLog 追加留痕；比例不改写总盘。
    浏览器 → window.AgentLedger；node → module.exports（纯函数，可注入 config）。
    ============================================================================ */
@@ -20,7 +20,6 @@
 
   var DEFAULTS = {
     frozenDays: 7,
-    selfRate: 0.10,
     grossShare: 0.5,
     ratioRange: { min: 0, max: 0.5 },
     eligibleTypes: ['order_paid_net', 'points_unlock_paid', 'value_added_paid'],
@@ -32,7 +31,7 @@
   function resolveCfg(over) {
     var c = JSON.parse(JSON.stringify(DEFAULTS));
     over = over || {};
-    ['frozenDays', 'selfRate', 'grossShare'].forEach(function (k) { if (typeof over[k] === 'number') c[k] = over[k]; });
+    ['frozenDays', 'grossShare'].forEach(function (k) { if (typeof over[k] === 'number') c[k] = over[k]; });
     if (over.ratioRange) c.ratioRange = Object.assign({}, c.ratioRange, over.ratioRange);
     if (Array.isArray(over.eligibleTypes)) c.eligibleTypes = over.eligibleTypes;
     if (Array.isArray(over.excludedTypes)) c.excludedTypes = over.excludedTypes;
@@ -94,14 +93,14 @@
     return { ok: true, value: r };
   }
 
-  /* ---------- M3-3 自身线：自身 settled 消费 × selfRate，独立分区 ---------- */
+  /* ---------- M3-3 自营线：省代直营获客用户 settled 消费 × 50% 全额归省代，独立分区 ---------- */
   function selfLineAmount(entries, cfg) {
     cfg = resolveCfg(cfg);
     var base = (entries || []).filter(function (e) {
-      return e.line === 'selfLedger' && e.frozenStatus === 'settled' &&
-        isEligibleConsumption(e.type, cfg) && !e.refunded;
+      return e.line === 'selfLine' && e.frozenStatus === 'settled' &&
+        isEligibleConsumption(e.type, cfg) && !e.refunded && !e.clawed;
     }).reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
-    return { base: r2(base), amount: r2(base * cfg.selfRate) };
+    return { base: r2(base), amount: r2(base * cfg.grossShare) };
   }
 
   /* ---------- M3-3 两分区独立小计（不相加、不互补贴） ---------- */
@@ -109,13 +108,13 @@
     var ratioIn = (cfg && typeof cfg._ratio === 'number') ? cfg._ratio : 0;
     cfg = resolveCfg(cfg);
     var sub = { line: 'subLedger', settledGross: 0, pool: 0, agreed: 0, retained: 0, count: 0 };
-    var self = { line: 'selfLedger', settledBase: 0, amount: 0, count: 0 };
+    var self = { line: 'selfLine', settledBase: 0, amount: 0, count: 0 };
     (entries || []).forEach(function (e) {
-      if (e.frozenStatus !== 'settled' || e.refunded) return;
+      if (e.frozenStatus !== 'settled' || e.refunded || e.clawed) return;
       if (e.line === 'subLedger' && isEligibleConsumption(e.type, cfg)) {
         sub.settledGross = r2(sub.settledGross + (Number(e.amount) || 0));
         sub.count++;
-      } else if (e.line === 'selfLedger' && isEligibleConsumption(e.type, cfg)) {
+      } else if (e.line === 'selfLine' && isEligibleConsumption(e.type, cfg)) {
         self.settledBase = r2(self.settledBase + (Number(e.amount) || 0));
         self.count++;
       }
@@ -124,8 +123,8 @@
     var ratio = Number(ratioIn) || 0;
     sub.agreed = r2(sub.pool * ratio);
     sub.retained = r2(sub.pool - sub.agreed);
-    self.amount = r2(self.settledBase * cfg.selfRate);
-    return { subLedger: sub, selfLedger: self };
+    self.amount = r2(self.settledBase * cfg.grossShare);
+    return { subLedger: sub, selfLine: self };
   }
 
   /* ---------- M3-2 退款三层（纯函数：返回新 entries，不原地改） ----------

@@ -1,7 +1,7 @@
 /* ============================================================================
    js/agent-demo.js —— M3-9 u11/u12 播种 + 硬刷新重置（DEMO_SCENARIOS）
    ----------------------------------------------------------------------------
-   - u11 四川总代（n/21、两分区、充值不进、frozen/settled/冲减、法定税、自身余额、
+   - u11 四川总代（n/21、两分区：二级线+自营线、充值不进、frozen/settled/冲减、法定税、自营线全额、
      待签/已签、团队 admin+member、叠加个人合伙人示例、清理日志样例）；
    - u12 成都二级（约定20%、本人所得、冻结退款、冲减、税、已签、团队）；
    - reset 仅清代理四键+代理签署键+清理日志，绝不覆盖 u9/u10/u1-u8 种子；
@@ -99,15 +99,15 @@
       try { d.R.createCode('u11'); } catch (e) {}
     }
 
-    /* ---- 台账样例：消费10000→总盘5000→20%→约定1000/自留4000 ---- */
+    /* ---- 台账样例：二级线 消费10000→总盘5000→20%→约定1000/自留4000；自营线 直营消费8000→全额4000 ---- */
     function entry(partial) { return Object.assign({ at: now - 10 * DAY, month: L.monthKey(now - 10 * DAY), line: 'subLedger', frozenStatus: 'settled', at: now - 10 * DAY }, partial); }
-    S.appendEntry(entry({ serialNo: 'ALG-DEMO-01', line: 'subLedger', type: 'order_paid_net', amount: 10000, orderNo: 'DEMO-ORD-01', subject: 'u12', balanceAfter: 0 }));
+    S.appendEntry(entry({ serialNo: 'ALG-DEMO-01', line: 'subLedger', type: 'order_paid_net', amount: 10000, orderNo: 'DEMO-ORD-01', subject: 'u12', channelOwner: 'u12', parentSub: 'sb-u12', balanceAfter: 0 }));
     /* 一笔冻结中（T+7 未到期） */
-    S.appendEntry({ serialNo: 'ALG-DEMO-02', line: 'subLedger', type: 'order_paid_net', amount: 3000, orderNo: 'DEMO-ORD-02', subject: 'u12', frozenStatus: 'frozen', at: now - 1 * DAY, month: L.monthKey(now - 1 * DAY), balanceAfter: 0 });
-    /* 自身线：u11 自身 settled 消费 ×10% */
-    S.appendEntry({ serialNo: 'ALG-DEMO-03', line: 'selfLedger', type: 'order_paid_net', amount: 8000, orderNo: 'DEMO-ORD-03', subject: 'u11', frozenStatus: 'settled', at: now - 12 * DAY, month: L.monthKey(now - 12 * DAY), balanceAfter: 0 });
-    /* 充值笔：明确不计入基数 */
-    S.appendEntry({ serialNo: 'ALG-DEMO-04', line: 'selfLedger', type: 'recharge', amount: 5000, orderNo: 'DEMO-RC-01', subject: 'u11', frozenStatus: 'settled', at: now - 9 * DAY, month: L.monthKey(now - 9 * DAY), balanceAfter: 0 });
+    S.appendEntry({ serialNo: 'ALG-DEMO-02', line: 'subLedger', type: 'order_paid_net', amount: 3000, orderNo: 'DEMO-ORD-02', subject: 'u12', channelOwner: 'u12', parentSub: 'sb-u12', frozenStatus: 'frozen', at: now - 1 * DAY, month: L.monthKey(now - 1 * DAY), balanceAfter: 0 });
+    /* 自营线：省代直营获客用户（u21，不归属任何二级企业）settled 消费 ×50% 全额归省代 */
+    S.appendEntry({ serialNo: 'ALG-DEMO-03', line: 'selfLine', type: 'order_paid_net', amount: 8000, orderNo: 'DEMO-ORD-03', subject: 'u21', channelOwner: 'u11', parentSub: '', frozenStatus: 'settled', at: now - 12 * DAY, month: L.monthKey(now - 12 * DAY), balanceAfter: 0 });
+    /* 充值笔：明确不计入自营线基数 */
+    S.appendEntry({ serialNo: 'ALG-DEMO-04', line: 'selfLine', type: 'recharge', amount: 5000, orderNo: 'DEMO-RC-01', subject: 'u21', channelOwner: 'u11', parentSub: '', frozenStatus: 'settled', at: now - 9 * DAY, month: L.monthKey(now - 9 * DAY), balanceAfter: 0 });
 
     /* ---- 法定税列（方案A 示例：约定所得1000 → 预扣40/税后960） ---- */
     if (T) {

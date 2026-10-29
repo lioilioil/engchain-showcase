@@ -28,7 +28,7 @@
   function cfgOf(over) {
     var d = L() ? (L().DEFAULTS || {}) : {};
     return Object.assign({
-      grossShare: 0.5, selfRate: 0.10, frozenDays: 7,
+      grossShare: 0.5, frozenDays: 7,
       eligibleTypes: ['order_paid_net', 'points_unlock_paid', 'value_added_paid']
     }, d, over || {});
   }
@@ -54,7 +54,7 @@
       var slice = monthSlice[m.month] || [];
       var pt = L() && L().partitionSubtotals
         ? L().partitionSubtotals(slice, Object.assign({}, c, { _ratio: ratio }))
-        : { subLedger: { settledGross: 0, pool: 0, agreed: 0, retained: 0, count: 0 }, selfLedger: { settledBase: 0, amount: 0, count: 0 } };
+        : { subLedger: { settledGross: 0, pool: 0, agreed: 0, retained: 0, count: 0 }, selfLine: { settledBase: 0, amount: 0, count: 0 } };
       var self = L() && L().selfLineAmount ? L().selfLineAmount(slice, c) : { base: 0, amount: 0 };
       return {
         month: m.month,
@@ -63,8 +63,8 @@
         agreed: r2(pt.subLedger.agreed),
         retained: r2(pt.subLedger.retained),
         subCount: pt.subLedger.count,
-        selfBase: r2(pt.selfLedger.settledBase || self.base),
-        selfAmount: r2(pt.selfLedger.amount || self.amount)
+        selfBase: r2(pt.selfLine.settledBase || self.base),
+        selfAmount: r2(pt.selfLine.amount || self.amount)
       };
     });
   }
@@ -109,14 +109,14 @@
     var ratio = (c && typeof c._ratio === 'number') ? c._ratio : 0;
     var pt = L() && L().partitionSubtotals
       ? L().partitionSubtotals(slice, Object.assign({}, c, { _ratio: ratio }))
-      : { subLedger: { settledGross: 0, pool: 0, agreed: 0, retained: 0, count: 0 }, selfLedger: { settledBase: 0, amount: 0, count: 0 } };
+      : { subLedger: { settledGross: 0, pool: 0, agreed: 0, retained: 0, count: 0 }, selfLine: { settledBase: 0, amount: 0, count: 0 } };
     var self = L() && L().selfLineAmount ? L().selfLineAmount(slice, c) : { base: 0, amount: 0 };
     var taxes = slice.filter(function (e) { return e.tax; }).map(function (e) { return e.tax; });
     var taxTotal = taxes.reduce(function (s, t) { return s + (Number(t && t.tax) || 0); }, 0);
     return {
       month: month,
       subLedger: { settledGross: r2(pt.subLedger.settledGross), pool: r2(pt.subLedger.pool), agreed: r2(pt.subLedger.agreed), retained: r2(pt.subLedger.retained), count: pt.subLedger.count },
-      selfLedger: { settledBase: r2(pt.selfLedger.settledBase || self.base), amount: r2(pt.selfLedger.amount || self.amount), count: pt.selfLedger.count },
+      selfLine: { settledBase: r2(pt.selfLine.settledBase || self.base), amount: r2(pt.selfLine.amount || self.amount), count: pt.selfLine.count },
       taxes: taxes, taxTotal: r2(taxTotal)
     };
   }

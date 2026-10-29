@@ -234,7 +234,7 @@
      M1-11 兼任并集骨架（D31）
      各资格位独立布尔并存、不互关；收益线独立标识；hasAny 并集门控。
      ------------------------------------------------------------------ */
-  var REVENUE_LINES = ['individualPartner', 'agentSubLedger', 'selfLedger', 'legacyRebate', 'franchise'];
+  var REVENUE_LINES = ['individualPartner', 'agentSubLedger', 'selfLine', 'legacyRebate', 'franchise'];
 
   /* 并集门控：任一命中即放行对应既有入口；不新增公司主体资格 */
   function hasAny(bits, flags) {
@@ -256,7 +256,7 @@
       franchise: !!parts.franchise,
       revenueLines: REVENUE_LINES.filter(function (ln) {
         if (ln === 'agentSubLedger') return !!parts.isProvinceAgent || !!parts.isSubAgent;
-        if (ln === 'selfLedger') return !!parts.isProvinceAgent;
+        if (ln === 'selfLine') return !!parts.isProvinceAgent;
         return !!parts[ln];
       })
     };

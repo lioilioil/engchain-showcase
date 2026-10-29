@@ -7,12 +7,15 @@
    - owner→legalRep/admin 映射（M1-9），旧 owner 保留 canManage 兼容不失权；
    - 不删 franchise（¥29,800 独立付费）、不删个人合伙人(u9)、不动 base/limited 真实返佣；
    - 新用户空表正常播种（迁移只清旧线残留，不制造空表阻断）。
+   - M6 后半段（schema/3）：v3 工作台演示键（engchain-v3-demo-*）数据合并迁移至
+     主体系台账键（engchain-agent-ledger），旧键标注 deprecated（保留为演示副本，
+     不再参与主体系口径）；工作台 UI 数据层与主体系口径同源（uni-shared financeSplit）。
    浏览器 window.AgentMigrate；node module.exports（注入 storage）。
    ============================================================================ */
 (function (root) {
   'use strict';
   var SCHEMA_KEY = 'engchain-agent-migration-v';
-  var CURRENT = 'agent-schema/1';
+  var CURRENT = 'agent-schema/3';
 
   function makeStorage(ls) {
     return {
@@ -98,13 +101,79 @@
     return { step: 'mapLegacyOwner', mapped: mapped, ok: true };
   }
 
+  /* 步骤5（schema/2）：旧 selfLedger（总代自身消费，D26 10% 语义）→ selfLine 且标记 legacy_self
+     不计入任何收益（决策1：不存在总代自身消费线；旧线改为自营线枚举但排除出白名单，保留留痕不误导） */
+  function stepPruneOldSelfLine(s) {
+    var raw = s.parse('engchain-agent-ledger', null);
+    if (!raw) return { step: 'pruneOldSelfLine', changed: false, ok: true };
+    var entries = Array.isArray(raw) ? raw : (raw.entries || []);
+    var changed = 0;
+    (entries || []).forEach(function (e) {
+      if (e && e.line === 'selfLedger') {
+        e.line = 'selfLine';
+        e.type = 'legacy_self';
+        e.legacySelf = true;
+        changed++;
+      }
+    });
+    if (changed) {
+      var store = Array.isArray(raw) ? { entries: entries, summaries: {}, version: 1 } : raw;
+      s.write('engchain-agent-ledger', store);
+    }
+    return { step: 'pruneOldSelfLine', changed: changed, ok: true };
+  }
+
+  /* 步骤6（schema/3）：M6 后半段——v3 工作台演示键（engchain-v3-demo-*）数据合并迁移至
+     主体系台账键（engchain-agent-ledger）：active 二级逐家 subGross → subLedger 线；
+     financeBase.selfGross → selfLine 线（直营）；agent-ledger 已有数据时跳过（幂等）。
+     旧键 engchain-v3-demo-state-v1 / engchain-v3-demo-scenario 标注 deprecated，
+     保留为工作台演示副本，不再参与主体系口径。 */
+  function stepMigrateV3ToAgent(s) {
+    var v3 = s.parse('engchain-v3-demo-state-v1', null);
+    if (!v3 || !v3.state) return { step: 'migrateV3ToAgent', skipped: true, reason: 'no-v3-state', ok: true };
+    var d = v3.state;
+    var raw = s.parse('engchain-agent-ledger', null);
+    var store = raw || { entries: [], summaries: {}, version: 0 };
+    if (Array.isArray(store)) store = { entries: store, summaries: {}, version: 1 };
+    if (!store.entries) store.entries = [];
+    if (store.entries.length) return { step: 'migrateV3ToAgent', skipped: true, reason: 'agent-ledger-not-empty', ok: true };
+    var fb = d.financeBase || {};
+    var ts = Date.UTC(2026, 9, 15);
+    var n = 0;
+    (d.subs || []).forEach(function (sub) {
+      if (!sub || (sub.status !== 'active' && sub.status !== 'approved')) return;
+      var amt = Number(sub.subGross || 0);
+      if (!amt) return;
+      n++;
+      store.entries.push({
+        line: 'subLedger', type: 'order_paid_net', frozenStatus: 'settled',
+        amount: amt, subject: sub.id || ('sub-' + n), subjectName: sub.name || ('二级' + n),
+        ratioToSub: Number(sub.ratioToSub || 0), parentSub: sub.id || null,
+        channelOwner: sub.channel || 'MIG', at: ts, serialNo: 'MIG-SUB-' + String(n).padStart(3, '0')
+      });
+    });
+    var selfAmt = Number(fb.selfGross || 0);
+    if (selfAmt) {
+      store.entries.push({
+        line: 'selfLine', type: 'order_paid_net', frozenStatus: 'settled',
+        amount: selfAmt, subject: 'direct', subjectName: '直营',
+        parentSub: null, channelOwner: 'MIG', at: ts, serialNo: 'MIG-SELF-001'
+      });
+    }
+    if (store.entries.length) {
+      store.version = 1;
+      s.write('engchain-agent-ledger', store);
+    }
+    return { step: 'migrateV3ToAgent', migrated: store.entries.length, selfAmt: selfAmt, ok: true };
+  }
+
   function run(storage) {
     var ls = storage || (root.localStorage);
     if (!ls) return { ok: false, reason: 'no storage' };
     var s = makeStorage(ls);
     var current = s.get(SCHEMA_KEY);
     if (current === CURRENT) return { ok: true, skipped: true, current: current };
-    var report = [stepClearDistSeed(s), stepPruneOldRebate(s), stepRevertU8(s), stepMapLegacyOwner(s)];
+    var report = [stepClearDistSeed(s), stepPruneOldRebate(s), stepRevertU8(s), stepMapLegacyOwner(s), stepPruneOldSelfLine(s), stepMigrateV3ToAgent(s)];
     s.set(SCHEMA_KEY, CURRENT);
     return { ok: true, current: CURRENT, report: report };
   }
@@ -112,7 +181,7 @@
   var api = {
     CURRENT: CURRENT, SCHEMA_KEY: SCHEMA_KEY,
     makeStorage: makeStorage, run: run,
-    _steps: { clearDistSeed: stepClearDistSeed, pruneOldRebate: stepPruneOldRebate, revertU8: stepRevertU8, mapLegacyOwner: stepMapLegacyOwner }
+    _steps: { clearDistSeed: stepClearDistSeed, pruneOldRebate: stepPruneOldRebate, revertU8: stepRevertU8, mapLegacyOwner: stepMapLegacyOwner, pruneOldSelfLine: stepPruneOldSelfLine, migrateV3ToAgent: stepMigrateV3ToAgent }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else {

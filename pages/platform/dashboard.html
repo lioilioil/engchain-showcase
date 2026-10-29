@@ -27,6 +27,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     <!-- 平台整体状态 -->
     <div class="pf-stats" id="pf-stats"></div>
 
+    <!-- P2-4 结算规则（平台执行 · 只读） -->
+    <div id="pf-settle"></div>
+
     <!-- 功能 Tab -->
     <div class="pf-tabs" id="pf-tabs"></div>
 
@@ -42,6 +45,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/agent-ledger.js"></script>
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
@@ -105,8 +109,31 @@ function renderStats(){
     return '<div class="ps-cell"><span class="ps-k">'+c.k+'</span><b class="ps-v" style="color:'+c.c+';">'+c.v+'</b></div>';
   }).join('')+'</div>';
 }
-function renderTabs(){
-  document.getElementById('pf-tabs').innerHTML=TABS.map(function(t){
+/* ===== P2-4 结算规则（平台执行 · 只读）：规则常量取自 agent-ledger.js DEFAULTS（单一数据源） ===== */
+var SETTLE_LABEL={
+  eligible:{order_paid_net:'供需成交订单·实付净额',points_unlock_paid:'积分解锁实付',value_added_paid:'增值服务实付'},
+  excluded:{recharge:'充值',free_points:'免费积分',entry_fee:'入驻/认证规费',refund_reversal:'退款冲回'}
+};
+function renderSettleRule(){
+  var el=document.getElementById('pf-settle');if(!el)return;
+  var D=null;
+  try{if(window.AgentLedger&&window.AgentLedger.DEFAULTS)D=window.AgentLedger.DEFAULTS;}catch(e){}
+  if(!D){el.innerHTML='';return;}
+  var share=Math.round((D.grossShare||0.5)*100);
+  var elig=(D.eligibleTypes||[]).map(function(t){return SETTLE_LABEL.eligible[t]||t;}).join(' · ');
+  var excl=(D.excludedTypes||[]).map(function(t){return SETTLE_LABEL.excluded[t]||t;}).join(' · ');
+  var maxR=Math.round(((D.ratioRange&&D.ratioRange.max)||0.5)*100);
+  el.innerHTML='<div class="pf-sec">结算规则（平台执行 · 只读）</div>'+
+    '<div class="pf-card" style="border-color:rgba(176, 138, 60, .35);">'+
+    '<div class="pf-top"><b>代理分账规则常量</b><span class="pf-st" style="color:var(--primary-dim);">后台执行比例</span></div>'+
+    '<div class="pf-meta">省代分账盘 = 平台合格消费 × '+share+'%；自营线（省代直营获客）×'+share+'% 全额归省代；二级约定比例 0–'+maxR+'% 逐家配置。</div>'+
+    '<div class="pf-meta">T+'+((D.frozenDays||0))+' 冻结转 settled；冻结期内退款剔除，当月红字冲减、跨月等额回冲。</div>'+
+    '<div class="pf-meta">计入合格消费：'+elig+'。</div>'+
+    '<div class="pf-meta">不计入：'+excl+'。</div>'+
+    '<div class="pf-meta" style="color:var(--text-3);">平台不参与交易资金，不提供资金监管与佣金结算；本卡仅只读展示规则常量，不做配置入口。</div>'+
+    '</div>';
+}
+function renderTabs(){  document.getElementById('pf-tabs').innerHTML=TABS.map(function(t){
     return '<span class="pf-chip'+(cur===t.k?' on':'')+'" onclick="window.setTab(\''+t.k+'\')">'+t.label+'</span>';
   }).join('');
 }
@@ -377,7 +404,7 @@ function renderAudit(){
       return '<div class="pf-audit-row"><span class="pf-audit-a">'+(l.action||'')+'</span><span class="pf-audit-tg">'+(l.target||'')+'</span><span class="pf-audit-tm">'+ftime(l.ts)+'</span>'+(l.extra?'<div class="pf-audit-ex">'+l.extra+'</div>':'')+'</div>';
     }).join('')+'</div>';
 }
-renderStats();renderTabs();renderBody();renderAudit();
+renderStats();renderSettleRule();renderTabs();renderBody();renderAudit();
 window.addEventListener('engchain:entry',function(){renderStats();if(cur==='entry')renderBody();});
 window.addEventListener('engchain:supply',function(){renderStats();if(cur==='supply')renderBody();});
 window.addEventListener('engchain:demand',function(){renderStats();if(cur==='demand')renderBody();});

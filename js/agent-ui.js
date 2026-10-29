@@ -421,7 +421,7 @@
     opts = opts || {};
     var DEFAULTS = Ledger.DEFAULTS || {};
     var rows = (entries || []).map(function (e) {
-      var isSelf = e.line === 'selfLedger';
+      var isSelf = e.line === 'selfLine';
       var settled = e.frozenStatus === 'settled' && !e.refunded;
       var eligible = Ledger.isEligibleConsumption(e.type, DEFAULTS);
       /* D-15：税注记行（tax_note）单独标注，不计入结算消费/总盘/约定/自留 */
@@ -442,7 +442,7 @@
 
       if (isSelf) {
         rowPool = '—';
-        rowAgreed = settled && eligible ? '自身10% ' + fmt(Ledger.round2((Number(e.amount) || 0) * DEFAULTS.selfRate)) : '—';
+        rowAgreed = settled && eligible ? '自营50% ' + fmt(Ledger.round2((Number(e.amount) || 0) * DEFAULTS.grossShare)) : '—';
         rowRetained = '—';
       } else if (settled && eligible) {
         var gp = Ledger.round2((Number(e.amount) || 0) * DEFAULTS.grossShare);
@@ -465,7 +465,7 @@
       return '<tr>'
         + '<td>' + fmtDate(e.at) + '</td>'
         + '<td>' + serial + '</td>'
-        + '<td>' + (isSelf ? '自身线' : '二级线') + '</td>'
+        + '<td>' + (isSelf ? '自营线' : '二级线') + '</td>'
         + '<td class="ag-num">' + fmt(e.amount) + '</td>'
         + '<td class="ag-num">' + rowPool + '</td>'
         + '<td class="ag-num">' + rowAgreed + '</td>'
@@ -522,7 +522,7 @@
         termDesc = '封存仅标记只读，原始记录完整保留；台账与协议可查阅，不再产生新的约定/自留分成。';
       }
       /* D-10：终止/封存独立块内提供封存台账只读区（静态直接展示，禁止折叠交互） */
-      var sealedEntries = (Store.listLedger() || []).filter(function (e) { return e.line === 'subLedger' || e.line === 'selfLedger'; });
+      var sealedEntries = (Store.listLedger() || []).filter(function (e) { return e.line === 'subLedger' || e.line === 'selfLine'; });
       var ledgerFold = '<div class="ag-card ag-mt-3">'
         + '<h3>封存台账（只读）</h3>'
         + ledgerTable(sealedEntries, 0, Ledger) + '</div>';
@@ -610,11 +610,11 @@
           gross = Ledger.round2(gross + (Number(e.amount) || 0));
           agreed = Ledger.round2(agreed + ga);
           retained = Ledger.round2(retained + Ledger.round2(gp - ga));
-        } else if (e.line === 'selfLedger') {
+        } else if (e.line === 'selfLine') {
           selfBase = Ledger.round2(selfBase + (Number(e.amount) || 0));
         }
       });
-      return { gross: gross, pool: Ledger.round2(gross * Ledger.DEFAULTS.grossShare), agreed: agreed, retained: retained, selfAmt: Ledger.round2(selfBase * Ledger.DEFAULTS.selfRate) };
+      return { gross: gross, pool: Ledger.round2(gross * Ledger.DEFAULTS.grossShare), agreed: agreed, retained: retained, selfAmt: Ledger.round2(selfBase * Ledger.DEFAULTS.grossShare) };
     }
     var cumAgg = agg(entries);
     var monAgg = agg(entries.filter(function (e) { return e.month === curMonth; }));
@@ -639,7 +639,7 @@
         + boardCell('合格消费', a.gross, mode === 'month' ? '本月已结算' : '累计已结算')
         + boardCell('总盘(×50%)', a.pool)
         + boardCell('总代自留', a.retained)
-        + boardCell('自身10%', a.selfAmt, '自身线独立分区')
+        + boardCell('自营50%', a.selfAmt, '自营线独立分区')
         + '<div class="ag-board-cell ag-board-cell--frozen"><div class="ag-board-cell__lb">T+7 冻结待结算</div>'
         + '<div class="ag-board-cell__val">' + frozen.count + ' 笔</div>'
         + '<div class="ag-board-cell__sub">¥' + fmt(frozen.amount) + '</div></div>'
@@ -718,10 +718,10 @@
       + '<div class="ag-amount-row"><span>约定所得</span><b>' + fmt(sub.subLedger.agreed) + '</b></div>'
       + '<div class="ag-amount-row"><span>总代自留</span><b>' + fmt(sub.subLedger.retained) + '</b></div></div></section>'
 
-      /* H-1 #/ledger 视图：自身线（P2-1 月份切片） */
-      + '<section class="ag-card" data-view="ledger"><h3>自身线（selfLedger · 10% · 独立不相加）</h3>'
+      /* H-1 #/ledger 视图：自营线（P2-1 月份切片） */
+      + '<section class="ag-card" data-view="ledger"><h3>自营线（selfLine · 50% · 独立分区）</h3>'
       + '<div id="ag-led-self"></div>'
-      + '<div class="ag-amount-block"><div class="ag-amount-row"><span>自身结算消费 ×10%</span><b>' + fmt(sub.selfLedger.settledBase) + ' = ' + fmt(sub.selfLedger.amount) + '</b></div></div></section>'
+      + '<div class="ag-amount-block"><div class="ag-amount-row"><span>直营获客结算消费 ×50%</span><b>' + fmt(sub.selfLine.settledBase) + ' = ' + fmt(sub.selfLine.amount) + '</b></div></div></section>'
 
       /* H-1 #/agreements 视图：协议中心（列表；八条进抽屉，H-5） */
       + '<section class="ag-card" data-view="agreements"><h3>协议中心（O4 二级合作协议）</h3><div id="ag-proto-list"></div></section>'
@@ -907,7 +907,7 @@
             bodyHtml: '<div class="ag-field"><label>约定比例（0–0.5，留空即 0% 全自留）</label>'
               + '<input class="ag-input ag-ratio-input" type="number" min="0" max="0.5" step="0.01" value="' + (rec.ratioToSub || 0) + '">'
               + '<div class="ag-field-err"></div></div>'
-              + '<div class="ag-disc">比例仅影响约定所得分配，总盘 50% 与自身 10% 不变；变更写入比例历史留痕。</div>',
+              + '<div class="ag-disc">比例仅影响约定所得分配，总盘 50% 与自营 50% 不变；变更写入比例历史留痕。</div>',
             footHtml: '<button class="ag-btn ag-btn--ghost" data-drawer-cancel>取消</button>'
               + '<button class="ag-btn ag-btn--primary" data-drawer-save>保存留痕</button>',
             onOpen: function (d) {
@@ -991,12 +991,12 @@
       };
     });
 
-    /* P2-1 月份切片绑定：二级线 / 自身线各自独立月份状态（纯视图，不改汇总/看板口径） */
+    /* P2-1 月份切片绑定：二级线 / 自营线各自独立月份状态（纯视图，不改汇总/看板口径） */
     mountMonthLedger(el.querySelector('#ag-led-sub'),
       entries.filter(function (e) { return e.line === 'subLedger'; }),
       function (rows) { return ledgerTable(rows, ratioUsed, Ledger, ratioByUid); });
     mountMonthLedger(el.querySelector('#ag-led-self'),
-      entries.filter(function (e) { return e.line === 'selfLedger'; }),
+      entries.filter(function (e) { return e.line === 'selfLine'; }),
       function (rows) { return ledgerTable(rows, ratioUsed, Ledger); });
 
     /* P1-1 看板本月/累计切换（纯前端重渲染，不改聚合口径） */
@@ -1248,7 +1248,7 @@
         + '<div class="ag-hero ag-card--sub">'
         + '<div class="ag-hero__lb">本人约定所得（' + (mode === 'month' ? '本月' : '累计') + '）</div>'
         + '<div class="ag-big">¥' + fmt(a.agreed) + '</div>'
-        + '<div class="ag-hero__sub">不展示自留/自身线 · 模拟测算，非税务意见</div></div>'
+        + '<div class="ag-hero__sub">不展示自留/自营线 · 模拟测算，非税务意见</div></div>'
         + '<div class="ag-board-grid">'
         + cell('本人合格消费', a.gross, mode === 'month' ? '本月已结算' : '累计已结算')
         + cell('总盘（×50%）', a.pool)

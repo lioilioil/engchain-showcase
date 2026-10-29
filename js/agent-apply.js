@@ -428,7 +428,7 @@
             : '';
           /* P0-5：已生效卡补「进入工作台」CTA（suspended 仍可进入只读视图） */
           var activeCta = (a.status === 'active' || a.status === 'suspended')
-            ? '<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary ag-btn--sm" href="../province-agent/index.html">进入工作台</a></div>'
+            ? '<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary ag-btn--sm" href="../province-agent/uni/pages/home.html">进入工作台</a></div>'
             : '';
           return '<div class="ag-member" style="align-items:flex-start;flex-direction:column;gap:6px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">' +

@@ -1,0 +1,226 @@
+/* ============================================================
+   uni-invite-stats.css · 获客转化 页内样式（v9 · 视觉重构）
+   设计意图：这是省代/二级合作方每日扫一眼的「经营简报」——
+   克制、可信、金色点睛。视线排序严格为：数字 > 分区标题 > 口径说明。
+   全部取值引用 app.css 令牌；共享基元(.uh-*)一律 #ag-view 页内覆盖，
+   绝不改动 uni-layout.css / app.css。
+   内容基元在 uni-layout.css；本文件 = 卡头重排 + 消费行账本化 +
+   焦点卡金色 + 线别行重排 + 统计卡层级收敛 + 语义色修正 + 入场动效。
+   ============================================================ */
+
+/* ---------- 0. 容器底部节奏（.no-pad 壳原本零底部留白，末卡贴视口底） ---------- */
+#ag-view { padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px)); }
+
+/* ============================================================
+   1. 卡头重排（P0）：eyebrow 独占一行；长口径徽章降级为块级说明条。
+      根因：原 .uh-finhead 为横向 flex，长 mute 胶囊 flex:none 把
+      flex:1 的 eyebrow 压成逐字竖排；现恒为两行——粗分区名 + 小字口径。
+   ============================================================ */
+#ag-view .uh-finhead {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding-bottom: 2px;
+}
+#ag-view .uh-finhead .uh-eyebrow {
+  flex: 0 0 auto;
+  white-space: normal;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--text-1);
+}
+#ag-view .uh-finhead .uh-badge--mute {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  flex: none;
+  padding: 6px 10px;
+  border-radius: var(--r-s);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: .01em;
+  text-align: left;
+  white-space: normal;
+  background: var(--bg-card-2);
+  color: var(--text-3);
+  border: 0;
+}
+
+/* ============================================================
+   2. 入场动效（克制两处：卡片 stagger fade-up + 条形 grow）
+      prefers-reduced-motion 下全部关闭。
+   ============================================================ */
+@keyframes uc-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#ag-view > section { animation: uc-rise .34s var(--e-out) both; }
+#ag-view > section:nth-child(1) { animation-delay: .02s; }
+#ag-view > section:nth-child(2) { animation-delay: .06s; }
+#ag-view > section:nth-child(3) { animation-delay: .10s; }
+#ag-view > section:nth-child(4) { animation-delay: .14s; }
+#ag-view > section:nth-child(5) { animation-delay: .18s; }
+#ag-view > section:nth-child(6) { animation-delay: .22s; }
+#ag-view > section:nth-child(7) { animation-delay: .26s; }
+#ag-view > section:nth-child(8) { animation-delay: .30s; }
+
+@keyframes uc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.uc-fnl__bar {
+  transform-origin: left center;
+  animation: uc-grow .5s var(--e-emph) both;
+}
+.uc-fnl__row:nth-child(1) .uc-fnl__bar { animation-delay: .10s; }
+.uc-fnl__row:nth-child(2) .uc-fnl__bar { animation-delay: .16s; }
+.uc-fnl__row:nth-child(3) .uc-fnl__bar { animation-delay: .22s; }
+.uc-fnl__row:nth-child(4) .uc-fnl__bar { animation-delay: .28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  #ag-view > section,
+  .uc-fnl__bar { animation: none !important; }
+}
+
+/* ============================================================
+   3. 漏斗行：人数与转化率分层（转化率才是视线焦点），条形收尾收细
+   ============================================================ */
+.uc-fnl { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.uc-fnl__hd { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.uc-fnl__label { font-size: var(--fs-base); color: var(--text-2); font-weight: 600; min-width: 0; }
+.uc-fnl__num { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.uc-fnl__cnt { font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); white-space: nowrap; }
+.uc-fnl__cnt::after { content: "·"; margin-left: 6px; color: var(--text-4); }
+.uc-fnl__pct { font-size: var(--fs-base); font-weight: 700; color: var(--text-1); white-space: nowrap; }
+.uc-fnl__track { margin-top: 7px; height: 5px; border-radius: var(--r-full); background: var(--bg-card-2); overflow: hidden; }
+.uc-fnl__bar { height: 100%; border-radius: var(--r-full); background: var(--primary); }
+.uc-fnl__bar.is-lost { background: var(--error); }
+/* 事项分布里"不计合格"条：徽章已表达语义，条本身降级中性灰，红色只留给漏斗「沉寂流失」 */
+.uc-fnl__bar.uc-bar--mute { background: var(--line-strong); }
+
+/* ============================================================
+   4. 消费记录行（P1）：去"面包片胶囊"，改为紧凑账本信息行——
+      左侧固定金额列（¥ 与千分位纵向对齐），右侧事项/日期/来源三段。
+   ============================================================ */
+.uc-cons { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.uc-cons__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: transparent;
+}
+.uc-cons__amt {
+  flex: 0 0 74px;
+  padding-top: 1px;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+}
+.uc-cons__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.uc-cons__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.uc-cons__item { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.uc-cons__nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uc-cons__tag {
+  flex: none;
+  font-size: 11px; color: var(--text-3); background: var(--bg-card-2);
+  padding: 1px 6px; border-radius: var(--r-full); border: 1px solid var(--line);
+}
+.uc-cons__tag.is-ok {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: color-mix(in srgb, var(--success) 9%, transparent);
+}
+.uc-cons__sub { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.45; }
+.uc-cons__src { font-size: var(--fs-xs); color: var(--text-4); line-height: 1.4; }
+
+/* ============================================================
+   5. 渠道码线别归属行（P1）：上行 code·归属人 + 线别徽章，
+      下行统计数字组，再进度条——三段信息各占一行，375/320 不崩。
+   ============================================================ */
+.uc-line__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.uc-line__label { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.uc-line__code {
+  flex: none;
+  font-size: var(--fs-base); font-weight: 700; color: var(--text-1);
+  font-variant-numeric: tabular-nums; letter-spacing: .01em;
+}
+.uc-line__owner {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-sm); color: var(--text-3);
+}
+.uc-line__stats { margin-top: 5px; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.uc-line__stats b { color: var(--text-1); font-weight: 700; }
+
+/* ============================================================
+   6. 焦点金额卡（P1）：英雄数字改用品牌金（令牌语义即 hero/大数字），
+      admin 空态靠收紧上下间距收掉留白（不填装饰色块）；
+      sub 免责声明升为中性提示行（高于普通 note、低于台账数字）。
+   ============================================================ */
+#ag-view .uh-bignum { color: var(--primary); margin-top: 6px; }
+#ag-view .uh-bignum .cur { color: var(--primary); }
+#ag-view .uh-note { margin-top: 14px; }
+#ag-view .uh-bignum ~ .uh-note {
+  margin-top: 12px;
+  padding: 7px 10px;
+  border-radius: var(--r-s);
+  background: var(--bg-card-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+#ag-view .uh-bignum ~ .uh-note::before {
+  content: "";
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--primary-dim);
+  margin-right: 6px;
+  vertical-align: 2px;
+}
+
+/* ============================================================
+   7. 运营统计卡（P1）：取消 17px 竖条子标题，降级为 12px 粗体小分组
+      标题（eyebrow 是本卡唯一标题层级）；kv 数字包等宽单元防左右游移。
+   ============================================================ */
+#ag-view .uh-sechead { margin: 18px 0 6px; }
+#ag-view .uh-sechead .lbl {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: .03em;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+#ag-view .uh-sechead .lbl::before { width: 3px; height: 10px; }
+.uv b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.uv .uv-amt { color: var(--text-1); }
+
+/* ============================================================
+   8. 分佣口径条款：条款名与正文拉开字号差（14 vs 12）
+   ============================================================ */
+#ag-view .uh-clause .no {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: .02em;
+  margin-bottom: 5px;
+}
+#ag-view .uh-clause .c { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.7; }
+
+/* ============================================================
+   9. 员工权限说明条（P1）：信息说明 ≠ 已暂停——从 warning 红橙底
+      降级为中性暖灰底，锁图标改用品牌金，与红橙暂停封条一眼可分。
+   ============================================================ */
+#ag-view .uh-readnote {
+  background: var(--bg-card-2);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+}
+#ag-view .uh-readnote .ic { color: var(--primary-dim); }

@@ -131,7 +131,7 @@
     entry = entry || {};
     entry.serialNo = entry.serialNo || ('ALG-' + (s.entries.length + 1) + '-' + Date.now().toString(36));
     entry.month = entry.month || monthKey(entry.at || Date.now());
-    entry.line = (entry.line === 'selfLedger') ? 'selfLedger' : 'subLedger';
+    entry.line = (entry.line === 'selfLine') ? 'selfLine' : 'subLedger';
     entry.frozenStatus = entry.frozenStatus || 'frozen';
     entry.at = entry.at || Date.now();
     s.entries.push(entry);

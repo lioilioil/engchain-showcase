@@ -900,14 +900,14 @@ window.MOCK = (function () {
       ]
     },
     /* ====================================================================
-       M1-6 台账消费闭合枚举 + T+7 冻结 + 自身10%（D9/D12/D26）
-       充值/免费积分/规费/退款笔不计入；frozenDays=7自然日；selfRate=0.10 独立分区。 */
+       M1-6 台账消费闭合枚举 + T+7 冻结 + 自营线（决策1 定稿）
+       充值/免费积分/规费/退款笔不计入；frozenDays=7自然日；
+       分佣比例=规则常量 grossShare 0.5（省代 50%，配置权威见 js/agent-ledger.js DEFAULTS）。 */
     agentLedger: {
       frozenDays: 7,
-      selfRate: 0.10,
       grossShare: 0.5,
       ratioRange: { min: 0, max: 0.5 },
-      lines: ['subLedger', 'selfLedger'],
+      lines: ['subLedger', 'selfLine'],
       eligibleTypes: [
         { id: 'order_paid_net', label: '订单成交实付净额' },
         { id: 'points_unlock_paid', label: '积分解锁实付' },
