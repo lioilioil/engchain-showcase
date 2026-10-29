@@ -46,6 +46,18 @@
 .uls-tile__ft { display: flex; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
 .uls-tile__ft .btn { flex: 1; min-width: 0; }
 
+/* 卡片右下角文字入口（替代卡内按钮） */
+.uls-tile__go {
+  display: flex; justify-content: flex-end; align-items: center;
+  border-top: 1px solid var(--line); padding-top: 7px;
+}
+.uls-cardgo {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--primary);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.uls-cardgo:active { opacity: .7; }
+
 .uls-tile__reason {
   font-size: var(--fs-xs); color: var(--error); background: var(--error-soft);
   border-radius: var(--r-s); padding: 6px 8px; line-height: 1.4;
@@ -68,22 +80,18 @@
 }
 .uls-link:active { opacity: .7; }
 
-/* 多选态卡片：左上角勾选圈，选中描边强调色（引用系统强调色令牌） */
-.uls-tile--multi { padding-left: 40px; position: relative; }
+/* 多选态：仅选中时在名称右侧出现勾选标记（未选中不留空圈/空槽），选中卡描边强调色 */
 .uls-chk {
-  position: absolute; top: 12px; left: 12px;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 1.5px solid var(--line-strong, var(--text-3));
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; transition: all .12s ease;
+  flex: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  animation: uls-chk-in .12s ease;
 }
-.uls-chk svg { opacity: 0; }
-.uls-tile--sel { border-color: var(--e-spring); box-shadow: 0 0 0 1px var(--e-spring) inset; }
-.uls-tile--sel .uls-chk { background: var(--e-spring); border-color: var(--e-spring); }
-.uls-tile--sel .uls-chk svg { opacity: 1; }
-/* 暂停企业：多选不可选（虚线空圈 + 卡片降饱和） */
+.uls-chk svg { width: 12px; height: 12px; }
+@keyframes uls-chk-in { from { transform: scale(.8); opacity: .4; } to { transform: none; opacity: 1; } }
+.uls-tile--sel { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+/* 暂停企业：多选不可选（卡片降饱和） */
 .uls-tile--na { opacity: .68; }
-.uls-tile--na .uls-chk { border-style: dashed; opacity: .45; }
 
 /* 多选批量操作栏（固定底部） */
 .uls-batchbar {
@@ -95,7 +103,56 @@
 }
 .uls-batchbar__cnt { font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); }
 .uls-batchbar__btns { display: flex; gap: 8px; }
-.uls-batchbar.is-empty .uls-batchbar__btns .btn { opacity: .45; pointer-events: none; }
+/* 未选中企业时仅禁用两个批量动作；“更多”始终可点（点击后弹出气泡，选择操作时再校验选中） */
+.uls-batchbar.is-empty .uls-batchbar__btns [data-batch] { opacity: .45; pointer-events: none; }
+/* 批量态页面底部为固定操作栏预留高度，避免最后一张卡片被栏体遮挡 */
+body.uls-batch .scroll.no-pad { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+
+/* ── 批量操作状态页：原页头隐藏 + 批量顶栏（左上角文字“返回”） ── */
+body.uls-batch .page-header { display: none; }
+.uls-batchhead {
+  position: sticky; top: 0; z-index: 40;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
+  padding: 10px 16px 10px 6px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.uls-batchhead__back {
+  justify-self: start; min-height: 40px; padding: 0 10px;
+  border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: 15px; font-weight: 600; color: var(--text-1);
+  -webkit-tap-highlight-color: transparent;
+}
+.uls-batchhead__back:active { opacity: .6; }
+.uls-batchhead__title { justify-self: center; font-size: 17px; font-weight: 600; color: var(--text-1); }
+
+/* “更多”气泡：自按钮位置向上弹出（单选操作：暂停合作 / 终止合作） */
+.uls-pop {
+  position: fixed; z-index: 60; min-width: 132px; padding: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line); border-radius: var(--r-m);
+  box-shadow: var(--shadow-float);
+  opacity: 0; transform: translateY(8px) scale(.97);
+  transform-origin: bottom right;
+  transition: opacity .16s ease, transform .16s ease;
+}
+.uls-pop.show { opacity: 1; transform: translateY(0) scale(1); }
+.uls-pop__arrow {
+  position: absolute; bottom: -6px; width: 12px; height: 12px;
+  background: var(--bg-elevated);
+  border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  transform: rotate(45deg);
+}
+.uls-pop__item {
+  display: block; width: 100%; text-align: left;
+  padding: 10px 12px; border: none; border-radius: 8px;
+  background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-base); font-weight: 600; color: var(--text-1);
+  -webkit-tap-highlight-color: transparent;
+}
+.uls-pop__item + .uls-pop__item { border-top: 1px solid var(--line); }
+.uls-pop__item:active { background: var(--bg-card-2); }
+.uls-pop__item--danger { color: var(--error); }
 
 /* 批量弹窗：涉及企业名单 */
 .uls-picklist {

@@ -54,6 +54,20 @@
   /* 多选批量状态（文件级：批量弹窗与 mount 共享）+ 当前 tab */
   var _multi = false, _sel = {}, _rerender = null, _tab = "active";
 
+  /* 批量状态气泡（更多 → 暂停合作 / 终止合作；自按钮位置向上弹出） */
+  var _pop = null;
+  function closeStatusPop() {
+    if (!_pop) return;
+    var p = _pop; _pop = null;
+    p.classList.remove("show");
+    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 180);
+  }
+  document.addEventListener("click", function (e) {
+    if (!_pop) return;
+    if (e.target && (e.target.closest(".uls-pop") || e.target.closest("[data-more]"))) return;
+    closeStatusPop();
+  });
+
   var STATE_VARIANTS = {
     admin: {
       label: "省级总代 · 管理员",
@@ -153,65 +167,44 @@
       }).join("") + "</div></section>";
   }
 
-  /* ---------- 待审批申请卡（紧凑名片：摘要 + 快捷操作，点击主体进详情） ---------- */
+  /* ---------- 待审批申请卡（紧凑名片：摘要 + 右下角文字入口，点击主体进详情） ---------- */
   function pendingCard(a, canReview) {
-    var acts = (!canReview) ? "" :
-      '<div class="uls-tile__ft"><button class="btn btn-ghost btn-sm" data-act="rej" data-id="' + ui.esc(a.id) + '">驳回</button>' +
-      '<button class="btn btn-primary btn-sm" data-act="pass" data-id="' + ui.esc(a.id) + '">通过</button></div>';
+    var go = canReview ? "去审批" : "点击查看";
     return '<div class="uls-tile" data-open="' + ui.esc(a.id) + '">' +
       '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(a.name) + '</span>' +
       '<span class="uh-badge uh-badge--info">待审批</span></div>' +
       '<div class="uls-tile__sum"><span>申请比例 <b>' + Math.round(a.ratio * 100) + '%</b> · 提交 <b>' + ui.esc(a.submittedAt || "—") + '</b></span></div>' +
-      acts + '</div>';
+      '<div class="uls-tile__go"><span class="uls-cardgo">' + go + '&gt;</span></div></div>';
   }
 
-  /* 生效中卡协议操作按钮（状态化） */
-  function agBtn(p, canManage) {
-    if (!canManage) return "";
-    var st = (p.agreement && p.agreement.state) || "signed";
-    if (st === "signed") {
-      return '<button class="btn btn-ghost btn-sm" data-act="view-ag" data-id="' + ui.esc(p.id) + '">查看协议</button>';
-    }
-    return '<button class="btn btn-ghost btn-sm" data-act="resend" data-id="' + ui.esc(p.id) + '">重发协议</button>';
-  }
-
-  /* ---------- 生效中合作卡（紧凑名片；含已暂停态；多选模式显示勾选态、隐藏单卡操作） ---------- */
+  /* ---------- 生效中合作卡（紧凑名片；含已暂停态；多选模式：不留空圈、隐藏卡内入口与“生效中”胶囊） ---------- */
   function activeCard(p, canManage, selOn, isSel) {
     var suspended = p.status === "suspended";
     var st = (p.agreement && p.agreement.state) || "signed";
     var stateBadge = suspended
       ? '<span class="uh-badge uh-badge--wait">已暂停</span>'
-      : '<span class="uh-badge uh-badge--ok">生效中</span>';
+      : (selOn ? "" : '<span class="uh-badge uh-badge--ok">生效中</span>');
     var agBadge = (selOn || suspended) ? "" :
       '<span class="uh-badge uh-badge--' + (AG_STATE[st] ? AG_STATE[st].cls : "ok") + '">' + (AG_STATE[st] ? AG_STATE[st].t : "已签署") + '</span>';
-    var acts = "";
-    if (!selOn && canManage) {
-      acts = '<div class="uls-tile__ft">';
-      if (suspended) {
-        acts += '<button class="btn btn-ghost btn-sm" data-act="view-ag" data-id="' + ui.esc(p.id) + '">查看协议</button>' +
-          '<button class="btn btn-primary btn-sm" data-act="resume" data-id="' + ui.esc(p.id) + '">恢复合作</button>';
-      } else {
-        acts += '<button class="btn btn-ghost btn-sm" data-act="ratio" data-id="' + ui.esc(p.id) + '">约定比例</button>' +
-          agBtn(p, canManage);
-      }
-      acts += '</div>';
-    }
+    var go = selOn ? "" : '<div class="uls-tile__go"><span class="uls-cardgo">去查看&gt;</span></div>';
     var na = selOn && suspended;
     return '<div class="uls-tile' + (selOn ? " uls-tile--multi" : "") + (isSel ? " uls-tile--sel" : "") + (na ? " uls-tile--na" : "") + '" data-open="' + ui.esc(p.id) + '">' +
-      (selOn ? (na ? '<span class="uls-chk uls-chk--na"></span>' : '<span class="uls-chk' + (isSel ? " on" : "") + '">' + ui.icon("check", 12) + '</span>') : "") +
       '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(p.name) + '</span>' +
+      /* 仅选中态显示勾选标记；未选中/不可选不留空圈 */
+      (selOn && isSel ? '<span class="uls-chk">' + ui.icon("check", 12) + '</span>' : "") +
       stateBadge + agBadge + '</div>' +
       '<div class="uls-tile__sum"><span>约定比例 <b>' + Math.round(p.ratioToSub * 100) + '%</b> · 合作自 <b>' + ui.esc(p.since) + '</b></span></div>' +
-      acts + '</div>';
+      go + '</div>';
   }
 
-  /* ---------- 已驳回申请卡（紧凑名片） ---------- */
+  /* ---------- 已驳回申请卡（紧凑名片：摘要 + 右下角文字入口） ---------- */
   function rejectedCard(a) {
     return '<div class="uls-tile uls-tile--dim" data-open="' + ui.esc(a.id) + '">' +
       '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(a.name) + '</span>' +
       '<span class="uh-badge uh-badge--bad">已驳回</span></div>' +
       '<div class="uls-tile__sum"><span>申请比例 <b>' + Math.round(a.ratio * 100) + '%</b> · 处理 <b>' + ui.esc(a.handledAt || a.submittedAt || "—") + '</b></span></div>' +
-      '<div class="uls-tile__reason">' + ui.esc(a.rejectReason || "未说明原因") + '</div></div>';
+      '<div class="uls-tile__reason">' + ui.esc(a.rejectReason || "未说明原因") + '</div>' +
+      '<div class="uls-tile__go"><span class="uls-cardgo">点击查看&gt;</span></div></div>';
   }
 
   /* ---------- 详情弹窗：合作申请（待审批 / 已驳回） ---------- */
@@ -541,6 +534,40 @@
     });
   }
 
+  /* ---------- 批量弹窗：统一暂停 / 终止合作（多选企业 · “更多”气泡入口） ---------- */
+  function batchStatusSheet(list, to, Uni) {
+    var M = {
+      suspended: { title: "批量暂停合作？", desc: "将统一暂停所选企业的分润结算与对账，仅保留查看权限。恢复前需双方确认问题已解决。", ok: "确认暂停", act: "suspended", doneMsg: "暂停" },
+      terminated: { title: "批量终止合作？", desc: "将统一解除所选企业的合作关系，不再产生分润结算，档案转入归档只读。该操作不可撤销。", ok: "确认终止", act: "terminated", doneMsg: "终止" }
+    }[to];
+    if (!M) return;
+    Uni.sheet({
+      title: M.title, danger: to === "terminated",
+      body:
+        '<div class="uh-sheetkv"><span class="k">涉及企业</span><span class="v">' + list.length + " 家</span></div>" +
+        '<div class="uls-picklist">' + list.map(function (p) {
+          return '<span class="uls-pickitem">' + ui.esc(p.name) + '</span>';
+        }).join("") + '</div>' +
+        '<div style="height:8px"></div>' +
+        '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>' + M.desc + '</span></div>' +
+        '<div class="field" style="margin-top:12px"><label class="field-label">操作原因（必填 · 留痕）</label>' +
+        '<textarea class="textarea" id="su-bstatus-reason" placeholder="说明原因，将留痕在操作记录中"></textarea></div>',
+      footer: [{ t: "取消", kind: "ghost" },
+      { t: M.ok, kind: to === "terminated" ? "danger" : "primary", onClick: function (ov) {
+          var v = (ov.querySelector("#su-bstatus-reason") ? ov.querySelector("#su-bstatus-reason").value : "").trim();
+          if (!v) { Uni.toast("请填写操作原因"); return false; }
+          var done = 0, firstErr = "";
+          list.forEach(function (p) {
+            var r = store.act("sub/setStatus", { id: p.id, to: M.act, reason: v });
+            if (r.ok) done++; else if (!firstErr) firstErr = r.reason || "操作失败";
+          });
+          if (done) Uni.toast("已" + M.doneMsg + " " + done + " 家合作", "ok");
+          else if (firstErr) Uni.toast(firstErr);
+          if (done) { _multi = false; _sel = {}; if (_rerender) _rerender(); }
+      } }]
+    });
+  }
+
   /* 唯一渲染路径（tab + 多选状态由闭包维护，操作后重渲染） */
   function mount(el, ctx, Uni) {
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
@@ -552,8 +579,40 @@
 
     _multi = false; _sel = {}; _tab = "active";
 
+    /* “更多”气泡：自“更多”按钮位置向上弹出（单选操作：暂停合作 / 终止合作） */
+    function statusPopFor(btn) {
+      if (_pop) { closeStatusPop(); return; } /* 再次点击“更多”关闭 */
+      var pop = document.createElement("div");
+      pop.className = "uls-pop";
+      pop.innerHTML =
+        '<div class="uls-pop__arrow"></div>' +
+        '<button type="button" class="uls-pop__item" data-popact="suspended">暂停合作</button>' +
+        '<button type="button" class="uls-pop__item uls-pop__item--danger" data-popact="terminated">终止合作</button>';
+      document.body.appendChild(pop);
+      var r = btn.getBoundingClientRect();
+      var pw = pop.offsetWidth;
+      var left = Math.max(10, Math.min(r.right - pw, window.innerWidth - pw - 10));
+      var top = Math.max(8, r.top - pop.offsetHeight - 10);
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+      var ar = pop.querySelector(".uls-pop__arrow");
+      if (ar) ar.style.left = Math.max(10, Math.min(pw - 22, r.left + r.width / 2 - left - 6)) + "px";
+      _pop = pop;
+      requestAnimationFrame(function () { pop.classList.add("show"); });
+      pop.querySelectorAll("[data-popact]").forEach(function (it) {
+        it.addEventListener("click", function () {
+          var to = it.getAttribute("data-popact");
+          closeStatusPop();
+          var pick = V.data(ctx).active.filter(function (p) { return _sel[p.id] && p.status !== "suspended"; });
+          if (!pick.length) { Uni.toast("请先选择企业"); return; }
+          batchStatusSheet(pick, to, Uni);
+        });
+      });
+    }
+
     function render() {
       var vm = V.data(ctx);
+      closeStatusPop();
 
       var sec = function (k, head, grid) {
         return '<section class="uh-sec">' + head + '<div class="uls-grid">' + grid + '</div></section>';
@@ -600,22 +659,31 @@
         body += sec("active", multiHead, activeHtml);
       }
 
-      /* 多选批量操作栏（固定底部，仅生效中 tab） */
+      /* 批量操作状态页顶栏（替换原页头：隐藏原 bar，左上角为文字“返回”） */
+      var batchHead = _multi ? '<div class="uls-batchhead">' +
+        '<button type="button" class="uls-batchhead__back" data-batchback>返回</button>' +
+        '<span class="uls-batchhead__title">批量操作</span></div>' : "";
+
+      /* 多选批量操作栏（固定底部，仅生效中 tab；“更多”位于批量操作按钮左侧） */
       var batchBar = (_multi && _tab === "active") ? '<div class="uls-batchbar' + (selCount ? "" : " is-empty") + '">' +
         '<span class="uls-batchbar__cnt">已选 ' + selCount + " 家</span>" +
         '<div class="uls-batchbar__btns">' +
+        '<button class="btn btn-ghost btn-sm" data-more="1">更多</button>' +
         '<button class="btn btn-ghost btn-sm" data-batch="ratio">批量配置比例</button>' +
         '<button class="btn btn-primary btn-sm" data-batch="resend">批量重发协议</button>' +
         '</div></div>' : "";
 
       el.innerHTML =
+        batchHead +
         (ro ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
           '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
           '<span class="lb-s">' + ui.esc(V.lockedNote) + '</span></div></div></section>' : "") +
-        tabsBar(vm, isSub) +
+        (_multi ? "" : tabsBar(vm, isSub)) +
         (vm.note ? '<section class="uh-sec"><div class="uh-readnote">' + ui.icon("info", 15) + '<span>' + ui.esc(vm.note) + '</span></div></section>' : "") +
         body +
         batchBar;
+      /* 批量操作状态：隐藏静态页头（顶部的 bar 不显示） */
+      document.body.classList.toggle("uls-batch", _multi);
 
       var apps = {};
       mergedSubApps(ctx.s).forEach(function (a) { apps[a.id] = a; });
@@ -632,36 +700,14 @@
         });
       });
 
-      el.querySelectorAll('[data-act="pass"]').forEach(function (n) {
-        n.addEventListener("click", function () { var a = apps[n.getAttribute("data-id")]; if (a) passSheet(a, Uni); });
-      });
-      el.querySelectorAll('[data-act="rej"]').forEach(function (n) {
-        n.addEventListener("click", function () { var a = apps[n.getAttribute("data-id")]; if (a) rejectSheet(a, Uni); });
-      });
-      el.querySelectorAll('[data-act="ratio"]').forEach(function (n) {
-        n.addEventListener("click", function () { var p = subs[n.getAttribute("data-id")]; if (p) ratioSheet(p, Uni); });
-      });
-      el.querySelectorAll('[data-act="resend"]').forEach(function (n) {
-        n.addEventListener("click", function () {
-          var p = subs[n.getAttribute("data-id")]; if (p) resendDialog(p, Uni);
-        });
-      });
-      el.querySelectorAll('[data-act="view-ag"]').forEach(function (n) {
-        n.addEventListener("click", function () {
-          var p = subs[n.getAttribute("data-id")]; if (p) agreementViewSheet(p, Uni);
-        });
-      });
-      el.querySelectorAll('[data-act="resume"]').forEach(function (n) {
-        n.addEventListener("click", function () {
-          var p = subs[n.getAttribute("data-id")]; if (p) statusDialog(p, "active", Uni);
-        });
-      });
       /* 详情弹窗内合作管理操作：绑定在 Uni.sheet 容器内（见 subDetailSheet），此处仅保留 data-open 卡片主体绑定 */
       el.querySelectorAll("[data-open]").forEach(function (n) {
         n.addEventListener("click", function (e) {
           if (e.target.closest("[data-act]")) return;
           var id = n.getAttribute("data-open");
           if (_multi && n.classList.contains("uls-tile--multi")) {
+            /* 已暂停企业不可批量选择：避免“未选中却计入已选”的状态错位 */
+            if (n.classList.contains("uls-tile--na")) { Uni.toast("该企业已暂停合作，暂不可批量选择"); return; }
             if (_sel[id]) delete _sel[id]; else _sel[id] = true;
             render();
             return;
@@ -681,6 +727,19 @@
           else { _multi = false; _sel = {}; }
           render();
         });
+      });
+
+      /* 批量状态页：文字“返回”退出批量操作状态 */
+      el.querySelectorAll("[data-batchback]").forEach(function (n) {
+        n.addEventListener("click", function () {
+          _multi = false; _sel = {};
+          render();
+        });
+      });
+
+      /* “更多”按钮：自按钮位置向上弹出气泡（暂停合作 / 终止合作） */
+      el.querySelectorAll("[data-more]").forEach(function (n) {
+        n.addEventListener("click", function () { statusPopFor(n); });
       });
 
       /* 批量操作（底部栏） */
