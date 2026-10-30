@@ -20,7 +20,6 @@
     "ledger.html":         { icon: "history", label: "经营台账" },
     "subs.html":           { icon: "building", label: "二级合作" },
     "team.html":           { icon: "users",   label: "团队管理" },
-    "share-config.html":   { icon: "badge",   label: "约定比例" },
     "agreement.html":      { icon: "file",    label: "合作协议" },
     "reconcile-sub.html":  { icon: "receipt", label: "收款确认" },
     "statement.html":      { icon: "file",    label: "月度对账单" }
@@ -69,7 +68,7 @@
         };
       },
       entries: ["invite-code.html", "invite-records.html", "invite-stats.html", "reconcile.html",
-        "ledger.html", "subs.html", "team.html", "share-config.html", "statement.html"],
+        "ledger.html", "subs.html", "team.html", "statement.html"],
       perms: { invite: true, createSub: true },
       badges: {},
       empty: { feed: { title: "暂无动态", desc: "合作申请、对账与付款进展将出现在这里" } },
