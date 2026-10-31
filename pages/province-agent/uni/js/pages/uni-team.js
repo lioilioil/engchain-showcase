@@ -36,6 +36,27 @@
     try { localStorage.setItem(KW_KEY, k); } catch (e) {}
   }
 
+  /* 账号头像池（复用 app 头像池资源；路径相对本页 pages/province-agent/uni/pages/） */
+  var AV_BASE = "../../../../assets/me/avatars/";
+  var AV_POOL = ["ox-01.jpg", "ox-02.jpg", "ox-03.jpg", "ox-04.jpg", "ox-05.jpg",
+    "horse-01.jpg", "horse-02.jpg", "horse-03.jpg", "horse-04.jpg", "horse-05.jpg",
+    "cat-01.jpg", "cat-02.jpg", "cat-03.jpg", "cat-04.jpg", "cat-05.jpg",
+    "dog-01.jpg", "dog-02.jpg", "dog-03.jpg", "dog-04.jpg", "dog-05.jpg"];
+  /* 按姓名稳定分配头像（同一成员每次一致） */
+  function pickAvatar(name) {
+    var n = 0;
+    for (var i = 0; i < name.length; i++) n = (n * 31 + name.charCodeAt(i)) % 997;
+    return AV_BASE + AV_POOL[n % AV_POOL.length];
+  }
+  /* 头像渲染：账号头像图优先，无头像回退首字母 */
+  function avatarHtml(m, lg) {
+    var cls = "uh-avatar tm-avatar" + (lg ? " tm-avatar--lg" : "");
+    if (m.avatar && m.avatar.indexOf(".") > -1) {
+      return '<img class="' + cls + ' tm-avatar--img" src="' + ui.esc(m.avatar) + '" alt="" role="img">';
+    }
+    return '<div class="' + cls + " " + m.roleAv + '"><span class="tm-initial">' + ui.esc(m.initial) + '</span></div>';
+  }
+
   /* 名下线索统计（员工归账口径：只数本人 owner 线索） */
   function ownedStats(ctx, name) {
     var leads = ctx.s.leads || {};
@@ -56,7 +77,7 @@
       "企业主体，天然持有经营终审权；可委托、更换或撤销管理员，不可被停用。" },
     admin: { label: "管理员", badge: "uh-badge--info", av: "tm-avatar--admin", note:
       "由法定代表人委托的经营负责人：可添加与停用成员、审批合作、配置比例与月度平账。" },
-    staff: { label: "员工", badge: "uh-badge--mute", av: "tm-avatar--staff", note:
+    staff: { label: "企业成员", badge: "uh-badge--mute", av: "tm-avatar--staff", note:
       "仅可管理本人渠道码与本人线索；付款登记、合作审批、比例配置、协议与月度平账由管理员或法定代表人操作。" }
   };
 
@@ -77,6 +98,7 @@
       name: m.name, isLegal: !!m.isLegal, isAdmin: isAdmin, disabled: !!disabled,
       roleKey: roleKey, roleLabel: meta.label, roleBadge: meta.badge, roleAv: meta.av,
       initial: (m.name || "?").slice(0, 1),
+      avatar: m.avatar || null,
       rows: rows
     };
   }
@@ -98,7 +120,8 @@
     var list = base.concat(ov.added.map(function (a) {
       return {
         name: a.name, role: "staff", title: a.title || "渠道专员",
-        phone: a.phone || "—", since: a.since, leads: 0, isLegal: false, channel: ""
+        phone: a.phone || "—", since: a.since, leads: 0, isLegal: false, channel: "",
+        avatar: pickAvatar(a.name)
       };
     }));
     var legalName = null;
@@ -156,7 +179,7 @@
       lockedNote: "团队信息已锁定，仅可查看"
     },
     staff: {
-      label: "省级总代 · 员工",
+      label: "省级总代 · 企业成员",
       manage: false,
       data: function (ctx) { return membersModel(ctx); },
       lockedNote: "团队信息已锁定，仅可查看"
@@ -174,54 +197,34 @@
   var _el = null, _ctx = null, _Uni = null;
   function rerender() { if (_el && _ctx && _Uni) mount(_el, _ctx, _Uni); }
 
-  /* ---------- 管理员身份栏（含委托状态与更换入口） ---------- */
-  function ownerCardHtml(owner, ctx, model, manage, legalOp) {
+  /* ---------- 法定代表人身份卡（头像 + 姓名 + 企业身份标签行） ---------- */
+  function ownerCardHtml(owner, ctx) {
     if (!owner) return "";
     var isMe = ctx.identity === "sub_admin" || (ctx.identity === "admin" && owner.isLegal) || (ctx.identity === "staff" && owner.name === ctx.staffName) || (ctx.identity === "sub_staff" && owner.name === ctx.staffName);
-    var sub = (owner.rows && owner.rows[0] ? owner.rows[0].v : "") + " · " + (owner.rows[2] ? owner.rows[2].v : "");
-    var admin = findMember(model, model.adminName);
-    var delegateTxt = admin
-      ? (admin.isLegal
-          ? "法定代表人兼任（当前）"
-          : ui.esc(admin.name) + " · 管理员（法定代表人委托）")
-      : "未设置";
-    var chgBtn = legalOp
-      ? '<button class="btn btn-ghost btn-sm tm-delegate__btn" data-act="change-admin">' +
-        ui.icon("shield", 14) + '<span>更换管理员</span></button>'
-      : "";
     return '<section class="uh-sec"><div class="card tm-owner">' +
-      '<div class="uh-avatar tm-avatar tm-avatar--legal">' + ui.icon("crown", 20) + '</div>' +
+      avatarHtml(owner, false) +
       '<div class="tm-owner__main">' +
-      '<div class="tm-owner__nm">' + ui.esc(owner.name) + (isMe ? '<span class="mc-self">（我）</span>' : "") +
-      ' <span class="uh-badge uh-badge--gold">法定代表人</span></div>' +
-      '<div class="tm-owner__sub">' + ui.esc(sub) + '</div>' +
-      '<div class="tm-owner__delegate' + (admin && !admin.isLegal ? " tm-owner__delegate--link" : "") + '"' +
-      (admin && !admin.isLegal ? ' data-act="open-member" data-name="' + ui.esc(admin.name) + '"' : "") + '>' +
-      '<span class="tm-delegate__k">' + ui.icon("shield", 13) + '管理员委托</span>' +
-      '<span class="tm-delegate__v">' + delegateTxt +
-      (admin && !admin.isLegal ? ui.icon("chev", 13) : "") + '</span>' +
+      '<div class="tm-owner__nm">' + ui.esc(owner.name) + (isMe ? '<span class="mc-self">（我）</span>' : "") + '</div>' +
+      '<div class="tm-owner__role"><span class="uh-badge ' + owner.roleBadge + '">' + ui.esc(owner.roleLabel) + '</span></div>' +
       '</div>' +
-      '</div>' +
-      chgBtn +
       '</div></section>';
   }
 
-  /* ---------- 成员摘要卡（点击 → 详情弹窗；在职/停用同模板） ---------- */
+  /* ---------- 成员摘要卡（账号头像 + 姓名行 + 企业身份标签行） ---------- */
   function memberCardHtml(m, ctx) {
     var isMe = m.name === loginName(ctx);
-    var av = m.isLegal
-      ? ui.icon("crown", 20)
-      : (m.isAdmin
-          ? ui.icon("shield", 18)
-          : '<span class="tm-initial">' + ui.esc(m.initial) + '</span>');
     return '<section class="card tm-card' + (m.disabled ? " tm-off" : "") + '" data-act="open-member" data-name="' + ui.esc(m.name) + '" role="button" tabindex="0">' +
-      '<div class="uh-avatar tm-avatar ' + m.roleAv + '">' + av + '</div>' +
-      '<div class="tm-card__nm">' + ui.esc(m.name) + (isMe ? '<span class="mc-self">（我）</span>' : "") + '</div>' +
-      '<div class="tm-card__tags">' +
-      '<span class="uh-badge ' + m.roleBadge + '">' + ui.esc(m.roleLabel) + '</span>' +
+      avatarHtml(m, false) +
+      '<div class="tm-card__main">' +
+      '<div class="tm-card__row1">' +
+      '<span class="tm-card__nm">' + ui.esc(m.name) + (isMe ? '<span class="mc-self">（我）</span>' : "") + '</span>' +
+      '<span class="tm-card__tags">' +
       (m.disabled ? '<span class="uh-badge uh-badge--bad">已停用</span>' : '<span class="uh-badge uh-badge--ok">在职</span>') +
+      '</span>' +
+      '<span class="tm-card__chev">' + ui.icon("chev", 16) + '</span>' +
       '</div>' +
-      '<div class="tm-card__chev">' + ui.icon("chev", 16) + '</div>' +
+      '<div class="tm-card__role"><span class="uh-badge ' + m.roleBadge + '">' + ui.esc(m.roleLabel) + '</span></div>' +
+      '</div>' +
       '</section>';
   }
 
@@ -233,15 +236,12 @@
     var brief = (m.rows[0] ? m.rows[0].v : "") + " · " + (m.rows[2] ? m.rows[2].v : "");
     var head =
       '<div class="tm-detail__head">' +
-      '<div class="uh-avatar tm-avatar tm-avatar--lg ' + m.roleAv + '">' +
-      (m.isLegal ? ui.icon("crown", 24) : (m.isAdmin ? ui.icon("shield", 22) : '<span class="tm-initial">' + ui.esc(m.initial) + '</span>')) +
-      '</div>' +
+      avatarHtml(m, true) +
       '<div class="tm-detail__id">' +
       '<div class="tm-detail__nm">' + ui.esc(m.name) +
-      '<span class="uh-badge ' + m.roleBadge + '">' + ui.esc(m.roleLabel) + '</span>' +
       (m.disabled ? '<span class="uh-badge uh-badge--bad">已停用</span>' : '<span class="uh-badge uh-badge--ok">在职</span>') +
       '</div>' +
-      '<div class="tm-detail__sub">' + ui.esc(brief) + '</div>' +
+      '<div class="tm-detail__sub"><span class="uh-badge ' + m.roleBadge + '">' + ui.esc(m.roleLabel) + '</span> ' + ui.esc(brief) + '</div>' +
       '</div></div>';
     var note =
       '<div class="uh-clause"><div class="no">权限说明</div><div class="c">' + ui.esc(ROLE_META[m.roleKey].note) + '</div></div>';
@@ -309,7 +309,7 @@
       title: "设为管理员",
       body:
         '<div class="uh-clause"><div class="c">将 <b>' + ui.esc(name) + '</b> 设为管理员后，其将获得团队管理与经营终审权限。' +
-        '当前管理员为 ' + ui.esc(curTxt) + '，确认后自动卸任为员工。</div></div>',
+        '当前管理员为 ' + ui.esc(curTxt) + '，确认后自动卸任为企业成员。</div></div>',
       footer: [
         { t: "取消", kind: "ghost", onClick: function (ov) { ov.close(); } },
         {
@@ -347,7 +347,7 @@
       '<div class="uh-eyebrow">选择新的管理员（在职成员）</div>' +
       '<div class="tm-picklist">' + rows + '</div>' +
       '<div class="uh-readnote">' + ui.icon("info", 15) +
-      '<span>确认后原管理员自动卸任为员工；法定代表人兼任时由新管理员接任。</span></div>';
+      '<span>确认后原管理员自动卸任为企业成员；法定代表人兼任时由新管理员接任。</span></div>';
     var sh = Uni.sheet({
       title: "更换管理员委托",
       body: body,
@@ -383,7 +383,7 @@
     Uni.center({
       title: "撤销管理员委托",
       body:
-        '<div class="uh-clause"><div class="c">撤销后 <b>' + ui.esc(name) + '</b> 回到员工身份，' +
+        '<div class="uh-clause"><div class="c">撤销后 <b>' + ui.esc(name) + '</b> 回到企业成员身份，' +
         '经营终审与团队管理权回归法定代表人 <b>' + ui.esc(model.legalName || "—") + '</b>。</div></div>',
       footer: [
         { t: "取消", kind: "ghost", onClick: function (ov) { ov.close(); } },
@@ -426,7 +426,7 @@
     h += '<section class="uh-sec"><div class="card">' +
       '<div class="uh-finhead" style="margin-bottom:4px"><span class="uh-eyebrow">成员管理说明</span></div>' +
       '<div class="uh-clause"><div class="c">法定代表人可委托一名在职成员为管理员（经营终审），并可随时更换或撤销委托；管理员可添加与停用成员。</div>' +
-      '<div class="c">员工仅可管理本人渠道码与本人线索；付款登记、合作审批、比例配置、协议与月度平账仅管理员或法定代表人可操作。</div>' +
+      '<div class="c">企业成员仅可管理本人渠道码与本人线索；付款登记、合作审批、比例配置、协议与月度平账仅管理员或法定代表人可操作。</div>' +
       '<div class="c">停用成员后，其名下渠道码与线索冻结、不计入团队业绩，启用后恢复。</div></div>' +
       (manage ? '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>团队成员上限 ' + TEAM_LIMIT + ' 人，成员新增后自动持久保存。</span></div>' : '') +
       '</div></section>';
@@ -448,18 +448,44 @@
         '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
         '<span class="lb-s">' + ui.esc(_V.lockedNote) + '</span></div></div></section>';
     }
-    html += ownerCardHtml(owner, ctx, model, manage, legalOp);
+    html += ownerCardHtml(owner, ctx);
 
     html += '<section class="uh-sec"><div class="tm-tools">' +
       '<div class="tm-search">' + ui.icon("search", 16) +
       '<input id="tm-search-input" placeholder="搜索成员姓名 / 电话"></div>' +
-      (manage ? '<button class="btn btn-primary btn-sm tm-add" data-act="add">' + ui.icon("plus", 16) + '添加成员</button>' : "") +
       '</div></section>';
 
     html += '<div id="tm-list">' + listHtml(model, ctx, manage) + '</div>';
 
     el.innerHTML = html;
     bindEvents(el, ctx, Uni, model, legalOp);
+    initCta(ctx, manage, legalOp);
+  }
+
+  /* ---------- 底部固定悬浮操作条（液态玻璃） ---------- */
+  function initCta(ctx, manage, legalOp) {
+    var bar = document.querySelector(".tm-cta");
+    if (!bar) return;
+    var add = document.getElementById("tm-cta-add");
+    var chg = document.getElementById("tm-cta-admin");
+    var showAdd = !!manage, showChg = !!legalOp;
+    if (add) {
+      if (!add.getAttribute("data-ic")) {
+        add.setAttribute("data-ic", "1");
+        add.insertAdjacentHTML("afterbegin", ui.icon("user-plus", 16));
+      }
+      add.style.display = showAdd ? "" : "none";
+      add.onclick = showAdd ? function () { openAddSheet(ctx, Uni); } : null;
+    }
+    if (chg) {
+      if (!chg.getAttribute("data-ic")) {
+        chg.setAttribute("data-ic", "1");
+        chg.insertAdjacentHTML("afterbegin", ui.icon("shield", 16));
+      }
+      chg.style.display = showChg ? "" : "none";
+      chg.onclick = showChg ? function () { openChangeAdmin(ctx, Uni); } : null;
+    }
+    bar.style.display = (showAdd || showChg) ? "" : "none";
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -473,10 +499,6 @@
         if (l) { l.innerHTML = listHtml(membersModel(ctx), ctx, canManage(ctx)); bindListEvents(l, ctx, Uni); }
       });
     }
-    var addBtn = el.querySelector("[data-act='add']");
-    if (addBtn) addBtn.addEventListener("click", function () { openAddSheet(ctx, Uni); });
-    var chgBtn = el.querySelector("[data-act='change-admin']");
-    if (chgBtn) chgBtn.addEventListener("click", function () { openChangeAdmin(ctx, Uni); });
     bindListEvents(el, ctx, Uni);
   }
   function bindListEvents(root, ctx, Uni) {
@@ -500,7 +522,7 @@
         '<input class="input" id="tm-mobile" type="tel" inputmode="numeric" maxlength="11" placeholder="输入 11 位手机号"></div>' +
         '<div class="field"><label class="field-label">职务</label>' +
         '<input class="input" id="tm-title" maxlength="12" placeholder="如：渠道专员"></div>' +
-        '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>新增成员默认为员工角色：仅可管理本人渠道与线索，经营终审权由法定代表人及其委托的管理员持有。</span></div>',
+        '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>新增成员默认为企业成员角色：仅可管理本人渠道与线索，经营终审权由法定代表人及其委托的管理员持有。</span></div>',
       footer: [
         { t: "取消", kind: "ghost", onClick: function (sh) { sh.close(); } },
         {

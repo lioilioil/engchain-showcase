@@ -10,11 +10,12 @@
   var store = window.V3.store, ui = window.V3.ui;
 
   /* ---------- P2-1 渠道码统计联动：注册 → 入驻 → 消费 → 线别归属 ----------
-     线别判定按渠道码 ownerType：省代侧（CH-P 招商 / CH-E 员工）→ 自营线；
-     二级侧（CH-S）→ 二级线。演示数据按 owner 名对线索归因。 */
+     线别判定按渠道码 ownerType：省代侧（CH-P 管理员 / CH-E 员工）→ 自营线；
+     二级侧（CH-S）→ 二级线。演示数据按 owner 名对线索归因。
+     20261030：招商码下线，省代侧仅 direct 桶（管理员/员工码同桶，按 ownerName 归因）。 */
   function lineStatsOf(s) {
     var out = { self: [], sub: [] };
-    ["direct", "agent"].forEach(function (ch) {
+    ["direct"].forEach(function (ch) {
       (s.channels[ch] || []).forEach(function (c) {
         if (c.status !== "active") return;
         var leads = (s.leads[ch] || []).filter(function (l) { return l.owner === c.ownerName; });
@@ -77,8 +78,8 @@
       label: "省级总代 · 员工",
       data: function (ctx) {
         var s = ctx.s, my = ctx.staffName;
-        var mine = { direct: [], agent: [] };
-        ["direct", "agent"].forEach(function (ch) {
+        var mine = { direct: [] };
+        ["direct"].forEach(function (ch) {
           (s.leads[ch] || []).forEach(function (l) { if (l.owner === my) mine[ch].push(l); });
         });
         var f = store.funnelOf(mine);
@@ -174,7 +175,7 @@
   }
 
   /* ---------- 消费记录域（获客转化 · 逐笔消费记录 + 运营统计） ---------- */
-  var CHANNEL_LABEL = { direct: "直接合作（CH-P/CH-E）", agent: "招商渠道（AG-）", school: "本企业码（CH-S）" };
+  var CHANNEL_LABEL = { direct: "直接合作（CH-P/CH-E）", school: "本企业码（CH-S）" };
   function channelLabelOf(ch) { return CHANNEL_LABEL[ch] || ch || "—"; }
 
   /* 记录行：脱敏展示（姓名姓* / 电话前3后4 / 企业首字**），事项按主体系口径标合格 */
@@ -276,7 +277,7 @@
         '<div class="uh-finhead"><span class="uh-eyebrow">渠道码线别归属</span>' +
         '<span class="uh-badge uh-badge--mute">注册 → 入驻 → 消费 → 线别</span></div>' +
         '<div class="uc-fnl">' + lr.join("") + "</div>" +
-        '<div class="uh-note">线别判定：省代侧渠道码（招商/员工）→ 自营线；二级渠道码 → 二级线。演示口径，与主体系渠道归属字段同源。</div>' +
+        '<div class="uh-note">线别判定：省代侧渠道码（管理员/员工）→ 自营线；二级渠道码 → 二级线。演示口径，与主体系渠道归属字段同源。</div>' +
         "</section>";
     }
     /* 段2 焦点金额卡 */

@@ -125,7 +125,7 @@
     ".doc-eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--text-3);}",
     ".doc-head h1{font-size:24px;font-weight:700;letter-spacing:-.01em;margin:8px 0 10px;}",
     ".doc-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px;color:var(--text-3);margin-top:10px;}",
-    ".doc-bignum{font-size:34px;font-weight:700;margin-top:14px;font-variant-numeric:tabular-nums;}",
+    ".doc-bignum{font-size:32px;font-weight:800;margin-top:14px;font-variant-numeric:tabular-nums;}",
     ".sec{margin-top:26px;}",
     ".sec-t{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin:0 0 10px;}",
     ".sec-t::before{content:'';width:3px;height:13px;background:var(--primary);border-radius:1px;}",
@@ -384,7 +384,7 @@
     var body =
       '<div class="uh-finhead" style="margin:2px 0 0"><span class="uh-eyebrow">' + ui.esc(tl + " · " + h.month) + '</span>' +
       '<span class="uh-badge uh-badge--' + cls + '">' + (HIST_LB[h.state] || "") + '</span></div>' +
-      '<div class="uh-bignum" style="font-size:28px">' + ui.moneyD(h.amount) + '</div>' +
+      '<div class="uh-bignum">' + ui.moneyD(h.amount) + '</div>' +
       '<div class="uc-histnote uc-histnote--' + cls + '" style="margin-top:12px"><b>' + (HIST_LB[h.state] || "") + '</b> · ' + (HIST_NOTE[h.state] || "") + '</div>' +
       '<div class="uh-sechead" style="margin:18px 0 2px"><span class="lbl">账单信息</span></div>' +
       kv("出账日", ui.esc(h.issueAt || "—")) +

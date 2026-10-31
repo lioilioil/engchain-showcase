@@ -67,13 +67,22 @@
     if (variants[nid]) return variants[nid];
     var base = (IDENTITY_META[nid] && IDENTITY_META[nid].mode === "sub") ? (variants.sub_admin || variants.sub_owner) : (variants.admin || variants.boss);
     if (!base) return null;
-    if (identityReadonly(nid) && !base.readonly) {
-      var copy = JSON.parse(JSON.stringify(base));
+    /* 2026-10-30 权限审计修复：回退身份（staff/sub_staff/legal_rep/sub_legal 等
+       页内未定义变体者）一律强制只读——禁止复用管理员变体获得可操作权限
+       （曾实证 sub_staff 在对账中心页可见可操作按钮）。canAct/perms/readonly 三键同步锁死。
+       2026-10-31 批次八回归修复：改用浅拷贝——JSON 复制会丢失 data 等函数成员，
+       导致回退身份 V.data(ctx) 抛 TypeError、页面主体空白（reconcile 页实证）。 */
+    if (!base.readonly) {
+      var copy = {};
+      Object.keys(base).forEach(function (k) { copy[k] = base[k]; });
       copy.readonly = true;
+      if ("canAct" in copy) copy.canAct = false;
       var p = copy.perms || {};
       Object.keys(p).forEach(function (k) { p[k] = false; });
       copy.perms = p;
-      copy.lockedNote = "法定代表人角色为只读视图，可查看全部信息，不执行任何操作";
+      copy.lockedNote = (nid === "sub_legal" || nid === "legal_rep")
+        ? "法定代表人角色为只读视图，可查看全部信息，不执行任何操作"
+        : "当前角色仅可查看；确认、异议与登记等操作仅对应企业管理员可执行";
       return copy;
     }
     return base;
@@ -87,7 +96,7 @@
     var k = String(route);
     if (k.indexOf("#/") === 0) {
       k = k.slice(2);
-      if (k === "payments") k = "reconcile-sub"; /* 历史锚点：二级收款确认 */
+      if (k === "payments") k = "reconcile-sub"; /* 历史锚点：二级对账中心 */
     }
     if (/\.html$/.test(k)) k = k.slice(0, -5);
     return /^[a-z0-9-]+$/.test(k) ? k + ".html" : "home.html";
@@ -156,6 +165,28 @@
     /* 模式禁区（如对账中心仅省代）：保持 v2 语义回落工作台 */
     if (view.modes && ctx && view.modes.indexOf(ctx.mode) < 0) {
       global.location.replace("home.html");
+      return;
+    }
+    /* 2026-10-31 批次八回归修复：回退身份（页内无变体，stateVariantFor 强制
+       V.readonly=true）统一合并进 ctx.readonly——所有按 ctx.readonly 门控写操作
+       的页面（home/agreement/reconcile/invite-records/subs 等）对回退身份生效。
+       此前仅 legal_rep/sub_legal（IDENTITY_META readonly）受控，sub_staff 等
+       回退身份可看到管理按钮（agreement 页实证「拒签/阅读并签署」）。 */
+    var V = view.STATE_VARIANTS ? Uni.stateVariantFor(view.STATE_VARIANTS, ctx.identity) : null;
+    if (V && V.readonly) ctx.readonly = true;
+    /* 批次九 L10（修正）：骨架仅在该页 register 标 skeleton 且 URL 带 ?skel=1（模拟慢网验收开关）
+       时先渲染骨架并停留 ≥650ms 再渲染真实内容；正常访问直接渲染真实内容，
+       避免本地同步数据（无请求期）下每次刷新闪一帧骨架且无法感知/验收。
+       real 环境若有真实请求期，可将开关改为「数据未就绪」条件后复用同一骨架分支。 */
+    var skelOn = view.skeleton && /(?:[?&])skel=1(?:&|$)/.test(global.location.search);
+    if (skelOn) {
+      container.innerHTML = Uni.skeletonHtml(view.skeletonKind || "hero");
+      setTimeout(function () {
+        if (views[pageKey] !== view || !container) return; /* 跳转竞态保护 */
+        container.innerHTML = "";
+        view.mount(container, ctx, Uni);
+        paintChrome();
+      }, 650);
       return;
     }
     container.innerHTML = "";
@@ -385,6 +416,53 @@
     };
   }
 
+  /* ---------- 批次四：方案 A 明细核对持久化（DL v2，v1 惰性迁移） ---------- */
+  var DL_KEY = "engchain-uni-detail-v1";   /* key 不变：结构 v1(数组) → v2(对象化) 惰性迁移 */
+  function detailLoad() {
+    var o = {};
+    try { o = JSON.parse(global.localStorage.getItem(DL_KEY) || "{}"); } catch (e) { o = {}; }
+    if (!o || typeof o !== "object") return { v: 2 };
+    if (o.v === 2) return o;
+    /* v1 → v2：{ calcId: [detailId, …] } → { v:2, calcId: { detailId: {state,at,by} } } */
+    var out = { v: 2 };
+    Object.keys(o).forEach(function (cid) {
+      if (cid === "v") return;
+      var v = o[cid];
+      if (Array.isArray(v)) {
+        var rec = {};
+        v.forEach(function (id) { if (id && typeof id === "string") rec[id] = { state: "checked", at: null, by: null }; });
+        out[cid] = rec;
+      } else if (v && typeof v === "object") { out[cid] = v; } /* 兼容半迁移态 */
+    });
+    try { global.localStorage.setItem(DL_KEY, JSON.stringify(out)); } catch (e) {}
+    return out;
+  }
+  function detailSave(o) { try { global.localStorage.setItem(DL_KEY, JSON.stringify(o)); } catch (e) {} }
+  function detailStateGet(calcId) {
+    var o = detailLoad();
+    var rec = (o[calcId] && typeof o[calcId] === "object" && !Array.isArray(o[calcId])) ? o[calcId] : {};
+    return Object.keys(rec).map(function (id) {
+      var s = rec[id] && rec[id].state;
+      return { id: id, state: s === "confirmed" ? "confirmed" : "checked" };
+    });
+  }
+  function detailStateSet(calcId, detailId, state, identity) {
+    var o = detailLoad();
+    if (!o[calcId] || typeof o[calcId] !== "object" || Array.isArray(o[calcId])) o[calcId] = {};
+    if (state) o[calcId][detailId] = { state: state, at: new Date().toISOString(), by: identity || null };
+    else delete o[calcId][detailId];
+    detailSave(o);
+  }
+  function detailConfirmBill(calcId, identity) {
+    var o = detailLoad();
+    if (!o[calcId] || typeof o[calcId] !== "object" || Array.isArray(o[calcId])) o[calcId] = {};
+    var now = new Date().toISOString();
+    Object.keys(o[calcId]).forEach(function (id) {
+      if (o[calcId][id].state === "checked") o[calcId][id] = { state: "confirmed", at: now, by: identity || o[calcId][id].by };
+    });
+    detailSave(o);
+  }
+
   function switchIdentity(identity) {
     var nid = normalizeIdentity(identity);
     if (nid === "sub_admin" || nid === "sub_legal" || nid === "sub_staff") { switchScenario("sub-active"); return; }
@@ -495,8 +573,8 @@
   /* 金额联动全局定价单一数据源 MOCK.business（js/data.js）：认证费/入驻费/破冰期体验价
      与认证中心(auth-enterprise)、入驻申请(entry-form)同一口径，改价只改数据源
      rules：可选——传入"结算口径与时限说明"条款 HTML 时，与费用计算范围在同一卡片内
-     并列两栏展示（对账中心页使用）；不传时保持原单栏卡片（二级收款确认等页不变）。 */
-  function scopeCardHtml(rules) {
+     并列两栏展示（对账中心页使用）；不传时保持原单栏卡片（二级对账中心等页不变）。 */
+  function scopeBodyHtml() {
     var esc = global.V3.ui.esc;
     var B = (window.MOCK && window.MOCK.business) ? window.MOCK.business : {};
     var cert = (B.certification && typeof B.certification.enterprise === "number") ? B.certification.enterprise : 999;
@@ -512,9 +590,7 @@
     var certTxt = cert > 0 ? (money(cert) + "/年") : "¥0 · 免费审核制";
     var entTxt = "建筑 " + money(cEnt) + (cEnt > 0 ? "" : " 限免") + " / 中介 " + money(aEnt) + " 每次" +
       (breakin ? "（破冰期体验价）" : "");
-    var scopeHead = '<div class="uh-sechead" style="margin:2px 0 10px"><span class="lbl">费用计算范围</span></div>';
-    var scopeBody =
-      '<div class="uc-scope__row"><div class="k">计入合格消费</div><ul>' +
+    return '<div class="uc-scope__row"><div class="k">计入合格消费</div><ul>' +
       "<li>企业认证费 <b>" + certTxt + "</b> · 按支付时点计入</li>" +
       "<li>企业入驻费 <b>" + entTxt + "</b> · 按支付时点计入</li>" +
       "<li>供需详情解锁 <b>积分消费</b> · 按解锁金额计入</li>" +
@@ -526,6 +602,10 @@
       "<li>退款 / 售后订单（返佣追回）</li>" +
       "<li>免费项：个人实名认证 · 个人合伙人 · 省代入驻（¥0）</li>" +
       "</ul></div>";
+  }
+  function scopeCardHtml(rules) {
+    var scopeHead = '<div class="uh-sechead" style="margin:2px 0 10px"><span class="lbl">费用计算范围</span></div>';
+    var scopeBody = scopeBodyHtml();
     if (rules) {
       return '<section class="uh-sec"><div class="card uc-scope"><div class="uc-scope__cols">' +
         '<div class="uc-scope__col">' + scopeHead + scopeBody + "</div>" +
@@ -536,6 +616,81 @@
     }
     return '<section class="uh-sec"><div class="card uc-scope">' + scopeHead + scopeBody + "</div></section>";
   }
+  /* ---------- 批次七组件：P1-2 白话句 / P1-6 收口进度条 / P1-7 口径折叠卡 ---------- */
+  function plainNoteHtml(inner) {
+    return '<div class="uh-plain">' + inner + "</div>";
+  }
+  function progressBarHtml(opts) {
+    var det = Math.max(0, Math.min(100, Math.round(opts.det || 0)));
+    var cfm = Math.max(0, Math.min(100, Math.round(opts.cfm || 0)));
+    var diff = opts.diff !== undefined && opts.diff !== null ? opts.diff : null;
+    var money = global.V3.ui.money;
+    return '<div class="uh-progress"><div class="prow">' +
+      "<span>明细核对 <b>" + det + "%</b></span>" +
+      "<span>确认到账 <b>" + cfm + "%</b></span>" +
+      (diff !== null ? '<span>差异 <b class="diff">' + money(diff) + "</b></span>" : "") +
+      '</div><div class="uh-ptrack">' +
+      '<div class="seg seg--detail" style="width:' + det + '%"></div>' +
+      '<div class="seg seg--confirm" style="width:' + cfm + '%"></div>' +
+      "</div></div>";
+  }
+  /* ---------- 批次九工具：金额 count-up / 骨架屏 ---------- */
+  function countUp(el, target, dur, fmt) {
+    if (!el) return;
+    var reduce = global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var fm = fmt || global.V3.ui.money;
+    if (reduce || !dur) { el.innerHTML = fm(target); return; }
+    var start = 0, t0 = null;
+    function step(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1);
+      var eased = 1 - Math.pow(1 - p, 3);
+      el.innerHTML = fm(start + (target - start) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function skeletonHtml(kind) {
+    var rows = kind === "hero"
+      ? ['<div class="uh-skeleton uh-skeleton--line" style="width:42%"></div>',
+         '<div class="uh-skeleton uh-skeleton--num" style="width:64%;margin-top:12px"></div>',
+         '<div class="uh-skeleton uh-skeleton--line" style="width:82%;margin-top:14px"></div>',
+         '<div class="uh-skeleton uh-skeleton--line" style="width:56%;margin-top:8px"></div>']
+      : ['<div class="uh-skeleton uh-skeleton--line" style="width:30%"></div>',
+         '<div class="uh-skeleton uh-skeleton--line" style="width:92%;margin-top:12px"></div>',
+         '<div class="uh-skeleton uh-skeleton--line" style="width:72%;margin-top:8px"></div>',
+         '<div class="uh-skeleton uh-skeleton--line" style="width:84%;margin-top:8px"></div>'];
+    return '<section class="card uh-sec" aria-hidden="true">' + rows.join("") + '</section>';
+  }
+
+  function scopeCardFold(oneLine, sheetTitle, bodyHtml) {    var esc = global.V3.ui.esc;
+    var icon = global.V3.ui.icon;
+    return '<section class="uh-sec"><div class="card" style="padding:12px 14px">' +
+      '<button type="button" class="uh-rfold" data-act="scopeFold" data-fold-rules data-title="' + esc(sheetTitle) + '" data-body="' + esc(bodyHtml) + '" onclick="var b=this;if(window.Uni&&window.Uni.sheet){window.Uni.sheet({title:b.getAttribute(\'data-title\'),body:b.getAttribute(\'data-body\'),footer:[{t:\'关闭\',kind:\'ghost\'}]});}return false;">' +
+      '<span class="uh-rfold__note">' + esc(oneLine) + "</span>" +
+      '<span class="uh-rfold__more">查看口径说明' + icon("chev-r", 14) + "</span></button>" +
+      "</div></section>";
+  }
+  function scopeSheetBodyHtml(rules) {
+    return '<div class="uh-sechead" style="margin:2px 0 10px"><span class="lbl">费用计算范围</span></div>' +
+      scopeBodyHtml() +
+      (rules ? '<div class="uh-sechead" style="margin:14px 0 10px"><span class="lbl">结算口径与时限说明</span></div>' + rules : "");
+  }
+  function bindScopeFold(el, Uni) {
+    var doc = (el.ownerDocument || document);
+    if (doc.__b7FoldBound) return; /* 委托在 document 上只绑一次，不受页面重渲染影响 */
+    doc.__b7FoldBound = true;
+    doc.addEventListener("click", function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-fold-rules]") : null;
+      if (!btn) return;
+      Uni.sheet({
+        title: btn.getAttribute("data-title"),
+        body: btn.getAttribute("data-body"),
+        footer: [{ t: "关闭", kind: "ghost" }]
+      });
+    });
+  }
+
   var ITEM_LABEL = { cert: "企业认证", entry: "企业入驻", unlock: "线索解锁", order: "供需订单" };
   function itemTag(it) {
     return '<span class="uc-itchip">' + (ITEM_LABEL[it] || "其他付费") + "</span>";
@@ -568,20 +723,19 @@
     return company.charAt(0) + "**" + company.slice(-4);
   }
 
-  /* ---------- 获客记录域：渠道码类型映射（口径与获客转化页 CHANNEL_LABEL 对齐） ---------- */
+  /* ---------- 获客记录域：渠道码类型映射（口径与获客转化页 CHANNEL_LABEL 对齐） ----------
+     20261030：招商码（agent）已下线，CHANNEL_TYPE 不再含 agent；员工码（CH-E）按 owner 判定归入 staff */
   var CHANNEL_TYPE = {
     province: { key: "province", label: "管理员码 CH-P" },
     staff:    { key: "staff",    label: "员工码 CH-E" },
-    agent:    { key: "agent",    label: "招商码 AG-" },
     sub:      { key: "sub",      label: "二级码 CH-S" }
   };
   function leadChannelTypeOf(lead, staffName) {
     if (!lead) return { key: "all", label: "全部" };
     if (lead.channel === "school") return CHANNEL_TYPE.sub;
-    if (lead.channel === "direct") return CHANNEL_TYPE.province;
-    if (lead.channel === "agent") {
+    if (lead.channel === "direct") {
       if (staffName && lead.owner === staffName) return CHANNEL_TYPE.staff;
-      return CHANNEL_TYPE.agent;
+      return CHANNEL_TYPE.province;
     }
     return { key: "all", label: "全部" };
   }
@@ -629,6 +783,21 @@
     permOf: permOf,
     stateVariantFor: stateVariantFor,
     financeSplit: financeSplit,
+    /* 批次四：方案 A 明细核对持久化（DL v2） */
+    detailState: {
+      get: detailStateGet,
+      set: detailStateSet,
+      confirmBill: detailConfirmBill
+    },
+    /* 批次七组件 */
+    plainNote: plainNoteHtml,
+    progressBar: progressBarHtml,
+    scopeCardFold: scopeCardFold,
+    scopeSheetBody: scopeSheetBodyHtml,
+    bindScopeFold: bindScopeFold,
+    /* 批次九工具 */
+    countUp: countUp,
+    skeletonHtml: skeletonHtml,
     switchIdentity: switchIdentity,
     switchScenario: switchScenario,
     switchRole: switchRole,
@@ -639,4 +808,12 @@
     msgTotal: msgTotal
   };
   global.Uni = global.Uni || Uni;
+  global.__openScopeFold = function (btn) {
+    if (!btn) return;
+    Uni.sheet({
+      title: btn.getAttribute("data-title"),
+      body: btn.getAttribute("data-body"),
+      footer: [{ t: "关闭", kind: "ghost" }]
+    });
+  };
 })(window);

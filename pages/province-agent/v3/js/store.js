@@ -30,11 +30,8 @@
   /* ---------------- 编号 ---------------- */
   var pad = function (n) { return String(n < 10 ? "0" + n : n); };
   var rnd6 = function () { return Math.random().toString(36).slice(2, 8).toUpperCase(); };
-  function genAgentCode() {
-    return "AG-" + rnd6();
-  }
   function genChannelCode(state, ownerType) {
-    /* ownerType: CH-P 省代招商（老板）/ CH-E 省代员工 / CH-S 二级 */
+    /* ownerType: CH-P 省代管理员 / CH-E 省代员工 / CH-S 二级 */
     var prefix = "CH-P";
     if (ownerType === "staff" || state.role === "staff") prefix = "CH-E";
     if (state.mode === "sub" || ownerType === "sub") prefix = "CH-S";
@@ -110,7 +107,7 @@
     var pairs = [];
     var channels = [];
     if (state.mode === "province") {
-      ["direct", "agent"].forEach(function (ch) {
+      ["direct"].forEach(function (ch) {
         (d.leads[ch] || []).forEach(function (l) {
           if (scope === "mine" && l.owner !== my) return;
           pairs.push({ l: l, ch: ch });
@@ -203,6 +200,10 @@
   }
 
   /* ---------------- 待办 / 消息（单源派生） ---------------- */
+  /* 待办金额千分位（2026-10-31 批次八回归修复：home/messages 待办标题
+     曾显示 ¥4760 无逗号，与各页 ¥4,760 口径不一致） */
+  function fmtMoney(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+
   function todoOf(state) {
     var d = state.state;
     var items = [];
@@ -222,23 +223,23 @@
       var subPending = (d.subApps || []).filter(function (a) { return a.status === "pending"; });
       l1Dis.forEach(function (r) {
         items.push({ key: "l1-disputed", id: r.id, type: "danger", icon: "warn",
-          t: "与平台对账有异议待处理 · ¥" + r.amount,
-          s: "第一层 ¥" + r.amount + "，T+5 工作日内核实", to: "#/reconcile" });
+          t: "与平台对账有异议待处理 · ¥" + fmtMoney(r.amount),
+          s: "第一层 ¥" + fmtMoney(r.amount) + "，T+5 工作日内核实", to: "#/reconcile" });
       });
       l1Pend.forEach(function (r) {
         items.push({ key: "l1-pending", id: r.id, type: "warn", icon: "clock",
-          t: "平台对账有付款待确认 · ¥" + r.amount,
-          s: "第一层 ¥" + r.amount + " 待确认，请核对凭证", to: "#/reconcile" });
+          t: "平台对账有付款待确认 · ¥" + fmtMoney(r.amount),
+          s: "第一层 ¥" + fmtMoney(r.amount) + " 待确认，请核对凭证", to: "#/reconcile" });
       });
       l2Dis.forEach(function (r) {
         items.push({ key: "l2-disputed", id: r.id, type: "danger", icon: "warn",
-          t: "二级提出收款异议 · ¥" + r.amount,
-          s: "第二层 ¥" + r.amount + " 异议待线下核实", to: "#/reconcile" });
+          t: "二级提出收款异议 · ¥" + fmtMoney(r.amount),
+          s: "第二层 ¥" + fmtMoney(r.amount) + " 异议待线下核实", to: "#/reconcile" });
       });
       l2Pend.forEach(function (r) {
         items.push({ key: "l2-pending", id: r.id, type: "warn", icon: "clock",
-          t: "二级收款待确认 · ¥" + r.amount,
-          s: "第二层 ¥" + r.amount + " 待二级确认", to: "#/reconcile" });
+          t: "二级收款待确认 · ¥" + fmtMoney(r.amount),
+          s: "第二层 ¥" + fmtMoney(r.amount) + " 待二级确认", to: "#/reconcile" });
       });
       subPending.forEach(function (a) {
         items.push({ key: "sub-pending", id: a.id, type: "info", icon: "file-text",
@@ -260,13 +261,13 @@
     var agreePending = d.agreement && (d.agreement.state === "pending_mine" || d.agreement.state === "rejected") ? 1 : 0;
     pendRegs.forEach(function (r) {
       items.push({ key: "pay-pending", id: r.id, type: "warn", icon: "clock",
-        t: "有省代付款待你确认 · ¥" + r.amount,
-        s: "¥" + r.amount + "，请核对到账与凭证后确认", to: "#/payments" });
+        t: "有省代付款待你确认 · ¥" + fmtMoney(r.amount),
+        s: "¥" + fmtMoney(r.amount) + "，请核对到账与凭证后确认", to: "#/payments" });
     });
     dispRegs.forEach(function (r) {
       items.push({ key: "pay-disputed", id: r.id, type: "danger", icon: "warn",
-        t: "有异议的付款待核实 · ¥" + r.amount,
-        s: "¥" + r.amount + "，线下核实后可确认", to: "#/payments" });
+        t: "有异议的付款待核实 · ¥" + fmtMoney(r.amount),
+        s: "¥" + fmtMoney(r.amount) + "，线下核实后可确认", to: "#/payments" });
     });
     if (d.agreement && d.agreement.state === "pending_mine") items.push({ key: "agree-sign", type: "info", icon: "file-text", t: "O4 合作协议待签署", s: "请阅读条款后完成签署", to: "#/home" });
     if (d.agreement && d.agreement.state === "rejected") items.push({ key: "agree-rejected", type: "info", icon: "file-text", t: "合作协议已拒签，待省代重新发起", s: "可查看拒签原因", to: "#/home" });
@@ -322,10 +323,13 @@
       var raw = localStorage.getItem(LS_KEY);
       if (raw) {
         var parsed = JSON.parse(raw);
-        /* 双壳共用 LS 键：模式不匹配或种子版本过旧（_v 不符）时强制重新播种，
-           避免省代/二级串数据，以及沿用陈旧种子（如生效中合作家数变更后） */
+        /* 双壳共用 LS 键：模式不匹配、种子版本过旧（_v 不符）或场景键与当前演示场景不一致时
+           强制重新播种，避免省代/二级串数据、沿用陈旧种子以及生效/暂停场景串状态 */
         var ver = window.V3.scenarios.dataVersion();
-        state = (parsed && parsed.mode === appMode() && parsed._v === ver) ? parsed : null;
+        var want = null;
+        try { want = localStorage.getItem(STATE_KEY); } catch (e2) {}
+        var sceneOk = !want || !parsed.scenarioKey || parsed.scenarioKey === want;
+        state = (parsed && parsed.mode === appMode() && parsed._v === ver && sceneOk) ? parsed : null;
       }
     } catch (e) { state = null; }
     return state;
@@ -342,6 +346,11 @@
   }
 
   /* ---------------- 守卫 ---------------- */
+  /* 身份归一化（与 uni-shared IDENTITY_ALIAS/IDENTITY_META 同源；公共库独立实现）。
+     2026-10-30 评审实证：sub_staff 经回退变体获得可操作权限 → 动作守卫一律按归一化身份校验。 */
+  var ROLE_ALIAS = { boss: "admin", sub_owner: "sub_admin", legalRep: "legal_rep", sub_legalRep: "sub_legal" };
+  var ROLES6 = { admin: 1, legal_rep: 1, staff: 1, sub_admin: 1, sub_legal: 1, sub_staff: 1 };
+  function normId(r) { var m = ROLE_ALIAS[r]; if (m) return m; return ROLES6[r] ? r : "admin"; }
   function ctxInfo() {
     var d = state.state;
     var role = state.role;
@@ -388,8 +397,10 @@
         var ownerType = p.ownerType || (c.isStaff ? "staff" : (c.isSubStaff ? "sub" : (c.mode === "sub" ? "sub" : "province")));
         var code = genChannelCode(state, ownerType);
         var ownerName = c.isStaff ? c.staffName : (c.isOwner || c.isSubStaff ? d.profile.contact : "王建国");
+        var cName = String(p.name || "").trim();
         list[ch].push({
           code: code,
+          name: cName || "通用推广",
           channel: ch,
           ownerType: ownerType,
           ownerName: ownerName,
@@ -414,19 +425,34 @@
         save(); return ok();
       }
 
+      case "channel/restore": {
+        /* 20261030 经营与渠道页：作废恢复对称操作（仅页面暴露给 admin/sub_admin；守卫与 void 同构） */
+        if (c.mode === "province" && !c.isBoss && !c.isStaff) return fail("无权限恢复渠道码");
+        if (c.mode === "sub" && !c.isOwner && !c.isSubStaff) return fail("无权限恢复渠道码");
+        var arrR = d.channels[p.channel] || [];
+        var recR = arrR.filter(function (x) { return x.code === p.code; })[0];
+        if (!recR) return fail("渠道码不存在");
+        if (recR.status !== "void") return fail("仅已作废的渠道码可恢复");
+        if (c.isStaff && recR.ownerName !== c.staffName) return fail("员工仅可恢复本人渠道码");
+        if (c.isSubStaff && recR.ownerName !== c.staffName) return fail("员工仅可恢复本人渠道码");
+        recR.status = "active";
+        delete recR.voidAt;
+        save(); return ok();
+      }
+
       /* ---------- 线索（员工仅本人） ---------- */
       case "lead/follow": {
-        if (!c.isBoss && !c.isStaff && !c.isSubStaff) return fail("无权限跟进线索");
+        if (!c.isBoss && !c.isStaff && !c.isOwner && !c.isSubStaff) return fail("无权限跟进线索");
         var lf = d.leads[p.channel].filter(function (x) { return x.id === p.id; })[0];
         if (!lf) return fail("线索不存在");
         if ((c.isStaff || c.isSubStaff) && lf.owner !== c.staffName) return fail("仅可跟进本人渠道线索");
         lf.notes = lf.notes || [];
-        lf.notes.push({ at: "今天", by: c.isStaff ? c.staffName : (c.isSubStaff ? c.staffName : "王建国"), text: p.note });
+        lf.notes.push({ at: "今天", by: c.isStaff ? c.staffName : (c.isSubStaff ? c.staffName : (c.isOwner ? d.profile.contact : "王建国")), text: p.note });
         save(); return ok();
       }
 
       case "lead/stage": {
-        if (!c.isBoss && !c.isStaff && !c.isSubStaff) return fail("无权限更新线索");
+        if (!c.isBoss && !c.isStaff && !c.isOwner && !c.isSubStaff) return fail("无权限更新线索");
         var ls = d.leads[p.channel].filter(function (x) { return x.id === p.id; })[0];
         if (!ls) return fail("线索不存在");
         if ((c.isStaff || c.isSubStaff) && ls.owner !== c.staffName) return fail("仅可更新本人渠道线索");
@@ -437,26 +463,6 @@
       case "lead/rebind": {
         /* 本期不做回收/换绑动作（决策 10） */
         return fail("线索已进入沉寂期，暂不支持换绑");
-      }
-
-      /* ---------- 招商码 ---------- */
-      case "agent/gen": {
-        if (!c.isBoss) return fail("仅管理员可生成招商码");
-        var a = d.agentCodes[p.channel];
-        if (a.status !== "active" || a.code) return fail("当前招商码有效，无需重复生成");
-        a.code = genAgentCode();
-        a.status = "active";
-        a.createdAt = "2026-10";
-        save(); return { ok: true, code: a.code };
-      }
-
-      case "agent/void": {
-        if (!c.isBoss) return fail("仅管理员可作废招商码");
-        var av = d.agentCodes[p.channel];
-        if (!av.code) return fail("尚无招商码");
-        av.status = "void";
-        av.voidAt = "2026-10";
-        save(); return ok();
       }
 
       /* ---------- 二级合作 ---------- */
@@ -552,7 +558,7 @@
 
       /* ---------- 付款登记 / 确认 / 异议 / 冲销 ---------- */
       case "pay/addReg": {
-        if (!c.isBoss) return fail("仅管理员可登记线下付款");
+        if (normId(c.role) !== "admin") return fail("仅管理员可登记线下付款");
         var regs = p.layer === "1" ? d.payRegs1 : d.payRegs2;
         var calc = (p.layer === "1" ? d.calc1 : d.calc2);
         if (!p.data || !p.data.amount || Number(p.data.amount) <= 0) return fail("请填写正确金额");
@@ -579,7 +585,7 @@
 
       case "pay/confirm": {
         if (p.layer === "2") {
-          if (!c.isOwner) return fail("仅二级管理员可确认");
+          if (normId(c.role) !== "sub_admin") return fail("仅二级管理员可确认");
           var r2 = d.payRegs.filter(function (x) { return x.id === p.id; })[0];
           if (!r2 || r2.status === "void") return fail("付款记录不存在");
           if (r2.status === "confirmed") return fail("该登记已确认，无需重复确认");
@@ -590,7 +596,7 @@
           r2.verifiedNote = p.verifiedNote || "";
           save(); return ok();
         }
-        if (!c.isBoss) return fail("仅管理员可确认平台对账");
+        if (normId(c.role) !== "admin") return fail("仅管理员可确认平台对账");
         var r1 = (p.layer === "1" ? d.payRegs1 : d.payRegs2).filter(function (x) { return x.id === p.id; })[0];
         if (!r1 || r1.status === "void") return fail("付款记录不存在");
         if (r1.status === "confirmed") return fail("该登记已确认，无需重复确认");
@@ -604,8 +610,8 @@
 
       case "pay/dispute": {
         if (p.layer === "2") {
-          if (!c.isOwner) return fail("仅二级管理员可提异议");
-        } else if (!c.isBoss) return fail("仅管理员可对平台对账提异议");
+          if (normId(c.role) !== "sub_admin") return fail("仅二级管理员可提异议");
+        } else if (normId(c.role) !== "admin") return fail("仅管理员可对平台对账提异议");
         if (!p.reason) return fail("请填写异议说明");
         var rd = (p.layer === "2" ? d.payRegs : (p.layer === "1" ? d.payRegs1 : d.payRegs2))
           .filter(function (x) { return x.id === p.id; })[0];
@@ -617,7 +623,7 @@
       }
 
       case "pay/void": {
-        if (!c.isBoss) return fail("仅管理员可冲销/作废登记");
+        if (normId(c.role) !== "admin") return fail("仅管理员可冲销/作废登记");
         var rv = (p.layer === "1" ? d.payRegs1 : d.payRegs2).filter(function (x) { return x.id === p.id; })[0];
         if (!rv) return fail("付款记录不存在");
         if (rv.status === "confirmed") return fail("已确认记录不可冲销");
@@ -627,7 +633,7 @@
       }
 
       case "stmt/balance": {
-        if (!c.isBoss) return fail("仅管理员可月度平账");
+        if (normId(c.role) !== "admin") return fail("仅管理员可月度平账");
         var regsB = p.layer === "1" ? d.payRegs1 : d.payRegs2;
         var calcB = p.layer === "1" ? d.calc1 : d.calc2;
         var stmts = d.statements;
@@ -706,7 +712,6 @@
   window.V3.store = {
     LS_KEY: LS_KEY,
     CONST: CONST,
-    genAgentCode: genAgentCode,
     genChannelCode: genChannelCode,
     calcFinance: calcFinance,
     subSettle: subSettle,

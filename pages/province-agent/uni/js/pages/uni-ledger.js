@@ -10,32 +10,34 @@
 (function () {
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
+  /* 白话句取值：把 "¥6,000" 类展示串解析为数值 */
+  function parseNum(s) { var n = Number(String(s || "").replace(/[^0-9.]/g, "")); return isNaN(n) ? 0 : n; }
 
   /* ---------- 员工视角：仅本人获客用户及其消费记录（M3 渠道归因数据隔离） ---------- */
   function buildStaffVm(ctx) {
     var s = ctx.s, my = ctx.staffName;
     var mine = [], users = 0, paidAmt = 0;
-    ["direct", "agent"].forEach(function (ch) {
+    ["direct"].forEach(function (ch) {
       (s.leads[ch] || []).forEach(function (l) {
         if (l.owner !== my) return;
         users++;
         if (l.stage === "paid" || l.stage === "repaid") {
           paidAmt += l.amount || 0;
-          mine.push({ user: l.name || "用户", channel: (ch === "direct" ? "直接合作" : "招商渠道"), amount: l.amount || 0, stageTxt: "已消费" });
+          mine.push({ user: l.name || "用户", channel: "直接合作", amount: l.amount || 0, stageTxt: "已消费" });
         }
       });
     });
     var codes = [];
-    ["direct", "agent"].forEach(function (ch) {
+    ["direct"].forEach(function (ch) {
       (s.channels[ch] || []).forEach(function (c) {
         if (c.ownerName === my && c.status === "active" && codes.indexOf(c.code) < 0) codes.push(c.code);
       });
     });
-    var byChannel = { "直接合作": 0, "招商渠道": 0 };
+    var byChannel = { "直接合作": 0 };
     mine.forEach(function (r) { byChannel[r.channel] += r.amount; });
-    var max = Math.max(byChannel["直接合作"], byChannel["招商渠道"]);
-    var bars = ["直接合作", "招商渠道"].map(function (lb, i) {
-      return { label: lb, value: byChannel[lb], cur: i === 0,
+    var max = Math.max(byChannel["直接合作"], 1);
+    var bars = ["直接合作"].map(function (lb) {
+      return { label: lb, value: byChannel[lb], cur: true,
                pct: max > 0 ? Math.max(Math.round(byChannel[lb] / max * 100), 16) : 16 };
     });
     return {
@@ -89,13 +91,14 @@
       /* 省代口径：T3 统一两分区（二级线 50% 盘 + 自营线 50% 全额） */
       var fin = window.Uni.financeSplit(ctx.s);
       var prevSum = store.regsSum(ctx.s.payRegs1 || [], "c0-l1"); /* 上月 L1 已确认 = 上月已平账口径 */
+      var prevSubSum = store.regsSum(ctx.s.payRegs2 || [], "c0-l2"); /* 上月 L2 已确认（省代已付二级） */
       var curIncome = fin.sub.retained + fin.self.amount;          /* 本月省代实得 = 二级线自留 + 自营线全额 */
       vm.rows = [
-        { month: "2026-09", eligible: Math.round(prevSum / 0.5), gross: prevSum, ratio: "—", income: Math.round(prevSum * 0.5) },
+        { month: "2026-09", eligible: Math.round(prevSum / 0.5), gross: prevSum, ratio: "—", income: prevSum - prevSubSum }, /* 实得 = L1 已确认 − L2 已确认（省代收平台、付二级） */
         { month: "2026-10", eligible: fin.gross, gross: fin.total, ratio: "—", income: curIncome }
       ];
       vm.bars = [
-        { label: "2026-09", value: Math.round(prevSum * 0.5), cur: false },
+        { label: "2026-09", value: prevSum - prevSubSum, cur: false },
         { label: "2026-10", value: curIncome, cur: true }
       ];
       vm.big = fin.total;
@@ -227,8 +230,22 @@
 
     var html = "";
 
-    /* 只读口径说明条 */
-    html += '<section class="uh-sec"><div class="uh-readnote">' + ui.icon("info", 15) + "<span>" + ui.esc(vm.notice) + "</span></div></section>";
+    /* 只读口径说明：折叠为「一句话 + 查看口径说明」（P1-7 去墙化） */
+    html += Uni.scopeCardFold(
+      vm.staff
+        ? "仅展示本人获客用户的消费记录，不涉及企业分佣台账。"
+        : (ctx.mode === "sub" ? "经营台账为只读口径复算：总盘 50%、T+7 冻结。" : "经营台账为只读口径：两级分账、不执行提现。"),
+      "经营台账口径说明",
+      '<div class="uh-readnote" style="margin-bottom:12px">' + ui.esc(vm.notice) + "</div>" +
+      (!vm.staff
+        ? '<div class="uh-clause"><div class="no">计入项</div>' +
+          "<div class=\"c\">订单净额 · 积分解锁付费 · 增值服务付费</div></div>" +
+          '<div class="uh-clause"><div class="no">排除项</div>' +
+          "<div class=\"c\">充值 · 免费积分 · 报名费 · 退款冲回</div></div>" +
+          '<div class="uh-clause"><div class="no">退款口径</div>' +
+          "<div class=\"c\">冻结期内剔除、当月红字冲减、跨月等额回冲。</div></div>"
+        : "")
+    );
 
     /* 暂停封条 */
     if (ctx.readonly) {
@@ -237,10 +254,16 @@
         '<span class="lb-s">' + ui.esc(V.lockedNote || "") + '</span></div></div></section>';
     }
 
+    /* 批次九 L5：桌面「经营所得 + 月度趋势」两栏并列（移动端单列顺序不变） */
+    html += '<div class="ulg-grid">';
+
     /* 经营所得卡 */
     html += '<section class="card uh-sec">' +
       '<div class="uh-finhead"><span class="uh-eyebrow">' + ui.esc(vm.cardTitle) + "</span>" + badge + "</div>" +
-      '<div class="uh-bignum">' + ui.moneyD(vm.big) + "</div>" +
+      '<div class="uh-bignum" data-count="' + vm.big + '">' + ui.moneyD(0) + "</div>" +
+      (ctx.mode === "sub"
+        ? Uni.plainNote("= 合格消费 <b>" + ui.money(vm.kvs[0] ? parseNum(vm.kvs[0].v) : 0) + "</b> × 约定 <b>" + (vm.kvs[2] ? vm.kvs[2].v : "—") + "</b>")
+        : Uni.plainNote("= 二级盘 <b>" + ui.money(vm.kvs[1] ? parseNum(vm.kvs[1].v) : 0) + "</b> + 自营收益 <b>" + ui.money(vm.kvs[4] ? parseNum(vm.kvs[4].v) : 0) + "</b>")) +
       '<div class="uh-ledgerline"></div>';
     vm.kvs.forEach(function (kv) {
       html += '<div class="uh-kv"><span class="k">' + ui.esc(kv.k) + "</span><span class=\"v\">" + kv.v + "</span></div>";
@@ -251,14 +274,16 @@
     html += '<section class="card uh-sec">' +
       '<div class="uh-finhead"><span class="uh-eyebrow">' + (vm.staff ? "我的获客消费构成" : "月度经营所得趋势") + '</span>' +
       '<span class="uh-badge uh-badge--mute">' + (vm.staff ? "按渠道" : "最近月高亮") + '</span></div>' +
-      '<div class="ulg-bars">' + bars + "</div></section>";
+      '<div class="ulg-bars">' + bars + "</div></section>" +
+      '</div>';
 
     /* 月度台账表格 */
+    var colSpan = vm.staff ? 4 : 5;
     html += '<section class="card uh-sec" style="padding:6px 16px 14px">' +
       '<div class="uh-finhead" style="margin:10px 0 4px"><span class="uh-eyebrow">月度台账</span></div>' +
       '<table class="ulg-table"><thead><tr>' +
       headCells +
-      "</tr></thead><tbody>" + rows + "</tbody></table></section>";
+      "</tr></thead><tbody>" + (vm.rows.length ? rows : '<tr><td colspan="' + colSpan + '" style="text-align:center;color:var(--text-3);padding:16px 0;">暂无月度台账</td></tr>') + "</tbody></table></section>";
 
     /* P1-1/P1-2/P1-4 省代经营分析三卡（员工仅本人获客视图，不展示企业分佣视角） */
     if (!vm.staff && vm.srcSplit) {
@@ -312,19 +337,22 @@
         }).join("") + '</section>';
     }
 
-    /* 计入/排除口径说明卡（员工不涉及分佣口径，隐藏） */
-    if (!vm.staff) {
-      html += '<section class="card uh-sec">' +
-        '<div class="uh-finhead"><span class="uh-eyebrow">计入 / 排除口径</span></div>' +
-        '<div class="uh-clause" style="margin-top:10px"><div class="no">计入项</div>' +
-        "<div class=\"c\">订单净额 · 积分解锁付费 · 增值服务付费</div></div>" +
-        '<div class="uh-clause"><div class="no">排除项</div>' +
-        "<div class=\"c\">充值 · 免费积分 · 报名费 · 退款冲回</div></div>" +
-        '<div class="uh-clause" style="margin-bottom:0"><div class="no">退款口径</div>' +
-        "<div class=\"c\">冻结期内剔除、当月红字冲减、跨月等额回冲。</div></div></section>";
-    }
-
     el.innerHTML = html;
+    Uni.bindScopeFold(el, Uni);
+    /* 批次九 L8：经营所得主数字 count-up（420ms ease-out；reduced-motion 直跳） */
+    var cnum = el.querySelector("[data-count]");
+    if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")), 420, ui.moneyD);
+    /* P1-7 口径折叠（data-act 委托，复用对账中心已验证链路） */
+    el.querySelectorAll("[data-act]").forEach(function (n) {
+      if (n.getAttribute("data-act") !== "scopeFold") return;
+      n.addEventListener("click", function () {
+        Uni.sheet({
+          title: n.getAttribute("data-title"),
+          body: n.getAttribute("data-body"),
+          footer: [{ t: "关闭", kind: "ghost" }]
+        });
+      });
+    });
   }
 
   window.Uni.register({
@@ -332,6 +360,7 @@
     route: "ledger.html",
     modes: ["province", "sub"],
     STATE_VARIANTS: STATE_VARIANTS,
+    skeleton: true,
     mount: mount
   });
 })();

@@ -1,5 +1,5 @@
 /* ============================================================
-   uni-reconcile-sub.js · 对账中心（二级企业收款确认 · reconcile-sub.html）
+   uni-reconcile-sub.js · 对账中心（二级企业确认到账 · reconcile-sub.html）
    模板节奏（三身份同构，数据驱动填充）：
      时限说明条 → 应付款卡（第 x/15 天进度）→ 登记行卡列表（含历史只读）
    身份差异仅限：数据换源（sub=s.calc[0]/s.payRegs；province=s.calc2/s.payRegs2）、
@@ -15,17 +15,19 @@
   var METHOD = { bank: "对公转账", wechat: "微信/支付宝", cash: "现金", other: "其他" };
   var REG_CLS = { pending_confirm: "wait", confirmed: "ok", disputed: "bad", void: "mute" };
 
-  /* 逐笔核对状态（本地覆盖层：按账单 calcId 记录已核对明细 id） */
-  var DL_KEY = "engchain-uni-detail-v1";
-  function loadChecked() { try { return JSON.parse(localStorage.getItem(DL_KEY)) || {}; } catch (e) { return {}; } }
-  function checkedIds(calcId) { return loadChecked()[calcId] || []; }
+  /* 逐笔核对状态（批次四：统一 Uni.detailState，DL v2 持久化 + v1 迁移；核对待持久、跨页生效） */
+  function checkedIds(calcId) { return (window.Uni.detailState.get(calcId) || []).map(function (r) { return r.id; }); }
   function toggleChecked(calcId, id) {
-    var o = loadChecked();
-    var a = o[calcId] || [];
-    var i = a.indexOf(id);
-    if (i > -1) a.splice(i, 1); else a.push(id);
-    o[calcId] = a;
-    try { localStorage.setItem(DL_KEY, JSON.stringify(o)); } catch (e) {}
+    var on = checkedIds(calcId).indexOf(id) < 0;
+    window.Uni.detailState.set(calcId, id, on ? "checked" : null,
+      (window.Uni.getCtx && window.Uni.getCtx().identity) || "admin");
+    return on;
+  }
+  function allCheckedOf(calc) {
+    var dl = (calc && calc.detail) || [];
+    if (!dl.length) return true; /* 无明细不设门槛 */
+    var ids = checkedIds(calc.id);
+    return dl.every(function (d) { return ids.indexOf(d.id) > -1; });
   }
 
   /* ---------- 数据源选择（纯数据判断：产出 view-model，不改变 DOM 结构） ---------- */
@@ -94,9 +96,10 @@
       if (r.verifiedNote) row.notes.push("线下核实：" + r.verifiedNote);
       if (r.voidInfo) row.notes.push("已冲销：" + r.voidInfo.reason + "（" + r.voidInfo.at + "）");
       if (vm.canActEff && isCur && r.status === "pending_confirm") {
+        var gated = !allCheckedOf(calc);
         row.acts = [
           { k: "未收到/提异议", act: "dispute", cls: "ghost" },
-          { k: "核对无误·确认", act: "confirm", cls: "primary" }
+          { k: "核对无误·确认", act: "confirm", cls: "primary", disabled: gated }
         ];
       } else if (vm.canActEff && isCur && r.status === "disputed") {
         row.acts = [{ k: "线下核实后确认", act: "verify", cls: "primary" }];
@@ -127,7 +130,7 @@
       data: function (ctx) {
         return buildVm(ctx, {
           cardTitle: "本月应付二级款",
-          notice: "数据仅可查看；收款确认、提出异议与线下核实仅管理员可操作。",
+          notice: "数据仅可查看；确认到账、提出异议与线下核实仅管理员可操作。",
           canAct: false
         });
       },
@@ -150,7 +153,7 @@
       perms: { confirm: true, dispute: true },
       badges: {},
       empty: { regs: { title: "暂无付款登记", desc: "省代线下付款登记后，将逐笔出现在这里供你核对确认" } },
-      lockedNote: "收款确认与异议均已锁定，台账与对账单仍可查阅"
+      lockedNote: "确认到账与异议均已锁定，台账与对账单仍可查阅"
     }
   };
 
@@ -168,7 +171,8 @@
     });
     if (row.acts.length) {
       h += '<div class="btn-row">' + row.acts.map(function (a) {
-        return '<button class="btn btn-' + a.cls + ' btn-sm" data-act="' + a.act + '" data-id="' + ui.esc(row.id) + '">' + ui.esc(a.k) + '</button>';
+        return '<button class="btn btn-' + a.cls + ' btn-sm" data-act="' + a.act + '" data-id="' + ui.esc(row.id) + '"' +
+          (a.disabled ? ' disabled title="请先完成逐笔核对（明细 100%）"' : "") + '>' + ui.esc(a.k) + '</button>';
       }).join("") + '</div>';
     }
     return h + '</div>';
@@ -176,6 +180,7 @@
 
   /* ---------- 弹窗：确认到账（E101） ---------- */
   function confirmSheet(ctx, Uni, rec) {
+    var cid = (pickSource(ctx).calc || {}).id;
     Uni.sheet({
       title: "确认到账",
       body:
@@ -187,7 +192,7 @@
         { t: "取消", kind: "ghost" },
         { t: "确认到账（记录）", kind: "ghost", onClick: function () {
           var r = Uni.actGuarded("pay/confirm", { layer: "2", id: rec.id, signMethod: "record" });
-          if (r.ok) Uni.toast("已确认，等待省代平账", "ok");
+          if (r.ok) { if (cid) Uni.detailState.confirmBill(cid, ctx.identity); Uni.toast("已确认，等待省代平账", "ok"); }
         } },
         { t: "电子签留痕", kind: "primary", onClick: function () {
           esignModal(ctx, Uni, rec); return false;
@@ -206,7 +211,7 @@
         { t: "取消", kind: "ghost" },
         { t: "同意并签署", kind: "primary", onClick: function () {
           var r = Uni.actGuarded("pay/confirm", { layer: "2", id: rec.id, signMethod: "esign" });
-          if (r.ok) Uni.toast("已签署，等待省代平账", "ok");
+          if (r.ok) { var cid2 = (pickSource(ctx).calc || {}).id; if (cid2) Uni.detailState.confirmBill(cid2, ctx.identity); Uni.toast("已签署，等待省代平账", "ok"); }
         } }
       ]
     });
@@ -226,7 +231,7 @@
           var v = ov.querySelector("#urs-v-note").value.trim();
           if (!v) { Uni.toast("异议记录须填写线下核实说明后再确认"); return false; }
           var r = Uni.actGuarded("pay/confirm", { layer: "2", id: rec.id, verifiedNote: v });
-          if (r.ok) Uni.toast("已确认，等待省代平账", "ok");
+          if (r.ok) { var cid3 = (pickSource(ctx).calc || {}).id; if (cid3) Uni.detailState.confirmBill(cid3, ctx.identity); Uni.toast("已确认，等待省代平账", "ok"); }
         } }
       ]
     });
@@ -272,10 +277,13 @@
     }).join("");
     return '<section class="uh-sec"><div class="uc-dlsec">' +
       '<div class="uh-sechead"><span class="lbl">逐笔核对</span>' +
+      (vm.canActEff && detail.length
+        ? '<button type="button" class="btn btn-ghost btn-xs" data-act="checkAll" style="margin-left:auto">全选核对</button>'
+        : "") +
       '<span class="uh-badge uh-badge--mute">已核对 ' + checked.length + '/' + detail.length + '</span></div>' +
       '<div class="card" style="padding:2px 14px">' + rows + '</div>' +
       '<div class="uc-dlsec__sum"><span>已核对金额 ' + ui.money(sumOn) + '</span>' +
-      '<span>明细合计 ' + ui.money(calc.eligibleBase) + '</span></div>' +
+      '<span>明细合计（合格消费）' + ui.money(calc.eligibleBase) + '</span></div>' +
       (vm.canActEff ? '<div class="uh-note" style="margin-top:6px">逐笔确认订单计入合格消费分润；差异以线下凭证核实后闭环。</div>' : "") +
       '</div></section>';
   }
@@ -375,10 +383,23 @@
         : "") +
       '<div class="uh-finhead"><span class="uh-eyebrow">' + ui.esc(vm.cardTitle) + "</span>" +
       '<span class="uh-badge uh-badge--' + vm.dueCls + '">第 ' + vm.dueDay + "/15 天</span></div>" +
-      dueBarHtml(vm.calcObj) +
-      '<div class="uh-bignum">' + ui.moneyD(vm.amount) + "</div>" +
+      '<div class="uh-bignum" data-count="' + vm.amount + '">' + ui.moneyD(0) + "</div>" +
+      Uni.plainNote("应得 = 平台盘 × 约定比例") +
       '<div class="urs-duebar"><div class="urs-duebar__fill urs-duebar__fill--' + vm.dueCls + '" style="width:' + vm.duePct + '%"></div></div>' +
-      '<div class="uh-ledgerline"></div>';
+      '<div class="uh-ledgerline"></div>' +
+      (function () {
+        var calcO = vm.calcObj || {};
+        var dlArr = calcO.detail || [];
+        var sumOn = 0;
+        dlArr.forEach(function (d) { if (checkedIds(calcO.id).indexOf(d.id) > -1) sumOn += d.amount; });
+        var due = vm.tri ? vm.tri.due : 0, cfm = vm.tri ? vm.tri.confirmed : 0;
+        return Uni.progressBar({
+          det: dlArr.length ? Math.round(sumOn / (vm.calcObj.eligibleBase || 1) * 100) : 0,
+          cfm: due > 0 ? Math.round(cfm / due * 100) : 0,
+          diff: due - cfm
+        });
+      })() +
+      dueBarHtml(vm.calcObj);
     vm.kvs.forEach(function (kv) {
       html += '<div class="uh-kv"><span class="k">' + ui.esc(kv.k) + "</span><span class=\"v\">" + kv.v + "</span></div>";
     });
@@ -415,10 +436,30 @@
     /* 历史对账记录（按月查询，含逾期锁定月） */
     html += histHtml(ctx, ui);
 
-    /* 计费范围：合格消费口径（计入 / 不计入），双端共用，置于页面最下方 */
-    html += Uni.scopeCard();
+    /* 计费范围：合格消费口径（计入 / 不计入）折叠为「一句话 + 查看口径说明」（P1-7 去墙化） */
+    html += Uni.scopeCardFold(
+      "费用按平台月度合格消费账单口径结算；线下凭证核实后闭环。",
+      "费用计算范围与结算口径",
+      Uni.scopeSheetBody()
+    );
+
+    /* 批次九 L2：页级粘性底栏容器（sub_admin 可操作时放「全选核对」主按钮） */
+    html += '<div class="uh-stickybar"></div>';
 
     el.innerHTML = html;
+    Uni.bindScopeFold(el, Uni);
+
+    /* 批次九 L2/L8：粘性底栏填充 + 应付款主数字 count-up */
+    var sb = el.querySelector(".uh-stickybar");
+    if (sb) {
+      var actBtn = (vm.canActEff && !ctx.readonly && !vm.overdue)
+        ? '<button type="button" class="btn btn-primary" data-act="checkAll">全选核对</button>'
+        : "";
+      sb.innerHTML = actBtn;
+      sb.classList.toggle("is-empty", !actBtn);
+    }
+    var cnum = el.querySelector("[data-count]");
+    if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")), 420, ui.moneyD);
 
     /* E100 凭证预览（统一系统回单卡渲染） */
     el.querySelectorAll("[data-voucher]").forEach(function (n) {
@@ -453,6 +494,23 @@
     el.querySelectorAll("[data-act]").forEach(function (n) {
       var act = n.getAttribute("data-act");
       n.addEventListener("click", function () {
+        if (act === "scopeFold") {
+          return Uni.sheet({
+            title: n.getAttribute("data-title"),
+            body: n.getAttribute("data-body"),
+            footer: [{ t: "关闭", kind: "ghost" }]
+          });
+        }
+        /* 批次九 L2：粘性底栏「全选核对」无 data-id，须在 rec 判空前处理 */
+        if (act === "checkAll") {
+          var calc = pickSource(ctx).calc;
+          if (!calc) return;
+          var dl = calc.detail || [];
+          if (!dl.length) { Uni.toast("暂无明细可核对"); return; }
+          dl.forEach(function (d) { Uni.detailState.set(calc.id, d.id, "checked", ctx.identity); });
+          Uni.toast("已全部核对（" + dl.length + " 笔）", "ok");
+          return mount(el, ctx, Uni);
+        }
         var rec = recOf(n.getAttribute("data-id"));
         if (!rec) return;
         if (act === "confirm") return confirmSheet(ctx, Uni, rec);
@@ -461,7 +519,7 @@
       });
     });
 
-    /* 待办弹窗放大跳转：?focus=cur 定位到当月收款确认主卡 */
+    /* 待办弹窗放大跳转：?focus=cur 定位到当月对账主卡 */
     var f = new URLSearchParams(window.location.search).get("focus");
     if (f) {
       var band = el.querySelector('[data-band="' + f + '"]');
@@ -474,6 +532,7 @@
     route: "reconcile-sub.html",
     modes: ["province", "sub"],
     STATE_VARIANTS: STATE_VARIANTS,
+    skeleton: true,
     mount: mount
   });
 })();

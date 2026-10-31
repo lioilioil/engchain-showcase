@@ -41,17 +41,19 @@
     stickyHandler();
   }
 
-  /* 逐笔核对状态（本地覆盖层：按账单 calcId 记录已核对明细 id） */
-  var DL_KEY = "engchain-uni-detail-v1";
-  function loadChecked() { try { return JSON.parse(localStorage.getItem(DL_KEY)) || {}; } catch (e) { return {}; } }
-  function checkedIds(calcId) { return loadChecked()[calcId] || []; }
+  /* 逐笔核对状态（批次四：统一 Uni.detailState，DL v2 持久化 + v1 迁移；核对待持久、跨页生效） */
+  function checkedIds(calcId) { return (window.Uni.detailState.get(calcId) || []).map(function (r) { return r.id; }); }
   function toggleChecked(calcId, id) {
-    var o = loadChecked();
-    var a = o[calcId] || [];
-    var i = a.indexOf(id);
-    if (i > -1) a.splice(i, 1); else a.push(id);
-    o[calcId] = a;
-    try { localStorage.setItem(DL_KEY, JSON.stringify(o)); } catch (e) {}
+    var on = checkedIds(calcId).indexOf(id) < 0;
+    window.Uni.detailState.set(calcId, id, on ? "checked" : null,
+      (window.Uni.getCtx && window.Uni.getCtx().identity) || "admin");
+    return on;
+  }
+  function allCheckedOf(calc) {
+    var dl = (calc && calc.detail) || [];
+    if (!dl.length) return true; /* 无明细不设门槛 */
+    var ids = checkedIds(calc.id);
+    return dl.every(function (d) { return ids.indexOf(d.id) > -1; });
   }
 
   var STATE_VARIANTS = {
@@ -183,8 +185,10 @@
     if (canAct && bm.cur.indexOf(r) >= 0) {
       var acts = "";
       if (r.status === "pending_confirm" && bm.layer === "1") {
+        var gated = !allCheckedOf(bm.calc);
         acts = '<button class="btn btn-ghost btn-sm" data-act="dispute" data-id="' + ui.esc(r.id) + '" style="flex:1">提出异议</button>' +
-          '<button class="btn btn-primary btn-sm" data-act="confirm" data-id="' + ui.esc(r.id) + '" style="flex:1">核对无误·确认</button>';
+          '<button class="btn btn-primary btn-sm" data-act="confirm" data-id="' + ui.esc(r.id) + '" style="flex:1"' +
+          (gated ? ' disabled title="请先完成逐笔核对（明细 100%）"' : "") + '>核对无误·确认</button>';
       } else if (r.status === "pending_confirm" && bm.layer === "2") {
         acts = '<button class="btn btn-ghost btn-sm" data-act="remind" data-id="' + ui.esc(r.id) + '" style="flex:1">提醒二级确认</button>';
       } else if (r.status === "disputed" && bm.layer === "2") {
@@ -216,11 +220,14 @@
     }).join("");
     /* 列表直接置于卡片内（.uc-dlrow 自带 hairline 分隔），不嵌套 .card，避免卡中卡 */
     return '<div class="uh-sechead"><span class="lbl">逐笔核对</span>' +
+      (canAct && detail.length
+        ? '<button type="button" class="btn btn-ghost btn-xs" data-act="checkAll" data-layer="' + bm.layer + '" style="margin-left:auto">全选核对</button>'
+        : "") +
       '<span class="uh-badge uh-badge--mute">已核对 ' + checked.length + '/' + detail.length + '</span></div>' +
       rows +
       '<div class="uc-dlsec__sum"><span>已核对金额 ' + ui.money(sumOn) + '</span>' +
-      '<span>明细合计 ' + ui.money(calc.eligibleBase) + '</span></div>' +
-      (canAct ? '<div class="uh-note" style="margin-top:6px">逐笔确认订单计入合格消费分润；异议中金额不计入已登记到账，线下凭证核实后闭环。</div>' : "");
+      '<span>明细合计（合格消费）' + ui.money(calc.eligibleBase) + '</span></div>' +
+      (canAct ? '<div class="uh-note" style="margin-top:6px">订单计入合格消费分润；异议不计入已登记，线下核实闭环。</div>' : "");
   }
 
   /* ---------- 生命节点 ---------- */
@@ -256,9 +263,9 @@
 
     /* ---- 卡1 · 卷宗现状：状态 / 差异焦点 / 截止期 / 进度 / 下一步提示 ---- */
     var focusNum = bm.state === "balanced"
-      ? '<div class="uh-bignum" style="font-size:26px">' + ui.moneyD(0) +
+      ? '<div class="uh-bignum">' + ui.moneyD(0) +
         '<span class="uc-zero-note">差异已清零</span></div>'
-      : '<div class="uh-bignum">' + ui.moneyD(bm.diff) + '</div>';
+      : '<div class="uh-bignum" data-count="' + bm.diff + '">' + ui.moneyD(0) + '</div>';
     var hint = bandHint(bm);
     var hintCls = bm.state === "balanced" ? "ok" : (bm.state === "diff" || bm.disputed.length ? "no" : "");
     var headCard =
@@ -274,9 +281,22 @@
         (bm.state === "balanced" ? '<span class="uh-badge uh-badge--ok">已平账</span>' :
           (bm.diff === 0 ? '<span class="uh-badge uh-badge--ok">金额已对齐</span>' : '<span class="uh-badge uh-badge--info">对账中</span>'))) +
       '</div>' +
+      focusNum +
+      (bm.layer === "1"
+        ? Uni.plainNote("差异 = 账单金额 − 已确认到账")
+        : Uni.plainNote("应付款 = 二级盘 × 约定比例")) +
+      (function () {
+        var dlArr = bm.calc.detail || [];
+        var sumOn = 0;
+        dlArr.forEach(function (d) { if (checkedIds(bm.calc.id).indexOf(d.id) > -1) sumOn += d.amount; });
+        return Uni.progressBar({
+          det: dlArr.length ? Math.round(sumOn / (bm.calc.eligibleBase || 1) * 100) : 0,
+          cfm: bm.calc.calcAmount > 0 ? Math.round(confSum / bm.calc.calcAmount * 100) : 0,
+          diff: bm.diff
+        });
+      })() +
       '<div class="uc-band__meta">' + ui.esc(bm.calc.month) + " · " + ui.esc(bm.calc.layer) + " · " + ui.esc(bm.calc.disputeDeadline) + '</div>' +
       dueBarHtml(bm.calc) +
-      focusNum +
       '<div class="uc-band__sum">账单 ' + ui.money(bm.calc.calcAmount) + ' · 已登记 ' + ui.money(bm.sum) +
         ' · 已确认 ' + ui.money(confSum) + '</div>' +
       (hint ? '<div class="uc-band__hint' + (hintCls ? " " + hintCls : "") + '">' + ui.esc(hint) + '</div>' : "") +
@@ -289,15 +309,14 @@
       ? '<section class="card uh-sec" data-band="' + bm.layer + '">' + detailHtml + '</section>'
       : "";
 
-    /* ---- 卡3 · 待办事项：待处理登记 + 收口动作 ---- */
+    /* ---- 卡3 · 待办事项：待处理登记（收口动作已上移至页级粘性底栏，批次九 L2） ---- */
     var footHtml = bandFoot(bm, canAct);
-    var todoCard = (actRegs.length || footHtml)
+    var todoCard = actRegs.length
       ? '<section class="card uh-sec" data-band="' + bm.layer + '">' +
         '<div class="uh-sechead"><span class="lbl">待办事项</span>' +
-        (actRegs.length ? '<span class="uh-badge uh-badge--wait">待处理 ' + actRegs.length + ' 笔</span>' : "") +
+        '<span class="uh-badge uh-badge--wait">待处理 ' + actRegs.length + ' 笔</span>' +
         '</div>' +
-        (actRegs.length ? '<div class="uc-regs">' + actRegs.map(function (r) { return regHtml(r, bm, canAct); }).join("") + '</div>' : "") +
-        footHtml +
+        '<div class="uc-regs">' + actRegs.map(function (r) { return regHtml(r, bm, canAct); }).join("") + '</div>' +
         '</section>'
       : "";
 
@@ -311,7 +330,10 @@
         : '<div class="uc-empty">该月暂无付款登记留痕</div>') +
       '</section>';
 
-    return headCard + detailCard + todoCard + archCard;
+    return '<div class="uc-band-grid">' +
+      '<div class="uc-band-grid__aside">' + headCard + '</div>' +
+      '<div class="uc-band-grid__main">' + detailCard + todoCard + archCard + '</div>' +
+      '</div>';
   }
 
   /* ---------- 弹窗：登记线下付款 ---------- */
@@ -412,11 +434,33 @@
     /* 卷宗 tab 切换：仅渲染当前卷宗带（历史对账记录已迁移至独立页 reconcile-history.html） */
     html += (_tab === "2" ? bandHtml(b2, canAct2, Uni) : bandHtml(b1, canAct1, Uni));
 
-    /* 计费范围 + 结算口径与时限说明：同一卡片内并列两栏，置于页面最下方 */
-    html += Uni.scopeCard(rulesClauseHtml());
+    /* 计费范围 + 结算口径与时限说明：折叠为「一句话 + 查看口径说明」（P1-7 去墙化） */
+    html += Uni.scopeCardFold(
+      "费用按平台月度合格消费账单口径结算；线下付款凭证强制留痕。",
+      "费用计算范围与结算口径",
+      Uni.scopeSheetBody(rulesClauseHtml())
+    );
+
+    /* 批次九 L2：页级粘性底栏容器（内容由 mount 末尾按当前卷宗填充） */
+    html += '<div class="uh-stickybar"></div>';
 
     el.innerHTML = html;
+    Uni.bindScopeFold(el, Uni);
     wireSticky(el); /* 卷宗 tab 吸顶：重挂载后重新绑定目标元素（监听器文件级单例） */
+
+    /* 批次九 L2：粘性底栏 = 当前卷宗的收口主操作（登记/平账）；tab/核对切换重挂载自动刷新 */
+    var curBm = _tab === "2" ? b2 : b1;
+    var curCan = _tab === "2" ? canAct2 : canAct1;
+    var sb = el.querySelector(".uh-stickybar");
+    if (sb) {
+      var foot = bandFoot(curBm, curCan);
+      sb.innerHTML = foot || "";
+      sb.classList.toggle("is-empty", !foot);
+    }
+
+    /* 批次九 L8：差异主数字 count-up（420ms ease-out；reduced-motion 直跳终值） */
+    var cnum = el.querySelector("[data-count]");
+    if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")), 420, ui.moneyD);
 
     /* 卷宗 tab 切换（省代双卷宗；二级域不可达本页） */
     el.querySelectorAll("[data-tab]").forEach(function (n) {
@@ -456,8 +500,24 @@
       var layer = n.getAttribute("data-layer") || (n.closest("[data-band]") || {}).getAttribute && n.closest("[data-band]").getAttribute("data-band");
       var id = n.getAttribute("data-id");
       n.addEventListener("click", function () {
+        if (act === "scopeFold") {
+          return Uni.sheet({
+            title: n.getAttribute("data-title"),
+            body: n.getAttribute("data-body"),
+            footer: [{ t: "关闭", kind: "ghost" }]
+          });
+        }
         if (ctx.readonly) { Uni.toast(V.lockedNote || "当前为只读态，经营动作已锁定"); return; }
         if (act === "addreg") return registerSheet(ctx, Uni, layer);
+        if (act === "checkAll") {
+          var cid = layer === "1" ? calc1.id : calc2.id;
+          var cobj = layer === "1" ? calc1 : calc2;
+          var dl = (cobj && cobj.detail) || [];
+          if (!dl.length) { Uni.toast("该卷宗暂无明细可核对"); return; }
+          dl.forEach(function (d) { Uni.detailState.set(cid, d.id, "checked", ctx.identity); });
+          Uni.toast("已全部核对（" + dl.length + " 笔）", "ok");
+          return mount(el, ctx, Uni);
+        }
         if (act === "balance") return Uni.actGuarded("stmt/balance", { layer: layer });
         if (act === "remind") return Uni.actGuarded("msg/add", { msg: { icon: "bell", type: "info", title: "已提醒二级企业确认收款", to: "reconcile.html" } });
         if (act === "dispute") {
@@ -483,10 +543,12 @@
               '<div class="uh-note">确认即代表已核对到账金额与凭证一致。</div>',
             footer: [{ t: "取消", kind: "ghost" },
             { t: "确认到账（记录）", kind: "ghost", onClick: function () {
-                Uni.actGuarded("pay/confirm", { layer: layer, id: id, signMethod: "record" });
+                var r = Uni.actGuarded("pay/confirm", { layer: layer, id: id, signMethod: "record" });
+                if (r.ok) { Uni.detailState.confirmBill(layer === "1" ? calc1.id : calc2.id, ctx.identity); }
             } },
             { t: "电子签留痕", kind: "primary", onClick: function () {
-                Uni.actGuarded("pay/confirm", { layer: layer, id: id, signMethod: "esign" });
+                var r = Uni.actGuarded("pay/confirm", { layer: layer, id: id, signMethod: "esign" });
+                if (r.ok) { Uni.detailState.confirmBill(layer === "1" ? calc1.id : calc2.id, ctx.identity); }
             } }]
           });
           return;
@@ -500,7 +562,8 @@
             { t: "确认到账", kind: "primary", onClick: function (sh) {
                 var v = sh.querySelector("#ur-v-note").value.trim();
                 if (!v) { Uni.toast("异议记录须填写线下核实说明后再确认"); return false; }
-                Uni.actGuarded("pay/confirm", { layer: layer, id: id, verifiedNote: v });
+                var r = Uni.actGuarded("pay/confirm", { layer: layer, id: id, verifiedNote: v });
+                if (r.ok) { Uni.detailState.confirmBill(layer === "1" ? calc1.id : calc2.id, ctx.identity); }
             } }]
           });
           return;
@@ -521,6 +584,7 @@
     route: "reconcile.html",
     modes: ["province"],
     STATE_VARIANTS: STATE_VARIANTS,
+    skeleton: true,
     mount: mount
   });
 })();

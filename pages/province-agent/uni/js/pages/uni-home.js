@@ -13,7 +13,7 @@
 
   /* 宫格条目共享元数据（条目渲染器唯一，三身份复用） */
   var ENTRY_META = {
-    "invite-code.html":    { icon: "qr",      label: "渠道码·海报" },
+    "invite-code.html":    { icon: "qr",      label: "经营与渠道" },
     "invite-records.html": { icon: "user",    label: "获客记录" },
     "invite-stats.html":   { icon: "chart",   label: "获客转化" },
     "reconcile.html":      { icon: "receipt", label: "对账中心" },
@@ -21,8 +21,8 @@
     "subs.html":           { icon: "building", label: "二级合作" },
     "team.html":           { icon: "users",   label: "团队管理" },
     "agreement.html":      { icon: "file",    label: "合作协议" },
-    "reconcile-sub.html":  { icon: "receipt", label: "收款确认" },
-    "statement.html":      { icon: "file",    label: "月度对账单" }
+    "reconcile-hub-sub.html": { icon: "receipt", label: "对账中心" },
+    "statement.html":      { icon: "file",    label: "阅读对账单" }
   };
 
   var STATE_VARIANTS = {
@@ -79,11 +79,11 @@
       data: function (ctx) {
         var state = store.getState(), s = ctx.s, my = ctx.staffName;
         var myLeads = [];
-        ["direct", "agent"].forEach(function (ch) {
+        ["direct"].forEach(function (ch) {
           (s.leads[ch] || []).forEach(function (l) { if (l.owner === my) myLeads.push(l); });
         });
         var users = 0, myCode = "尚未生成";
-        ["direct", "agent"].forEach(function (ch) {
+        ["direct"].forEach(function (ch) {
           (s.channels[ch] || []).forEach(function (c) {
             if (c.ownerName === my && c.status === "active") { users += c.users || 0; if (myCode === "尚未生成") myCode = c.code; }
           });
@@ -178,11 +178,11 @@
           permNote: ""
         };
       },
-      entries: ["invite-code.html", "invite-records.html", "agreement.html", "reconcile-sub.html", "team.html"],
+      entries: ["invite-code.html", "invite-records.html", "agreement.html", "reconcile-hub-sub.html", "team.html"],
       perms: { invite: true, createSub: false, signAgreement: true },
       badges: {},
       empty: { feed: { title: "暂无动态", desc: "与上级省代的对账、协议动态将出现在这里" } },
-      lockedNote: "邀请与收款确认均已锁定，台账与协议仍可查阅"
+      lockedNote: "邀请与确认到账均已锁定，台账与协议仍可查阅"
     }
   };
 
@@ -270,7 +270,7 @@
     var tiles = V.entries.map(function (route) {
       var m = ENTRY_META[route] || { icon: "file", label: route };
       var dot = (route === "subs.html" && todo.subs > 0) ? '<span class="dot"></span>' :
-        (route === "reconcile-sub.html" && todo.payments > 0 ? '<span class="dot"></span>' : "");
+        (route === "reconcile-hub-sub.html" && todo.payments > 0 ? '<span class="dot"></span>' : "");
       return '<button class="uh-tile" data-go="' + route + '">' + dot +
         '<span class="ic">' + ui.icon(m.icon, 18) + '</span><span>' + ui.esc(m.label) + '</span></button>';
     }).join("");

@@ -1,5 +1,5 @@
 /* ============================================================
-   uni-statement.js · 月度对账单（statement.html）（E106–E107）
+   uni-statement.js · 阅读对账单（statement.html）（E106–E107）
    模板节奏（三身份同构，数据驱动填充）：
      暂停封条 → 逐月对账单卡片（应付 − 已登记到账算式 + 差异五态结论）
    身份差异仅限：数据换源（二级=s.statements+s.calc+s.payRegs；
@@ -54,6 +54,7 @@
 
       vm.cards.push({
         month: st.month,
+        tier: isSub ? "s" : (isL1 ? "p" : "s"),
         badgeCls: st.status === "balanced" ? "ok" : "wait",
         badgeTxt: st.status === "balanced" ? "已平账" : "对账中",
         amount: amount, sum: sum, diff: diff,
@@ -101,7 +102,7 @@
       label: "二级合作企业 · 管理员",
       data: function (ctx) {
         return buildVm(ctx, {
-          actionPage: "请到收款确认页提出异议或线下核实",
+          actionPage: "请到对账中心提出异议或线下核实",
           pendingText: "待你核对确认（15 天仅提醒）",
           diffText: "待省代补齐",
           readyText: "待省代平账"
@@ -115,10 +116,11 @@
     }
   };
 
-  /* ---------- 逐月对账单卡（系统 .card + uh- 基元） ---------- */
+  /* ---------- 逐月对账单卡（系统 .card + uh- 基元；月份在组头，卡内不再重复） ---------- */
   function statementCard(c) {
     return '<section class="card uh-sec">' +
-      '<div class="uh-finhead"><span class="uh-eyebrow">月度对账单 · ' + ui.esc(c.month) + "</span>" +
+      '<div class="uh-finhead"><span class="uh-eyebrow">阅读对账单</span>' +
+      '<span class="uh-tier uh-tier--' + c.tier + '">' + (c.tier === "p" ? "平台→省代" : "省代→二级") + "</span>" +
       '<span class="uh-badge uh-badge--' + c.badgeCls + '">' + c.badgeTxt + "</span></div>" +
       '<div class="uh-sheetkv" style="margin-top:8px"><span class="k">应付金额</span><span class="v">' + ui.money(c.amount) + "</span></div>" +
       '<div class="uh-sheetkv"><span class="k">已登记到账</span><span class="v">' + ui.money(c.sum) + "</span></div>" +
@@ -134,6 +136,19 @@
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
     var vm = V.data(ctx);
 
+    /* 批次九 L3：按月份分组 + 月份组头（最近月在前，月内多卡并列） */
+    var groups = {}, months = [];
+    vm.cards.forEach(function (c) {
+      if (!groups[c.month]) { groups[c.month] = []; months.push(c.month); }
+      groups[c.month].push(c);
+    });
+    var listHtml = months.map(function (m) {
+      return '<section class="uh-sec"><div class="uh-sechead" style="margin-bottom:10px">' +
+        '<span class="lbl">' + ui.esc(m) + "</span>" +
+        '<span class="uh-badge uh-badge--mute">' + groups[m].length + " 张</span></div>" +
+        '<div class="st-grid">' + groups[m].map(statementCard).join("") + '</div></section>';
+    }).join("");
+
     el.innerHTML =
       (ctx.readonly
         ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
@@ -142,8 +157,8 @@
         : "") +
       (vm.cards.length
         ? '<section class="uh-sec"><div class="uh-sechead"><span class="lbl">逐月对账</span>' +
-          '<span class="uh-badge uh-badge--mute">' + vm.cards.length + " 个月</span></div></section>" +
-          vm.cards.map(statementCard).join("")
+          '<span class="uh-badge uh-badge--mute">' + months.length + " 个月 · " + vm.cards.length + " 张</span></div></section>" +
+          listHtml
         : '<section class="uh-sec"><div class="card">' +
           Uni.emptyHtml("暂无对账单", "月度出账后，对账单将逐月出现在这里", "doc") +
           '</div></section>');
@@ -154,6 +169,7 @@
     route: "statement.html",
     modes: ["province", "sub"],
     STATE_VARIANTS: STATE_VARIANTS,
+    skeleton: true,
     mount: mount
   });
 })();

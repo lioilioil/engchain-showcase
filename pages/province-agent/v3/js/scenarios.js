@@ -4,10 +4,34 @@
    说明：
    - 待办与消息由 store.todoOf / messagesOf 派生，种子不写 alerts 假数据
    - 线索 owner 字段用于员工（王敏）数据隔离演示
+   - 渠道语义 20261030：删除招商码（agentCodes）、channels/leads 的 agent 桶合并入 direct
+     （subs/subApps 的 channel:"agent" 为二级合作来源标记，非招商码，保留）
    - 所有金额为演示模拟数据，页面统一标注"模拟测算"
    ============================================================ */
 (function () {
   "use strict";
+
+  /* APP 操作流水派生器（演示层）：仅按种子既有真实字段格式化，不伪造行为。
+     事件 type：register 注册完成 / login App登录 / entry 提交入驻申请并缴入驻费 /
+     unlock 解锁供需 / order 下单或增值服务支付；cert 事件留给真实埋点（演示层不产）。
+     按 at 升序返回。 */
+  function opsOf(lead) {
+    var ev = [];
+    if (lead.createdAt || lead.boundAt) {
+      ev.push({ type: "register", at: (lead.boundAt || lead.createdAt).slice(0, 10), desc: "完成手机号注册" });
+    }
+    if (lead.loginAt) ev.push({ type: "login", at: lead.loginAt.slice(0, 10), desc: "登录 App" });
+    (lead.consumption || []).forEach(function (c) {
+      var at = (c.date || "").slice(0, 10);
+      if (!at) return;
+      if (c.type === "entry_fee") ev.push({ type: "entry", at: at, desc: "提交入驻申请并缴纳入驻费" });
+      else if (c.type === "points_unlock_paid") ev.push({ type: "unlock", at: at, desc: "解锁供需详情" });
+      else if (c.type === "value_added_paid") ev.push({ type: "order", at: at, desc: "购买增值服务并完成支付" });
+      else ev.push({ type: "order", at: at, desc: "产生供需订单并完成支付" });
+    });
+    ev.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+    return ev;
+  }
 
   /* ---------------- 省代（老板 / 员工） ---------------- */
   function provinceSeed(status, isEmpty) {
@@ -27,8 +51,7 @@
       frozenDays: 7,
       disputeDeadline: "T+5 工作日",
       dueDay: 3,
-      detail: z ? [] : [
-        { id: "D101", item: "cert", user: "成都远大工程有限公司", order: "AC20261001001", amount: 999, date: "2026-10-03" },
+      detail: z ? [] : [        { id: "D101", item: "cert", user: "成都远大工程有限公司", order: "AC20261001001", amount: 999, date: "2026-10-03" },
         { id: "D102", item: "entry", user: "绵阳宏达建设集团有限公司", order: "EN20261001005", amount: 3999, date: "2026-10-05" },
         { id: "D103", item: "unlock", user: "德阳恒基建材有限公司", order: "UL20261001012", amount: 1800, date: "2026-10-08" },
         { id: "D104", item: "order", user: "南充嘉陵建筑工程有限公司", order: "DD20260901018", amount: 3202, date: "2026-10-12" }
@@ -40,16 +63,16 @@
       month: "2026-10",
       issueAt: "2026-10-25",
       dueAt: "2026-10-30",
-      eligibleBase: 10000,
+      eligibleBase: 6000,          /* 方案甲 20261030：二级独立口径 = 二级线合格消费（financeBase.subGross），不再引用全省 10000 */
       ratioToSub: 0.20,
-      calcAmount: z ? 0 : 1000,
+      calcAmount: z ? 0 : 600,     /* 600 = 6,000 × 50% × 20%（二级线盘 × 约定比例） */
       disputeDeadline: "出账后 15 天",
       dueDay: 12,
       detail: z ? [] : [
-        { id: "D201", item: "cert", user: "成都蓉建科贸有限公司", order: "AC20261002001", amount: 999, date: "2026-10-02" },
-        { id: "D202", item: "entry", user: "成都蓉建科贸有限公司", order: "EN20261002005", amount: 3999, date: "2026-10-06" },
-        { id: "D203", item: "unlock", user: "成都蓉建科贸有限公司", order: "UL20261002012", amount: 1800, date: "2026-10-09" },
-        { id: "D204", item: "order", user: "成都蓉建科贸有限公司", order: "DD20260902018", amount: 3202, date: "2026-10-11" }
+        { id: "D201", item: "cert", user: "成都蓉建科贸有限公司", order: "AC20261002001", amount: 1800, date: "2026-10-02" },
+        { id: "D202", item: "entry", user: "成都蓉建科贸有限公司", order: "EN20261002005", amount: 1500, date: "2026-10-06" },
+        { id: "D203", item: "unlock", user: "成都蓉建科贸有限公司", order: "UL20261002012", amount: 1300, date: "2026-10-09" },
+        { id: "D204", item: "order", user: "成都蓉建科贸有限公司", order: "DD20260902018", amount: 1400, date: "2026-10-11" }
       ]
     };
 
@@ -109,7 +132,7 @@
     ];
     var payRegs2 = z ? [] : [
       {
-        id: "r0-l2", calcId: "c0-l2", amount: 920, method: "bank",
+        id: "r0-l2", calcId: "c0-l2", amount: 460, method: "bank",
         date: "2026-09-12",
         vouchers: [{
           name: "9月二级转款回单.png", kind: "receipt",
@@ -117,7 +140,7 @@
             bank: "中国建设银行", bankNo: "EB2026091200713052",
             payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
             payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-            amount: 920, amountCn: "玖佰贰拾元整",
+            amount: 460, amountCn: "肆佰陆拾元整",
             purpose: "2026-09 二级合作分润 · 结算单 ST-202609-L2",
             at: "2026-09-12 11:24:18", by: "王建国"
           }
@@ -126,7 +149,7 @@
         confirmedAt: "2026-09-13", signMethod: "esign", createdAt: "2026-09-12"
       },
       {
-        id: "r1-l2", calcId: "c1-l2", amount: 1000, method: "bank",
+        id: "r1-l2", calcId: "c1-l2", amount: 600, method: "bank",
         date: "2026-10-11",
         vouchers: [{
           name: "10月二级转款回单.png", kind: "receipt",
@@ -134,7 +157,7 @@
             bank: "中国建设银行", bankNo: "EB2026101100824176",
             payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
             payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-            amount: 1000, amountCn: "壹仟元整",
+            amount: 600, amountCn: "陆佰元整",
             purpose: "2026-10 二级合作分润 · 结算单 ST-202610-L2",
             at: "2026-10-11 09:47:52", by: "王建国"
           }
@@ -162,7 +185,7 @@
       }
     ];
 
-    return {
+    var seed = {
       mode: "province",
       role: "admin",
       roleStaffName: "王敏",
@@ -225,7 +248,7 @@
             contact: "何斌",
             phone: "138****4471",
             address: "四川省泸州市江阳区酒城大道三段 51 号",
-            ratioToSub: 0.18,
+            ratioToSub: 0.20,
             subGross: 1200,
             since: "2026-08-25",
             status: "active",
@@ -239,7 +262,7 @@
             contact: "罗刚",
             phone: "137****8853",
             address: "四川省宜宾市翠屏区临港大道 108 号",
-            ratioToSub: 0.22,
+            ratioToSub: 0.20,
             subGross: 1000,
             since: "2026-09-03",
             status: "active",
@@ -253,7 +276,7 @@
             contact: "杨帆",
             phone: "136****2096",
             address: "四川省乐山市市中区柏杨中路 66 号",
-            ratioToSub: 0.16,
+            ratioToSub: 0.20,
             subGross: 500,
             since: "2026-09-15",
             status: "active",
@@ -281,7 +304,7 @@
             contact: "唐雪",
             phone: "158****3315",
             address: "四川省广元市利州区东坝街道 27 号",
-            ratioToSub: 0.15,
+            ratioToSub: 0.20,
             subGross: 300,
             since: "2026-10-05",
             status: "active",
@@ -295,7 +318,7 @@
             contact: "张强",
             phone: "186****6629",
             address: "四川省内江市东兴区汉安大道 74 号",
-            ratioToSub: 0.24,
+            ratioToSub: 0.20,
             subGross: 200,
             since: "2026-10-12",
             status: "active",
@@ -309,7 +332,7 @@
             contact: "刘波",
             phone: "139****5172",
             address: "四川省自贡市富顺县釜江大道 112 号",
-            ratioToSub: 0.19,
+            ratioToSub: 0.20,
             since: "2026-10-18",
             status: "active",
             channel: "agent"
@@ -336,28 +359,19 @@
             rejectReason: "营业执照经营范围与工程服务类目不符", handledAt: "2026-10-20", submittedAt: "2026-10-18"
           }
         ],
-        agentCodes: z ? {
-          direct: { code: "", status: "inactive", channel: "direct", validUntil: "2026-12-31" },
-          agent: { code: "", status: "inactive", channel: "agent", validUntil: "2026-12-31" }
-        } : {
-          direct: { code: "AG-7KQ2TZ", status: "active", channel: "direct", createdAt: "2026-08", validUntil: "2026-12-31" },
-          agent: { code: "AG-3MN9WP", status: "void", channel: "agent", voidAt: "2026-09", validUntil: "2026-05-31" }
-        },
-        channels: z ? { direct: [], agent: [] } : {
+        channels: z ? { direct: [] } : {
           direct: [
-            { code: "CH-P-8KQ2TV", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 8, validUntil: "2026-12-31", status: "active" },
-            { code: "CH-P-9WT1XC", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-07", users: 3, validUntil: "2026-09-30", status: "void" }
-          ],
-          agent: [
-            { code: "CH-P-4HN7MW", channel: "agent", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 6, validUntil: "2026-12-31", status: "active" },
-            { code: "CH-E-2QP6ZK", channel: "agent", ownerType: "staff", ownerName: "王敏", createdAt: "2026-09", users: 4, validUntil: "2026-12-31", status: "active" }
+            { code: "CH-P-8KQ2TV", name: "成都建筑协会", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 8, validUntil: "2026-12-31", status: "active" },
+            { code: "CH-P-9WT1XC", name: "德阳工程交流群", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-07", users: 3, validUntil: "2026-09-30", status: "void" },
+            { code: "CH-P-4HN7MW", name: "建材市场地推", channel: "direct", ownerType: "province", ownerName: "王建国", createdAt: "2026-08", users: 6, validUntil: "2026-12-31", status: "active" },
+            { code: "CH-E-2QP6ZK", name: "朋友圈推广", channel: "direct", ownerType: "staff", ownerName: "王敏", createdAt: "2026-09", users: 4, validUntil: "2026-12-31", status: "active" }
           ]
         },
         team: z ? [] : [
-          { name: "王建国", role: "boss", title: "法定代表人 / 总经理", phone: "138****8021", since: "2026-08-12", leads: 0, isLegal: true },
-          { name: "王敏", role: "staff", title: "渠道专员", phone: "135****4902", since: "2026-09-02", leads: 4, isLegal: false, channel: "CH-E-2QP6ZK" }
+          { name: "王建国", role: "boss", title: "法定代表人 / 总经理", phone: "138****8021", since: "2026-08-12", leads: 0, isLegal: true, avatar: "../../../../assets/me/avatars/ox-01.jpg" },
+          { name: "王敏", role: "staff", title: "渠道专员", phone: "135****4902", since: "2026-09-02", leads: 4, isLegal: false, channel: "CH-E-2QP6ZK", avatar: "../../../../assets/me/avatars/cat-01.jpg" }
         ],
-        leads: z ? { direct: [], agent: [] } : {
+        leads: z ? { direct: [] } : {
           direct: [
             { id: "L001", name: "张磊", phone: "139****1123", stage: "paid", owner: "王建国", createdAt: "2026-09-15", boundAt: "2026-09-15", loginAt: "2026-10-06", amount: 3600, company: "成都筑信工程有限公司",
               consumption: [
@@ -390,15 +404,13 @@
                 { date: "2026-09-27", type: "entry_fee", amount: 1000 }
               ],
               notes: [] },
-            { id: "L009", name: "马超", phone: "133****4478", stage: "registered", owner: "王建国", createdAt: "2026-10-12", boundAt: "2026-10-12", loginAt: "2026-10-13", notes: [] }
-          ],
-          agent: [
+            { id: "L009", name: "马超", phone: "133****4478", stage: "registered", owner: "王建国", createdAt: "2026-10-12", boundAt: "2026-10-12", loginAt: "2026-10-13", notes: [] },
             { id: "L101", name: "孙丽", phone: "139****2267", stage: "paid", owner: "王建国", createdAt: "2026-09-11", boundAt: "2026-09-11", loginAt: "2026-09-20", amount: 1980, company: "绵阳恒达商贸有限公司",
               consumption: [
                 { date: "2026-09-11", type: "entry_fee", amount: 600 },
                 { date: "2026-09-11", type: "order_paid_net", amount: 1980 }
               ],
-              notes: [{ at: "2026-09-11", by: "王建国", text: "招商渠道导流" }] },
+              notes: [{ at: "2026-09-11", by: "王建国", text: "渠道码导流" }] },
             { id: "L102", name: "周杰", phone: "138****5590", stage: "onboarded", owner: "王建国", createdAt: "2026-09-18", boundAt: "2026-09-18", loginAt: "2026-09-28", company: "德阳华瑞物资有限公司",
               consumption: [
                 { date: "2026-09-19", type: "entry_fee", amount: 1000 }
@@ -427,22 +439,84 @@
               notes: [] }
           ]
         },
+        /* 二级线获客明细独立桶（不入 s.leads，省代 funnelOf/consumeOf 统计口径零污染）。
+           6 条移植自 subSeed（sub-rongjian 陈志远）+ 4 条扩展（luzhou/yibin/leshan）。 */
+        leadsSub: z ? [] : [
+          { id: "U001", name: "黄磊", phone: "139****8820", stage: "paid", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-09-05", boundAt: "2026-09-05", loginAt: "2026-09-25", amount: 5200, company: "德阳金鑫工程有限公司",
+            consumption: [ { date: "2026-09-05", type: "order_paid_net", amount: 3200 }, { date: "2026-09-12", type: "points_unlock_paid", amount: 2000 } ] },
+          { id: "U002", name: "许静", phone: "138****4412", stage: "onboarded", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-09-19", boundAt: "2026-09-19", loginAt: "2026-09-29", company: "绵阳润泽商贸有限公司",
+            consumption: [ { date: "2026-09-20", type: "entry_fee", amount: 1000 } ] },
+          { id: "U003", name: "邓涛", phone: "137****6609", stage: "registered", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-10-09", boundAt: "2026-10-09", loginAt: "2026-10-10" },
+          { id: "U004", name: "蔡敏", phone: "135****2287", stage: "paid", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-09-23", boundAt: "2026-09-23", loginAt: "2026-10-09", amount: 2800, company: "广汉鑫诚建材有限公司",
+            consumption: [ { date: "2026-09-23", type: "order_paid_net", amount: 1800 }, { date: "2026-09-27", type: "points_unlock_paid", amount: 1000 } ] },
+          { id: "U005", name: "罗军", phone: "136****1145", stage: "onboarded", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-10-05", boundAt: "2026-10-05", loginAt: "2026-10-13", company: "什邡恒运商贸有限公司",
+            consumption: [ { date: "2026-10-06", type: "entry_fee", amount: 1000 } ] },
+          { id: "U006", name: "蒋雪", phone: "139****7736", stage: "registered", owner: "陈志远", subId: "sub-rongjian", createdAt: "2026-10-16", boundAt: "2026-10-16", loginAt: "2026-10-18" },
+          { id: "U101", name: "周明", phone: "135****8821", stage: "paid", owner: "何斌", subId: "sub-luzhou", createdAt: "2026-09-08", boundAt: "2026-09-08", loginAt: "2026-09-22", amount: 2700, company: "泸州川南建材工程分公司",
+            consumption: [ { date: "2026-09-08", type: "order_paid_net", amount: 1800 }, { date: "2026-09-15", type: "points_unlock_paid", amount: 900 } ] },
+          { id: "U102", name: "李娟", phone: "138****3390", stage: "onboarded", owner: "何斌", subId: "sub-luzhou", createdAt: "2026-09-28", boundAt: "2026-09-28", loginAt: "2026-10-09", company: "泸州江阳安装工程队",
+            consumption: [ { date: "2026-09-29", type: "entry_fee", amount: 1000 } ] },
+          { id: "U103", name: "吴强", phone: "137****5512", stage: "registered", owner: "罗刚", subId: "sub-yibin", createdAt: "2026-10-15", boundAt: "2026-10-15", loginAt: "2026-10-19", company: "宜宾临港物流服务部" },
+          { id: "U104", name: "郑丽", phone: "139****7743", stage: "paid", owner: "杨帆", subId: "sub-leshan", createdAt: "2026-09-12", boundAt: "2026-09-12", loginAt: "2026-09-26", amount: 800, company: "乐山五通桥物资经营部",
+            consumption: [ { date: "2026-09-13", type: "value_added_paid", amount: 800 } ] }
+        ],
         hist: z ? [] : [
           { month: "2026-10", type: "platform", issueAt: "2026-10-25", dueAt: "2026-10-30", amount: 5000, state: "pending" },
-          { month: "2026-10", type: "sub", issueAt: "2026-10-25", dueAt: "2026-10-30", amount: 1000, state: "pending" },
+          { month: "2026-10", type: "sub", issueAt: "2026-10-25", dueAt: "2026-10-30", amount: 600, state: "pending" },
           { month: "2026-09", type: "platform", issueAt: "2026-09-25", dueAt: "2026-09-30", amount: 4600, state: "settled", settledAt: "2026-09-28" },
-          { month: "2026-09", type: "sub", issueAt: "2026-09-25", dueAt: "2026-09-30", amount: 920, state: "settled", settledAt: "2026-09-14" },
+          { month: "2026-09", type: "sub", issueAt: "2026-09-25", dueAt: "2026-09-30", amount: 460, state: "settled", settledAt: "2026-09-14" },
           { month: "2026-08", type: "platform", issueAt: "2026-08-25", dueAt: "2026-08-30", amount: 5200, state: "overdue" },
           { month: "2026-08", type: "sub", issueAt: "2026-08-25", dueAt: "2026-08-30", amount: 880, state: "overdue" }
         ],
         msgLog: z ? [] : [
           { icon: "check", type: "ok", title: "二级企业合作已通过", desc: "成都蓉建科贸有限公司已入驻并生效", time: "今天 14:30", to: "subs.html" },
-          { icon: "receipt", type: "info", title: "月度对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 10:20", to: "statement.html" },
+          { icon: "receipt", type: "info", title: "阅读对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 10:20", to: "statement.html" },
           { icon: "file", type: "info", title: "合作协议已签署", desc: "与成都蓉建科贸有限公司约定比例 20%", time: "昨天 16:40", to: "agreement.html" },
           { icon: "bank", type: "ok", title: "平台付款已登记", desc: "平台已登记对公转账 ¥24,000", time: "昨天 11:05", to: "reconcile.html" }
         ],
       }
     };
+    /* APP 操作流水：按既有真实字段派生回填（不伪造） */
+    Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { l.ops = opsOf(l); }); });
+    (seed.state.leadsSub || []).forEach(function (l) { l.ops = opsOf(l); });
+    /* uni11：lifecycle 状态机字段回填（页面层现算；store funnelOf 口径不动） */
+    var LIFECYCLE_BY_STAGE = { registered: "已注册", onboarded: "已企业入驻", paid: "已企业入驻", repaid: "已企业入驻", lost: "流失" };
+    Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { if (!l.lifecycle) l.lifecycle = LIFECYCLE_BY_STAGE[l.stage] || "已注册"; }); });
+    (seed.state.leadsSub || []).forEach(function (l) { if (!l.lifecycle) l.lifecycle = LIFECYCLE_BY_STAGE[l.stage] || "已注册"; });
+    /* uni11 §5.2：新增演示 lead（覆盖 8 状态；空场景不补） */
+    if (!z) {
+      /* 自营线 direct：游客×1 / 已个人认证 / 已企业认证 / 已加入认证企业 / 已加入入驻企业 */
+      seed.state.leads.direct.push(
+        { id: "G001", name: "访客A", phone: "", stage: "registered", owner: "王建国", lifecycle: "游客" },
+        { id: "P001", name: "陈晨", phone: "138****6620", stage: "registered", owner: "王建国", lifecycle: "已个人认证", createdAt: "2026-10-18", boundAt: "2026-10-18", loginAt: "2026-10-19" },
+        { id: "Q001", name: "刘一帆", phone: "139****5517", stage: "registered", owner: "王建国", lifecycle: "已企业认证", createdAt: "2026-10-11", boundAt: "2026-10-11", loginAt: "2026-10-14", company: "成都经开工程监理有限公司" },
+        { id: "J001", name: "杨光", phone: "136****9923", stage: "registered", owner: "王建国", lifecycle: "已加入认证企业", createdAt: "2026-10-09", boundAt: "2026-10-09", loginAt: "2026-10-12", company: "成都蓉建科贸有限公司" },
+        { id: "H001", name: "黄敏", phone: "135****3308", stage: "onboarded", owner: "王建国", lifecycle: "已加入入驻企业", createdAt: "2026-10-05", boundAt: "2026-10-05", loginAt: "2026-10-16", company: "绵阳润泽商贸有限公司" }
+      );
+      /* 自营线 direct：游客×1 / 已个人认证 / 已企业认证 / 已加入认证企业 / 已加入入驻企业（原 agent 桶已合并入 direct） */
+      seed.state.leads.direct.push(
+        { id: "G002", name: "访客B", phone: "", stage: "registered", owner: "王敏", lifecycle: "游客" },
+        { id: "P002", name: "何静", phone: "137****1145", stage: "registered", owner: "王敏", lifecycle: "已个人认证", createdAt: "2026-10-17", boundAt: "2026-10-17", loginAt: "2026-10-18" },
+        { id: "Q002", name: "罗成", phone: "138****8830", stage: "registered", owner: "王敏", lifecycle: "已企业认证", createdAt: "2026-10-10", boundAt: "2026-10-10", loginAt: "2026-10-13", company: "成都温江市政工程队" },
+        { id: "J002", name: "高翔", phone: "135****7726", stage: "registered", owner: "王敏", lifecycle: "已加入认证企业", createdAt: "2026-10-08", boundAt: "2026-10-08", loginAt: "2026-10-11", company: "德阳华瑞物资有限公司" },
+        { id: "H002", name: "唐莉", phone: "136****4419", stage: "onboarded", owner: "王敏", lifecycle: "已加入入驻企业", createdAt: "2026-10-04", boundAt: "2026-10-04", loginAt: "2026-10-15", company: "德阳金鑫工程有限公司" }
+      );
+      /* 二级线 leadsSub：游客×2 / 已个人认证×2 / 已加入认证企业×2 / 已加入入驻企业×2（挂现有 4 家） */
+      (seed.state.leadsSub = seed.state.leadsSub || []).push(
+        { id: "U201", name: "访客甲", phone: "", stage: "registered", owner: "陈志远", subId: "sub-rongjian", lifecycle: "游客" },
+        { id: "U202", name: "访客乙", phone: "", stage: "registered", owner: "何斌", subId: "sub-luzhou", lifecycle: "游客" },
+        { id: "U203", name: "冯军", phone: "137****5582", stage: "registered", owner: "陈志远", subId: "sub-rongjian", lifecycle: "已个人认证", createdAt: "2026-10-14", boundAt: "2026-10-14", loginAt: "2026-10-16" },
+        { id: "U204", name: "宋佳", phone: "138****2260", stage: "registered", owner: "杨帆", subId: "sub-leshan", lifecycle: "已个人认证", createdAt: "2026-10-13", boundAt: "2026-10-13", loginAt: "2026-10-15" },
+        { id: "U205", name: "曹阳", phone: "139****7741", stage: "registered", owner: "陈志远", subId: "sub-rongjian", lifecycle: "已加入认证企业", createdAt: "2026-10-07", boundAt: "2026-10-07", loginAt: "2026-10-12", company: "成都蓉建科贸有限公司" },
+        { id: "U206", name: "邓辉", phone: "136****8815", stage: "registered", owner: "何斌", subId: "sub-luzhou", lifecycle: "已加入认证企业", createdAt: "2026-10-06", boundAt: "2026-10-06", loginAt: "2026-10-10", company: "泸州川南建材工程分公司" },
+        { id: "U207", name: "彭琳", phone: "135****3394", stage: "onboarded", owner: "罗刚", subId: "sub-yibin", lifecycle: "已加入入驻企业", createdAt: "2026-09-30", boundAt: "2026-09-30", loginAt: "2026-10-14", company: "宜宾叙府工程设备有限公司" },
+        { id: "U208", name: "蔡文", phone: "137****6648", stage: "onboarded", owner: "陈志远", subId: "sub-rongjian", lifecycle: "已加入入驻企业", createdAt: "2026-09-27", boundAt: "2026-09-27", loginAt: "2026-10-12", company: "成都蓉建科贸有限公司" }
+      );
+      /* 回填新 lead 的 ops（新 lead 无 consumption；游客无时间字段 → ops 为空 → 渲染占位） */
+      Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { if (!l.ops) l.ops = opsOf(l); }); });
+      (seed.state.leadsSub || []).forEach(function (l) { if (!l.ops) l.ops = opsOf(l); });
+    }
+    return seed;
   }
 
   /* ---------------- 协议条款（O4 正式演示文本） ---------------- */
@@ -451,7 +525,7 @@
       { no: "第一条", t: "合作主体", c: "甲方为省级总代四川锦程工程供应链有限公司，乙方为经甲方审核通过的二级合作企业；双方均为合法存续的市场主体，独立经营、自负盈亏。" },
       { no: "第二条", t: "合作内容与区域", c: "甲方授权乙方在约定区域内开展工程服务用户推广与转化，乙方不得跨区域恶性竞争，不得转授权、不得发展下级分润主体。" },
       { no: "第三条", t: "约定所得比例", c: "乙方按其名下合格消费额的约定比例（见合作配置单，初始 20%）取得合作所得；比例可经双方书面（含本协议电子流程）确认后调整，调整后以补签版本为准。" },
-      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过收款确认与月度对账单留痕。" },
+      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过对账中心与阅读对账单留痕。" },
       { no: "第五条", t: "付款与确认", c: "甲方在 App 外通过对公转账等线下方式付款并登记凭证；乙方核对到账金额与凭证一致后在系统内确认。出账后 15 天内仅提醒，系统不自动确认、不自动到账。" },
       { no: "第六条", t: "异议处理", c: "乙方发现未到账、金额不符或凭证不清，可提出异议；双方线下核实并补充凭证，异议闭环前不进行月度平账。" },
       { no: "第七条", t: "发票与税费", c: "各方依法各自承担税费；如需开票，按实际结算金额与发票管理规则另行办理。" },
@@ -468,15 +542,15 @@
       id: "sc-1", month: "2026-10",
       issueAt: "2026-10-25",
       dueAt: "2026-10-30",
-      eligibleBase: 10000,
+      eligibleBase: 6000,          /* 方案甲 20261030：二级独立口径（与 calc2/c1-l2 同盘） */
       ratioToSub: 0.20,
-      calcAmount: z ? 0 : 1000,
+      calcAmount: z ? 0 : 600,
       dueDay: 12,
       detail: z ? [] : [
-        { id: "D301", item: "cert", user: "黄磊", order: "AC20261002001", amount: 999, date: "2026-10-02" },
-        { id: "D302", item: "entry", user: "许静", order: "EN20261002005", amount: 3999, date: "2026-10-06" },
-        { id: "D303", item: "unlock", user: "邓涛", order: "UL20261002012", amount: 1800, date: "2026-10-09" },
-        { id: "D304", item: "order", user: "周林", order: "DD20260902018", amount: 3202, date: "2026-10-11" }
+        { id: "D301", item: "cert", user: "黄磊", order: "AC20261002001", amount: 1800, date: "2026-10-02" },
+        { id: "D302", item: "entry", user: "许静", order: "EN20261002005", amount: 1500, date: "2026-10-06" },
+        { id: "D303", item: "unlock", user: "邓涛", order: "UL20261002012", amount: 1300, date: "2026-10-09" },
+        { id: "D304", item: "order", user: "周林", order: "DD20260902018", amount: 1400, date: "2026-10-11" }
       ]
     };
     var calcPrev = {
@@ -484,19 +558,20 @@
       issueAt: "2026-09-25",
       dueAt: "2026-09-30",
       settledAt: "2026-09-14",
-      eligibleBase: 9200,
+      eligibleBase: 4600,          /* 方案甲 20261030：9 月二级独立口径 */
       ratioToSub: 0.20,
-      calcAmount: z ? 0 : 920,
+      calcAmount: z ? 0 : 460,
       detail: z ? [] : [
-        { id: "D401", item: "cert", user: "黄磊", order: "AC20260901003", amount: 999, date: "2026-09-04" },
-        { id: "D402", item: "entry", user: "许静", order: "EN20260901008", amount: 3999, date: "2026-09-09" },
-        { id: "D403", item: "unlock", user: "邓涛", order: "UL20260901011", amount: 1600, date: "2026-09-15" },
-        { id: "D404", item: "order", user: "周林", order: "DD20260901016", amount: 2602, date: "2026-09-21" }
+        { id: "D401", item: "cert", user: "黄磊", order: "AC20260901003", amount: 1200, date: "2026-09-04" },
+        { id: "D402", item: "entry", user: "许静", order: "EN20260901008", amount: 1100, date: "2026-09-09" },
+        { id: "D403", item: "unlock", user: "邓涛", order: "UL20260901011", amount: 1300, date: "2026-09-15" },
+        { id: "D404", item: "order", user: "周林", order: "DD20260901016", amount: 1000, date: "2026-09-21" }
       ]
     };
-    return {
+    var seed = {
       mode: "sub",
       role: "sub_admin",
+      roleStaffName: "刘颖",   /* T2 二级员工视角归属人（sub_staff 仅见本人卡/线索） */
       theme: "light",
       state: {
         profile: {
@@ -524,7 +599,7 @@
         calc: [calcCur, calcPrev],
         payRegs: z ? [] : [
           {
-            id: "sr-0", calcId: "sc-0", amount: 920, method: "bank",
+            id: "sr-0", calcId: "sc-0", amount: 460, method: "bank",
             date: "2026-09-12",
             vouchers: [{
               name: "9月转款回单.png", kind: "receipt",
@@ -532,7 +607,7 @@
                 bank: "中国建设银行", bankNo: "EB2026091200713052",
                 payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
                 payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-                amount: 920, amountCn: "玖佰贰拾元整",
+                amount: 460, amountCn: "肆佰陆拾元整",
                 purpose: "2026-09 二级合作分润 · 结算单 ST-202609-L2",
                 at: "2026-09-12 11:24:18", by: "王建国"
               }
@@ -541,7 +616,7 @@
             confirmedAt: "2026-09-13", signMethod: "esign", createdAt: "2026-09-12"
           },
           {
-            id: "sr-1", calcId: "sc-1", amount: 1000, method: "bank",
+            id: "sr-1", calcId: "sc-1", amount: 600, method: "bank",
             date: "2026-10-11",
             vouchers: [{
               name: "10月转款回单.png", kind: "receipt",
@@ -549,7 +624,7 @@
                 bank: "中国建设银行", bankNo: "EB2026101100824176",
                 payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
                 payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-                amount: 1000, amountCn: "壹仟元整",
+                amount: 600, amountCn: "陆佰元整",
                 purpose: "2026-10 二级合作分润 · 结算单 ST-202610-L2",
                 at: "2026-10-11 09:47:52", by: "王建国"
               }
@@ -611,12 +686,12 @@
           rejectedAt: ""
         },
         team: z ? [] : [
-          { name: "陈志远", role: "boss", title: "法定代表人 / 总经理", phone: "139****6620", since: "2026-08-12", leads: 0, isLegal: true },
-          { name: "刘颖", role: "staff", title: "渠道专员", phone: "136****5588", since: "2026-09-05", leads: 0, isLegal: false }
+          { name: "陈志远", role: "boss", title: "法定代表人 / 总经理", phone: "139****6620", since: "2026-08-12", leads: 0, isLegal: true, avatar: "../../../../assets/me/avatars/horse-01.jpg" },
+          { name: "刘颖", role: "staff", title: "渠道专员", phone: "136****5588", since: "2026-09-05", leads: 0, isLegal: false, avatar: "../../../../assets/me/avatars/dog-01.jpg" }
         ],
         channels: z ? { school: [] } : {
           school: [
-            { code: "CH-S-5KQ8TN", channel: "school", ownerType: "sub", ownerName: "陈志远", createdAt: "2026-08", users: 5, validUntil: "2026-12-31", status: "active" }
+            { code: "CH-S-5KQ8TN", name: "成都建筑协会", channel: "school", ownerType: "sub", ownerName: "陈志远", createdAt: "2026-08", users: 5, validUntil: "2026-12-31", status: "active" }
           ]
         },
         leads: z ? { school: [] } : {
@@ -644,17 +719,22 @@
           ]
         },
         hist: z ? [] : [
-          { month: "2026-10", issueAt: "2026-10-25", dueAt: "2026-10-30", amount: 1000, state: "pending" },
-          { month: "2026-09", issueAt: "2026-09-25", dueAt: "2026-09-30", amount: 920, state: "settled", settledAt: "2026-09-14" },
+          { month: "2026-10", issueAt: "2026-10-25", dueAt: "2026-10-30", amount: 600, state: "pending" },
+          { month: "2026-09", issueAt: "2026-09-25", dueAt: "2026-09-30", amount: 460, state: "settled", settledAt: "2026-09-14" },
           { month: "2026-08", issueAt: "2026-08-25", dueAt: "2026-08-30", amount: 880, state: "overdue" }
         ],
         msgLog: z ? [] : [
-          { icon: "receipt", type: "info", title: "月度对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 09:00", to: "statement.html" },
+          { icon: "receipt", type: "info", title: "阅读对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 09:00", to: "statement.html" },
           { icon: "bank", type: "ok", title: "省代付款已登记", desc: "省代已登记对公转账 ¥4,800", time: "昨天 15:30", to: "reconcile-sub.html" },
           { icon: "file", type: "info", title: "合作协议已签署", desc: "与四川锦程工程供应链有限公司约定比例 20%", time: "2026-08-12", to: "agreement.html" }
         ],
       }
     };
+    /* APP 操作流水：按既有真实字段派生回填（school 桶） */
+    Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { l.ops = opsOf(l); }); });
+    /* uni11：lifecycle 状态机字段回填 */
+    Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { if (!l.lifecycle) l.lifecycle = ({ registered: "已注册", onboarded: "已企业入驻", paid: "已企业入驻", repaid: "已企业入驻", lost: "流失" })[l.stage] || "已注册"; }); });
+    return seed;
   }
 
   var SCENARIOS = {
@@ -670,7 +750,7 @@
 
   /* 种子数据版本：种子内容/结构变更（新增企业、修改比例、调整字段）时 +1。
      旧版缓存（_v 不符或无 _v）在 boot 时自动失效并重播种，避免页面沿用陈旧种子。 */
-  var DATA_VERSION = 5;
+  var DATA_VERSION = 10;
 
   function seedByScenario(key) {
     var fn = SCENARIOS[key] || SCENARIOS.active;

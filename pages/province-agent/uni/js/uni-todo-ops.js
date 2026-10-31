@@ -74,7 +74,7 @@
       var rows2 = (s.payRegs || []).filter(function (r) { return r.status === want; })
         .map(function (r) { r.layer = "2"; return r; });
       html = '<div class="uh-sechead">' + (key.indexOf("disputed") > -1 ? "异议付款" : "待确认付款") + " · " + rows2.length + " 笔</div>" +
-        (rows2.length ? regOpRows(rows2) : '<div class="uh-dim">暂无明细，可前往收款确认页查看</div>');
+        (rows2.length ? regOpRows(rows2) : '<div class="uh-dim">暂无明细，可前往对账中心查看</div>');
     } else if (key === "agree-sign") {
       var ag = s.agreement;
       if (ag) {

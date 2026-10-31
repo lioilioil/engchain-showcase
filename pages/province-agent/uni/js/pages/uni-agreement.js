@@ -176,10 +176,14 @@
   /* ---------- 协议区块卡（系统 .card + uh- 基元；按钮按 acts/perms/readonly 渲染） ---------- */
   function blockHtml(b, V, ro) {
     var btns = [];
-    if (b.acts.indexOf("reject") >= 0 && !ro) btns.push('<button class="btn btn-ghost btn-sm" data-act="ag-reject">拒签</button>');
-    if (b.acts.indexOf("sign") >= 0 && !ro) btns.push('<button class="btn btn-primary btn-sm" data-act="ag-sign">阅读并签署</button>');
+    /* 2026-10-31 批次八回归修复：写操作按钮同时门控 ctx.readonly 与变体 readonly——
+       回退身份（sub_staff/sub_legal 等）经 stateVariantFor 强制 V.readonly=true，
+       此前仅查 ctx.readonly（store profile.status），sub_staff 可见「拒签/阅读并签署」。 */
+    var locked = ro || !!V.readonly;
+    if (b.acts.indexOf("reject") >= 0 && !locked) btns.push('<button class="btn btn-ghost btn-sm" data-act="ag-reject">拒签</button>');
+    if (b.acts.indexOf("sign") >= 0 && !locked) btns.push('<button class="btn btn-primary btn-sm" data-act="ag-sign">阅读并签署</button>');
     if (b.acts.indexOf("view") >= 0) btns.push('<button class="btn btn-ghost btn-sm" data-act="ag-view">查看协议</button>');
-    if (b.acts.indexOf("resend") >= 0 && V.perms.resend && !ro) btns.push('<button class="btn btn-ghost btn-sm" data-act="ag-resend">重新发起协议</button>');
+    if (b.acts.indexOf("resend") >= 0 && V.perms.resend && !locked) btns.push('<button class="btn btn-ghost btn-sm" data-act="ag-resend">重新发起协议</button>');
     var acts = btns.length
       ? '<div class="btn-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">' + btns.join("") + '</div>'
       : "";

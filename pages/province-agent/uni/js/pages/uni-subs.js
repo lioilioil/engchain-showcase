@@ -243,7 +243,7 @@
         '<div class="uh-sheetkv"><span class="k">约定比例</span><span class="v">' + Math.round(p.ratioToSub * 100) + '%</span></div>' +
         '<div class="uh-sheetkv"><span class="k">协议状态</span><span class="v">' + ui.esc(ag) + '</span></div>' +
         '<div class="uh-sechead">协议要点</div>' +
-        '<div class="uh-clause"><div class="no">1 · 分润结算</div><div class="c">按约定比例结算合格消费分润，以月度对账单为准。</div></div>' +
+        '<div class="uh-clause"><div class="no">1 · 分润结算</div><div class="c">按约定比例结算合格消费分润，以阅读对账单为准。</div></div>' +
         '<div class="uh-clause"><div class="no">2 · 对账窗口</div><div class="c">月度对账在账单生成后 5 日内完成，超期将锁定该月对账。</div></div>' +
         '<div class="uh-clause"><div class="no">3 · 状态变更</div><div class="c">合作暂停或终止须双方确认并留痕，终止后不再产生分润结算。</div></div>',
       footer: [{ t: "关闭", kind: "primary" }]
