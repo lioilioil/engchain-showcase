@@ -625,7 +625,7 @@
       var mx = it.rows[0].amount || 1;
       var bodySub = it.rows.map(function (r) {
         return '<div class="ulg-rk" style="--w:' + Math.round(r.amount / mx * 100) + '%">' +
-          '<span class="ulg-rk__n">' + ui.icon(r.icon, 15) + ui.esc(r.label) + "</span>" +
+          '<span class="ulg-rk__n">' + ui.icon(r.icon, 15) + '<span class="ulg-rk__t">' + ui.esc(r.label) + "</span></span>" +
           '<span class="ulg-rk__p">' + Math.round(r.share * 1000) / 10 + "%</span>" +
           '<span class="ulg-rk__v">' + ui.money(r.amount) + "</span></div>";
       }).join("");
@@ -647,7 +647,7 @@
     var body = all.map(function (r) {
       return '<div class="ulg-rk' + (r.self ? " is-self" : "") + '" style="--w:' + Math.round(r.retained / max * 100) + '%" ' +
         (r.self ? "" : 'data-sub="' + ui.esc(r.name) + '" tabindex="0" role="button"') + ">" +
-        '<span class="ulg-rk__n">' + ui.esc(r.name) +
+        '<span class="ulg-rk__n"><span class="ulg-rk__t">' + ui.esc(r.name) + "</span>" +
         (r.self ? '<i class="ulg-rk__tg">自营</i>' : '<i class="ulg-rk__tg">约定 ' + Math.round(r.ratio * 100) + "%</i>") + "</span>" +
         '<span class="ulg-rk__p">消费 ' + ui.moneyPlain(r.settled) + "</span>" +
         '<span class="ulg-rk__v">' + ui.money(r.retained) + "</span></div>";
@@ -858,15 +858,12 @@
       }
 
       if (vm.staff) {
-        html += '<div class="ulg-pad">' + staffHtml(vm) +
-          Uni.scopeCardFold("仅展示本人渠道码带来用户的消费记录。", "经营台账口径说明", scopeBody(vm)) +
-          "</div>";
+        html += '<div class="ulg-pad">' + staffHtml(vm) + "</div>";
       } else if (vm.empty) {
         html += '<div class="ulg-pad">' +
           '<section class="card ulg-blk">' +
           Uni.emptyHtml("暂无经营台账",
             "平台月度账单出账后自动生成台账；出账前无可复算的经营数据。", "receipt") + "</section>" +
-          Uni.scopeCardFold("经营台账为只读口径 · 记录、计算与分析。", "经营台账口径说明", scopeBody(vm)) +
           "</div>";
         el.innerHTML = html;
         if (sc) sc.scrollTop = 0;
@@ -879,11 +876,6 @@
         html += ledgerBookHtml(vm);
         html += splitHtml(vm);
         html += rankHtml(vm);
-        html += Uni.scopeCardFold(
-          vm.role === "sub"
-            ? "账期金额取自月度账单，分项由约定比例复算；看结构看本页，看单据去对账中心。"
-            : "账期口径看趋势与台账，基数口径看分账结构与来源排行；看单据去对账中心。",
-          "经营台账口径说明", scopeBody(vm));
         html += "</div>";
       }
 
@@ -968,6 +960,20 @@
         n.addEventListener("click", open);
         n.addEventListener("keydown", function (e) {
           if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); open(); }
+        });
+      });
+    }
+
+    /* 口径说明：入口在页头右上角（页底折叠卡已移除），弹出同一份口径正文 */
+    var scopeBtn = document.getElementById("lg-scope");
+    if (scopeBtn && !scopeBtn.getAttribute("data-bound")) {
+      scopeBtn.setAttribute("data-bound", "1");
+      scopeBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        Uni.sheet({
+          title: "经营台账口径说明",
+          body: scopeBody(vm),
+          footer: [{ t: "关闭", kind: "ghost" }]
         });
       });
     }
