@@ -21,8 +21,7 @@
     "subs.html":           { icon: "building", label: "二级合作" },
     "team.html":           { icon: "users",   label: "团队管理" },
     "agreement.html":      { icon: "file",    label: "合作协议" },
-    "reconcile-hub-sub.html": { icon: "receipt", label: "对账中心" },
-    "statement.html":      { icon: "file",    label: "阅读对账单" }
+    "reconcile-hub-sub.html": { icon: "receipt", label: "对账中心" }
   };
 
   var STATE_VARIANTS = {
@@ -67,8 +66,9 @@
           permNote: ""
         };
       },
+      /* P0-4：对账单改为「对账中心 → 明细 → 单据」二级承载，宫格收敛为 7 项（原 8 项） */
       entries: ["invite-code.html", "invite-records.html", "invite-stats.html", "reconcile.html",
-        "ledger.html", "subs.html", "team.html", "statement.html"],
+        "ledger.html", "subs.html", "team.html"],
       perms: { invite: true, createSub: true },
       badges: {},
       empty: { feed: { title: "暂无动态", desc: "合作申请、对账与付款进展将出现在这里" } },

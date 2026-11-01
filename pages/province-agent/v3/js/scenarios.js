@@ -470,7 +470,7 @@
         ],
         msgLog: z ? [] : [
           { icon: "check", type: "ok", title: "二级企业合作已通过", desc: "成都蓉建科贸有限公司已入驻并生效", time: "今天 14:30", to: "subs.html" },
-          { icon: "receipt", type: "info", title: "阅读对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 10:20", to: "statement.html" },
+          { icon: "receipt", type: "info", title: "本月对账单已生成", desc: "2026-10 两级账单已生成，待核对与平账", time: "今天 10:20", to: "reconcile.html?focus=1" },
           { icon: "file", type: "info", title: "合作协议已签署", desc: "与成都蓉建科贸有限公司约定比例 20%", time: "昨天 16:40", to: "agreement.html" },
           { icon: "bank", type: "ok", title: "平台付款已登记", desc: "平台已登记对公转账 ¥24,000", time: "昨天 11:05", to: "reconcile.html" }
         ],
@@ -516,6 +516,30 @@
       Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { if (!l.ops) l.ops = opsOf(l); }); });
       (seed.state.leadsSub || []).forEach(function (l) { if (!l.ops) l.ops = opsOf(l); });
     }
+    /* uni15：线索挂渠道码（来源行展示"码名称"；不改变任何统计口径）。
+       自营线：王建国 CH-P（成都建筑协会/建材市场地推）、王敏 CH-E（朋友圈推广）；
+       二级线：按 subId 归属企业码；合作企业补 channels（省代视角可见二级码名称）。 */
+    var DIRECT_CODE = {
+      L001: "CH-P-8KQ2TV", L002: "CH-P-4HN7MW", L003: "CH-P-8KQ2TV", L005: "CH-P-4HN7MW",
+      L006: "CH-P-8KQ2TV", L007: "CH-P-4HN7MW", L008: "CH-P-8KQ2TV", L009: "CH-P-4HN7MW",
+      L101: "CH-P-8KQ2TV", L102: "CH-P-4HN7MW",
+      L103: "CH-E-2QP6ZK", L104: "CH-E-2QP6ZK", L105: "CH-E-2QP6ZK", L106: "CH-E-2QP6ZK", L107: "CH-E-2QP6ZK",
+      G001: "CH-P-8KQ2TV", P001: "CH-P-4HN7MW", Q001: "CH-P-8KQ2TV", J001: "CH-P-4HN7MW", H001: "CH-P-8KQ2TV",
+      G002: "CH-E-2QP6ZK", P002: "CH-E-2QP6ZK", Q002: "CH-E-2QP6ZK", J002: "CH-E-2QP6ZK", H002: "CH-E-2QP6ZK"
+    };
+    (seed.state.leads.direct || []).forEach(function (l) { if (DIRECT_CODE[l.id]) l.code = DIRECT_CODE[l.id]; });
+    var SUB_CODE = {
+      "sub-rongjian": "CH-S-5KQ8TN", "sub-luzhou": "CH-S-3LX7PM",
+      "sub-yibin": "CH-S-7YB2QW", "sub-leshan": "CH-S-9LS4KR"
+    };
+    (seed.state.leadsSub || []).forEach(function (l) { if (SUB_CODE[l.subId]) l.code = SUB_CODE[l.subId]; });
+    var SUB_CHANNELS = {
+      "sub-rongjian": [{ code: "CH-S-5KQ8TN", name: "成都建筑协会" }],
+      "sub-luzhou": [{ code: "CH-S-3LX7PM", name: "泸州建材地推" }],
+      "sub-yibin": [{ code: "CH-S-7YB2QW", name: "宜宾工程交流群" }],
+      "sub-leshan": [{ code: "CH-S-9LS4KR", name: "乐山材料供应圈" }]
+    };
+    (seed.state.subs || []).forEach(function (s) { if (SUB_CHANNELS[s.id]) s.channels = SUB_CHANNELS[s.id]; });
     return seed;
   }
 
@@ -525,7 +549,7 @@
       { no: "第一条", t: "合作主体", c: "甲方为省级总代四川锦程工程供应链有限公司，乙方为经甲方审核通过的二级合作企业；双方均为合法存续的市场主体，独立经营、自负盈亏。" },
       { no: "第二条", t: "合作内容与区域", c: "甲方授权乙方在约定区域内开展工程服务用户推广与转化，乙方不得跨区域恶性竞争，不得转授权、不得发展下级分润主体。" },
       { no: "第三条", t: "约定所得比例", c: "乙方按其名下合格消费额的约定比例（见合作配置单，初始 20%）取得合作所得；比例可经双方书面（含本协议电子流程）确认后调整，调整后以补签版本为准。" },
-      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过对账中心与阅读对账单留痕。" },
+      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过对账中心与对账单留痕。" },
       { no: "第五条", t: "付款与确认", c: "甲方在 App 外通过对公转账等线下方式付款并登记凭证；乙方核对到账金额与凭证一致后在系统内确认。出账后 15 天内仅提醒，系统不自动确认、不自动到账。" },
       { no: "第六条", t: "异议处理", c: "乙方发现未到账、金额不符或凭证不清，可提出异议；双方线下核实并补充凭证，异议闭环前不进行月度平账。" },
       { no: "第七条", t: "发票与税费", c: "各方依法各自承担税费；如需开票，按实际结算金额与发票管理规则另行办理。" },
@@ -724,7 +748,7 @@
           { month: "2026-08", issueAt: "2026-08-25", dueAt: "2026-08-30", amount: 880, state: "overdue" }
         ],
         msgLog: z ? [] : [
-          { icon: "receipt", type: "info", title: "阅读对账单已生成", desc: "2026-09 合格消费账单已生成，待确认", time: "今天 09:00", to: "statement.html" },
+          { icon: "receipt", type: "info", title: "本月对账单已生成", desc: "2026-10 合格消费账单已生成，待核对与平账", time: "今天 09:00", to: "reconcile-hub-sub.html" },
           { icon: "bank", type: "ok", title: "省代付款已登记", desc: "省代已登记对公转账 ¥4,800", time: "昨天 15:30", to: "reconcile-sub.html" },
           { icon: "file", type: "info", title: "合作协议已签署", desc: "与四川锦程工程供应链有限公司约定比例 20%", time: "2026-08-12", to: "agreement.html" }
         ],
@@ -734,6 +758,8 @@
     Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { l.ops = opsOf(l); }); });
     /* uni11：lifecycle 状态机字段回填 */
     Object.keys(seed.state.leads).forEach(function (b) { (seed.state.leads[b] || []).forEach(function (l) { if (!l.lifecycle) l.lifecycle = ({ registered: "已注册", onboarded: "已企业入驻", paid: "已企业入驻", repaid: "已企业入驻", lost: "流失" })[l.stage] || "已注册"; }); });
+    /* uni15：二级企业渠道码（来源行展示码名称：成都建筑协会） */
+    (seed.state.leads.school || []).forEach(function (l) { l.code = "CH-S-5KQ8TN"; });
     return seed;
   }
 
@@ -750,7 +776,7 @@
 
   /* 种子数据版本：种子内容/结构变更（新增企业、修改比例、调整字段）时 +1。
      旧版缓存（_v 不符或无 _v）在 boot 时自动失效并重播种，避免页面沿用陈旧种子。 */
-  var DATA_VERSION = 10;
+  var DATA_VERSION = 12;
 
   function seedByScenario(key) {
     var fn = SCENARIOS[key] || SCENARIOS.active;

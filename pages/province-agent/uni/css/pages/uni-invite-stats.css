@@ -1,30 +1,32 @@
 /* ============================================================
-   uni-invite-stats.css · 获客转化 页内样式（v9 · 视觉重构）
-   设计意图：这是省代/二级合作方每日扫一眼的「经营简报」——
-   克制、可信、金色点睛。视线排序严格为：数字 > 分区标题 > 口径说明。
+   uni-invite-stats.css · 获客转化（页内三分页：明细 / 统计 / 分析）
+   设计意图：省代/二级合作方每天看的一页「转化体检」——
+   明细回答"钱从哪来"，统计回答"结构好不好"，分析回答"下一步做什么"。
+   视线排序恒为：数字 > 分区标题 > 口径说明。
    全部取值引用 app.css 令牌；共享基元(.uh-*)一律 #ag-view 页内覆盖，
-   绝不改动 uni-layout.css / app.css。
-   内容基元在 uni-layout.css；本文件 = 卡头重排 + 消费行账本化 +
-   焦点卡金色 + 线别行重排 + 统计卡层级收敛 + 语义色修正 + 入场动效。
+   绝不改动 uni-layout.css / app.css。本页私有类统一 .us- 前缀。
+   交互词汇与「获客记录」(uni-invite-records) 同源：
+   吸顶主 bar / 筛选胶囊 / 底部 sheet 筛选 / 20 条分页 / 视角多选。
    ============================================================ */
 
 /* ---------- 0. 容器底部节奏（.no-pad 壳原本零底部留白，末卡贴视口底） ---------- */
 #ag-view { padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px)); }
 
 /* ============================================================
-   1. 卡头重排（P0）：eyebrow 独占一行；长口径徽章降级为块级说明条。
-      根因：原 .uh-finhead 为横向 flex，长 mute 胶囊 flex:none 把
-      flex:1 的 eyebrow 压成逐字竖排；现恒为两行——粗分区名 + 小字口径。
+   1. 卡头：分区名（eyebrow）左、口径徽章右，单行。
+      历史坑：长 mute 胶囊 flex:none 会把 flex:1 的 eyebrow 压成逐字竖排。
+      本页所有徽章均为 2–8 字短标签，故保留横排 + nowrap，
+      既不会竖排，也不会撑成整行灰条。
    ============================================================ */
 #ag-view .uh-finhead {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
   min-height: 0;
   padding-bottom: 2px;
 }
 #ag-view .uh-finhead .uh-eyebrow {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: normal;
   font-size: var(--fs-sm);
   font-weight: 700;
@@ -32,138 +34,21 @@
   color: var(--text-1);
 }
 #ag-view .uh-finhead .uh-badge--mute {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
+  flex: none;
   height: auto;
   min-height: 0;
-  flex: none;
-  padding: 6px 10px;
-  border-radius: var(--r-s);
+  padding: 3px 9px;
+  /* 卡头徽章承载「口径/范围」信息，暗色下 --text-3 在 --bg-card-2 上过灰，
+     统一提到 --text-2（仅本页作用域，不动 uni-layout.css 的共享基元）。 */
+  color: var(--text-2);
   font-size: var(--fs-xs);
   font-weight: 500;
   line-height: 1.6;
   letter-spacing: .01em;
-  text-align: left;
-  white-space: normal;
-  background: var(--bg-card-2);
-  color: var(--text-3);
-  border: 0;
+  white-space: nowrap;
 }
 
-/* ============================================================
-   2. 入场动效（克制两处：卡片 stagger fade-up + 条形 grow）
-      prefers-reduced-motion 下全部关闭。
-   ============================================================ */
-@keyframes uc-rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-#ag-view > section { animation: uc-rise .34s var(--e-out) both; }
-#ag-view > section:nth-child(1) { animation-delay: .02s; }
-#ag-view > section:nth-child(2) { animation-delay: .06s; }
-#ag-view > section:nth-child(3) { animation-delay: .10s; }
-#ag-view > section:nth-child(4) { animation-delay: .14s; }
-#ag-view > section:nth-child(5) { animation-delay: .18s; }
-#ag-view > section:nth-child(6) { animation-delay: .22s; }
-#ag-view > section:nth-child(7) { animation-delay: .26s; }
-#ag-view > section:nth-child(8) { animation-delay: .30s; }
-
-@keyframes uc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.uc-fnl__bar {
-  transform-origin: left center;
-  animation: uc-grow .5s var(--e-emph) both;
-}
-.uc-fnl__row:nth-child(1) .uc-fnl__bar { animation-delay: .10s; }
-.uc-fnl__row:nth-child(2) .uc-fnl__bar { animation-delay: .16s; }
-.uc-fnl__row:nth-child(3) .uc-fnl__bar { animation-delay: .22s; }
-.uc-fnl__row:nth-child(4) .uc-fnl__bar { animation-delay: .28s; }
-
-@media (prefers-reduced-motion: reduce) {
-  #ag-view > section,
-  .uc-fnl__bar { animation: none !important; }
-}
-
-/* ============================================================
-   3. 漏斗行：人数与转化率分层（转化率才是视线焦点），条形收尾收细
-   ============================================================ */
-.uc-fnl { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
-.uc-fnl__hd { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.uc-fnl__label { font-size: var(--fs-base); color: var(--text-2); font-weight: 600; min-width: 0; }
-.uc-fnl__num { display: inline-flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
-.uc-fnl__cnt { font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); white-space: nowrap; }
-.uc-fnl__cnt::after { content: "·"; margin-left: 6px; color: var(--text-4); }
-.uc-fnl__pct { font-size: var(--fs-base); font-weight: 700; color: var(--text-1); white-space: nowrap; }
-.uc-fnl__track { margin-top: 7px; height: 5px; border-radius: var(--r-full); background: var(--bg-card-2); overflow: hidden; }
-.uc-fnl__bar { height: 100%; border-radius: var(--r-full); background: var(--primary); }
-.uc-fnl__bar.is-lost { background: var(--error); }
-/* 事项分布里"不计合格"条：徽章已表达语义，条本身降级中性灰，红色只留给漏斗「沉寂流失」 */
-.uc-fnl__bar.uc-bar--mute { background: var(--line-strong); }
-
-/* ============================================================
-   4. 消费记录行（P1）：去"面包片胶囊"，改为紧凑账本信息行——
-      左侧固定金额列（¥ 与千分位纵向对齐），右侧事项/日期/来源三段。
-   ============================================================ */
-.uc-cons { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
-.uc-cons__row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-m);
-  background: transparent;
-}
-.uc-cons__amt {
-  flex: 0 0 74px;
-  padding-top: 1px;
-  font-size: var(--fs-base);
-  font-weight: 700;
-  color: var(--text-1);
-  line-height: 1.35;
-  font-variant-numeric: tabular-nums;
-  font-family: var(--font-num);
-}
-.uc-cons__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.uc-cons__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.uc-cons__item { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
-.uc-cons__nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.uc-cons__tag {
-  flex: none;
-  font-size: 11px; color: var(--text-3); background: var(--bg-card-2);
-  padding: 1px 6px; border-radius: var(--r-full); border: 1px solid var(--line);
-}
-.uc-cons__tag.is-ok {
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 45%, transparent);
-  background: color-mix(in srgb, var(--success) 9%, transparent);
-}
-.uc-cons__sub { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.45; }
-.uc-cons__src { font-size: var(--fs-xs); color: var(--text-4); line-height: 1.4; }
-
-/* ============================================================
-   5. 渠道码线别归属行（P1）：上行 code·归属人 + 线别徽章，
-      下行统计数字组，再进度条——三段信息各占一行，375/320 不崩。
-   ============================================================ */
-.uc-line__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.uc-line__label { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.uc-line__code {
-  flex: none;
-  font-size: var(--fs-base); font-weight: 700; color: var(--text-1);
-  font-variant-numeric: tabular-nums; letter-spacing: .01em;
-}
-.uc-line__owner {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fs-sm); color: var(--text-3);
-}
-.uc-line__stats { margin-top: 5px; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
-.uc-line__stats b { color: var(--text-1); font-weight: 700; }
-
-/* ============================================================
-   6. 焦点金额卡（P1）：英雄数字改用品牌金（令牌语义即 hero/大数字），
-      admin 空态靠收紧上下间距收掉留白（不填装饰色块）；
-      sub 免责声明升为中性提示行（高于普通 note、低于台账数字）。
-   ============================================================ */
+/* 焦点金额：英雄数字用品牌金（令牌语义即 hero/大数字） */
 #ag-view .uh-bignum { color: var(--primary); margin-top: 6px; }
 #ag-view .uh-bignum .cur { color: var(--primary); }
 #ag-view .uh-note { margin-top: 14px; }
@@ -186,10 +71,7 @@
   vertical-align: 2px;
 }
 
-/* ============================================================
-   7. 运营统计卡（P1）：取消 17px 竖条子标题，降级为 12px 粗体小分组
-      标题（eyebrow 是本卡唯一标题层级）；kv 数字包等宽单元防左右游移。
-   ============================================================ */
+/* 子分组标题：取消 17px 竖条子标题，降级为 12px 粗体小分组标题 */
 #ag-view .uh-sechead { margin: 18px 0 6px; }
 #ag-view .uh-sechead .lbl {
   font-size: var(--fs-sm);
@@ -199,12 +81,8 @@
   color: var(--text-2);
 }
 #ag-view .uh-sechead .lbl::before { width: 3px; height: 10px; }
-.uv b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.uv .uv-amt { color: var(--text-1); }
 
-/* ============================================================
-   8. 分佣口径条款：条款名与正文拉开字号差（14 vs 12）
-   ============================================================ */
+/* 口径条款：条款名与正文拉开字号差（14 vs 12） */
 #ag-view .uh-clause .no {
   font-size: var(--fs-base);
   font-weight: 700;
@@ -214,13 +92,669 @@
 }
 #ag-view .uh-clause .c { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.7; }
 
-/* ============================================================
-   9. 员工权限说明条（P1）：信息说明 ≠ 已暂停——从 warning 红橙底
-      降级为中性暖灰底，锁图标改用品牌金，与红橙暂停封条一眼可分。
-   ============================================================ */
+/* 权限说明条：信息说明 ≠ 已暂停——中性暖灰底 + 品牌金锁，与红橙暂停封条一眼可分 */
 #ag-view .uh-readnote {
   background: var(--bg-card-2);
   border: 1px solid var(--line);
   color: var(--text-2);
 }
 #ag-view .uh-readnote .ic { color: var(--primary-dim); }
+
+/* ============================================================
+   2. 入场动效（克制两处：卡片 stagger fade-up + 条形 grow）
+      prefers-reduced-motion 下全部关闭。
+   ============================================================ */
+@keyframes uc-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#ag-view > section,
+#ag-view > .us-mainbar { animation: uc-rise .34s var(--e-out) both; }
+#ag-view > *:nth-child(2) { animation-delay: .05s; }
+#ag-view > *:nth-child(3) { animation-delay: .09s; }
+#ag-view > *:nth-child(4) { animation-delay: .13s; }
+#ag-view > *:nth-child(5) { animation-delay: .17s; }
+#ag-view > *:nth-child(6) { animation-delay: .21s; }
+#ag-view > *:nth-child(7) { animation-delay: .25s; }
+#ag-view > *:nth-child(8) { animation-delay: .29s; }
+#ag-view > *:nth-child(9) { animation-delay: .33s; }
+#ag-view > *:nth-child(10) { animation-delay: .37s; }
+
+@keyframes uc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.us-fnl__bar,
+.us-grp__bar,
+.us-comp__bar,
+.us-trend__bar {
+  transform-origin: left center;
+  animation: uc-grow .5s var(--e-emph) both;
+}
+.us-trend__bar { transform-origin: center bottom; }
+.us-fnl__row:nth-child(1) .us-fnl__bar { animation-delay: .08s; }
+.us-fnl__row:nth-child(2) .us-fnl__bar { animation-delay: .13s; }
+.us-fnl__row:nth-child(3) .us-fnl__bar { animation-delay: .18s; }
+.us-fnl__row:nth-child(4) .us-fnl__bar { animation-delay: .23s; }
+.us-fnl__row:nth-child(5) .us-fnl__bar { animation-delay: .28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  #ag-view > section,
+  #ag-view > .us-mainbar,
+  .us-fnl__bar,
+  .us-grp__bar,
+  .us-comp__bar,
+  .us-trend__bar { animation: none !important; }
+}
+
+/* ============================================================
+   3. 吸顶主 bar（页面唯一 .seg；切分页用，不随内容滚动）
+      —— 与「获客记录」uni15 一致：透明、无底边、无模糊层。
+   ============================================================ */
+.us-mainbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: 0 calc(var(--page-pad) * -1);
+  padding: 4px var(--page-pad) 6px;
+}
+.us-mainbar .us-mainsec { padding-top: 0; }
+.us-mainbar .us-mainseg { margin: 0; }
+/* 主 bar 是 div 包裹的，破坏了 .uh-sec + .uh-sec 的 12px 节奏，
+   手动补回首屏内容与分段条之间的呼吸间距（不改 uni-layout.css）。 */
+#ag-view > .us-mainbar + section { margin-top: 10px; }
+.us-mainseg .seg-item {
+  font-family: inherit;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-3);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--d-fast) var(--e-out);
+}
+.us-mainseg .seg-item.active { color: var(--text-1); }
+.us-mainseg .seg-item:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+/* ============================================================
+   4. 筛选行（明细 / 统计共用）：日期快捷胶囊组 + 筛选入口
+      —— 与获客记录 .ir-leftstate / .ir-datecaps 同构
+   ============================================================ */
+.us-listhead { justify-content: space-between; gap: 12px; }
+.us-filterbtn { cursor: pointer; color: var(--primary-dim); font-weight: 600; flex: none; }
+.us-leftstate {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.us-leftstate__tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.us-leftstate.is-on { color: var(--primary-dim); font-weight: 600; }
+.us-datecaps { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.us-datecap {
+  padding: 4px 11px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--d-fast) var(--e-out);
+}
+.us-datecap.is-on {
+  background: var(--primary-soft);
+  border-color: var(--accent-line);
+  color: var(--primary-dim);
+  font-weight: 600;
+}
+.us-datecap:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+/* 筛选入口小圆点（存在生效筛选时） */
+.us-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: var(--r-full);
+  background: var(--accent-line);
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+/* ============================================================
+   5. 筛选底部 sheet：分组容器（组间 hairline，组头 3px 金竖线）
+   ============================================================ */
+.us-filtbody { min-width: 0; }
+.us-fg { padding: 12px 0; border-top: 1px solid var(--line); }
+.us-fg:first-child { border-top: none; padding-top: 2px; }
+.us-fg__head {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  margin-bottom: 8px;
+  border-left: 3px solid var(--primary);
+  padding-left: 7px;
+  line-height: 1.2;
+}
+.us-fgnote { margin-top: 8px; }
+.us-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.us-chip {
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-sm);
+  line-height: 1.2;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--d-fast) var(--e-out);
+}
+.us-chip.is-on {
+  background: var(--primary-soft);
+  border-color: var(--accent-line);
+  color: var(--primary-dim);
+  font-weight: 600;
+}
+.us-chip:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.us-dates { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.us-dates .input { flex: 1; min-width: 0; padding: 8px 10px; font-size: var(--fs-sm); }
+.us-dates__sep { flex: none; font-size: var(--fs-sm); color: var(--text-3); }
+
+/* ============================================================
+   6. 顶部视角入口（topbar-right）+ 视角多选居中弹窗
+   ============================================================ */
+.us-scopebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary-dim);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  font: inherit;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.us-topscope { min-height: 32px; }
+.us-scopebtn__hint { font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
+.us-scopebtn:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-s); }
+
+.us-scopebox { display: flex; flex-direction: column; gap: 4px; padding: 4px 16px; }
+.us-scoperow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-base);
+  color: var(--text-1);
+  text-align: left;
+  font-family: inherit;
+}
+.us-scoperow:last-of-type { border-bottom: none; }
+.us-scoperow__tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.us-scoperow__s { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.4; }
+.us-cbx {
+  width: 20px; height: 20px;
+  border-radius: var(--r-full);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--line);
+  color: transparent;
+  transition: all var(--d-fast) var(--e-out);
+}
+.us-cbx.is-on { background: var(--primary-soft); border-color: var(--accent-line); color: var(--primary-dim); }
+
+/* ============================================================
+   7. 明细：合计条 + 扁平账本行（去卡片化，仅 hairline 分隔）
+   ============================================================ */
+.us-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-s);
+  background: var(--bg-card-2);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.us-sum b { color: var(--text-1); font-weight: 700; }
+.us-sum__r { color: var(--text-2); flex: none; }
+.us-sum__r b { color: var(--primary-dim); }
+
+.us-rlist { margin-top: 4px; }
+.us-rrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--d-fast) var(--e-out);
+}
+.us-rrow:last-child { border-bottom: none; }
+.us-rrow:active { opacity: .62; }
+.us-rrow:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-s); }
+.us-rrow__amt {
+  flex: 0 0 76px;
+  padding-top: 1px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.35;
+}
+.us-rrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.us-rrow__t {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.us-rrow__s {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.us-rrow__src {
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.us-rrow__chev { flex: none; color: var(--text-4); display: flex; padding-top: 2px; }
+
+/* 行内标签：合格 / 线别 */
+.us-tag {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-3);
+  background: var(--bg-card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 0 6px;
+}
+.us-tag.is-ok {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: color-mix(in srgb, var(--success) 9%, transparent);
+}
+.us-tag.is-line {
+  color: var(--primary-dim);
+  border-color: var(--accent-line);
+  background: transparent;
+}
+
+.us-emptywrap { padding: 12px 0 4px; }
+.us-loadmore { display: block; width: 100%; margin: 14px 0 4px; }
+.us-allloaded {
+  padding: 14px 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+/* ============================================================
+   8. 统计：三连小数（付费用户 / 客单价 / 合格占比）
+   ============================================================ */
+.us-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  flex-wrap: wrap;
+}
+.us-mini b { color: var(--text-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.us-mini i { width: 1px; height: 10px; background: var(--line-strong); flex: none; }
+
+/* ============================================================
+   9. 转化漏斗（5 步，累计口径单调不回退）
+   ============================================================ */
+.us-fnl { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.us-fnl__hd { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.us-fnl__label { font-size: var(--fs-base); color: var(--text-2); font-weight: 600; min-width: 0; }
+.us-fnl__num {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.us-fnl__num b { font-size: var(--fs-base); font-weight: 700; color: var(--text-1); }
+.us-fnl__pct { font-weight: 700; color: var(--text-2); }
+.us-fnl__track {
+  margin-top: 7px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--bg-card-2);
+  overflow: hidden;
+}
+.us-fnl__bar { height: 100%; border-radius: var(--r-full); background: var(--primary); }
+.us-fnl__row.is-final .us-fnl__label { color: var(--text-1); }
+.us-fnl__row.is-final .us-fnl__bar { background: var(--primary-dim); }
+.us-fnl__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.us-fnl__foot b { color: var(--text-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   10. 来源效能 / 事项构成（横向占比条）
+   ============================================================ */
+.us-grp { padding: 12px 0; }
+.us-grp + .us-grp { border-top: 1px solid var(--line); }
+.us-grp:first-of-type { padding-top: 4px; }
+.us-grp__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.us-grp__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.us-grp__tag {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.us-grp__amt {
+  flex: none;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.us-grp__meta { margin-top: 4px; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.us-grp__track {
+  margin-top: 7px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--bg-card-2);
+  overflow: hidden;
+}
+.us-grp__bar { height: 100%; border-radius: var(--r-full); background: var(--accent-line); }
+
+.us-comp { padding: 12px 0; }
+.us-comp + .us-comp { border-top: 1px solid var(--line); }
+.us-comp:first-of-type { padding-top: 4px; }
+.us-comp__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.us-comp__n {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+}
+.us-comp__v {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.us-comp__track {
+  margin-top: 7px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--bg-card-2);
+  overflow: hidden;
+}
+.us-comp__bar { height: 100%; border-radius: var(--r-full); background: var(--primary); }
+.us-comp__bar.is-mute { background: var(--line-strong); }
+
+/* ============================================================
+   11. 折叠说明（统计 / 分析共用，就地开合不重渲染）
+   ============================================================ */
+.us-fold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.us-fold > span:first-child { display: flex; align-items: center; gap: 7px; }
+.us-fold .ic { color: var(--primary-dim); }
+.us-fold__chev { display: flex; color: var(--text-3); transition: transform var(--d-fast) var(--e-out); }
+.us-fold.is-open .us-fold__chev { transform: rotate(180deg); }
+.us-fold:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-s); }
+.us-foldbody { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.us-foldbody[hidden] { display: none; }
+
+/* ============================================================
+   12. 分析：口径行
+   ============================================================ */
+.us-scopeline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.us-scopeline__l { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-2); }
+.us-scopeline__l .ic { color: var(--primary-dim); }
+.us-scopeline__r { font-variant-numeric: tabular-nums; }
+.us-scopenote { margin-top: 8px; }
+
+/* ============================================================
+   13. 环比：本期 vs 上期
+   ============================================================ */
+.us-cmp__row { padding: 10px 0; }
+.us-cmp__row + .us-cmp__row { border-top: 1px solid var(--line); }
+.us-cmp__row:first-of-type { padding-top: 4px; }
+.us-cmp__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.us-cmp__k { font-size: var(--fs-sm); color: var(--text-2); font-weight: 600; }
+.us-cmp__v {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.us-cmp__meta { margin-top: 3px; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.us-delta {
+  flex: none;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  font-variant-numeric: tabular-nums;
+}
+.us-delta.is-up {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+.us-delta.is-down {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 9%, transparent);
+}
+.us-delta.is-flat { color: var(--text-3); background: var(--bg-card-2); }
+
+/* ============================================================
+   14. 趋势：近 N 个月柱状（柱高=新增获客，灰字=付费率）
+   ============================================================ */
+.us-trend {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 4px;
+}
+.us-trend__col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.us-trend__v { font-size: var(--fs-xs); font-weight: 700; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.us-trend__track {
+  width: 100%;
+  height: 84px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.us-trend__bar {
+  display: block;
+  width: 60%;
+  max-width: 34px;
+  border-radius: var(--r-s) var(--r-s) 0 0;
+  /* 历史月用 soft-2 而非 soft：12% 金在浅底上过淡，柱体近乎消失，
+     读不出"这是数据"；22% 仍明显弱于当月实心金，层级不变。 */
+  background: var(--primary-soft-2);
+  border: 1px solid var(--accent-line);
+  border-bottom: 0;
+  box-sizing: border-box;
+}
+.us-trend__col:last-child .us-trend__bar { background: var(--primary); border-color: var(--primary); }
+.us-trend__m { font-size: var(--fs-xs); color: var(--text-2); font-weight: 600; }
+.us-trend__r { font-size: var(--fs-xs); color: var(--text-4); font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   15. 用户健康度（三行可点开清单）
+   ============================================================ */
+.us-hrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--d-fast) var(--e-out);
+}
+.us-hrow:first-of-type { border-top: none; margin-top: 8px; }
+.us-hrow:active { opacity: .62; }
+/* 该类当前 0 人：静态行，不可点、无箭头，数值降为次要灰 */
+.us-hrow.is-empty { cursor: default; }
+.us-hrow.is-empty:active { opacity: 1; }
+.us-hrow.is-empty .us-hrow__n { color: var(--text-3); font-weight: 600; }
+.us-hrow.is-empty .us-hrow__ic { background: var(--bg-card-2); color: var(--text-3); }
+.us-hrow:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-s); }
+.us-hrow__ic {
+  flex: none;
+  width: 34px; height: 34px;
+  border-radius: var(--r-s);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-soft);
+  color: var(--primary-dim);
+}
+.us-hrow__ic .ic { width: 17px; height: 17px; }
+.us-hrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.us-hrow__t { font-size: var(--fs-base); font-weight: 600; color: var(--text-1); }
+.us-hrow__s { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.4; }
+.us-hrow__n {
+  flex: none;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.us-hrow__chev { flex: none; color: var(--text-4); display: flex; }
+
+/* 健康度清单弹窗 */
+.us-ulnote { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.6; margin-bottom: 8px; }
+.us-ulist { display: flex; flex-direction: column; }
+.us-urow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.us-urow:first-child { border-top: none; }
+.us-urow__n { flex: none; font-size: var(--fs-base); font-weight: 600; color: var(--text-1); }
+.us-urow__s { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--text-3); line-height: 1.4; }
+.us-urow__a {
+  flex: none;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+/* ============================================================
+   16. 运营建议（重量排序，最多 3 条）
+   ============================================================ */
+.us-tip { display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.us-tip:first-of-type { border-top: none; margin-top: 6px; }
+.us-tip__ic { flex: none; color: var(--primary-dim); display: flex; padding-top: 2px; }
+.us-tip__b { flex: 1; min-width: 0; }
+.us-tip__t { font-size: var(--fs-base); font-weight: 600; color: var(--text-1); line-height: 1.45; }
+.us-tip__d { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; }

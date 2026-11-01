@@ -1,97 +1,332 @@
 /* ============================================================
-   uni-reconcile.css · 对账中心 页内特有布局（内容基元在 uni-layout.css，
-   组件视觉一律系统类 .card/.btn/.seg/.input/.uh-*；本文件仅双带页内细节）
+   uni-reconcile.css · 对账中心（省代）· 卷宗制三层视图
+   页内结构：吸顶「卷宗切换 + 视图分段」→ 核对 / 明细 / 分析
+   内容基元来自 uni-layout.css（.uh-*），组件视觉来自 app.css
+   （.card/.btn/.uh-badge/.uh-kv…）；本文件只放本页特有布局与动效。
    ============================================================ */
 
-/* 带头副信息 */
-.uc-band__meta{font-size:var(--fs-sm);color:var(--text-3);margin-top:8px;}
-.uc-band__sum{font-size:var(--fs-xs);color:var(--text-3);margin-top:6px;font-variant-numeric:tabular-nums;}
-.uc-zero-note{font-size:var(--fs-sm);font-weight:500;color:var(--text-3);margin-left:8px;}
+/* ---------------- 1. 页面骨架 ---------------- */
+#ag-view { padding-bottom: calc(var(--sp-6) + 28px); }
+/* 有卷宗级底栏时留出让位高度，避免末尾内容被玻璃底栏压住 */
+#ag-view.ur-hasbar { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
-/* 焦点区：下一步提示（一行为准，直指执行路径） */
-.uc-band__hint{font-size:var(--fs-sm);color:var(--primary-dim);margin-top:8px;line-height:1.5;}
-.uc-band__hint.ok{color:var(--success);}
-.uc-band__hint.no{color:var(--warning-ink);}
+.ur-panel { margin-top: 8px; scroll-margin-top: 92px; animation: ur-in .18s var(--e-out) both; }
+@keyframes ur-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
-/* 卷宗 tab 吸顶：条宽恒常（全宽贯穿窗口，不随吸顶变化，消除宽度跳动动效）；
-   胶囊与两侧窗口距离恒为 --page-pad（与其他卡片一致）；
-   吸顶仅切换页面底色（var(--bg)）遮罩 + 细分隔线，无阴影等冗余装饰；
-   底色为页面本色，瞬时切换不可感知，不产生"变色"或突变 */
-.uc-bandtabs{
-  position:sticky;top:0;z-index:30;
-  margin:0 calc(var(--page-pad) * -1);
-  padding:8px var(--page-pad) 10px;
-}
-.uc-bandtabs .uls-tabs{margin-top:0;}
-.uc-bandtabs.is-stuck{
-  background:var(--bg);
-  border-bottom:.5px solid var(--line-hairline);
+/* 移动端：单列纵向（媒体查询之前声明，桌面分栏才能覆盖它） */
+.ur-grid { display: block; }
+
+@media (min-width: 768px) {
+  /* 桌面：壳加宽后左右分栏（核对区在左，卷宗状态带在右并吸顶） */
+  .ur-grid { display: grid; grid-template-columns: minmax(0, 1fr) 372px;
+    grid-template-areas: "main aside"; gap: 16px; align-items: start; }
+  .ur-grid__main { grid-area: main; min-width: 0; }
+  .ur-grid__aside { grid-area: aside; position: sticky; top: 104px; }
+  .ur-grid .uh-sec { margin-left: 0; margin-right: 0; }
 }
 
-/* 生命节点（出账/登记/确认/平账留痕） */
-.uc-life{display:flex;margin-top:16px;}
-.uc-life__step{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;}
-.uc-life__step .dot{width:10px;height:10px;border-radius:var(--r-full);
-  background:var(--bg-card-2);border:1.5px solid var(--line-strong);z-index:1;}
-.uc-life__step .lb{font-size:var(--fs-xs);color:var(--text-3);}
-.uc-life__step:not(:last-child)::before{content:"";position:absolute;top:4px;
-  left:calc(50% + 6px);width:calc(100% - 12px);height:1.5px;background:var(--line-strong);}
-.uc-life__step.done .dot{background:var(--primary);border-color:var(--primary);}
-.uc-life__step.done .lb{color:var(--text-2);}
-.uc-life__step.cur .dot{background:var(--bg-card);border-color:var(--primary);
-  box-shadow:0 0 0 3px var(--primary-soft);}
-.uc-life__step.cur .lb{color:var(--text-1);font-weight:600;}
+/* ---------------- 2. 吸顶导航（卷宗切换 + 视图分段） ---------------- */
+/* 页内为 no-pad 滚动容器（内容自带 16px 边距）：导航自身铺满宽度、内缩对齐 */
+.ur-nav {
+  position: sticky; top: 0; z-index: 30;
+  padding: 6px var(--page-pad) 4px;
+}
+/* 吸顶仅切换页面本色 + 细分隔线：瞬时切换不可感知，不产生突变或宽度跳动 */
+.ur-nav.is-stuck { background: var(--bg); border-bottom: .5px solid var(--line-hairline); }
 
-/* 登记行（现均为"卡内紧跟区块标题"场景：不再画上分隔线，标题即分隔） */
-.uc-regs{margin-top:0;border-top:0;}
-.uc-reg{padding:12px 0;border-bottom:1px solid var(--line);}
-.uc-reg:last-child{border-bottom:0;}
-.uc-reg.is-history{opacity:.65;}
-.uc-reg__hd{display:flex;align-items:center;gap:8px;}
-.uc-reg__amt{font-size:var(--fs-md);font-weight:700;color:var(--text-1);
-  font-variant-numeric:tabular-nums;}
-.uc-reg__meta{font-size:var(--fs-sm);color:var(--text-3);margin-top:5px;line-height:1.5;}
-.uc-reg__note{font-size:var(--fs-sm);color:var(--warning-ink);margin-top:5px;line-height:1.5;}
-.uc-reg__acts{margin-top:10px;}
+.ur-switch { display: flex; gap: 8px; }
+.ur-switch__i {
+  flex: 1 1 0; min-width: 0; text-align: left;
+  padding: 6px 10px 7px;
+  border: 1px solid var(--line); border-radius: 11px;
+  background: var(--bg-card-2); font-family: inherit; cursor: pointer;
+  transition: background var(--d-fast) var(--e-standard), border-color var(--d-fast) var(--e-standard), box-shadow var(--d-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.ur-switch__i:active { transform: scale(.985); }
+.ur-switch__i.is-on { background: var(--bg-card); border-color: var(--accent-line); box-shadow: 0 1px 4px rgba(0, 0, 0, .06); }
+.ur-switch__i:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.ur-switch__n { display: block; font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); letter-spacing: .01em; }
+.ur-switch__i.is-on .ur-switch__n { color: var(--text-1); }
+.ur-switch__s {
+  display: block; margin-top: 2px; font-size: 11px; line-height: 1.3;
+  color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ur-switch__s b { font-weight: 600; }
 
-/* 卡内区块标题（卡片按功能拆分的场景）：标题是卡内首元素时去掉顶部 22px 空距 */
-.uh-sec.card > .uh-sechead:first-child{margin-top:0;}
+/* 开关状态的语义色（文字承载语义，颜色只做强化） */
+.ur-t-bad { color: var(--error) !important; }
+.ur-t-wait { color: var(--warning-ink) !important; }
+.ur-t-ok { color: var(--success) !important; }
+.ur-t-mute { color: var(--text-3) !important; }
 
-/* 留痕空态（无登记时的一行说明，非卡片） */
-.uc-empty{font-size:var(--fs-sm);color:var(--text-3);padding:6px 0 2px;}
+.ur-views { display: flex; gap: 22px; margin-top: 2px; padding: 0 2px; }
+.ur-view {
+  position: relative; height: 34px; padding: 0; border: 0; background: none;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--text-3);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ur-view.is-on { color: var(--text-1); }
+.ur-view.is-on::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 2px; border-radius: 2px; background: var(--primary);
+}
+.ur-view:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: 4px; }
+.ur-view__dot { display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--error); vertical-align: 2px; }
 
-/* 窗口边距：scroll.no-pad 清空底部留白会贴屏底，补回内容底部呼吸与安全区 */
-#ag-view{padding-bottom:calc(var(--sp-6) + 28px);}
+/* ---------------- 3. 卷宗状态带 ---------------- */
+.ur-hero__top { display: flex; align-items: center; gap: 8px; }
+.ur-tier {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+  border-radius: 6px; font-size: var(--fs-xs); font-weight: 600; line-height: 1;
+  border: 1px solid transparent; flex: none; white-space: nowrap;
+}
+.ur-tier--in { background: var(--primary-soft); color: var(--primary-dim); border-color: var(--accent-line); }
+.ur-tier--out { background: var(--info-soft); color: var(--info); border-color: var(--line); }
+.ur-hero__mon { flex: 1; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 
-/* 带底动作 */
-.uc-band__ft{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.ur-hero__lab { margin-top: 14px; font-size: var(--fs-sm); color: var(--text-3); }
+.ur-hero__lab em { font-style: normal; color: var(--text-4); font-size: var(--fs-xs); margin-left: 4px; }
 
-/* 凭证上传框（登记 sheet 内） */
-.uc-upload{border:1.5px dashed var(--line-strong);border-radius:var(--r-m);padding:18px;
-  text-align:center;color:var(--text-3);font-size:var(--fs-sm);
-  background:var(--bg-card-2);cursor:pointer;}
-.uc-upload .ic{margin:0 auto 6px;display:block;}
+/* 金额构成条：账单 100% 的分解（含超登时按登记总额归一，并画应付基准线） */
+.ur-comp { position: relative; display: flex; height: 9px; margin-top: 14px; border-radius: 999px; background: var(--bg-card-2); overflow: hidden; }
+.ur-comp__seg { height: 100%; width: 0; transition: width .5s var(--e-out); }
+.ur-comp__seg:last-child { border-radius: 0 999px 999px 0; }
+.ur-comp__s--ok { background: var(--success); }
+.ur-comp__s--bad { background: var(--error); }
+.ur-comp__s--gap { background: var(--line-strong); }
+/* 待确认 / 争议在本主题下同为暖红档（--warning 与 --error 色相接近），
+   仅靠色相无法区分：待确认用斜纹「未定」填充，争议用实心；图例同构。 */
+.ur-comp__s--wait {
+  background-color: var(--warning);
+  background-image: repeating-linear-gradient(45deg,
+    color-mix(in srgb, var(--bg-card) 62%, transparent) 0 2px, transparent 2px 5px);
+}
+.ur-comp__mark { position: absolute; top: -3px; bottom: -3px; width: 2px; border-radius: 2px; background: var(--text-2); opacity: .55; }
 
-/* ================= 批次九 · 对账中心布局/动效优化 ================= */
+.ur-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 9px; }
+.ur-legend__i { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.ur-dot { flex: none; width: 7px; height: 7px; border-radius: 2px; box-sizing: border-box; }
+.ur-dot--ok { background: var(--success); }
+/* 待确认：空心（尚未落定）；争议：实心（已有分歧）——形状与文字共同承载语义 */
+.ur-dot--wait { background: transparent; box-shadow: inset 0 0 0 1.5px var(--warning); }
+.ur-dot--bad { background: var(--error); }
+.ur-dot--gap { background: var(--line-strong); }
 
-/* L1 · hero 分层：正常截止提醒降噪为次要文本行（逾期/截止日仍保留警示底） */
-.uc-due--ok{background:transparent;color:var(--text-3);padding:4px 0;font-weight:500;}
+/* 对账台账（账单 → 未结清的逐步拆解），复用 .uh-kv 行基元 */
+.ur-ledger { margin-top: 12px; border-top: 1px solid var(--line); }
+.ur-ledger .uh-kv { padding: 9px 0; }
+.ur-ledger .uh-kv .k { display: flex; align-items: center; gap: 6px; }
+.ur-ledger .uh-kv .k em { font-style: normal; font-size: var(--fs-xs); color: var(--text-4); }
+.ur-ledger .v--bad { color: var(--error); }
+.ur-ledger .v--wait { color: var(--warning-ink); }
+.ur-ledger .v--ok { color: var(--success); }
+.ur-ledger .v--mute { color: var(--text-3); }
 
-/* L6 · 窄屏生命节点收紧（出账/登记/确认/平账留痕四等分不折行） */
-@media (max-width:400px){
-  .uc-life{gap:2px;}
-  .uc-life__step{gap:4px;}
-  .uc-life__step .lb{font-size:10px;white-space:nowrap;}
+/* 时限条 */
+.ur-due { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding: 9px 12px; border-radius: var(--r-s); font-size: var(--fs-xs); font-weight: 600; line-height: 1.4; }
+.ur-due .ic { flex: none; }
+.ur-due--ok { background: var(--primary-soft); color: var(--primary-dim); }
+.ur-due--warn { background: var(--warning-soft); color: var(--warning-ink); }
+.ur-due--over { background: var(--error-soft); color: var(--error); }
+.ur-due--mute { background: var(--bg-card-2); color: var(--text-2); }
+
+/* 账务进度轴（出账 / 登记 / 确认 / 平账，各带日期） */
+.ur-life { display: flex; margin-top: 14px; }
+.ur-life__s { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ur-life__s .dot { z-index: 1; width: 9px; height: 9px; border-radius: 50%; background: var(--bg-card-2); border: 1.5px solid var(--line-strong); }
+.ur-life__s .lb { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+.ur-life__s .dt { font-size: 10px; color: var(--text-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ur-life__s:not(:last-child)::before {
+  content: ""; position: absolute; top: 3.5px; left: calc(50% + 6px);
+  width: calc(100% - 12px); height: 1.5px; background: var(--line-strong);
+}
+.ur-life__s.is-done .dot { background: var(--primary); border-color: var(--primary); }
+.ur-life__s.is-done .lb { color: var(--text-2); }
+.ur-life__s.is-cur .dot { background: var(--bg-card); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.ur-life__s.is-cur .lb { color: var(--text-1); font-weight: 600; }
+
+/* 下一步（一句话执行路径） */
+.ur-next { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-strong); font-size: var(--fs-sm); line-height: 1.6; color: var(--text-2); }
+.ur-next b { color: var(--text-1); font-weight: 600; }
+.ur-next.is-warn { color: var(--warning-ink); }
+.ur-next.is-ok { color: var(--success); }
+.ur-next.is-mute { color: var(--text-3); }
+
+/* ---------------- 4. 逐笔核对 ---------------- */
+.ur-oline {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 0;
+  background: none; border: 0; border-top: 1px solid var(--line);
+  font-family: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ur-oline:first-of-type { border-top: 0; }
+.ur-oline.is-static { cursor: default; }
+.ur-oline:active:not(.is-static) { background: var(--bg-card-2); }
+.ur-oline:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.ur-oline__ck {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1.5px solid var(--line-strong); color: transparent;
+  transition: background var(--d-fast), border-color var(--d-fast), color var(--d-fast);
+}
+.ur-oline.is-on .ur-oline__ck { background: var(--primary); border-color: var(--primary); color: var(--text-inv); }
+.ur-oline__main { flex: 1; min-width: 0; }
+.ur-oline__nm { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ur-oline__meta { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; overflow: hidden; }
+.ur-oline__meta > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.ur-oline__amt { flex: none; font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+
+/* 口径公式（合格消费 → 账单），避免明细合计与账单两个金额口径混淆 */
+.ur-formula { margin-top: 10px; padding: 8px 10px; border-radius: var(--r-s); background: var(--bg-card-2); font-size: var(--fs-xs); line-height: 1.6; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.ur-formula b { color: var(--text-1); font-weight: 600; }
+
+/* 前置条件提示（确认到账须先完成逐笔核对） */
+.ur-gate { display: flex; align-items: flex-start; gap: 5px; margin-top: 9px; font-size: var(--fs-xs); line-height: 1.5; color: var(--warning-ink); }
+.ur-gate .ic { flex: none; margin-top: 1px; }
+.ur-gate--ok { color: var(--success); }
+
+/* ---------------- 5. 登记行（待办 / 明细） ---------------- */
+.ur-reg { padding: 12px 0; border-top: 1px solid var(--line); }
+.ur-reg:first-child { border-top: 0; }
+.ur-reg.is-void { opacity: .62; }
+.ur-reg__hd { display: flex; align-items: flex-start; gap: 8px; }
+.ur-reg__tap { flex: 1; min-width: 0; display: block; padding: 0; border: 0; background: none; font-family: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ur-reg__tap:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: 4px; }
+.ur-reg__tap:active { opacity: .7; }
+.ur-reg__top { display: flex; align-items: center; gap: 8px; }
+.ur-reg__amt { font-size: var(--fs-md); font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.ur-reg__meta { display: block; margin-top: 4px; font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+.ur-reg__doc {
+  flex: none; display: inline-flex; align-items: center; gap: 3px;
+  height: 26px; padding: 0 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg-card);
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 600; color: var(--text-2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ur-reg__doc:active { background: var(--bg-card-2); }
+.ur-reg__why { margin-top: 8px; padding: 7px 10px; border-radius: var(--r-s); background: var(--warning-soft); font-size: var(--fs-xs); line-height: 1.55; color: var(--warning-ink); }
+.ur-reg__why--ok { background: var(--success-soft); color: var(--success); }
+.ur-reg__why--void { background: var(--bg-card-2); color: var(--text-3); }
+.ur-reg__ops { margin-top: 10px; }
+.btn.is-gated { background: var(--bg-card-2); border: 1px dashed var(--line-strong); color: var(--text-3); box-shadow: none; }
+.btn.is-gated:active { transform: none; }
+
+/* ---------------- 6. 明细筛选 ---------------- */
+/* 固定 5 个状态筛选：等分一行（胶囊自动换行会出现末项独占一行的碎行） */
+.ur-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.ur-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 0; height: 30px; padding: 0 4px; border-radius: var(--r-full);
+  border: 1px solid var(--line); background: transparent;
+  font-family: inherit; font-size: var(--fs-xs); line-height: 1; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background var(--d-fast) var(--e-out), border-color var(--d-fast) var(--e-out), color var(--d-fast);
+}
+.ur-chip.is-on { background: var(--primary-soft); border-color: var(--accent-line); color: var(--primary-dim); font-weight: 600; }
+.ur-chip:active { transform: scale(.97); }
+.ur-chip:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.ur-chip b { margin-left: 3px; font-weight: 600; font-variant-numeric: tabular-nums; opacity: .75; }
+.ur-subhead { margin: 16px 0 2px; font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); letter-spacing: .04em; }
+.ur-subhead:first-child { margin-top: 4px; }
+
+/* ---------------- 7. 分析 ---------------- */
+.ur-fact { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.ur-fact:first-child { border-top: 0; }
+.ur-fact__ic { flex: none; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card-2); color: var(--text-3); }
+.ur-fact__ic--bad { background: var(--error-soft); color: var(--error); }
+.ur-fact__ic--wait { background: var(--warning-soft); color: var(--warning-ink); }
+.ur-fact__ic--ok { background: var(--success-soft); color: var(--success); }
+.ur-fact__b { flex: 1; min-width: 0; }
+.ur-fact__t { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--text-1); }
+.ur-fact__d { display: block; margin-top: 3px; font-size: var(--fs-xs); line-height: 1.55; color: var(--text-3); }
+.ur-fact__v { flex: none; text-align: right; font-size: var(--fs-sm); font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.ur-fact__v small { display: block; margin-top: 2px; font-size: 10px; font-weight: 500; color: var(--text-3); }
+
+.ur-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.ur-tile { padding: 10px 12px; border-radius: var(--r-m); background: var(--bg-card-2); }
+.ur-tile__k { font-size: var(--fs-xs); color: var(--text-3); }
+.ur-tile__v { margin-top: 4px; font-size: var(--fs-md); font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.ur-tile__s { margin-top: 3px; font-size: 10px; line-height: 1.4; color: var(--text-3); }
+
+/* ---------------- 8. 杂项 ---------------- */
+.ur-link {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 13px 0; border: 0; border-top: 1px solid var(--line);
+  background: none; font-family: inherit; font-size: var(--fs-sm);
+  color: var(--text-2); text-align: left; text-decoration: none; cursor: pointer;
+}
+.ur-link:first-child { border-top: 0; }
+.ur-link .ic { color: var(--text-3); flex: none; }
+.ur-link__t { flex: 1; min-width: 0; }
+.ur-link__s { font-size: var(--fs-xs); color: var(--text-3); }
+
+.ur-more {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; min-height: 40px; margin-top: 8px; border: 0; background: none;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--primary-dim);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ur-more:active { opacity: .6; }
+
+.ur-empty { padding: 8px 0 4px; font-size: var(--fs-sm); color: var(--text-3); }
+
+/* P1-1 对账单行：整行可点 → 单据弹窗（账期 + 金额 + 状态 + chev，热区 = 整行） */
+.ur-stmt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 12px 0; border: 0; border-top: 1px solid var(--line);
+  background: none; font-family: inherit; font-size: var(--fs-sm); color: var(--text-2);
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color var(--d-fast) ease;
+}
+.ur-stmt:first-child { border-top: 0; }
+.ur-stmt .k { font-weight: 600; color: var(--text-2); }
+.ur-stmt .v { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.ur-stmt .v b { font-weight: 700; color: var(--text-1); }
+.ur-stmt .ic { color: var(--text-3); flex: none; }
+.ur-stmt:active { opacity: .6; }
+@media (hover: hover) { .ur-stmt:hover .k { color: var(--text-1); } }
+
+/* 行内文字按钮（「全部核对」等轻量批量操作，不抢卡片主按钮层级） */
+.ur-mini {
+  padding: 2px 2px; border: 0; background: none;
+  font-family: inherit; font-size: var(--fs-xs); font-weight: 600; color: var(--primary-dim);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.ur-mini:active { opacity: .55; }
+.ur-mini:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: 4px; }
+
+/* 登记 sheet 内的凭证上传框 */
+.ur-upload {
+  border: 1.5px dashed var(--line-strong); border-radius: var(--r-m);
+  padding: 18px; text-align: center; color: var(--text-3); font-size: var(--fs-sm);
+  background: var(--bg-card-2); cursor: pointer;
+}
+.ur-upload .ic { display: block; margin: 0 auto 6px; }
+
+/* 跳转目标定位（吸顶导航之下）与高亮 */
+[data-anchor] { scroll-margin-top: 96px; }
+@keyframes ur-flash {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  25% { box-shadow: 0 0 0 3px var(--primary-soft-2); }
+  65% { box-shadow: 0 0 0 3px transparent; }
+}
+.ur-flash { animation: ur-flash 1.2s var(--e-out); }
+
+/* 触控热区：小尺寸控件保持视觉尺寸不变，命中区补足到 44×44（移动端可点性），
+   用 ::before 透明层实现；.ur-view 的 ::after 已用于当前页下划线，故不用 ::after。 */
+.ur-chip, .ur-view, .ur-reg__doc, .ur-mini { position: relative; }
+.ur-chip::before, .ur-view::before, .ur-reg__doc::before, .ur-mini::before {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ur-panel, .ur-flash { animation: none; }
+  .ur-comp__seg, .ur-oline__ck { transition: none; }
 }
 
-/* L5 · 桌面双栏：左明细（逐笔核对/待办/留痕）右汇总（卷宗现状，sticky） */
-.uc-band-grid{display:block;}
-@media (min-width:768px){
-  /* L5 · 桌面下壳加宽，双栏（main+aside）才有可用宽度（390px 壳内两栏会挤爆） */
-  .phone { width: min(880px, calc(100vw - 48px)); }
-  .uc-band-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;
-    grid-template-areas:"main aside";gap:16px;align-items:start;}
-  .uc-band-grid__main{grid-area:main;min-width:0;}
-  .uc-band-grid__aside{grid-area:aside;position:sticky;top:64px;}
-  .uc-band-grid__main .uh-sec,.uc-band-grid__aside .uh-sec{margin-left:0;margin-right:0;}
+/* 窄屏：四段进度轴文字收紧，避免折行 */
+@media (max-width: 400px) {
+  .ur-life__s .lb { font-size: 10px; }
 }

@@ -1,5 +1,19 @@
 /* ============================================================
-   uni-invite-records.js · 获客记录（重构版 20261030uni12）
+   uni-invite-records.js · 获客记录（重构版 20261031uni16）
+   uni16 增量：筛选行（日期胶囊组 + 筛选按钮 + 筛选摘要）抽为 filterRowHtml()，
+               在记录/统计/对比三个分页顶部（主 bar 下方）同样位置一致渲染；
+               筛选状态三页共享、操作三页同步生效，统计/对比空态亦保留筛选行
+   uni15 增量：① 主 bar（记录/统计/对比）去除玻璃背景层/模糊/底边，仅保留吸顶
+              ② 记录列表去卡片化（.ir-listflat：去边框/背景/圆角/阴影，保留行分隔）
+              ③ 来源行改为「来源 姓名 · 成员所在公司（省代或二级企业）· 渠道码名称」，
+                 不再展示码类型标签；线索挂 code（种子 uni15 同步补全）
+   uni14 增量：记录列表头左侧日期属性改为胶囊按钮组（全部/近7天/仅30天/本月，
+               默认选中全部）；仅日期快捷筛选时胶囊常驻并高亮当前档，存在
+               渠道/成员/阶段/付费等筛选时原位替换为筛选摘要（已筛选：…）
+   uni13 增量：① 主 bar（记录/统计/对比）吸顶固定（.ir-mainbar），不随内容滚动
+              ② 记录列表头左侧新增日期属性，筛选确认后以筛选摘要原位替换；
+                 独立 .ir-fsum 行删除
+              ③ 快捷日期措辞统一：近30天 → 仅30天（筛选弹窗/摘要/表头左侧一致）
    uni12 增量：招商码下线联动——CH_LABEL/筛选/分组/对比渠道项删 agent，
                agent 线索桶并入 direct（员工码按 owner 判定归 staff）
    uni11 增量：① 筛选改底部 sheet 弹窗（五分组/重置/确认/遮罩取消）
@@ -375,6 +389,28 @@
     var vm = V.data(ctx);
     var staffName = ctx.staffName;
 
+    /* uni15：码名称索引（自营码 channels.direct + 二级码 subs[].channels / channels.school）
+       与来源成员所在公司（二级线按 subId 查合作企业，其余回退 profile 企业名） */
+    function buildCodeMap() {
+      var m = {}, ch = ctx.s.channels || {};
+      (ch.direct || []).forEach(function (c) { if (c && c.code) m[c.code] = c; });
+      (ch.school || []).forEach(function (c) { if (c && c.code) m[c.code] = c; });
+      (ctx.s.subs || []).forEach(function (s) { (s.channels || []).forEach(function (c) { if (c && c.code) m[c.code] = c; }); });
+      return m;
+    }
+    var codeMap = buildCodeMap();
+    function memberCompanyOf(l) {
+      var sub = (ctx.s.subs || []).filter(function (x) { return x.id === l.subId; })[0];
+      if (sub && sub.name) return sub.name;
+      return (ctx.s.profile && ctx.s.profile.name) || "";
+    }
+    function codeNameOf(l) {
+      var code = l.code || "";
+      if (!code) return "";
+      var c = codeMap[code];
+      return c ? c.name : "";
+    }
+
     /* ---- 运行时交互态（身份差异之外的页面态） ---- */
     var view = "list";                 // list | stats | compare
     /* 视角集合（uni11 §3）：默认仅自营线；二级线默认不选，与 uni10 默认口径一致 */
@@ -420,7 +456,7 @@
     function activeSummary() {
       var out = [];
       if (fQuick === "7d") out.push("近7天");
-      else if (fQuick === "30d") out.push("近30天");
+      else if (fQuick === "30d") out.push("仅30天");
       else if (fQuick === "month") out.push("本月");
       if (fStart || fEnd) out.push((fStart || "…") + "–" + (fEnd || "…"));
       if (fChannel !== "all") out.push(CH_SHORT[fChannel] || fChannel);
@@ -445,7 +481,7 @@
         /* 日期组（恒显） */
         parts.push('<div class="ir-fg"><div class="ir-fg__head">日期</div>' +
           chipsHtml("quick", t.quick, [
-            { v: "all", t: "全部" }, { v: "7d", t: "近7天" }, { v: "30d", t: "近30天" }, { v: "month", t: "本月" }
+            { v: "all", t: "全部" }, { v: "7d", t: "近7天" }, { v: "30d", t: "仅30天" }, { v: "month", t: "本月" }
           ]) +
           '<div class="ir-dates"><input type="date" class="input" data-fs-start value="' + t.start + '" aria-label="开始日期">' +
           '<span class="ir-dates__sep">至</span>' +
@@ -569,8 +605,9 @@
     };
     function rowHtml(l) {
       var life = lifecycleOf(l);
-      var c = channelOf(Uni, vm, l, staffName);
       var paid = paidFlag(l);
+      var srcCo = memberCompanyOf(l);
+      var codeNm = codeNameOf(l);
       var row = '<div class="set-item" data-lead="' + ui.esc(l.id) + '">' +
         '<div class="si-ic" style="background:' + (LEAD_TINT[l.stage] || LEAD_TINT.registered) + '">' + ui.icon("user", 18) + '</div>' +
         '<div class="si-body">' +
@@ -579,7 +616,9 @@
           '<span class="ir-paycap">' + (paid ? "已付费" : "未付费") + "</span></div>" +
           '<div class="si-sub">' + ui.esc(Uni.maskPhone(l.phone)) +
           (l.company ? " · " + ui.esc(Uni.maskCompany(l.company)) : "") + '</div>' +
-          '<div class="si-sub">来源 ' + ui.esc(l.owner || "—") + " · " + ui.esc(c.label) + '</div>' +
+          '<div class="si-sub">来源 ' + ui.esc(l.owner || "—") +
+          (srcCo ? " · " + ui.esc(srcCo) : "") +
+          (codeNm ? " · " + ui.esc(codeNm) : "") + '</div>' +
           '<div class="si-sub">' + ui.esc(activityText(l)) + '</div>' +
         '</div>' +
         '<span class="ir-rowright">' +
@@ -591,37 +630,56 @@
       }
       return row;
     }
+    /* 表头左侧：日期快捷胶囊组（uni14：仅日期快捷筛选时胶囊常驻并高亮当前档；
+       存在渠道/成员/阶段/付费等筛选时原位替换为筛选摘要） */
+    var QUICK_OPTS = [
+      { v: "all", t: "全部" }, { v: "7d", t: "近7天" }, { v: "30d", t: "仅30天" }, { v: "month", t: "本月" }
+    ];
+    function dateOnlyActive() {
+      return fQuick !== "all" && fChannel === "all" && fMember === "all" && fStage === "all" && fPaid === "all";
+    }
+    function dateCapsHtml() {
+      return '<span class="ir-datecaps">' + QUICK_OPTS.map(function (o) {
+        return '<button type="button" class="ir-datecap' + (o.v === fQuick ? " is-on" : "") +
+          '" data-datecap="' + o.v + '">' + o.t + "</button>";
+      }).join("") + "</span>";
+    }
+    /* 筛选行（uni16：记录/统计/对比三视图顶部一致渲染；筛选态三视图同步生效） */
+    function filterRowHtml() {
+      var summary = activeSummary();
+      var showCaps = summary.length === 0 || dateOnlyActive();
+      return '<section class="uh-sec"><div class="uh-sechead ir-listhead">' +
+        '<span class="ir-leftstate' + (summary.length && !showCaps ? " is-on" : "") + '">' +
+        (showCaps
+          ? dateCapsHtml()
+          : '<span class="ir-dot" aria-hidden="true"></span><span class="ir-leftstate__tx">已筛选：' + ui.esc(summary.join(" · ")) + "</span>") +
+        "</span>" +
+        '<span class="more ir-filterbtn" data-filter-toggle>' +
+        (summary.length ? '<span class="ir-dot" aria-hidden="true"></span>' : "") + "筛选</span>" +
+        "</div></section>";
+    }
     function listViewHtml() {
       var F = mergedCollection().filter(matches);
-      var summary = activeSummary();
-      var head = '<section class="uh-sec">' +
-        '<div class="uh-sechead ir-listhead">' +
-        '<span class="more ir-filterbtn" data-filter-toggle>' +
-        (summary.length ? '<span class="ir-dot" aria-hidden="true"></span>' : "") + "筛选</span></div>";
-      if (summary.length) head += '<div class="ir-fsum">已筛选：' + ui.esc(summary.join(" · ")) + "</div>";
-
-      var body;
+      var html = filterRowHtml();
       if (!F.length) {
         /* 视角/筛选为空 → 空态（二级线待接入说明仅在仅选二级线且桶空时提示） */
         if (scopeSet.sub && !scopeSet.self && !(vm.school || []).length) {
           var actSubs = (ctx.s.subs || []).filter(function (x) { return x.status === "active"; });
-          body = '<div style="margin-top:14px">' + Uni.emptyHtml("二级企业获客数据待接入", "当前版本暂无二级线获客流水，待数据接入后自动展示", "tray") + "</div>" +
+          return html + '<section class="uh-sec"><div style="margin-top:14px">' + Uni.emptyHtml("二级企业获客数据待接入", "当前版本暂无二级线获客流水，待数据接入后自动展示", "tray") + "</div>" +
             '<div class="uh-note ir-subnote">已合作二级企业（只读）：' +
-            ui.esc(actSubs.map(function (x) { return x.name; }).join(" · ") || "—") + "</div>";
-        } else {
-          var filtered = summary.length > 0;
-          body = '<div style="margin-top:14px">' + Uni.emptyHtml(
-            filtered ? "暂无匹配用户" : V.empty.leads.title,
-            filtered ? "当前筛选条件下没有符合的用户，可调整条件后重试" : V.empty.leads.desc, "user") + "</div>";
+            ui.esc(actSubs.map(function (x) { return x.name; }).join(" · ") || "—") + "</div></section>";
         }
-        return head + body + "</section>";
+        var filtered = activeSummary().length > 0;
+        return html + '<section class="uh-sec"><div style="margin-top:14px">' + Uni.emptyHtml(
+          filtered ? "暂无匹配用户" : V.empty.leads.title,
+          filtered ? "当前筛选条件下没有符合的用户，可调整条件后重试" : V.empty.leads.desc, "user") + "</div></section>";
       }
       var shown = F.slice(0, visibleCount);
-      body = '<div class="uh-list" style="padding:0 14px">' + shown.map(rowHtml).join("") + "</div>";
+      var body = '<div class="uh-list ir-listflat" style="padding:0 14px">' + shown.map(rowHtml).join("") + "</div>";
       var rest = F.length - visibleCount;
       if (rest > 0) body += '<button type="button" class="btn btn-ghost ir-loadmore" data-loadmore>加载更多（剩余 ' + rest + " 条）</button>";
       else body += '<div class="ir-allloaded">已全部加载 · 共 ' + F.length + " 条</div>";
-      return head + body + "</section>";
+      return html + '<section class="uh-sec">' + body + "</section>";
     }
 
     /* ---------- 统计视图：漏斗现算（§4.4）+ 分组卡 ---------- */
@@ -631,6 +689,7 @@
     function statsViewHtml() {
       var F = mergedCollection().filter(matches);
       var Fn = F.length;
+      var html = filterRowHtml();
       var AUTH = { "已个人认证": 1, "已企业认证": 1, "已企业入驻": 1, "已加入认证企业": 1, "已加入入驻企业": 1 };
       var cReg = F.filter(function (l) { return lifecycleOf(l) !== "游客" && lifecycleOf(l) !== "流失"; }).length;
       var cAuth = F.filter(function (l) { return AUTH[lifecycleOf(l)]; }).length;
@@ -640,7 +699,7 @@
       var onRate = Fn > 0 ? Math.round(cSettled / Fn * 100) + "%" : "—";
       var payRate = Fn > 0 ? Math.round(cConsume / Fn * 100) + "%" : "—";
 
-      var html = '<section class="uh-sec">' +
+      html += '<section class="uh-sec">' +
         '<div class="uh-finhead ir-fin"><div class="uh-eyebrow">获客漏斗概览</div>' +
         '<div class="uh-bignum ir-num">' + Fn + '<span class="ir-bignum-sub">当前筛选集</span></div></div>' +
         kvRow("总用户", Fn) + kvRow("已注册", cReg) + kvRow("已认证", cAuth) + kvRow("已入驻", cSettled) +
@@ -689,10 +748,10 @@
     }
     function compareViewHtml() {
       var F = mergedCollection().filter(matches);
+      var html = filterRowHtml();
       if (!F.length) {
-        return '<section class="uh-sec">' + Uni.emptyHtml("暂无对比数据", "当前视角与筛选下没有获客记录", "tray") + "</section>";
+        return html + '<section class="uh-sec">' + Uni.emptyHtml("暂无对比数据", "当前视角与筛选下没有获客记录", "tray") + "</section>";
       }
-      var html = "";
       /* 线别对比（§3.4）：仅 self+sub 双线均选中时显示，各自行内现算 */
       if (scopeSet.self && scopeSet.sub) {
         var sf = F.filter(function (l) { return l.__line === "self"; });
@@ -758,12 +817,12 @@
         var hint = document.getElementById("ir-scope-hint");
         if (hint) hint.textContent = (scopeSet.self ? "自营线" : "") + (scopeSet.self && scopeSet.sub ? " + " : "") + (scopeSet.sub ? "二级线" : "");
       }
-      /* ★ 全页唯一主 bar（记录/统计/对比） */
-      html += '<section class="uh-sec ir-mainsec"><div class="seg ir-mainseg" role="tablist">' +
+      /* ★ 全页唯一主 bar（记录/统计/对比）：.ir-mainbar 吸顶，不随内容滚动 */
+      html += '<div class="ir-mainbar"><section class="uh-sec ir-mainsec"><div class="seg ir-mainseg" role="tablist">' +
         '<button class="seg-item' + (view === "list" ? " active" : "") + '" data-view="list">记录</button>' +
         '<button class="seg-item' + (view === "stats" ? " active" : "") + '" data-view="stats">统计</button>' +
         '<button class="seg-item' + (view === "compare" ? " active" : "") + '" data-view="compare">对比</button>' +
-        "</div></section>";
+        "</div></section></div>";
       /* 锁条 / 权限说明条（按身份渲染，可空） */
       if (ctx.readonly) {
         html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
@@ -799,6 +858,15 @@
       /* 主 bar 视图切换（保留筛选态与视角集合，分页重置 20） */
       var v = e.target.closest("[data-view]");
       if (v) { view = v.getAttribute("data-view"); visibleCount = PAGE_SIZE; renderAll(); return; }
+      /* 日期快捷胶囊：直接应用快捷日期档（全部=清除日期筛选） */
+      var cap = e.target.closest("[data-datecap]");
+      if (cap) {
+        var dk = cap.getAttribute("data-datecap");
+        fQuick = dk;
+        if (dk === "all") { fStart = ""; fEnd = ""; }
+        else { var dr = quickRange(dk); fStart = dr.start; fEnd = dr.end; }
+        visibleCount = PAGE_SIZE; renderAll(); return;
+      }
       /* 筛选底部弹窗 */
       if (e.target.closest("[data-filter-toggle]")) { openFilterSheet(); return; }
       /* 加载更多 */

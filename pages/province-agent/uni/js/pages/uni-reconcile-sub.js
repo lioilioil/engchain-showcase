@@ -305,34 +305,18 @@
   }
 
   /* ---------- 历史对账记录（按月查询） ---------- */
-  var HIST_LB = { pending: "对账中", settled: "已平账", overdue: "逾期锁定" };
-  var HIST_CLS = { pending: "wait", settled: "ok", overdue: "bad" };
-  var HIST_NOTE = {
-    pending: "该月账单处于 5 天对账窗口内，请完成逐笔核对与到账确认；超期将锁定该月对账。",
-    settled: "该月已完成对账并平账留痕，无未闭环差异。",
-    overdue: "该月账单已超过对账期限（出账后 5 天），对账状态已锁定，仅可查看凭证与明细，不可手动对账。"
-  };
-  function histSheet(h, Uni) {
-    var cls = HIST_CLS[h.state] || "mute";
-    var body =
-      '<div class="uh-sheetkv"><span class="k">账单月份</span><span class="v">' + h.month + '</span></div>' +
-      '<div class="uh-sheetkv"><span class="k">出账日</span><span class="v">' + (h.issueAt || "—") + '</span></div>' +
-      '<div class="uh-sheetkv"><span class="k">对账截止</span><span class="v">' + (h.dueAt || "—") + '</span></div>' +
-      '<div class="uh-sheetkv"><span class="k">账单金额</span><span class="v">' + ui.money(h.amount) + '</span></div>' +
-      (h.settledAt ? '<div class="uh-sheetkv"><span class="k">平账时间</span><span class="v">' + h.settledAt + '</span></div>' : "") +
-      '<div style="height:12px"></div>' +
-      '<div class="uc-histnote uc-histnote--' + cls + '"><b>' + (HIST_LB[h.state] || h.state) + '</b> · ' + (HIST_NOTE[h.state] || "") + '</div>';
-    var footer = [{ t: "关闭", kind: "ghost" }];
-    if (h.state === "pending") {
-      footer.push({
-        t: "去对账", kind: "primary", onClick: function (ov) {
-          ov.close();
-          var band = document.querySelector("[data-band='cur']");
-          if (band) band.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-      });
-    }
-    Uni.center({ title: "对账记录 · " + h.month, body: body, footer: footer });
+  /* 历史账期弹窗：模板统一走 uni-doc.js（对账单摘要 + 账单信息 + 可下载卷宗），
+     本页只补「去对账」这个就地动作 */
+  var Doc = window.UniDoc;
+  var HIST_LB = Doc.HIST_LB, HIST_CLS = Doc.HIST_CLS;
+  function histSheet(h, ctx, Uni) {
+    var more = h.state === "pending"
+      ? { t: "去对账", on: function () {
+        var band = document.querySelector("[data-band='cur']");
+        if (band) band.scrollIntoView({ behavior: "smooth", block: "start" });
+      } }
+      : null;
+    Doc.openSheet(ctx, h, Uni, { more: more });
   }
   function histHtml(ctx, ui) {
     var hist = ctx.s.hist || [];
@@ -486,7 +470,7 @@
       n.addEventListener("click", function () {
         var month = n.getAttribute("data-hist");
         var hist = (ctx.s.hist || []).filter(function (h) { return h.month === month; });
-        if (hist.length) histSheet(hist[0], Uni);
+        if (hist.length) histSheet(hist[0], ctx, Uni);
       });
     });
 

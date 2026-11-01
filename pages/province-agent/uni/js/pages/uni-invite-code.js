@@ -283,7 +283,8 @@
         '<div class="uc-dinfo"><div class="uc-dname">' + ui.esc(m.name) + (x.isMe ? '<span class="uc-me">（我）</span>' : "") +
         '<span class="uh-badge uh-badge--gold">' + ui.esc(x.roleLabel) + "</span></div>" +
         '<div class="uc-dmeta">名下渠道码 ' + x.codes.length + ' 张 · 已注册 ' + x.users + ' 人</div></div></div>' +
-        '<div class="uc-dcodes">' + codeRows + "</div>",
+        '<div class="uc-dcodes">' + codeRows + "</div>" +
+        '<div class="uc-dtail" aria-hidden="true"></div>',
       footer: footer
     });
 
@@ -348,7 +349,10 @@
           '<span class="uc-script__btns">' +
             '<button type="button" class="btn btn-ghost btn-sm" data-act="shuffle">换一换</button>' +
             '<button type="button" class="btn btn-ghost btn-sm" data-act="edit">自定义</button>' +
-          "</span></div></div>";
+          "</span></div>" +
+        '<div class="uc-script__copyrow">' +
+          '<button type="button" class="btn btn-ghost btn-sm uc-scriptcopy" data-act="copy-script">复制文案与链接</button>' +
+        "</div></div>";
     }
     function bodyHtml() {
       return '<div class="uc-copybox">' +
@@ -359,7 +363,6 @@
           }).join("") + "</div></div>" +
         '<div class="field" style="margin-top:14px"><label class="field-label">推荐推广文案</label>' +
           scriptHtml() +
-          (editing ? "" : '<button type="button" class="btn btn-ghost btn-sm uc-scriptcopy" data-act="copy-script">复制文案与链接</button>') +
         "</div>" +
         '<div class="field" style="margin-top:14px"><label class="field-label">推广链接<span class="uc-hint">点击跳转平台小程序</span></label>' +
           '<div class="uc-linkrow">' +

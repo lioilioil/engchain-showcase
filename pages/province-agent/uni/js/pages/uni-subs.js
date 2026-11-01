@@ -1,22 +1,42 @@
 /* ============================================================
    uni-subs.js · 二级合作管理（E024–E033）
-   顶部胶囊 tab（生效中/待审批/已驳回，样式同「会话列表-会话/消息」）；
-   生效中合作卡：协议状态化操作（已签→查看协议 / 待签·拒签→重发协议）
-   + 约定比例；详情弹窗承载合作管理（对账单/操作记录/暂停/恢复/终止）。
-   身份差异全部落在 V.data() / V.perms / V.empty（S1/S2）。
+   ┌ 省代视角（province）：合作总览 → 待办提醒 → 三段 tab
+   │  · 生效中：协议 / 状态 / 约定比例 / 本月应得四要素一屏可读；
+   │    待签与暂停卡内直接给「重发协议 / 恢复合作」一键入口；
+   │  · 待审批：申请详情 → 通过（落档案 + 生成待签协议）/ 驳回（留痕）；
+   │  · 已驳回：申请与驳回原因留痕，支持重新发起；
+   │  · 已结束：终止档案只读查阅（归档 tab，仅在有档案时出现）。
+   └ 二级视角（sub）：合作档案 + 本月所得拆解 + 协议签署入口 + 相关入口。
+   身份差异只落在 STATE_VARIANTS（perms / note / lockedNote / readonly），
    S1 铁律：全页仅 `var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);` 一行身份分支。
    ============================================================ */
 (function () {
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
+  var esc = ui.esc;
+  var G = 0.5; /* 规则常量：二级线分佣比例 50%（与 Uni.financeSplit 同源） */
+  /* 约定比例区间：与 store.CONST 同源（当前 0–50%），界面文案不写死数字 */
+  var RC = store.CONST || {};
+  var RATIO_MIN = Math.round(Number(RC.ratioMin || 0) * 100);
+  var RATIO_MAX = Math.round(Number(RC.ratioMax || 0.5) * 100);
 
-  var REJECT_QUICK = ["资质不符", "经营范围不符", "信息填写有误"];
-  var AG_STATE = { signed: { t: "已签署", cls: "ok" }, pending: { t: "待对方签署", cls: "wait" }, rejected: { t: "已拒签", cls: "bad" } };
+  var REJECT_QUICK = ["资质不符", "经营范围不符", "信息填写有误", "重复提交"];
+  var ITEM_LABEL = { cert: "证书认证", entry: "入驻申请", unlock: "解锁供需", order: "订单支付" };
 
-  /* ---------- 招商申请跨端覆盖层（M4：用户端 apply 页写入，工作台合并展示与审批） ---------- */
+  /* 协议状态字典：pending = 待对方（二级）签署；pending_mine = 待我方（二级）签署 */
+  var AG_STATE = {
+    signed: { t: "已签署", cls: "ok" },
+    pending: { t: "待对方签署", cls: "info" },
+    pending_mine: { t: "待我方签署", cls: "info" },
+    rejected: { t: "已拒签", cls: "bad" }
+  };
+  function agInfo(st) { return AG_STATE[st] || AG_STATE.signed; }
+
+  /* ---------- 招商申请跨端覆盖层（用户端 apply 页写入，工作台合并展示与审批） ---------- */
   var SUB_APPS_KEY = "engchain-sub-apps";
-  var SUB_ACTIVE_KEY = "engchain-sub-active";
-  function readKey(k) { try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; } }
+  function readKey(k) {
+    try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; }
+  }
   function writeKey(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function mergedSubApps(s) {
     var base = (s.subApps || []).slice();
@@ -25,746 +45,1359 @@
     });
     return base;
   }
-  function mergedActive(s) {
-    return (s.subs || []).concat(readKey(SUB_ACTIVE_KEY));
+  function isStoreApp(id) {
+    return (store.getState().state.subApps || []).some(function (x) { return x.id === id; });
   }
-  /* 审批同步：更新跨端申请状态；通过时生成生效子企业档案 */
-  function applyReview(appId, pass, reason) {
-    var list = readKey(SUB_APPS_KEY), hit = null;
+  function markLocalApp(id, status, reason) {
+    var list = readKey(SUB_APPS_KEY);
     list.forEach(function (a) {
-      if (a.id === appId) { a.status = pass ? "approved" : "rejected"; if (!pass) a.rejectReason = reason; hit = a; }
+      if (a.id !== id) return;
+      a.status = status;
+      a.handledAt = todayStr();
+      if (reason) a.rejectReason = reason;
     });
-    if (hit) writeKey(SUB_APPS_KEY, list);
-    if (pass && hit) {
-      var act = readKey(SUB_ACTIVE_KEY);
-      var now = new Date(), pad = function (n) { return n < 10 ? "0" + n : "" + n; };
-      act.push({
-        id: "sub-" + String(appId).replace(/^app-apply-/, "apply"),
-        name: hit.name, uscc: hit.uscc, contact: hit.contact, phone: hit.phone,
-        address: hit.address || "",
-        ratioToSub: hit.ratio != null ? hit.ratio : 0.2,
-        since: now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()),
-        status: "active", channel: "agent", source: "apply",
-        agreement: { state: "pending" }
-      });
-      writeKey(SUB_ACTIVE_KEY, act);
+    writeKey(SUB_APPS_KEY, list);
+  }
+  /* 审批桥接：工作台种子申请走 app/review；跨端申请先落库再审批，避免
+     「通过后档案重复 / 列表不刷新」两处历史问题（旧实现在 LS 里另建 active）。 */
+  function approveApp(a) {
+    if (isStoreApp(a.id)) return store.act("app/review", { id: a.id, pass: true });
+    if (!/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(String(a.uscc || "").toUpperCase())) {
+      return { ok: false, reason: "统一社会信用代码不符合规范（18 位，不含 I/O/S/V/Z）" };
     }
+    var r = store.act("app/create", {
+      data: {
+        name: a.name, uscc: a.uscc, contact: a.contact, phone: a.phone,
+        address: a.address, ratio: a.ratio == null ? 0.2 : a.ratio
+      },
+      channel: a.channel || "agent"
+    });
+    if (!r.ok) return r;
+    var d = store.getState().state;
+    var created = d.subApps[d.subApps.length - 1];
+    r = store.act("app/review", { id: created.id, pass: true });
+    if (r.ok) markLocalApp(a.id, "approved");
+    return r;
+  }
+  function rejectApp(a, reason) {
+    if (isStoreApp(a.id)) return store.act("app/review", { id: a.id, pass: false, reason: reason });
+    markLocalApp(a.id, "rejected", reason);
+    return { ok: true };
   }
 
-  /* 多选批量状态（文件级：批量弹窗与 mount 共享）+ 当前 tab */
-  var _multi = false, _sel = {}, _rerender = null, _tab = "active";
+  /* ---------- 本页局部：重发后的协议状态覆盖 ----------
+     store 的 agree/resend 只落消息与留痕、不改协议状态（公共库只读），
+     页内用一份 id 白名单把「已重发」呈现为待签，不改动共享数据。 */
+  var RESENT_KEY = "engchain-subs-resent";
+  function readResent() { return readKey(RESENT_KEY); }
+  function isResent(id) { return readResent().indexOf(id) > -1; }
+  function markResent(id) {
+    var list = readResent();
+    if (list.indexOf(id) > -1) return;
+    list.push(id);
+    writeKey(RESENT_KEY, list);
+  }
+  /* 省代视角：该合作当前协议状态（含重发覆盖） */
+  function agStateOf(p) {
+    var st = (p.agreement && p.agreement.state) || "";
+    if (!st) return "pending";                 /* 新通过的合作 = 待对方签署 */
+    if (st !== "signed" && isResent(p.id)) return "pending";
+    return st;
+  }
 
-  /* 批量状态气泡（更多 → 暂停合作 / 终止合作；自按钮位置向上弹出） */
+  /* ---------- 通用小工具 ---------- */
+  function pct(r) { return Math.round(Number(r || 0) * 100) + "%"; }
+
+  /* ---------- 比例输入（发起合作 / 配置比例 / 批量配置 三处共用） ----------
+     整数数字框 + 单位后缀；越界时红框 + 行内提示，提交前再兜底校验一次 */
+  function ratioFieldHtml(o) {
+    return '<div class="field su-ratiofield' + (o.last ? ' su-ratiofield--last' : '') + '" data-ratio-field>' +
+      '<label class="field-label" for="' + o.id + '">' + o.label + '</label>' +
+      '<div class="unit-input">' +
+        '<input class="input" id="' + o.id + '" type="number" inputmode="numeric" step="1" ' +
+          'min="' + RATIO_MIN + '" max="' + RATIO_MAX + '" value="' + o.value + '"' +
+          (o.placeholder ? ' placeholder="' + esc(o.placeholder) + '"' : '') +
+          ' aria-describedby="' + o.id + '-msg">' +
+        '<span class="unit">%</span>' +
+      '</div>' +
+      '<div class="su-field-msg" id="' + o.id + '-msg" data-ratio-msg role="alert" hidden></div>' +
+      (o.note ? '<div class="uh-note">' + o.note + '</div>' : '') +
+      '</div>';
+  }
+
+  function bindRatioInput(sh) {
+    var field = sh && sh.querySelector("[data-ratio-field]");
+    if (!field) return null;
+    var inp = field.querySelector("input"), msg = field.querySelector("[data-ratio-msg]");
+    var last = inp.value;
+
+    function paint(text) {
+      field.classList.toggle("is-err", !!text);
+      inp.setAttribute("aria-invalid", text ? "true" : "false");
+      if (msg) {
+        msg.hidden = !text;
+        msg.innerHTML = text ? ui.icon("x-circle", 14) + '<span>' + esc(text) + '</span>' : "";
+      }
+      if (text) window.requestAnimationFrame(reveal);
+    }
+    /* 提示出现在输入框下方，字段若已贴到弹窗底边会被挡住——把它滚回可视区 */
+    function reveal() {
+      var box = field.parentNode;
+      while (box && !(box.classList && box.classList.contains("sheet-body"))) box = box.parentNode;
+      if (!box) return;
+      var br = box.getBoundingClientRect(), fr = field.getBoundingClientRect();
+      var k = box.clientHeight ? br.height / box.clientHeight : 1;   /* .phone 的 fit 缩放 */
+      var pad = 10 * k;
+      if (fr.bottom + pad > br.bottom) box.scrollTop += (fr.bottom + pad - br.bottom) / k;
+      else if (fr.top - pad < br.top) box.scrollTop -= (br.top - fr.top + pad) / k;
+    }
+    function errOf() {
+      var raw = inp.value.trim();
+      if (raw === "") return "请填写 " + RATIO_MIN + "–" + RATIO_MAX + " 的整数";
+      var n = Number(raw);
+      if (!/^\d+$/.test(raw)) return "仅可填写整数，请去掉小数或符号";
+      if (n > RATIO_MAX) return "超出授权上限：约定比例最高 " + RATIO_MAX + "%，请下调后再提交";
+      if (n < RATIO_MIN) return "约定比例不能低于 " + RATIO_MIN + "%";
+      return "";
+    }
+
+    /* 整数约束（一层）：在插入前拦掉小数点 / 指数 / 正负号 / 空白，连粘贴一起挡 */
+    inp.addEventListener("beforeinput", function (e) {
+      if (e.data && /\D/.test(e.data)) e.preventDefault();
+    });
+    /* 整数约束（二层，兜底不支持 beforeinput 的环境） */
+    inp.addEventListener("keydown", function (e) {
+      if (e.key && e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+      }
+    });
+    /* 输入中：仅越界才提示，不因为中途清空而报错 */
+    inp.addEventListener("input", function () {
+      if (inp.value !== "" && !/^\d+$/.test(inp.value)) { inp.value = last; return; }
+      last = inp.value;
+      paint(inp.value.trim() === "" ? "" : errOf());
+      if (typeof sh.__ratioChange === "function") sh.__ratioChange(inp.value);
+    });
+
+    return {
+      input: inp,
+      value: function () { return inp.value.trim(); },
+      /* 快选芯片等程序化赋值：同步校验态与联动回调 */
+      set: function (v) {
+        inp.value = String(v);
+        last = inp.value;
+        paint(inp.value.trim() === "" ? "" : errOf());
+        if (typeof sh.__ratioChange === "function") sh.__ratioChange(inp.value);
+      },
+      refresh: function () { paint(inp.value.trim() === "" ? "" : errOf()); },
+      /* 提交前校验：空值也提示，并把焦点送回输入框 */
+      validate: function () {
+        var e = errOf();
+        paint(e);
+        if (e) inp.focus();
+        return !e;
+      }
+    };
+  }
+  function todayStr() {
+    var d = new Date(), p = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+  function kv(k, v) { return '<div class="uh-sheetkv"><span class="k">' + k + '</span><span class="v">' + v + '</span></div>'; }
+  function mgrRow(ic, t, s, act, danger) {
+    return '<button type="button" class="uh-row' + (danger ? ' is-danger' : '') + '" data-mgr="' + act + '">' +
+      '<span class="uh-row__ic">' + ui.icon(ic, 18) + '</span>' +
+      '<span class="uh-row__main"><span class="uh-row__t">' + esc(t) + '</span><span class="uh-row__s">' + esc(s) + '</span></span>' +
+      '<span class="uh-chev">' + ui.icon("chev", 16) + '</span></button>';
+  }
+  /* 已勾选且可批量操作的家数（暂停中的不计） */
+  function countSel(live) {
+    return Object.keys(_sel).filter(function (id) {
+      return live.some(function (p) { return p.id === id && p.status !== "suspended"; });
+    }).length;
+  }
+  function linkRow(ic, t, s, act) {
+    return '<button type="button" class="uh-row" data-subact="' + act + '">' +
+      '<span class="uh-row__ic">' + ui.icon(ic, 18) + '</span>' +
+      '<span class="uh-row__main"><span class="uh-row__t">' + esc(t) + '</span><span class="uh-row__s">' + esc(s) + '</span></span>' +
+      '<span class="uh-chev">' + ui.icon("chev", 16) + '</span></button>';
+  }
+
+  /* ---------- 模块级交互状态（跨 mount 保留：操作后不跳回首个 tab） ---------- */
+  var _multi = false, _sel = {}, _tab = "active", _filter = "all";
+  var _ctx = null, _first = true, _lastIdentity = null;
   var _pop = null;
   function closeStatusPop() {
     if (!_pop) return;
     var p = _pop; _pop = null;
     p.classList.remove("show");
-    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 180);
+    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 160);
   }
   document.addEventListener("click", function (e) {
     if (!_pop) return;
     if (e.target && (e.target.closest(".uls-pop") || e.target.closest("[data-more]"))) return;
     closeStatusPop();
   });
+  document.addEventListener("scroll", function () { if (_pop) closeStatusPop(); }, true);
 
+  /* ---------- 生效中筛选 ---------- */
+  var FILTERS = [
+    { k: "all", t: "全部", on: function () { return true; } },
+    { k: "wait", t: "待签", on: function (p) { var s = agStateOf(p); return s === "pending" || s === "pending_mine"; } },
+    { k: "signed", t: "已签", on: function (p) { return agStateOf(p) === "signed"; } },
+    { k: "rej", t: "拒签", on: function (p) { return agStateOf(p) === "rejected"; } },
+    { k: "susp", t: "暂停", on: function (p) { return p.status === "suspended"; } }
+  ];
+
+  /* ============================================================
+     数据视图（两种身份口径，供 STATE_VARIANTS.data 复用）
+     ============================================================ */
+  function provinceVm(ctx) {
+    var s = ctx.s;
+    var apps = mergedSubApps(s);
+    var subs = (s.subs || []).slice();
+    return {
+      live: subs.filter(function (p) { return p.status === "active" || p.status === "suspended"; }),
+      ended: subs.filter(function (p) { return p.status === "terminated"; }),
+      pending: apps.filter(function (a) { return a.status === "pending"; }),
+      rejected: apps.filter(function (a) { return a.status === "rejected"; })
+    };
+  }
+  function subVm(ctx) {
+    var s = ctx.s, p = s.parent || {};
+    var ag = s.agreement || {};
+    var calc = (s.calc || [])[0] || {};
+    return {
+      archive: {
+        name: String(p.name || "").replace(/（.*）/, "") || "上级省代",
+        uscc: p.uscc || s.profile.uscc,
+        contact: p.contact || "",
+        phone: p.phone || "",
+        address: p.address || "",
+        ratioToSub: p.ratioToSub != null ? p.ratioToSub : calc.ratioToSub,
+        since: p.since || s.profile.since
+      },
+      agreement: ag,
+      calc: calc,
+      live: [], ended: [], pending: [], rejected: []
+    };
+  }
+
+  /* ============================================================
+     身份变体（S1：唯一身份分支点由 mount 内的 stateVariantFor 提供）
+     ============================================================ */
   var STATE_VARIANTS = {
+    /* —— 省代 —— */
     admin: {
       label: "省级总代 · 管理员",
-      data: function (ctx) {
-        var s = ctx.s;
-        var apps = mergedSubApps(s); /* M4：合并跨端招商申请 */
-        return {
-          subtitle: "合作申请、生效主体与约定比例配置",
-          pending: apps.filter(function (a) { return a.status === "pending"; }),
-          active: mergedActive(s).filter(function (a) { return a.status === "active" || a.status === "suspended"; }),
-          rejected: apps.filter(function (a) { return a.status === "rejected"; }),
-          note: null
-        };
-      },
-      entries: [],
-      perms: { createApp: true, review: true, setRatio: true, resend: true, status: true },
-      badges: {},
-      empty: {
-        pending: { title: "暂无待审批申请", desc: "新的二级合作申请提交后将出现在这里" },
-        active: { title: "暂无生效中合作", desc: "审批通过的二级合作将在这里建立档案" },
-        rejected: { title: "暂无已驳回申请", desc: "被驳回的合作申请将留痕在这里" }
-      },
-      lockedNote: "审批、比例配置与协议操作均已锁定"
+      data: provinceVm,
+      perms: { createApp: true, review: true, setRatio: true, resend: true, status: true, sign: false },
+      note: null,
+      lockedNote: "审批、比例配置与协议操作均已锁定；恢复账号后可继续操作"
     },
     staff: {
       label: "省级总代 · 员工",
-      data: function (ctx) {
-        var s = ctx.s;
-        var apps = mergedSubApps(s); /* M4：合并跨端招商申请 */
-        return {
-          subtitle: "合作申请、生效主体与约定比例配置",
-          pending: apps.filter(function (a) { return a.status === "pending"; }),
-          active: mergedActive(s).filter(function (a) { return a.status === "active" || a.status === "suspended"; }),
-          rejected: apps.filter(function (a) { return a.status === "rejected"; }),
-          note: "审批、发起合作与比例配置仅管理员可操作；列表数据仅可查看。"
-        };
-      },
-      entries: [],
-      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false },
-      badges: {},
-      empty: {
-        pending: { title: "暂无待审批申请", desc: "新的二级合作申请提交后将出现在这里" },
-        active: { title: "暂无生效中合作", desc: "审批通过的二级合作将在这里建立档案" },
-        rejected: { title: "暂无已驳回申请", desc: "被驳回的合作申请将留痕在这里" }
-      },
-      lockedNote: "合作管理动作已锁定，仅可查看"
+      data: provinceVm,
+      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
+      note: "员工可查阅全部合作档案、协议与对账；审批、发起合作与比例配置由管理员执行。",
+      lockedNote: "员工可查阅全部合作档案；合作管理动作已锁定，仅可查看。"
     },
+    legal_rep: {
+      label: "省级总代 · 法定代表人",
+      data: provinceVm,
+      readonly: true,
+      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
+      note: "法定代表人只读视图：可查阅全部合作档案、协议与对账，不执行审批与配置。",
+      lockedNote: "法定代表人为只读视图；账号暂停期间审批与配置全部锁定，仅可查阅。"
+    },
+    /* —— 二级 —— */
     sub_admin: {
       label: "二级合作企业 · 管理员",
-      data: function (ctx) {
-        var s = ctx.s;
-        var p = s.parent || {};
-        return {
-          subtitle: "我的合作档案：与上级总代的合作信息（只读状态）",
-          pending: [],
-          active: [{
-            id: "archive",
-            name: p.name ? p.name.replace(/（.*）/, "") : "—",
-            uscc: p.uscc || s.profile.uscc,
-            contact: p.contact || "",
-            phone: p.phone || "",
-            address: p.address || "",
-            ratioToSub: p.ratioToSub != null ? p.ratioToSub : 0,
-            since: p.since || s.profile.since,
-            status: "active",
-            agreement: { state: "signed" }
-          }],
-          rejected: [],
-          note: "合作档案为只读口径：约定比例由上级省代配置，协议事项请与上级省代沟通。"
-        };
-      },
-      entries: [],
-      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false },
-      badges: {},
-      empty: {
-        pending: { title: "暂无合作申请", desc: "你与上级总代之间没有待审批的申请记录" },
-        active: { title: "暂无合作档案", desc: "合作生效后档案将出现在这里" },
-        rejected: { title: "无已驳回记录", desc: "你与上级总代之间没有被驳回的申请记录" }
-      },
-      lockedNote: "合作已暂停，档案仍可查阅，联系上级省代处理"
+      data: subVm,
+      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: true },
+      note: "约定比例由上级省代配置；协议与结算以双方签署版本为准。",
+      lockedNote: "分润结算与对账冻结，合作档案仍可查阅；恢复后联系上级省代处理。"
+    },
+    sub_legal: {
+      label: "二级合作企业 · 法定代表人",
+      data: subVm,
+      readonly: true,
+      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
+      note: "法定代表人只读视图：可查阅合作协议与对账，签署与配置由企业管理员执行。",
+      lockedNote: "法定代表人为只读视图；合作暂停期间结算与对账冻结，档案仍可查阅。"
+    },
+    sub_staff: {
+      label: "二级合作企业 · 员工",
+      data: subVm,
+      perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
+      note: "员工仅可查阅合作档案；协议签署与比例配置由企业管理员执行。",
+      lockedNote: "员工仅可查阅合作档案；合作暂停期间结算与对账冻结。"
     }
   };
 
-  /* ---------- 顶部胶囊 tab（样式同「会话列表-会话/消息」msg-tabs） ---------- */
-  function tabsBar(vm, isSub) {
+  /* ============================================================
+     省代视角 · 结构件
+     ============================================================ */
+  /* 合作总览：在营 / 本月合格消费 / 本月约定分润（口径与 financeSplit 一致） */
+  function overviewHtml(vm) {
+    var live = 0, settled = 0, agreed = 0;
+    vm.live.forEach(function (p) {
+      if (p.status !== "active") return;
+      var g = Number(p.subGross || 0);
+      live++;
+      settled += g;
+      agreed += Math.round(g * G * Number(p.ratioToSub || 0));
+    });
+    return '<section class="uh-sec"><div class="su-ov">' +
+      '<div class="su-ov__cell"><span class="su-ov__k">在营合作</span>' +
+      '<span class="su-ov__v">' + live + '<em>家</em></span></div>' +
+      '<div class="su-ov__cell"><span class="su-ov__k">本月合格消费</span>' +
+      '<span class="su-ov__v" data-cnt="settled">' + ui.money(settled) + '</span></div>' +
+      '<div class="su-ov__cell"><span class="su-ov__k">本月约定分润</span>' +
+      '<span class="su-ov__v su-ov__v--accent" data-cnt="agreed">' + ui.money(agreed) + '</span></div>' +
+      '</div></section>';
+  }
+
+  /* 待办提醒：只有存在可推进事项时才出现（点击直达对应 tab / 筛选） */
+  function alertsHtml(vm) {
+    var wait = 0, rej = 0, susp = 0;
+    vm.live.forEach(function (p) {
+      if (p.status === "suspended") { susp++; return; }
+      var st = agStateOf(p);
+      if (st === "rejected") rej++;
+      else if (st !== "signed") wait++;
+    });
+    var items = [];
+    if (vm.pending.length) items.push({ tone: "info", t: "待审批", n: vm.pending.length, jump: "pending" });
+    if (wait) items.push({ tone: "info", t: "协议待签", n: wait, jump: "wait" });
+    if (rej) items.push({ tone: "bad", t: "协议拒签", n: rej, jump: "rej" });
+    if (susp) items.push({ tone: "mute", t: "暂停中", n: susp, jump: "susp" });
+    if (!items.length) return "";
+    return '<div class="su-alerts">' + items.map(function (x) {
+      return '<button type="button" class="su-alert su-alert--' + x.tone + '" data-jump="' + x.jump + '">' +
+        x.t + '<b>' + x.n + '</b>' + ui.icon("chev", 12) + '</button>';
+    }).join("") + '</div>';
+  }
+
+  function tabsHtml(vm) {
     var tabs = [
-      { k: "active", t: "生效中", n: vm.active.length },
+      { k: "active", t: "生效中", n: vm.live.length },
       { k: "pending", t: "待审批", n: vm.pending.length },
       { k: "rejected", t: "已驳回", n: vm.rejected.length }
     ];
-    if (isSub) tabs = [tabs[0]];
-    return '<section class="uh-sec" style="margin-top:0"><div class="uls-tabs">' +
-      tabs.map(function (x) {
-        return '<button class="uls-tab' + (_tab === x.k ? " active" : "") + '" data-tab="' + x.k + '">' + x.t +
-          /* 仅待审批 tab 显示数量徽标；数量为 0 时不显示 */
-          (x.k === "pending" && x.n ? '<span class="uls-tab__badge">' + x.n + "</span>" : "") + "</button>";
-      }).join("") + "</div></section>";
+    if (vm.ended.length) tabs.push({ k: "ended", t: "已结束", n: vm.ended.length });
+    return '<section class="uh-sec"><div class="uls-tabs">' + tabs.map(function (x) {
+      return '<button type="button" class="uls-tab' + (_tab === x.k ? " active" : "") + '" data-tab="' + x.k + '">' + x.t +
+        (x.k !== "active" && x.n ? '<span class="uls-tab__badge">' + x.n + '</span>' : "") + '</button>';
+    }).join("") + '</div></section>';
   }
 
-  /* ---------- 待审批申请卡（紧凑名片：摘要 + 右下角文字入口，点击主体进详情） ---------- */
-  function pendingCard(a, canReview) {
-    var go = canReview ? "去审批" : "点击查看";
-    return '<div class="uls-tile" data-open="' + ui.esc(a.id) + '">' +
-      '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(a.name) + '</span>' +
-      '<span class="uh-badge uh-badge--info">待审批</span></div>' +
-      '<div class="uls-tile__sum"><span>申请比例 <b>' + Math.round(a.ratio * 100) + '%</b> · 提交 <b>' + ui.esc(a.submittedAt || "—") + '</b></span></div>' +
-      '<div class="uls-tile__go"><span class="uls-cardgo">' + go + '&gt;</span></div></div>';
+  function filtersHtml(vm) {
+    if (vm.live.length < 5) return "";
+    return '<div class="su-filters">' + FILTERS.map(function (f) {
+      var n = vm.live.filter(f.on).length;
+      if (f.k !== "all" && !n) return "";
+      return '<button type="button" class="su-chip' + (_filter === f.k ? " is-on" : "") + '" data-filter="' + f.k + '">' +
+        f.t + '<b>' + n + '</b></button>';
+    }).join("") + '</div>';
   }
 
-  /* ---------- 生效中合作卡（紧凑名片；含已暂停态；多选模式：不留空圈、隐藏卡内入口与“生效中”胶囊） ---------- */
-  function activeCard(p, canManage, selOn, isSel) {
-    var suspended = p.status === "suspended";
-    var st = (p.agreement && p.agreement.state) || "signed";
-    var stateBadge = suspended
+  function liveCard(p, caps) {
+    var st = agStateOf(p), ai = agInfo(st);
+    var susp = p.status === "suspended";
+    var on = !!_sel[p.id];
+    var settled = Number(p.subGross || 0);
+    var amt = Math.round(settled * G * Number(p.ratioToSub || 0));
+    var badges = susp
       ? '<span class="uh-badge uh-badge--wait">已暂停</span>'
-      : (selOn ? "" : '<span class="uh-badge uh-badge--ok">生效中</span>');
-    var agBadge = (selOn || suspended) ? "" :
-      '<span class="uh-badge uh-badge--' + (AG_STATE[st] ? AG_STATE[st].cls : "ok") + '">' + (AG_STATE[st] ? AG_STATE[st].t : "已签署") + '</span>';
-    var go = selOn ? "" : '<div class="uls-tile__go"><span class="uls-cardgo">去查看&gt;</span></div>';
-    var na = selOn && suspended;
-    return '<div class="uls-tile' + (selOn ? " uls-tile--multi" : "") + (isSel ? " uls-tile--sel" : "") + (na ? " uls-tile--na" : "") + '" data-open="' + ui.esc(p.id) + '">' +
-      '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(p.name) + '</span>' +
-      /* 仅选中态显示勾选标记；未选中/不可选不留空圈 */
-      (selOn && isSel ? '<span class="uls-chk">' + ui.icon("check", 12) + '</span>' : "") +
-      stateBadge + agBadge + '</div>' +
-      '<div class="uls-tile__sum"><span>约定比例 <b>' + Math.round(p.ratioToSub * 100) + '%</b> · 合作自 <b>' + ui.esc(p.since) + '</b></span></div>' +
-      go + '</div>';
+      : '<span class="uh-badge uh-badge--ok">生效中</span>' +
+        '<span class="uh-badge uh-badge--' + ai.cls + (st === "signed" ? " uh-badge--quiet" : "") + '">' + ai.t + '</span>';
+    var foot = "";
+    if (_multi) {
+      if (susp) foot = '<div class="su-card__ft"><span class="su-card__hint">已暂停合作，不参与批量操作</span></div>';
+    } else if (susp && caps.status) {
+      foot = '<div class="su-card__ft"><span class="su-card__hint">已暂停：分润结算与对账冻结</span>' +
+        '<button type="button" class="su-card__act" data-quick="resume" data-id="' + esc(p.id) + '">恢复合作</button></div>';
+    } else if (!susp && st !== "signed" && caps.resend) {
+      var hint = st === "rejected" ? "对方已拒签，修订后可重新发起" : "对方尚未签署，可重新发起";
+      foot = '<div class="su-card__ft"><span class="su-card__hint">' + hint + '</span>' +
+        '<button type="button" class="su-card__act" data-quick="resend" data-id="' + esc(p.id) + '">重发协议</button></div>';
+    }
+    return '<div class="su-card' + (on ? " is-sel" : "") + (susp && _multi ? " is-na" : "") + '"' +
+      ' data-open="' + esc(p.id) + '" role="button" tabindex="0">' +
+      (_multi ? '<span class="su-check' + (on ? " is-on" : "") + (susp ? " is-na" : "") + '">' +
+        (on ? ui.icon("check", 12) : "") + '</span>' : "") +
+      '<div class="su-card__main">' +
+        '<div class="su-card__nm">' + esc(p.name) + '</div>' +
+        '<div class="su-card__meta">' + badges +
+          '<span class="su-card__ratio">约定 <b>' + pct(p.ratioToSub) + '</b></span></div>' +
+        '<div class="su-card__sub">合作自 ' + esc(p.since || "—") + '</div>' +
+      '</div>' +
+      '<div class="su-card__amt">' +
+        (susp ? '<b class="is-off">冻结</b><span>暂停结算</span>'
+              : '<b>' + ui.money(amt) + '</b><span>本月应得</span>') +
+      '</div>' +
+      (_multi ? "" : '<span class="su-card__chev">' + ui.icon("chev", 16) + '</span>') +
+      foot + '</div>';
   }
 
-  /* ---------- 已驳回申请卡（紧凑名片：摘要 + 右下角文字入口） ---------- */
+  function pendingCard(a, caps) {
+    return '<div class="su-card" data-open="' + esc(a.id) + '" role="button" tabindex="0">' +
+      '<div class="su-card__main">' +
+        '<div class="su-card__nm">' + esc(a.name) + '</div>' +
+        '<div class="su-card__meta"><span class="uh-badge uh-badge--info">待审批</span>' +
+          '<span class="su-card__ratio">申请 <b>' + pct(a.ratio) + '</b></span></div>' +
+        '<div class="su-card__sub">提交于 ' + esc(a.submittedAt || "—") + '</div>' +
+      '</div>' +
+      '<span class="su-card__cta">' + (caps.review ? "去审批" : "查看") + '</span></div>';
+  }
+
   function rejectedCard(a) {
-    return '<div class="uls-tile uls-tile--dim" data-open="' + ui.esc(a.id) + '">' +
-      '<div class="uls-tile__hd"><span class="uls-tile__nm">' + ui.esc(a.name) + '</span>' +
-      '<span class="uh-badge uh-badge--bad">已驳回</span></div>' +
-      '<div class="uls-tile__sum"><span>申请比例 <b>' + Math.round(a.ratio * 100) + '%</b> · 处理 <b>' + ui.esc(a.handledAt || a.submittedAt || "—") + '</b></span></div>' +
-      '<div class="uls-tile__reason">' + ui.esc(a.rejectReason || "未说明原因") + '</div>' +
-      '<div class="uls-tile__go"><span class="uls-cardgo">点击查看&gt;</span></div></div>';
+    return '<div class="su-card is-dim" data-open="' + esc(a.id) + '" role="button" tabindex="0">' +
+      '<div class="su-card__main">' +
+        '<div class="su-card__nm">' + esc(a.name) + '</div>' +
+        '<div class="su-card__meta"><span class="uh-badge uh-badge--bad">已驳回</span>' +
+          '<span class="su-card__ratio">申请 <b>' + pct(a.ratio) + '</b></span></div>' +
+        '<div class="su-card__sub">处理于 ' + esc(a.handledAt || a.submittedAt || "—") + '</div>' +
+        '<div class="su-card__reason">' + esc(a.rejectReason || "未说明原因") + '</div>' +
+      '</div>' +
+      '<span class="su-card__chev">' + ui.icon("chev", 16) + '</span></div>';
   }
 
-  /* ---------- 详情弹窗：合作申请（待审批 / 已驳回） ---------- */
-  function appDetailSheet(a, canReview, Uni) {
-    Uni.sheet({
-      title: a.status === "rejected" ? "驳回记录详情" : "合作申请详情",
+  function endedCard(p) {
+    return '<div class="su-card is-dim" data-open="' + esc(p.id) + '" role="button" tabindex="0">' +
+      '<div class="su-card__main">' +
+        '<div class="su-card__nm">' + esc(p.name) + '</div>' +
+        '<div class="su-card__meta"><span class="uh-badge uh-badge--mute">已终止</span>' +
+          '<span class="su-card__ratio">原约定 <b>' + pct(p.ratioToSub) + '</b></span></div>' +
+        '<div class="su-card__sub">终止于 ' + esc(p.statusAt || "—") + ' · 档案归档只读</div>' +
+      '</div>' +
+      '<span class="su-card__chev">' + ui.icon("chev", 16) + '</span></div>';
+  }
+
+  /* 空态（按 tab 语义化） */
+  var EMPTY = {
+    active: { t: "暂无生效中合作", d: "审批通过的二级合作将在这里建立档案", ic: "users" },
+    pending: { t: "暂无待审批申请", d: "新的二级合作申请提交后将出现在这里", ic: "clipboard" },
+    rejected: { t: "暂无已驳回申请", d: "被驳回的合作申请将留痕在这里", ic: "x-circle" },
+    ended: { t: "暂无已结束合作", d: "终止的合作档案将归档在这里，仅作查阅", ic: "history" }
+  };
+  function emptyBlock(Uni, key, filtered, caps) {
+    var m = filtered
+      ? { t: "没有符合条件的合作", d: "切换到「全部」可查看该项下的其他企业", ic: "filter" }
+      : (EMPTY[key] || EMPTY.active);
+    var cta = (caps && caps.create && key === "active" && !filtered)
+      ? '<div class="su-empty__cta"><button type="button" class="btn btn-primary btn-sm" data-create>发起新二级合作</button></div>'
+      : "";
+    return '<div class="card su-empty">' + Uni.emptyHtml(m.t, m.d, m.ic) + cta + '</div>';
+  }
+
+  function sectionHead(lbl, right) {
+    return '<div class="uh-sechead"><span class="lbl">' + lbl + '</span>' +
+      (right ? '<div class="su-headright">' + right + '</div>' : "") + '</div>';
+  }
+
+  /* 省代视角主体 */
+  function provinceBody(vm, caps) {
+    /* 批量模式：只保留可勾选的合作列表，提醒/分页/筛选全部让位 */
+    if (_multi) return batchBody(vm, caps);
+
+    var html = "";
+    html += '<section class="uh-sec">' + alertsHtml(vm) + '</section>';
+    html += tabsHtml(vm);
+
+    if (_tab === "pending") {
+      html += '<section class="uh-sec">' +
+        sectionHead("待审批申请", vm.pending.length ? '<span class="uh-badge uh-badge--info">' + vm.pending.length + ' 条</span>' : "") +
+        (vm.pending.length
+          ? '<div class="su-list">' + vm.pending.map(function (a) { return pendingCard(a, caps); }).join("") + '</div>'
+          : emptyBlock(caps.Uni, "pending", false, caps)) +
+        '</section>';
+      return html;
+    }
+    if (_tab === "rejected") {
+      html += '<section class="uh-sec">' +
+        sectionHead("已驳回申请", vm.rejected.length ? '<span class="uh-badge uh-badge--bad">' + vm.rejected.length + ' 条</span>' : "") +
+        (vm.rejected.length
+          ? '<div class="su-list">' + vm.rejected.map(rejectedCard).join("") + '</div>'
+          : emptyBlock(caps.Uni, "rejected", false, caps)) +
+        '</section>';
+      return html;
+    }
+    if (_tab === "ended") {
+      html += '<section class="uh-sec">' +
+        sectionHead("已结束合作", '<span class="uh-badge uh-badge--mute">' + vm.ended.length + ' 家</span>') +
+        (vm.ended.length
+          ? '<div class="su-list">' + vm.ended.map(endedCard).join("") + '</div>'
+          : emptyBlock(caps.Uni, "ended", false, caps)) +
+        '</section>';
+      return html;
+    }
+
+    /* 生效中 */
+    var list = vm.live.filter(function (p) {
+      var f = null;
+      FILTERS.forEach(function (x) { if (x.k === _filter) f = x; });
+      return f ? f.on(p) : true;
+    });
+    var head = sectionHead("生效中合作",
+        '<span class="uh-badge uh-badge--ok">' + vm.live.length + ' 家</span>' +
+        (caps.batch && vm.live.length > 1 ? '<button type="button" class="su-linkbtn" data-multi="enter">批量操作</button>' : ""));
+    html += '<section class="uh-sec">' + head + filtersHtml(vm) +
+      (list.length
+        ? '<div class="su-list">' + list.map(function (p) { return liveCard(p, caps); }).join("") + '</div>'
+        : emptyBlock(caps.Uni, "active", _filter !== "all", caps)) +
+      '</section>';
+    return html;
+  }
+
+  /* 批量模式主体：勾选区 + 提示，不再重复展示概览与筛选 */
+  function batchBody(vm, caps) {
+    var list = vm.live;
+    var tip = '<div class="su-batchtip">' + ui.icon("info", 14) +
+      '<span>勾选需统一处理的合作；<b>已暂停</b>的合作不参与批量操作</span></div>';
+    return '<section class="uh-sec su-batchsec">' + tip +
+      (list.length
+        ? '<div class="su-list">' + list.map(function (p) { return liveCard(p, caps); }).join("") + '</div>'
+        : emptyBlock(caps.Uni, "active", false, caps)) +
+      '</section>';
+  }
+
+  /* ============================================================
+     二级视角 · 主体（档案 + 本月所得 + 协议签署 + 相关入口）
+     ============================================================ */
+  function subBody(vm, ctx, canSign) {
+    var a = vm.archive, ag = vm.agreement || {}, c = vm.calc || {};
+    var st = ag.state || "signed";
+    var ai = agInfo(st);
+    var income = Number(c.calcAmount || 0);
+    var sign = "";
+    if (st === "pending_mine" && canSign) {
+      sign = '<button type="button" class="su-sign" data-subact="sign">' +
+        '<span class="su-sign__ic">' + ui.icon("file-text", 20) + '</span>' +
+        '<span class="su-sign__main"><b>合作协议待你签署</b>' +
+        '<span>省代已于 ' + esc(ag.sentAt || "—") + ' 发起 · 请查阅条款后签署</span></span>' +
+        '<span class="su-sign__go">去签署</span></button>';
+    } else if (st === "pending_mine") {
+      sign = '<div class="su-sign is-static">' +
+        '<span class="su-sign__ic">' + ui.icon("lock", 20) + '</span>' +
+        '<span class="su-sign__main"><b>合作协议待签署</b>' +
+        '<span>签署由企业管理员执行，当前身份仅可查阅</span></span></div>';
+    } else if (st === "rejected") {
+      sign = '<div class="su-sign is-bad">' +
+        '<span class="su-sign__ic">' + ui.icon("x-circle", 20) + '</span>' +
+        '<span class="su-sign__main"><b>合作协议已拒签</b>' +
+        '<span>' + esc(ag.rejectReason || "请联系上级省代修订后重新发起") + '</span></span></div>';
+    } else {
+      /* 已签署：不再占一整块卡片，只留一行安静的状态线 */
+      sign = '<div class="su-signline">' + ui.icon("check-circle", 15) +
+        '<span>协议' + ai.t + ' · ' + esc(ag.signedAt || "—") +
+        (ag.signerName ? " · " + esc(ag.signerName) : "") +
+        ' · 有效期至 ' + esc(ag.expireAt || "—") + '</span></div>';
+    }
+    var signUnder = st === "signed";
+
+    return '<section class="uh-sec"><div class="card su-arch">' +
+        '<div class="uh-finhead"><span class="uh-eyebrow">' + esc(c.month || "本月") + ' 合作所得</span>' +
+          '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span></div>' +
+        '<div class="uh-bignum" data-cnt="income">' + ui.moneyD(income) + '</div>' +
+        Uni2.plainNote("合格消费 <b>" + ui.money(Number(c.eligibleBase || 0)) + '</b> × 约定 <b>' + pct(c.ratioToSub != null ? c.ratioToSub : a.ratioToSub) +
+          '</b> × 分佣线 <b>' + pct(G) + '</b>') +
+        '<div class="uh-ledgerline"></div>' +
+        '<div class="uh-kv"><span class="k">上级省代</span><span class="v">' + esc(a.name) + '</span></div>' +
+        '<div class="uh-kv"><span class="k">合作起始</span><span class="v">' + esc(a.since || "—") + '</span></div>' +
+        '<div class="uh-kv"><span class="k">约定比例</span><span class="v">' + pct(a.ratioToSub) + '</span></div>' +
+        '<div class="uh-kv"><span class="k">统一信用代码</span><span class="v">' + esc(a.uscc || "—") + '</span></div>' +
+      '</div>' + (signUnder ? sign : "") + '</section>' +
+      (signUnder ? "" : '<section class="uh-sec">' + sign + '</section>') +
+      '<section class="uh-sec">' +
+        sectionHead("合作条款", "") +
+        '<div class="uh-list">' +
+          linkRow("file-text", "合作协议", "条款全文 · " + ai.t + " · " + (ag.version || "—"), "agree") +
+          linkRow("chart", "本月对账明细", "合格消费 " + ui.money(Number(c.eligibleBase || 0)) + " · 应得 " + ui.money(income), "calc") +
+          linkRow("building", "上级省代信息", a.name + (a.contact ? " · " + a.contact : ""), "parent") +
+        '</div>' +
+      '</section>';
+  }
+  /* 二级主体里提前引用 Uni.plainNote（避免把 Uni 透传进纯函数） */
+  var Uni2 = { plainNote: function (inner) { return window.Uni.plainNote(inner); } };
+
+  /* ============================================================
+     省代视角 · 弹窗
+     ============================================================ */
+  function appDetailSheet(a, caps) {
+    var U = caps.Uni;
+    var pending = a.status === "pending";
+    U.sheet({
+      title: pending ? "合作申请详情" : "驳回记录详情",
       body:
-        '<div class="uh-sheetkv"><span class="k">企业名称</span><span class="v">' + ui.esc(a.name) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">统一社会信用代码</span><span class="v">' + ui.esc(a.uscc || "—") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">联系人</span><span class="v">' + ui.esc(a.contact || "—") + (a.phone ? " · " + ui.esc(a.phone) : "") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">地址</span><span class="v">' + ui.esc(a.address || "—") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">申请比例</span><span class="v">' + Math.round(a.ratio * 100) + '%</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">提交时间</span><span class="v">' + ui.esc(a.submittedAt || "—") + '</span></div>' +
-        (a.handledAt ? '<div class="uh-sheetkv"><span class="k">处理时间</span><span class="v">' + ui.esc(a.handledAt) + '</span></div>' : "") +
-        (a.rejectReason ? '<div class="uh-sheetkv"><span class="k">驳回原因</span><span class="v">' + ui.esc(a.rejectReason) + '</span></div>' : ""),
-      footer: canReview
-        ? [{ t: "驳回", kind: "ghost", onClick: function (ov) { ov.close(); rejectSheet(a, Uni); } },
-           { t: "确认通过", kind: "primary", onClick: function (ov) {
-               var r = Uni.actGuarded("app/review", { id: a.id, pass: true });
-               if (r.ok) Uni.toast("已通过，合作协议已生成", "ok");
-             } }]
+        kv("企业名称", esc(a.name)) +
+        kv("统一社会信用代码", esc(a.uscc || "—")) +
+        kv("联系人", esc(a.contact || "—") + (a.phone ? " · " + esc(a.phone) : "")) +
+        kv("地址", esc(a.address || "—")) +
+        kv("申请比例", pct(a.ratio)) +
+        kv("提交时间", esc(a.submittedAt || "—")) +
+        (a.handledAt ? kv("处理时间", esc(a.handledAt)) : "") +
+        (a.rejectReason ? kv("驳回原因", '<span style="color:var(--error)">' + esc(a.rejectReason) + '</span>') : "") +
+        (pending
+          ? '<div class="su-infonote" style="margin-top:12px">' + ui.icon("info", 15) +
+            '<span>通过后自动建立合作档案并生成待签协议；驳回需填写原因并留痕。</span></div>'
+          : ""),
+      footer: (pending && caps.review)
+        ? [{ t: "驳回", kind: "ghost", onClick: function (ov) { ov.close(); rejectSheet(a, U); } },
+           { t: "确认通过", kind: "primary", onClick: function () {
+             var r = approveApp(a);
+             if (r.ok) { U.toast("已通过，合作协议已生成", "ok"); U.renderCurrent(); }
+             else U.toast(r.reason || "审批失败", "err");
+           } }]
         : [{ t: "关闭", kind: "primary" }]
     });
   }
 
-  /* ---------- 协议查看 sheet（生效中合作） ---------- */
-  function agreementViewSheet(p, Uni) {
-    var st = (p.agreement && p.agreement.state) || "signed";
-    var ag = AG_STATE[st] ? AG_STATE[st].t : "已签署";
-    Uni.sheet({
-      title: "合作协议",
+  function liveDetailSheet(p, caps) {
+    var U = caps.Uni;
+    var st = agStateOf(p), ai = agInfo(st);
+    var susp = p.status === "suspended";
+    var settled = Number(p.subGross || 0);
+    var amt = Math.round(settled * G * Number(p.ratioToSub || 0));
+    var rows = mgrRow("history", "操作记录", "比例变更 · 协议重发 · 状态变更留痕", "records") +
+      mgrRow("chart", "查看对账单", "分润结算与月度对账明细", "recon");
+    if (!susp && caps.ratio) rows += mgrRow("badge", "配置约定比例", "当前 " + pct(p.ratioToSub) + "，调整后需补签", "ratio");
+    if (!susp && caps.resend && st !== "signed") rows += mgrRow("send", "重新发起协议", "当前" + ai.t + "，重新发起后待对方签署", "resend");
+    if (!susp && caps.status) rows += mgrRow("clock", "暂停合作", "冻结分润结算与对账", "pause");
+    if (susp && caps.status) rows += mgrRow("refresh", "恢复合作", "重新参与分润结算与对账", "resume");
+    if (caps.status) rows += mgrRow("x-circle", "终止合作", "解除合作关系 · 不可撤销", "terminate", true);
+
+    var sh = U.sheet({
+      title: "合作档案",
       body:
-        '<div class="uh-sheetkv"><span class="k">合作企业</span><span class="v">' + ui.esc(p.name) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">协议编号</span><span class="v">' + ui.esc(p.agreement && p.agreement.id ? p.agreement.id : ("O4-" + p.id.toUpperCase() + "-" + (p.since || "2026-08"))) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">合作期限</span><span class="v">' + ui.esc(p.since) + " 起 · 一年" + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">约定比例</span><span class="v">' + Math.round(p.ratioToSub * 100) + '%</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">协议状态</span><span class="v">' + ui.esc(ag) + '</span></div>' +
-        '<div class="uh-sechead">协议要点</div>' +
-        '<div class="uh-clause"><div class="no">1 · 分润结算</div><div class="c">按约定比例结算合格消费分润，以阅读对账单为准。</div></div>' +
-        '<div class="uh-clause"><div class="no">2 · 对账窗口</div><div class="c">月度对账在账单生成后 5 日内完成，超期将锁定该月对账。</div></div>' +
-        '<div class="uh-clause"><div class="no">3 · 状态变更</div><div class="c">合作暂停或终止须双方确认并留痕，终止后不再产生分润结算。</div></div>',
+        kv("企业名称", esc(p.name)) +
+        kv("统一社会信用代码", esc(p.uscc || "—")) +
+        kv("联系人", esc(p.contact || "—") + (p.phone ? " · " + esc(p.phone) : "")) +
+        kv("地址", esc(p.address || "—")) +
+        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>') +
+        kv("约定比例", pct(p.ratioToSub)) +
+        kv("合作起始", esc(p.since || "—")) +
+        kv("本月合格消费", ui.money(settled)) +
+        kv("本月应得", '<b>' + (susp ? "已冻结" : ui.money(amt)) + '</b>') +
+        '<div class="uh-sechead" style="margin:16px 0 8px"><span class="lbl">合作管理</span></div>' +
+        '<div class="uh-list">' + rows + '</div>',
+      footer: [{ t: "关闭", kind: "primary" }]
+    });
+    if (!sh) return;
+    Array.prototype.forEach.call(sh.querySelectorAll("[data-mgr]"), function (n) {
+      n.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var act = n.getAttribute("data-mgr");
+        sh.close();
+        if (act === "records") recordsSheet(p, U);
+        else if (act === "recon") U.navTo("reconcile.html");
+        else if (act === "ratio") ratioSheet(p, U);
+        else if (act === "resend") resendDialog(p, U);
+        else if (act === "pause") statusDialog(p, "suspended", U);
+        else if (act === "resume") statusDialog(p, "active", U);
+        else if (act === "terminate") statusDialog(p, "terminated", U);
+      });
+    });
+  }
+
+  function endedDetailSheet(p, U) {
+    U.sheet({
+      title: "已结束合作",
+      body:
+        kv("企业名称", esc(p.name)) +
+        kv("统一社会信用代码", esc(p.uscc || "—")) +
+        kv("联系人", esc(p.contact || "—") + (p.phone ? " · " + esc(p.phone) : "")) +
+        kv("合作起始", esc(p.since || "—")) +
+        kv("终止时间", esc(p.statusAt || "—")) +
+        kv("原约定比例", pct(p.ratioToSub)) +
+        (p.statusReason ? kv("终止原因", esc(p.statusReason)) : "") +
+        '<div class="uh-readnote" style="margin-top:12px">' + ui.icon("info", 15) +
+        '<span>合作已终止，档案转入归档只读；如需重新合作，请重新发起合作申请。</span></div>',
       footer: [{ t: "关闭", kind: "primary" }]
     });
   }
 
-  /* ---------- 操作记录 sheet（比例变更 / 协议重发 / 状态变更留痕） ---------- */
-  function recordsSheet(p, Uni) {
+  function agreementViewSheet(p, caps) {
+    var U = caps.Uni;
+    var st = agStateOf(p), ai = agInfo(st);
+    var ag = p.agreement || {};
+    var canResend = caps.resend && p.status === "active" && st !== "signed";
+    U.sheet({
+      title: "合作协议",
+      body:
+        kv("合作企业", esc(p.name)) +
+        kv("协议编号", esc(ag.id || ("O4-" + String(p.id).toUpperCase() + "-" + (p.since || "2026-08")))) +
+        kv("协议版本", esc(ag.version || "v2026.10")) +
+        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>') +
+        kv("发起时间", esc(ag.sentAt || "—")) +
+        (ag.signedAt ? kv("签署时间", esc(ag.signedAt) + (ag.signerName ? " · " + esc(ag.signerName) : "")) : "") +
+        kv("有效期至", esc(ag.expireAt || "—")) +
+        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">协议要点</span></div>' +
+        '<div class="uh-clause"><div class="no">1 · 分润结算</div><div class="c">按约定比例结算合格消费分润，以对账中心的对账单为准。</div></div>' +
+        '<div class="uh-clause"><div class="no">2 · 对账窗口</div><div class="c">月度对账在账单生成后 5 日内完成，超期将锁定该月对账。</div></div>' +
+        '<div class="uh-clause"><div class="no">3 · 状态变更</div><div class="c">合作暂停或终止须双方确认并留痕，终止后不再产生分润结算。</div></div>' +
+        '<div class="uh-clause"><div class="no">4 · 比例变更</div><div class="c">约定比例调整须双方补签协议，补签完成前仍按原比例结算。</div></div>',
+      footer: canResend
+        ? [{ t: "关闭", kind: "ghost" },
+           { t: "重新发起协议", kind: "primary", onClick: function (ov) { ov.close(); resendDialog(p, U); } }]
+        : [{ t: "关闭", kind: "primary" }]
+    });
+  }
+
+  /* 操作记录：合并比例变更 / 协议重发 / 状态变更，按时间倒序 */
+  function recordsSheet(p, U) {
     var d = store.getState().state;
     var rows = [];
-    (d.ratioLog || []).forEach(function (r) { if (r.subId === p.id) rows.push({ icon: "file-text", t: "约定比例 " + Math.round(r.from * 100) + "% → " + Math.round(r.to * 100) + "%", d: r.at + " · " + (r.note || "") }); });
-    (d.statusLog || []).forEach(function (r) { if (r.subId === p.id) rows.push({ icon: r.to === "terminated" ? "warn" : "bell", t: "合作" + { suspended: "暂停", active: "恢复", terminated: "终止" }[r.to] + "合作", d: r.at + " · " + r.reason }); });
-    if (!rows.length) rows.push({ icon: "check", t: "暂无操作记录", d: "合作档案建立后尚未发生变更" });
-    Uni.sheet({
+    (d.ratioLog || []).forEach(function (r) {
+      if (r.subId !== p.id) return;
+      if (r.act === "resend") rows.push({ ic: "send", t: "重新发起合作协议", d: r.at + " · 已通知对方查阅并签署" });
+      else rows.push({ ic: "badge", t: "约定比例 " + pct(r.from) + " → " + pct(r.to), d: r.at + (r.note ? " · " + r.note : "") });
+    });
+    (d.statusLog || []).forEach(function (r) {
+      if (r.subId !== p.id) return;
+      var L = { suspended: "暂停合作", active: "恢复合作", terminated: "终止合作" }[r.to] || "状态变更";
+      rows.push({ ic: r.to === "terminated" ? "warn" : "refresh", t: L, d: r.at + (r.reason ? " · " + r.reason : "") });
+    });
+    rows.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : 0; });
+    if (!rows.length) rows.push({ ic: "check", t: "暂无操作记录", d: "合作档案建立后尚未发生变更" });
+    U.sheet({
       title: "操作记录",
       body: rows.map(function (r) {
-        return '<div class="uh-todo-row"><div class="mn"><span class="mt" style="font-weight:600;color:var(--text-1)">' + ui.esc(r.t) + '</span>' +
-          '<span class="mt">' + ui.esc(r.d) + '</span></div></div>';
+        return '<div class="uh-todo-row"><div class="mn">' +
+          '<span class="mt" style="font-weight:600;color:var(--text-1)">' + ui.icon(r.ic, 13) + " " + esc(r.t) + '</span>' +
+          '<span class="mt">' + esc(r.d) + '</span></div></div>';
       }).join(""),
       footer: [{ t: "关闭", kind: "primary" }]
     });
   }
 
-  /* ---------- 合作状态管理弹窗：暂停 / 恢复 / 终止 ---------- */
-  function statusDialog(p, to, Uni) {
+  /* 配置比例：常用比例快选 + 按本月消费实时估算分润 */
+  function ratioSheet(p, U) {
+    var cur = Math.round(Number(p.ratioToSub || 0) * 100);
+    var base = Number(p.subGross || 0);
+    function est(v) {
+      return '<span>按本月合格消费 ' + ui.money(base) + ' 估算</span><b>' +
+        ui.money(Math.round(base * G * (Number(v) || 0) / 100)) + '</b>';
+    }
+    var sh = U.sheet({
+      title: "配置约定比例",
+      body:
+        kv("合作企业", esc(p.name)) +
+        kv("当前比例", pct(p.ratioToSub)) +
+        kv("本月合格消费", ui.money(base)) +
+        '<div style="margin-top:12px">' + ratioFieldHtml({
+          id: "su-newratio", label: "新约定比例（" + RATIO_MIN + "–" + RATIO_MAX + "%）", value: cur
+        }) + '</div>' +
+        '<div class="uls-quick">' + [10, 15, 20, 25, 30].map(function (v) {
+          return '<button type="button" class="su-quickchip' + (v === cur ? " is-on" : "") + '" data-qv="' + v + '">' + v + '%</button>';
+        }).join("") + '</div>' +
+        '<div class="su-est" id="su-est">' + est(cur) + '</div>' +
+        '<div class="uh-note">变更后需与二级补签协议，补签完成前仍按原比例结算。</div>',
+      footer: [{ t: "取消", kind: "ghost" },
+      { t: "确认变更", kind: "primary", onClick: function (ov) {
+        var ctl = sh && sh.__ratioCtl;
+        if (!ctl || !ctl.validate()) return false;
+        var v = Number(ctl.value());
+        var r = store.act("sub/setRatio", { id: p.id, ratio: v / 100, from: p.ratioToSub });
+        if (!r.ok) { U.toast(r.reason || "变更失败", "err"); return false; }
+        U.renderCurrent();
+        U.toast("比例已变更，待补签协议", "ok");
+      } }]
+    });
+    if (!sh) return;
+    var box = sh.querySelector("#su-est");
+    function sync() {
+      if (!box) return;
+      var v = ctl ? ctl.value() : "";
+      box.innerHTML = est(v);
+      Array.prototype.forEach.call(sh.querySelectorAll("[data-qv]"), function (b) {
+        b.classList.toggle("is-on", Number(b.getAttribute("data-qv")) === Number(v));
+      });
+    }
+    sh.__ratioChange = sync;
+    var ctl = sh.__ratioCtl = bindRatioInput(sh);
+    sync();
+    Array.prototype.forEach.call(sh.querySelectorAll("[data-qv]"), function (b) {
+      b.addEventListener("click", function () { ctl.set(b.getAttribute("data-qv")); });
+    });
+  }
+
+  function statusDialog(p, to, U) {
     var M = {
-      suspended: { title: "暂停合作？", desc: "暂停后将冻结该企业的分润结算与对账，仅保留查看权限。恢复前需双方确认问题已解决。", ok: "确认暂停", act: "suspended" },
-      active: { title: "恢复合作？", desc: "恢复后该企业重新参与分润结算与对账，协议与约定比例不变。", ok: "确认恢复", act: "active" },
-      terminated: { title: "终止合作？", desc: "终止后合作关系解除，不再产生分润结算，档案转入归档只读。该操作不可撤销。", ok: "确认终止", act: "terminated" }
+      suspended: { title: "暂停合作？", desc: "暂停后该企业的分润结算与对账冻结，仅保留查看权限。恢复前需双方确认问题已解决。", ok: "确认暂停" },
+      active: { title: "恢复合作？", desc: "恢复后该企业重新参与分润结算与对账，协议与约定比例不变。", ok: "确认恢复" },
+      terminated: { title: "终止合作？", desc: "终止后合作关系解除，不再产生分润结算，档案转入归档只读。该操作不可撤销。", ok: "确认终止" }
     }[to];
-    var sh = Uni.sheet({
+    U.sheet({
       title: M.title, danger: to === "terminated",
       body:
-        '<div class="uh-sheetkv"><span class="k">合作企业</span><span class="v">' + ui.esc(p.name) + '</span></div>' +
-        '<div style="height:8px"></div>' +
+        kv("合作企业", esc(p.name)) +
+        '<div style="height:10px"></div>' +
         '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>' + M.desc + '</span></div>' +
         '<div class="field" style="margin-top:12px"><label class="field-label">操作原因（必填 · 留痕）</label>' +
         '<textarea class="textarea" id="su-status-reason" placeholder="说明原因，将留痕在操作记录中"></textarea></div>',
       footer: [{ t: "取消", kind: "ghost" },
       { t: M.ok, kind: to === "terminated" ? "danger" : "primary", onClick: function (ov) {
-          var v = ov.querySelector("#su-status-reason").value.trim();
-          if (!v) { Uni.toast("请填写操作原因"); return false; }
-          var r = Uni.actGuarded("sub/setStatus", { id: p.id, to: M.act, reason: v });
-          if (r.ok) { Uni.toast((M.act === "active" ? "已恢复合作" : M.act === "suspended" ? "已暂停合作" : "已终止合作"), "ok"); if (_rerender) _rerender(); return true; }
-          Uni.toast(r.reason || "操作失败");
-          return false;
+        var v = (ov.querySelector("#su-status-reason").value || "").trim();
+        if (!v) { U.toast("请填写操作原因"); return false; }
+        var r = store.act("sub/setStatus", { id: p.id, to: to, reason: v });
+        if (!r.ok) { U.toast(r.reason || "操作失败", "err"); return false; }
+        U.renderCurrent();
+        U.toast(to === "active" ? "已恢复合作" : to === "suspended" ? "已暂停合作" : "已终止合作", "ok");
       } }]
     });
-    return sh;
   }
 
-  /* ---------- 详情弹窗：生效中合作（完整信息 + 合作管理操作） ---------- */
-  function subDetailSheet(p, canManage, Uni) {
-    var st = (p.agreement && p.agreement.state) || "signed";
-    var agT = AG_STATE[st] ? AG_STATE[st].t : "已签署";
-    var mgr = canManage
-      ? '<div class="uh-sechead" style="margin:14px 0 8px">合作管理</div>' +
-        '<button class="uc-dlrow" data-mgr="records" data-id="' + ui.esc(p.id) + '">' +
-        '<span class="uh-row__ic">' + ui.icon("clock", 18) + '</span>' +
-        '<span class="uh-row__main"><span class="uh-row__t">操作记录</span><span class="uh-row__s">比例变更 · 协议重发 · 状态变更留痕</span></span>' +
-        ui.icon("chev", 16) + '</button>' +
-        '<button class="uc-dlrow" data-mgr="recon" data-id="' + ui.esc(p.id) + '">' +
-        '<span class="uh-row__ic">' + ui.icon("chart", 18) + '</span>' +
-        '<span class="uh-row__main"><span class="uh-row__t">查看对账单</span><span class="uh-row__s">分润结算与月度对账明细</span></span>' +
-        ui.icon("chev", 16) + '</button>' +
-        (p.status === "active"
-          ? '<button class="uc-dlrow" data-mgr="pause" data-id="' + ui.esc(p.id) + '">' +
-            '<span class="uh-row__ic">' + ui.icon("pause", 18) + '</span>' +
-            '<span class="uh-row__main"><span class="uh-row__t">暂停合作</span><span class="uh-row__s">冻结分润结算与对账</span></span>' +
-            ui.icon("chev", 16) + '</button>'
-          : '<button class="uc-dlrow" data-mgr="resume" data-id="' + ui.esc(p.id) + '">' +
-            '<span class="uh-row__ic">' + ui.icon("play", 18) + '</span>' +
-            '<span class="uh-row__main"><span class="uh-row__t">恢复合作</span><span class="uh-row__s">重新参与分润结算</span></span>' +
-            ui.icon("chev", 16) + '</button>') +
-        '<button class="uc-dlrow" data-mgr="terminate" data-id="' + ui.esc(p.id) + '" style="color:var(--error)">' +
-        '<span class="uh-row__ic">' + ui.icon("warn", 18) + '</span>' +
-        '<span class="uh-row__main"><span class="uh-row__t">终止合作</span><span class="uh-row__s">解除合作关系 · 不可撤销</span></span>' +
-        ui.icon("chev", 16) + '</button>'
-      : "";
-    var foot = canManage
-      ? [{ t: st === "signed" ? "查看协议" : "重新发起协议", kind: "ghost", onClick: function (ov) {
-             ov.close();
-             if (st === "signed") agreementViewSheet(p, Uni); else resendDialog(p, Uni);
-         } },
-         { t: "配置约定比例", kind: "primary", onClick: function (ov) { ov.close(); ratioSheet(p, Uni); } }]
-      : [{ t: "关闭", kind: "primary" }];
-    var sh = Uni.sheet({
-      title: "合作档案详情",
-      body:
-        '<div class="uh-sheetkv"><span class="k">企业名称</span><span class="v">' + ui.esc(p.name) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">统一社会信用代码</span><span class="v">' + ui.esc(p.uscc || "—") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">联系人</span><span class="v">' + ui.esc(p.contact || "—") + (p.phone ? " · " + ui.esc(p.phone) : "") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">地址</span><span class="v">' + ui.esc(p.address || "—") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">约定比例</span><span class="v">' + Math.round(p.ratioToSub * 100) + '%</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">合作自</span><span class="v">' + ui.esc(p.since) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">协议状态</span><span class="v">' + ui.esc(agT) + '</span></div>' +
-        mgr,
-      footer: foot
-    });
-    if (sh) {
-      Array.prototype.forEach.call(sh.querySelectorAll("[data-mgr]"), function (n) {
-        n.addEventListener("click", function (e) {
-          e.stopPropagation();
-          var mgr = n.getAttribute("data-mgr");
-          if (typeof sh.close === "function") sh.close();
-          if (mgr === "records") recordsSheet(p, Uni);
-          else if (mgr === "recon") Uni.navTo("reconcile.html");
-          else if (mgr === "pause") statusDialog(p, "suspended", Uni);
-          else if (mgr === "resume") statusDialog(p, "active", Uni);
-          else if (mgr === "terminate") statusDialog(p, "terminated", Uni);
-        });
-      });
-    }
-    return sh;
-  }
-
-  /* ---------- 空态段 ---------- */
-  function emptyBlock(Uni, em) {
-    return '<div class="card">' + Uni.emptyHtml(em.title, em.desc, "doc") + '</div>';
-  }
-
-  /* ---------- 弹窗：发起新二级合作 ---------- */
-  function createSheet(Uni) {
-    Uni.sheet({
+  function createSheet(U) {
+    var sh = U.sheet({
       title: "发起新二级合作",
       body:
         '<div class="field"><label class="field-label">企业名称（必填）</label><input class="input" id="su-n" placeholder="例如：德阳恒基建材有限公司"></div>' +
-        '<div class="field"><label class="field-label">统一社会信用代码（必填 · 18 位）</label><input class="input" id="su-uscc" maxlength="18" placeholder="18 位 USCC"></div>' +
+        '<div class="field"><label class="field-label">统一社会信用代码（必填 · 18 位）</label><input class="input" id="su-uscc" maxlength="18" placeholder="18 位统一社会信用代码"></div>' +
         '<div class="field"><label class="field-label">联系人</label><input class="input" id="su-contact" placeholder="企业负责人姓名"></div>' +
         '<div class="field"><label class="field-label">联系电话（11 位手机号）</label><input class="input" id="su-phone" maxlength="11" placeholder="11 位手机号"></div>' +
         '<div class="field"><label class="field-label">地址</label><input class="input" id="su-addr" placeholder="企业经营地址"></div>' +
-        '<div class="field"><label class="field-label">约定比例（0–50%）</label>' +
-        '<input class="input" id="su-ratio" type="number" value="20" min="0" max="50">' +
-        '<div class="uh-note">比例范围 0–50%</div></div>',
+        ratioFieldHtml({
+          id: "su-ratio", label: "约定比例（" + RATIO_MIN + "–" + RATIO_MAX + "%）", value: 20, last: true,
+          note: "提交后进入待审批，通过即建立合作档案并生成待签协议。"
+        }),
       footer: [{ t: "取消", kind: "ghost" },
-      { t: "提交合作申请", kind: "primary", onClick: function (ov) {
-        var name = ov.querySelector("#su-n").value.trim();
-        var uscc = ov.querySelector("#su-uscc").value.trim();
-        var contact = ov.querySelector("#su-contact").value.trim();
-        var phone = ov.querySelector("#su-phone").value.trim();
-        var address = ov.querySelector("#su-addr").value.trim();
-        var ratio = Number(ov.querySelector("#su-ratio").value);
-        if (!name) { Uni.toast("请填写企业名称"); return false; }
-        if (!/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(uscc)) { Uni.toast("统一社会信用代码应为 18 位"); return false; }
-        if (phone && !/^1\d{10}$/.test(phone)) { Uni.toast("请输入正确的手机号"); return false; }
-        if (isNaN(ratio) || ratio < 0 || ratio > 50) { Uni.toast("约定比例须在 0–50% 之间"); return false; }
-        var r = Uni.actGuarded("app/create", { data: { name: name, uscc: uscc, contact: contact, phone: phone, address: address, ratio: ratio / 100, channel: "agent" } });
-        if (r.ok) Uni.toast("已提交合作申请", "ok");
+      { t: "提交申请", kind: "primary", onClick: function (ov) {
+        var name = (ov.querySelector("#su-n").value || "").trim();
+        var uscc = (ov.querySelector("#su-uscc").value || "").trim().toUpperCase();
+        var contact = (ov.querySelector("#su-contact").value || "").trim();
+        var phone = (ov.querySelector("#su-phone").value || "").trim();
+        var address = (ov.querySelector("#su-addr").value || "").trim();
+        if (!name) { U.toast("请填写企业名称"); return false; }
+        if (!/^[0-9A-HJ-NPQRTUWXY]{18}$/.test(uscc)) { U.toast("统一社会信用代码应为 18 位"); return false; }
+        if (phone && !/^1\d{10}$/.test(phone)) { U.toast("请输入正确的手机号"); return false; }
+        var ratioCtl = sh && sh.__ratioCtl;
+        if (!ratioCtl || !ratioCtl.validate()) return false;
+        var ratio = Number(ratioCtl.value());
+        var r = store.act("app/create", {
+          data: { name: name, uscc: uscc, contact: contact, phone: phone, address: address, ratio: ratio / 100 },
+          channel: "agent"
+        });
+        if (!r.ok) { U.toast(r.reason || "提交失败", "err"); return false; }
+        _tab = "pending";
+        U.renderCurrent();
+        U.toast("已提交合作申请", "ok");
       } }]
     });
+    if (sh) sh.__ratioCtl = bindRatioInput(sh);
   }
 
-  /* ---------- 弹窗：通过合作申请 ---------- */
-  function passSheet(app, Uni) {
-    Uni.sheet({
-      title: "合作申请审批",
-      body:
-        '<div class="uh-sheetkv"><span class="k">企业名称</span><span class="v">' + ui.esc(app.name) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">USCC</span><span class="v">' + ui.esc(app.uscc) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">联系人</span><span class="v">' + ui.esc(app.contact || "—") + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">申请比例</span><span class="v">' + Math.round(app.ratio * 100) + '%</span></div>' +
-        '<div class="uh-readnote" style="margin-top:12px">' + ui.icon("info", 15) +
-        '<span>通过后将自动生成合作协议，并通知二级企业登录后签署。</span></div>',
-      footer: [{ t: "再想想", kind: "ghost" },
-      { t: "确认通过", kind: "primary", onClick: function () {
-        var r = Uni.actGuarded("app/review", { id: app.id, pass: true });
-        if (r.ok) { applyReview(app.id, true, ""); Uni.toast("已通过，合作协议已生成", "ok"); if (_rerender) _rerender(); }
-      } }]
-    });
-  }
-
-  /* ---------- 弹窗：驳回原因 ---------- */
-  function rejectSheet(app, Uni) {
-    var sh = Uni.sheet({
+  function rejectSheet(a, U) {
+    var sh = U.sheet({
       title: "驳回合作申请",
       body:
-        '<div class="uh-sheetkv"><span class="k">企业名称</span><span class="v">' + ui.esc(app.name) + '</span></div>' +
+        kv("企业名称", esc(a.name)) +
         '<div style="height:10px"></div>' +
         '<div class="field"><label class="field-label">驳回原因（必填）</label>' +
         '<textarea class="textarea" id="su-rej" placeholder="说明驳回原因，留痕在申请档案中"></textarea></div>' +
-        '<div class="uls-quick">' +
-        REJECT_QUICK.map(function (q) {
-          return '<button class="btn btn-ghost btn-sm" data-quick="' + ui.esc(q) + '">' + q + '</button>';
+        '<div class="uls-quick">' + REJECT_QUICK.map(function (q) {
+          return '<button type="button" class="su-quickchip" data-quick-text="' + esc(q) + '">' + esc(q) + '</button>';
         }).join("") + '</div>',
       footer: [{ t: "取消", kind: "ghost" },
       { t: "确认驳回", kind: "danger", onClick: function (ov) {
-        var v = ov.querySelector("#su-rej").value.trim();
-        if (!v) { Uni.toast("请填写驳回原因"); return false; }
-        var r = Uni.actGuarded("app/review", { id: app.id, pass: false, reason: v });
-        if (r.ok) { applyReview(app.id, false, v); Uni.toast("已驳回，留痕在申请档案", "ok"); if (_rerender) _rerender(); }
+        var v = (ov.querySelector("#su-rej").value || "").trim();
+        if (!v) { U.toast("请填写驳回原因"); return false; }
+        var r = rejectApp(a, v);
+        if (!r.ok) { U.toast(r.reason || "驳回失败", "err"); return false; }
+        U.renderCurrent();
+        U.toast("已驳回，留痕在申请档案", "ok");
       } }]
     });
-    Array.prototype.forEach.call(sh.querySelectorAll("[data-quick]"), function (b) {
+    if (!sh) return;
+    Array.prototype.forEach.call(sh.querySelectorAll("[data-quick-text]"), function (b) {
       b.addEventListener("click", function () {
-        sh.querySelector("#su-rej").value = b.getAttribute("data-quick");
+        sh.querySelector("#su-rej").value = b.getAttribute("data-quick-text");
       });
     });
   }
 
-  /* ---------- 弹窗：配置/调整约定比例 ---------- */
-  function ratioSheet(p, Uni) {
-    var cur = Math.round(p.ratioToSub * 100);
-    Uni.sheet({
-      title: "配置约定比例",
-      body:
-        '<div class="uh-sheetkv"><span class="k">合作企业</span><span class="v">' + ui.esc(p.name) + '</span></div>' +
-        '<div class="uh-sheetkv"><span class="k">当前比例</span><span class="v">' + cur + '%</span></div>' +
-        '<div style="height:10px"></div>' +
-        '<div class="field"><label class="field-label">新约定比例（0–50%）</label>' +
-        '<input class="input" id="su-newratio" type="number" value="' + cur + '" min="0" max="50"></div>' +
-        '<div class="uh-readnote" style="margin-top:10px">' + ui.icon("info", 15) +
-        '<span>变更后需与二级补签合作协议，将生成一条待办。</span></div>',
-      footer: [{ t: "取消", kind: "ghost" },
-      { t: "确认变更", kind: "primary", onClick: function (ov) {
-        var raw = (ov.querySelector("#su-newratio").value || "").trim();
-        if (!raw) { Uni.toast("请输入约定比例"); return false; }
-        var v = Number(raw);
-        if (isNaN(v) || v < 0 || v > 50) { Uni.toast("约定比例须在 0–50% 之间"); return false; }
-        var r = Uni.actGuarded("sub/setRatio", { id: p.id, ratio: v / 100, from: p.ratioToSub });
-        if (r.ok) { Uni.toast("比例已变更，待补签协议", "ok"); if (_rerender) _rerender(); }
-      } }]
-    });
-  }
-
-  /* ---------- 弹窗：重新发起合作协议（确认） ---------- */
-  function resendDialog(p, Uni) {
-    var st = (p.agreement && p.agreement.state) || "signed";
-    Uni.dialog({
-      title: "重新发起合作协议？", danger: true,
-      text: st === "rejected"
-        ? "该企业此前已拒签，修订后重新发起；发起后将通知二级企业重新查阅并签署。"
-        : "用于二级企业待签或协议修订后重新发起；重新发起后将通知二级企业重新查阅并签署。",
+  function resendDialog(p, U) {
+    var st = agStateOf(p);
+    U.dialog({
+      title: "重新发起合作协议？",
+      text: (st === "rejected" ? "该企业此前已拒签，修订后重新发起。" : "用于协议修订或对方长期未签署时重新发起。") +
+        "发起后协议回到待签署状态，并通知对方重新查阅与签署。",
       ok: "确认重新发起",
       onOk: function () {
-        var r = Uni.actGuarded("agree/resend", { id: p.id });
-        if (r.ok) { Uni.toast("协议已重新发起", "ok"); if (_rerender) _rerender(); }
+        var r = store.act("agree/resend", { id: p.id });
+        if (!r.ok) { U.toast(r.reason || "重发失败", "err"); return; }
+        markResent(p.id);
+        U.renderCurrent();
+        U.toast("协议已重新发起，待对方签署", "ok");
       }
     });
   }
 
-  /* ---------- 批量弹窗：统一配置约定比例（多选企业） ---------- */
-  function batchRatioSheet(list, Uni) {
-    Uni.sheet({
+  /* ============================================================
+     批量操作（多选）
+     ============================================================ */
+  function batchBarHtml(vm) {
+    var n = countSel(vm.live);
+    return '<div class="uls-batchbar' + (n ? "" : " is-empty") + '">' +
+      '<span class="uls-batchbar__cnt">已选 <b>' + n + '</b> 家</span>' +
+      '<div class="uls-batchbar__btns">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-more="1">更多</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-batch="ratio">配置比例</button>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-batch="resend">重发协议</button>' +
+      '</div></div>';
+  }
+
+  function pickListHtml(list) {
+    return '<div class="uls-picklist">' + list.map(function (p) {
+      return '<span class="uls-pickitem">' + esc(p.name) + '</span>';
+    }).join("") + '</div>';
+  }
+
+  function batchRatioSheet(list, U) {
+    var base = list.reduce(function (a, p) { return a + Number(p.subGross || 0); }, 0);
+    function est(v) {
+      return '<span>' + list.length + ' 家 · 本月合格消费合计 ' + ui.money(base) + ' 估算</span><b>' +
+        ui.money(Math.round(base * G * (Number(v) || 0) / 100)) + '</b>';
+    }
+    var sh = U.sheet({
       title: "批量配置约定比例",
       body:
-        '<div class="uh-sheetkv"><span class="k">涉及企业</span><span class="v">' + list.length + " 家</span></div>" +
-        '<div class="uls-picklist">' + list.map(function (p) {
-          return '<span class="uls-pickitem">' + ui.esc(p.name) + '</span>';
-        }).join("") + '</div>' +
-        '<div class="field"><label class="field-label">统一新约定比例（0–50%）</label>' +
-        '<input class="input" id="su-bratio" type="number" min="0" max="50" placeholder="输入 0–50 整数"></div>' +
-        '<div class="uh-readnote" style="margin-top:10px">' + ui.icon("info", 15) +
-        '<span>将统一调整 ' + list.length + ' 家企业的约定比例；变更后各需与二级补签协议。</span></div>',
+        kv("涉及企业", list.length + " 家") +
+        pickListHtml(list) +
+        '<div style="margin-top:12px">' + ratioFieldHtml({
+          id: "su-bratio", label: "统一新约定比例（" + RATIO_MIN + "–" + RATIO_MAX + "%）", value: "",
+          placeholder: "输入 " + RATIO_MIN + "–" + RATIO_MAX + " 的整数"
+        }) + '</div>' +
+        '<div class="su-est" id="su-best">' + est(0) + '</div>' +
+        '<div class="uh-note">各企业变更后需分别补签协议，补签完成前仍按原比例结算。</div>',
       footer: [{ t: "取消", kind: "ghost" },
-      { t: "确认批量变更", kind: "primary", onClick: function (ov) {
-          var raw = (ov.querySelector("#su-bratio").value || "").trim();
-          if (!raw) { Uni.toast("请输入约定比例"); return false; }
-          var v = Number(raw);
-          if (isNaN(v) || v < 0 || v > 50) { Uni.toast("约定比例须在 0–50% 之间"); return false; }
-          var done = 0, firstErr = "";
-          list.forEach(function (p) {
-            var r = store.act("sub/setRatio", { id: p.id, ratio: v / 100, from: p.ratioToSub });
-            if (r.ok) done++; else if (!firstErr) firstErr = r.reason || "变更失败";
-          });
-          if (done) Uni.toast("已更新 " + done + " 家约定比例，待补签协议", "ok");
-          else if (firstErr) Uni.toast(firstErr);
-          if (done) { _multi = false; _sel = {}; if (_rerender) _rerender(); }
+      { t: "确认变更", kind: "primary", onClick: function (ov) {
+        var ctl = sh && sh.__ratioCtl;
+        if (!ctl || !ctl.validate()) return false;
+        var v = Number(ctl.value());
+        var done = 0, err = "";
+        list.forEach(function (p) {
+          var r = store.act("sub/setRatio", { id: p.id, ratio: v / 100, from: p.ratioToSub });
+          if (r.ok) done++; else if (!err) err = r.reason || "变更失败";
+        });
+        if (!done) { U.toast(err || "变更失败", "err"); return false; }
+        _multi = false; _sel = {};
+        U.renderCurrent();
+        U.toast("已更新 " + done + " 家约定比例，待补签协议", "ok");
       } }]
     });
+    if (!sh) return;
+    var box = sh.querySelector("#su-best");
+    sh.__ratioChange = function (v) { if (box) box.innerHTML = est(v); };
+    sh.__ratioCtl = bindRatioInput(sh);
   }
 
-  /* ---------- 批量弹窗：重新发起合作协议（多选企业） ---------- */
-  function batchResendDialog(list, Uni) {
-    Uni.dialog({
-      title: "批量重发协议？", danger: true,
-      text: "将向 " + list.length + " 家企业重新发起合作协议（用于协议修订或拒签后重发），各企业将收到重新查阅并签署的提醒。",
+  function batchResendDialog(list, U) {
+    U.dialog({
+      title: "批量重发协议？",
+      text: "将向 " + list.length + " 家企业重新发起合作协议，发起后协议回到待签署状态并通知对方。",
       ok: "确认批量重发",
       onOk: function () {
-        var done = 0, firstErr = "";
+        var done = 0, err = "";
         list.forEach(function (p) {
           var r = store.act("agree/resend", { id: p.id });
-          if (r.ok) done++; else if (!firstErr) firstErr = r.reason || "重发失败";
+          if (r.ok) { done++; markResent(p.id); } else if (!err) err = r.reason || "重发失败";
         });
-        if (done) Uni.toast("已向 " + done + " 家企业重新发起协议", "ok");
-        else if (firstErr) Uni.toast(firstErr);
-        if (done) { _multi = false; _sel = {}; if (_rerender) _rerender(); }
+        if (!done) { U.toast(err || "重发失败", "err"); return; }
+        _multi = false; _sel = {};
+        U.renderCurrent();
+        U.toast("已向 " + done + " 家企业重新发起协议", "ok");
       }
     });
   }
 
-  /* ---------- 批量弹窗：统一暂停 / 终止合作（多选企业 · “更多”气泡入口） ---------- */
-  function batchStatusSheet(list, to, Uni) {
+  function batchStatusSheet(list, to, U) {
     var M = {
-      suspended: { title: "批量暂停合作？", desc: "将统一暂停所选企业的分润结算与对账，仅保留查看权限。恢复前需双方确认问题已解决。", ok: "确认暂停", act: "suspended", doneMsg: "暂停" },
-      terminated: { title: "批量终止合作？", desc: "将统一解除所选企业的合作关系，不再产生分润结算，档案转入归档只读。该操作不可撤销。", ok: "确认终止", act: "terminated", doneMsg: "终止" }
+      suspended: { title: "批量暂停合作？", desc: "将统一暂停所选企业的分润结算与对账，仅保留查看权限。恢复前需双方确认问题已解决。", ok: "确认暂停", done: "暂停" },
+      terminated: { title: "批量终止合作？", desc: "将统一解除所选企业的合作关系，不再产生分润结算，档案转入归档只读。该操作不可撤销。", ok: "确认终止", done: "终止" }
     }[to];
     if (!M) return;
-    Uni.sheet({
+    U.sheet({
       title: M.title, danger: to === "terminated",
       body:
-        '<div class="uh-sheetkv"><span class="k">涉及企业</span><span class="v">' + list.length + " 家</span></div>" +
-        '<div class="uls-picklist">' + list.map(function (p) {
-          return '<span class="uls-pickitem">' + ui.esc(p.name) + '</span>';
-        }).join("") + '</div>' +
+        kv("涉及企业", list.length + " 家") +
+        pickListHtml(list) +
         '<div style="height:8px"></div>' +
         '<div class="uh-readnote">' + ui.icon("info", 15) + '<span>' + M.desc + '</span></div>' +
         '<div class="field" style="margin-top:12px"><label class="field-label">操作原因（必填 · 留痕）</label>' +
         '<textarea class="textarea" id="su-bstatus-reason" placeholder="说明原因，将留痕在操作记录中"></textarea></div>',
       footer: [{ t: "取消", kind: "ghost" },
       { t: M.ok, kind: to === "terminated" ? "danger" : "primary", onClick: function (ov) {
-          var v = (ov.querySelector("#su-bstatus-reason") ? ov.querySelector("#su-bstatus-reason").value : "").trim();
-          if (!v) { Uni.toast("请填写操作原因"); return false; }
-          var done = 0, firstErr = "";
-          list.forEach(function (p) {
-            var r = store.act("sub/setStatus", { id: p.id, to: M.act, reason: v });
-            if (r.ok) done++; else if (!firstErr) firstErr = r.reason || "操作失败";
-          });
-          if (done) Uni.toast("已" + M.doneMsg + " " + done + " 家合作", "ok");
-          else if (firstErr) Uni.toast(firstErr);
-          if (done) { _multi = false; _sel = {}; if (_rerender) _rerender(); }
+        var v = (ov.querySelector("#su-bstatus-reason").value || "").trim();
+        if (!v) { U.toast("请填写操作原因"); return false; }
+        var done = 0, err = "";
+        list.forEach(function (p) {
+          var r = store.act("sub/setStatus", { id: p.id, to: to, reason: v });
+          if (r.ok) done++; else if (!err) err = r.reason || "操作失败";
+        });
+        if (!done) { U.toast(err || "操作失败", "err"); return false; }
+        _multi = false; _sel = {};
+        U.renderCurrent();
+        U.toast("已" + M.done + " " + done + " 家合作", "ok");
       } }]
     });
   }
 
-  /* 唯一渲染路径（tab + 多选状态由闭包维护，操作后重渲染） */
+  /* ============================================================
+     二级视角 · 弹窗
+     ============================================================ */
+  function subAgreementSheet(ctx, U, caps) {
+    var ag = ctx.s.agreement || {};
+    var st = ag.state || "signed", ai = agInfo(st);
+    U.sheet({
+      title: "合作协议",
+      body:
+        kv("协议编号", esc(ag.id || "—")) +
+        kv("协议版本", esc(ag.version || "—")) +
+        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>') +
+        kv("发起时间", esc(ag.sentAt || "—")) +
+        (ag.signedAt ? kv("签署时间", esc(ag.signedAt) + (ag.signerName ? " · " + esc(ag.signerName) : "")) : "") +
+        kv("有效期至", esc(ag.expireAt || "—")) +
+        '<div class="uh-sheetkv"><span class="k">省代</span><span class="v">' +
+          esc((ag.province && ag.province.name) || (ctx.s.parent && ctx.s.parent.name) || "—") + '</span></div>' +
+        '<div class="uh-sheetkv"><span class="k">我方</span><span class="v">' +
+          esc((ag.sub && ag.sub.name) || (ctx.s.profile && ctx.s.profile.name) || "—") + '</span></div>' +
+        ((st === "pending_mine" && !caps.sign)
+          ? '<div class="su-infonote" style="margin-top:12px">' + ui.icon("info", 15) +
+            '<span>协议签署由企业管理员执行，当前身份仅可查阅条款。</span></div>'
+          : "") +
+        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">协议条款</span></div>' +
+        ((ag.terms || []).map(function (t) {
+          return '<div class="uh-clause"><div class="no">' + esc(t.no + " · " + t.t) + '</div><div class="c">' + esc(t.c) + '</div></div>';
+        }).join("") || '<div class="uh-plain">条款明细以双方签署版本为准。</div>'),
+      footer: (st === "pending_mine" && caps.sign)
+        ? [{ t: "关闭", kind: "ghost" },
+           { t: "前往签署", kind: "primary", onClick: function (ov) { ov.close(); U.navTo("agreement.html"); } }]
+        : [{ t: "关闭", kind: "primary" }]
+    });
+  }
+
+  function subCalcSheet(ctx, U) {
+    var c = (ctx.s.calc || [])[0] || {};
+    var detail = c.detail || [];
+    var total = Number(c.eligibleBase || 0);
+    U.sheet({
+      title: "本月对账明细",
+      body:
+        kv("账单月份", esc(c.month || "—")) +
+        kv("出账时间", esc(c.issueAt || "—")) +
+        kv("合格消费", ui.money(total)) +
+        kv("约定比例", pct(c.ratioToSub)) +
+        kv("本月所得", '<b>' + ui.money(Number(c.calcAmount || 0)) + '</b>') +
+        '<div class="uh-note">所得 = 合格消费 × 分佣线 ' + pct(G) + ' × 约定比例，逐笔明细见下。</div>' +
+        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">分摊明细</span></div>' +
+        (detail.length
+          ? detail.map(function (d) {
+              return '<div class="uh-todo-row"><div class="mn">' +
+                '<span class="mt" style="font-weight:600;color:var(--text-1)">' + esc(ITEM_LABEL[d.item] || d.item) + " · " + esc(d.user || "—") + '</span>' +
+                '<span class="mt">' + esc(d.date || "—") + " · " + esc(d.order || "") + '</span></div>' +
+                '<span class="uh-row__amt">' + ui.money(d.amount) + '</span></div>';
+            }).join("")
+          : '<div class="empty-state" style="padding:24px 0"><div class="e-desc">本月暂无合格消费明细</div></div>'),
+      footer: [{ t: "关闭", kind: "primary" }]
+    });
+  }
+
+  function subParentSheet(ctx, U) {
+    var p = ctx.s.parent || {};
+    U.sheet({
+      title: "上级省代信息",
+      body:
+        kv("企业名称", esc(p.name || "—")) +
+        kv("统一社会信用代码", esc(p.uscc || "—")) +
+        kv("联系人", esc(p.contact || "—") + (p.phone ? " · " + esc(p.phone) : "")) +
+        kv("法定代表人", esc(p.legalPerson || "—")) +
+        kv("地址", esc(p.address || "—")) +
+        kv("合作起始", esc(p.since || "—")) +
+        kv("约定比例", pct(p.ratioToSub)) +
+        '<div class="uh-note">合作条款、比例与结算均以上级省代签署版本为准；如有异议可在对账中心发起核实。</div>',
+      footer: [{ t: "关闭", kind: "primary" }]
+    });
+  }
+
+  /* ============================================================
+     规则说明（页头「规则」入口）
+     ============================================================ */
+  function rulesSheet(ctx, caps) {
+    var isSub = ctx.mode === "sub";
+    var rules = isSub
+      ? [
+          { t: "合作归属", c: "你与上级省代为一对一合作关系，合作协议由省代发起，双方签署后生效。" },
+          { t: "约定比例", c: "约定比例由上级省代配置（" + RATIO_MIN + "–" + RATIO_MAX + "%），调整后需双方补签协议，补签完成前按原比例结算。" },
+          { t: "协议签署", c: "收到协议后请查阅全部条款再签署；签署记录与版本变更均留痕，历史版本不覆盖。" },
+          { t: "结算口径", c: "本月所得 = 本人线合格消费 × 分佣线 50% × 约定比例，以对账中心的对账单为准。" },
+          { t: "争议与暂停", c: "对账差异可在对账中心发起异议；合作暂停期间档案仍可查阅，结算与对账冻结。" }
+        ]
+      : [
+          { t: "合作申请", c: "提交后进入待审批；审批通过即建立合作档案，并生成待对方签署的合作协议。" },
+          { t: "约定比例", c: "范围 " + RATIO_MIN + "–" + RATIO_MAX + "%，须为整数；调整后需双方补签协议，补签完成前仍按原比例结算。" },
+          { t: "协议签署", c: "双方签署后生效；拒签或长期未签可重新发起，发起记录与历史留痕可查。" },
+          { t: "结算口径", c: "本月应得 = 该企业合格消费 × 分佣线 50% × 约定比例，以对账中心的对账单为准。" },
+          { t: "状态变更", c: "暂停冻结结算与对账，恢复后继续；终止不可撤销，档案转入归档只读。" }
+        ];
+    caps.Uni.sheet({
+      title: "合作规则说明",
+      body: rules.map(function (r, i) {
+        return '<div class="su-rule"><span class="su-rule__no">' + (i + 1) + '</span>' +
+          '<div class="su-rule__bd"><b>' + esc(r.t) + '</b><p>' + esc(r.c) + '</p></div></div>';
+      }).join(""),
+      footer: [{ t: "我知道了", kind: "primary" }]
+    });
+  }
+
+  /* ============================================================
+     唯一渲染入口
+     ============================================================ */
   function mount(el, ctx, Uni) {
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
     var ro = ctx.readonly;
     var isSub = ctx.mode === "sub";
+    var suspended = !!(ctx.s.profile && ctx.s.profile.status !== "active");
 
-    var canReview = !ro && V.perms.review;
-    var canManage = !ro && V.perms.setRatio;
+    if (_lastIdentity !== ctx.identity) {
+      _lastIdentity = ctx.identity;
+      _multi = false; _sel = {};
+      _tab = isSub ? "active" : "active";
+      _filter = "all";
+      _first = true;
+    }
+    _ctx = ctx;
 
-    _multi = false; _sel = {}; _tab = "active";
+    var caps = {
+      Uni: Uni,
+      review: !ro && V.perms.review,
+      ratio: !ro && V.perms.setRatio,
+      resend: !ro && V.perms.resend,
+      status: !ro && V.perms.status,
+      create: !ro && V.perms.createApp,
+      sign: !ro && !!V.perms.sign,
+      batch: !ro && V.perms.setRatio && V.perms.status
+    };
 
-    /* “更多”气泡：自“更多”按钮位置向上弹出（单选操作：暂停合作 / 终止合作） */
+    var vm = V.data(ctx);
+
+    /* “更多”气泡：自按钮位置向上弹出（相对 .phone 定位，兼容页面缩放） */
     function statusPopFor(btn) {
-      if (_pop) { closeStatusPop(); return; } /* 再次点击“更多”关闭 */
+      if (_pop) { closeStatusPop(); return; }
+      var host = el.closest(".phone") || document.querySelector(".phone") || document.body;
       var pop = document.createElement("div");
       pop.className = "uls-pop";
       pop.innerHTML =
         '<div class="uls-pop__arrow"></div>' +
         '<button type="button" class="uls-pop__item" data-popact="suspended">暂停合作</button>' +
         '<button type="button" class="uls-pop__item uls-pop__item--danger" data-popact="terminated">终止合作</button>';
-      document.body.appendChild(pop);
+      pop.style.position = "absolute";
+      host.appendChild(pop);
+      var hr = host.getBoundingClientRect();
+      var scale = host.offsetWidth ? hr.width / host.offsetWidth : 1;
       var r = btn.getBoundingClientRect();
-      var pw = pop.offsetWidth;
-      var left = Math.max(10, Math.min(r.right - pw, window.innerWidth - pw - 10));
-      var top = Math.max(8, r.top - pop.offsetHeight - 10);
+      var pw = pop.offsetWidth, ph = pop.offsetHeight;
+      var left = Math.min(Math.max(8, host.offsetWidth - pw - 8), Math.max(8, (r.right - hr.left) / scale - pw));
+      var top = Math.max(8, (r.top - hr.top) / scale - ph - 10);
       pop.style.left = left + "px";
       pop.style.top = top + "px";
       var ar = pop.querySelector(".uls-pop__arrow");
-      if (ar) ar.style.left = Math.max(10, Math.min(pw - 22, r.left + r.width / 2 - left - 6)) + "px";
+      if (ar) ar.style.left = Math.max(10, Math.min(pw - 24, (r.left + r.width / 2 - hr.left) / scale - left - 6)) + "px";
       _pop = pop;
       requestAnimationFrame(function () { pop.classList.add("show"); });
-      pop.querySelectorAll("[data-popact]").forEach(function (it) {
+      Array.prototype.forEach.call(pop.querySelectorAll("[data-popact]"), function (it) {
         it.addEventListener("click", function () {
           var to = it.getAttribute("data-popact");
           closeStatusPop();
-          var pick = V.data(ctx).active.filter(function (p) { return _sel[p.id] && p.status !== "suspended"; });
+          var pick = liveSel();
           if (!pick.length) { Uni.toast("请先选择企业"); return; }
           batchStatusSheet(pick, to, Uni);
         });
       });
     }
+    function liveSel() {
+      var cur = V.data(ctx);
+      return cur.live.filter(function (p) { return _sel[p.id] && p.status !== "suspended"; });
+    }
 
     function render() {
-      var vm = V.data(ctx);
+      var now = V.data(ctx);
+      vm = now;
       closeStatusPop();
+      if (isSub) _tab = "active";
 
-      var sec = function (k, head, grid) {
-        return '<section class="uh-sec">' + head + '<div class="uls-grid">' + grid + '</div></section>';
-      };
+      var head = "";
+      if (_multi && !isSub) {
+        head = '<div class="uls-batchhead">' +
+          '<button type="button" class="uls-batchhead__back" data-batchback>返回</button>' +
+          '<span class="uls-batchhead__title">批量操作 · 已选 ' + countSel(now.live) + ' 家</span>' +
+          '<span class="uls-batchhead__act">' +
+          '<button type="button" class="su-linkbtn" data-multi="all">全选</button>' +
+          '<button type="button" class="su-linkbtn" data-multi="clear">清空</button>' +
+          '</span></div>';
+      }
+      var lock = suspended
+        ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
+          '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
+          '<span class="lb-s">' + esc(V.lockedNote) + '</span></div></div></section>'
+        : "";
+      var note = (V.note && !suspended)
+        ? '<section class="uh-sec"><div class="su-infonote">' + ui.icon("info", 15) + '<span>' + esc(V.note) + '</span></div></section>'
+        : "";
+      /* 空态卡片里已有主 CTA，再挂 FAB 就是同屏两个同样的按钮 */
+      var emptyCta = !isSub && _tab === "active" && !now.live.length;
+      var fab = (!isSub && caps.create && !_multi && !emptyCta)
+        ? '<button type="button" class="su-fab" data-create aria-label="发起新二级合作">' +
+          ui.icon("user-plus", 18) + '<span>发起合作</span></button>'
+        : "";
 
-      /* 各 tab 内容按需构建（仅当前 tab 渲染） */
-      var body = "";
-      if (_tab === "pending") {
-        var pendingHtml = vm.pending.length
-          ? vm.pending.map(function (a) { return pendingCard(a, canReview); }).join("")
-          : emptyBlock(Uni, V.empty.pending);
-        body += sec("pending",
-          '<div class="uh-sechead"><span class="lbl">待审批申请</span>' +
-          (vm.pending.length ? '<span class="uh-badge uh-badge--info">待处理 ' + vm.pending.length + '</span>' : "") + '</div>',
-          pendingHtml);
-      } else if (_tab === "rejected") {
-        var rejectedHtml = vm.rejected.length
-          ? vm.rejected.map(function (a) { return rejectedCard(a); }).join("")
-          : emptyBlock(Uni, V.empty.rejected);
-        body += sec("rejected",
-          '<div class="uh-sechead"><span class="lbl">已驳回申请</span></div>',
-          rejectedHtml);
-      } else {
-        var activeHtml = vm.active.length
-          ? vm.active.map(function (p) { return activeCard(p, canManage, _multi, !!_sel[p.id]); }).join("")
-          : emptyBlock(Uni, V.empty.active);
-        /* 生效中段头：多选入口 / 多选态（仅可操作身份 & ≥2 家时提供批量管理） */
-        var multiHead = "";
-        var selCount = Object.keys(_sel).length;
-        if (canManage && vm.active.length > 1 && !isSub) {
-          if (_multi) {
-            multiHead = '<div class="uh-sechead uls-multihead"><span class="lbl">已选 ' + selCount + ' 家</span>' +
-              '<span class="grp"><button class="btn btn-ghost btn-sm" data-multi="all">全选</button>' +
-              '<button class="btn btn-ghost btn-sm" data-multi="exit">取消</button></span></div>';
-          } else {
-            multiHead = '<div class="uh-sechead uls-multihead"><span class="lbl">生效中合作</span>' +
-              '<span class="grp"><span class="uh-badge uh-badge--ok">生效中 ' + vm.active.length + '</span>' +
-              '<a class="uls-link" data-multi="enter">批量操作</a></span></div>';
-          }
-        } else if (vm.active.length) {
-          multiHead = '<div class="uh-sechead"><span class="lbl">生效中合作</span>' +
-            '<span class="uh-badge uh-badge--ok">生效中 ' + vm.active.length + '</span></div>';
+      el.innerHTML = head + lock +
+        ((isSub || _multi) ? "" : overviewHtml(now)) +
+        note +
+        (isSub ? subBody(now, ctx, caps.sign) : provinceBody(now, caps)) +
+        ((!_multi && !isSub) ? '<section class="uh-sec su-footnote"><div class="uh-note">本月数据为演示模拟测算；分佣线 50% 为规则常量，不含平台其他费用。</div></section>' : "") +
+        fab +
+        ((_multi && !isSub) ? batchBarHtml(now) : "");
+
+      document.body.classList.toggle("uls-batch", _multi && !isSub);
+      el.classList.toggle("su-has-fab", !!fab);
+
+      /* 数字滚动（仅首次渲染，切换 tab 不重复动画） */
+      if (_first) {
+        _first = false;
+        if (!isSub) {
+          var se = el.querySelector('[data-cnt="settled"]');
+          var ag = el.querySelector('[data-cnt="agreed"]');
+          if (se) Uni.countUp(se, now.live.reduce(function (a, p) {
+            return a + (p.status === "active" ? Number(p.subGross || 0) : 0);
+          }, 0), 700, function (v) { return ui.money(v); });
+          if (ag) Uni.countUp(ag, now.live.reduce(function (a, p) {
+            return a + (p.status === "active" ? Math.round(Number(p.subGross || 0) * G * Number(p.ratioToSub || 0)) : 0);
+          }, 0), 700, function (v) { return ui.money(v); });
+        } else {
+          var inc = el.querySelector('[data-cnt="income"]');
+          if (inc) Uni.countUp(inc, Number((now.calc || {}).calcAmount || 0), 700, function (v) { return ui.moneyD(v); });
         }
-        body += sec("active", multiHead, activeHtml);
       }
 
-      /* 批量操作状态页顶栏（替换原页头：隐藏原 bar，左上角为文字“返回”） */
-      var batchHead = _multi ? '<div class="uls-batchhead">' +
-        '<button type="button" class="uls-batchhead__back" data-batchback>返回</button>' +
-        '<span class="uls-batchhead__title">批量操作</span></div>' : "";
+      bind();
+    }
 
-      /* 多选批量操作栏（固定底部，仅生效中 tab；“更多”位于批量操作按钮左侧） */
-      var batchBar = (_multi && _tab === "active") ? '<div class="uls-batchbar' + (selCount ? "" : " is-empty") + '">' +
-        '<span class="uls-batchbar__cnt">已选 ' + selCount + " 家</span>" +
-        '<div class="uls-batchbar__btns">' +
-        '<button class="btn btn-ghost btn-sm" data-more="1">更多</button>' +
-        '<button class="btn btn-ghost btn-sm" data-batch="ratio">批量配置比例</button>' +
-        '<button class="btn btn-primary btn-sm" data-batch="resend">批量重发协议</button>' +
-        '</div></div>' : "";
-
-      el.innerHTML =
-        batchHead +
-        (ro ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-          '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
-          '<span class="lb-s">' + ui.esc(V.lockedNote) + '</span></div></div></section>' : "") +
-        (_multi ? "" : tabsBar(vm, isSub)) +
-        (vm.note ? '<section class="uh-sec"><div class="uh-readnote">' + ui.icon("info", 15) + '<span>' + ui.esc(vm.note) + '</span></div></section>' : "") +
-        body +
-        batchBar;
-      /* 批量操作状态：隐藏静态页头（顶部的 bar 不显示） */
-      document.body.classList.toggle("uls-batch", _multi);
-
+    function bind() {
       var apps = {};
       mergedSubApps(ctx.s).forEach(function (a) { apps[a.id] = a; });
       var subs = {};
-      (ctx.s.subs || []).forEach(function (p) { subs[p.id] = p; });
-      vm.active.forEach(function (p) { if (!subs[p.id]) subs[p.id] = p; });
+      ((V.data(ctx).live || []).concat(V.data(ctx).ended || [])).forEach(function (p) { subs[p.id] = p; });
 
-      /* tab 切换 */
-      el.querySelectorAll("[data-tab]").forEach(function (n) {
+      /* tab */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-tab]"), function (n) {
         n.addEventListener("click", function () {
           _tab = n.getAttribute("data-tab");
           _multi = false; _sel = {};
           render();
         });
       });
-
-      /* 详情弹窗内合作管理操作：绑定在 Uni.sheet 容器内（见 subDetailSheet），此处仅保留 data-open 卡片主体绑定 */
-      el.querySelectorAll("[data-open]").forEach(function (n) {
-        n.addEventListener("click", function (e) {
-          if (e.target.closest("[data-act]")) return;
+      /* 提醒直达 */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-jump]"), function (n) {
+        n.addEventListener("click", function () {
+          var j = n.getAttribute("data-jump");
+          _tab = "active";
+          _filter = "all";
+          if (j === "pending") _tab = "pending";
+          else _filter = j;
+          render();
+        });
+      });
+      /* 筛选 */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-filter]"), function (n) {
+        n.addEventListener("click", function () {
+          _filter = n.getAttribute("data-filter");
+          render();
+        });
+      });
+      /* 卡片主体：多选态切换选中，否则进详情 */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-open]"), function (n) {
+        function go(e) {
+          if (e && e.target.closest("[data-quick]")) return;
           var id = n.getAttribute("data-open");
-          if (_multi && n.classList.contains("uls-tile--multi")) {
-            /* 已暂停企业不可批量选择：避免“未选中却计入已选”的状态错位 */
-            if (n.classList.contains("uls-tile--na")) { Uni.toast("该企业已暂停合作，暂不可批量选择"); return; }
+          if (_multi) {
+            if (n.classList.contains("is-na")) { Uni.toast("该企业已暂停合作，暂不可批量选择"); return; }
             if (_sel[id]) delete _sel[id]; else _sel[id] = true;
             render();
             return;
           }
           var a = apps[id], p = subs[id];
-          if (a) appDetailSheet(a, canReview && a.status === "pending", Uni);
-          else if (p) subDetailSheet(p, canManage, Uni);
+          if (a) appDetailSheet(a, caps);
+          else if (p && p.status === "terminated") endedDetailSheet(p, Uni);
+          else if (p) liveDetailSheet(p, caps);
+        }
+        n.addEventListener("click", go);
+        n.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); }
         });
       });
-
-      /* 多选入口 / 全选 / 取消 */
-      el.querySelectorAll("[data-multi]").forEach(function (n) {
+      /* 卡内一键动作（重发协议 / 恢复合作） */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-quick]"), function (n) {
+        n.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var id = n.getAttribute("data-id");
+          var p = subs[id];
+          if (!p) return;
+          if (n.getAttribute("data-quick") === "resend") resendDialog(p, Uni);
+          else statusDialog(p, "active", Uni);
+        });
+      });
+      /* 多选入口 / 全选 / 清空 / 退出 */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-multi]"), function (n) {
         n.addEventListener("click", function () {
           var a = n.getAttribute("data-multi");
-          if (a === "enter") { _multi = true; _sel = {}; }
-          else if (a === "all") { V.data(ctx).active.filter(function (p) { return p.status !== "suspended"; }).forEach(function (p) { _sel[p.id] = true; }); }
+          if (a === "enter") { _multi = true; _sel = {}; _filter = "all"; }
+          else if (a === "all") {
+            V.data(ctx).live.forEach(function (p) { if (p.status !== "suspended") _sel[p.id] = true; });
+          } else if (a === "clear") { _sel = {}; }
           else { _multi = false; _sel = {}; }
           render();
         });
       });
-
-      /* 批量状态页：文字“返回”退出批量操作状态 */
-      el.querySelectorAll("[data-batchback]").forEach(function (n) {
-        n.addEventListener("click", function () {
-          _multi = false; _sel = {};
-          render();
-        });
+      Array.prototype.forEach.call(el.querySelectorAll("[data-batchback]"), function (n) {
+        n.addEventListener("click", function () { _multi = false; _sel = {}; render(); });
       });
-
-      /* “更多”按钮：自按钮位置向上弹出气泡（暂停合作 / 终止合作） */
-      el.querySelectorAll("[data-more]").forEach(function (n) {
+      Array.prototype.forEach.call(el.querySelectorAll("[data-more]"), function (n) {
         n.addEventListener("click", function () { statusPopFor(n); });
       });
-
-      /* 批量操作（底部栏） */
-      el.querySelectorAll("[data-batch]").forEach(function (n) {
+      Array.prototype.forEach.call(el.querySelectorAll("[data-batch]"), function (n) {
         n.addEventListener("click", function () {
-          var pick = V.data(ctx).active.filter(function (p) { return _sel[p.id] && p.status !== "suspended"; });
+          var pick = liveSel();
           if (!pick.length) { Uni.toast("请先选择企业"); return; }
           if (n.getAttribute("data-batch") === "ratio") batchRatioSheet(pick, Uni);
           else batchResendDialog(pick, Uni);
         });
       });
+      var createBtn = el.querySelector("[data-create]");
+      if (createBtn) createBtn.addEventListener("click", function () { createSheet(Uni); });
+
+      /* 二级视角：相关入口 + 签署 */
+      Array.prototype.forEach.call(el.querySelectorAll("[data-subact]"), function (n) {
+        n.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var act = n.getAttribute("data-subact");
+          if (act === "sign") {
+            if (!caps.sign) { Uni.toast("协议签署由企业管理员执行"); return; }
+            Uni.navTo("agreement.html"); return;
+          }
+          if (act === "agree") subAgreementSheet(ctx, Uni, caps);
+          else if (act === "calc") subCalcSheet(ctx, Uni);
+          else if (act === "parent") subParentSheet(ctx, Uni);
+        });
+      });
     }
 
     render();
-    _rerender = render;
 
-    /* FAB：发起新二级合作（只读/无权限不渲染） */
-    if (!ro && V.perms.createApp) {
-      var fab = document.createElement("button");
-      fab.className = "uh-fab";
-      fab.setAttribute("aria-label", "发起新二级合作");
-      fab.innerHTML = ui.icon("user-plus", 22);
-      fab.addEventListener("click", function () { createSheet(Uni); });
-      el.appendChild(fab);
-    }
+    /* 页头「规则」入口（页面静态按钮，每次 mount 重绑以保证 ctx 最新） */
+    var rulesBtn = document.getElementById("su-rules");
+    if (rulesBtn) rulesBtn.onclick = function () { rulesSheet(ctx, caps); };
   }
 
   window.Uni.register({

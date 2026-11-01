@@ -3,7 +3,7 @@
    拍板③：二级端「对账中心」入口收口为聚合页，三 tab：
      Tab1 对账核对（= 原 reconcile-sub 核心：应付款/收口进度/逐笔核对/登记）
      Tab2 经营台账（= 原 ledger-sub 核心：应得/趋势/月度台账）
-     Tab3 阅读对账单（= 原 statement-sub 核心：双月卡 + 层级徽章）
+     Tab3 对账单（= 原 statement-sub 核心：双月卡 + 层级徽章）
    数据单一源：store/scenarios（批次六定稿矩阵：10 月 6,000→600、9 月 4,600→460）。
    方案 A（拍板④，批次三先落交互目标态）：勾选明细 → 收口进度联动 → 全核对后
    「核对无误·确认」启用 → 差异收口；勾选态为内存（会话内保留，批次四统一
@@ -50,6 +50,12 @@
     var stCur = store.subSettle(calc || {});
     var stPrev = store.subSettle(prev || {});
     var openStmts = stmts.filter(function (x) { return x.status === "open"; }).length;
+    /* Tab2 月度台账：月份取自 calc（复算口径），不再写死月份字符串；
+       账单里存在但无复算记录的账期（逾期锁定 / 未结算）不能静默缺席，
+       与 uni-ledger.js 二级口径用的是同一句披露语 */
+    var calcMonths = [calc, prev].filter(Boolean).map(function (c) { return c.month; });
+    var missM = (s.hist || []).map(function (h) { return h.month; })
+      .filter(function (m, i, a) { return m && calcMonths.indexOf(m) < 0 && a.indexOf(m) === i; });
     return {
       calc: calc, prev: prev,
       due: due, dueDay: dueDay, eligible: eligible,
@@ -57,6 +63,14 @@
       confirmedAmt: confirmedAmt, pendingAmt: pendingAmt, disputedAmt: disputedAmt,
       detail: (calc && calc.detail) || [], prevDetail: (prev && prev.detail) || [],
       cur: cur, hist: hist,
+      /* 台账行 + 缺席账期披露（口径与省代经营台账一致，两个入口不再各说各话） */
+      ledgerRows: [
+        calc ? { m: calc.month, eligible: stCur.eligible, ratio: Math.round(stCur.ratioToSub * 100) + "%", agreed: stCur.agreed, state: "核算中" } : null,
+        prev ? { m: prev.month, eligible: stPrev.eligible, ratio: Math.round(stPrev.ratioToSub * 100) + "%", agreed: stPrev.agreed, state: "已结" } : null
+      ].filter(Boolean),
+      tableNote: missM.length
+        ? missM.sort().reverse().join("、") + " 账期无结算复算记录（逾期锁定 / 未结算），不在本表计列，明细见对账历史。"
+        : "",
       tri: { due: due, registered: sum, confirmed: confirmedAmt, pending: pendingAmt, disputed: disputedAmt, pendingCnt: pending.length, disputedCnt: disputed.length },
       sub: { eligible: stCur.eligible, gross: stCur.gross, ratio: stCur.ratioToSub, agreed: stCur.agreed, frozen: stCur.frozen },
       prevRow: { eligible: prevEligible, gross: stPrev.gross, agreed: stPrev.agreed, settled: prevSum },
@@ -74,7 +88,7 @@
     return '<div class="uls-tabs">' +
       '<button class="uls-tab active" data-p="p1">对账核对' + badge1 + "</button>" +
       '<button class="uls-tab" data-p="p2">经营台账</button>' +
-      '<button class="uls-tab" data-p="p3">阅读对账单' + badge3 + "</button>" +
+      '<button class="uls-tab" data-p="p3">对账单' + badge3 + "</button>" +
       "</div>";
   }
 
@@ -157,15 +171,18 @@
   }
 
   function tab2Html(vm) {
+    /* 柱与表同源：月份一律取 calc，不写死；无上月时不画单柱 */
     var bars = [
-      { m: "2026-10", v: vm.sub.agreed, pct: 100, cur: true },
-      { m: "2026-09", v: vm.prevRow.agreed, pct: Math.max(Math.round(vm.prevRow.agreed / (vm.sub.agreed || 1) * 100), 18), cur: false }
+      { m: vm.calc.month, v: vm.sub.agreed, pct: 100, cur: true }
     ];
+    if (vm.prev) {
+      bars.push({ m: vm.prev.month, v: vm.prevRow.agreed, pct: Math.max(Math.round(vm.prevRow.agreed / (vm.sub.agreed || 1) * 100), 18), cur: false });
+    }
     return '<div class="uh-pane" id="p2">' +
       amtCardHtml(vm, "本月应得（实得口径）", money(vm.sub.agreed),
         "合格消费 <b>" + money(vm.sub.eligible) + "</b> × 约定 <b>50%</b> × 平台分成 <b>20%</b>", vm.sub.agreed) +
       '<div class="card"><div class="uh-sechead" style="display:flex;align-items:center;gap:7px;margin-bottom:10px;"><span class="lbl" style="font-size:var(--fs-base);font-weight:700;">应得趋势</span>' +
-      '<span class="more" style="margin-left:auto;font-size:var(--fs-sm);color:var(--text-3);">10 月 / 9 月</span></div>' +
+      '<span class="more" style="margin-left:auto;font-size:var(--fs-sm);color:var(--text-3);">' + bars.map(function (b) { return Number(b.m.slice(5)) + " 月"; }).join(" / ") + '</span></div>' +
       '<div class="uh-trend">' + bars.map(function (b) {
         return '<div class="uh-tr-col' + (b.cur ? " cur" : "") + '"><div class="bar" style="height:' + (b.pct >= 100 ? 64 : Math.round(64 * b.pct / 100)) + 'px"></div>' +
           '<span class="tv">' + money(b.v) + '</span><span class="tm">' + b.m + "</span></div>";
@@ -173,9 +190,13 @@
       '<div class="card"><div class="uh-sechead" style="display:flex;align-items:center;gap:7px;margin-bottom:10px;"><span class="lbl" style="font-size:var(--fs-base);font-weight:700;">月度台账</span>' +
       '<span class="more" style="margin-left:auto;font-size:var(--fs-sm);color:var(--text-3);">合格消费 → 应得</span></div>' +
       '<table class="uh-ltable"><tr><th>月份</th><th>合格消费</th><th>约定</th><th>应得</th><th>状态</th></tr>' +
-      '<tr><td>2026-10</td><td>' + money(vm.sub.eligible) + "</td><td>20%</td><td>" + money(vm.sub.agreed) + '</td><td class="ok">核算中</td></tr>' +
-      '<tr><td>2026-09</td><td>' + money(vm.prevRow.eligible) + "</td><td>20%</td><td>" + money(vm.prevRow.agreed) + '</td><td class="ok">已结</td></tr>' +
-      "</table></div></div>";
+      vm.ledgerRows.map(function (r) {
+        return "<tr><td>" + r.m + "</td><td>" + money(r.eligible) + "</td><td>" + r.ratio + "</td>" +
+          "<td>" + money(r.agreed) + '</td><td class="ok">' + r.state + "</td></tr>";
+      }).join("") +
+      "</table>" +
+      (vm.tableNote ? '<div class="uh-note" style="margin-top:8px">' + vm.tableNote + "</div>" : "") +
+      "</div></div>";
   }
 
   function stCardHtml(vm, st, month, due, diff, extra) {
