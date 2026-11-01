@@ -50,23 +50,22 @@
 
   function seed(opts) {
     opts = opts || {};
-    var d = deps(), S = d.S, L = d.L, E = d.E, T = d.T, A = d.A;
+    var d = deps(), S = d.S, L = d.L, E = d.E, T = d.T;
     if (!S) return { error: 'E_DEPS_MISSING' };
     reset(opts);
     var now = Date.now();
 
-    /* ---- R-15 兼任并集播种：u11 总代叠加个人合伙人身份（备份原 auth，reset 还原） ----
-       仅浏览器环境有 AuthStore/localStorage；node 测试跳过。 */
-    if (A && typeof window !== 'undefined' && window.localStorage) {
+    /* ---- R-15 兼任并集：播种前备份原 auth，reset 时还原（仅浏览器环境；node 测试跳过） ----
+       合伙人标记本身不在这里写了：这里是"谁当前登录就给谁加"，而 seed() 也被
+       u12（二级）/u3（省代申请人）等场景调用，会被套上不属于自己的合伙人身位；
+       且该写入只落在 L2 AuthStore、与 L1 用户表快照不一致，页面下次启动时
+       ensureCurrentSynced() 会按用户表覆盖回去（表现为刷新后身份回退）。
+       现在由 databus 里 u11 系列场景显式调用 grantUnionPartner() 写入。 */
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
         if (!window.localStorage.getItem(AUTH_BACKUP_KEY)) {
           window.localStorage.setItem(AUTH_BACKUP_KEY, window.localStorage.getItem('engchain-auth') || '');
         }
-        var auth = A.read ? A.read() : {};
-        auth = JSON.parse(JSON.stringify(auth || {}));
-        auth.realname = auth.realname || { ok: true, name: '林振华' };
-        auth.partner = { ok: true, status: 'approved', approvedAt: now - 30 * DAY, profitConfig: {} };
-        A.write(auth);
       } catch (e) {}
     }
 

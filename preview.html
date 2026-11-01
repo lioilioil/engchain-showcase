@@ -1889,55 +1889,29 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: dec, maximumFractionDigits: 2 });
   }
 
-  /* 九个种子账号的"干净起点态"签名：uid → {场景key, 应点亮轨道(无序), 入驻类型}。
-     仅当当前状态与该签名完全一致（无任一轨道审核中/驳回、点亮集合一致、入驻类型一致）才回显对应起点场景；
-     任何页面内/后台真实推进都会落到占位项，杜绝猜错（如 u5 被真实升到企业认证不会被误标成"实名"）。 */
-  var START_SEED = {
-    u7: { key: 'guest',                 done: [],                                  type: null },
-    u6: { key: 'registered',            done: [],                                  type: null },
-    u5: { key: 'realname',              done: ['realname'],                        type: null },
-    u4: { key: 'pro',                   done: ['realname', 'personal-entry'],      type: null },
-    u9: { key: 'partner',               done: ['realname', 'partner'],             type: null },
-    u3: { key: 'enterprise',            done: ['realname', 'enterprise'],          type: null },
-    u1: { key: 'resident_construction', done: ['realname', 'enterprise', 'entry'], type: 'construction' },
-    u2: { key: 'resident_agency',       done: ['realname', 'enterprise', 'entry'], type: 'agency' },
-    /* [M4-4] u8 旧企业合伙人已回退为实名普通用户，START_SEED 同步 */
-    u8: { key: 'realname',              done: ['realname'],                        type: null }
-  };
+  /* 种子起点态反推表已上收到 DataBus.inferDemoScenario()：preview 与「我的·演示设置」
+     共用同一份口径，避免两处各写一张表、各自猜错。 */
   var lastScenarioKey = '', lastScenarioSig = '';
-  /* 当前身份签名：uid + 五轨道状态 + 入驻类型/审核阶段 + 各认证域 status，足以区分共用 base 的多场景 */
+  /* 当前身份签名：全站只此一份口径，由数据层 DataBus.demoScenarioSig() 提供
+     （uid + 五轨道 + 入驻类型/审核阶段 + 各认证域 status + 工作台场景域）。
+     不再在页面里另写一份——两处口径一旦分叉，就会出现"这边认得、那边不认得"。 */
   function curIdentitySig(){
-    var ds = window.deriveIdentityStates ? deriveIdentityStates() : null;
-    var st = ds ? ds.states : {};
-    var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-    var e = window.EntryStore ? EntryStore.read() : {};
-    var a = window.AuthStore ? AuthStore.read() : {};
-    function s(k){ return st[k] || 'locked'; }
-    return [ cu ? cu.id : '?', s('realname'), s('personal-entry'), s('partner'), s('enterprise'), s('entry'),
-      e.type || '', e.status || '',
-      (a.personalEntry && a.personalEntry.status) || '',
-      (a.partner && a.partner.status) || '',
-      (a.enterprise && a.enterprise.status) || '' ].join('|');
+    return (window.DataBus && DataBus.demoScenarioSig) ? DataBus.demoScenarioSig() : '';
   }
-  /* 反向同步下拉：最近一次面板所选且签名未变 → 保持；干净种子起点态 → 回显起点；其余 → 占位项 */
+  /* 反向同步下拉：最近一次面板所选且签名未变 → 保持；数据层的场景记忆验签通过 → 回显该场景；
+     干净种子起点态 → 回显起点；其余 → 占位项。
+     记忆优先于种子反推：代理演示账号（u11/u12）不在种子表里，只能靠记忆回显。 */
   function syncScenarioSelect(){
     if (!selScenario || !selScenario.options || !selScenario.options.length) return;
     var sig = curIdentitySig();
     if (lastScenarioKey && sig === lastScenarioSig) { selScenario.value = lastScenarioKey; return; }
-    var ds = window.deriveIdentityStates ? deriveIdentityStates() : null;
-    var st = ds ? ds.states : {};
-    var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-    var e = window.EntryStore ? EntryStore.read() : {};
     var key = '';
-    if (cu && START_SEED[cu.id]) {
-      var exp = START_SEED[cu.id];
-      var inProgress = false;
-      TRACKS.forEach(function (t) { var x = st[t[0]]; if (x === 'review' || x === 'reject') inProgress = true; });
-      var doneNow = TRACKS.map(function (t) { return t[0]; }).filter(function (k) { return st[k] === 'done'; }).sort();
-      var doneExp = exp.done.slice().sort();
-      var sameDone = (doneNow.length === doneExp.length) && doneNow.every(function (x, i) { return x === doneExp[i]; });
-      if (!inProgress && sameDone && ((e.type || null) === (exp.type || null))) key = exp.key;
+    if (window.DataBus && DataBus.currentDemoScenario) {
+      var saved = DataBus.currentDemoScenario();
+      if (saved && selScenario.querySelector('option[value="' + saved + '"]')) key = saved;
     }
+    if (!key && window.DataBus && DataBus.inferDemoScenario) key = DataBus.inferDemoScenario();
+    if (key) { lastScenarioKey = key; lastScenarioSig = sig; }
     selScenario.value = key;   /* 匹配不到时 value='' 自动落到占位项 */
   }
 

@@ -1945,6 +1945,20 @@ window.DataBus = (function () {
     return u;
   }
 
+  /* R-15 兼任并集：u11 省级总代叠加个人合伙人身份（并入 L2 AuthStore）。
+     只允许 u11 系列场景调用——早先这段写在 AgentDemo.seed() 里，等于"谁当前登录就给谁加"，
+     u12（二级）、u3（省代申请人）也会被套上不属于自己的合伙人身位。
+     注意口径限制：这份授权只落在 L2，L1 用户表里 u11 的快照没有它，
+     好在 ensureCurrentSynced() 对 u11 有专门补齐规则，刷新后能续上。 */
+  function grantUnionPartner() {
+    try {
+      if (!window.AuthStore) return;
+      var au = AuthStore.read() || {};
+      au.partner = { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} };
+      AuthStore.write(au);
+    } catch (e) {}
+  }
+
   /* 场景表：group = start(起点终态) / review(审核中) / reject(已驳回) */
   var DEMO_SCENARIOS = {
     /* A 起点身份（终态） */
@@ -1963,13 +1977,7 @@ window.DataBus = (function () {
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已开通' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
-        /* [R-15 兼任并集] seed 后强制写 AuthStore.partner（u11 兼任个人合伙人），
-           防止 databus restore/login 用无 partner 的账号快照覆盖；u12 不兼任。 */
-        if (window.AuthStore) {
-          var _au = AuthStore.read();
-          _au.partner = { ok: true, status: 'approved', approvedAt: Date.now() - 30 * 864e5, profitConfig: {} };
-          AuthStore.write(_au);
-        }
+        grantUnionPartner();
       } },
     sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12', workbench: 'sub-active',
       ensure: { name: '陈二级', company: '成都××合作公司', mobile: '139****0012', tag: '二级合作 · 已绑定' },
@@ -1978,6 +1986,7 @@ window.DataBus = (function () {
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已暂停' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
+        grantUnionPartner();
         var S = window.AgentStore;
         if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'suspended'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示暂停', fromStatus: 'active', toStatus: 'suspended' }); S.saveProvince(p); } }
       } },
@@ -1985,6 +1994,7 @@ window.DataBus = (function () {
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已终止' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
+        grantUnionPartner();
         var S = window.AgentStore;
         if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'terminated'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示终止', fromStatus: 'active', toStatus: 'terminated' }); S.saveProvince(p); } }
       } },
@@ -2023,6 +2033,7 @@ window.DataBus = (function () {
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
+        grantUnionPartner();
         var S = window.AgentStore;
         if (S) S.saveSub({ id: 'sb-demo-pending', parentUid: 'u11', uid: '', company: { name: '绵阳××合作公司', uscc: '91510100DEMO-SB1', license: '营业执照(示例)', legalRep: '演示法人', contact: '演示联系人' }, province: '四川省', ratioToSub: 0.15, status: 'pending', statusLog: [{ operator: 'u11', at: Date.now(), reason: '发起二级申请', fromStatus: '', toStatus: 'pending' }], rejects: [], ratioLog: [], signature: { status: 'pending' }, sealedAt: 0 });
       } },
@@ -2131,6 +2142,8 @@ window.DataBus = (function () {
     if (typeof window.deriveIdentityStates === 'function') result.states = window.deriveIdentityStates().states;
     /* 3. 同步工作台（栈 B）：场景域 + 默认身份 + 清除陈旧工作台状态 */
     result.workbench = syncWorkbench(key);
+    /* 4. 落记忆：此时状态与工作台场景域都已定稿，签名才代表"这个场景落地后的样子" */
+    markDemoScenario(key);
     audit('演示场景', '调试面板', sc.label, '切换至：' + sc.label + (result.balanceUnchanged ? '（余额未变）' : ''));
     return result;
   }
@@ -2138,6 +2151,99 @@ window.DataBus = (function () {
     return Object.keys(DEMO_SCENARIOS).map(function (k) {
       return { key: k, label: DEMO_SCENARIOS[k].label, group: DEMO_SCENARIOS[k].group, base: DEMO_SCENARIOS[k].base };
     });
+  }
+
+  /* ---- 演示场景记忆：preview 侧栏与「我的·演示设置」双向回显的唯一真源 ----
+     旧做法是两处下拉框各自"从当前身份反推是哪个预设场景"，有三处硬伤：
+       a) 反推表 START_SEED 只收了 9 个种子账号，代理演示账号（u11/u12）根本没有条目；
+       b) preview 记的 lastScenarioKey 只是内存变量，刷新即丢；
+       c) profile 的弹窗干脆不做反推，恒定落在占位项。
+     改为"应用时记账、读取时验签"：applyDemoScenario() 落 {key, sig, at}，
+     读取时签名必须与当前状态一致才认——页面内/后台任何真实操作改动了身份、认证、
+     入驻或工作台场景域，记忆立即失效，不会把真实推进误标回某个预设场景。
+     重置会连这条记忆一起清掉（resetAll 删除全部 engchain-* 键）。 */
+  var DEMO_KEY = 'engchain-demo-scenario';
+
+  /* 身份签名（preview 的 curIdentitySig 直接委托到这里，全站只此一份口径），
+     并在五轨道/认证/入驻之外补上工作台场景域：
+     同一 base 账号的多个场景（如省代 active / suspended）身份签名完全相同，
+     只有场景域能把它们分开。 */
+  function demoScenarioSig() {
+    try {
+      var cu = current();
+      var st = {};
+      if (typeof window.deriveIdentityStates === 'function') {
+        var d = window.deriveIdentityStates();
+        st = (d && d.states) || {};
+      }
+      var e = (window.EntryStore && window.EntryStore.read) ? (window.EntryStore.read() || {}) : {};
+      var a = (window.AuthStore && window.AuthStore.read) ? (window.AuthStore.read() || {}) : {};
+      var wb = '';
+      try { wb = LS.getItem(WB_SCENARIO_KEY) || ''; } catch (err) {}
+      function s(k) { return st[k] || 'locked'; }
+      return [ cu ? cu.id : '?',
+        s('realname'), s('personal-entry'), s('partner'), s('enterprise'), s('entry'),
+        e.type || '', e.status || '',
+        (a.personalEntry && a.personalEntry.status) || '',
+        (a.partner && a.partner.status) || '',
+        (a.enterprise && a.enterprise.status) || '',
+        wb ].join('|');
+    } catch (err) { return ''; }
+  }
+
+  function markDemoScenario(key, sig) {
+    try {
+      LS.setItem(DEMO_KEY, JSON.stringify({ key: key, sig: sig || demoScenarioSig(), at: Date.now() }));
+    } catch (e) {}
+  }
+
+  /* 返回当前仍然有效的预设场景 key；验签不过 / 场景已下线 → '' （调用方回落到占位项） */
+  function currentDemoScenario() {
+    var raw = null;
+    try { raw = LS.getItem(DEMO_KEY); } catch (e) { return ''; }
+    if (!raw) return '';
+    var it = null;
+    try { it = JSON.parse(raw); } catch (e) { it = null; }
+    if (!it || !it.key || !DEMO_SCENARIOS[it.key]) return '';
+    return it.sig === demoScenarioSig() ? it.key : '';
+  }
+
+  /* 种子起点态反推（记忆不可用时的兜底）：九个种子账号"没被动过的样子"。
+     仅当五轨道无审核中/驳回、点亮集合与入驻类型都与种子一致才认出场景；
+     任何真实推进一律返回 ''，宁可落到占位项也不猜错。
+     这张表此前只存在于 preview.html 里，profile 因为没有它而永远显示占位项——现在归到数据层。 */
+  var DEMO_SEED_SIG = {
+    u7: { key: 'guest',                 done: [],                                  type: null },
+    u6: { key: 'registered',            done: [],                                  type: null },
+    u5: { key: 'realname',              done: ['realname'],                        type: null },
+    u4: { key: 'pro',                   done: ['realname', 'personal-entry'],      type: null },
+    u9: { key: 'partner',               done: ['realname', 'partner'],             type: null },
+    u3: { key: 'enterprise',            done: ['realname', 'enterprise'],          type: null },
+    u1: { key: 'resident_construction', done: ['realname', 'enterprise', 'entry'], type: 'construction' },
+    u2: { key: 'resident_agency',       done: ['realname', 'enterprise', 'entry'], type: 'agency' },
+    u8: { key: 'realname',              done: ['realname'],                        type: null }
+  };
+  var DEMO_TRACKS = ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'];
+
+  function inferDemoScenario() {
+    if (typeof window.deriveIdentityStates !== 'function') return '';
+    try {
+      var cu = current();
+      var exp = cu && DEMO_SEED_SIG[cu.id];
+      if (!exp) return '';
+      var st = (window.deriveIdentityStates() || {}).states || {};
+      var e = (window.EntryStore && window.EntryStore.read) ? (window.EntryStore.read() || {}) : {};
+      for (var i = 0; i < DEMO_TRACKS.length; i++) {
+        var x = st[DEMO_TRACKS[i]];
+        if (x === 'review' || x === 'reject') return '';
+      }
+      var doneNow = DEMO_TRACKS.filter(function (k) { return st[k] === 'done'; }).sort();
+      var doneExp = exp.done.slice().sort();
+      if (doneNow.length !== doneExp.length) return '';
+      for (var j = 0; j < doneNow.length; j++) { if (doneNow[j] !== doneExp[j]) return ''; }
+      if ((e.type || null) !== (exp.type || null)) return '';
+      return exp.key;
+    } catch (err) { return ''; }
   }
 
   /* 平台内部人员判定：当前登录账号带 isPlatformStaff 标记即为运营方（与 C/B 端身份正交）。
@@ -2241,6 +2347,10 @@ window.DataBus = (function () {
     resetUserToSeed: resetUserToSeed,
     applyDemoScenario: applyDemoScenario,
     demoScenarioList: demoScenarioList,
+    /* 场景记忆读取（preview 侧栏 / 「我的·演示设置」共用） */
+    currentDemoScenario: currentDemoScenario,
+    inferDemoScenario: inferDemoScenario,
+    demoScenarioSig: demoScenarioSig,
     /* 演示场景 ↔ 工作台联动（预览侧栏 / 个人中心读取回声与补应用意图） */
     applyPendingWorkbench: applyPendingWorkbench,
     workbenchSceneOf: workbenchSceneOf,
