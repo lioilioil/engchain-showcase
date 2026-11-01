@@ -56,7 +56,7 @@ var STATUS_MAP = {
   escrowed: { label: '已托管', cls: 'tag-primary', desc: '资金由平台托管中' },
   disputed: { label: '纠纷中', cls: 'tag-danger', desc: '订单存在争议，平台介入处理' }
 };
-var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
+var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商', unlock: '信息解锁' };
 
 function getOrderId() {
   var m = /[?&]id=([^&]+)/.exec(location.search);
@@ -224,6 +224,75 @@ function milestoneHtml(o) {
   } catch (e) { return ''; }
 }
 
+/* 购买记录（type='unlock'）：信息解锁不涉及对手方、佣金、里程碑与验收流程，
+   走独立精简视图——金额 / 解锁内容 / 支付通道 / 回跳原信息。 */
+function renderUnlock(o) {
+  var box = document.getElementById('detail-content');
+  var cta = document.getElementById('cta-bar');
+  var isCredit = (o.payMethod === 'credit' && o.credits > 0);
+  var amt = isCredit ? (o.credits + ' 积分') : (o.amount ? UI.money(o.amount) : '免费');
+  var title = o.srcTitle || String(o.title || '').replace(/^解锁 · /, '');
+  var srcHref = '';
+  if (o.srcPath) {
+    /* 页面有 <base href="pages/order/">，相对路径需去掉 pages/ 前缀再上跳一级 */
+    var rel = String(o.srcPath).replace(/^\/+/, '').replace(/^pages\//, '');
+    if (rel) srcHref = '../' + rel + (o.supplyId ? '?id=' + encodeURIComponent(o.supplyId) : '');
+  }
+  box.innerHTML =
+    '<div class="card" style="text-align:center;">' +
+      '<div style="font-size:12px;color:var(--text-2);">实付金额</div>' +
+      '<div class="mono fw-700" style="font-size:32px;margin:10px 0 8px;">' + amt + '</div>' +
+      '<span class="tag tag-success">已完成</span>' +
+      '<div class="text-3 fs-11" style="margin-top:10px;">信息已解锁，可查看完整联系方式与详情</div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">解锁内容</div></div>' +
+    '<div class="card" style="padding:0;overflow:hidden;">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid var(--line);">' +
+        '<div class="fw-600 fs-14" style="margin-bottom:6px;">' + title + '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<span class="tag tag-gold">信息解锁</span>' +
+          (o.location ? '<span class="tag tag-gray"><svg class="ic" style="width:10px;height:10px;vertical-align:-1px;"><use href="#i-pin"/></svg> ' + o.location + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 16px;display:flex;align-items:center;gap:10px;">' +
+        '<svg class="ic" style="width:18px;height:18px;color:var(--text-3);flex:none;"><use href="#i-user"/></svg>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="fw-600 fs-13">' + (o.counterparty || '平台') + '</div>' +
+          '<div class="text-3 fs-11" style="margin-top:2px;">信息提供方</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">订单信息</div></div>' +
+    '<div class="group">' +
+      '<div class="row"><span class="label text-2">订单编号</span><span class="value mono">' + o.id + '</span></div>' +
+      '<div class="row"><span class="label text-2">创建时间</span><span class="value">' + fmtTs(o.ts) + '</span></div>' +
+      '<div class="row"><span class="label text-2">订单类型</span><span class="value">信息解锁</span></div>' +
+      '<div class="row"><span class="label text-2">解锁内容</span><span class="value">' + title + '</span></div>' +
+    '</div>' +
+    '<div class="section-title" style="margin-top:18px;"><div class="st-left">费用明细</div></div>' +
+    '<div class="group">' +
+      '<div class="row"><span class="label text-2">支付方式</span><span class="value">' + (o.payLabel || '—') + '</span></div>' +
+      (isCredit ? '<div class="row"><span class="label text-2">消耗积分</span><span class="value mono">' + o.credits + ' 积分</span></div>' : '') +
+      '<div class="fb-between" style="padding:14px 16px;border-top:1px solid var(--line);"><span class="fw-600">实付金额</span><span class="mono fw-700">' + amt + '</span></div>' +
+    '</div>' +
+    '<div class="text-3" style="margin:14px 14px 0;font-size:11px;line-height:1.7;">信息解锁购买的是查看权限，不构成交易订单。</div>' +
+    '<div style="margin:10px 14px 0;display:flex;gap:8px;">' +
+      '<a href="../refund/appeal.html?orderId=' + encodeURIComponent(o.id) + '" style="flex:1;text-align:center;padding:10px 0;border:1px solid var(--line);border-radius:var(--r-full);font-size:12px;color:var(--text-2);text-decoration:none;">申请退款</a>' +
+    '</div>';
+
+  cta.style.display = 'block';
+  var bar = document.getElementById('cta-buttons');
+  var btns = [];
+  if (srcHref) btns.push({ text: '查看信息', cls: 'btn-primary', fn: function () { location.href = srcHref; } });
+  btns.push({ text: '联系客服', cls: srcHref ? 'btn-ghost' : 'btn-primary', fn: showKefu });
+  bar.innerHTML = btns.map(function (b) {
+    return '<button class="btn ' + b.cls + '" style="flex:1;">' + b.text + '</button>';
+  }).join('');
+  bar.querySelectorAll('button').forEach(function (btn, i) {
+    btn.addEventListener('click', btns[i].fn);
+  });
+}
+
 function render() {
   var id = getOrderId();
   var box = document.getElementById('detail-content');
@@ -240,6 +309,7 @@ function render() {
     box.innerHTML = orderEmptyHtml('订单不存在或已删除', '该订单可能已取消，或链接地址有误');
     return;
   }
+  if (o.type === 'unlock') { renderUnlock(o); return; }
   var st = STATUS_MAP[o.status] || STATUS_MAP.pending;
   var type = TYPE_MAP[o.type] || o.type;
   /* 金额统一走 UI.money */

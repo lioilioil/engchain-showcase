@@ -1131,13 +1131,18 @@ html, body { margin:0; padding:0; background:var(--bg); }
         if (DataBus.published) pub = DataBus.published().length;
         else if (window.SupplyStore) pub = (SupplyStore.listActive() || []).length;
       }
-      /* 订单数：普通订单 + 中介托管订单 */
+      /* 订单数：普通订单 + 中介托管订单（口径与「我的订单」一致：只计当前用户） */
       try {
+        var me0 = (window.DataBus && DataBus.current) ? (DataBus.current() || {}) : {};
+        var uid0 = me0.id || '';
         var ord = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders') || '[]');
-        order = ord.length;
+        /* 购买记录（unlock）是单向消费，只计买家；双向订单买卖双方都计 */
+        order = (ord || []).filter(function (o) {
+          if (!o) return false;
+          if (o.type === 'unlock') return o.owner === uid0;
+          return o.owner === uid0 || o.counterpartyId === uid0;
+        }).length;
         if (window.Mediation) {
-          var me0 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-          var uid0 = me0 ? me0.id : '';
           order += (Mediation.list({ uid: uid0 }) || []).length;
         }
       } catch (e) {}
@@ -1229,15 +1234,20 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var guest = !st0.loggedIn;
     if (!guest) {
       try {
-        /* 普通订单 */
+        /* 普通订单（只计当前用户，与「我的订单」同口径） */
+        var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+        var uid = me ? me.id : '';
         var ord = (window.DataBus && DataBus.orders) ? DataBus.orders() : JSON.parse(localStorage.getItem('engchain-orders') || '[]');
-        counts.normal = ord.length;
-        counts.all += ord.length;
+        /* 购买记录（unlock）是单向消费，只计买家；双向订单买卖双方都计 */
+        counts.normal = (ord || []).filter(function (o) {
+          if (!o) return false;
+          if (o.type === 'unlock') return o.owner === uid;
+          return o.owner === uid || o.counterpartyId === uid;
+        }).length;
+        counts.all += counts.normal;
         /* 中介托管订单 */
         if (window.Mediation) {
           try {
-            var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
-            var uid = me ? me.id : '';
             var med = Mediation.list({ uid: uid });
             counts.mediation = med.length;
             counts.all += med.length;

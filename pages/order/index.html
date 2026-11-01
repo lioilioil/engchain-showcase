@@ -106,7 +106,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     disputed:     { label: '纠纷中', cls: 'tag-danger' },
     draft:        { label: '待支付', cls: 'tag-warning' }
   };
-  var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商' };
+  var TYPE_MAP = { supply: '供方承接', need: '需求匹配', agency: '中介撮合', transfer: '建企买卖', qual: '资质招商', unlock: '信息解锁' };
   var currentTab = 'all';
   /* P1-5 解析 ?tab= 参数并同步 seg 激活态 */
   var _tp = new URLSearchParams(location.search).get('tab');
@@ -138,10 +138,18 @@ function currentUser() {
     var cu = currentUser();
     var uid = cu ? (cu.id || '') : '';
     var acct = cu ? (cu.account || '') : '';
-    return orders.filter(function (o) { return o.owner === uid || o.counterpartyId === uid; }).map(function (o) {
+    /* 购买记录（unlock）是单向消费，只有买家拥有；双向订单则买卖双方都可见。
+       若一律按 owner||counterpartyId 匹配，信息提供方会看到别人的解锁购买单。 */
+    return orders.filter(function (o) {
+      if (!o) return false;
+      if (o.type === 'unlock') return o.owner === uid;
+      return o.owner === uid || o.counterpartyId === uid;
+    }).map(function (o) {
       return {
         kind: 'normal', id: o.id, title: o.title || '', type: TYPE_MAP[o.type] || o.type, rawType: o.type,
         counterparty: o.counterparty || '', amount: o.amount, status: o.status,
+        /* 购买记录（unlock）附加字段：金额按支付通道展示（免费 / N 积分 / ¥N） */
+        payMethod: o.payMethod || '', payLabel: o.payLabel || '', credits: o.credits || 0,
         ts: o.ts ? new Date(String(o.ts).replace(/-/g,'/')).getTime() : (o.updatedAt || 0),
         detailUrl: 'detail.html?id=' + o.id
       };
@@ -207,12 +215,17 @@ function currentUser() {
     empty.style.display = 'none';
     list.innerHTML = all.map(function (o) {
       var st = STATUS_MAP[o.status] || { label: '未知', cls: 'tag-gray' };/* P3-16 未知状态中性灰色兜底 */
-      var amt = o.amount ? UI.money(o.amount) : '面议';
+      var isUnlock = o.rawType === 'unlock';
+      /* 购买记录金额：积分通道显示积分、免费额度显示「免费」、其余按人民币 */
+      var amt = isUnlock
+        ? (o.payMethod === 'credit' && o.credits ? o.credits + ' 积分' : (o.amount ? UI.money(o.amount) : '免费'))
+        : (o.amount ? UI.money(o.amount) : '面议');
+      var subline = isUnlock ? (o.type + (o.payLabel ? ' · ' + o.payLabel : '')) : (o.type + ' · ' + (o.counterparty || ''));
       var escrowBadge = o.kind === 'mediation' ? '<span class="tag tag-gold" style="margin-left:6px;font-size:10px;">托管</span>' : '';
       return '<div class="card" style="margin-bottom:10px;cursor:pointer;" onclick="location.href=\'' + o.detailUrl + '\'">' +
         '<div class="fb-between"><span class="text-3 fs-12">订单号 ' + o.id + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
         '<div class="fw-600 fs-14" style="margin-top:8px;">' + (o.title || '') + escrowBadge + '</div>' +
-        '<div class="text-3 fs-12 mt-1">' + o.type + ' · ' + (o.counterparty || '') + '</div>' +
+        '<div class="text-3 fs-12 mt-1">' + subline + '</div>' +
         '<div class="fb-between" style="margin-top:10px;"><span class="mono fw-700">' + amt + '</span>' +
         '<span class="link-green fs-12">查看 ›</span></div>' +
         '</div>';

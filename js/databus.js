@@ -1201,6 +1201,49 @@ window.DataBus = (function () {
     var _r = Array.isArray(a) && a.length ? a : seedOrders(); _cacheSet('orders', _r); return _r;
   }
   function saveOrders(a) { try { LS.setItem(ORDERS_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('orders', a); return a; }
+  /* [FEAT 购买记录] 新增订单——此前 saveOrders 只被「种子初始化 / 状态流转 / 里程碑推进」调用，
+     没有任何创建入口，导致付费解锁等购买行为无单可查。这里补上唯一写入口。
+     幂等：同一 user + 同一 supplyId + 5 秒内重复提交只保留一条（防双击重复下单）。 */
+  function addOrder(payload) {
+    var p = payload || {};
+    var a = loadOrders();
+    var now = Date.now();
+    var sid = p.supplyId || '';
+    for (var i = 0; i < a.length; i++) {
+      var e = a[i];
+      if (e && e.owner === p.owner && (e.supplyId || '') === sid && now - (e.createdAt || 0) < 5000) return e;
+    }
+    var d = new Date(), p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    var id = 'UN' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + p2(d.getHours()) + p2(d.getMinutes()) + p2(d.getSeconds()) + p2(Math.floor(Math.random() * 100));
+    var it = {
+      id: id,
+      type: p.type || 'unlock',
+      title: p.title || '',
+      amount: Number(p.amount) || 0,
+      owner: p.owner || '',
+      counterparty: p.counterparty || '',
+      counterpartyId: p.counterpartyId || '',
+      status: p.status || 'settled',
+      ts: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()),
+      milestones: Array.isArray(p.milestones) ? p.milestones : [],
+      fee: Number(p.fee) || 0,
+      rate: Number(p.rate) || 0,
+      note: p.note || '',
+      /* 购买记录附加字段（解锁类）：来源信息 / 支付通道 / 消耗积分 / 回跳路径 */
+      supplyId: sid,
+      srcTitle: p.srcTitle || '',
+      srcPath: p.srcPath || '',
+      location: p.location || '',
+      payMethod: p.payMethod || '',
+      payLabel: p.payLabel || '',
+      credits: Number(p.credits) || 0,
+      createdAt: now
+    };
+    a.unshift(it);
+    saveOrders(a);
+    window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: it.id, created: true } }));
+    return it;
+  }
   function orderCalc(amount) {
     /* 规则同源：调用 stores.js 暴露的 commissionRate（同 data.js 阶梯 + 破冰期首档） */
     var r = { rate: 0.08, fee: 0 };
@@ -2381,7 +2424,7 @@ window.DataBus = (function () {
     /* [分片D P0-02/P0-05] 类型注册表 + 统一目录/查找 API（C/X/N 分片稳定签名，勿再变） */
     TYPE_MAP: TYPE_MAP, resolveType: resolveType, getListing: getListing, getRecord: getRecord,
     ORDERS_KEY: ORDERS_KEY, orders: loadOrders, orderCalc: orderCalc,
-    orderTransition: orderTransition, orderAdvanceMilestone: orderAdvanceMilestone,
+    orderTransition: orderTransition, orderAdvanceMilestone: orderAdvanceMilestone, addOrder: addOrder,
     MSG_KEY: MSG_KEY, messages: loadMessages, publishMessage: publishMessage, pushDirectMessage: pushDirectMessage,
     /* Phase 3 用户与认证中心 */
     TYPE_LABEL: TYPE_LABEL,

@@ -3169,7 +3169,10 @@ window.DETAIL = (function () {
           sheet.body().querySelectorAll('.pm-item').forEach(function (i) { i.classList.remove('selected'); });
           item.classList.add('selected');
           currentPay = item.dataset.pay;
-          var btn = sheet.body().querySelector('#pay-go');
+          /* [FIX] UI.sheet 会把 .us-footer 提升到 sheet 底部容器，绑定后再在 body 内查找会得到 null，
+             导致切换支付方式时按钮文案不更新且抛错；改为全局查找兜底 */
+          var btn = document.getElementById('pay-go') || sheet.body().querySelector('#pay-go');
+          if (!btn) return;
           if (currentPay === 'credit') btn.textContent = '确认解锁 · ' + costM3 + '积分';
           else if (currentPay === 'wechat') btn.textContent = isDeposit ? '微信支付 ¥' + Number(up.price).toLocaleString() : '微信支付 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */;
           else if (currentPay === 'alipay') btn.textContent = isDeposit ? '支付宝 ¥' + Number(up.price).toLocaleString() : '支付宝 ¥' + Math.round(costM3 * creditToCnyRate()) /* [FIX BM-015] 1.28 收敛到 creditToCnyRate() */;
@@ -3623,22 +3626,55 @@ window.DETAIL = (function () {
         if(uf) uf.style.display='none';
       },50);
     }
+    /* [FEAT 购买记录] 解锁成功 → 写一条 type='unlock' 购买订单，使「我的订单」可查。
+       口径：只记支付面板内确认完成的解锁（免费额度/会员/积分/微信/支付宝/保证金）；
+       本省免解锁、personnel 免费类、游客破冰示例不产生记录（非购买行为）。 */
+    var UNLOCK_PAY_LABEL = {
+      wechat: '微信支付', alipay: '支付宝', credit: '积分解锁', balance: '余额支付',
+      deposit: '保证金冻结', member: '会员免费', quota_daily: '每日免费额度', quota_monthly: '月度免费额度'
+    };
+    function recordUnlockOrder(rec, pay) {
+      try {
+        if (!window.DataBus || typeof DataBus.addOrder !== 'function' || !rec) return null;
+        var me = (DataBus.current && DataBus.current()) || {};
+        if (!me.id) return null;
+        var m = pay || {};
+        var p = String(location.pathname || ''), i = p.indexOf('/pages/');
+        return DataBus.addOrder({
+          type: 'unlock',
+          title: '解锁 · ' + String(rec.title || rec.name || '供需信息'),
+          srcTitle: String(rec.title || rec.name || '供需信息'),
+          amount: Number(m.amount) || 0,
+          credits: Number(m.credits) || 0,
+          owner: me.id,
+          counterparty: String(rec.company || rec.publisherName || '平台'),
+          counterpartyId: String(rec.sellerId || rec.publisher || ''),
+          supplyId: String(rec.id || ''),
+          srcPath: i >= 0 ? p.slice(i + 1) : '',
+          location: String(rec.location || rec.city || ''),
+          payMethod: String(m.method || ''),
+          payLabel: UNLOCK_PAY_LABEL[m.method] || String(m.label || '解锁')
+        });
+      } catch (e) { return null; }
+    }
     /* M3：积分/免费额度/保证金 三种解锁执行（免费额度优先 → 扣积分 → 不足去充值） */
     function payGo(rec, up) {
       if (up.mode === 'free') { unlock('已开放沟通权限'); return; } /* [FIX BM-013] 文案统一沟通权限 */
       /* [FIX BM-010] trade 保证金不再在此空壳 toast+mark，统一走 payGoDeposit 真实冻结/解冻 */
       /* [FEAT 9.2-1] 年度会员：积分类详情免费解锁，不消耗月度免费额度与积分；保证金类仍走保证金流程 */
       if (window.MemberStore && MemberStore.isActive() && up.mode === 'credit') {
+        recordUnlockOrder(rec, { method: 'member', amount: 0 });
         UI.toast('年度会员免费解锁 · 已开放完整信息', 'ok'); unlock(); return;
       }
       /* [FEAT 9.2-4] 每日免费浏览摘要额度（游客3/注册5/实名10，跨天重置），优先于月度免费额度 */
       if (window.FreeQuotaStore && up.mode === 'credit' && FreeQuotaStore.use(1)) {
+        recordUnlockOrder(rec, { method: 'quota_daily', amount: 0 });
         UI.toast('已使用今日免费浏览额度 1 条 · 今日剩 ' + FreeQuotaStore.remaining() + ' 条', 'ok'); unlock(); return;
       }
       var fqG = freeQuotaInfo();
-      if (fqG.allow && fqG.remain > 0) { CreditStore.freeSpend(1); UI.toast('已使用免费解锁额度 1 条 · 本月剩 ' + (fqG.remain - 1), 'ok'); unlock(); return; }
+      if (fqG.allow && fqG.remain > 0) { CreditStore.freeSpend(1); recordUnlockOrder(rec, { method: 'quota_monthly', amount: 0 }); UI.toast('已使用免费解锁额度 1 条 · 本月剩 ' + (fqG.remain - 1), 'ok'); unlock(); return; }
       var costG = Math.round(up.price * creditDiscountRate());
-      if (window.CreditStore && CreditStore.read().balance >= costG) { CreditStore.consume(costG, '解锁' + ((rec.title || rec.name || '') + '').slice(0, 12)); UI.toast('已扣 ' + costG + ' 积分解锁', 'ok'); unlock(); return; }
+      if (window.CreditStore && CreditStore.read().balance >= costG) { CreditStore.consume(costG, '解锁' + ((rec.title || rec.name || '') + '').slice(0, 12)); recordUnlockOrder(rec, { method: 'credit', credits: costG, amount: Math.round(costG * creditToCnyRate() * 100) / 100 }); UI.toast('已扣 ' + costG + ' 积分解锁', 'ok'); unlock(); return; }
       /* P2-6：积分不足时先展示积分包选项，再引导充值 */
       var pkgs = (MOCK.business.credits && MOCK.business.credits.packages) || [];
       var pkgHtml = pkgs.map(function(p) {
@@ -3673,6 +3709,7 @@ window.DETAIL = (function () {
       arr.push({ ref: rec.id, amount: deposit, status: 'frozen', ts: Date.now(), releaseAt: Date.now() + 30 * 864e5 });
       _tradeDepositWrite(arr);
       UnlockStore.mark(rec);
+      recordUnlockOrder(rec, { method: 'deposit', amount: deposit });
       unlock('保证金 ¥' + deposit.toLocaleString() + ' 已冻结 · 信息已解锁（30 天未成交可全额退还）');
     }
     /* [FIX BM-011 / E1-09] 单次解锁：微信/支付宝只走人民币流水(unlock_sim_pay/unlock_cny_pay)→平台收入台账，不再双扣积分；积分支付走上面 credit 分支只扣积分 */
@@ -3688,6 +3725,7 @@ window.DETAIL = (function () {
           if (consumeResult === null) { UI.toast('积分不足，请先充值积分', 'warn'); return; }
         }
         UnlockStore.mark(rec);
+        recordUnlockOrder(rec, { method: 'credit', credits: costCredit, amount: Math.round(costCredit * creditToCnyRate() * 100) / 100 });
         UI.toast('已扣 ' + costCredit + ' 积分', 'ok');
         unlock();
         return;
@@ -3706,6 +3744,7 @@ window.DETAIL = (function () {
         BalanceStore.write(s);
       }
       UnlockStore.mark(rec);
+      recordUnlockOrder(rec, { method: method, amount: rmb });
       UI.toast(payName + '成功，已扣 ¥' + rmb, 'ok');
       unlock();
     }
