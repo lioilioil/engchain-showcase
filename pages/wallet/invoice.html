@@ -245,6 +245,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var invType = '增值税普通发票';
 
   function loadTitles() {
+    /* 首次进入开票页播种两条演示抬头（仅键为 null 时，不覆盖用户编辑） */
+    try { if (window.DataBus && DataBus.ensureInvoiceTitles) DataBus.ensureInvoiceTitles(); } catch (e) {}
     try { return JSON.parse(localStorage.getItem(TITLE_KEY) || '[]'); } catch (e) { return []; }
   }
   function saveTitles(arr) {
@@ -263,6 +265,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     pending:  { label: '待审核', cls: 'tag-warning' },
     issued:   { label: '已开票', cls: 'tag-success' },
     rejected: { label: '已驳回', cls: 'tag-gray' }
+  };
+  /* 旧数据兼容：shipped（已邮寄）归入已开票，void（已作废）归入已驳回。
+     与 stores.js 首次迁移的映射一致，保证存量 localStorage 也能正确分页/计数。 */
+  var ST_ALIAS = { shipped: 'issued', void: 'rejected' };
+  function normStatus(x) { var s = (x && x.status) || 'pending'; return ST_ALIAS[s] || s; }
+  /* 分页空态文案：筛选页为空时不再复用「暂无发票」通用文案 */
+  var EMPTY_COPY = {
+    all:      { title: '暂无发票', sub: '消费后可在此申请开具电子发票' },
+    pending:  { title: '暂无待审核发票', sub: '提交开票申请后可在此跟进审核进度' },
+    issued:   { title: '暂无已开票记录', sub: '发票开具成功后会在此展示，可下载或重新发送' },
+    rejected: { title: '暂无已驳回记录', sub: '被驳回的开票申请会在此展示驳回原因' }
   };
 
   /* ---- 申请开票 Bottom Sheet（UI.sheet 自下而上弹窗；抬头/关联订单用选择列表，复用 pm-radio 视觉语言） ---- */
@@ -539,7 +552,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { var st = UI.state.get(); if (st) acct = st.account || ''; } catch (e) {}
     var settledStates = { settled: 1, paid: 1, completed: 1, finished: 1, done: 1 };
     return orders.filter(function (o) {
-      if (!(o.owner === uid || o.counterparty === uid || o.counterparty === acct)) return false;/* P2-6 补全对家为当前用户的可开票订单 */
+      /* P2-6 补全对家为当前用户的可开票订单：订单表的对家是 counterpartyId（uid），
+         counterparty 存的是公司名，不能直接与 uid/account 比较；acct 兜底兼容旧数据。 */
+      if (!(o.owner === uid || (uid && o.counterpartyId === uid) || (acct && o.counterparty === acct))) return false;
       return settledStates[o.state] || settledStates[o.status];
     });
   }
@@ -553,7 +568,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
       var uid = me ? me.id : '';
       list.forEach(function (x) {
-        if (x.status === 'rejected') return;
+        if (normStatus(x) === 'rejected') return;
         if (uid && x.uid && x.uid !== uid) return;
         invoiced += Number(x.amount) || 0;
       });
@@ -585,19 +600,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var uid = me ? me.id : '';
     /* 过滤当前用户的发票（如有 uid 字段） */
     var mine = list.filter(function (x) { return !x.uid || x.uid === uid; });
-    if (currentFilter !== 'all') mine = mine.filter(function (x) { return x.status === currentFilter; });
+    if (currentFilter !== 'all') mine = mine.filter(function (x) { return normStatus(x) === currentFilter; });
     var el = document.getElementById('inv-list');
     var empty = document.getElementById('inv-empty');
     var cnt = document.getElementById('inv-count');
     if (cnt) cnt.textContent = mine.length + ' 条';
     if (!mine.length) {
       el.innerHTML = '';
+      var copy = EMPTY_COPY[currentFilter] || EMPTY_COPY.all;
+      var tEl = empty.querySelector('.inv-empty-title');
+      var sEl = empty.querySelector('.inv-empty-sub');
+      if (tEl) tEl.textContent = copy.title;
+      if (sEl) sEl.textContent = copy.sub;
       empty.style.display = 'block';
       return;
     }
     empty.style.display = 'none';
     el.innerHTML = mine.map(function (x) {
-      var st = ST_MAP[x.status] || ST_MAP.pending;
+      var st = ST_MAP[normStatus(x)] || ST_MAP.pending;
       var date = x.ts ? fmtDate(x.ts) : (x.applyAt || '');
       var issuedDate = x.issuedAt ? fmtDate(x.issuedAt) : '';
       var html = '<div class="card inv-card">' +
@@ -605,13 +625,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         '<div class="fw-600 fs-14">' + esc(x.title || '') + ' · ' + esc(x.type || '增值税普通发票') + '</div>' +
         '<div class="inv-amt mt-1">' + money(x.amount) + (x.orderId ? ' · 订单 ' + x.orderId : '') + '</div>' +
         (x.email ? '<div class="text-3 fs-11 mt-1">接收邮箱：' + esc(x.email) + '</div>' : '');
-      if (x.status === 'issued') {
+      if (normStatus(x) === 'issued') {
         html += '<div class="text-3 fs-11 mt-1">发票号 ' + esc(x.invoiceNo || '') + (issuedDate ? ' · 开票日期 ' + issuedDate : '') + '</div>';
         html += '<div class="mt-2 fb-between"><button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'发票已下载\',\'ok\')">下载发票</button>' +
           '<button type="button" class="btn btn-ghost btn-sm" onclick="UI.toast(\'已重新发送至邮箱\',\'ok\')">重新发送</button></div>';
-      } else if (x.status === 'rejected') {
-        html += '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote || '资料不完整') + '</div>';
-      } else if (x.status === 'pending') {
+      } else if (normStatus(x) === 'rejected') {
+        html += '<div class="text-3 fs-11 mt-1" style="color:var(--danger);">驳回原因：' + esc(x.rejectNote || x.note || '资料不完整') + '</div>';
+      } else if (normStatus(x) === 'pending') {
         html += '<div class="mt-2 fb-between"><span class="text-2 fs-11 inv-note">财务审核中，预计 1-2 个工作日</span>' +
           '<button type="button" class="urge-btn" onclick="urgeInvoice()">催开票</button></div>';
       }
@@ -645,7 +665,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var uid = me ? me.id : '';
     var mine = list.filter(function (x) { return !x.uid || x.uid === uid; });
     var pending = 0, issued = 0;
-    mine.forEach(function (x) { if (x.status === 'pending') pending++; else if (x.status === 'issued') issued++; });
+    mine.forEach(function (x) { var s = normStatus(x); if (s === 'pending') pending++; else if (s === 'issued') issued++; });
     var e1 = document.getElementById('ov-inv-total');
     var e2 = document.getElementById('ov-inv-pending');
     var e3 = document.getElementById('ov-inv-issued');
@@ -739,7 +759,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var list = (window.DataBus && DataBus.invoiceList) ? DataBus.invoiceList() : ((window.DataBus && DataBus.invoices) ? DataBus.invoices() : []);
       var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
       var uid = me ? me.id : '';
-      var mine = (list || []).filter(function (x) { return (!x.uid || x.uid === uid) && x.status !== 'rejected' && x.status !== 'issued'; });
+      var mine = (list || []).filter(function (x) { var s = normStatus(x); return (!x.uid || x.uid === uid) && s !== 'rejected' && s !== 'issued'; });
       if (mine.length) id = mine[0].invoiceNo || mine[0].id || '';
     } catch (e) {}
     UI.toast(id ? ('已催开票（发票号：' + id + '），财务将加急处理') : '已催开票，财务将加急处理（演示）', 'ok');

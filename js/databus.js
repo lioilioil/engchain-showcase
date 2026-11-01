@@ -1469,15 +1469,54 @@ window.DataBus = (function () {
     return w;
   }
 
-  /* ---- 发票（engchain-invoices）：复用 App 发票页字段（抬头/税号/类型/金额/状态） ---- */
+  /* ---- 发票（engchain-invoices）：复用 App 发票页字段（抬头/税号/类型/金额/状态） ----
+     种子须覆盖发票页四个分页（全部 / 待审核 / 已开票 / 已驳回），字段按 InvoiceStore 契约
+     { id,title,tax,type,amount,email,orderId,status,ts,applyAt,issuedAt,rejectNote,invoiceNo } 补全。
+     状态只用 pending / issued / rejected；旧种子的 shipped / void 由 loadInvoices() 升级。 */
+  /* 开票抬头（engchain-invoice-titles）：首次进入开票相关页时播种企业专票 + 个人普票两条，
+     仅当该键从未创建（null）时写入；用户新增/编辑/全部删除后不会被覆盖。
+     抬头是页面级 localStorage 键（与改造前一致，不区分用户）。 */
+  var INV_TITLE_KEY = 'engchain-invoice-titles';
+  function ensureInvoiceTitles() {
+    try {
+      if (LS.getItem(INV_TITLE_KEY) !== null) return false;
+      var seed = [
+        { name: '四川省××建设有限公司', tax: '91510100MA6C9LKD1X', titleType: 'enterprise',
+          invoiceType: '增值税专用发票', address: '成都市武侯区天府大道北段1700号', phone: '028-85001234',
+          bank: '招商银行成都分行营业部', bankAccount: '6214 8300 0000 0001',
+          email: 'finance@scjianshe.example.com', isDefault: true },
+        { name: '陈建国', tax: '510104199001011234', titleType: 'personal',
+          invoiceType: '增值税普通发票', address: '', phone: '', bank: '', bankAccount: '',
+          email: 'chenjianguo@engchain.cn', isDefault: false }
+      ];
+      LS.setItem(INV_TITLE_KEY, JSON.stringify(seed));
+      return true;
+    } catch (e) { return false; }
+  }
+  var INV_SEED_VER_KEY = 'engchain-invoices-seed-ver';
+  var INV_SEED_VER = 2;
+  var INV_LEGACY_SEED_IDS = ['INV20260904001', 'INV20260903012', 'INV20260902007', 'INV20260901005'];
   function seedInvoices() {
     var now = Date.now();
     var t = function (d) { return new Date(now - d * 864e5).toISOString().slice(0, 10); };
     return [
-      { id: 'INV20260904001', title: '四川省××建设有限公司', tax: '91510100MA6C9LKD1X', type: '增值税专用发票', amount: 8600, status: 'pending', applyAt: t(0), note: '' },
-      { id: 'INV20260903012', title: '××工程咨询有限公司', tax: '91510100MA5A1B2C3D', type: '增值税专用发票', amount: 5000, status: 'issued', applyAt: t(1), note: '' },
-      { id: 'INV20260902007', title: '四川××机械租赁有限公司', tax: '91510100MA6B2C3D4E', type: '增值税普通发票', amount: 1280, status: 'shipped', applyAt: t(2), note: '' },
-      { id: 'INV20260901005', title: '成都××建材供应有限公司', tax: '91510100MA7C3D4E5F', type: '增值税普通发票', amount: 960, status: 'void', applyAt: t(3), note: '信息有误，已作废' }
+      { id: 'INV20260904001', title: '四川省××建设有限公司', tax: '91510100MA6C9LKD1X', type: '增值税专用发票',
+        amount: 8600, status: 'pending', ts: now - 0.5 * 864e5, applyAt: t(0),
+        email: 'finance@scjianshe.example.com', orderId: '', issuedAt: 0, invoiceNo: '',
+        rejectNote: '', note: '' },
+      { id: 'INV20260903012', title: '××工程咨询有限公司', tax: '91510100MA5A1B2C3D', type: '增值税专用发票',
+        amount: 5000, status: 'issued', ts: now - 1.5 * 864e5, applyAt: t(1),
+        email: 'finance@gczx.example.com', orderId: '', issuedAt: now - 1.2 * 864e5, invoiceNo: 'FP20260903001256',
+        rejectNote: '', note: '' },
+      { id: 'INV20260902007', title: '四川××机械租赁有限公司', tax: '91510100MA6B2C3D4E', type: '增值税普通发票',
+        amount: 1280, status: 'rejected', ts: now - 2.5 * 864e5, applyAt: t(2),
+        email: 'finance@scjixie.example.com', orderId: '', issuedAt: 0, invoiceNo: '',
+        rejectNote: '抬头与纳税人识别号不一致，请核对后重新提交',
+        note: '抬头与纳税人识别号不一致，请核对后重新提交' },
+      { id: 'INV20260901005', title: '成都××建材供应有限公司', tax: '91510100MA7C3D4E5F', type: '增值税普通发票',
+        amount: 960, status: 'issued', ts: now - 3.5 * 864e5, applyAt: t(3),
+        email: 'finance@cdjiancai.example.com', orderId: '', issuedAt: now - 3.2 * 864e5, invoiceNo: 'FP20260901000987',
+        rejectNote: '', note: '' }
     ];
   }
   function saveInvoices(a) {
@@ -1490,11 +1529,36 @@ window.DataBus = (function () {
     }
     try { LS.setItem(INV_KEY, JSON.stringify(a)); } catch (e) {} return a;
   }
+  /* 旧演示种子识别：仅当四条记录恰好是旧种子 ID 且都不属于任何用户时才升级，
+     用户在演示中新增/处理过的发票不会被覆盖。 */
+  function isLegacyInvoiceSeed(a) {
+    if (!Array.isArray(a) || a.length !== INV_LEGACY_SEED_IDS.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!a[i] || a[i].id !== INV_LEGACY_SEED_IDS[i] || a[i].uid) return false;
+    }
+    return true;
+  }
+  function invoiceSeedVerGet() {
+    try { return Number(LS.getItem(INV_SEED_VER_KEY) || 0) || 0; } catch (e) { return 0; }
+  }
+  function invoiceSeedVerSet() {
+    try { LS.setItem(INV_SEED_VER_KEY, String(INV_SEED_VER)); } catch (e) {}
+  }
   function loadInvoices() {
     /* L3：优先从 InvoiceStore 读取，兼容旧数组格式 */
     if (window.InvoiceStore) {
       var list = InvoiceStore.list();
-      if (list && list.length) return list;
+      if (list && list.length) {
+        /* v1 种子的 shipped/void 在页面里既无标签也进不了任何筛选页，且没有已驳回记录；
+           升级到 v2 完整种子（pending / issued / rejected 全覆盖） */
+        if (invoiceSeedVerGet() < INV_SEED_VER && isLegacyInvoiceSeed(list)) {
+          var upgraded = seedInvoices();
+          saveInvoices(upgraded);
+          invoiceSeedVerSet();
+          return upgraded;
+        }
+        return list;
+      }
     }
     var a = [];
     try {
@@ -1502,7 +1566,11 @@ window.DataBus = (function () {
       if (Array.isArray(raw)) a = raw;
       else if (raw && Array.isArray(raw.items)) a = raw.items;
     } catch (e) {}
-    if (!Array.isArray(a) || !a.length) { a = seedInvoices(); saveInvoices(a); }
+    if (!Array.isArray(a) || !a.length) {
+      a = seedInvoices();
+      invoiceSeedVerSet();
+      saveInvoices(a);
+    }
     return a;
   }
   var INV_ACT = { pending: '开票', issued: '已开票', shipped: '寄出', void: '作废' };
@@ -2329,7 +2397,7 @@ window.DataBus = (function () {
     withdrawals: loadWithdrawals, withdrawalFrozen: withdrawalFrozen,
     withdrawalApply: withdrawalApply, withdrawalApprove: withdrawalApprove, withdrawalReject: withdrawalReject, withdrawalCancel: withdrawalCancel,
     withdrawalFirstApprove: withdrawalFirstApprove, withdrawalFinalApprove: withdrawalFinalApprove,
-    invoices: loadInvoices, invoiceUpdate: invoiceUpdate,
+    invoices: loadInvoices, invoiceUpdate: invoiceUpdate, ensureInvoiceTitles: ensureInvoiceTitles,
     invoiceApply: invoiceApply, invoiceApprove: invoiceApprove, invoiceReject: invoiceReject, invoiceList: invoiceList,
     commissionFlows: commissionFlows, settledPending: settledPending, commissionSettle: commissionSettle,
     violations: loadViolations, violationPunish: violationPunish,

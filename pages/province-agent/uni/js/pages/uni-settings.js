@@ -246,13 +246,40 @@
     '.clause .c{font-size:13px;color:#3b423e}' +
     '.p{margin:6px 0 0;font-size:13px;color:#3b423e}' +
     '.foot{margin-top:28px;padding-top:12px;border-top:1px solid #edecea;font-size:11.5px;color:#8a938e}' +
+    /* 协议正文排版：与 uni-layout.css 的 .uh-doc 一一对应，
+       导出文件是自包含的（不加载系统样式表），所以这里用固定色值复刻一份 */
+    '.uh-doc{font-size:13.5px;line-height:1.9;color:#3b423e;word-break:break-word;overflow-wrap:anywhere}' +
+    '.uh-doc>:first-child{margin-top:0}.uh-doc>:last-child{margin-bottom:0}' +
+    '.uh-doc p{margin:0 0 10px;text-indent:2em;text-align:left}' +
+    '.uh-doc h1{margin:0 0 12px;text-indent:0;text-align:center;font-size:18px;font-weight:700;color:#1d211f;line-height:1.5}' +
+    '.uh-doc h2{margin:20px 0 6px;text-indent:0;font-size:16px;font-weight:700;color:#1d211f;line-height:1.5}' +
+    '.uh-doc h3,.uh-doc h4{margin:18px 0 6px;text-indent:0;font-size:13.5px;font-weight:700;color:#1d211f}' +
+    '.uh-doc .uh-doc__h{margin:18px 0 6px;text-indent:0;text-align:left;font-size:13.5px;font-weight:700;color:#1d211f;line-height:1.6}' +
+    '.uh-doc .uh-doc--c{text-indent:0;text-align:center}.uh-doc .uh-doc--r{text-indent:0;text-align:right}' +
+    '.uh-doc .uh-doc--j{text-align:justify}' +
+    '.uh-doc ul,.uh-doc ol{margin:0 0 10px;padding-left:22px;text-indent:0}' +
+    '.uh-doc ul{list-style:disc outside}.uh-doc ol{list-style:decimal outside}' +
+    '.uh-doc li{margin:3px 0;text-indent:0}' +
+    '.uh-doc li::marker{color:#6b7671}' +
+    '.uh-doc__tw{margin:12px 0;overflow-x:auto;border:1px solid #edecea;border-radius:4px}' +
+    '.uh-doc table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12.5px}' +
+    '.uh-doc th,.uh-doc td{padding:7px 10px;text-indent:0;text-align:left;vertical-align:top;border-bottom:1px solid #edecea;line-height:1.6}' +
+    '.uh-doc tr:last-child th,.uh-doc tr:last-child td{border-bottom:0}' +
+    '.uh-doc th{background:#f7f8f7;font-weight:600;color:#1d211f}' +
+    '.uh-doc td+td,.uh-doc th+th{border-left:1px solid #edecea}' +
+    '.uh-doc blockquote{margin:12px 0;padding:8px 12px;text-indent:0;border-left:2px solid #d5d9d6;color:#3b423e}' +
+    '.uh-doc strong,.uh-doc b{font-weight:700;color:#1d211f}.uh-doc em,.uh-doc i{font-style:italic}' +
+    '.uh-doc a{color:#3c5a49;text-decoration:underline;text-underline-offset:2px}' +
+    '.uh-doc hr{margin:16px 0;border:0;border-top:1px solid #edecea}' +
+    '.uh-doc img{display:block;max-width:100%;height:auto;margin:10px auto}' +
     '@media print{body{background:#fff}.doc{box-shadow:none;padding:0}}';
 
   function docRow(k, v) {
     return '<div class="kv"><span>' + ui.esc(k) + '</span><b>' + ui.esc(txt(v)) + '</b></div>';
   }
 
-  /* 文档外壳：协议与授权书共用（sections: {t, rows|clauses|text}） */
+  /* 文档外壳：协议与授权书共用（sections: {t, rows|clauses|text|html}）
+     html 是后台富文本正文，已经过 Uni.richDoc() 清洗，这里不再转义 */
   function docShell(o) {
     var meta = (o.meta || []).map(function (m) {
       return '<span>' + ui.esc(m[0]) + '：' + ui.esc(txt(m[1])) + '</span>';
@@ -265,7 +292,9 @@
           '<div class="c">' + ui.esc(c.c) + '</div></div>';
       }).join("");
       if (s.text) body += '<p class="p">' + ui.esc(s.text) + '</p>';
-      return '<section class="sec"><h2 class="sec-t">' + ui.esc(s.t) + '</h2>' + body + '</section>';
+      if (s.html) body += s.html;
+      return '<section class="sec">' +
+        (s.t ? '<h2 class="sec-t">' + ui.esc(s.t) + '</h2>' : "") + body + '</section>';
     }).join("");
     return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n' +
       '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
@@ -368,6 +397,18 @@
     return st;
   }
 
+  /* 协议正文：后台富文本存档（ag.bodyHtml）优先，没有就按本份协议要素回填模板。
+     省代侧协议对象不带 sub / province，Uni.agreementBody 会自己取 ag.province / ag.sub。 */
+  function agBody(ag) {
+    return Uni.agreementBody(ag);
+  }
+
+  /* 导出文件专用：外壳已经有文件标题，去掉正文自带的那个标题，避免同一页出现两遍 */
+  function agBodyHtml(ag) {
+    return Uni.richDoc(agBody(ag))
+      .replace(/^(<div class="uh-doc">)\s*<h1>[\s\S]*?<\/h1>/, "$1");
+  }
+
   function agDocHtml(ag, ctx) {
     var signed = ag.state === "signed";
     var rows = [["甲方发起", ag.sentAt], ["签署时间", signed ? ag.signedAt : "—"],
@@ -382,7 +423,8 @@
         { t: "甲方 · 省级总代", rows: partyRows(ag.province) },
         { t: "乙方 · 二级合作企业", rows: partyRows(ag.sub) },
         { t: "签署信息", rows: rows },
-        { t: "协议条款", clauses: (ag.terms || []).map(function (x) { return { no: x.no + " · " + x.t, c: x.c }; }) }
+        { t: "协议正文", html: agBodyHtml(ag) ||
+          '<p class="p">正文由省代在后台编辑生成，当前版本暂无可展示的正文。</p>' }
       ],
       foot: "本文件由合作工作台于 " + nowStamp() + " 自动生成，仅作协议留痕参考；" +
         "协议效力以双方电子签存证版本为准。"
@@ -599,9 +641,9 @@
           kv("签署人", signed ? ag.signerName : "—") +
           kv("有效期至", ag.expireAt) +
           (ag.state === "rejected" ? kv("拒签时间", ag.rejectedAt) + kv("拒签原因", ag.rejectReason) : "") +
-          secHead("协议条款") + clauses((ag.terms || []).map(function (x) {
-            return { t: x.no + " · " + x.t, c: ui.esc(x.c) };
-          })) +
+          secHead("协议正文") +
+          (Uni.richDoc(agBody(ag)) ||
+            '<div class="uh-plain">正文由省代在后台编辑生成，当前版本暂无可展示的正文。</div>') +
           secHead("协议文件") + doc2.card +
           note(n)
       };

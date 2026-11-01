@@ -659,11 +659,15 @@
   function liveDetailSheet(p, caps) {
     var U = caps.Uni;
     var st = agStateOf(p), ai = agInfo(st);
+    var ag = p.agreement || {};
     var susp = p.status === "suspended";
     var settled = Number(p.subGross || 0);
     var amt = Math.round(settled * G * Number(p.ratioToSub || 0));
     var rows = mgrRow("history", "操作记录", "比例变更 · 协议重发 · 状态变更留痕", "records") +
-      mgrRow("chart", "查看对账单", "分润结算与月度对账明细", "recon");
+      /* 目标必须是「这家企业」的账单：reconcile.html 是平台 → 省代的第一层对账，
+         与二级企业无关，点进来只能看到全省聚合数，等于没有针对性 */
+      mgrRow("chart", "查看对账单", "该企业本月分润应付 · 逐笔明细与付款登记", "recon") +
+      mgrRow("file-text", "合作协议", (ag.id ? ag.id + " · " : "") + ai.t + " · 全文、签署与补签留痕", "agree");
     if (!susp && caps.ratio) rows += mgrRow("badge", "配置约定比例", "当前 " + pct(p.ratioToSub) + "，调整后需补签", "ratio");
     if (!susp && caps.resend && st !== "signed") rows += mgrRow("send", "重新发起协议", "当前" + ai.t + "，重新发起后待对方签署", "resend");
     if (!susp && caps.status) rows += mgrRow("clock", "暂停合作", "冻结分润结算与对账", "pause");
@@ -677,7 +681,9 @@
         kv("统一社会信用代码", esc(p.uscc || "—")) +
         kv("联系人", esc(p.contact || "—") + (p.phone ? " · " + esc(p.phone) : "")) +
         kv("地址", esc(p.address || "—")) +
-        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>') +
+        kv("协议编号", esc(ag.id || "—") + (ag.version ? " · " + esc(ag.version) : "")) +
+        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>' +
+          (ag.state === "signed" && ag.expireAt ? '<span style="color:var(--text-3);margin-left:6px">有效期至 ' + esc(ag.expireAt) + '</span>' : "")) +
         kv("约定比例", pct(p.ratioToSub)) +
         kv("合作起始", esc(p.since || "—")) +
         kv("本月合格消费", ui.money(settled)) +
@@ -693,7 +699,8 @@
         var act = n.getAttribute("data-mgr");
         sh.close();
         if (act === "records") recordsSheet(p, U);
-        else if (act === "recon") U.navTo("reconcile.html");
+        else if (act === "recon") U.navTo("reconcile-sub.html?sub=" + encodeURIComponent(p.id));
+        else if (act === "agree") U.navTo("agreement.html?sub=" + encodeURIComponent(p.id));
         else if (act === "ratio") ratioSheet(p, U);
         else if (act === "resend") resendDialog(p, U);
         else if (act === "pause") statusDialog(p, "suspended", U);
@@ -720,32 +727,8 @@
     });
   }
 
-  function agreementViewSheet(p, caps) {
-    var U = caps.Uni;
-    var st = agStateOf(p), ai = agInfo(st);
-    var ag = p.agreement || {};
-    var canResend = caps.resend && p.status === "active" && st !== "signed";
-    U.sheet({
-      title: "合作协议",
-      body:
-        kv("合作企业", esc(p.name)) +
-        kv("协议编号", esc(ag.id || ("O4-" + String(p.id).toUpperCase() + "-" + (p.since || "2026-08")))) +
-        kv("协议版本", esc(ag.version || "v2026.10")) +
-        kv("协议状态", '<span class="uh-badge uh-badge--' + ai.cls + '">' + ai.t + '</span>') +
-        kv("发起时间", esc(ag.sentAt || "—")) +
-        (ag.signedAt ? kv("签署时间", esc(ag.signedAt) + (ag.signerName ? " · " + esc(ag.signerName) : "")) : "") +
-        kv("有效期至", esc(ag.expireAt || "—")) +
-        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">协议要点</span></div>' +
-        '<div class="uh-clause"><div class="no">1 · 分润结算</div><div class="c">按约定比例结算合格消费分润，以对账中心的对账单为准。</div></div>' +
-        '<div class="uh-clause"><div class="no">2 · 对账窗口</div><div class="c">月度对账在账单生成后 5 日内完成，超期将锁定该月对账。</div></div>' +
-        '<div class="uh-clause"><div class="no">3 · 状态变更</div><div class="c">合作暂停或终止须双方确认并留痕，终止后不再产生分润结算。</div></div>' +
-        '<div class="uh-clause"><div class="no">4 · 比例变更</div><div class="c">约定比例调整须双方补签协议，补签完成前仍按原比例结算。</div></div>',
-      footer: canResend
-        ? [{ t: "关闭", kind: "ghost" },
-           { t: "重新发起协议", kind: "primary", onClick: function (ov) { ov.close(); resendDialog(p, U); } }]
-        : [{ t: "关闭", kind: "primary" }]
-    });
-  }
+  /* 协议正文不再在合作弹窗里预览：协议要素、条款全文、签署留痕与签署动作
+     都归 agreement.html?sub=<id> 一处，弹窗只做跳转，避免两处口径各说各话 */
 
   /* 操作记录：合并比例变更 / 协议重发 / 状态变更，按时间倒序 */
   function recordsSheet(p, U) {
@@ -1069,10 +1052,9 @@
           ? '<div class="su-infonote" style="margin-top:12px">' + ui.icon("info", 15) +
             '<span>协议签署由企业管理员执行，当前身份仅可查阅条款。</span></div>'
           : "") +
-        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">协议条款</span></div>' +
-        ((ag.terms || []).map(function (t) {
-          return '<div class="uh-clause"><div class="no">' + esc(t.no + " · " + t.t) + '</div><div class="c">' + esc(t.c) + '</div></div>';
-        }).join("") || '<div class="uh-plain">条款明细以双方签署版本为准。</div>'),
+        '<div class="uh-sechead" style="margin:16px 0 6px"><span class="lbl">协议正文</span></div>' +
+        (U.richDoc(U.agreementBody(ag)) ||
+          '<div class="uh-plain">正文由省代在后台编辑生成，当前版本暂无可展示的正文。</div>'),
       footer: (st === "pending_mine" && caps.sign)
         ? [{ t: "关闭", kind: "ghost" },
            { t: "前往签署", kind: "primary", onClick: function (ov) { ov.close(); U.navTo("agreement.html"); } }]

@@ -74,9 +74,11 @@
           permNote: ""
         };
       },
-      /* P0-4：对账单改为「对账中心 → 明细 → 单据」二级承载，宫格收敛为 7 项（原 8 项） */
+      /* P0-4：对账单改为「对账中心 → 明细 → 单据」二级承载。
+         2026-11-01：协议中心补入口，紧邻「二级合作」——协议是按二级企业发的，
+         两者必须能互相跳转（二级合作档案 → 该企业协议，协议 → 该企业对账单）。 */
       entries: ["invite-code.html", "invite-records.html", "invite-stats.html", "reconcile.html",
-        "ledger.html", "subs.html", "team.html"],
+        "ledger.html", "subs.html", "agreement.html", "team.html"],
       perms: { invite: true, createSub: true },
       badges: {},
       empty: { feed: { title: "暂无动态", desc: "合作申请、对账与付款进展将出现在这里" } },

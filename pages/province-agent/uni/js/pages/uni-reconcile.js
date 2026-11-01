@@ -250,7 +250,10 @@
         return '<button type="button" role="tab" aria-selected="' + on + '" class="ur-switch__i' + (on ? " is-on" : "") +
           '" data-tab="' + b.layer + '">' +
           '<span class="ur-switch__n">' + LAYER[b.layer].no + "</span>" +
-          '<span class="ur-switch__s">' + LAYER[b.layer].short + ' · <b class="ur-t-' + M.tone + '">' + M.t + "</b></span>" +
+          /* 状态点 + 状态词双重编码：不可达的卷宗也能一眼看出是哪一侧卡住 */
+          '<span class="ur-switch__s">' + LAYER[b.layer].short +
+          '<i class="ur-sdot ur-sdot--' + M.tone + '"></i>' +
+          '<b class="ur-t-' + M.tone + '">' + M.t + "</b></span>" +
           "</button>";
       }).join("") +
       "</div>" +
@@ -261,7 +264,7 @@
         return '<button type="button" role="tab" aria-selected="' + on + '" class="ur-view' + (on ? " is-on" : "") +
           '" data-view="' + v.k + '">' + v.t + dot + "</button>";
       }).join("") +
-      "</div></section>";
+      '<i class="ur-ink" aria-hidden="true"></i></div></section>';
   }
 
   /* ============================================================
@@ -269,52 +272,65 @@
      ============================================================ */
   function heroHtml(bm, actOk, who) {
     var M = metaOf(bm), L = LAYER[bm.layer];
-    var h = '<section class="card uh-sec" data-band="' + bm.layer + '">' +
+    var h = '<section class="card uh-sec ur-hero" data-band="' + bm.layer + '">' +
       '<div class="ur-hero__top">' +
       '<span class="ur-tier ur-tier--' + (bm.layer === "1" ? "in" : "out") + '">' + L.dir + "</span>" +
       '<span class="ur-hero__mon">' + ui.esc(bm.calc.month || "—") + " 账期</span>" +
-      '<span class="uh-badge uh-badge--' + M.cls + '">' + M.t + "</span>" +
+      '<span class="uh-badge uh-badge--' + M.cls + '"><i class="ur-bdot"></i>' + M.t + "</span>" +
       "</div>" +
       (bm.isEmpty ? '<div class="ur-hero__lab">本月未出账</div>'
-        : '<div class="ur-hero__lab">未结清 <em>账单 − 已确认到账</em></div>') +
+        : '<div class="ur-hero__lab">未结清<span class="ur-hero__hint">账单 − 已确认到账</span></div>') +
       '<div class="uh-bignum" data-count="' + bm.unsettled + '">' + ui.moneyD(0) + "</div>";
 
-    /* 金额构成条：以 max(账单, 已登记) 归一，超登时在账单处画基准线 */
-    if (bm.bill > 0) {
-      var denom = Math.max(bm.bill, bm.regSum) || 1;
-      var segs = [];
-      if (bm.confSum) segs.push(["ok", bm.confSum]);
-      if (bm.pendSum) segs.push(["wait", bm.pendSum]);
-      if (bm.dispSum) segs.push(["bad", bm.dispSum]);
-      if (bm.gap) segs.push(["gap", bm.gap]);
-      h += '<div class="ur-comp">' + segs.map(function (x) {
-        return '<i class="ur-comp__seg ur-comp__s--' + x[0] + '" data-w="' + pct(x[1], denom) + '"></i>';
-      }).join("") + (bm.overReg > 0
-        ? '<i class="ur-comp__mark" style="left:' + pct(bm.bill, denom) + '"></i>' : "") + "</div>";
-
-      var lg = [["ok", "已确认", bm.confSum]];
-      if (bm.pendSum) lg.push(["wait", "待确认", bm.pendSum]);
-      if (bm.dispSum) lg.push(["bad", "争议", bm.dispSum]);
-      if (bm.gap) lg.push(["gap", "未登记", bm.gap]);
-      h += '<div class="ur-legend">' + lg.map(function (x) {
-        return '<span class="ur-legend__i"><i class="ur-dot ur-dot--' + x[0] + '"></i>' + x[1] + " " + ui.money(x[2]) + "</span>";
-      }).join("") + "</div>";
-    }
-
     if (!bm.isEmpty) {
-      var rows = kv("账单金额", ui.money(bm.bill));
-      rows += kv("已确认到账", ui.money(bm.confSum), bm.confSum > 0 ? "ok" : "mute", bm.conf.length ? bm.conf.length + " 笔" : "");
-      if (bm.pendSum) rows += kv("待确认到账", ui.money(bm.pendSum), "wait", bm.pend.length + " 笔");
-      if (bm.dispSum) rows += kv("争议待核", ui.money(bm.dispSum), "bad", bm.disp.length + " 笔");
-      if (bm.gap) rows += kv("未登记", ui.money(bm.gap), "wait", "待补登记");
-      if (bm.overReg) rows += kv("超登", ui.money(bm.overReg), "bad", "平账不采纳");
-      h += '<div class="ur-ledger">' + rows + "</div>";
+      /* 金额构成条 + 分解台账：同一组颜色、同一组数字，只呈现一次。
+         构成条以 max(账单, 已登记) 归一，超登时在账单处画基准线。 */
+      var denom = Math.max(bm.bill, bm.regSum) || 1;
+      if (bm.bill > 0) {
+        var segs = [];
+        if (bm.confSum) segs.push(["ok", bm.confSum]);
+        if (bm.pendSum) segs.push(["wait", bm.pendSum]);
+        if (bm.dispSum) segs.push(["bad", bm.dispSum]);
+        if (bm.gap) segs.push(["gap", bm.gap]);
+        h += '<div class="ur-comp">' + segs.map(function (x, i) {
+          return '<i class="ur-comp__seg ur-comp__s--' + x[0] + '" data-w="' + pct(x[1], denom) +
+            '" style="transition-delay:' + (80 + i * 90) + 'ms"></i>';
+        }).join("") + (bm.overReg > 0
+          ? '<i class="ur-comp__mark" style="left:' + pct(bm.bill, denom) + '"></i>' : "") + "</div>";
+      }
+
+      /* 金额为 0 时不挂语义色：绿色 ¥0 会被误读成「已到账」 */
+      var kids = brk(bm.confSum > 0 ? "ok" : "gap", "已确认到账", bm.confSum, denom, bm.conf.length ? bm.conf.length + " 笔" : "");
+      if (bm.pendSum) kids += brk("wait", "待确认到账", bm.pendSum, denom, bm.pend.length + " 笔");
+      if (bm.dispSum) kids += brk("bad", "争议待核", bm.dispSum, denom, bm.disp.length + " 笔");
+      if (bm.gap) kids += brk("gap", "未登记", bm.gap, denom, "待补登记");
+      /* 超登时比例基准是「登记总额」而非账单，此时账单行标「基准」而不是一个
+         小于 100% 的占比——否则「账单金额 76.9%」会被读成账单本身打了折 */
+      h += '<div class="ur-brk">' + brk("bill", "账单金额", bm.bill, denom, "", " is-base",
+        bm.overReg > 0 ? "基准" : "") +
+        '<div class="ur-brk__kids">' + kids + "</div>" +
+        /* 超登不进树：它不参与账单构成，是独立的一条告警 */
+        (bm.overReg ? '<div class="ur-brk__over">' + ui.icon("alert-circle", 13) +
+          "<span>超登 " + ui.money(bm.overReg) + " · 平账不采纳，须冲销</span></div>" : "") +
+        "</div>";
       h += dueHtml(bm);
       h += lifeHtml(bm);
     }
     var nx = nextOf(bm, actOk, who);
-    h += '<div class="ur-next ' + nx.cls + '">' + nx.t + "</div>";
+    var nxIc = nx.cls === "is-ok" ? "check-circle" : (nx.cls === "is-warn" ? "alert-circle" : "info");
+    h += '<div class="ur-next ' + nx.cls + '">' + ui.icon(nxIc, 15) +
+      '<span class="ur-next__tx">' + nx.t + "</span></div>";
     return h + "</section>";
+  }
+
+  /* 分解行：色点（与构成条同色）+ 名称（附笔数）+ 占比 + 金额 */
+  function brk(tone, k, v, denom, tail, extra, pctTxt) {
+    var vc = tone === "ok" ? " v--ok" : tone === "wait" ? " v--wait" : tone === "bad" ? " v--bad" : "";
+    return '<div class="ur-brk__row' + (extra || "") + '">' +
+      '<i class="ur-brk__dot is-' + tone + '"></i>' +
+      '<span class="ur-brk__k">' + k + (tail ? "<em>" + tail + "</em>" : "") + "</span>" +
+      '<span class="ur-brk__pct">' + (pctTxt || pct(v, denom)) + "</span>" +
+      '<span class="ur-brk__v' + vc + '">' + ui.money(v) + "</span></div>";
   }
 
   function dueHtml(bm) {
@@ -456,8 +472,13 @@
       gate = '<div class="ur-gate ur-gate--ok">' + ui.icon("check-circle", 13) + "<span>本卷宗已平账，明细转为留痕档案。</span></div>";
     }
 
+    /* 进度轨道：把 n/M 画出来，勾一笔亮一段（纯视觉，不改语义） */
+    var rail = '<div class="ur-ckbar">' + dl.map(function (d) {
+      return '<i class="' + (on.indexOf(d.id) > -1 ? "is-on" : "") + '"></i>';
+    }).join("") + "</div>";
+
     return '<section class="card uh-sec" data-anchor="dl">' + sechead("逐笔核对", right, true) +
-      rows + (f ? '<div class="ur-formula">' + f + "</div>" : "") + gate + "</section>";
+      rail + rows + (f ? '<div class="ur-formula">' + f + "</div>" : "") + gate + "</section>";
   }
 
   /* ============================================================
@@ -471,7 +492,7 @@
       '<button type="button" class="ur-reg__tap" data-reg="' + ui.esc(r.id) + '">' +
       '<span class="ur-reg__top">' +
       '<span class="ur-reg__amt">' + ui.money(r.amount) + "</span>" +
-      '<span class="uh-badge uh-badge--' + badge + '">' + ui.REG[r.status] + "</span>" +
+      '<span class="uh-badge uh-badge--' + badge + '"><i class="ur-bdot"></i>' + ui.REG[r.status] + "</span>" +
       "</span>" +
       '<span class="ur-reg__meta">' + (METHOD[r.method] || "线下付款") + " · " + ui.esc(r.date) +
       " · 登记人 " + ui.esc(r.registeredBy || "—") + (vn ? " · 凭证 " + vn + " 张" : "") + "</span>" +
@@ -565,8 +586,11 @@
     var body = keys.map(function (m) {
       var isCur = m === (bm.calc.month || "");
       var stt = bm.stmts.filter(function (s) { return s.month === m; })[0];
-      var tag = isCur ? " · 本月" : (stt && stt.status === "balanced" ? " · 已平账" : "");
-      return '<div class="ur-subhead">' + m + tag + " · " + groups[m].length + " 笔</div>" +
+      var tag = isCur ? "本月" : (stt && stt.status === "balanced" ? "已平账" : "");
+      return '<div class="ur-ghead"><span class="ur-ghead__m">' + m + "</span>" +
+        (tag ? '<span class="ur-ghead__tag">' + tag + "</span>" : "") +
+        '<span class="ur-ghead__rule"></span>' +
+        '<span class="ur-ghead__n">' + groups[m].length + " 笔</span></div>" +
         '<div class="card" style="padding:2px 14px">' +
         groups[m].map(function (r) { return regRow(r, bm, false, false); }).join("") + "</div>";
     }).join("");
@@ -586,7 +610,7 @@
         '<span class="v">' +
         (hrec ? "<b>" + ui.money(hrec.amount) + "</b>" : "") +
         '<span class="uh-badge uh-badge--' + (ok ? "ok" : "wait") + '">' + (ok ? "已平账" : "未平账") + "</span>" +
-        ui.icon("chev-r", 15) + "</span></button>";
+        ui.icon("chev", 15) + "</span></button>";
     }).join("") : '<div class="ur-empty">暂无对账单记录。</div>';
 
     return chips +
@@ -601,12 +625,16 @@
   /* ============================================================
      十、分析视图（差异归因 / 时效 / 风险 / 月度对照）
      ============================================================ */
+  /* s = 次生信息（停留天数 / 处理状态），收成金额下方的语义小标签；
+     不再与金额同排（金额是结论，停留天数是依据，读的时候不该抢行） */
   function fact(ic, tone, t, d, v, s) {
+    var stag = (s && (tone === "bad" || tone === "wait")) ? " ur-fact__tag--" + tone : "";
     return '<div class="ur-fact">' +
       '<span class="ur-fact__ic' + (tone ? " ur-fact__ic--" + tone : "") + '">' + ui.icon(ic, 15) + "</span>" +
       '<span class="ur-fact__b"><span class="ur-fact__t">' + t + "</span>" +
-      '<span class="ur-fact__d">' + d + "</span></span>" +
-      (v ? '<span class="ur-fact__v">' + v + (s ? "<small>" + s + "</small>" : "") + "</span>" : "") +
+      '<span class="ur-fact__d">' + d + "</span>" +
+      (s ? '<span class="ur-fact__tag' + stag + '">' + s + "</span>" : "") + "</span>" +
+      (v ? '<span class="ur-fact__v">' + v + "</span>" : "") +
       "</div>";
   }
 
@@ -647,10 +675,12 @@
     /* 2 · 时效与进度 */
     var cover = bm.bill > 0 ? Math.min(bm.regSum / bm.bill, 1) : 0;
     var confRate = bm.bill > 0 ? Math.min(bm.confSum / bm.bill, 1) : 0;
+    var dlAll = bm.detail.length;
+    var dlRate = dlAll ? Math.min(checkedCount(bm.calc) / dlAll, 1) : 0;
     var tiles = '<div class="ur-tiles">' +
-      tile("登记覆盖", Math.round(cover * 100) + "%", "已登记 " + ui.money(bm.regSum) + " / 账单 " + ui.money(bm.bill)) +
-      tile("确认到账", Math.round(confRate * 100) + "%", "已确认 " + ui.money(bm.confSum)) +
-      tile("逐笔核对", checkedCount(bm.calc) + "/" + bm.detail.length, "核对后解锁确认") +
+      tile("登记覆盖", Math.round(cover * 100) + "%", "已登记 " + ui.money(bm.regSum) + " / 账单 " + ui.money(bm.bill), cover, cover >= 1) +
+      tile("确认到账", Math.round(confRate * 100) + "%", "已确认 " + ui.money(bm.confSum), confRate, confRate >= 1) +
+      tile("逐笔核对", checkedCount(bm.calc) + "/" + dlAll, "核对后解锁确认", dlRate, dlAll > 0 && dlRate >= 1) +
       tile("距截止", bm.remain === null ? "—" : (bm.remain < 0 ? "已逾期" : bm.remain + " 天"), "截止 " + (mmdd(bm.calc.dueAt) || "—")) +
       "</div>";
     var ageRows = "";
@@ -686,18 +716,28 @@
       (risks.length ? risks.join("") : '<div class="ur-empty">按当前口径无超期、无超登，节奏正常。</div>') +
       "</section>";
 
-    /* 4 · 月度对照 */
+    /* 4 · 月度对照（两根同基线的对照条，差值单列成标签，不做单值相减推理） */
     var delta = bm.prevConf > 0 ? Math.round((bm.bill - bm.prevConf) / bm.prevConf * 100) : null;
-    var cmp = kv("本月账单", ui.money(bm.bill), "ok") +
-      kv("上月已确认", ui.money(bm.prevConf), "", delta === null ? "" : (delta >= 0 ? "+" : "") + delta + "%");
+    var mx = Math.max(bm.bill, bm.prevConf) || 1;
+    var cmp = '<div class="ur-cmrow is-cur"><span class="k">本月账单</span>' +
+      '<span class="track"><i data-ratio="' + (bm.bill / mx * 100) + '"></i></span>' +
+      '<span class="v">' + ui.money(bm.bill) + "</span></div>" +
+      '<div class="ur-cmrow"><span class="k">上月已确认</span>' +
+      '<span class="track"><i data-ratio="' + (bm.prevConf / mx * 100) + '"></i></span>' +
+      '<span class="v">' + ui.money(bm.prevConf) + "</span></div>" +
+      (delta === null ? "" : '<span class="ur-delta ' + (delta >= 0 ? "ur-delta--up" : "ur-delta--down") + '">' +
+        (delta >= 0 ? "↑" : "↓") + " 环比 " + (delta >= 0 ? "+" : "") + delta + "%</span>");
     var card4 = '<section class="card uh-sec">' + sechead("月度对照", "", true) + cmp + "</section>";
 
     return card1 + card2 + card3 + card4;
   }
 
-  function tile(k, v, s) {
+  /* ratio 省略 = 不画进度条（如「距截止」，没有可比的满值） */
+  function tile(k, v, s, ratio, full) {
     return '<div class="ur-tile"><div class="ur-tile__k">' + k + '</div>' +
       '<div class="ur-tile__v">' + v + '</div>' +
+      (ratio === undefined ? "" : '<div class="ur-tile__bar"><i class="' + (full ? "is-done" : "") +
+        '" data-ratio="' + Math.round(Math.max(0, Math.min(ratio, 1)) * 1000) / 10 + '"></i></div>') +
       '<div class="ur-tile__s">' + s + "</div></div>";
   }
 
@@ -1067,19 +1107,19 @@
     var cnum = el.querySelector("[data-count]");
     if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")) || 0, 460, ui.moneyD);
 
-    /* 构成条入场：宽度从 0 过渡到目标值 */
+    /* 构成条 / 进度条入场：宽度从 0 过渡到目标值（reduced-motion 直跳） */
     var segs = el.querySelectorAll(".ur-comp__seg");
-    if (segs.length) {
-      if (reduceMotion()) {
+    var bars = el.querySelectorAll("[data-ratio]");
+    if (segs.length || bars.length) {
+      var grow = function () {
         Array.prototype.forEach.call(segs, function (s) { s.style.width = s.getAttribute("data-w"); });
-      } else {
-        requestAnimationFrame(function () {
-          Array.prototype.forEach.call(segs, function (s) { s.style.width = s.getAttribute("data-w"); });
-        });
-      }
+        Array.prototype.forEach.call(bars, function (b) { b.style.width = b.getAttribute("data-ratio") + "%"; });
+      };
+      if (reduceMotion()) grow(); else requestAnimationFrame(grow);
     }
 
     wireStuck(el);
+    wireInk(el);
 
     /* ---- 卷宗切换 ---- */
     el.querySelectorAll("[data-tab]").forEach(function (n) {
@@ -1239,6 +1279,33 @@
         setTimeout(function () { todo.classList.remove("ur-flash"); }, 1300);
       }
     }
+  }
+
+  /* 视图分段的共享墨条：首帧直接落位（不播动画），之后在两项之间滑动。
+     挂载是整段重建的，所以用文件级 _inkX 记住上一帧位置，新 DOM 先摆在旧位置
+     再回到新位置，读起来才是「同一支笔挪了位置」而不是「重新出现」。 */
+  var _inkX = null;
+  function wireInk(el) {
+    var wrap = el.querySelector(".ur-views");
+    var ink = el.querySelector(".ur-ink");
+    var on = wrap && wrap.querySelector(".ur-view.is-on");
+    if (!ink || !on) { _inkX = null; return; }
+    var x = on.offsetLeft, w = on.offsetWidth;
+    if (_inkX === null || _inkX === x || reduceMotion()) {
+      ink.style.transition = "none";
+      ink.style.width = w + "px";
+      ink.style.transform = "translateX(" + x + "px)";
+      void ink.offsetWidth;          /* 强制回流，让「无过渡」的那一帧生效 */
+      ink.style.transition = "";
+    } else {
+      ink.style.transition = "none";
+      ink.style.width = w + "px";
+      ink.style.transform = "translateX(" + _inkX + "px)";
+      void ink.offsetWidth;
+      ink.style.transition = "";
+      requestAnimationFrame(function () { ink.style.transform = "translateX(" + x + "px)"; });
+    }
+    _inkX = x;
   }
 
   /* 吸顶背景（监听器文件级单例，重挂载仅换目标） */

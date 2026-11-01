@@ -14,6 +14,41 @@
 
   var METHOD = { bank: "对公转账", wechat: "微信/支付宝", cash: "现金", other: "其他" };
   var REG_CLS = { pending_confirm: "wait", confirmed: "ok", disputed: "bad", void: "mute" };
+  /* 演示时钟统一取 store.TODAY（10-27）：墙钟会让 10 月账期在演示当天整体变成"逾期锁定" */
+  var TODAY = (store && store.TODAY) || "2026-10-27";
+
+  /* 省代视角的「这一家」：?sub=<企业 id>。二级视角恒为自身，不需要参数。
+     二级合作页点「查看对账单」必须落到该企业的账单，而不是省代 ↔ 平台的
+     主对账页（reconcile.html，那是第一层：平台→省代，与二级企业无关）。 */
+  function querySub(ctx) {
+    if (ctx.mode === "sub") return null;
+    var id;
+    try { id = new URLSearchParams(window.location.search).get("sub"); } catch (e) { id = ""; }
+    if (!id) return null;
+    return (ctx.s.subs || []).filter(function (p) { return p.id === id; })[0] || null;
+  }
+  function shortName(n) {
+    return String(n || "").replace(/(股份有限公司|有限责任公司|有限公司)$/, "");
+  }
+  /* 单个二级企业本期账目（省代视角；与 aggregate 同一份 calc2 明细，只按 subId 归集） */
+  function perSubCalc(agg, sub) {
+    if (!agg) return null;
+    var detail = (agg.detail || []).filter(function (x) { return x.subId === sub.id; });
+    var base = detail.reduce(function (a, x) { return a + (x.amount || 0); }, 0);
+    var ratio = Number(sub.ratioToSub) || 0;
+    return {
+      /* checkId 独立：逐笔核对的勾选要按企业分开存，不能串到聚合账或别家 */
+      id: agg.id + ":" + sub.id,
+      regsCalcId: agg.id,
+      layer: agg.layer, month: agg.month,
+      issueAt: agg.issueAt, dueAt: agg.dueAt,
+      disputeDeadline: agg.disputeDeadline, dueDay: agg.dueDay,
+      eligibleBase: base, ratioToSub: ratio,
+      /* 与 store.subDueOf 同一算式同一常量（grossShare=0.5），不另写一个 0.5 */
+      calcAmount: Math.round(base * (store.CONST ? store.CONST.grossShare : 0.5) * ratio),
+      detail: detail
+    };
+  }
 
   /* 逐笔核对状态（批次四：统一 Uni.detailState，DL v2 持久化 + v1 迁移；核对待持久、跨页生效） */
   function checkedIds(calcId) { return (window.Uni.detailState.get(calcId) || []).map(function (r) { return r.id; }); }
@@ -33,9 +68,16 @@
   /* ---------- 数据源选择（纯数据判断：产出 view-model，不改变 DOM 结构） ---------- */
   function pickSource(ctx) {
     if (ctx.mode === "sub") {
-      return { calc: (ctx.s.calc && ctx.s.calc[0]) || null, regs: ctx.s.payRegs || [] };
+      return { calc: (ctx.s.calc && ctx.s.calc[0]) || null, regs: ctx.s.payRegs || [], sub: null };
     }
-    return { calc: ctx.s.calc2 || null, regs: ctx.s.payRegs2 || [] };
+    var agg = ctx.s.calc2 || null;
+    var sub = querySub(ctx);
+    if (!sub) return { calc: agg, regs: ctx.s.payRegs2 || [], sub: null };
+    return {
+      sub: sub,
+      calc: perSubCalc(agg, sub),
+      regs: (ctx.s.payRegs2 || []).filter(function (r) { return r.subId === sub.id; })
+    };
   }
 
   /* ---------- view-model 折算（数据映射层） ---------- */
@@ -52,9 +94,12 @@
       kvs: [], regs: [], hasCalc: !!calc, calcObj: calc
     };
     if (!calc) return vm;
-    var cur = regs.filter(function (r) { return r.calcId === calc.id; });
-    var history = regs.filter(function (r) { return r.calcId !== calc.id; });
-    var sum = store.regsSum(regs, calc.id);
+    /* 单企业账单的合成 calc 用它自己的 id 存核对勾选，但登记记录仍挂在真实账期 id 上 */
+    var regCalcId = calc.regsCalcId || calc.id;
+    if (src.sub) vm.cardTitle = "本月应付 " + shortName(src.sub.name) + " · 分润款";
+    var cur = regs.filter(function (r) { return r.calcId === regCalcId; });
+    var history = regs.filter(function (r) { return r.calcId !== regCalcId; });
+    var sum = store.regsSum(regs, regCalcId);
     var pending = cur.filter(function (r) { return r.status === "pending_confirm"; });
     var disputed = cur.filter(function (r) { return r.status === "disputed"; });
     var confirmedCount = cur.filter(function (r) { return r.status === "confirmed"; }).length;
@@ -70,11 +115,14 @@
     };
 
     /* 逾期判定：出账后 5 天对账窗口，超期 → 锁定该月对账（仅可查看） */
-    vm.overdue = !!calc.dueAt && new Date(calc.dueAt + "T23:59:59") < new Date();
+    vm.overdue = !!calc.dueAt && new Date(calc.dueAt + "T23:59:59") < new Date(TODAY + "T23:59:59");
     vm.canActEff = vm.canAct && !vm.overdue;
 
     var dueDay = calc.dueDay || 0;
     vm.dueCls = dueDay >= 15 ? "bad" : (dueDay >= 10 ? "wait" : "ok");
+    /* 逐笔核对：二级管理员照旧；省代在「某家企业的账单」里也逐笔核对（按企业独立留痕），
+       聚合账页不放行，避免省代在总盘上把别家的明细一起勾掉 */
+    vm.canCheck = vm.canActEff || (!!src.sub && !ctx.readonly && !vm.overdue);
     vm.duePct = Math.min(Math.round(dueDay / 15 * 100), 100);
     vm.kvs = [
       { k: "未到账差异", v: ui.moneyD(calc.calcAmount - sum) },
@@ -84,7 +132,7 @@
     ];
 
     vm.regs = cur.concat(history).map(function (r) {
-      var isCur = r.calcId === calc.id;
+      var isCur = r.calcId === regCalcId;
       var row = {
         id: r.id, amount: r.amount, status: r.status,
         badgeCls: REG_CLS[r.status] || "mute", badgeTxt: ui.REG[r.status] || "—",
@@ -286,7 +334,7 @@
       var on = checked.indexOf(d.id) > -1;
       if (on) sumOn += d.amount;
       return '<button type="button" class="uc-dlrow' + (on ? " is-on" : "") + '" data-dl="' + ui.esc(d.id) + '"' +
-        (vm.canActEff ? "" : ' disabled aria-disabled="true"') + '>' +
+        (vm.canCheck ? "" : ' disabled aria-disabled="true"') + '>' +
         '<span class="amt">' + ui.money(d.amount) + '</span>' +
         '<span class="info"><span class="nm">' + ui.esc(d.user) + '</span>' +
         '<span class="od">' + Uni.itemTag(d.item) + ' ' + ui.esc(d.order) + ' · ' + ui.esc(d.date) + '</span></span>' +
@@ -295,14 +343,14 @@
     }).join("");
     return '<section class="uh-sec"><div class="uc-dlsec">' +
       '<div class="uh-sechead"><span class="lbl">逐笔核对</span>' +
-      (vm.canActEff && detail.length
+      (vm.canCheck && detail.length
         ? '<button type="button" class="btn btn-ghost btn-xs" data-act="checkAll" style="margin-left:auto">全选核对</button>'
         : "") +
       '<span class="uh-badge uh-badge--mute">已核对 ' + checked.length + '/' + detail.length + '</span></div>' +
       '<div class="card" style="padding:2px 14px">' + rows + '</div>' +
       '<div class="uc-dlsec__sum"><span>已核对金额 ' + ui.money(sumOn) + '</span>' +
       '<span>明细合计（合格消费）' + ui.money(calc.eligibleBase) + '</span></div>' +
-      (vm.canActEff ? '<div class="uh-note" style="margin-top:6px">逐笔确认订单计入合格消费分润；差异以线下凭证核实后闭环。</div>' : "") +
+      (vm.canCheck ? '<div class="uh-note" style="margin-top:6px">逐笔确认订单计入合格消费分润；差异以线下凭证核实后闭环。</div>' : "") +
       '</div></section>';
   }
 
@@ -310,7 +358,7 @@
   function remainDays(dueAt) {
     if (!dueAt) return 1;
     var due = new Date(dueAt + "T23:59:59");
-    return Math.ceil((due - new Date()) / 86400000);
+    return Math.ceil((due - new Date(TODAY + "T23:59:59")) / 86400000);
   }
   function dueBarHtml(calc) {
     if (!calc.dueAt) return "";
@@ -352,16 +400,150 @@
       '<div class="card" style="padding:2px 14px">' + rows + '</div></div></section>';
   }
 
+  /* ---------- 省代视角：单企业账目抬头（?sub= 时的页首） ---------- */
+  function scopeHeadHtml(ctx, src, vm) {
+    var p = src.sub, ag = p.agreement || {};
+    var agSt = AG_TXT[ag.state] || { t: "未签", c: "mute" };
+    return '<section class="card uh-sec">' +
+      '<div class="uh-finhead"><span class="uh-eyebrow">二级企业账目</span>' +
+      '<span class="uh-badge uh-badge--' + agSt.c + '">协议' + agSt.t + '</span></div>' +
+      '<div class="uh-row" style="padding:0;min-height:auto;cursor:default">' +
+      '<span class="uh-row__ic">' + ui.icon("building", 18) + '</span>' +
+      '<span class="uh-row__main"><span class="uh-row__t">' + ui.esc(p.name) + '</span>' +
+      '<span class="uh-row__s">' + ui.esc(p.uscc || "") + ' · 合作自 ' + ui.esc(p.since || "") + '</span></span>' +
+      '</div>' +
+      '<div class="uh-kv"><span class="k">约定比例</span><span class="v">' + Math.round((Number(p.ratioToSub) || 0) * 100) + '%</span></div>' +
+      '<div class="uh-kv"><span class="k">本月合格消费（该企业名下）</span><span class="v">' + ui.money(vm.calcObj ? vm.calcObj.eligibleBase : 0) + '</span></div>' +
+      '<div class="uh-kv"><span class="k">协议编号 / 版本</span><span class="v">' + ui.esc(ag.id || "—") + " · " + ui.esc(ag.version || "—") + '</span></div>' +
+      '<div class="btn-row" style="margin-top:10px">' +
+      '<a class="btn btn-ghost btn-sm" href="' + Uni.hrefOf("agreement.html") + "?sub=" + encodeURIComponent(p.id) + '">查看合作协议</a>' +
+      '<a class="btn btn-ghost btn-sm" href="' + Uni.hrefOf("reconcile-sub.html") + '">全部二级企业</a>' +
+      '</div></section>';
+  }
+
+  /* ---------- 省代视角：二级企业账目清单（无 ?sub= 时的页首总览） ---------- */
+  var AG_TXT = {
+    signed: { t: "已签", c: "ok" },
+    pending: { t: "待签", c: "wait" },
+    pending_mine: { t: "待我方签", c: "info" },
+    rejected: { t: "已拒签", c: "bad" }
+  };
+  function subLedgerHtml(ctx, Uni) {
+    var agg = ctx.s.calc2;
+    if (!agg) return "";
+    var tDue = 0, tReg = 0, rows = "";
+    (ctx.s.subs || []).filter(function (p) { return p.status === "active"; }).forEach(function (p) {
+      var due = store.subDueOf(ctx.s, p);
+      var regs = (ctx.s.payRegs2 || []).filter(function (r) { return r.subId === p.id && r.calcId === agg.id; });
+      var reg = store.regsSum(regs, agg.id);
+      var disp = regs.some(function (r) { return r.status === "disputed"; });
+      var pend = regs.some(function (r) { return r.status === "pending_confirm"; });
+      tDue += due; tReg += reg;
+      var b = due <= 0 ? { t: "本期无应付", c: "mute" }
+        : disp ? { t: "有异议", c: "bad" }
+          : pend ? { t: "待确认", c: "wait" }
+            : reg >= due - 0.01 ? { t: "已结清", c: "ok" }
+              : reg > 0 ? { t: "部分登记", c: "wait" }
+                : { t: "未登记", c: "info" };
+      var agSt = AG_TXT[(p.agreement || {}).state] || { t: "未签", c: "mute" };
+      rows += '<button type="button" class="uh-row" data-sub="' + ui.esc(p.id) + '">' +
+        '<span class="uh-row__ic">' + ui.icon("building", 18) + '</span>' +
+        '<span class="uh-row__main"><span class="uh-row__t">' + ui.esc(shortName(p.name)) + '</span>' +
+        '<span class="uh-row__s">协议' + agSt.t + ' · ' + Math.round((Number(p.ratioToSub) || 0) * 100) +
+        '% · 消费 ' + ui.money(p.subGross || 0) +
+        (reg > 0 && reg < due ? ' · 已登记 ' + ui.money(reg) : '') + '</span></span>' +
+        '<span class="uh-row__right"><span class="uh-row__amt">' + ui.money(due) + '</span>' +
+        '<span class="uh-badge uh-badge--' + b.c + '">' + b.t + '</span></span>' +
+        '<span class="uh-chev">' + ui.icon("chev", 16) + '</span></button>';
+    });
+    return '<section class="card uh-sec" style="padding-top:6px">' +
+      '<div class="uh-finhead" style="margin:6px 0 2px"><span class="uh-eyebrow">二级企业账目 · 本月应付合计 ' + ui.money(tDue) + '</span>' +
+      '<span class="uh-badge uh-badge--mute">已登记 ' + ui.money(tReg) + '</span></div>' +
+      (rows || Uni.emptyHtml("暂无在营二级企业", "二级企业审核通过后，账目会出现在这里", "building")) +
+      '<div class="uh-note" style="padding:10px 14px 4px">点任一企业进入其本月账目：明细、登记与凭证只针对该企业，不与其他企业混盘。</div>' +
+      '</section>';
+  }
+
+  /* ---------- 省代：在「该企业账目」里登记线下付款 ---------- */
+  function registerSheet(ctx, Uni, vm) {
+    var p = pickSource(ctx).sub;
+    if (!p) return;
+    var cap = Math.max(vm.tri.due - vm.tri.registered, 0);
+    var vouchers = [];
+    var sh = Uni.sheet({
+      title: "登记线下付款 · " + shortName(p.name),
+      body:
+        '<div class="uh-sheetkv"><span class="k">该企业本月应付</span><span class="v">' + ui.money(vm.tri.due) + "</span></div>" +
+        '<div class="uh-sheetkv"><span class="k">已登记（不含冲销）</span><span class="v">' + ui.money(vm.tri.registered) + "</span></div>" +
+        '<div class="uh-sheetkv"><span class="k">可登记</span><span class="v">' + ui.money(cap) + "</span></div>" +
+        '<div style="height:14px"></div>' +
+        '<div class="field"><label class="field-label">金额<em class="req">*</em></label>' +
+        '<input class="input" id="urs-amount" type="number" inputmode="decimal" value="' + cap + '"></div>' +
+        '<div class="field"><label class="field-label">付款方式</label><div class="seg" data-pick>' +
+        '<button type="button" class="seg-item active" data-v="bank">对公转账</button>' +
+        '<button type="button" class="seg-item" data-v="wechat">微信/支付宝</button>' +
+        '<button type="button" class="seg-item" data-v="cash">现金</button></div></div>' +
+        '<div class="field"><label class="field-label">付款日期</label>' +
+        '<input class="input" id="urs-date" type="date" value="' + TODAY + '" max="' + TODAY + '"></div>' +
+        '<div class="field" style="margin-bottom:0"><label class="field-label">付款凭证<em class="req">*</em></label>' +
+        '<div class="ur-upload" id="urs-voucher">' + ui.icon("camera", 22) + "<div>点击上传凭证图片</div></div>" +
+        '<input type="file" id="urs-file" accept="image/*" hidden></div>',
+      footer: [{ t: "取消", kind: "ghost" },
+      {
+        t: "提交登记", kind: "primary", onClick: function (ov) {
+          var amount = Number(ov.querySelector("#urs-amount").value);
+          var mit = ov.querySelector("[data-pick] .seg-item.active");
+          var method = mit ? mit.getAttribute("data-v") : "bank";
+          var date = ov.querySelector("#urs-date").value || TODAY;
+          if (!amount || amount <= 0) { Uni.toast("请填写正确金额", "err"); return false; }
+          if (amount > cap + 0.01) { Uni.toast("超出该企业可登记金额 " + ui.money(cap), "err"); return false; }
+          if (!vouchers.length) { Uni.toast("请上传付款凭证（凭证强制）", "err"); return false; }
+          var r = Uni.actGuarded("pay/addReg", {
+            layer: "2",
+            data: { subId: p.id, amount: amount, method: method, date: date, vouchers: vouchers }
+          });
+          if (!r.ok) return false;
+          Uni.toast("已登记 " + ui.money(amount) + "，待该企业确认到账", "ok");
+          mount(document.getElementById("ag-view"), ctx, Uni);
+        }
+      }]
+    });
+    var up = sh.querySelector("#urs-voucher"), file = sh.querySelector("#urs-file");
+    up.addEventListener("click", function () { file.click(); });
+    file.addEventListener("change", function () {
+      var f = file.files && file.files[0];
+      if (!f) return;
+      ui.fileToVoucher(f).then(function (v) {
+        vouchers.push(v);
+        up.innerHTML = ui.icon("image", 20) + "<div>" + ui.esc(v.name) + "</div>";
+        up.style.color = "var(--text-2)";
+      });
+    });
+    sh.querySelectorAll("[data-pick] .seg-item").forEach(function (b) {
+      b.addEventListener("click", function () {
+        sh.querySelectorAll("[data-pick] .seg-item").forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+      });
+    });
+  }
+
   /* 唯一渲染路径 */
   function mount(el, ctx, Uni) {
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
     var vm = V.data(ctx);
+    var scope = pickSource(ctx);
 
     /* 全部登记记录（供凭证预览与动作弹窗反查） */
     var src = ctx.mode === "sub" ? (ctx.s.payRegs || []) : (ctx.s.payRegs2 || []);
     function recOf(id) { return src.filter(function (r) { return r.id === id; })[0]; }
 
     var html = "";
+
+    /* 省代视角：带 ?sub= 是「这一家」的账单，不带是二级企业账目清单。
+       二级视角（ctx.mode === "sub"）永远是自身，两者都不渲染。 */
+    if (ctx.mode !== "sub") {
+      html += scope.sub ? scopeHeadHtml(ctx, scope, vm) : subLedgerHtml(ctx, Uni);
+    }
 
     /* E097 时限说明条（文案随身份换源；为空则不渲染） */
     if (vm.notice) {
@@ -405,6 +587,13 @@
     vm.kvs.forEach(function (kv) {
       html += '<div class="uh-kv"><span class="k">' + ui.esc(kv.k) + "</span><span class=\"v\">" + kv.v + "</span></div>";
     });
+    /* 省代在单企业账单里登记付款：额度按该企业应付算，不占别家额度 */
+    if (ctx.mode !== "sub" && ctx.identity === "admin" && !ctx.readonly && scope.sub && !vm.overdue &&
+      vm.tri && vm.tri.due - vm.tri.registered > 0.01) {
+      html += '<div class="btn-row" style="margin-top:12px">' +
+        '<button type="button" class="btn btn-primary btn-sm" data-act="addreg">登记线下付款 · ' +
+        ui.money(vm.tri.due - vm.tri.registered) + '</button></div>';
+    }
     html += "</section>";
 
     /* P2-2 应得 vs 已登记 vs 待确认（金额口径三态对照；双端管理员可见） */
@@ -474,12 +663,20 @@
     /* 逐笔核对：负责人逐笔标记（本地覆盖层持久，跨页生效） */
     el.querySelectorAll("[data-dl]").forEach(function (n) {
       n.addEventListener("click", function () {
-        if (ctx.readonly || !vm.canActEff) { Uni.toast("逐笔核对仅管理员可操作", "err"); return; }
+        if (ctx.readonly || !vm.canCheck) { Uni.toast("逐笔核对仅管理员可操作", "err"); return; }
         var calc = pickSource(ctx).calc;
         if (!calc) return;
         toggleChecked(calc.id, n.getAttribute("data-dl"));
         Uni.toast(checkedIds(calc.id).indexOf(n.getAttribute("data-dl")) > -1 ? "已核对该笔订单" : "已取消核对", "ok");
         mount(el, ctx, Uni);
+      });
+    });
+
+    /* 省代：二级企业账目清单 → 进入该企业账单 */
+    el.querySelectorAll("[data-sub]").forEach(function (n) {
+      n.addEventListener("click", function () {
+        var id = n.getAttribute("data-sub");
+        Uni.navTo("reconcile-sub.html?sub=" + encodeURIComponent(id));
       });
     });
 
@@ -513,6 +710,11 @@
           Uni.toast("已全部核对（" + dl.length + " 笔）", "ok");
           return mount(el, ctx, Uni);
         }
+        /* 省代单企业账单：登记线下付款（无 data-id，须在 rec 判空前处理） */
+        if (act === "addreg") {
+          if (!scope.sub) return;
+          return registerSheet(ctx, Uni, vm);
+        }
         var rec = recOf(n.getAttribute("data-id"));
         if (!rec) return;
         if (act === "confirm") return confirmSheet(ctx, Uni, rec);
@@ -520,6 +722,14 @@
         if (act === "dispute") return disputeSheet(ctx, Uni, rec);
       });
     });
+
+    /* 页头语境：走的是"某家企业的账单"时，标题换成企业名，返回键回到二级账目清单 */
+    if (ctx.mode !== "sub") {
+      var tt = el.closest(".phone") && el.closest(".phone").querySelector(".topbar-title");
+      if (tt) tt.textContent = scope.sub ? shortName(scope.sub.name) + " · 对账" : "对账中心";
+      var back = el.closest(".phone") && el.closest(".phone").querySelector(".nav-back");
+      if (back && scope.sub) back.setAttribute("href", "reconcile-sub.html");
+    }
 
     /* 待办弹窗放大跳转：?focus=cur 定位到当月对账主卡 */
     var f = new URLSearchParams(window.location.search).get("focus");

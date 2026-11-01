@@ -222,11 +222,21 @@
       calcAmount: z ? 0 : 600,     /* 600 = 6,000 × 50% × 20%（二级线盘 × 约定比例） */
       disputeDeadline: "出账后 15 天",
       dueDay: 12,
+      /* 明细按 subId 归到具体二级企业：单企业应付 = 该企业明细合计 × 50% × 约定比例，
+         8 家合计仍为 6,000 → 600（面向二级的对账单必须能落到"这一家"，
+         旧版 4 笔明细全挂成都蓉建，点任何企业的对账单都只能看到同一份盘）。 */
       detail: z ? [] : [
-        { id: "D201", item: "cert", user: "成都蓉建科贸有限公司", order: "AC20261002001", amount: 1800, date: "2026-10-02" },
-        { id: "D202", item: "entry", user: "成都蓉建科贸有限公司", order: "EN20261002005", amount: 1500, date: "2026-10-06" },
-        { id: "D203", item: "unlock", user: "成都蓉建科贸有限公司", order: "UL20261002012", amount: 1300, date: "2026-10-09" },
-        { id: "D204", item: "order", user: "成都蓉建科贸有限公司", order: "DD20260902018", amount: 1400, date: "2026-10-11" }
+        { id: "D201", subId: "sub-rongjian", item: "cert", user: "成都蓉建科贸有限公司", order: "AC20261002001", amount: 900, date: "2026-10-02" },
+        { id: "D202", subId: "sub-rongjian", item: "entry", user: "成都蓉建科贸有限公司", order: "EN20261002005", amount: 800, date: "2026-10-05" },
+        { id: "D203", subId: "sub-rongjian", item: "order", user: "成都蓉建科贸有限公司", order: "DD20260902018", amount: 700, date: "2026-10-08" },
+        { id: "D204", subId: "sub-luzhou", item: "cert", user: "泸州川南建材有限公司", order: "AC20261002031", amount: 700, date: "2026-10-04" },
+        { id: "D205", subId: "sub-luzhou", item: "unlock", user: "泸州川南建材有限公司", order: "UL20261002037", amount: 500, date: "2026-10-09" },
+        { id: "D206", subId: "sub-yibin", item: "entry", user: "宜宾叙府工程设备有限公司", order: "EN20261003002", amount: 600, date: "2026-10-06" },
+        { id: "D207", subId: "sub-yibin", item: "order", user: "宜宾叙府工程设备有限公司", order: "DD20261003009", amount: 400, date: "2026-10-12" },
+        { id: "D208", subId: "sub-leshan", item: "unlock", user: "乐山嘉州建设材料有限公司", order: "UL20261004003", amount: 500, date: "2026-10-07" },
+        { id: "D209", subId: "sub-suining", item: "cert", user: "遂宁锦华商贸有限公司", order: "AC20261005006", amount: 400, date: "2026-10-10" },
+        { id: "D210", subId: "sub-guangyuan", item: "order", user: "广元利州工程服务有限公司", order: "DD20261006004", amount: 300, date: "2026-10-13" },
+        { id: "D211", subId: "sub-neijiang", item: "entry", user: "内江甜城物资有限公司", order: "EN20261007008", amount: 200, date: "2026-10-14" }
       ]
     };
 
@@ -286,7 +296,7 @@
     ];
     var payRegs2 = z ? [] : [
       {
-        id: "r0-l2", calcId: "c0-l2", amount: 460, method: "bank",
+        id: "r0-l2", calcId: "c0-l2", subId: "sub-rongjian", amount: 320, method: "bank",
         date: "2026-09-12",
         vouchers: [{
           name: "9月二级转款回单.png", kind: "receipt",
@@ -294,7 +304,7 @@
             bank: "中国建设银行", bankNo: "EB2026091200713052",
             payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
             payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-            amount: 460, amountCn: "肆佰陆拾元整",
+            amount: 320, amountCn: "叁佰贰拾元整",
             purpose: "2026-09 二级合作分润 · 结算单 ST-202609-L2",
             at: "2026-09-12 11:24:18", by: "王建国"
           }
@@ -303,7 +313,7 @@
         confirmedAt: "2026-09-13", signMethod: "esign", createdAt: "2026-09-12"
       },
       {
-        id: "r1-l2", calcId: "c1-l2", amount: 600, method: "bank",
+        id: "r1-l2", calcId: "c1-l2", subId: "sub-rongjian", amount: 240, method: "bank",
         date: "2026-10-11",
         vouchers: [{
           name: "10月二级转款回单.png", kind: "receipt",
@@ -311,7 +321,7 @@
             bank: "中国建设银行", bankNo: "EB2026101100824176",
             payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
             payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-            amount: 600, amountCn: "陆佰元整",
+            amount: 240, amountCn: "贰佰肆拾元整",
             purpose: "2026-10 二级合作分润 · 结算单 ST-202610-L2",
             at: "2026-10-11 09:47:52", by: "王建国"
           }
@@ -320,22 +330,39 @@
         dueDay: 12, createdAt: "2026-10-11"
       },
       {
-        id: "r2-l2", calcId: "c1-l2", amount: 180, method: "bank",
+        id: "r2-l2", calcId: "c1-l2", subId: "sub-suining", amount: 40, method: "bank",
         date: "2026-10-16",
         vouchers: [{
           name: "10月二级转款回单.png", kind: "receipt",
           meta: {
             bank: "中国建设银行", bankNo: "EB2026101600357219",
             payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
-            payee: "成都蓉建科贸有限公司", payeeAcct: "6217 **** **** 5520",
-            amount: 180, amountCn: "壹佰捌拾元整",
+            payee: "遂宁锦华商贸有限公司", payeeAcct: "6217 **** **** 9034",
+            amount: 40, amountCn: "肆拾元整",
             purpose: "2026-10 二级合作分润 · 结算单 ST-202610-L2",
             at: "2026-10-16 16:05:31", by: "王建国"
           }
         }],
         registeredBy: "王建国", status: "disputed",
-        reason: "二级企业反馈实收分润与结算单相差 ¥180，待线下核实",
+        reason: "二级企业反馈实收分润与结算单相差 ¥40，待线下核实",
         disputedAt: "2026-10-17", dueDay: 2, createdAt: "2026-10-16"
+      },
+      {
+        id: "r3-l2", calcId: "c1-l2", subId: "sub-yibin", amount: 100, method: "bank",
+        date: "2026-10-08",
+        vouchers: [{
+          name: "10月二级转款回单（宜宾）.png", kind: "receipt",
+          meta: {
+            bank: "中国工商银行", bankNo: "EB2026100800516620",
+            payer: "四川锦程工程供应链有限公司", payerAcct: "6222 **** **** 0181",
+            payee: "宜宾叙府工程设备有限公司", payeeAcct: "6217 **** **** 4416",
+            amount: 100, amountCn: "壹佰元整",
+            purpose: "2026-10 二级合作分润 · 结算单 ST-202610-L2",
+            at: "2026-10-08 14:22:07", by: "王建国"
+          }
+        }],
+        registeredBy: "王建国", status: "confirmed",
+        confirmedAt: "2026-10-09", signMethod: "esign", createdAt: "2026-10-08"
       }
     ];
 
@@ -382,10 +409,15 @@
         subs: z ? [] : [
           {
             id: "sub-rongjian",
-            agreement: { state: "signed" },
+            agreement: subAgreement({
+              id: "A2-2026-0812", version: "v2026.08", state: "signed",
+              sentAt: "2026-08-12", signedAt: "2026-08-13", signerName: "陈志远",
+              expireAt: "2027-08-11"
+            }),
             name: "成都蓉建科贸有限公司",
             uscc: "91510107MA6XR4TQ8L",
             contact: "陈志远",
+            legalPerson: "陈志远",
             phone: "139****6620",
             address: "成都市武侯区武科西一路 88 号",
             ratioToSub: 0.20,
@@ -396,10 +428,14 @@
           },
           {
             id: "sub-luzhou",
-            agreement: { state: "pending" },
+            agreement: subAgreement({
+              id: "A2-2026-0825", version: "v2026.08", state: "pending",
+              sentAt: "2026-08-25", expireAt: "2027-08-24"
+            }),
             name: "泸州川南建材有限公司",
             uscc: "91510502MA63Q2BX7W",
             contact: "何斌",
+            legalPerson: "何斌",
             phone: "138****4471",
             address: "四川省泸州市江阳区酒城大道三段 51 号",
             ratioToSub: 0.20,
@@ -410,10 +446,15 @@
           },
           {
             id: "sub-yibin",
-            agreement: { state: "signed" },
+            agreement: subAgreement({
+              id: "A2-2026-0903", version: "v2026.09", state: "signed",
+              sentAt: "2026-09-03", signedAt: "2026-09-04", signerName: "罗刚",
+              expireAt: "2027-09-02"
+            }),
             name: "宜宾叙府工程设备有限公司",
             uscc: "91511500MA64J5NQ9H",
             contact: "罗刚",
+            legalPerson: "罗刚",
             phone: "137****8853",
             address: "四川省宜宾市翠屏区临港大道 108 号",
             ratioToSub: 0.20,
@@ -424,10 +465,15 @@
           },
           {
             id: "sub-leshan",
-            agreement: { state: "signed" },
+            agreement: subAgreement({
+              id: "A2-2026-0915", version: "v2026.09", state: "signed",
+              sentAt: "2026-09-15", signedAt: "2026-09-16", signerName: "杨帆",
+              expireAt: "2027-09-14"
+            }),
             name: "乐山嘉州建设材料有限公司",
             uscc: "91511100MA6AC9RM4T",
             contact: "杨帆",
+            legalPerson: "杨帆",
             phone: "136****2096",
             address: "四川省乐山市市中区柏杨中路 66 号",
             ratioToSub: 0.20,
@@ -438,10 +484,14 @@
           },
           {
             id: "sub-suining",
-            agreement: { state: "pending" },
+            agreement: subAgreement({
+              id: "A2-2026-0922", version: "v2026.09", state: "pending",
+              sentAt: "2026-09-22", expireAt: "2027-09-21"
+            }),
             name: "遂宁锦华商贸有限公司",
             uscc: "91510900MA697T8LQ2",
             contact: "黄磊",
+            legalPerson: "黄磊",
             phone: "135****7748",
             address: "四川省遂宁市船山区滨江路 39 号",
             ratioToSub: 0.20,
@@ -452,10 +502,15 @@
           },
           {
             id: "sub-guangyuan",
-            agreement: { state: "signed" },
+            agreement: subAgreement({
+              id: "A2-2026-1005", version: "v2026.10", state: "signed",
+              sentAt: "2026-10-05", signedAt: "2026-10-06", signerName: "唐雪",
+              expireAt: "2027-10-04"
+            }),
             name: "广元利州工程服务有限公司",
             uscc: "91510800MA64F5NWK3",
             contact: "唐雪",
+            legalPerson: "唐雪",
             phone: "158****3315",
             address: "四川省广元市利州区东坝街道 27 号",
             ratioToSub: 0.20,
@@ -466,10 +521,16 @@
           },
           {
             id: "sub-neijiang",
-            agreement: { state: "rejected" },
+            agreement: subAgreement({
+              id: "A2-2026-1012", version: "v2026.10", state: "rejected",
+              sentAt: "2026-10-12", rejectedAt: "2026-10-14",
+              rejectReason: "对第七条发票与税费的表述有异议，请补充开票主体与税率口径后再发起",
+              expireAt: "2027-10-11"
+            }),
             name: "内江甜城物资有限公司",
             uscc: "91511000MA6BX9PQ8G",
             contact: "张强",
+            legalPerson: "张强",
             phone: "186****6629",
             address: "四川省内江市东兴区汉安大道 74 号",
             ratioToSub: 0.20,
@@ -480,10 +541,15 @@
           },
           {
             id: "sub-zigong",
-            agreement: { state: "signed" },
+            agreement: subAgreement({
+              id: "A2-2026-1018", version: "v2026.10", state: "signed",
+              sentAt: "2026-10-18", signedAt: "2026-10-19", signerName: "刘波",
+              expireAt: "2027-10-17"
+            }),
             name: "自贡富顺机械有限公司",
             uscc: "91510321MA65L7NW4R",
             contact: "刘波",
+            legalPerson: "刘波",
             phone: "139****5172",
             address: "四川省自贡市富顺县釜江大道 112 号",
             ratioToSub: 0.20,
@@ -718,23 +784,169 @@
       "sub-leshan": [{ code: "CH-S-9LS4KR", name: "乐山材料供应圈" }]
     };
     (seed.state.subs || []).forEach(function (s) { if (SUB_CHANNELS[s.id]) s.channels = SUB_CHANNELS[s.id]; });
+    /* 协议正文归档：真实后台在「发起协议」时按模板回填双方主体、约定比例与期限，
+       把结果作为这一份协议的正文存档（ag.bodyHtml）。之后再怎么改模板、调比例，
+       已归档的那一份都不会变——改了要重新发起，这是合同该有的行为。
+       前端各展示位只读这份存档，统一走 Uni.richDoc() 清洗排版。 */
+    (seed.state.subs || []).forEach(function (p) {
+      if (!p.agreement || p.agreement.bodyHtml) return;
+      p.agreement.ratio = p.ratioToSub;      /* 发起时锁定的约定比例，之后按比例调整不改这里 */
+      p.agreement.bodyHtml = agreementBody({
+        jia: seed.state.profile, yi: p, ratio: p.agreement.ratio, ag: p.agreement
+      });
+    });
     return seed;
   }
 
-  /* ---------------- 协议条款（O4 正式演示文本） ---------------- */
-  function agreementTerms() {
-    return [
-      { no: "第一条", t: "合作主体", c: "甲方为省级总代四川锦程工程供应链有限公司，乙方为经甲方审核通过的二级合作企业；双方均为合法存续的市场主体，独立经营、自负盈亏。" },
-      { no: "第二条", t: "合作内容与区域", c: "甲方授权乙方在约定区域内开展工程服务用户推广与转化，乙方不得跨区域恶性竞争，不得转授权、不得发展下级分润主体。" },
-      { no: "第三条", t: "约定所得比例", c: "乙方按其名下合格消费额的约定比例（见合作配置单，初始 20%）取得合作所得；比例可经双方书面（含本协议电子流程）确认后调整，调整后以补签版本为准。" },
-      { no: "第四条", t: "结算口径", c: "以平台月度合格消费账单为基准，退货、退款、取消订单不计入；账单按月生成，双方通过对账中心与对账单留痕。" },
-      { no: "第五条", t: "付款与确认", c: "甲方在 App 外通过对公转账等线下方式付款并登记凭证；乙方核对到账金额与凭证一致后在系统内确认。出账后 15 天内仅提醒，系统不自动确认、不自动到账。" },
-      { no: "第六条", t: "异议处理", c: "乙方发现未到账、金额不符或凭证不清，可提出异议；双方线下核实并补充凭证，异议闭环前不进行月度平账。" },
-      { no: "第七条", t: "发票与税费", c: "各方依法各自承担税费；如需开票，按实际结算金额与发票管理规则另行办理。" },
-      { no: "第八条", t: "合规经营", c: "双方不得虚假交易、刷单套利、违规承诺收益；不得利用本合作从事违法活动。违反者甲方有权暂停或终止合作。" },
-      { no: "第九条", t: "协议期限与续签", c: "本协议自双方签署之日起生效，有效期一年；到期前 30 日双方无异议则按届时规则续签。" },
-      { no: "第十条", t: "暂停与终止", c: "乙方违规或资质失效的，甲方可暂停其经营权限（仅可查看）；终止后渠道码失效、未结算款项按已确认数据继续结清。" }
-    ];
+  /* ---------------- 协议正文（后台富文本模板 → 每份协议一份正文） ----------------
+     正文不在前端拼装：运营在后台富文本编辑器里维护这份模板（Word 文档直接复制粘贴），
+     保存下来就是一段带 Word 样式的 HTML，其中 {{变量}} 在「发起协议」时按双方主体、
+     约定比例、期限回填，生成这家企业专属的那一份正文并存档。
+
+     因此这里要还原的是**后台存下来的原始 HTML**，包括 Word 粘贴的各种残留：
+     class="MsoNormal"、<o:p>、<font>、&nbsp; 空段、font-size/font-family 内联样式、
+     table 的 border/width 属性。前端由 Uni.richDoc() 统一清洗排版，各展示位共用。 */
+  var AGREEMENT_TPL = [
+    '<p class="MsoNormal" align="center" style="text-align:center;line-height:150%"><strong>',
+    '<span style="font-family:宋体;font-size:16.0pt">平台省级总代理与二级合作企业合作协议</span></strong></p>',
+    '<p class="MsoNormal" align="center" style="text-align:center">',
+    '<span style="font-size:10.5pt">协议编号：{{id}}　版本：{{version}}　签署后生效</span></p>',
+    '<p class="MsoNormal"><o:p>&nbsp;</o:p></p>',
+
+    '<p class="MsoNormal"><strong>甲方（省级总代）：</strong>{{jia}}</p>',
+    '<p class="MsoNormal">统一社会信用代码：{{jia_uscc}}</p>',
+    '<p class="MsoNormal">法定代表人：{{jia_legal}}　　注册地址：{{jia_addr}}</p>',
+    '<p class="MsoNormal"><strong>乙方（二级合作企业）：</strong>{{yi}}</p>',
+    '<p class="MsoNormal">统一社会信用代码：{{yi_uscc}}</p>',
+    '<p class="MsoNormal">法定代表人：{{yi_legal}}　　注册地址：{{yi_addr}}</p>',
+    '<p class="MsoNormal"><o:p>&nbsp;</o:p></p>',
+
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">甲乙双方本着平等自愿、诚实信用的原则，' +
+      '就乙方在甲方授权范围内开展工程服务用户推广与转化事宜，经协商一致，订立本协议，共同遵守。</p>',
+
+    '<p class="MsoNormal"><strong>第一条　合作主体</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">甲方为平台授权的省级总代理，乙方为经甲方审核通过的二级合作企业。' +
+      '双方均为合法存续的市场主体，独立经营、自负盈亏，不因本协议形成劳动关系、代理关系或合伙关系。</p>',
+
+    '<p class="MsoNormal"><strong>第二条　合作内容与区域</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">甲方授权乙方在其注册经营地址所在行政区域（以下简称“约定区域”）内，' +
+      '开展工程服务用户的推广、转化与维护，并按本协议约定取得合作所得。乙方不得跨区域恶性竞争，不得转授权，' +
+      '不得发展下级分润主体（平台分润层级两级封顶）。</p>',
+
+    '<p class="MsoNormal"><strong>第三条　约定所得比例</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">乙方按其名下合格消费额，以<strong>{{ratio}}</strong>的比例取得合作所得。' +
+      '该比例经双方书面确认（含本协议电子流程）后调整，调整须以补签版本为准；补签完成前，仍按原比例结算。</p>',
+
+    '<p class="MsoNormal"><strong>第四条　结算口径</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">结算以平台月度合格消费账单为唯一基准，退货、退款、取消订单及经核实存在异常的交易不计入合格消费。' +
+      '账单按月生成，双方通过对账中心与对账单留痕，任何一方不得以线下口头约定变更账单口径。</p>',
+
+    '<p class="MsoNormal"><strong>第五条　付款与确认</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">甲方在 App 外通过对公转账等线下方式付款，并在系统内登记付款凭证；' +
+      '乙方核对到账金额与凭证一致后，在系统内确认到账。账单出账后 15 日内系统仅作提醒，<strong>不自动确认、不自动到账</strong>；' +
+      '逾期未确认的，由双方线下核实后处理。</p>',
+
+    '<p class="MsoNormal"><strong>第六条　异议处理</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">乙方发现未到账、金额不符或凭证不清的，应在对账窗口内提出异议。' +
+      '双方线下核实并补充凭证，异议闭环前不进行月度平账；异议成立的部分冲减当期应付，不成立的部分维持原账面并留痕。</p>',
+
+    '<p class="MsoNormal"><strong>第七条　发票与税费</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">各方依法各自承担其应纳税费。如需开票，按实际结算金额与发票管理规则另行办理，' +
+      '开票主体、税率与开票时点以双方另行确认为准；未确认前不得以开票事由延迟付款。</p>',
+
+    '<p class="MsoNormal"><strong>第八条　数据与保密</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">双方对因合作获知的对方经营数据、用户信息、结算数据负有保密义务，仅可用于履行本协议，不得复制、披露或用于其他目的。' +
+      '合作终止后，保密义务持续两年。</p>',
+
+    '<p class="MsoNormal"><strong>第九条　合规经营</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">双方不得从事下列行为：</p>',
+    '<ol><li>虚假交易、刷单套利，或协助他人套取分润；</li>',
+    '<li>向用户承诺保本、保收益或其他法律法规禁止的收益承诺；</li>',
+    '<li>以本合作名义从事传销、非法集资等违法活动；</li>',
+    '<li>擅自使用对方的商标、字号、资质文件对外宣传。</li></ol>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">一方违反前述约定的，另一方有权立即暂停其经营权限并追究相应责任。</p>',
+
+    '<p class="MsoNormal"><strong>第十条　协议期限与续签</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">本协议自双方签署之日起生效，有效期一年，' +
+      '即自 <strong>{{sentAt}}</strong> 起至 <strong>{{expireAt}}</strong> 止。到期前 30 日双方均无异议的，按届时规则续签；' +
+      '任一方提出异议的，应就续签条款重新协商并补签。</p>',
+
+    '<p class="MsoNormal"><strong>第十一条　暂停与终止</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">乙方违规经营或资质失效的，甲方可暂停其经营权限，暂停期间乙方仅可查看历史数据。' +
+      '本协议终止后，乙方渠道码即时失效，未结算款项按已确认数据继续结清，双方不再产生新的分润结算。</p>',
+
+    '<p class="MsoNormal"><strong>第十二条　争议解决</strong></p>',
+    '<p class="MsoNormal" style="text-indent:21.0pt;line-height:150%">因本协议引起的争议，双方应先行协商；协商不成的，' +
+      '提交甲方所在地有管辖权的人民法院诉讼解决。本协议未尽事宜，双方可另行签订补充协议，补充协议与本协议具有同等效力。</p>',
+
+    '<p class="MsoNormal"><o:p>&nbsp;</o:p></p>',
+    '<p class="MsoNormal"><strong>附则　分润与结算口径对照表</strong></p>',
+    '<table border="1" cellspacing="0" cellpadding="4" width="100%" style="border-collapse:collapse">',
+    '<tbody>',
+    '<tr><td width="22%"><strong>项目</strong></td><td width="34%"><strong>口径</strong></td><td width="44%"><strong>说明</strong></td></tr>',
+    '<tr><td>合格消费</td><td>平台月度账单</td><td>退货、退款、取消订单不计入</td></tr>',
+    '<tr><td>约定比例</td><td>{{ratio}}</td><td>以本协议签署版本为准</td></tr>',
+    '<tr><td>结算层级</td><td>省代 → 二级企业</td><td>仅一层，不发展下级</td></tr>',
+    '<tr><td>付款方式</td><td>线下对公转账</td><td>App 内登记凭证，乙方确认到账</td></tr>',
+    '<tr><td>对账窗口</td><td>账单生成后 15 日</td><td>逾期待双方线下核实</td></tr>',
+    '</tbody></table>',
+
+    '<p class="MsoNormal"><o:p>&nbsp;</o:p></p>',
+    '<p class="MsoNormal" style="text-align:right">甲方（盖章）：{{jia}}<br>授权代表：<br>日期：____ 年 __ 月 __ 日</p>',
+    '<p class="MsoNormal" style="text-align:right">乙方（盖章）：{{yi}}<br>授权代表：{{yi_legal}}<br>日期：____ 年 __ 月 __ 日</p>'
+  ].join("\n");
+
+  /* 变量回填：值按文本插入（转义 & < >），避免企业名里的字符破坏正文结构 */
+  function agreeFill(tpl, v) {
+    return String(tpl).replace(/\{\{(\w+)\}\}/g, function (m, k) {
+      var val = v[k];
+      if (val === undefined || val === null) return m;
+      return String(val).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    });
+  }
+
+  /* 生成某一份协议的正文 HTML。
+     o = { jia, yi, ratio, id, version, sentAt, expireAt }
+     每家企业一份协议，正文里的乙方名称、统一社会信用代码、比例、编号、期限
+     都必须跟着这一份走，不能像条款模板那样全站共用一段文字。 */
+  function agreementBody(o) {
+    o = o || {};
+    var jia = o.jia || {}, yi = o.yi || {}, ag = o.ag || o;
+    var r = Number(o.ratio || 0);
+    return agreeFill(AGREEMENT_TPL, {
+      id: ag.id || "—",
+      version: ag.version || "—",
+      jia: jia.name || "—",
+      jia_uscc: jia.uscc || "—",
+      jia_legal: jia.legalPerson || "—",
+      jia_addr: jia.address || "—",
+      yi: yi.name || "—",
+      yi_uscc: yi.uscc || "—",
+      yi_legal: yi.legalPerson || "—",
+      yi_addr: yi.address || "—",
+      ratio: r ? Math.round(r * 100) + "%" : "—",
+      sentAt: ag.sentAt || "—",
+      expireAt: ag.expireAt || "—"
+    });
+  }
+
+  /* 合作协议档案（省代 → 二级）。
+     这里只存这份协议自身的身份与流转留痕：编号 / 版本 / 发起 / 签署 / 期限 / 拒签。
+     正文由 agreementBody() 按双方主体回填模板生成——8 家企业 8 份正文，
+     乙方名称、比例、编号、期限各不相同，所以正文不在这里存副本，也不共用一段文字。
+     state 取 signed | pending（待对方签署）| rejected；二级域另有 pending_mine（待我方签署）。 */
+  function subAgreement(o) {
+    return {
+      id: o.id,
+      version: o.version,
+      state: o.state,
+      sentAt: o.sentAt,
+      expireAt: o.expireAt,
+      signedAt: o.signedAt || "",
+      signerName: o.signerName || "",
+      rejectReason: o.rejectReason || "",
+      rejectedAt: o.rejectedAt || ""
+    };
   }
 
   /* ---------------- 二级合作 ---------------- */
@@ -784,8 +996,8 @@
           since: "2026-08-12",
           uscc: "91510107MA6XR4TQ8L",
           contact: "陈志远",
-          phone: "139****6620",
           legalPerson: "陈志远",
+          phone: "139****6620",
           address: "成都市武侯区武科西一路 88 号"
         },
         parent: {
@@ -860,8 +1072,11 @@
           { id: "sst-1", calcId: "sc-1", month: "2026-10", status: "open", balancedAt: "" }
         ],
         agreement: {
-          id: "O4-2026-10",
+          /* 编号沿用省代 A2 序列：二级看到的这份与省代台账里那一条是同一份文件，
+             编号前缀若写成模板码（O4）会让人以为是另一种协议。 */
+          id: "A2-2026-1027",
           version: "v2026.10",
+          ratioToSub: 0.20,
           state: z ? "signed" : (status === "suspended" ? "signed" : "pending_mine"),
           province: {
             name: "四川锦程工程供应链有限公司",
@@ -881,7 +1096,6 @@
           },
           sentAt: "2026-10-27",
           expireAt: "2027-10-26",
-          terms: agreementTerms(),
           signedAt: z || status === "suspended" ? "2026-10-15" : "",
           signerName: z || status === "suspended" ? "陈志远" : "",
           rejectReason: "",
@@ -951,6 +1165,14 @@
     /* uni15：二级企业渠道码（来源行展示码名称：成都建筑协会）
        2026-11-01：改为「缺省才回填」——多成员渠道后不能把所有人的码都刷成同一个 */
     (seed.state.leads.school || []).forEach(function (l) { if (!l.code) l.code = "CH-S-5KQ8TN"; });
+    /* 二级侧：与本企业相关的那一份协议正文同样在发起时归档（与 provinceSeed 同口径） */
+    var agS = seed.state.agreement;
+    if (agS && !agS.bodyHtml) {
+      agS.ratio = agS.ratioToSub;
+      agS.bodyHtml = agreementBody({
+        jia: agS.province, yi: agS.sub, ratio: agS.ratio, ag: agS
+      });
+    }
     return seed;
   }
 
@@ -967,7 +1189,7 @@
 
   /* 种子数据版本：种子内容/结构变更（新增企业、修改比例、调整字段）时 +1。
      旧版缓存（_v 不符或无 _v）在 boot 时自动失效并重播种，避免页面沿用陈旧种子。 */
-  var DATA_VERSION = 16;
+  var DATA_VERSION = 21;
 
   function seedByScenario(key) {
     var fn = SCENARIOS[key] || SCENARIOS.active;
@@ -981,7 +1203,8 @@
     seedByScenario: seedByScenario,
     provinceSeed: provinceSeed,
     subSeed: subSeed,
-    agreementTerms: agreementTerms,
+    agreementBody: agreementBody,
+    agreementTemplate: function () { return AGREEMENT_TPL; },
     dataVersion: function () { return DATA_VERSION; },
     keys: Object.keys(SCENARIOS)
   };

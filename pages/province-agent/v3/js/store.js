@@ -13,6 +13,11 @@
   var LS_KEY = "engchain-v3-demo-state-v1";
   var STATE_KEY = "engchain-v3-demo-scenario";
 
+  /* 演示时钟：账期叙事固定在 10 月账期、10-27 当天，与种子数据同日。
+     用墙钟会让种子随时间推移整体"逾期失效"（calc2.dueAt=2026-10-30），
+     所有对账页在演示时变成一片锁定态。 */
+  var TODAY = "2026-10-27";
+
   /* 业务常量（演示口径；分佣规则常量权威见 js/agent-ledger.js DEFAULTS：grossShare=0.5） */
   var CONST = {
     grossShare: 0.50,          // 省代总盘 = 平台总合格消费 × 50%
@@ -81,6 +86,14 @@
       agreed: agreed,
       frozen: Math.round(agreed * 0.05)
     };
+  }
+  /* 某二级企业本月应付：该企业名下合格消费 × 50% × 约定比例。
+     与「该企业的对账单」同源——明细只按 subId 归集，不另存一份汇总数，
+     避免出现「企业应付」和「账单应付」两套数字各自漂移。 */
+  function subDueOf(d, sub) {
+    var detail = ((d.calc2 && d.calc2.detail) || []).filter(function (x) { return x.subId === sub.id; });
+    var base = detail.reduce(function (a, x) { return a + (x.amount || 0); }, 0);
+    return Math.round(base * CONST.grossShare * (Number(sub.ratioToSub) || 0));
   }
   function funnelOf(leads) {
     var all = [];
@@ -528,7 +541,7 @@
         if (p.pass) {
           app.status = "approved";
           app.handledAt = "2026-10-27";
-          d.subs.push({
+          var newSub = {
             id: genId("sub"),
             name: app.name,
             uscc: app.uscc,
@@ -539,7 +552,25 @@
             since: "2026-10-27",
             status: "active",
             channel: app.channel
-          });
+          };
+          /* 审批通过即按模板发起协议：正文在发起时回填并归档（ag.bodyHtml），
+             二级企业登录后看到的就是这一份，不是前端现拼的。 */
+          var agNew = {
+            id: "A2-2026-1027-" + (d.subs.length + 1),
+            version: "v2026.10",
+            ratio: app.ratio,
+            state: "pending",
+            sentAt: "2026-10-27",
+            expireAt: "2027-10-26",
+            signedAt: "", signerName: "", rejectReason: "", rejectedAt: ""
+          };
+          if (window.V3 && window.V3.scenarios && window.V3.scenarios.agreementBody) {
+            agNew.bodyHtml = window.V3.scenarios.agreementBody({
+              jia: d.profile, yi: newSub, ratio: app.ratio, ag: agNew
+            });
+          }
+          newSub.agreement = agNew;
+          d.subs.push(newSub);
           pushMsg(d, { icon: "file-text", type: "info", title: "合作已通过：" + app.name, desc: "合作协议已生成，待二级企业登录后签署", to: "#/subs" });
         } else {
           app.status = "rejected";
@@ -603,12 +634,25 @@
         if (!p.data.vouchers || !p.data.vouchers.length) return fail("请上传付款凭证（凭证强制）");
         var confirmed = regsSum(regs, calc.id);
         var remain = calc.calcAmount - confirmed;
-        if (Number(p.data.amount) > remain + 0.01) {
+        /* 指定二级企业登记（省代在「该企业对账单」里付款）：额度按该企业的应付与已登记算，
+           不占别家的额度。未指定 subId 时保持原聚合口径。 */
+        var subId = p.data.subId || "";
+        if (subId) {
+          var targetSub = (d.subs || []).filter(function (x) { return x.id === subId; })[0];
+          if (!targetSub) return fail("未找到该二级企业");
+          var subDue = subDueOf(d, targetSub);
+          var subRegSum = regsSum(regs.filter(function (r) { return r.subId === subId; }), calc.id);
+          var subRemain = subDue - subRegSum;
+          if (Number(p.data.amount) > subRemain + 0.01) {
+            return fail("登记金额 ¥" + Number(p.data.amount).toLocaleString() + " 超过该企业未登记差额 ¥" + subRemain.toLocaleString() + "，请先冲销更正后再登记");
+          }
+        } else if (Number(p.data.amount) > remain + 0.01) {
           return fail("登记金额 ¥" + Number(p.data.amount).toLocaleString() + " 超过未登记差额 ¥" + remain.toLocaleString() + "，请先冲销更正后再登记");
         }
         regs.push({
           id: genId("r"),
           calcId: calc.id,
+          subId: subId,
           amount: Number(p.data.amount),
           method: p.data.method || "bank",
           date: p.data.date || "2026-10-27",
@@ -722,6 +766,21 @@
           target = d.subs.filter(function (x) { return x.status === "active"; })[0];
         }
         if (!target) return fail("没有可重新发起协议的二级企业");
+        /* 重发 = 对同一份合作再次发起：编号沿用，协议回到待签署，签署/拒签留痕清空，
+           上一轮拒签原因保留（协议中心据此提示"为何重发"）。
+           2026-11-01 修正：原实现只发消息不改状态，页面上"已重发"靠 localStorage 覆盖层假装，
+           刷新或换页后协议又回到已签署/已拒签，与消息留痕自相矛盾。 */
+        var tg = target.agreement || (target.agreement = {});
+        tg.state = "pending";
+        tg.sentAt = TODAY;
+        tg.signedAt = "";
+        tg.signerName = "";
+        tg.rejectedAt = "";
+        if (!tg.id) tg.id = "A2-" + TODAY;
+        if (!tg.version) tg.version = "v" + TODAY.slice(0, 7);
+        /* 重发即重新起算一年（协议第九条）：沿用旧 expireAt 会出现
+           「发起 2026-10-27 / 拟定期限至 2027-10-11」这种自相矛盾的账期。 */
+        tg.expireAt = (Number(TODAY.slice(0, 4)) + 1) + TODAY.slice(4);
         pushMsg(d, { icon: "file-text", type: "info", title: "协议已重新发起：" + target.name, desc: "已通知二级企业重新查阅并签署", to: "#/subs" });
         d.ratioLog = d.ratioLog || [];
         d.ratioLog.unshift({ id: genId("rl"), subId: target.id, sub: target.name, act: "resend", by: "boss", at: new Date().toLocaleString("zh-CN", { hour12: false }) });
@@ -749,7 +808,9 @@
   window.V3 = window.V3 || {};
   window.V3.store = {
     LS_KEY: LS_KEY,
+    TODAY: TODAY,
     CONST: CONST,
+    subDueOf: subDueOf,
     genChannelCode: genChannelCode,
     calcFinance: calcFinance,
     subSettle: subSettle,

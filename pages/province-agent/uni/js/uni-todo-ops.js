@@ -81,10 +81,9 @@
         html = '<div class="uh-sheetkv"><span class="k">甲方</span><span class="v">' + ui.esc(ag.province.name) + '</span></div>' +
           '<div class="uh-sheetkv"><span class="k">乙方</span><span class="v">' + ui.esc(ag.sub.name) + '</span></div>' +
           '<div class="uh-sheetkv"><span class="k">合作期限</span><span class="v">' + ui.esc(ag.sentAt) + " 起 · 一年" + '</span></div>' +
-          '<div class="uh-sechead">协议要点</div>' +
-          (ag.terms || []).map(function (t) {
-            return '<div class="uh-clause"><div class="no">' + ui.esc(t.no + " · " + t.t) + '</div><div class="c">' + ui.esc(t.c) + '</div></div>';
-          }).join("");
+          '<div class="uh-sechead">协议正文</div>' +
+          (window.Uni.richDoc(window.Uni.agreementBody(ag)) ||
+            '<div class="uh-plain">正文由省代在后台编辑生成，当前版本暂无可展示的正文。</div>');
       }
     } else if (key === "agree-rejected") {
       var ag2 = s.agreement;
@@ -188,9 +187,9 @@
   /* ---------- 协议签署 / 查看 sheet（二级） ---------- */
   function agreementSheet(ctx, mode, Uni) {
     var ag = ctx.s.agreement;
-    var terms = (ag.terms || []).map(function (t) {
-      return '<div class="uh-clause"><div class="no">' + ui.esc(t.no + " · " + t.t) + '</div><div class="c">' + ui.esc(t.c) + '</div></div>';
-    }).join("");
+    /* 正文由省代在后台富文本里维护，这里只做清洗排版，不在前端拼条款 */
+    var terms = Uni.richDoc(Uni.agreementBody(ag)) ||
+      '<div class="uh-plain">正文由省代在后台编辑生成，当前版本暂无可展示的正文。</div>';
     var foot;
     if (mode === "sign") {
       foot = [

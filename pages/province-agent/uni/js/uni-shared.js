@@ -425,6 +425,167 @@
       '<div class="e-desc">' + global.V3.ui.esc(desc || "") + "</div></div>";
   }
 
+  /* ---------- 富文本正文（协议正文：后台富文本编辑器 / Word 粘贴） ----------
+     正文由后台富文本编辑器产出 HTML 后入库，前端只做「清洗 + 归一」两件事：
+
+     · 清洗：标签 / 属性白名单，脚本、事件属性、内联样式一律剔除。
+       后台内容同样按不可信数据对待——编辑器允许粘贴任意 HTML，
+       等于把写权限交给了运营，不能直接塞进 innerHTML。
+     · 归一：Word 粘贴残留就地抹平（class="MsoNormal"、<o:p>、<font> 标签、
+       &nbsp; 空段、font-size/font-family 内联样式、table 的 border/width 属性），
+       行内加粗/斜体/下划线转成语义标签，对齐方式转成类名，空段丢弃。
+
+     全站唯一出口：所有展示位都调用 Uni.richDoc()，输出统一的
+     <div class="uh-doc">，排版只由 CSS 的 .uh-doc 决定，各页面各写一套的情况不会再出现。 */
+  var RICH_ALLOW = {
+    P: 1, BR: 1, STRONG: 1, B: 1, EM: 1, I: 1, U: 1, S: 1, SUB: 1, SUP: 1,
+    H1: 1, H2: 1, H3: 1, H4: 1, UL: 1, OL: 1, LI: 1,
+    TABLE: 1, THEAD: 1, TBODY: 1, TR: 1, TH: 1, TD: 1,
+    BLOCKQUOTE: 1, HR: 1, A: 1, IMG: 1
+  };
+  /* 连内容一起丢弃的标签：脚本类 + Word 的 Office 命名空间标记 */
+  var RICH_DROP = {
+    SCRIPT: 1, STYLE: 1, IFRAME: 1, OBJECT: 1, EMBED: 1, LINK: 1, META: 1,
+    FORM: 1, INPUT: 1, BUTTON: 1, TEXTAREA: 1, SELECT: 1, SVG: 1, CANVAS: 1, "O:P": 1
+  };
+  var RICH_BLOCK = { P: 1, H1: 1, H2: 1, H3: 1, H4: 1, LI: 1, TD: 1, TH: 1, BLOCKQUOTE: 1 };
+
+  function richEsc(s) { return global.V3.ui.esc(s); }
+
+  /* 只保留安全的目标：http(s)/mailto 链接、data: 或相对路径的图片。
+     其余（javascript:、// 外链）按纯文本处理，避免正文里藏跳转。 */
+  function richHref(v) {
+    v = String(v || "").trim();
+    return /^(https?:|mailto:)/i.test(v) ? v : "";
+  }
+  function richSrc(v) {
+    v = String(v || "").trim();
+    if (/^data:image\//i.test(v)) return v;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(v) && v.indexOf("//") !== 0) return v;
+    return "";
+  }
+
+  /* 对齐：Word 用 <p align=center> 或内联 text-align，统一转成类名 */
+  function richAlign(el) {
+    var st = (el.getAttribute("style") || "").toLowerCase();
+    var m = /text-align\s*:\s*(center|right|justify)/.exec(st);
+    var al = (m ? m[1] : (el.getAttribute("align") || "")).toLowerCase();
+    return al === "center" ? "uh-doc--c" : al === "right" ? "uh-doc--r" : al === "justify" ? "uh-doc--j" : "";
+  }
+
+  /* 段内是否还有可见内容：只有标签、&nbsp;、空白 = Word 的空行，整段丢弃 */
+  function richHas(html) {
+    if (/<img[\s>]/i.test(html)) return true;
+    return html.replace(/<[^>]*>/g, "").replace(/&nbsp;| |\s/g, "") !== "";
+  }
+
+  /* 每次 richDoc() 重置：整篇正文只升格一个居中标题为 h1 */
+  var richTitleDone = false;
+
+  function richWalk(node) {
+    var out = "";
+    for (var i = 0; i < node.childNodes.length; i++) {
+      var n = node.childNodes[i];
+      if (n.nodeType === 3) {
+        /* 源码换行会被浏览器当成空格，这里先压成单空格再转义 */
+        out += richEsc(String(n.nodeValue).replace(/[\t\n\r]+/g, " ").replace(/ {2,}/g, " "));
+        continue;
+      }
+      if (n.nodeType !== 1) continue;                 /* 注释 / CDATA 丢弃 */
+      var tag = n.nodeName.toUpperCase();
+      if (RICH_DROP[tag]) continue;
+
+      /* <span>/<font> 在编辑器里是排版壳（字体、字号、颜色），壳要拆掉；
+         但若带着加粗/斜体/下划线的语义，拆壳前先补回语义标签，
+         否则「整段论述里的关键一句」在清洗后会丢失强调 */
+      if (tag === "SPAN" || tag === "FONT") {
+        var st0 = (n.getAttribute("style") || "").toLowerCase();
+        var inner0 = richWalk(n);
+        var wrap = /font-weight\s*:\s*(bold|[6-9]00)/.test(st0) ? "strong"
+          : /font-style\s*:\s*italic/.test(st0) ? "em"
+            : /text-decoration[^;]*underline/.test(st0) ? "u" : "";
+        out += wrap ? "<" + wrap + ">" + inner0 + "</" + wrap + ">" : inner0;
+        continue;
+      }
+
+      if (!RICH_ALLOW[tag]) { out += richWalk(n); continue; }   /* 未知标签：保内容、去壳 */
+      if (tag === "BR") { out += "<br>"; continue; }
+      if (tag === "HR") { out += "<hr>"; continue; }
+      if (tag === "IMG") {
+        var src = richSrc(n.getAttribute("src"));
+        if (src) out += '<img src="' + richEsc(src) + '" alt="' + richEsc(n.getAttribute("alt") || "") + '" loading="lazy">';
+        continue;
+      }
+      if (tag === "A") {
+        var href = richHref(n.getAttribute("href"));
+        var innerA = richWalk(n);
+        out += href ? '<a href="' + richEsc(href) + '" target="_blank" rel="noopener noreferrer">' + innerA + "</a>" : innerA;
+        continue;
+      }
+      if (tag === "TABLE") { out += '<div class="uh-doc__tw"><table>' + richWalk(n) + "</table></div>"; continue; }
+
+      var inner = richWalk(n);
+      if (RICH_BLOCK[tag] && !richHas(inner)) continue;         /* Word 的空段与占位行 */
+
+      var name = tag === "B" ? "strong" : tag === "I" ? "em" : tag.toLowerCase();
+      var attr = "";
+      if (tag === "TD" || tag === "TH") {
+        ["colspan", "rowspan"].forEach(function (k) {
+          var v = parseInt(n.getAttribute(k), 10);
+          if (v > 1 && v <= 20) attr += " " + k + '="' + v + '"';
+        });
+        /* Word 表的列宽写在 td 的 width 属性上（22% / 120px）；
+           只认百分比——px 宽在手机上会把表格撑出屏幕 */
+        var w = /^(\d{1,3})%$/.exec(String(n.getAttribute("width") || "").trim());
+        if (w) attr += ' style="width:' + w[1] + '%"';
+      }
+      /* Word 里「第一条　合作主体」往往是整段加粗的普通段落而不是标题样式；
+         整段只有一处加粗且不过长，就按条标题渲染，避免条标题被当成正文缩进。
+         居中加粗的短段落在合同里是文件标题（Word 里也是居中的普通段落），
+         取第一处升格为 h1，好让标题与条标题在字号上拉开层级 */
+      var mh = tag === "P" ? /^<strong>([^<]{1,26})<\/strong>$/.exec(inner) : null;
+      if (mh) {
+        if (richAlign(n) === "uh-doc--c" && !richTitleDone) {
+          richTitleDone = true;
+          out += "<h1>" + mh[1] + "</h1>";
+        } else {
+          out += '<p class="uh-doc__h">' + mh[1] + "</p>";
+        }
+        continue;
+      }
+
+      var cls = richAlign(n);
+      out += "<" + name + attr + (cls ? ' class="' + cls + '"' : "") + ">" + inner + "</" + name + ">";
+    }
+    return out;
+  }
+
+  /* 协议正文取数：后台存档（ag.bodyHtml）优先，没有就按双方主体与约定比例回填模板。
+     右二级协议自带 province / sub，只传 ag 即可；省代侧由调用方补 jia / yi / ratio。 */
+  function agreementBodyOf(ag, opt) {
+    opt = opt || {};
+    if (ag && ag.bodyHtml) return ag.bodyHtml;
+    var S = global.V3.scenarios;
+    if (!S || !S.agreementBody) return "";
+    return S.agreementBody({
+      jia: opt.jia || (ag && ag.province) || {},
+      yi: opt.yi || (ag && ag.sub) || {},
+      ratio: opt.ratio !== undefined ? opt.ratio : (ag && ag.ratioToSub),
+      ag: ag || {}
+    });
+  }
+
+  function richDoc(html) {
+    if (!html) return "";
+    var box = global.document.createElement("div");
+    box.innerHTML = String(html);          /* 只解析，不回填到文档树，事件不会触发 */
+    richTitleDone = false;
+    var out = richWalk(box)
+      .replace(/(<br>\s*){3,}/g, "<br><br>")
+      .replace(/(<br>\s*)+<\/(p|h1|h2|h3|h4|li)>/gi, "</$2>");   /* 段尾多余的 <br> 是 Word 的换行壳 */
+    return out ? '<div class="uh-doc">' + out + "</div>" : "";
+  }
+
   /* ---------- 与账号层（栈 A：engchain-state / preview / profile）联动的回声键 ----------
      分工：工作台场景键是【工作台】的权威；账号层场景（DataBus.DEMO_SCENARIOS）是【账号】的权威。
      正向：账号层应用演示场景时直接写工作台场景键（见 js/databus.js syncWorkbench）。
@@ -856,6 +1017,8 @@
     dialog: dialog,
     toast: toast,
     emptyHtml: emptyHtml,
+    richDoc: richDoc,
+    agreementBody: agreementBodyOf,
     icon: icon,
     catOf: function (t) {
       var m = { danger: { t: "需处理", c: "var(--error)" },

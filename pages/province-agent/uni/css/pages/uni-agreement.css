@@ -1,0 +1,146 @@
+/* ============================================================
+   uni-agreement.css · 合作协议（省代协议中心 / 二级签署台）
+   结构：台账统计 → 状态分组行 → 单份协议详情（要素 / 流程 / 双方 / 条款）
+   内容基元来自 uni-layout.css（.uh-*），组件视觉来自 app.css
+   （.card/.btn/.uh-badge…）；本文件只放本页特有布局与动效。
+   颜色一律取系统令牌，不写死色值。
+   ============================================================ */
+
+/* 底部留白要避让右下角常驻的 AI 悬浮球，否则页尾按钮会被压住 */
+#ag-view { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+/* 有粘性底栏时再让一档，避免条款末尾被玻璃底栏压住 */
+#ag-view.ag-hasbar { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
+/* 本页是次级页、没有 tabbar：底栏贴到手机底部安全区，
+   否则会沿用 .uh-stickybar 给 tabbar 预留的 88px，在底部悬空一截 */
+#ag-view .uh-stickybar { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------------- 1. 台账统计 ---------------- */
+.ag-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-top: 10px;
+}
+.ag-stat {
+  background: var(--bg-card-2); border-radius: var(--r-m);
+  padding: 10px 6px; text-align: center;
+}
+.ag-stat b {
+  display: block; font-size: var(--fs-xl); font-weight: 700;
+  color: var(--text-1); font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.ag-stat span { display: block; font-size: var(--fs-xs); color: var(--text-3); margin-top: 3px; }
+.ag-stat--wait b { color: var(--warning); }
+.ag-stat--ok b { color: var(--success); }
+.ag-stat--bad b { color: var(--error); }
+
+/* ---------------- 2. 分组行（待签 / 拒签 / 已签） ---------------- */
+.ag-nm { font-size: var(--fs-md); font-weight: 700; color: var(--text-1); }
+.ag-meta {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--text-3); margin-top: 3px;
+}
+.ag-meta i { font-style: normal; opacity: .5; }
+
+/* 单段不折行（编号、日期这类不可切分的串）：换行只允许发生在「·」分隔处 */
+.ag-nw { white-space: nowrap; }
+
+/* 第三行的语义分段：段内不折行，分隔点用 ::before 生成，
+   这样折行时分隔点一定跟着下一段走到行首，不会吊在上一行行尾 */
+.ag-seg { white-space: nowrap; }
+.ag-seg + .ag-seg::before { content: "·"; margin-inline: 5px; opacity: .55; }
+.ag-seg--warn { color: var(--warning); }
+
+/* 多行行（含协议编号 / 签署留痕 / 拒签原因）：图标顶对齐，避免多行时居中发飘 */
+.ag-row { align-items: flex-start; }
+.ag-row .uh-row__ic { margin-top: 2px; }
+.ag-row .uh-row__right { margin-top: 1px; }
+
+/* 拒签原因：条状引述，不用色块——同一屏里已经有一个红色徽标，
+   再叠一块红底会把「已拒签」这一个事实说三遍 */
+.ag-rej {
+  display: block; margin-top: 8px; padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5;
+}
+
+/* 操作区：主操作独占一行，次级入口并排——三个等宽按钮会把中文标签挤成两行 */
+.ag-acts__main { margin-bottom: 8px; }
+.ag-acts__sub { display: flex; gap: 10px; }
+.ag-acts__sub .btn { flex: 1 1 0; min-width: 0; }
+
+/* ---------------- 3. 单份协议：抬头 ---------------- */
+.ag-hero { display: flex; align-items: center; gap: 12px; }
+.ag-hero > span:last-child { min-width: 0; }
+.ag-hero__ic {
+  width: 44px; height: 44px; flex: none; border-radius: var(--r-m);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--primary-soft); color: var(--primary-dim);
+}
+.ag-hero__t { display: block; font-size: var(--fs-lg); font-weight: 700; color: var(--text-1); line-height: 1.3; }
+.ag-hero__s { display: block; font-size: var(--fs-sm); color: var(--text-3); margin-top: 3px; line-height: 1.45; }
+
+/* 双方主体：各成一块，标题压成 eyebrow 档，主体名做主信息 */
+.ag-party__h {
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em;
+  color: var(--text-3); margin-bottom: 2px;
+}
+.ag-party__n {
+  font-size: var(--fs-base); font-weight: 700; color: var(--text-1);
+  line-height: 1.4; padding-bottom: 2px;
+}
+
+/* 有效期进度：一年期协议已走过多少 */
+.ag-life { margin-top: 12px; }
+.ag-life__bar {
+  height: 6px; border-radius: 999px; background: var(--bg-card-2); overflow: hidden;
+}
+.ag-life__fill {
+  height: 100%; border-radius: 999px; background: var(--primary);
+  transform-origin: left center; animation: ag-fill .6s var(--e-emph) both;
+}
+.ag-life__fill--warn { background: var(--warning); }
+.ag-life__fill--bad { background: var(--error); }
+.ag-life__lg {
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-xs); color: var(--text-3); margin-top: 5px;
+}
+@keyframes ag-fill { from { transform: scaleX(0); } }
+
+/* ---------------- 4. 流程时间线 ---------------- */
+.ag-tl { position: relative; padding-left: 24px; margin-top: 4px; }
+.ag-tl::before {
+  content: ""; position: absolute; left: 5.5px; top: 8px; bottom: 10px;
+  width: 1px; background: var(--line);
+}
+.ag-tl__i { position: relative; padding-bottom: 16px; }
+.ag-tl__i:last-child { padding-bottom: 0; }
+.ag-tl__i::before {
+  content: ""; position: absolute; left: -24px; top: 4px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--bg-card); border: 2px solid var(--line); box-sizing: border-box;
+}
+.ag-tl__i.is-done::before { background: var(--success); border-color: var(--success); }
+.ag-tl__i.is-now::before {
+  background: var(--primary); border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.ag-tl__i.is-bad::before { background: var(--error); border-color: var(--error); }
+.ag-tl__t { font-size: var(--fs-base); font-weight: 600; color: var(--text-1); }
+.ag-tl__i.is-todo .ag-tl__t { color: var(--text-3); font-weight: 500; }
+.ag-tl__d { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; line-height: 1.45; }
+
+/* ---------------- 5. 协议正文 ----------------
+   正文由后台富文本生成，排版统一由 uni-layout.css 的 .uh-doc 决定；
+   本页只给合同正文留一段与卡片边距协调的内边距，避免长文贴边。 */
+#ag-view .uh-doc { margin-top: 6px; }
+
+/* ---------------- 6. 入场动效 ---------------- */
+#ag-view > section { animation: ag-in .32s var(--e-emph) both; }
+#ag-view > section:nth-child(2) { animation-delay: .04s; }
+#ag-view > section:nth-child(3) { animation-delay: .08s; }
+#ag-view > section:nth-child(4) { animation-delay: .12s; }
+#ag-view > section:nth-child(n + 5) { animation-delay: .16s; }
+@keyframes ag-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #ag-view > section, .ag-life__fill { animation: none; }
+}
