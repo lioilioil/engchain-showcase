@@ -125,6 +125,8 @@ body, .phone { background: var(--bg); }
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- 站内页面预览弹窗（自下而上 + 右上角「放大至全屏」+ 关闭），与消息页/会话页共用同一套 -->
+<script src="../../js/preview-sheet.js"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -211,8 +213,13 @@ body, .phone { background: var(--bg); }
         if (it.cat) metaParts.push(it.cat);
         metaParts.push(formatTime(it.viewedAt));
         var meta = metaParts.join(' <span class="dot"></span> ');
+        /* href 保留（无 JS / 新窗口打开时仍可直达）；data-preview 交给下方委托处理器
+           改为站内预览弹窗，标题作为弹窗标题 */
+        var href = '../supply/detail.html?id=' + encodeURIComponent(it.id);
+        var label = it.title || '页面预览';
         html +=
-          '<a class="vh-card" href="../supply/detail.html?id=' + encodeURIComponent(it.id) + '">' +
+          '<a class="vh-card" href="' + href + '" data-preview="1" data-preview-label="' +
+            (window.UI && UI.esc ? UI.esc(label) : label) + '">' +
             '<div class="vh-card-icon">' + icon + '</div>' +
             '<div class="vh-card-body">' +
               '<div class="vh-card-title">' + (it.title || '未命名条目') + '</div>' +
@@ -225,6 +232,22 @@ body, .phone { background: var(--bg); }
 
     content.innerHTML = html;
   }
+
+  /* 条目点击：自下而上预览弹窗（右上角带「放大至全屏」icon）；
+     弹窗能力由 js/preview-sheet.js 提供，与消息页 / 会话页同一套组件，
+     这里不复制任何弹窗样式或图标。preview-sheet 未就绪时保持原生跳转。 */
+  content.addEventListener('click', function (e) {
+    var card = e.target && e.target.closest ? e.target.closest('.vh-card[data-preview]') : null;
+    if (!card) return;
+    /* 修饰键 / 中键点击：尊重浏览器「在新标签打开」的默认行为 */
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (typeof window.openPagePreview !== 'function') return;
+    e.preventDefault();
+    window.openPagePreview(
+      card.getAttribute('href'),
+      card.getAttribute('data-preview-label') || '页面预览'
+    );
+  });
 
   /* 返回按钮 */
   backBtn.addEventListener('click', function () {
