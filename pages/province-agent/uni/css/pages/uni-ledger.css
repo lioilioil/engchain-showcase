@@ -1,34 +1,738 @@
 /* ============================================================
-   uni-ledger.css · 经营台账页内 token 布局（柱图 + 台账表格）
-   组件视觉一律系统类与 uh 基元；本文件仅页内布局。取值引用 app.css 令牌。
+   uni-ledger.css · 经营台账（ledger.html）
+
+   视觉方向：账簿秩序 × 现代数据卡
+     · 账期条   —— 会计分栏签（ink 选中态，区别于对账中心的金色 tab 语汇）
+     · 主数字   —— 单一强调，只给「经营实得」一个金色焦点
+     · 趋势图   —— 零基线柱 + 均值虚线基线（不自造的 y 轴截断）
+     · 账期台账 —— 真账簿表格：等宽数字、发丝分隔线、行内状态签
+     · 分账结构 —— 层级缩进 + 占比底纹，读得出「这笔钱怎么算的」
+     · 来源结构 —— 行内占比条 + 排行
+
+   所有取值引用 app.css 令牌；排版基元复用 uni-layout.css（.uh-*）。
    ============================================================ */
 
-/* 月度趋势柱图 */
-.ulg-bars { display: flex; align-items: flex-end; gap: 20px; height: 132px; padding: 18px 10px 4px; }
-.ulg-bar { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; }
-.ulg-col { width: 100%; max-width: 46px; border-radius: var(--r-s) var(--r-s) 0 0; background: var(--bg-card-2); border: 1px solid var(--line); border-bottom: 0; }
-.ulg-col--cur { background: var(--primary-soft); border-color: var(--accent-line); box-shadow: inset 0 -3px 0 var(--primary); }
-.ulg-col__v { font-size: var(--fs-xs); font-weight: 700; color: var(--text-1); font-variant-numeric: tabular-nums; }
-.ulg-col__lb { font-size: 10px; color: var(--text-3); letter-spacing: .04em; padding-bottom: 2px; }
+/* ================= 容器 ================= */
+.ulg-pad { padding: 12px var(--page-pad) 24px; }
+.ulg-blk { margin-top: 12px; }
+.ulg-blk:first-child { margin-top: 0; }
+.ulg-locks { margin: 12px var(--page-pad) 0; }
+.ulg-bookcard { padding: 14px 14px 10px; }
 
-/* 月度台账表格 */
-.ulg-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-.ulg-table th { font-size: 10px; font-weight: 600; letter-spacing: .05em; color: var(--text-3); padding: 8px 4px; text-align: right; border-bottom: 1px solid var(--line-strong); }
-.ulg-table th:first-child, .ulg-table td:first-child { text-align: left; }
-.ulg-table td { padding: 11px 4px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-1); border-bottom: 1px solid var(--line); font-weight: 600; }
-.ulg-table tbody tr:last-child td { border-bottom: 0; }
+/* ================= ① 账期条（sticky） ================= */
+.ulg-pbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: linear-gradient(to bottom, var(--bg) 72%, color-mix(in srgb, var(--bg) 0%, transparent));
+  padding: 8px 0 10px;
+}
+.ulg-pbar__in { padding: 0 var(--page-pad); }
 
-/* P1-3 月度台账行可点开单据：整行热区 + 键盘焦点环，不改变排版 */
-.ulg-row { cursor: pointer; transition: background var(--d-fast) ease; }
-.ulg-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--primary); border-radius: 6px; }
-.ulg-row:active { background: var(--bg-card-2); }
-@media (hover: hover) { .ulg-row:hover { background: var(--bg-card-2); } }
+.ulg-periods {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 1px 0 2px;
+}
+.ulg-periods::-webkit-scrollbar { display: none; }
 
-/* P0-3 收益全景：数值后的属性补充说明（不参与金额口径） */
-.ulg-pano__sub { margin-left: 8px; font-size: var(--fs-xs); font-weight: 500; color: var(--text-3); }
+.ulg-pchip {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 96px;
+  padding: 8px 13px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-m);
+  background: var(--bg-card);
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--d-fast) var(--e-standard),
+              border-color var(--d-fast) var(--e-standard),
+              box-shadow var(--d-fast) var(--e-standard),
+              color var(--d-fast) var(--e-standard);
+}
+.ulg-pchip:hover { border-color: var(--line-strong); }
+.ulg-pchip:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.ulg-pchip:active { transform: scale(.985); }
 
-/* 批次九 L5：桌面「经营所得 + 月度趋势」两栏并列（移动端单列顺序不变） */
-.ulg-grid { display: block; }
+.ulg-pchip__m {
+  display: flex; align-items: center; gap: 5px;
+  font-size: var(--fs-xs); font-weight: 700;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+}
+.ulg-pchip__a {
+  font-size: var(--fs-md); font-weight: 700;
+  font-family: var(--font-num);
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+/* 选中态用 --action/--on-action 成对令牌，明暗主题各自成立（不可硬写白字） */
+.ulg-pchip.is-on {
+  background: var(--action);
+  border-color: var(--action);
+  color: color-mix(in srgb, var(--on-action) 62%, transparent);
+  box-shadow: var(--btn-lift);
+}
+.ulg-pchip.is-on .ulg-pchip__a { color: var(--on-action); }
+.ulg-pchip.is-on .ulg-dot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--on-action) 24%, transparent); }
+
+.ulg-dot {
+  width: 6px; height: 6px; flex: none;
+  border-radius: 50%;
+  background: var(--text-4);
+}
+.ulg-dot--ok   { background: var(--success); }
+.ulg-dot--wait { background: var(--warning); }
+.ulg-dot--bad  { background: var(--error); }
+.ulg-dot--mute { background: var(--text-4); }
+
+.ulg-pbar__sum {
+  margin-top: 6px;
+  padding-left: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ulg-pbar__sum b { color: var(--text-2); font-weight: 700; }
+
+/* ================= ② 本期概览 ================= */
+.ulg-hero {
+  position: relative;
+  overflow: hidden;
+  scroll-margin-top: 62px;
+}
+.ulg-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 108px;
+  background: linear-gradient(180deg, rgba(176, 138, 60, .10), rgba(176, 138, 60, 0));
+  pointer-events: none;
+}
+.ulg-hero > * { position: relative; }
+
+.ulg-hero__head { display: flex; align-items: center; gap: 10px; }
+.ulg-hero__head .uh-eyebrow { font-size: var(--fs-sm); letter-spacing: .07em; }
+
+.ulg-hero__main {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ulg-bignum {
+  font-size: 36px;
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.ulg-bignum .cur { font-size: .5em; }
+
+/* 环比签 */
+.ulg-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+.ulg-delta__ar { width: 12px; height: 12px; }
+.ulg-delta em { font-style: normal; font-weight: 500; opacity: .72; margin-left: 1px; }
+.ulg-delta--up   { background: var(--success-soft); color: var(--success); }
+.ulg-delta--down { background: var(--warning-soft); color: var(--warning-ink); }
+.ulg-delta--down .ulg-delta__ar { transform: rotate(90deg); }
+.ulg-delta--flat { background: var(--bg-card-2); color: var(--text-3); font-weight: 500; }
+
+/* 可复算式 */
+.ulg-formula {
+  margin-top: 8px;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-3);
+}
+.ulg-formula b {
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 收款登记进度 */
+.ulg-receipt {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+}
+.ulg-receipt__h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+.ulg-receipt__none { color: var(--text-4); }
+.ulg-receipt__bar {
+  display: flex;
+  gap: 2px;
+  height: 7px;
+  margin-top: 8px;
+  border-radius: var(--r-full);
+  overflow: hidden;
+  background: var(--bg-card-2);
+}
+.ulg-seg { display: block; height: 100%; }
+.ulg-seg--ok   { background: var(--success); }
+.ulg-seg--wait { background: var(--warning); }
+.ulg-seg--bad  { background: var(--error); opacity: .78; }
+
+.ulg-receipt__l {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ulg-receipt__l span { display: inline-flex; align-items: center; gap: 5px; }
+.ulg-receipt__l i {
+  width: 7px; height: 7px; border-radius: 2px; flex: none;
+  background: var(--text-4);
+}
+.ulg-receipt__l .d-ok i   { background: var(--success); }
+.ulg-receipt__l .d-wait i { background: var(--warning); }
+.ulg-receipt__l .d-bad i  { background: var(--error); opacity: .78; }
+
+/* 三格 KPI */
+.ulg-kv3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ulg-kv3__i { display: flex; flex-direction: column; gap: 4px; padding-right: 8px; }
+.ulg-kv3__i + .ulg-kv3__i { padding-left: 12px; border-left: 1px solid var(--line); }
+.ulg-kv3__i span {
+  font-size: 10.5px;
+  color: var(--text-3);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ulg-kv3__i b {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
+/* ================= ③ 账期趋势 ================= */
+.ulg-mtabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-full);
+  background: var(--bg-card-2);
+  flex: none;
+}
+.ulg-mtab {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--e-standard), color var(--d-fast) var(--e-standard);
+  white-space: nowrap;
+}
+.ulg-mtab.is-on {
+  background: var(--bg-card);
+  color: var(--text-1);
+  box-shadow: var(--shadow-xs);
+}
+.ulg-mtab:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+
+.ulg-plot {
+  position: relative;
+  height: 118px;
+  margin: 18px 0 0;
+}
+.ulg-cols {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.ulg-col {
+  flex: 1 1 0;
+  position: relative;
+  height: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.ulg-col:focus-visible { outline: none; }
+.ulg-col:focus-visible .ulg-col__bar { box-shadow: var(--shadow-focus); }
+
+.ulg-col__bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(44px, 62%);
+  border-radius: 7px 7px 3px 3px;
+  background: linear-gradient(180deg, var(--primary-strong), var(--primary));
+  opacity: .34;
+  transition: height var(--d-slow) var(--e-emph), opacity var(--d-fast) var(--e-standard);
+}
+.ulg-col.is-on .ulg-col__bar { opacity: 1; box-shadow: 0 6px 16px -8px rgba(176, 138, 60, .65); }
+.ulg-col:hover .ulg-col__bar { opacity: .6; }
+.ulg-col.is-on:hover .ulg-col__bar { opacity: 1; }
+
+.ulg-col__v {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.ulg-col.is-on .ulg-col__v { color: var(--text-1); font-weight: 700; }
+
+.ulg-col__na {
+  position: absolute;
+  left: 0; right: 0; bottom: 6px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-4);
+}
+
+/* 均值基线（只画线不写字，数值在下方 note 里） */
+.ulg-rule {
+  position: absolute;
+  left: 0; right: 0;
+  border-top: 1px dashed var(--line-strong);
+  pointer-events: none;
+}
+
+/* 轴标签 */
+.ulg-axis {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.ulg-ax {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  border-radius: var(--r-s);
+  padding: 2px 0;
+  transition: background var(--d-fast);
+}
+.ulg-ax:hover { background: var(--bg-card-2); }
+.ulg-ax span {
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ulg-ax em {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ulg-ax em.up { color: var(--success); }
+.ulg-ax em.down { color: var(--warning-ink); }
+.ulg-ax em.flat { color: var(--text-4); font-weight: 500; }
+.ulg-ax.is-on span { color: var(--text-1); font-weight: 700; }
+
+/* ================= ④ 账期台账 ================= */
+.ulg-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  background: var(--bg-card);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color var(--d-fast), color var(--d-fast);
+}
+.ulg-tool:hover { border-color: var(--accent-line); color: var(--primary-dim); }
+.ulg-tool:active { transform: scale(.97); }
+.ulg-tool svg { width: 13px; height: 13px; }
+
+.ulg-book { margin-top: 2px; }
+.ulg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.ulg-table th {
+  padding: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-4);
+  text-align: right;
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+.ulg-table th:first-child { text-align: left; }
+.ulg-table th:last-child { width: 16px; }
+
+.ulg-table td {
+  padding: 9px 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.ulg-table td:first-child { text-align: left; }
+.ulg-table tr:last-child td { border-bottom: 0; }
+
+.tb-month { display: flex; align-items: center; gap: 6px; }
+.tb-month > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.01em;
+}
+.tb-strong {
+  font-weight: 700;
+  color: var(--text-1) !important;
+  font-size: 13.5px !important;
+}
+.tb-go { color: var(--text-4); padding-left: 4px !important; }
+.tb-go svg { width: 14px; height: 14px; display: block; margin-left: auto; }
+
+.ulg-tag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: var(--r-xs);
+  white-space: nowrap;
+  letter-spacing: .01em;
+}
+.ulg-tag--ok   { background: var(--success-soft); color: var(--success); }
+.ulg-tag--wait { background: var(--warning-soft); color: var(--warning-ink); }
+.ulg-tag--bad  { background: var(--error-soft); color: var(--error); }
+.ulg-tag--mute { background: var(--bg-card-2); color: var(--text-3); }
+
+.ulg-brow { cursor: pointer; transition: background var(--d-fast); }
+.ulg-brow:hover { background: var(--primary-soft); }
+.ulg-brow:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-line); }
+.ulg-brow.is-on { box-shadow: inset 3px 0 0 var(--primary); background: var(--primary-soft); }
+.ulg-brow.is-on td:first-child { padding-left: 8px; }
+.ulg-brow td:first-child { transition: padding-left var(--d-fast) var(--e-standard); }
+
+/* ================= ⑤ 分账结构（树） ================= */
+.ulg-tree { margin-top: 10px; }
+
+.ulg-trow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 8px 10px;
+  min-height: 34px;
+  box-sizing: border-box;
+}
+.ulg-trow::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 26px;
+  width: var(--w, 0%);
+  border-radius: var(--r-s);
+  background: linear-gradient(90deg, var(--primary-soft), rgba(176, 138, 60, .04));
+  pointer-events: none;
+}
+.ulg-trow > * { position: relative; }
+
+.ulg-trow__lb {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ulg-trow__v {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.ulg-trow__tag {
+  flex: none;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-4);
+}
+
+/* 层级缩进 + 引导线 */
+.ulg-trow--lv1 { padding-left: 22px; }
+.ulg-trow--lv1::after,
+.ulg-trow--lv2::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--line-strong);
+}
+.ulg-trow--lv1::after { top: -6px; }
+.ulg-trow--lv2 { padding-left: 34px; }
+.ulg-trow--lv2::after { left: 22px; }
+.ulg-trow--lv2::before { left: 12px; width: calc(var(--w, 0%) - 12px); }
+.ulg-trow--lv1 .ulg-trow__lb { font-weight: 600; color: var(--text-1); }
+.ulg-trow--lv2 .ulg-trow__lb { font-size: var(--fs-xs); color: var(--text-3); }
+.ulg-trow--lv2 .ulg-trow__v { font-size: var(--fs-sm); color: var(--text-2); }
+
+.ulg-trow.is-neg .ulg-trow__v { color: var(--warning-ink); }
+
+.ulg-trow.is-total {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1.5px solid var(--line-strong);
+}
+.ulg-trow.is-total::before { display: none; }
+.ulg-trow.is-total .ulg-trow__lb {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-1);
+}
+.ulg-trow.is-total .ulg-trow__v {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--primary-dim);
+}
+
+/* ================= ⑥ 来源结构（排行） ================= */
+.ulg-rklist { margin-top: 8px; }
+
+.ulg-rk {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: var(--r-s);
+  overflow: hidden;
+  transition: background var(--d-fast);
+}
+.ulg-rk::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: var(--w, 0%);
+  background: linear-gradient(90deg, var(--primary-soft-2), rgba(176, 138, 60, .03));
+  pointer-events: none;
+}
+.ulg-rk > * { position: relative; }
+.ulg-rk[data-sub] { cursor: pointer; }
+.ulg-rk[data-sub]:hover { background: var(--primary-soft); }
+.ulg-rk[data-sub]:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent-line); }
+.ulg-rk + .ulg-rk { margin-top: 2px; }
+
+.ulg-rk__n {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ulg-rk__n .ic { color: var(--primary-dim); flex: none; }
+.ulg-rk__tg {
+  flex: none;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--bg-card-2);
+  padding: 2px 5px;
+  border-radius: var(--r-xs);
+  letter-spacing: .01em;
+}
+.ulg-rk__p {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.ulg-rk__v {
+  flex: none;
+  min-width: 62px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+.ulg-rk.is-self .ulg-rk__n,
+.ulg-rk.is-self .ulg-rk__v { color: var(--primary-dim); }
+.ulg-rk.is-self .ulg-rk__tg { background: var(--primary-soft); color: var(--primary-dim); }
+
+.ulg-rkfoot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 10px 10px 0;
+  border-top: 1.5px solid var(--line-strong);
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+.ulg-rkfoot b {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 员工视角明细 ================= */
+.ulg-stafflist { margin-top: 4px; }
+.ulg-staffrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: var(--fs-sm);
+}
+.ulg-staffrow + .ulg-staffrow { border-top: 1px solid var(--line); }
+.ulg-staffrow__u {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text-1);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ulg-staffrow__u em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+.ulg-staffrow__c {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+  background: var(--bg-card-2);
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+}
+.ulg-staffrow__v {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 账期分解弹窗 ================= */
+.ulg-dhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0 10px;
+}
+.ulg-dhead__m {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= 桌面端：两栏并行 ================= */
 @media (min-width: 768px) {
-  .ulg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  .ulg-pad {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+    padding-top: 14px;
+  }
+  .ulg-pad > .ulg-blk { margin-top: 0; }
+  .ulg-pad > #lg-hero,
+  .ulg-pad > .uh-sec { grid-column: 1 / -1; }
+  .ulg-bignum { font-size: 42px; }
+  .ulg-plot { height: 136px; }
+}
+
+/* ================= 动效降级 ================= */
+@media (prefers-reduced-motion: reduce) {
+  .ulg-col__bar { transition: none; }
+  .ulg-pchip,
+  .ulg-brow,
+  .ulg-brow td:first-child,
+  .ulg-rk { transition: none; }
 }

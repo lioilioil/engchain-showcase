@@ -1,21 +1,223 @@
 /* ============================================================
    uni-ledger.js · 经营台账（ledger.html）
-   模板节奏（三身份同构，数据驱动填充）：
-     只读口径说明条 → 经营所得卡（大数字 + KV）→ 月度趋势柱图 → 月度台账表格 → 计入/排除口径卡
-   身份差异仅限：数据换源（二级=逐月 subSettle；省代=calcFinance + 上月已平账口径回推）、
-   说明文案、徽章。员工只读。
-   组件视觉全部为系统类（.card/.btn/.uh-* 基元…）；弹窗/Toast 经 Uni.*。
+
+   —— 页面定位（与相邻页面分工，互不重叠）——
+     · 对账中心   = 单个账期的「过程」：逐笔核对、异议、确认、平账
+     · 对账历史   = 历次对账单的「档案」：按账单类型归档索引与下载
+     · 经营台账   = 按账期归集的「结果」：赚了多少、怎么算出来的、从哪来、往哪走、可导出
+
+   信息架构（四身份同构，差异仅在数据源与文案）：
+     ① 账期条     横向账期切换（sticky），全页账期口径的唯一入口
+     ② 本期概览   经营实得（大数字 + 环比）+ 可复算式 + 收款登记进度 + 三格 KPI
+     ③ 账期趋势   三指标切换 · 均值基线 · 点柱切账期
+     ④ 账期台账   账簿式表格（账期/账单/付二级/实得/状态）→ 行点开「账期分解」
+     ⑤ 分账结构   这笔钱是怎么算出来的（省代=两分区树；二级=单企业树）
+     ⑥ 来源结构   省代=逐家二级线留存排行；二级=按事项类型构成
+     ⑦ 口径说明   折叠；含「本页与相邻页面的分工」
+
+   口径纪律（沿用既有审计结论）：
+     · 主数字必带可复算算式，禁止与台账行出现两个真值（P0-1）
+     · 账期集合以 hist（月度账单权威清单）为准，不静默缺席任何账期（P1-3）
+     · 无复算记录的账期只列账单金额并显式标注「不可复算」，不臆造合格消费
+     · 分账明细（基数口径）与月度账单（账期口径）不等时明示，不掩盖（P0-2）
+
    S1 铁律：全页仅 `var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);` 一行身份分支。
+   视觉全部复用 app.css 令牌与 uni-layout.css 基元；弹窗/Toast 经 Uni.*。
    ============================================================ */
 (function () {
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
 
-  /* ---------- 员工视角：仅本人获客用户及其消费记录（M3 渠道归因数据隔离） ----------
-     2026-11-01 审计补齐：二级员工（sub_staff）与省代员工同构。渠道桶随域切换
-     （省代 = direct「直接合作」，二级 = school「二级渠道」，与 scenarios.js 种子键一致），
-     其余口径完全一致——都只汇总本人名下线索与本人渠道码，不下发企业分佣台账。 */
-  function buildStaffVm(ctx) {
+  /* ================= 常量 ================= */
+
+  /* 事项类型（与 uni-doc 同一套词表；此处用于「收入构成」而非单据行） */
+  var ITEM_LB = { cert: "企业认证", entry: "企业入驻", unlock: "线索解锁", order: "供需订单" };
+  var ITEM_IC = { cert: "badge", entry: "company", unlock: "unlock", order: "box" };
+  var ITEM_SEQ = ["cert", "entry", "unlock", "order"];
+
+  /* 付款登记状态 → 归集桶（与对账中心共用同一批登记记录，本页只呈现「结果」不提供动作） */
+  var REG_CLS = { confirmed: "ok", pending_confirm: "wait", disputed: "bad" };
+  var REG_LB = { confirmed: "已确认", pending_confirm: "待确认", disputed: "争议" };
+
+  /* 会话内状态：mount 重建不丢失（账期 / 趋势指标） */
+  var _s = { month: null, metric: null };
+
+  function histLb() {
+    return (window.UniDoc && window.UniDoc.HIST_LB) || { pending: "对账中", settled: "已平账", overdue: "逾期锁定" };
+  }
+  function histCls() {
+    return (window.UniDoc && window.UniDoc.HIST_CLS) || { pending: "wait", settled: "ok", overdue: "bad" };
+  }
+
+  /* ================= 通用小工具 ================= */
+
+  function num(v) { return typeof v === "number" && isFinite(v); }
+  function share(a, b) { return b > 0 && num(a) ? Math.min(a / b, 1) : 0; }
+  function pctTxt(a, b) { return b > 0 ? Math.round(a / b * 1000) / 10 : 0; }
+  function signPct(p) { return (p > 0 ? "+" : "") + (Math.round(p * 10) / 10) + "%"; }
+
+  function deltaOf(cur, prev, key) {
+    if (!cur || !prev) return null;
+    var a = cur[key], b = prev[key];
+    if (!num(a) || !num(b) || b === 0) return null;
+    return { pct: (a - b) / Math.abs(b) * 100, abs: a - b, prevMonth: prev.month };
+  }
+
+  function deltaHtml(d, emptyTxt) {
+    if (!d) return '<span class="ulg-delta ulg-delta--flat">' + ui.esc(emptyTxt || "无上期可比") + "</span>";
+    var up = d.pct >= 0;
+    return '<span class="ulg-delta ulg-delta--' + (up ? "up" : "down") + '">' +
+      '<svg class="ulg-delta__ar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>' +
+      "<b>" + signPct(d.pct) + "</b><em>较 " + ui.esc(d.prevMonth) + "</em></span>";
+  }
+
+  /* CSV 落地：BOM + CRLF，Excel 直接可读 */
+  function downloadCsv(name, rows) {
+    var text = "﻿" + rows.map(function (r) {
+      return r.map(function (c) {
+        var s = String(c == null ? "" : c);
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }).join(",");
+    }).join("\r\n");
+    try {
+      var blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* ================= 数据层：账期集合 ================= */
+
+  /* 账单月份 ↔ 账单编号映射（用于把付款登记归到账期；登记自带日期时以日期兜底） */
+  function calcIdMap(s, isSub) {
+    var m = {};
+    if (isSub) {
+      (s.calc || []).forEach(function (c) { if (c && c.id && c.month) m[c.id] = c.month; });
+    } else {
+      [s.calc1, s.calc2].forEach(function (c) { if (c && c.id && c.month) m[c.id] = c.month; });
+    }
+    return m;
+  }
+
+  function regMonth(reg, cmap) {
+    var cid = reg && reg.calcId;
+    if (cid && cmap[cid]) return cmap[cid];
+    var d = (reg && reg.date) || "";
+    return /^\d{4}-\d{2}/.test(d) ? d.slice(0, 7) : "";
+  }
+
+  /* → { "2026-10": { ok, wait, bad, total, n } } */
+  function regsByMonth(regs, cmap) {
+    var out = {};
+    (regs || []).forEach(function (r) {
+      var m = regMonth(r, cmap);
+      if (!m) return;
+      var b = out[m] || (out[m] = { ok: 0, wait: 0, bad: 0, total: 0, n: 0 });
+      var k = REG_CLS[r.status] || "wait";
+      var amt = Number(r.amount) || 0;
+      b[k] += amt;
+      b.total += amt;
+      b.n++;
+    });
+    return out;
+  }
+
+  /* ---------- 省代：账期行以 hist（月度账单权威清单）为唯一来源 ---------- */
+  function provincePeriods(ctx) {
+    var LB = histLb(), CLS = histCls(), s = ctx.s;
+    var map = {}, order = [];
+    (s.hist || []).forEach(function (h) {
+      if (!h || !h.month) return;
+      var e = map[h.month];
+      if (!e) { e = map[h.month] = { month: h.month, plat: null, sub: null }; order.push(h.month); }
+      if ((h.type || "platform") === "sub") e.sub = h; else e.plat = h;
+    });
+    var cmap = calcIdMap(s, false);
+    var regIn = regsByMonth(s.payRegs1, cmap);   /* 平台 → 省代（进账） */
+    var regOut = regsByMonth(s.payRegs2, cmap);  /* 省代 → 二级（出账） */
+
+    return order.sort().reverse().map(function (m) {
+      var e = map[m];
+      var bill = e.plat ? Number(e.plat.amount || 0) : 0;
+      var paySub = e.sub ? Number(e.sub.amount || 0) : 0;
+      var st = (e.plat && e.plat.state) || (e.sub && e.sub.state) || "pending";
+      return {
+        month: m,
+        bill: bill,
+        paySub: paySub,
+        income: bill - paySub,                 /* 省代实得 = 收平台账单 − 付二级账单 */
+        eligible: Math.round(bill / 0.5),      /* 合格消费 = 账单 ÷ 50% 分佣线 */
+        state: st,
+        stateTxt: LB[st] || "对账中",
+        stateCls: CLS[st] || "mute",
+        issueAt: (e.plat && e.plat.issueAt) || (e.sub && e.sub.issueAt) || "",
+        dueAt: (e.plat && e.plat.dueAt) || (e.sub && e.sub.dueAt) || "",
+        settledAt: (e.plat && e.plat.settledAt) || (e.sub && e.sub.settledAt) || "",
+        regIn: regIn[m] || null,
+        regOut: regOut[m] || null,
+        detail: (s.calc1 && s.calc1.month === m) ? (s.calc1.detail || []) : null,
+        detailOut: (s.calc2 && s.calc2.month === m) ? (s.calc2.detail || []) : null
+      };
+    });
+  }
+
+  /* ---------- 二级：账单金额/状态取 hist，复算口径取 calc ---------- */
+  function subPeriods(ctx) {
+    var LB = histLb(), CLS = histCls(), s = ctx.s;
+    var calcMap = {}, histMap = {}, seen = {}, order = [];
+    function add(m) { if (m && !seen[m]) { seen[m] = 1; order.push(m); } }
+    (s.calc || []).forEach(function (c) { if (c && c.month) { calcMap[c.month] = c; add(c.month); } });
+    (s.hist || []).forEach(function (h) { if (h && h.month) { histMap[h.month] = h; add(h.month); } });
+
+    var cmap = calcIdMap(s, true);
+    var regIn = regsByMonth(s.payRegs, cmap);    /* 省代 → 二级（本企业进账） */
+
+    return order.sort().reverse().map(function (m) {
+      var c = calcMap[m], h = histMap[m];
+      var st = h ? h.state : "pending";
+      var row = {
+        month: m,
+        state: st,
+        stateTxt: LB[st] || "对账中",
+        stateCls: CLS[st] || "mute",
+        issueAt: (h && h.issueAt) || (c && c.issueAt) || "",
+        dueAt: (h && h.dueAt) || (c && c.dueAt) || "",
+        settledAt: (h && h.settledAt) || (c && c.settledAt) || "",
+        regIn: regIn[m] || null,
+        detail: (c && (c.detail || []).length) ? c.detail : null,
+        derived: !c
+      };
+      if (c) {
+        var st2 = store.subSettle(c);
+        row.eligible = st2.eligible;
+        row.gross = st2.gross;
+        row.ratio = st2.ratioToSub;
+        row.ratioTxt = Math.round(st2.ratioToSub * 100) + "%";
+        row.income = st2.agreed;
+        row.frozen = st2.frozen;
+      } else {
+        /* 逾期锁定账期无当月复算记录：只列账单金额，合格消费留空不臆造 */
+        row.eligible = null;
+        row.gross = null;
+        row.ratio = null;
+        row.ratioTxt = "—";
+        row.income = h ? Number(h.amount || 0) : 0;
+        row.frozen = 0;
+      }
+      return row;
+    });
+  }
+
+  /* ---------- 员工：仅本人渠道码带来的用户及其消费 ---------- */
+  function staffVm(ctx) {
     var s = ctx.s, my = ctx.staffName;
     var isSub = ctx.mode === "sub";
     var chKeys = isSub ? ["school"] : ["direct"];
@@ -27,7 +229,7 @@
         users++;
         if (l.stage === "paid" || l.stage === "repaid") {
           paidAmt += l.amount || 0;
-          mine.push({ user: l.name || "用户", channel: chLabel, amount: l.amount || 0, stageTxt: "已消费" });
+          mine.push({ user: l.name || "用户", channel: chLabel, amount: l.amount || 0, at: (l.paidAt || l.createdAt || "").slice(0, 10) });
         }
       });
     });
@@ -37,454 +239,765 @@
         if (c.ownerName === my && c.status === "active" && codes.indexOf(c.code) < 0) codes.push(c.code);
       });
     });
-    var byChannel = {};
-    byChannel[chLabel] = 0;
-    mine.forEach(function (r) { byChannel[r.channel] += r.amount; });
-    var max = Math.max(byChannel[chLabel], 1);
-    var bars = [chLabel].map(function (lb) {
-      return { label: lb, value: byChannel[lb], cur: true,
-               pct: max > 0 ? Math.max(Math.round(byChannel[lb] / max * 100), 16) : 16 };
-    });
     return {
-      notice: "员工视角：仅展示本人渠道码带来的用户及其消费记录；不展示企业分佣台账。",
-      cardTitle: "我的获客消费",
-      big: paidAmt,
-      bigMonth: "",
-      bigNote: window.Uni.plainNote("= 已消费 <b>" + mine.length + " 人</b> 消费合计（名下注册 <b>" + users + " 人</b>）"),
-      kvs: [
-        { k: "名下已注册用户", v: users + " 人" },
-        { k: "已消费用户", v: mine.length + " 人" },
-        { k: "已消费金额", v: ui.money(paidAmt) },
-        { k: "名下渠道码", v: codes.length ? codes.join(" · ") : "尚未生成" }
-      ],
-      bars: bars,
-      rows: mine,
-      staff: true
+      staff: true,
+      role: "staff",
+      who: my || "本人",
+      channel: chLabel,
+      periods: [],
+      cur: null,
+      total: paidAmt,
+      registered: users,
+      buyers: mine.length,
+      codes: codes,
+      rows: mine.sort(function (a, b) { return a.at < b.at ? 1 : -1; })
     };
   }
 
-  /* ---------- view-model 折算（数据映射层：口径换源全部在此） ---------- */
-  function buildVm(ctx, opt) {
+  /* ================= 数据层：分账结构 / 来源排行 ================= */
+
+  function provinceSplit(ctx) {
+    var fin = window.Uni.financeSplit(ctx.s);
+    var subs = (fin.sub.perSub || []).slice().sort(function (a, b) { return b.agreed - a.agreed; });
+    /* 逐家净留存 = 该线盘 ×50% − 约定付出；用于「来源排行」（按为省代创造的实际留存排序） */
+    var rank = subs.map(function (p) {
+      var pool = Math.round(p.settled * 0.5);
+      return {
+        name: p.name,
+        settled: p.settled,
+        ratio: p.ratio,
+        agreed: p.agreed,
+        pool: pool,
+        retained: pool - p.agreed
+      };
+    }).sort(function (a, b) { return b.retained - a.retained; });
+
+    var total = fin.sub.retained + fin.self.amount;
+    return {
+      gross: fin.gross,
+      sub: fin.sub,
+      self: fin.self,
+      total: total,
+      subCount: subs.length,
+      selfLine: { name: "自营线 · 直营获客", settled: fin.self.settledGross, ratio: 1, agreed: 0, pool: fin.self.amount, retained: fin.self.amount, self: true },
+      rank: rank
+    };
+  }
+
+  /* 二级：按事项类型拆解本期合格消费（有当月明细时才有） */
+  function itemSplit(period) {
+    if (!period || !period.detail) return null;
+    var acc = {}, total = 0;
+    period.detail.forEach(function (d) {
+      var k = d.item || "order";
+      acc[k] = (acc[k] || 0) + (Number(d.amount) || 0);
+      total += Number(d.amount) || 0;
+    });
+    var rows = ITEM_SEQ.filter(function (k) { return acc[k]; }).map(function (k) {
+      return { key: k, label: ITEM_LB[k], icon: ITEM_IC[k], amount: acc[k], share: share(acc[k], total) };
+    }).sort(function (a, b) { return b.amount - a.amount; });
+    return { rows: rows, total: total };
+  }
+
+  /* ================= 数据层：统一 view-model ================= */
+
+  function buildVm(ctx, role) {
+    if (role === "staff") return staffVm(ctx);
+
+    var isSub = role === "sub";
+    var periods = isSub ? subPeriods(ctx) : provincePeriods(ctx);
+
+    /* 当前账期：优先保留用户选择，失效则回到最新账期 */
+    var months = periods.map(function (p) { return p.month; });
+    if (!_s.month || months.indexOf(_s.month) < 0) _s.month = months[0] || null;
+    var idx = months.indexOf(_s.month);
+    var cur = periods[idx] || null;
+    var prev = idx >= 0 ? periods[idx + 1] || null : null;
+
     var vm = {
-      notice: opt.notice,
-      cardTitle: opt.cardTitle,
-      big: 0,
-      bigMonth: "",
-      bigNote: "",
-      bigWarn: "",
-      flowPath: "",
-      panoNote: "",
-      kvs: [],
-      bars: [],
-      rows: [],
-      tableNote: ""
+      staff: false,
+      role: role,
+      periods: periods,
+      cur: cur,
+      prev: prev,
+      delta: deltaOf(cur, prev, "income"),
+      split: isSub ? null : provinceSplit(ctx),
+      items: isSub ? itemSplit(cur) : null,
+      empty: !periods.length
     };
 
-    if (ctx.mode === "sub") {
-      /* 二级口径：逐月 subSettle 派生 */
-      var calcs = ctx.s.calc || [];
-      calcs.forEach(function (c, i) {
-        var st = store.subSettle(c);
-        vm.rows.push({
-          month: c.month, eligible: st.eligible, gross: st.gross,
-          ratio: Math.round(st.ratioToSub * 100) + "%", income: st.agreed
-        });
-        vm.bars.push({ label: c.month, value: st.agreed, cur: i === 0 });
-      });
-      var cur = vm.rows[0] || { eligible: 0, gross: 0, income: 0, ratio: "0%", frozen: 0 };
-      var curSt = store.subSettle(calcs[0] || {});
-      vm.big = cur.income;
-      vm.bigMonth = cur.month || "";
-      /* P0-1：主数字必带可复算的算式，禁止与月度台账行出现两个真值 */
-      /* 算式必须一步算得出主数字：合格消费 6,000 × 约定 20% ≠ 600，中间要先过 ×50% 分佣线 */
-      vm.bigNote = window.Uni.plainNote("= 总盘 <b>" + ui.money(cur.gross) + "</b>（合格消费 ×50%）× 约定 <b>" + cur.ratio + "</b>");
-      /* P0-2：分账链路由整段示意图收敛为一句可读路径，随口径说明抽屉展开 */
-      vm.flowPath = "合格消费 → 总盘 ×50% → × 本人约定比例 = 约定所得（T+7 冻结期内不计）";
-      vm.kvs = [
-        { k: "合格消费", v: ui.money(cur.eligible) },
-        { k: "总盘（合格消费 ×50%）", v: ui.money(cur.gross) },
-        { k: "约定所得比例", v: cur.ratio },
-        { k: "T+7 在途冻结", v: ui.money(curSt.frozen) }
+    if (isSub) {
+      vm.metrics = [
+        { key: "income", label: "经营所得" },
+        { key: "eligible", label: "合格消费" },
+        { key: "gross", label: "分账总盘" }
       ];
-      /* 台账行由结算复算派生，账单里存在但无复算记录的账期（逾期锁定 / 未结算）
-         不能静默缺席，否则台账月份集合会小于对账历史 */
-      var haveM = {};
-      vm.rows.forEach(function (r) { haveM[r.month] = 1; });
-      var missM = (ctx.s.hist || []).map(function (h) { return h.month; })
-        .filter(function (m, i, a) { return m && !haveM[m] && a.indexOf(m) === i; });
-      if (missM.length) {
-        vm.tableNote = missM.sort().reverse().join("、") +
-          " 账期无结算复算记录（逾期锁定 / 未结算），不在本表计列，明细见对账历史。";
-      }
     } else {
-      /* 省代口径：T3 统一两分区（二级线 50% 盘 + 自营线 50% 全额） */
-      var fin = window.Uni.financeSplit(ctx.s);
-      var curIncome = fin.sub.retained + fin.self.amount;          /* 分账口径自算值（无月度账单时兜底） */
-      /* P1-3：月度行改由 hist（月度账单权威清单，与「对账历史」同源）派生。
-         旧实现写死 2026-09 / 2026-10 两行，且 09 行取自付款登记，
-         台账月份集合会与对账历史漂移（2026-08 逾期月整月缺席）。 */
-      var HIST = window.UniDoc ? window.UniDoc.HIST_LB : { pending: "对账中", settled: "已平账", overdue: "逾期锁定" };
-      var mMap = {};
-      (ctx.s.hist || []).forEach(function (h) {
-        if (!h || !h.month) return;
-        var e = mMap[h.month] || (mMap[h.month] = { month: h.month, plat: null, sub: null });
-        if (h.type === "sub") e.sub = h; else e.plat = h;
-      });
-      vm.rows = Object.keys(mMap).sort(function (a, b) { return a < b ? 1 : -1; }).map(function (m) {
-        var e = mMap[m];
-        var plat = e.plat ? Number(e.plat.amount || 0) : 0;
-        var sub = e.sub ? Number(e.sub.amount || 0) : 0;
-        var st = (e.plat && e.plat.state) || (e.sub && e.sub.state) || "pending";
-        return {
-          month: m, eligible: Math.round(plat / 0.5), gross: plat,
-          state: st, stateTxt: HIST[st] || "对账中",
-          income: plat - sub /* 省代实得 = 收平台账单 − 付二级账单 */
-        };
-      });
-      /* 柱图按时间正序（最新月高亮） */
-      vm.bars = vm.rows.slice().reverse().map(function (r, i, arr) {
-        return { label: r.month, value: r.income, cur: i === arr.length - 1 };
-      });
-      /* P0-1：主数字 = 最新账期省代实得，与月度台账首行取自同一份月度账单记录（单一真值）；
-         无账单数据时回落到分账口径自算值。 */
-      var curRow = vm.rows[0] || null;
-      vm.big = curRow ? curRow.income : curIncome;
-      vm.bigMonth = curRow ? curRow.month : ((ctx.s.calc1 && ctx.s.calc1.month) || "");
-      vm.bigNote = window.Uni.plainNote(curRow
-        ? "= 平台账单 <b>" + ui.money(curRow.gross) + "</b> − 付二级 <b>" + ui.money(curRow.gross - curRow.income) + "</b>"
-        : "= 二级线自留 <b>" + ui.money(fin.sub.retained) + "</b> + 自营线收益 <b>" + ui.money(fin.self.amount) + "</b>");
-      /* 大数字取自月度账单（hist），下方分账明细取自 financeBase —— 两套源。
-         当前种子相等（4,400 = 2,400 + 2,000）不等于永远相等：只要有人改了一边，
-         卡片会一边显示账单实得、一边明细相加是别的数，且静默无提示。
-         不等时明示，宁可暴露口径差异也不让卡片自相矛盾。 */
-      var finIncome = fin.sub.retained + fin.self.amount;
-      vm.bigWarn = curRow && finIncome !== curRow.income
-        ? "分账明细合计 " + ui.money(finIncome) + " 与月度账单实得 " + ui.money(curRow.income) + " 不一致：以账单为准，明细待核。"
-        : "";
-      /* P0-2：分账链路由整段示意图收敛为一句可读路径，随口径说明抽屉展开 */
-      vm.flowPath = "全省合格消费 → 省代分账盘 ×50% → 自营线全额归省代；二级线按逐家约定分配，余额自留";
-      vm.kvs = [
-        { k: "平台合格消费", v: ui.money(fin.gross) },
-        { k: "二级线盘（×50%）", v: ui.money(fin.sub.pool) },
-        { k: "约定给二级", v: ui.money(fin.sub.agreed) },
-        { k: "二级线自留", v: ui.money(fin.sub.retained) },
-        { k: "自营线收益（×50%）", v: ui.money(fin.self.amount) }
+      vm.metrics = [
+        { key: "income", label: "经营实得" },
+        { key: "bill", label: "平台账单" },
+        { key: "eligible", label: "合格消费" }
       ];
-      /* P1-1 按来源拆分：直营线（自营）与各二级线逐家（消费 / 总盘贡献 / 约定分配 / 自留） */
-      var activeSubs2 = (ctx.s.subs || []).filter(function (x) { return x.status === "active" || x.status === "approved"; });
-      var pendApps2 = (ctx.s.subApps || []).filter(function (a) { return a.status === "pending"; }).length;
-      vm.srcSplit = {
-        self: { label: "自营线 · 直营获客", settledGross: fin.self.settledGross, amount: fin.self.amount },
-        subs: (fin.sub.perSub || []).map(function (p) {
-          return { name: p.name, settled: p.settled, ratio: p.ratio, agreed: p.agreed };
-        }),
-        subGross: fin.sub.settledGross, subPool: fin.sub.pool,
-        subAgreed: fin.sub.agreed, subRetained: fin.sub.retained,
-        activeSubs: activeSubs2.length, pendingApps: pendApps2
-      };
-      /* P1-4 收益全景五条线：二级线所得 / 自营线收益 / 招商（家数）/ 个人合伙人返佣（可提现）/ 旧返佣留痕 */
-      var rebate = 0, rebateCount = 0;
-      try {
-        var rb = JSON.parse(window.localStorage.getItem("engchain-rebate-orders") || "[]");
-        if (Array.isArray(rb)) rb.forEach(function (r) {
-          if (r && !r.voided && !r.clawed && r.amount) { rebate += Number(r.amount) || 0; rebateCount++; }
-        });
-      } catch (e) {}
-      var legacySelf = 0, legacyCount = 0;
-      try {
-        var alg = JSON.parse(window.localStorage.getItem("engchain-agent-ledger") || "null");
-        var alEntries = alg && alg.entries ? alg.entries : (Array.isArray(alg) ? alg : []);
-        alEntries.forEach(function (e) {
-          if (e && e.legacySelf && e.amount) { legacySelf += Number(e.amount) || 0; legacyCount++; }
-        });
-      } catch (e) {}
-      /* P0-3：唯一可提现项置顶并给主色；无金额 / 不计收益项降为脚注，不再与真金白银同权排列 */
-      vm.panorama = [
-        { name: "个人合伙人 · 返佣", value: ui.money(rebate), attr: "可提现 · 用户端钱包", cls: "ok", sub: rebateCount + " 笔可提现" },
-        { name: "代理 · 二级线自留", value: ui.money(fin.sub.retained), attr: "只读分账 · 不可提现", cls: "mute", sub: "逐家约定后的余额" },
-        { name: "代理 · 自营线收益", value: ui.money(fin.self.amount), attr: "只读分账 · 独立分区", cls: "mute", sub: "直营获客消费 ×50% 全额" }
-      ];
-      vm.panoNote = "另：招商预估 " + activeSubs2.length + " 家二级在约（按约定比例逐家配置，待确认金额不展示）；" +
-        "旧返佣留痕 " + ui.money(legacySelf) + "（" + legacyCount + " 笔），不计收益。";
     }
-
-    /* 柱图比例（相对最大值，最近月高亮） */
-    var max = vm.bars.reduce(function (m, b) { return Math.max(m, b.value); }, 0);
-    vm.bars.forEach(function (b) {
-      b.pct = max > 0 ? Math.max(Math.round(b.value / max * 100), 16) : 16;
-    });
+    if (!_s.metric || !vm.metrics.some(function (m) { return m.key === _s.metric; })) {
+      _s.metric = vm.metrics[0].key;
+    }
+    vm.metric = _s.metric;
     return vm;
   }
+
+  /* ================= 渲染：账期条 ================= */
+
+  function periodBarHtml(vm) {
+    if (!vm.periods.length) return "";
+    var chips = vm.periods.map(function (p) {
+      var on = p.month === (vm.cur && vm.cur.month);
+      return '<button type="button" class="ulg-pchip' + (on ? " is-on" : "") + '" role="tab" ' +
+        'aria-selected="' + (on ? "true" : "false") + '" data-month="' + ui.esc(p.month) + '">' +
+        '<span class="ulg-pchip__m"><i class="ulg-dot ulg-dot--' + p.stateCls + '" aria-hidden="true"></i>' +
+        ui.esc(p.month) + "</span>" +
+        '<span class="ulg-pchip__a">' + ui.moneyPlain(p.income) + "</span>" +
+        "</button>";
+    }).join("");
+
+    var sum = vm.periods.reduce(function (a, p) { return a + (num(p.income) ? p.income : 0); }, 0);
+    return '<div class="ulg-pbar"><div class="ulg-pbar__in">' +
+      '<div class="ulg-periods" role="tablist" aria-label="账期切换">' + chips + "</div>" +
+      '<div class="ulg-pbar__sum">近 ' + vm.periods.length + " 期累计 <b>" + ui.money(sum) + "</b></div>" +
+      "</div></div>";
+  }
+
+  /* ================= 渲染：本期概览 ================= */
+
+  function receiptHtml(reg, label) {
+    if (!reg || !reg.n) {
+      return '<div class="ulg-receipt"><div class="ulg-receipt__h"><span>' + ui.esc(label) + "</span>" +
+        '<span class="ulg-receipt__none">本期暂无付款登记</span></div></div>';
+    }
+    var okW = share(reg.ok, reg.total) * 100;
+    var waitW = share(reg.wait, reg.total) * 100;
+    var badW = share(reg.bad, reg.total) * 100;
+    var segs = "";
+    if (okW > 0) segs += '<i class="ulg-seg ulg-seg--ok" style="width:' + okW + '%"></i>';
+    if (waitW > 0) segs += '<i class="ulg-seg ulg-seg--wait" style="width:' + waitW + '%"></i>';
+    if (badW > 0) segs += '<i class="ulg-seg ulg-seg--bad" style="width:' + badW + '%"></i>';
+    return '<div class="ulg-receipt">' +
+      '<div class="ulg-receipt__h"><span>' + ui.esc(label) + '</span>' +
+      '<span class="ulg-receipt__none">登记 ' + reg.n + " 笔 · " + ui.money(reg.total) + "</span></div>" +
+      '<div class="ulg-receipt__bar">' + segs + "</div>" +
+      '<div class="ulg-receipt__l">' +
+      '<span class="d-ok"><i></i>已确认 ' + ui.money(reg.ok) + "</span>" +
+      '<span class="d-wait"><i></i>待确认 ' + ui.money(reg.wait) + "</span>" +
+      '<span class="d-bad"><i></i>争议 ' + ui.money(reg.bad) + "</span>" +
+      "</div></div>";
+  }
+
+  function heroHtml(vm) {
+    var p = vm.cur;
+    var isSub = vm.role === "sub";
+
+    var formula = isSub
+      ? (p.derived
+        ? "该账期无复算记录 · 仅列账单金额"
+        : "= 合格消费 <b>" + ui.money(p.eligible) + "</b> × 50% → 分账总盘 <b>" + ui.money(p.gross) +
+          "</b> → 约定 <b>" + ui.esc(p.ratioTxt) + "</b>")
+      : "= 平台账单 <b>" + ui.money(p.bill) + "</b> − 付二级 <b>" + ui.money(p.paySub) + "</b>";
+
+    var kpis = "";
+    if (isSub) {
+      kpis =
+        '<div class="ulg-kv3__i"><span>合格消费</span><b>' + (num(p.eligible) ? ui.money(p.eligible) : "—") + "</b></div>" +
+        '<div class="ulg-kv3__i"><span>分账总盘</span><b>' + (num(p.gross) ? ui.money(p.gross) : "—") + "</b></div>" +
+        '<div class="ulg-kv3__i"><span>约定比例</span><b>' + ui.esc(p.ratioTxt) + "</b></div>";
+    } else {
+      kpis =
+        '<div class="ulg-kv3__i"><span>平台合格消费</span><b>' + ui.money(p.eligible) + "</b></div>" +
+        '<div class="ulg-kv3__i"><span>平台账单</span><b>' + ui.money(p.bill) + "</b></div>" +
+        '<div class="ulg-kv3__i"><span>付二级企业</span><b>' + ui.money(p.paySub) + "</b></div>";
+    }
+
+    return '<section class="card ulg-hero" id="lg-hero">' +
+      '<div class="ulg-hero__head"><span class="uh-eyebrow">' + (isSub ? "本期经营所得" : "本期经营实得") + "</span>" +
+      '<span class="uh-badge uh-badge--' + p.stateCls + '">' + ui.esc(p.stateTxt) + "</span></div>" +
+      '<div class="ulg-hero__main">' +
+      '<div class="uh-bignum ulg-bignum" data-count="' + (num(p.income) ? p.income : 0) + '">' + ui.moneyD(0) + "</div>" +
+      deltaHtml(vm.delta, "首期无环比") +
+      "</div>" +
+      '<div class="ulg-formula">' + formula + "</div>" +
+      receiptHtml(p.regIn, isSub ? "省代付款登记" : "平台付款登记") +
+      '<div class="ulg-kv3">' + kpis + "</div>" +
+      "</section>";
+  }
+
+  /* ================= 渲染：账期趋势 ================= */
+
+  function metricVal(p, key) {
+    var v = p[key];
+    return num(v) ? v : null;
+  }
+
+  function trendHtml(vm) {
+    if (vm.periods.length < 2) {
+      return '<section class="card ulg-blk">' +
+        '<div class="uh-finhead"><span class="uh-eyebrow">账期趋势</span></div>' +
+        '<div class="uh-note" style="margin-top:8px">仅 1 个账期，暂无可比趋势；次期账单出账后自动生成。</div></section>';
+    }
+
+    var key = vm.metric;
+    var asc = vm.periods.slice().reverse();                 /* 时间正序 */
+    var vals = asc.map(function (p) { return metricVal(p, key); });
+    var finite = vals.filter(function (v) { return v !== null; });
+    var max = finite.length ? Math.max.apply(null, finite) : 0;
+    var scale = max > 0 ? max * 1.24 : 1;
+
+    var cols = "", axis = "";
+    asc.forEach(function (p, i) {
+      var v = vals[i];
+      var on = p.month === (vm.cur && vm.cur.month);
+      var d = i > 0 ? deltaOf(p, asc[i - 1], key) : null;
+      var h = v === null ? 0 : Math.max(share(v, scale) * 100, 2);
+      cols += '<button type="button" class="ulg-col' + (on ? " is-on" : "") + (v === null ? " is-na" : "") + '" ' +
+        'data-month="' + ui.esc(p.month) + '" aria-label="' + ui.esc(p.month) + (v === null ? " 无数据" : " " + ui.money(v)) + '">' +
+        (v === null
+          ? '<span class="ulg-col__na">—</span>'
+          : '<span class="ulg-col__v" style="bottom:calc(' + h + '% + 4px)">' + ui.moneyPlain(v) + "</span>" +
+            '<i class="ulg-col__bar" style="height:' + h + '%"></i>') +
+        "</button>";
+      axis += '<div class="ulg-ax' + (on ? " is-on" : "") + '" data-month="' + ui.esc(p.month) + '">' +
+        "<span>" + ui.esc(p.month.slice(5)) + "月</span>" +
+        (d ? '<em class="' + (d.pct >= 0 ? "up" : "down") + '">' + signPct(d.pct) + "</em>" : '<em class="flat">首期</em>') +
+        "</div>";
+    });
+
+    var avgBottom = finite.length ? share(finite.reduce(function (a, b) { return a + b; }, 0) / finite.length, scale) * 100 : 0;
+    /* 均值只画虚线不写字：本期与均值接近时（数据本就平淡）标签必与柱顶数值相撞 */
+    var rule = finite.length ? '<div class="ulg-rule" style="bottom:' + avgBottom + '%"></div>' : "";
+
+    var mtabs = vm.metrics.map(function (m) {
+      return '<button type="button" class="ulg-mtab' + (m.key === key ? " is-on" : "") + '" data-metric="' + m.key + '">' + ui.esc(m.label) + "</button>";
+    }).join("");
+
+    /* 基线可比：本期 vs 近 N 期均值 */
+    var note = "";
+    if (finite.length) {
+      var avg = finite.reduce(function (a, b) { return a + b; }, 0) / finite.length;
+      var curv = metricVal(vm.cur, key);
+      if (num(curv) && avg > 0) {
+        var dev = (curv - avg) / avg * 100;
+        note = "虚线为近 " + finite.length + " 期均值 " + ui.money(Math.round(avg)) + " · 本期" +
+          (Math.abs(dev) < 0.5 ? "持平均值" : (dev > 0 ? "高于均值 " : "低于均值 ") + Math.abs(Math.round(dev * 10) / 10) + "%");
+      }
+    }
+
+    return '<section class="card ulg-blk">' +
+      '<div class="uh-finhead"><span class="uh-eyebrow">账期趋势</span>' +
+      '<div class="ulg-mtabs" role="tablist">' + mtabs + "</div></div>" +
+      '<div class="ulg-plot">' + rule + '<div class="ulg-cols">' + cols + "</div></div>" +
+      '<div class="ulg-axis">' + axis + "</div>" +
+      (note ? '<div class="uh-note" style="margin-top:10px">' + ui.esc(note) + "</div>" : "") +
+      "</section>";
+  }
+
+  /* ================= 渲染：账期台账 ================= */
+
+  function ledgerBookHtml(vm) {
+    var isSub = vm.role === "sub";
+    var rows = vm.periods.map(function (p) {
+      var on = p.month === (vm.cur && vm.cur.month);
+      var cells;
+      if (isSub) {
+        cells = "<td>" + (num(p.eligible) ? ui.moneyPlain(p.eligible) : "—") + "</td>" +
+          "<td>" + (num(p.gross) ? ui.moneyPlain(p.gross) : "—") + "</td>" +
+          '<td class="tb-strong">' + ui.moneyPlain(p.income) + "</td>";
+      } else {
+        cells = "<td>" + ui.moneyPlain(p.bill) + "</td>" +
+          "<td>" + ui.moneyPlain(p.paySub) + "</td>" +
+          '<td class="tb-strong">' + ui.moneyPlain(p.income) + "</td>";
+      }
+      return '<tr class="ulg-brow' + (on ? " is-on" : "") + '" data-month="' + ui.esc(p.month) + '" tabindex="0" role="button" ' +
+        'aria-label="查看 ' + ui.esc(p.month) + ' 账期分解">' +
+        '<td class="tb-month"><span>' + ui.esc(p.month) + "</span>" +
+        '<i class="ulg-tag ulg-tag--' + p.stateCls + '">' + ui.esc(p.stateTxt) + "</i></td>" +
+        cells +
+        '<td class="tb-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></td>' +
+        "</tr>";
+    }).join("");
+
+    var head = isSub
+      ? "<th>账期 / 状态</th><th>合格消费</th><th>分账总盘</th><th>经营所得</th><th></th>"
+      : "<th>账期 / 状态</th><th>平台账单</th><th>付二级</th><th>经营实得</th><th></th>";
+
+    var note = vm.periods.some(function (p) { return p.derived; })
+      ? "标「—」的账期无当月复算记录（逾期锁定 / 未结算），仅列账单金额，不做推算。"
+      : "点任意账期查看当期分解与对账单。";
+
+    return '<section class="card ulg-blk ulg-bookcard">' +
+      '<div class="uh-finhead" style="margin-bottom:10px"><span class="uh-eyebrow">账期台账</span>' +
+      '<button type="button" class="ulg-tool" data-act="export">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>' +
+      "导出 CSV</button></div>" +
+      '<div class="ulg-book"><table class="ulg-table"><thead><tr>' + head + "</tr></thead>" +
+      "<tbody>" + rows + "</tbody></table></div>" +
+      '<div class="uh-note" style="margin-top:10px">' + ui.esc(note) + "</div>" +
+      "</section>";
+  }
+
+  /* ================= 渲染：分账结构（这笔钱怎么算出来的） ================= */
+
+  function treeRow(lv, label, value, opts) {
+    var o = opts || {};
+    var w = o.share != null ? Math.round(o.share * 100) : null;
+    return '<div class="ulg-trow ulg-trow--lv' + lv + (o.total ? " is-total" : "") + (o.neg ? " is-neg" : "") + '"' +
+      (w != null ? ' style="--w:' + w + '%"' : "") + ">" +
+      '<span class="ulg-trow__lb">' + ui.esc(label) + "</span>" +
+      (o.tag ? '<i class="ulg-trow__tag">' + ui.esc(o.tag) + "</i>" : "") +
+      '<span class="ulg-trow__v">' + ui.esc(value) + "</span>" +
+      "</div>";
+  }
+
+  function splitHtml(vm) {
+    if (vm.role === "sub") {
+      var p = vm.cur;
+      if (!p || !num(p.eligible)) {
+        return '<section class="card ulg-blk">' +
+          '<div class="uh-finhead"><span class="uh-eyebrow">分账结构</span>' +
+          '<span class="uh-badge uh-badge--mute">账期口径</span></div>' +
+          '<div class="uh-note" style="margin-top:8px">该账期无复算记录，分账结构不可复算；请查看对账单或对账历史。</div></section>';
+      }
+      var rows =
+        treeRow(0, "本企业合格消费", ui.money(p.eligible), { share: 1 }) +
+        treeRow(1, "分账总盘（×50%）", ui.money(p.gross), { share: 0.5 }) +
+        treeRow(2, "约定所得（× " + p.ratioTxt + "）", ui.money(p.income), { share: p.ratio * 0.5, neg: false }) +
+        treeRow(0, "本期经营所得", ui.money(p.income), { total: true });
+      return '<section class="card ulg-blk">' +
+        '<div class="uh-finhead"><span class="uh-eyebrow">分账结构</span>' +
+        '<span class="uh-badge uh-badge--mute">账期口径 · ' + ui.esc(p.month) + "</span></div>" +
+        '<div class="ulg-tree">' + rows + "</div>" +
+        (p.frozen ? '<div class="uh-note" style="margin-top:8px">T+7 冻结期内 ' + ui.money(p.frozen) + " 暂不计入可结算所得。</div>" : "") +
+        "</section>";
+    }
+
+    var sp = vm.split;
+    if (!sp || !sp.gross) {
+      return '<section class="card ulg-blk">' +
+        '<div class="uh-finhead"><span class="uh-eyebrow">分账结构</span></div>' +
+        '<div class="uh-note" style="margin-top:8px">尚无经营基数，平台产生首笔合格消费后自动生成。</div></section>';
+    }
+    var rows2 =
+      treeRow(0, "平台合格消费", ui.money(sp.gross), { share: 1 }) +
+      treeRow(1, "二级线 · " + sp.subCount + " 家在约", ui.money(sp.sub.settledGross), { share: share(sp.sub.settledGross, sp.gross) }) +
+      treeRow(2, "二级线盘（×50%）", ui.money(sp.sub.pool), {}) +
+      treeRow(2, "约定给二级企业", ui.money(-sp.sub.agreed), { neg: true }) +
+      treeRow(2, "二级线自留", ui.money(sp.sub.retained), {}) +
+      treeRow(1, "自营线 · 直营获客", ui.money(sp.self.settledGross), { share: share(sp.self.settledGross, sp.gross) }) +
+      treeRow(2, "自营线收益（×50% 全额）", ui.money(sp.self.amount), {}) +
+      treeRow(0, "经营基数合计", ui.money(sp.total), { total: true });
+
+    /* 分账明细与月度账单不等时明示（P0-2：不让卡片自相矛盾） */
+    var warn = "";
+    if (vm.cur && !vm.cur.derived && num(vm.cur.income) && sp.total !== vm.cur.income) {
+      warn = '<div class="uh-note" style="color:var(--warning-ink);margin-top:8px">' +
+        "分账明细合计 " + ui.money(sp.total) + " 与 " + ui.esc(vm.cur.month) + " 账单实得 " + ui.money(vm.cur.income) +
+        " 不一致：台账以账单为准，明细待核。</div>";
+    }
+
+    return '<section class="card ulg-blk">' +
+      '<div class="uh-finhead"><span class="uh-eyebrow">分账结构</span>' +
+      '<span class="uh-badge uh-badge--mute">基数口径</span></div>' +
+      '<div class="ulg-tree">' + rows2 + "</div>" +
+      '<div class="uh-note" style="margin-top:10px">经营基数按各二级企业最近账期合格消费测算，不随上方账期切换；账期口径见「账期台账」。</div>' +
+      warn + "</section>";
+  }
+
+  /* ================= 渲染：来源结构 ================= */
+
+  function rankHtml(vm) {
+    if (vm.role === "sub") {
+      var it = vm.items;
+      var headSub = '<div class="uh-finhead"><span class="uh-eyebrow">收入构成 · 按事项</span>' +
+        '<span class="uh-badge uh-badge--mute">账期口径' + (vm.cur ? " · " + ui.esc(vm.cur.month) : "") + "</span></div>";
+      if (!it || !it.rows.length) {
+        return '<section class="card ulg-blk">' + headSub +
+          '<div class="uh-note" style="margin-top:8px">该账期暂无事项级明细；明细分项随月度账单归档，可在「对账单」中查看。</div></section>';
+      }
+      var mx = it.rows[0].amount || 1;
+      var bodySub = it.rows.map(function (r) {
+        return '<div class="ulg-rk" style="--w:' + Math.round(r.amount / mx * 100) + '%">' +
+          '<span class="ulg-rk__n">' + ui.icon(r.icon, 15) + ui.esc(r.label) + "</span>" +
+          '<span class="ulg-rk__p">' + Math.round(r.share * 1000) / 10 + "%</span>" +
+          '<span class="ulg-rk__v">' + ui.money(r.amount) + "</span></div>";
+      }).join("");
+      return '<section class="card ulg-blk">' + headSub +
+        '<div class="ulg-rklist">' + bodySub + "</div>" +
+        '<div class="ulg-rkfoot"><span>合格消费合计</span><b>' + ui.money(it.total) + "</b></div></section>";
+    }
+
+    var sp = vm.split;
+    var head = '<div class="uh-finhead"><span class="uh-eyebrow">来源结构 · 省代留存排行</span>' +
+      '<span class="uh-badge uh-badge--mute">基数口径</span></div>';
+    if (!sp || !sp.rank.length) {
+      return '<section class="card ulg-blk">' + head +
+        '<div class="uh-note" style="margin-top:8px">暂无在约二级企业，来源结构在签约后生成。</div></section>';
+    }
+
+    var all = [sp.selfLine].concat(sp.rank).sort(function (a, b) { return b.retained - a.retained; });
+    var max = all[0] ? all[0].retained || 1 : 1;
+    var body = all.map(function (r) {
+      return '<div class="ulg-rk' + (r.self ? " is-self" : "") + '" style="--w:' + Math.round(r.retained / max * 100) + '%" ' +
+        (r.self ? "" : 'data-sub="' + ui.esc(r.name) + '" tabindex="0" role="button"') + ">" +
+        '<span class="ulg-rk__n">' + ui.esc(r.name) +
+        (r.self ? '<i class="ulg-rk__tg">自营</i>' : '<i class="ulg-rk__tg">约定 ' + Math.round(r.ratio * 100) + "%</i>") + "</span>" +
+        '<span class="ulg-rk__p">消费 ' + ui.moneyPlain(r.settled) + "</span>" +
+        '<span class="ulg-rk__v">' + ui.money(r.retained) + "</span></div>";
+    }).join("");
+
+    return '<section class="card ulg-blk">' + head +
+      '<div class="ulg-rklist">' + body + "</div>" +
+      '<div class="ulg-rkfoot"><span>合计（= 经营基数）</span><b>' + ui.money(sp.total) + "</b></div>" +
+      '<div class="uh-note" style="margin-top:8px">留存 = 该线盘（合格消费 ×50%）− 约定付出；自营线 100% 归省代。</div>' +
+      "</section>";
+  }
+
+  /* ================= 渲染：员工视角 ================= */
+
+  function staffHtml(vm) {
+    if (!vm.rows.length) {
+      return '<section class="card ulg-blk">' +
+        window.Uni.emptyHtml("暂无获客消费记录",
+          "名下获客用户产生有效消费后，这里会按月汇总本人消费明细。", "receipt") + "</section>";
+    }
+    var rows = vm.rows.map(function (r) {
+      return '<div class="ulg-staffrow">' +
+        '<span class="ulg-staffrow__u">' + ui.esc(r.user) + '<em>' + ui.esc(r.at || "—") + "</em></span>" +
+        '<span class="ulg-staffrow__c">' + ui.esc(r.channel) + "</span>" +
+        '<span class="ulg-staffrow__v">' + ui.money(r.amount) + "</span></div>";
+    }).join("");
+
+    return '<section class="card ulg-blk">' +
+      '<div class="uh-finhead"><span class="uh-eyebrow">我的获客消费</span>' +
+      '<span class="uh-badge uh-badge--mute">本人渠道</span></div>' +
+      '<div class="uh-bignum ulg-bignum" data-count="' + vm.total + '">' + ui.moneyD(0) + "</div>" +
+      '<div class="ulg-formula">= 已消费 <b>' + vm.buyers + " 人</b> 的消费合计（名下注册 <b>" + vm.registered + " 人</b>）</div>" +
+      '<div class="ulg-kv3">' +
+      '<div class="ulg-kv3__i"><span>名下注册</span><b>' + vm.registered + " 人</b></div>" +
+      '<div class="ulg-kv3__i"><span>已消费</span><b>' + vm.buyers + " 人</b></div>" +
+      '<div class="ulg-kv3__i"><span>渠道码</span><b>' + (vm.codes.length ? vm.codes.length + " 个" : "未生成") + "</b></div>" +
+      "</div></section>" +
+      '<section class="card ulg-blk">' +
+      '<div class="uh-finhead" style="margin-bottom:6px"><span class="uh-eyebrow">消费明细</span>' +
+      '<span class="uh-badge uh-badge--mute">' + vm.rows.length + " 笔</span></div>" +
+      '<div class="ulg-stafflist">' + rows + "</div></section>";
+  }
+
+  /* ================= 口径说明（含页面分工） ================= */
+
+  function scopeBody(vm) {
+    var common =
+      '<div class="uh-clause"><div class="no">本页与相邻页面的分工</div><div class="c">' +
+      "<b>对账中心</b>：单个账期的核对过程——逐笔比对、异议、确认、平账，以及付款登记与凭据流转。<br>" +
+      "<b>对账历史</b>：历次对账单的档案索引——按账单类型归档、下载留存。<br>" +
+      "<b>经营台账</b>：本页。按账期归集的经营结果——赚了多少、怎么算出来的、从哪来、走向如何，并可整表导出。</div></div>" +
+      '<div class="uh-clause"><div class="no">计入项</div><div class="c">订单净额 · 积分解锁付费 · 增值服务付费 · 企业认证与入驻费</div></div>' +
+      '<div class="uh-clause"><div class="no">排除项</div><div class="c">充值 · 免费积分 · 报名费 · 退款冲回（冻结期内剔除、当月红字冲减、跨月等额回冲）</div></div>';
+
+    if (vm.role === "staff") {
+      return '<div class="uh-clause"><div class="no">员工口径</div><div class="c">' +
+        "仅展示本人渠道码带来的用户及其消费记录，不涉及企业分佣台账、不展示其他成员数据。</div></div>" + common;
+    }
+    if (vm.role === "sub") {
+      return '<div class="uh-clause"><div class="no">分账路径</div><div class="c">' +
+        "本企业合格消费 → 分账总盘（×50%）→ × 约定所得比例 = 约定所得；T+7 冻结期内不计入可结算。</div></div>" +
+        '<div class="uh-clause"><div class="no">账期口径说明</div><div class="c">' +
+        "账期金额与状态取自月度账单；合格消费、总盘、比例由约定比例复算。无当月复算记录的账期（逾期锁定 / 未结算）只列账单金额，不做推算。</div></div>" +
+        common;
+    }
+    return '<div class="uh-clause"><div class="no">分账路径</div><div class="c">' +
+      "全省合格消费 → 省代分账盘（×50%）→ 二级线按逐家约定比例分配，余额自留；自营线（直营获客）不参与逐家分配，×50% 全额归省代。</div></div>" +
+      '<div class="uh-clause"><div class="no">两种口径</div><div class="c">' +
+      "<b>账期口径</b>：本期概览、账期趋势、账期台账，取自月度账单，可逐期对比。<br>" +
+      "<b>基数口径</b>：分账结构、来源结构，按各二级企业最近账期合格消费测算，用于看结构而非看单期。</div></div>" +
+      common;
+  }
+
+  /* ================= 交互：账期分解弹窗 ================= */
+
+  function detailHtml(ctx, vm, p) {
+    var isSub = vm.role === "sub";
+    var rows = [];
+
+    function kv(k, v, cls) {
+      rows.push('<div class="uh-sheetkv"><span class="k">' + ui.esc(k) + '</span><span class="v"' +
+        (cls ? ' style="color:' + cls + '"' : "") + ">" + v + "</span></div>");
+    }
+
+    if (isSub) {
+      kv("合格消费", num(p.eligible) ? ui.money(p.eligible) : "不可复算（无当月记录）");
+      kv("分账总盘（×50%）", num(p.gross) ? ui.money(p.gross) : "—");
+      kv("约定比例", ui.esc(p.ratioTxt));
+      kv("经营所得", ui.money(p.income));
+    } else {
+      kv("平台合格消费", ui.money(p.eligible));
+      kv("平台账单", ui.money(p.bill));
+      kv("付二级企业", ui.money(p.paySub));
+      kv("经营实得", ui.money(p.income));
+    }
+    if (p.issueAt) kv("出账日", ui.esc(p.issueAt));
+    if (p.dueAt) kv("应付日", ui.esc(p.dueAt));
+    if (p.settledAt) kv("结算日", ui.esc(p.settledAt));
+
+    var regHtml = "";
+    if (p.regIn && p.regIn.n) {
+      regHtml = '<div class="uh-sechead" style="margin:14px 0 8px"><span class="lbl">' +
+        (isSub ? "省代付款登记" : "平台付款登记") + "</span></div>" +
+        '<div class="uh-sheetkv"><span class="k">已确认</span><span class="v" style="color:var(--success)">' + ui.money(p.regIn.ok) + "</span></div>" +
+        '<div class="uh-sheetkv"><span class="k">待确认</span><span class="v" style="color:var(--warning-ink)">' + ui.money(p.regIn.wait) + "</span></div>" +
+        '<div class="uh-sheetkv"><span class="k">争议</span><span class="v" style="color:var(--error)">' + ui.money(p.regIn.bad) + "</span></div>";
+    }
+
+    /* 事项构成：仅当月有明细的账期（省代取平台→省代明细；二级取本企业明细） */
+    var it = p.detail && p.detail.length ? itemSplit({ detail: p.detail }) : null;
+    var itHtml = "";
+    if (it && it.rows.length) {
+      itHtml = '<div class="uh-sechead" style="margin:16px 0 8px"><span class="lbl">事项构成（合格消费）</span></div>' +
+        it.rows.map(function (r) {
+          return '<div class="uh-sheetkv"><span class="k">' + ui.esc(r.label) + '</span><span class="v">' +
+            ui.money(r.amount) + " · " + Math.round(r.share * 1000) / 10 + "%</span></div>";
+        }).join("");
+    }
+
+    return '<div class="ulg-dhead">' +
+      '<span class="ulg-dhead__m">' + ui.esc(p.month) + " 账期</span>" +
+      '<span class="uh-badge uh-badge--' + p.stateCls + '">' + ui.esc(p.stateTxt) + "</span></div>" +
+      '<div class="uh-ledgerline"></div>' +
+      rows.join("") + regHtml + itHtml;
+  }
+
+  function openDetail(ctx, vm, month, Uni) {
+    var p = vm.periods.filter(function (x) { return x.month === month; })[0];
+    if (!p) { Uni.toast("该账期数据缺失", "err"); return; }
+
+    var hasDoc = !!(ctx.s.hist || []).filter(function (h) {
+      if ((h.month || "") !== month) return false;
+      return ctx.mode === "sub" ? true : (h.type || "platform") === "platform";
+    })[0];
+
+    Uni.sheet({
+      title: "账期分解",
+      body: detailHtml(ctx, vm, p),
+      footer: [
+        {
+          t: hasDoc ? "对账单" : "无对账单",
+          kind: "ghost",
+          onClick: function () {
+            if (!hasDoc || !window.UniDoc) { Uni.toast("该账期对账单缺失", "err"); return false; }
+            var h = (ctx.s.hist || []).filter(function (x) {
+              return (x.month || "") === month && (ctx.mode === "sub" ? true : (x.type || "platform") === "platform");
+            })[0];
+            window.UniDoc.openSheet(ctx, h, Uni, {
+              more: { t: "去对账中心", on: function () { Uni.navTo("reconcile.html"); } }
+            });
+          }
+        },
+        { t: "去对账中心", kind: "primary", onClick: function () { Uni.navTo("reconcile.html"); } }
+      ]
+    });
+  }
+
+  /* ================= 状态变体 ================= */
 
   var STATE_VARIANTS = {
     admin: {
       label: "省级总代 · 管理员",
-      data: function (ctx) {
-        return buildVm(ctx, {
-          cardTitle: "本月经营实得",
-          notice: "经营台账为只读口径：二级线盘 = 二级线合格消费 × 50%，约定给二级按各家合作比例逐家配置；自营线 = 省代直营获客合格消费 × 50% 全额（独立分区）。不执行提现，仅记录、计算与分析。"
-        });
-      },
-      entries: [],
-      perms: {},
-      badges: {},
-      empty: {},
+      data: function (ctx) { return buildVm(ctx, "province"); },
+      entries: [], perms: {}, badges: {}, empty: {},
       lockedNote: "台账数据已锁定，仅可查看"
     },
     staff: {
       label: "省级总代 · 员工",
-      data: function (ctx) {
-        return buildStaffVm(ctx); /* M3：员工仅本人获客用户及其消费记录 */
-      },
-      entries: [],
-      perms: {},
+      data: function (ctx) { return buildVm(ctx, "staff"); },
+      entries: [], perms: {},
       badges: { ledger: "员工 · 只读" },
       empty: {},
       lockedNote: "台账数据已锁定，仅可查看"
     },
     sub_admin: {
       label: "二级合作企业 · 管理员",
-      data: function (ctx) {
-        return buildVm(ctx, {
-          cardTitle: "本月经营所得",
-          notice: "经营台账为只读口径复算：总盘 50%、本人约定所得按省代授权比例、T+7 冻结；仅展示已有月度数据。"
-        });
-      },
-      entries: [],
-      perms: {},
-      badges: {},
-      empty: {},
+      data: function (ctx) { return buildVm(ctx, "sub"); },
+      entries: [], perms: {}, badges: {}, empty: {},
       lockedNote: "台账数据已锁定，仅可查看"
     },
-    /* 2026-11-01 审计补齐：二级员工此前无页内变体，回退复用 sub_admin 的 data()，
-       会把二级企业整盘台账（金额、分佣、对账）读给员工。此处给同构员工视角。 */
+    /* 二级员工无企业台账读取权，回退到本人渠道视角（不得落到 sub_admin 的 data） */
     sub_staff: {
       label: "二级合作企业 · 员工",
-      data: function (ctx) {
-        return buildStaffVm(ctx); /* 仅本人获客用户及其消费记录 */
-      },
-      entries: [],
-      perms: {},
+      data: function (ctx) { return buildVm(ctx, "staff"); },
+      entries: [], perms: {},
       badges: { ledger: "员工 · 仅本人渠道" },
       empty: {},
       lockedNote: "台账数据已锁定，仅可查看"
     }
   };
 
-  /* 台账行 → 单据：月份在 hist 中唯一（省代取平台侧、二级取本域账单），
-     找不到就不弹空单，明确提示缺失 */
-  function histOf(ctx, month) {
-    var want = ctx.mode === "sub" ? null : "platform";
-    var hit = (ctx.s.hist || []).filter(function (h) {
-      if ((h.month || "") !== month) return false;
-      return want ? (h.type || "platform") === want : true;
-    })[0];
-    return hit || null;
-  }
+  /* ================= 唯一渲染路径 ================= */
 
-  /* P1-7 口径折叠（data-act 委托，复用对账中心已验证链路）；空态与满态共用 */
-  function bindScopeFold(el, Uni) {
-    el.querySelectorAll("[data-act]").forEach(function (n) {
-      if (n.getAttribute("data-act") !== "scopeFold") return;
-      n.addEventListener("click", function () {
-        Uni.sheet({
-          title: n.getAttribute("data-title"),
-          body: n.getAttribute("data-body"),
-          footer: [{ t: "关闭", kind: "ghost" }]
-        });
-      });
-    });
-  }
-
-  /* 唯一渲染路径 */
   function mount(el, ctx, Uni) {
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
     var vm = V.data(ctx);
 
-    var badge = V.badges.ledger ? '<span class="uh-badge uh-badge--gold">' + ui.esc(V.badges.ledger) + "</span>" : "";
-    /* P0-1：主数字必须自带所属月份，避免「总盘 / 实得」口径切换后读者不知是哪个月 */
-    var monthBadge = vm.bigMonth ? '<span class="uh-badge uh-badge--mute">' + ui.esc(vm.bigMonth) + "</span>" : "";
+    var sc = el.closest ? el.closest(".scroll") : null;
 
-    /* 柱图 */
-    var bars = vm.bars.map(function (b) {
-      return '<div class="ulg-bar"><div class="ulg-col' + (b.cur ? " ulg-col--cur" : "") + '" style="height:' + b.pct + '%"></div>' +
-        '<div class="ulg-col__v">' + ui.money(b.value) + "</div>" +
-        '<div class="ulg-col__lb">' + ui.esc(b.label) + "</div></div>";
-    }).join("");
+    function paint() {
+      var html = "";
 
-    /* 表格（员工=本人获客用户消费明细；管理员/二级=月度台账）
-       省代行来自月度账单记录，第四列给「对账状态」并整行可点开单据；
-       二级行来自约定比例复算，第四列仍是「比例」。 */
-    var isSub = ctx.mode === "sub";
-    var headCells = vm.staff
-      ? "<th>用户</th><th>渠道</th><th>消费金额</th><th>状态</th>"
-      : (isSub
-        ? "<th>月份</th><th>合格消费</th><th>总盘 50%</th><th>比例</th><th>经营所得</th>"
-        : "<th>月份</th><th>合格消费</th><th>总盘 50%</th><th>对账状态</th><th>经营所得</th>");
-    var rows = vm.rows.map(function (r) {
+      /* 只读封条（法代 / 冻结态） */
+      if (ctx.readonly) {
+        html += '<section class="ulg-blk ulg-locks"><div class="uh-lockbar">' + ui.icon("lock", 18) +
+          '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, V)) + "（仅可查看）</span>" +
+          '<span class="lb-s">' + ui.esc(V.lockedNote || "") + "</span></div></div></section>";
+      }
+
       if (vm.staff) {
-        return "<tr><td>" + ui.esc(r.user) + "</td>" +
-          "<td>" + ui.esc(r.channel) + "</td>" +
-          "<td>" + ui.money(r.amount) + "</td>" +
-          "<td>" + ui.esc(r.stageTxt) + "</td></tr>";
+        html += '<div class="ulg-pad">' + staffHtml(vm) +
+          Uni.scopeCardFold("仅展示本人渠道码带来用户的消费记录。", "经营台账口径说明", scopeBody(vm)) +
+          "</div>";
+      } else if (vm.empty) {
+        html += '<div class="ulg-pad">' +
+          '<section class="card ulg-blk">' +
+          Uni.emptyHtml("暂无经营台账",
+            "平台月度账单出账后自动生成台账；出账前无可复算的经营数据。", "receipt") + "</section>" +
+          Uni.scopeCardFold("经营台账为只读口径 · 记录、计算与分析。", "经营台账口径说明", scopeBody(vm)) +
+          "</div>";
+        el.innerHTML = html;
+        if (sc) sc.scrollTop = 0;
+        return;
+      } else {
+        html += periodBarHtml(vm);
+        html += '<div class="ulg-pad">';
+        html += heroHtml(vm);
+        html += trendHtml(vm);
+        html += ledgerBookHtml(vm);
+        html += splitHtml(vm);
+        html += rankHtml(vm);
+        html += Uni.scopeCardFold(
+          vm.role === "sub"
+            ? "账期金额取自月度账单，分项由约定比例复算；看结构看本页，看单据去对账中心。"
+            : "账期口径看趋势与台账，基数口径看分账结构与来源排行；看单据去对账中心。",
+          "经营台账口径说明", scopeBody(vm));
+        html += "</div>";
       }
-      if (isSub) {
-        return "<tr><td>" + ui.esc(r.month) + "</td>" +
-          "<td>" + ui.money(r.eligible) + "</td>" +
-          "<td>" + ui.money(r.gross) + "</td>" +
-          "<td>" + ui.esc(r.ratio) + "</td>" +
-          "<td>" + ui.money(r.income) + "</td></tr>";
-      }
-      var stCls = (window.UniDoc && window.UniDoc.HIST_CLS[r.state]) || "mute";
-      return '<tr class="ulg-row" data-month="' + ui.esc(r.month) + '" tabindex="0" role="button" ' +
-        'aria-label="查看 ' + ui.esc(r.month) + " 对账单\">" +
-        "<td>" + ui.esc(r.month) + "</td>" +
-        "<td>" + ui.money(r.eligible) + "</td>" +
-        "<td>" + ui.money(r.gross) + "</td>" +
-        '<td><span class="uh-badge uh-badge--' + stCls + '">' + ui.esc(r.stateTxt) + "</span></td>" +
-        "<td>" + ui.money(r.income) + "</td></tr>";
-    }).join("");
 
-    var html = "";
-
-    /* P2：趋势柱只给横向高低，读者无法判断「这个月算好还是差」；
-       补一条可比基线（近 N 月均值 + 本月相对偏离） */
-    var barNote = "";
-    if (!vm.staff && vm.bars.length >= 2) {
-      var bvals = vm.bars.map(function (b) { return b.value; });
-      var bavg = Math.round(bvals.reduce(function (a, b) { return a + b; }, 0) / bvals.length);
-      var curBar = vm.bars.filter(function (b) { return b.cur; })[0] || vm.bars[bvals.length - 1];
-      var bpct = bavg > 0 ? Math.round((curBar.value - bavg) / bavg * 100) : 0;
-      barNote = "近 " + bvals.length + " 月均值 " + ui.money(bavg) + " · " +
-        curBar.label + " " + (bpct >= 0 ? "+" : "") + bpct + "%";
-    }
-
-    /* 只读口径说明：折叠为「一句话 + 查看口径说明」（P1-7 去墙化） */
-    html += Uni.scopeCardFold(
-      vm.staff
-        ? "仅展示本人获客用户的消费记录，不涉及企业分佣台账。"
-        : (ctx.mode === "sub" ? "经营台账为只读口径复算：总盘 50%、T+7 冻结。" : "经营台账为只读口径：两级分账、不执行提现。"),
-      "经营台账口径说明",
-      '<div class="uh-readnote" style="margin-bottom:12px">' + ui.esc(vm.notice) + "</div>" +
-      (!vm.staff
-        ? (vm.flowPath ? '<div class="uh-clause"><div class="no">分账路径</div><div class="c">' + ui.esc(vm.flowPath) + "</div></div>" : "") +
-          '<div class="uh-clause"><div class="no">计入项</div>' +
-          "<div class=\"c\">订单净额 · 积分解锁付费 · 增值服务付费</div></div>" +
-          '<div class="uh-clause"><div class="no">排除项</div>' +
-          "<div class=\"c\">充值 · 免费积分 · 报名费 · 退款冲回</div></div>" +
-          '<div class="uh-clause"><div class="no">退款口径</div>' +
-          "<div class=\"c\">冻结期内剔除、当月红字冲减、跨月等额回冲。</div></div>"
-        : "")
-    );
-
-    /* 暂停封条 */
-    if (ctx.readonly) {
-      html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, V)) + '（仅可查看）</span>' +
-        '<span class="lb-s">' + ui.esc(V.lockedNote || "") + '</span></div></div></section>';
-    }
-
-    /* P2：完全无数据时给空态，不铺一屏 ¥0 卡片和空表格
-       （员工看获客消费、管理员看月度账单，两者口径不同但空态语义一致） */
-    var noData = vm.staff ? !vm.rows.length
-      : (!vm.rows.length && !(ctx.s.hist || []).length);
-    if (noData) {
-      html += '<section class="uh-sec"><div class="card">' +
-        Uni.emptyHtml(
-          vm.staff ? "暂无获客消费记录" : "暂无经营台账",
-          vm.staff
-            ? "名下获客用户产生有效消费后，这里会按月汇总本人消费明细。"
-            : "平台月度账单出账后自动生成台账；出账前无可复算的经营数据。",
-          "ledger") + "</div></section>";
       el.innerHTML = html;
-      Uni.bindScopeFold(el, Uni);
-      bindScopeFold(el, Uni);
-      return;
+
+      /* 主数字 count-up（reduced-motion 直跳，由 Uni.countUp 内部处理） */
+      var cnum = el.querySelector("[data-count]");
+      if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")), 420, ui.moneyD);
+
+      wire();
     }
 
-    /* 批次九 L5：桌面「经营所得 + 月度趋势」两栏并列（移动端单列顺序不变） */
-    html += '<div class="ulg-grid">';
-
-    /* 经营所得卡 */
-    html += '<section class="card uh-sec">' +
-      '<div class="uh-finhead"><span class="uh-eyebrow">' + ui.esc(vm.cardTitle) + "</span>" + monthBadge + badge + "</div>" +
-      '<div class="uh-bignum" data-count="' + vm.big + '">' + ui.moneyD(0) + "</div>" +
-      (vm.bigNote || "") +
-      (vm.bigWarn ? '<div class="uh-note" style="color:var(--warning-ink)">' + vm.bigWarn + "</div>" : "") +
-      '<div class="uh-ledgerline"></div>';
-    vm.kvs.forEach(function (kv) {
-      html += '<div class="uh-kv"><span class="k">' + ui.esc(kv.k) + "</span><span class=\"v\">" + kv.v + "</span></div>";
-    });
-    html += '<div class="uh-note">' + (vm.staff ? "仅展示本人获客用户的消费记录，不涉及企业分佣台账。" : "约定所得为只读台账口径，不构成可提现金额。") + '</div></section>';
-
-    /* 月度趋势柱图（员工=本人渠道消费构成） */
-    html += '<section class="card uh-sec">' +
-      '<div class="uh-finhead"><span class="uh-eyebrow">' + (vm.staff ? "我的获客消费构成" : "月度经营所得趋势") + '</span>' +
-      '<span class="uh-badge uh-badge--mute">' + (vm.staff ? "按渠道" : "最近月高亮") + '</span></div>' +
-      '<div class="ulg-bars">' + bars + "</div>" +
-      (barNote ? '<div class="uh-note">' + ui.esc(barNote) + "</div>" : "") + "</section>" +
-      '</div>';
-
-    /* 月度台账表格 */
-    var colSpan = vm.staff ? 4 : 5;
-    html += '<section class="card uh-sec" style="padding:6px 16px 14px">' +
-      '<div class="uh-finhead" style="margin:10px 0 4px"><span class="uh-eyebrow">月度台账</span>' +
-      (!vm.staff && !isSub ? '<span class="uh-badge uh-badge--mute">点行查看单据</span>' : "") + "</div>" +
-      '<table class="ulg-table"><thead><tr>' +
-      headCells +
-      "</tr></thead><tbody>" + (vm.rows.length ? rows : '<tr><td colspan="' + colSpan + '" style="text-align:center;color:var(--text-3);padding:16px 0;">暂无月度台账</td></tr>') + "</tbody></table>" +
-      (vm.tableNote ? '<div class="uh-note">' + ui.esc(vm.tableNote) + "</div>" : "") + "</section>";
-
-    /* P1-1 / P0-3 省代经营分析两卡（员工仅本人获客视图，不展示企业分佣视角） */
-    if (!vm.staff && vm.srcSplit) {
-      /* ---- P1-1 按来源拆分经营分析（直营线 / 各二级线逐家） ---- */
-      var s1 = [];
-      s1.push('<div class="uh-kv"><span class="k">' + ui.esc(vm.srcSplit.self.label) + '</span>' +
-        '<span class="v">合格消费 ' + ui.money(vm.srcSplit.self.settledGross) + ' · 收益（×50% 全额）' + ui.money(vm.srcSplit.self.amount) + '</span></div>');
-      vm.srcSplit.subs.forEach(function (p) {
-        s1.push('<div class="uh-kv"><span class="k">二级线 · ' + ui.esc(p.name) + '</span>' +
-          '<span class="v">消费 ' + ui.money(p.settled) + ' · 比例 ' + Math.round(p.ratio * 100) + '% · 约定 ' + ui.money(p.agreed) + '</span></div>');
-      });
-      s1.push('<div class="uh-kv"><span class="k">二级线合计</span>' +
-        '<span class="v">盘 ' + ui.money(vm.srcSplit.subPool) + ' · 约定 ' + ui.money(vm.srcSplit.subAgreed) + ' · 自留 ' + ui.money(vm.srcSplit.subRetained) + '</span></div>');
-      html += '<section class="card uh-sec">' +
-        '<div class="uh-finhead"><span class="uh-eyebrow">按来源拆分经营分析</span>' +
-        '<span class="uh-badge uh-badge--mute">两分区独立</span></div>' +
-        '<div class="uh-ledgerline"></div>' + s1.join("") + '</section>';
-
-      /* ---- P0-3 收益全景（可提现置顶 + 只读分账 + 脚注） ---- */
-      html += '<section class="card uh-sec">' +
-        '<div class="uh-finhead"><span class="uh-eyebrow">收益全景</span>' +
-        '<span class="uh-badge uh-badge--mute">属性标注</span></div>' +
-        vm.panorama.map(function (p) {
-          return '<div class="uh-clause"><div class="no">' + ui.esc(p.name) +
-            ' <span class="uh-badge uh-badge--' + p.cls + '" style="margin-left:6px">' + ui.esc(p.attr) + '</span></div>' +
-            '<div class="c">' + ui.esc(p.value) + (p.sub ? '<span class="ulg-pano__sub">' + ui.esc(p.sub) + '</span>' : '') + '</div></div>';
-        }).join("") +
-        (vm.panoNote ? '<div class="uh-note">' + ui.esc(vm.panoNote) + '</div>' : '') + '</section>';
-    }
-
-    el.innerHTML = html;
-    Uni.bindScopeFold(el, Uni);
-    bindScopeFold(el, Uni);
-    /* 批次九 L8：经营所得主数字 count-up（420ms ease-out；reduced-motion 直跳） */
-    var cnum = el.querySelector("[data-count]");
-    if (cnum) Uni.countUp(cnum, parseFloat(cnum.getAttribute("data-count")), 420, ui.moneyD);
-    /* P1-3：月度台账行 → 对账单单据（模板与下载走 uni-doc.js，三个入口同一张单） */
-    el.querySelectorAll("[data-month]").forEach(function (n) {
-      function open() {
-        var h = histOf(ctx, n.getAttribute("data-month"));
-        if (!window.UniDoc) { Uni.toast("对账文件模块未加载，请刷新后重试", "err"); return; }
-        if (!h) { Uni.toast("该账期对账单缺失", "err"); return; }
-        window.UniDoc.openSheet(ctx, h, Uni, {
-          more: { t: "去对账中心", on: function () { Uni.navTo("reconcile.html"); } }
-        });
+    /* 切账期：重算 → 重绘 → 把账期条带回滚动视口顶部（内容高度相近，不打断阅读） */
+    function gotoMonth(m) {
+      if (!m || m === _s.month) return;
+      _s.month = m;
+      vm = V.data(ctx);
+      paint();
+      if (sc) {
+        var bar = el.querySelector(".ulg-pbar");
+        var hero = el.querySelector("#lg-hero");
+        if (hero) {
+          var hr = hero.getBoundingClientRect();
+          var cr = sc.getBoundingClientRect();
+          var stick = bar ? bar.offsetHeight : 0;
+          sc.scrollTo({ top: Math.max(0, sc.scrollTop + (hr.top - cr.top) - stick), behavior: "smooth" });
+        }
       }
-      n.addEventListener("click", open);
-      n.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); open(); }
+    }
+
+    function wire() {
+      /* 账期条 + 趋势柱 + 台账行：同一套 data-month 委托 */
+      el.querySelectorAll('.ulg-pchip[data-month], .ulg-col[data-month], .ulg-ax[data-month]').forEach(function (n) {
+        n.addEventListener("click", function () { gotoMonth(n.getAttribute("data-month")); });
       });
+
+      /* 台账行：点开账期分解（键盘可达） */
+      el.querySelectorAll(".ulg-brow[data-month]").forEach(function (n) {
+        function open() { openDetail(ctx, vm, n.getAttribute("data-month"), Uni); }
+        n.addEventListener("click", open);
+        n.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); open(); }
+        });
+      });
+
+      /* 趋势指标切换 */
+      el.querySelectorAll("[data-metric]").forEach(function (n) {
+        n.addEventListener("click", function () {
+          var k = n.getAttribute("data-metric");
+          if (k === _s.metric) return;
+          _s.metric = k;
+          vm = V.data(ctx);          /* 必须重算：vm.metric 由 buildVm 读 _s.metric，否则标签不跟随 */
+          paint();
+        });
+      });
+
+      /* 导出 CSV */
+      el.querySelectorAll('[data-act="export"]').forEach(function (n) {
+        n.addEventListener("click", function () { exportCsv(ctx, vm, Uni); });
+      });
+
+      /* 来源排行 → 该二级线明细（省代） */
+      el.querySelectorAll('.ulg-rk[data-sub]').forEach(function (n) {
+        function open() {
+          var name = n.getAttribute("data-sub");
+          var row = vm.split && vm.split.rank.filter(function (r) { return r.name === name; })[0];
+          if (!row) return;
+          Uni.sheet({
+            title: name,
+            body: '<div class="uh-kv"><span class="k">合格消费（基数）</span><span class="v">' + ui.money(row.settled) + "</span></div>" +
+              '<div class="uh-kv"><span class="k">该线盘（×50%）</span><span class="v">' + ui.money(row.pool) + "</span></div>" +
+              '<div class="uh-kv"><span class="k">约定比例</span><span class="v">' + Math.round(row.ratio * 100) + "%</span></div>" +
+              '<div class="uh-kv"><span class="k">约定付出</span><span class="v" style="color:var(--warning-ink)">' + ui.money(row.agreed) + "</span></div>" +
+              '<div class="uh-kv"><span class="k">省代留存</span><span class="v">' + ui.money(row.retained) + "</span></div>" +
+              '<div class="uh-note" style="margin-top:10px">基数为该企业最近账期合格消费；逐家账期明细见「对账中心 → 明细」。</div>',
+            footer: [
+              { t: "关闭", kind: "ghost" },
+              { t: "去对账中心", kind: "primary", onClick: function () { Uni.navTo("reconcile.html?focus=2"); } }
+            ]
+          });
+        }
+        n.addEventListener("click", open);
+        n.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); open(); }
+        });
+      });
+    }
+
+    paint();
+  }
+
+  /* ================= 导出 ================= */
+
+  function exportCsv(ctx, vm, Uni) {
+    var isSub = vm.role === "sub";
+    var head = isSub
+      ? ["账期", "状态", "合格消费", "分账总盘", "约定比例", "经营所得", "已确认", "待确认", "争议", "出账日", "应付日", "结算日"]
+      : ["账期", "状态", "合格消费", "平台账单", "付二级企业", "经营实得", "已确认", "待确认", "争议", "出账日", "应付日", "结算日"];
+
+    var rows = [head];
+    vm.periods.slice().reverse().forEach(function (p) {
+      var reg = p.regIn || { ok: 0, wait: 0, bad: 0 };
+      rows.push(isSub
+        ? [p.month, p.stateTxt, num(p.eligible) ? p.eligible : "", num(p.gross) ? p.gross : "", p.ratioTxt, p.income,
+           reg.ok, reg.wait, reg.bad, p.issueAt, p.dueAt, p.settledAt]
+        : [p.month, p.stateTxt, p.eligible, p.bill, p.paySub, p.income,
+           reg.ok, reg.wait, reg.bad, p.issueAt, p.dueAt, p.settledAt]);
     });
+
+    var who = isSub ? "二级企业" : "省级总代";
+    var stamp = (vm.cur && vm.cur.month) || "";
+    var ok = downloadCsv("经营台账_" + who + (stamp ? "_" + stamp : "") + ".csv", rows);
+    if (ok) Uni.toast("已导出 " + (rows.length - 1) + " 个账期");
+    else Uni.toast("导出失败，请检查浏览器下载权限", "err");
   }
 
   window.Uni.register({
