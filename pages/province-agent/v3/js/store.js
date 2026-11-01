@@ -256,6 +256,11 @@
         items: items
       };
     }
+    /* 2026-11-01 数据级脱敏补齐：二级员工与省代员工同构——无付款确认/异议/协议签署
+       职责，不派生企业级待办与角标。此前 sub_staff 会拿到全企业待办与金额。 */
+    if (normId(state.role) === "sub_staff") {
+      return { payments: 0, agreement: 0, total: 0, items: [] };
+    }
     var pendRegs = (d.payRegs || []).filter(function (r) { return r.status === "pending_confirm"; });
     var dispRegs = (d.payRegs || []).filter(function (r) { return r.status === "disputed"; });
     var agreePending = d.agreement && (d.agreement.state === "pending_mine" || d.agreement.state === "rejected") ? 1 : 0;
@@ -279,19 +284,26 @@
     };
   }
 
-  /* 消息列表：派生待办 + 手动动作留痕（msgLog）+ 静态运营提示 */
+  /* 消息列表：派生待办（source=todo）+ 系统消息（source=state）
+     系统消息 = 业务通知 msgLog + 平台公告 sysMsgs + 暂停封条。
+     20261102 起 msgLog 归入系统消息（它本来就是"通知"），
+     「动作留痕」改由 freeActsOf 独立供给 —— 二者混在同一栏会让
+     "谁在什么时候免费解锁了什么"这类审计信息淹没在业务通知里。 */
   function messagesOf(state) {
     var todo = todoOf(state);
     var msgs = [];
     var d = state.state;
     todo.items.forEach(function (it) {
-      msgs.push({ key: it.key, id: it.id, icon: it.icon, type: it.type, title: it.t, desc: it.s, to: it.to, time: "今天", source: "todo" });
+      msgs.push({ key: it.key, id: it.key + ":" + (it.id || ""), icon: it.icon, type: it.type, title: it.t, desc: it.s, body: "", to: it.to, time: "今天", source: "todo", tag: "" });
     });
     if (d.profile.status === "suspended") {
-      msgs.push({ icon: "lock", type: "danger", title: "账号已暂停（仅可查看）", desc: "全部经营动作锁定，请联系平台或上级处理", to: state.mode === "sub" ? "#/home" : "#/home", time: "今天", source: "state" });
+      msgs.push({ id: "sys-suspended", icon: "lock", type: "danger", title: "账号已暂停（仅可查看）", desc: "全部经营动作锁定，请联系平台或上级处理", body: "", to: state.mode === "sub" ? "#/home" : "#/home", time: "今天", source: "state", tag: "状态" });
     }
-    (d.msgLog || []).forEach(function (m) {
-      msgs.push({ icon: m.icon || "bell", type: m.type || "info", title: m.title, desc: m.desc, to: m.to || "", time: m.time || "刚刚", source: "log" });
+    (d.msgLog || []).forEach(function (m, i) {
+      msgs.push({ id: m.id || ("ml-" + i), icon: m.icon || "bell", type: m.type || "info", title: m.title, desc: m.desc, body: m.body || "", to: m.to || "", time: m.time || "刚刚", source: "state", tag: m.tag || "通知" });
+    });
+    (d.sysMsgs || []).forEach(function (m) {
+      msgs.push({ id: m.id, icon: m.icon || "bell", type: m.type || "info", title: m.title, desc: m.desc, body: m.body || "", to: m.to || "", time: m.time || "", source: "state", tag: m.tag || "公告" });
     });
     return msgs;
   }
@@ -302,6 +314,15 @@
     return (d.msgLog || []).slice();
   }
 
+  /* 动作留痕：省内免费解锁执行记录（时间倒序）。
+     独立事件源 —— 不进 messagesOf，否则底部导航的消息角标会被审计流水撑爆。 */
+  function freeActsOf(state) {
+    var d = state.state;
+    var list = (d.freeActs || []).slice();
+    list.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+    return list;
+  }
+
   /* ---------------- store 主体 ---------------- */
   var state = null;
 
@@ -310,6 +331,8 @@
     state = JSON.parse(JSON.stringify(initial));
     state.scenarioKey = scenarioKey || (state.mode === "sub" ? "sub-active" : "active");
     if (!state.state.msgLog) state.state.msgLog = [];
+    if (!state.state.sysMsgs) state.state.sysMsgs = [];
+    if (!state.state.freeActs) state.state.freeActs = [];
     save();
     return state;
   }
@@ -329,7 +352,12 @@
         var want = null;
         try { want = localStorage.getItem(STATE_KEY); } catch (e2) {}
         var sceneOk = !want || !parsed.scenarioKey || parsed.scenarioKey === want;
-        state = (parsed && parsed.mode === appMode() && parsed._v === ver && sceneOk) ? parsed : null;
+        /* 身份域校验（2026-11-01）：role 必须属于 mode 的域。
+           历史缺陷：持久化 sub 场景 + ?role=staff 时，mode=sub 而 role=staff，
+           页面取 staff 变体去读二级种子（无 subs 字段）→ mount 抛错、容器已清空 → 永久白屏。
+           roleOk 不通过即丢弃缓存，由 boot 重新播种回该场景的默认身份。 */
+        var roleOk = !parsed.role || roleModeOf(parsed.role) === parsed.mode;
+        state = (parsed && parsed.mode === appMode() && parsed._v === ver && sceneOk && roleOk) ? parsed : null;
       }
     } catch (e) { state = null; }
     return state;
@@ -350,7 +378,11 @@
      2026-10-30 评审实证：sub_staff 经回退变体获得可操作权限 → 动作守卫一律按归一化身份校验。 */
   var ROLE_ALIAS = { boss: "admin", sub_owner: "sub_admin", legalRep: "legal_rep", sub_legalRep: "sub_legal" };
   var ROLES6 = { admin: 1, legal_rep: 1, staff: 1, sub_admin: 1, sub_legal: 1, sub_staff: 1 };
+  /* 身份 → 所属域（与 uni-shared IDENTITY_META.mode 同源）。跨域身份禁止写入该域状态。 */
+  var ROLE_MODE = { admin: "province", legal_rep: "province", staff: "province",
+                    sub_admin: "sub", sub_legal: "sub", sub_staff: "sub" };
   function normId(r) { var m = ROLE_ALIAS[r]; if (m) return m; return ROLES6[r] ? r : "admin"; }
+  function roleModeOf(r) { return ROLE_MODE[normId(r)]; }
   function ctxInfo() {
     var d = state.state;
     var role = state.role;
@@ -382,11 +414,17 @@
       case "theme/set":
         state.theme = p.theme; save(); return ok();
 
-      case "role/set":
-        /* 演示身份切换（非真实业务动作） */
-        state.role = p.role;
-        if (p.role === "staff" && !state.roleStaffName) state.roleStaffName = "王敏";
+      case "role/set": {
+        /* 演示身份切换（非真实业务动作）。
+           域校验（2026-11-01）：身份必须属于当前域，跨域一律拒绝——
+           防 staff 被写进二级状态、sub_admin 被写进省代状态导致取变体读错种子（白屏根因）。 */
+        var nid = normId(p.role);
+        if (roleModeOf(nid) !== state.mode) return fail("身份与当前工作台域不匹配");
+        state.role = nid;
+        if (nid === "staff" && !state.roleStaffName) state.roleStaffName = "王敏";
+        if (nid === "sub_staff" && !state.roleStaffName) state.roleStaffName = "刘颖";
         save(); return ok();
+      }
 
       /* ---------- 渠道码 ---------- */
       case "channel/gen": {
@@ -723,6 +761,7 @@
     todoOf: todoOf,
     messagesOf: messagesOf,
     activitiesOf: activitiesOf,
+    freeActsOf: freeActsOf,
     seed: seed,
     getState: getState,
     reset: reset,

@@ -654,7 +654,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js"></script>
+<script src="../../js/common.js?v=20261101wb1"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/avatar-pool.js"></script>
 <script src="../../js/databus.js"></script>
@@ -829,11 +829,14 @@ html, body { margin:0; padding:0; background:var(--bg); }
         var acc = window.entryAccess ? entryAccess() : null;
         if (acc && acc.agent && acc.agent.active) {
           var isPa = acc.agent.isProvinceAgent;
-          var pLabel = isPa ? '省级总代' : '合作机构';
+          /* 术语对齐权威 IDENTITY_META（uni-shared）：二级档位一律「二级合作企业」，
+             不再用旧称「合作机构」。团队角色后缀读工作台回声（法代/员工）做反向联动。 */
+          var pLabel = isPa ? '省级总代' : '二级合作企业';
           var emblemImg = isPa ? 'tag-emblem-pa.png' : 'tag-emblem-sub.png';
+          var wbRole = workbenchRoleLabel(isPa);
           badgeHtml += '<span class="pf-agent-tag ' + (isPa ? 'tag-pa' : 'tag-sub') + '">' +
             '<span class="tag-emblem"><img src="../../assets/me/' + emblemImg + '" alt="' + pLabel + '" loading="lazy" decoding="async"></span>' +
-            pLabel + '</span>';
+            pLabel + (wbRole ? ' · ' + wbRole : '') + '</span>';
         }
       } catch (e) {}
       badgeBox.innerHTML = badgeHtml;
@@ -945,12 +948,34 @@ html, body { margin:0; padding:0; background:var(--bg); }
     } catch (e) {}
   }
 
-  /* ---------- 代理工作台入口卡（省级总代 / 二级合作专属，替代认证成长卡位） ---------- */
+  /* ---------- 代理工作台入口卡（省级总代 / 二级合作企业专属，替代认证成长卡位） ---------- */
+  /* 工作台入口 URL：显式带场景与身份，避免沿用上一个演示者在 localStorage 里留下的域
+     （原省级总代分支是裸 home.html，上一轮停在二级时会被送进二级工作台）。
+     带哪一套：读工作台回声键，域一致就"进去还是刚才那个身份"，否则回到该域默认场景。 */
+  /* 2026-11-01：收口到 UI.workbenchHref() 唯一实现（回声优先），
+     与分销中心 / 消息中心 / 提现 / 海报页共用同一套域与身份判定 */
+  function workbenchHref(isProvince) {
+    return UI.workbenchHref({ isSub: !isProvince });
+  }
+
+  /* 工作台身份回声：工作台切身份后写入，个人中心据此显示团队角色后缀（法代/员工） */
+  function workbenchEcho() {
+    try { return JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (e) { return null; }
+  }
+  var WB_ROLE_LABEL = { admin: '', legal_rep: '法定代表人', staff: '员工',
+                        sub_admin: '', sub_legal: '法定代表人', sub_staff: '员工' };
+  function workbenchRoleLabel(isProvince) {
+    var e = workbenchEcho();
+    if (!e) return '';
+    if (e.mode !== (isProvince ? 'province' : 'sub')) return '';
+    return WB_ROLE_LABEL[e.identity] || '';
+  }
+
   window.pfAgentEnter = function () {
     try {
       var acc = window.entryAccess ? entryAccess() : null;
       if (acc && acc.agent && acc.agent.active) {
-        location.href = acc.agent.isProvinceAgent ? '../province-agent/uni/pages/home.html' : '../province-agent/uni/pages/home.html?scenario=sub-active&role=sub_owner';
+        location.href = workbenchHref(!!acc.agent.isProvinceAgent);
       }
     } catch (e) {}
   };
@@ -970,11 +995,11 @@ html, body { margin:0; padding:0; background:var(--bg); }
     /* 破框徽章（黑底 PNG，screen 混合） */
     var badgeBox = document.getElementById('pf-agent-badge');
     if (badgeBox) {
-      badgeBox.innerHTML = '<img src="../../assets/me/' + (isPa ? 'badge-agent-pa.png' : 'badge-agent-sub.png') + '" alt="' + (isPa ? '省级总代徽章' : '合作机构徽章') + '">';
+      badgeBox.innerHTML = '<img src="../../assets/me/' + (isPa ? 'badge-agent-pa.png' : 'badge-agent-sub.png') + '" alt="' + (isPa ? '省级总代徽章' : '二级合作企业徽章') + '">';
     }
-    /* 身份名（标题位：升级总代 / 合作机构） */
+    /* 身份名（标题位：省级总代 / 二级合作企业） */
     var nameEl = document.getElementById('pf-agent-name');
-    if (nameEl) nameEl.textContent = isPa ? '省级总代' : '合作机构';
+    if (nameEl) nameEl.textContent = isPa ? '省级总代' : '二级合作企业';
 
     /* 数据栏：从 AgentStore 真实计算，不硬编码占位数 */
     var statsEl = document.getElementById('pf-agent-stats');
@@ -997,7 +1022,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
           ];
           statsEl.classList.remove('cols-2');
         } else {
-          /* 合作机构（T2，末端）：本月业绩(subLedger settled) / 已签协议数；不显示下属团队 */
+          /* 二级合作企业（T2，末端）：本月业绩(subLedger settled) / 已签协议数；不显示下属团队 */
           var sum2 = (window.AgentStore && AgentStore.monthlySummary) ? AgentStore.monthlySummary(mk, 'subLedger') : { amount: 0 };
           var signed = 0;
           try { if (window.AgentEsign && AgentEsign.list) { signed = AgentEsign.list().filter(function (c) { return c.status === 'signed' || c.signature; }).length; } } catch (e) {}
@@ -1258,7 +1283,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
       var _acc = window.entryAccess ? entryAccess() : null;
       if (_acc && _acc.agent && _acc.agent.active) {
         items.push({
-          href: _acc.agent.isProvinceAgent ? '../province-agent/uni/pages/home.html' : '../province-agent/uni/pages/home.html?scenario=sub-active&role=sub_owner',
+          href: workbenchHref(!!_acc.agent.isProvinceAgent),
           n: '53', title: '代理工作台'
         });
       }
@@ -1725,8 +1750,23 @@ html, body { margin:0; padding:0; background:var(--bg); }
 
   /* ---------- 初始化 ---------- */
   var _pfInited = false;
+  /* 工作台侧发起的跨域切换（省代↔二级）会在 localStorage 留一条意图键，
+     账号层首次启动时补应用对应演示场景，保证"工作台里切了身份，回来个人中心也是这个身份"。
+     只做一次；本页写 LS 不会触发自身的 storage 事件，无重入风险。 */
+  var _wbPendingDone = false;
+  function applyPendingWorkbenchOnce() {
+    if (_wbPendingDone) return;
+    _wbPendingDone = true;
+    try {
+      if (!(window.DataBus && DataBus.applyPendingWorkbench)) return;
+      var r = DataBus.applyPendingWorkbench();
+      if (r && window.UI && UI.toast) UI.toast('已同步工作台身份：' + r.label, 'ok');
+    } catch (e) {}
+  }
+
   function init() {
     NT_POOL.length = 0;  /* 业务通知：每次全量重渲染前清空收集池 */
+    applyPendingWorkbenchOnce();
     renderHeader();
     renderCertTracks();      /* 认证成长：单行总览 + 双列分步进度（单源承载身份/状态/下一步行动） */
     renderAgentCard();       /* 代理工作台入口卡（总代/二级专属，替代认证成长卡位） */

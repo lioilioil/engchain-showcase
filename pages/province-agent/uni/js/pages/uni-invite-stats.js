@@ -314,7 +314,7 @@
     function activeSummary() {
       var out = [];
       if (fQuick === "7d") out.push("获客近7天");
-      else if (fQuick === "30d") out.push("获客仅30天");
+      else if (fQuick === "30d") out.push("获客近30天");
       else if (fQuick === "month") out.push("获客本月");
       if (fStart || fEnd) out.push("获客 " + (fStart || "…") + "–" + (fEnd || "…"));
       if (fChannel !== "all") out.push(CH_SHORT[fChannel] || fChannel);
@@ -330,7 +330,7 @@
     }
 
     /* ---------- 筛选行（明细/统计共用；分析不接明细筛选） ---------- */
-    var QUICK_OPTS = [{ v: "all", t: "全部" }, { v: "7d", t: "近7天" }, { v: "30d", t: "仅30天" }, { v: "month", t: "本月" }];
+    var QUICK_OPTS = [{ v: "all", t: "全部" }, { v: "7d", t: "近7天" }, { v: "30d", t: "近30天" }, { v: "month", t: "本月" }];
     function dateCapsHtml() {
       return '<span class="us-datecaps">' + QUICK_OPTS.map(function (o) {
         return '<button type="button" class="us-datecap' + (o.v === fQuick ? " is-on" : "") +
@@ -983,7 +983,8 @@
         "</div></section></div>";
       if (ctx.readonly) {
         html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-          '<div><span class="lb-t">' + ui.esc(vm.lockedTitle) + "（仅可查看）</span>" +
+          /* 2026-11-01：V.lockedTitle 优先——法代只读时由 stateVariantFor 统一改写为「只读视图」 */
+          '<div><span class="lb-t">' + ui.esc(V.lockedTitle || vm.lockedTitle || "只读视图") + "（仅可查看）</span>" +
           '<span class="lb-s">' + ui.esc(V.lockedNote || "") + "</span></div></div></section>";
       }
       if (vm.note) {

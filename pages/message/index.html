@@ -75,7 +75,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js?v=2026100310"></script>
+<script src="../../js/common.js?v=20261101wb1"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/orgs.js"></script>
@@ -310,7 +310,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         (pa.statusLog || []).forEach(function (lg, i) {
           push('pa-' + pa.id + '-' + i, '省代申请状态：' + agentStatusTxt(lg.toStatus),
             lg.reason ? lg.reason : ('由 ' + agentStatusTxt(lg.fromStatus) + ' 变更为 ' + agentStatusTxt(lg.toStatus)),
-            lg.at, '../province-agent/uni/pages/home.html', '进入工作台');
+            lg.at, UI.workbenchHref({ isSub: false }), '进入工作台');
         });
       });
       /* 二级记录：本人发起（parentUid=me.id）或本人作为二级（uid=me.id） */
@@ -321,7 +321,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         (sb.statusLog || []).forEach(function (lg, i) {
           push('sub-' + sb.id + '-log-' + i, (mineSelf ? '您的二级合作状态：' : '二级合作方状态：') + agentStatusTxt(lg.toStatus),
             lg.reason ? lg.reason : ('由 ' + agentStatusTxt(lg.fromStatus) + ' 变更为 ' + agentStatusTxt(lg.toStatus)),
-            lg.at, mineSelf ? '../province-agent/uni/pages/home.html?scenario=sub-active&role=sub_owner' : '../province-agent/uni/pages/home.html',
+            lg.at, UI.workbenchHref({ isSub: !!mineSelf }),
             mineSelf ? '进入二级视角' : '查看');
         });
         var pend = null;
@@ -332,7 +332,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (pend) {
           push('sub-' + sb.id + '-esign', '协议待签署：' + ((sb.company && sb.company.name) || ''),
             'O4 二级合作协议待' + (mineSelf ? '您' : '二级') + '签署', pend.sentAt || Date.now(),
-            mineSelf ? '../province-agent/uni/pages/home.html?scenario=sub-active&role=sub_owner' : '../province-agent/uni/pages/home.html', '去签署');
+            UI.workbenchHref({ isSub: !!mineSelf }), '去签署');
         }
       });
     } catch (e) {}
@@ -359,7 +359,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var isSub = st.mode === 'sub';
       var d = isSub ? st.sub : st.province;
       if (!d) return out;
-      var base = isSub ? '../province-agent/uni/pages/home.html?scenario=sub-active&role=sub_owner' : '../province-agent/uni/pages/home.html';
+      /* 2026-11-01：统一走 UI.workbenchHref()（回声优先，避免覆盖工作台已切换的身份）
+         返回值可继续拼接 hash（下方 base + (hash || '#/home')） */
+      var base = UI.workbenchHref({ isSub: !!isSub });
       function push(id, cat, title, body, ts, hash, label) {
         out.push({ kind: 'pa', cat: cat, id: id, title: title, body: body,
           time: fmtTs(ts), ts: tsNum(ts), unread: unreadOf(id),

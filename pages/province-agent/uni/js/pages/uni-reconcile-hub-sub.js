@@ -333,8 +333,9 @@
     }
     var cb = q.querySelector("[data-act='confirm']");
     if (cb) cb.disabled = !allChecked(vm) || vm.confirmedAmt > 0;
-    /* 批次九 L2：粘性底栏主按钮文案随状态同步（查看平账/去确认/去对账） */
-    var sbGo = el.querySelector("#sbGo");
+    /* 批次九 L2：粘性底栏主按钮文案随状态同步（查看平账/去确认/去对账）
+       refresh 没有 el 形参，根节点统一走 el_cur()（原写法 el.querySelector 抛 ReferenceError） */
+    var sbGo = q.querySelector("#sbGo");
     if (sbGo) {
       var go = q.querySelector("#vdGo");
       sbGo.textContent = go ? go.textContent : "去对账";

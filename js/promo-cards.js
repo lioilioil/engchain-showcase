@@ -39,12 +39,20 @@
 
   function isClosed(id) { return getClosedIds().indexOf(id) >= 0; }
 
+  /* ---------- 图标 ----------
+     项目硬规则：任何位置不允许 emoji，图标一律引用共享 SVG 精灵（#i-*）。
+     卡片池只存图标名，尺寸由渲染处决定。 */
+  function ic(name, size) {
+    return '<svg class="ic" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<use href="#i-' + name + '"/></svg>';
+  }
+
   /* ---------- 卡片池 ---------- */
   var CARDS = [
     {
       id: 'register-guide',
       type: 'guide',
-      icon: '🎁',
+      icon: 'award',
       title: '注册即送 50 积分',
       subtitle: '实名认证免费解锁供需权益',
       shortText: '注册送50积分 · 实名解锁5条供需',
@@ -58,7 +66,7 @@
     {
       id: 'verify-guide',
       type: 'guide',
-      icon: '✅',
+      icon: 'shield',
       title: '完成实名认证',
       subtitle: '解锁发布供需与联系洽谈权益',
       shortText: '实名认证 · 解锁发布与联系洽谈',
@@ -72,7 +80,7 @@
     {
       id: 'entry-guide',
       type: 'guide',
-      icon: '🏢',
+      icon: 'company',
       title: '入驻企业享专属折扣',
       subtitle: '流量扶持 · 官方认证 · 佣金从优',
       shortText: '企业入驻 · 专属折扣与流量扶持',
@@ -86,7 +94,7 @@
     {
       id: 'breakin-promo',
       type: 'promo',
-      icon: '⭐',
+      icon: 'star',
       title: '破冰期限时优惠',
       subtitle: '建筑 0 元入驻 · 中介 5 折',
       shortText: '限时优惠 · 建筑0元入驻 · 中介5折',
@@ -101,7 +109,7 @@
     {
       id: 'resident-workbench',
       type: 'tool',
-      icon: '📊',
+      icon: 'grid',
       title: '入驻专属工作台',
       subtitle: '我的发布 · 佣金数据 · 入驻服务',
       shortText: '工作台 · 我的发布/佣金数据/入驻服务',
@@ -169,7 +177,7 @@
     var root = window.__ROOT__ || '';
     var bg = BG_MAP[card.bg] || BG_MAP.gold;
     return '<div class="promo-card promo-card-lg" data-id="' + card.id + '" style="background:' + bg + ';border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;flex:none;width:100%;box-sizing:border-box;min-height:72px;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
-      '<span style="flex:none;font-size:24px;">' + card.icon + '</span>' +
+      '<span style="flex:none;">' + ic(card.icon, 24) + '</span>' +
       '<span style="flex:1;min-width:0;">' +
         '<div style="font-size:13px;font-weight:700;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + card.title + '</div>' +
         '<div style="font-size:11px;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + card.subtitle + '</div>' +
@@ -190,7 +198,7 @@
     var root = window.__ROOT__ || '';
     return '<div class="promo-card promo-flag" data-id="' + card.id + '" style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 6px;border-radius:10px;background:linear-gradient(90deg,rgba(201,164,92,.14),rgba(201,164,92,.04));border:1px solid rgba(201,164,92,.26);font-size:11px;color:var(--text-2);cursor:pointer;box-sizing:border-box;overflow:hidden;" onclick="location.href=\'' + root + card.ctaHref + '\'">' +
       '<span style="flex:none;width:3px;height:20px;border-radius:2px;background:linear-gradient(180deg,var(--primary-strong),var(--primary-dim));"></span>' +
-      '<span style="flex:none;font-size:14px;">' + card.icon + '</span>' +
+      '<span style="flex:none;">' + ic(card.icon, 14) + '</span>' +
       '<span style="flex:none;padding:2px 6px;border-radius:4px;background:linear-gradient(135deg,var(--primary),var(--primary-dim));color:var(--text-inv);font-size:9px;font-weight:700;letter-spacing:.05em;">限时</span>' +
       '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;">' + card.shortText + '</span>' +
       '<span style="flex:none;color:var(--primary-dim);font-size:11px;font-weight:700;white-space:nowrap;">去查看 ›</span>' +

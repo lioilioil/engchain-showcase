@@ -68,9 +68,15 @@
       data: function (ctx) {
         var ag = ctx.s.agreement || null;
         if (!ag) return { blocks: [], note: null };
-        var st = AG_BADGE[ag.state] || ["—", "mute"];
+        /* 2026-11-01 审计修复（数据级脱敏）：本变体同时被 sub_legal / sub_staff 复用
+           （stateVariantFor 回退），「待我签署」与签署/拒签动作只属于企业管理员。
+           其余身份拿到的是中性文案「待签署」且无签署类动作，不依赖 CSS 只读锁兜底。 */
+        var mine = ctx.identity === "sub_admin";
+        var st = (ag.state === "pending_mine" && !mine)
+          ? ["待签署", "info"]
+          : (AG_BADGE[ag.state] || ["—", "mute"]);
         var acts = [];
-        if (ag.state === "pending_mine") acts.push("reject", "sign");
+        if (ag.state === "pending_mine" && mine) acts.push("reject", "sign");
         else acts.push("view");
         var kv = [
           { k: "协议编号", v: ag.id },
@@ -100,6 +106,43 @@
       badges: {},
       empty: { blocks: { title: "暂无合作协议", desc: "上级省代发起合作后，协议将出现在这里" } },
       lockedNote: "合作已暂停，协议仍可查阅"
+    },
+    /* 2026-11-01 审计补齐：二级员工显式变体。data 复用二级管理员那套装配
+       （其中「待我签署 / 签署·拒签动作」已按 ctx.identity 归一），这里只换身份标签与只读说明。 */
+    sub_staff: {
+      label: "二级合作企业 · 员工",
+      data: function (ctx) {
+        var ag = ctx.s.agreement || null;
+        if (!ag) return { blocks: [], note: null };
+        var st = ag.state === "pending_mine" ? ["待签署", "info"] : (AG_BADGE[ag.state] || ["—", "mute"]);
+        var kv = [
+          { k: "协议编号", v: ag.id },
+          { k: "版本", v: ag.version },
+          { k: "甲方", v: ag.province.name },
+          { k: "合作期限", v: (ag.sentAt || "—") + " 起 · 至 " + (ag.expireAt || "—") }
+        ];
+        if (ag.state === "signed") {
+          kv.push({ k: "签署时间", v: ag.signedAt || "—" });
+          kv.push({ k: "签署人", v: ag.signerName || "—" });
+        }
+        return {
+          blocks: [{
+            kind: "sub", id: ag.id, subName: ag.sub.name,
+            badge: st, kv: kv,
+            rejectStrip: ag.state === "rejected"
+              ? "拒签原因：" + (ag.rejectReason || "—") + (ag.rejectedAt ? "（" + ag.rejectedAt + "）" : "") + "。省代修订后可重新发起协议。"
+              : null,
+            acts: ["view"],
+            agree: ag
+          }],
+          note: "协议签署与拒签仅企业管理员可操作；员工仅可查看协议档案。"
+        };
+      },
+      entries: [],
+      perms: { resend: false },
+      badges: {},
+      empty: { blocks: { title: "暂无合作协议", desc: "上级省代发起合作后，协议将出现在这里" } },
+      lockedNote: "协议档案仅可查看"
     }
   };
 
@@ -213,7 +256,7 @@
     el.innerHTML =
       (ctx.readonly
         ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-          '<div><span class="lb-t">' + (ctx.mode === "sub" ? "合作已暂停" : "合作权限已暂停") + '（仅可查看）</span>' +
+          '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, V)) + '（仅可查看）</span>' +
           '<span class="lb-s">' + ui.esc(V.lockedNote) + '</span></div></div></section>'
         : "") +
       (vm.note

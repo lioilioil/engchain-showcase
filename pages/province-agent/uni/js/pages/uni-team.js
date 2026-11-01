@@ -165,8 +165,11 @@
     }
     return false;
   }
-  /* 当前操作者是否为法定代表人（唯一可变更管理员委托） */
+  /* 当前操作者是否为法定代表人（唯一可变更管理员委托）
+     2026-11-01 审计修复：缺只读守卫——法律代表人设为只读视图，却能拿到
+     「撤销/更换管理员委托」「设为管理员」按钮。只读身份一律不具备委托变更权。 */
   function isLegalOperator(ctx, model) {
+    if (ctx.readonly) return false;
     return !!model.legalName && loginName(ctx) === model.legalName;
   }
 
@@ -189,6 +192,15 @@
       manage: true,
       data: function (ctx) { return membersModel(ctx); },
       lockedNote: "合作已暂停，团队信息仍可查阅"
+    },
+    /* 2026-11-01 审计补齐：二级员工此前无页内变体，回退时 lockedNote 会落到 sub_admin 的
+       「合作已暂停」，正常的合作企业员工一进团队页就被误标成合作中断。此处与省代员工同构：
+       成员名单只读可看，无添加/停用成员权。 */
+    sub_staff: {
+      label: "二级合作企业 · 员工",
+      manage: false,
+      data: function (ctx) { return membersModel(ctx); },
+      lockedNote: "付款确认、异议与团队管理仅企业管理员可操作"
     }
   };
 
@@ -445,7 +457,7 @@
     var html = "";
     if (ctx.readonly) {
       html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
+        '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, _V)) + '（仅可查看）</span>' +
         '<span class="lb-s">' + ui.esc(_V.lockedNote) + '</span></div></div></section>';
     }
     html += ownerCardHtml(owner, ctx);

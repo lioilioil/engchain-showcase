@@ -64,7 +64,24 @@
   /* 页面 STATE_VARIANTS 回退：新身份无页内变体时复用 admin/sub_admin 变体并强制只读 */
   function stateVariantFor(variants, id) {
     var nid = normalizeIdentity(id);
-    if (variants[nid]) return variants[nid];
+    if (variants[nid]) {
+      /* 2026-11-01 审计修复：法定代表人（legal_rep / sub_legal）是「只读身份」，
+         不是「合作暂停」。各页变体里把 lockedTitle 写死成「合作（权限）已暂停」，
+         合作正常的企业法代一进页面就被误标成合作中断。
+         此处统一收口：企业状态正常 → 只读视图；企业非 active → 保留暂停文案。 */
+      if (nid === "legal_rep" || nid === "sub_legal") {
+        var cur = null;
+        try { cur = global.V3.store.getState(); } catch (e) {}
+        var paused = !!(cur && cur.state && cur.state.profile && cur.state.profile.status !== "active");
+        var ov = {};
+        Object.keys(variants[nid]).forEach(function (k) { ov[k] = variants[nid][k]; });
+        ov.lockedTitle = paused
+          ? ((cur && cur.mode === "sub") ? "合作已暂停" : "合作权限已暂停")
+          : "只读视图";
+        return ov;
+      }
+      return variants[nid];
+    }
     var base = (IDENTITY_META[nid] && IDENTITY_META[nid].mode === "sub") ? (variants.sub_admin || variants.sub_owner) : (variants.admin || variants.boss);
     if (!base) return null;
     /* 2026-10-30 权限审计修复：回退身份（staff/sub_staff/legal_rep/sub_legal 等
@@ -77,15 +94,30 @@
       Object.keys(base).forEach(function (k) { copy[k] = base[k]; });
       copy.readonly = true;
       if ("canAct" in copy) copy.canAct = false;
-      var p = copy.perms || {};
-      Object.keys(p).forEach(function (k) { p[k] = false; });
+      /* 2026-11-01：perms 必须新建对象再改——原实现 copy.perms 与 base.perms 同一引用，
+         清零会污染 admin/sub_admin 基础变体，后续同页切回管理员时权限全灭。 */
+      var p = {}, src = base.perms || {};
+      Object.keys(src).forEach(function (k) { p[k] = false; });
       copy.perms = p;
       copy.lockedNote = (nid === "sub_legal" || nid === "legal_rep")
         ? "法定代表人角色为只读视图，可查看全部信息，不执行任何操作"
         : "当前角色仅可查看；确认、异议与登记等操作仅对应企业管理员可执行";
+      /* 锁条主标题：各页可直接渲染 V.lockedTitle，杜绝页面硬编码「合作已暂停」误伤员工视角 */
+      copy.lockedTitle = (nid === "sub_legal" || nid === "legal_rep") ? "只读视图" : "受限视图";
       return copy;
     }
     return base;
+  }
+
+  /* 只读锁条主标题：优先认页面或回退给出的 V.lockedTitle，再按企业实际状态判定。
+     2026-11-01 审计修复：多个页面把「合作权限已暂停」硬编码在 ctx.readonly 分支里，
+     合作正常的法定代表人（以及与页面无关的员工只读视角）一进页面就被标成合作中断。
+     新增页面一律用 Uni.lockTitle(ctx, V)，不要再写死标题。 */
+  function lockTitle(ctx, V) {
+    if (V && V.lockedTitle) return V.lockedTitle;
+    var st = (ctx && ctx.s && ctx.s.profile) ? ctx.s.profile.status : "active";
+    if (st !== "active") return (ctx && ctx.mode === "sub") ? "合作已暂停" : "合作权限已暂停";
+    return "只读视图";
   }
 
   /* ---------- 路由归一：真实相对路径（无 hash 路由） ----------
@@ -183,14 +215,34 @@
       container.innerHTML = Uni.skeletonHtml(view.skeletonKind || "hero");
       setTimeout(function () {
         if (views[pageKey] !== view || !container) return; /* 跳转竞态保护 */
-        container.innerHTML = "";
-        view.mount(container, ctx, Uni);
-        paintChrome();
+        mountSafely(view);
       }, 650);
       return;
     }
+    mountSafely(view);
+  }
+
+  /* 渲染兜底：mount 抛错时不留空白页（此前容器已清空 → 永久白屏，且错误只落在控制台）。
+     统一降级为可操作错误态，并把场景键复位提示给用户，避免"整站空白但无任何线索"。 */
+  function mountSafely(view) {
     container.innerHTML = "";
-    view.mount(container, ctx, Uni);
+    try {
+      view.mount(container, ctx, Uni);
+    } catch (e) {
+      if (global.console && global.console.error) global.console.error("[uni] 页面渲染失败：" + pageKey, e);
+      container.innerHTML =
+        '<div class="empty-state" style="padding:64px 24px">' +
+        '<div class="e-title">页面加载失败</div>' +
+        '<div class="e-desc">当前身份与该页面的数据不匹配（' + (ctx && ctx.identityLabel || "") + '）。</div>' +
+        '<div class="e-desc" style="margin-top:8px;font-size:12px;opacity:.7">' + (e && e.message ? String(e.message) : "") + '</div>' +
+        '<button class="btn btn--primary" style="margin-top:20px" id="__uni_reset">重置演示数据</button>' +
+        '</div>';
+      var btn = container.querySelector("#__uni_reset");
+      if (btn) btn.addEventListener("click", function () {
+        try { global.localStorage.removeItem(STATE_KEY); } catch (e2) {}
+        global.location.reload();
+      });
+    }
     paintChrome();
   }
 
@@ -373,20 +425,57 @@
       '<div class="e-desc">' + global.V3.ui.esc(desc || "") + "</div></div>";
   }
 
+  /* ---------- 与账号层（栈 A：engchain-state / preview / profile）联动的回声键 ----------
+     分工：工作台场景键是【工作台】的权威；账号层场景（DataBus.DEMO_SCENARIOS）是【账号】的权威。
+     正向：账号层应用演示场景时直接写工作台场景键（见 js/databus.js syncWorkbench）。
+     反向：工作台切场景/身份后写回声键，preview 侧栏与 profile 身份胶囊随即显示工作台身份；
+           跨域切换（省代↔二级）另写意图键，账号层下次启动时补应用对应演示场景。
+     团队角色（法代/员工）在账号层无对应概念，只在下发时的 identity 字段中体现。 */
+  var ECHO_KEY = "engchain-workbench-echo";
+  var INTENT_KEY = "engchain-workbench-intent";
+  var WB_TO_DEMO = {
+    active: "province_agent_active", dark: "province_agent_active", empty: "province_agent_active",
+    suspended: "province_agent_suspended",
+    "sub-active": "sub_agent_active", "sub-dark": "sub_agent_active",
+    "sub-empty": "sub_agent_active", "sub-readonly": "sub_agent_active"
+  };
+  function demoKeyOf(sceneKey) { return WB_TO_DEMO[sceneKey] || "province_agent_active"; }
+
+  function writeEcho(prevMode) {
+    if (!ctx) return;
+    try {
+      var scene = global.V3.store.currentScenario();
+      global.localStorage.setItem("engchain-v3-demo-identity", ctx.identity);
+      global.localStorage.setItem(ECHO_KEY, JSON.stringify({
+        scene: scene, identity: ctx.identity, label: ctx.identityLabel, mode: ctx.mode, at: Date.now()
+      }));
+      if (prevMode && prevMode !== ctx.mode) {
+        global.localStorage.setItem(INTENT_KEY, JSON.stringify({ demoKey: demoKeyOf(scene), at: Date.now() }));
+      }
+    } catch (e) {}
+  }
+
   /* ---------- 演示身份切换（全页生效：LS 权威值 + 重渲染当前页） ---------- */
   function switchScenario(key) {
+    var prevMode = ctx && ctx.mode;
     try { global.localStorage.setItem(STATE_KEY, key); } catch (e) {}
     syncAppMode();
     var state = global.V3.store.reset(global.V3.scenarios.seedByScenario(key), key);
     syncThemeFromSeed(state);
     applyTheme(readTheme());
     ctx = buildCtx(state);
+    writeEcho(prevMode);
     renderCurrent();
+    return { ok: true };
   }
   function switchRole(role) {
-    global.V3.store.act("role/set", { role: role });
+    var prevMode = ctx && ctx.mode;
+    var r = global.V3.store.act("role/set", { role: role });
+    if (!r || !r.ok) return r || { ok: false, reason: "身份切换失败" };
     ctx = buildCtx(global.V3.store.getState());
+    writeEcho(prevMode);
     renderCurrent();
+    return r;
   }
   /* ---------- T3 统一口径：两分区财务拆分（与主体系 agent-ledger 规则同源：grossShare=0.5 规则常量） ---------- */
   function financeSplit(s) {
@@ -463,11 +552,17 @@
     detailSave(o);
   }
 
+  /* 六身份统一切换入口（设置页身份卡 / URL ?role= / 外部联动均走这里）。
+     2026-11-01 修正：原实现对二级三身份只切场景不切角色，sub_legal / sub_staff 永远选不中
+     （切到 sub-active 后角色恒为种子默认 sub_admin）。现按目标身份所属域选场景，再切角色。 */
   function switchIdentity(identity) {
     var nid = normalizeIdentity(identity);
-    if (nid === "sub_admin" || nid === "sub_legal" || nid === "sub_staff") { switchScenario("sub-active"); return; }
-    if (ctx && ctx.mode !== "province") switchScenario("active"); // 回省代域再切角色
-    switchRole(nid);                                              // admin | legal_rep | staff
+    var targetMode = (IDENTITY_META[nid] || IDENTITY_META.admin).mode;
+    if (!ctx || ctx.mode !== targetMode) {
+      var scene = targetMode === "sub" ? "sub-active" : "active";
+      switchScenario(scene);            // 跨域：先落场景（含重置种子），再切角色
+    }
+    return switchRole(nid);             // admin | legal_rep | staff | sub_admin | sub_legal | sub_staff
   }
   function toggleTheme() {
     var next = readTheme() === "dark" ? "light" : "dark";
@@ -499,10 +594,16 @@
     }
     var ro = q.get("role");
     if (ro) {
-      /* 演示钩子角色合法性：按场景域限定，非法组合忽略（保持场景默认身份，防渲染崩溃） */
-      var legalRoles = desiredMode(sc) === "sub" ? ["sub_admin", "sub_legal", "sub_staff"] : ["admin", "legal_rep", "staff"];
+      /* 演示钩子角色合法性：按【实际生效的域】限定，非法组合忽略（保持场景默认身份，防渲染崩溃）。
+         2026-11-01 修正：原按 desiredMode(sc) 判断，而未带 ?scenario 时 URL 域恒为 province，
+         会放行 staff/sub_admin 等与持久化场景域不符的身份 → 取变体读错种子 → 白屏。
+         现改为按 state.mode（即场景键真实解析出的域）判定。 */
+      var legalRoles = state.mode === "sub" ? ["sub_admin", "sub_legal", "sub_staff"] : ["admin", "legal_rep", "staff"];
       var norm = normalizeIdentity(ro);
-      if (legalRoles.indexOf(norm) > -1) { global.V3.store.act("role/set", { role: norm }); state = global.V3.store.getState(); }
+      if (legalRoles.indexOf(norm) > -1) {
+        var rr = global.V3.store.act("role/set", { role: norm });
+        if (rr && rr.ok) state = global.V3.store.getState();
+      }
     }
     applyTheme(readTheme());
     ctx = buildCtx(state);
@@ -782,6 +883,7 @@
     identityReadonly: identityReadonly,
     permOf: permOf,
     stateVariantFor: stateVariantFor,
+    lockTitle: lockTitle,
     financeSplit: financeSplit,
     /* 批次四：方案 A 明细核对持久化（DL v2） */
     detailState: {

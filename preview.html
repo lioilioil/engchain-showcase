@@ -612,8 +612,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           </span>
         </div>
         <div class="pv-note" id="status-note"></div>
+        <!-- 工作台身份回声：工作台侧切场景/身份后写入 engchain-workbench-echo，此处回显（反向联动） -->
+        <div class="pv-note" id="pv-wb-identity"></div>
         <!-- 原型演示身份（D5 权限差异演示）落位说明：自「我的」移出的演示能力，仅在本播种区说明，省代成品页面零 dev 文案 -->
-        <div class="pv-note" id="demo-identity-note"><b>原型演示身份（D5 权限差异演示）：</b>在上方「演示场景」下拉选择 <b>省级总代 · 已开通</b>（u11 四川华建）或 <b>二级合作 · 已绑定</b>（u12 成都成达）后，于演示窗口内进入「身份详情」视图，可在 <b>老板/管理员 ↔ 员工</b> 之间切换演示角色，验证 D5 权限差异：员工仅可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。</div>
+        <div class="pv-note" id="demo-identity-note"><b>身份联动（双向）：</b>在上方「演示场景」选择 <b>省级总代 · 已开通/已暂停</b> 或 <b>二级合作 · 已绑定</b> 时，工作台会同步切换到对应域并以该域管理员身份打开；选择其它身份（游客/注册/认证/入驻…）则工作台复位为省代默认场景。反向：在工作台「设置 → 身份卡」切换 <b>管理员 / 法定代表人 / 员工</b> 后，回到本页与「我的」会显示同一身份。</div>
       </div>
     </div>
 
@@ -1961,6 +1963,30 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       + renderAcctRow()
       + '<div>'+badges+'</div>';
     syncScenarioSelect();
+    renderWbIdentity();
+  }
+
+  /* 反向联动回显：工作台当前场景 + 身份（由工作台切场景/切身份时写入 engchain-workbench-echo） */
+  var WB_SCENE_LABEL = {
+    active: '省级总代 · 生效中', suspended: '省级总代 · 已暂停（只读）',
+    dark: '省级总代 · 生效中', empty: '省级总代 · 空数据',
+    'sub-active': '二级合作企业 · 生效中', 'sub-readonly': '二级合作企业 · 只读',
+    'sub-dark': '二级合作企业 · 生效中', 'sub-empty': '二级合作企业 · 空数据'
+  };
+  var WB_ID_LABEL = {
+    admin: '管理员', legal_rep: '法定代表人', staff: '员工',
+    sub_admin: '管理员', sub_legal: '法定代表人', sub_staff: '员工'
+  };
+  function renderWbIdentity(){
+    var el = document.getElementById('pv-wb-identity');
+    if (!el) return;
+    var e = null;
+    try { e = JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (err) {}
+    if (!e || !e.scene) { el.innerHTML = ''; return; }
+    var scene = WB_SCENE_LABEL[e.scene] || e.scene;
+    var who = WB_ID_LABEL[e.identity] || '';
+    el.innerHTML = '<b>工作台身份：</b>' + escAttr(scene) + (who ? ' · ' + escAttr(who) : '')
+      + '　<span style="color:var(--text-3);">（在工作台「设置 → 身份卡」可切换）</span>';
   }
 
   /* 当前演示账号 + 可用/冻结余额（便于核对"余额恒种子"；数据读当前账号快照，不修改任何值） */
@@ -2540,6 +2566,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (cu && window.DataBus && DataBus.login) DataBus.login(cu.id);
     }
   })();
+  /* 工作台侧发起的跨域切换（省代↔二级）会留意图键，本页启动时补应用对应演示场景，
+     保证"工作台里切了域，回到预览侧栏也显示同一身份"。只做一次。 */
+  try {
+    if (window.DataBus && DataBus.applyPendingWorkbench) {
+      var _wbPending = DataBus.applyPendingWorkbench();
+      if (_wbPending && window.UI && UI.toast) UI.toast('已同步工作台身份：' + _wbPending.label, 'ok');
+    }
+  } catch (e) {}
   renderState();
   /* 实时镜像：iframe 页内登录/认证/入驻/退出（storage 跨文档事件）+ 本窗口 store 事件 → 侧栏自动同步 */
   function refreshAll() { renderState(); renderMode(); renderKPI(); }

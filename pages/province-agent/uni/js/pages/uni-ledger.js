@@ -11,30 +11,37 @@
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
 
-  /* ---------- 员工视角：仅本人获客用户及其消费记录（M3 渠道归因数据隔离） ---------- */
+  /* ---------- 员工视角：仅本人获客用户及其消费记录（M3 渠道归因数据隔离） ----------
+     2026-11-01 审计补齐：二级员工（sub_staff）与省代员工同构。渠道桶随域切换
+     （省代 = direct「直接合作」，二级 = school「二级渠道」，与 scenarios.js 种子键一致），
+     其余口径完全一致——都只汇总本人名下线索与本人渠道码，不下发企业分佣台账。 */
   function buildStaffVm(ctx) {
     var s = ctx.s, my = ctx.staffName;
+    var isSub = ctx.mode === "sub";
+    var chKeys = isSub ? ["school"] : ["direct"];
+    var chLabel = isSub ? "二级渠道" : "直接合作";
     var mine = [], users = 0, paidAmt = 0;
-    ["direct"].forEach(function (ch) {
+    chKeys.forEach(function (ch) {
       (s.leads[ch] || []).forEach(function (l) {
         if (l.owner !== my) return;
         users++;
         if (l.stage === "paid" || l.stage === "repaid") {
           paidAmt += l.amount || 0;
-          mine.push({ user: l.name || "用户", channel: "直接合作", amount: l.amount || 0, stageTxt: "已消费" });
+          mine.push({ user: l.name || "用户", channel: chLabel, amount: l.amount || 0, stageTxt: "已消费" });
         }
       });
     });
     var codes = [];
-    ["direct"].forEach(function (ch) {
+    chKeys.forEach(function (ch) {
       (s.channels[ch] || []).forEach(function (c) {
         if (c.ownerName === my && c.status === "active" && codes.indexOf(c.code) < 0) codes.push(c.code);
       });
     });
-    var byChannel = { "直接合作": 0 };
+    var byChannel = {};
+    byChannel[chLabel] = 0;
     mine.forEach(function (r) { byChannel[r.channel] += r.amount; });
-    var max = Math.max(byChannel["直接合作"], 1);
-    var bars = ["直接合作"].map(function (lb) {
+    var max = Math.max(byChannel[chLabel], 1);
+    var bars = [chLabel].map(function (lb) {
       return { label: lb, value: byChannel[lb], cur: true,
                pct: max > 0 ? Math.max(Math.round(byChannel[lb] / max * 100), 16) : 16 };
     });
@@ -248,6 +255,19 @@
       badges: {},
       empty: {},
       lockedNote: "台账数据已锁定，仅可查看"
+    },
+    /* 2026-11-01 审计补齐：二级员工此前无页内变体，回退复用 sub_admin 的 data()，
+       会把二级企业整盘台账（金额、分佣、对账）读给员工。此处给同构员工视角。 */
+    sub_staff: {
+      label: "二级合作企业 · 员工",
+      data: function (ctx) {
+        return buildStaffVm(ctx); /* 仅本人获客用户及其消费记录 */
+      },
+      entries: [],
+      perms: {},
+      badges: { ledger: "员工 · 仅本人渠道" },
+      empty: {},
+      lockedNote: "台账数据已锁定，仅可查看"
     }
   };
 
@@ -360,7 +380,7 @@
     /* 暂停封条 */
     if (ctx.readonly) {
       html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
+        '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, V)) + '（仅可查看）</span>' +
         '<span class="lb-s">' + ui.esc(V.lockedNote || "") + '</span></div></div></section>';
     }
 

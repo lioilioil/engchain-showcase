@@ -308,7 +308,9 @@
       readonly: true,
       perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
       note: "法定代表人只读视图：可查阅全部合作档案、协议与对账，不执行审批与配置。",
-      lockedNote: "法定代表人为只读视图；账号暂停期间审批与配置全部锁定，仅可查阅。"
+      /* 2026-11-01 审计修复：锁条现在「暂停 或 身份只读」都会出现，说明文案不能再假设账号已暂停，
+         改为对两种来源都成立的中性表述。 */
+      lockedNote: "法定代表人为只读视图：可查阅全部合作档案与口径，不执行审批、比例配置与协议操作。"
     },
     /* —— 二级 —— */
     sub_admin: {
@@ -324,7 +326,7 @@
       readonly: true,
       perms: { createApp: false, review: false, setRatio: false, resend: false, status: false, sign: false },
       note: "法定代表人只读视图：可查阅合作协议与对账，签署与配置由企业管理员执行。",
-      lockedNote: "法定代表人为只读视图；合作暂停期间结算与对账冻结，档案仍可查阅。"
+      lockedNote: "法定代表人为只读视图：可查阅全部合作档案与结算口径，不执行签署与对账操作。"
     },
     sub_staff: {
       label: "二级合作企业 · 员工",
@@ -1237,10 +1239,13 @@
           '<button type="button" class="su-linkbtn" data-multi="clear">清空</button>' +
           '</span></div>';
       }
-      var lock = suspended
+      /* 2026-11-01 审计修复：锁条原先只看企业是否暂停，合作正常的法定代表人（identityReadonly）
+         进本页既无锁条也无说明，看起来与管理员同权。改为「暂停 或 身份只读」都出锁条，
+         标题统一由 Uni.lockTitle 判定，避免再写死「合作权限已暂停」。 */
+      var lock = (suspended || ro)
         ? '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-          '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
-          '<span class="lb-s">' + esc(V.lockedNote) + '</span></div></div></section>'
+          '<div><span class="lb-t">' + esc(Uni.lockTitle(ctx, V)) + '（仅可查看）</span>' +
+          '<span class="lb-s">' + esc(V.lockedNote || "") + '</span></div></div></section>'
         : "";
       var note = (V.note && !suspended)
         ? '<section class="uh-sec"><div class="su-infonote">' + ui.icon("info", 15) + '<span>' + esc(V.note) + '</span></div></section>'

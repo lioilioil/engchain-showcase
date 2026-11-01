@@ -9,6 +9,10 @@
    - 复制链接弹窗（居中）：话术库（内置 3 条省代/二级口径 + 换一换 + 自定义持久化）
      + 推广渠道选项（微信好友/朋友圈/短信，链接带 ch 参数）
    - 海报弹窗（自下而上）：商用级省代/二级获客海报卡 + canvas 保存（750×1334）
+     20261102uni12：footer 由 [复制链接][保存海报] 收拢为单个 [分享]，点开分享面板
+     （朋友圈 / 微信好友 / 保存）。海报弹窗内的「复制链接」与海报语境无关，删除。
+     平台限制：浏览器无法程序化调起微信，朋友圈/好友优先走 Web Share API
+     （navigator.canShare），不支持时保存 PNG + 分步引导层，不假装已一键直达。
    模板节奏：
      暂停封条（readonly）/ 权限说明条 → 帮助入口（说明 sheet）→ 成员卡列表 → FAB(生成渠道码)
    组件视觉全部为系统类（.card/.btn/.uh-* 基元）；弹窗/Toast 一律经 Uni.sheet / Uni.center / Uni.dialog / Uni.toast。
@@ -26,6 +30,19 @@
     { key: "sms", label: "短信", ic: "send" }
   ];
   var PROOF = [["12,000+", "入驻企业"], ["86,000+", "认证工程师"], ["4,200+", "撮合项目"]];
+
+  /* 朋友圈字形：ui.js 的 P 表无此名（未加进去是不想动共享文件），页面本地补一条 */
+  var LOCAL_IC = {
+    moments: '<circle cx="12" cy="12" r="8.6"/><circle cx="12" cy="12" r="3.6"/>' +
+      '<circle cx="12" cy="12" r=".9" fill="currentColor" stroke="none"/>'
+  };
+  function shareIc(name, size) {
+    var s = size || 22;
+    if (!LOCAL_IC[name]) return ui.icon(name, s);
+    return '<svg class="ic" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      LOCAL_IC[name] + "</svg>";
+  }
 
   /* ---------- 身份标签（法定代表人 / 管理员 / 企业成员，按团队数据） ---------- */
   function roleLabelOf(m) {
@@ -139,7 +156,11 @@
     return {
       members: members,
       myName: my,
-      lockedTitle: ctx.mode === "sub" ? "合作权限已暂停" : "合作权限已暂停"
+      /* 2026-11-01 审计修复：原三元两个分支同值（无意义），且只读有两种来源——
+         企业合作状态非 active（真暂停）与当前身份本身只读（法定代表人） */
+      lockedTitle: ctx.s.profile.status !== "active"
+        ? (ctx.mode === "sub" ? "合作已暂停" : "合作权限已暂停")
+        : "只读视图"
     };
   }
 
@@ -449,14 +470,117 @@
         '<div class="uc-pfoot">扫码 / 填码 · 立即注册绑定</div>' +
       "</div>",
       footer: [
-        { t: "复制链接", kind: "ghost", onClick: function () { copyText(inviteUrl(code, "poster")); } },
-        { t: "保存海报", kind: "primary", onClick: function () { savePosterCanvas(code, ctx); } }
+        /* 返回 false = 不关闭海报弹窗：分享面板叠在上面，关掉后仍回到海报 */
+        { t: "分享", kind: "primary", onClick: function () { shareSheet(code, ctx); return false; } }
       ]
     });
   }
 
-  /* ---------- 海报 canvas 保存（750×1334 竖版，dark 墨金风） ---------- */
-  function savePosterCanvas(code, ctx) {
+  /* ---------- 分享面板：朋友圈 / 微信好友 / 保存 ----------
+     说明：纯 H5 无法直接调起微信分享面板（JS-SDK 只能改写分享卡片，不能唤起）。
+     支持 Web Share API 的移动浏览器 → 调起系统分享面板（用户在其中选微信，真转发）；
+     不支持（含微信内置浏览器）→ 保存 PNG + 分步引导层。产品化走 uni-app 的 uni.share 时只需换掉 shareVia 的实现。 */
+  function shareSheet(code, ctx) {
+    var ov = Uni.sheet({
+      title: "分享海报",
+      body: '<div class="uc-sharepane">' +
+        '<div class="uc-sharetiles">' +
+          '<button type="button" class="uc-sharetile" data-share="moments">' +
+            '<span class="uc-sharetile__ic uc-sharetile__ic--wx">' + shareIc("moments", 24) + "</span>" +
+            "<span>朋友圈</span></button>" +
+          '<button type="button" class="uc-sharetile" data-share="wechat">' +
+            '<span class="uc-sharetile__ic uc-sharetile__ic--wx">' + shareIc("wechat", 24) + "</span>" +
+            "<span>微信好友</span></button>" +
+          '<button type="button" class="uc-sharetile" data-share="save">' +
+            '<span class="uc-sharetile__ic">' + shareIc("download", 24) + "</span>" +
+            "<span>保存</span></button>" +
+        "</div>" +
+        '<div class="uc-sharehint">海报已带专属邀请码 <b>' + ui.esc(code) + "</b>，对方扫码即绑定你的渠道。</div>" +
+      "</div>"
+      /* 不设 footer：common.js 的 boostStickyFoot 会给置底按钮预留 98px，
+         本面板内容只有三瓦片，会空出一大片；关闭走右上角 × 或点遮罩 */
+    });
+    /* 见 uni-invite-code.css：叠在深色海报上必须改成不透明底 */
+    ov.classList.add("uc-sharesheet");
+    ov.addEventListener("click", function (e) {
+      var t = e.target.closest("[data-share]");
+      if (!t) return;
+      var kind = t.getAttribute("data-share");
+      ov.close();
+      if (kind === "save") { downloadPoster(code, ctx); return; }
+      shareVia(kind, code, ctx);
+    });
+  }
+
+  /* 同步取 Blob：navigator.share 必须在用户手势内同步调用，
+     toBlob 是异步回调，放在里面会丢手势（Safari 直接拒绝） */
+  function posterBlob(code, ctx) {
+    var cv = buildPosterCanvas(code, ctx);
+    var dataUrl = cv.toDataURL("image/png");
+    var bin = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: "image/png" });
+  }
+
+  function shareVia(kind, code, ctx) {
+    var blob = null;
+    try { blob = posterBlob(code, ctx); } catch (e) { blob = null; }
+    var file = null;
+    try { if (blob && window.File) file = new File([blob], "engchain-poster-" + shortCode(code) + ".png", { type: "image/png" }); } catch (e2) { file = null; }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        files: [file],
+        title: "工程链 · 渠道海报",
+        text: "扫码或填码注册，绑定我的合作渠道。邀请码 " + code
+      }).then(function () {
+        Uni.toast("已调起系统分享", "ok");
+      }, function (err) {
+        if (err && err.name === "AbortError") return; /* 用户自己取消，不打扰 */
+        downloadPoster(code, ctx, true);
+        guideSheet(kind, code);
+      });
+      return;
+    }
+    /* 兜底：保存 + 说明为什么需要手动几步 */
+    downloadPoster(code, ctx, true);
+    guideSheet(kind, code);
+  }
+
+  /* 引导层：承认浏览器限制，给出可执行的三步 */
+  function guideSheet(kind, code) {
+    var isMoments = kind === "moments";
+    /* 正文里的重点用 <em>：<b> 在 .uc-gtxt 里是整行标题（display:block），
+       嵌在句中会把一句话拆成好几行 */
+    var steps = isMoments
+      ? [["打开微信", "在「发现」页进入<em>朋友圈</em>"],
+         ["点右上角相机", "选择<em>从相册选择</em>"],
+         ["选中刚保存的海报", "配一句文案发布即可"]]
+      : [["打开微信", "进入要发送的<em>聊天</em>"],
+         ["点输入框旁「＋」", "选择<em>相册</em>"],
+         ["选中刚保存的海报", "发送给好友即可"]];
+    var ov = Uni.center({
+      title: "海报已保存",
+      body: '<div class="uc-guide">' +
+        '<p class="uc-guide__lead">当前浏览器无法直接调起微信分享，' +
+        "海报已保存到本机，请按下面 " + steps.length + " 步完成发布：</p>" +
+        steps.map(function (s, i) {
+          return '<div class="uc-gstep"><span class="uc-gnum">' + (i + 1) + "</span>" +
+            '<span class="uc-gtxt"><b>' + s[0] + "</b>" + s[1] + "</span></div>";
+        }).join("") +
+        '<div class="uc-guide__note">首次使用需允许微信访问相册；海报内容含邀请码 ' +
+        ui.esc(code) + "，请勿裁切二维码区域。</div>" +
+      "</div>",
+      footer: [{ t: "我知道了", kind: "primary" }]
+    });
+    /* 本弹窗叠在深色海报之上，玻璃底会让正文发灰（见 uni-invite-code.css） */
+    var mdl = ov && ov.querySelector(".cert-modal");
+    if (mdl) mdl.classList.add("uc-soliddlg");
+  }
+
+  /* ---------- 海报 canvas 绘制（750×1334 竖版，dark 墨金风）----------
+     纯绘制无副作用：保存与分享共用，避免两套画法走样 */
+  function buildPosterCanvas(code, ctx) {
     var my = myNameOf(ctx);
     var isSub = ctx.mode === "sub";
     var hint = isSub ? "注册即归属本企业 · 认证入驻成交计入本企业" : "注册即绑定合作渠道 · 认证入驻成交计入合作";
@@ -559,11 +683,18 @@
     x.fillStyle = TH.sub; x.font = "12px sans-serif";
     x.fillText("工程链 ENGCHAIN · 渠道合作 · 绑定关系平台可追溯", W / 2, H - 66);
     x.textAlign = "left";
+    return cv;
+  }
+
+  /* ---------- 海报保存（下载 PNG）----------
+     silent=true 时不出 toast：分享兜底路径后面还有引导层，两条提示会打架 */
+  function downloadPoster(code, ctx, silent) {
+    var cv = buildPosterCanvas(code, ctx);
     var a = document.createElement("a");
     a.href = cv.toDataURL("image/png");
     a.download = "engchain-channel-poster.png";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    Uni.toast("海报已保存，可在相册分享", "ok");
+    if (!silent) Uni.toast("海报已保存，可在相册分享", "ok");
   }
 
   /* ---------- 生成新渠道码（填写码名称/应用发布场景后创建） ---------- */
@@ -606,7 +737,7 @@
     var html = "";
     if (ctx.readonly) {
       html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">' + ui.esc(V.lockedTitle) + "（仅可查看）</span>" +
+        '<div><span class="lb-t">' + ui.esc(V.lockedTitle || vm.lockedTitle || "只读视图") + "（仅可查看）</span>" +
         '<span class="lb-s">' + ui.esc(V.lockedNote || "") + "</span></div></div></section>";
     }
     html += memberHtml();

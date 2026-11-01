@@ -154,6 +154,24 @@
       badges: {},
       empty: { regs: { title: "暂无付款登记", desc: "省代线下付款登记后，将逐笔出现在这里供你核对确认" } },
       lockedNote: "确认到账与异议均已锁定，台账与对账单仍可查阅"
+    },
+    /* 2026-11-01 审计补齐：二级员工此前无页内变体，回退复用 sub_admin 变体——
+       拿到 perms.confirm / perms.dispute 的值取决于回退路径，且提示文案按管理员口吻写。
+       此处与省代员工同构：可查看登记与凭证，确认到账与异议仅企业管理员可操作。 */
+    sub_staff: {
+      label: "二级合作企业 · 员工",
+      data: function (ctx) {
+        return buildVm(ctx, {
+          cardTitle: "本月省代应付款",
+          notice: "数据仅可查看；确认到账、提出异议与线下核实仅企业管理员可操作。",
+          canAct: false
+        });
+      },
+      entries: [],
+      perms: { confirm: false, dispute: false },
+      badges: {},
+      empty: {},
+      lockedNote: "全部经营动作已锁定，仅可查看"
     }
   };
 
@@ -354,7 +372,7 @@
     /* 暂停封条 */
     if (ctx.readonly) {
       html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">合作权限已暂停（仅可查看）</span>' +
+        '<div><span class="lb-t">' + ui.esc(Uni.lockTitle(ctx, V)) + '（仅可查看）</span>' +
         '<span class="lb-s">' + ui.esc(V.lockedNote || "") + '</span></div></div></section>';
     }
 

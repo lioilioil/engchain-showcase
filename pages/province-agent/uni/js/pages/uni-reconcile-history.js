@@ -17,11 +17,14 @@
   var Doc = window.UniDoc;
   var HIST_LB = Doc.HIST_LB, HIST_CLS = Doc.HIST_CLS;
 
-  /* 本页纯查看 + 下载取证，不锁任何动作；三身份同权（查看与下载本就不区分角色） */
+  /* 本页纯查看 + 下载取证，不锁任何动作；各身份同权（查看与下载本就不区分角色）。
+     2026-11-01 审计补齐：补 sub_staff 显式变体——此前二级员工回退 sub_admin 变体，
+     身份胶囊与抬头文案按管理员显示。 */
   var STATE_VARIANTS = {
     admin: { label: "省级总代 · 管理员", locked: false, note: null },
     staff: { label: "省级总代 · 员工", locked: false, note: null },
-    sub_admin: { label: "二级合作企业 · 管理员", locked: false, note: null }
+    sub_admin: { label: "二级合作企业 · 管理员", locked: false, note: null },
+    sub_staff: { label: "二级合作企业 · 员工", locked: false, note: null }
   };
 
   /* ---------- 弹窗：模板统一走 uni-doc.js（三处入口同一张单） ---------- */

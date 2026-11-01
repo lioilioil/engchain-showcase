@@ -11,6 +11,14 @@
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
 
+  /* 员工视角动态脱敏：付款/对账类通知带企业级金额，不对员工下发。
+     员工只保留协议、合作进展这类非财务通知。 */
+  function feedForStaff(state) {
+    return store.activitiesOf(state).filter(function (m) {
+      return m.tag !== "付款" && m.tag !== "对账";
+    });
+  }
+
   /* 宫格条目共享元数据（条目渲染器唯一，三身份复用） */
   var ENTRY_META = {
     "invite-code.html":    { icon: "qr",      label: "经营与渠道" },
@@ -116,7 +124,7 @@
             ]
           },
           todo: store.todoOf(state),
-          feed: store.activitiesOf(state),
+          feed: feedForStaff(state),
           partner: { layout: "list", eyebrow: "合作档案", more: { text: "全部合作", go: "subs.html" }, rows: pRows },
           emptyState: false,
           permNote: "员工权限：仅可管理本人渠道码与本人线索；登记付款、合作审批、比例配置、协议与月度平账仅管理员可操作。"
@@ -135,9 +143,6 @@
         var cur = (s.calc && s.calc[0]) || null;
         var st = store.subSettle(cur);
         var funnel = store.funnelOf(s.leads || {});
-        var ag = s.agreement || null;
-        var AG_STATE = { signed: ["已签署", "ok"], pending_mine: ["待我签署", "info"], rejected: ["已拒签", "bad"] };
-        var agBadge = ag ? (AG_STATE[ag.state] || ["—", "mute"]) : ["—", "mute"];
         return {
           company: s.profile.name,
           roleLine: "上级总代 · " + (s.parent ? s.parent.name.replace(/（.*）/, "") : "—"),
@@ -161,17 +166,9 @@
           seg: [],
           todo: store.todoOf(state),
           feed: store.activitiesOf(state),
-          partner: (function () {
-            if (!ag) return null;
-            var agRows = [{ k: "协议编号", v: ag.id }, { k: "版本", v: ag.version }];
-            if (ag.signedAt) agRows.push({ k: "签署时间", v: ag.signedAt });
-            var agFoot = (ag.state === "pending_mine" && !ctx.readonly)
-              ? [{ t: "拒签", kind: "ghost", act: "ag-reject" },
-                 { t: "阅读并签署", kind: "primary", act: "ag-sign" }]
-              : [{ t: "查看协议", kind: "ghost", act: "ag-view" }];
-            return { layout: "kv", eyebrow: "合作协议档案",
-                     badge: { text: agBadge[0], cls: agBadge[1] }, rows: agRows, footer: agFoot };
-          })(),
+          /* 合作协议档案块已下线：协议状态/签署动作由「待办事项」承载，
+             已签署的全文与双方信息见 设置 → 合作协议（含下载），首页不再重复一遍 */
+          partner: null,
           funnel: funnel,
           emptyState: false,
           finNote: "约定所得为只读台账口径，不构成可提现金额",
@@ -183,6 +180,61 @@
       badges: {},
       empty: { feed: { title: "暂无动态", desc: "与上级省代的对账、协议动态将出现在这里" } },
       lockedNote: "邀请与确认到账均已锁定，台账与协议仍可查阅"
+    },
+    sub_staff: {
+      /* 2026-11-01 数据级脱敏：此前无本变体，回退 sub_admin 后被 stateVariantFor
+         强制只读且数据仍是全企业口径——员工能看到陈志远名下全部 8 条线索与
+         全盘对账金额。现按员工身份重算：只统计本人（ctx.staffName）名下渠道码
+         与名下线索，企业盘（finance/subSettle）、对账、协议与团队一律不下发。 */
+      label: "二级合作企业 · 员工",
+      data: function (ctx) {
+        var state = store.getState(), s = ctx.s, my = ctx.staffName;
+        var par = s.parent || {};
+        /* 二级域线索/渠道统一挂 school 桶 */
+        var myLeads = [];
+        (s.leads.school || []).forEach(function (l) { if (l.owner === my) myLeads.push(l); });
+        var users = 0, myCode = "尚未生成";
+        (s.channels.school || []).forEach(function (c) {
+          if (c.ownerName === my) {
+            if (c.status === "active") { users += c.users || 0; if (myCode === "尚未生成") myCode = c.code; }
+          }
+        });
+        var paid = myLeads.filter(function (l) { return l.stage === "paid" || l.stage === "repaid"; });
+        var amount = paid.reduce(function (sum, l) { return sum + (l.amount || 0); }, 0);
+        return {
+          company: s.profile.name,
+          roleLine: "企业成员 · " + my + "（渠道专员）",
+          badge: ui.ACCT[s.profile.status] || "生效中",
+          badgeCls: "ok",
+          metaL: "约定比例 " + Math.round((par.ratioToSub || 0) * 100) + "%",
+          metaR: "合作自 " + (par.since || s.profile.since),
+          finTitle: "我的获客概览",
+          fin: {
+            variant: "staff",
+            mark: "SECONDARY · 员工渠道",
+            seg: [],
+            views: [{ hero: ui.moneyD(amount), tag: "已消费金额（本人渠道）", sub: "名下渠道 · 本月累计" }],
+            metrics: [
+              { k: "名下已注册用户", v: users + " 人" },
+              { k: "已跟进线索", v: myLeads.length + " 条" },
+              { k: "已消费用户", v: paid.length + " 人" },
+              { k: "我的渠道码", v: myCode }
+            ]
+          },
+          /* 二级员工无付款确认/异议/协议签署职责：待办由 store.todoOf 的
+             sub_staff 分支直接返回空集，这里不再做二次过滤 */
+          todo: store.todoOf(state),
+          feed: feedForStaff(state),
+          partner: null,
+          emptyState: false,
+          permNote: "员工权限：仅可管理本人渠道码与本人线索；付款确认、异议处理、比例配置、团队管理与对账平账仅企业管理员可执行。"
+        };
+      },
+      entries: ["invite-code.html", "invite-records.html"],
+      perms: { invite: true, genCode: true, createSub: false, signAgreement: false },
+      badges: { fin: "员工 · 仅本人渠道" },
+      empty: { feed: { title: "暂无动态", desc: "完成本人渠道推广后，动态将出现在这里" } },
+      lockedNote: "付款确认、异议与团队管理仅企业管理员可操作"
     }
   };
 
@@ -245,7 +297,7 @@
       '<div class="nm-list">' + body + '</div></section>';
   }
 
-  /* ---------- 子渲染：合作协议档案块（二级视角；省代合作档案已收敛至「二级合作」） ---------- */
+  /* ---------- 子渲染：合作档案块（省代员工视角；二级协议档案已并入「待办事项」与设置页弹窗） ---------- */
   function partnerHtml(vm) {
     var p = vm.partner;
     if (!p) return "";
@@ -294,21 +346,38 @@
       '<div class="uh-ticker__track" data-track>' + one + '</div></div></section>';
   }
 
-  /* ---------- 企业信息 sheet ---------- */
+  /* ---------- 企业信息 sheet ----------
+     2026-11-01 审计修复：原实现用 `else` 兜底承接二级管理员，
+     legal_rep（省代法定代表人）走同一分支时 s.parent 不存在 → TypeError、sheet 打不开。
+     改为按 mode + 身份显式分派，并对 s.parent 统一取 {} 兜底。 */
   function identitySheet(ctx, vm) {
-    var s = ctx.s, rows = [];
-    if (ctx.identity === "admin") {
-      rows = [["企业名称", s.profile.name], ["联系人", s.profile.contact], ["合作状态", ui.ACCT[s.profile.status]],
-      ["授权编号", s.profile.authNo], ["统一社会信用代码", s.profile.uscc], ["法定代表人", s.profile.legalPerson],
-      ["合作起始", s.profile.since], ["地址", s.profile.address]];
-    } else if (ctx.identity === "staff") {
-      rows = [["姓名", ctx.staffName], ["职务", "渠道专员"], ["所属企业", s.profile.name],
-      ["合作状态", ui.ACCT[s.profile.status]], ["授权编号", s.profile.authNo],
-      ["权限说明", "仅本人渠道码与本人线索；对账/审批/比例/协议仅管理员"]];
+    var s = ctx.s, par = s.parent || {}, rows = [];
+    var id = ctx.identity;
+    if (ctx.mode === "province") {
+      if (id === "staff") {
+        rows = [["姓名", ctx.staffName], ["职务", "渠道专员"], ["所属企业", s.profile.name],
+        ["合作状态", ui.ACCT[s.profile.status]], ["授权编号", s.profile.authNo],
+        ["权限说明", "仅本人渠道码与本人线索；对账/审批/比例/协议仅管理员"]];
+      } else {
+        /* admin / legal_rep：省代企业档案（法代只读，仅多一行身份标注） */
+        rows = [["企业名称", s.profile.name], ["联系人", s.profile.contact], ["合作状态", ui.ACCT[s.profile.status]],
+        ["授权编号", s.profile.authNo], ["统一社会信用代码", s.profile.uscc], ["法定代表人", s.profile.legalPerson],
+        ["合作起始", s.profile.since], ["地址", s.profile.address]];
+        if (id === "legal_rep") rows.push(["当前身份", "法定代表人 · 只读视图"]);
+      }
     } else {
-      rows = [["企业名称", s.profile.name], ["合作编号", s.profile.authNo], ["统一社会信用代码", s.profile.uscc],
-      ["负责人", s.profile.contact], ["上级总代", s.parent.name], ["约定比例", Math.round(s.parent.ratioToSub * 100) + "%（只读）"],
-      ["合作起始", s.parent.since]];
+      if (id === "sub_staff") {
+        rows = [["姓名", ctx.staffName], ["职务", "渠道专员"], ["所属企业", s.profile.name],
+        ["合作状态", ui.ACCT[s.profile.status]], ["合作编号", s.profile.authNo],
+        ["上级总代", par.name || "—"], ["权限说明", "仅本人渠道码与本人线索；对账/异议/团队仅企业管理员"]];
+      } else {
+        /* sub_admin / sub_legal */
+        rows = [["企业名称", s.profile.name], ["合作编号", s.profile.authNo], ["统一社会信用代码", s.profile.uscc],
+        ["负责人", s.profile.contact], ["上级总代", par.name || "—"],
+        ["约定比例", Math.round((par.ratioToSub || 0) * 100) + "%（只读）"],
+        ["合作起始", par.since || s.profile.since]];
+        if (id === "sub_legal") rows.push(["当前身份", "法定代表人 · 只读视图"]);
+      }
     }
     Uni.sheet({
       title: "企业信息",
@@ -326,12 +395,25 @@
   function mount(el, ctx, Uni) {
     var V = Uni.stateVariantFor(STATE_VARIANTS, ctx.identity);
     var vm = V.data(ctx);
+    /* 2026-11-01 审计修复：法代（legal_rep / sub_legal）没有页内变体，回退时复用管理员
+       data()，页脚身份行会原样显示管理员那句「省级总代 · 编号 …」。这里换成身份全称，
+       与顶部身份胶囊、锁定条保持同一口径。 */
+    if ((ctx.identity === "legal_rep" || ctx.identity === "sub_legal") && vm) {
+      vm.roleLine = ctx.identityLabel;
+    }
 
     var html = "";
-    /* 段0 暂停封条 */
+    /* 段0 暂停封条
+       2026-11-01 审计修复：readonly 有两种来源——①企业合作状态非 active（真暂停）
+       ②当前身份本身只读（法定代表人）。原实现一律渲染「合作已暂停」，把法代误标成
+       合作中断。改为按来源取标题：状态暂停 → 合作暂停；身份只读 → V.lockedTitle。 */
     if (ctx.readonly) {
+      var paused = ctx.s.profile.status !== "active";
+      var lockT = paused
+        ? (ctx.mode === "sub" ? "合作已暂停" : "合作权限已暂停")
+        : (V.lockedTitle || "只读视图");
       html += '<section class="uh-sec"><div class="uh-lockbar">' + ui.icon("lock", 18) +
-        '<div><span class="lb-t">' + (ctx.mode === "sub" ? "合作已暂停" : "合作权限已暂停") + '（仅可查看）</span>' +
+        '<div><span class="lb-t">' + ui.esc(lockT) + '（仅可查看）</span>' +
         '<span class="lb-s">' + ui.esc(V.lockedNote || "") + '</span></div></div></section>';
     }
     /* 段1 最新动态滚动条（顶部） */
@@ -417,26 +499,8 @@
     var idb = el.querySelector('[data-act="identity"]');
     if (idb) idb.addEventListener("click", function () { identitySheet(ctx, vm); });
 
-    /* 协议动作（二级） */
-    var agSign = el.querySelector('[data-act="ag-sign"]');
-    if (agSign) agSign.addEventListener("click", function () { window.UniTodoOps.agreement(ctx, "sign", Uni); });
-    var agView = el.querySelector('[data-act="ag-view"]');
-    if (agView) agView.addEventListener("click", function () { window.UniTodoOps.agreement(ctx, "view", Uni); });
-    var agReject = el.querySelector('[data-act="ag-reject"]');
-    if (agReject) agReject.addEventListener("click", function () {
-      Uni.sheet({
-        title: "拒签合作协议",
-        body: '<div style="font-size:var(--fs-base);color:var(--text-1);margin-bottom:8px">拒签原因</div>' +
-          '<textarea id="uni-reason" placeholder="说明原因，省代可据此修订后重新发起" style="width:100%;min-height:88px;padding:10px 12px;border-radius:var(--r-m);border:1px solid var(--line);background:var(--bg-card);color:var(--text-1);font-size:var(--fs-base);font-family:inherit;resize:none;box-sizing:border-box"></textarea>',
-        footer: [{ t: "取消", kind: "ghost" },
-        { t: "确认拒签", kind: "danger", onClick: function (ov) {
-          var v = ov.querySelector("#uni-reason").value.trim();
-          if (!v) { Uni.toast("请填写拒签原因"); return false; }
-          var r = Uni.actGuarded("agree/reject", { reason: v });
-          return r.ok;
-        } }]
-      });
-    });
+    /* 协议动作（签署/查看/拒签）已随首页协议档案块下线：签署走「待办事项」，
+       全文与留痕走 设置 → 合作协议（uni-settings.js 内绑定下载） */
 
     var newSub = el.querySelector('[data-act="new-sub"]');
     if (newSub) newSub.addEventListener("click", function () { Uni.navTo("subs.html"); });

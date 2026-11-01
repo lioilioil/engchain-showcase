@@ -1959,7 +1959,7 @@ window.DataBus = (function () {
     /* [M4-4] 旧企业合伙人 resident_partner 场景已摘除（u8 回退为实名普通用户）；个人合伙人 partner 场景保留 */
 
     /* ---- 省级代理体系终态（数据走 AgentDemo.seed() 真实播种：两分区/T+7/税列/团队/O4，余额不动） ---- */
-    province_agent_active: { label: '省级总代 · 已开通（四川 · active）', group: 'start', base: 'u11',
+    province_agent_active: { label: '省级总代 · 已开通（四川 · active）', group: 'start', base: 'u11', workbench: 'active',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已开通' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
@@ -1971,17 +1971,17 @@ window.DataBus = (function () {
           AuthStore.write(_au);
         }
       } },
-    sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12',
+    sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12', workbench: 'sub-active',
       ensure: { name: '陈二级', company: '成都××合作公司', mobile: '139****0012', tag: '二级合作 · 已绑定' },
       build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
-    province_agent_suspended: { label: '省级总代 · 已暂停（锁顶 · 台账只读）', group: 'start', base: 'u11',
+    province_agent_suspended: { label: '省级总代 · 已暂停（锁顶 · 台账只读）', group: 'start', base: 'u11', workbench: 'suspended',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已暂停' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
         var S = window.AgentStore;
         if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'suspended'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示暂停', fromStatus: 'active', toStatus: 'suspended' }); S.saveProvince(p); } }
       } },
-    province_agent_terminated: { label: '省级总代 · 已终止（只读独立块）', group: 'start', base: 'u11',
+    province_agent_terminated: { label: '省级总代 · 已终止（只读独立块）', group: 'start', base: 'u11', workbench: 'suspended',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已终止' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
@@ -2053,6 +2053,56 @@ window.DataBus = (function () {
     staff_internal: { label: '平台内部人员（运营）', group: 'staff', base: 'u10' }
   };
 
+  /* ---------------- 演示场景 ↔ 工作台联动（栈 A → 栈 B） ----------------
+     账号层是【账号身份】的权威，工作台场景键是【工作台】的权威。
+     正向：应用演示场景时同步写工作台场景键，并清空工作台状态缓存，使其下次启动按新场景
+           重新播种（含该场景默认身份：省代→管理员 / 二级→管理员）。
+     反向：工作台切场景/身份后写 engchain-workbench-echo / engchain-workbench-intent，
+           preview 侧栏与 profile 身份胶囊读取回声；跨域切换的意图由 applyPendingWorkbench()
+           在账号层下次启动时补应用（见 boot 处调用）。
+     非代理身份（游客/注册/认证/入驻/申请审核…）一律复位到省代默认场景——
+     否则上一轮演示停在二级域时，从个人中心/分销/消息进入工作台会落到二级工作台。 */
+  var WB_SCENARIO_KEY = 'engchain-v3-demo-scenario';
+  var WB_STATE_KEY = 'engchain-v3-demo-state-v1';
+  var WB_IDENTITY_KEY = 'engchain-v3-demo-identity';
+  var WB_ECHO_KEY = 'engchain-workbench-echo';
+  var WB_INTENT_KEY = 'engchain-workbench-intent';
+
+  function workbenchSceneOf(demoKey) {
+    var sc = DEMO_SCENARIOS[demoKey];
+    return (sc && sc.workbench) || 'active';
+  }
+
+  function syncWorkbench(demoKey) {
+    var wb = workbenchSceneOf(demoKey);
+    var isSub = wb.indexOf('sub-') === 0;
+    try {
+      localStorage.setItem(WB_SCENARIO_KEY, wb);
+      localStorage.removeItem(WB_STATE_KEY);
+      localStorage.removeItem(WB_IDENTITY_KEY);
+      localStorage.removeItem(WB_INTENT_KEY);   /* 账号层已自行应用，撤销待办意图 */
+      localStorage.setItem(WB_ECHO_KEY, JSON.stringify({
+        scene: wb, identity: isSub ? 'sub_admin' : 'admin',
+        mode: isSub ? 'sub' : 'province', at: Date.now()
+      }));
+    } catch (e) {}
+    return wb;
+  }
+
+  /* 工作台侧发起的跨域切换意图：账号层启动时补应用对应演示场景（幂等，5 分钟有效） */
+  function applyPendingWorkbench() {
+    var raw = null;
+    try { raw = localStorage.getItem(WB_INTENT_KEY); } catch (e) { return null; }
+    if (!raw) return null;
+    var it = null;
+    try { it = JSON.parse(raw); } catch (e) { it = null; }
+    try { localStorage.removeItem(WB_INTENT_KEY); } catch (e) {}
+    if (!it || !it.demoKey || !DEMO_SCENARIOS[it.demoKey]) return null;
+    if (!it.at || (Date.now() - it.at) > 5 * 60000) return null;
+    var r = applyDemoScenario(it.demoKey);
+    return r && r.ok ? r : null;
+  }
+
   function applyDemoScenario(key) {
     var sc = DEMO_SCENARIOS[key];
     if (!sc) return { ok: false, error: '未知演示场景：' + key };
@@ -2079,6 +2129,8 @@ window.DataBus = (function () {
       balanceUnchanged: !!(balBefore && balAfter && balBefore.balance === balAfter.balance && balBefore.frozen === balAfter.frozen)
     };
     if (typeof window.deriveIdentityStates === 'function') result.states = window.deriveIdentityStates().states;
+    /* 3. 同步工作台（栈 B）：场景域 + 默认身份 + 清除陈旧工作台状态 */
+    result.workbench = syncWorkbench(key);
     audit('演示场景', '调试面板', sc.label, '切换至：' + sc.label + (result.balanceUnchanged ? '（余额未变）' : ''));
     return result;
   }
@@ -2189,6 +2241,10 @@ window.DataBus = (function () {
     resetUserToSeed: resetUserToSeed,
     applyDemoScenario: applyDemoScenario,
     demoScenarioList: demoScenarioList,
+    /* 演示场景 ↔ 工作台联动（预览侧栏 / 个人中心读取回声与补应用意图） */
+    applyPendingWorkbench: applyPendingWorkbench,
+    workbenchSceneOf: workbenchSceneOf,
+    WB_ECHO_KEY: WB_ECHO_KEY, WB_SCENARIO_KEY: WB_SCENARIO_KEY,
     isPlatformStaff: isPlatformStaff,
     /* v2.0：内存缓存管理 */
     invalidateCache: function (key) { _cacheClear(key); }

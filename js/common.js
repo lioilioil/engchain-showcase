@@ -1270,7 +1270,36 @@ window.UI = (function () {
     });
   })();
 
-  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic };
+  /* ---- 工作台入口 URL（全站唯一实现 · 身份联动权威） ----------------------------------
+     背景：工作台（pages/province-agent/uni/pages/home.html）有独立的身份栈
+     （engchain-v3-demo-scenario / engchain-v3-demo-state-v1），与账号/演示场景栈
+     （engchain-state）并行。历史做法是在各页用 ?role=sub_owner 之类的字面量硬编码，
+     会导致「用户在工作台切成了二级员工 → 从分销/消息中心点进入工作台 → 身份被静默
+     改回二级管理员」。
+     决策优先级：①工作台回声（用户最近一次显式选择，最高权威）
+                → ②调用方按账号判定的默认域（isSub）
+                → ③省代默认域。
+     opts.isSub  账号侧判定的默认域（可缺省）
+     opts.base   工作台页相对路径（缺省为 pages/ 下一层的 ../province-agent/...）
+     返回值可直接拼接 hash（如 + '#/home'）。 */
+  function workbenchHref(opts) {
+    opts = opts || {};
+    var echo = null;
+    try { echo = JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (e) { echo = null; }
+    var echoSub = !!(echo && echo.scene && String(echo.scene).indexOf('sub-') === 0);
+    var mode = (echo && echo.scene) ? (echoSub ? 'sub' : 'province') : (opts.isSub ? 'sub' : 'province');
+    var scene = mode === 'sub' ? 'sub-active' : 'active';
+    var role = mode === 'sub' ? 'sub_admin' : 'admin';
+    /* 回声与本域一致时才采用其场景与身份（跨域回声只用于定域，不串用对侧身份） */
+    if (echo && echo.scene && (mode === 'sub') === echoSub) {
+      scene = echo.scene;
+      if (echo.identity) role = echo.identity;
+    }
+    var base = opts.base || '../province-agent/uni/pages/home.html';
+    return base + '?scenario=' + encodeURIComponent(scene) + '&role=' + encodeURIComponent(role);
+  }
+
+  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchHref };
 })();
 
 /* ============================================================================
