@@ -614,6 +614,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/common.js"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
+<!-- 隐私护栏：屏蔽企业 / 简历公开 的唯一判定入口（见 js/privacy-guard.js 头部说明） -->
+<script src="../../js/privacy-guard.js"></script>
+<script src="../../js/talent-adapter.js"></script>
 <script src="../../js/delegates.js"></script>
 <script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
 <script src="../../js/liquid-cta.js?v=20260928184535"></script>
@@ -656,6 +659,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           }));
         }
       });
+    }
+  } catch (e) {}
+
+  /* 个人入驻已通过的用户补投影到 SupplyStore，使其出现在「持证人才」
+     （幂等；仅当前登录用户）。必须早于下方 SupplyStore 合并。 */
+  try {
+    if (window.TalentAdapter && TalentAdapter.ensureProjection && window.DataBus) {
+      var _curU = DataBus.current();
+      if (_curU && _curU.id !== 'u7') TalentAdapter.ensureProjection(_curU);
     }
   } catch (e) {}
 
@@ -777,8 +789,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     '城乡规划师':        { levels: ['不分等级'],       majors: [] }
   };
 
-  /* ===== 当前数据 ===== */
-  function currentData() { return currentTab === 'enterprise' ? entData : talentData; }
+  /* ===== 当前数据 =====
+     「持证人才」统一在此收口隐私护栏：屏蔽当前企业 / 简历未公开 / 仅认证企业可见
+     的条目一律不出现在列表、急寻滚动区、筛选与统计里（renderList / renderHot /
+     applyFilters 全部经由本函数取数）。 */
+  function currentData() {
+    var list = currentTab === 'enterprise' ? entData : talentData;
+    if (currentTab === 'talent' && window.PrivacyGuard && PrivacyGuard.filterTalents) {
+      try { return PrivacyGuard.filterTalents(list); } catch (e) { return list; }
+    }
+    return list;
+  }
 
   /* ===== 筛选匹配 ===== */
   function applyFilters(list) {
@@ -961,7 +982,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       }
     }
     /* [分片N] talent-supply（人才应聘）配对承接：列出人才记录并跳详情，typeKey 透传 */
-    var _ts = (window.MOCK && MOCK.catalog || []).filter(function (r) { return r && r.typeKey === 'talent-supply'; }).slice(0, 3);
+    var _ts = (window.MOCK && MOCK.catalog || []).filter(function (r) {
+      if (!r || r.typeKey !== 'talent-supply') return false;
+      /* 承接卡绕过 talentData，必须同样过隐私护栏 */
+      if (window.PrivacyGuard && PrivacyGuard.checkTalent) {
+        try { if (PrivacyGuard.checkTalent(r).hidden) return false; } catch (e) {}
+      }
+      return true;
+    }).slice(0, 3);
     if (_ts.length) {
       container.insertAdjacentHTML('beforeend',
         '<div style="margin:16px 0 8px;font-size:14px;font-weight:700;color:var(--text-1);">人才应聘 · 可直接对接</div>' +

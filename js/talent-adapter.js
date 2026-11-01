@@ -298,7 +298,13 @@
       arrivalTime: salaryObj.arrivalTime,
       workArea: jobIntent.location || basic.location || '成都',
       languageSkill: '普通话熟练',
-      resumeActive: true,
+      /* 简历公开状态来自「我的投递 → 设置」，不再硬编码：
+         关闭公开后该条目从「持证人才」下架（判定见 js/privacy-guard.js） */
+      resumeActive: (function () {
+        try {
+          return !(window.PrivacyGuard && PrivacyGuard.prefs().resumePublic === false);
+        } catch (e) { return true; }
+      })(),
       selfEvaluation: profile.intro || '多年建筑行业从业经验，具备丰富的现场技术管理和团队协调经验。',
       desc: profile.intro || '',
       /* 经历 */
@@ -402,6 +408,41 @@
   }
 
   /* ============================================================
+     补投影：个人入驻已通过的用户，应在「持证人才」里有对应条目
+     ------------------------------------------------------------------
+     此前仅在 auth-qualification 重新提交时写入 SupplyStore，预置
+     已通过的账号（如张敏）没有条目 —— 既看不到自己的人才卡片，
+     也无法演示「简历公开 / 屏蔽企业」。此函数幂等：已存在则原样返回。
+     仅对当前登录用户投影（AuthStore 只保存当前账号快照），非本人直接跳过。
+     ============================================================ */
+  function ensureProjection(user) {
+    if (!user || !user.id) return null;
+    if (!window.AuthStore || !window.SupplyStore) return null;
+    try {
+      var cur = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      if (cur && cur.id && cur.id !== user.id) return null;
+      var auth = AuthStore.read();
+      var pe = auth && auth.personalEntry;
+      if (!pe || pe.ok !== true) return null;
+
+      var acct = (cur && cur.account) || (auth.account || '');
+      if (!acct) return null;
+      var tid = talentIdFor(acct);
+      var existing = (SupplyStore.byId && SupplyStore.byId(tid)) || null;
+      if (existing) return existing;
+
+      var rn = (auth.realname && auth.realname.ok) ? auth.realname : null;
+      var talent = profileToTalent(pe, rn);
+      var item = talentToSupplyItem(talent, acct, acct);
+      item.id = tid;
+      item.status = 'active';
+      item.verified = true;
+      if (SupplyStore.add) SupplyStore.add(item);
+      return item;
+    } catch (e) { return null; }
+  }
+
+  /* ============================================================
      对比两份 certs 是否发生变更（决定是否需要重新审核）
      ============================================================ */
   function certsChanged(oldCerts, newCerts) {
@@ -422,6 +463,7 @@
     profileToTalent: profileToTalent,
     talentToSupplyItem: talentToSupplyItem,
     talentIdFor: talentIdFor,
+    ensureProjection: ensureProjection,
     certsChanged: certsChanged,
     parseCertName: parseCertName,
     maskName: maskName,

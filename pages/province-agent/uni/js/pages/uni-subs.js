@@ -32,7 +32,9 @@
   };
   function agInfo(st) { return AG_STATE[st] || AG_STATE.signed; }
 
-  /* ---------- 招商申请跨端覆盖层（用户端 apply 页写入，工作台合并展示与审批） ---------- */
+  /* ---------- 招商申请跨端覆盖层（工作台合并展示与审批）
+     注：写入方 pages/apply/ 已下线；本键保留用于读取历史/种子数据，勿删，
+     否则已存在的申请记录会在工作台凭空消失。 ---------- */
   var SUB_APPS_KEY = "engchain-sub-apps";
   function readKey(k) {
     try { return JSON.parse(localStorage.getItem(k)) || []; } catch (e) { return []; }

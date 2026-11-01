@@ -2192,8 +2192,13 @@ window.DETAIL = (function () {
     h += sec('解锁完整简历', talentPricePanel(r));
     /* 相似人才推荐 */
     if (MOCK.byBizType) {
-      var similar = MOCK.byBizType('talent').filter(function (x) { return x.id !== r.id && x.certType === r.certType; }).slice(0, 2);
-      if (!similar.length) similar = MOCK.byBizType('talent').filter(function (x) { return x.id !== r.id; }).slice(0, 2);
+      /* 相似人才同样过隐私护栏：推荐位会渲染姓名 + 详情直链，是第二条展示通道 */
+      var _simPool = MOCK.byBizType('talent').filter(function (x) { return x.id !== r.id; });
+      if (window.PrivacyGuard && PrivacyGuard.filterTalents) {
+        try { _simPool = PrivacyGuard.filterTalents(_simPool); } catch (eSim) {}
+      }
+      var similar = _simPool.filter(function (x) { return x.certType === r.certType; }).slice(0, 2);
+      if (!similar.length) similar = _simPool.slice(0, 2);
       if (similar.length) {
         var simHtml = '<div class="t-similar">';
         similar.forEach(function (x) {
@@ -2655,6 +2660,22 @@ window.DETAIL = (function () {
 
   function attach(rec) {
     sweepTradeDeposits(); /* [FIX BM-010] 每次进入详情页清扫已过 30 天 TTL 的保证金并解冻退还 */
+
+    /* 隐私护栏：人才条目的可见性判定，早于状态门与渲染器分发，
+       覆盖「列表点进来」与「详情直达 URL」两条路径。
+       屏蔽企业 / 简历未公开 / 仅认证企业可见 → 按下架处理，不泄露任何字段。 */
+    if (rec && rec.bizKey === 'talent' && window.PrivacyGuard && PrivacyGuard.checkTalent) {
+      var _pv = null;
+      try { _pv = PrivacyGuard.checkTalent(rec); } catch (ePv) { _pv = null; }
+      if (_pv && _pv.hidden) {
+        if (_pv.reason === 'blocked') {
+          renderStatusBlock('st-off', ST_ICON.off, '该简历暂不可查看', '发布者对该企业设置了隐私屏蔽，仅展示已公开的信息', BACK_ACTION);
+        } else {
+          renderStatusBlock('st-off', ST_ICON.off, '该简历已停止公开', '发布者已关闭简历公开，暂不可查看', BACK_ACTION);
+        }
+        return;
+      }
+    }
 
     /* [S0 §2.3/2.4/2.5] 状态门：rejected / off / pending_review 只读预览，直接渲染 S0 状态区块，
        不进入 16 类渲染器分发，不动解锁/保证金/actionbar 行为。 */

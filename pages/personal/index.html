@@ -246,6 +246,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/agent-region.js"></script>
 <script src="../../js/domain.js"></script>
 <script src="../../js/homepage-editor.js"></script>
+<script src="../../js/privacy-guard.js"></script>
 <script src="../../js/preview-sheet.js"></script>
 <script src="../../js/chat-sheet.js"></script>
 <script src="../../js/liquid-glass.iife.js?v=2026100310"></script>
@@ -264,8 +265,37 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   if (!p || p.id !== id) {
     var tl = (MOCK.talents || []).filter(function (x) { return x.id === id; })[0];
     if (tl) { p = tl; isResume = true; }
+    /* 个人入驻投影 / 用户发布的简历只落在 SupplyStore，不在 MOCK.talents 里；
+       详情页「个人主页」链接按 rec.id 直达本页，需能解析到同一份数据。 */
+    if (!tl && window.SupplyStore && SupplyStore.byId) {
+      var sr = null;
+      try { sr = SupplyStore.byId(id); } catch (eSr) { sr = null; }
+      if (sr && sr.bizKey === 'talent') { p = sr; isResume = true; }
+    }
   }
   if (!p) p = MOCK.personById(id);
+
+  /* ---- 隐私护栏：简历模式下同样受「简历公开 / 屏蔽企业」约束 ----
+     个人主页是按 id 直出的第二条展示通道，绕过列表过滤，必须在此独立判定。 */
+  if (isResume && p && window.PrivacyGuard && PrivacyGuard.checkTalent) {
+    var _pg = null;
+    try { _pg = PrivacyGuard.checkTalent(p); } catch (ePg) { _pg = null; }
+    if (_pg && _pg.hidden) {
+      document.getElementsByClassName('phone')[0].innerHTML =
+        '<div class="navbar"><button class="nav-back" onclick="history.back()" aria-label="返回">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>' +
+        '</button><div class="nav-title">个人主页</div><div class="nav-right"></div></div>' +
+        '<div class="scroll" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 40px;">' +
+        '<div style="width:56px;height:56px;border-radius:50%;background:var(--bg-card-2);display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--text-3);">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:24px;height:24px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>' +
+        '<div style="font-size:15px;font-weight:600;color:var(--text-1);margin-bottom:8px;">' +
+        (_pg.reason === 'blocked' ? '该简历暂不可查看' : '该简历已停止公开') + '</div>' +
+        '<div style="font-size:12.5px;color:var(--text-3);line-height:1.7;">' +
+        (_pg.reason === 'blocked' ? '发布者对该企业设置了隐私屏蔽，仅展示已公开的信息' : '发布者已关闭简历公开，暂不可查看') + '</div></div>';
+      return;
+    }
+  }
+
   var displayId = p.id || id;
   /* ---- [P0-14] 页面内解锁态助手：与 detail.js UnlockStore 同 key 同语义（本页未加载 detail.js） ----
      localStorage key 'engchain-unlocked'，结构 {bizKey_id:{t:timestamp}}；
@@ -412,7 +442,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var stats = [
     { n: pub, l: '发布供需' },
     { n: (pub * 2), l: '成交订单' },
-    { n: p.reviewCount, l: '个人评价' },
+    { n: (p.reviewCount || 0), l: '个人评价' },
     { n: 12, l: '在促合作' }
   ];
   document.getElementById('stats').innerHTML = '<div style="display:flex;">' + stats.map(function (s, i) {

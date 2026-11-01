@@ -5,7 +5,8 @@
    - 招商码 = 总代招募二级的「渠道授权凭证」，与分销 Referral 完全隔离；
    - 招商关系禁止写入 engchain-referral-links（该键按 L1/L2 触发分销返佣与积分，
      误写将错误产生返佣单）；招商关系仅落 engchain-agent-invites；
-   - 二级申请入口链接为 apply.html?invite=<CODE>（T2 实现），不进入 register 注册链。
+   - 二级申请入口（T2 实现）由省代工作台发起，不进入 register 注册链；
+     原 C 端「二级合作申请」页（pages/apply/）已下线，招商码仅作渠道凭证留存。
 
    键（localStorage，纯 Mock）：
      engchain-agent-invites      招商码记录（数组）
