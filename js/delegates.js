@@ -147,8 +147,8 @@
     if (!raw) return { province: '', city: '', text: '', ok: false, empty: true };
     if (raw === '全国') return { province: '全国', city: '', text: '全国', ok: true };
     var t = cleanStr(raw);
-    /* 直辖市直接命中 */
-    var muni = ['北京', '上海', '天津', '重庆'];
+    /* 直辖市与港澳（省=市，无下辖区县市可选）直接命中 */
+    var muni = ['北京', '上海', '天津', '重庆', '香港', '澳门'];
     for (var m = 0; m < muni.length; m++) { if (t.indexOf(muni[m]) > -1) return { province: muni[m], city: muni[m], text: muni[m], ok: true }; }
     /* 匹配省份（输入含省名，或省名含输入） */
     var prov = '';

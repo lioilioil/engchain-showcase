@@ -664,10 +664,45 @@ body.page-ready .phone {
 .cs-cell { font-size: 13px; color: var(--text-1); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-m); padding: 9px 4px; text-align: center; transition: background var(--d-fast), border-color var(--d-fast), color var(--d-fast); }
 .cs-cell:active { background: var(--primary-soft); border-color: var(--accent-soft); color: var(--primary-dim); }
 .cs-empty { grid-column: 1 / -1; text-align: center; color: var(--text-3); font-size: 12.5px; padding: 24px 0; }
-.cs-provs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
-.cs-provs::-webkit-scrollbar { display: none; }
-.cs-prov { flex: none; font-size: 12.5px; color: var(--text-2); background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-full); padding: 6px 14px; }
-.cs-prov.active { color: var(--primary-dim); background: var(--primary-soft); border-color: var(--accent-soft); font-weight: 600; }
+/* ---- 按省份选择：A–Z 分组竖向列表 + 右侧字母索引条 ---- */
+.sheet.city-sheet .sheet-body { padding-right: calc(var(--page-pad) + 15px); }
+/* 搜索时没有长列表可撑，让 sheet 收到内容高度（.sheet 已带 height 过渡，收起是动画而非跳变） */
+.sheet.city-sheet.is-search { height: auto; max-height: 80vh; }
+.cs-title-hint { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--text-3); opacity: .7; }
+/* 省份列表落在磨砂 sheet 上的一张实心面卡片里。
+   原因：吸顶字母条必须不透明才压得住滑过的城市名（条内的 backdrop-filter 嵌在玻璃层里
+   实测不生效），而"不透明 + 磨砂底"就是一条突兀的横杠。做成卡片后条与面同源，吸顶无接缝。 */
+.cs-alpha { background: var(--bg-elev); border-radius: var(--r-l); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(22, 22, 22, .03); padding: 2px 12px; margin-bottom: 4px; }
+.cs-alpha-hd { position: sticky; top: 0; z-index: 2; padding: 7px 0 5px; background: var(--bg-elev); border-bottom: 1px solid var(--line); font-size: 11px; font-weight: 700; color: var(--text-3); letter-spacing: .1em; }
+.cs-alpha-item { border-bottom: 1px solid var(--line); }
+.cs-alpha-group:last-child .cs-alpha-item:last-child { border-bottom: 0; }
+.cs-prov { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; font-size: 13.5px; color: var(--text-1); text-align: left; -webkit-tap-highlight-color: transparent; }
+.cs-prov:active { background: var(--primary-soft); }
+.cs-prov-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-prov-n { flex: none; font-size: 11px; color: var(--text-3); }
+.cs-prov-arrow { flex: none; width: 14px; height: 14px; color: var(--text-3); transition: transform var(--d-fast); }
+.cs-alpha-item.open .cs-prov-arrow { transform: rotate(180deg); }
+.cs-alpha-item.open .cs-prov-name { color: var(--primary-dim); font-weight: 600; }
+/* 展开后的城市做成自适应宽度的胶囊流（广东 21 个市用 3 列网格要撑 7 行，太长），
+   与「热门城市」的等宽网格区分：热门是固定入口，展开是长尾清单。 */
+.cs-prov-cities { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
+/* display:flex 会盖掉 UA 的 [hidden]{display:none}，必须自己补一条，否则所有省份的城市都摊开显示 */
+.cs-prov-cities[hidden] { display: none; }
+.cs-prov-cities .cs-cell { flex: 0 0 auto; padding-inline: 12px; }
+.cs-cell.is-cur { color: var(--primary-dim); background: var(--primary-soft); border-color: var(--accent-line); font-weight: 600; }
+.cs-alpha-bar { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; gap: 1px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; }
+.cs-alpha-bar button { width: 15px; padding: 1px 0; border: 0; background: transparent; font-size: 9.5px; font-weight: 700; line-height: 1.15; color: var(--text-3); -webkit-tap-highlight-color: transparent; pointer-events: none; }
+.cs-alpha-bar button.active { color: var(--primary-dim); }
+/* 按住/拖动索引条时跟手的水平水滴气泡：圆头在左、尖尾朝右指着字母条。
+   纯视觉反馈（pointer-events:none），列表只在松手时滚一次。
+   right:20px → 尖尾墨迹（视口 x=54/60）落在距条 8px 处，避开 drop-shadow 糊住正在按的那个字母。 */
+.cs-alpha-bubble { position: absolute; right: 20px; z-index: 4; width: 60px; height: 40px; pointer-events: none; opacity: 0; transform: translateY(-50%) scale(.86); transform-origin: 100% 50%; transition: opacity .12s var(--e-out), transform .12s var(--e-out); }
+.cs-alpha-bubble.show { opacity: 1; transform: translateY(-50%) scale(1); }
+.cs-alpha-bubble svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 6px 14px rgba(20, 19, 16, .22)); }
+.cs-alpha-bubble svg path { fill: var(--text-1); }
+/* 字母压在圆头圆心（视口 x 10–42）上，不跟着尾尖走 */
+.cs-alpha-bubble-l { position: absolute; left: 16.67%; top: 0; width: 53.33%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; line-height: 1; color: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .cs-alpha-bubble { transition: none; } }
 
 .modal-overlay { position: fixed; inset: 0; z-index: 160; background: rgba(20, 19, 16, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: opacity var(--d-norm); }
 .modal-overlay.show { opacity: 1; visibility: visible; }
