@@ -23,20 +23,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   .pv-wrap { display: flex; min-height: 100vh; }
 
   /* ---- 左侧导航 / 控制台 ---- */
-  .pv-side { width: 240px; flex: 0 0 240px; border-right: 1px solid var(--line); background: var(--bg-elev); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
-  /* 侧边栏宽度拖拽：右侧边缘整条手柄（可拖）；完全置于栏内（overflow:hidden 会裁剪越界部分） */
-  .pv-resizer { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; cursor: col-resize; z-index: 70; background: transparent; transition: background var(--d-fast); }
+  .pv-side { width: 320px; flex: 0 0 320px; border-right: 1px solid var(--line); background: var(--bg-elev); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  /* 侧边栏宽度拖拽：右侧边缘整条手柄（可拖）；完全置于栏内（overflow:hidden 会裁剪越界部分）。
+     320px 为 CSS 兜底（≈品牌头单行宽度），真实单行宽度由 sideResizer 按 DOM 实测后以内联样式覆盖。 */
+  .pv-resizer { position: absolute; top: 0; right: 0; bottom: 0; width: 10px; cursor: col-resize; z-index: 70; background: transparent; transition: background var(--d-fast); touch-action: none; }
   .pv-resizer::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: var(--primary-dim); opacity: 0; transition: opacity var(--d-fast); }
   .pv-resizer:hover::after, body.resizing .pv-resizer::after { opacity: .55; }
   .pv-resizer:hover, body.resizing .pv-resizer { background: linear-gradient(180deg, rgba(176, 138, 60, .08), rgba(176, 138, 60, .16)); }
   body.resizing { user-select: none; -webkit-user-select: none; cursor: col-resize; }
   body.resizing iframe { pointer-events: none; }
-  /* BUG-COMP-001 修复：≤812px 区间（768 平板）收窄左侧控制台栏并减小舞台横向 padding，
-     避免手机壳（.device 固有布局宽 ~402px）+ 左栏 320px 把 .pv-stage 撑出 812px 导致右侧 FAB 被裁。
-     ≥1280 桌面保持 240px 不变（默认已为最小宽度，见 sideResizer）；≤640 移动视口本就由 body 横向裁剪接管，不受影响。 */
+  /* 触屏设备（手机/平板）：加宽拖拽热区，便于手指抓取 */
+  @media (pointer: coarse) {
+    .pv-resizer { width: 18px; }
+    .pv-resizer::after { left: 8px; }
+  }
+  /* BUG-COMP-001 修复：≤812px 区间（768 平板）收窄舞台横向 padding，保证「品牌头单行宽度的左栏 +
+     手机壳（.device 布局宽 ~410px）」不把 .pv-stage 撑出视口导致右侧内容被裁。
+     ≤430 移动视口由 app.css 的 body overflow-x:hidden 横向裁剪接管；431~640 允许横向滚动。 */
   @media (max-width: 812px) {
-    .pv-side { width: 240px; flex: 0 0 240px; }
-    .pv-stage { padding-left: 24px; padding-right: 24px; }
+    .pv-side { width: 320px; flex: 0 0 320px; }
+    .pv-stage { padding-left: 12px; padding-right: 12px; }
   }
   .pv-side-hd { padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
   .pv-side-hd .brand { font-size: 21px; font-weight: 800; letter-spacing: -.02em; }
@@ -465,13 +471,13 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     .fs-dialog-hd { padding: 16px 16px 12px; }
     .fs-body { padding: 14px 16px 18px; }
   }
-/* preview 专属：回到顶部按钮固定于左侧边栏（默认 240px）中间位置，拖拽展开时由 sideResizer 动态同步中心；
+/* preview 专属：回到顶部按钮固定于左侧边栏（默认 320px）中间位置，拖拽展开时由 sideResizer 动态同步中心；
    覆盖全局 back-to-top.js 的视口底部居中定位；显示/消失与点击逻辑保持不变 */
   body > .engchain-backtop,
   body > .engchain-backtop.is-show,
   body > .engchain-backtop:hover,
   body > .engchain-backtop:active {
-    left: 120px !important;   /* 边栏默认宽度 240px 的水平中心（兜底，拖拽后由 JS 覆盖） */
+    left: 160px !important;   /* 边栏默认宽度 320px 的水平中心（兜底，拖拽后由 JS 覆盖） */
     top: 50% !important;      /* 边栏垂直居中 */
     bottom: auto !important;  /* 覆盖 JS 动态写入的 bottom 内联值 */
     transform: translate(-50%, -50%) scale(1) !important;
@@ -1032,6 +1038,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       ]},
       { name:'建企买卖·首页', src:'pages/trade/index.html', desc:'建企买卖', children:[
         ['pages/supply/detail.html?id=t1', '企业买卖·M&A', '供需详情 · M&A（id=t1）'],
+        ['pages/trade/broker.html', '转让经纪·收购流程', '转让经纪 · 联系经纪/收购流程/需求委托表单'],
       ]},
       { name:'人员招聘·首页', src:'pages/personnel/index.html', desc:'人员招聘', children:[
         ['pages/supply/detail.html?id=p1', '企业招聘·需求详情', '供需详情 · 需求详情（id=p1）'],
@@ -1424,46 +1431,80 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '<div class="pv-group" data-group="' + escAttr(m.name) + '"><button type="button" class="g-name" data-group="' + escAttr(m.name) + '" title="点击折叠 / 展开整组">' + NAV_ICONS.cat + '<span class="g-label">' + escAttr(m.name) + '</span><span class="g-count"></span><svg class="g-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="links">' + links + '</div></div>';
   }).join('');
 
-  /* ---- 侧边栏宽度拖拽：右侧边缘手柄；240px 起，上限取视口一半；localStorage 记忆；收窄切 narrow 自适应；
-     默认自适应至最小宽度（240px + narrow 模式），无记忆或记忆无效时直接收敛最小，用户拖拽展开后记忆，下次沿用 ---- */
+  /* ---- 侧边栏宽度拖拽：右侧边缘手柄；下限=品牌头单行所需宽度（icon+工程链ENGCHAIN+重置演示 不换行），
+     上限取视口一半；localStorage 记忆；Pointer 事件统一鼠标/触屏（移动端可拖），无 PointerEvent 的旧浏览器回退 touch+mouse；
+     无记忆或记忆无效时默认收敛至单行宽度，用户拖拽展开后记忆，下次沿用 ---- */
   (function sideResizer() {
     var side = document.querySelector('.pv-side');
     var rz = document.querySelector('.pv-resizer');
     if (!side || !rz) return;
     var KEY = 'engchain-side-w';
-    var MIN = 240;
-    function maxW() { return Math.min(560, Math.max(MIN, Math.floor(window.innerWidth / 2))); }
+    var MIN = 240;                 /* 绝对下限兜底，实际下限见 minW() */
+    var FIT = MIN;                 /* 品牌头（icon + 工程链ENGCHAIN + 重置演示）单行不换行所需宽度，按 DOM 实测后缓存 */
+    var userDragged = false;
+    function measureFit() {
+      var hd = document.querySelector('.pv-side-hd-row');
+      if (!hd) return MIN;
+      var prev = hd.style.whiteSpace;
+      hd.style.whiteSpace = 'nowrap';              /* 测量期间强制不换行，取整行自然宽度 */
+      var w = hd.scrollWidth + 40;                 /* + .pv-side-hd 左右各 20px 内边距 */
+      hd.style.whiteSpace = prev;
+      return Math.max(MIN, Math.min(560, Math.round(w)));
+    }
+    function minW() { return Math.max(MIN, Math.min(560, FIT)); }      /* 拖拽下限 = 品牌头单行宽度，保证不换行 */
+    function maxW() { return Math.min(560, Math.max(minW(), Math.floor(window.innerWidth / 2))); }
+    function hasSaved() { try { var s = parseInt(localStorage.getItem(KEY), 10); return !!(s && s >= minW()); } catch (e) { return false; } }
+    function applyDefault() { apply(minW(), false); }
     function syncBacktop() {
       var bt = document.querySelector('.engchain-backtop');
       if (bt) bt.style.setProperty('left', Math.round(side.getBoundingClientRect().width / 2) + 'px', 'important');
     }
     function apply(w, save) {
-      w = Math.max(MIN, Math.min(maxW(), Math.round(w)));
+      w = Math.max(minW(), Math.min(maxW(), Math.round(w)));
       side.style.width = w + 'px';
       side.style.flexBasis = w + 'px';
       side.classList.toggle('narrow', w < 300);
       syncBacktop();
       if (save) { try { localStorage.setItem(KEY, String(w)); } catch (e) {} }
     }
-    /* 有记忆且 >= MIN 时沿用记忆宽度，否则默认收敛至最小宽度 */
-    try { var saved = parseInt(localStorage.getItem(KEY), 10); if (saved && saved >= MIN) apply(saved, false); else apply(MIN, false); } catch (e) { apply(MIN, false); }
+    FIT = measureFit();
+    /* 有记忆且 >= 单行宽度时沿用记忆宽度，否则默认收敛至单行宽度（品牌头不换行） */
+    if (hasSaved()) { try { apply(parseInt(localStorage.getItem(KEY), 10), false); } catch (e) { applyDefault(); } }
+    else applyDefault();
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncBacktop);
     else syncBacktop();
-    rz.addEventListener('mousedown', function (e) {
+    /* 字体加载完成后复核（用户尚未拖拽且无有效记忆时），避免按未就绪字体测出宽度偏小 */
+    try {
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
+        var nw = measureFit();
+        if (nw === FIT) return;
+        FIT = nw;
+        if (!userDragged && !hasSaved()) applyDefault();
+      });
+    } catch (e) {}
+    /* 拖拽：Pointer Events 统一鼠标/触屏（移动端可拖）；无 PointerEvent 的旧浏览器回退 touch + mouse */
+    var hasPointer = !!window.PointerEvent;
+    function getX(e) { return (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX; }
+    function dragStart(e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;   /* 仅鼠标左键 / 触屏主触点 */
       e.preventDefault();
-      var startX = e.clientX;
+      userDragged = true;
+      var startX = getX(e);
       var startW = side.getBoundingClientRect().width;
       document.body.classList.add('resizing');
-      function move(ev) { apply(startW + (ev.clientX - startX), false); }
+      function move(ev) { if (ev.cancelable) ev.preventDefault(); apply(startW + getX(ev) - startX, false); }
       function up() {
-        document.removeEventListener('mousemove', move);
-        document.removeEventListener('mouseup', up);
+        (hasPointer ? ['pointermove', 'pointerup', 'pointercancel'] : ['mousemove', 'mouseup', 'touchmove', 'touchend', 'touchcancel'])
+          .forEach(function (n) { document.removeEventListener(n, move); document.removeEventListener(n, up); });
         document.body.classList.remove('resizing');
         apply(side.getBoundingClientRect().width, true);
       }
-      document.addEventListener('mousemove', move);
-      document.addEventListener('mouseup', up);
-    });
+      if (hasPointer) { try { rz.setPointerCapture(e.pointerId); } catch (err) {} }
+      (hasPointer ? ['pointermove'] : ['mousemove', 'touchmove']).forEach(function (n) { document.addEventListener(n, move, { passive: false }); });
+      (hasPointer ? ['pointerup', 'pointercancel'] : ['mouseup', 'touchend', 'touchcancel']).forEach(function (n) { document.addEventListener(n, up); });
+    }
+    rz.addEventListener(hasPointer ? 'pointerdown' : 'mousedown', dragStart);
+    if (!hasPointer) rz.addEventListener('touchstart', dragStart, { passive: false });
     window.addEventListener('resize', function () {
       var w = side.getBoundingClientRect().width;
       if (w > maxW()) apply(w, true);
