@@ -444,6 +444,8 @@ body, .phone { background: var(--af-bg); }
        dist   = 需企业入驻或个人合伙人，金锁（与 entryAccess 同源）
        agency = 需中介服务企业入驻，金锁
        vendor = 需登录+入驻（B端增值道具），游客灰锁，登录后 ¥ 角标
+       workbench = 合作工作台：省代/二级准入，状态由 UI.workbenchAccess() 计算，
+                   锁色沿用现有（灰=未登录/已终止，蓝=审核中/未通过，金=非合作方）
      pay   = 付费入口标识（金色 ¥ 角标；点击进入对应付费页）
      hs    = 联系官方入口标识（耳麦角标）
      okKey = 认证类入口：已完成身份标识（personal/enterprise/partner/pro/resident），绿勾
@@ -505,7 +507,7 @@ body, .phone { background: var(--af-bg); }
       { id:'dist',     label:'分销中心', href:'../distribution/index.html',      n:'35', need:'dist' },
       { id:'agency-sv', label:'中介服务', href:'../agency/seller-board.html',    n:'36', need:'agency' },
       { id:'share',    label:'我的分享', href:'share.html',                      n:'37', need:'login' },
-      { id:'uni-workbench', label:'合作工作台', href:'../province-agent/uni/pages/home.html', n:'53', need:'open' }
+      { id:'uni-workbench', label:'合作工作台', href:'../province-agent/uni/pages/home.html', n:'53', need:'workbench' }
     ]},
     { name:'钱包与积分', items:[
       { id:'credits',    label:'我的积分', href:'../wallet/credits.html',        n:'38', need:'login' },
@@ -571,6 +573,18 @@ body, .phone { background: var(--af-bg); }
         if (!loggedIn()) return 'login';
         return acc.agency ? 'open' : 'agency';
       }
+      case 'workbench': {
+        /* 工作台准入只认账号栈（精确账号），状态来源与页面闸门同一函数 */
+        var wa = null;
+        try { wa = (window.UI && UI.workbenchAccess) ? UI.workbenchAccess() : null; } catch (e) {}
+        if (!wa) return loggedIn() ? 'wb-none' : 'login';
+        if (wa.ok) return 'open';   /* suspended 也允许进入，由工作台渲染只读 */
+        if (wa.reason === 'guest' || wa.reason === 'nologin') return 'login';
+        if (wa.reason === 'pending') return 'wb-pending';
+        if (wa.reason === 'rejected') return 'wb-rejected';
+        if (wa.reason === 'terminated' || wa.reason === 'revoked') return 'wb-ended';
+        return 'wb-none';
+      }
       case 'staff': {
         /* 平台运营台：运营身份开放；其他人可点（决策 A：入口可见），点入后由 dashboard 自身门控渲染无权限占位 */
         if (!loggedIn()) return 'login';
@@ -610,8 +624,8 @@ body, .phone { background: var(--af-bg); }
       else if (en.hs) badge = '<span class="af-badge af-badge-hs">' + HS_SVG + '</span>';
     } else {
       var lockCls = '';
-      if (st === 'resume' || st === 'jobs') lockCls = ' auth';
-      else if (st === 'dist' || st === 'agency') lockCls = ' entry';
+      if (st === 'resume' || st === 'jobs' || st === 'wb-pending' || st === 'wb-rejected') lockCls = ' auth';
+      else if (st === 'dist' || st === 'agency' || st === 'wb-none') lockCls = ' entry';
       badge = '<span class="af-lock' + lockCls + '">' + LOCK_SVG + '</span>';
     }
     var icStyle = '--af-ic:url(../../assets/af-icons/liquid-glass/icon-' + en.n + '-light.png);'
@@ -639,6 +653,15 @@ body, .phone { background: var(--af-bg); }
 
   /* ---------- 点击（事件委托） ---------- */
   function openOrGuide(en, st) {
+    /* 合作工作台：可进入才跳转（带账号身份），其余一律居中弹窗，绝不落到下方 default 跳转 */
+    if (en.need === 'workbench') {
+      if (st === 'open') {
+        location.href = (window.UI && UI.workbenchHref) ? UI.workbenchHref() : en.href;
+        return;
+      }
+      wbBlocked(st);
+      return;
+    }
     if (st === 'open') { location.href = en.href; return; }
     switch (st) {
       case 'login':  requireLogin('登录后解锁「' + en.label + '」'); break;
@@ -677,6 +700,61 @@ body, .phone { background: var(--af-bg); }
     if (cta) cta.addEventListener('click', function(){ location.href = '../auth/login.html'; });
   };
 
+  /* ---------- 合作工作台：居中弹窗阻挡（不跳转） ---------- */
+  function wbBlocked(st) {
+    /* UI.dialog 不可用时宁可不响应，也不回落到跳转 */
+    if (!(window.UI && UI.dialog)) return;
+    /* 二级合作没有自助申请页：待审/驳回的进度由所属省代掌握，不能指向省代申请页 */
+    var wa = null;
+    try { wa = UI.workbenchAccess ? UI.workbenchAccess() : null; } catch (e) {}
+    var subOnly = !!(wa && !wa.canProvince && wa.subStatus);
+    var subPending = subOnly && wa.subStatus === 'pending';
+    var subRejected = subOnly && wa.subStatus === 'rejected';
+    var cfg = {
+      login: {
+        title: '登录后进入合作工作台',
+        text: '合作工作台面向省级总代与二级合作企业，请先登录对应的合作账号。',
+        ok: '去登录', cancel: '取消', href: '../auth/login.html'
+      },
+      'wb-none': {
+        title: '合作工作台 · 仅对合作方开放',
+        text: '当前账号不是省级总代或二级合作企业。<br>省级总代可提交省代申请；二级合作由所属省代邀请开通。',
+        ok: '了解省代申请', cancel: '知道了', href: 'entry.html'
+      },
+      'wb-pending': subPending ? {
+        title: '二级合作 · 审核中',
+        text: '二级合作申请由所属省级总代审核，审核进度以省代通知为准。<br>审核通过后即可进入工作台。',
+        ok: '联系客服', cancel: '知道了', kefu: true
+      } : {
+        title: '合作工作台 · 审核中',
+        text: '合作入驻申请已提交，平台正在审核，预计 24 小时内完成。<br>审核通过后即可进入工作台。',
+        ok: '查看审核进度', cancel: '知道了', href: 'entry-review.html'
+      },
+      'wb-rejected': subRejected ? {
+        title: '二级合作 · 未通过',
+        text: '申请未通过所属省级总代的审核，请联系省代重新发起。<br>如需平台协助，可联系客服。',
+        ok: '联系客服', cancel: '知道了', kefu: true
+      } : {
+        title: '合作工作台 · 入驻未通过',
+        text: '申请未通过审核，可按平台反馈补充资料后重新提交。<br>二级合作请联系所属省级总代重新发起。',
+        ok: '查看审核原因', cancel: '知道了', href: 'entry-review.html'
+      },
+      'wb-ended': {
+        title: '合作工作台 · 合作已终止',
+        text: '当前账号的合作关系已终止，工作台数据已转为只读归档。<br>如需恢复合作，请联系平台客服。',
+        ok: '联系客服', cancel: '取消', kefu: true
+      }
+    }[st];
+    if (!cfg) return;
+    UI.dialog({
+      title: cfg.title,
+      text: cfg.text,
+      ok: cfg.ok,
+      cancel: cfg.cancel,
+      onOk: cfg.kefu ? function () { UI.openKefu(); } : function () { location.href = cfg.href; }
+    });
+  }
+
   /* ---------- 引导：认证 / 入驻 dialog ---------- */
   function guideDialog(name, title, text, href) {
     var okLabel = '去开通';
@@ -714,8 +792,8 @@ body, .phone { background: var(--af-bg); }
   var quickWrap = null, quickLeftEl = null, quickRightEl = null;
 
   function quickLockCls(st) {
-    if (st === 'resume' || st === 'jobs') return ' auth';
-    if (st === 'dist' || st === 'agency') return ' entry';
+    if (st === 'resume' || st === 'jobs' || st === 'wb-pending' || st === 'wb-rejected') return ' auth';
+    if (st === 'dist' || st === 'agency' || st === 'wb-none') return ' entry';
     return '';
   }
 
@@ -774,6 +852,8 @@ body, .phone { background: var(--af-bg); }
       g.items.forEach(function (en) {
         if (en.id === 'my-jobs' && !QuickConfig.canShowMyJobs()) return;
         if (en.id === 'org-members' && !QuickConfig.canShowOrgMembers()) return;
+        /* 合作工作台不在 QuickConfig.CATALOG（不可加入常用服务），跳过以免出现无效「添加」按钮 */
+        if (en.id === 'uni-workbench') return;
         totalRightItems++;
         if (selected.indexOf(en.id) >= 0) {
           alreadyAddedCount++;
@@ -941,7 +1021,10 @@ body, .phone { background: var(--af-bg); }
   try {
     if (window.QuickConfig) {
       var gIds = [];
-      GROUPS.forEach(function (g) { g.items.forEach(function (it) { gIds.push(it.id); }); });
+      GROUPS.forEach(function (g) { g.items.forEach(function (it) {
+        if (it.id === 'uni-workbench') return;   /* 不进常用服务，见 renderQuickPanel 过滤 */
+        gIds.push(it.id);
+      }); });
       var cIds = Object.keys(QuickConfig.CATALOG);
       var miss = gIds.filter(function (x) { return cIds.indexOf(x) < 0; });
       var extra = cIds.filter(function (x) { return gIds.indexOf(x) < 0; });
