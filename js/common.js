@@ -613,6 +613,7 @@ window.UI = (function () {
     'external': '<path d="M7 17L17 7M9 7h8v8"/>',
     'fire':     '<path d="M12 2c1 3 3.5 4.3 4 6.2a5 5 0 0 1-8 3.8C7 13 9 12 9 9.5 6.5 10.5 6 12.6 6 13a6 6 0 0 0 12 0C18 5 12 8 12 2z"/>',
     'x':        '<path d="M18 6L6 18M6 6l12 12"/>',
+    'phone':    '<path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
     /* —— 补充：我的页面等使用的 Feather 风格图标 —— */
     'shield':   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
     'award':    '<circle cx="12" cy="8" r="6"/><path d="M15.5 13.5L17 22l-5-3-5 3 1.5-8.5"/>',
@@ -1240,6 +1241,14 @@ window.UI = (function () {
      ================================================================ */
   var KEFU_HOTLINE = '400-888-6688';
   var KEFU_WECOM_LINK = 'https://work.weixin.qq.com/kf/0000-demo-engchain'; /* [模拟] 企业微信加好友链接占位 */
+  /* [模拟] 招商商务经理名片：生产环境由后台按省/业务线分配，前端只读展示 */
+  var BIZ_MANAGER = {
+    name: '王振',
+    title: '省代招商 · 商务经理',
+    mobile: '138 0013 8888',
+    wecom: '省代招商商务经理',
+    banner: '<b>省级总代（省代）招商咨询</b>：一省独家授权，省级名额、分成比例与开通流程由商务经理一对一说明。'
+  };
   var KEFU_STYLE_ID = 'engchain-kefu-style';
   var KEFU_CSS = '' +
     '.dg-handoff { padding: 6px 0 2px; }' +
@@ -1313,12 +1322,29 @@ window.UI = (function () {
     ov.classList.remove('show');
     setTimeout(function () { ov.remove(); document.body.style.overflow = ''; }, 260);
   }
-  function helpDial() { /* [模拟] 真实环境跳转系统拨号：location.href = 'tel:' + KEFU_HOTLINE */ toast('正在拨打 ' + KEFU_HOTLINE, 'ok'); }
+  function helpDial(num) { /* [模拟] 真实环境跳转系统拨号：location.href = 'tel:' + 号码 */ toast('正在拨打 ' + (num || KEFU_HOTLINE), 'ok'); }
   function helpAddWecom() { /* [模拟] 真实环境唤起企业微信加好友页（KEFU_WECOM_LINK / 长按识别） */ toast('已唤起企业微信添加好友（演示）', 'ok'); }
   function helpCopyWecom() { /* [模拟] 真实环境为企业微信加好友链接，可复制分享 */ try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(KEFU_WECOM_LINK); } catch (e) {} toast('企业微信链接已复制', 'ok'); }
 
-  /* 全站统一联系客服弹窗：openKefu() / UI.openKefu() */
-  function openKefu() {
+  /* 全站统一联系弹窗：openKefu() / UI.openKefu()
+     openKefu()                  → 客服中心（默认）
+     openKefu({role:'manager'})  → 商务经理身份（省代招商等业务对接，样式复用同一套） */
+  function openKefu(cfg) {
+    /* 兼容被当作事件处理器直接传入（Event 对象），非对象或非 manager 一律回落客服口径 */
+    var isMgr = !!(cfg && cfg.role === 'manager');
+    var who = Object.assign({}, BIZ_MANAGER, isMgr && cfg.agent ? cfg.agent : {});
+    var title = isMgr ? '商务经理' : '客服中心';
+    var banner = isMgr ? who.banner : '7×12 小时人工服务（周一至周日 9:00 - 21:00），电话咨询与微信留言均可获得平台顾问的及时响应。';
+    var lineLabel = isMgr ? who.name + ' · ' + who.title : '客服热线（周一至周日 9:00–21:00）';
+    var lineVal = isMgr ? who.mobile : KEFU_HOTLINE;
+    var wecomLabel = isMgr ? '企业微信 · ' + who.name : '客服微信 · 企业微信';
+    var wecomVal = isMgr ? '扫码添加 · 商务经理一对一' : '扫码添加 · 微信私聊咨询';
+    var wecomTip = isMgr
+      ? '扫码添加商务经理企业微信，索取省级名额测算表与授权协议范本'
+      : '扫码添加专属客服微信，随时私聊咨询平台业务与问题反馈';
+    var note = isMgr
+      ? '如需指定回访时间，可在申请备注中说明，商务经理将优先回电。'
+      : '如遇忙线，请添加客服微信留言，顾问将优先处理。';
     /* 重复打开保护：弹窗已存在时不再叠加 */
     if (document.querySelector('.kefu-modal')) return;
     injectKefuStyle();
@@ -1326,34 +1352,34 @@ window.UI = (function () {
     ov.className = 'modal-overlay';
     ov.innerHTML =
       '<div class="kefu-modal">' +
-        '<div class="kefu-head"><div class="kefu-title">客服中心</div><button type="button" class="kefu-close" id="kefuCloseBtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button></div>' +
-        '<div class="kefu-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><div>7×12 小时人工服务（周一至周日 9:00 - 21:00），电话咨询与微信留言均可获得平台顾问的及时响应。</div></div>' +
+        '<div class="kefu-head"><div class="kefu-title">' + esc(title) + '</div><button type="button" class="kefu-close" id="kefuCloseBtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button></div>' +
+        '<div class="kefu-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><div>' + banner + '</div></div>' +
         '<div class="dg-handoff-card">' +
           '<div class="dg-handoff-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></div>' +
           '<div class="dg-handoff-card-body">' +
-            '<div class="dg-handoff-card-label">客服热线（周一至周日 9:00–21:00）</div>' +
-            '<div class="dg-handoff-card-val">' + KEFU_HOTLINE + '</div>' +
+            '<div class="dg-handoff-card-label">' + esc(lineLabel) + '</div>' +
+            '<div class="dg-handoff-card-val">' + esc(lineVal) + '</div>' +
           '</div>' +
-          '<button type="button" class="dg-handoff-btn" onclick="helpDial()">点击拨打</button>' +
+          '<button type="button" class="dg-handoff-btn" onclick="helpDial(\'' + esc(lineVal) + '\')">点击拨打</button>' +
         '</div>' +
         '<div class="dg-handoff-card dg-handoff-wecom">' +
           '<div class="dg-handoff-card-head">' +
             '<div class="dg-handoff-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.2 0-2.4-.25-3.4-.7L4 20l1-4.2A8.5 8.5 0 1 1 21 11.5z"/><path d="M8.5 10.5h.01M12.5 10.5h.01M16.5 10.5h.01"/></svg></div>' +
             '<div class="dg-handoff-card-body">' +
-              '<div class="dg-handoff-card-label">客服微信 · 企业微信</div>' +
-              '<div class="dg-handoff-card-val">扫码添加 · 微信私聊咨询</div>' +
+              '<div class="dg-handoff-card-label">' + esc(wecomLabel) + '</div>' +
+              '<div class="dg-handoff-card-val">' + esc(wecomVal) + '</div>' +
             '</div>' +
           '</div>' +
           '<div class="dg-wecom-main">' +
             '<div class="dg-qr-box"><canvas id="kefuWecomQr" width="120" height="120"></canvas><div class="dg-qr-tip">长按识别二维码添加好友</div></div>' +
             '<div class="dg-wecom-side">' +
-              '<div class="dg-wecom-tip">扫码添加专属客服微信，随时私聊咨询平台业务与问题反馈</div>' +
-              '<button type="button" class="dg-handoff-btn" onclick="helpAddWecom()">添加客服微信</button>' +
+              '<div class="dg-wecom-tip">' + esc(wecomTip) + '</div>' +
+              '<button type="button" class="dg-handoff-btn" onclick="helpAddWecom()">' + (isMgr ? '添加商务经理微信' : '添加客服微信') + '</button>' +
               '<button type="button" class="dg-handoff-btn ghost" onclick="helpCopyWecom()">复制链接</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="dg-handoff-note">如遇忙线，请添加客服微信留言，顾问将优先处理。</div>' +
+        '<div class="dg-handoff-note">' + esc(note) + '</div>' +
         '<button type="button" class="btn btn-primary btn-block" style="height:46px;" id="kefuBackBtn">返回</button>' +
       '</div>';
     document.body.appendChild(ov);
@@ -1367,7 +1393,7 @@ window.UI = (function () {
     var closeBtn = ov.querySelector('#kefuCloseBtn');
     if (closeBtn) closeBtn.addEventListener('click', function () { closeKefu(ov); });
     var qr = ov.querySelector('#kefuWecomQr');
-    if (qr) paintKefuQr(qr, 'kefu-engchain');
+    if (qr) paintKefuQr(qr, isMgr ? 'kefu-manager' : 'kefu-engchain');
   }
   window.openKefu = openKefu;
   window.helpDial = helpDial;

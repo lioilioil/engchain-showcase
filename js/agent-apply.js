@@ -31,48 +31,93 @@
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  /* M2-1 提交省级总代申请（fee 恒 0，无付费） */
+  /* M2-1 提交省级总代申请（fee 恒 0，无付费）
+     两种口径：
+       payload.personal = true → 个人实名申请（entry-form.html?type=provinceAgent）：
+         不采集企业主体，实名与注册手机号由账户自动引用，必填只有「意向授权省」；
+         主体资料（执照/USCC/法人）留待审核阶段补齐，故不解锁 D31 自然人主体位。
+       默认 → 企业主体申请：保留原四要素必填校验与一公司一记录口径。 */
   function submitProvinceApplication(payload, opts) {
     opts = opts || {};
     var d = deps(), R = d.R, S = opts.store || d.S;
     if (!R || !S) return { error: 'E_DEPS_MISSING', msg: 'AgentRules/AgentStore 未加载' };
     payload = payload || {};
+    var personal = !!payload.personal;
 
-    /* 必填拦截：执照 / 意向省 / 公司名 / uscc / 法人 / 联系人 */
-    if (!String(payload.companyName || '').trim()) return { error: 'E_COMPANY_EMPTY', msg: '请填写分公司名称' };
-    if (!String(payload.uscc || '').trim()) return { error: 'E_USCC_EMPTY', msg: '请填写统一社会信用代码' };
-    if (!String(payload.license || '').trim()) return { error: 'E_LICENSE_REQUIRED', msg: '请上传/填写营业执照（缺执照拦截）' };
-    if (!String(payload.province || '').trim()) return { error: 'E_PROVINCE_REQUIRED', msg: '请选择意向授权省（缺意向省拦截）' };
-    if (!String(payload.legalRep || '').trim()) return { error: 'E_LEGALREP_EMPTY', msg: '请填写法定代表人' };
-    if (!String(payload.contact || '').trim()) return { error: 'E_CONTACT_EMPTY', msg: '请填写联系人' };
+    if (personal) {
+      /* 实名前置：未完成个人实名认证不可提交（表单已断链，此处兜底防绕过） */
+      if (!payload.realnameOk) return { error: 'E_REALNAME_REQUIRED', msg: '请先完成个人实名认证后再申请省代' };
+      if (!String(payload.realName || '').trim()) return { error: 'E_REALNAME_REQUIRED', msg: '未读取到实名信息，请先完善实名认证' };
+      if (!String(payload.mobile || '').trim()) return { error: 'E_MOBILE_REQUIRED', msg: '未读取到注册手机号，请先完善账户信息' };
+      if (!String(payload.province || '').trim()) return { error: 'E_PROVINCE_REQUIRED', msg: '请选择意向授权省（缺意向省拦截）' };
+    } else {
+      /* 必填拦截：执照 / 意向省 / 公司名 / uscc / 法人 / 联系人 */
+      if (!String(payload.companyName || '').trim()) return { error: 'E_COMPANY_EMPTY', msg: '请填写分公司名称' };
+      if (!String(payload.uscc || '').trim()) return { error: 'E_USCC_EMPTY', msg: '请填写统一社会信用代码' };
+      if (!String(payload.license || '').trim()) return { error: 'E_LICENSE_REQUIRED', msg: '请上传/填写营业执照（缺执照拦截）' };
+      if (!String(payload.province || '').trim()) return { error: 'E_PROVINCE_REQUIRED', msg: '请选择意向授权省（缺意向省拦截）' };
+      if (!String(payload.legalRep || '').trim()) return { error: 'E_LEGALREP_EMPTY', msg: '请填写法定代表人' };
+      if (!String(payload.contact || '').trim()) return { error: 'E_CONTACT_EMPTY', msg: '请填写联系人' };
+    }
 
     var uid = payload.uid || currentUid();
-    var uscc = R.normalizeUscc(payload.uscc);
+    if (personal && !uid) return { error: 'E_UID_REQUIRED', msg: '请先登录后提交申请' };
+    var uscc = personal ? '' : R.normalizeUscc(payload.uscc);
     var province = R.normalizeProvince(payload.province, opts.quotaCfg && opts.quotaCfg.aliases);
 
     /* 四道校验（M1-3）：省独家 / uscc 唯一 / 一人一省 / 自然人禁入 */
     var ctx = { provinceAgents: S.listProvinces(), subAgents: S.listSubs(), quotaCfg: opts.quotaCfg || {} };
-    var v = R.validateProvinceAgent({ uid: uid, province: province, uscc: uscc, isNaturalPerson: !!payload.isNaturalPerson }, ctx);
+    var v = R.validateProvinceAgent({ uid: uid, province: province, uscc: uscc, isNaturalPerson: personal ? false : !!payload.isNaturalPerson }, ctx);
+
+    /* 主体落库字段：个人口径把实名人与注册手机号作为联络主体，企业字段留空待审核补齐 */
+    var realName = String(payload.realName || '').trim();
+    var mobile = String(payload.mobile || '').trim();
+    var altContact = String(payload.altContact || '').trim();
+    var altPhone = String(payload.altPhone || '').trim();
+    var remark = String(payload.remark || '').trim();
+    function branchOf() {
+      if (!personal) {
+        return { name: payload.companyName, uscc: uscc, license: payload.license,
+          legalRep: payload.legalRep, contact: payload.contact, phone: payload.phone || '' };
+      }
+      return { name: '', uscc: '', license: '', legalRep: realName, contact: realName, phone: mobile,
+        altContact: altContact, altPhone: altPhone };
+    }
+    function applicantOf() {
+      if (!personal) return null;
+      return { name: realName, mobile: mobile, altContact: altContact, altPhone: altPhone,
+        realnameAt: payload.realnameAt || 0, mode: 'personal' };
+    }
+    function materialsOf() {
+      if (!personal) return payload.materials || [];
+      return remark ? [remark] : [];
+    }
 
     /* M2-4 一公司一记录：已存在同 uscc 记录 → 复用（rejected/terminated 释放态回退 pending；
-       active/suspended/pending 直接冲突拦截，不新建重复记录） */
-    var existing = ctx.provinceAgents.find(function (a) {
-      return R.normalizeUscc(a.branchCompany && a.branchCompany.uscc) === uscc;
-    });
+       active/suspended/pending 直接冲突拦截，不新建重复记录）。
+       个人口径无 uscc，按 uid 归口（一账号一记录）。 */
+    var existing = personal
+      ? (ctx.provinceAgents.filter(function (a) { return a.uid === uid; })[0] || null)
+      : ctx.provinceAgents.find(function (a) {
+        return R.normalizeUscc(a.branchCompany && a.branchCompany.uscc) === uscc;
+      });
     if (existing) {
-      if (existing.status === 'active' || existing.status === 'suspended' || existing.status === 'pending') {
-        return { error: v.code === 'E_PROVINCE_TAKEN' ? 'E_PROVINCE_TAKEN' : 'E_USCC_DUPLICATE',
-          msg: v.ok ? '该公司已有在审/在册总代记录，不可重复提交' : v.msg };
+      if (existing.status === 'active' || existing.status === 'suspended') {
+        return { error: 'E_ALREADY_AGENT', msg: '当前账号已是' + (existing.province || '') + '在册省级总代' };
+      }
+      if (existing.status === 'pending') {
+        return { error: personal ? 'E_APPLY_PENDING' : (v.code === 'E_PROVINCE_TAKEN' ? 'E_PROVINCE_TAKEN' : 'E_USCC_DUPLICATE'),
+          msg: v.ok ? (personal ? '你的省代申请正在审核中，不可重复提交' : '该公司已有在审/在册总代记录，不可重复提交') : v.msg };
       }
       /* 释放态（rejected/terminated/revoked）：复用原记录回退 pending，保留 rejects 历史 */
       existing.status = 'pending';
       existing.rejectReason = '';
-      existing.branchCompany = {
-        name: payload.companyName, uscc: uscc, license: payload.license,
-        legalRep: payload.legalRep, contact: payload.contact, phone: payload.phone || ''
-      };
+      existing.branchCompany = branchOf();
+      existing.applicant = applicantOf();
+      existing.applyMode = personal ? 'personal' : 'company';
+      existing.remark = personal ? remark : '';
       existing.province = province;
-      existing.materials = payload.materials || [];
+      existing.materials = materialsOf();
       existing.statusLog = existing.statusLog || [];
       existing.statusLog.push({ operator: uid || 'self', at: Date.now(), reason: '补资料重新提交', fromStatus: existing.status, toStatus: 'pending' });
       var saved = S.saveProvince(existing);
@@ -87,12 +132,15 @@
       uid: uid,
       province: province,
       provinceCode: '',
-      branchCompany: { name: payload.companyName, uscc: uscc, license: payload.license, legalRep: payload.legalRep, contact: payload.contact, phone: payload.phone || '' },
+      branchCompany: branchOf(),
+      applicant: applicantOf(),
+      applyMode: personal ? 'personal' : 'company',
+      remark: personal ? remark : '',
       status: 'pending',
       appointedAt: 0, appointedBy: '', source: 'apply',
-      rejects: [], statusLog: [{ operator: uid || 'self', at: Date.now(), reason: '提交申请', fromStatus: '', toStatus: 'pending' }],
-      provinceHistory: [], sealedAt: 0, orgId: '', legalRep: payload.legalRep, admins: [],
-      materials: payload.materials || [], fee: 0 /* M2-1：fee 恒 0，无付费入口 */
+      rejects: [], statusLog: [{ operator: uid || 'self', at: Date.now(), reason: personal ? '个人实名提交省代申请' : '提交申请', fromStatus: '', toStatus: 'pending' }],
+      provinceHistory: [], sealedAt: 0, orgId: '', legalRep: personal ? realName : payload.legalRep, admins: [],
+      materials: materialsOf(), fee: 0 /* M2-1：fee 恒 0，无付费入口 */
     };
     var r = S.saveProvince(rec);
     if (r.error) return r;
@@ -277,49 +325,190 @@
     t._timer = setTimeout(function () { t.className = 'ag-toast'; }, 2400);
   }
 
-  /* M2-1 省级总代表单（¥0，无付费入口）；浏览器专用（M-11：内联红框校验） */
+  /* M2-1 省级总代表单 · 个人实名口径（¥0，无付费入口）；浏览器专用
+     页面：pages/profile/entry-form.html?type=provinceAgent
+     口径（2026-11）：不采集企业主体（分公司/营业执照/USCC/法人已全部去掉）。
+       实名 + 注册手机号由账户自动引用且只读；必填只有「意向授权省」；
+       备选联系人/电话与备注选填；主体资料留待审核阶段由商务经理补齐。
+     底部 .pa-dock 悬浮操作坞：联系商务经理 + 提交申请（固定于浏览窗底部）。 */
   function mountProvinceForm(container, opts) {
     if (typeof document === 'undefined' || !container) return;
     opts = opts || {};
-    var provinceOpts = PROVINCE_LIST.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
-    container.innerHTML =
-      '<section class="ag-card">'+
-        '<div class="ag-meta" style="margin-bottom:12px;">¥0 · 平台人工审核，不收取线上入驻费；一省独家授权，审核通过后开通。</div>'+
-        '<div id="pa-conflict" class="ag-banner-err" hidden>'+
-          '<svg class="ag-banner-err__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>'+
-          '<span id="pa-conflict-tx"></span>'+
-        '</div>'+
-        fieldRow('pa-co','分公司名称','请填写分公司/授权主体全称','text',true)+
-        fieldRow('pa-uscc','统一社会信用代码','18 位统一社会信用代码','text',true)+
-        fieldRow('pa-license','营业执照编号/上传凭证','缺此项将被拦截','text',true)+
-        fieldRow('pa-legal','法定代表人','执照登记法人姓名','text',true)+
-        fieldRow('pa-contact','联系人','必填','text',true)+
-        fieldRow('pa-phone','联系电话','选填','tel',false)+
-        '<div class="ag-field" id="f-pa-province"><label>意向授权省<span class="ag-req">*</span></label>'+
-        '<select id="pa-province" class="ag-input"><option value="">请选择省份</option>'+provinceOpts+'</select>'+
-        '<div class="ag-field-err"></div></div>'+
-        '<div class="ag-field"><label>公司资料（选填）</label>'+
-        '<textarea id="pa-materials" class="ag-input" rows="3" placeholder="补充说明资质/渠道/团队等，选填"></textarea></div>'+
-      '</section>'+
-      '<div id="pa-msg"></div>'+
-      '<div class="ag-actions"><button class="ag-btn ag-btn--primary btn-block" id="pa-submit">¥0 确认提交 · 等待审核</button></div>';
 
-    function fieldRow(id,label,ph,type,required){
-      return '<div class="ag-field" id="f-'+id+'"><label>'+label+(required?'<span class="ag-req">*</span>':'')+'</label>'+
-        '<input id="'+id+'" type="'+(type||'text')+'" class="ag-input" placeholder="'+ph+'">'+
-        '<div class="ag-field-err"></div></div>';
+    /* —— 账户身份（只读引用，不可在表单内改写） —— */
+    var u = {};
+    try { u = (window.DataBus && typeof DataBus.current === 'function') ? (DataBus.current() || {}) : {}; } catch (e) { u = {}; }
+    var rn = (u.auth && u.auth.realname) || {};
+    var uid = String(u.id || '');
+    var realnameOk = !!rn.ok;
+    var realName = String(rn.name || u.name || '').trim();
+    var mobileRaw = String(u.mobile || '').replace(/\D/g, '') || String(rn.mobile || '').replace(/\D/g, '');
+    var realnameAt = Number(rn.ts) || 0;
+    var formed = realnameOk && !!realName && !!mobileRaw;  /* 实名 + 手机号齐备才可提交 */
+
+    function sic(name) { return '<svg class="ic" aria-hidden="true"><use href="#i-' + name + '"/></svg>'; }
+    function fmtMobile(m) {
+      var d = String(m || '').replace(/\D/g, '');
+      return d.length === 11 ? d.slice(0, 3) + ' ' + d.slice(3, 7) + ' ' + d.slice(7) : String(m || '');
     }
-    function fieldError(id, show, msg) {
-      var wrap = container.querySelector('#f-' + id);
-      if (!wrap) return;
-      wrap.classList.toggle('ag-field--error', show);
-      var e = wrap.querySelector('.ag-field-err');
-      if (e) e.textContent = show ? (msg || '此项必填') : '';
+    function fmtDate(ts) {
+      if (!ts) return '—';
+      var d = new Date(ts);
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     }
-    /* M2-6 持久冲突红条：同省已有在册独家总代时留在表单上方，不随 toast 消失 */
+
+    /* 同账号唯一：个人口径按 uid 去重，已提交/已开通时给出常驻提示 */
+    var existing = null;
+    try {
+      var S = deps().S;
+      var rows = (S && typeof S.listProvinces === 'function') ? S.listProvinces() : [];
+      for (var i = 0; i < rows.length; i++) { if (rows[i] && rows[i].uid === uid) { existing = rows[i]; break; } }
+    } catch (e) { existing = null; }
+
+    var provinceOpts = PROVINCE_LIST.map(function (p) { return '<option value="' + escAttr(p) + '">' + escAttr(p) + '</option>'; }).join('');
+
+    /* —— 申请身份卡：已实名 → 只读展示；未实名 → 阻断态 + 去认证 —— */
+    var idBody;
+    if (formed) {
+      idBody =
+        '<div class="pa-idrow">' +
+          '<span class="pa-idrow-ic">' + sic('shield') + '</span>' +
+          '<div class="pa-idrow-main"><div class="pa-idrow-lb">实名主体</div><div class="pa-idrow-val">' + escAttr(realName) + '</div></div>' +
+          '<span class="pa-ok">' + sic('check') + '已实名</span>' +
+        '</div>' +
+        '<div class="pa-idrow">' +
+          '<span class="pa-idrow-ic">' + sic('phone') + '</span>' +
+          '<div class="pa-idrow-main"><div class="pa-idrow-lb">注册手机号</div><div class="pa-idrow-val">' + escAttr(fmtMobile(mobileRaw)) + '</div></div>' +
+        '</div>' +
+        '<div class="pa-hint">' + sic('info') + '<span>实名与手机号随账户自动带入，不可在此修改；如信息有误请前往 <a href="auth-personal.html">实名认证</a>。</span></div>';
+    } else if (!uid) {
+      idBody =
+        '<div class="pa-gate">' +
+          '<span class="pa-gate-ic">' + sic('alert') + '</span>' +
+          '<div class="pa-gate-main"><div class="pa-gate-title">尚未登录</div>' +
+          '<div class="pa-gate-sub">登录后自动引用账户实名与注册手机号。</div></div>' +
+          '<button type="button" class="pa-gate-btn" onclick="location.href=\'../auth/login.html\'">去登录</button>' +
+        '</div>';
+    } else {
+      idBody =
+        '<div class="pa-gate">' +
+          '<span class="pa-gate-ic">' + sic('alert') + '</span>' +
+          '<div class="pa-gate-main"><div class="pa-gate-title">未完成个人实名认证</div>' +
+          '<div class="pa-gate-sub">省代申请以实名主体发起，完成认证后即可提交。</div></div>' +
+          '<button type="button" class="pa-gate-btn" onclick="location.href=\'auth-personal.html\'">去实名认证</button>' +
+        '</div>' +
+        '<div class="pa-hint">' + sic('info') + '<span>实名信息仅用于主体核验，不会在申请页展示证件号码。</span></div>';
+    }
+
+    /* —— 已提交过：常驻提示（pending / active / suspended） —— */
+    var existNote = '';
+    if (existing && (existing.status === 'pending' || existing.status === 'active' || existing.status === 'suspended')) {
+      var stTxt = existing.status === 'active' ? '已开通' : (existing.status === 'suspended' ? '已暂停' : '审核中');
+      existNote =
+        '<section class="pa-card">' +
+          '<div class="pa-idrow" style="border-bottom:none;padding-bottom:2px;">' +
+            '<span class="pa-idrow-ic">' + sic('clock') + '</span>' +
+            '<div class="pa-idrow-main"><div class="pa-idrow-lb">本账号已有省代申请</div>' +
+            '<div class="pa-idrow-val" style="font-size:13px;">' + escAttr(existing.province || '—') + ' · ' + stTxt + '</div></div>' +
+            '<a class="pa-link" href="entry-review.html">查看进度</a>' +
+          '</div>' +
+        '</section>';
+    }
+
+    container.innerHTML =
+      '<div class="pa-form">' +
+        '<section class="pa-hero">' +
+          '<div class="pa-hero-top">' +
+            '<span class="pa-hero-eyebrow">' + sic('award') + '省级总代 · 一省独家</span>' +
+            '<span class="pa-hero-fee"><b>¥0</b><span>免费申请</span></span>' +
+          '</div>' +
+          '<div class="pa-hero-title">申请成为省级总代</div>' +
+          '<div class="pa-hero-sub">个人实名即可发起申请，企业主体资料由商务经理在审核阶段协助补齐。通过后开通本省独家授权。</div>' +
+          '<div class="pa-flow">' +
+            '<span class="pa-flow-step is-now"><span class="pa-flow-num">1</span>填写申请</span>' +
+            '<span class="pa-flow-line"></span>' +
+            '<span class="pa-flow-step"><span class="pa-flow-num">2</span>商务对接</span>' +
+            '<span class="pa-flow-line"></span>' +
+            '<span class="pa-flow-step"><span class="pa-flow-num">3</span>审核开通</span>' +
+          '</div>' +
+        '</section>' +
+        existNote +
+        '<section class="pa-card">' +
+          '<div class="pa-card-hd"><span class="pa-card-title">申请身份</span>' +
+            '<span class="pa-card-tag ' + (formed ? 'pa-card-tag--req' : '') + '">' + (formed ? '需实名' : '待完成') + '</span></div>' +
+          idBody +
+        '</section>' +
+        '<section class="pa-card">' +
+          '<div class="pa-card-hd"><span class="pa-card-title">备选联系方式</span><span class="pa-card-tag pa-card-tag--opt">选填</span></div>' +
+          '<div class="pa-field"><label for="pa-alt-contact">备选联系人</label>' +
+            '<input id="pa-alt-contact" type="text" maxlength="20" autocomplete="off" placeholder="如：合伙人姓名"></div>' +
+          '<div class="pa-field" id="w-pa-alt-phone"><label for="pa-alt-phone">备选电话</label>' +
+            '<input id="pa-alt-phone" type="tel" inputmode="numeric" maxlength="13" autocomplete="off" placeholder="11 位手机号"></div>' +
+          '<div class="pa-err pa-err--block" id="e-pa-alt-phone"></div>' +
+          '<div class="pa-hint">' + sic('info') + '<span>首选联系号码为注册手机号；备选号码仅在无人接听时使用。</span></div>' +
+        '</section>' +
+        '<section class="pa-card">' +
+          '<div class="pa-card-hd"><span class="pa-card-title">意向授权省</span><span class="pa-card-tag pa-card-tag--req">必选</span></div>' +
+          '<div id="pa-conflict" class="ag-banner-err" hidden>' +
+            '<svg class="ag-banner-err__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>' +
+            '<span id="pa-conflict-tx"></span>' +
+          '</div>' +
+          '<div class="pa-select-wrap" id="w-pa-province">' +
+            '<select id="pa-province" class="pa-select" aria-label="意向授权省"><option value="">请选择意向授权省</option>' + provinceOpts + '</select>' +
+          '</div>' +
+          '<div class="pa-err pa-err--block" id="e-pa-province"></div>' +
+          '<div class="pa-prov-note">' + sic('info') + '<span>一省仅授权一家，已被占用的省份不可重复开通。</span></div>' +
+        '</section>' +
+        '<section class="pa-card">' +
+          '<div class="pa-card-hd"><span class="pa-card-title">备注</span><span class="pa-card-tag pa-card-tag--opt">选填</span></div>' +
+          '<textarea id="pa-remark" class="pa-ta" maxlength="200" placeholder="可补充区域资源、渠道团队、合作计划等，便于商务经理评估"></textarea>' +
+          '<div class="pa-ta-count" id="pa-ta-count">0/200</div>' +
+        '</section>' +
+      '</div>';
+
+    /* —— 底部悬浮操作坞（挂在 .phone 上，等同窗口底部固定） —— */
+    var phone = container.closest ? container.closest('.phone') : null;
+    var prevDock = phone ? phone.querySelector('.pa-dock') : null;
+    if (prevDock) prevDock.parentNode.removeChild(prevDock);
+    var dock = el('<div class="pa-dock">' +
+      '<button type="button" class="pa-dock-contact" id="pa-contact">' + sic('headset') + '联系商务经理</button>' +
+      '<button type="button" class="pa-dock-submit" id="pa-submit">提交申请</button>' +
+    '</div>');
+    if (phone) phone.appendChild(dock);
+    function dropDock() { if (dock && dock.parentNode) dock.parentNode.removeChild(dock); }
+
+    var submitBtn = dock.querySelector('#pa-submit');
+    /* 未实名即锁定提交（点击仍给出口，避免灰按钮无反馈） */
+    if (!formed) { submitBtn.disabled = true; submitBtn.textContent = '请先完成实名认证'; }
+    else if (existing && (existing.status === 'pending' || existing.status === 'active' || existing.status === 'suspended')) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = existing.status === 'pending' ? '申请审核中'
+        : (existing.status === 'active' ? '本省省代已开通' : '省代账号已暂停');
+    }
+
+    var contactBtn = dock.querySelector('#pa-contact');
+    if (contactBtn) {
+      contactBtn.onclick = function () {
+        /* 复用既有客服弹窗，只把身份文案换成商务经理（不新建样式） */
+        if (window.UI && typeof UI.openKefu === 'function') UI.openKefu({ role: 'manager' });
+        else if (typeof window.openKefu === 'function') window.openKefu({ role: 'manager' });
+      };
+    }
+
+    /* —— 内联校验：红框 + 行下文案（错误码仍以引擎为准） —— */
+    function setProvErr(msg) {
+      var w = container.querySelector('#w-pa-province'), e = container.querySelector('#e-pa-province');
+      if (w) w.classList.toggle('is-err', !!msg);
+      if (e) e.textContent = msg || '';
+    }
+    function setPhoneErr(msg) {
+      var w = container.querySelector('#w-pa-alt-phone'), e = container.querySelector('#e-pa-alt-phone');
+      if (w) w.classList.toggle('is-err', !!msg);
+      if (e) e.textContent = msg || '';
+    }
+    /* M2-6 持久冲突红条：同省已有在册独家总代时留在表单内，不随 toast 消失 */
     function showConflict(msg) {
-      var box = container.querySelector('#pa-conflict');
-      var tx = container.querySelector('#pa-conflict-tx');
+      var box = container.querySelector('#pa-conflict'), tx = container.querySelector('#pa-conflict-tx');
       if (!box) return;
       if (tx) tx.textContent = msg;
       box.hidden = false;
@@ -328,54 +517,94 @@
       var box = container.querySelector('#pa-conflict');
       if (box) box.hidden = true;
     }
-    /* 输入即清除该项红框（保留原校验逻辑，错误码不变） */
-    ['pa-co','pa-uscc','pa-license','pa-legal','pa-contact','pa-phone','pa-province','pa-materials'].forEach(function(id){
-      var el=container.querySelector('#'+id);
-      if(!el) return;
-      var ev=(el.tagName==='SELECT')?'change':'input';
-      el.addEventListener(ev,function(){ fieldError(id,false); });
-    });
-    /* 重新选择省份即清除同省冲突持久红条（不再重复报错旧省） */
-    var provSel=container.querySelector('#pa-province');
-    if(provSel) provSel.addEventListener('change', hideConflict);
-    container.querySelector('#pa-submit').onclick=function(){
-      var payload = {
-        companyName:val('pa-co'), uscc:val('pa-uscc'), license:val('pa-license'),
-        legalRep:val('pa-legal'), contact:val('pa-contact'), phone:val('pa-phone'),
-        province:val('pa-province'), materials:[val('pa-materials')].filter(Boolean)
-      };
-      /* 前端先按必填项标红（显式字段→负载键，避免 undefined 误判），提交仍以错误码为准 */
-      var need = [
-        ['pa-co', 'companyName', '请填写分公司名称'],
-        ['pa-uscc', 'uscc', '请填写统一社会信用代码'],
-        ['pa-license', 'license', '请填写营业执照（缺执照拦截）'],
-        ['pa-legal', 'legalRep', '请填写法定代表人'],
-        ['pa-contact', 'contact', '请填写联系人'],
-        ['pa-province', 'province', '请选择意向授权省']
-      ];
-      need.forEach(function(n){ fieldError(n[0], false); });
-      need.forEach(function(n){ if (!String(payload[n[1]] || '').trim()) fieldError(n[0], true, n[2]); });
-      hideConflict();
-      var r=submitProvinceApplication(payload, { quotaCfg: opts.quotaCfg });
-      if(r.ok){
-        container.innerHTML='<div class="ag-card" style="text-align:center;padding:30px 16px;">'+
-          '<div class="ag-prov" style="margin-bottom:8px;">申请已提交 · 等待平台审核</div>'+
-          '<div class="ag-meta" style="line-height:1.8;">¥0 免费审核制 · 审核结果将在消息中心同步；省代为一省独家，通过后开通本省权益。</div>'+
-          '<div class="ag-actions" style="justify-content:center;margin-top:18px;"><button class="ag-btn ag-btn--primary" onclick="location.href=\'entry-review.html\'">查看申请进度</button>'
-          + '<button class="ag-btn ag-btn--ghost" onclick="location.href=\'entry.html\'">返回类型选择</button></div></div>';
-      } else {
-        /* M2-6 省独家冲突提示：仅页面提示，无短信/Push/邮件外发；失败结果走 error 字段，兼容 code */
-        var code = r.error || r.code;
-        var txt = code==='E_PROVINCE_TAKEN' ? '该省已独家授权，不可重复开通' : (r.msg||'提交失败');
-        applyToast(txt, false);
-        if (code === 'E_PROVINCE_TAKEN') {
-          showConflict('该省已有在册省级总代（省独家），不可重复开通；请更换意向授权省。');
-        }
-        /* 把后端返回的必填错误落到对应红框 */
-        var map = { E_COMPANY_EMPTY:'pa-co', E_USCC_EMPTY:'pa-uscc', E_LICENSE_REQUIRED:'pa-license',
-          E_LEGALREP_EMPTY:'pa-legal', E_CONTACT_EMPTY:'pa-contact', E_PROVINCE_REQUIRED:'pa-province' };
-        if (map[code]) fieldError(map[code], true, txt);
+
+    var provSel = container.querySelector('#pa-province');
+    if (provSel) {
+      provSel.addEventListener('change', function () { setProvErr(''); hideConflict(); });
+    }
+    var altPhone = container.querySelector('#pa-alt-phone');
+    if (altPhone) {
+      altPhone.addEventListener('input', function () {
+        /* 只留数字，便于逐位输入 */
+        var d = String(altPhone.value || '').replace(/\D/g, '').slice(0, 11);
+        if (this.value !== d) this.value = d;
+        setPhoneErr('');
+      });
+    }
+    var remark = container.querySelector('#pa-remark');
+    var count = container.querySelector('#pa-ta-count');
+    if (remark && count) {
+      remark.addEventListener('input', function () {
+        count.textContent = remark.value.length + '/200';
+      });
+    }
+
+    submitBtn.onclick = function () {
+      if (!formed) {
+        applyToast(!uid ? '请先登录后再申请' : '请先完成个人实名认证后再申请省代', false);
+        return;
       }
+      var province = val('pa-province');
+      var altC = val('pa-alt-contact');
+      var altP = val('pa-alt-phone');
+      var remarkTx = val('pa-remark');
+      setProvErr(''); setPhoneErr(''); hideConflict();
+
+      var bad = false;
+      if (!province) { setProvErr('请选择意向授权省'); bad = true; }
+      if (altP && !/^1[3-9]\d{9}$/.test(altP)) { setPhoneErr('请填写 11 位有效手机号'); bad = true; }
+      if (bad) {
+        var first = container.querySelector('.pa-select-wrap.is-err, .pa-field.is-err');
+        if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return;
+      }
+
+      submitBtn.disabled = true;
+      var r = submitProvinceApplication({
+        personal: true, uid: uid,
+        realnameOk: realnameOk, realName: realName, mobile: mobileRaw, realnameAt: realnameAt,
+        altContact: altC, altPhone: altP,
+        province: province, remark: remarkTx
+      }, { quotaCfg: opts.quotaCfg });
+
+      if (r && r.ok) {
+        dropDock();
+        var rec = (r.item || r.record || r.agent || r.data || {});
+        container.innerHTML =
+          '<section class="pa-card" style="padding:0">' +
+          '<div class="pa-done">' +
+            '<div class="pa-done-ic">' + sic('check') + '</div>' +
+            '<div class="pa-done-title">申请已提交</div>' +
+            '<div class="pa-done-sub">商务经理将在 1-3 个工作日内与你联系核验资料。¥0 免费审核，通过后开通本省独家授权。</div>' +
+            '<div class="pa-done-meta">' +
+              '<div class="pa-done-meta-row"><span>意向授权省</span><span>' + escAttr(province) + '</span></div>' +
+              '<div class="pa-done-meta-row"><span>申请主体</span><span>' + escAttr(realName) + '</span></div>' +
+              '<div class="pa-done-meta-row"><span>联系电话</span><span>' + escAttr(fmtMobile(mobileRaw)) + '</span></div>' +
+              '<div class="pa-done-meta-row"><span>提交时间</span><span>' + escAttr(fmtDate((rec && rec.createdAt) || Date.now())) + '</span></div>' +
+              '<div class="pa-done-meta-row"><span>当前状态</span><span>待审核</span></div>' +
+            '</div>' +
+            '<div class="pa-done-acts">' +
+              '<button type="button" class="ag-btn ag-btn--primary" onclick="location.href=\'entry-review.html\'">查看申请进度</button>' +
+              '<button type="button" class="ag-btn ag-btn--ghost" onclick="location.href=\'entry.html\'">返回入驻中心</button>' +
+            '</div>' +
+          '</div>' +
+          '</section>';
+        applyToast('申请已提交，等待平台审核', true);
+        return;
+      }
+
+      submitBtn.disabled = false;
+      var code = (r && (r.error || r.code)) || '';
+      var txt = (r && r.msg) || '提交失败';
+      if (code === 'E_PROVINCE_TAKEN') {
+        txt = '该省已独家授权，不可重复开通';
+        showConflict('该省已有在册省级总代（省独家），不可重复开通；请更换意向授权省。');
+      } else if (code === 'E_PROVINCE_REQUIRED') {
+        setProvErr(txt);
+      } else if (code === 'E_ALREADY_AGENT' || code === 'E_APPLY_PENDING') {
+        showConflict(txt);
+      }
+      applyToast(txt, false);
     };
   }
 
@@ -413,9 +642,12 @@
         mine.map(function (a) {
           var st = statusMap[a.status] || [a.status, ''];
           var rj = a.status === 'rejected' ? '<div class="ag-field-err" style="display:block;margin-top:6px;">驳回原因：' + (a.rejectReason || '—') + '</div>' : '';
-          /* D-3：驳回态补资料小表单（执照号/公司名/意向省），patch 合并后再重提；缺执照不再按钮失效 */
+          /* D-3：驳回态补资料小表单（执照号/公司名/意向省），patch 合并后再重提；缺执照不再按钮失效
+             个人实名口径无企业主体，不给执照补填表单，直接回到申请页重提（原记录复用回退 pending） */
           var patchForm = a.status === 'rejected'
-            ? '<div class="ag-field" style="margin-top:10px;"><label>营业执照编号（必填）</label>'
+            ? (a.applyMode === 'personal'
+              ? '<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary ag-btn--sm" href="entry-form.html?type=provinceAgent">重新提交申请</a></div>'
+              : '<div class="ag-field" style="margin-top:10px;"><label>营业执照编号（必填）</label>'
               + '<input id="rl-' + a.id + '" class="ag-input" placeholder="补填营业执照编号" value="' + escAttr(a.branchCompany && a.branchCompany.license || '') + '">'
               + '<div class="ag-field-err"></div></div>'
               + '<div class="ag-field"><label>公司名称</label>'
@@ -424,7 +656,7 @@
               + '<select id="rp-' + a.id + '" class="ag-input"><option value="">请选择省份</option>'
               + PROVINCE_LIST.map(function(p){return '<option value="'+p+'"'+(p===a.province?' selected':'')+'>'+p+'</option>';}).join('')
               + '</select><div class="ag-field-err"></div></div>'
-              + '<div class="ag-actions" style="margin-top:8px;"><button class="ag-btn ag-btn--primary ag-btn--sm" onclick="AgentApply._resubmitForm(\'' + a.id + '\')">补资料并重新提交</button></div>'
+              + '<div class="ag-actions" style="margin-top:8px;"><button class="ag-btn ag-btn--primary ag-btn--sm" onclick="AgentApply._resubmitForm(\'' + a.id + '\')">补资料并重新提交</button></div>')
             : '';
           /* P0-5：已生效卡补「进入工作台」CTA（suspended 仍可进入只读视图） */
           var activeCta = (a.status === 'active' || a.status === 'suspended')
@@ -432,8 +664,8 @@
             : '';
           return '<div class="ag-member" style="align-items:flex-start;flex-direction:column;gap:6px;">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;">' +
-            '<div class="ag-member__main"><div class="ag-member__name">' + (a.branchCompany && a.branchCompany.name || '—') + '</div>' +
-            '<div class="ag-member__sub">授权省：' + (a.province || '—') + '</div>' + rj + '</div>' +
+            '<div class="ag-member__main"><div class="ag-member__name">' + ((a.applicant && a.applicant.name) || (a.branchCompany && a.branchCompany.name) || '—') + '</div>' +
+            '<div class="ag-member__sub">授权省：' + (a.province || '—') + (a.applyMode === 'personal' ? ' · 个人实名申请' : '') + '</div>' + rj + '</div>' +
             '<span class="ag-badge ' + (st[1] || '') + '">' + st[0] + '</span></div>' +
             patchForm + activeCta + '</div>';
         }).join('') + '</section>';
