@@ -136,11 +136,11 @@ window.DETAIL = (function () {
       try { window.dispatchEvent(new CustomEvent('engchain-unlock-changed', { detail: o })); } catch (e) { }
     },
     _key: function (rec) { return (rec.bizKey || 'unknown') + '_' + rec.id; },
-    /* 有效期（天）：普通供需/合作永久；人才单条 7 天；建企转让保证金 30 天；简要类 7 天；-1 表示永久 */
+    /* 有效期（天）：普通供需/合作永久；人才单条 7 天；建企转让保证金 30 天；简要类（含收购意向）7 天；-1 表示永久 */
     _ttlDays: function (rec) {
       var bk = rec && rec.bizKey;
       if (bk === 'talent') return 7;
-      if (bk === 'trade') return 30;
+      if (bk === 'trade' && !(rec && rec.detailLevel === 'brief')) return 30;
       if (rec && rec.detailLevel === 'brief') return 7;
       return -1;
     },
@@ -2236,7 +2236,12 @@ window.DETAIL = (function () {
     var cons = (MOCK.business.credits || {}).consume || {};
     var key = rec && rec.bizKey;
     if (key === 'talent') return { price: cons.talent || 29, original: null, tiered: false, mode: 'credit' };
-    if (key === 'trade') return { price: (MOCK.business.credits || {}).tradeDeposit || 5000, original: null, tiered: false, mode: 'deposit' };
+    /* [收购意向付费墙] 建企买卖-需求（收购意向·简要类）与其他信息一致走积分解锁（consume.trade）；
+       建企转让-需求（详细类）保留保证金解锁（tradeDeposit） */
+    if (key === 'trade') {
+      if (rec && rec.detailLevel === 'brief') return { price: cons.trade || 198, original: null, tiered: false, mode: 'credit' };
+      return { price: (MOCK.business.credits || {}).tradeDeposit || 5000, original: null, tiered: false, mode: 'deposit' };
+    }
     /* [PHASE 0] agency 由免费留资改为积分解锁（98 积分，与主板块一致）；personnel 保持免费投递 */
     if (key === 'personnel') return { price: 0, original: null, tiered: false, mode: 'free' };
     if (key === 'agency') return { price: cons.agency || 98, original: null, tiered: false, mode: 'credit' };
@@ -2777,7 +2782,7 @@ window.DETAIL = (function () {
     var __demandExtras = '';
     if (resolved && resolved.typeKey === 'trade-demand') {
       __demandExtras = sec('收购意向说明',
-        '<div class="ds-text">收购意向为意向登记，不构成要约。对接转让经纪前需按平台规则冻结诚意保证金 <b>¥5,000</b>（成交可抵作交易款，未成交按规则解冻退还）。</div>' +
+        '<div class="ds-text">本项为收购方发布的收购 / 控股建筑企业意向登记，不构成要约。解锁后可查看发布方联系方式并与转让经纪对接；平台仅提供撮合与信息核验，不参与具体交易。</div>' +
         '<a class="demand-export-btn" href="../trade/index.html?openDelegate=1">联系转让经纪 · 了解收购流程</a>');
     } else if (resolved && resolved.typeKey === 'franchise-demand') {
       __demandExtras = sec('挂靠 / 合作说明',

@@ -2675,13 +2675,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     function row(k, v, note) {
       items.push({ k: k, v: v, note: note || '' });
     }
-    if (cat === '建企买卖' && role === 'demand') {
-      var dep = (biz && biz.tradeDeposit) || 5000;
-      var avail = (window.BalanceStore && BalanceStore.available) ? BalanceStore.available() : 0;
-      row('诚意保证金', '¥' + dep, '发布时冻结，用于过滤无效信息');
-      row('退回规则', '审核驳回原路解冻', '成交或下架后按平台规则退回');
-      row('当前可用余额', '¥' + avail.toFixed(2), avail < dep ? '余额不足，提交前请先充值' : '余额充足，可正常发布');
-    } else if (cat === '招聘' && role === 'demand') {
+    if (cat === '招聘' && role === 'demand') {
       var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 5;
       var used = (window.CreditStore && CreditStore.freeUsed) ? CreditStore.freeUsed() : 0;
       var left = Math.max(0, freeTotal - used);
@@ -2732,11 +2726,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var biz = (window.MOCK && MOCK.business && MOCK.business.credits) || {};
     var icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
     var html = '';
-    if (cat === '建企买卖' && role === 'demand') {
-      var dep = (biz && biz.tradeDeposit) || 5000;
-      html = icon + '<span>发布时将冻结诚意保证金 <b>¥' + dep + '</b>，审核不通过原路解冻</span>';
-      box.className = 'fee-preview show';
-    } else if (cat === '招聘' && role === 'demand') {
+    if (cat === '招聘' && role === 'demand') {
       var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 5;
       var cost = (biz && biz.consume) ? (biz.consume.talent || biz.consume.material || 98) : 98;
       html = icon + '<span>本月可免费发布 <b>' + freeTotal + '</b> 条，超出后 <b>' + cost + '</b> 积分/条</span>';
@@ -3852,9 +3842,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
      积分价格只取 consume.talent，不再回退 material；缺配置给显式默认 98。 */
   function inspectFee(cat, r) {
     var biz = (window.MOCK && MOCK.business && MOCK.business.credits) || {};
-    if (cat === '建企买卖' && r === 'demand') {
-      return { kind: 'deposit', dep: (biz && biz.tradeDeposit) || 5000 };
-    }
     if (cat === '招聘' && r === 'demand') {
       var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 3;
       var used = (window.CreditStore && CreditStore.freeUsed) ? CreditStore.freeUsed() : 0;
@@ -3924,17 +3911,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
        实际扣费（押金冻结/积分消耗）移到落库成功后执行。 */
     var biz = (window.MOCK && MOCK.business && MOCK.business.credits) || {};
     var feeNote = '';
-    if (data.category === '建企买卖' && role === 'demand') {
-      var dep = (biz && biz.tradeDeposit) || 5000;
-      var avail = (window.BalanceStore && BalanceStore.available) ? BalanceStore.available() : 0;
-      if (avail < dep) {
-        UI.toast('诚意保证金 ¥' + dep + '，当前可用余额 ¥' + avail.toFixed(2) + '，请先充值', 'warn');
-        if (confirm('发布建企买卖需求需冻结诚意保证金 ¥' + dep + '（审核不通过原路解冻）。当前可用余额不足，是否前往充值？')) {
-          location.href = '../wallet/index.html';
-        }
-        return;
-      }
-    } else if (data.category === '招聘' && role === 'demand') {
+    if (data.category === '招聘' && role === 'demand') {
       var freeTotal = (biz && biz.freeQuota && biz.freeQuota.monthly) || 5;
       var used = (window.CreditStore && CreditStore.freeUsed) ? CreditStore.freeUsed() : 0;
       if (used >= freeTotal) {
@@ -3990,15 +3967,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     if (!saved) { UI.toast('发布失败，请重试', 'err'); return; }
     /* P0-1：落库成功后才执行费用（先落库后收费）；执行异常仅提示，不影响已提交的信息 */
     try {
-      if (data.category === '建企买卖' && role === 'demand') {
-        var bs = (window.BalanceStore && BalanceStore.read) ? BalanceStore.read() : null;
-        if (bs) {
-          bs.frozen = Math.round((bs.frozen + dep) * 100) / 100;
-          bs.logs.unshift({ type: 'deposit', amount: -dep, method: 'freeze', reason: '建企买卖需求发布诚意保证金（冻结）', ts: Date.now(), status: 'frozen' });
-          BalanceStore.write(bs);
-        }
-        feeNote = '押金冻结';
-      } else if (data.category === '招聘' && role === 'demand') {
+      if (data.category === '招聘' && role === 'demand') {
         if (used >= freeTotal) {
           CreditStore.consume(cost, '招聘需求发布（超出免费额度）');
           feeNote = '消耗 ' + cost + ' 积分';
@@ -4017,7 +3986,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var channelHref = '';
     if (role === 'demand') {
       if (cat2 === '建企买卖') {
-        successDesc = '您的收购需求已提交，诚意保证金 ¥' + ((biz && biz.tradeDeposit) || 5000) + ' 已冻结。审核不通过将原路解冻，成交或下架后按平台规则退回。';
+        successDesc = '您的收购需求已提交，审核通过后将向转让企业 / 转让经纪展示收购意向，可前往建企买卖中心查看匹配的转让标的。';
         channelHref = '../trade/index.html';
       } else if (cat2 === '资质招商') {
         successDesc = '您的合作需求已提交，审核通过后将向资质方 / 招商企业展示您的合作意向。';
