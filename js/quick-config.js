@@ -30,7 +30,7 @@
     'invoice':       { id:'invoice',       n:'03', label:'发票管理', href:'../wallet/invoice.html' },
     'refund':        { id:'refund',        n:'04', label:'退款售后', href:'../refund/index.html' },
     'member':        { id:'member',        n:'05', label:'年度会员', href:'../wallet/membership.html' },
-    'upgrades':      { id:'upgrades',      n:'06', label:'增值道具', href:'../vendor/upgrades.html' },
+    'upgrades':      { id:'upgrades',      n:'06', label:'运营包', href:'../vendor/upgrades.html' },
     'match':         { id:'match',         n:'07', label:'智能推荐', href:'../match/preferences.html' },
     'esign':         { id:'esign',         n:'08', label:'电子签',   href:'../esign/index.html' },
     'monitor':       { id:'monitor',       n:'09', label:'企业监控', href:'../monitor/index.html' },

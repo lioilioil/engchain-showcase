@@ -1125,6 +1125,399 @@ window.MOCK = (function () {
       escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '[PHASE 0] 已下线：平台不提供资金托管', _phase0: true },
       demandExpireDays: 7
     },
+    /* ===== 身份感知运营包（服务商升级 v4） =====
+       设计口径：不是"卖道具"，而是按当前演示身份（个人 / 建筑企业 / 中介 / 区域代理）
+       给出「增强发布 + 系统推送 + 经营工具 + 专属服务」四柱一体包。
+       - plans[].features：四柱权益文案，key 供 OpsStore.hasFeature() 判权
+       - plans[].limits：可量化额度（置顶名额 / 线索条数 / AI 字数 / 电子签份数）
+       - plans[].toolKeys：工具面板解锁项（见 opsPackages.tools）
+       - 购买走 BalanceStore；置顶/线索额度写入 UpgradeStore，旧链路（seller-board / supply）自动生效
+       - 注册未实名 / 游客：展示个人线方案但不可购买；区域代理：随身份免费开通 */
+    opsPackages: {
+      version: '1.0',
+      trial: { enabled: true, days: 7, label: '7 天体验', note: '每个身份仅可体验一次，体验期内不自动续费' },
+      promo: { enabled: true, label: '首发立减', discount: 30, note: '首次开通专业版及以上运营包立减 ¥30，轻量版不参与' },
+      billing: {
+        monthly: { days: 30, label: '月付', unit: '/月' },
+        yearly: { days: 365, label: '年付', unit: '/年', freeMonths: 2, note: '年付立省 2 个月' }
+      },
+      trialLimits: { topSlots: 1, leadCredits: 5, aiWords: 15, esign: 0, seats: 1 },
+      groups: {
+        personal: {
+          key: 'personal', label: '个人经营者', short: '个人', identityLabel: '个人认证 · 个人入驻 · 个人合伙人',
+          headline: '让专业能力被看见，让每一次接单更高效',
+          sub: '围绕个人主页、项目机会与能力背书，组合成一整套轻量经营方案。',
+          needs: [
+            { icon: 'eye', title: '被更多雇主看到', desc: '主页与信息在搜索结果中优先展示', href: '../profile/index.html' },
+            { icon: 'briefcase', title: '接到匹配项目', desc: '项目机会、用工需求按能力精准触达', href: '../supply/list.html' },
+            { icon: 'shield', title: '沉淀能力背书', desc: '证书、履历、案例形成可信名片', href: '../profile/auth.html' }
+          ],
+          pushCats: ['项目机会', '用工需求', '资质政策', '价格行情'],
+          defaultPushCats: ['项目机会', '资质政策'],
+          manager: { name: '周顾问', title: '个人成长顾问', avatar: '周', hours: '09:00-21:00', sla: '4 小时内响应', phone: '400-880-6688 转 2' }
+        },
+        enterprise: {
+          key: 'enterprise', label: '建筑企业', short: '企业', identityLabel: '企业认证 · 建筑企业入驻',
+          headline: '把企业实力，变成持续的项目机会',
+          sub: '面向建筑企业：招标线索、企业展示、资质风控与经营数据，一条链路打通。',
+          needs: [
+            { icon: 'pin', title: '抢到优质项目', desc: '招标公告与采购需求按资质匹配推送', href: '../supply/list.html' },
+            { icon: 'company', title: '展示企业实力', desc: '资质、案例、团队在主页完整呈现', href: '../profile/index.html' },
+            { icon: 'alert', title: '守住资质与风险', desc: '资质到期、司法与经营异常及时预警', href: '../monitor/index.html' }
+          ],
+          pushCats: ['招标公告', '采购需求', '资质政策', '中标动态'],
+          defaultPushCats: ['招标公告', '资质政策'],
+          manager: { name: '李经理', title: '企业客户经理', avatar: '李', hours: '08:30-20:00', sla: '2 小时内响应', phone: '400-880-6688 转 1' }
+        },
+        agency: {
+          key: 'agency', label: '中介服务', short: '中介', identityLabel: '中介服务企业入驻',
+          headline: '更快接到询盘，更稳做好服务',
+          sub: '面向中介机构：需求抢单、精准线索、服务展示与合规经营，一套包解决获客与交付。',
+          needs: [
+            { icon: 'bolt', title: '抢到精准询盘', desc: '需求广场新需求实时提醒，先人一步', href: '../agency/seller-board.html' },
+            { icon: 'star', title: '提升服务曝光', desc: '服务置顶、案例展示与金牌标识', href: '../agency/seller-board.html' },
+            { icon: 'shield', title: '合规稳健经营', desc: '明码标价、资质与投诉风险提示', href: '../help/index.html' }
+          ],
+          pushCats: ['买家需求', '政策合规', '同行报价', '资质政策'],
+          defaultPushCats: ['买家需求', '政策合规'],
+          manager: { name: '陈顾问', title: '中介行业顾问', avatar: '陈', hours: '09:00-21:00', sla: '2 小时内响应', phone: '400-880-6688 转 3' }
+        },
+        agent: {
+          key: 'agent', label: '区域代理', short: '代理', identityLabel: '省级总代 · 二级合作',
+          headline: '区域经营，一屏统筹',
+          sub: '区域运营包随代理身份开通：区域项目、团队协同、政策推送与专属运营经理。',
+          needs: [
+            { icon: 'compass', title: '统筹区域项目', desc: '本省项目与政策一屏掌握', href: '../province-agent/uni/pages/home.html' },
+            { icon: 'users', title: '管理合作团队', desc: '二级合作公司活跃与分佣台账', href: '../province-agent/uni/pages/home.html' },
+            { icon: 'bell', title: '政策及时落地', desc: '住建政策与平台规则定向推送', href: '../industry/index.html' }
+          ],
+          pushCats: ['区域政策', '项目动态', '团队日报', '平台活动'],
+          defaultPushCats: ['区域政策', '团队日报'],
+          manager: { name: '王经理', title: '区域运营经理', avatar: '王', hours: '08:30-22:00', sla: '1 小时内响应', phone: '400-880-6688 转 0' }
+        },
+        registered: {
+          key: 'registered', label: '注册会员', short: '注册', identityLabel: '已注册 · 未实名',
+          headline: '先完成实名，再开启你的经营包',
+          sub: '实名认证后可发布信息、领取 7 天体验，并按个人身份匹配运营权益。',
+          needs: [
+            { icon: 'shield', title: '完成实名认证', desc: '解锁发布、沟通与交易基础能力', href: '../profile/auth.html' },
+            { icon: 'edit', title: '发布第一条信息', desc: '让有需要的人先找到你', href: '../publish/index.html' },
+            { icon: 'sparkle', title: '领取体验权益', desc: '实名后可免费体验 7 天专业版', href: '../profile/auth.html' }
+          ],
+          pushCats: ['平台公告', '资质政策', '活动通知'],
+          defaultPushCats: ['平台公告'],
+          manager: { name: '客服小链', title: '平台客服', avatar: '链', hours: '09:00-18:00', sla: '工作日 8 小时内响应', phone: '400-880-6688' }
+        },
+        guest: {
+          key: 'guest', label: '游客', short: '游客', identityLabel: '未登录',
+          headline: '登录后，看看为你匹配的运营包',
+          sub: '运营包按身份匹配。登录并完成认证，才能查看价格、领取体验并开通。',
+          needs: [
+            { icon: 'user', title: '登录 / 注册', desc: '保存你的身份与经营数据', href: '../auth/login.html' },
+            { icon: 'shield', title: '完成实名', desc: '解锁发布与沟通能力', href: '../auth/login.html' },
+            { icon: 'grid', title: '浏览全部功能', desc: '先了解平台能为你做什么', href: '../profile/all-functions.html' }
+          ],
+          pushCats: ['平台公告', '活动通知'],
+          defaultPushCats: ['平台公告'],
+          manager: { name: '客服小链', title: '平台客服', avatar: '链', hours: '09:00-18:00', sla: '工作日 8 小时内响应', phone: '400-880-6688' }
+        },
+        staff: {
+          key: 'staff', label: '平台运营', short: '运营', identityLabel: '平台内部 · 运营视角',
+          headline: '运营包配置总览',
+          sub: '内部账号不参与购买。可切换身份视角，预览各身份看到的方案、推送与服务。',
+          needs: [
+            { icon: 'grid', title: '查看身份方案', desc: '四个身份组、十档方案与权益', href: '#' },
+            { icon: 'bell', title: '核对推送内容', desc: '按身份检查推送模板与频次', href: '#' },
+            { icon: 'headset', title: '检查服务配置', desc: '专属顾问与 SLA 档位', href: '#' }
+          ],
+          pushCats: ['平台公告', '运营通知'],
+          defaultPushCats: ['平台公告'],
+          manager: { name: '运营值班', title: '平台运营', avatar: '运', hours: '全天', sla: '内部工单', phone: '内部通道' }
+        }
+      },
+      tools: {
+        dashboard: { name: '经营看板', desc: '曝光 · 询盘 · 成交全链路', icon: 'eye', href: '../vendor/dashboard.html' },
+        lead: { name: '项目 / 线索池', desc: '匹配项目与精准询盘', icon: 'briefcase',
+          hrefByGroup: { agency: '../agency/seller-board.html', enterprise: '../supply/list.html', personal: '../supply/list.html', agent: '../supply/list.html' },
+          href: '../supply/list.html' },
+        aiCopy: { name: 'AI 文案助手', desc: '生成标题、描述与标签', icon: 'sparkle', action: 'aiCopy' },
+        quote: { name: '报价单工具', desc: '快速生成可分享报价', icon: 'doc', action: 'quote' },
+        report: { name: '行业报告', desc: '区域行情与品类趋势', icon: 'file', href: '../industry/index.html' },
+        monitor: { name: '商机监控', desc: '招标、中标与竞对动态', icon: 'bell', href: '../monitor/index.html' },
+        esign: { name: '电子签', desc: '合同在线签署与归档', icon: 'edit', href: '../esign/index.html' },
+        crm: { name: '客户跟进', desc: '询盘线索状态与回访', icon: 'users', action: 'crm' },
+        team: { name: '团队与区域', desc: '合作团队、台账与分佣', icon: 'users', action: 'workbench' },
+        policy: { name: '政策库', desc: '住建政策与平台规则', icon: 'shield', action: 'policy' },
+        api: { name: '数据接口', desc: '项目与行情数据 API', icon: 'bolt', href: '../api/index.html' }
+      },
+      plans: [
+        /* ---------------- 个人经营者 ---------------- */
+        { key: 'p-lite', group: 'personal', name: '轻量版', tag: '先跑起来', price: 19, annualPrice: 190, days: 30, recommended: false,
+          blurb: '低成本试水：先被看见，再谈接单',
+          limits: { topSlots: 1, leadCredits: 0, aiWords: 20, esign: 0, seats: 1 },
+          toolKeys: ['report', 'aiCopy'],
+          features: {
+            publish: [
+              { k: 'publish.daily3', l: '每日 3 条高曝光发布', d: '基础曝光加权，优先进入搜索结果' },
+              { k: 'publish.topSlots', l: '1 个置顶名额', d: '任选一条信息在广场排序置前' },
+              { k: 'publish.template', l: '标准发布模板', d: '引导填写关键信息，减少无效内容' }
+            ],
+            push: [
+              { k: 'push.digest', l: '每日机会摘要', d: '每天 1 条与你能力匹配的机会汇总' },
+              { k: 'push.app', l: '站内推送', d: '消息中心实时查看' },
+              { k: 'push.cats1', l: '1 个品类订阅', d: '只接收最相关的一个品类' }
+            ],
+            service: [
+              { k: 'service.standard', l: '标准客服', d: '工作时间在线，工单 48 小时内处理' }
+            ]
+          } },
+        { key: 'p-pro', group: 'personal', name: '专业版', tag: '最受欢迎', price: 59, annualPrice: 590, days: 30, recommended: true,
+          blurb: '曝光、机会、工具一步到位',
+          limits: { topSlots: 3, leadCredits: 0, aiWords: 100, esign: 0, seats: 1 },
+          toolKeys: ['dashboard', 'lead', 'aiCopy', 'quote', 'report'],
+          features: {
+            publish: [
+              { k: 'publish.daily10', l: '每日 10 条高曝光发布', d: '平台优先索引，曝光显著提升' },
+              { k: 'publish.topSlots', l: '3 个置顶名额', d: '信息在供需广场排序置前' },
+              { k: 'publish.template', l: '高级发布模板', d: '结构化展示证书、履历与案例' },
+              { k: 'publish.urgent', l: '加急审核', d: '平均 30 分钟过审' },
+              { k: 'publish.badge', l: '主页认证标识', d: '个人主页展示专业认证徽章' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '实时机会推送', d: '符合条件的机会第一时间触达' },
+              { k: 'push.sms', l: '站内 + 短信双通道', d: '重要机会不漏接' },
+              { k: 'push.custom', l: '品类 / 区域订阅', d: '只推与你相关的机会' }
+            ],
+            service: [
+              { k: 'service.manager', l: '专属成长顾问', d: '1v1 顾问，4 小时内响应' },
+              { k: 'service.priority', l: '工单优先处理', d: '问题进入专属队列' }
+            ]
+          } },
+        { key: 'p-premium', group: 'personal', name: '尊享版', tag: '全力增长', price: 129, annualPrice: 1290, days: 30, recommended: false,
+          blurb: '把个人品牌做成长期资产',
+          limits: { topSlots: 10, leadCredits: 0, aiWords: 500, esign: 20, seats: 1 },
+          toolKeys: ['dashboard', 'lead', 'aiCopy', 'quote', 'report', 'monitor', 'esign', 'crm'],
+          features: {
+            publish: [
+              { k: 'publish.unlimited', l: '不限量发布', d: '按需发布，不再受每日条数限制' },
+              { k: 'publish.topSlots', l: '10 个置顶名额', d: '重点信息长期占据前排' },
+              { k: 'publish.video', l: '视频 / 多图展示', d: '用作品与现场说话' },
+              { k: 'publish.home', l: '首页推荐 1 次 / 月', d: '获得平台级曝光' },
+              { k: 'publish.gold', l: '金牌个人标识', d: '搜索结果与主页专属金色徽章' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '全渠道实时推送', d: '站内、短信、微信服务号' },
+              { k: 'push.wechat', l: '微信服务号推送', d: '公众号模板消息实时触达' },
+              { k: 'push.rival', l: '竞对动态', d: '关注同行价格与动态变化' },
+              { k: 'push.policy', l: '政策预警', d: '资质、继续教育与行业新规' },
+              { k: 'push.custom', l: '自定义推送策略', d: '频次、时段、品类全部可调' }
+            ],
+            service: [
+              { k: 'service.manager', l: '1v1 专属顾问', d: '30 分钟内响应，7×12 专线' },
+              { k: 'service.compliance', l: '内容合规审核', d: '发布前把关，降低违规风险' }
+            ]
+          } },
+        /* ---------------- 建筑企业 ---------------- */
+        { key: 'e-std', group: 'enterprise', name: '标准版', tag: '稳定获客', price: 199, annualPrice: 1990, days: 30, recommended: false,
+          blurb: '先把企业门面与项目入口搭起来',
+          limits: { topSlots: 2, leadCredits: 10, aiWords: 50, esign: 0, seats: 2 },
+          toolKeys: ['dashboard', 'lead', 'report', 'aiCopy'],
+          features: {
+            publish: [
+              { k: 'publish.daily10', l: '每日 10 条企业发布', d: '覆盖材料、设备、劳务与项目' },
+              { k: 'publish.topSlots', l: '2 个置顶名额', d: '重点项目优先展示' },
+              { k: 'publish.badge', l: '企业认证标识', d: '列表与主页展示认证状态' },
+              { k: 'publish.case', l: '资质 / 案例展示', d: '结构化呈现企业能力' }
+            ],
+            push: [
+              { k: 'push.match', l: '招标采购匹配', d: '按资质与区域匹配项目机会' },
+              { k: 'push.digest', l: '每日机会摘要', d: '每天早上汇总值得看的项目' },
+              { k: 'push.app', l: '站内推送', d: '消息中心实时查看' }
+            ],
+            service: [
+              { k: 'service.standard', l: '企业客服', d: '工作日 8 小时内响应' }
+            ]
+          } },
+        { key: 'e-pro', group: 'enterprise', name: '专业版', tag: '企业首选', price: 499, annualPrice: 4990, days: 30, recommended: true,
+          blurb: '招标线索实时达，经营工具全打通',
+          limits: { topSlots: 6, leadCredits: 30, aiWords: 200, esign: 20, seats: 3 },
+          toolKeys: ['dashboard', 'lead', 'report', 'aiCopy', 'quote', 'monitor', 'esign'],
+          features: {
+            publish: [
+              { k: 'publish.daily30', l: '每日 30 条企业发布', d: '多品类、多项目并行展示' },
+              { k: 'publish.topSlots', l: '6 个置顶名额', d: '重点项目持续占据前排' },
+              { k: 'publish.urgent', l: '加急审核', d: '紧急项目 30 分钟内过审' },
+              { k: 'publish.video', l: '视频 / 多图展示', d: '工程现场与案例更有说服力' },
+              { k: 'publish.case', l: '项目案例展示', d: '主页呈现业绩与资质' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '实时招标预警', d: '新招标第一时间推送' },
+              { k: 'push.sms', l: '站内 + 短信双通道', d: '重要项目不漏接' },
+              { k: 'push.custom', l: '区域 / 品类订阅', d: '按经营区域与服务能力筛选' }
+            ],
+            service: [
+              { k: 'service.manager', l: '专属客户经理', d: '2 小时内响应' },
+              { k: 'service.review', l: '季度经营复盘', d: '数据诊断 + 获客建议' }
+            ]
+          } },
+        { key: 'e-flagship', group: 'enterprise', name: '旗舰版', tag: '全域经营', price: 999, annualPrice: 9990, days: 30, recommended: false,
+          blurb: '品牌曝光、风控与多账号协作',
+          limits: { topSlots: 15, leadCredits: 100, aiWords: 1000, esign: 50, seats: 10 },
+          toolKeys: ['dashboard', 'lead', 'report', 'aiCopy', 'quote', 'monitor', 'esign', 'crm', 'api', 'policy'],
+          features: {
+            publish: [
+              { k: 'publish.unlimited', l: '不限量发布', d: '全品类、全项目自由发布' },
+              { k: 'publish.topSlots', l: '15 个置顶名额', d: '核心信息长期置顶' },
+              { k: 'publish.home', l: '首页品牌位', d: '平台首页固定曝光' },
+              { k: 'publish.gold', l: '金牌供应商标识', d: '搜索与推荐优先展示' },
+              { k: 'publish.priority', l: '优先推荐', d: '平台撮合与人工推荐优先' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '全渠道实时推送', d: '站内、短信、微信服务号' },
+              { k: 'push.wechat', l: '微信服务号推送', d: '公众号模板消息实时触达' },
+              { k: 'push.rival', l: '竞对 / 政策 / 中标监控', d: '三类关键动态一网打尽' },
+              { k: 'push.custom', l: '推送策略自定义', d: '按项目、区域、资质精细配置' }
+            ],
+            service: [
+              { k: 'service.manager', l: '1v1 客户成功', d: '30 分钟内响应，7×24 专线' },
+              { k: 'service.onsite', l: '季度线下拜访', d: '面对面经营诊断' },
+              { k: 'service.compliance', l: '合规审查', d: '资质与发布内容双重把关' }
+            ]
+          } },
+        /* ---------------- 中介服务 ---------------- */
+        { key: 'a-std', group: 'agency', name: '入门版', tag: '先接询盘', price: 299, annualPrice: 2990, days: 30, recommended: false,
+          blurb: '用线索包打开获客第一步',
+          limits: { topSlots: 2, leadCredits: 20, aiWords: 50, esign: 0, seats: 1 },
+          toolKeys: ['dashboard', 'lead', 'report', 'quote', 'aiCopy'],
+          features: {
+            publish: [
+              { k: 'publish.daily10', l: '每日 10 条服务发布', d: '资质代办、工商财税等多服务展示' },
+              { k: 'publish.topSlots', l: '2 个置顶名额', d: '主推服务优先展示' },
+              { k: 'publish.badge', l: '服务保障标识', d: '列表展示平台服务保障' },
+              { k: 'publish.case', l: '服务案例展示', d: '用成功案例建立信任' }
+            ],
+            push: [
+              { k: 'push.match', l: '需求广场匹配', d: '新需求按服务品类推送' },
+              { k: 'push.digest', l: '每日需求摘要', d: '每天汇总可承接需求' },
+              { k: 'push.app', l: '站内推送', d: '消息中心实时查看' }
+            ],
+            service: [
+              { k: 'service.standard', l: '标准客服', d: '工作日 8 小时内响应' }
+            ]
+          } },
+        { key: 'a-pro', group: 'agency', name: '专业版', tag: '中介首选', price: 699, annualPrice: 6990, days: 30, recommended: true,
+          blurb: '抢单更快，交付更稳',
+          limits: { topSlots: 6, leadCredits: 80, aiWords: 200, esign: 20, seats: 4 },
+          toolKeys: ['dashboard', 'lead', 'report', 'quote', 'aiCopy', 'monitor', 'esign', 'crm'],
+          features: {
+            publish: [
+              { k: 'publish.daily30', l: '每日 30 条服务发布', d: '多服务、多区域并行获客' },
+              { k: 'publish.topSlots', l: '6 个置顶名额', d: '主推服务持续占据前排' },
+              { k: 'publish.urgent', l: '加急审核', d: '新服务 30 分钟内上线' },
+              { k: 'publish.case', l: '服务案例置顶展示', d: '案例直接带来询盘' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '实时需求推送', d: '新需求第一时间触达' },
+              { k: 'push.sms', l: '站内 + 短信双通道', d: '高意向需求不漏接' },
+              { k: 'push.custom', l: '区域 / 服务品类订阅', d: '只推能接的需求' }
+            ],
+            service: [
+              { k: 'service.manager', l: '专属行业顾问', d: '2 小时内响应' },
+              { k: 'service.priority', l: '工单优先处理', d: '纠纷与合规问题优先' }
+            ]
+          } },
+        { key: 'a-flagship', group: 'agency', name: '旗舰版', tag: '规模化', price: 1299, annualPrice: 12990, days: 30, recommended: false,
+          blurb: '多坐席协作与同行监控',
+          limits: { topSlots: 15, leadCredits: 200, aiWords: 1000, esign: 50, seats: 10 },
+          toolKeys: ['dashboard', 'lead', 'report', 'aiCopy', 'quote', 'monitor', 'esign', 'crm', 'api', 'policy'],
+          features: {
+            publish: [
+              { k: 'publish.unlimited', l: '不限量发布', d: '多业务线自由铺量' },
+              { k: 'publish.topSlots', l: '15 个置顶名额', d: '核心服务长期置顶' },
+              { k: 'publish.home', l: '首页推荐', d: '平台首页服务推荐位' },
+              { k: 'publish.gold', l: '金牌中介标识', d: '搜索与派单优先' },
+              { k: 'publish.priority', l: '优先派单', d: '平台需求优先匹配' }
+            ],
+            push: [
+              { k: 'push.realtime', l: '全渠道实时推送', d: '站内、短信、微信服务号' },
+              { k: 'push.wechat', l: '微信服务号推送', d: '公众号模板消息实时触达' },
+              { k: 'push.rival', l: '竞对报价监控', d: '同城同行报价变化提醒' },
+              { k: 'push.custom', l: '需求热度预警', d: '区域需求升温即时提醒' }
+            ],
+            service: [
+              { k: 'service.manager', l: '1v1 客户成功', d: '30 分钟内响应，7×24 专线' },
+              { k: 'service.compliance', l: '合规陪跑', d: '明码标价与合同风险检查' },
+              { k: 'service.onsite', l: '月度线下服务', d: '团队培训与经营复盘' }
+            ]
+          } },
+        /* ---------------- 区域代理（随身份开通） ---------------- */
+        { key: 'ag-core', group: 'agent', name: '区域运营包', tag: '随身份开通', price: 0, annualPrice: 0, days: 365, recommended: true, included: true,
+          blurb: '区域项目、团队、政策与数据一站统筹',
+          limits: { topSlots: 5, leadCredits: 50, aiWords: 500, esign: 20, seats: 20 },
+          toolKeys: ['dashboard', 'lead', 'report', 'monitor', 'esign', 'crm', 'aiCopy', 'quote', 'team', 'policy', 'api'],
+          features: {
+            publish: [
+              { k: 'publish.region', l: '区域信息优先展示', d: '本省信息在区域频道优先露出' },
+              { k: 'publish.topSlots', l: '5 个区域置顶名额', d: '区域重点信息置顶' },
+              { k: 'publish.regionOp', l: '区域频道运营位', d: '本省频道专属运营入口' }
+            ],
+            push: [
+              { k: 'push.policy', l: '本省政策 / 项目推送', d: '住建政策与区域项目定向触达' },
+              { k: 'push.team', l: '团队日报', d: '合作公司活跃与业绩每日汇总' },
+              { k: 'push.region', l: '区域热度', d: '本省供需与价格热度变化' }
+            ],
+            service: [
+              { k: 'service.manager', l: '区域运营经理', d: '1 小时内响应' },
+              { k: 'service.channel', l: '省代专属通道', d: '政策、结算与团队问题直达' }
+            ]
+          } }
+      ],
+      /* 推送模板：{company}/{city}/{name} 在发送时替换为当前身份信息 */
+      pushTemplates: {
+        personal: [
+          { kind: '项目机会', title: '成都 · 房建项目寻找技术负责人', body: '「成都天府新区某商业综合体」正在组建项目班子，与你的一级建造师资质匹配，建议尽快查看。' },
+          { kind: '用工需求', title: '3 条新的用工需求与你匹配', body: '成都、绵阳两地新增 3 条项目管理岗位，薪资 18-30K，已按你的求职意向筛选。' },
+          { kind: '资质政策', title: '建造师继续教育政策更新', body: '住建部门发布新一期继续教育安排，未完成学时可能影响注册，请及时查看。' },
+          { kind: '价格行情', title: '本周成都建筑人才行情', body: '项目经理岗位均价环比上涨 4.2%，一级建造师证书补贴中位数 ¥1,800/月。' }
+        ],
+        enterprise: [
+          { kind: '招标公告', title: '四川省××医院改扩建工程招标', body: '项目预算 1.2 亿元，报名截止 11-08，要求建筑工程施工总承包贰级及以上，与你企业资质匹配。' },
+          { kind: '采购需求', title: '钢材集中采购询价', body: '成都某总包单位发布钢材集采询价，需求量约 3,200 吨，支持账期结算。' },
+          { kind: '中标动态', title: '成都××市政项目中标公示', body: '你关注的市政道路改造项目公布中标结果，中标价 8,600 万元，可查看中标单位与报价。' },
+          { kind: '资质政策', title: '建筑业资质动态核查提醒', body: '本月起开展资质动态核查，请确认人员社保与业绩材料齐全，避免影响投标。' }
+        ],
+        agency: [
+          { kind: '买家需求', title: '买家发布：成都二级资质代办', body: '买家需要建筑二级资质新办，预算 8-12 万，期望 45 天内完成，已开放报价。' },
+          { kind: '政策合规', title: '中介服务明码标价检查提醒', body: '平台将开展明码标价专项检查，请确认服务项目、价格与退费规则已完整公示。' },
+          { kind: '同行报价', title: '同城 3 家机构更新了服务报价', body: '成都区域资质代办服务均价下调 6%，建议关注并调整你的服务包。' },
+          { kind: '资质政策', title: '造价咨询资质政策更新', body: '住建部门发布工程造价咨询企业信用评价新规，涉及备案与执业人员要求。' }
+        ],
+        agent: [
+          { kind: '区域政策', title: '四川省住建厅发布新版资质标准', body: '新版标准对总承包资质人员与业绩提出新要求，请同步给本省合作公司。' },
+          { kind: '项目动态', title: '本周区域新增 26 条项目信息', body: '成都、绵阳、宜宾三地新增项目信息 26 条，其中 8 条与你区域重点品类匹配。' },
+          { kind: '团队日报', title: '3 家二级合作公司本周活跃', body: '本周团队新增跟进项目 12 个，成交 2 单，分佣台账已更新。' },
+          { kind: '平台活动', title: '区域运营激励计划开放报名', body: '本月区域新增有效企业可获额外返佣，报名截止 11-10。' }
+        ],
+        registered: [
+          { kind: '平台公告', title: '完成实名认证，解锁发布能力', body: '实名后可发布供需信息、领取 7 天专业版体验，并查看为你匹配的运营包。' },
+          { kind: '资质政策', title: '个人执业资格政策速递', body: '本周住建领域新规汇总，完成实名后可订阅精准政策提醒。' }
+        ],
+        guest: [
+          { kind: '平台公告', title: '工程链运营包上线', body: '按身份匹配的发布、推送、工具与服务方案已上线，登录后查看你的专属方案。' }
+        ],
+        staff: [
+          { kind: '运营通知', title: '运营包配置已更新', body: '四个身份组、十档方案已同步，请检查推送模板与服务 SLA。' }
+        ]
+      },
+      faqs: [
+        { q: '运营包和以前的置顶、线索包有什么区别？', a: '运营包是按身份组合的一整套经营方案，包含增强发布、系统推送、经营工具与专属服务；置顶、线索包等单项道具仍可在「按需加购」中单独购买，已购额度与运营包额度合并计算。' },
+        { q: '开通后什么时候生效？', a: '支付成功后立即生效。置顶名额与线索额度会同步写入你的权益账户，可在「我的权益」或对应工作台直接使用。' },
+        { q: '可以升级或续费吗？', a: '可以。升级按剩余价值抵扣差价，剩余周期重新计算；续费在当前到期日基础上顺延，额度同步补充。' },
+        { q: '7 天体验会自动扣费吗？', a: '不会。体验包不绑定支付方式、不自动续费，到期后自动回到未开通状态，可随时再选择正式方案。' },
+        { q: '推送太频繁可以调整吗？', a: '可以。在「智能推送」中可设置频次、渠道、品类、区域与免打扰时段；低档方案仅支持站内推送与每日摘要。' },
+        { q: '虚拟权益可以退款吗？', a: '运营包为虚拟服务，开通后即时生效。如因平台原因未生效，可在订单中发起退款申请，平台 1 个工作日内审核；已消耗的置顶名额与线索额度不支持退款。' }
+      ]
+    },
     /* 企业关注/监控（P0-7.1） */
     monitor: {
       dimensions: ['资质到期', '项目更新', '中标', '司法', '经营异常', '工商变更'],

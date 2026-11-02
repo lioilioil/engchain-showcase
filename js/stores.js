@@ -1809,6 +1809,696 @@
     return out;
   };
 
+  /* ---- 身份感知运营包 OpsStore（服务商升级 v4） ----
+     键 engchain-ops，按 uid 隔离；一个身份同一时间只有一份生效中的订阅。
+     数据：sub / history / push / pushLog / tickets / chat / usage / trialUsed / meta
+     与旧链路关系：
+       - 置顶名额、线索条数不新建配额体系，直接写入 UpgradeStore（fromOps 标记），
+         supply/list 排序、seller-board 精准解锁无需改动即可消费；
+       - 资金统一走 BalanceStore.consume / refund；
+       - 系统推送走 DataBus.pushDirectMessage，消息中心按 targetUid 可见。
+     判权：hasFeature(key) / hasTool(toolKey) / limit(key) —— 供 dashboard、seller-board 等页面复用。 */
+  var OpsStore = makeStore('engchain-ops', { byUid: {} }, 'engchain:ops');
+
+  OpsStore.cfg = function () {
+    return (MOCK.business && MOCK.business.opsPackages) || {};
+  };
+  OpsStore.group = function () {
+    var DB = window.DataBus;
+    if (DB && typeof DB.isGuest === 'function' && DB.isGuest()) return 'guest';
+    if (DB && typeof DB.isPlatformStaff === 'function' && DB.isPlatformStaff()) return 'staff';
+    var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
+    if (idy.agent && idy.agent.active) return 'agent';
+    if (idy.enterprise === 'resident') return (idy.entryTypes || []).indexOf('agency') >= 0 ? 'agency' : 'enterprise';
+    if (idy.enterprise === 'verified') return 'enterprise';
+    if (idy.personal === 'professional' || idy.personal === 'partner' || idy.personal === 'full' || idy.partner) return 'personal';
+    if (idy.personal === 'verified') return 'personal';
+    return 'registered';
+  };
+  OpsStore.groupMeta = function (g) {
+    var cfg = this.cfg();
+    return (cfg.groups || {})[g || this.group()] || {};
+  };
+  OpsStore.plansFor = function (g) {
+    var cfg = this.cfg();
+    g = g || this.group();
+    if (g === 'registered' || g === 'guest') g = 'personal';
+    return (cfg.plans || []).filter(function (p) { return p.group === g; });
+  };
+  OpsStore.plan = function (key) {
+    var arr = this.cfg().plans || [];
+    for (var i = 0; i < arr.length; i++) if (arr[i].key === key) return arr[i];
+    return null;
+  };
+  OpsStore.recommendedPlan = function (g) {
+    var arr = this.plansFor(g);
+    for (var i = 0; i < arr.length; i++) if (arr[i].recommended) return arr[i];
+    return arr[0] || null;
+  };
+  OpsStore.toolsCatalog = function () { return this.cfg().tools || {}; };
+  OpsStore.manager = function (g) { return this.groupMeta(g).manager || {}; };
+  OpsStore._uid = function () {
+    try {
+      if (window.DataBus && typeof DataBus.current === 'function') { var u = DataBus.current(); return u ? u.id : ''; }
+      if (window.UI && UI.currentUserId) return UI.currentUserId();
+    } catch (e) {}
+    return '';
+  };
+  OpsStore._defaultPush = function (g) {
+    var meta = this.groupMeta(g);
+    return {
+      enabled: true,
+      frequency: 'daily',
+      channels: { app: true, sms: false, wechat: false },
+      cats: (meta.defaultPushCats || []).slice(),
+      region: '',
+      quiet: { from: '22:00', to: '08:00' },
+      autoDemo: false
+    };
+  };
+  OpsStore._ensure = function (s, uid) {
+    if (!s.byUid) s.byUid = {};
+    var g = this.group();
+    if (!s.byUid[uid]) {
+      s.byUid[uid] = {
+        sub: null, history: [], push: this._defaultPush(g), pushLog: [],
+        tickets: [], chat: [], usage: {}, trialUsed: {}, meta: {}
+      };
+    }
+    var r = s.byUid[uid];
+    if (!Array.isArray(r.history)) r.history = [];
+    if (!Array.isArray(r.pushLog)) r.pushLog = [];
+    if (!Array.isArray(r.tickets)) r.tickets = [];
+    if (!Array.isArray(r.chat)) r.chat = [];
+    if (!r.usage) r.usage = {};
+    if (!r.trialUsed) r.trialUsed = {};
+    if (!r.meta) r.meta = {};
+    if (!r.push) r.push = this._defaultPush(g);
+    if (!r.push.channels) r.push.channels = { app: true, sms: false, wechat: false };
+    if (!r.push.quiet) r.push.quiet = { from: '22:00', to: '08:00' };
+    if (!Array.isArray(r.push.cats)) r.push.cats = [];
+    return r;
+  };
+  OpsStore.rec = function () {
+    var uid = this._uid();
+    var s = this.read();
+    var r = this._ensure(s, uid);
+    return { uid: uid, rec: r, state: s };
+  };
+  OpsStore._writeRec = function (state, uid, rec) {
+    state.byUid[uid] = rec;
+    return this.write(state);
+  };
+  OpsStore._active = function (sub) {
+    return !!(sub && sub.status === 'active' && sub.expireAt > Date.now());
+  };
+  OpsStore.current = function () {
+    var r = this.rec();
+    var sub = r.rec.sub;
+    if (!this._active(sub)) return null;
+    /* 随代理身份开通的运营包在身份终止后即时失效：回收未使用额度并清空订阅，
+       避免演示场景从「代理生效」切到「已终止」后仍残留区域包权益 */
+    var plan = this.plan(sub.planKey);
+    if (sub.source === 'included' && plan && plan.included && plan.group === 'agent' && this.group() !== 'agent') {
+      this._removeUnused(sub.planKey, 0);
+      r.rec.sub = null;
+      r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+      this._writeRec(r.state, r.uid, r.rec);
+      return null;
+    }
+    return sub;
+  };
+  OpsStore.lastSub = function () { return this.rec().rec.sub || null; };
+  OpsStore.planOf = function (sub) {
+    if (!sub) return null;
+    var p = this.plan(sub.planKey);
+    if (!p) return null;
+    var out = {};
+    for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k)) out[k] = p[k];
+    out.limits = Object.assign({}, p.limits || {}, sub.limits || {});
+    out._trial = !!sub.trial;
+    return out;
+  };
+  OpsStore.activePlan = function () { return this.planOf(this.current()); };
+  OpsStore.hasFeature = function (key) {
+    var plan = this.activePlan();
+    if (!plan) return false;
+    var pillars = ['publish', 'push', 'service'];
+    for (var i = 0; i < pillars.length; i++) {
+      var arr = (plan.features && plan.features[pillars[i]]) || [];
+      for (var j = 0; j < arr.length; j++) if (arr[j].k === key) return true;
+    }
+    return false;
+  };
+  OpsStore.entitled = function (key) { return this.hasFeature(key); };
+  OpsStore.hasTool = function (toolKey) {
+    var plan = this.activePlan();
+    return !!(plan && (plan.toolKeys || []).indexOf(toolKey) >= 0);
+  };
+  OpsStore.limit = function (key) {
+    var plan = this.activePlan();
+    return plan ? (plan.limits[key] || 0) : 0;
+  };
+  OpsStore.usage = function (key) { return this.rec().rec.usage[key] || 0; };
+  OpsStore.daysLeft = function (sub) {
+    sub = sub || this.current();
+    if (!sub) return 0;
+    return Math.max(0, Math.ceil((sub.expireAt - Date.now()) / 86400000));
+  };
+  OpsStore.progress = function (sub) {
+    sub = sub || this.current();
+    if (!sub || !sub.startedAt || !sub.days) return 0;
+    var total = sub.days * 86400000;
+    var used = Math.max(0, Math.min(total, Date.now() - sub.startedAt));
+    return Math.round(used / total * 100);
+  };
+  OpsStore.promoAvailable = function () { return !this.rec().rec.meta.promoUsed; };
+  OpsStore.priceFor = function (plan, billing) {
+    if (!plan) return 0;
+    var p = billing === 'yearly' ? (plan.annualPrice || plan.price * 10) : plan.price;
+    var cfg = this.cfg();
+    var off = (cfg.promo && cfg.promo.discount) || 0;
+    /* 立减不把小额方案打成 0 元：方案价需高于立减额才可用 */
+    if (p > 0 && cfg.promo && cfg.promo.enabled && this.promoAvailable() && p > off) {
+      p = Math.round((p - off) * 100) / 100;
+    }
+    return p;
+  };
+  OpsStore.billingDays = function (plan, billing) {
+    var cfg = this.cfg();
+    var b = (cfg.billing || {})[billing] || {};
+    return b.days || plan.days || 30;
+  };
+  OpsStore.trialEligible = function () {
+    var cfg = this.cfg();
+    if (!cfg.trial || !cfg.trial.enabled) return false;
+    var g = this.group();
+    if (['personal', 'enterprise', 'agency'].indexOf(g) < 0) return false;
+    var r = this.rec().rec;
+    return !r.trialUsed[g] && !this.current();
+  };
+  OpsStore._id = function (prefix) { return (prefix || 'OPS') + Date.now() + Math.floor(Math.random() * 900 + 100); };
+  OpsStore._orderNo = function () {
+    var d = new Date();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return 'OP' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + z(d.getHours()) + z(d.getMinutes()) + Math.floor(Math.random() * 90 + 10);
+  };
+  /* 把运营包额度写入旧道具账：置顶名额逐条建 topListing，线索额度建一条 leadPack（均带 fromOps 标记） */
+  OpsStore._grant = function (limits, expireAt, source) {
+    var topN = limits.topSlots || 0;
+    var leadN = limits.leadCredits || 0;
+    if (!topN && !leadN) return;
+    var now = Date.now();
+    var s = UpgradeStore.read();
+    var k;
+    for (k = 0; k < topN; k++) {
+      s.items.unshift({
+        id: 'OPST' + now + k + Math.floor(Math.random() * 90 + 10),
+        type: 'topListing', targetId: '', startedAt: 0, expireAt: expireAt,
+        count: 0, used: 0, status: 'active', purchasedAt: now, fromOps: source || ''
+      });
+    }
+    if (leadN > 0) {
+      s.items.unshift({
+        id: 'OPSL' + now + Math.floor(Math.random() * 90 + 10),
+        type: 'leadPack', targetId: '', startedAt: now, expireAt: expireAt,
+        count: leadN, used: 0, status: 'active', purchasedAt: now, fromOps: source || ''
+      });
+    }
+    UpgradeStore.write(s);
+  };
+  OpsStore._removeUnused = function (source, keepCount) {
+    /* 开通/续费前回收尚未使用的旧额度，避免叠加成无限配额；source 传 '*' 时清全部运营包额度，
+       保留 keepCount 个置顶名额与已消耗记录 */
+    var s = UpgradeStore.read();
+    var kept = 0;
+    s.items = (s.items || []).filter(function (it) {
+      if (!it.fromOps) return true;
+      if (source !== '*' && it.fromOps !== source) return true;
+      if (it.type === 'topListing' && !it.targetId && (it.used || 0) === 0) {
+        if (kept < keepCount) { kept++; return true; }
+        return false;
+      }
+      if (it.type === 'leadPack' && (it.used || 0) === 0) return false;
+      return true;
+    });
+    UpgradeStore.write(s);
+  };
+  OpsStore._push = function (title, body, kind) {
+    var uid = this._uid();
+    var entry = { id: this._id('PSH'), title: title, body: body, kind: kind || '系统', ts: Date.now(), read: false };
+    var r = this.rec();
+    r.rec.pushLog.unshift(entry);
+    r.rec.pushLog = r.rec.pushLog.slice(0, 30);
+    r.rec.usage.pushCount = (r.rec.usage.pushCount || 0) + 1;
+    this._writeRec(r.state, r.uid, r.rec);
+    try { if (window.DataBus && DataBus.pushDirectMessage) DataBus.pushDirectMessage(uid, title, body); } catch (e) {}
+    return entry;
+  };
+  OpsStore._fill = function (tpl) {
+    var u = null;
+    try { u = window.DataBus && DataBus.current ? DataBus.current() : null; } catch (e) {}
+    var company = (u && u.company) || '你的企业';
+    var city = '成都';
+    try {
+      var ent = (window.AuthStore && AuthStore.read().enterprise) || {};
+      if (ent.region) city = String(ent.region).split('·').pop() || city;
+      if (u && u.entry && u.entry.address && u.entry.address.city) city = u.entry.address.city;
+    } catch (e) {}
+    var name = (u && u.name) || '你';
+    return String(tpl || '').replace(/\{company\}/g, company).replace(/\{city\}/g, city).replace(/\{name\}/g, name);
+  };
+  OpsStore._welcomePush = function (plan) {
+    var lines = [];
+    if (plan.features && plan.features.publish && plan.features.publish[0]) lines.push('发布：' + plan.features.publish[0].l);
+    if (plan.features && plan.features.push && plan.features.push[0]) lines.push('推送：' + plan.features.push[0].l);
+    if (plan.toolKeys && plan.toolKeys.length) lines.push('工具：' + plan.toolKeys.length + ' 项已解锁');
+    if (plan.features && plan.features.service && plan.features.service[0]) lines.push('服务：' + plan.features.service[0].l);
+    this._push('运营包已生效 · ' + plan.name, lines.join('；') + '。额度已发放至你的权益账户，可直接使用。', '运营包');
+  };
+  OpsStore.subscribe = function (planKey, billing) {
+    billing = billing === 'yearly' ? 'yearly' : 'monthly';
+    var g = this.group();
+    if (g === 'guest') return { error: '请先登录' };
+    if (g === 'staff') return { error: '平台内部账号不参与购买' };
+    if (g === 'registered') return { error: '完成实名认证后可开通运营包' };
+    var plan = this.plan(planKey);
+    if (!plan) return { error: '方案不存在' };
+    if (plan.group !== g) return { error: '该方案不适用于当前身份' };
+    if (this.current()) return { error: '已有生效中的运营包，请选择续费或升级' };
+    var price = this.priceFor(plan, billing);
+    if (price > 0) {
+      var consumed = BalanceStore.consume(price, 'ops', { remark: '开通运营包 · ' + plan.name + '（' + ((this.cfg().billing || {})[billing] || {}).label + '）' });
+      if (!consumed) return { error: '余额不足，请先充值' };
+    }
+    var now = Date.now();
+    var days = this.billingDays(plan, billing);
+    var sub = {
+      id: this._id('SUB'), planKey: plan.key, group: g, name: plan.name,
+      billing: billing, price: price, listPrice: billing === 'yearly' ? plan.annualPrice : plan.price,
+      days: days, startedAt: now, expireAt: now + days * 86400000,
+      autoRenew: true, status: 'active', source: 'purchase', orderNo: this._orderNo(),
+      limits: Object.assign({}, plan.limits || {})
+    };
+    var r = this.rec();
+    r.rec.sub = sub;
+    if (price > 0) r.rec.meta.promoUsed = true;
+    r.rec.history.unshift({ id: sub.id, kind: 'subscribe', planKey: plan.key, planName: plan.name, amount: price, ts: now, days: days, note: '开通 ' + ((this.cfg().billing || {})[billing] || {}).label, orderNo: sub.orderNo, status: 'paid' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    this._removeUnused('*', 0);
+    this._grant(sub.limits, sub.expireAt, plan.key);
+    this._welcomePush(plan);
+    return { ok: true, sub: sub, price: price, plan: plan };
+  };
+  OpsStore.startTrial = function () {
+    if (!this.trialEligible()) return { error: '当前身份暂不可领取体验包' };
+    var g = this.group();
+    var plan = this.recommendedPlan(g);
+    if (!plan) return { error: '暂无可体验方案' };
+    var cfg = this.cfg();
+    var days = (cfg.trial && cfg.trial.days) || 7;
+    var limits = Object.assign({}, cfg.trialLimits || plan.limits || {});
+    var now = Date.now();
+    var sub = {
+      id: this._id('TRL'), planKey: plan.key, group: g, name: plan.name,
+      billing: 'monthly', price: 0, listPrice: 0, days: days,
+      startedAt: now, expireAt: now + days * 86400000,
+      autoRenew: false, status: 'active', source: 'trial', trial: true,
+      orderNo: this._orderNo(), limits: limits
+    };
+    var r = this.rec();
+    r.rec.sub = sub;
+    r.rec.trialUsed[g] = true;
+    r.rec.history.unshift({ id: sub.id, kind: 'trial', planKey: plan.key, planName: plan.name + ' · 体验', amount: 0, ts: now, days: days, note: '7 天免费体验', orderNo: sub.orderNo, status: 'trial' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    this._grant(limits, sub.expireAt, 'trial');
+    this._push('7 天体验已开启 · ' + plan.name, '体验期内可使用核心权益，不自动续费。到期前可随时转正式方案，已产生的数据会保留。', '体验');
+    return { ok: true, sub: sub, plan: plan };
+  };
+  OpsStore.activateIncluded = function () {
+    var g = this.group();
+    if (g !== 'agent') return { error: '当前身份无随附运营包' };
+    if (this.current()) return { ok: true, sub: this.current(), existing: true };
+    var plan = this.recommendedPlan(g);
+    if (!plan) return { error: '方案不存在' };
+    var now = Date.now();
+    var days = plan.days || 365;
+    var sub = {
+      id: this._id('INC'), planKey: plan.key, group: g, name: plan.name,
+      billing: 'yearly', price: 0, listPrice: 0, days: days,
+      startedAt: now, expireAt: now + days * 86400000,
+      autoRenew: true, status: 'active', source: 'included',
+      orderNo: this._orderNo(), limits: Object.assign({}, plan.limits || {})
+    };
+    var r = this.rec();
+    r.rec.sub = sub;
+    r.rec.history.unshift({ id: sub.id, kind: 'included', planKey: plan.key, planName: plan.name, amount: 0, ts: now, days: days, note: '随代理身份开通', orderNo: sub.orderNo, status: 'paid' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    this._removeUnused('*', 0);
+    this._grant(sub.limits, sub.expireAt, plan.key);
+    this._push('区域运营包已开通', '区域项目、团队台账、政策推送与数据工具已就绪，可在运营包页查看。', '运营包');
+    return { ok: true, sub: sub };
+  };
+  /* 体验转正：体验计划与正式方案同 key，但价格/周期/额度按正式方案重算；体验期剩余时间不折现 */
+  OpsStore.convertTrial = function (billing) {
+    billing = billing === 'yearly' ? 'yearly' : 'monthly';
+    var sub = this.current();
+    if (!sub || !sub.trial) return { error: '当前不在体验期' };
+    var plan = this.plan(sub.planKey);
+    if (!plan) return { error: '方案不存在' };
+    var price = this.priceFor(plan, billing);
+    if (price > 0) {
+      var consumed = BalanceStore.consume(price, 'ops', { remark: '体验转正式 · ' + plan.name });
+      if (!consumed) return { error: '余额不足，请先充值' };
+    }
+    var now = Date.now();
+    var days = this.billingDays(plan, billing);
+    var oldLimits = sub.limits || {};
+    sub.trial = false;
+    sub.source = 'purchase';
+    sub.billing = billing;
+    sub.price = price;
+    sub.days = days;
+    sub.startedAt = now;
+    sub.expireAt = now + days * 86400000;
+    sub.autoRenew = true;
+    sub.status = 'active';
+    sub.limits = Object.assign({}, plan.limits || {});
+    var r = this.rec();
+    r.rec.sub = sub;
+    if (price > 0) r.rec.meta.promoUsed = true;
+    r.rec.history.unshift({ id: this._id('CNV'), kind: 'subscribe', planKey: plan.key, planName: plan.name, amount: price, ts: now, days: days, note: '体验转正式', orderNo: this._orderNo(), status: 'paid' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    this._grant({
+      topSlots: Math.max(0, (plan.limits.topSlots || 0) - (oldLimits.topSlots || 0)),
+      leadCredits: Math.max(0, (plan.limits.leadCredits || 0) - (oldLimits.leadCredits || 0))
+    }, sub.expireAt, plan.key);
+    this._push('体验已转为正式方案 · ' + plan.name, '正式权益已生效，到期前会按你的设置自动续费。', '运营包');
+    return { ok: true, sub: sub, price: price };
+  };
+  OpsStore.renew = function () {
+    var sub = this.current() || (this.lastSub() && this.lastSub().status === 'active' ? this.lastSub() : null);
+    if (!sub) return { error: '暂无运营包可续费' };
+    if (sub.trial) return { error: '体验包无需续费，请转为正式方案' };
+    var plan = this.plan(sub.planKey);
+    if (!plan) return { error: '方案不存在' };
+    var now = Date.now();
+    var price = plan.included ? 0 : (sub.billing === 'yearly' ? (plan.annualPrice || plan.price * 10) : plan.price);
+    if (price > 0) {
+      var consumed = BalanceStore.consume(price, 'ops', { remark: '续费运营包 · ' + plan.name });
+      if (!consumed) return { error: '余额不足，请先充值' };
+    }
+    var days = sub.days || 30;
+    var base = Math.max(now, sub.expireAt || 0);
+    var r = this.rec();
+    sub.expireAt = base + days * 86400000;
+    sub.status = 'active';
+    sub.startedAt = sub.startedAt || now;
+    sub.limits = Object.assign({}, plan.limits || {});
+    r.rec.sub = sub;
+    r.rec.history.unshift({ id: this._id('REN'), kind: 'renew', planKey: plan.key, planName: plan.name, amount: price, ts: now, days: days, note: '续费 ' + days + ' 天', orderNo: this._orderNo(), status: 'paid' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    this._removeUnused('*', 0);
+    this._grant(sub.limits, sub.expireAt, plan.key);
+    return { ok: true, sub: sub, price: price };
+  };
+  OpsStore.upgrade = function (planKey, billing) {
+    billing = billing === 'yearly' ? 'yearly' : (this.current() ? this.current().billing : 'monthly');
+    var sub = this.current();
+    if (!sub) return { error: '请先开通运营包' };
+    if (sub.trial) return { error: '体验期请先转为正式方案，再升级档位' };
+    var curPlan = this.plan(sub.planKey);
+    var newPlan = this.plan(planKey);
+    if (!newPlan) return { error: '方案不存在' };
+    if (newPlan.key === sub.planKey) return { error: '当前已在生效该方案' };
+    if (newPlan.group !== sub.group) return { error: '不能跨身份升级' };
+    if ((newPlan.price || 0) <= (curPlan.price || 0)) return { error: '请选择更高档位的方案' };
+    var now = Date.now();
+    var newPrice = billing === 'yearly' ? (newPlan.annualPrice || newPlan.price * 10) : newPlan.price;
+    var leftRatio = sub.days ? Math.max(0, Math.min(1, (sub.expireAt - now) / (sub.days * 86400000))) : 0;
+    var credit = Math.round((sub.price || 0) * leftRatio * 100) / 100;
+    var pay = Math.max(0, Math.round((newPrice - credit) * 100) / 100);
+    if (pay > 0) {
+      var consumed = BalanceStore.consume(pay, 'ops', { remark: '升级运营包 · ' + newPlan.name + '（抵扣 ¥' + credit + '）' });
+      if (!consumed) return { error: '余额不足，请先充值' };
+    }
+    var days = this.billingDays(newPlan, billing);
+    var oldLimits = sub.limits || {};
+    sub.planKey = newPlan.key;
+    sub.name = newPlan.name;
+    sub.billing = billing;
+    sub.price = newPrice;
+    sub.days = days;
+    sub.startedAt = now;
+    sub.expireAt = now + days * 86400000;
+    sub.limits = Object.assign({}, newPlan.limits || {});
+    sub.autoRenew = true;
+    sub.status = 'active';
+    var r = this.rec();
+    r.rec.sub = sub;
+    r.rec.history.unshift({ id: this._id('UPG'), kind: 'upgrade', planKey: newPlan.key, planName: newPlan.name, amount: pay, ts: now, days: days, note: '升级抵扣 ¥' + credit + '，实付 ¥' + pay, orderNo: this._orderNo(), status: 'paid' });
+    r.rec.usage = Object.assign({}, r.rec.usage || {}, { aiWords: 0 });
+    this._writeRec(r.state, r.uid, r.rec);
+    /* 升级只补差量额度，已有未用额度保留 */
+    var delta = {
+      topSlots: Math.max(0, (newPlan.limits.topSlots || 0) - (oldLimits.topSlots || 0)),
+      leadCredits: Math.max(0, (newPlan.limits.leadCredits || 0) - (oldLimits.leadCredits || 0))
+    };
+    this._grant(delta, sub.expireAt, newPlan.key);
+    this._push('已升级至 ' + newPlan.name, '新权益已生效，差额额度已补发。当前到期时间：' + new Date(sub.expireAt).toLocaleDateString('zh-CN') + '。', '运营包');
+    return { ok: true, sub: sub, pay: pay, credit: credit, plan: newPlan };
+  };
+  OpsStore.setAutoRenew = function (on) {
+    var sub = this.current() || this.lastSub();
+    if (!sub) return { error: '暂无运营包' };
+    var r = this.rec();
+    sub.autoRenew = !!on;
+    r.rec.sub = sub;
+    this._writeRec(r.state, r.uid, r.rec);
+    return { ok: true, sub: sub };
+  };
+  OpsStore.requestRefund = function (orderId) {
+    var r = this.rec();
+    var hit = null;
+    (r.rec.history || []).forEach(function (h) { if (h.id === orderId || h.orderNo === orderId) hit = h; });
+    if (!hit) return { error: '订单不存在' };
+    if (hit.amount <= 0) return { error: '该订单无需退款' };
+    if (hit.status === 'refund_review') return { error: '退款申请已提交，请等待审核' };
+    if (hit.kind !== 'subscribe' && hit.kind !== 'renew') return { error: '该订单不支持自助退款' };
+    if (Date.now() - hit.ts > 7 * 86400000) return { error: '已超过 7 天自助退款时限，请联系客服' };
+    hit.status = 'refund_review';
+    r.rec.history.unshift({ id: this._id('RFH'), kind: 'refund', planKey: hit.planKey, planName: hit.planName, amount: 0, ts: Date.now(), note: '退款申请审核中 · 原订单 ' + hit.orderNo, orderNo: hit.orderNo, status: 'refund_review' });
+    this._writeRec(r.state, r.uid, r.rec);
+    var t = this.createTicket({
+      subject: '退款申请 · ' + hit.planName, category: '计费', priority: 'high',
+      detail: '订单号 ' + (hit.orderNo || hit.id) + '，支付金额 ¥' + hit.amount + '，申请原因：开通后未使用/不符合预期（演示）。'
+    });
+    return { ok: true, ticket: t, order: hit };
+  };
+  /* ---- 推送偏好 ---- */
+  OpsStore.pushPrefs = function () {
+    var r = this.rec().rec;
+    var p = r.push || {};
+    return {
+      enabled: p.enabled !== false,
+      frequency: p.frequency || 'daily',
+      channels: Object.assign({ app: true, sms: false, wechat: false }, p.channels || {}),
+      cats: (p.cats || []).slice(),
+      region: p.region || '',
+      quiet: Object.assign({ from: '22:00', to: '08:00' }, p.quiet || {}),
+      autoDemo: !!p.autoDemo
+    };
+  };
+  OpsStore.savePushPrefs = function (patch) {
+    var r = this.rec();
+    var p = Object.assign(this.pushPrefs(), patch || {});
+    p.channels = Object.assign(this.pushPrefs().channels, (patch && patch.channels) || {});
+    p.quiet = Object.assign(this.pushPrefs().quiet, (patch && patch.quiet) || {});
+    if (!this.hasFeature('push.realtime') && p.frequency === 'realtime') p.frequency = 'daily';
+    if (!this.hasFeature('push.sms')) p.channels.sms = false;
+    if (!this.hasFeature('push.wechat')) p.channels.wechat = false;
+    if (!this.hasFeature('push.off') && p.enabled === false && !this.hasFeature('push.app')) p.enabled = true;
+    r.rec.push = p;
+    this._writeRec(r.state, r.uid, r.rec);
+    return p;
+  };
+  OpsStore.simulatePush = function (kind) {
+    var g = this.group();
+    var cfg = this.cfg();
+    var list = (cfg.pushTemplates || {})[g] || [];
+    if (kind === 'welcome') {
+      var plan = this.activePlan();
+      if (!plan) return { error: '暂无生效中的运营包' };
+      return this._push('欢迎使用 ' + plan.name, '发布、推送、工具与专属服务已就绪，可在运营包页逐项使用。', '运营包');
+    }
+    if (!list.length) return { error: '当前身份暂无推送模板' };
+    var tpl = list[Math.floor(Math.random() * list.length)];
+    if (kind) {
+      for (var i = 0; i < list.length; i++) if (list[i].kind === kind) { tpl = list[i]; break; }
+    }
+    return this._push(tpl.title, tpl.body, tpl.kind);
+  };
+  OpsStore.pushLog = function () { return this.rec().rec.pushLog || []; };
+  OpsStore.markPushRead = function (id) {
+    var r = this.rec();
+    (r.rec.pushLog || []).forEach(function (x) { if (x.id === id) x.read = true; });
+    this._writeRec(r.state, r.uid, r.rec);
+  };
+  /* ---- 工单 ---- */
+  OpsStore._reply = function (category) {
+    var map = {
+      '发布': '已收到你的发布问题。请确认信息标题、品类与联系方式的完整性；加急审核需运营包包含「加急审核」权益。我会同步审核队列，预计 30 分钟内处理。',
+      '推送': '已记录你的推送问题。可在「智能推送」中调整频次、渠道、品类与免打扰时段；若仍未收到，请检查消息中心的系统消息是否被折叠。',
+      '工具': '已收到工具使用问题。请说明具体工具与报错步骤；专属顾问会协助排查，必要时为你开通临时权限。',
+      '计费': '已登记你的计费问题。退款申请将在 1 个工作日内审核，审核结果会通过站内消息通知；已消耗的置顶与线索额度不支持退款。',
+      '其他': '已收到你的问题，专属顾问会尽快跟进。紧急事项可直接拨打专属热线。'
+    };
+    return map[category] || map['其他'];
+  };
+  OpsStore.createTicket = function (input) {
+    input = input || {};
+    var r = this.rec();
+    var now = Date.now();
+    var meta = this.groupMeta();
+    var manager = meta.manager || {};
+    var t = {
+      id: this._id('TK'),
+      no: 'TK' + String(now).slice(-8),
+      subject: input.subject || '未命名工单',
+      category: input.category || '其他',
+      priority: input.priority || 'normal',
+      status: 'processing',
+      createdAt: now, updatedAt: now,
+      messages: [
+        { from: 'me', text: input.detail || '', ts: now },
+        { from: 'agent', name: manager.name || '专属顾问', text: this._reply(input.category || '其他'), ts: now + 1000 }
+      ]
+    };
+    r.rec.tickets.unshift(t);
+    this._writeRec(r.state, r.uid, r.rec);
+    return t;
+  };
+  OpsStore.replyTicket = function (id, text) {
+    if (!String(text || '').trim()) return { error: '请输入内容' };
+    var r = this.rec();
+    var t = null;
+    (r.rec.tickets || []).forEach(function (x) { if (x.id === id) t = x; });
+    if (!t) return { error: '工单不存在' };
+    var now = Date.now();
+    t.messages.push({ from: 'me', text: String(text).trim(), ts: now });
+    t.messages.push({ from: 'agent', name: (this.manager().name || '专属顾问'), text: this._reply(t.category), ts: now + 1000 });
+    t.status = 'processing';
+    t.updatedAt = now;
+    this._writeRec(r.state, r.uid, r.rec);
+    return { ok: true, ticket: t };
+  };
+  OpsStore.resolveTicket = function (id) {
+    var r = this.rec();
+    var t = null;
+    (r.rec.tickets || []).forEach(function (x) { if (x.id === id) t = x; });
+    if (!t) return { error: '工单不存在' };
+    t.status = 'resolved';
+    t.updatedAt = Date.now();
+    t.messages.push({ from: 'agent', name: (this.manager().name || '专属顾问'), text: '该工单已标记解决。如仍有问题，可随时重新打开或新建工单。', ts: Date.now() });
+    this._writeRec(r.state, r.uid, r.rec);
+    return { ok: true, ticket: t };
+  };
+  OpsStore.reopenTicket = function (id) {
+    var r = this.rec();
+    var t = null;
+    (r.rec.tickets || []).forEach(function (x) { if (x.id === id) t = x; });
+    if (!t) return { error: '工单不存在' };
+    t.status = 'processing';
+    t.updatedAt = Date.now();
+    t.messages.push({ from: 'agent', name: (this.manager().name || '专属顾问'), text: '已重新打开工单，我会继续跟进。', ts: Date.now() });
+    this._writeRec(r.state, r.uid, r.rec);
+    return { ok: true, ticket: t };
+  };
+  OpsStore.tickets = function () { return (this.rec().rec.tickets || []).slice(); };
+  OpsStore.ticket = function (id) {
+    var arr = this.rec().rec.tickets || [];
+    for (var i = 0; i < arr.length; i++) if (arr[i].id === id) return arr[i];
+    return null;
+  };
+  /* ---- 专属顾问会话 ---- */
+  OpsStore.chat = function () { return (this.rec().rec.chat || []).slice(); };
+  OpsStore.sendChat = function (text) {
+    text = String(text || '').trim();
+    if (!text) return { error: '请输入内容' };
+    var r = this.rec();
+    var now = Date.now();
+    var meta = this.groupMeta();
+    var manager = meta.manager || {};
+    r.rec.chat.push({ from: 'me', text: text, ts: now });
+    var reply;
+    if (/退款|退费|发票|扣费|价格|多少钱/.test(text)) reply = '费用相关的问题我帮你登记：可在「订单」中发起退款（7 天内），发票可在钱包开具。需要我直接转成工单吗？';
+    else if (/推送|消息|通知|短信/.test(text)) reply = '推送可以在「智能推送」里调整频次、渠道和免打扰时段。若想接收短信，需要专业版及以上；我可以帮你升级。';
+    else if (/置顶|曝光|发布|流量/.test(text)) reply = '置顶名额已发放到「我的权益」，在发布管理里选择信息即可使用；加急审核同样在发布页触发。';
+    else if (/线索|询盘|客户/.test(text)) reply = '线索额度可在工作台「需求广场」精准解锁，解锁后会自动写入询盘线索列表。需要我帮你看一下剩余额度吗？';
+    else if (/工具|看板|数据|报告/.test(text)) reply = '经营看板、行业报告和 AI 文案都在「经营工具」里；如果显示锁定，说明当前方案未包含，可以升级解锁。';
+    else reply = '收到。我是你的' + (manager.title || '专属顾问') + '，' + (manager.sla || '会尽快响应') + '。你可以直接描述问题，或点「转工单」留下处理记录。';
+    r.rec.chat.push({ from: 'agent', name: manager.name || '专属顾问', text: reply, ts: now + 800 });
+    r.rec.chat = r.rec.chat.slice(-60);
+    this._writeRec(r.state, r.uid, r.rec);
+    return { ok: true, reply: reply };
+  };
+  OpsStore.chatToTicket = function () {
+    var msgs = this.chat();
+    if (!msgs.length) return { error: '暂无可转工单的会话' };
+    var last = msgs[msgs.length - 1];
+    return { ok: true, ticket: this.createTicket({ subject: '顾问会话转工单', category: '其他', priority: 'normal', detail: last.text }) };
+  };
+  /* ---- 统计 ---- */
+  OpsStore.topStats = function () {
+    var total = 0, used = 0, available = 0;
+    var g = this.group();
+    UpgradeStore.listActive().forEach(function (it) {
+      if (it.type !== 'topListing' || !it.fromOps) return;
+      total++;
+      if (it.targetId) used++; else available++;
+    });
+    return { total: total, used: used, available: available, group: g };
+  };
+  OpsStore.leadRemaining = function () { return UpgradeStore.remaining('leadPack'); };
+  OpsStore.leadUsed = function () { return UpgradeStore.usage('leadPack'); };
+  OpsStore.aiRemaining = function () {
+    var lim = this.limit('aiWords');
+    return Math.max(0, lim - this.usage('aiWords'));
+  };
+  OpsStore.useAi = function (n) {
+    var r = this.rec();
+    r.rec.usage.aiWords = (r.rec.usage.aiWords || 0) + (n || 1);
+    this._writeRec(r.state, r.uid, r.rec);
+    return r.rec.usage.aiWords;
+  };
+  OpsStore.history = function () { return (this.rec().rec.history || []).slice(); };
+  OpsStore.openTickets = function () {
+    return this.tickets().filter(function (t) { return t.status !== 'resolved'; });
+  };
+  OpsStore.summary = function () {
+    var sub = this.current();
+    var plan = this.activePlan();
+    return {
+      group: this.group(),
+      active: !!sub,
+      plan: plan,
+      sub: sub,
+      daysLeft: this.daysLeft(sub),
+      progress: this.progress(sub),
+      top: this.topStats(),
+      leadRemaining: this.leadRemaining(),
+      leadUsed: this.leadUsed(),
+      aiRemaining: this.aiRemaining(),
+      tickets: this.openTickets().length,
+      pendingRefund: (this.history().filter(function (h) { return h.status === 'refund_review'; })).length
+    };
+  };
+
   /* ---- [FEAT 9.2-3] 供需匹配智能推送 Store ----
      键 engchain-matches，结构 { feed: [...], preferences: {cats, subs, dir, location, notify, updatedAt} }
      v2：匹配池与发现页 mergedList 同源（MOCK.catalog + SupplyStore 活跃条目），
@@ -2506,6 +3196,7 @@
   window.MemberStore = MemberStore;
   window.FreeQuotaStore = FreeQuotaStore;
   window.UpgradeStore = UpgradeStore;
+  window.OpsStore = OpsStore;
   window.MatchStore = MatchStore;
   window.DashboardStore = DashboardStore;
   window.ReportStore = ReportStore;
