@@ -654,7 +654,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js?v=20261101wb1"></script>
+<script src="../../js/common.js?v=20261102wb1"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/avatar-pool.js"></script>
 <script src="../../js/databus.js"></script>
@@ -671,7 +671,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
 <script src="../../js/orgs.js"></script>
 <script src="../../js/delegates.js"></script>
 <script src="../../js/quick-config.js?v=20261002"></script>
-<script src="../../js/preview-sheet.js"></script>
+<script src="../../js/preview-sheet.js?v=20261101ntd1"></script>
 <script>
 (function () {
   window.__ROOT__ = '../../';
@@ -1064,7 +1064,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     if (!st.loggedIn) return;
     var e = {}; try { if (window.EntryStore) e = EntryStore.read() || {}; } catch (ex) {}
     if (e.status === 'pending' || e.status === 'review' || e.status === 'first_ok') {
-      NT_POOL.push({ prio:2, type:'review', title:'入驻审核中 · 预计 3-5 个工作日', sub:'资料已提交，平台审核通过后自动开通全部入驻权益', cta:'进度 ›', href:'entry.html' });
+      NT_POOL.push({ nid:'entry-review', prio:2, type:'review', title:'入驻审核中 · 预计 3-5 个工作日', sub:'资料已提交，平台审核通过后自动开通全部入驻权益', cta:'进度 ›', href:'entry.html' });
     }
   }
 
@@ -1073,7 +1073,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var on = !!(window.ModeStore && ModeStore.isBreakIn());
     var idy = currentIdentity();
     if (on && idy.enterprise !== 'resident') {
-      NT_POOL.push({ prio:4, type:'breakin', title:'建筑入驻限时 0 元', sub:'破冰期专享 · 中介入驻 5 折 · 名额有限', cta:'立即入驻 ›', href:'entry.html', whole:true });
+      NT_POOL.push({ nid:'breakin', prio:4, type:'breakin', title:'建筑入驻限时 0 元', sub:'破冰期专享 · 中介入驻 5 折 · 名额有限', cta:'立即入驻 ›', href:'entry.html', whole:true });
     }
   }
 
@@ -1082,7 +1082,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var isBanned = false;
     try { var me = (window.DataBus && DataBus.current) ? DataBus.current() : null; isBanned = !!(me && me.banned); } catch (e) {}
     if (isBanned) {
-      NT_POOL.push({ prio:1, type:'banned', title:'账号已封禁', sub:'交易与发布功能已暂停，如需申诉请查看详情', cta:'申诉 ›', href:'../auth/banned.html' });
+      NT_POOL.push({ nid:'banned', prio:1, type:'banned', title:'账号已封禁', sub:'交易与发布功能已暂停，如需申诉请查看详情', cta:'申诉 ›', href:'../auth/banned.html' });
       /* 功能入口置灰 */
       var quick = document.getElementById('pf-quick-scroll');
       if (quick) quick.classList.add('is-banned-dim');
@@ -1101,7 +1101,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
       if (idy.isGuest || idy.primary === 'guest') {
         NT_POOL.push({ prio:5, type:'login', title:'登录后解锁全部功能', sub:'登录后解锁发布、收藏、洽谈等全部功能', cta:'立即登录 ›', act:'openMember()' });
       }
-      NT_POOL.push({ prio:5, type:'guide', title:'诚信分', sub:'完成实名认证解锁诚信分，分数影响发布/提现权限', cta:'去认证 ›', href:'auth-prep.html?type=center' });
+      NT_POOL.push({ nid:'credit-guide', prio:5, type:'guide', title:'诚信分', sub:'完成实名认证解锁诚信分，分数影响发布/提现权限', cta:'去认证 ›', href:'auth-prep.html?type=center' });
     }
   }
 
@@ -1708,7 +1708,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
       if (window.EntryStore && EntryStore.needRenew && EntryStore.needRenew()) {
         var s = EntryStore.read();
         var daysLeft = Math.ceil((s.expireAt - Date.now()) / 864e5);
-        NT_POOL.push({ prio:3, type:'renew', title:'入驻即将到期', sub:'剩余 ' + daysLeft + ' 天到期，续费后可继续享受全部权益', cta:'续费 ›', act:'__renewEntry()' });
+        /* nid 带到期时间：续费后 expireAt 变化即为新通知，不会被历史已读误伤 */
+        NT_POOL.push({ nid:'entry-renew:' + s.expireAt, prio:3, type:'renew', title:'入驻即将到期', sub:'剩余 ' + daysLeft + ' 天到期，续费后可继续享受全部权益', cta:'续费 ›', act:'__renewEntry()' });
       }
     } catch(e) {}
   }
@@ -1739,21 +1740,62 @@ html, body { margin:0; padding:0; background:var(--bg); }
   };
   /* 通知条目 onclick 转义（href/title 内嵌单引号时安全拼接） */
   function npq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  /* ---------- 业务通知「已读，不再显示」：本地持久化已读 id 列表 ----------
+     每条通知带稳定 nid（随状态变化重算，例如续费到期时间变了就是新通知），
+     已读 id 存 localStorage，渲染与计数都先过滤；弹窗底部悬浮按钮触发。 */
+  var NT_DISMISS_KEY = 'engchain-pf-nt-dismissed';
+  var NT_MAP = {};
+  function ntDismissedList() {
+    try {
+      var a = JSON.parse(localStorage.getItem(NT_DISMISS_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+  }
+  function ntDismiss(nid) {
+    if (!nid) return;
+    try {
+      var a = ntDismissedList();
+      if (a.indexOf(nid) < 0) a.push(nid);
+      localStorage.setItem(NT_DISMISS_KEY, JSON.stringify(a));
+    } catch (e) {}
+    /* 立即从收集池剔除并重渲染（不刷新页面） */
+    for (var i = NT_POOL.length - 1; i >= 0; i--) {
+      if (NT_POOL[i].nid === nid) NT_POOL.splice(i, 1);
+    }
+    refreshTaskCenter();
+    try { if (window.UI && UI.toast) UI.toast('已标记已读，不再显示', 'ok'); } catch (e) {}
+  }
+  /* 站内页面通知 → 预览弹窗 + 底部悬浮「已读，不再显示」 */
+  window.__ntOpenPreview = function (nid) {
+    var it = NT_MAP[nid];
+    if (!it || !it.href) return;
+    openPagePreview(it.href, it.title, {
+      dismissLabel: '已读，不再显示',
+      onDismiss: function () { ntDismiss(nid); }
+    });
+  };
   function refreshTaskCenter() {
     var card = document.getElementById('wb-task-card');
     var list = document.getElementById('pf-notify-list');
     var countEl = document.getElementById('pf-notify-count');
-    NT_POOL.sort(function (a, b) { return (a.prio || 9) - (b.prio || 9); });
-    var n = NT_POOL.length;
+    /* 已读过滤：nid 命中本地已读列表的条目不参与排序/计数/渲染 */
+    var dismissed = ntDismissedList();
+    var items = NT_POOL.filter(function (it) { return !it.nid || dismissed.indexOf(it.nid) < 0; });
+    NT_MAP = {};
+    items.forEach(function (it) { if (it.nid) NT_MAP[it.nid] = it; });
+    items.sort(function (a, b) { return (a.prio || 9) - (b.prio || 9); });
+    var n = items.length;
     if (countEl) {
       countEl.textContent = n;
       countEl.style.display = n ? '' : 'none';
     }
     if (list) {
-      list.innerHTML = NT_POOL.map(function (it) {
+      list.innerHTML = items.map(function (it) {
         /* 站内页面链接 → 弹窗预览（preview-sheet：可拖动 + 右上角「放大至全屏」跳转）；
            act 动作类（身份切换面板/登录引导/续费）保持原交互不变 */
-        var act = it.act ? it.act : (it.href ? "openPagePreview('" + npq(it.href) + "', '" + npq(it.title) + "')" : '');
+        var act = it.act ? it.act
+          : (it.nid ? "__ntOpenPreview('" + npq(it.nid) + "')"
+          : (it.href ? "openPagePreview('" + npq(it.href) + "', '" + npq(it.title) + "')" : ''));
         var cta = it.cta ? '<span class="nt-cta"' + (act ? ' onclick="' + act + '"' : '') + '>' + it.cta + '</span>' : '';
         var rowClick = (it.whole && act) ? ' onclick="' + act + '"' : '';
         return '<div class="nt-item ' + it.type + '"' + rowClick + '>' +

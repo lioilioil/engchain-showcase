@@ -33,7 +33,16 @@
       '.np-err-ic svg{width:20px;height:20px;}' +
       '.np-err-txt{line-height:1.6;}' +
       '.sheet-head-actions{display:flex;align-items:center;gap:8px;flex:none;}' +
-      '.sheet-expand{flex:none;}';
+      '.sheet-expand{flex:none;}' +
+      /* 悬浮「已读，不再显示」：底部居中浮在 iframe 之上（opt-in，仅传入 onDismiss 时注入）；
+         悬停在 84px 处，避开预览页自身的底部固定操作条（.ap-bottom-bar 等约 72px），不遮挡其主按钮 */
+      '.np-dismiss-bar{position:absolute;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;justify-content:center;pointer-events:none;animation:np-bar-in .3s cubic-bezier(.16,1,.3,1) .16s both;}' +
+      '@keyframes np-bar-in{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}' +
+      '.np-dismiss-btn{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 18px;border:1px solid rgba(255,255,255,.16);border-radius:999px;background:rgba(30,28,24,.9);color:#F6F2E9;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.2px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.32);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);transition:transform .16s ease,opacity .16s ease;}' +
+      '.np-dismiss-btn:active{transform:scale(.95);}' +
+      '.np-dismiss-btn:disabled{opacity:.5;pointer-events:none;}' +
+      '.np-dismiss-btn svg{width:15px;height:15px;flex:none;}' +
+      '@media (prefers-reduced-motion:reduce){.np-dismiss-bar{animation:none;}.np-dismiss-btn{transition:none;}}';
     document.head.appendChild(st);
   }
   if (document.readyState === 'loading') {
@@ -76,7 +85,29 @@
     setTimeout(function () { fallbackPreviewMode(win); }, 1200);
   }
 
-  window.openPagePreview = function (href, label) {
+  /* 底部悬浮按钮：调用方传入 { dismissLabel, onDismiss } 才注入；
+     点击后按钮置灰（防重复），执行 onDismiss 并收起弹窗。 */
+  function dismissBar(opts) {
+    var bar = document.createElement('div');
+    bar.className = 'np-dismiss-bar';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'np-dismiss-btn';
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+    var txt = document.createElement('span');
+    txt.textContent = opts.dismissLabel || '已读，不再显示';
+    btn.appendChild(txt);
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try { opts.onDismiss(); } catch (e) { console.error('openPagePreview: onDismiss error', e); }
+      if (window.UI && UI.closeSheet) UI.closeSheet();
+    });
+    bar.appendChild(btn);
+    return bar;
+  }
+
+  window.openPagePreview = function (href, label, opts) {
     if (!href || href === '#') return;
     /* 外部链接不适合 iframe 预览：不拦截，直接完整打开 */
     if (/^(https?:|javascript:|mailto:|tel:)/i.test(href)) { location.href = href; return; }
@@ -90,6 +121,7 @@
     sh.classList.add('notice-preview-sheet', 'sheet-expanded');
     sh.setText(label || '页面预览');
     var body = sh.body();
+    var dismissOpt = (opts && typeof opts.onDismiss === 'function') ? opts : null;
     function buildFrame() {
       body.innerHTML = '<div class="np-loading"><span class="np-spin"></span><span class="np-txt">正在加载…</span></div>';
       var frame = document.createElement('iframe');
@@ -97,6 +129,8 @@
       frame.src = url;
       frame.title = label || '页面预览';
       body.appendChild(frame);
+      /* 悬浮按钮挂在 iframe 之后（绝对定位，不参与 boostStickyFoot 的置底按钮收编） */
+      if (dismissOpt) body.appendChild(dismissBar(dismissOpt));
       frame.addEventListener('load', function () {
         cleanPreviewShell(frame.contentDocument, frame.contentWindow);
         frame.classList.add('np-loaded');
@@ -108,6 +142,8 @@
           '<div class="np-err-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg></div>' +
           '<div class="np-err-txt">页面加载失败，请检查网络后重试</div>' +
           '<button type="button" class="n-btn primary" id="np-retry">重试</button></div>';
+        /* 加载失败也允许「已读，不再显示」（body.innerHTML 重建后需重新挂载） */
+        if (dismissOpt) body.appendChild(dismissBar(dismissOpt));
         var retry = body.querySelector('#np-retry');
         if (retry) retry.addEventListener('click', buildFrame);
       });
