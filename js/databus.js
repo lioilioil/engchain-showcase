@@ -2182,8 +2182,9 @@ window.DataBus = (function () {
      反向：工作台切场景/身份后写 engchain-workbench-echo / engchain-workbench-intent，
            preview 侧栏与 profile 身份胶囊读取回声；跨域切换的意图由 applyPendingWorkbench()
            在账号层下次启动时补应用（见 boot 处调用）。
-     非代理身份（游客/注册/认证/入驻/申请审核…）一律复位到省代默认场景——
-     否则上一轮演示停在二级域时，从个人中心/分销/消息进入工作台会落到二级工作台。 */
+     非代理身份（游客/注册/认证/入驻/申请审核…）仍写省代默认场景，但这只是数据层归一；
+     准入已由工作台页的准入闸门（uni-shared.js boot，2026-11-02）按账号资格拦截：
+     这类身份进入工作台会看到无权限占位，不再因为场景键被复位而"看起来能进"。 */
   var WB_SCENARIO_KEY = 'engchain-v3-demo-scenario';
   var WB_STATE_KEY = 'engchain-v3-demo-state-v1';
   var WB_IDENTITY_KEY = 'engchain-v3-demo-identity';

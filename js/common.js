@@ -937,7 +937,7 @@ window.UI = (function () {
     return { close: close };
   }
 
-  /* ---- 城市选择数据：大陆 31 省级行政区 + 地级市/州/盟 ---- */
+  /* ---- 城市选择数据：大陆 31 省级行政区 + 港澳台 + 地级市/州/盟 ---- */
   const HOT_CITIES = ['北京', '上海', '广州', '深圳', '成都', '杭州', '重庆', '西安', '武汉', '南京', '天津', '苏州'];
   const CITY_DATA = [
     ['北京', ['北京']], ['天津', ['天津']], ['上海', ['上海']], ['重庆', ['重庆']],
@@ -967,11 +967,47 @@ window.UI = (function () {
     ['广西', ['南宁', '柳州', '桂林', '梧州', '北海', '防城港', '钦州', '贵港', '玉林', '百色', '贺州', '河池', '来宾', '崇左']],
     ['西藏', ['拉萨', '日喀则', '昌都', '林芝', '山南', '那曲', '阿里']],
     ['宁夏', ['银川', '石嘴山', '吴忠', '固原', '中卫']],
-    ['新疆', ['乌鲁木齐', '克拉玛依', '吐鲁番', '哈密', '昌吉', '博尔塔拉', '巴音郭楞', '阿克苏', '克孜勒苏', '喀什', '和田', '伊犁', '塔城', '阿勒泰']]
+    ['新疆', ['乌鲁木齐', '克拉玛依', '吐鲁番', '哈密', '昌吉', '博尔塔拉', '巴音郭楞', '阿克苏', '克孜勒苏', '喀什', '和田', '伊犁', '塔城', '阿勒泰']],
+    /* 港澳台：港澳全区即一个城市级单位，与直辖市同构；台湾按县市列（同名的新竹/嘉义市与县合并为一条，
+       金门、连江马祖按大陆区划属福建，故不并入台湾）。
+       注意：省级代理配额体系（agent-rules.js EXCLUDED_PROVINCES / agent-apply.js PROVINCE_LIST）本期仍不含港澳台，
+       这里的补录只作用于「选择城市」与地域解析，不影响代理开通校验。 */
+    ['香港', ['香港']],
+    ['澳门', ['澳门']],
+    ['台湾', ['台北', '新北', '桃园', '台中', '台南', '高雄', '基隆', '新竹', '嘉义', '苗栗', '彰化', '南投', '云林', '屏东', '宜兰', '花莲', '台东', '澎湖']]
   ];
   const ALL_CITIES = (function () { const m = {}; CITY_DATA.forEach(function (g) { g[1].forEach(function (c) { m[c] = g[0]; }); }); return m; })();
 
-  /* ---- 城市选择 Bottom Sheet（80% 高度，自下而上）：当前定位 + 搜索 + 热门 + 省/市两级。opts={current,onSelect} ---- */
+  /* 省份全拼：仅用于「按省份选择」的 A–Z 分组与排序（按字面排序会把重庆排到青海前面）。
+     新增省份必须同步补录，漏录的会被兜底落到 '#' 组并排在最后。 */
+  const PROV_PY = {
+    '安徽': 'anhui', '澳门': 'aomen', '北京': 'beijing', '重庆': 'chongqing', '福建': 'fujian',
+    '甘肃': 'gansu', '广东': 'guangdong', '广西': 'guangxi', '贵州': 'guizhou', '海南': 'hainan',
+    '河北': 'hebei', '河南': 'henan', '黑龙江': 'heilongjiang', '湖北': 'hubei', '湖南': 'hunan',
+    '吉林': 'jilin', '江苏': 'jiangsu', '江西': 'jiangxi', '辽宁': 'liaoning', '内蒙古': 'neimenggu',
+    '宁夏': 'ningxia', '青海': 'qinghai', '山东': 'shandong', '山西': 'shanxi', '陕西': 'shaanxi',
+    '上海': 'shanghai', '四川': 'sichuan', '台湾': 'taiwan', '天津': 'tianjin', '香港': 'xianggang',
+    '西藏': 'xizang', '新疆': 'xinjiang', '云南': 'yunnan', '浙江': 'zhejiang'
+  };
+  /* 省份 A–Z 分组：先按全拼排序，再按首字母切组 */
+  const PROV_ALPHA = (function () {
+    const arr = CITY_DATA.map(function (g) { return { name: g[0], cities: g[1], py: PROV_PY[g[0]] || '' }; })
+      .sort(function (a, b) {
+        if (!a.py) return 1;              /* 未补录拼音的省份兜底排到最后 */
+        if (!b.py) return -1;
+        return a.py < b.py ? -1 : (a.py > b.py ? 1 : 0);
+      });
+    const out = [];
+    arr.forEach(function (p) {
+      const L = (p.py.charAt(0) || '#').toUpperCase();
+      const last = out[out.length - 1];
+      if (last && last.L === L) last.list.push(p);
+      else out.push({ L: L, list: [p] });
+    });
+    return out;
+  })();
+
+  /* ---- 城市选择 Bottom Sheet（80% 高度，自下而上）：当前定位 + 搜索 + 热门 + 省份 A–Z 列表。opts={current,onSelect} ---- */
   function cityPicker(opts) {
     opts = opts || {};
     const sh = sheet();
@@ -983,38 +1019,176 @@ window.UI = (function () {
         '<button type="button" class="cl-current" data-city="成都"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg>成都</button></div>' +
       '<div class="city-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input type="text" id="city-kw" placeholder="搜索城市名" autocomplete="off"></div>' +
       '<div class="city-sec" data-sec="hot"><div class="cs-title">热门城市</div><div class="cs-grid" id="cs-hot"></div></div>' +
-      '<div class="city-sec" data-sec="prov"><div class="cs-title">按省份选择</div><div class="cs-provs" id="cs-provs"></div></div>' +
-      '<div class="city-sec cs-cities-sec" data-sec="cities"><div class="cs-title" id="cs-cities-title"></div><div class="cs-grid" id="cs-cities"></div></div>' +
+      '<div class="city-sec" data-sec="prov"><div class="cs-title">按省份选择<span class="cs-title-hint">拼音首字母</span></div><div class="cs-alpha" id="cs-alpha"></div></div>' +
       '<div class="city-sec" data-sec="search" hidden><div class="cs-title">搜索结果</div><div class="cs-grid" id="cs-search"></div></div>';
+    /* 字母索引条挂在 .sheet 上而非 .sheet-body，避免跟着列表一起滚走 */
+    const barBox = document.createElement('div');
+    barBox.className = 'cs-alpha-bar';
+    barBox.innerHTML = PROV_ALPHA.map(function (g) {
+      return '<button type="button" data-l="' + g.L + '">' + g.L + '</button>';
+    }).join('');
+    sh.appendChild(barBox);
 
     function gridHtml(list) {
       return list.map(function (c) { return '<button type="button" class="cs-cell" data-city="' + c + '">' + c + '</button>'; }).join('');
     }
     document.getElementById('cs-hot').innerHTML = gridHtml(HOT_CITIES);
-    const provsBox = document.getElementById('cs-provs');
-    provsBox.innerHTML = CITY_DATA.map(function (g, i) {
-      return '<button type="button" class="cs-prov' + (i === 0 ? ' active' : '') + '" data-p="' + g[0] + '">' + g[0] + '</button>';
+
+    const alphaBox = document.getElementById('cs-alpha');
+    alphaBox.innerHTML = PROV_ALPHA.map(function (grp) {
+      return '<div class="cs-alpha-group" data-l="' + grp.L + '">' +
+        '<div class="cs-alpha-hd">' + grp.L + '</div>' +
+        grp.list.map(function (p) {
+          return '<div class="cs-alpha-item" data-p="' + p.name + '">' +
+            '<button type="button" class="cs-prov" aria-expanded="false">' +
+              '<span class="cs-prov-name">' + p.name + '</span>' +
+              '<span class="cs-prov-n">' + p.cities.length + '</span>' +
+              '<svg class="cs-prov-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
+            '</button>' +
+            '<div class="cs-prov-cities" hidden>' + gridHtml(p.cities) + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>';
     }).join('');
-    function renderProv(p) {
-      const g = CITY_DATA.find(function (x) { return x[0] === p; });
-      document.getElementById('cs-cities-title').textContent = p + '（' + (g ? g[1].length : 0) + ' 城）';
-      document.getElementById('cs-cities').innerHTML = g ? gridHtml(g[1]) : '';
+
+    /* 展开/收起：同一时间只展开一个省，避免长列表越滚越长 */
+    function collapseAll() {
+      alphaBox.querySelectorAll('.cs-alpha-item.open').forEach(function (x) {
+        x.classList.remove('open');
+        const c = x.querySelector('.cs-prov-cities'); if (c) c.hidden = true;
+        const b = x.querySelector('.cs-prov'); if (b) b.setAttribute('aria-expanded', 'false');
+      });
     }
-    renderProv(CITY_DATA[0][0]);
+    function openProv(item, scrollIntoViewMode) {
+      collapseAll();
+      item.classList.add('open');
+      const cities = item.querySelector('.cs-prov-cities');
+      const btn = item.querySelector('.cs-prov');
+      if (cities) cities.hidden = false;
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+      if (scrollIntoViewMode) {
+        requestAnimationFrame(function () {
+          const bRect = body.getBoundingClientRect();
+          const r = item.getBoundingClientRect();
+          if (r.bottom <= bRect.bottom) return;
+          /* 展开后放得下就把底部带进来，放不下就把该省标题顶到可视区顶部 */
+          const fits = r.height < bRect.height - 24;
+          body.scrollTop += fits ? (r.bottom - bRect.bottom + 12) : (r.top - bRect.top + 26);
+        });
+      }
+    }
+    alphaBox.addEventListener('click', function (e) {
+      const btn = e.target.closest('.cs-prov'); if (!btn) return;
+      const item = btn.parentElement;
+      if (item.classList.contains('open')) { item.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); item.querySelector('.cs-prov-cities').hidden = true; return; }
+      openProv(item, true);
+    });
+
+    /* 右侧字母索引：按住/拖动时水滴气泡跟手显示字母，松手后列表平滑滚到该字母。
+       不用 click —— 拖动过程中不会触发 click，且松手瞬间的瞬时滚动会和气泡时序打架；
+       Pointer 事件同时覆盖鼠标与触摸，另保留 keyboard 回车（detail === 0）。 */
+    const bubble = document.createElement('div');
+    bubble.className = 'cs-alpha-bubble';
+    bubble.setAttribute('aria-hidden', 'true');
+    bubble.innerHTML = '<svg viewBox="0 0 60 40"><path d="M34 6.1A16 16 0 1 0 34 33.9L54 20Z"/></svg><span class="cs-alpha-bubble-l"></span>';
+    sh.appendChild(bubble);
+    const bubbleL = bubble.querySelector('.cs-alpha-bubble-l');
+    function barBtns() { return Array.prototype.slice.call(barBox.querySelectorAll('button')); }
+    function markActive(btn) { barBtns().forEach(function (x) { x.classList.toggle('active', x === btn); }); }
+
+    /* 触点 Y → 字母：用首末按钮的实际位置反推步长，按在字母之间的空隙里也算命中 */
+    function letterAtY(y) {
+      const btns = barBtns();
+      if (!btns.length) return null;
+      const first = btns[0].getBoundingClientRect();
+      const last = btns[btns.length - 1].getBoundingClientRect();
+      const step = (last.bottom - first.top) / btns.length || 1;
+      const i = Math.floor((y - first.top) / step);
+      return btns[Math.max(0, Math.min(btns.length - 1, i))];
+    }
+    function showBubble(btn, y) {
+      bubbleL.textContent = btn.dataset.l;
+      const r = sh.getBoundingClientRect();
+      const half = (bubble.offsetHeight || 40) / 2;
+      /* 贴着触点走，但不许顶出 sheet 上下边 */
+      bubble.style.top = Math.min(Math.max(y - r.top, half + 4), r.height - half - 4) + 'px';
+      bubble.classList.add('show');
+      markActive(btn);
+    }
+    function jumpToLetter(L) {
+      const grp = alphaBox.querySelector('.cs-alpha-group[data-l="' + L + '"]');
+      if (!grp) return;
+      const top = body.scrollTop + grp.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      /* 减弱动效（系统偏好或 preview 的「交互特效」开关）时直接落位，不做平滑滚动 */
+      const still = document.documentElement.classList.contains('motion-off') ||
+        (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (!still && typeof body.scrollTo === 'function') body.scrollTo({ top: top, behavior: 'smooth' });
+      else body.scrollTop = top;
+    }
+
+    let barDragging = false, barLetter = '';
+    barBox.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const btn = letterAtY(e.clientY);
+      if (!btn) return;
+      barDragging = true;
+      barLetter = btn.dataset.l;
+      try { barBox.setPointerCapture(e.pointerId); } catch (err) {}   /* 手指/鼠标滑出 15px 宽的条也能继续跟踪 */
+      showBubble(btn, e.clientY);
+      e.preventDefault();
+    });
+    barBox.addEventListener('pointermove', function (e) {
+      if (!barDragging) return;
+      const btn = letterAtY(e.clientY);
+      if (!btn) return;
+      if (btn.dataset.l !== barLetter) { barLetter = btn.dataset.l; haptic('light'); }
+      showBubble(btn, e.clientY);
+      e.preventDefault();
+    });
+    function endBarDrag(e) {
+      if (!barDragging) return;
+      barDragging = false;
+      try { barBox.releasePointerCapture(e.pointerId); } catch (err) {}
+      bubble.classList.remove('show');
+      jumpToLetter(barLetter);
+    }
+    barBox.addEventListener('pointerup', endBarDrag);
+    barBox.addEventListener('pointercancel', endBarDrag);
+    /* 松手后浏览器会在原地补发 click（detail >= 1），已由 pointerup 处理，忽略；只剩键盘回车走这里 */
+    barBox.addEventListener('click', function (e) {
+      if (e.detail !== 0) return;
+      const b = e.target.closest('button[data-l]'); if (!b) return;
+      markActive(b);
+      jumpToLetter(b.dataset.l);
+    });
+
+    /* 初始态：把当前城市所属省份展开并标记该城市（首页/地区输入框都会传 current）。
+       页面没传或传的不是已知城市（如首页未设置城市时传的「设置城市」）就保持全部收起。 */
+    (function preselect() {
+      const cur = String(opts.current || '');
+      if (!cur) return;
+      let best = '';
+      Object.keys(ALL_CITIES).forEach(function (c) { if (cur.indexOf(c) > -1 && c.length > best.length) best = c; });
+      const prov = best ? ALL_CITIES[best] : '';
+      if (!prov) return;
+      const item = alphaBox.querySelector('.cs-alpha-item[data-p="' + prov + '"]');
+      if (item) openProv(item, false);
+      const cell = alphaBox.querySelector('.cs-cell[data-city="' + best + '"]');
+      if (cell) cell.classList.add('is-cur');
+    })();
 
     const kw = document.getElementById('city-kw');
     kw.addEventListener('input', function () {
       const v = kw.value.trim();
       const secs = body.querySelectorAll('[data-sec]');
+      barBox.style.display = v ? 'none' : '';  /* 搜索态下索引条无意义 */
+      sh.classList.toggle('is-search', !!v);    /* 搜索态收起高度，避免下方留一大片空玻璃 */
+      body.scrollTop = 0;
       if (!v) { secs.forEach(function (s) { s.hidden = (s.dataset.sec === 'search'); }); return; }
-      const hit = Object.keys(ALL_CITIES).filter(function (c) { return c.indexOf(v) > -1; });
-      document.getElementById('cs-search').innerHTML = hit.length ? gridHtml(hit) : '<div class="cs-empty">未找到「' + v + '」相关城市</div>';
+      /* 城市名或所属省名命中都算：搜「台湾」「广东」这类省名也要出结果，否则只会提示未找到 */
+      const hit = Object.keys(ALL_CITIES).filter(function (c) { return c.indexOf(v) > -1 || ALL_CITIES[c].indexOf(v) > -1; });
+      document.getElementById('cs-search').innerHTML = hit.length ? gridHtml(hit) : '<div class="cs-empty">未找到「' + esc(v) + '」相关城市</div>';
       secs.forEach(function (s) { s.hidden = (s.dataset.sec !== 'search'); });
-    });
-    provsBox.addEventListener('click', function (e) {
-      const b = e.target.closest('.cs-prov'); if (!b) return;
-      provsBox.querySelectorAll('.cs-prov').forEach(function (x) { x.classList.remove('active'); });
-      b.classList.add('active'); renderProv(b.dataset.p);
     });
     body.addEventListener('click', function (e) {
       const cell = e.target.closest('[data-city]');
@@ -1270,36 +1444,108 @@ window.UI = (function () {
     });
   })();
 
+  /* ---- 工作台准入（栈 A 权威） ----------------------------------------------------------
+     工作台只认账号身份：engchain-state.account → engchain-users（精确匹配，绝不回退 u1）
+     → engchain-province-agents / engchain-sub-agents。工作台场景键（栈 B）只决定视角与数据，
+     不再具备准入效力。状态白名单与 AgentStore.bitsFor 严格同口径：
+       省代 active|suspended；二级 approved|suspended。
+     其余（pending / rejected / terminated / revoked / 无记录 / 游客）一律拒绝进入。 */
+  var WB_ENTER_PROVINCE = { active: 1, suspended: 1 };
+  var WB_ENTER_SUB = { approved: 1, suspended: 1 };
+  function wbRead(key, def) {
+    try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : def; } catch (e) { return def; }
+  }
+  function wbSceneMode(key) { return (key && String(key).indexOf('sub-') === 0) ? 'sub' : 'province'; }
+  function workbenchAccess() {
+    var st = stateStore.get();
+    var out = { ok: false, uid: '', name: st.user || '', account: st.account || '',
+      canProvince: false, canSub: false, provinceStatus: '', subStatus: '', reason: 'none' };
+    if (st.loggedIn === false || st.status === 'guest') { out.reason = 'guest'; return out; }
+    var acct = String(st.account || '').trim();
+    if (!acct) { out.reason = 'nologin'; return out; }
+    var users = wbRead('engchain-users', []);
+    if (!Array.isArray(users)) users = [];
+    var u = null;
+    for (var i = 0; i < users.length; i++) {
+      if (users[i] && String(users[i].account || '') === acct) { u = users[i]; break; }
+    }
+    if (!u) { out.reason = 'nouser'; return out; }
+    out.uid = u.id || ''; out.name = u.name || out.name; out.account = acct;
+    var pa = wbRead('engchain-province-agents', []);
+    var sb = wbRead('engchain-sub-agents', []);
+    var paStatus = '', sbStatus = '';
+    if (Array.isArray(pa)) for (var j = 0; j < pa.length; j++) {
+      if (pa[j] && pa[j].uid === u.id) { paStatus = String(pa[j].status || ''); break; }
+    }
+    if (Array.isArray(sb)) for (var k = 0; k < sb.length; k++) {
+      if (sb[k] && sb[k].uid === u.id) { sbStatus = String(sb[k].status || ''); break; }
+    }
+    out.provinceStatus = paStatus; out.subStatus = sbStatus;
+    out.canProvince = !!WB_ENTER_PROVINCE[paStatus];
+    out.canSub = !!WB_ENTER_SUB[sbStatus];
+    if (out.canProvince || out.canSub) { out.ok = true; return out; }
+    var states = [paStatus, sbStatus];
+    var byReason = ['pending', 'rejected', 'terminated', 'revoked'];
+    for (var r = 0; r < byReason.length; r++) {
+      if (states.indexOf(byReason[r]) > -1) { out.reason = byReason[r]; return out; }
+    }
+    return out;
+  }
+  /* 场景收敛：把 URL/残留场景键锁到账号可用域；暂停/终止强制只读场景，
+     防止 ?scenario=active 绕过只读。 */
+  function pinWorkbenchScene(access, requestedKey) {
+    access = access || workbenchAccess();
+    var req = String(requestedKey || '');
+    var mode;
+    if (access.canProvince && access.canSub) mode = req ? wbSceneMode(req) : 'province';
+    else mode = access.canProvince ? 'province' : 'sub';
+    var key = (req && wbSceneMode(req) === mode) ? req : (mode === 'sub' ? 'sub-active' : 'active');
+    var status = mode === 'sub' ? access.subStatus : access.provinceStatus;
+    if (status === 'suspended' || status === 'terminated') key = mode === 'sub' ? 'sub-readonly' : 'suspended';
+    return key;
+  }
+
   /* ---- 工作台入口 URL（全站唯一实现 · 身份联动权威） ----------------------------------
      背景：工作台（pages/province-agent/uni/pages/home.html）有独立的身份栈
      （engchain-v3-demo-scenario / engchain-v3-demo-state-v1），与账号/演示场景栈
      （engchain-state）并行。历史做法是在各页用 ?role=sub_owner 之类的字面量硬编码，
      会导致「用户在工作台切成了二级员工 → 从分销/消息中心点进入工作台 → 身份被静默
      改回二级管理员」。
-     决策优先级：①工作台回声（用户最近一次显式选择，最高权威）
-                → ②调用方按账号判定的默认域（isSub）
-                → ③省代默认域。
+     决策优先级：①账号实际拥有的层级（栈 A，最高权威）
+                → ②工作台回声（仅当账号确实拥有回声所属层级时采用）
+                → ③调用方按账号判定的默认域（isSub）
+     这样残留的跨域回声不会再把人送进没有权限的工作台。
      opts.isSub  账号侧判定的默认域（可缺省）
      opts.base   工作台页相对路径（缺省为 pages/ 下一层的 ../province-agent/...）
      返回值可直接拼接 hash（如 + '#/home'）。 */
   function workbenchHref(opts) {
     opts = opts || {};
-    var echo = null;
-    try { echo = JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (e) { echo = null; }
-    var echoSub = !!(echo && echo.scene && String(echo.scene).indexOf('sub-') === 0);
-    var mode = (echo && echo.scene) ? (echoSub ? 'sub' : 'province') : (opts.isSub ? 'sub' : 'province');
-    var scene = mode === 'sub' ? 'sub-active' : 'active';
-    var role = mode === 'sub' ? 'sub_admin' : 'admin';
-    /* 回声与本域一致时才采用其场景与身份（跨域回声只用于定域，不串用对侧身份） */
-    if (echo && echo.scene && (mode === 'sub') === echoSub) {
-      scene = echo.scene;
+    var access = workbenchAccess();
+    var echo = wbRead('engchain-workbench-echo', null);
+    var echoScene = (echo && echo.scene) ? String(echo.scene) : '';
+    var echoSub = echoScene ? wbSceneMode(echoScene) === 'sub' : false;
+    var echoAllowed = !!(echoScene && access.ok && (echoSub ? access.canSub : access.canProvince));
+    var isSub;
+    if (!access.ok) isSub = !!opts.isSub;
+    else if (echoAllowed) isSub = echoSub;
+    else if (access.canProvince && access.canSub) isSub = !!opts.isSub;
+    else isSub = !!access.canSub;
+    var scene = isSub ? 'sub-active' : 'active';
+    var role = isSub ? 'sub_admin' : 'admin';
+    if (echoAllowed && echoScene && (wbSceneMode(echoScene) === 'sub') === isSub) {
+      scene = echoScene;
       if (echo.identity) role = echo.identity;
+    }
+    var status = isSub ? access.subStatus : access.provinceStatus;
+    if (access.ok && (status === 'suspended' || status === 'terminated')) {
+      scene = isSub ? 'sub-readonly' : 'suspended';
+      role = isSub ? 'sub_admin' : 'admin';
     }
     var base = opts.base || '../province-agent/uni/pages/home.html';
     return base + '?scenario=' + encodeURIComponent(scene) + '&role=' + encodeURIComponent(role);
   }
 
-  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchHref };
+  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchAccess, pinWorkbenchScene, workbenchHref };
 })();
 
 /* ============================================================================

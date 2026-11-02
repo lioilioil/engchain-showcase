@@ -141,6 +141,8 @@
     "gear":   '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     "chev-r": '<path d="M9 18l6-6-6-6"/>',
     "chev-l": '<path d="M15 18l-6-6 6-6"/>',
+    /* 无权限占位（锁）：演示场景身份不具备工作台准入时使用 */
+    "lock":   '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     /* 放大至全屏（Phosphor arrows-out）：待办弹窗右上角入口，点击切换至对应功能页 */
     "arrows-out": '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>'
   };
@@ -616,8 +618,19 @@
     } catch (e) {}
   }
 
-  /* ---------- 演示身份切换（全页生效：LS 权威值 + 重渲染当前页） ---------- */
+  /* ---------- 演示身份切换（全页生效：LS 权威值 + 重渲染当前页） ----------
+     准入闸门之后，切换也必须服从账号层级：不得跨域、不得用场景键绕过暂停只读。
+     无权限账号（页面已被占位接管）一律拒绝切换。 */
   function switchScenario(key) {
+    var a = accessOf();
+    if (a) {
+      if (!a.ok) return { ok: false, reason: "当前账号无工作台权限" };
+      var mode = desiredMode(key);
+      if ((mode === "sub" && !a.canSub) || (mode === "province" && !a.canProvince)) {
+        return { ok: false, reason: "当前账号无该层级权限" };
+      }
+      key = pinScene(a, key);
+    }
     var prevMode = ctx && ctx.mode;
     try { global.localStorage.setItem(STATE_KEY, key); } catch (e) {}
     syncAppMode();
@@ -630,6 +643,15 @@
     return { ok: true };
   }
   function switchRole(role) {
+    var nid = normalizeIdentity(role);
+    var a = accessOf();
+    if (a) {
+      if (!a.ok) return { ok: false, reason: "当前账号无工作台权限" };
+      var tm = (IDENTITY_META[nid] || IDENTITY_META.admin).mode;
+      if ((tm === "sub" && !a.canSub) || (tm === "province" && !a.canProvince)) {
+        return { ok: false, reason: "当前账号无该层级权限" };
+      }
+    }
     var prevMode = ctx && ctx.mode;
     var r = global.V3.store.act("role/set", { role: role });
     if (!r || !r.ok) return r || { ok: false, reason: "身份切换失败" };
@@ -719,9 +741,17 @@
   function switchIdentity(identity) {
     var nid = normalizeIdentity(identity);
     var targetMode = (IDENTITY_META[nid] || IDENTITY_META.admin).mode;
+    var a = accessOf();
+    if (a) {
+      if (!a.ok) return { ok: false, reason: "当前账号无工作台权限" };
+      if ((targetMode === "sub" && !a.canSub) || (targetMode === "province" && !a.canProvince)) {
+        return { ok: false, reason: "当前账号无该层级权限" };
+      }
+    }
     if (!ctx || ctx.mode !== targetMode) {
       var scene = targetMode === "sub" ? "sub-active" : "active";
-      switchScenario(scene);            // 跨域：先落场景（含重置种子），再切角色
+      var rs = switchScenario(scene);   // 跨域：先落场景（含重置种子），再切角色
+      if (rs && rs.ok === false) return rs;
     }
     return switchRole(nid);             // admin | legal_rep | staff | sub_admin | sub_legal | sub_staff
   }
@@ -732,6 +762,134 @@
     applyTheme(next);
   }
 
+  /* ---------- 工作台准入闸门（栈 A 权威；2026-11-02） ------------------------------
+     工作台 14 个独立页共用此入口。此前 boot() 只认栈 B 的场景键，任何人只要
+     ?scenario=active 就能进省代/二级工作台，且 syncWorkbench 会把非代理账号强行
+     置为 active。现在：账号（engchain-state → engchain-users 精确匹配）不具备
+     省代/二级身份时，页面渲染无权限占位，不播种、不加载、不渲染业务内容；具备
+     身份时把场景键收敛到本域，暂停/终止强制只读场景。
+     判定函数唯一来源是 js/common.js 的 UI.workbenchAccess / UI.pinWorkbenchScene。 */
+  var A_KEYS = ["engchain-state", "engchain-users", "engchain-province-agents", "engchain-sub-agents"];
+  var deniedAccess = null;   // 非空表示当前页已渲染无权限占位
+  var RECHECK_TICK = null;   // 账号态变更去抖：applyDemoScenario 先 login 再 build 资格记录
+
+  function accessOf() {
+    if (global.UI && typeof global.UI.workbenchAccess === "function") return global.UI.workbenchAccess();
+    /* 公共层未升级（缓存错配）时保持可用：告警后按既有行为继续，避免全站工作台白屏 */
+    try { console.warn("[uni-shared] UI.workbenchAccess 缺失，工作台准入闸门未生效"); } catch (e) {}
+    return null;
+  }
+  function pinScene(access, requested) {
+    if (global.UI && typeof global.UI.pinWorkbenchScene === "function") return global.UI.pinWorkbenchScene(access, requested);
+    var req = String(requested || "");
+    var mode = (access.canProvince && access.canSub) ? (req ? desiredMode(req) : "province")
+      : (access.canProvince ? "province" : "sub");
+    var key = (req && desiredMode(req) === mode) ? req : (mode === "sub" ? "sub-active" : "active");
+    var status = mode === "sub" ? access.subStatus : access.provinceStatus;
+    if (status === "suspended" || status === "terminated") key = mode === "sub" ? "sub-readonly" : "suspended";
+    return key;
+  }
+  function escHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function denyCopy(a) {
+    var r = a && a.reason;
+    if (r === "guest" || r === "nologin") {
+      return { t: "需要登录后进入工作台", d: "当前为游客身份。工作台仅向已完成入驻的省级总代与二级合作企业开放。" };
+    }
+    if (r === "pending") {
+      return { t: "入驻审核中", d: "你的入驻申请正在审核，审核通过后即可进入对应层级的工作台。" };
+    }
+    if (r === "rejected") {
+      return { t: "入驻申请未通过", d: "当前账号的入驻申请未通过审核，暂不能进入工作台。" };
+    }
+    if (r === "terminated") {
+      return { t: "合作已终止", d: "当前账号的省代 / 二级合作已终止，工作台数据已停止更新。" };
+    }
+    if (r === "revoked") {
+      return { t: "资质已撤销", d: "当前账号的合作资质已撤销，暂不能进入工作台。" };
+    }
+    if (r === "nouser") {
+      return { t: "当前账号未完成入驻", d: "未找到该账号的入驻档案。工作台仅向省级总代与二级合作企业开放。" };
+    }
+    return { t: "当前身份没有工作台权限", d: "工作台仅向省级总代与二级合作企业开放。" };
+  }
+  /* 无权限占位：替换业务容器、收掉工作台 chrome（返回键 / 铃铛设置 / 底部 tabbar），
+     不读取任何业务数据。样式复用系统 .empty-state，与 platform/dashboard 的拦截页同视觉。 */
+  function renderDenied(a) {
+    deniedAccess = a || { ok: false, reason: "none" };
+    injectSprite();
+    var c = denyCopy(deniedAccess);
+    var back = "../../../../pages/profile/index.html";
+    var titleEl = global.document.querySelector(".topbar-title");
+    if (titleEl) titleEl.textContent = "工作台";
+    var rights = global.document.querySelector(".topbar-right");
+    if (rights) rights.innerHTML = "";
+    var navBack = global.document.querySelector(".nav-back");
+    if (navBack) navBack.setAttribute("href", back);
+    else {
+      var leftLink = global.document.querySelector(".topbar-left a");
+      if (leftLink) {
+        leftLink.setAttribute("href", back);
+        leftLink.setAttribute("aria-label", "返回我的");
+        leftLink.setAttribute("title", "返回我的");
+        leftLink.textContent = "返回我的";
+      }
+    }
+    global.document.title = "无法进入工作台 · 工程链";
+    if (container) {
+      container.innerHTML =
+        '<div class="empty-state">' +
+          '<div class="e-icon">' + (global.UI && global.UI.icon ? global.UI.icon("lock") : icon("lock")) + '</div>' +
+          '<div class="e-title">' + escHtml(c.t) + '</div>' +
+          '<div class="e-desc">' + escHtml(c.d) +
+            '<br>若在演示中，请在演示场景切换为「省级总代」或「二级合作企业」身份后重试。</div>' +
+          '<div style="margin-top:var(--sp-6)"><a class="btn btn--primary" href="' + back + '">返回我的</a></div>' +
+        '</div>';
+    }
+    var tb = global.document.getElementById("uni-tabbar");
+    if (tb) tb.innerHTML = "";
+    var ph = global.document.querySelector(".phone");
+    if (ph) ph.classList.remove("has-uni-tab");
+    paintStatus();
+    if (STATUS_TICK) { clearInterval(STATUS_TICK); STATUS_TICK = null; }
+  }
+  /* 账号态变化（演示场景切换 / 登录登出 / 入驻状态变更）后重新判定：
+     无权限 → 渲染占位；已恢复权限 → 整页重载，走完整 boot。 */
+  function recheckAccess() {
+    var a = accessOf();
+    if (!a) return;
+    if (!a.ok) { if (!deniedAccess || deniedAccess.reason !== a.reason) renderDenied(a); return; }
+    if (deniedAccess) global.location.reload();
+  }
+  /* 演示场景切换的写入顺序是「先登录账号，再播种资格记录」；若在账号事件上立刻判定，
+     会短暂误判为无权限并闪一帧占位。延迟到同一轮写入结束后再判。 */
+  function scheduleRecheck() {
+    if (RECHECK_TICK) clearTimeout(RECHECK_TICK);
+    RECHECK_TICK = setTimeout(function () { RECHECK_TICK = null; recheckAccess(); }, 120);
+  }
+  /* 场景键变化：先按账号收敛（防止 ?scenario=active 绕过只读/跨域），再重建 ctx。 */
+  function reloadFromScene(nextKey) {
+    var a = accessOf();
+    if (a && !a.ok) { recheckAccess(); return; }
+    var key = a ? pinScene(a, nextKey || readScenarioKey()) : (nextKey || readScenarioKey());
+    try { global.localStorage.setItem(STATE_KEY, key); } catch (e) {}
+    syncAppMode();
+    var fresh = global.V3.store.load();
+    if (fresh && fresh.mode === desiredMode(key)) ctx = buildCtx(fresh);
+    else ctx = buildCtx(global.V3.store.reset(global.V3.scenarios.seedByScenario(key), key));
+    applyTheme(readTheme());
+    renderCurrent();
+  }
+  function onStorage(e) {
+    if (!e || !e.key) return;
+    if (e.key === THEME_KEY) { applyTheme(e.newValue === "dark" ? "dark" : "light"); return; }
+    if (e.key === STATE_KEY) { reloadFromScene(e.newValue); return; }
+    if (A_KEYS.indexOf(e.key) > -1) scheduleRecheck();
+  }
+
   /* ---------- 启动 ---------- */
   function boot(key, opts) {
     pageKey = key;
@@ -739,10 +897,21 @@
     if (!container) return;
     injectSprite();
 
-    /* URL 演示钩子（G5）：?scenario=&role=&theme= 驱动身份与主题，便于演示与截图 */
+    /* 0. 准入闸门（先于一切 URL 钩子与播种）：账号无省代/二级身份 → 无权限占位并终止 */
+    var access = accessOf();
+    if (access && !access.ok) { applyTheme(readTheme()); renderDenied(access); return; }
+
+    /* URL 演示钩子（G5）：?scenario=&role=&theme= 驱动身份与主题，便于演示与截图。
+       场景键一律经 pinScene 收敛到账号可用域（含暂停/终止只读），不再直接采信。 */
     var q = new global.URLSearchParams(global.location.search);
     var sc = q.get("scenario");
-    if (sc) { try { global.localStorage.setItem(STATE_KEY, sc); } catch (e) {} }
+    var requested = sc || readScenarioKey() || "";
+    if (access) {
+      var pinned = pinScene(access, requested);
+      try { global.localStorage.setItem(STATE_KEY, pinned); } catch (e) {}
+    } else if (sc) {
+      try { global.localStorage.setItem(STATE_KEY, sc); } catch (e) {}
+    }
     var th = q.get("theme");
     if (th === "dark" || th === "light") { try { global.localStorage.setItem(THEME_KEY, th); } catch (e) {} }
 
@@ -769,23 +938,8 @@
     applyTheme(readTheme());
     ctx = buildCtx(state);
 
-    /* 跨页联动：场景键 / 主题权威值 storage 事件 */
-    global.addEventListener("storage", function (e) {
-      if (!e || !e.key) return;
-      if (e.key === STATE_KEY) {
-        var fresh = global.V3.store.load();
-        syncAppMode();
-        if (fresh && fresh.mode === desiredMode(e.newValue)) ctx = buildCtx(fresh);
-        else {
-          var k2 = global.V3.store.currentScenario();
-          ctx = buildCtx(global.V3.store.reset(global.V3.scenarios.seedByScenario(k2), k2));
-        }
-        applyTheme(readTheme());
-        renderCurrent();
-      } else if (e.key === THEME_KEY) {
-        applyTheme(e.newValue === "dark" ? "dark" : "light");
-      }
-    });
+    /* 跨页联动：账号态 / 场景键 / 主题权威值 storage 事件 */
+    global.addEventListener("storage", onStorage);
 
     renderCurrent();
     if (STATUS_TICK) clearInterval(STATUS_TICK);
@@ -1066,6 +1220,8 @@
     switchIdentity: switchIdentity,
     switchScenario: switchScenario,
     switchRole: switchRole,
+    workbenchAccess: accessOf,
+    recheckAccess: recheckAccess,
     toggleTheme: toggleTheme,
     renderCurrent: renderCurrent,
     paintChrome: paintChrome,

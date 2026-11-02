@@ -75,7 +75,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 </div>
 
 <script src="../../js/data.js"></script>
-<script src="../../js/common.js?v=20261101wb1"></script>
+<script src="../../js/common.js?v=20261102wb1"></script>
 <script src="../../js/stores.js"></script>
 <script src="../../js/databus.js"></script>
 <script src="../../js/orgs.js"></script>
@@ -298,7 +298,25 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (!me || !window.AgentStore) return out;
       var read = agentReadIds();
       var E = window.AgentEsign || null;
+      /* 工作台入口必须与账号资格一致（2026-11-02 决策 3T2）：只有省代 active/suspended、
+         二级 approved/suspended 才给工作台链接；其余状态（待审/驳回/终止/撤销）落到
+         「我的」查看详情，避免把无权限账号送进工作台。 */
+      var bits = {};
+      try { bits = AgentStore.bitsFor(me.id) || {}; } catch (e2) { bits = {}; }
+      var PROFILE_HREF = '../profile/index.html';
+      function workbenchFor(preferred) {
+        if (preferred === 'sub' ? bits.isSubAgent : bits.isProvinceAgent) return preferred;
+        if (bits.isSubAgent) return 'sub';
+        if (bits.isProvinceAgent) return 'province';
+        return '';
+      }
+      function agentCta(preferred, label) {
+        var tgt = workbenchFor(preferred);
+        if (!tgt) return { href: PROFILE_HREF, label: '查看详情' };
+        return { href: UI.workbenchHref({ isSub: tgt === 'sub' }), label: label };
+      }
       function push(id, title, body, ts, href, label) {
+        if (href && typeof href === 'object') { label = label || href.label; href = href.href; }
         if (out.some(function (x) { return x.id === id; })) return;
         out.push({ kind: 'agent', cat: '代理', id: id, title: title, body: body,
           time: fmtTs(ts), ts: tsNum(ts), unread: read.indexOf(id) < 0,
@@ -310,7 +328,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         (pa.statusLog || []).forEach(function (lg, i) {
           push('pa-' + pa.id + '-' + i, '省代申请状态：' + agentStatusTxt(lg.toStatus),
             lg.reason ? lg.reason : ('由 ' + agentStatusTxt(lg.fromStatus) + ' 变更为 ' + agentStatusTxt(lg.toStatus)),
-            lg.at, UI.workbenchHref({ isSub: false }), '进入工作台');
+            lg.at, agentCta('province', '进入工作台'));
         });
       });
       /* 二级记录：本人发起（parentUid=me.id）或本人作为二级（uid=me.id） */
@@ -321,8 +339,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         (sb.statusLog || []).forEach(function (lg, i) {
           push('sub-' + sb.id + '-log-' + i, (mineSelf ? '您的二级合作状态：' : '二级合作方状态：') + agentStatusTxt(lg.toStatus),
             lg.reason ? lg.reason : ('由 ' + agentStatusTxt(lg.fromStatus) + ' 变更为 ' + agentStatusTxt(lg.toStatus)),
-            lg.at, UI.workbenchHref({ isSub: !!mineSelf }),
-            mineSelf ? '进入二级视角' : '查看');
+            lg.at, agentCta(mineParent && !mineSelf ? 'province' : 'sub',
+              mineSelf ? '进入二级视角' : '查看'));
         });
         var pend = null;
         try {
@@ -332,7 +350,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (pend) {
           push('sub-' + sb.id + '-esign', '协议待签署：' + ((sb.company && sb.company.name) || ''),
             'O4 二级合作协议待' + (mineSelf ? '您' : '二级') + '签署', pend.sentAt || Date.now(),
-            UI.workbenchHref({ isSub: !!mineSelf }), '去签署');
+            agentCta(mineParent && !mineSelf ? 'province' : 'sub', '去签署'));
         }
       });
     } catch (e) {}
@@ -354,9 +372,15 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try {
       var st = JSON.parse(localStorage.getItem('engchain-v3-demo-state-v1') || 'null');
       if (!st) return out;
+      var isSub = st.mode === 'sub';
+      /* 工作台待办属于栈 B 演示数据；当前账号不具备对应层级时整组隐藏，
+         否则非代理账号会看到别人的待办，并拿到一个进不去的工作台链接（2026-11-02）。 */
+      var me0 = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+      var bits0 = {};
+      try { bits0 = (me0 && window.AgentStore) ? (AgentStore.bitsFor(me0.id) || {}) : {}; } catch (e0) { bits0 = {}; }
+      if (isSub ? !bits0.isSubAgent : !bits0.isProvinceAgent) return out;
       var read = paTodoReadIds();
       function unreadOf(id) { return read.indexOf(id) < 0; }
-      var isSub = st.mode === 'sub';
       var d = isSub ? st.sub : st.province;
       if (!d) return out;
       /* 2026-11-01：统一走 UI.workbenchHref()（回声优先，避免覆盖工作台已切换的身份）

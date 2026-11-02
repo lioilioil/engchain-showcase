@@ -910,12 +910,15 @@
   ];
   function identitySheet(ctx, Uni) {
     var cur = ctx.identity, curMode = ctx.mode;
+    /* 只列本域 3 个身份（2026-11-02 决策 1A）：工作台不再提供跨域切换，
+       层级由演示场景决定；跨域切换既会让账号与场景分叉，也是越权的入口。 */
+    var list = IDENTITY_ORDER.filter(function (p) {
+      return (p[0].indexOf("sub_") === 0 ? "sub" : "province") === curMode;
+    });
     var body = '<div class="uh-padx"><div class="uh-list">' +
-      IDENTITY_ORDER.map(function (p) {
+      list.map(function (p) {
         var on = p[0] === cur;
-        var sameDomain = (p[0].indexOf("sub_") === 0 ? "sub" : "province") === curMode;
-        var sub = on ? "当前身份"
-          : (sameDomain ? "同域切换，保留当前演示数据" : "跨域切换，将按目标域重新播种演示数据");
+        var sub = on ? "当前身份" : "同域切换，保留当前演示数据";
         return '<button type="button" class="uh-row" data-id="' + p[0] + '"' +
           (on ? ' aria-current="true"' : '') + '>' +
           '<span class="uh-row__main"><span class="uh-row__t">' + ui.esc(p[1]) + '</span>' +
@@ -924,7 +927,8 @@
             : '<span class="uh-chev">' + ui.icon("chev", 16) + '</span>') +
           '</button>';
       }).join('') + '</div>' +
-      '<div class="uh-footnote">演示用身份切换，不产生真实业务操作记录。</div></div>';
+      '<div class="uh-footnote">演示用身份切换，不产生真实业务操作记录。<br>' +
+      '切换省级总代 / 二级合作层级，请到演示场景选择对应账号。</div></div>';
     var sh = Uni.sheet({ title: "切换演示身份", body: body, footer: [{ t: "关闭", kind: "ghost" }] });
     Array.prototype.forEach.call(sh.querySelectorAll("[data-id]"), function (n) {
       n.addEventListener("click", function () {
