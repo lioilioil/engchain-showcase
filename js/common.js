@@ -1984,9 +1984,7 @@ window.Cards = (function () {
     if (s.hot) out += '<span class="tag tag-red badge b-hot sc-badge sc-hot">热点</span>';
     /* [P0-01] 本人 pending_review：审核中灰角标（.sc-pending 由 state.css 纳入体系），卡片可点进只读预览 */
     if (s.status === 'pending_review') out += '<span class="sc-pending">审核中</span>';
-    var match = (typeof s.match === 'number') ? s.match : '';
-    /* 无匹配分（match 非数字）时不渲染匹配度胶囊，避免出现带「—」的空壳占位块（首页/列表通用） */
-    if (match !== '') out += '<span class="match-pill match-high badge b-match sc-match" style="margin-left:auto;">' + match + '%</span>';
+    /* AI 匹配度已下线（无 AI 分析数据源）：不再渲染匹配度胶囊（match-pill），避免展示无依据的百分比 */
     /* 无任何角标时不输出空壳包裹行，避免 .sc-badges 的 margin-bottom 形成孤立空隙（纯视觉） */
     if (!out) return '';
     return '<div class="sc-badges jc-tags">' + out + '</div>';

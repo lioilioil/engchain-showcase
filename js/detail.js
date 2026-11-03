@@ -124,8 +124,9 @@ window.DETAIL = (function () {
       (o.meta && o.meta.length ? '<div class="dh-meta">' + o.meta.map(function (m) { return '<span class="dh-meta-item">' + m + '</span>'; }).join('') + '</div>' : '') +
       '</div>';
   }
-  function matchMeta(r) { return [mt('pin', r.location), mt('check', 'AI匹配 ' + r.match + '%'), mt('eye', r.views + ' 浏览')]; }
-  function oppMeta(r) { return [mt('pin', r.location), mt('check', 'AI匹配 ' + r.match + '%'), mt('eye', r.views + ' 浏览')]; }
+  /* AI 匹配度已下线（App 未接入 AI 分析功能，无数据来源）：详情页不再展示「AI匹配 X%」，仅保留地点与浏览量 */
+  function matchMeta(r) { return [mt('pin', r.location), mt('eye', r.views + ' 浏览')]; }
+  function oppMeta(r) { return [mt('pin', r.location), mt('eye', r.views + ' 浏览')]; }
   /* ---- 解锁状态持久化（P0）：localStorage 快速渲染 + 分类有效期（原型无服务端，仅本地模拟持久化） ---- */
   var UnlockStore = {
     KEY: 'engchain-unlocked',
@@ -2502,8 +2503,8 @@ window.DETAIL = (function () {
           '<svg class="verified-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg></span></div>' +
         '<div class="cert-badge-sub">个人持证人才 · 简历信息已核验</div>' +
         '<div class="cert-badge-meta">' + UI.esc(meta || rec.title || '') + '</div></div></div>' +
-      '<div class="cert-score"><div class="cert-score-row"><span class="cert-score-num">' + (rec.match || '—') + '</span><span class="cert-score-max">%</span></div>' +
-        '<div class="cert-score-label">匹配度</div>' +
+      /* AI 匹配度已下线（无 AI 分析数据源）：移除证书卡「匹配度 X%」分数，仅保留资质等级徽章 */
+      '<div class="cert-score">' +
         '<div class="cert-score-grade" style="background:var(--primary-soft);border-color:var(--accent-line);color:var(--primary);">✦ ' + (rec.certLevel || '持证') + '</div></div>' +
     '</div>';
     // 底部
@@ -2574,9 +2575,8 @@ window.DETAIL = (function () {
         var base = dHero({ tag: d.txt + ' · ' + (r.cat || t0.label), verifiedHint: (r.verified ? '已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, locked: !UnlockStore.isUnlocked(r), meta: matchMeta(r) });
         var ai = r.aiAnalysis || {};
         var chips = (ai.tags || []).slice(0, 5).map(function (x) { return cfgText(x.k) + ' ' + cfgText(x.v); });
-        var matchPill = (ai.matchCount != null && ai.matchCount !== '')
-          ? '<span class="match-pill">匹配 ' + cfgText(ai.matchCount) + ' 位</span>' : '';
-        return base + matchPill + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +
+        /* AI 匹配数量已随匹配度一并下线（无 AI 分析数据源），不再展示「匹配 N 位」 */
+        return base + (chips.length ? '<div class="hero-grade"><span class="hg-label">结构化速览</span><div class="hg-list">' +
           chips.map(function (x) { return '<span class="tag tag-gold">' + x + '</span>'; }).join('') + '</div></div>' : '');
       },
       sections: function (r, c) {
@@ -4134,8 +4134,7 @@ window.DETAIL = (function () {
   function publishMeta(r) {
     var meta = [];
     if (r.location) meta.push(mt('pin', r.location));
-    if (typeof r.matches === 'number' && r.matches > 0) meta.push(mt('check', r.matches + ' 匹配'));
-    else if (typeof r.match === 'number') meta.push(mt('check', 'AI匹配 ' + r.match + '%'));
+    /* AI 匹配度已下线（无 AI 分析数据源）：发布类详情不再展示「AI匹配 X%」 */
     if (typeof r.views === 'number') meta.push(mt('eye', r.views + ' 浏览'));
     return meta;
   }
