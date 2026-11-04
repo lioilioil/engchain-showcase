@@ -70,7 +70,7 @@
     'feedback':      { id:'feedback',      n:'34', label:'意见反馈', href:'../help/feedback.html' },
     /* 分销与邀请 */
     'dist':          { id:'dist',          n:'35', label:'分销中心', href:'../distribution/index.html' },
-    'agency-sv':     { id:'agency-sv',     n:'36', label:'中介服务', href:'../agency/seller-board.html' },
+    'agency-sv':     { id:'agency-sv',     n:'36', label:'服务商', href:'../agency/seller-board.html' },
     'share':         { id:'share',          n:'37', label:'我的分享', href:'share.html' },
     /* 钱包与积分 */
     'credits':       { id:'credits',       n:'38', label:'我的积分', href:'../wallet/credits.html' },
@@ -108,7 +108,7 @@
     catch (e) { return null; }
   }
 
-  /* §4.1 我的招聘可见：已登录 && 企业认证(verified)/企业入驻(resident) && 非中介入驻 */
+  /* §4.1 我的招聘可见：已登录 && 企业认证(verified)/企业入驻(resident) && 非服务商入驻 */
   function canShowMyJobs() {
     try {
       if (!loggedIn()) return false;

@@ -680,23 +680,23 @@ window.MOCK = (function () {
       }
     },
     {
-      id: 1016, type: 'demand', title: '成都 需要建筑资质新办服务 建筑施工总承包三级 找正规中介', cat: '中介服务', sub: '',
+      id: 1016, type: 'demand', title: '成都 需要建筑资质新办服务 建筑施工总承包三级 找正规服务商', cat: '服务商', sub: '',
       budget: '', price: '', location: '成都市·武侯', city: '成都', distance: '2.1km',
       tags: ['资质新办', '总承包三级'], time: ago(55),
       company: '四川建设咨询有限公司', contact: '周经理', phone: '139****6677', wechat: 'zhou***',
       address: '成都市武侯区大厦', file: '',
-      detail: '公司需要新办建筑工程施工总承包三级资质（含安许），要求正规中介机构代办，价格合理、流程透明。',
+      detail: '公司需要新办建筑工程施工总承包三级资质（含安许），要求正规服务机构代办，价格合理、流程透明。',
       fields: [
         { k: '服务类型', v: '资质新办（总承包三级 + 安许）' },
         { k: '预算', v: '面议，按行情价' },
-        { k: '要求', v: '正规中介、流程透明、可查进度' }
+        { k: '要求', v: '正规服务商、流程透明、可查进度' }
       ],
-      qual: '要求中介企业具备企业入驻认证，服务流程可追踪，签订正式服务合同。', match: 84, views: 45, verified: false, hot: false,
+      qual: '要求服务商企业具备企业入驻认证，服务流程可追踪，签订正式服务合同。', match: 84, views: 45, verified: false, hot: false,
       detailLevel: 'brief',
       aiAnalysis: {
-        text: '成都 需要建筑资质新办服务 建筑施工总承包三级 找正规中介',
-        tags: [{ k: '品类', v: '中介服务' }, { k: '地区', v: '成都' }, { k: '服务类型', v: '资质新办' }],
-        summary: '系统判定为「找中介服务-需求」意向，目标区域成都，已自动匹配入驻中介服务商，解锁后可查看联系方式与服务菜单。',
+        text: '成都 需要建筑资质新办服务 建筑施工总承包三级 找正规服务商',
+        tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '服务类型', v: '资质新办' }],
+        summary: '系统判定为「我要找服务-需求」意向，目标区域成都，已自动匹配入驻服务商，解锁后可查看联系方式与服务菜单。',
         matchCount: 2
       }
     }
@@ -764,7 +764,7 @@ window.MOCK = (function () {
       rights: ['解锁联系方式', '付费详情', '精准匹配', '投标报价'] },
     { id: 'enterprise', label: '企业认证',      level: 4, desc: '企业工商 + 资质认证',
       rights: ['订单管理', '资金账户', '发票 / 对公', '企业店铺'] },
-    { id: 'resident',   label: '企业入驻',      level: 5, desc: '平台入驻企业（建筑/中介）',
+    { id: 'resident',   label: '企业入驻',      level: 5, desc: '平台入驻企业（建筑/服务商）',
       rights: ['全功能', '分销推广', '专属客服', '蓝V 企业标识'],
       types: ['construction', 'agency'] }
   ];
@@ -987,7 +987,7 @@ window.MOCK = (function () {
       consume: { material: 98, equipment: 98, labor: 98, transport: 98,
         /* [收购意向付费墙] 建企买卖-需求（收购意向·简要类）积分解锁 198 积分；建企转让-需求仍为保证金（tradeDeposit） */
         trade: 198,
-        /* [PHASE 0] 中介服务积分解锁：比价免费、解锁联系方式消耗 98 积分（与主板块一致） */
+        /* [PHASE 0] 服务商积分解锁：比价免费、解锁联系方式消耗 98 积分（与主板块一致） */
         agency: 98,
         /* 资质招商分级积分（后台可调；t1 一级总包/特级/电力一级，t2 二级总包/设计·监理甲级，t3 专业承包/其他） */
         franchise: {
@@ -1062,7 +1062,7 @@ window.MOCK = (function () {
     entryTypes: {
       construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V',
         yearly: { price: 3599, cycle: 'yearly', discount: 0.9 } },
-      agency: { fee: 2999, cycle: 'once', label: '中介服务企业', badge: '金V',
+      agency: { fee: 2999, cycle: 'once', label: '服务商企业', badge: '金V',
         /* [PHASE 0] 入驻费重构为「深度认证年审费」：含人工能力评估+征信评估+案例核验+年度复审清退；建议参数（可调） */
         yearly: { price: 2699, cycle: 'yearly', discount: 0.9 } }
       /* [M4-4] 旧企业合伙人 partner 入驻档位已摘除（个人合伙人 individualPartner 配置不受影响） */
@@ -1073,7 +1073,7 @@ window.MOCK = (function () {
     membership: {
       types: [
         { id: 'construction', name: '建筑企业', creditDiscount: 0.8, badge: '蓝V' },
-        { id: 'agency',       name: '中介服务企业', creditDiscount: 0.7, badge: '金V' }
+        { id: 'agency',       name: '服务商企业', creditDiscount: 0.7, badge: '金V' }
         /* [M4-4] 旧企业合伙人 partner 会员档已摘除 */
       ],
       /* [FEAT 9.2-1] 年度解锁会员（P1）：年费订阅，全部详情免费解锁 + 积分折扣提升至 0.5x */
@@ -1085,7 +1085,7 @@ window.MOCK = (function () {
         benefits: ['全部详情免费解锁', '积分折扣提升至0.5x', '专属标识', '优先客服']
       }
     },
-    /* 中介佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
+    /* 服务商佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
     /* [PHASE 0] 已下线：平台不做资金托管/放款/交易抽成，不介入服务过程与交易资金。
        tier/intent/escrow/warranty 仅保留结构供历史数据兼容，新业务不再产生佣金/意向金/托管流水。
        平台只做：信息发布与解锁、认证评估（基础免费+深度年审）、双向撮合。 */
@@ -1128,7 +1128,7 @@ window.MOCK = (function () {
       demandExpireDays: 7
     },
     /* ===== 身份感知运营包（服务商升级 v4） =====
-       设计口径：不是"卖道具"，而是按当前演示身份（个人 / 建筑企业 / 中介 / 区域代理）
+       设计口径：不是"卖道具"，而是按当前演示身份（个人 / 建筑企业 / 服务商 / 区域代理）
        给出「增强发布 + 系统推送 + 经营工具 + 专属服务」四柱一体包。
        - plans[].features：四柱权益文案，key 供 OpsStore.hasFeature() 判权
        - plans[].limits：可量化额度（置顶名额 / 线索条数 / AI 字数 / 电子签份数）
@@ -1172,9 +1172,9 @@ window.MOCK = (function () {
           manager: { name: '李经理', title: '企业客户经理', avatar: '李', hours: '08:30-20:00', sla: '2 小时内响应', phone: '400-880-6688 转 1' }
         },
         agency: {
-          key: 'agency', label: '中介服务', short: '中介', identityLabel: '中介服务企业入驻',
+          key: 'agency', label: '服务商', short: '服务商', identityLabel: '服务商企业入驻',
           headline: '更快接到询盘，更稳做好服务',
-          sub: '面向中介机构：需求抢单、精准线索、服务展示与合规经营，一套包解决获客与交付。',
+          sub: '面向服务机构：需求抢单、精准线索、服务展示与合规经营，一套包解决获客与交付。',
           needs: [
             { icon: 'bolt', title: '抢到精准询盘', desc: '需求广场新需求实时提醒，先人一步', href: '../agency/seller-board.html' },
             { icon: 'star', title: '提升服务曝光', desc: '服务置顶、案例展示与金牌标识', href: '../agency/seller-board.html' },
@@ -1182,7 +1182,7 @@ window.MOCK = (function () {
           ],
           pushCats: ['买家需求', '政策合规', '同行报价', '资质政策'],
           defaultPushCats: ['买家需求', '政策合规'],
-          manager: { name: '陈顾问', title: '中介行业顾问', avatar: '陈', hours: '09:00-21:00', sla: '2 小时内响应', phone: '400-880-6688 转 3' }
+          manager: { name: '陈顾问', title: '服务商行业顾问', avatar: '陈', hours: '09:00-21:00', sla: '2 小时内响应', phone: '400-880-6688 转 3' }
         },
         agent: {
           key: 'agent', label: '区域代理', short: '代理', identityLabel: '省级总代 · 二级合作',
@@ -1386,7 +1386,7 @@ window.MOCK = (function () {
               { k: 'service.compliance', l: '合规审查', d: '资质与发布内容双重把关' }
             ]
           } },
-        /* ---------------- 中介服务 ---------------- */
+        /* ---------------- 服务商 ---------------- */
         { key: 'a-std', group: 'agency', name: '入门版', tag: '先接询盘', price: 299, annualPrice: 2990, days: 30, recommended: false,
           blurb: '用线索包打开获客第一步',
           limits: { topSlots: 2, leadCredits: 20, aiWords: 50, esign: 0, seats: 1 },
@@ -1407,7 +1407,7 @@ window.MOCK = (function () {
               { k: 'service.standard', l: '标准客服', d: '工作日 8 小时内响应' }
             ]
           } },
-        { key: 'a-pro', group: 'agency', name: '专业版', tag: '中介首选', price: 699, annualPrice: 6990, days: 30, recommended: true,
+        { key: 'a-pro', group: 'agency', name: '专业版', tag: '服务商首选', price: 699, annualPrice: 6990, days: 30, recommended: true,
           blurb: '抢单更快，交付更稳',
           limits: { topSlots: 6, leadCredits: 80, aiWords: 200, esign: 20, seats: 4 },
           toolKeys: ['dashboard', 'lead', 'report', 'quote', 'aiCopy', 'monitor', 'esign', 'crm'],
@@ -1437,7 +1437,7 @@ window.MOCK = (function () {
               { k: 'publish.unlimited', l: '不限量发布', d: '多业务线自由铺量' },
               { k: 'publish.topSlots', l: '15 个置顶名额', d: '核心服务长期置顶' },
               { k: 'publish.home', l: '首页推荐', d: '平台首页服务推荐位' },
-              { k: 'publish.gold', l: '金牌中介标识', d: '搜索与派单优先' },
+              { k: 'publish.gold', l: '金牌服务商标识', d: '搜索与派单优先' },
               { k: 'publish.priority', l: '优先派单', d: '平台需求优先匹配' }
             ],
             push: [
@@ -1490,7 +1490,7 @@ window.MOCK = (function () {
         ],
         agency: [
           { kind: '买家需求', title: '买家发布：成都二级资质代办', body: '买家需要建筑二级资质新办，预算 8-12 万，期望 45 天内完成，已开放报价。' },
-          { kind: '政策合规', title: '中介服务明码标价检查提醒', body: '平台将开展明码标价专项检查，请确认服务项目、价格与退费规则已完整公示。' },
+          { kind: '政策合规', title: '服务商明码标价检查提醒', body: '平台将开展明码标价专项检查，请确认服务项目、价格与退费规则已完整公示。' },
           { kind: '同行报价', title: '同城 3 家机构更新了服务报价', body: '成都区域资质代办服务均价下调 6%，建议关注并调整你的服务包。' },
           { kind: '资质政策', title: '造价咨询资质政策更新', body: '住建部门发布工程造价咨询企业信用评价新规，涉及备案与执业人员要求。' }
         ],
@@ -1808,6 +1808,90 @@ window.MOCK = (function () {
       ],
       reviewCount: 142, certId: 'CERT-2026-EC-008701', emphasis: '建筑企业服务咨询备案',
       contact: { name: '王顾问', title: '企业服务负责人', phone: '138****2233' }, published: ['a1', 'a2']
+    },
+    {
+      id: 'c-bszx', name: '成都标筑标书服务有限公司', short: '标筑标书', avatar: '标',
+      industry: '建筑企业服务·招投标', mainBusiness: '标书编制 · 投标代办 · 电子标与 CA 服务', location: '成都·高新区',
+      creditCode: '91510100MA6BZBSX1X', legalRep: '刘明', regCapital: '200万元', founded: '2020-05-18', status: '存续（在营）',
+      score: { value: 8.8, grade: 'AA级' },
+      dims: [
+        { k: '资质合规', v: '8.6', s: 86, c: 'accent' },
+        { k: '经营稳定', v: '8.8', s: 88, c: 'accent' },
+        { k: '信用良好', v: '8.9', s: 89, c: 'success' },
+        { k: '服务优质', v: '9.0', s: 90, c: 'info' }
+      ],
+      tags: [{ t: '营业执照', ic: 'check' }, { t: '服务备案', ic: 'doc' }, { t: '法人认证', ic: 'user' }, { t: '对公验证', ic: 'info' }],
+      certs: [
+        { name: '营业执照核验', date: '2026-02-10' },
+        { name: '招投标代理服务备案', date: '2026-02-16' },
+        { name: '银行对公账户验证', date: '2026-02-12' },
+        { name: '法定代表人身份认证', date: '2026-02-10' }
+      ],
+      reviewCount: 96, certId: 'CERT-2026-EC-009102', emphasis: '招投标代理服务备案',
+      contact: { name: '刘顾问', title: '投标服务负责人', phone: '139****8812' }, published: ['a8']
+    },
+    {
+      id: 'c-jcjc', name: '四川恒信工程检测有限公司', short: '恒信检测', avatar: '检',
+      industry: '建筑工程检测', mainBusiness: '见证取样 · 桩基/主体结构 · 消防/防雷检测', location: '成都·金牛区',
+      creditCode: '91510100MA6CJHX9X9', legalRep: '陈志强', regCapital: '800万元', founded: '2016-08-02', status: '存续（在营）',
+      score: { value: 9.2, grade: 'AAA级' },
+      dims: [
+        { k: '资质合规', v: '9.4', s: 94, c: 'accent' },
+        { k: '经营稳定', v: '9.0', s: 90, c: 'accent' },
+        { k: '信用良好', v: '9.1', s: 91, c: 'success' },
+        { k: '服务优质', v: '9.2', s: 92, c: 'info' }
+      ],
+      tags: [{ t: 'CMA资质', ic: 'check' }, { t: '检验检测机构资质', ic: 'doc' }, { t: '法人认证', ic: 'user' }, { t: '对公验证', ic: 'info' }],
+      certs: [
+        { name: '检验检测机构资质认定（CMA）', date: '2025-11-30' },
+        { name: '建设工程质量检测机构资质', date: '2026-01-08' },
+        { name: '银行对公账户验证', date: '2026-01-05' },
+        { name: '法定代表人身份认证', date: '2025-12-20' }
+      ],
+      reviewCount: 208, certId: 'CERT-2026-EC-010023', emphasis: 'CMA 检验检测机构资质认定',
+      contact: { name: '陈主任', title: '检测业务负责人', phone: '138****5520' }, published: ['a10']
+    },
+    {
+      id: 'c-bxjj', name: '成都安泰保险经纪有限公司', short: '安泰保险', avatar: '保',
+      industry: '保险经纪·建筑工程', mainBusiness: '建工意外 · 雇主责任 · 工程一切险 · 安责险 · 投标保证保险', location: '成都·锦江区',
+      creditCode: '91510100MA6BXJJ8X8', legalRep: '周慧', regCapital: '1000万元', founded: '2017-03-15', status: '存续（在营）',
+      score: { value: 9.0, grade: 'AAA级' },
+      dims: [
+        { k: '资质合规', v: '9.3', s: 93, c: 'accent' },
+        { k: '经营稳定', v: '9.0', s: 90, c: 'accent' },
+        { k: '信用良好', v: '8.9', s: 89, c: 'success' },
+        { k: '服务优质', v: '9.1', s: 91, c: 'info' }
+      ],
+      tags: [{ t: '保险经纪牌照', ic: 'check' }, { t: '服务备案', ic: 'doc' }, { t: '法人认证', ic: 'user' }, { t: '对公验证', ic: 'info' }],
+      certs: [
+        { name: '保险经纪业务许可证', date: '2026-01-20' },
+        { name: '服务备案', date: '2026-01-26' },
+        { name: '银行对公账户验证', date: '2026-01-22' },
+        { name: '法定代表人身份认证', date: '2026-01-20' }
+      ],
+      reviewCount: 168, certId: 'CERT-2026-EC-010561', emphasis: '保险经纪业务许可（全国）',
+      contact: { name: '周经理', title: '工程险负责人', phone: '137****3306' }, published: ['a11']
+    },
+    {
+      id: 'c-jlzx', name: '四川华兴监理咨询有限公司', short: '华兴监理', avatar: '监',
+      industry: '工程监理与咨询', mainBusiness: '工程监理 · 全过程工程咨询 · 项目管理 · 代建', location: '成都·武侯区',
+      creditCode: '91510100MA6JLX1X1X', legalRep: '赵建华', regCapital: '1200万元', founded: '2014-11-06', status: '存续（在营）',
+      score: { value: 9.1, grade: 'AAA级' },
+      dims: [
+        { k: '资质合规', v: '9.5', s: 95, c: 'accent' },
+        { k: '经营稳定', v: '9.0', s: 90, c: 'accent' },
+        { k: '信用良好', v: '9.0', s: 90, c: 'success' },
+        { k: '服务优质', v: '9.1', s: 91, c: 'info' }
+      ],
+      tags: [{ t: '工程监理甲级', ic: 'check' }, { t: '服务备案', ic: 'doc' }, { t: '法人认证', ic: 'user' }, { t: '对公验证', ic: 'info' }],
+      certs: [
+        { name: '房屋建筑工程监理甲级', date: '2025-12-18' },
+        { name: '市政公用工程监理甲级', date: '2025-12-18' },
+        { name: '银行对公账户验证', date: '2026-01-10' },
+        { name: '法定代表人身份认证', date: '2025-12-22' }
+      ],
+      reviewCount: 186, certId: 'CERT-2026-EC-010982', emphasis: '房屋建筑/市政公用工程监理甲级',
+      contact: { name: '赵总监', title: '监理业务负责人', phone: '136****7789' }, published: ['a12']
     }
   ];
 
@@ -3007,10 +3091,10 @@ window.MOCK = (function () {
     }
   ];
 
-  /* ---- 中介服务详情 (建筑企业服务 · 工商注册/资质代办/咨询) ---- */
+  /* ---- 服务商详情 (建筑企业服务 · 工商注册/资质代办/咨询) ---- */
   const agencies = [
     {
-      id: 'a1', bizType: '中介服务', cat: '中介服务', sub: '资质升级', verified: true, hot: true, dir: 'supply', cats: ['资质代办'],
+      id: 'a1', bizType: '服务商', cat: '服务商', sub: '资质升级', verified: true, hot: true, dir: 'supply', cats: ['资质代办'],
       title: '建筑资质升级代办（二级→一级/安许新办延期 全程）',
       budget: '¥18.0', unit: '万元 · 一价全包', location: '成都·天府新区', city: '成都', distance: '—',
       tags: ['资质升级', '安许新办', '一价全包', '不过退款'], time: ago(42), views: 214, match: 86, companyId: 'c-znzx',
@@ -3076,7 +3160,7 @@ window.MOCK = (function () {
       contact: { name: '王顾问（资质部）', phone: '13880091122', wechat: 'wang-zizhi-cd', addr: '成都·天府新区·企业服务中心' }
     },
     {
-      id: 'a2', bizType: '中介服务', cat: '中介服务', sub: '工商注册', verified: true, hot: false, dir: 'supply', cats: ['资质代办','企业服务'],
+      id: 'a2', bizType: '服务商', cat: '服务商', sub: '工商注册', verified: true, hot: false, dir: 'supply', cats: ['资质代办','企业服务'],
       title: '建筑公司工商注册+安许+资质 一条龙代办',
       budget: '¥3.8', unit: '万元 · 全套', location: '贵阳·观山湖', city: '贵阳', distance: '—',
       tags: ['工商注册', '安许代办', '新办建筑', '注册+安全'], time: ago(90), views: 132, match: 78, companyId: 'c-znzx',
@@ -3136,7 +3220,7 @@ window.MOCK = (function () {
       contact: { name: '刘顾问（工商部）', phone: '13985013344', wechat: 'liu-gongshang-gy', addr: '贵阳·观山湖区·政务服务中心旁' }
     },
     {
-      id: 'a3', bizType: '中介服务', cat: '中介服务', sub: '安许代办', verified: true, hot: true, dir: 'supply', cats: ['资质代办','企业服务'],
+      id: 'a3', bizType: '服务商', cat: '服务商', sub: '安许代办', verified: true, hot: true, dir: 'supply', cats: ['资质代办','企业服务'],
       title: '建筑企业 安全生产许可证新办/延期 加急通道',
       budget: '¥6.8', unit: '万元 · 一价全包', location: '西安·雁塔', city: '西安', distance: '—',
       tags: ['安许新办', '延期', '加急', '不过退款'], time: ago(35), views: 156, match: 85, companyId: 'c-znzx',
@@ -3198,7 +3282,7 @@ window.MOCK = (function () {
       contact: { name: '赵顾问（安许部）', phone: '13772015566', wechat: 'zhao-anxu-xa', addr: '西安·雁塔区·建筑科技产业园' }
     },
     {
-      id: 'a4', bizType: '中介服务', cat: '中介服务', sub: '资质分立', verified: true, hot: false, dir: 'supply', cats: ['资质代办'],
+      id: 'a4', bizType: '服务商', cat: '服务商', sub: '资质分立', verified: true, hot: false, dir: 'supply', cats: ['资质代办'],
       title: '建筑资质分立/重组 专业代办 全国可办',
       budget: '¥12.0', unit: '万元 · 分期付款', location: '成都·武侯', city: '成都', distance: '—',
       tags: ['资质分立', '重组', '人员剥离', '全国'], time: ago(78), views: 121, match: 82, companyId: 'c-znzx',
@@ -3260,7 +3344,7 @@ window.MOCK = (function () {
       contact: { name: '孙顾问（重组部）', phone: '13688017788', wechat: 'sun-fenli-cd', addr: '成都·武侯区·商务总部基地' }
     },
     {
-      id: 'a5', bizType: '中介服务', cat: '中介服务', sub: '工程担保', verified: true, hot: true, dir: 'supply', cats: ['工程担保'],
+      id: 'a5', bizType: '服务商', cat: '服务商', sub: '工程担保', verified: true, hot: true, dir: 'supply', cats: ['工程担保'],
       title: '工程担保代办（投标/履约/预付款保函 全国出函）',
       budget: '¥0.8', unit: '万元/笔起 · 按担保额', location: '成都·武侯', city: '成都', distance: '—',
       tags: ['投标保函', '履约保函', '预付款担保', '电子保函'], time: ago(28), views: 186, match: 84, companyId: 'c-znzx',
@@ -3319,7 +3403,7 @@ window.MOCK = (function () {
       contact: { name: '赵顾问（担保部）', phone: '13785002233', wechat: 'zhao-danbao-cd', addr: '成都·武侯区·金融城' }
     },
     {
-      id: 'a6', bizType: '中介服务', cat: '中介服务', sub: '造价咨询', verified: true, hot: false, dir: 'supply', cats: ['造价咨询'],
+      id: 'a6', bizType: '服务商', cat: '服务商', sub: '造价咨询', verified: true, hot: false, dir: 'supply', cats: ['造价咨询'],
       title: '造价咨询/结算审核/全过程咨询 按项目计价',
       budget: '¥2.0', unit: '万元/项目起 · 按送审额', location: '成都·高新', city: '成都', distance: '—',
       tags: ['造价咨询', '结算审核', '全过程咨询', '审计'], time: ago(52), views: 143, match: 81, companyId: 'c-znzx',
@@ -3380,7 +3464,7 @@ window.MOCK = (function () {
       contact: { name: '李顾问（造价部）', phone: '13980991144', wechat: 'li-zaojia-cd', addr: '成都·高新区·天府软件园' }
     },
     {
-      id: 'a7', bizType: '中介服务', cat: '中介服务', sub: '劳务派遣', verified: true, hot: false, dir: 'supply', cats: ['劳务派遣'],
+      id: 'a7', bizType: '服务商', cat: '服务商', sub: '劳务派遣', verified: true, hot: false, dir: 'supply', cats: ['劳务派遣'],
       title: '建筑劳务派遣/班组分包 全国进场 用工合规',
       budget: '¥0.2', unit: '万元/人·月起 · 按工种', location: '成都·青羊', city: '成都', distance: '—',
       tags: ['劳务派遣', '班组分包', '用工合规', '持证上岗'], time: ago(61), views: 158, match: 80, companyId: 'c-znzx',
@@ -3438,6 +3522,412 @@ window.MOCK = (function () {
       ],
       qual: '入驻机构具备劳务派遣经营资质，人员实名制与社保规范。',
       contact: { name: '周顾问（劳务部）', phone: '13551006677', wechat: 'zhou-lw-cd', addr: '成都·青羊区·人力资源产业园' }
+    },
+    {
+      id: 'a8', bizType: '服务商', cat: '服务商', sub: '标书编制', verified: true, hot: true, dir: 'supply', cats: ['招投标'],
+      title: '招投标标书编制/投标代办 电子标 CA 一条龙',
+      budget: '¥0.2', unit: '万元/标 · 按项目', location: '成都·高新区', city: '成都', distance: '—',
+      tags: ['标书编制', '投标代办', '电子标', 'CA 办理'], time: ago(19), views: 236, match: 92, companyId: 'c-bszx',
+      desc: '提供投标文件编制（技术标/商务标）、投标资料整理、电子标上传与 CA 证书办理、投标保证金代办等全流程服务，覆盖房建、市政、公路等常见招标项目。',
+      serveType: '标书编制 / 投标代办 / 电子标与 CA / 保证金代办',
+      targetQualLevel: '不限——按招标文件要求整理投标资格资料',
+      targetQualMajor: '房建 / 市政 / 公路 / 机电安装等公开招标项目',
+      priceInclude: '含标书编制、排版封装、电子标上传指导；保证金代办手续费另计',
+      paymentTerms: '分 2 期：签约 50% · 递交前 50%（按标段计价）',
+      handleCycle: '常规标书 3–7 天；加急标 24–48 小时（视项目复杂度）',
+      personnelReq: '配备注册造价师与专职标书编制人员，多人复核后再递交',
+      policyBasis: '依据《招标投标法》及各地电子招投标管理办法规范编制与递交',
+      refundPolicy: '未按约定时限递交标书的，退还已收编制费用；已递交后不因废标退费',
+      overdueClause: '承诺递交时限每逾期 1 天减免当日服务费，上限 5 天',
+      govFeeNote: '不含招标文件工本费与投标保证金（由企业直接缴纳，平台/机构不代收）',
+      invoiceType: '增值税专用发票（6% 现代服务），对公结算',
+      successRate: 92,
+      rating: 4.8,
+      quote: {
+        total: '¥0.2 万/标起', range: '按标段规模、是否含技术标编制计价',
+        items: [
+          { k: '商务标编制', v: '¥0.08–0.15 万/标', note: '含资格文件整理' },
+          { k: '技术标编制', v: '¥0.15–0.4 万/标', note: '按施工方案复杂度' },
+          { k: '电子标/CA 代办', v: '¥500–1500/项', note: '含平台注册指导' },
+          { k: '全套投标托管', v: '按项目报价', note: '编制+递交+答疑一条龙' }
+        ],
+        govFee: '标书工本费与保证金由企业直缴',
+        payStages: [
+          { stage: '签约', pct: '50%', when: '需求确认、编制方案确定后' },
+          { stage: '递交', pct: '50%', when: '标书递交前完成支付' }
+        ],
+        include: ['标书编制与排版', '电子标上传指导', '废标项自查清单', '递交前复核'],
+        exclude: ['招标文件工本费', '投标保证金']
+      },
+      cases: [
+        { caseCompany: '成都某市政项目', caseQual: '施工总承包招标', caseLevel: '市政 · 资格+商务标', caseCycle: '5 天完成', caseResult: '一次通过资格评审，未出现废标项', caseDate: '2026-02', verifyUrl: '可提供递交回执（脱敏）' },
+        { caseCompany: '眉山某房建项目', caseQual: '房建总承包招标', caseLevel: '房建 · 全套托管', caseCycle: '7 天完成', caseResult: '技术标评分进入前 3，顺利入围', caseDate: '2026-05', verifyUrl: '可提供评标结果公示' }
+      ],
+      requiredMaterials: [
+        { name: '招标文件与澄清补遗', required: '必须', who: '企业提供', note: '编制与响应依据' },
+        { name: '企业资质与业绩证明', required: '必须', who: '企业提供', note: '营业执照、资质证书、业绩合同' },
+        { name: '人员证书与社保证明', required: '视招标要求', who: '企业提供', note: '项目经理、技术负责人证书' },
+        { name: 'CA 锁与平台账号', required: '视项目', who: '双方配合', note: '电子标需企业完成实名注册' }
+      ],
+      serveProcess: [
+        { step: 1, title: '招标文件解读', desc: '提取资格条件、评分办法与废标项', duration: '1 天', customerAction: '提供招标文件' },
+        { step: 2, title: '标书编制', desc: '商务标/技术标编制，内部双人复核', duration: '3–5 天', customerAction: '确认方案与盖章' },
+        { step: 3, title: '递交与跟进', desc: '电子标上传/线下递交，答疑澄清配合', duration: '1–2 天', customerAction: '配合答疑与开标' }
+      ],
+      fields: [
+        { k: '服务范围', v: '成都及周边 · 可远程' },
+        { k: '周期', v: '3–7 天（加急 24–48 小时）' },
+        { k: '费用构成', v: '按标段/是否含技术标' }
+      ],
+      qual: '入驻机构具备招投标代理服务备案，编制人员持证上岗、多人复核，递交全程留痕。',
+      contact: { name: '刘顾问（投标部）', phone: '139****8812', wechat: 'biaozhu-bs', addr: '成都·高新区·天府软件园' }
+    },
+    {
+      id: 'a9', bizType: '服务商', cat: '服务商', sub: '人才证照', verified: true, hot: true, dir: 'supply', cats: ['人才证照', '资质代办'],
+      title: '建造师/职称/特种作业证配置 资质人才一条龙',
+      budget: '¥1', unit: '万元/人 · 按证书类型', location: '成都·天府新区', city: '成都', distance: '—',
+      tags: ['建造师配置', '职称评审', '特种作业证', '继续教育'], time: ago(25), views: 189, match: 90, companyId: 'c-znzx',
+      desc: '为资质申报与投标提供建造师、中高级职称、八大员、特种作业操作证等人员配置服务，含证书核验、继续教育安排与注册变更代办，人员证书信息可追溯。',
+      serveType: '建造师配置 / 职称评审 / 特种作业证 / 继续教育',
+      targetQualLevel: '按企业资质申报与投标的人员配置要求匹配',
+      targetQualMajor: '房建 / 市政 / 公路 / 机电等资质类别',
+      priceInclude: '含证书核验、匹配推荐、注册变更与继续教育安排；按证书类型与配置周期计价',
+      paymentTerms: '分 2 期：匹配确认 50% · 完成注册/变更 50%',
+      handleCycle: '常规配置 7–15 天；加急按证书类别 3–10 天',
+      personnelReq: '仅提供持证人员合法推荐、培训取证与继续教育服务，不从事证书挂靠',
+      policyBasis: '依据《注册建造师管理规定》及住建部门人员配置要求提供服务',
+      refundPolicy: '未按约定完成配置的退还服务费；因企业提供材料不实导致失败的按实结算',
+      overdueClause: '承诺周期每逾期 1 天减免当日服务费，上限 7 天',
+      govFeeNote: '培训与考试报名费按官方标准实缴，不含行政规费',
+      invoiceType: '增值税专用发票（6% 现代服务），对公结算',
+      successRate: 94,
+      rating: 4.7,
+      quote: {
+        total: '¥1 万/人起', range: '按证书类别与配置周期计价',
+        items: [
+          { k: '二级建造师配置', v: '¥1–2 万/人', note: '含注册变更' },
+          { k: '一级建造师配置', v: '¥2–4 万/人', note: '按专业与业绩' },
+          { k: '中高级职称', v: '¥0.8–1.5 万/人', note: '评审材料指导' },
+          { k: '特种作业证培训取证', v: '¥1500–3000/证', note: '含培训与考试' }
+        ],
+        govFee: '培训、考试报名费按官方标准实缴',
+        payStages: [
+          { stage: '匹配', pct: '50%', when: '人员匹配确认后' },
+          { stage: '落地', pct: '50%', when: '注册/变更完成、证书可核验后' }
+        ],
+        include: ['证书核验', '匹配推荐', '注册变更代办', '继续教育安排'],
+        exclude: ['证书挂靠', '社保代缴（按实际需求另议）']
+      },
+      cases: [
+        { caseCompany: '成都某劳务企业', caseQual: '劳务资质', caseLevel: '8 人证书包', caseCycle: '12 天完成', caseResult: '二级建造师与特种作业证配置齐备，资质申报一次通过', caseDate: '2026-03', verifyUrl: '可提供人员证书核验记录' },
+        { caseCompany: '德阳某专业承包企业', caseQual: '专业承包资质', caseLevel: '职称+八大员', caseCycle: '20 天完成', caseResult: '中高级职称与八大员补配完成，投标人员要求满足', caseDate: '2026-06', verifyUrl: '可提供评审结果' }
+      ],
+      requiredMaterials: [
+        { name: '企业资质申报/投标需求', required: '必须', who: '企业提供', note: '需配置的证书类别与数量' },
+        { name: '企业营业执照', required: '必须', who: '企业提供', note: '配置协议签署用' },
+        { name: '人员证书与社保信息', required: '视需求', who: '双方配合', note: '存量人员核验' }
+      ],
+      serveProcess: [
+        { step: 1, title: '需求诊断', desc: '按资质/投标要求梳理证书缺口', duration: '1–2 天', customerAction: '提供企业证书清单' },
+        { step: 2, title: '匹配推荐', desc: '核验证书真实性后推荐人员', duration: '3–7 天', customerAction: '确认人选' },
+        { step: 3, title: '落地变更', desc: '注册/变更与继续教育安排', duration: '按证书类型', customerAction: '配合提交材料' }
+      ],
+      fields: [
+        { k: '服务范围', v: '全国 · 常备成都' },
+        { k: '周期', v: '7–15 天常规配置' },
+        { k: '费用构成', v: '按证书类别与周期' }
+      ],
+      qual: '入驻机构具备建筑业企业咨询服务备案，仅提供合法人才推荐、培训取证与继续教育，不从事挂靠服务。',
+      contact: { name: '王顾问（企业服务部）', phone: '138****2233', wechat: 'znzx-hr', addr: '成都·天府新区·中建咨询大厦' }
+    },
+    {
+      id: 'a10', bizType: '服务商', cat: '服务商', sub: '工程检测', verified: true, hot: true, dir: 'supply', cats: ['工程检测'],
+      title: '见证取样/桩基/结构检测 资质机构 出具 CMA 报告',
+      budget: '¥0.5', unit: '万元/项 · 按检测内容', location: '成都·金牛区', city: '成都', distance: '—',
+      tags: ['见证取样', '桩基检测', '主体结构', '消防/防雷'], time: ago(12), views: 312, match: 95, companyId: 'c-jcjc',
+      desc: '提供建筑材料见证取样检测、桩基与主体结构检测、消防/防雷检测、环境检测等工程检测服务，出具 CMA 资质认定报告，检测数据可对接质监备案。',
+      serveType: '见证取样 / 桩基与结构 / 消防防雷 / 环境检测',
+      targetQualLevel: '建设工程质量检测机构资质 · CMA 认定',
+      targetQualMajor: '房建 / 市政 / 公路 / 工业厂房等在建项目',
+      priceInclude: '含现场取样、检测试验、报告出具与质监备案配合',
+      paymentTerms: '分 2 期：进场 50% · 出报告 50%',
+      handleCycle: '见证取样 2–5 天；桩基/结构检测 5–15 天（按试验项目）',
+      personnelReq: '持证检测工程师现场取样，仪器设备按期检定',
+      policyBasis: '依据《建设工程质量检测管理办法》及 CMA 资质认定要求开展检测',
+      refundPolicy: '因机构原因无法按期出具报告的退还应检测费用；已出具报告后不因结论退费',
+      overdueClause: '承诺周期每逾期 1 天减免当日费用，上限 5 天',
+      govFeeNote: '不含质监站见证费与委托送检行政费用（如有）',
+      invoiceType: '增值税专用发票（6% 技术服务），对公结算',
+      successRate: 97,
+      rating: 4.9,
+      quote: {
+        total: '¥0.5 万/项起', range: '按检测项目与委托数量计价',
+        items: [
+          { k: '见证取样检测', v: '¥300–800/组', note: '按材料类别' },
+          { k: '桩基检测（低应变/静载）', v: '¥0.2–0.8 万/根', note: '按桩型与试验方法' },
+          { k: '主体结构检测', v: '¥0.5–2 万/栋', note: '按建筑面积' },
+          { k: '消防/防雷检测', v: '¥0.3–1 万/项目', note: '按检测点位' }
+        ],
+        govFee: '质监备案相关费用按实代收',
+        payStages: [
+          { stage: '进场', pct: '50%', when: '现场取样/试验进场后' },
+          { stage: '出报告', pct: '50%', when: '检测报告出具交付后' }
+        ],
+        include: ['现场取样', '试验检测', 'CMA 报告出具', '质监备案配合'],
+        exclude: ['质监站见证费', '特殊仪器租赁']
+      },
+      cases: [
+        { caseCompany: '成都某住宅项目', caseQual: '见证取样+主体结构', caseLevel: '房建 · 3 栋', caseCycle: '10 天完成', caseResult: '报告按时出具，质监备案一次通过', caseDate: '2026-04', verifyUrl: '可提供 CMA 报告编号' },
+        { caseCompany: '绵阳某厂房项目', caseQual: '桩基检测', caseLevel: '钢结构 · 120 根', caseCycle: '14 天完成', caseResult: '低应变检测全部完成，出具完整报告', caseDate: '2026-07', verifyUrl: '可提供检测报告' }
+      ],
+      requiredMaterials: [
+        { name: '委托检测清单', required: '必须', who: '企业提供', note: '检测项目、数量与部位' },
+        { name: '工程图纸/桩位图', required: '视项目', who: '企业提供', note: '桩基/结构检测定位用' },
+        { name: '现场作业条件', required: '必须', who: '双方配合', note: '取样部位、用电与安全条件' }
+      ],
+      serveProcess: [
+        { step: 1, title: '委托受理', desc: '确认检测项目与计价，签订委托单', duration: '1 天', customerAction: '提供检测清单' },
+        { step: 2, title: '现场取样/试验', desc: '持证人员进场取样，开展试验', duration: '2–10 天', customerAction: '配合现场条件' },
+        { step: 3, title: '报告出具', desc: '出具 CMA 报告并配合质监备案', duration: '1–3 天', customerAction: '接收报告' }
+      ],
+      fields: [
+        { k: '资质', v: 'CMA 认定 · 建设工程质量检测机构资质' },
+        { k: '周期', v: '2–15 天按项目' },
+        { k: '费用构成', v: '按检测项目与数量' }
+      ],
+      qual: '入驻机构具备 CMA 检验检测机构资质认定与建设工程质量检测机构资质，报告可对接质监备案。',
+      contact: { name: '陈主任（检测部）', phone: '138****5520', wechat: 'hengxin-jc', addr: '成都·金牛区·检测科技园' }
+    },
+    {
+      id: 'a11', bizType: '服务商', cat: '服务商', sub: '工程保险', verified: true, hot: false, dir: 'supply', cats: ['工程保险'],
+      title: '建工意外/雇主责任/安责险 工程保险方案定制',
+      budget: '¥0.1', unit: '万元/人·年 · 按工种', location: '成都·锦江区', city: '成都', distance: '—',
+      tags: ['建工意外险', '雇主责任险', '安全生产责任险', '投标保证保险'], time: ago(9), views: 174, match: 88, companyId: 'c-bxjj',
+      desc: '为施工企业定制建工意外伤害险、雇主责任险、工程一切险、安全生产责任险与投标保证保险方案，多家保司比价出单，提供理赔代办与续保管理。',
+      serveType: '建工意外 / 雇主责任 / 工程一切险 / 安责险 / 投标保证保险',
+      targetQualLevel: '保险经纪牌照机构 · 覆盖全国出单',
+      targetQualMajor: '房建 / 市政 / 公路 / 装饰装修等施工企业',
+      priceInclude: '含方案比价、投保出单、理赔协助与续保提醒；保费按保司费率实收',
+      paymentTerms: '保费直接支付至承保保险公司，经纪服务费另议（通常免收）',
+      handleCycle: '投保出单 1–3 天；批量项目 3–7 天',
+      personnelReq: '经纪人核验企业资质与人员名单后出单',
+      policyBasis: '依据《保险法》及安全生产责任保险相关要求规范投保',
+      refundPolicy: '承保后按保险合同退保条款执行；未出单前可全额退',
+      overdueClause: '出单时限每逾期 1 天减免当日经纪服务费，上限 5 天',
+      govFeeNote: '保费为保司标准费率，经纪服务不额外加收',
+      invoiceType: '保费由保司开具保险费发票；经纪服务费开具服务费发票',
+      successRate: 96,
+      rating: 4.8,
+      quote: {
+        total: '¥0.1 万/人·年起', range: '按工种与保额档次计价，多家保司比价',
+        items: [
+          { k: '建工意外险', v: '¥300–800/人·年', note: '按保额与工种' },
+          { k: '雇主责任险', v: '¥500–1500/人·年', note: '按赔偿限额' },
+          { k: '工程一切险', v: '按工程造价', note: '通常 1‰–3‰' },
+          { k: '安责险', v: '按项目投保', note: '强制险种' }
+        ],
+        govFee: '保费为保司标准费率',
+        payStages: [
+          { stage: '投保', pct: '100%', when: '保费直接支付承保保司' }
+        ],
+        include: ['方案比价', '投保出单', '理赔协助', '续保提醒'],
+        exclude: ['保费以外的附加服务费']
+      },
+      cases: [
+        { caseCompany: '成都某总承包企业', caseQual: '雇主责任险', caseLevel: '120 人 · 年单', caseCycle: '3 天出单', caseResult: '比价后保费下降 12%，人员名单全覆盖', caseDate: '2026-05', verifyUrl: '可提供保单号' },
+        { caseCompany: '乐山某劳务企业', caseQual: '建工意外险', caseLevel: '80 人 · 项目单', caseCycle: '2 天出单', caseResult: '按工种分档投保，理赔流程顺利', caseDate: '2026-08', verifyUrl: '可提供承保凭证' }
+      ],
+      requiredMaterials: [
+        { name: '企业营业执照', required: '必须', who: '企业提供', note: '投保主体核验' },
+        { name: '人员名单与工种', required: '必须', who: '企业提供', note: '按险种提供名单/花名册' },
+        { name: '项目信息', required: '视险种', who: '企业提供', note: '工程一切险/安责险需项目详情' }
+      ],
+      serveProcess: [
+        { step: 1, title: '需求确认', desc: '明确险种、保额与人员名单', duration: '1 天', customerAction: '提供名单与需求' },
+        { step: 2, title: '比价出单', desc: '多家保司比价，确认方案后投保', duration: '1–3 天', customerAction: '确认方案' },
+        { step: 3, title: '理赔与续保', desc: '出险协助理赔，到期前续保提醒', duration: '长期', customerAction: '出险时联系' }
+      ],
+      fields: [
+        { k: '资质', v: '保险经纪业务许可（全国）' },
+        { k: '出单', v: '1–3 天' },
+        { k: '费用', v: '保司标准费率，经纪免服务费' }
+      ],
+      qual: '入驻机构具备保险经纪业务许可证，方案比价透明、出单快捷，理赔全程协助。',
+      contact: { name: '周经理（工程险部）', phone: '137****3306', wechat: 'antai-bx', addr: '成都·锦江区·金融城' }
+    },
+    {
+      id: 'a12', bizType: '服务商', cat: '服务商', sub: '监理咨询', verified: true, hot: false, dir: 'supply', cats: ['监理咨询'],
+      title: '工程监理/全过程咨询 甲级监理机构',
+      budget: '¥5', unit: '万元/项目 · 按规模', location: '成都·武侯区', city: '成都', distance: '—',
+      tags: ['工程监理', '全过程咨询', '项目管理', '代建'], time: ago(30), views: 98, match: 85, companyId: 'c-jlzx',
+      desc: '提供房屋建筑与市政公用工程监理、全过程工程咨询、项目管理与代建服务，甲级监理资质，总监持证常驻，按节点出具监理报告。',
+      serveType: '工程监理 / 全过程工程咨询 / 项目管理 / 代建',
+      targetQualLevel: '房屋建筑、市政公用工程监理甲级',
+      targetQualMajor: '房建 / 市政 / 装修 / 工业厂房等项目',
+      priceInclude: '含监理人员驻场、旁站、验收与监理报告；按项目规模与工期计价',
+      paymentTerms: '分 3 期：进场 30% · 主体 40% · 竣工 30%',
+      handleCycle: '进场 3–7 天；全过程服务按工期',
+      personnelReq: '总监持注册监理工程师证，专业监理工程师按专业配置',
+      policyBasis: '依据《建设工程质量管理条例》与监理规范履行监理职责',
+      refundPolicy: '因机构原因无法履约的按已提供服务部分结算；企业原因中止按实结算',
+      overdueClause: '关键节点响应延迟的按合同约定减免服务费',
+      govFeeNote: '不含政府性规费与检测费',
+      invoiceType: '增值税专用发票（6% 现代服务），对公结算',
+      successRate: 93,
+      rating: 4.9,
+      quote: {
+        total: '¥5 万/项目起', range: '按工程造价与工期取费（通常 1%–2%）',
+        items: [
+          { k: '施工监理', v: '按造价 1%–1.5%', note: '房建/市政' },
+          { k: '全过程咨询', v: '按项目阶段报价', note: '决策-实施-竣工' },
+          { k: '项目管理/代建', v: '按项目包干', note: '含进度/质量/成本' }
+        ],
+        govFee: '不含政府性规费',
+        payStages: [
+          { stage: '进场', pct: '30%', when: '监理人员进场后' },
+          { stage: '主体', pct: '40%', when: '主体结构验收后' },
+          { stage: '竣工', pct: '30%', when: '竣工验收资料移交后' }
+        ],
+        include: ['总监常驻', '旁站与验收', '监理月报', '竣工验收配合'],
+        exclude: ['检测试验费', '政府性规费']
+      },
+      cases: [
+        { caseCompany: '成都某商业综合体', caseQual: '施工监理', caseLevel: '房建 · 8 万㎡', caseCycle: '18 个月', caseResult: '全程监理履约，竣工验收一次通过', caseDate: '2026-01', verifyUrl: '可提供监理合同（脱敏）' },
+        { caseCompany: '宜宾某市政道路', caseQual: '全过程咨询', caseLevel: '市政 · 4 公里', caseCycle: '10 个月', caseResult: '投资控制在概算内，按期交付', caseDate: '2026-06', verifyUrl: '可提供咨询报告' }
+      ],
+      requiredMaterials: [
+        { name: '项目资料', required: '必须', who: '企业提供', note: '图纸、施工合同、进度计划' },
+        { name: '监理委托需求', required: '必须', who: '企业提供', note: '监理范围与阶段' },
+        { name: '现场配合条件', required: '视项目', who: '双方配合', note: '办公与检测条件' }
+      ],
+      serveProcess: [
+        { step: 1, title: '委托评估', desc: '评估项目规模与取费，签订监理合同', duration: '2–3 天', customerAction: '提供项目资料' },
+        { step: 2, title: '进场履约', desc: '总监带团队进场，编制监理规划', duration: '按工期', customerAction: '提供现场条件' },
+        { step: 3, title: '竣工移交', desc: '验收、监理资料归档与移交', duration: '竣工期', customerAction: '组织竣工验收' }
+      ],
+      fields: [
+        { k: '资质', v: '房建/市政监理甲级' },
+        { k: '周期', v: '按工期' },
+        { k: '取费', v: '按造价 1%–2%' }
+      ],
+      qual: '入驻机构具备房屋建筑与市政公用工程监理甲级资质，总监持证常驻、报告合规。',
+      contact: { name: '赵总监（监理部）', phone: '136****7789', wechat: 'huaxing-jl', addr: '成都·武侯区·监理大厦' }
+    },
+    {
+      id: 'a13', bizType: '服务商', cat: '服务商', sub: '评估审计', verified: true, hot: false, dir: 'supply', cats: ['评估审计', '造价咨询'],
+      title: '资产评估/财务审计/竣工决算 专业机构',
+      budget: '¥1', unit: '万元/项 · 按资产规模', location: '成都·青羊区', city: '成都', distance: '—',
+      tags: ['资产评估', '财务审计', '竣工决算审计', '司法鉴定'], time: ago(21), views: 122, match: 86, companyId: 'c-cdrj',
+      desc: '提供企业资产评估、财务审计、竣工决算审计与工程造价司法鉴定服务，服务资质分立合并、破产重组与结算纠纷场景，出具具备法律效力的报告。',
+      serveType: '资产评估 / 财务审计 / 竣工决算审计 / 司法鉴定',
+      targetQualLevel: '具备相应执业资质的专业机构',
+      targetQualMajor: '建筑企业分立/合并、重组、结算纠纷等场景',
+      priceInclude: '含现场评估/审计、报告出具与后续答疑；按资产规模或工作量计价',
+      paymentTerms: '分 2 期：进场 50% · 报告交付 50%',
+      handleCycle: '常规评估/审计 10–20 天；司法鉴定按案件排期',
+      personnelReq: '注册评估师/注册会计师带队，执业资质可查',
+      policyBasis: '依据《资产评估法》《审计法》及行业执业准则出具报告',
+      refundPolicy: '因机构原因无法出具报告的退还已收费用；已出报告后不因结论退费',
+      overdueClause: '约定周期每逾期 1 天减免当日费用，上限 7 天',
+      govFeeNote: '不含司法鉴定受理费等行政规费（如有）',
+      invoiceType: '增值税专用发票（6% 现代服务），对公结算',
+      successRate: 95,
+      rating: 4.8,
+      quote: {
+        total: '¥1 万/项起', range: '按资产规模、工作量与用途计价',
+        items: [
+          { k: '资产评估', v: '¥1–5 万/项', note: '按资产规模' },
+          { k: '财务审计', v: '¥1–3 万/项', note: '按账套与工作量' },
+          { k: '竣工决算审计', v: '按送审金额', note: '通常 0.1%–0.3%' },
+          { k: '司法鉴定', v: '按案件报价', note: '需立案委托' }
+        ],
+        govFee: '司法鉴定受理费按实代收',
+        payStages: [
+          { stage: '进场', pct: '50%', when: '评估/审计进场后' },
+          { stage: '交付', pct: '50%', when: '报告交付后' }
+        ],
+        include: ['现场作业', '报告出具', '后续答疑', '归档文件'],
+        exclude: ['司法鉴定受理费', '差旅（视项目另议）']
+      },
+      cases: [
+        { caseCompany: '成都某建企分立', caseQual: '资产评估', caseLevel: '分立评估', caseCycle: '15 天完成', caseResult: '评估报告支撑资质分立顺利办理', caseDate: '2026-04', verifyUrl: '可提供报告编号' },
+        { caseCompany: '南充某结算纠纷', caseQual: '司法鉴定', caseLevel: '造价鉴定', caseCycle: '35 天完成', caseResult: '鉴定意见被采信，纠纷顺利结案', caseDate: '2026-07', verifyUrl: '可提供鉴定意见' }
+      ],
+      requiredMaterials: [
+        { name: '委托目的与范围', required: '必须', who: '企业提供', note: '评估/审计/鉴定用途' },
+        { name: '财务与资产资料', required: '必须', who: '企业提供', note: '账册、报表、资产清单' },
+        { name: '项目文件', required: '视用途', who: '企业提供', note: '合同、结算、图纸' }
+      ],
+      serveProcess: [
+        { step: 1, title: '委托受理', desc: '明确用途与范围，评估工作量报价', duration: '1–2 天', customerAction: '提供委托资料' },
+        { step: 2, title: '现场作业', desc: '评估/审计进场，收集核验资料', duration: '5–15 天', customerAction: '配合资料提供' },
+        { step: 3, title: '报告交付', desc: '出具报告并解答疑问', duration: '3–7 天', customerAction: '接收报告' }
+      ],
+      fields: [
+        { k: '资质', v: '注册评估师/注册会计师执业' },
+        { k: '周期', v: '10–20 天常规' },
+        { k: '费用', v: '按资产规模/工作量' }
+      ],
+      qual: '入驻机构由注册评估师、注册会计师带队执业，报告具备法律效力，可用于分立、重组与诉讼场景。',
+      contact: { name: '李总监（评估部）', phone: '138****6623', wechat: 'runjin-pg', addr: '成都·青羊区·财会大厦' }
+    },
+    {
+      id: 'a14', bizType: '服务商', cat: '服务商', sub: '认证信用', verified: true, hot: false, dir: 'supply', cats: ['认证信用', '企业服务'],
+      title: 'ISO/AAA信用/高新申报 企业信用修复',
+      budget: '¥0.5', unit: '万元/项 · 按认证类型', location: '成都·天府新区', city: '成都', distance: '—',
+      tags: ['ISO 体系认证', 'AAA 信用评级', '高新/专精特新', '信用修复'], time: ago(16), views: 143, match: 87, companyId: 'c-znzx',
+      desc: '提供 ISO 体系认证、AAA 信用评级、高新技术企业与专精特新申报、招投标加分项代办及企业信用修复服务，协助企业提升投标竞争力与合规经营水平。',
+      serveType: 'ISO 认证 / 信用评级 / 高新申报 / 信用修复',
+      targetQualLevel: '不限——按企业规模与投标需求匹配认证方案',
+      targetQualMajor: '建筑企业招投标加分、合规经营、资质维护',
+      priceInclude: '含认证辅导、材料组织、申报递交与后续年审提醒',
+      paymentTerms: '分 2 期：签约 50% · 证书/批复下发 50%',
+      handleCycle: 'ISO 认证 30–60 天；AAA 信用 7–15 天；高新申报按批次',
+      personnelReq: '认证咨询师与材料专员协同，申报材料全程留痕',
+      policyBasis: '依据 ISO 认证规则、企业信用评级标准与高新认定管理办法提供服务',
+      refundPolicy: '未通过评审且非企业原因导致的，按约定退还相应服务费',
+      overdueClause: '约定周期每逾期 1 天减免当日服务费，上限 10 天',
+      govFeeNote: '认证审核费与申报规费按官方标准实缴',
+      invoiceType: '增值税专用发票（6% 现代服务），对公结算',
+      successRate: 91,
+      rating: 4.6,
+      quote: {
+        total: '¥0.5 万/项起', range: '按认证类型与企业规模计价',
+        items: [
+          { k: 'ISO 9001/14001/45001', v: '¥0.8–2 万/项', note: '含辅导与审核费' },
+          { k: 'AAA 信用评级', v: '¥0.5–1.5 万/项', note: '含评级报告' },
+          { k: '高新/专精特新申报', v: '¥2–5 万/项', note: '按申报批次' },
+          { k: '信用修复', v: '按案件报价', note: '含异议申请' }
+        ],
+        govFee: '审核费与申报规费按官方标准实缴',
+        payStages: [
+          { stage: '签约', pct: '50%', when: '方案确认后' },
+          { stage: '下发', pct: '50%', when: '证书/批复下发后' }
+        ],
+        include: ['认证辅导', '材料组织', '申报递交', '年审提醒'],
+        exclude: ['官方审核费（实缴）', '审计报告费（如需）']
+      },
+      cases: [
+        { caseCompany: '成都某装饰企业', caseQual: 'ISO 三体系', caseLevel: '房装 · 三体系', caseCycle: '45 天通过', caseResult: '三体系认证一次通过，投标加分项齐全', caseDate: '2026-03', verifyUrl: '可提供认证证书' },
+        { caseCompany: '内江某劳务企业', caseQual: 'AAA 信用', caseLevel: '信用评级', caseCycle: '12 天完成', caseResult: '获 AAA 信用等级，投标资信评分提升', caseDate: '2026-06', verifyUrl: '可提供评级报告' }
+      ],
+      requiredMaterials: [
+        { name: '企业基础资料', required: '必须', who: '企业提供', note: '营业执照、资质、业绩' },
+        { name: '管理体系文件', required: '视认证', who: '双方配合', note: 'ISO 认证需体系文件' },
+        { name: '财务与纳税信息', required: '视申报', who: '企业提供', note: '高新/信用申报用' }
+      ],
+      serveProcess: [
+        { step: 1, title: '方案评估', desc: '按企业情况匹配认证/申报方案', duration: '1–2 天', customerAction: '提供企业资料' },
+        { step: 2, title: '辅导申报', desc: '材料组织、辅导审核、递交申报', duration: '按认证类型', customerAction: '配合整改与签批' },
+        { step: 3, title: '证书落地', desc: '证书/批复下发与年审提醒', duration: '长期', customerAction: '接收证书' }
+      ],
+      fields: [
+        { k: '服务范围', v: '全国 · 常备成都' },
+        { k: '周期', v: '7–60 天按认证类型' },
+        { k: '费用构成', v: '按认证类型与企业规模' }
+      ],
+      qual: '入驻机构具备建筑业企业咨询服务备案，认证与申报材料全程留痕、失败按约退还。',
+      contact: { name: '王顾问（企业服务部）', phone: '138****2233', wechat: 'znzx-auth', addr: '成都·天府新区·中建咨询大厦' }
     }
   ];
 
@@ -5045,7 +5535,7 @@ window.MOCK = (function () {
       'franchise-supply':  { cat: '资质招商', role: 'supply', detailLevel: 'detail', bizKey: 'franchise' },
       'trade-supply':      { cat: '建企买卖', role: 'supply', detailLevel: 'detail', bizKey: 'trade' },
       'personnel-demand':  { cat: '招聘',   role: 'demand',  detailLevel: 'detail', bizKey: 'personnel' },
-      'agency-supply':     { cat: '中介服务', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
+      'agency-supply':     { cat: '服务商', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
       'material-demand':   { cat: '材料',   role: 'demand',  detailLevel: 'brief',  bizKey: 'material' },
       'labor-demand':      { cat: '劳务',   role: 'demand',  detailLevel: 'brief',  bizKey: 'labor' },
       'equipment-demand':  { cat: '设备',   role: 'demand',  detailLevel: 'brief',  bizKey: 'equipment' },
@@ -5053,7 +5543,7 @@ window.MOCK = (function () {
       'franchise-demand':  { cat: '资质招商', role: 'demand', detailLevel: 'brief',  bizKey: 'franchise' },
       'trade-demand':      { cat: '建企买卖', role: 'demand', detailLevel: 'brief',  bizKey: 'trade' },
       'talent-supply':     { cat: '求职',   role: 'demand',  detailLevel: 'brief',  bizKey: 'talent' },
-      'agency-demand':     { cat: '中介服务', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
+      'agency-demand':     { cat: '服务商', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
     };
     function backfill(x) {
       if (!x) return;
@@ -5085,7 +5575,7 @@ window.MOCK = (function () {
           '招聘': 'personnel-demand',
           '人才': 'talent-supply',
           '求职': 'talent-supply',
-          '中介服务': (x.dir === 'demand') ? 'agency-demand' : 'agency-supply'
+          '服务商': (x.dir === 'demand') ? 'agency-demand' : 'agency-supply'
         };
         t = byCat[x.cat];
       }
@@ -5268,22 +5758,223 @@ window.MOCK = (function () {
         },
         files: []
       },
-      /* 8) agency-demand 找中介 #2（1016 为 #1） */
+      /* 8) agency-demand 找服务商 #2（1016 为 #1） */
       {
         id: 'B-AGd-02', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
-        cat: '中介服务', title: '成都企业 想找中介代办 施工总承包二级升一级 全程透明报价',
-        subCate: '找中介', sub: '资质升级', location: '成都市·青羊区', city: '成都',
+        cat: '服务商', title: '成都企业 想找服务商代办 施工总承包二级升一级 全程透明报价',
+        serviceCat: 'qual', sub: '资质升级', subCate: '资质代办', location: '成都市·青羊区', city: '成都',
         price: '', budget: '面议', unit: '',
-        desc: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办中介，要求先报价后签约、流程可查、不捆绑隐形消费。',
-        detail: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办中介，要求先报价后签约、流程可查、不捆绑隐形消费。',
-        tags: ['找中介', '资质升级', '二级升一级'],
+        desc: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办服务商，要求先报价后签约、流程可查、不捆绑隐形消费。',
+        detail: '成都本地建筑公司需办理施工总承包二级升一级资质升级，希望找正规代办服务商，要求先报价后签约、流程可查、不捆绑隐形消费。',
+        tags: ['找服务商', '资质升级', '二级升一级'],
         contact: { name: '高经理', phone: '136****4490', wechat: 'gaojl_hr' },
         address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 83, views: 52,
         aiAnalysis: {
-          text: '成都企业 想找中介代办 施工总承包二级升一级 全程透明报价',
-          tags: [{ k: '品类', v: '中介服务' }, { k: '地区', v: '成都' }, { k: '需求', v: '资质升级代办' }, { k: '级别', v: '二级升一级' }],
-          summary: '系统判定为「找中介服务-需求」意向，已匹配入驻资质代办服务商，解锁后可查看服务菜单与报价。',
+          text: '成都企业 想找服务商代办 施工总承包二级升一级 全程透明报价',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '需求', v: '资质升级代办' }, { k: '级别', v: '二级升一级' }],
+          summary: '系统判定为「我要找服务-需求·资质代办」意向，已匹配入驻资质代办服务商，解锁后可查看服务菜单与报价。',
           matchCount: 3
+        },
+        files: []
+      },
+      /* 9-19) agency-demand 找服务 #3-#13：服务广场 12 类业务分类各配一条需求种子
+         （#1/#2 为资质代办口径；serviceCat 与 pages/agency 的 CATS 12 类 id 一致，
+          subCate 用分类 label，供需列表服务子 tab 与详情页子类行可直接命中） */
+      {
+        id: 'B-AGd-03', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '成都房建项目 需履约保函 银行直开免保证金 3个工作日内出函',
+        serviceCat: 'guarantee', sub: '履约保函', subCate: '工程担保', location: '成都市·高新区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '房建总包项目需开具履约保函，要求银行直开、免保证金或低保证金，3 个工作日内出函，希望找担保机构按市场费率报价。',
+        detail: '房建总包项目需开具履约保函，要求银行直开、免保证金或低保证金，3 个工作日内出函，希望找担保机构按市场费率报价。',
+        tags: ['工程担保', '履约保函', '免保证金'],
+        contact: { name: '刘经理', phone: '138****2187', wechat: 'liubh88' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 86, views: 31,
+        aiAnalysis: {
+          text: '成都房建项目 需履约保函 银行直开免保证金 3个工作日内出函',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '工程担保' }, { k: '需求', v: '履约保函' }],
+          summary: '系统判定为「我要找服务-需求·工程担保」意向，已匹配入驻担保服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-04', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '市政项目 全过程造价咨询 从概算到结算审核 要求造价师驻场',
+        serviceCat: 'cost', sub: '全过程造价', subCate: '造价咨询', location: '成都市·天府新区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '市政道路项目需全过程造价咨询，覆盖投资概算、预算编制、过程跟踪与结算审核，要求注册造价师驻场，按节点付费。',
+        detail: '市政道路项目需全过程造价咨询，覆盖投资概算、预算编制、过程跟踪与结算审核，要求注册造价师驻场，按节点付费。',
+        tags: ['造价咨询', '全过程造价', '结算审核'],
+        contact: { name: '王工', phone: '139****5521', wechat: 'wangzj88' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 84, views: 27,
+        aiAnalysis: {
+          text: '市政项目 全过程造价咨询 从概算到结算审核 要求造价师驻场',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '造价咨询' }, { k: '需求', v: '全过程造价' }],
+          summary: '系统判定为「我要找服务-需求·造价咨询」意向，已匹配入驻造价服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 3
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-05', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '劳务公司 需长期派遣 电工焊工架子工 50人 按项目结算',
+        serviceCat: 'labor', sub: '劳务派遣', subCate: '劳务派遣', location: '成都市·双流区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '安装公司需长期劳务派遣，电工、焊工、架子工共约 50 人，要求持证上岗、工伤保险齐全，按项目进度结算，可长期合作。',
+        detail: '安装公司需长期劳务派遣，电工、焊工、架子工共约 50 人，要求持证上岗、工伤保险齐全，按项目进度结算，可长期合作。',
+        tags: ['劳务派遣', '电工', '焊工', '架子工'],
+        contact: { name: '赵经理', phone: '137****3316', wechat: 'zhaolaowu' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 88, views: 44,
+        aiAnalysis: {
+          text: '劳务公司 需长期派遣 电工焊工架子工 50人 按项目结算',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '劳务派遣' }, { k: '数量', v: '50人' }],
+          summary: '系统判定为「我要找服务-需求·劳务派遣」意向，已匹配入驻派遣服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 4
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-06', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '新设建筑公司 需工商注册+代账 全程代办 每月报税',
+        serviceCat: 'corp', sub: '工商注册代账', subCate: '企业服务', location: '成都市·武侯区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '新设建筑公司需要工商注册、银行开户协助、刻章备案与常年记账报税一条龙服务，要求财务合规、每月按时报税，报价透明。',
+        detail: '新设建筑公司需要工商注册、银行开户协助、刻章备案与常年记账报税一条龙服务，要求财务合规、每月按时报税，报价透明。',
+        tags: ['企业服务', '工商注册', '代账报税'],
+        contact: { name: '陈会计', phone: '158****9043', wechat: 'chenacc' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 82, views: 19,
+        aiAnalysis: {
+          text: '新设建筑公司 需工商注册+代账 全程代办 每月报税',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '企业服务' }, { k: '需求', v: '注册代账' }],
+          summary: '系统判定为「我要找服务-需求·企业服务」意向，已匹配入驻企业服务商，解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-07', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '市政绿化项目 需标书编制+电子投标 一级建造师答疑 两套标书',
+        serviceCat: 'bid', sub: '标书编制', subCate: '招投标', location: '成都市·锦江区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '市政绿化项目投标需专业标书编制，含技术标与商务标两套，要求熟悉电子投标流程、提供开标答疑支持，按中标情况付费可谈。',
+        detail: '市政绿化项目投标需专业标书编制，含技术标与商务标两套，要求熟悉电子投标流程、提供开标答疑支持，按中标情况付费可谈。',
+        tags: ['招投标', '标书编制', '电子投标'],
+        contact: { name: '周工', phone: '135****7629', wechat: 'zhoubiao' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 85, views: 38,
+        aiAnalysis: {
+          text: '市政绿化项目 需标书编制+电子投标 一级建造师答疑 两套标书',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '招投标' }, { k: '需求', v: '标书编制' }],
+          summary: '系统判定为「我要找服务-需求·招投标」意向，已匹配入驻标书服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 3
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-08', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '资质维护 需补挂一级建造师2名 职称证3本 只做合法配置不挂靠',
+        serviceCat: 'talent', sub: '人才证照配置', subCate: '人才证照', location: '成都市·金牛区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '公司资质维护需补充一级建造师 2 名、中级职称 3 本，仅用于合法人员配置与资质申报，不接受挂靠或倒证，需正规猎聘/培训渠道。',
+        detail: '公司资质维护需补充一级建造师 2 名、中级职称 3 本，仅用于合法人员配置与资质申报，不接受挂靠或倒证，需正规猎聘/培训渠道。',
+        tags: ['人才证照', '建造师配置', '职称', '不挂靠'],
+        contact: { name: '何经理', phone: '133****8056', wechat: 'hezp88' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 81, views: 26,
+        aiAnalysis: {
+          text: '资质维护 需补挂一级建造师2名 职称证3本 只做合法配置不挂靠',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '人才证照' }, { k: '需求', v: '合法配置' }],
+          summary: '系统判定为「我要找服务-需求·人才证照」意向，已匹配入驻人才证照服务方（合法猎聘/培训取证，不涉挂靠），解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-09', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '住宅项目 主体结构检测 见证取样+回弹+钢筋扫描 出CMA报告',
+        serviceCat: 'test', sub: '主体结构检测', subCate: '工程检测', location: '成都市·龙泉驿区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '住宅项目主体结构验收需第三方检测，含混凝土回弹、钢筋保护层扫描与见证取样，要求具备 CMA 资质、报告用于质检验收。',
+        detail: '住宅项目主体结构验收需第三方检测，含混凝土回弹、钢筋保护层扫描与见证取样，要求具备 CMA 资质、报告用于质检验收。',
+        tags: ['工程检测', '主体结构', 'CMA报告'],
+        contact: { name: '吴工', phone: '159****1173', wechat: 'wujc88' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 87, views: 33,
+        aiAnalysis: {
+          text: '住宅项目 主体结构检测 见证取样+回弹+钢筋扫描 出CMA报告',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '工程检测' }, { k: '需求', v: '主体结构检测' }],
+          summary: '系统判定为「我要找服务-需求·工程检测」意向，已匹配入驻检测服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-10', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '在建项目 需建工意外+雇主责任险 200人 保单当日生效 按人计费',
+        serviceCat: 'insure', sub: '建工意外险', subCate: '工程保险', location: '成都市·郫都区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '在建项目需为 200 名工人投保建工意外险与雇主责任险，要求保单当日生效、按人计费、理赔流程清晰，可由保险经纪比价出方案。',
+        detail: '在建项目需为 200 名工人投保建工意外险与雇主责任险，要求保单当日生效、按人计费、理赔流程清晰，可由保险经纪比价出方案。',
+        tags: ['工程保险', '建工意外险', '雇主责任险'],
+        contact: { name: '郑经理', phone: '136****6684', wechat: 'zhengbx' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 86, views: 41,
+        aiAnalysis: {
+          text: '在建项目 需建工意外+雇主责任险 200人 保单当日生效 按人计费',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '工程保险' }, { k: '数量', v: '200人' }],
+          summary: '系统判定为「我要找服务-需求·工程保险」意向，已匹配入驻保险经纪服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 3
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-11', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '厂房项目 需监理+全过程咨询 专业监理工程师驻场 旁站关键工序',
+        serviceCat: 'supv', sub: '工程监理', subCate: '监理咨询', location: '成都市·新都区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '工业厂房项目需委托监理单位，专业监理工程师驻场，负责进度、质量、安全三控与关键工序旁站，可一并提供全过程咨询。',
+        detail: '工业厂房项目需委托监理单位，专业监理工程师驻场，负责进度、质量、安全三控与关键工序旁站，可一并提供全过程咨询。',
+        tags: ['监理咨询', '工程监理', '全过程咨询'],
+        contact: { name: '孙总', phone: '130****2275', wechat: 'sunjl88' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 83, views: 22,
+        aiAnalysis: {
+          text: '厂房项目 需监理+全过程咨询 专业监理工程师驻场 旁站关键工序',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '监理咨询' }, { k: '需求', v: '工程监理' }],
+          summary: '系统判定为「我要找服务-需求·监理咨询」意向，已匹配入驻监理服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-12', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '公司并购前 需资产评估+财务审计 出具评估报告 30天内完成',
+        serviceCat: 'audit', sub: '资产评估', subCate: '评估审计', location: '成都市·青羊区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '并购前尽职调查需资产评估机构出具资产与股权评估报告，会计师事务所做近三年财务审计，要求 30 天内完成、报告用于交易定价。',
+        detail: '并购前尽职调查需资产评估机构出具资产与股权评估报告，会计师事务所做近三年财务审计，要求 30 天内完成、报告用于交易定价。',
+        tags: ['评估审计', '资产评估', '财务审计'],
+        contact: { name: '钱总', phone: '151****3948', wechat: 'qianpg' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 84, views: 18,
+        aiAnalysis: {
+          text: '公司并购前 需资产评估+财务审计 出具评估报告 30天内完成',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '评估审计' }, { k: '需求', v: '资产评估' }],
+          summary: '系统判定为「我要找服务-需求·评估审计」意向，已匹配入驻评估审计服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 2
+        },
+        files: []
+      },
+      {
+        id: 'B-AGd-13', typeKey: 'agency-demand', bizKey: 'agency', role: 'demand', detailLevel: 'brief',
+        cat: '服务商', title: '装饰公司 需ISO9001+AAA信用认证 全程代办 含内审培训 3个月下证',
+        serviceCat: 'credit', sub: 'ISO认证', subCate: '认证信用', location: '成都市·成华区', city: '成都',
+        price: '', budget: '面议', unit: '',
+        desc: '装饰公司需办理 ISO9001 质量管理体系认证与 AAA 信用等级认证，要求全程代办含内审员培训，3 个月内下证，价格含认证费。',
+        detail: '装饰公司需办理 ISO9001 质量管理体系认证与 AAA 信用等级认证，要求全程代办含内审员培训，3 个月内下证，价格含认证费。',
+        tags: ['认证信用', 'ISO9001', 'AAA信用'],
+        contact: { name: '杨经理', phone: '157****6619', wechat: 'yangiso' },
+        address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 85, views: 35,
+        aiAnalysis: {
+          text: '装饰公司 需ISO9001+AAA信用认证 全程代办 含内审培训 3个月下证',
+          tags: [{ k: '品类', v: '服务商' }, { k: '地区', v: '成都' }, { k: '业务分类', v: '认证信用' }, { k: '需求', v: 'ISO认证' }],
+          summary: '系统判定为「我要找服务-需求·认证信用」意向，已匹配入驻认证服务方，解锁后可查看服务菜单与报价。',
+          matchCount: 2
         },
         files: []
       }

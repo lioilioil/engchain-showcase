@@ -27,8 +27,8 @@ const seedInvoices = [
 
 // ========== 佣金流水 ==========
 const seedCommissionFlows = [
-  { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '中介撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * DAY, status: 'done' },
-  { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '中介撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * DAY, status: 'done' }
+  { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '服务商撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * DAY, status: 'done' },
+  { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '服务商撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * DAY, status: 'done' }
 ]
 
 // ========== 违规处罚 ==========

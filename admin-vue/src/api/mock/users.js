@@ -46,8 +46,8 @@ const seedUsers = [
     credits: { balance: 2350, quota: { month: '', used: 0 } }
   },
   {
-    id: 'u2', name: '李雅', company: '四川××工程中介服务有限公司', account: 'liya@engchain.cn', pwd: 'demo8888',
-    mobile: '13700002345', avatar: '李', tag: '入驻企业 · 中介', status: 'resident',
+    id: 'u2', name: '李雅', company: '四川××工程服务有限公司', account: 'liya@engchain.cn', pwd: 'demo8888',
+    mobile: '13700002345', avatar: '李', tag: '入驻企业 · 服务商', status: 'resident',
     identity: { personal: 'verified', enterprise: 'resident', entryTypes: ['agency'] },
     auth: {
       realname: { ok: true, ts: now - DAY * 45 },
@@ -352,7 +352,7 @@ export function tagOf(u) {
   if (u.banned) return '已封禁'
   const st = statusOf(u)
   /* [M4-4] 旧企业合伙人 partner 标签已摘除；个人合伙人(st=partner)在下方单独映射 */
-  const TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业' }
+  const TYPE_LABEL = { construction: '建筑企业', agency: '服务商企业' }
   if (st === 'resident') {
     const et = u.identity?.entryTypes?.[0] || u.entry?.type
     return '企业入驻 · ' + (TYPE_LABEL[et] || '')

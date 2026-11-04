@@ -341,6 +341,12 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
   if (!TYPE || TYPE.detailLevel !== 'brief') { location.href = 'guide.html'; return; }
   if (!TYPE.hide && TYPE.detailLevel === 'detail') { location.href = 'editor.html?type=' + typeKey; return; }
 
+  /* 服务业务分类（「我要找服务」二级选择带入）：serviceCat=12类 id，label 查 SERVICE_CATS */
+  var serviceCat = params.get('serviceCat') || '';
+  var SC = null;
+  try { if (serviceCat && window.serviceCatById) SC = serviceCatById(serviceCat); } catch (e) { SC = null; }
+  var isAgencyDemand = (typeKey === 'agency-demand');
+
   var st = (window.UI && UI.state) ? UI.state.get() : {};
   if (!st.loggedIn) { location.href = '../auth/login.html'; return; }
   var auth = (window.AuthStore && AuthStore.read) ? AuthStore.read() : {};
@@ -377,7 +383,7 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     '建企买卖':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
     '招聘':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
     '求职':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v3H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/></svg>',
-    '中介服务':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+    '服务商':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
   };
   function icon(k){ return CAT_ICON[k] || CAT_ICON['材料']; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -393,8 +399,9 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
 
   /* ---- 顶部类型卡 ---- */
   var head = document.getElementById('type-head');
+  var headSub = (SC && isAgencyDemand) ? ('业务分类：' + SC.label) : TYPE.sub;
   head.innerHTML = '<div class="type-head"><span class="type-ic">' + icon(TYPE.cat) + '</span>'
-    + '<div class="type-bd"><b>' + TYPE.label + '</b><span>' + TYPE.sub + '</span></div>'
+    + '<div class="type-bd"><b>' + TYPE.label + '</b><span>' + headSub + '</span></div>'
     + '<button class="type-change" type="button" id="btn-change-type">更换类型</button>'
     + '<span class="type-tag">即时上架</span></div>';
   var btnChangeType = document.getElementById('btn-change-type');
@@ -411,7 +418,7 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
       var idy = (acc0 && acc0.identity) ? acc0.identity : {};
       var nm = (st.user && st.user.name) || '实名用户';
       var flag = '';
-      if (idy.enterprise === 'resident') flag = '企业入驻 · ' + ((idy.entryTypes||[]).indexOf('agency')>=0?'中介企业':'建筑企业');
+      if (idy.enterprise === 'resident') flag = '企业入驻 · ' + ((idy.entryTypes||[]).indexOf('agency')>=0?'服务商企业':'建筑企业');
       else if (idy.enterprise === 'verified') flag = '企业认证';
       else if (idy.personal === 'professional' || idy.personal === 'full') flag = '个人入驻 · ' + ((st.user && st.user.userType === 'jobseeker') ? '应聘类' : '标准类');
       else flag = '个人认证 · 实名用户';
@@ -436,7 +443,8 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     if (mP) tags.push({ k: '预算', v: (mP[1]||mP[2]) + (mP[1] ? '万' : '元') });
     var mT = text.match(/(\d+)\s*天|(\d+)\s*日内|尽快|急/);
     if (mT) tags.push({ k: '时效', v: mT[1] ? mT[1] + '天' : (mT[0].indexOf('急')>=0 ? '紧急' : '尽快') });
-    var summary = '系统判定为「' + TYPE.label + '」意向，' + (region ? '目标区域 ' + region + '，' : '') + '已自动匹配同品类' + (TYPE.cat==='求职'?'招聘方':'供应方') + '，解锁后可查看联系方式与完整文件。';
+    if (SC && isAgencyDemand) tags.push({ k: '业务分类', v: SC.label });
+    var summary = '系统判定为「' + TYPE.label + (SC && isAgencyDemand ? ('·' + SC.label) : '') + '」意向，' + (region ? '目标区域 ' + region + '，' : '') + '已自动匹配同品类' + (TYPE.cat==='求职'?'招聘方':'供应方') + '，解锁后可查看联系方式与完整文件。';
     return { tags: tags, summary: summary };
   }
   function matches(limit){
@@ -445,10 +453,27 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     var pool = [];
     try {
       var cat = (window.MOCK && MOCK.catalog) ? MOCK.catalog.slice() : [];
-      pool = pool.concat(cat.filter(function(x){ return x.bizKey === biz || x.cat === (TYPE.cat==='求职'?'招聘':pairCat(pair)); }));
+      /* 「我要找服务」：优先按业务分类过滤服务方（服务记录的 cats 含分类 label），
+         不满足分类则不混入同品类其它服务，保证匹配方向正确 */
+      if (SC && isAgencyDemand) {
+        pool = pool.concat(cat.filter(function (x) {
+          if (x.bizKey !== 'agency' && x.cat !== '服务商') return false;
+          var cs = (x.cats || []).concat([x.subCate || '', x.sub || '', x.serveType || '']);
+          return cs.indexOf(SC.label) >= 0;
+        }));
+      } else {
+        pool = pool.concat(cat.filter(function(x){ return x.bizKey === biz || x.cat === (TYPE.cat==='求职'?'招聘':pairCat(pair)); }));
+      }
       if (window.SupplyStore) {
         var items = (SupplyStore.read().items || []);
-        pool = pool.concat(items.filter(function(x){ return (x.bizKey === biz) && x.status === 'active'; }));
+        var live = items.filter(function(x){ return (x.bizKey === biz) && x.status === 'active'; });
+        if (SC && isAgencyDemand) {
+          live = live.filter(function (x) {
+            var cs = (x.cats || []).concat([x.serviceCat || '', x.subCate || '', x.sub || '']);
+            return cs.indexOf(SC.id) >= 0 || cs.indexOf(SC.label) >= 0;
+          });
+        }
+        pool = pool.concat(live);
       }
     } catch(e){}
     var seen = {}, out = [];
@@ -494,7 +519,7 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     'franchise-demand':'本人有施工团队，想在成都找建筑总承包资质加盟或单项目挂靠，长期合作',
     'trade-demand':'想在四川收购一家带建筑总承包二级资质的公司，要求资质干净无债务，预算面谈',
     'talent-supply':'一级建造师建筑专业，8 年施工管理经验，求职项目经理，期望薪资 1.8 万每月，工作地成都',
-    'agency-demand':'新办建筑总承包二级资质加安许，想找靠谱中介，期望 60 天内取证，预算 6 万'
+    'agency-demand':'新办建筑总承包二级资质加安许，想找靠谱服务商，期望 60 天内取证，预算 6 万'
   };
   var voice = { mode:null, rec:null, base:'', final:'', timer:null, sec:0, fellback:false };
   var micBtn = document.getElementById('btn-voice');
@@ -743,7 +768,9 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
       bizKey: BIZ[typeKey] || 'material',
       detailLevel: 'brief',
       dir: TYPE.role, type: TYPE.role, role: TYPE.role,
-      cat: TYPE.cat, category: TYPE.cat, sub: '',
+      cat: TYPE.cat, category: TYPE.cat, sub: (SC && isAgencyDemand) ? SC.label : '',
+      serviceCat: (SC && isAgencyDemand) ? SC.id : '',
+      subCate: (SC && isAgencyDemand) ? SC.label : '',
       title: txt.substring(0, 24),
       desc: txt, detail: txt,
       city: region, location: region,
@@ -872,11 +899,14 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     var contact = { name: rn.name || (curUser && curUser.name) || st.user || '', phone: plainMobile, wechat: basic.wechat || st.wechat || '' };
     var payload = {
       title: txt.substring(0, 24),
-      type: TYPE.role, cat: TYPE.cat, sub: '',
+      type: TYPE.role, cat: TYPE.cat,
+      sub: (SC && isAgencyDemand) ? SC.label : '',
+      serviceCat: (SC && isAgencyDemand) ? SC.id : '',
       /* G-P4：brief 六键——detailLevel/typeKey/pubType/role/cat/bizKey；pubType 兼容旧读 */
       role: TYPE.role, typeKey: typeKey, pubType: typeKey, contact: contact,
-      /* 简要类轻量归类：发布时对标题做受控子类猜测（guess 不上则为空，详情页显示「未分类」） */
-      subCate: (function () {
+      /* 简要类轻量归类：发布时对标题做受控子类猜测（guess 不上则为空，详情页显示「未分类」）；
+         「我要找服务」直接采用二级选择的业务分类，不再靠标题猜测 */
+      subCate: (SC && isAgencyDemand) ? SC.label : (function () {
         if (!window.EngchainCatalog || !EngchainCatalog.guessRecord) return '';
         try {
           var g = EngchainCatalog.guessRecord({ category: TYPE.cat, subType: '', title: txt });
@@ -907,14 +937,14 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     var sucM = document.getElementById('suc-matches');
     if (ms.length) sucM.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px;text-align:left;">已匹配 ' + ms.length + ' 个相关' + (TYPE.cat==='求职'?'招聘':'供应') + '方</div>' + ms.map(function(m){ return matchItemHtml(m, true); }).join('');
     else sucM.innerHTML = '<div class="struct-empty" style="padding:0;text-align:left;">当前暂无同品类活跃信息，发布后平台将持续为您推荐。</div>';
-    document.getElementById('suc-desc').textContent = '您的「' + TYPE.label + '」已即时上架，供需双方可立即看到。浏览方解锁后可查看联系方式与文件。';
+    document.getElementById('suc-desc').textContent = '您的「' + TYPE.label + (SC && isAgencyDemand ? ('·' + SC.label) : '') + '」已即时上架，供需双方可立即看到。浏览方解锁后可查看联系方式与文件。';
     renderSucActions(typeKey);
     document.getElementById('success-page').classList.add('show');
   }
   submitBtn.addEventListener('click', doSubmit);
   pvSubmit.addEventListener('click', doSubmit);
 
-  /* 成功页操作按钮：按发布类型分支（收购→顾问闭环；找中介→供需池/服务广场双出口） */
+  /* 成功页操作按钮：按发布类型分支（收购→顾问闭环；找服务→供需池/服务广场双出口） */
   function renderSucActions(tk) {
     var box = document.getElementById('suc-actions');
     if (!box) return;
@@ -935,7 +965,7 @@ textarea.step-input{padding:14px 58px 14px 15px;border-radius:var(--r-l);line-he
     var bind = function (id, fn) { var el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
     bind('suc-view', function () { location.href = 'records.html'; });
     bind('suc-records', function () { location.href = 'records.html'; });
-    bind('suc-pool', function () { location.href = '../supply/list.html?cat=' + encodeURIComponent('中介服务'); });
+    bind('suc-pool', function () { location.href = '../supply/list.html?cat=' + encodeURIComponent('服务商'); });
     bind('suc-plaza', function () { location.href = '../agency/index.html'; });
     bind('suc-advisor', function () { location.href = '../trade/index.html?openDelegate=1'; });
     bind('suc-home', function () { location.href = '../../home.html'; });

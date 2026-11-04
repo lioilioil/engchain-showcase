@@ -33,7 +33,7 @@
     { name: '运输', keys: ['transport-supply', 'transport-demand'] },
     { name: '建筑企业', keys: ['franchise-supply', 'franchise-demand', 'trade-supply', 'trade-demand'] },
     { name: '人才', keys: ['personnel-demand', 'talent-supply'] },
-    { name: '中介服务', keys: ['agency-supply', 'agency-demand'] }
+    { name: '服务商', keys: ['agency-supply', 'agency-demand'] }
   ];
 
   var SVG = {
@@ -113,7 +113,14 @@
       + 'html[data-theme="dark"] .pts-row.is-current{border-color:rgba(111,184,154,.4);background:rgba(111,184,154,.08);}'
       + 'html[data-theme="dark"] .pts-ic.supply{background:rgba(201,164,92,.16);color:#C9A45C;}'
       + 'html[data-theme="dark"] .pts-badge.supply{color:#C9A45C;background:rgba(201,164,92,.16);}'
-      + 'html[data-theme="dark"] .pts-lock-ic{color:rgba(244,240,233,.5);}';
+      + 'html[data-theme="dark"] .pts-lock-ic{color:rgba(244,240,233,.5);}'
+      /* 服务业务分类二级视图：首字色块 + 返回条 */
+      + '.pts-ic-c{font-weight:800;font-size:13px;font-style:normal;width:32px;height:32px;border-radius:10px;}'
+      + '.pts-back{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;padding:11px;'
+      + 'font-size:12px;font-weight:700;color:rgba(38,30,18,.55);background:rgba(38,30,18,.04);border:1px dashed rgba(38,30,18,.16);border-radius:12px;cursor:pointer;}'
+      + '.pts-back svg{width:14px;height:14px;}'
+      + '.pts-back:active{background:rgba(38,30,18,.08);}'
+      + 'html[data-theme="dark"] .pts-back{color:rgba(244,240,233,.55);background:rgba(244,240,233,.05);border-color:rgba(244,240,233,.18);}';
     var st = document.createElement('style');
     st.setAttribute('data-pts', '1');
     st.textContent = css;
@@ -175,34 +182,12 @@
     panel.setAttribute('aria-modal', 'true');
     panel.setAttribute('aria-label', title);
 
-    var rowsHtml = '';
-    GROUPS.forEach(function (g) {
-      var inner = '';
-      g.keys.forEach(function (k) {
-        var t = PT[k];
-        if (!t || t.hide) return;
-        var isCur = (k === current);
-        var locked = !allowed[k] && !isCur;
-        var side = t.role === 'supply' ? 'supply' : 'demand';
-        var badge;
-        if (isCur) badge = '<span class="pts-badge cur">' + SVG.check + '当前</span>';
-        else if (locked) badge = '<span class="pts-badge lock">' + SVG.lock + esc(lockReason(t, au)) + '</span>';
-        else badge = '<span class="pts-badge ' + side + '">' + (side === 'supply' ? '供' : '需') + '</span>';
-        inner += '<button type="button" class="pts-row' + (isCur ? ' is-current' : '') + (locked ? ' is-locked' : '') + '"'
-          + ' data-key="' + esc(k) + '" data-locked="' + (locked ? '1' : '0') + '"' + (isCur ? ' disabled' : '') + '>'
-          + '<span class="pts-ic ' + side + '">' + SVG[side] + '</span>'
-          + '<span class="pts-main"><b>' + esc(t.guideLabel || t.label) + '</b><span>' + esc(t.guideSub || t.sub) + '</span></span>'
-          + badge + '</button>';
-      });
-      if (inner) rowsHtml += '<div class="pts-grp"><div class="pts-gh"><i>' + esc(g.name.charAt(0)) + '</i><b>' + esc(g.name) + '</b><span>' + g.keys.length + ' 类</span></div>' + inner + '</div>';
-    });
-
     panel.innerHTML = ''
       + '<div class="pts-grab"></div>'
       + '<div class="pts-hd"><div class="pts-ti"><b>' + esc(title) + '</b>'
       + '<span class="pts-sub">' + esc(subText) + '</span></div>'
       + '<button type="button" class="pts-x" aria-label="关闭">' + SVG.close + '</button></div>'
-      + '<div class="pts-bd">' + rowsHtml + '</div>';
+      + '<div class="pts-bd"></div>';
 
     document.body.appendChild(mask);
     document.body.appendChild(panel);
@@ -210,6 +195,10 @@
     var sheet = { mask: mask, panel: panel, onKey: function (e) { if (e.key === 'Escape') close(); } };
     openSheet = sheet;
     document.addEventListener('keydown', sheet.onKey, true);
+
+    /* 视图状态：主视图 / 服务业务分类二级视图共用同一 sheet，渲染函数按 state 重建 .pts-bd */
+    var state = { PT: PT, allowed: allowed, current: current, au: au, opts: opts, title: title, subText: subText, panel: panel };
+    renderMainInto(state);
 
     requestAnimationFrame(function () {
       mask.classList.add('pts-show');
@@ -237,6 +226,12 @@
       }
       if (k === current) { close(); return; }
 
+      /* 「我要找服务」类：先展开 12 类服务业务分类二级选择，选中后带 serviceCat 直达发布表单 */
+      if (t.serviceCats) {
+        renderServiceCatView(state, k);
+        return;
+      }
+
       /* 目标编辑器 URL：复用统一路由，并标记 fresh=1 —— 目标页以全新空白表单起步，不弹自动草稿恢复 */
       var href = global.publishTypeHref(k);
       href += (href.indexOf('?') >= 0 ? '&' : '?') + 'fresh=1';
@@ -246,6 +241,78 @@
         if (ret === false) return; /* 调用方自行接管导航 */
       }
       global.location.href = href;
+    });
+  }
+
+  /* ---- 主视图：全部发布类型分组列表 ---- */
+  function renderMainView(state) {
+    var rowsHtml = '';
+    GROUPS.forEach(function (g) {
+      var inner = '';
+      g.keys.forEach(function (k) {
+        var t = state.PT[k];
+        if (!t || t.hide) return;
+        var isCur = (k === state.current);
+        var locked = !state.allowed[k] && !isCur;
+        var side = t.role === 'supply' ? 'supply' : 'demand';
+        var badge;
+        if (isCur) badge = '<span class="pts-badge cur">' + SVG.check + '当前</span>';
+        else if (locked) badge = '<span class="pts-badge lock">' + SVG.lock + esc(lockReason(t, state.au)) + '</span>';
+        else badge = '<span class="pts-badge ' + side + '">' + (side === 'supply' ? '供' : '需') + '</span>';
+        inner += '<button type="button" class="pts-row' + (isCur ? ' is-current' : '') + (locked ? ' is-locked' : '') + '"'
+          + ' data-key="' + esc(k) + '" data-locked="' + (locked ? '1' : '0') + '"' + (isCur ? ' disabled' : '') + '>'
+          + '<span class="pts-ic ' + side + '">' + SVG[side] + '</span>'
+          + '<span class="pts-main"><b>' + esc(t.guideLabel || t.label) + '</b><span>' + esc(t.guideSub || t.sub) + '</span></span>'
+          + badge + '</button>';
+      });
+      if (inner) rowsHtml += '<div class="pts-grp"><div class="pts-gh"><i>' + esc(g.name.charAt(0)) + '</i><b>' + esc(g.name) + '</b><span>' + g.keys.length + ' 类</span></div>' + inner + '</div>';
+    });
+    return rowsHtml;
+  }
+
+  function renderMainInto(state) {
+    var hd = state.panel.querySelector('.pts-hd');
+    hd.querySelector('b').textContent = state.title;
+    hd.querySelector('.pts-sub').textContent = state.subText;
+    state.panel.querySelector('.pts-bd').innerHTML = renderMainView(state);
+  }
+
+  /* ---- 服务业务分类二级视图：「我要找服务」→ 12 类直达 ---- */
+  var SERVICE_TONES = ['#7A5C1E', '#2B6B4F', '#8A5A2A', '#3E6B8A', '#6B4E8A', '#8A4E4E'];
+  function hexToRgb(hex) {
+    var h = String(hex || '').replace('#', '');
+    if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+    var n = parseInt(h, 16);
+    return (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255);
+  }
+  function renderServiceCatView(state, k) {
+    var hd = state.panel.querySelector('.pts-hd');
+    hd.querySelector('b').textContent = '选择你要的服务业务分类';
+    hd.querySelector('.pts-sub').textContent = '按你要办的事选分类，直达发布表单，平台按分类匹配服务方';
+    var html = '';
+    (global.SERVICE_CATS || []).forEach(function (c, i) {
+      var c1 = SERVICE_TONES[i % SERVICE_TONES.length];
+      html += '<button type="button" class="pts-row pts-sc" data-sc="' + esc(c.id) + '">'
+        + '<span class="pts-ic pts-ic-c" style="background:rgba(' + hexToRgb(c1) + ',.14);color:' + c1 + ';">' + esc(c.label.charAt(0)) + '</span>'
+        + '<span class="pts-main"><b>' + esc(c.label) + '</b><span>' + esc(c.sub) + '</span></span>'
+        + '<span class="pts-badge demand">需</span></button>';
+    });
+    html += '<button type="button" class="pts-back" data-pts-back="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>返回全部发布类型</button>';
+    var bd = state.panel.querySelector('.pts-bd');
+    bd.innerHTML = html;
+    bd.querySelector('[data-pts-back]').addEventListener('click', function () { renderMainInto(state); });
+    bd.querySelectorAll('.pts-sc').forEach(function (row) {
+      row.addEventListener('click', function () {
+        var sc = row.getAttribute('data-sc');
+        var href = global.publishTypeHref(k);
+        href += (href.indexOf('?') >= 0 ? '&' : '?') + 'serviceCat=' + encodeURIComponent(sc) + '&fresh=1';
+        close();
+        if (typeof state.opts.onPick === 'function') {
+          var ret = state.opts.onPick(href, k);
+          if (ret === false) return;
+        }
+        global.location.href = href;
+      });
     });
   }
 

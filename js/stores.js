@@ -249,7 +249,7 @@
   };
 
   /* ---- 入驻记录（R2，v2.0 多类型并行 + v3.0 扩展资料） ----
-     types = 入驻类型数组，支持并行（合伙人可与建筑/中介同时存在；建筑⇄中介互斥）
+     types = 入驻类型数组，支持并行（合伙人可与建筑/服务商同时存在；建筑⇄服务商互斥）
      qualifications[] = 建筑资质列表（v3.0 新增）
      intro{} = 企业介绍（成立年份/注册资本/员工规模/简介，v3.0 新增）
      cases[] = 企业案例列表（v3.0 新增）
@@ -564,7 +564,7 @@
     return this.write(s);
   };
 
-  /* ---- 中介线上订单（R5） ---- */
+  /* ---- 服务商线上订单（R5） ---- */
   var AgencyOrderStore = makeStore('engchain-agency-orders', { list: [] }, 'engchain:agency-orders');
   AgencyOrderStore.create = function (o) {
     var s = this.read();
@@ -701,7 +701,7 @@
     var limits = (MOCK.business.monitor && MOCK.business.monitor.limits) || { realname: 5, pro: 10, construction: 30, agency: 50 };
     /* [M4-4] 旧企业合伙人 partner 200 额度已摘除；省代本省无限由下方 M4-2 分支实现 */
     /* M4-2 本省无限：active 代理（总代/二级）本省关注无限；终止态不放行；无省不误放开。
-       建筑30/中介50 旧额度原样保留。 */
+       建筑30/服务商50 旧额度原样保留。 */
     var _ab = agentAccessBits();
     if (_ab.active && (_ab.status === 'active')) return Infinity;
     var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
@@ -1026,7 +1026,7 @@
     var s = this.read();
     var lead = Object.assign({
       id: 'LD' + Date.now() + Math.floor(Math.random() * 90 + 10),
-      svcId: input.svcId || '', svcName: input.svcName || '中介服务', sellerId: input.sellerId || 'u2',
+      svcId: input.svcId || '', svcName: input.svcName || '服务商', sellerId: input.sellerId || 'u2',
       buyerId: input.buyerId || '', name: input.name || '', phone: input.phone || '',
       serve: input.serve || '', urge: input.urge || '', note: input.note || '',
       status: 'new', createdAt: Date.now()
@@ -1509,8 +1509,8 @@
   }
 
   /* ---- 入口门控源：身份+入驻类型 → 专有入口显隐/档位（单一来源，v3.0 五身份叠加） ----
-     规则：分销中心 = 企业入驻 或 个人合伙人；中介服务 = 中介服务企业（入驻类型含 agency）专有。
-     多类型入驻时：分销档位取最高（合伙人>中介>建筑），中介权限只要含 agency 即可。
+     规则：分销中心 = 企业入驻 或 个人合伙人；服务商 = 服务商企业（入驻类型含 agency）专有。
+     多类型入驻时：分销档位取最高（合伙人>服务商>建筑），服务商权限只要含 agency 即可。
      [M4-3] 个人合伙人全程 distTier='individualPartner'（8%/2%），无团队管理（hasTeam=false）；
      旧企业 partner→full 档位已摘除（随 M4-4 下线）。
      profile 宫格 / distribution×3 / agency×2 统一引用本函数，杜绝入口显隐与页面门控错配。 */
@@ -1523,7 +1523,7 @@
     var isIndividualPartner = !!(idy.partner && idy.identities.indexOf('partner') >= 0 && !isResident);
     /* 主入驻类型：取数组第一个（兼容旧单值 type） */
     var type = isResident ? (types.length ? types[0] : 'construction') : '';
-    /* 多类型入驻时分销档位：个人合伙人=individualPartner(8%/2%) / 中介=limited(6%) / 建筑=base(12%/3%)；
+    /* 多类型入驻时分销档位：个人合伙人=individualPartner(8%/2%) / 服务商=limited(6%) / 建筑=base(12%/3%)；
        [M4-3] 旧企业 partner→full 映射摘除，不再授予 full */
     var distTier = 'base';
     if (isIndividualPartner) distTier = 'individualPartner';
@@ -1540,7 +1540,7 @@
       dist: dist,
       distTier: distTier,
       distBadge: distTier === 'individualPartner' ? '个人合伙人' : (distTier === 'limited' ? '受限' : '蓝V'),
-      /* 中介服务：入驻类型含 agency 即可（多类型并行时也有效） */
+      /* 服务商：入驻类型含 agency 即可（多类型并行时也有效） */
       agency: isResident && types.indexOf('agency') >= 0,
       agencyBadge: '金V',
       /* 团队管理：仅企业入驻且类型含 partner 时拥有；个人合伙人无团队管理 */
@@ -1562,8 +1562,8 @@
 
   /* ---- 发布能力矩阵（v2 叠加身份模型）：按账号实时计算可用品类 ----
      个人侧：实名→材料/设备/劳务(D+S)+资质招商(D)；专业入驻→+求职(S，单独核准)
-     企业侧：认证→材料/设备/劳务(D+S)+资质招商(D+S)+招聘(D)+建企买卖(D，非中介)
-             建筑入驻→+建企买卖(S)；中介入驻→资质招商仅D、招聘/建企买卖不可发、+中介服务(S，
+     企业侧：认证→材料/设备/劳务(D+S)+资质招商(D+S)+招聘(D)+建企买卖(D，非服务商)
+             建筑入驻→+建企买卖(S)；服务商入驻→资质招商仅D、招聘/建企买卖不可发、+服务商(S，
              编辑器内由 data-locked 锁定机制控制仅工作台可见)
      return: role==='demand'? 需求侧品类数组 : 供应侧品类数组 */
   function publishableCats(acc, role) {
@@ -1589,9 +1589,9 @@
       if (isConst) s.push('建企买卖');
     }
     if (per === 'professional') s.push('求职');
-    if (isAgency) s.push('中介服务');
-    /* 中介需求侧（找中介服务）本期开放：已实名个人/企业均可发代办/担保等需求 */
-    if (isPer || isEnt) d.push('中介服务');
+    if (isAgency) s.push('服务商');
+    /* 服务商需求侧（找服务商）本期开放：已实名个人/企业均可发代办/担保等需求 */
+    if (isPer || isEnt) d.push('服务商');
     return role === 'demand' ? d : s;
   }
 
@@ -2507,10 +2507,10 @@
   var MatchStore = makeStore('engchain-matches',
     { feed: [], preferences: { cats: [], subs: [], dir: '', location: '', notify: true, updatedAt: 0 } }, 'engchain:matches');
 
-  /* 品类归一：目录内部口径（中介/加盟/买卖/资质/人才）→ 用户可见标准品类 */
+  /* 品类归一：目录内部口径（服务商/加盟/买卖/资质/人才）→ 用户可见标准品类 */
   MatchStore.normCat = function (cat) {
     var m = { '材料':'材料', '设备':'设备', '劳务':'劳务',
-      '中介':'中介服务', '中介服务':'中介服务', '加盟':'资质招商', '资质招商':'资质招商', '招商':'资质招商',
+      '中介':'服务商', '中介服务':'服务商', '加盟':'资质招商', '资质招商':'资质招商', '招商':'资质招商',
       '买卖':'建企买卖', '建企买卖':'建企买卖', '资质':'招聘', '人才':'求职',
       '招聘':'招聘', '求职':'求职' };
     return m[cat] || cat || '';

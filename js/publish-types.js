@@ -8,9 +8,10 @@
  *
  * 命名口径（2026-10-09 与用户确认）：
  *   详细类：材料-供应 / 劳务-供应 / 设备-供应 / 运输-供应 / 建筑企业-招商 /
- *          建企转让-需求 / 人才-招聘 / 提供服务-中介
+ *          建企转让-需求 / 人才-招聘 / 提供服务-服务商
  *   简要类：材料-需求 / 劳务-需求 / 设备-需求 / 运输-需求 /
- *          加盟或单项目挂靠-需求 / 收购或控股建筑企业-需求 / 人才应聘-需求 / 找中介服务-需求
+ *          加盟或单项目挂靠-需求 / 收购或控股建筑企业-需求 / 人才应聘-需求 / 我要找服务-需求
+ *          （agency-demand 2026-11-04 起二级选择服务业务分类 12 类，见 SERVICE_CATS）
  * 判定逻辑：长期存在方 / 先发生方发布详细类；一次性意向方发布简要类。
  * 招标不单独成类，发布详细类的需求即承载招标语义。
  * ================================================================ */
@@ -61,10 +62,10 @@
       nav: '发布招聘', desc: '企业发岗位，收简历'
     },
     'agency-supply': {
-      cat: '中介服务', role: 'supply', group: 'supply', detailLevel: 'detail',
-      label: '提供服务-中介', sub: '资质代办/担保/咨询',
-      guideLabel: '我是服务商，提供服务', guideSub: '资质代办 / 咨询等中介服务',
-      nav: '发布中介服务', desc: '中介服务商挂服务菜单',
+      cat: '服务商', role: 'supply', group: 'supply', detailLevel: 'detail',
+      label: '提供服务-服务商', sub: '资质/担保/造价/检测/保险/监理…12 类',
+      guideLabel: '我是服务商，提供服务', guideSub: '资质代办 / 检测 / 保险 / 监理等 12 类服务',
+      nav: '发布服务', desc: '服务商挂服务菜单',
       viaSeller: true
     },
 
@@ -112,13 +113,36 @@
       nav: '发布应聘', desc: '人才发求职意向，等企业联系'
     },
     'agency-demand': {
-      cat: '中介服务', role: 'demand', group: 'supply', detailLevel: 'brief',
-      label: '找中介服务-需求', sub: '资质新办 / 担保一句话',
-      guideLabel: '我要找中介办事', guideSub: '找中介代办 / 咨询服务',
-      nav: '发布找中介需求', desc: '你要办资质、找担保等'
+      cat: '服务商', role: 'demand', group: 'supply', detailLevel: 'brief',
+      label: '我要找服务-需求', sub: '资质/担保/造价/检测/保险/监理…12 类直达',
+      guideLabel: '我要找服务办事', guideSub: '选业务分类直达：资质、担保、造价、检测、保险、监理…12 类',
+      nav: '发布找服务需求', desc: '你要办资质、做检测、上保险等，选分类直达',
+      serviceCats: true
     },
 
   };
+
+  /* ================================================================
+   * SERVICE_CATS — 服务业务分类注册表（12 类）
+   * 与服务广场（pages/agency/index.html 的 CATS）同口径：
+   *   id 一致、label 一致；此处用于发布侧「我要找服务」分类选择、
+   *   服务商发布的服务类目、供需列表服务子 tab。
+   * 2026-11-04 由服务广场 5→12 类方案同步建立。
+   * ================================================================ */
+  var SERVICE_CATS = [
+    { id: 'qual', label: '资质代办', sub: '办资质 / 升级 / 增项 / 延续' },
+    { id: 'guarantee', label: '工程担保', sub: '投标 / 履约 / 预付款保函' },
+    { id: 'cost', label: '造价咨询', sub: '预算编制 / 结算审核 / 全过程' },
+    { id: 'labor', label: '劳务派遣', sub: '用工派遣 / 班组合作' },
+    { id: 'corp', label: '企业服务', sub: '工商注册 / 记账报税' },
+    { id: 'bid', label: '招投标', sub: '标书编制 / 投标代办 / 电子标' },
+    { id: 'talent', label: '人才证照', sub: '建造师配置 / 职称 / 特种作业证' },
+    { id: 'test', label: '工程检测', sub: '见证取样 / 桩基结构 / 消防防雷' },
+    { id: 'insure', label: '工程保险', sub: '建工意外 / 雇主责任 / 安责险' },
+    { id: 'supv', label: '监理咨询', sub: '工程监理 / 全过程咨询' },
+    { id: 'audit', label: '评估审计', sub: '资产评估 / 财务审计 / 决算' },
+    { id: 'credit', label: '认证信用', sub: 'ISO / AAA 信用 / 高新申报' }
+  ];
 
   /* 当前身份可发布的 16 类列表（按新权限口径）：
      - 游客/未认证：不可发布
@@ -165,6 +189,11 @@
   }
 
   global.PUBLISH_TYPES = PUBLISH_TYPES;
+  global.SERVICE_CATS = SERVICE_CATS;
+  global.serviceCatById = function (id) {
+    for (var i = 0; i < SERVICE_CATS.length; i++) { if (SERVICE_CATS[i].id === id) return SERVICE_CATS[i]; }
+    return null;
+  };
   global.publishTypeHref = editorHref;
   global.availablePublishTypes = availableTypes;
   global.availableTypesByAccount = availableTypesByAccount;

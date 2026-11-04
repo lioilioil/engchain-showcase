@@ -11,7 +11,7 @@ const router = useRouter()
 const TYPE_MAP = {
   supply: '供应承接',
   need: '需求匹配',
-  agency: '中介撮合',
+  agency: '服务商撮合',
   transfer: '建企买卖',
   qual: '资质招商'
 }
@@ -43,7 +43,7 @@ const filters = [
   { prop: 'type', label: '类型', type: 'select', options: [
     { value: 'supply', label: '供应承接' },
     { value: 'need', label: '需求匹配' },
-    { value: 'agency', label: '中介撮合' },
+    { value: 'agency', label: '服务商撮合' },
     { value: 'transfer', label: '建企买卖' },
     { value: 'qual', label: '资质招商' }
   ]},

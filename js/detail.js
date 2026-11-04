@@ -103,7 +103,7 @@ window.DETAIL = (function () {
     return r.name || r.company || (c && c.name) || '';
   }
   /* 品类 → 搜索页业务 key（与编辑器 bizMap 口径一致） */
-  var ENGCHAIN_BIZ = { '材料': 'material', '设备': 'equipment', '劳务': 'labor', '运输': 'transport', '中介服务': 'agency', '资质招商': 'franchise', '建企买卖': 'trade', '招聘': 'personnel', '求职': 'talent' };
+  var ENGCHAIN_BIZ = { '材料': 'material', '设备': 'equipment', '劳务': 'labor', '运输': 'transport', '服务商': 'agency', '资质招商': 'franchise', '建企买卖': 'trade', '招聘': 'personnel', '求职': 'talent' };
   /* 统一取联系人姓名：contact 可能是对象 {name,...} 或历史字符串 */
   function contactName(r) {
     if (!r) return '';
@@ -146,7 +146,7 @@ window.DETAIL = (function () {
       return -1;
     },
     /* 免费/不设锁类别：企业招聘 personnel（投递流程替代付费墙）、publish。
-       [PHASE 0] 中介服务 agency 由「免费留资咨询」改为「积分解锁联系方式」（与其他供需板块一致），
+       [PHASE 0] 服务商 agency 由「免费留资咨询」改为「积分解锁联系方式」（与其他供需板块一致），
        解锁消耗积分并记录于 UnlockStore，判定逻辑与主板块相同。 */
     isFree: function (bizKey) { return bizKey === 'personnel' || bizKey === 'publish'; },
     isUnlocked: function (rec) {
@@ -973,7 +973,7 @@ window.DETAIL = (function () {
       { k: '加盟政策', v: '品牌授权 + 区域保护' }
     ];
   }
-  /* ================= 中介服务（agency）：15 字段 + 4 组件 + 全免费咨询转化 ================= */
+  /* ================= 服务商（agency）：15 字段 + 4 组件 + 全免费咨询转化 ================= */
   /* ① 报价明细卡 */
   function agencyQuoteCard(q) {
     if (!q) return '';
@@ -1829,7 +1829,7 @@ window.DETAIL = (function () {
     return v >= 10000 ? (' ¥' + (v / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万') : (' ¥' + v.toLocaleString());
   }
   byType.agency = {
-    label: '中介服务', cta: '解锁联系方式', ctaLocked: '解锁联系方式', inlineLock: true, verified: '机构已认证',
+    label: '服务商', cta: '解锁联系方式', ctaLocked: '解锁联系方式', inlineLock: true, verified: '机构已认证',
     hero: function (r, c) {
       var d = dirTag(r.dir);
       var base = dHero({ tag: d.txt + ' · ' + r.sub, verifiedHint: (r.verified ? '机构已认证' : ''), title: r.title, price: heroPrice(r), unit: r.unit, priceUnit: r.priceUnit, priceLocked: false, meta: oppMeta(r) });
@@ -3505,7 +3505,7 @@ window.DETAIL = (function () {
     /* ---- 资质招商：免费加盟意向登记（留资转化，提交即原地开放联系方式，不收取信息费） ---- */
     function openConsult(rec, c) {
       var sheet = UI.sheet();
-      /* —— 中介服务：免费咨询需求登记（提交即原地开放联系方式，不收信息费） —— */
+      /* —— 服务商：免费咨询需求登记（提交即原地开放联系方式，不收信息费） —— */
       if (rec.bizKey === 'agency') {
         var agServeOpts = ['资质升级', '工商注册', '安许代办', '资质分立', '其他'];
         var agUrgeOpts = ['常规办理', '加急通道', '仅先咨询'];
@@ -3557,7 +3557,7 @@ window.DETAIL = (function () {
               var me = (window.DataBus && DataBus.current) ? DataBus.current() : null;
               LeadStore.create({
                 svcId: String(rec.id || ''),
-                svcName: String(rec.title || rec.name || '中介服务'),
+                svcName: String(rec.title || rec.name || '服务商'),
                 sellerId: rec.sellerId || rec.publisher || (rec.companyId ? 'u2' : 'u2'),
                 buyerId: me ? me.id : '',
                 name: name, phone: phone,

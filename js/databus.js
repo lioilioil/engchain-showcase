@@ -30,7 +30,7 @@ window.DataBus = (function () {
     'franchise-supply':  { cat: '资质招商', role: 'supply', detailLevel: 'detail', bizKey: 'franchise' },
     'trade-supply':      { cat: '建企买卖', role: 'supply', detailLevel: 'detail', bizKey: 'trade' },
     'personnel-demand':  { cat: '招聘',   role: 'demand',  detailLevel: 'detail', bizKey: 'personnel' },
-    'agency-supply':     { cat: '中介服务', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
+    'agency-supply':     { cat: '服务商', role: 'supply', detailLevel: 'detail', bizKey: 'agency' },
     'material-demand':   { cat: '材料',   role: 'demand',  detailLevel: 'brief',  bizKey: 'material' },
     'labor-demand':      { cat: '劳务',   role: 'demand',  detailLevel: 'brief',  bizKey: 'labor' },
     'equipment-demand':  { cat: '设备',   role: 'demand',  detailLevel: 'brief',  bizKey: 'equipment' },
@@ -38,7 +38,7 @@ window.DataBus = (function () {
     'franchise-demand':  { cat: '资质招商', role: 'demand', detailLevel: 'brief',  bizKey: 'franchise' },
     'trade-demand':      { cat: '建企买卖', role: 'demand', detailLevel: 'brief', bizKey: 'trade' },
     'talent-supply':     { cat: '求职',   role: 'demand',  detailLevel: 'brief',  bizKey: 'talent' },
-    'agency-demand':     { cat: '中介服务', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
+    'agency-demand':     { cat: '服务商', role: 'demand', detailLevel: 'brief', bizKey: 'agency' }
   };
   /* 旧 bizKey + 方向/深度 → typeKey 反查表（用于存量记录兜底，不臆造新定位） */
   var BIZ_TO_TYPE = {
@@ -106,8 +106,8 @@ window.DataBus = (function () {
         entry:{ type:'construction', types:['construction'], orderId:'EN20260601001', status:'active', active:true, paidAt:now-DAY*60, expireAt:now+YEAR, depositType:'basic', depositPaid:5000, fee:2980, contact:'陈建国', tel:'13800001234', scope:'房屋建筑工程 · 市政公用工程 · 建筑装修装饰工程 · 机电设备安装工程 · 建筑幕墙工程 · 钢结构工程 · 地基基础工程 · 环保工程 · 城市及道路照明工程 · 特种工程（结构补强）', qualifications:[{name:'建筑工程施工总承包',level:'贰级',no:'D2510××××',expireAt:'2027-12-31',image:''},{name:'市政公用工程施工总承包',level:'叁级',no:'D3510××××',expireAt:'2026-06-30',image:''}], intro:{founded:'2008',capital:'5000',staffSize:'101-500人',desc:'四川省××建设有限公司成立于2008年，是一家集房屋建筑、市政公用、装饰装修、机电安装于一体的综合性建筑施工企业。公司注册资本5000万元，拥有建筑工程施工总承包贰级、市政公用工程施工总承包叁级等多项资质。现有员工300余人，其中高级工程师20人，一级建造师15人，二级建造师30人。公司先后承建了成都天府新区多个重点项目，累计施工面积超过200万平方米，工程合格率100%，多次获得"四川省优质工程奖"、"成都市安全文明工地"等荣誉。公司秉承"质量第一、信誉至上"的经营理念，致力于为客户提供优质、高效、安全的建筑服务。'}, cases:[{name:'成都天府新区××商业综合体项目',type:'房屋建筑',amount:'32000',startDate:'2023-03-01',endDate:'2025-06-30',desc:'项目位于成都天府新区核心商务区，总建筑面积约18万平方米，包含两栋甲级写字楼、一栋商业裙楼及地下三层车库。我司承担总承包施工，涵盖基坑支护、主体结构、机电安装、装饰装修全流程。项目采用BIM技术进行全过程管理，荣获2024年度四川省建设工程"天府杯"银奖。施工期间实现零安全事故，主体结构提前45天封顶。',images:[]},{name:'成都市××市政道路改造工程',type:'市政公用',amount:'8600',startDate:'2022-05-01',endDate:'2023-11-30',desc:'项目对成都市武侯区三条主干道进行综合改造，道路总长4.2公里，包含路面翻新、雨污管网分流、绿化景观提升、照明系统更新及交通设施完善。施工期间采用半幅通行方案，最大限度减少对市民出行的影响。项目竣工验收评定为优良工程。',images:[]}], address:{province:'四川省',city:'成都市',district:'武侯区',detail:'天府大道北段××号××大厦15楼'}, website:'https://www.sc-jianshe.example.com', attachments:[] },
         balance:{ balance:1286.50, frozen:200, totalIn:13486.50 },
         credits:{ balance:2350, quota:{ month:'', used:0 } } },
-      { id:'u2', name:'李雅', company:'四川××工程中介服务有限公司', account:'liya@engchain.cn', pwd:'demo8888',
-        mobile:'13700002345', avatar:'李', tag:'入驻企业 · 中介', status:'resident',
+      { id:'u2', name:'李雅', company:'四川××工程服务有限公司', account:'liya@engchain.cn', pwd:'demo8888',
+        mobile:'13700002345', avatar:'李', tag:'入驻企业 · 服务商', status:'resident',
         identity:{ personal:'verified', enterprise:'resident', entryTypes:['agency'] },
         auth:{ realname:{ok:true,ts:now-DAY*45}, enterprise:{ok:true,expireAt:now+YEAR}, personalQual:{ok:false,list:[]}, enterpriseQual:{ok:true,list:['房地产经纪机构备案','工程造价咨询乙级']}, qual:{ok:true,list:['房地产经纪机构备案','工程造价咨询乙级']}, payment:{ok:true,ts:now-DAY*40} },
         entry:{ type:'agency', types:['agency'], orderId:'EN20260615001', status:'active', active:true, paidAt:now-DAY*40, expireAt:now+YEAR, depositType:'engineering', depositPaid:20000 },
@@ -403,8 +403,8 @@ window.DataBus = (function () {
            App 端（同源 iframe）经 storage 事件 / preview refreshAll 即时派生；非当前登录仅写用户表，
            下次登录 login(id) 时自然读到新状态。 */
   var ENTRYFEE_KEY = 'engchain-entry-fees';
-  /* [M4-4] 旧企业合伙人 partner 已摘除；TYPE_LABEL/DEPOSIT_TYPE 仅保留建筑/中介（个人合伙人走 auth.partner，不在此表） */
-  var TYPE_LABEL = { construction: '建筑企业', agency: '中介服务企业' };
+  /* [M4-4] 旧企业合伙人 partner 已摘除；TYPE_LABEL/DEPOSIT_TYPE 仅保留建筑/服务商（个人合伙人走 auth.partner，不在此表） */
+  var TYPE_LABEL = { construction: '建筑企业', agency: '服务商企业' };
   var DEPOSIT_TYPE = { construction: 'basic', agency: 'engineering' };
   function statusOf(u) {
     if (u.banned) return 'banned';
@@ -945,8 +945,8 @@ window.DataBus = (function () {
       { id:'SU006', cat:'劳务', dir:'supply', title:'供应 钢筋工/木工/混凝土工 劳务班组 可进场', company:'四川××劳务分包有限公司', location:'成都·青白江', amount:'按工日', publisher:'u1', status:'on', ts:t(2), note:'' },
       { id:'SU007', cat:'资质招商', dir:'supply', title:'大型公建 EPC 联合体联营 寻求设计+施工伙伴', company:'××建筑设计院', location:'成都·锦江', amount:'面议', publisher:'u3', status:'on', ts:t(4), note:'' },
       { id:'SU008', cat:'劳务', dir:'demand', title:'市政道路项目 劳务分包合作 长期稳定需求', company:'成都××市政工程有限公司', location:'成都·温江', amount:'¥950,000', publisher:'u5', status:'pending', ts:t(0), note:'' },
-      { id:'SU009', cat:'中介服务', dir:'supply', title:'建筑资质升级代办 施工总承包二升一 全程服务', company:'四川××工程中介服务有限公司', location:'成都·高新', amount:'¥68,000', publisher:'u2', status:'on', ts:t(1), note:'' },
-      { id:'SU010', cat:'中介服务', dir:'supply', title:'安许代办/资质分立 西南区域 承诺制办理', company:'××企业管理咨询有限公司', location:'成都·武侯', amount:'¥25,000', publisher:'u2', status:'rejected', ts:t(6), note:'材料真实性存疑，请补充安许有效期证明' },
+      { id:'SU009', cat:'服务商', dir:'supply', title:'建筑资质升级代办 施工总承包二升一 全程服务', company:'四川××工程服务有限公司', location:'成都·高新', amount:'¥68,000', publisher:'u2', status:'on', ts:t(1), note:'' },
+      { id:'SU010', cat:'服务商', dir:'supply', title:'安许代办/资质分立 西南区域 承诺制办理', company:'××企业管理咨询有限公司', location:'成都·武侯', amount:'¥25,000', publisher:'u2', status:'rejected', ts:t(6), note:'材料真实性存疑，请补充安许有效期证明' },
       { id:'SU011', cat:'资质招商', dir:'supply', title:'电力工程施工总承包一级 寻分公司合作', company:'贵州黔电电力工程有限公司', location:'贵阳·观山湖', amount:'10-30万/年', publisher:'u1', status:'on', ts:t(2), note:'' },
       { id:'SU012', cat:'资质招商', dir:'supply', title:'建筑工程施工总承包一级 联营/分公司挂靠', company:'四川××建设集团有限公司', location:'成都·青羊', amount:'面议', publisher:'u3', status:'on', ts:t(5), note:'' },
       { id:'SU013', cat:'建企买卖', dir:'supply', title:'公路工程施工总承包二级 建企整体转让', company:'××路桥建设工程有限公司', location:'成都·双流', amount:'¥580,000', publisher:'u1', status:'on', ts:t(3), note:'' },
@@ -957,14 +957,14 @@ window.DataBus = (function () {
       { id:'SU018', cat:'设备', dir:'supply', title:'供应 挖掘机/装载机 台班出租 带司机', company:'成都××工程机械有限公司', location:'成都·新都', amount:'按台班', publisher:'u1', status:'off', ts:t(8), note:'季节性调整下架' },
       { id:'SU019', cat:'劳务', dir:'supply', title:'供应 水电安装班组 持证上岗 可全国进场', company:'四川××水电安装有限公司', location:'成都·金牛', amount:'按工日', publisher:'u3', status:'on', ts:t(1), note:'' },
       { id:'SU020', cat:'资质招商', dir:'supply', title:'建材供应链招商加盟 区域独家授权', company:'××供应链管理有限公司', location:'成都·龙泉驿', amount:'¥120,000', publisher:'u8', status:'pending', ts:t(0), note:'' },
-      { id:'SU021', cat:'中介服务', dir:'supply', title:'工商注册/变更 建筑类公司 加急代办', company:'××企业管理服务有限公司', location:'成都·锦江', amount:'¥8,800', publisher:'u2', status:'on', ts:t(2), note:'' },
+      { id:'SU021', cat:'服务商', dir:'supply', title:'工商注册/变更 建筑类公司 加急代办', company:'××企业管理服务有限公司', location:'成都·锦江', amount:'¥8,800', publisher:'u2', status:'on', ts:t(2), note:'' },
       { id:'SU022', cat:'资质招商', dir:'supply', title:'水利水电施工总承包二级 资质联营合作', company:'××水利水电工程有限公司', location:'绵阳·涪城', amount:'面议', publisher:'u3', status:'on', ts:t(4), note:'' },
       { id:'SU023', cat:'建企买卖', dir:'supply', title:'机电安装专业承包一级 带安许 转让', company:'××机电安装工程有限公司', location:'德阳·旌阳', amount:'¥420,000', publisher:'u1', status:'off', ts:t(9), note:'资料更新中，暂下架' },
       { id:'SU024', cat:'求职', dir:'supply', title:'造价工程师（一级） 10 年经验 全职/项目制', company:'李×（个人）', location:'成都·天府新区', amount:'面议', publisher:'u4', status:'pending', ts:t(0), note:'' },
       { id:'SU025', cat:'运输', dir:'demand', title:'成都双流物流园项目 需 混凝土罐车 6 台 租赁或承包均可', company:'成都××物流园区建设有限公司', location:'成都·双流', amount:'按台班', publisher:'u5', status:'pending', ts:t(0), note:'' },
       { id:'SU026', cat:'运输', dir:'supply', title:'供应 砂石/土方运输车队 自有车辆 全国调度 可开票', company:'四川××运输服务有限公司', location:'成都·新津', amount:'按车次', publisher:'u1', status:'on', ts:t(3), note:'' },
       { id:'SU027', cat:'资质招商', dir:'demand', title:'寻 建筑工程施工总承包一级 分公司加盟/单项目挂靠', company:'成都××工程项目管理有限公司', location:'成都·武侯', amount:'面议', publisher:'u3', status:'pending', ts:t(0), note:'' },
-      { id:'SU028', cat:'中介服务', dir:'demand', title:'需 建筑资质新办/安许代办 中介服务 川内企业', company:'成都××建设工程有限公司', location:'成都·青羊', amount:'面议', publisher:'u5', status:'pending', ts:t(0), note:'' }
+      { id:'SU028', cat:'服务商', dir:'demand', title:'需 建筑资质新办/安许代办 服务商 川内企业', company:'成都××建设工程有限公司', location:'成都·青羊', amount:'面议', publisher:'u5', status:'pending', ts:t(0), note:'' }
     ];
   }
   /* 演示池版本：seed 内容更新时递增，旧 localStorage 数据按 id 去重合并新条目（不覆盖用户发布） */
@@ -978,7 +978,7 @@ window.DataBus = (function () {
     '资质招商': { supply: { typeKey: 'franchise-supply', bizKey: 'franchise', detailLevel: 'detail' }, demand: { typeKey: 'franchise-demand', bizKey: 'franchise', detailLevel: 'brief' } },
     '建企买卖': { supply: { typeKey: 'trade-supply', bizKey: 'trade', detailLevel: 'detail' }, demand: { typeKey: 'trade-demand', bizKey: 'trade', detailLevel: 'brief' } },
     '招聘':   { demand: { typeKey: 'personnel-demand', bizKey: 'personnel', detailLevel: 'detail' } },
-    '中介服务': { supply: { typeKey: 'agency-supply', bizKey: 'agency', detailLevel: 'detail' }, demand: { typeKey: 'agency-demand', bizKey: 'agency', detailLevel: 'brief' } },
+    '服务商': { supply: { typeKey: 'agency-supply', bizKey: 'agency', detailLevel: 'detail' }, demand: { typeKey: 'agency-demand', bizKey: 'agency', detailLevel: 'brief' } },
     '求职':   { demand: { typeKey: 'talent-supply', bizKey: 'talent', detailLevel: 'brief' } }
   };
   function cleanPlaceholder(s) { return String(s == null ? '' : s).split('××').join(''); }
@@ -1145,7 +1145,7 @@ window.DataBus = (function () {
   }
 
   /* ---- 订单生命周期 Store（Phase 2 运营中心 · 订单管理） ----
-     类型：供方承接 / 需求匹配 / 中介撮合 / 建企买卖 / 资质招商
+     类型：供方承接 / 需求匹配 / 服务商撮合 / 建企买卖 / 资质招商
      状态机：pending(待支付)→serving(服务中)→await_accept(待验收)→settled(已结算)；→cancelled(已取消)
      里程碑：金额 ≥5 万按 4 节点 30/30/30/10 分期（规则同源 data.js commission.milestone）；<5 万整单结算。
      佣金：commissionRate(amount) 同源（stores.js 暴露） */
@@ -1175,18 +1175,18 @@ window.DataBus = (function () {
     return [
       mk('EN20260904001','supply','商品混凝土供应承接 · 天府新区综合体', 320000, 'u1', '四川中建××建设有限公司', 'u2', 'settled', 1, true, '1001'),
       mk('EN20260903058','need','塔吊租赁需求匹配 · 重庆江津河道治理', 86000, 'u5', '成都××机械租赁有限公司', 'u1', 'serving', 2, true),
-      mk('EN20260903021','agency','中介撮合 · 资质升级代办（二升一）', 500000, 'u2', '××建设集团有限公司', 'u1', 'await_accept', 3, true),
+      mk('EN20260903021','agency','服务商撮合 · 资质升级代办（二升一）', 500000, 'u2', '××建设集团有限公司', 'u1', 'await_accept', 3, true),
       mk('EN20260902094','supply','劳务班组供应承接 · 贵阳旧改防水分包', 45200, 'u1', '贵阳××建设有限公司', 'u3', 'serving', 4, false, '1004'),
       mk('EN20260902012','need','砂石料采购匹配 · 西安浐灞项目', 12800, 'u5', '西安××建设集团有限公司', 'u2', 'cancelled', 5, false),
       mk('EN20260901077','transfer','建企买卖 · 公路二级整体转让', 580000, 'u1', '××路桥建设工程有限公司', 'u5', 'serving', 6, true),
       mk('EN20260901033','qual','资质招商 · 电力一级分公司合作', 200000, 'u1', '贵州黔电电力工程有限公司', 'u3', 'pending', 6, true),
-      mk('EN20260831009','agency','中介撮合 · 安许代办承诺制', 25000, 'u2', '××企业管理咨询有限公司', 'u3', 'settled', 8, false),
+      mk('EN20260831009','agency','服务商撮合 · 安许代办承诺制', 25000, 'u2', '××企业管理咨询有限公司', 'u3', 'settled', 8, false),
       mk('EN20260831021','supply','水泥供应承接 · 成都双流仓', 96000, 'u3', '成都××建材供应有限公司', 'u1', 'serving', 8, true, '1009'),
       mk('EN20260830055','need','汽车吊租赁匹配 · 西安泾河项目', 54000, 'u5', '成都××工程机械有限公司', 'u2', 'await_accept', 9, true),
       mk('EN20260830018','transfer','建企买卖 · 机电一级带安许转让', 420000, 'u1', '××机电安装工程有限公司', 'u5', 'pending', 9, true),
       mk('EN20260829003','qual','资质招商 · 水利二级联营合作', 0, 'u3', '××水利水电工程有限公司', 'u2', 'cancelled', 10, true),
       mk('EN20260828044','supply','水电班组承接 · 成都金牛项目', 61000, 'u3', '四川××水电安装有限公司', 'u1', 'serving', 11, true),
-      mk('EN20260828007','agency','中介撮合 · 工商注册加急代办', 8800, 'u2', '××企业管理服务有限公司', 'u5', 'settled', 11, false),
+      mk('EN20260828007','agency','服务商撮合 · 工商注册加急代办', 8800, 'u2', '××企业管理服务有限公司', 'u5', 'settled', 11, false),
       mk('EN20260827019','need','防水分包匹配 · 西安浐灞旧改', 33200, 'u5', '××防水工程有限公司', 'u3', 'settled', 12, false),
       mk('EN20260827031','supply','塔吊整机租赁承接 · 成都辐射西南', 158000, 'u1', '××建设集团有限公司', 'u2', 'pending', 12, true, '1003')
     ];
@@ -1299,7 +1299,7 @@ window.DataBus = (function () {
   function seedMessages() {
     var t = function (d) { return new Date(Date.now() - d * 864e5).toISOString().slice(0, 10); };
     return [
-      { id:'MSG1005', type:'公告', title:'破冰期扶持政策延续', body:'建筑企业 0 元入驻、中介 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target:'全部用户', ts:t(1), action:{ label:'查看活动', href:'../co-create/index.html' } },
+      { id:'MSG1005', type:'公告', title:'破冰期扶持政策延续', body:'建筑企业 0 元入驻、服务商 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target:'全部用户', ts:t(1), action:{ label:'查看活动', href:'../co-create/index.html' } },
       { id:'MSG1004', type:'系统', title:'对公转账入账优化', body:'对公转账审批通过后将自动入账至钱包余额，无需手动确认。', target:'入驻企业', ts:t(2), action:{ label:'查看钱包', href:'../wallet/index.html' } },
       { id:'MSG1003', type:'风控', title:'防跳单治理规则提醒', body:'平台将对线下跳单行为实施警告、禁聊、罚款直至清退处罚，请遵守撮合规则。', target:'全部用户', ts:t(4) },
       { id:'MSG1002', type:'活动', title:'共创者计划招募', body:'诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与佣金阶段性减免。', target:'认证企业', ts:t(6), action:{ label:'立即参与', href:'../co-create/index.html' } },
@@ -1670,8 +1670,8 @@ window.DataBus = (function () {
   function seedCommissionFlows() {
     var now = Date.now();
     return [
-      { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '中介撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * 864e5, status: 'done' },
-      { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '中介撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * 864e5, status: 'done' }
+      { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '服务商撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * 864e5, status: 'done' },
+      { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '服务商撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * 864e5, status: 'done' }
     ];
   }
   function commissionFlows() {
@@ -1749,7 +1749,7 @@ window.DataBus = (function () {
     var t = function (d) { return new Date(now - d * 864e5).toISOString().slice(0, 10); };
     return [
       { id: 'QUA001', uid: 'u1', company: '四川省××建设有限公司', license: '91510100MA6×××12X', quals: ['建筑业企业资质 · 建筑工程施工总承包贰级'], geo: 92, source: '系统核验 · 企业资质核验报告', status: 'verified', ts: t(28) },
-      { id: 'QUA002', uid: 'u2', company: '四川××工程中介服务有限公司', license: '91510100MA6×××88Q', quals: ['房地产经纪机构备案', '工程造价咨询乙级'], geo: 88, source: '系统核验 · 企业资质核验报告', status: 'verified', ts: t(24) },
+      { id: 'QUA002', uid: 'u2', company: '四川××工程服务有限公司', license: '91510100MA6×××88Q', quals: ['房地产经纪机构备案', '工程造价咨询乙级'], geo: 88, source: '系统核验 · 企业资质核验报告', status: 'verified', ts: t(24) },
       { id: 'QUA003', uid: 'u8', company: '四川××建设工程（集团）有限公司', license: '91510100MA6×××66K', quals: ['建筑业企业资质 · 市政公用工程施工总承包壹级'], geo: 95, source: '系统核验 · 企业资质核验报告', status: 'verified', ts: t(15) }
     ];
   }
@@ -1771,7 +1771,7 @@ window.DataBus = (function () {
       var t = function (d, h) { return new Date(now - d * 864e5).toISOString().slice(0, 10) + ' ' + (h || '09:00'); };
       s.feed = [
         { company: '成都××机械租赁有限公司', dim: '风险', kind: 'warn', text: '出现 1 笔疑似跳单预警，已进入风控复核', ts: t(0, '10:40'), read: false },
-        { company: '四川××工程中介服务有限公司', dim: '经营', kind: 'info', text: '新增 2 条服务评价，评分 4.8 保持高位', ts: t(1, '16:20'), read: false },
+        { company: '四川××工程服务有限公司', dim: '经营', kind: 'info', text: '新增 2 条服务评价，评分 4.8 保持高位', ts: t(1, '16:20'), read: false },
         { company: '四川省××建设有限公司', dim: '资金', kind: 'ok', text: '对公入账 ¥1,500 已确认，资金流正常', ts: t(2, '09:15'), read: false },
         { company: '××工程咨询有限公司', dim: '风险', kind: 'warn', text: '多次线下接单规避平台佣金，风险等级提升', ts: t(3, '14:05'), read: false }
       ];
@@ -1798,7 +1798,7 @@ window.DataBus = (function () {
   ];
 
   /* ---- Phase 5 分销中心 API ----
-     档位派生复用 stores.js entryAccess（建筑=基础一级 / 中介=受限一级6% / 个人合伙人 8%/2%）；
+     档位派生复用 stores.js entryAccess（建筑=基础一级 / 服务商=受限一级6% / 个人合伙人 8%/2%）；
      [M4-3/M4-4] 旧企业合伙人完整二级(full)已摘除；充值不计入返佣基数。
      本层：分销团队（engchain-dist-team）、返佣流水（engchain-dist-flows：订单/入驻，状态机 pending→settled→paid）。 */
   var DIST_TEAM_KEY = 'engchain-dist-team';
@@ -2080,7 +2080,7 @@ window.DataBus = (function () {
     partner: { label: '个人合伙人', group: 'start', base: 'u9' },
     enterprise: { label: '企业工商认证（未入驻）', group: 'start', base: 'u3' },
     resident_construction: { label: '企业入驻 · 建筑企业', group: 'start', base: 'u1' },
-    resident_agency: { label: '企业入驻 · 中介服务', group: 'start', base: 'u2' },
+    resident_agency: { label: '企业入驻 · 服务商', group: 'start', base: 'u2' },
     /* [M4-4] 旧企业合伙人 resident_partner 场景已摘除（u8 回退为实名普通用户）；个人合伙人 partner 场景保留 */
 
     /* ---- 省级代理体系终态（数据走 AgentDemo.seed() 真实播种：两分区/T+7/税列/团队/O4，余额不动） ---- */
@@ -2118,7 +2118,7 @@ window.DataBus = (function () {
       authApply('enterprise', { co: '演示认证科技有限公司', code: '91510100DEMO99', legal: '张演示', registeredAddress: '四川省成都市高新区演示路 1 号' }, 0); } },
     entry_construction_pending: { label: '企业入驻·建筑 · 待初审', group: 'review', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'construction', 'pending'); } },
-    entry_agency_pending: { label: '企业入驻·中介 · 待初审', group: 'review', base: 'u3', build: function (uid) {
+    entry_agency_pending: { label: '企业入驻·服务商 · 待初审', group: 'review', base: 'u3', build: function (uid) {
       _demoEntryUnderReview(uid, 'agency', 'pending'); } },
     /* [M4-4] 旧企业合伙人 entry_partner_pending 场景已摘除 */
     entry_construction_first: { label: '企业入驻·建筑 · 待终审', group: 'review', base: 'u3', build: function (uid) {

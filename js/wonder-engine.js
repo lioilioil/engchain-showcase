@@ -304,7 +304,7 @@
      ====================================================================== */
   var CAT_LABEL = {
     material: '建材', equipment: '设备租赁', labor: '劳务班组',
-    franchise: '资质招商', talent: '工程人才', personnel: '企业招聘', agency: '中介服务'
+    franchise: '资质招商', talent: '工程人才', personnel: '企业招聘', agency: '服务商'
   };
   function topCats(signals, n) {
     return Object.keys(signals.catTally || {}).map(function (k) {

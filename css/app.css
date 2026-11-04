@@ -20,6 +20,45 @@
   --bg-inset: #E4E1DA;
   --card: #FFFFFF;
 
+  /* 浮层专用配色 —— 完整独立色板，与弹窗背景形成高级区分
+     区分逻辑（三维，非简单明度差）：
+     ① 色温差：弹窗 sheet = 暖白偏暖( #FBFAF7 )，浮层 dropdown = 冷白偏中性 + 微妙渐变
+     ② 品牌呼应：边框/选中态/对勾全部带金调，而非纯黑/纯灰
+     ③ 材质感：内高光 + 多层阴影，模拟真实悬浮材质
+     内部元素（文字/分割线/选中态）全部使用专用变量，与浮层整体统一 */
+  /* 明亮模式 */
+  --dropdown-bg: #FFFFFF;
+  --dropdown-bg-gradient: linear-gradient(180deg, #FFFFFF 0%, #FDFCFA 100%);
+  --dropdown-border: rgba(176, 138, 60, .14);
+  --dropdown-shadow:
+    0 1px 2px rgba(22, 22, 22, .04),
+    0 4px 12px rgba(22, 22, 22, .06),
+    0 16px 48px rgba(22, 22, 22, .10);
+  --dropdown-inset-highlight: 0 1px 0 rgba(255, 255, 255, .95) inset;
+  /* 内部元素 */
+  --dropdown-text: #161616;
+  --dropdown-text-desc: #9A958C;
+  --dropdown-divider: rgba(176, 138, 60, .08);
+  --dropdown-item-active: rgba(176, 138, 60, .06);
+  --dropdown-item-selected-bg: rgba(176, 138, 60, .10);
+  --dropdown-item-selected-text: #7A5C1E;
+  --dropdown-check: #B08A3C;
+  /* 暗色模式预留 */
+  --dropdown-bg-dark: #25211B;
+  --dropdown-bg-gradient-dark: linear-gradient(180deg, #2A251F 0%, #221E19 100%);
+  --dropdown-border-dark: rgba(176, 138, 60, .20);
+  --dropdown-shadow-dark:
+    0 2px 4px rgba(0, 0, 0, .3),
+    0 8px 24px rgba(0, 0, 0, .4),
+    0 20px 60px rgba(0, 0, 0, .5);
+  --dropdown-text-dark: #F4F2EE;
+  --dropdown-text-desc-dark: #8A8378;
+  --dropdown-divider-dark: rgba(176, 138, 60, .12);
+  --dropdown-item-active-dark: rgba(176, 138, 60, .10);
+  --dropdown-item-selected-bg-dark: rgba(176, 138, 60, .16);
+  --dropdown-item-selected-text-dark: #D2B169;
+  --dropdown-check-dark: #D2B169;
+
   /* 品牌主色 — 古铜金 (信任/专业/品质)
      V3.4：把"一个金色"拆成四档职责，每档只管一件事。旧版只有一个金色，被迫同时当"面"
      又当"字"：当面时太浅（CTA 与米白底仅 1.59:1，融进背景），当字时太淡（小字仅 3.4:1）。 */
@@ -558,6 +597,144 @@ body.page-ready .phone {
 .unit-input .input { flex: 1 1 auto; width: auto; min-width: 0; border: none; background: transparent; border-radius: var(--r-m) 0 0 var(--r-m); box-shadow: none; }
 .unit-input .input:focus { box-shadow: none; }
 .unit-input .unit { height: 48px; line-height: 48px; padding: 0 var(--sp-4); background: transparent; border: none; border-left: 1.5px solid var(--line); border-radius: 0 var(--r-m) var(--r-m) 0; color: var(--text-2); font-size: var(--fs-md); }
+
+/* ---------------------------------------------------------------------------
+   下拉选择器 (.ui-select) —— 专项视觉规则
+   原生 select 在移动端下拉列表无法自定义，改用触发器 + sheet 弹层方案。
+   触发器外观与 .input 完全对齐，选择列表在 sheet 内渲染，样式统一可控。
+--------------------------------------------------------------------------- */
+.ui-select {
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--sp-4);
+  padding-right: 38px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-m);
+  font-size: var(--fs-md);
+  color: var(--dropdown-text);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  cursor: pointer;
+  transition: border-color var(--d-fast), box-shadow var(--d-fast);
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.ui-select:active { transform: scale(.99); }
+.ui-select .us-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select .us-value.placeholder { color: var(--dropdown-text-desc); }
+.ui-select .us-arrow {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--dropdown-text-desc);
+  transition: transform var(--d-fast), color var(--d-fast);
+}
+.ui-select.open .us-arrow { transform: rotate(180deg); color: var(--dropdown-check); }
+.ui-select.open { border-color: var(--dropdown-check); box-shadow: 0 0 0 3px rgba(176, 138, 60, .12); }
+
+/* ---------------------------------------------------------------------------
+   浮层下拉 (.ui-dropdown) —— 智能定位，紧贴触发器展开
+   方向：自动判断向上/向下；宽度：默认等宽，内容过长时自动加宽不超屏
+--------------------------------------------------------------------------- */
+.ui-dropdown {
+  position: fixed;
+  left: 0; top: 0;
+  min-width: 120px;
+  max-width: calc(100vw - 32px);
+  background: var(--dropdown-bg-gradient);
+  border-radius: var(--r-m);
+  box-shadow: var(--dropdown-shadow), var(--dropdown-inset-highlight);
+  border: 1px solid var(--dropdown-border);
+  z-index: 200;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top left;
+  transition: opacity var(--d-fast), transform var(--d-fast);
+  pointer-events: none;
+}
+.ui-dropdown.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.ui-dropdown.drop-up { transform-origin: bottom left; transform: translateY(6px) scale(.98); }
+.ui-dropdown.drop-up.show { transform: translateY(0) scale(1); }
+
+.ui-dropdown .ud-list {
+  max-height: 240px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0;
+}
+.ui-dropdown .ud-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 12px 14px;
+  font-size: var(--fs-md);
+  color: var(--dropdown-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--d-fast), color var(--d-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-dropdown .ud-item:active { background: var(--dropdown-item-active); }
+.ui-dropdown .ud-item + .ud-item { border-top: 1px solid var(--dropdown-divider); }
+.ui-dropdown .ud-item .udi-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ui-dropdown .ud-item .udi-desc { font-size: var(--fs-sm); color: var(--dropdown-text-desc); flex: 0 0 auto; }
+.ui-dropdown .ud-item .udi-check {
+  flex: 0 0 auto;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--dropdown-check);
+  opacity: 0;
+  transform: scale(.5);
+  transition: opacity .15s var(--e-standard), transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.ui-dropdown .ud-item.on { color: var(--dropdown-item-selected-text); font-weight: 600; background: var(--dropdown-item-selected-bg); }
+.ui-dropdown .ud-item.on .udi-check { opacity: 1; transform: scale(1); }
+
+/* sheet 内的选择列表 */
+.sheet-select-list { padding: 4px 0 8px; }
+.sheet-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px var(--sp-5);
+  font-size: var(--fs-md);
+  color: var(--text-1);
+  cursor: pointer;
+  transition: background var(--d-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.sheet-select-item:active { background: var(--bg-card-2); }
+.sheet-select-item + .sheet-select-item { border-top: 1px solid var(--line-hairline); }
+.sheet-select-item .ssi-label { flex: 1 1 auto; }
+.sheet-select-item .ssi-desc { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; }
+.sheet-select-item .ssi-check {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--primary);
+  opacity: 0;
+  transform: scale(.5);
+  transition: opacity .15s var(--e-standard), transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.sheet-select-item.on { color: var(--primary-dim); font-weight: 600; }
+.sheet-select-item.on .ssi-check { opacity: 1; transform: scale(1); }
 
 /* 开关 */
 .switch { position: relative; width: 50px; height: 30px; flex: 0 0 auto; }
@@ -2869,7 +3046,7 @@ body.page-ready .phone {
 .cs-item:last-child .cs-body { padding-bottom:0; }
 
 /* ============================================================
-   第二批 · 第7类 中介服务 agency
+   第二批 · 第7类 服务商 agency
    ============================================================ */
 /* ① 报价明细卡 */
 .ag-quote { padding:13px; border-radius:var(--r-m); background:var(--bg-card); border:.5px solid var(--line); box-shadow:var(--shadow-xs); margin-top:10px; }
@@ -3870,7 +4047,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
 
 /* ============================================================================
    身份视觉徽章系统 (Identity Badge System)
-   蓝V(建筑企业) / 金V(中介服务) / 专属(合伙人) / 个人合伙人
+   蓝V(建筑企业) / 金V(服务商) / 专属(合伙人) / 个人合伙人
    ============================================================================ */
 .id-badge{
   display:inline-flex;align-items:center;gap:4px;
@@ -3899,7 +4076,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
 }
 .id-badge-bluev .id-badge-icon{color:#fff;}
 
-/* ---- 金V：中介服务企业 ---- */
+/* ---- 金V：服务商企业 ---- */
 .id-badge-goldv{
   background:linear-gradient(135deg,#E3C88E 0%,#B08A3C 45%,#8A6A28 100%);
   color:#fff;
@@ -3963,7 +4140,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
 .et-tier-badge[data-type="construction"].et-tier-l4{background:linear-gradient(135deg,#1f66b8,#0d4a96);color:#fff;border-color:rgba(13,74,150,.6);box-shadow:0 2px 10px rgba(13,74,150,.3);}
 .et-tier-badge[data-type="construction"].et-tier-l4 .et-tier-lv{background:rgba(255,255,255,.25);}
 
-/* 等级颜色 — 中介服务（金色系） */
+/* 等级颜色 — 服务商（金色系） */
 .et-tier-badge[data-type="agency"].et-tier-l1{background:linear-gradient(135deg,#faf3e3,#f0e4c8);color:#7A5C1E;border-color:rgba(210,177,105,.4);}
 .et-tier-badge[data-type="agency"].et-tier-l1 .et-tier-lv{background:#D2B169;}
 .et-tier-badge[data-type="agency"].et-tier-l2{background:linear-gradient(135deg,#f0e4c8,#e4d0a0);color:#7a5f25;border-color:rgba(196,164,92,.45);}

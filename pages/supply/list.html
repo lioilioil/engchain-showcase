@@ -178,7 +178,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var type = params.get('type') || 'all';
 
   /* ---- 供需方向 + 资源分类 统一映射 ---- */
-  var BIZ_MAP = { '材料':'material','设备':'equipment','劳务':'labor','运输':'transport','中介服务':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent' };
+  var BIZ_MAP = { '材料':'material','设备':'equipment','劳务':'labor','运输':'transport','服务商':'agency','资质招商':'franchise','建企买卖':'trade','招聘':'personnel','求职':'talent' };
 
   /* 资源类分类对应的 bizKey */
   var RESOURCE_BIZ = { franchise: 'franchise', trade: 'trade', talent: 'talent' };
@@ -221,29 +221,38 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       '设备': ['1-5万','5-20万','20-100万'],
       '劳务': ['面议','1万以下','1-5万'],
       '运输': ['面议','1万以下','1-5万'],
-      '中介服务': ['1-5万','5-20万'],
+      '服务商': ['1-5万','5-20万'],
       '资质招商': ['5-20万','20-100万'],
       '建企买卖': ['20-100万','100万以上'],
       '招聘': ['面议','1万以下','1-5万'],
       '求职': ['面议','1万以下','1-5万']
     }
   };
-  /* 一级 tab 的二级分类（资源/供需/服务；供需方向在筛选弹窗中选择） */
+  /* 一级 tab 的二级分类（资源/供需/服务；供需方向在筛选弹窗中选择）。
+     service 子 tab 与服务广场 12 类口径一致（2026-11-04 同步扩展） */
   var SUBTABS = {
     resource: [{ key: 'all', label: '全部' }, { key: 'franchise', label: '资质招商' }, { key: 'trade', label: '建企买卖' }, { key: 'personnel', label: '企业招聘' }, { key: 'talent', label: '人才求职' }],
     biz: [{ key: 'all', label: '全部' }, { key: 'material', label: '材料' }, { key: 'equipment', label: '设备' }, { key: 'labor', label: '劳务' }, { key: 'transport', label: '运输' }],
-    service: [{ key: 'all', label: '全部' }, { key: '资质代办', label: '资质代办' }, { key: '工程担保', label: '工程担保' }, { key: '造价咨询', label: '造价咨询' }, { key: '企业服务', label: '企业服务' }]
+    service: [{ key: 'all', label: '全部' }, { key: '资质代办', label: '资质代办' }, { key: '工程担保', label: '工程担保' }, { key: '造价咨询', label: '造价咨询' }, { key: '劳务派遣', label: '劳务派遣' }, { key: '企业服务', label: '企业服务' }, { key: '招投标', label: '招投标' }, { key: '人才证照', label: '人才证照' }, { key: '工程检测', label: '工程检测' }, { key: '工程保险', label: '工程保险' }, { key: '监理咨询', label: '监理咨询' }, { key: '评估审计', label: '评估审计' }, { key: '认证信用', label: '认证信用' }]
   };
-  /* 服务子类关键词匹配 */
+  /* 服务子类关键词匹配（与服务广场 CATS 判定正则同口径） */
   var SERVICE_KEYS = {
-    '资质代办': ['资质', '代办', '升级', '安许', '新办', '延期', '分立'],
-    '工程担保': ['担保', '保函', '履约', '投标'],
-    '造价咨询': ['造价', '咨询', '结算', '审核', '审计'],
-    '企业服务': ['工商', '注册', '劳务', '招标', '代理', '服务']
+    '资质代办': ['资质', '代办', '升级', '安许', '新办', '延期', '分立', '增项'],
+    '工程担保': ['担保', '保函', '履约', '投标', '预付款'],
+    '造价咨询': ['造价', '咨询', '结算', '审核', '审计', '预算', '决算'],
+    '劳务派遣': ['劳务', '派遣', '用工', '班组'],
+    '企业服务': ['工商', '注册', '税务', '记账', '报税', '代账', '财务'],
+    '招投标': ['标书', '投标', '招标', '电子标', '代标'],
+    '人才证照': ['建造师', '职称', '特种作业', '证照', '证书', '继续教育'],
+    '工程检测': ['检测', '见证取样', '桩基', '结构', '防雷', '消防'],
+    '工程保险': ['保险', '建工意外', '雇主责任', '安责险', '工伤'],
+    '监理咨询': ['监理', '全过程咨询', '旁站'],
+    '评估审计': ['评估', '审计', '验资', '决算', '资产评估'],
+    '认证信用': ['ISO', 'AAA', '信用', '高新', '体系认证']
   };
   function matchService(item, key) {
     if (key === 'all') return true;
-    var hay = (item.sub || '') + ' ' + (item.title || '') + ' ' + (item.serveType || '');
+    var hay = (item.sub || '') + ' ' + (item.title || '') + ' ' + (item.serveType || '') + ' ' + ((item.cats || []).join(' '));
     var keys = SERVICE_KEYS[key] || [key];
     for (var i = 0; i < keys.length; i++) if (hay.indexOf(keys[i]) >= 0) return true;
     return false;

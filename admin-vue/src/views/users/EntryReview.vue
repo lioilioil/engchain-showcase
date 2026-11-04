@@ -100,7 +100,7 @@ onMounted(loadData)
     <div class="page-header">
       <div>
         <h2>入驻审核</h2>
-        <p class="page-desc">建筑/中介入驻申请审核（省级总代审核/终止见独立桥接视图；个人合伙人走独立认证审核）</p>
+        <p class="page-desc">建筑/服务商入驻申请审核（省级总代审核/终止见独立桥接视图；个人合伙人走独立认证审核）</p>
       </div>
       <el-button size="small" type="primary" plain @click="router.push('/agents/province')">省代开通/审核/终止（桥接）</el-button>
     </div>

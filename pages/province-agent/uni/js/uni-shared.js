@@ -1004,7 +1004,7 @@
     var aEnt = (breakin && typeof bi.agency === "number") ? bi.agency : aFee;
     function money(v) { return v > 0 ? ("¥" + Number(v).toLocaleString()) : "¥0"; }
     var certTxt = cert > 0 ? (money(cert) + "/年") : "¥0 · 免费审核制";
-    var entTxt = "建筑 " + money(cEnt) + (cEnt > 0 ? "" : " 限免") + " / 中介 " + money(aEnt) + " 每次" +
+    var entTxt = "建筑 " + money(cEnt) + (cEnt > 0 ? "" : " 限免") + " / 服务商 " + money(aEnt) + " 每次" +
       (breakin ? "（破冰期体验价）" : "");
     return '<div class="uc-scope__row"><div class="k">计入合格消费</div><ul>' +
       "<li>企业认证费 <b>" + certTxt + "</b> · 按支付时点计入</li>" +

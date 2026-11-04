@@ -1,13 +1,13 @@
 /* ============================================================================
-   js/domain.js —— 分销 & 中介服务 领域层（v3.0 迭代新增，纯增量、不改动既有 Store 语义）
+   js/domain.js —— 分销 & 服务商 领域层（v3.0 迭代新增，纯增量、不改动既有 Store 语义）
    ----------------------------------------------------------------------------
-   职责（对应《分销与中介迭代计划书》S1~S5 + 《规则配置化任务书》C0~C2）：
+   职责（对应《分销与服务商迭代计划书》S1~S5 + 《规则配置化任务书》C0~C2）：
    0. 配置中心：CONFIG_PATCH 出厂补齐 + ConfigAPI（override 真正生效）+ 全局 RULE() 唯一读取入口
    1. Timeline 记录时间线（Twenty CRM Record Timeline，多态 bizType:bizId）
    2. Ledger 资金台账（多科目、借贷相等、幂等、守恒校验）
    3. Referral 邀请关系（L1/L2、自邀/成环/超深/重复绑定校验、合规上限二级）
    4. Rebate 返佣引擎（消费事件生成 → frozen → settled(T+1) → paid；退款 clawback）
-   5. Mediation 统一中介托管订单（合并旧 AO 单；标准状态机 + 里程碑 + 托管/结算/退款/纠纷）
+   5. Mediation 统一服务商托管订单（合并旧 AO 单；标准状态机 + 里程碑 + 托管/结算/退款/纠纷）
    6. Outbox/Sync/FormStash 离线队列、增量同步元数据、表单回退暂存
    依赖顺序：data.js → common.js → stores.js → databus.js → domain.js
    说明：本层为前端原型的"后台能力占位"，方法签名即后端接口契约，接真实后端时仅替换读写实现。
@@ -52,12 +52,12 @@
     distribution: {
       maxLevel: 2, freezeDays: 1, bindWindowHours: 72,
       tiers: {
-        /* [M4-3] 档位：base（建筑旧持有人）/limited（中介旧持有人）+ individualPartner 个人合伙人档（8%/2%）。
+        /* [M4-3] 档位：base（建筑旧持有人）/limited（服务商旧持有人）+ individualPartner 个人合伙人档（8%/2%）。
            旧「full 完整二级（合伙人企业）」档位已摘除（旧企业合伙人随 M4-4 下线），不再配置/校验/结算。
            费率不硬编码死值：applyConfig 时以 MOCK.business.distribution.tier1/tier2 覆盖 base.t1/t2，
            以 MOCK.business.distribution.individualPartner 覆盖个人合伙人档；后台 ConfigAPI.save 改价即时生效。 */
         base: { label: '基础一级（建筑企业）', t1: 12, t2: 3 },
-        limited: { label: '受限一级（中介企业）', t1: 6, t2: 0 },
+        limited: { label: '受限一级（服务商企业）', t1: 6, t2: 0 },
         individualPartner: { label: '个人合伙人', t1: 8, t2: 2 }
       },
       levelRules: [
@@ -389,7 +389,7 @@
           status: 'frozen', frozenUntil: Date.now() + (RULE('distribution.freezeDays', 1)) * DAY,
           createdAt: Date.now(), settledAt: 0, paidAt: 0, walletTxnId: '', clawbackOf: '', idemKey: idem, ruleSnapshot: { tier: tier, rate: rate }
         };
-        /* 返佣冻结由平台运营账户拨付（非佣金收入科目，避免冲减中介佣金），待发放后转受益人可用 */
+        /* 返佣冻结由平台运营账户拨付（非佣金收入科目，避免冲减服务商佣金），待发放后转受益人可用 */
         Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'available', toUid: ben, toAcct: 'rebate_frozen', amount: fee, bizType: 'rebate', bizId: order.id, remark: ev.sourceType + ' 返佣冻结', allowNegative: true });
         list.push(order); created.push(order);
         Timeline.add('rebate', order.id, '生成返佣单（冻结）', 'system', { fee: fee, rate: rate, level: link.level });
@@ -493,7 +493,7 @@
   }
 
   /* ==========================================================================
-     5. Mediation 统一中介托管订单
+     5. Mediation 统一服务商托管订单
      ========================================================================== */
   var MED_KEY = 'engchain-mediation-orders';
   var LEGAL = {
@@ -516,7 +516,7 @@
     for (var i = 1; i < tiers.length; i++) if (Math.abs(tiers[i] - target) < Math.abs(best - target)) best = tiers[i];
     return best;
   }
-  /* [SEED] 中介托管订单演示数据 — [PHASE 0] 托管已下线，平台不再生成新托管订单，返回空种子 */
+  /* [SEED] 服务商托管订单演示数据 — [PHASE 0] 托管已下线，平台不再生成新托管订单，返回空种子 */
   function seedMediationOrders() {
     return [];
   }
@@ -574,7 +574,7 @@
       var me = currentUid();
       var o = {
         id: uid('MD'), buyerId: input.buyerId || me, sellerId: input.sellerId || '', svcId: input.svcId || '', svcName: input.svcName || '',
-        category: input.category || '', title: input.title || input.svcName || '中介服务订单', amount: amt, fee: r2(calc.fee),
+        category: input.category || '', title: input.title || input.svcName || '服务商订单', amount: amt, fee: r2(calc.fee),
         settle: r2(amt - calc.fee), intentAmount: intentAmountOf(amt, input.bizType || input.category), intentPaid: false, intentTxnId: '', intentTransferred: false,
         state: 'draft', payMethod: '', payTxnId: '', idemKey: '',
         milestones: buildMilestones(amt), refund: null, dispute: null, review: null, timeline: [], version: 1,
@@ -589,9 +589,9 @@
       var o = this.byId(id); if (!o) return { error: '订单不存在' };
       if (!this._can(o, 'intent')) return { error: '当前状态不可支付意向金' };
       var key = idemKey || ('int_' + o.id);
-      var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'intent', amount: o.intentAmount, bizType: 'mediation_intent', bizId: o.id, idemKey: key, remark: '中介服务意向金' });
+      var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'intent', amount: o.intentAmount, bizType: 'mediation_intent', bizId: o.id, idemKey: key, remark: '服务商意向金' });
       if (tx.error) return tx;
-      safeMoneyMinus(o.buyerId, o.intentAmount, '中介服务意向金');
+      safeMoneyMinus(o.buyerId, o.intentAmount, '服务商意向金');
       o.state = 'intent'; o.intentPaid = true; o.intentTxnId = tx.txn ? tx.txn.id : ''; o.payMethod = method || 'balance'; o.idemKey = key; o.version++; o.updatedAt = Date.now();
       this._tl(o, '支付意向金，确认合作意向', o.buyerId, { amount: o.intentAmount });
       this._write(o); emit('engchain:mediation', { id: id, state: o.state }); return o;
@@ -603,9 +603,9 @@
       var remain = r2(o.amount - (o.intentAmount || 0));
       var key = idemKey || ('pay_' + o.id);
       if (remain > 0) {
-        var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: remain, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '中介订单服务费托管' });
+        var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: remain, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '服务商订单服务费托管' });
         if (tx.error) return tx;
-        safeMoneyMinus(o.buyerId, remain, '中介订单服务费托管');
+        safeMoneyMinus(o.buyerId, remain, '服务商订单服务费托管');
         o.payTxnId = tx.txn ? tx.txn.id : '';
       }
       if (o.intentPaid && !o.intentTransferred) {
@@ -635,10 +635,10 @@
       if (o.state === 'intent') return this.startService(id, method, idemKey);
       if (!this._can(o, 'escrowed')) return { error: '当前状态不可支付托管' };
       var key = idemKey || ('pay_' + o.id);
-      var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: o.amount, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '中介订单资金托管' });
+      var tx = Ledger.transfer({ fromUid: o.buyerId, fromAcct: 'available', toUid: Ledger.PLATFORM, toAcct: 'escrow', amount: o.amount, bizType: 'mediation_pay', bizId: o.id, idemKey: key, remark: '服务商订单资金托管' });
       if (tx.error) return tx;
       /* 买方钱包扣减（当前登录即买方时写 BalanceStore；同时回写用户表） */
-      safeMoneyMinus(o.buyerId, o.amount, '中介订单托管');
+      safeMoneyMinus(o.buyerId, o.amount, '服务商订单托管');
       o.state = 'escrowed'; o.payMethod = method || 'balance'; o.payTxnId = tx.txn ? tx.txn.id : ''; o.idemKey = key; o.version++; o.updatedAt = Date.now();
       this._tl(o, '付款并托管至监管账户', o.buyerId, { amount: o.amount });
       this._write(o); emit('engchain:mediation', { id: id, state: o.state }); return o;
@@ -759,7 +759,7 @@
       var remain = r2(o.amount - released);
       if (remain > 0) {
         Ledger.transfer({ fromUid: Ledger.PLATFORM, fromAcct: 'escrow', toUid: o.buyerId, toAcct: 'available', amount: remain, bizType: 'mediation_refund', bizId: o.id, idemKey: 'ref_' + o.id, remark: ev });
-        safeMoneyAdd(o.buyerId, remain, '中介订单退款');
+        safeMoneyAdd(o.buyerId, remain, '服务商订单退款');
       }
       o.state = released > 0 ? 'partial_refund' : 'refunded';
       o.refund = { amount: remain, reason: reason || '', at: Date.now(), released: released }; o.version++; o.updatedAt = Date.now();

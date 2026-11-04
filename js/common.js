@@ -371,6 +371,100 @@ window.UI = (function () {
   }
   document.addEventListener('pointerdown', customSheetDelegate, true);
   document.addEventListener('mousedown', customSheetDelegate, true);
+
+  /* ---- 浮层下拉 (智能定位) ----
+     自动判断向上/向下展开；默认与触发器等宽，不超出屏幕边距；
+     点击外部关闭；滚动/resize 时实时跟随定位。 */
+  let _lastDropdown = null;
+  function dropdown(opts) {
+    const o = { trigger: null, items: [], value: null, onChange: null, ...opts };
+    if (!o.trigger) return;
+    if (_lastDropdown) _lastDropdown.close();
+
+    const dd = document.createElement('div');
+    dd.className = 'ui-dropdown';
+    dd.innerHTML = '<div class="ud-list"></div>';
+    document.body.appendChild(dd);
+
+    const listEl = dd.querySelector('.ud-list');
+    listEl.innerHTML = o.items.map(function (item) {
+      return '<div class="ud-item' + (item.value === o.value ? ' on' : '') + '" data-val="' + item.value + '">' +
+        '<span class="udi-label">' + item.label + '</span>' +
+        (item.desc ? '<span class="udi-desc">' + item.desc + '</span>' : '') +
+        '<span class="udi-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>' +
+        '</div>';
+    }).join('');
+
+    function position() {
+      const rect = o.trigger.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const margin = 16;
+
+      let w = rect.width;
+      w = Math.max(w, 140);
+      w = Math.min(w, vw - margin * 2);
+      dd.style.width = w + 'px';
+
+      let left = rect.left;
+      if (left + w > vw - margin) left = vw - margin - w;
+      left = Math.max(margin, left);
+
+      const spaceBelow = vh - rect.bottom;
+      const spaceAbove = rect.top;
+      const ddH = dd.offsetHeight;
+      let top, dropUp = false;
+
+      if (spaceBelow >= ddH || spaceBelow >= spaceAbove) {
+        top = rect.bottom + 6;
+      } else {
+        top = rect.top - ddH - 6;
+        dropUp = true;
+      }
+
+      dd.style.left = left + 'px';
+      dd.style.top = top + 'px';
+      dd.classList.toggle('drop-up', dropUp);
+    }
+
+    requestAnimationFrame(function () {
+      position();
+      dd.classList.add('show');
+      o.trigger.classList.add('open');
+    });
+
+    function close() {
+      dd.classList.remove('show');
+      o.trigger.classList.remove('open');
+      setTimeout(function () { dd.remove(); }, 200);
+      document.removeEventListener('pointerdown', onDocDown, true);
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+      _lastDropdown = null;
+    }
+
+    function onDocDown(e) {
+      if (!dd.contains(e.target) && !o.trigger.contains(e.target)) close();
+    }
+
+    listEl.addEventListener('click', function (e) {
+      const item = e.target.closest('.ud-item');
+      if (!item) return;
+      const val = item.dataset.val;
+      const itemData = o.items.filter(function (x) { return x.value === val; })[0];
+      if (o.onChange) o.onChange(val, itemData);
+      close();
+    });
+
+    document.addEventListener('pointerdown', onDocDown, true);
+    window.addEventListener('resize', position);
+    window.addEventListener('scroll', position, true);
+
+    dd.close = close;
+    _lastDropdown = dd;
+    return dd;
+  }
+
   /* ---- 居中对话框 ---- */
   function dialog(opts) {
     const o = { title: '', text: '', ok: '确定', cancel: '取消', onOk: null, onCancel: null, danger: false, agree: false, agreeHref: '', agreeText: '我已阅读并同意', agreeName: '服务协议', ...opts };
@@ -1571,7 +1665,7 @@ window.UI = (function () {
     return base + '?scenario=' + encodeURIComponent(scene) + '&role=' + encodeURIComponent(role);
   }
 
-  return { base, toast, sheet, dialog, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchAccess, pinWorkbenchScene, workbenchHref };
+  return { base, toast, sheet, dialog, dropdown, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchAccess, pinWorkbenchScene, workbenchHref };
 })();
 
 /* ============================================================================
@@ -1958,7 +2052,7 @@ window.ViewHistory = ViewHistory;
 /* ============================================================================
    工程链 ENGCHAIN — 统一分类卡片 (Cards)
    首页 / 资源页 / 发现页共用：按 bizKey 输出对应卡片模板
-   资质招商 / 建企买卖 / 企业招聘 / 人才求职 / 材料 / 设备 / 劳务 / 中介
+   资质招商 / 建企买卖 / 企业招聘 / 人才求职 / 材料 / 设备 / 劳务 / 服务商
    ============================================================================ */
 window.Cards = (function () {
   function esc(s) { return String(s == null ? '' : s); }
@@ -2196,7 +2290,7 @@ window.Cards = (function () {
     return body + foot(p.text || '面议', p.unit, companyLine(s));
   }
 
-  /* ---- 中介供应 agencyLike：serviceCats chips 直上（P1-07），由 supplyLike 派生 ---- */
+  /* ---- 服务商供应 agencyLike：serviceCats chips 直上（P1-07），由 supplyLike 派生 ---- */
   function agencyLike(s, ctx) {
     var sc = serviceCatsOf(s);
     var scRow = sc.length ? '<div class="sc-svcats">' + sc.map(function (c) { return '<span class="sc-chip sc-svcat">' + esc(c) + '</span>'; }).join('') + '</div>' : '';
@@ -2251,7 +2345,7 @@ window.Cards = (function () {
        不回填 typeKey、不参与数据分发，避免丰富 legacy 记录掉进纯文通用卡。 */
     if (!variant && !meta) {
       var ctxt = String(s.cat || '') + ' ' + (Array.isArray(s.cats) ? s.cats.join(' ') : '');
-      if (/中介|agency|服务代办/i.test(ctxt)) variant = 'agencyLike';
+      if (/服务商|agency|服务代办/i.test(ctxt)) variant = 'agencyLike';
     }
     if (!variant) variant = 'generic';
     /* [V2 回修 V-P1-01] 记录自带 role/detailLevel/typeKey 优先，仅缺失时才用 resolveType
@@ -2548,7 +2642,7 @@ window.ListFooter = (function () {
 })();
 /* ============================================================================
    身份视觉徽章系统 IdBadge
-   蓝V(建筑企业) / 金V(中介服务) / 专属(合伙人) / 个人合伙人
+   蓝V(建筑企业) / 金V(服务商) / 专属(合伙人) / 个人合伙人
    用法：IdBadge.render('construction', 'md') → HTML字符串
         IdBadge.html('bluev', '蓝V', 'lg') → 自定义
    ============================================================================ */
@@ -2593,7 +2687,7 @@ window.ListFooter = (function () {
    入驻档位系统 EntryTier
    系统根据企业信息自动判断档位，非用户选择
    建筑企业：标准建企/成长建企/规模建企/龙头建企
-   中介服务：基础服务/专业服务/深度服务/尊享服务
+   服务商：基础服务/专业服务/深度服务/尊享服务
    合伙人：初级合伙/中级合伙/高级合伙/战略合伙
    ============================================================================ */
 (function(){
@@ -2634,7 +2728,7 @@ window.ListFooter = (function () {
         /* 降级：从用户扩展字段读取 */
         if (u.enterprise) return u.enterprise;
       }
-      /* 中介/合伙人：从用户统计字段读取 */
+      /* 服务商/合伙人：从用户统计字段读取 */
       if (u.stats) return u.stats;
       if (u.agencyStats) return u.agencyStats;
       if (u.partnerStats) return u.partnerStats;

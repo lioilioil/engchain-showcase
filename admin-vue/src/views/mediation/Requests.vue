@@ -24,7 +24,7 @@ const filters = [
     { value: '材料', label: '材料' },
     { value: '设备', label: '设备' },
     { value: '劳务', label: '劳务' },
-    { value: '中介服务', label: '中介服务' },
+    { value: '服务商', label: '服务商' },
     { value: '资质招商', label: '资质招商' },
     { value: '建企买卖', label: '建企买卖' },
     { value: '招聘', label: '招聘' },
@@ -297,7 +297,7 @@ onMounted(loadData)
             <el-option label="材料" value="材料" />
             <el-option label="设备" value="设备" />
             <el-option label="劳务" value="劳务" />
-            <el-option label="中介服务" value="中介服务" />
+            <el-option label="服务商" value="服务商" />
             <el-option label="资质招商" value="资质招商" />
             <el-option label="建企买卖" value="建企买卖" />
             <el-option label="招聘" value="招聘" />

@@ -358,7 +358,7 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       { key:'transport', label:'运输', sub:'运力供应 / 用车运输', cat:'transport', next:'q-transport' },
       { key:'firm', label:'建筑企业', sub:'招商加盟 / 转让收购', cat:'firm', next:'q-firm' },
       { key:'talent', label:'人才', sub:'企业招人 / 个人求职', cat:'talent', next:'q-talent' },
-      { key:'agency', label:'中介服务', sub:'服务商接单 / 找中介', cat:'agency', next:'q-agency' },
+      { key:'agency', label:'服务商', sub:'服务商接单 / 找服务 12 类', cat:'agency', next:'q-agency' },
       { key:'other', label:'其他', sub:'人工客服 / 全部类型', cat:'other', next:'q-other' }
     ]},
     'q-material': { cat:'材料', text:'材料方面，你是供应方还是采购方？', options:[
@@ -387,9 +387,9 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       { key:'personnel-demand', label:'企业方，我要招人', sub:'发布详细招聘岗位', side:'supply', type:'personnel-demand' },
       { key:'talent-supply', label:'个人，我要找工作', sub:'求职简历 / 求职意向', side:'demand', type:'talent-supply' }
     ]},
-    'q-agency': { cat:'中介服务', text:'中介服务方面，你的身份是？', options:[
-      { key:'agency-supply', label:'我是服务商，提供服务', sub:'资质代办 / 咨询等中介服务', side:'supply', type:'agency-supply', viaSeller:true },
-      { key:'agency-demand', label:'我要找中介办事', sub:'找中介代办 / 咨询服务', side:'demand', type:'agency-demand' }
+    'q-agency': { cat:'服务商', text:'服务商方面，你的身份是？', options:[
+      { key:'agency-supply', label:'我是服务商，提供服务', sub:'资质/担保/造价/检测/保险/监理…12 类', side:'supply', type:'agency-supply', viaSeller:true },
+      { key:'agency-demand', label:'我要找服务办事', sub:'资质/担保/造价/检测/保险/监理…12 类直达', side:'demand', type:'agency-demand' }
     ]},
     'q-other': { cat:'其他', text:'需要帮助吗？', options:[
       { key:'help', label:'转人工客服', sub:'专业顾问协助发布', side:'action', action:'help' },
@@ -513,7 +513,11 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       engaged=true;
       appendUser(o);
       stack.push({qkey:qkey,o:o,key:o.key});
-      if(o.type){goConfirm(o);}
+      if(o.type){
+        /* 「我要找服务」（agency-demand）：先选 12 类业务分类，再进确认卡 */
+        if (o.type === 'agency-demand' && window.SERVICE_CATS) { renderServiceCatStep(o, qkey); return; }
+        goConfirm(o);
+      }
       else if(o.action==='help'){contactService();}
       else if(o.action==='choose'){
         /* 「查看全部类型」：原地弹出底部类型选择，不再跳转独立 choose.html */
@@ -528,10 +532,11 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
     return busy;
   }
 
-  /* 确认卡：逐字文案 + 800ms 后打开真实发布页（与原生产页一致）；按钮可立即前往 */
-  function goConfirm(o){
+  /* 确认卡：逐字文案 + 800ms 后打开真实发布页（与原生产页一致）；按钮可立即前往。
+     extraQuery 供「我要找服务」携带 serviceCat=业务分类 id */
+  function goConfirm(o, extraQuery){
     var label=typeLabel(o.type);
-    var href=typeHref(o.type);
+    var href=typeHref(o.type)+(extraQuery||'');
     var br=botRow();flowEl.appendChild(br.row);
     var card=el('div','confirm');
     card.innerHTML='<div class="chd"><span class="cic">'+svg('seal')+'</span><b>好的，即将为你打开「'+esc(label)+'」发布页。</b></div>'
@@ -541,6 +546,38 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
     br.col.appendChild(card);
     follow();
     goTimer=setTimeout(function(){location.href=href;},5000);
+  }
+
+  /* 「我要找服务」：追加一轮业务分类选择（12 类，与类型弹窗二级视图同口径），
+     选中后带 serviceCat 进入确认卡 */
+  function renderServiceCatStep(o, qkey){
+    busy=(async function(){
+      await busy;
+      if(goTimer){clearTimeout(goTimer);goTimer=null;}
+      engaged=true;
+      var br=botRow();flowEl.appendChild(br.row);
+      var q=el('div','q');
+      q.innerHTML='<span class="qq">'+svg('ask')+'</span><div class="qt"><b>你要找哪类服务？</b><span>选好分类直达发布表单，平台按分类为你匹配服务方</span></div>';
+      br.col.appendChild(q);
+      var wrap=el('div','opts rows');
+      (window.SERVICE_CATS||[]).forEach(function(c){
+        var b=el('button','opt demand','');
+        b.innerHTML='<span class="oic">'+svg('down')+'</span>'
+          +'<span class="obd"><b>'+esc(c.label)+'</b><span>'+esc(c.sub)+'</span></span>'
+          +'<span class="oside">需</span><span class="ogo">'+svg('go')+'</span>';
+        b.onclick=function(){
+          var oo=Object.assign({},o,{ label: c.label, side: 'demand', serviceCat: c.id });
+          appendUser(oo);
+          stack.push({qkey:qkey,o:o,key:o.key,serviceCat:c.id});
+          goConfirm(oo,'&serviceCat='+encodeURIComponent(c.id));
+        };
+        wrap.appendChild(b);
+      });
+      br.col.appendChild(wrap);
+      flowEl.appendChild(br.row);
+      follow();
+    })();
+    return busy;
   }
 
   function rebuildTo(idx){
@@ -553,7 +590,7 @@ html[data-theme="dark"] .fab-help{color:#FFF0CF;
       var last=stack[stack.length-1];
       engaged=true;
       if(last.o.next){renderQuestion(last.o.next,FLOW[last.o.next],{instant:true});}
-      else if(last.o.type){goConfirm(last.o);}
+      else if(last.o.type){goConfirm(last.o, last.serviceCat ? ('&serviceCat='+encodeURIComponent(last.serviceCat)) : '');}
       else{renderQuestion(last.qkey,FLOW[last.qkey],{instant:true});}
     }
   }

@@ -268,7 +268,7 @@ function handleEmptyAction() {
     // 数据为空 → 填入示例数据（教育价值，可再清除）
     const samples = [
       { id: 'demo1', name: '示例建筑公司', company: '示例建设有限公司', mobile: '13800000001', tag: 'resident', status: 'active', banned: false, balance: { balance: 0 }, credits: { balance: 0 } },
-      { id: 'demo2', name: '示例中介', company: '示例工程中介', mobile: '13800000002', tag: 'realname', status: 'active', banned: false, balance: { balance: 0 }, credits: { balance: 0 } }
+      { id: 'demo2', name: '示例服务商', company: '示例工程服务', mobile: '13800000002', tag: 'realname', status: 'active', banned: false, balance: { balance: 0 }, credits: { balance: 0 } }
     ]
     allData.value = [...allData.value, ...samples]
     applyFilter()
