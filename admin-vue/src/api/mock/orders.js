@@ -1,63 +1,23 @@
 /**
  * 订单数据模块
  * 数据来源：旧版 databus.js seedOrders()
- * 共 16 个订单，含状态机和里程碑
+ * 共 16 个订单，含状态机；平台不抽佣、不做里程碑结算与资金托管
  */
 
 const t = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10)
 
-// 里程碑配置（与旧版 data.js commission.milestone 同源）
-const MILESTONE_CONFIG = {
-  enable: true,
-  minAmount: 50000,
-  nodes: [0.3, 0.3, 0.3, 0.1],
-  labels: ['合同签订', '服务进度50%', '验收', '质保期满']
-}
-
 /**
- * 佣金计算（与旧版 commissionRate 同口径）
- * 阶梯费率：5万以下5%，5-20万8%，20-50万10%，50万以上12%
+ * 订单不计费：平台不抽佣、不代收代付，订单只记录金额与状态
  */
-export function orderCalc(amount) {
-  let rate = 0.08
-  if (amount < 50000) rate = 0.05
-  else if (amount < 200000) rate = 0.08
-  else if (amount < 500000) rate = 0.10
-  else rate = 0.12
-  const fee = Math.round(amount * rate * 100) / 100
-
-  const multi = MILESTONE_CONFIG.enable && amount >= MILESTONE_CONFIG.minAmount
-  const nodes = multi ? MILESTONE_CONFIG.nodes : [1]
-  const labels = multi ? MILESTONE_CONFIG.labels : ['整单结算']
-  const items = nodes.map((p, i) => ({
-    label: labels[i] || `节点${i + 1}`,
-    pct: p,
-    fee: Math.round(fee * p * 100) / 100
-  }))
-
-  return { rate, fee, milestone: multi, items }
+export function orderCalc() {
+  return { rate: 0, fee: 0, milestone: false, items: [] }
 }
 
 // 生成单个订单
 function mk(id, type, title, amount, owner, counterparty, counterpartyId, status, day) {
-  const calc = orderCalc(amount)
-  const multi = calc.milestone
-  const nodes = multi ? MILESTONE_CONFIG.nodes : [1]
-  const labels = multi ? MILESTONE_CONFIG.labels : ['整单结算']
-  const milestones = nodes.map((p, i) => ({
-    label: labels[i] || `节点${i + 1}`,
-    pct: p,
-    status: 'todo',
-    doneAt: 0
-  }))
-
-  let fee = 0
-  let rate = 0
-  if (status === 'settled') {
-    milestones.forEach(m => { m.status = 'done'; m.doneAt = Date.now() })
-    fee = calc.fee
-    rate = calc.rate
-  }
+  const milestones = []
+  const fee = 0
+  const rate = 0
 
   return {
     id, type, title, amount, owner, counterparty, counterpartyId: counterpartyId || '',
@@ -131,39 +91,18 @@ export function transition(id, next, patch = {}) {
   order.status = next
   Object.assign(order, patch)
 
-  // 到达结算：按里程碑比例计提佣金
-  if (next === 'settled') {
-    const calc = orderCalc(order.amount)
-    let donePct = 0
-    order.milestones.forEach(m => { if (m.status === 'done') donePct += m.pct })
-    order.fee = Math.round(calc.fee * (donePct > 0 ? donePct : 1) * 100) / 100
-    order.rate = calc.rate
-  }
-
   order.updatedAt = Date.now()
   return order
 }
 
 /**
- * 推进里程碑
+ * 订单推进到待验收（无节点结算，仅状态流转）
  */
-export function advanceMilestone(id, idx) {
-  const orders = list()
-  const order = orders.find(o => o.id === id)
+export function advanceMilestone(id) {
+  const order = byId(id)
   if (!order) return null
-  if (order.status !== 'serving' && order.status !== 'await_accept') {
-    return { error: '当前状态不可推进里程碑' }
-  }
-  if (!order.milestones[idx]) return { error: '里程碑节点不存在' }
-  if (order.milestones[idx].status === 'done') return { error: '该节点已达成' }
-
-  order.milestones[idx].status = 'done'
-  order.milestones[idx].doneAt = Date.now()
-
-  const allDone = order.milestones.every(m => m.status === 'done')
-  if (allDone && order.status === 'serving') {
-    order.status = 'await_accept'
-  }
+  if (order.status !== 'serving') return { error: '当前状态不可推进' }
+  order.status = 'await_accept'
   order.updatedAt = Date.now()
   return order
 }

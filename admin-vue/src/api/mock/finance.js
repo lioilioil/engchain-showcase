@@ -1,6 +1,6 @@
 /**
  * 财务数据模块
- * 包含：提现、发票、佣金流水、违规处罚
+ * 包含：提现、发票、违规处罚
  * 数据来源：旧版 databus.js 各 seed 函数
  */
 
@@ -25,22 +25,15 @@ const seedInvoices = [
   { id: 'INV20260901005', title: '成都××建材供应有限公司', tax: '91510100MA7C3D4E5F', type: '增值税普通发票', amount: 960, status: 'void', applyAt: t(3), note: '信息有误，已作废' }
 ]
 
-// ========== 佣金流水 ==========
-const seedCommissionFlows = [
-  { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '服务商撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * DAY, status: 'done' },
-  { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '服务商撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * DAY, status: 'done' }
-]
-
 // ========== 违规处罚 ==========
 const seedViolations = [
   { id: 'VIO001', uid: 'u5', userName: '赵磊', company: '成都××机械租赁有限公司', level: 'warn', desc: '撮合后绕开平台线下交易（订单 EN20260903058 疑似跳单）', ts: t(2), status: 'open', note: '' },
-  { id: 'VIO002', uid: 'u3', userName: '王强', company: '××工程咨询有限公司', level: 'serious', desc: '多次线下接单规避平台佣金', ts: t(5), status: 'open', note: '' }
+  { id: 'VIO002', uid: 'u3', userName: '王强', company: '××工程咨询有限公司', level: 'serious', desc: '多次线下接单规避平台规则', ts: t(5), status: 'open', note: '' }
 ]
 
 // ========== 内存缓存 ==========
 let _wdCache = null
 let _invCache = null
-let _commCache = null
 let _vioCache = null
 
 // ========== 提现 API ==========
@@ -84,12 +77,6 @@ export function invoiceUpdate(id, status, note) {
   return item
 }
 
-// ========== 佣金 API ==========
-export function listCommissionFlows() {
-  if (!_commCache) _commCache = JSON.parse(JSON.stringify(seedCommissionFlows))
-  return _commCache
-}
-
 // ========== 违规 API ==========
 export function listViolations() {
   if (!_vioCache) _vioCache = JSON.parse(JSON.stringify(seedViolations))
@@ -119,7 +106,6 @@ export const PUNISH_STEPS = [
 export default {
   listWithdrawals, withdrawalApprove, withdrawalReject,
   listInvoices, invoiceUpdate,
-  listCommissionFlows,
   listViolations, punishViolation,
   PUNISH_STEPS
 }

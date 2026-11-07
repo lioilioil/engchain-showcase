@@ -4,8 +4,7 @@ import { ElMessage } from 'element-plus'
 
 const pricingItems = ref([
   { key: 'entry-enterprise', name: '企业入驻费', price: 2980, unit: '元/年', desc: '含企业认证、商铺展示、供需发布' },
-  { key: 'entry-agency', name: '服务商入驻费', price: 1980, unit: '元/年', desc: '含服务商资质、撮合佣金权限' },
-  { key: 'commission-rate', name: '撮合佣金率', price: 2.5, unit: '%', desc: '按成交金额收取' },
+  { key: 'entry-agency', name: '服务商入驻费', price: 1980, unit: '元/年', desc: '含服务商资质、报价与撮合权限' },
   { key: 'credits-package-100', name: '积分包（100）', price: 10, unit: '元', desc: '100 积分 = 10 元' },
   { key: 'credits-package-500', name: '积分包（500）', price: 45, unit: '元', desc: '500 积分 = 45 元（9折）' },
   { key: 'credits-package-1000', name: '积分包（1000）', price: 80, unit: '元', desc: '1000 积分 = 80 元（8折）' }

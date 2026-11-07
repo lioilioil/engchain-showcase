@@ -33,7 +33,6 @@ const columns = [
   { prop: 'amount', label: '金额', width: 120, formatter: (row) => `¥${row.amount?.toLocaleString()}` },
   { prop: 'owner', label: '甲方', width: 140, formatter: (row) => row.counterparty },
   { prop: 'status', label: '状态', width: 110, slot: 'status' },
-  { prop: 'fee', label: '佣金', width: 100, formatter: (row) => row.fee ? `¥${row.fee?.toLocaleString()}` : '-' },
   { prop: 'ts', label: '创建时间', width: 120 }
 ]
 
@@ -253,7 +252,6 @@ onMounted(loadData)
         <el-descriptions-item label="类型">{{ TYPE_MAP[currentRow.type] || currentRow.type }}</el-descriptions-item>
         <el-descriptions-item label="甲方">{{ currentRow.counterparty }}</el-descriptions-item>
         <el-descriptions-item label="金额">¥{{ currentRow.amount?.toLocaleString() }}</el-descriptions-item>
-        <el-descriptions-item label="佣金">{{ currentRow.fee ? `¥${currentRow.fee?.toLocaleString()}` : '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间" :span="2">{{ currentRow.ts }}</el-descriptions-item>
       </el-descriptions>
 

@@ -21,7 +21,7 @@ const seedMonitorFeed = [
   { company: '成都××机械租赁有限公司', dim: '风险', kind: 'warn', text: '出现 1 笔疑似跳单预警，已进入风控复核', ts: th(0, '10:40'), read: false },
   { company: '四川××工程服务有限公司', dim: '经营', kind: 'info', text: '新增 2 条服务评价，评分 4.8 保持高位', ts: th(1, '16:20'), read: false },
   { company: '四川省××建设有限公司', dim: '资金', kind: 'ok', text: '对公入账 ¥1,500 已确认，资金流正常', ts: th(2, '09:15'), read: false },
-  { company: '××工程咨询有限公司', dim: '风险', kind: 'warn', text: '多次线下接单规避平台佣金，风险等级提升', ts: th(3, '14:05'), read: false }
+  { company: '××工程咨询有限公司', dim: '风险', kind: 'warn', text: '多次线下接单规避平台规则，风险等级提升', ts: th(3, '14:05'), read: false }
 ]
 
 // ========== 内存缓存 ==========

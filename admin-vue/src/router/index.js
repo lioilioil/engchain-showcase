@@ -17,13 +17,11 @@ const PAGE_COMPONENTS = {
   '/risk/reports': () => import('@/views/risk/Reports.vue'),
   '/403': () => import('@/views/error/403.vue'),
   '/mediation/requests': () => import('@/views/mediation/Requests.vue'),
-  '/mediation/deals': () => import('@/views/mediation/Deals.vue'),
   '/mediation/matches': () => import('@/views/mediation/Matches.vue'),
   '/operations/orders': () => import('@/views/operations/Orders.vue'),
   '/users/owner-review': () => import('@/views/users/OwnerReview.vue'),
   '/finance/wallet': () => import('@/views/finance/Wallet.vue'),
   '/finance/withdraw': () => import('@/views/finance/Withdraw.vue'),
-  '/finance/commission': () => import('@/views/finance/Commission.vue'),
   '/distribution/overview': () => import('@/views/distribution/Overview.vue'),
   '/operations/messages': () => import('@/views/operations/Messages.vue'),
   '/users/entry-review': () => import('@/views/users/EntryReview.vue'),
@@ -55,7 +53,6 @@ const PAGE_COMPONENTS = {
   '/finance/points-dashboard': () => import('@/views/finance/PointsDashboard.vue'),
   '/finance/revenue': () => import('@/views/finance/Revenue.vue'),
   '/companies/detail/:id': () => import('@/views/companies/Detail.vue'),
-  '/mediation/escrow': () => import('@/views/mediation/Escrow.vue'),
   '/mediation/orders': () => import('@/views/mediation/Orders.vue'),
   '/mediation/sellers': () => import('@/views/mediation/Sellers.vue')
 }
@@ -88,8 +85,7 @@ export const MENU_GROUPS = [
     group: '撮合中心',
     items: [
       { title: '供需信息池', path: '/mediation/requests' },
-      { title: '撮合匹配', path: '/mediation/matches' },
-      { title: '成交记录', path: '/mediation/deals' }
+      { title: '撮合匹配', path: '/mediation/matches' }
     ]
   },
   {
@@ -118,7 +114,6 @@ export const MENU_GROUPS = [
       { title: '提现审批', path: '/finance/withdraw' },
       { title: '积分管理', path: '/finance/credits' },
       { title: '积分运营看板', path: '/finance/points-dashboard' },
-      { title: '佣金结算', path: '/finance/commission' },
       { title: '发票管理', path: '/finance/invoice' }
     ]
   },
@@ -192,7 +187,6 @@ const extraChildren = [
   { path: '/finance/revenue',        component: resolveComponent('/finance/revenue'), meta: { title: '收入看板', group: '资金中心' } },
   { path: '/users/detail/:id',       component: resolveComponent('/users/detail/:id'), meta: { title: '用户详情', group: '用户与认证' } },
   { path: '/companies/detail/:id',   component: resolveComponent('/companies/detail/:id'), meta: { title: '企业详情', group: '用户与认证' } },
-  { path: '/mediation/escrow',       component: resolveComponent('/mediation/escrow'), meta: { title: '资金托管', group: '撮合中心' } },
   { path: '/mediation/orders',       component: resolveComponent('/mediation/orders'), meta: { title: '撮合订单', group: '撮合中心' } },
   { path: '/mediation/sellers',      component: resolveComponent('/mediation/sellers'), meta: { title: '供方库',   group: '撮合中心' } },
   { path: '/403', component: resolveComponent('/403'), meta: { title: '无权访问', group: '' } },

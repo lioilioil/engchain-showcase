@@ -27,10 +27,8 @@ async function loadData() {
     revenueData.value = [
       { id: 'r1', type: '入驻费', amount: 2980, date: '2026-10-08', source: '企业入驻' },
       { id: 'r2', type: '入驻费', amount: 1980, date: '2026-10-07', source: '服务商入驻' },
-      { id: 'r3', type: '撮合佣金', amount: 2500, date: '2026-10-06', source: '订单 #1001' },
-      { id: 'r4', type: '增值道具', amount: 99, date: '2026-10-05', source: '供需置顶' },
-      { id: 'r5', type: '撮合佣金', amount: 4800, date: '2026-10-04', source: '订单 #1003' },
-      { id: 'r6', type: '入驻费', amount: 2980, date: '2026-10-03', source: '企业入驻' },
+          { id: 'r4', type: '增值道具', amount: 99, date: '2026-10-05', source: '供需置顶' },
+          { id: 'r6', type: '入驻费', amount: 2980, date: '2026-10-03', source: '企业入驻' },
       { id: 'r7', type: '增值道具', amount: 199, date: '2026-10-02', source: '认证徽章' }
     ]
   } finally {

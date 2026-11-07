@@ -104,7 +104,7 @@ Engchain3.0/
     ├── data.js            # MOCK 种子数据（用户/企业/供需/定价）
     ├── stores.js          # Store 层（BalanceStore/AuthStore/EntryStore/RevenueStore...）
     ├── databus.js         # DataBus 总线（用户表/订单/审批状态机/storage 事件联动）
-    ├── domain.js          # 业务域（Rebate 返佣引擎/Mediation 托管）
+    ├── domain.js          # 业务域（Rebate 返佣引擎 / Ledger 平台账户）
     ├── delegates.js       # 委托服务（L1/L2/L3 流程 + ¥29.9 收银台）
     ├── detail.js          # 供需/建企买卖详情/解锁/转让诚意保证金
     └── common.js          # 通用工具（UI/格式化/事件）
@@ -146,8 +146,8 @@ DataBus.orders()          // 全部订单
 DataBus.supply()          // 全部供需单
 DataBus.withdrawals()     // 全部提现申请
 DataBus.messages()        // 全部平台消息
-DataBus.stats()           // 平台统计（用户数/入驻数/佣金总额）
-DataBus.orderCalc(amt)    // 订单费用计算（费率/服务费）
+DataBus.stats()           // 平台统计（用户数/入驻数/订单量）
+DataBus.orderCalc(amt)    // 订单计费口径（平台不抽佣，恒为 0）
 ```
 
 ---
@@ -158,7 +158,7 @@ DataBus.orderCalc(amt)    // 订单费用计算（费率/服务费）
 
 - ✅ 平台只做信息匹配，**不碰交易资金**
 - ✅ **不抽佣**（commission._phase0.tradingEnabled = false）
-- ✅ **银行托管已下线**（mediation 模块已清理）
+- ✅ **交易类收费与资金托管已下线**（不抽佣、不代收代付，mediation 模块已清理）
 - ✅ 收入来源：入驻费 + 信息解锁（¥29.9）+ 增值服务
 
 ---

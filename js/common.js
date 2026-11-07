@@ -2254,7 +2254,7 @@ window.Cards = (function () {
     if (s.mode) m += ' · ' + esc(s.mode);
     var price = (s.unlockPrice ? '¥' + s.unlockPrice : (s.budget || '面议'));
     if (s.originalPrice) price += '<span class="o" style="font-size:11px;color:var(--text-3);text-decoration:line-through;font-weight:400;margin-left:5px;">¥' + s.originalPrice + '</span>';
-    var unit = s.unlockPrice ? '意向金' : (s.unit || '');
+    var unit = s.unlockPrice ? '解锁价' : (s.unit || '');
     var body = head(s, ctx) + textBlock(s, ctx,
       '<div class="jc-title">' + esc(name) + (q ? ' · ' + esc(q) : '') + '</div>',
       '<div class="jc-meta">' + m + '</div>') + chips(s.tags, 3);

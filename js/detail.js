@@ -333,17 +333,6 @@ window.DETAIL = (function () {
   function guaranteeSec(rec) {
     var items = GUARANTEE[rec.bizKey];
     if (!items || !items.length) return '';
-    /* P3-8：成交类详情页增加平台佣金费率说明，提升成交信任 */
-    var dealTypes = ['material', 'equipment', 'labor'];
-    var commHtml = '';
-    if (dealTypes.indexOf(rec.bizKey) >= 0) {
-      var cm = (MOCK.business && MOCK.business.commission) || {};
-      var tiers = cm.tier || [];
-      var isBreakin = !!(window.ModeStore && ModeStore.isBreakIn());
-      var firstRate = isBreakin ? ((MOCK.business.breakin || {}).commissionFirstTier || 0.05) : (tiers[0] ? tiers[0].rate : 0.08);
-      var tierText = tiers.map(function(t) { return (t.min / 10000) + '万以上 ' + (t.rate * 100) + '%'; }).join(' / ');
-      commHtml = '<div style="margin-top:10px;padding:8px 12px;background:var(--primary-soft);border:1px solid var(--accent-line);border-radius:8px;"><div style="font-size:11px;font-weight:600;color:var(--primary-dim);margin-bottom:3px;">平台服务费（成交后收取）</div><div style="font-size:10.5px;color:var(--text-2);line-height:1.5;">阶梯费率：' + tierText + '，最低 ' + (cm.minCommission || 10000).toLocaleString() + ' 元' + (isBreakin ? '；<b style="color:var(--accent);">破冰期首档优惠至 ' + (firstRate * 100) + '%（5万以下成交）</b>' : '') + '</div></div>';
-    }
     var gtIcons = ['shield', 'wallet', 'doc', 'check'];
     var rows = items.map(function (x, i) {
       return '<div class="gt-card"><div class="gt-ic">' + icon(gtIcons[i % gtIcons.length]) + '</div><div class="gt-tx">' + x + '</div></div>';
@@ -352,7 +341,6 @@ window.DETAIL = (function () {
     return sec(gtTitle, '<div class="gt-wrap">' +
       '<div class="gt-head">' + icon('shield') + '<div><div class="gt-head-t">' + gtTitle + ' · 交易全流程安心护航</div><div class="gt-head-s">工程链平台为每笔交易提供全链路保障</div></div></div>' +
       '<div class="gt-grid">' + rows + '</div>' +
-      (commHtml ? '<div class="gt-comm">' + commHtml + '</div>' : '') +
       '</div>');
   }
   /* ---- 通用：相关推荐（同业务类型，同子类/同城优先，人才/招聘各自有推荐则跳过） ---- */

@@ -631,42 +631,9 @@
   };
   InvoiceStore.list = function () { return this.read().items || []; };
 
-  /* ---- 佣金流水 + 防跳单违规（R5 后台跟踪） ----
-     [FIX BM-025] 修复：原 flows 无状态细分（仅 done），T+1 为文案。
-     新结构：flow.status = pending(待结算) / settled(已结算) / withdrawable(可提现) / paid(已提现)；
-     frozenUntil = 可结算时间戳（默认创建 +1 天），读取时惰性到期自动 pending->settled。 */
-  var CommissionStore = makeStore('engchain-commission', { flows: [], violations: [] }, 'engchain:commission');
-  CommissionStore.addFlow = function (f) {
-    var s = this.read();
-    f = Object.assign({ status: 'pending', frozenUntil: Date.now() + 864e5 }, f || {});
-    s.flows.unshift(f);
-    return this.write(s);
-  };
-  CommissionStore.addViolation = function (v) { var s = this.read(); s.violations.unshift(v); return this.write(s); };
-  /* 惰性结算：frozenUntil 到期的 pending 流水自动转 settled，返回本次结算条数 */
-  CommissionStore._lazySettle = function (s) {
-    var now = Date.now(), n = 0;
-    (s.flows || []).forEach(function (fl) {
-      if (fl.status === 'pending' && fl.frozenUntil && fl.frozenUntil <= now) { fl.status = 'settled'; n++; }
-    });
-    return n;
-  };
-  CommissionStore.settleFlow = function (id) {
-    var s = this.read(); var hit = false;
-    (s.flows || []).forEach(function (fl) {
-      if (String(fl.id) === String(id) && fl.status === 'pending') { fl.status = 'settled'; hit = true; }
-    });
-    if (hit) this.write(s);
-    return hit;
-  };
-  CommissionStore.markWithdrawable = function (id) {
-    var s = this.read(); var hit = false;
-    (s.flows || []).forEach(function (fl) {
-      if (String(fl.id) === String(id) && fl.status === 'settled') { fl.status = 'withdrawable'; hit = true; }
-    });
-    if (hit) this.write(s);
-    return hit;
-  };
+  /* ---- 违规记录（防跳单行为留痕；原佣金流水 Store 已随交易佣金规则一并移除） ---- */
+  var ViolationStore = makeStore('engchain-violations', { violations: [] }, 'engchain:violations');
+  ViolationStore.addViolation = function (v) { var s = this.read(); s.violations.unshift(v); return this.write(s); };
 
   /* ---- 企业关注/监控（P0-7.1） ----
      [FIX BM-040] 修复：监控限额原仅页面级校验，未下沉 Store 层。
@@ -1047,15 +1014,15 @@
     };
   };
 
-  /* ---- 需求广场（v4.0 双向撮合）：买家发布需求 → 服务商报价 → 买家接受报价生成托管单 ----
+  /* ---- 需求广场（v4.0 双向撮合）：买家发布需求 → 服务商报价 → 买家接受报价后线下对接 ----
      需求状态机：open(开放报价) → quoted(已有报价) → matched(已接受报价) → closed(已转订单)
                  / expired(超时自动关闭) / cancelled(买家取消)
      报价 status：pending(待选择) / accepted(被接受) / declined(被拒绝) / withdrawn(撤回)
-     规则：需求发布即开放（实名即可），超时（commission.demandExpireDays，默认7天）未成交自动关闭；
+     规则：需求发布即开放（实名即可），超时（vendorCommerce.demandExpireDays，默认7天）未成交自动关闭；
            买家可接受一个报价 → 生成订单后 markOrdered 关闭需求；服务商可撤回自己的 pending 报价 */
   var DemandStore = makeStore('engchain-agency-demands', { items: [] }, 'engchain:demand');
   DemandStore.expireDays = function () {
-    return (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.demandExpireDays) || 7;
+    return (window.MOCK && MOCK.business && MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.demandExpireDays) || 7;
   };
   DemandStore.create = function (input) {
     var s = this.read();
@@ -1139,7 +1106,7 @@
     if (!d.quotes.length) d.status = 'open';
     d.updatedAt = Date.now(); this._save(d); return d;
   };
-  /* 买家接受报价：需求 → matched（保留选中报价）；随后在订单创建页按报价生成托管单并 markOrdered */
+  /* 买家接受报价：需求 → matched（保留选中报价），双方按报价线下对接 */
   DemandStore.acceptQuote = function (id, qid, buyerId) {
     var d = this.byId(id);
     if (!d) return { error: '需求不存在' };
@@ -1212,36 +1179,8 @@
       if (r && r.count > 0) { ratingScore = Math.min(ratingMax, (r.avg / 5) * ratingMax); ratingInfo = r; }
     } else if (sellerId) {
       /* 服务商综合维度：遍历该服务商所有订单关联的服务，聚合评价 */
-      try {
-        if (window.Mediation) {
-          var allOrders = Mediation.list({ uid: sellerId, role: 'seller' });
-          var svcIds = {};
-          allOrders.forEach(function (o) { if (o.svcId) svcIds[o.svcId] = true; });
-          var totalCount = 0, totalSum = 0;
-          Object.keys(svcIds).forEach(function (sid) {
-            var sr = SvcRatingStore.get(sid);
-            if (sr && sr.count > 0) { totalCount += sr.count; totalSum += sr.sum; }
-          });
-          if (totalCount > 0) {
-            var avg = Math.round((totalSum / totalCount) * 10) / 10;
-            ratingScore = Math.min(ratingMax, (avg / 5) * ratingMax);
-            ratingInfo = { count: totalCount, avg: avg };
-          }
-        }
-      } catch (e) {}
     }
     var fulfillScore = 0, totalOrders = 0, fulfillRate = null;
-    try {
-      if (window.Mediation && sellerId) {
-        var orders = Mediation.list({ uid: sellerId, role: 'seller' });
-        totalOrders = orders.length;
-        if (totalOrders > 0) {
-          var bad = orders.filter(function (o) { return o.state === 'disputed' || o.state === 'refunded' || o.state === 'partial_refund'; }).length;
-          fulfillRate = Math.round(((totalOrders - bad) / totalOrders) * 100);
-          fulfillScore = Math.min(fulfillMax, ((totalOrders - bad) / totalOrders) * fulfillMax);
-        }
-      }
-    } catch (e) {}
     if (ratingScore === 0 && totalOrders === 0) return { score: defaultScore, rating: null, fulfillRate: null, totalOrders: 0, level: '新入驻' };
     var score = Math.round(Math.min(100, base + ratingScore + fulfillScore));
     var level = score >= 95 ? '金牌' : (score >= 85 ? '银牌' : (score >= 70 ? '铜牌' : '观察'));
@@ -1447,23 +1386,6 @@
     return best;
   }
 
-  /* ---- 佣金阶梯：按金额取费率（P0-5.1）；破冰期首档优惠至 commissionFirstTier ---- */
-  function commissionRate(amount) {
-    var cm = MOCK.business.commission || { tier: [] };
-    var rate = 0.08; var i;
-    for (i = 0; i < cm.tier.length; i++) if (amount >= cm.tier[i].min) rate = cm.tier[i].rate;
-    var firstMin = (cm.tier[1] && cm.tier[1].min) || 50000;
-    if (window.ModeStore && ModeStore.isBreakIn() && MOCK.business.breakin && amount < firstMin) {
-      rate = MOCK.business.breakin.commissionFirstTier || rate;
-    }
-    var total = Math.round(amount * rate);
-    /* [FIX BM-028] 佣金下限（小额保护）：按用户确认改为"最低单笔佣金"。
-       原保底规则（amount>=500000 && total<10000）在 4%/3% 档下永不触发（死逻辑），
-       现改为对全部订单生效的单笔下限，避免超小额订单佣金趋零、也不产生倒挂。 */
-    if (amount > 0 && total < cm.minCommission) total = cm.minCommission;
-    return { rate: rate, fee: total };
-  }
-
   /* ---- M1-2 省级总代资格位只读叠加（D31 并集，不互覆盖；禁止写 entry.types/auth.partner） ----
      优先读 window.AgentStore.bitsFor(当前uid)；模块未加载时回退直读 localStorage 两键；
      缺键 try/catch 回退空位；terminated/revoked/removed 终止态即时失效。
@@ -1594,7 +1516,7 @@
      键 engchain-upgrades，结构 { items: [{id, type, targetId, startedAt, expireAt, status}] } */
   var UpgradeStore = makeStore('engchain-upgrades', { items: [], meta: {} }, 'engchain:upgrades');
   UpgradeStore.purchase = function (type, targetId) {
-    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades[type]) || null;
+    var cfg = (MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades && MOCK.business.vendorCommerce.vendorUpgrades[type]) || null;
     if (!cfg || !cfg.enabled) return { error: '该道具未上架' };
     /* [FEAT 9.2-4] 入驻类型权限检查 */
     var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
@@ -1615,7 +1537,7 @@
     if (type === 'topListing' && !targetId) return { error: '请先选择要置顶的供需信息' };
     /* 扣减费用（新客礼首购立减） */
     var price = this.effectivePrice(cfg.price || 0);
-    var _mg = (MOCK.business.commission.vendorUpgrades.marketing) || {};
+    var _mg = (MOCK.business.vendorCommerce.vendorUpgrades.marketing) || {};
     var _gd = (_mg.newGift || {}).discount || 0;
     var consumed = BalanceStore.consume(price, 'upgrade', { remark: '购买' + (cfg.label || type) + (this.newGiftClaimed() ? '' : '（新客礼立减¥' + _gd + '）') });
     if (!consumed) return { error: '余额不足，无法购买' };
@@ -1650,7 +1572,7 @@
   };
   /* 新客礼：首次购买立减；返回优惠后的应付价（无优惠则原价） */
   UpgradeStore.effectivePrice = function (price) {
-    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var vus = (MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades) || {};
     var mg = vus.marketing || {};
     if (mg.newGift && mg.newGift.enabled && !this.newGiftClaimed() && price > 0) {
       return Math.max(0, Math.round((price - (mg.newGift.discount || 0)) * 100) / 100);
@@ -1659,7 +1581,7 @@
   };
   /* 组合包购买：按 marketing.combo 配置一次创建多个道具（置顶名额先建后应用） */
   UpgradeStore.purchaseCombo = function () {
-    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var vus = (MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades) || {};
     var mg = vus.marketing || {};
     var combo = mg.combo;
     if (!combo || !combo.enabled) return { error: '组合包未上架' };
@@ -1703,7 +1625,7 @@
     (s.items || []).forEach(function (it) { if (it.id === itemId) hit = it; });
     if (!hit) return { error: '名额不存在' };
     if (hit.type !== 'topListing' || hit.targetId) return { error: '该名额已使用' };
-    var cfg = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades.topListing) || {};
+    var cfg = (MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades && MOCK.business.vendorCommerce.vendorUpgrades.topListing) || {};
     if (!cfg.enabled) return { error: '该道具未上架' };
     var now = Date.now();
     var activeTop = this.listActive();
@@ -1740,7 +1662,7 @@
     });
   };
   UpgradeStore.listAvailable = function () {
-    var vus = (MOCK.business.commission && MOCK.business.commission.vendorUpgrades) || {};
+    var vus = (MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades) || {};
     var idy = (typeof deriveIdentity === 'function') ? deriveIdentity() : {};
     var isIndividualPartner = !!(idy.partner && idy.enterprise !== 'resident');
     var types = idy.entryTypes || [];
@@ -1787,7 +1709,7 @@
       hit = it;
     });
     if (!hit) {
-      var _lb = ((MOCK.business.commission.vendorUpgrades || {})[type] || {}).label || type;
+      var _lb = ((MOCK.business.vendorCommerce.vendorUpgrades || {})[type] || {}).label || type;
       return { error: '暂无可用' + _lb + '配额' };
     }
     hit.used = (hit.used || 0) + 1;
@@ -2690,11 +2612,6 @@
       var leads = (window.LeadStore ? LeadStore.list() : []) || [];
       inquiryCount = leads.length;
     } catch (e) {}
-    try {
-      var orders = (window.Mediation ? Mediation.list({}) : []) || [];
-      orderCount = orders.filter(function (o) { return o.state === 'completed' || o.state === 'settled'; }).length;
-      totalAmount = orders.reduce(function (sum, o) { return sum + (Number(o.amount) || 0); }, 0);
-    } catch (e) {}
     /* 模拟浏览量与客单价 */
     var viewCount = publishCount * 47 + inquiryCount * 12;
     var avgAmount = orderCount > 0 ? Math.round(totalAmount / orderCount) : 0;
@@ -2826,14 +2743,14 @@
 
   /* ---- [FEAT 9.2-7] 收入结构规划与路线图 Store（P3） ----
      键 engchain-revenue，结构 { streams, monthly, total }
-     generate()：从 BalanceStore.logs/CommissionStore 等聚合各收入流数据 */
+     generate()：从 BalanceStore.logs / CreditStore.logs / ApiStore 等聚合各收入流数据 */
   var RevenueStore = makeStore('engchain-revenue',
-    { streams: { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 },
+    { streams: { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R6_upgrade: 0, R7_api: 0, other: 0 },
       monthly: [], total: 0 },
     'engchain:revenue');
   RevenueStore.generate = function () {
     var s = this.read();
-    var streams = { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R5_commission: 0, R6_upgrade: 0, R7_api: 0, other: 0 };
+    var streams = { R1_cert: 0, R2_entry: 0, R3_unlock: 0, R4_credits: 0, R6_upgrade: 0, R7_api: 0, other: 0 };
     /* R1/R2/R6：从 BalanceStore.logs 聚合 */
     try {
       var logs = (window.BalanceStore ? BalanceStore.read().logs : []) || [];
@@ -2861,13 +2778,6 @@
            现金直付解锁（unlock_cny_pay）在上面 BalanceStore.logs 里已归入 R3。 */
       });
     } catch (e) {}
-    /* R5：从 CommissionStore.flows 聚合 */
-    try {
-      var flows = (window.CommissionStore ? CommissionStore.read().flows : []) || [];
-      flows.forEach(function (fl) {
-        streams.R5_commission += Math.abs(Number(fl.amount) || Number(fl.fee) || 0);
-      });
-    } catch (e) {}
     /* R7：从 ApiStore.calls 聚合 API 调用费用 */
     try {
       var apiCalls = (window.ApiStore ? ApiStore.read().calls : []) || [];
@@ -2884,8 +2794,7 @@
         total: Math.round(50000 + seed * 2000 + (5 - m) * 8000),
         R1_cert: Math.round(streams.R1_cert / 6 + seed * 200),
         R2_entry: Math.round(streams.R2_entry / 6 + seed * 300),
-        R3_unlock: Math.round(streams.R3_unlock / 6 + seed * 150),
-        R5_commission: Math.round(streams.R5_commission / 6 + seed * 250)
+        R3_unlock: Math.round(streams.R3_unlock / 6 + seed * 150)
       });
     }
     s.streams = streams;
@@ -2898,7 +2807,7 @@
     var s = this.read();
     var streams = s.streams || {};
     var total = s.total || 1;
-    var labels = { R1_cert: 'R1认证费', R2_entry: 'R2入驻费', R3_unlock: 'R3解锁', R4_credits: 'R4积分', R5_commission: 'R5佣金', R6_upgrade: 'R6增值', R7_api: 'R7API', other: '其他' };
+    var labels = { R1_cert: 'R1认证费', R2_entry: 'R2入驻费', R3_unlock: 'R3解锁', R4_credits: 'R4积分', R6_upgrade: 'R6增值', R7_api: 'R7API', other: '其他' };
     return Object.keys(streams).map(function (k) {
       return { key: k, label: labels[k] || k, amount: streams[k] || 0, pct: Math.round((streams[k] / total) * 1000) / 10 };
     });
@@ -3169,7 +3078,7 @@
   window.BalanceStore = BalanceStore;
   window.AgencyOrderStore = AgencyOrderStore;
   window.InvoiceStore = InvoiceStore;
-  window.CommissionStore = CommissionStore;
+  window.ViolationStore = ViolationStore;
   window.MonitorStore = MonitorStore;
   window.FavoriteStore = FavoriteStore;
   window.ContactRemarkStore = ContactRemarkStore;
@@ -3190,8 +3099,7 @@
   window.RevenueStore = RevenueStore;
   window.FileStore = FileStore;
   window.OpLog = OpLog;
-  /* 派生规则暴露给后台复用（规则同源：后台佣金试算/身份派生与 App 同一函数） */
-  window.commissionRate = commissionRate;
+  /* 派生规则暴露给后台复用（身份派生与 App 同一函数） */
   window.deriveStatus = deriveStatus;
   window.deriveIdentity = deriveIdentity;
   window.deriveIdentityStates = deriveIdentityStates;

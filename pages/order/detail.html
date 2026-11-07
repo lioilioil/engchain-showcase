@@ -169,10 +169,6 @@ function handleAction(o, action) {
       onOk: function () {
         var r = DataBus.orderTransition(o.id, nextStatus);
         if (r && !r.error) {
-          if (nextStatus === 'settled') {
-            /* 触发佣金结算 */
-            try { if (window.DataBus && DataBus.commissionSettle) DataBus.commissionSettle(o.id); } catch (e) {}
-          }
           UI.toast((nextStatus === 'settled') ? '验收成功，订单已完成' : '已进入待验收阶段', 'ok');
         } else { UI.toast('操作失败：' + (r && r.error ? r.error : '未知错误'), 'err'); }
       }
@@ -197,34 +193,7 @@ function orderEmptyHtml(title, desc) {
     '<div class="st-actions"><a href="index.html" class="btn es-cta es-action">返回订单列表</a></div></div>';
 }
 
-/* 履约进度（里程碑时间线）：有 o.milestones 用之；无且金额≥5万 用默认四节点 */
-function milestoneHtml(o) {
-  try {
-    var MS_CFG = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.milestone) || { minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], labels: ['合同签订', '服务进度50%', '验收', '质保期满'] };
-    var ms = Array.isArray(o.milestones) ? o.milestones : null;
-    if (!ms && Number(o.amount) >= (MS_CFG.minAmount || 50000)) {
-      ms = (MS_CFG.nodes || [1]).map(function (p, i) {
-        return { label: (MS_CFG.labels && MS_CFG.labels[i]) || ('节点' + (i + 1)), pct: p, status: 'todo', doneAt: 0 };
-      });
-    }
-    if (!ms || !ms.length) return '';
-    var rows = ms.map(function (m) {
-      var done = m.status === 'done';
-      var _pct = (m.pct > 1) ? (m.pct / 100) : (m.pct || 0); var relAmt = Math.round(Number(o.amount || 0) * _pct);
-      var stTxt = done ? '已达成' : '待达成';
-      var stCol = done ? 'var(--success)' : 'var(--text-3)';
-      var timeTxt = (done && m.doneAt) ? fmtTs(m.doneAt) : '—';
-      return '<div class="row"><span class="label text-2">' + (m.label || '') + '</span>' +
-        '<span class="value" style="text-align:right;"><span style="color:' + stCol + ';font-weight:600;">' + stTxt + '</span>' +
-        '<span class="text-3" style="font-size:11px;margin-left:8px;">释放 ' + UI.money(relAmt) + '</span>' +
-        '<span class="text-3" style="font-size:11px;display:block;margin-top:2px;">' + timeTxt + '</span></span></div>';
-    }).join('');
-    return '<div class="section-title" style="margin-top:18px;"><div class="st-left">履约进度</div></div>' +
-      '<div class="group">' + rows + '</div>';
-  } catch (e) { return ''; }
-}
-
-/* 购买记录（type='unlock'）：信息解锁不涉及对手方、佣金、里程碑与验收流程，
+/* 购买记录（type='unlock'）：信息解锁不涉及对手方与验收流程，
    走独立精简视图——金额 / 解锁内容 / 支付通道 / 回跳原信息。 */
 function renderUnlock(o) {
   var box = document.getElementById('detail-content');
@@ -314,11 +283,7 @@ function render() {
   var type = TYPE_MAP[o.type] || o.type;
   /* 金额统一走 UI.money */
   var amt = o.amount ? UI.money(o.amount) : '面议';
-  /* 佣金：费率从 commissionRate 取，feeVal 为计算后佣金；Phase 0 纯信息撮合不抽佣时 feeVal=0，不渲染服务费行 */
-  var _phase0Trading = (window.MOCK && MOCK.business.commission && MOCK.business.commission._phase0 && MOCK.business.commission._phase0.tradingEnabled === false);
-  var crInfo = (!_phase0Trading && window.commissionRate && o.amount) ? commissionRate(Number(o.amount)) : null;
-  var feeVal = crInfo ? Number(crInfo.fee) : 0;
-  var ratePct = crInfo ? (Math.round(crInfo.rate * 1000) / 10) : '';
+  /* 平台不抽佣：费用明细只列订单金额与实付金额，不派生服务费 */
   /* 联系方式：仅已验收(settled)后展示明文；其余状态打码并引导站内联系 */
   var isFree = !o.amount || Number(o.amount) === 0;
   var isSettled = (o.status === 'settled');
@@ -328,15 +293,6 @@ function render() {
 
   cta.style.display = 'block';
   renderActions(o);
-
-  /* E2-03 佣金行：fee 为 0 整行不渲染；否则展示费率与计算过程 */
-  var feeRowHtml = '';
-  if (feeVal > 0) {
-    var baseNum = String(UI.money(o.amount)).replace(/^¥/, '');
-    feeRowHtml =
-      '<div class="row"><span class="label text-2">平台服务费（费率' + ratePct + '%）</span><span class="value mono">' + UI.money(feeVal) + '</span></div>' +
-      '<div class="row"><span class="label text-2" style="font-weight:400;">计算过程</span><span class="value text-3" style="font-size:11px;">' + baseNum + ' × ' + ratePct + '% = ' + UI.money(feeVal) + '</span></div>';
-  }
 
   box.innerHTML =
     '<div class="card" style="text-align:center;">' +
@@ -383,30 +339,8 @@ function render() {
     '<div class="section-title" style="margin-top:18px;"><div class="st-left">费用明细</div></div>' +
     '<div class="group">' +
       '<div class="row"><span class="label text-2">订单金额</span><span class="value mono">' + amt + '</span></div>' +
-      feeRowHtml +
       '<div class="fb-between" style="padding:14px 16px;border-top:1px solid var(--line);"><span class="fw-600">实付金额</span><span class="mono fw-700">' + amt + '</span></div>' +
     '</div>';
-
-    /* E2-02 履约进度（里程碑时间线）：费用明细后、质保金前 */
-    var msHtml = milestoneHtml(o);
-
-    /* [FEAT 9.2-5] warranty info section */
-    var warHtml = '';
-    try {
-      var medOrder = window.Mediation ? Mediation.byId(o.id) : null;
-      var war = medOrder ? medOrder.warranty : null;
-      if (war && war.amount > 0) {
-        var warStatus = war.status === 'released' ? '已释放' : '冻结中';
-        var warColor = war.status === 'released' ? 'var(--success)' : 'var(--text-2)';
-        warHtml = '<div class="section-title" style="margin-top:18px;"><div class="st-left">质保金</div></div>' +
-          '<div class="group">' +
-          '<div class="row"><span class="label text-2">预留金额</span><span class="value mono">' + UI.money(war.amount) + '</span></div>' +
-          '<div class="row"><span class="label text-2">状态</span><span class="value" style="color:' + warColor + ';font-weight:600;">' + warStatus + '</span></div>' +
-          (war.releaseAt ? '<div class="row"><span class="label text-2">预计释放</span><span class="value">' + new Date(war.releaseAt).toLocaleDateString() + '</span></div>' : '') +
-          '<div style="padding:10px 16px;font-size:11px;color:var(--text-3);line-height:1.6;">质保金按交易金额5%预留，验收后30天自动释放给服务商。</div>' +
-          '</div>';
-      }
-    } catch (e) {}
 
     /* E2-05 信息撮合说明 + 争议/客服入口（CTA 上方） */
     var safeHtml =
@@ -420,7 +354,7 @@ function render() {
         '<button onclick="showKefu()" style="flex:1;padding:10px 0;border:1px solid var(--line);border-radius:var(--r-full);font-size:12px;color:var(--text-2);background:transparent;cursor:pointer;">联系客服</button>' +
       '</div>';
 
-    box.innerHTML += msHtml + warHtml + safeHtml;
+    box.innerHTML += safeHtml;
 }
 
 window.addEventListener('engchain:orders', render);

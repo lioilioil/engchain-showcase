@@ -723,7 +723,7 @@
      对齐详情页解锁弹窗（detail.js）既有视觉/交互：
      · 商品卡可点击下滑展开「顾问匹配信息概览」，付款前按详情页规则遮蔽关键信息（掩码+锁标）
      · 支付方式：积分支付 / 微信支付 / 支付宝（.unlock-paymethods + .pm-item 组件）
-     · 底部置底支付区：协议勾选 + 支付按钮（按方式切换文案）+ 托管保障
+     · 底部置底支付区：协议勾选 + 支付按钮（按方式切换文案）+ 平台保障说明
      · 支付成功自动进入「委托信息详情」详情页 */
   /* 积分价口径：¥1 = 1 积分（与钱包积分充值 1:1 一致），四舍五入取整 */
   function creditCostOf(order) { return Math.max(1, Math.round(Number(order && order.amount) || 0)); }
@@ -786,7 +786,7 @@
         /* ③ 支付方式 */
         payMethodHtml +
         pkgHtml +
-        /* ④ 底部置底支付区（协议 + 支付按钮 + 托管保障） */
+        /* ④ 底部置底支付区（协议 + 支付按钮 + 平台保障说明） */
         '<div class="dg-pay-footer">' +
           '<label class="pay-agree" id="dgPayAgree" style="margin:0 0 10px;"><span class="pa-box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span><span>支付即视为同意《委托服务协议》与《退款规则》</span></label>' +
           '<button type="button" class="btn btn-primary btn-block btn-lg" id="dgPayGo" data-order-no="' + order.orderNo + '" data-method="credit">确认支付 · ' + creditCost + '积分</button>' +
@@ -797,7 +797,7 @@
     s.show();
     var body = s.body();
     if (!body) return;
-    /* 对齐详情页解锁弹窗：协议行 + 托管保障移入底部 foot 区，与支付按钮同处吸底栏（.sheet-foot-inner 纵向排列） */
+    /* 对齐详情页解锁弹窗：协议行 + 平台保障说明移入底部 foot 区，与支付按钮同处吸底栏（.sheet-foot-inner 纵向排列） */
     setTimeout(function () {
       var footInner = document.querySelector('.sheet.show .sheet-foot-inner');
       var agree = document.getElementById('dgPayAgree');

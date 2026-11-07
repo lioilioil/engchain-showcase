@@ -1182,7 +1182,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/distribution/team.html', '我的团队', '我的团队'],
         ['pages/distribution/poster.html', '推广海报', '推广海报'],
         ['pages/distribution/rules.html', '分销规则', '分销规则'],
-        ['pages/distribution/withdraw.html', '提现', '佣金提现'],
+        ['pages/distribution/withdraw.html', '提现', '分销返佣提现'],
       ]},
     ]},
     { name:'省级代理', pages:[
@@ -1274,7 +1274,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         ['pages/agreement/user.html#auth', '认证与授权服务协议', '认证与授权服务协议（#auth）'],
         ['pages/agreement/user.html#recharge', '余额充值与提现协议', '余额充值与提现协议（#recharge）'],
         ['pages/agreement/user.html#credits', '积分与会员服务协议', '积分与会员服务协议（#credits）'],
-        ['pages/agreement/user.html#trade', '交易与资金托管协议', '交易与资金托管协议（#trade）'],
+        ['pages/agreement/user.html#trade', '交易服务协议', '交易服务协议（#trade）'],
         ['pages/agreement/user.html#franchise', '加盟与分销协议', '加盟与分销协议（#franchise）'],
         ['pages/agreement/user.html#publish', '信息发布规范', '信息发布规范（#publish）'],
         ['pages/agreement/user.html#communication', '沟通与交易秩序规则', '沟通与交易秩序规则（#communication）'],
@@ -2480,14 +2480,14 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var cBi = (bi && typeof bi.construction === 'number') ? bi.construction : 0;
     var aBi = (bi && typeof bi.agency === 'number') ? bi.agency : 1499;
     if (note) note.innerHTML = isB
-      ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>' + fmt(cBi) + '</b> / 服务商 <b>' + fmt(aBi) + '</b>（5折）；省级总代 <b>¥0</b>（人工审核·一省独家）<br>首档佣金 <b>5%</b>｜实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
-      : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>' + fmt(cFee) + '</b> / 服务商 <b>' + fmt(aFee) + '</b>；省级总代 <b>¥0</b>（人工审核·一省独家）<br>首档佣金 <b>8%</b>｜实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
+      ? '<b style="color:var(--text-1);">当前 · 破冰期（冷启动扶持）</b><br>入驻：建筑 <b>' + fmt(cBi) + '</b> / 服务商 <b>' + fmt(aBi) + '</b>（5折）；省级总代 <b>¥0</b>（人工审核·一省独家）<br>实名免费解锁 <b>5+3=8 条</b><br>监控试用 7 天｜游客可看 1 条样例'
+      : '<b style="color:var(--text-1);">当前 · 成熟期（标准定价）</b><br>入驻：建筑 <b>' + fmt(cFee) + '</b> / 服务商 <b>' + fmt(aFee) + '</b>；省级总代 <b>¥0</b>（人工审核·一省独家）<br>实名免费解锁 <b>5 条</b><br>监控按认证等级额度｜游客仅看公开摘要';
     updateStateSummary();
   }
   document.getElementById('seg-mode').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (window.ModeStore) ModeStore.switch(b.dataset.v);
-    UI.toast((b.dataset.v==='breakin'?'已切换：破冰期（建筑 0 元入驻/服务商 5 折/首档佣金 5%/注册送 3 条解锁）':'已切换：成熟期（标准定价/首档佣金 8%）'), 'ok');
+    UI.toast((b.dataset.v==='breakin'?'已切换：破冰期（建筑 0 元入驻/服务商 5 折/注册送 3 条解锁）':'已切换：成熟期（标准定价）'), 'ok');
     renderMode(); renderKPI(); reloadFrame();
   });
   /* ---- M5：KPI 仪表（五收入流）---- */
@@ -2496,7 +2496,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var e=window.EntryStore?EntryStore.read():{};
     var c=window.CreditStore?CreditStore.read():{balance:0};
     var o=window.AgencyOrderStore?AgencyOrderStore.read():{list:[]};
-    var cm=window.CommissionStore?CommissionStore.read():{flows:[]};
     /* 企业认证费/周期：唯一数据源 MOCK.business.certification（不再硬编码 ¥999） */
     var cert=(window.MOCK&&MOCK.business&&MOCK.business.certification)||{enterprise:999,enterpriseCycle:'year'};
     var certCycle=cert.enterpriseCycle==='year'?'/年':'';
@@ -2525,11 +2524,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         else { entryTxt=lab+'入驻 · '+feeDesc; }
       }
     }
-    var feeTotal=0; for(var i=0;i<cm.flows.length;i++)feeTotal+=cm.flows[i].fee||0;
     var html='<b style="color:var(--text-1);">五收入流 KPI</b><br>'+
       '认证费：'+authTxt+'｜入驻费：'+entryTxt+'<br>'+
-      '积分余额：<b>'+c.balance.toLocaleString()+'</b> ｜ 免费解锁：'+((c.quota&&c.quota.used)||0)+' 条'+
-      '｜ 佣金累计：<b>'+pvMoney(feeTotal)+'</b>（'+cm.flows.length+' 单）<br>'+
+      '积分余额：<b>'+c.balance.toLocaleString()+'</b> ｜ 免费解锁：'+((c.quota&&c.quota.used)||0)+' 条<br>'+
       '服务商订单：'+o.list.length+' 单（'+(o.list.filter(function(x){return x.state==='settled';}).length)+' 已结算）';
     var kpi=document.getElementById('kpi-note');
     if(kpi)kpi.innerHTML=html;

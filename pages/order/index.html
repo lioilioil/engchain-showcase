@@ -92,7 +92,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function(){
   window.__ROOT__='../../';
-  /* 统一状态映射：普通订单 + 服务商托管 */
+  /* 统一状态映射：普通订单 */
   var STATUS_MAP = {
     pending:      { label: '待支付', cls: 'tag-warning' },
     serving:      { label: '服务中', cls: 'tag-warning' },
@@ -102,7 +102,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     cancelled:    { label: '已取消', cls: 'tag-gray' },
     refunded:     { label: '已退款', cls: 'tag-gray' },
     partial_refund:{ label: '部分退款', cls: 'tag-gray' },
-    escrowed:     { label: '已托管', cls: 'tag-primary' },
     disputed:     { label: '纠纷中', cls: 'tag-danger' },
     draft:        { label: '待支付', cls: 'tag-warning' }
   };
@@ -110,7 +109,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   var currentTab = 'all';
   /* P1-5 解析 ?tab= 参数并同步 seg 激活态 */
   var _tp = new URLSearchParams(location.search).get('tab');
-  if (_tp === 'normal' || _tp === 'mediation') currentTab = _tp;
+  if (_tp === 'normal') currentTab = _tp;
   document.querySelectorAll('.seg-item').forEach(function(x){ x.classList.toggle('is-on', x.getAttribute('data-tab')===currentTab); });
 /* 状态 chips 分组（E3-15） */
   var STATUS_GROUPS = {
@@ -155,9 +154,6 @@ function currentUser() {
       };
     });
   }
-
-  /* [PHASE 0] 服务商托管已下线：平台不再承接服务商交易资金，订单中心不展示托管单 */
-  function getMediationOrders() { return []; }
 
   /* [PERF] 防抖工具 */
   function debounce(fn, wait) {
@@ -221,10 +217,9 @@ function currentUser() {
         ? (o.payMethod === 'credit' && o.credits ? o.credits + ' 积分' : (o.amount ? UI.money(o.amount) : '免费'))
         : (o.amount ? UI.money(o.amount) : '面议');
       var subline = isUnlock ? (o.type + (o.payLabel ? ' · ' + o.payLabel : '')) : (o.type + ' · ' + (o.counterparty || ''));
-      var escrowBadge = o.kind === 'mediation' ? '<span class="tag tag-gold" style="margin-left:6px;font-size:10px;">托管</span>' : '';
       return '<div class="card" style="margin-bottom:10px;cursor:pointer;" onclick="location.href=\'' + o.detailUrl + '\'">' +
         '<div class="fb-between"><span class="text-3 fs-12">订单号 ' + o.id + '</span><span class="tag ' + st.cls + '">' + st.label + '</span></div>' +
-        '<div class="fw-600 fs-14" style="margin-top:8px;">' + (o.title || '') + escrowBadge + '</div>' +
+        '<div class="fw-600 fs-14" style="margin-top:8px;">' + (o.title || '') + '</div>' +
         '<div class="text-3 fs-12 mt-1">' + subline + '</div>' +
         '<div class="fb-between" style="margin-top:10px;"><span class="mono fw-700">' + amt + '</span>' +
         '<span class="link-green fs-12">查看 ›</span></div>' +
@@ -272,7 +267,6 @@ function currentUser() {
   }
   /* [PERF] 只监听订单相关事件 */
   window.addEventListener('engchain:orders', function () { invalidateCache(); scheduleRender(); });
-  window.addEventListener('engchain:mediation', function () { invalidateCache(); scheduleRender(); });
   /* [PERF] 立即渲染：不等待350ms */
   showSkeleton();
   scheduleRender();

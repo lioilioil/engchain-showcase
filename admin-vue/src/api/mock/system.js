@@ -15,7 +15,6 @@ const seedAuditLogs = [
   { ts: now - 5 * 3600e3, operator: '运营A', action: '提现通过', module: '提现审批', target: '陈建国', extra: '¥400 已打款' },
   { ts: now - 8 * 3600e3, operator: '运营A', action: '入驻通过', module: '入驻审核', target: '李雅', extra: '服务商企业 入驻费 ¥2980' },
   { ts: now - 1 * DAY, operator: '风控B', action: '违规处罚', module: '风控合规', target: '赵磊 · 成都××机械租赁有限公司', extra: '警告 · 疑似跳单预警' },
-  { ts: now - 1 * DAY, operator: '周平台', action: '佣金结算', module: '佣金结算', target: '服务商撮合 · 安许代办承诺制', extra: '¥1250 @5%' },
   { ts: now - 2 * DAY, operator: '运营A', action: '发票开票', module: '发票管理', target: '××工程咨询有限公司', extra: '¥5000 · 已开票' },
   { ts: now - 2 * DAY, operator: '周平台', action: '登录', module: '账号', target: '周平台', extra: '切换账号：平台内部 · 运营' }
 ]
@@ -25,7 +24,7 @@ const seedMessages = [
   { id: 'MSG1005', type: '公告', title: '破冰期扶持政策延续', body: '建筑企业 0 元入驻、服务商 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target: '全部用户', ts: t(1), action: { label: '查看活动', href: '#' } },
   { id: 'MSG1004', type: '系统', title: '对公转账入账优化', body: '对公转账审批通过后将自动入账至钱包余额，无需手动确认。', target: '入驻企业', ts: t(2), action: { label: '查看钱包', href: '#' } },
   { id: 'MSG1003', type: '风控', title: '防跳单治理规则提醒', body: '平台将对线下跳单行为实施警告、禁聊、罚款直至清退处罚，请遵守撮合规则。', target: '全部用户', ts: t(4) },
-  { id: 'MSG1002', type: '活动', title: '共创者计划招募', body: '诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与佣金阶段性减免。', target: '认证企业', ts: t(6), action: { label: '立即参与', href: '#' } },
+  { id: 'MSG1002', type: '活动', title: '共创者计划招募', body: '诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与增值服务折扣。', target: '认证企业', ts: t(6), action: { label: '立即参与', href: '#' } },
   { id: 'MSG1001', type: '系统', title: '平台例行维护通知', body: '本周六 02:00-04:00 系统例行维护，期间部分功能暂不可用，敬请谅解。', target: '全部用户', ts: t(8) }
 ]
 

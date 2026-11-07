@@ -1088,25 +1088,10 @@ window.MOCK = (function () {
         benefits: ['全部详情免费解锁', '积分折扣提升至0.5x', '专属标识', '优先客服']
       }
     },
-    /* 服务商佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
-    /* [PHASE 0] 已下线：平台不做资金托管/放款/交易抽成，不介入服务过程与交易资金。
-       tier/intent/escrow/warranty 仅保留结构供历史数据兼容，新业务不再产生佣金/意向金/托管流水。
-       平台只做：信息发布与解锁、认证评估（企业认证年费 + 年度复审，个人实名免费）、双向撮合。 */
-    commission: {
-      _phase0: { tradingEnabled: false, note: '纯信息撮合模式：平台不参与交易资金，不抽佣' },
-      tier: [ { min: 0, rate: 0.08 }, { min: 50000, rate: 0.06 }, { min: 200000, rate: 0.05 }, { min: 500000, rate: 0.04 }, { min: 1000000, rate: 0.03 } ],
-      minCommission: 100, /* [FIX BM-028] 佣金下限改为"最低单笔佣金 ¥100"（小额保护，全部订单生效） */
-      milestone: { enable: true, minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], autoConfirmDays: 14, labels: ['合同签订', '服务进度50%', '验收', '质保期满'] },
-      /* 入驻不收保证金（2026-11 规则变更）。以下档位仅保留给"认证保证金（违规扣罚）"展示，该机制未启用，
-         不参与入驻提交、审核与资金划转。 */
-      deposit: { basic: 5000, engineering: 20000, high: 50000 },
+    /* 增值道具与经营规则：平台不设随成交额浮动的收费科目，
+       此处只保留平台内真实收费所需的道具配置、跳单罚则与需求有效期。 */
+    vendorCommerce: {
       jumpContract: { warn: true, chatBlockDays: 7, secondChatBlockDays: 30, firstPenalty: 5000, firstSuspendDays: 15, secondClear: true },
-      settleNote: '成交后 T+1 结算',
-      refundNote: '未成交全额退款',
-      /* WP5 毛利保护/最低售价：按服务品类配置最低可售服务费，0=不启用（首期默认不启用） */
-      minServiceFee: { '资质代办': 0, '工商注册': 0, '税务筹划': 0, '工程担保': 0, '造价咨询': 0, '企业服务': 0, '_default': 0 },
-      /* WP7 意向金（[PHASE 0] 已下线：不设交易资金节点，联系方式解锁不再依赖意向金；仅保留结构供历史数据兼容） */
-      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], remindDays: 7, autoCancelDays: 30, _phase0: true },
       /* [FEAT 9.2-1] R6 B端增值道具：激活架构预留（topListing/leadPack/saasTools） */
       /* [FEAT 9.2-4] 入驻类型差异：entryTypes 限制不同入驻类型可购买的道具 */
       /* [FEAT 9.2-1+] 服务商升级页增量：effectAnchor 效果锚点（说服层）；marketing 营销层（新客礼/限时特惠/组合包，非独立SKU）。
@@ -1126,10 +1111,6 @@ window.MOCK = (function () {
           combo: { enabled: true, label: '流量组合包', desc: '2 次服务置顶（名额 7 天） + 50 条精准线索', original: 497, price: 398, items: [ { type: 'topListing', qty: 2 }, { type: 'leadPack', qty: 1 } ] }
         }
       },
-      /* [FEAT 9.2-5][PHASE 0] 质保金改造为「认证保证金」：不挂钩交易赔付，仅作违规扣罚/虚假信息罚没/年审清退约束 */
-      warranty: { rate: 0.05, releaseDays: 30, label: '质保金（未启用）', desc: '未启用的历史计提设计：原拟从成交额计提 5% 作违规扣罚来源，账户中没有对应资金池，现行规则不扣罚保证金', _phase0: true },
-      /* v4.0 托管单超时接单（[PHASE 0] 已下线：资金托管服务移除，仅保留结构供历史数据兼容） */
-      escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '[PHASE 0] 已下线：平台不提供资金托管', _phase0: true },
       demandExpireDays: 7
     },
     /* ===== 身份感知运营包（服务商升级 v4） =====
@@ -1552,7 +1533,6 @@ window.MOCK = (function () {
       /* 破冰期结束日（含当日）：到期后 ModeStore.isBreakIn() 自动返回 false，页面与后台按成熟期标准价执行。
          2026-11-07 由运营确认；延期只要改这一处，页面无需改动。 */
       endAt: '2027-09-30',
-      commissionFirstTier: 0.05,
       registerBonus: 2,
       monitorTrialDays: 7,
       guestSample: 1

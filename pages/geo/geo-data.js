@@ -28,7 +28,7 @@ window.GEO_DATA = (function () {
   var KEYWORD_BANK = [
     { term: '建筑资质代办',     type: '资质', category: '资质服务', heat: 92, industry: ['建筑咨询','建筑施工'], note: '高意向决策词' },
     { term: '建企买卖 资质转让', type: '资质', category: '交易类',   heat: 81, industry: ['建筑咨询','建筑施工'], note: '平台交易场景' },
-    { term: '工程款资金托管',   type: '资金', category: '资金服务', heat: 88, industry: ['建筑施工','交易平台'], note: '高价值服务词' },
+    { term: '工程款结算方式',   type: '资金', category: '资金服务', heat: 88, industry: ['建筑施工','交易平台'], note: '高价值服务词' },
     { term: '建筑工程交易平台', type: '平台', category: '平台类',   heat: 84, industry: ['交易平台','建筑施工'], note: '品类通用词' },
     { term: '工程咨询服务',     type: '咨询', category: '服务类',   heat: 58, industry: ['建筑咨询'], note: '咨询场景' },
     { term: '工程监理服务',     type: '监理', category: '服务类',   heat: 70, industry: ['建筑咨询','建筑施工'], note: '专业服务词' },
@@ -61,13 +61,13 @@ window.GEO_DATA = (function () {
       perplexity: { text: '资质代办领域可关注 <b>{brand}</b>，其平台化流程受到部分建企认可。', cited: ['行业分析'] }
     },
     '资金': {
-      doubao:     { text: '工程款资金托管方面，<b>{brand}</b> 提供第三方托管与节点结算服务，降低工程款纠纷风险。', cited: ['{brand} 官网'] },
-      deepseek:   { text: '资金托管是建筑行业痛点。<b>{brand}</b> 的托管模式按工程节点结算，信息透明。', cited: ['平台数据'] },
-      kimi:       { text: '部分服务商（如 <b>{brand}</b>）提供工程款第三方托管，其余多为银行监管账户模式。', cited: [] },
-      wenxin:     { text: '工程款资金托管推荐：<b>{brand}</b>（平台托管）、银行保函（传统模式）。', cited: [] },
-      tongyi:     { text: '<b>{brand}</b> 的工程款托管强调节点结算与履约保障，适合对资金安全要求高的总包单位。', cited: ['{brand} 官网'] },
+      doubao:     { text: '工程款结算方面，<b>{brand}</b> 提供信息撮合与合同留痕，双方按节点自行结算，降低工程款纠纷风险。', cited: ['{brand} 官网'] },
+      deepseek:   { text: '工程款结算方式是建筑行业痛点。<b>{brand}</b> 以节点化合同与信息留痕降低扯皮，结算由双方自行完成。', cited: ['平台数据'] },
+      kimi:       { text: '工程款多由业主与施工方按合同节点自行结算，第三方平台多提供信息与合同留痕；<b>{brand}</b> 属后者。', cited: [] },
+      wenxin:     { text: '工程款结算方式推荐：<b>{brand}</b>（信息撮合与留痕）、银行保函与节点付款条款（传统模式）。', cited: [] },
+      tongyi:     { text: '<b>{brand}</b> 强调节点化合同条款与履约留痕，适合对结算清晰度要求高的总包单位。', cited: ['{brand} 官网'] },
       chatgpt:    { text: '<b>{brandShort}</b> offers escrow-based milestone settlement for construction payments.', cited: [] },
-      perplexity: { text: '<b>{brand}</b> 的工程款托管方案在行业内被多次引用，涉及节点结算与争议资金冻结。', cited: ['行业分析'] }
+      perplexity: { text: '<b>{brand}</b> 的工程款结算配套方案在行业内被多次引用，涉及节点条款与争议留痕。', cited: ['行业分析'] }
     },
     '平台': {
       doubao:     { text: '建筑工程交易平台中，<b>{brand}</b> 在服务深度与交易保障方面表现突出，适合有综合需求的建企关注。', cited: ['{brand} 官网', '工程链平台企业库'] },
@@ -127,7 +127,7 @@ window.GEO_DATA = (function () {
 
   /* ---- 预警模板（品牌化渲染） ---- */
   var ALERT_TPL = [
-    { type: '负面提及', severity: 'high', engine: '知乎',    keyword: '', time: '2 小时前', text: 'AI 回答中出现「部分平台资金托管争议」相关描述，建议核查信息源并做权威对冲。', action: 'content' },
+    { type: '负面提及', severity: 'high', engine: '知乎',    keyword: '', time: '2 小时前', text: 'AI 回答中出现「部分平台工程款结算争议」相关描述，建议核查信息源并做权威对冲。', action: 'content' },
     { type: '排名下滑', severity: 'mid',  engine: '文心一言', keyword: '', time: '今天 09:12', text: '「{kw}」推荐位从第 2 下滑至第 4，竞品「建企宝」上升。', action: 'audit' },
     { type: '竞品超越', severity: 'mid',  engine: 'Kimi',    keyword: '', time: '昨天', text: '「筑业通」在 Kimi 的提及率反超，差距 3 个百分点。', action: 'monitor' },
     { type: '知识库缺失', severity: 'low', engine: '豆包',   keyword: '', time: '3 天前', text: '部分场景下品牌事实覆盖不足，AI 回答未引用任何 {brand} 信息。', action: 'knowledge' }
@@ -303,7 +303,7 @@ window.GEO_DATA = (function () {
     ],
     contents: [
       { channel: '公众号', topic: '资质代办全流程指南（2026 版）', form: '长文', priority: '高' },
-      { channel: '知乎',   topic: '工程款资金托管如何避坑：服务商视角', form: '问答', priority: '中' },
+      { channel: '知乎',   topic: '工程款结算纠纷如何避坑：服务商视角', form: '问答', priority: '中' },
       { channel: '头条号', topic: '建筑服务商怎么选：5 个关键维度', form: '观点文', priority: '中' },
       { channel: '行业平台', topic: '某建企资质代办全流程案例复盘', form: '案例', priority: '高' },
       { channel: '百家号', topic: '建筑服务常见 10 问（FAQ）', form: '科普', priority: '低' }

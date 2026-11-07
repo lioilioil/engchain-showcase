@@ -23,8 +23,7 @@ const filters = [
     { value: '提现审批', label: '提现审批' },
     { value: '运营中心', label: '运营中心' },
     { value: '风控合规', label: '风控合规' },
-    { value: '佣金结算', label: '佣金结算' },
-    { value: '发票管理', label: '发票管理' },
+      { value: '发票管理', label: '发票管理' },
     { value: '系统', label: '系统' }
   ]},
   { prop: 'keyword', label: '关键词', type: 'input', placeholder: '搜索操作人/对象/备注' }

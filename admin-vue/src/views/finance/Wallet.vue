@@ -20,10 +20,9 @@ const currentRow = ref(null)
 async function loadData() {
   loading.value = true
   try {
-    const [users, withdrawals, commissionFlows] = await Promise.all([
+    const [users, withdrawals] = await Promise.all([
       api.user.list(),
-      api.finance.listWithdrawals(),
-      api.finance.listCommissionFlows()
+      api.finance.listWithdrawals()
     ])
 
     // 汇总所有用户钱包
@@ -43,14 +42,6 @@ async function loadData() {
         amount: -w.amount,
         status: w.status,
         time: w.appliedAt
-      })),
-      ...commissionFlows.slice(0, 5).map(c => ({
-        id: c.id,
-        type: '佣金',
-        userName: c.userName,
-        amount: c.fee,
-        status: 'done',
-        time: c.ts
       }))
     ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8)
   } finally {

@@ -81,8 +81,6 @@ export const financeApi = {
   // 发票
   listInvoices: mockRequest(finance.listInvoices),
   invoiceUpdate: mockRequest(finance.invoiceUpdate),
-  // 佣金
-  listCommissionFlows: mockRequest(finance.listCommissionFlows),
   // 违规
   listViolations: mockRequest(finance.listViolations),
   punishViolation: mockRequest(finance.punishViolation),

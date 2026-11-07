@@ -325,12 +325,12 @@
       /* 价格
          [FIX BM-041] 清除硬编码旧"线索包"定价 29/59/79/229，统一改读 MOCK.business：
          单价 = credits.consume.talent；原价 = credits.consume.franchise.t3.original 同源演示价；
-         条数包 packOptions 由 commission.vendorUpgrades.leadPack.enabled 控制（首期 false → 空数组不展示）。 */
+         条数包 packOptions 由 vendorCommerce.vendorUpgrades.leadPack.enabled 控制（首期 false → 空数组不展示）。 */
       unlockPrice: {
         singlePrice: (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.talent) || 29,
         originalPrice: (window.MOCK && MOCK.business && MOCK.business.credits && MOCK.business.credits.consume && MOCK.business.credits.consume.franchise && MOCK.business.credits.consume.franchise.t3 && MOCK.business.credits.consume.franchise.t3.original) || 58,
-        packOptions: (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.vendorUpgrades && MOCK.business.commission.vendorUpgrades.leadPack && MOCK.business.commission.vendorUpgrades.leadPack.enabled)
-          ? (MOCK.business.commission.vendorUpgrades.leadPack.packs || [])
+        packOptions: !!(window.MOCK && MOCK.business && MOCK.business.vendorCommerce && MOCK.business.vendorCommerce.vendorUpgrades && MOCK.business.vendorCommerce.vendorUpgrades.leadPack && MOCK.business.vendorCommerce.vendorUpgrades.leadPack.enabled)
+          ? (MOCK.business.vendorCommerce.vendorUpgrades.leadPack.packs || [])
           : [],
         unlockContent: ['真实姓名与联系方式', '完整工作履历与项目详情', '证书编号与注册状态', '社保缴纳情况', '期望薪资与到岗时间', '详细自我介绍', '在线沟通对接']
       },

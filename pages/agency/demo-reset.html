@@ -34,7 +34,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
     <div class="card" style="margin-top:10px;">
       <div class="fw-700 fs-13" style="margin-bottom:10px;">将执行</div>
-      <div class="dr-item"><span class="dr-dot ok"></span>清空旧托管订单存档（历史兼容，不再生成新托管单）</div>
+      <div class="dr-item"><span class="dr-dot ok"></span>清空历史订单存档（交易类旧数据，不再生成新单）</div>
       <div class="dr-item"><span class="dr-dot ok"></span>清空需求广场与询盘线索，便于重新走通撮合</div>
       <div class="dr-item"><span class="dr-dot ok"></span>当前账号充值 ¥500,000 演示资金（原余额保留）</div>
       <div class="dr-item"><span class="dr-dot ok"></span>开通「服务商」入驻并激活（若未入驻）</div>
@@ -56,8 +56,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 document.getElementById('dr-run').addEventListener('click', function () {
   var done = [];
   try {
-    /* 1) 旧托管订单存档 → 清空（[PHASE 0] 托管已下线，仅清理历史数据） */
-    if (window.Mediation && Mediation.KEY) { localStorage.removeItem(Mediation.KEY); done.push('托管订单'); }
+    /* 1) 历史订单存档 → 清空（仅清理历史数据） */
+    if (localStorage.getItem('engchain-mediation-orders')) { localStorage.removeItem('engchain-mediation-orders'); done.push('历史订单'); }
     /* 2) 需求广场 / 询盘线索 */
     if (window.DemandStore && DemandStore.KEY) { localStorage.removeItem(DemandStore.KEY); done.push('需求广场'); }
     if (window.LeadStore && LeadStore.KEY) { localStorage.removeItem(LeadStore.KEY); done.push('询盘线索'); }
@@ -65,7 +65,7 @@ document.getElementById('dr-run').addEventListener('click', function () {
     var uid = '';
     try { var cur = DataBus.current(); if (cur) uid = cur.id; } catch (e) {}
     if (uid && window.BalanceStore && typeof BalanceStore.recharge === 'function') {
-      /* 先清空旧台账与余额，再走正式充值链路（钩子同步 Ledger：PLATFORM→用户 available），保证托管支付可用且可对账 */
+      /* 先清空旧台账与余额，再走正式充值链路（钩子同步 Ledger：PLATFORM→用户 available），保证余额支付可用且可对账 */
       try { if (window.Ledger && Ledger.KEY) localStorage.removeItem(Ledger.KEY); } catch (e0) {}
       try { if (BalanceStore.KEY) localStorage.removeItem(BalanceStore.KEY); } catch (e1) {}
       BalanceStore.recharge(1000000, 'demo');

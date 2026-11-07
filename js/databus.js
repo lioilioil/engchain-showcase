@@ -324,7 +324,7 @@ window.DataBus = (function () {
   }
 
   /* ---- 全局重置：恢复所有用户数据到预设初始状态（仅业务数据，不动 UI 偏好） ---- */
-  /* 重置范围：用户表/登录历史/认证/入驻/余额/积分/订单/供需/消息/提现/发票/佣金/团队/资质/违规/签到/监控/模式/解锁记录/收藏/角色/审计
+  /* 重置范围：用户表/登录历史/认证/入驻/余额/积分/订单/供需/消息/提现/发票/团队/资质/违规/签到/监控/模式/解锁记录/收藏/角色/审计
      不重置：engchain-theme（主题偏好）、engchain-sidenav（后台侧边栏折叠状态） */
   function resetAll() {
     var KEEP = ['engchain-theme', 'engchain-sidenav'];
@@ -887,14 +887,11 @@ window.DataBus = (function () {
     var corp = (window.CorpPay ? CorpPay.list() : []);
     var corpPending = 0;
     for (i = 0; i < corp.length; i++) if (corp[i].status === 'pending' || corp[i].status === 'submitted') corpPending++;
-    var cm = (window.CommissionStore ? CommissionStore.read() : { flows: [] });
-    var feeTotal = 0;
-    for (i = 0; i < (cm.flows || []).length; i++) feeTotal += cm.flows[i].fee || 0;
   
   return {
       users: Math.max(0, users.length - 1),   /* 游客不计注册 */
       realname: realname, enterprise: enterprise, resident: resident,
-      corpPending: corpPending, feeTotal: feeTotal, feeCount: (cm.flows || []).length
+      corpPending: corpPending, feeTotal: 0, feeCount: 0   /* 平台不抽佣，交易类手续费恒为 0 */
     };
   }
 
@@ -1115,27 +1112,12 @@ window.DataBus = (function () {
   /* ---- 订单生命周期 Store（Phase 2 运营中心 · 订单管理） ----
      类型：供方承接 / 需求匹配 / 服务商撮合 / 建企买卖 / 资质招商
      状态机：pending(待支付)→serving(服务中)→await_accept(待验收)→settled(已结算)；→cancelled(已取消)
-     里程碑：金额 ≥5 万按 4 节点 30/30/30/10 分期（规则同源 data.js commission.milestone）；<5 万整单结算。
-     佣金：commissionRate(amount) 同源（stores.js 暴露） */
+     平台不抽佣、不做里程碑结算与资金托管：订单只记录金额与状态，不派生费率、手续费与分期节点。 */
   var ORDERS_KEY = 'engchain-orders';
   function seedOrders() {
     var t = function (d) { return new Date(Date.now() - d * 864e5).toISOString().slice(0, 10); };
     function mk(id, type, title, amount, owner, counterparty, counterpartyId, status, day, ms, supplyId) {
-      var M = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.milestone) || { enable: true, minAmount: 50000, nodes: [0.3,0.3,0.3,0.1], labels:['合同签订','服务进度50%','验收','质保期满'] };
-      var multi = M.enable && amount >= M.minAmount;
-      var nodes = multi ? M.nodes : [1];
-      var labels = multi ? M.labels : ['整单结算'];
-      var milestones = [];
-      for (var i = 0; i < nodes.length; i++) {
-        milestones.push({ label: labels[i] || ('节点' + (i+1)), pct: nodes[i], status: 'todo', doneAt: 0 });
-      }
-      var fee = 0, rate = 0;
-      /* 已结算订单：里程碑全达成 + 佣金按 orderCalc 全额计提（与结算逻辑同源，演示数据不自相矛盾） */
-      if (status === 'settled') {
-        var c = orderCalc(amount);
-        milestones.forEach(function (m) { m.status = 'done'; m.doneAt = Date.now(); });
-        fee = c.fee; rate = c.rate;
-      }
+      var milestones = [], fee = 0, rate = 0;
       return { id:id, type:type, title:title, amount:amount, owner:owner, counterparty:counterparty, counterpartyId:counterpartyId || '',
                status:status, ts:t(day), milestones:milestones, fee:fee, rate:rate, note:'', supplyId: supplyId || '',
                contactPhone: '13' + String(80000000 + (id.charCodeAt(id.length-2) * 137 + id.charCodeAt(id.length-1) * 911) % 90000000).slice(0,9) };
@@ -1212,15 +1194,9 @@ window.DataBus = (function () {
     window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: it.id, created: true } }));
     return it;
   }
+  /* 平台不抽佣：保留同名接口供旧调用方读取，费率与手续费恒为 0、不产生里程碑节点 */
   function orderCalc(amount) {
-    /* 规则同源：调用 stores.js 暴露的 commissionRate（同 data.js 阶梯 + 破冰期首档） */
-    var r = { rate: 0.08, fee: 0 };
-    try { r = window.commissionRate ? commissionRate(amount) : r; } catch (e) {}
-    var M = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.milestone) || { enable: true, minAmount: 50000, nodes: [0.3,0.3,0.3,0.1], labels:['合同签订','服务进度50%','验收','质保期满'] };
-    var nodes = (M.enable && amount >= M.minAmount) ? M.nodes : [1];
-    var labels = (M.enable && amount >= M.minAmount) ? M.labels : ['整单结算'];
-    var items = nodes.map(function (p, i) { return { label: labels[i] || ('节点' + (i+1)), pct: p, fee: Math.round(r.fee * p * 100) / 100 }; });
-    return { rate: r.rate, fee: r.fee, milestone: (M.enable && amount >= M.minAmount), items: items };
+    return { rate: 0, fee: 0, milestone: false, items: [] };
   }
   function orderTransition(id, next, patch) {
     var a = loadOrders(), i, it = null;
@@ -1231,14 +1207,6 @@ window.DataBus = (function () {
     if (!can) return { error: '非法状态迁移: ' + it.status + ' → ' + next };
     it.status = next;
     if (patch) for (var k in patch) if (patch.hasOwnProperty(k)) it[k] = patch[k];
-    /* 到达结算：按里程碑已达成比例计提佣金；未启用里程碑整单计提 */
-    if (next === 'settled') {
-      var c = orderCalc(it.amount);
-      var donePct = 0, j;
-      for (j = 0; j < it.milestones.length; j++) if (it.milestones[j].status === 'done') donePct += it.milestones[j].pct;
-      it.fee = Math.round(c.fee * (donePct > 0 ? donePct : 1) * 100) / 100;
-      it.rate = c.rate;
-    }
     it.updatedAt = Date.now();
     saveOrders(a);
     window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: id, status: it.status } }));
@@ -1270,7 +1238,7 @@ window.DataBus = (function () {
       { id:'MSG1005', type:'公告', title:'破冰期扶持政策延续', body:'建筑企业 0 元入驻、服务商 5 折优惠延续至本月底，注册即送 3 条免费解锁额度。', target:'全部用户', ts:t(1), action:{ label:'查看活动', href:'../co-create/index.html' } },
       { id:'MSG1004', type:'系统', title:'对公转账入账优化', body:'对公转账审批通过后将自动入账至钱包余额，无需手动确认。', target:'入驻企业', ts:t(2), action:{ label:'查看钱包', href:'../wallet/index.html' } },
       { id:'MSG1003', type:'风控', title:'防跳单治理规则提醒', body:'平台将对线下跳单行为实施警告、禁聊、罚款直至清退处罚，请遵守撮合规则。', target:'全部用户', ts:t(4) },
-      { id:'MSG1002', type:'活动', title:'共创者计划招募', body:'诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与佣金阶段性减免。', target:'认证企业', ts:t(6), action:{ label:'立即参与', href:'../co-create/index.html' } },
+      { id:'MSG1002', type:'活动', title:'共创者计划招募', body:'诚邀建筑企业与建筑人加入首批共创成员，享流量扶持与增值服务折扣。', target:'认证企业', ts:t(6), action:{ label:'立即参与', href:'../co-create/index.html' } },
       { id:'MSG1001', type:'系统', title:'平台例行维护通知', body:'本周六 02:00-04:00 系统例行维护，期间部分功能暂不可用，敬请谅解。', target:'全部用户', ts:t(8) }
     ];
   }
@@ -1311,7 +1279,7 @@ window.DataBus = (function () {
      余额账 = BalanceStore（engchain-balance）、积分 = CreditStore（engchain-credits）、
      对公审批记录 = CorpPay（engchain-corp-pays，common.js 定义）——全部同源复用；
      本层新增：提现申请审批流（engchain-withdrawals：申请冻结→通过打款/驳回解冻）、
-     发票（engchain-invoices）、佣金结算（settled 订单派生 + CommissionStore 结算单）、防跳单违规处罚。 */
+     发票（engchain-invoices）、防跳单违规处罚。 */
   var WDL_KEY = 'engchain-withdrawals';
   var INV_KEY = 'engchain-invoices';
 
@@ -1634,60 +1602,22 @@ window.DataBus = (function () {
     return loadInvoices();
   }
 
-  /* ---- 佣金结算：settled 订单派生（规则同源 orderCalc）+ 结算单 CommissionStore + 防跳单违规 ---- */
-  function seedCommissionFlows() {
-    var now = Date.now();
-    return [
-      { orderId: 'EN20260831009', uid: 'u2', userName: '李雅', title: '服务商撮合 · 安许代办承诺制', amount: 25000, rate: 0.05, fee: 1250, milestones: '整单', settledAt: now - 2 * 864e5, status: 'done' },
-      { orderId: 'EN20260828007', uid: 'u2', userName: '李雅', title: '服务商撮合 · 工商注册加急代办', amount: 8800, rate: 0.05, fee: 440, milestones: '整单', settledAt: now - 3 * 864e5, status: 'done' }
-    ];
-  }
-  function commissionFlows() {
-    if (!window.CommissionStore) return [];
-    var s = CommissionStore.read();
-    if (!s.flows || !s.flows.length) { s.flows = seedCommissionFlows(); CommissionStore.write(s); }
-    return s.flows;
-  }
-  /* 待结算 = settled 且未在结算单中的订单 */
-  function settledPending() {
-    var out = [];
-    var done = commissionFlows().map(function (f) { return f.orderId; });
-    loadOrders().forEach(function (o) { if (o.status === 'settled' && done.indexOf(o.id) < 0) out.push(o); });
-    return out;
-  }
-  function commissionSettle(orderId) {
-    var o = null;
-    loadOrders().forEach(function (x) { if (x.id === orderId) o = x; });
-    if (!o || o.status !== 'settled' || !window.CommissionStore) return null;
-    var c = orderCalc(o.amount);
-    var u = byId(o.owner);
-    var ms = o.milestones || [];
-    var f = { orderId: o.id, uid: o.owner, userName: u ? u.name : o.owner, title: o.title, amount: o.amount,
-              rate: c.rate, fee: c.fee,
-              milestones: c.milestone ? (ms.filter(function (m) { return m.status === 'done'; }).length + '/' + ms.length) : '整单',
-              settledAt: Date.now(), status: 'done' };
-    CommissionStore.addFlow(f);
-    audit('佣金结算', '佣金结算', o.title, '¥' + c.fee + ' @' + Math.round(c.rate * 100) + '%');
-    window.dispatchEvent(new CustomEvent('engchain:commission', { detail: f }));
-    return f;
-  }
-  /* 防跳单违规（Phase 4 seed + 处罚执行；Phase 6 合规审计复用同一 Store） */
   function seedViolations() {
     var now = Date.now();
     var t = function (d) { return new Date(now - d * 864e5).toISOString().slice(0, 10); };
     return [
       { id: 'VIO001', uid: 'u5', userName: '赵磊', company: '成都××机械租赁有限公司', level: 'warn', desc: '撮合后绕开平台线下交易（订单 EN20260903058 疑似跳单）', ts: t(2), status: 'open', note: '' },
-      { id: 'VIO002', uid: 'u3', userName: '王强', company: '××工程咨询有限公司', level: 'serious', desc: '多次线下接单规避平台佣金', ts: t(5), status: 'open', note: '' }
+      { id: 'VIO002', uid: 'u3', userName: '王强', company: '××工程咨询有限公司', level: 'serious', desc: '多次线下接单规避平台规则', ts: t(5), status: 'open', note: '' }
     ];
   }
   function loadViolations() {
-    if (!window.CommissionStore) return [];
-    var s = CommissionStore.read();
-    if (!s.violations || !s.violations.length) { s.violations = seedViolations(); CommissionStore.write(s); }
+    if (!window.ViolationStore) return [];
+    var s = ViolationStore.read();
+    if (!s.violations || !s.violations.length) { s.violations = seedViolations(); ViolationStore.write(s); }
     return s.violations;
   }
   function violationPunish(id, action) {
-    if (!window.CommissionStore) return null;
+    if (!window.ViolationStore) return null;
     /* 先确保 seed（loadViolations 首次调用写入预置违规） */
     var list = loadViolations();
     var v = null;
@@ -1696,9 +1626,9 @@ window.DataBus = (function () {
     v.status = 'done'; v.note = action || '已处理';
     v.punish = { action: action || '警告', at: Date.now(), operator: '平台管理员' };
     /* 必须基于同一数组写回（read() 重读会丢失内存改动） */
-    var s = CommissionStore.read();
+    var s = ViolationStore.read();
     s.violations = list;
-    CommissionStore.write(s);
+    ViolationStore.write(s);
     audit('违规处罚 · ' + (action || '已处理'), '风控合规', v.userName + ' · ' + v.desc, '已完成处置');
     window.dispatchEvent(new CustomEvent('engchain:violations', { detail: v }));
     return v;
@@ -1741,7 +1671,7 @@ window.DataBus = (function () {
         { company: '成都××机械租赁有限公司', dim: '风险', kind: 'warn', text: '出现 1 笔疑似跳单预警，已进入风控复核', ts: t(0, '10:40'), read: false },
         { company: '四川××工程服务有限公司', dim: '经营', kind: 'info', text: '新增 2 条服务评价，评分 4.8 保持高位', ts: t(1, '16:20'), read: false },
         { company: '四川省××建设有限公司', dim: '资金', kind: 'ok', text: '对公入账 ¥1,500 已确认，资金流正常', ts: t(2, '09:15'), read: false },
-        { company: '××工程咨询有限公司', dim: '风险', kind: 'warn', text: '多次线下接单规避平台佣金，风险等级提升', ts: t(3, '14:05'), read: false }
+        { company: '××工程咨询有限公司', dim: '风险', kind: 'warn', text: '多次线下接单规避平台规则，风险等级提升', ts: t(3, '14:05'), read: false }
       ];
       MonitorStore.write(s);
     }
@@ -1868,7 +1798,7 @@ window.DataBus = (function () {
     if (!f || f.status !== 'settled') return null;
     f.status = 'paid'; f.paidAt = Date.now();
     saveDistFlows(a);
-    /* 佣金入账：受益人余额 +fee（当前登录用户同步 BalanceStore，否则仅写用户表） */
+    /* 返佣入账：受益人余额 +fee（当前登录用户同步 BalanceStore，否则仅写用户表） */
     var amt = Math.round((f.fee || 0) * 100) / 100;
     if (amt > 0) {
       var users = loadUsers(), j, cur = current();
@@ -2411,7 +2341,7 @@ window.DataBus = (function () {
     withdrawalFirstApprove: withdrawalFirstApprove, withdrawalFinalApprove: withdrawalFinalApprove,
     invoices: loadInvoices, invoiceUpdate: invoiceUpdate, ensureInvoiceTitles: ensureInvoiceTitles,
     invoiceApply: invoiceApply, invoiceApprove: invoiceApprove, invoiceReject: invoiceReject, invoiceList: invoiceList,
-    commissionFlows: commissionFlows, settledPending: settledPending, commissionSettle: commissionSettle,
+    violations: loadViolations, violationPunish: violationPunish,
     violations: loadViolations, violationPunish: violationPunish,
     /* Phase 5 分销中心 */
     DIST_TEAM_KEY: DIST_TEAM_KEY, DIST_FLOW_KEY: DIST_FLOW_KEY,
