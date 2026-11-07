@@ -326,22 +326,26 @@ window.demandRestore=function(id){
 
 /* [PHASE 0] 纠纷仲裁 / 佣金报表 / 资金监管已下线：平台不参与交易资金，不提供资金监管与佣金结算。 */
 
-/* ========== 认证年审：企业认证年费与年度复审（与入驻费分开核算） ========== */
+/* ========== 认证年审：企业认证首次核验与年度年审（与入驻费分开核算） ========== */
 function renderCert(){
   var body=document.getElementById('pf-body');if(!body)return;
-  /* 认证费只读认证配置 certification.enterprise（¥999/年，成熟期标准价），当期实付走 ModeStore.certFee()。
+  /* 认证费只读 certification.enterprise（¥999 首次核验，成熟期标准价），当期实付走 ModeStore.certFee()；
+     年度年审单列 certification.annualReview（¥599/年），当期实付走 ModeStore.reviewFee()。
      入驻费（建筑 ¥3,999 / 服务商 ¥2,999）是另一笔钱，在「入驻审核」模块按申请记录展示，本模块不读取、不摊分。 */
-  var certStd=0,certNow=0,endAt='';
+  var certStd=0,certNow=0,revStd=0,revNow=0,endAt='';
   try{certStd=Number((window.MOCK&&MOCK.business&&MOCK.business.certification&&MOCK.business.certification.enterprise)||0)||0;}catch(e){}
+  try{revStd=Number((window.MOCK&&MOCK.business&&MOCK.business.certification&&MOCK.business.certification.annualReview)||0)||0;}catch(e){}
   try{endAt=(window.MOCK&&MOCK.business&&MOCK.business.breakin&&MOCK.business.breakin.endAt)||'';}catch(e){}
   try{certNow=(window.ModeStore&&ModeStore.certFee)?(Number(ModeStore.certFee())||0):certStd;}catch(e){certNow=certStd;}
-  var feeLine='企业认证 '+fmt(certStd)+'/年 · 个人实名与个人资质免费';
-  if(certNow!==certStd){feeLine+=' · 破冰期以权益赠送全免，本期实付 '+fmt(certNow)+'/年'+(endAt?('（截止 '+endAt+'）'):'');}
+  try{revNow=(window.ModeStore&&ModeStore.reviewFee)?(Number(ModeStore.reviewFee())||0):revStd;}catch(e){revNow=revStd;}
+  var feeLine='企业认证首次核验 '+fmt(certStd)+' · 年度年审 '+fmt(revStd)+'/年 · 个人实名与个人资质免费';
+  if(certNow!==certStd||revNow!==revStd){feeLine+=' · 破冰期以权益赠送全免，本期实付 首次核验 '+fmt(certNow)+' / 年审 '+fmt(revNow)+(endAt?('（截止 '+endAt+'）'):'');}
   var html='<div class="pf-card" style="border-color:rgba(176, 138, 60, .35);">'+
-    '<div class="pf-top"><b>企业认证（年费）</b><span class="pf-st" style="color:var(--primary-dim);">平台信任规则</span></div>'+
+    '<div class="pf-top"><b>企业认证（首次核验 + 年度年审）</b><span class="pf-st" style="color:var(--primary-dim);">平台信任规则</span></div>'+
     '<div class="pf-meta">'+feeLine+'</div>'+
     '<div class="pf-meta">认证与入驻是两笔独立收费：认证收的是主体核验与背书（本模块），入驻费收的是发布与经营权益（见「入驻审核」模块，建筑 ¥3,999 / 服务商 ¥2,999），两者不互相包含、不互相抵扣。</div>'+
-    '<div class="pf-meta">年度复审：人工能力评估 / 征信评估 / 案例核验；复审不合格清退，取消认证标识并下架服务。</div></div>';
+    '<div class="pf-meta">首次核验与年度年审也是两笔：首次 ¥'+Number(certStd).toLocaleString()+'（含当年年审），次年起按 ¥'+Number(revStd).toLocaleString()+'/年 收取，分开列账、分别退。</div>'+
+    '<div class="pf-meta">年度年审内容：人工能力评估 / 征信评估 / 案例核验；年审不合格清退，取消认证标识并下架服务。</div></div>';
   var sellers=[],seen={};
   try{
     var items=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items:[];
@@ -360,7 +364,7 @@ function renderCert(){
       :'<button class="pf-btn gold" onclick="window.certAct(\''+sid+'\',\'pass\')">通过年审</button>'+(st!=='removed'?'<button class="pf-btn ghost" onclick="window.certAct(\''+sid+'\',\'remove\')">清退</button>':'<button class="pf-btn" onclick="window.certAct(\''+sid+'\',\'renew\')">恢复</button>');
     return '<div class="pf-card">'+
       '<div class="pf-top"><b>'+bname(sid)+'</b><span class="pf-st" style="color:'+stc+';">'+stt+'</span></div>'+
-      '<div class="pf-meta">企业认证 · 年费 '+fmt(certStd)+'/年（入驻费另计，不进本行）</div>'+
+      '<div class="pf-meta">企业认证 · 首次核验 '+fmt(certStd)+'（含当年年审）· 年度年审 '+fmt(revStd)+'/年（入驻费另计，不进本行）</div>'+
       '<div class="pf-acts">'+acts+'</div></div>';
   }).join('');
 }
@@ -375,11 +379,11 @@ window.certAct=function(sid,act){
     }catch(e){}
     var nm=bname(sid);
     if(act==='pass'){
-      try{DataBus.pushDirectMessage(sid,'年审已通过','您的企业认证年度复审已通过，认证继续有效。');}catch(e){}
+      try{DataBus.pushDirectMessage(sid,'年审已通过','您的企业认证年度年审已通过，认证继续有效。');}catch(e){}
       try{DataBus.audit('年审通过','平台运营台',nm,'');}catch(e){}
       if(window.UI)UI.toast('年审已通过','ok');
     }else if(act==='remove'){
-      try{DataBus.pushDirectMessage(sid,'认证已被清退','您的企业认证未通过年度复审，已被清退，认证标识取消、服务下架。');}catch(e){}
+      try{DataBus.pushDirectMessage(sid,'认证已被清退','您的企业认证未通过年度年审，已被清退，认证标识取消、服务下架。');}catch(e){}
       try{DataBus.audit('年审清退','平台运营台',nm,'取消认证标识并下架服务');}catch(e){}
       if(window.UI)UI.toast('已清退，认证标识已取消','ok');
     }else{

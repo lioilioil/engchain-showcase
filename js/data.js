@@ -947,9 +947,10 @@ window.MOCK = (function () {
        待 M3/M5 页面迁移后收敛删除，避免阶段0破坏现有页面。 */
     /* 认证费（R1，按年） */
     /* [FEAT 9.2-3] 企业认证多维度资质核验：5项逐项提交/审核 */
-    /* 企业认证费 ¥999/年 为成熟期标准价；破冰期全免由 breakin.certification=0 提供，
-       两期取价统一走 ModeStore.certFee()，页面不直接读本字段 */
-    certification: { personal: 0, enterprise: 999, qual: 0, enterpriseCycle: 'year',
+    /* 企业认证首次核验 ¥999 为成熟期标准价；破冰期全免由 breakin.certification=0 提供，
+       两期取价统一走 ModeStore.certFee()，页面不直接读本字段。
+       年度年审单列 ¥599/年（首年认证费已含当年年审），取价走 ModeStore.reviewFee()。 */
+    certification: { personal: 0, enterprise: 999, annualReview: 599, qual: 0, enterpriseCycle: 'year',
       dimensions: [
         { id: 'business', label: '营业执照', required: true },
         { id: 'legal', label: '法人身份', required: true },

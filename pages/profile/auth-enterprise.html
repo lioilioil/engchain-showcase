@@ -151,7 +151,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 
       <div class="card ae-fee">
         <div class="fb-between" style="margin-bottom:8px;">
-          <span class="fw-600 fs-14">认证费（年费）</span>
+          <span class="fw-600 fs-14">认证费（首次核验 · 含当年年审）</span>
           <span class="fw-700 fs-17" style="color:var(--primary);" id="fee-txt">¥999</span>
         </div>
         <div class="text-3 fs-12" style="line-height:1.7;" id="fee-note">包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。</div>
@@ -268,22 +268,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script>
 (function(){window.__ROOT__='../../';
 /* 认证费按平台阶段取价（单一来源 ModeStore.certFee）：破冰期读 breakin.certification（¥0），
-   成熟期读 certification.enterprise（¥999/年）；与共创页 feeLabel、金额文档 §2.1 同一口径。
-   破冰期文案一律带“限时减免 + 标准价”，避免用户把限免读成永久定价。 */
+   成熟期读 certification.enterprise（¥999 首次核验）；年度年审另走 ModeStore.reviewFee（¥599/年）。
+   与共创页 feeLabel、金额文档 §2 同一口径。破冰期文案一律带“限时减免 + 标准价”，避免把限免读成永久定价。 */
 var stdFee=(typeof MOCK.business.certification.enterprise==='number')?MOCK.business.certification.enterprise:999;
 var fee=(window.ModeStore&&ModeStore.certFee)?ModeStore.certFee():stdFee;
+var stdReview=(typeof MOCK.business.certification.annualReview==='number')?MOCK.business.certification.annualReview:599;
+var reviewFee=(window.ModeStore&&ModeStore.reviewFee)?ModeStore.reviewFee():stdReview;
+var reviewStdTxt='¥'+Number(stdReview).toLocaleString();
+var reviewTxt=reviewFee>0?('¥'+Number(reviewFee).toLocaleString()):'¥0';
 var feeStdTxt='¥'+Number(stdFee).toLocaleString();
 var feeTxt=fee>0?('¥'+Number(fee).toLocaleString()):'¥0';
 var endTxt=(window.ModeStore&&ModeStore.breakinEndAt)?ModeStore.breakinEndAt():'';
 document.getElementById('fee-txt').textContent=feeTxt;
 document.getElementById('pay-btn').textContent=fee>0?('支付 ¥'+Number(fee).toLocaleString()+' 提交审核'):'提交审核（破冰期限时减免）';
 var _fBanner=document.getElementById('fee-banner');
-if(_fBanner){_fBanner.textContent=fee>0?('认证费 '+feeStdTxt+'/年 · 工商三要素核验 + 人工复核 · 有效期 365 天'):('认证费 ¥0（破冰期限时减免'+(endTxt?('至 '+endTxt):'')+' · 标准价 '+feeStdTxt+'/年）· 工商三要素核验 + 人工复核 · 有效期 365 天');}
+if(_fBanner){_fBanner.textContent=fee>0?('首次核验 '+feeStdTxt+' · 含当年年审 · 工商三要素核验 + 人工复核 · 有效期 365 天'):('首次核验 ¥0（破冰期限时减免'+(endTxt?('至 '+endTxt):'')+' · 标准价 '+feeStdTxt+') · 含当年年审 · 有效期 365 天');}
 var _fNote=document.getElementById('fee-note');
-if(_fNote){_fNote.textContent=fee>0?'包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。':('破冰期限时减免，本期实付 ¥0；'+(endTxt?('到期日 '+endTxt+' 后'):'成熟期')+'按标准价 '+feeStdTxt+'/年 执行，通过后有效期 365 天，到期前可续费。');}
-/* 续费与首次提交同价（按当前阶段取价） */
+if(_fNote){_fNote.textContent=fee>0?('包含工商三要素核验、信用代码校验、企业认证标识，首年含当年年审；次年起按年度年审 '+reviewStdTxt+'/年 顺延 365 天。'):('破冰期限时减免，本期实付 ¥0；'+(endTxt?('到期日 '+endTxt+' 后'):'成熟期')+'按标准价 '+feeStdTxt+' 执行，通过后有效期 365 天，首年含当年年审，次年起按年度年审 '+reviewStdTxt+'/年 顺延。');}
+/* 续审（年度年审）单列收费，与首次核验分开扣、分开退 */
 var renewBtn=document.getElementById('renew-btn');
-if(renewBtn){renewBtn.textContent=fee>0?('续费一年 ¥'+Number(fee).toLocaleString()):'续费一年（破冰期限时减免）';}
+if(renewBtn){renewBtn.textContent=reviewFee>0?('年度年审 '+Number(reviewFee).toLocaleString()+' 元 / 年'):'年度年审（破冰期限时减免）';}
 var st=UI.state.get();
 function fmtD(t){if(!t)return '—';var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function cur(){return AuthStore.read();}
@@ -727,7 +731,7 @@ window.payEnterprise=function(){
     html+='<div class="fw-700 fs-16" style="margin-bottom:14px;">企业认证 · 支付确认</div>';
     /* 订单信息 */
     html+='<div style="background:var(--bg-card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px;">';
-    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">认证服务费（年费）</span><b style="font-family:var(--font-num);">¥'+fee+'</b></div>';
+    html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">认证服务费（首次核验 · 含当年年审）</span><b style="font-family:var(--font-num);">¥'+fee+'</b></div>';
     html+='<div class="fb-between" style="font-size:13px;padding:5px 0;"><span class="text-2">审核时效</span><b>1–3 个工作日人工复核</b></div>';
     html+='<div class="fb-between" style="font-size:13px;padding:5px 0 0;"><span class="text-2">服务内容</span><b>企业认证标识 + 详情页优先展示</b></div>';
     html+='</div>';
@@ -801,10 +805,10 @@ document.getElementById('in-short').addEventListener('input',function(){
 
 window.renew=function(){
   var avail=window.BalanceStore?BalanceStore.available():0;
-  UI.dialog({title:'续费确认',text:'续费一年费用 <b style="color:var(--primary)">¥'+fee+'</b>，当前余额 ¥'+avail.toLocaleString()+'，续费后有效期顺延 365 天。',ok:'确认续费',cancel:'取消',onOk:function(){
-    var r=DataBus.authRenew(fee);
+  UI.dialog({title:'年度年审确认',text:'年度年审费用 <b style="color:var(--primary)">'+reviewTxt+'</b>，当前余额 ¥'+avail.toLocaleString()+'，年审通过后有效期顺延 365 天。',ok:'确认年审',cancel:'取消',onOk:function(){
+    var r=DataBus.authRenew(reviewFee);
     if(r&&r.error){UI.toast(r.error,'warn');return;}
-    UI.toast('续费成功，有效期已延长','ok');render();
+    UI.toast('年审成功，有效期已延长','ok');render();
   }});
 };
   /* [FEAT 9.2-3] 提交某一维核验材料 */

@@ -1204,13 +1204,21 @@
   };
   ModeStore.switch = function (phase) { return this.set({ phase: phase === 'normal' ? 'normal' : 'breakin' }); };
   /* 认证费按阶段取价（单一来源）：破冰期读 breakin.certification（¥0），
-     成熟期读 certification.enterprise（¥999/年）。页面一律调本方法，不直接读配置值，
-     避免成熟期仍显示“免费提交审核”。企业认证按年，续费与首次提交同价。 */
+     成熟期读 certification.enterprise（¥999 首次核验）。页面一律调本方法，不直接读配置值，
+     避免成熟期仍显示“免费提交审核”。首年认证费已含当年年审，续审另走 reviewFee。 */
   ModeStore.certFee = function () {
     var C = (MOCK.business && MOCK.business.certification) || {};
     var b = (MOCK.business && MOCK.business.breakin) || {};
     if (this.isBreakIn() && typeof b.certification === 'number') return b.certification;
     return typeof C.enterprise === 'number' ? C.enterprise : 999;
+  };
+  /* 年度年审费按阶段取价：破冰期随认证同步减免（同读 breakin.certification=0），
+     成熟期读 certification.annualReview（¥599/年）。与认证费分列账、分别退，不互相顶替。 */
+  ModeStore.reviewFee = function () {
+    var C = (MOCK.business && MOCK.business.certification) || {};
+    var b = (MOCK.business && MOCK.business.breakin) || {};
+    if (this.isBreakIn() && typeof b.certification === 'number') return b.certification;
+    return typeof C.annualReview === 'number' ? C.annualReview : 599;
   };
 
   /* ---- v3.0 五身份叠加推导：返回结构化身份对象 ----
