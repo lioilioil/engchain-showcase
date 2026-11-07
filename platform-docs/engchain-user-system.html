@@ -105,7 +105,7 @@
   <h1>Engchain3.0 用户体系与权限说明文档</h1>
   <div class="tagline">覆盖用户身份、角色、特征、属性、数据存储结构、业务逻辑、权限体系与应用功能八大主题的完整说明。适用对象：产品、设计、研发、测试、运营与平台管理人员。</div>
   <div class="meta">
-    <span>版本 v1.2</span><span>2026-11-07</span><span>适用：App 端 + 后台管理端</span><span>Phase 0 纯信息撮合</span><span>配套图解 ×4</span>
+    <span>版本 v1.3</span><span>2026-11-07</span><span>适用：App 端 + 后台管理端</span><span>Phase 0 纯信息撮合</span><span>配套图解 ×4</span>
   </div>
 </header>
 
@@ -141,8 +141,8 @@
 <h3>1.1 项目定位</h3>
 <p><strong>Engchain3.0（工程链）</strong>是面向建筑行业的 B2B 供需平台：供方（建筑企业、服务商企业、专业个人）发布供给，需方查找、匹配并建立联系。当前数据层以浏览器本地存储实现，尚无服务端；<strong>Phase 0 仅做信息撮合</strong>——不抽佣、不托管资金，交易能力仅保留结构兼容。</p>
 <div class="grid2">
-  <div class="kv"><span class="k">App 端</span>：<code>index.html / home.html / preview.html</code> + <code>pages/</code>（30 个功能目录）+ <code>js/</code>（数据层）</div>
-  <div class="kv"><span class="k">管理后台</span>：<code>admin-vue/</code>（Vue3 + Element 风格），12 组 42 项菜单</div>
+  <div class="kv"><span class="k">App 端</span>：三个入口页（首页、导览页、预览页）+ pages/（29 个已交付功能目录）+ 数据层脚本</div>
+  <div class="kv"><span class="k">管理后台</span>：独立的后台工程（Vue3 + Element 风格），12 组 42 项菜单</div>
   <div class="kv"><span class="k">商业模式（Phase 0）</span>：收入 = 企业认证年费 + 企业入驻费 + 信息解锁（98 积分/条）+ 增值道具与会员/运营包；破冰期对认证与入驻执行限时减免，成熟期按标准价；不涉及交易资金与托管</div>
   <div class="kv"><span class="k">省级总代体系</span>：S0–S5 六阶段招商能力已交付（省代/二级代理/台账/行为四套存储）</div>
 </div>
@@ -169,13 +169,13 @@
 </div>
 <ul>
   <li><strong>账号层</strong>：个人账号是唯一法律、资金、权限主体，承担登录/余额/订单。</li>
-  <li><strong>资质层</strong>：个人资质（<code>AuthStore · engchain-auth</code>：实名/专业/合伙人）与入驻资质（<code>EntryStore · engchain-entry</code>：建筑/服务商入驻），均从权威用户表快照同步。</li>
-  <li><strong>派生层</strong>：<code>deriveIdentity / entryAccess</code> 等只读纯函数，把资质翻译成页面能力门控。</li>
+  <li><strong>资质层</strong>：个人资质（实名、专业、合伙人三条轨道）与入驻资质（建筑、服务商两类入驻），均由权威用户表派生并随其变更同步。</li>
+  <li><strong>派生层</strong>：一组只读规则把资质翻译成对外身份与页面能力门控，不做任何写入。</li>
   <li><strong>组织/外显层</strong>：组织关系（老板/管理员/成员）与手动切换的展示身份，仅供展示与署名，<b>不得</b>写入资质。</li>
 </ul>
 <div class="callout red">
   <span class="t">设计红线（历史修复项，身份状态串写问题）</span>
-  ① 组织成员关系 ≠ 企业资质——员工不得因任职获得企业向权益；② 外显身份切换不改变任何权限；③ 代理新身份（未叠加个人合伙人）默认关闭旧返佣出口（AgentAccess 门控）。
+  ① 组织成员关系 ≠ 企业资质——员工不得因任职获得企业向权益；② 外显身份切换不改变任何权限；③ 代理新身份（未叠加个人合伙人）默认关闭旧返佣出口（由代理门控统一判定）。
 </div>
 
 <h3 id="s2-2">2.2 身份结构与状态派生</h3>
@@ -224,9 +224,9 @@
 
 <h3 id="s2-4">2.4 游客与登录判定（S5 统一口径）</h3>
 <ul>
-  <li>判定游客：<code>UI.state.loggedIn === false</code> 或身份状态为 <code>guest</code>（DataBus.isGuest 统一口径，兼容旧字段）；</li>
+  <li>判定游客：未登录，或身份状态为游客（全站统一判定，兼容早期字段）；</li>
   <li>游客可浏览供需、搜索、查看详情，但发布、解锁、认证、入驻、钱包、返佣等能力全部锁定；</li>
-  <li>登录态存于 <code>engchain-state</code>（account），登录历史存 <code>engchain-history</code>。</li>
+  <li>登录态与登录历史分开留存，具体键名见 §5.2。</li>
 </ul>
 
 <!-- ============ 3 角色体系 ============ -->
@@ -242,9 +242,9 @@
 <table>
   <tr><th>角色</th><th>中文名</th><th>定位</th><th>典型操作</th></tr>
   <tr><td><span class="badge b-rose">super</span></td><td>超级管理员</td><td>全通，拥有全部 12 组菜单</td><td>一切操作、角色权限配置</td></tr>
-  <tr><td><span class="badge b-blue">ops</span></td><td>运营</td><td>日常运营</td><td>用户管理/编辑/导出、供需与订单、营销、分销、电子签合同</td></tr>
-  <tr><td><span class="badge b-emerald">finance</span></td><td>财务</td><td>资金侧</td><td>钱包、充值/对公审批、提现审批、发票、积分、签署订单与退款审核</td></tr>
-  <tr><td><span class="badge b-amber">risk</span></td><td>风控</td><td>合规审计</td><td>合规审计/管理、企业监控、诚信分、举报处理、电子签合同</td></tr>
+  <tr><td><span class="badge b-blue">ops</span></td><td>运营</td><td>日常运营</td><td>用户管理/编辑/导出、供需与订单、营销、分销</td></tr>
+  <tr><td><span class="badge b-emerald">finance</span></td><td>财务</td><td>资金侧</td><td>钱包、充值/对公审批、提现审批、发票、积分、退款审核</td></tr>
+  <tr><td><span class="badge b-amber">risk</span></td><td>风控</td><td>合规审计</td><td>合规审计/管理、企业监控、诚信分、举报处理</td></tr>
   <tr><td><span class="badge b-slate">viewer</span></td><td>只读</td><td>只读观察</td><td>总览、用户与认证（仅查看用户）</td></tr>
 </table>
 <h3>3.2 省代团队 4 角色（M3-10 团队协作）</h3>
@@ -420,7 +420,7 @@
 <table>
   <tr><th>对象</th><th>存储键</th><th>关键字段</th></tr>
   <tr><td>年度会员</td><td><code>engchain-member</code></td><td>生效状态、开通时间、到期时间、等级（对应权益折扣 0.8x / 0.7x / 0.5x）</td></tr>
-  <tr><td>增值道具额度</td><td><code>engchain-upgrades</code></td><td>置顶名额、线索额度、AI 字数、电子签份数、席位数的已购与已用</td></tr>
+  <tr><td>增值道具额度</td><td><code>engchain-upgrades</code></td><td>置顶名额、线索额度、AI 字数、席位数的已购与已用</td></tr>
   <tr><td>返佣</td><td><code>engchain-balance</code> · <code>totalRebate</code></td><td>分销返佣累计、返佣流水（type=rebate）；派发走 BalanceStore.rebate()</td></tr>
   <tr><td>发票</td><td><code>engchain-invoices</code></td><td>抬头、税号、开票类型、金额、状态</td></tr>
   <tr><td>免费额度</td><td><code>engchain-free-quota</code></td><td>周期、额度上限、已用条数</td></tr>
@@ -458,13 +458,13 @@
   <div class="cap"><span>图 3 · 数据层架构（种子 → Store → 总线 → 业务域 → 页面 + localStorage）</span><a href="data-layer-architecture.html" target="_blank">新窗口打开 ↗</a></div>
 </div>
 <table>
-  <tr><th>层</th><th>文件</th><th>职责</th></tr>
-  <tr><td>种子/配置</td><td><code>js/data.js</code></td><td>用户/企业/供需种子数据 + MOCK.business 商业配置（入驻费、分销档位、增值道具、会员）</td></tr>
-  <tr><td>Store 层</td><td><code>js/stores.js</code></td><td>Store 工厂（makeStore + <code>engchain-*</code> 键 + CustomEvent）；AuthStore（五轨道+dimensions 企业认证+pendingChanges 变更留档）、EntryStore、BalanceStore、CreditStore、RevenueStore 等</td></tr>
-  <tr><td>总线</td><td><code>js/databus.js</code></td><td>用户表/订单/审批状态机的业务规则与跨页通信；身份派生与游客判定</td></tr>
-  <tr><td>业务域</td><td><code>js/domain.js</code></td><td>Rebate 返佣引擎（frozen→settled(T+1)→paid、clawback 退款、safeDistTier 三档）、Ledger 平台账户、ViolationStore 违规留痕</td></tr>
-  <tr><td>持久化</td><td>localStorage</td><td>30+ 个 <code>engchain-*</code> 键，用户表为权威、Store 为快照</td></tr>
-  <tr><td>页面</td><td><code>pages/</code>（30 目录）</td><td>渲染与交互，经 DataBus 查询、经 storage/CustomEvent 联动</td></tr>
+  <tr><th>层</th><th>职责</th><th>对应位置</th></tr>
+  <tr><td>种子与配置</td><td>用户、企业、供需的种子数据，以及入驻费、分销档位、增值道具、会员等商业配置</td><td rowspan="4">数据层源文件，见 §10.2 源文件索引</td></tr>
+  <tr><td>数据仓库</td><td>按业务对象存放用户、认证、入驻、余额、积分等数据，变更时广播事件驱动页面刷新</td></tr>
+  <tr><td>总线</td><td>用户表、订单、审批状态机的业务规则与跨页通信；身份派生与游客判定</td></tr>
+  <tr><td>业务规则</td><td>返佣引擎（冻结 → 次日结算 → 已打款，退款追回，三档费率）、平台账户台账、违规留痕</td></tr>
+  <tr><td>持久化</td><td>浏览器本地存储，30 余个键；用户表为权威，其余为快照</td><td>键名全集见 §5.2</td></tr>
+  <tr><td>页面</td><td>渲染与交互，经总线查询、经本地存储与事件联动</td><td>pages/（29 个已交付目录）</td></tr>
 </table>
 
 <h3>5.2 localStorage 存储键全集</h3>
@@ -473,7 +473,7 @@
   <tr><td>用户与认证</td><td><code>engchain-users</code>（权威用户表）、<code>engchain-auth</code>、<code>engchain-entry</code>、<code>engchain-entry-fees</code>（入驻费记录）、<code>engchain-member</code>（年度会员）</td></tr>
   <tr><td>登录与会话</td><td><code>engchain-state</code>（登录态/account）、<code>engchain-history</code>（登录历史）、<code>engchain-mode</code>（phase: <code>breakin</code> 破冰期 / <code>normal</code> 成熟期，决定认证与入驻的当期价；认证费读 <code>ModeStore.certFee()</code>；破冰期截止 2027-09-30，见 <code>breakin.endAt</code>）</td></tr>
   <tr><td>资金与积分</td><td><code>engchain-balance</code>、<code>engchain-credits</code>、<code>engchain-credits-rewards</code>、<code>engchain-credits-invited-codes</code>、<code>engchain-invoices</code>、<code>engchain-commission</code>、<code>engchain-revenue</code>、<code>engchain-checkin</code>（签到）</td></tr>
-  <tr><td>业务数据</td><td><code>engchain-supply</code>、<code>engchain-applies</code>、<code>engchain-agency-orders</code>、<code>engchain-agency-leads</code>、<code>engchain-agency-demands</code>、<code>engchain-matches</code>、<code>engchain-favorites</code>、<code>engchain-contact-remarks</code>、<code>engchain-svc-ratings</code>、<code>engchain-upgrades</code>（增值道具）、<code>engchain-free-quota</code>、<code>engchain-ops</code>、<code>engchain-monitor</code>、<code>engchain-api</code>、<code>engchain-dashboard</code>、<code>engchain-reports</code>、<code>engchain-history-files</code>、<code>engchain-esign</code>、<code>engchain-oplog</code></td></tr>
+  <tr><td>业务数据</td><td><code>engchain-supply</code>、<code>engchain-applies</code>、<code>engchain-agency-orders</code>、<code>engchain-agency-leads</code>、<code>engchain-agency-demands</code>、<code>engchain-matches</code>、<code>engchain-favorites</code>、<code>engchain-contact-remarks</code>、<code>engchain-svc-ratings</code>、<code>engchain-upgrades</code>（增值道具）、<code>engchain-free-quota</code>、<code>engchain-ops</code>、<code>engchain-monitor</code>、<code>engchain-api</code>、<code>engchain-dashboard</code>、<code>engchain-reports</code>、<code>engchain-history-files</code>、<code>engchain-oplog</code></td></tr>
   <tr><td>省代体系（四键+日志）</td><td><code>engchain-province-agents</code>、<code>engchain-sub-agents</code>、<code>engchain-agent-ledger</code>（{entries,summaries,version}）、<code>engchain-agent-behavior</code>、<code>engchain-behavior-cleanup-log</code></td></tr>
   <tr><td>委托服务</td><td><code>engchain_delegates</code>、<code>engchain_delegate_orders</code>、<code>engchain_delegate_unlocks</code>（统一委托 ¥29.9 解锁，实名门控）</td></tr>
 </table>
@@ -494,40 +494,40 @@
 </div>
 <table>
   <tr><th>环节</th><th>规则</th></tr>
-  <tr><td>两期定价</td><td>破冰期（<code>phase:'breakin'</code>，出厂默认，<b>截止 2027-09-30</b>）建筑入驻 ¥0、服务商入驻 ¥1,499（5 折）、企业认证 ¥0；成熟期（<code>normal</code>）建筑 ¥3,999、服务商 ¥2,999、企业认证 ¥999/年。减免只作用于本期实付，标准价始终并列展示，期后按标准价续费。到期后即使开关仍停在破冰期，<code>isBreakIn()</code> 也按 <code>breakin.endAt</code> 返回 false，不再免费。认证费按阶段取价由 <code>ModeStore.certFee()</code> 单一出口给出（<code>breakin.certification</code>=0 / <code>certification.enterprise</code>=999），认证页、认证中心、资料准备页、认证结果页同读一处；渠道对账页（省代工作台）不加载 <code>stores.js</code>，由 <code>uni-shared.js</code> 按同一键与同一截止日自读阶段；续费与首次提交同价</td></tr>
-  <tr><td>入驻类型</td><td>construction 建筑企业（蓝V，标准价 ¥3,999）/ agency 服务商企业（金V，标准价 ¥2,999）；破冰期分别为 ¥0 与 ¥1,499；年度续费 9 折（¥3,599 / ¥2,699）；入驻不收取保证金</td></tr>
-  <tr><td>入驻状态机</td><td><span class="flow"><span class="step">pending 待初审</span><span class="arr">→</span><span class="step">first_ok 初审通过</span><span class="arr">→</span><span class="step">active 终审通过</span></span>；驳回分 rejectLevel = first / final</td></tr>
-  <tr><td>资金动作</td><td>申请即按当期实付扣入驻费（BalanceStore.consume, type:'entry'）；终审通过入驻生效、费用确认为收入；驳回全额退回（FIX BM-006）。认证同构：提交即扣当期实付，通过后起算一年有效期，驳回全退（FIX BM-003）。两笔钱分别扣、分别退，互不包含；入驻不冻结、不划转保证金</td></tr>
-  <tr><td>企业认证</td><td>5 维资料（business/legal/qualification/bank/office），认证等级 none→basic(≥2维)→advanced(≥3维)→full(5维)；企业认证按年计费，标准价 ¥999/年（破冰期以权益赠送方式全免），个人实名与个人资质认证 ¥0；驳回退认证费（FIX BM-003）；续费 authRenew 即时 +1 年；B 类变更走 pendingChanges 留档审核（reviewType:'daily'）</td></tr>
+  <tr><td>两期定价</td><td>破冰期（出厂默认，<b>截止 2027-09-30</b>）建筑入驻 ¥0、服务商入驻 ¥1,499（5 折）、企业认证 ¥0；成熟期建筑 ¥3,999、服务商 ¥2,999、企业认证 ¥999/年。减免只作用于本期实付，标准价始终并列展示，期后按标准价续费。到期后即使阶段开关仍停在破冰期，系统也按截止日判定为成熟期，不再免费。认证费按阶段由统一取价出口给出（破冰期 0 / 成熟期 999），认证页、认证中心、资料准备页、认证结果页同读一处；渠道对账页不依赖主数据层，按同一阶段标记与截止日自行判定；续费与首次提交同价</td></tr>
+  <tr><td>入驻类型</td><td>建筑企业（蓝V，标准价 ¥3,999）/ 服务商企业（金V，标准价 ¥2,999）；破冰期分别为 ¥0 与 ¥1,499；年度续费 9 折（¥3,599 / ¥2,699）；入驻不收取保证金</td></tr>
+  <tr><td>入驻状态机</td><td><span class="flow"><span class="step">待初审</span><span class="arr">→</span><span class="step">初审通过</span><span class="arr">→</span><span class="step">终审通过</span></span>；驳回区分初审驳回与终审驳回</td></tr>
+  <tr><td>资金动作</td><td>申请即按当期实付扣入驻费；终审通过入驻生效、费用确认为收入；驳回全额退回。认证同构：提交即扣当期实付，通过后起算一年有效期，驳回全退。两笔钱分别扣、分别退，互不包含；入驻不冻结、不划转保证金</td></tr>
+  <tr><td>企业认证</td><td>五维资料（工商、法务、资质、开户、办公场所），认证等级由维度数决定（2 维基本 / 3 维高级 / 5 维完整）；企业认证按年计费，标准价 ¥999/年（破冰期以权益赠送方式全免），个人实名与个人资质认证 ¥0；驳回退认证费；续费即时顺延一年；主体信息变更留档后按日报审核</td></tr>
   <tr><td>实名认证</td><td>二要素 + 活体自动核验，即时通过，不进入后台队列</td></tr>
-  <tr><td>支付方式</td><td>balance / wechat / alipay / corp（对公生成 CorpPay 待审记录）；余额扣费用 available() = balance − frozen（FIX BM-002/009）</td></tr>
+  <tr><td>支付方式</td><td>余额 / 微信 / 支付宝 / 对公转账（对公转账生成待审记录，到账后入账）；余额可用金额 = 余额 − 冻结</td></tr>
 </table>
-<p>App 端与后台的同步：后台审批直接写用户表（权威）；被审账号若正在登录，App 经 storage 事件 + CustomEvent 同步 Store 快照并重算身份；后台审批后 App 需整页刷新（已知限制）。</p>
+<p>App 端与后台的同步：后台审批直接写用户表（权威）；被审账号若正在登录，App 会在本地存储变更时刷新快照并重算身份；后台审批后 App 需整页刷新（已知限制）。</p>
 
-<h3 id="s6-2">6.2 返佣与分销（domain.js 返佣引擎）</h3>
+<h3 id="s6-2">6.2 返佣与分销（返佣引擎）</h3>
 <table>
   <tr><th>项</th><th>规则</th></tr>
-  <tr><td>分销档位（safeDistTier）</td><td>基础一级 12%/3%（最低提现 ¥100）· limited 6%/0 · individualPartner 8%/2%（最低提现 ¥50）；返佣结算 T+1（settleNote）</td></tr>
-  <tr><td>返佣生命周期</td><td>Rebate.createFromEvent：frozen → settled(T+1) → paid；退款触发 clawback 追回</td></tr>
+  <tr><td>分销档位</td><td>基础一级 12% / 3%（最低提现 ¥100）· 受限档 6% / 0 · 个人合伙人 8% / 2%（最低提现 ¥50）；返佣次日（工作日）结算</td></tr>
+  <tr><td>返佣生命周期</td><td>返佣先进入冻结，次日转为可结算，打款后结清；订单退款时按原路径追回</td></tr>
   <tr><td>有效分销员判定</td><td>必须是 active 分销身份，且未被清零（u8 已回退实名，无返佣资格）</td></tr>
-  <tr><td>平台账户</td><td>Ledger 记录平台收入（认证费 + 入驻费 + 解锁 + 增值）；交易资金不进入平台账户</td></tr>
-  <tr><td>旧返佣出口门控（AgentAccess）</td><td>新代理身份（未叠加个人合伙人）默认关闭返佣中心/佣金提现/海报/直达URL，测算佣金不可提现；ownBalance 自身余额与 agentLedger 例外放行；叠加个人合伙人后个人线并集放行</td></tr>
+  <tr><td>平台账户</td><td>平台账户台账记录平台收入（认证费 + 入驻费 + 解锁 + 增值）；交易资金不进入平台账户</td></tr>
+  <tr><td>旧返佣出口门控</td><td>新代理身份（未叠加个人合伙人）默认关闭返佣中心、佣金提现、海报与直达链接，测算佣金不可提现；自身余额与代理台账例外放行；叠加个人合伙人后按个人线并集放行</td></tr>
 </table>
 
 <h3 id="s6-3">6.3 省代体系（S0–S5）</h3>
 <table>
   <tr><th>项</th><th>规则</th></tr>
-  <tr><td>状态机 transition</td><td>AgentRules.canTransition 合法边校验 + statusLog 留痕；终止态（terminated/revoked/removed）置 sealedAt 封存只读</td></tr>
-  <tr><td>台账</td><td>两分区 subLedger/selfLine；frozenStatus frozen→settled(T+7)；月汇总版本化缓存只汇总 settled；企业税目不进计算列；流水号 ALG-…</td></tr>
-  <tr><td>资格位 bitsFor</td><td>active|suspended 视为有效；省份名额 agentQuotaUsed/agentQuotaCap（一省一总代）</td></tr>
+  <tr><td>状态机</td><td>合法状态流转校验，每次变更留痕；终止态（终止 / 撤销 / 移除）封存为只读</td></tr>
+  <tr><td>台账</td><td>两分区（下级台账 / 自身线）；冻结 7 天后转可结算；月汇总按版本留存，只汇总已结算部分；企业税目不进计算列；流水号按 ALG- 前缀编排</td></tr>
+  <tr><td>代理资格位</td><td>启用与暂停中视为有效；省份名额一省一总代，可查已用与上限</td></tr>
   <tr><td>招商</td><td>一总代一有效招商码；省级独家海报 3 主题；二级代理协议约定比例（如 u12 成都二级 20%）</td></tr>
 </table>
 
 <h3 id="s6-4">6.4 委托与增值服务</h3>
 <ul>
-  <li><strong>统一委托</strong>：¥29.9 解锁委托服务（delegates），实名门控（gateRealname）前置；</li>
+  <li><strong>统一委托</strong>：¥29.9 解锁委托服务，需先完成实名；</li>
   <li><strong>信息解锁</strong>：查看供需方联系方式 98 积分/次（人才 29 积分、收购意向解锁 198 积分），每月 3 条免费额度；</li>
-  <li><strong>增值道具</strong>：topListing ¥99/7天（置顶）、leadPack ¥299/50条（线索包，仅 agency 可购）、saasTools ¥199/30天（工具包）；</li>
+  <li><strong>增值道具</strong>：置顶 ¥99/7 天、线索包 ¥299/50 条（仅服务商可购）、经营工具 ¥199/30 天；</li>
   <li><strong>年度会员</strong>：membershipAnnual ¥999/年，积分折扣 0.5x；会员蓝V 0.8x / 金V 0.7x 权益倍率。</li>
 </ul>
 
@@ -544,7 +544,7 @@
   <tr><td><code>finance:view / finance:withdraw / finance:export</code></td><td>资金中心</td><td>✔</td><td></td><td>✔</td><td></td><td></td></tr>
   <tr><td><code>risk:view / risk:audit</code></td><td>风控合规</td><td>✔</td><td></td><td></td><td>✔</td><td></td></tr>
 </table>
-<h3>7.2 后台分组可见性（ROLE_GROUP_MAP）与菜单</h3>
+<h3>7.2 后台分组可见性与菜单</h3>
 <table>
   <tr><th>分组（12 组 42 项）</th><th>super</th><th>ops</th><th>finance</th><th>risk</th><th>viewer</th></tr>
   <tr><td>总览（待办中心/数据总览）</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td><td>✔</td></tr>
@@ -555,30 +555,28 @@
   <tr><td>会员中心（年度续费）</td><td>✔</td><td></td><td></td><td></td><td></td></tr>
   <tr><td>资金中心（钱包/充值/提现/积分/看板/发票/收入看板）</td><td>✔</td><td></td><td>✔</td><td></td><td></td></tr>
   <tr><td>分销中心（总览/团队树/返佣发放）</td><td>✔</td><td>✔</td><td>✔</td><td></td><td></td></tr>
-  <tr><td>电子签（合同/订单/退款）</td><td>✔</td><td>部分</td><td>部分</td><td>部分</td><td></td></tr>
   <tr><td>风控合规（审计/合规/监控/诚信分/举报/日志）</td><td>✔</td><td></td><td></td><td>✔</td><td></td></tr>
   <tr><td>数据分析（运营周报/增长分析）</td><td>✔</td><td></td><td></td><td></td><td></td></tr>
   <tr><td>系统设置（定价/周期/角色权限/短语）</td><td>✔</td><td></td><td></td><td></td><td></td></tr>
 </table>
 <div class="callout blue">
   <span class="t">路由守卫四层（admin-vue）</span>
-  public 页放行 → 未登录强制跳 /login?redirect → super 全通 → 分组级可见性 → 单页级 roles。<b>电子签子项细分</b>：电子合同限 super/ops/risk；签署订单与退款审核限 super/finance。访问无权限跳 403。省代开通/审核路由 /agents/province（agents/ProvinceAdmin.vue）。
+  public 页放行 → 未登录强制跳 /login?redirect → super 全通 → 分组级可见性 → 单页级 roles。访问无权限跳 403。省代开通与审核在后台“省代管理”页。
 </div>
 <h3>7.3 App 端能力门控（由身份派生）</h3>
 <table>
   <tr><th>能力</th><th>门控身份</th></tr>
   <tr><td>发布供给/需求</td><td>非游客（guest 不可）</td></tr>
-  <tr><td>解锁联系方式（98 积分/条）</td><td>非游客；委托服务另需实名（gateRealname）</td></tr>
+  <tr><td>解锁联系方式（98 积分/条）</td><td>非游客；委托服务另需实名</td></tr>
   <tr><td>企业入驻/认证</td><td>realname 及以上（实名是轨道基石）</td></tr>
-  <tr><td>返佣中心/佣金提现</td><td>partner 且未被 AgentAccess 门控（新代理默认关闭）</td></tr>
+  <tr><td>返佣中心 / 佣金提现</td><td>合伙人且未被代理门控（新代理默认关闭）</td></tr>
   <tr><td>钱包提现</td><td>实名 + 非封禁；最低提现 ¥50/¥100 按档位</td></tr>
-  <tr><td>电子签</td><td>企业入驻（resident）企业向能力</td></tr>
   <tr><td>团队管理（省代）</td><td>owner/admin 角色；接受邀请仅本人</td></tr>
 </table>
 
 <!-- ============ 8 应用功能清单 ============ -->
 <h2 id="s8"><span class="num">8</span>应用功能清单</h2>
-<h3>8.1 App 端功能模块（pages/ 30 个目录）</h3>
+<h3>8.1 App 端功能模块（pages/ 29 个已交付目录）</h3>
 <table>
   <tr><th>目录</th><th>功能模块</th><th>目录</th><th>功能模块</th></tr>
   <tr><td>auth</td><td>登录/注册/实名/认证/入驻申请</td><td>personal</td><td>个人页/个人认证</td></tr>
@@ -587,18 +585,17 @@
   <tr><td>search</td><td>搜索</td><td>match</td><td>智能撮合/匹配</td></tr>
   <tr><td>trade</td><td>交易（Phase 0 信息撮合）</td><td>order</td><td>订单</td></tr>
   <tr><td>refund</td><td>退款</td><td>wallet</td><td>钱包/余额/充值/提现/发票</td></tr>
-  <tr><td>distribution</td><td>分销/返佣</td><td>esign</td><td>电子签</td></tr>
-  <tr><td>agency</td><td>委托代理</td><td>franchise</td><td>招商加盟</td></tr>
-  <tr><td>province-agent</td><td>省级总代</td><td>vendor</td><td>增值服务商</td></tr>
-  <tr><td>personnel</td><td>团队人员</td><td>message</td><td>消息中心</td></tr>
-  <tr><td>favorite</td><td>收藏</td><td>monitor</td><td>企业监控/风险</td></tr>
-  <tr><td>industry</td><td>行业资讯</td><td>geo</td><td>地理/地图定位</td></tr>
-  <tr><td>co-create</td><td>共创</td><td>api</td><td>API 示例/调试</td></tr>
-  <tr><td>agreement</td><td>协议条款</td><td>guide / help</td><td>新手引导 / 帮助中心</td></tr>
-  <tr><td>platform</td><td>平台运营视图</td><td>—</td><td>—</td></tr>
+  <tr><td>distribution</td><td>分销/返佣</td><td>agency</td><td>委托代理</td></tr>
+  <tr><td>franchise</td><td>招商加盟</td><td>province-agent</td><td>省级总代</td></tr>
+  <tr><td>vendor</td><td>增值服务商</td><td>personnel</td><td>团队人员</td></tr>
+  <tr><td>message</td><td>消息中心</td><td>favorite</td><td>收藏</td></tr>
+  <tr><td>monitor</td><td>企业监控/风险</td><td>industry</td><td>行业资讯</td></tr>
+  <tr><td>geo</td><td>地理/地图定位</td><td>co-create</td><td>共创</td></tr>
+  <tr><td>api</td><td>API 示例/调试</td><td>agreement</td><td>协议条款</td></tr>
+  <tr><td>guide / help</td><td>新手引导 / 帮助中心</td><td>platform</td><td>平台运营视图</td></tr>
 </table>
 <h3>8.2 后台菜单全量（12 组 42 项，见 §7.2 表）</h3>
-<p>除 §7.2 表中 12 组菜单外，另有 5 个附加路由页：收入看板（资金中心）、用户详情、企业详情、撮合订单、供方库（撮合中心）。</p>
+<p>除 §7.2 表中 12 组菜单外，另有 5 个附加路由页：收入看板（资金中心）、用户详情、企业详情、撮合订单、供方库（撮合中心）。演示站另有 1 个尚未落地的愿景模块，不计入本清单。</p>
 <h3>8.3 13 节点演示旅程（README 导览）</h3>
 <div class="flow">
   <span class="step">首页/导览</span><span class="arr">→</span><span class="step">注册/登录</span><span class="arr">→</span><span class="step">实名认证</span><span class="arr">→</span><span class="step">个人入驻/合伙人</span><span class="arr">→</span><span class="step">企业认证</span><span class="arr">→</span><span class="step">企业入驻（蓝V/金V）</span><span class="arr">→</span><span class="step">发布供给</span><span class="arr">→</span><span class="step">搜索/匹配</span><span class="arr">→</span><span class="step">解锁联系</span><span class="arr">→</span><span class="step">钱包/发票</span><span class="arr">→</span><span class="step">分销返佣</span><span class="arr">→</span><span class="step">省代招商</span><span class="arr">→</span><span class="step">后台审批</span>
@@ -634,7 +631,7 @@
   <tr><td>RBAC</td><td>基于角色的访问控制（后台 super/ops/finance/risk/viewer）</td></tr>
   <tr><td>两级审批</td><td>入驻审批 pending → first_ok（初审）→ active（终审）</td></tr>
   <tr><td>AgentAccess 门控</td><td>新代理身份对旧返佣出口的并集门控（legacyExitAllowed / commissionWithdrawable / agentBlocked / hasAny）</td></tr>
-  <tr><td>两期定价</td><td>破冰期（获客期）与成熟期（标准期）两个执行阶段，由 <code>engchain-mode</code> 控制；减免只作用于本期实付，标价不变</td></tr>
+  <tr><td>两期定价</td><td>破冰期（获客期）与成熟期（标准期）两个执行阶段，由同一个阶段开关控制；减免只作用于本期实付，标价不变</td></tr>
   <tr><td>认证年费</td><td>企业工商认证 ¥999/年（破冰期 ¥0）；个人实名与个人资质认证永久 ¥0</td></tr>
   <tr><td>Phase 0</td><td>纯信息撮合阶段：不抽佣、不托管、交易仅结构兼容</td></tr>
 </table>
@@ -663,7 +660,7 @@
 <footer>
   本文档由项目源码（databus.js / stores.js / data.js / domain.js / agent-store.js / admin-vue 权限模块）核对整理生成。
   配套交互图解：identity-architecture.html · identity-lifecycle.html · auth-entry-sequence.html · data-layer-architecture.html（同目录，新窗口打开）。
-  配套金额文档：engchain-money-model.html（金额与收费规则，含 48 项参数总表；§2 为认证、入驻与两期定价）。
+  配套金额文档：engchain-money-model.html（金额与收费规则，含 45 项参数总表；§2 为认证、入驻与两期定价）。
   所有金额、档位、比例均为系统配置参数，最终以公司确认为准。
 </footer>
 </main>
