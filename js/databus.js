@@ -1151,7 +1151,7 @@ window.DataBus = (function () {
     var _r = Array.isArray(a) && a.length ? a : seedOrders(); _cacheSet('orders', _r); return _r;
   }
   function saveOrders(a) { try { LS.setItem(ORDERS_KEY, JSON.stringify(a)); } catch (e) {} _cacheSet('orders', a); return a; }
-  /* [FEAT 购买记录] 新增订单——此前 saveOrders 只被「种子初始化 / 状态流转 / 里程碑推进」调用，
+  /* [FEAT 购买记录] 新增订单——此前 saveOrders 只被「种子初始化 / 状态流转 / 节点推进」调用，
      没有任何创建入口，导致付费解锁等购买行为无单可查。这里补上唯一写入口。
      幂等：同一 user + 同一 supplyId + 5 秒内重复提交只保留一条（防双击重复下单）。 */
   function addOrder(payload) {
@@ -1212,20 +1212,9 @@ window.DataBus = (function () {
     window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: id, status: it.status } }));
     return it;
   }
-  function orderAdvanceMilestone(id, idx) {
-    var a = loadOrders(), i, it = null;
-    for (i = 0; i < a.length; i++) if (a[i].id === id) { it = a[i]; break; }
-    if (!it) return null;
-    if (it.status !== 'serving' && it.status !== 'await_accept') return { error: '当前状态不可推进里程碑' };
-    if (!it.milestones[idx]) return { error: '里程碑节点不存在' };
-    if (it.milestones[idx].status === 'done') return { error: '该节点已达成' };
-    it.milestones[idx].status = 'done';
-    it.milestones[idx].doneAt = Date.now();
-    var allDone = it.milestones.every(function (m) { return m.status === 'done'; });
-    if (allDone && it.status === 'serving') it.status = 'await_accept';
-    it.updatedAt = Date.now();
-    saveOrders(a);
-    window.dispatchEvent(new CustomEvent('engchain:orders', { detail: { id: id, ms: idx } }));
+  /* 兼容旧调用方：平台不设节点结算，推进动作只做 serving → await_accept 的状态流转 */
+  function orderAdvanceMilestone(id) {
+    var it = orderTransition(id, 'await_accept');
     return it;
   }
 

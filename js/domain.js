@@ -77,10 +77,8 @@
     credits: { deduct: { pointsToYuan: 100, capRate: 0.1 } },
     invoice: { taxRate: 0.06 },
     clue: { validDays: 7 },
-    commission: {
-      settleCycle: 'T+1',
-      deposit: { basic: 5000, engineering: 20000, high: 50000, note: '未启用：入驻不收取保证金，档位仅保留结构' },
-      intent: { rate: 0.2, tiers: [100, 500, 800, 5000], note: '买方意向金：成交价×20% 就近取档（100/500/800/5000），锁定需求+保障平台佣金，服务启动前可退，启动后抵扣服务费' },
+    riskControl: {
+      /* 防跳单罚则档位（只作用于权益与功能，账户层面没有可扣的资金池） */
       actions: [
         { id: 'warn', label: '警告' }, { id: 'ban7', label: '禁聊 7 天' }, { id: 'ban30', label: '二次禁聊 30 天' },
         { id: 'fine', label: '罚款 ¥5,000' }, { id: 'freeze15', label: '停号 15 天' }, { id: 'remove', label: '二次清退' }

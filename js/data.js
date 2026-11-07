@@ -2126,7 +2126,7 @@ window.MOCK = (function () {
         contact: { name: '陈经理', title: '招商经理', phone: '13888007710', wechat: 'chen_ynjc', addr: '昆明市官渡区建材产业园云岭厂区' }
       },
       title: '云岭建材 区域代理招商（A级防火保温）开放云贵川',
-      budget: '¥9.8', unit: '万元 · 意向金', location: '昆明·官渡', city: '昆明', distance: '—',
+      budget: '¥9.8', unit: '万元 · 投资额', location: '昆明·官渡', city: '昆明', distance: '—',
       tags: ['区域代理', '云贵川', '扶持培训', '首批24家'], time: ago(66), views: 188, match: 82, companyId: 'c-ynjc',
       desc: '云岭建材面向云贵川开放区域代理，主营 A 级防火保温板与保温砂浆。提供品牌授权、区域保护、市场扶持与驻店培训，首批开放 24 家。',
       fields: [
