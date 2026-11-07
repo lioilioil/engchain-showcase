@@ -456,7 +456,7 @@
      · 认证信息锁定：表单联系人/电话只读取自实名认证，仅可补充备用手机号
      · 提交成功 → 对接信息页（顾问热线电话 + 企业微信二维码）
      · 付费渠道：提交委托后【模拟后台推送】「信息详情页解锁浏览」待付款订单；
-       用户进入首页时弹窗提醒 → 收银台支付 → 支付成功解锁浏览顾问匹配信息
+       用户进入首页时弹窗提醒 → 收银台支付 → 支付成功解锁浏览服务方匹配信息
      全部"后台"行为均为纯前端 localStorage 模拟（无真实后端），
      真实接口实现见各函数内 [模拟] 占位注释，交付说明见 docs/委托服务-方案交付说明.html。
      ═══════════════════════════════════════════════════════════════ */
@@ -494,8 +494,8 @@
         '<div class="dg-guide-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 2.5v5.2c0 4.6-3 7.4-7 9.3-4-1.9-7-4.7-7-9.3V5.5L12 3z"/><path d="M9.3 12l2 2 3.4-3.6"/></svg></div>' +
         '<div class="dg-guide-title">委托服务仅面向实名用户</div>' +
         '<div class="dg-guide-desc">' + (guest
-          ? '请先登录并完成实名认证，即可提交委托，享受平台专属顾问 1 对 1 服务。'
-          : '完成实名认证后即可提交委托，平台将通过<b>电话联系</b>与<b>企业微信私聊</b>为您提供专属顾问服务。') + '</div>' +
+          ? '请先登录并完成实名认证，即可提交委托，由合作服务方顾问 1 对 1 对接。'
+          : '完成实名认证后即可提交委托，由合作服务方通过<b>电话联系</b>与<b>企业微信私聊</b>为您对接。') + '</div>' +
         '<div class="dg-guide-note"><b>为什么需要实名？</b><br>核实您的真实身份，保护企业信息隐私，确保对接过程可追溯。</div>' +
         '<div class="dg-guide-btns">' +
           '<button type="button" class="btn btn-primary btn-block" style="height:46px;" onclick="location.href=\'' + (guest ? loginHref : authHref) + '\'">' + (guest ? '去登录' : '去实名认证') + '</button>' +
@@ -550,7 +550,7 @@
       '<div class="dg-handoff">' +
         '<div class="dg-handoff-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>' +
         '<div class="dg-handoff-title">委托已提交</div>' +
-        '<div class="dg-handoff-desc">平台专属顾问将在 <b>2 小时内</b> 电话联系您，请保持电话畅通。<br>默认对接方式：<b>电话联系 + 企业微信私聊</b>，您也可主动联系我们：</div>' +
+        '<div class="dg-handoff-desc">服务方顾问将在 <b>2 小时内</b> 电话联系您，请保持电话畅通。<br>默认对接方式：<b>电话联系 + 企业微信私聊</b>，您也可主动联系我们：</div>' +
         '<div class="dg-handoff-card">' +
           '<div class="dg-handoff-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></div>' +
           '<div class="dg-handoff-card-body">' +
@@ -721,7 +721,7 @@
 
   /* ---------- 收银台 v3（模拟支付）----------
      对齐详情页解锁弹窗（detail.js）既有视觉/交互：
-     · 商品卡可点击下滑展开「顾问匹配信息概览」，付款前按详情页规则遮蔽关键信息（掩码+锁标）
+     · 商品卡可点击下滑展开「服务方匹配信息概览」，付款前按详情页规则遮蔽关键信息（掩码+锁标）
      · 支付方式：积分支付 / 微信支付 / 支付宝（.unlock-paymethods + .pm-item 组件）
      · 底部置底支付区：协议勾选 + 支付按钮（按方式切换文案）+ 平台保障说明
      · 支付成功自动进入「委托信息详情」详情页 */
@@ -767,7 +767,7 @@
       }).join('') + '</div>';
     s.html(
       '<div class="dg-pay">' +
-        /* ① 商品卡：点击下滑展开「顾问匹配信息概览」 */
+        /* ① 商品卡：点击下滑展开「服务方匹配信息概览」 */
         '<div class="dg-pay-goods" id="dgPayGoods" role="button" aria-expanded="false">' +
           '<div class="dg-pay-goods-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg></div>' +
           '<div class="dg-pay-goods-body"><div class="dg-pay-goods-title">' + UI.esc(order.title) + '</div><div class="dg-pay-goods-desc">' + UI.esc(order.desc) + '</div></div>' +
@@ -775,7 +775,7 @@
         '</div>' +
         '<div class="dg-pay-overview" id="dgPayOverview">' +
           '<div class="dg-ov-inner">' +
-            '<div class="dg-ov-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>顾问匹配信息 · 概览<span class="dg-ov-hint">付款后解锁完整信息</span></div>' +
+            '<div class="dg-ov-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>服务方匹配信息 · 概览<span class="dg-ov-hint">付款后解锁完整信息</span></div>' +
             overviewItemsHTML(order) +
             '<div class="dg-ov-note"><svg class="ic"><use href="#i-lock"/></svg>关键信息已按平台规则遮蔽，付款后自动解锁完整联系方式与价格明细</div>' +
           '</div>' +
@@ -913,7 +913,7 @@
     return '<div class="dg-pay-ok">' +
       '<div class="dg-pay-ok-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>' +
       '<div class="dg-pay-ok-title">支付成功 · 信息已解锁</div>' +
-      '<div class="dg-pay-ok-desc">「' + UI.esc(order.title) + '」已解锁，即将进入委托信息详情页查看顾问匹配信息</div>' +
+      '<div class="dg-pay-ok-desc">「' + UI.esc(order.title) + '」已解锁，即将进入委托信息详情页查看服务方匹配信息</div>' +
       '<button type="button" class="btn btn-primary btn-block" style="height:46px;" data-order-no="' + order.orderNo + '" onclick="Delegates.viewDelegateDetail(event)">查看委托信息详情</button>' +
       '<button type="button" class="btn btn-ghost btn-block" style="height:46px;" onclick="UI.closeSheet()">留在当前页</button>' +
       '<div class="dg-pay-ok-foot">如需更多匹配信息，可在企业微信中继续与顾问沟通</div>' +
@@ -941,7 +941,7 @@
     s.html(
       '<div class="dg-unlock">' +
         '<div class="dg-unlock-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>已解锁</div>' +
-        '<div class="dg-unlock-title">' + UI.esc(order.bizLabel || '委托服务') + ' · 顾问匹配信息</div>' +
+        '<div class="dg-unlock-title">' + UI.esc(order.bizLabel || '委托服务') + ' · 服务方匹配信息</div>' +
         '<div class="dg-unlock-desc">以下为顾问为您筛选的信息详情，可点击电话直接对接。</div>' +
         '<div class="dg-unlock-list">' + unlockItemsHTML(order) + '</div>' +
         '<div class="dg-unlock-note">信息已解锁，可通过上方联系方式对接；如需更多信息，请在企业微信中联系顾问。</div>' +
@@ -950,7 +950,7 @@
     );
     s.show();
   }
-  /* 顾问匹配信息数据源（模拟后台运营账号推送 · 9 类信息产品，含真实联系方式与报价） */
+  /* 服务方匹配信息数据源（模拟后台运营账号推送 · 9 类信息产品，含真实联系方式与报价） */
   function matchedInfoItems(order) {
     var biz = order && order.biz || '';
     var map = {

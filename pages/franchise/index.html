@@ -819,8 +819,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '';
   }
 
-  /* ---- [FIX BM-048] 加盟申请：Franchise 模块尚未就绪时，本页实现申请按钮 + 模拟支付扣减逻辑。
-     加盟费从 BalanceStore 扣减（模拟支付流程），成功后写入本地加盟关系并在卡片上显示已加盟状态。 ---- */
+  /* ---- [口径修正] 加盟申请：加盟费、管理费、保证金由招商企业自行定价并对公收取，平台不代收。
+     本页只提交意向、不扣减余额；卡片显示“已提交意向”，后续由招商企业联系并按其对公方式收款。 ---- */
   var JOINED_KEY = 'engchain-franchise-joined';
   function readJoined() { try { return JSON.parse(localStorage.getItem(JOINED_KEY) || '{}'); } catch (e) { return {}; } }
   function writeJoined(o) { try { localStorage.setItem(JOINED_KEY, JSON.stringify(o)); } catch (e) {} }
@@ -839,26 +839,17 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     try { var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null; if (cu && cu.banned) { UI.toast('账号已被封禁，无法执行此操作', 'warn'); return; } } catch (e) {}
     var f = all.filter(function (x) { return x.id === fid; })[0];
     if (!f) return;
-    if (isJoined(fid)) { UI.toast('已提交加盟申请，等待品牌方审核', 'ok'); return; }
+    if (isJoined(fid)) { UI.toast('已提交加盟意向，等待招商企业联系', 'ok'); return; }
     var fee = franchiseFee(f);
-    var avail = window.BalanceStore ? BalanceStore.available() : 0;
     UI.dialog({
-      title: '申请加盟',
-      text: '加盟「' + (f.name || '') + '」需加盟费 <b style="color:var(--primary-dim)">¥' + fee.toLocaleString() + '</b>（模拟支付，从余额扣减）。当前可用余额 ¥' + avail.toLocaleString() + '。确认申请？',
-      ok: '确认支付加盟费', agree:true,agreeHref:'../agreement/user.html#franchise',agreeName:'加盟服务协议', cancel: '取消',
+      title: '提交加盟意向',
+      text: '加盟「' + (f.name || '') + '」的加盟费为 <b style="color:var(--primary-dim)">¥' + fee.toLocaleString() + '</b>，由招商企业自行定价、对公收取，平台不代收。提交意向后，招商企业将与您联系并按其对公账户或公布的方式收款。是否提交？',
+      ok: '提交意向', agree:true,agreeHref:'../agreement/user.html#franchise',agreeName:'加盟服务协议', cancel: '取消',
       onOk: function () {
-        if (avail < fee) { UI.toast('模拟支付：余额不足，请先充值', 'warn'); return; }
-        /* 经 BalanceStore 扣减（read→修改→write，Math.round 规整 + logs 记录） */
-        try {
-          var bs = BalanceStore.read();
-          bs.balance = Math.round((bs.balance - fee) * 100) / 100;
-          bs.logs.unshift({ type: 'franchise_join', amount: -fee, method: 'balance', reason: '加盟「' + (f.name || '') + '」加盟费', ts: Date.now(), status: 'success' });
-          BalanceStore.write(bs);
-        } catch (e) { UI.toast('支付失败：' + (e.message || e), 'err'); return; }
         var j = readJoined();
         j[fid] = { ts: Date.now(), fee: fee, name: f.name };
         writeJoined(j);
-        UI.toast('加盟费 ¥' + fee.toLocaleString() + ' 已支付，加盟申请已提交', 'ok');
+        UI.toast('加盟意向已提交；加盟费 ¥' + fee.toLocaleString() + ' 请按招商企业提供的方式对公支付，平台不代收', 'ok');
         renderList();
       }
     });
@@ -876,11 +867,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var hotCls = f.hot ? ' hot' : '';
     var joined = isJoined(f.id);
     var applyBtn = joined
-      ? '<span class="fc-view" style="background:var(--success-soft);color:var(--success);">已加盟 · 待审核</span>'
-      : '<button class="fc-view" style="border:none;cursor:pointer;font-family:inherit;" onclick="franchiseApply(\'' + f.id + '\',event)">申请加盟</button>';
+      ? '<span class="fc-view" style="background:var(--success-soft);color:var(--success);">已提交意向 · 待招商企业联系</span>'
+      : '<button class="fc-view" style="border:none;cursor:pointer;font-family:inherit;" onclick="franchiseApply(\'' + f.id + '\',event)">提交加盟意向</button>';
     return '<a href="../supply/detail.html?id=' + f.id + '" class="franchise-card' + hotCls + '">' +
       '<div class="fc-top">' + verifiedTag(f) + levelTag(f) + urgentTag(f) +
-        (joined ? '<span class="tag tag-success" style="margin-left:auto;">已加盟</span>' : '') +
+        (joined ? '<span class="tag tag-success" style="margin-left:auto;">意向已提交</span>' : '') +
         '</div>' +
       '<div class="fc-name">' + f.name + ' · ' + (f.qualCategory || f.qualType || '') + '</div>' +
       '<div class="fc-meta">' +
