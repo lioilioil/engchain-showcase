@@ -439,6 +439,18 @@ h2:hover .h-anchor,h3:hover .h-anchor,.h-anchor:focus-visible{opacity:1}
   .table-hint::after{content:" →";color:var(--brass)}
 }
 @media print{.table-hint{display:none!important}.toc-close{display:none!important}}
+/* ---------- 窄屏图解横滑 ---------- */
+.fig-scroll{position:relative}
+.fig-hint{display:none}
+@media (max-width:1023px){
+  .fig{overflow:visible}
+  .fig-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .fig-scroll iframe{width:960px;min-width:960px;height:600px}
+  .fig-hint{display:block;margin:0 0 8px;font-size:11.5px;color:var(--ink-3);letter-spacing:.03em}
+  .fig-hint::before{content:"← ";color:var(--brass)}
+  .fig-hint::after{content:" →";color:var(--brass)}
+}
+@media print{.fig-scroll{display:none}.fig-hint{display:none!important}}
 </style>
 
 
@@ -1119,6 +1131,23 @@ h2:hover .h-anchor,h3:hover .h-anchor,.h-anchor:focus-visible{opacity:1}
       });
     });
   }
+
+  /* ---- 窄屏图解改为整块横滑 ---- */
+  Array.prototype.slice.call(document.querySelectorAll('.fig iframe')).forEach(function (ifr) {
+    if (ifr.parentNode.classList && ifr.parentNode.classList.contains('fig-scroll')) return;
+    var box = document.createElement('div');
+    box.className = 'fig-scroll';
+    ifr.parentNode.insertBefore(box, ifr);
+    box.appendChild(ifr);
+    var fig = ifr.closest ? ifr.closest('.fig') : null;
+    var prev = fig ? fig.previousElementSibling : null;
+    if (fig && !(prev && prev.classList && prev.classList.contains('fig-hint'))) {
+      var hint = document.createElement('div');
+      hint.className = 'fig-hint';
+      hint.textContent = '左右滑动查看完整图解';
+      fig.parentNode.insertBefore(hint, fig);
+    }
+  });
 
   /* ---- 抽屉关闭按钮 ---- */
   if (nav) {
