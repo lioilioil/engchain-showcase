@@ -106,7 +106,7 @@ Engchain3.0/
     ├── databus.js         # DataBus 总线（用户表/订单/审批状态机/storage 事件联动）
     ├── domain.js          # 业务域（Rebate 返佣引擎/Mediation 托管）
     ├── delegates.js       # 委托服务（L1/L2/L3 流程 + ¥29.9 收银台）
-    ├── detail.js          # 供需/建企买卖详情/解锁/保证金
+    ├── detail.js          # 供需/建企买卖详情/解锁/转让诚意保证金
     └── common.js          # 通用工具（UI/格式化/事件）
 ```
 

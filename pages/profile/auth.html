@@ -373,6 +373,15 @@
   var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
 
+  /* 认证费按阶段取价（单一来源 ModeStore.certFee）：破冰期 ¥0、成熟期 ¥999·年。
+     列表卡片与详情页同口径，破冰期一律并列显示标准价，避免把限免读成永久免费。 */
+  var CERT_STD=(typeof MOCK.business.certification.enterprise==='number')?MOCK.business.certification.enterprise:999;
+  var CERT_FEE=(window.ModeStore&&ModeStore.certFee)?ModeStore.certFee():CERT_STD;
+  var CERT_STD_TXT='¥'+Number(CERT_STD).toLocaleString()+'/年';
+  var CERT_FEE_TXT=CERT_FEE>0?('¥'+Number(CERT_FEE).toLocaleString()+' / 年'):'¥0 / 年 · 破冰期限免';
+  var CERT_END=(window.ModeStore&&ModeStore.breakinEndAt)?ModeStore.breakinEndAt():'';
+  var CERT_DESC=CERT_FEE>0?('企业工商信息认证，认证服务费 '+CERT_STD_TXT):('企业工商信息认证，破冰期限时减免'+(CERT_END?('（至 '+CERT_END+'）'):'')+'，标准价 '+CERT_STD_TXT);
+
   /* 五类身份定义（name/desc/applyHref/detailHref 沿用真实页面；补充展示素材与静态说明） */
   var IDENTITY_DEFS = [
     { key:'realname', name:'个人认证', line:'F',
@@ -391,8 +400,8 @@
       applyHref:'auth-prep.html?type=partner', detailHref:'auth-partner.html?mode=detail',
       benefits:['获得专属分销合伙人资格','邀请好友成交可获得佣金','独立合伙人后台查看收益'] },
     { key:'enterprise', name:'企业工商认证', line:'E',
-      desc:'企业工商信息认证，认证服务费 ¥999/年',
-      img:IMG+'identity-enterprise.jpg', fee:'¥999 / 年', time:'1–3 工作日',
+      desc:CERT_DESC,
+      img:IMG+'identity-enterprise.jpg', fee:CERT_FEE_TXT, time:'1–3 工作日',
       applyHref:'auth-prep.html?type=enterprise', detailHref:'auth-enterprise.html',
       benefits:['获得官方企业可信标识','企业发布内容获更高可信度','可进一步开通企业入驻'] },
     { key:'entry', name:'企业入驻', line:'E',

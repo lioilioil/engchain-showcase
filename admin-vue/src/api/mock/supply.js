@@ -19,7 +19,7 @@ const seedSupply = [
   { id: 'SU009', cat: '服务商', dir: 'supply', title: '建筑资质升级代办 施工总承包二升一 全程服务', company: '四川××工程服务有限公司', location: '成都·高新', amount: '¥68,000', publisher: 'u2', status: 'on', ts: t(1), note: '' },
   { id: 'SU010', cat: '服务商', dir: 'supply', title: '安许代办/资质分立 西南区域 承诺制办理', company: '××企业管理咨询有限公司', location: '成都·武侯', amount: '¥25,000', publisher: 'u2', status: 'rejected', ts: t(6), note: '材料真实性存疑，请补充安许有效期证明' },
   { id: 'SU011', cat: '资质招商', dir: 'supply', title: '电力工程施工总承包一级 寻分公司合作', company: '贵州黔电电力工程有限公司', location: '贵阳·观山湖', amount: '10-30万/年', publisher: 'u1', status: 'on', ts: t(2), note: '' },
-  { id: 'SU012', cat: '资质招商', dir: 'supply', title: '建筑工程施工总承包一级 联营/分公司挂靠', company: '四川××建设集团有限公司', location: '成都·青羊', amount: '面议', publisher: 'u3', status: 'on', ts: t(5), note: '' },
+  { id: 'SU012', cat: '资质招商', dir: 'supply', title: '建筑工程施工总承包一级 联营/分公司合作', company: '四川××建设集团有限公司', location: '成都·青羊', amount: '面议', publisher: 'u3', status: 'on', ts: t(5), note: '' },
   { id: 'SU013', cat: '建企买卖', dir: 'supply', title: '公路工程施工总承包二级 建企整体转让', company: '××路桥建设工程有限公司', location: '成都·双流', amount: '¥580,000', publisher: 'u1', status: 'on', ts: t(3), note: '' },
   { id: 'SU014', cat: '建企买卖', dir: 'demand', title: '收购 水利水电施工总承包三级 带安许 川内', company: '成都××投资有限公司', location: '成都·成华', amount: '¥300,000', publisher: 'u5', status: 'pending', ts: t(0), note: '' },
   { id: 'SU015', cat: '招聘', dir: 'demand', title: '招聘 一级建造师（建筑工程） 成都 全职', company: '四川××建设有限公司', location: '成都·高新', amount: '薪资面议', publisher: 'u1', status: 'on', ts: t(1), note: '' },

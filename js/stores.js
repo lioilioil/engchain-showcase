@@ -257,7 +257,7 @@
      旧 type 字段保留为兼容别名（取 types[0]） */
   var EntryStore = makeStore('engchain-entry',
     { type: null, types: [], orderId: null, status: null, active: false, paidAt: 0, expireAt: 0,
-      depositType: null, depositPaid: 0, fee: 0, contact: '', tel: '', scope: '', submittedAt: 0, note: '',
+      fee: 0, contact: '', tel: '', scope: '', submittedAt: 0, note: '',
       /* [FEAT 9.2-2] 付费模式：once=一次性入驻 / yearly=年度订阅 */
       cycle: 'once',
       qualifications: [], intro: { founded: '', capital: '', staffSize: '', desc: '' },
@@ -516,32 +516,8 @@
     });
     return this.write(s);
   };
-  /* [FIX BM-007] 保证金冻结：available() 校验后 frozen += amt。 */
-  BalanceStore.freezeDeposit = function (amount, reason) {
-    var s = this.read(); var amt = Math.round(amount * 100) / 100;
-    if (amt <= 0) return s;
-    if (this.available() < amt) return null;
-    s.frozen = Math.round((s.frozen + amt) * 100) / 100;
-    s.logs.unshift({ type: 'freeze', amount: -amt, method: 'deposit', reason: reason || '保证金冻结', ts: Date.now() });
-    return this.write(s);
-  };
-  /* [FIX BM-007] 保证金解冻（驳回/退出）：frozen -= amt，余额不变。 */
-  BalanceStore.unfreezeDeposit = function (amount, reason) {
-    var s = this.read(); var amt = Math.round(amount * 100) / 100;
-    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
-    s.logs.unshift({ type: 'unfreeze', amount: amt, method: 'deposit', reason: reason || '保证金解冻', ts: Date.now() });
-    return this.write(s);
-  };
-  /* [FIX BM-007] 保证金转正（终审入驻）：frozen 划转至实缴 depositPaid（frozen -= amt 且 balance -= amt）。 */
-  BalanceStore.commitDeposit = function (amount, reason) {
-    var s = this.read(); var amt = Math.round(amount * 100) / 100;
-    /* [健壮性] 0 元保证金（演示/partner 审核制）不产生流水，与 consume/freeze/rebate 的 0 守卫一致 */
-    if (amt <= 0) return s;
-    s.frozen = Math.max(0, Math.round((s.frozen - amt) * 100) / 100);
-    s.balance = Math.max(0, Math.round((s.balance - amt) * 100) / 100);
-    s.logs.unshift({ type: 'deposit_paid', amount: -amt, method: 'deposit', reason: reason || '保证金缴纳', ts: Date.now() });
-    return this.write(s);
-  };
+  /* 入驻不收保证金：原先的冻结/解冻/转正三个资金方法已随规则取消移除，
+     钱包 frozen 仅由提现审核、封禁等真实冻结场景产生。 */
   BalanceStore.withdraw = function (amount, method, extra) {
     var s = this.read(); var amt = Math.round(amount * 100) / 100;
     if (s.balance - s.frozen < amt) return null;
@@ -1274,11 +1250,29 @@
 
   /* ---- 破冰期/成熟期模式（v1.2 §10.4；phase: breakin=破冰期 / normal=成熟期） ---- */
   var ModeStore = makeStore('engchain-mode', { phase: 'breakin' }, 'engchain:mode');
+  /* 破冰期截止日（breakin.endAt，含当日 23:59:59）。到期即视为成熟期，即使开关仍停在 breakin，
+     避免“限时减免”变成事实上的永久免费；延期只改配置，不改页面。 */
+  ModeStore.breakinEndAt = function () {
+    var b = (MOCK.business && MOCK.business.breakin) || {};
+    return b.endAt || '';
+  };
   ModeStore.isBreakIn = function () {
     var b = MOCK.business && MOCK.business.breakin;
-    return !!(b && b.enabled && this.read().phase === 'breakin');
+    if (!(b && b.enabled && this.read().phase === 'breakin')) return false;
+    var end = b.endAt ? new Date(String(b.endAt) + 'T23:59:59').getTime() : 0;
+    if (!end || isNaN(end)) return true;
+    return Date.now() <= end;
   };
   ModeStore.switch = function (phase) { return this.set({ phase: phase === 'normal' ? 'normal' : 'breakin' }); };
+  /* 认证费按阶段取价（单一来源）：破冰期读 breakin.certification（¥0），
+     成熟期读 certification.enterprise（¥999/年）。页面一律调本方法，不直接读配置值，
+     避免成熟期仍显示“免费提交审核”。企业认证按年，续费与首次提交同价。 */
+  ModeStore.certFee = function () {
+    var C = (MOCK.business && MOCK.business.certification) || {};
+    var b = (MOCK.business && MOCK.business.breakin) || {};
+    if (this.isBreakIn() && typeof b.certification === 'number') return b.certification;
+    return typeof C.enterprise === 'number' ? C.enterprise : 999;
+  };
 
   /* ---- v3.0 五身份叠加推导：返回结构化身份对象 ----
      个人线 personal: none=未认证 / verified=个人认证(实名) / professional=个人入驻(资质+简历)
@@ -2283,22 +2277,14 @@
     return { ok: true, sub: sub };
   };
   OpsStore.requestRefund = function (orderId) {
+    /* [规则统一] 运营包属订阅制虚拟服务，开通即生效，不支持退款；
+       仅系统重复扣款、支付故障等平台原因可经客服核查后原路退回。 */
     var r = this.rec();
     var hit = null;
     (r.rec.history || []).forEach(function (h) { if (h.id === orderId || h.orderNo === orderId) hit = h; });
     if (!hit) return { error: '订单不存在' };
-    if (hit.amount <= 0) return { error: '该订单无需退款' };
-    if (hit.status === 'refund_review') return { error: '退款申请已提交，请等待审核' };
-    if (hit.kind !== 'subscribe' && hit.kind !== 'renew') return { error: '该订单不支持自助退款' };
-    if (Date.now() - hit.ts > 7 * 86400000) return { error: '已超过 7 天自助退款时限，请联系客服' };
-    hit.status = 'refund_review';
-    r.rec.history.unshift({ id: this._id('RFH'), kind: 'refund', planKey: hit.planKey, planName: hit.planName, amount: 0, ts: Date.now(), note: '退款申请审核中 · 原订单 ' + hit.orderNo, orderNo: hit.orderNo, status: 'refund_review' });
-    this._writeRec(r.state, r.uid, r.rec);
-    var t = this.createTicket({
-      subject: '退款申请 · ' + hit.planName, category: '计费', priority: 'high',
-      detail: '订单号 ' + (hit.orderNo || hit.id) + '，支付金额 ¥' + hit.amount + '，申请原因：开通后未使用/不符合预期（演示）。'
-    });
-    return { ok: true, ticket: t, order: hit };
+    if (hit.status === 'refund_review' || hit.status === 'refunded') return { error: '该订单已有退款记录，以审核结论为准' };
+    return { error: '运营包开通即生效，不支持退款；如为重复扣款等平台原因，请联系客服核查' };
   };
   /* ---- 推送偏好 ---- */
   OpsStore.pushPrefs = function () {

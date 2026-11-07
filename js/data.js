@@ -928,7 +928,7 @@ window.MOCK = (function () {
     /* 提现限制 */
     withdraw: { singleMax: 1000, dailyMax: 2, fee: 0, arrive: '2 小时内到账' },
     /* 退款 */
-    refund: { days: 7, note: '7 天无理由退款保障' },
+    refund: { days: 7, note: '入驻与未使用道具 7 天退款保障；积分、会员与运营包开通即不退' },
     /* 合规信任背书 */
     compliance: {
       icp: '蜀ICP备2026000000号-1',
@@ -947,7 +947,9 @@ window.MOCK = (function () {
        待 M3/M5 页面迁移后收敛删除，避免阶段0破坏现有页面。 */
     /* 认证费（R1，按年） */
     /* [FEAT 9.2-3] 企业认证多维度资质核验：5项逐项提交/审核 */
-    certification: { personal: 0, enterprise: 0, qual: 0, enterpriseCycle: 'year',
+    /* 企业认证费 ¥999/年 为成熟期标准价；破冰期全免由 breakin.certification=0 提供，
+       两期取价统一走 ModeStore.certFee()，页面不直接读本字段 */
+    certification: { personal: 0, enterprise: 999, qual: 0, enterpriseCycle: 'year',
       dimensions: [
         { id: 'business', label: '营业执照', required: true },
         { id: 'legal', label: '法人身份', required: true },
@@ -1063,7 +1065,8 @@ window.MOCK = (function () {
       construction: { fee: 3999, cycle: 'once', label: '建筑企业', badge: '蓝V',
         yearly: { price: 3599, cycle: 'yearly', discount: 0.9 } },
       agency: { fee: 2999, cycle: 'once', label: '服务商企业', badge: '金V',
-        /* [PHASE 0] 入驻费重构为「深度认证年审费」：含人工能力评估+征信评估+案例核验+年度复审清退；建议参数（可调） */
+        /* [PHASE 0][2026-11-07] 入驻费只买发布与经营权益（金V、报价、服务橱窗），与认证费无关。
+           “深度认证年审费”这一别名已取消：年审以企业认证为单位，价目取 certification.enterprise（¥999/年）。 */
         yearly: { price: 2699, cycle: 'yearly', discount: 0.9 } }
       /* [M4-4] 旧企业合伙人 partner 入驻档位已摘除（个人合伙人 individualPartner 配置不受影响） */
     },
@@ -1088,12 +1091,14 @@ window.MOCK = (function () {
     /* 服务商佣金（Q4 + P0-5.1/5.2/5.4/6.1） */
     /* [PHASE 0] 已下线：平台不做资金托管/放款/交易抽成，不介入服务过程与交易资金。
        tier/intent/escrow/warranty 仅保留结构供历史数据兼容，新业务不再产生佣金/意向金/托管流水。
-       平台只做：信息发布与解锁、认证评估（基础免费+深度年审）、双向撮合。 */
+       平台只做：信息发布与解锁、认证评估（企业认证年费 + 年度复审，个人实名免费）、双向撮合。 */
     commission: {
       _phase0: { tradingEnabled: false, note: '纯信息撮合模式：平台不参与交易资金，不抽佣' },
       tier: [ { min: 0, rate: 0.08 }, { min: 50000, rate: 0.06 }, { min: 200000, rate: 0.05 }, { min: 500000, rate: 0.04 }, { min: 1000000, rate: 0.03 } ],
       minCommission: 100, /* [FIX BM-028] 佣金下限改为"最低单笔佣金 ¥100"（小额保护，全部订单生效） */
       milestone: { enable: true, minAmount: 50000, nodes: [0.3, 0.3, 0.3, 0.1], autoConfirmDays: 14, labels: ['合同签订', '服务进度50%', '验收', '质保期满'] },
+      /* 入驻不收保证金（2026-11 规则变更）。以下档位仅保留给"认证保证金（违规扣罚）"展示，该机制未启用，
+         不参与入驻提交、审核与资金划转。 */
       deposit: { basic: 5000, engineering: 20000, high: 50000 },
       jumpContract: { warn: true, chatBlockDays: 7, secondChatBlockDays: 30, firstPenalty: 5000, firstSuspendDays: 15, secondClear: true },
       settleNote: '成交后 T+1 结算',
@@ -1122,7 +1127,7 @@ window.MOCK = (function () {
         }
       },
       /* [FEAT 9.2-5][PHASE 0] 质保金改造为「认证保证金」：不挂钩交易赔付，仅作违规扣罚/虚假信息罚没/年审清退约束 */
-      warranty: { rate: 0.05, releaseDays: 30, label: '认证保证金', desc: '违规扣罚：虚假信息/跳单/年审不合格，从认证保证金扣罚；不挂钩交易赔付', _phase0: true },
+      warranty: { rate: 0.05, releaseDays: 30, label: '质保金（未启用）', desc: '未启用的历史计提设计：原拟从成交额计提 5% 作违规扣罚来源，账户中没有对应资金池，现行规则不扣罚保证金', _phase0: true },
       /* v4.0 托管单超时接单（[PHASE 0] 已下线：资金托管服务移除，仅保留结构供历史数据兼容） */
       escrow: { remindDays: 7, autoCancelDays: 15, label: '托管单接单超时', desc: '[PHASE 0] 已下线：平台不提供资金托管', _phase0: true },
       demandExpireDays: 7
@@ -1542,6 +1547,11 @@ window.MOCK = (function () {
     breakin: {
       enabled: true,
       entry: { construction: 0, agency: 1499 },
+      /* 破冰期企业认证 ¥0（成熟期标准价见 certification.enterprise）；两期取价走 ModeStore.certFee() */
+      certification: 0,
+      /* 破冰期结束日（含当日）：到期后 ModeStore.isBreakIn() 自动返回 false，页面与后台按成熟期标准价执行。
+         2026-11-07 由运营确认；延期只要改这一处，页面无需改动。 */
+      endAt: '2027-09-30',
       commissionFirstTier: 0.05,
       registerBonus: 2,
       monitorTrialDays: 7,
@@ -3193,7 +3203,7 @@ window.MOCK = (function () {
           { stage: '全套交付', pct: '50%', when: '执照/安许/资质全部交付' }
         ],
         include: ['工商注册与五章', '银行开户与税务报到', '安许新办全程', '首次资质定级', '不过按约退款'],
-        exclude: ['注册地址挂靠费（如需）', '官方规费与刻章费', '人员社保实缴']
+        exclude: ['注册地址托管费（如需）', '官方规费与刻章费', '人员社保实缴']
       },
       cases: [
         { caseCompany: '贵阳某劳务有限公司', caseQual: '施工劳务 + 安许', caseLevel: '新办', caseCycle: '15 天办结注册、45 天拿安许', caseResult: '注册+安许+首级资质一并交付', caseDate: '2025-12', verifyUrl: '可提供营业执照与安许证号核验' }
@@ -3935,10 +3945,10 @@ window.MOCK = (function () {
   const personnels = [
     {
       id: 'p1', bizType: '资质人员', cat: '资质', sub: '一级建造师', verified: true, hot: true,
-      title: '急需一级建造师（建筑/市政）持证合作 挂靠或全职',
+      title: '急需一级建造师（建筑/市政）持证全职合作 · 唯一社保',
       budget: '¥40,000', unit: '年/证 · 面议', location: '成都·天府新区', city: '成都', distance: '8.4km',
-      tags: ['一级建造师', '可挂靠', '唯一社保', '急转'], time: ago(22), views: 0, match: 0, companyId: 'c-znzjs',
-      desc: '总承包一级项目缺口，诚邀持一级建造师（建筑工程/市政）人员合作，可挂靠或全职入册，报酬面议，唯一社保优先，配合项目出场。',
+      tags: ['一级建造师', '全职合作', '唯一社保', '急转'], time: ago(22), views: 0, match: 0, companyId: 'c-znzjs',
+      desc: '总承包一级项目缺口，诚邀持一级建造师（建筑工程/市政）人员合作，全职入册或项目合作，报酬面议，唯一社保优先，配合项目出场。',
       /* —— 20 新字段 —— */
       jobType: '证书合作（可转全职）',
       certLevel: '一级', certMajor: '建筑工程',
@@ -3982,7 +3992,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 6 万/年',
         projectBonus: '项目奖金约 3 万/年',
         annualBonus: '年终绩效约 2 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥40,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥40,000；全职含上述全部结构'
       },
       qual: '需求方持「建筑工程施工总承包一级」，建造师岗位可入册，平台核验资格证书与社保记录。',
       certType: '建造师', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '高级职称',
@@ -4049,7 +4059,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥30,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥30,000；全职含上述全部结构'
       },
       qual: '需求方为市政工程施工企业，监理岗位可入册，平台核验执业证书。',
       certType: '监理工程师', registerStatus: '已注册', socialSecurity: '不强制', titleLevel: '中级职称',
@@ -4069,10 +4079,10 @@ window.MOCK = (function () {
     },
     {
       id: 'p3', bizType: '资质人员', cat: '资质', sub: '二级建造师', verified: true, hot: true,
-      title: '十局建工 · 急聘二级建造师（市政公用）全职或挂靠',
+      title: '十局建工 · 急聘二级建造师（市政公用）全职/项目合作',
       budget: '¥15,000', unit: '年/证 · 面议', location: '成都·武侯', city: '成都', distance: '5.2km',
-      tags: ['二级建造师', '市政', '急聘', '可挂靠'], time: ago(6), views: 0, match: 0, companyId: 'c-cdrj',
-      desc: '市政公用工程施工总承包二级企业，多个在建项目需求二级建造师（市政）持证人员，可全职或挂靠，社保可配合转入，急聘。',
+      tags: ['二级建造师', '市政', '急聘', '全职合作'], time: ago(6), views: 0, match: 0, companyId: 'c-cdrj',
+      desc: '市政公用工程施工总承包二级企业，多个在建项目需求二级建造师（市政）持证人员，可全职或项目合作，社保可配合转入，急聘。',
       /* —— 20 新字段 —— */
       jobType: '证书合作（可转全职）',
       certLevel: '二级', certMajor: '市政公用工程',
@@ -4116,7 +4126,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥15,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥15,000；全职含上述全部结构'
       },
       qual: '需求方持「市政公用工程施工总承包二级」，岗位可入册，平台核验资格证书。',
       certType: '建造师', registerStatus: '初始注册', socialSecurity: '可配合', titleLevel: '中级职称',
@@ -4183,7 +4193,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥18,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥18,000；全职含上述全部结构'
       },
       qual: '需求方持「电力工程施工总承包一级」，造价岗位可入册，平台核验执业证书。',
       certType: '造价工程师', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '中级职称',
@@ -4250,7 +4260,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥12,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥12,000；全职含上述全部结构'
       },
       qual: '需求方持「公路工程施工总承包二级」，安全岗位可入册，平台核验执业证书。',
       certType: '安全工程师', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '初级职称',
@@ -4317,7 +4327,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 6 万/年',
         projectBonus: '项目奖金约 3 万/年',
         annualBonus: '年终绩效约 2 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥20,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥20,000；全职含上述全部结构'
       },
       qual: '需求方持「消防设施工程专业承包一级」，消防岗位可入册，平台核验执业证书。',
       certType: '消防工程师', registerStatus: '已注册', socialSecurity: '不强制', titleLevel: '中级职称',
@@ -4384,7 +4394,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 8 万/年',
         projectBonus: '项目奖金约 4 万/年',
         annualBonus: '年终绩效约 1 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥28,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥28,000；全职含上述全部结构'
       },
       qual: '需求方持「建筑行业（建筑工程）甲级」设计资质，结构岗位可入册，平台核验执业证书。',
       certType: '结构工程师', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '高级职称',
@@ -4451,7 +4461,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥18,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥18,000；全职含上述全部结构'
       },
       qual: '需求方持「市政公用工程监理甲级」资质，总监岗位可入册，平台核验执业证书。',
       certType: '监理工程师', registerStatus: '已注册', socialSecurity: '可配合', titleLevel: '高级职称',
@@ -4518,7 +4528,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 9 万/年',
         projectBonus: '项目奖金约 4 万/年',
         annualBonus: '年终绩效约 2 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥35,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥35,000；全职含上述全部结构'
       },
       qual: '需求方持「建筑行业（建筑工程）甲级」设计资质，建筑师岗位可入册，平台核验执业证书。',
       certType: '建筑师', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '高级职称',
@@ -4541,7 +4551,7 @@ window.MOCK = (function () {
       title: '蜀电安装 · 急聘注册电气工程师（供配电）机电项目',
       budget: '¥22,000', unit: '年 · 面议', location: '成都·双流', city: '成都', distance: '—',
       tags: ['注册电气', '供配电', '急聘', '机电安装'], time: ago(15), views: 0, match: 0, companyId: 'c-sczl',
-      desc: '机电安装工程专业承包一级企业，多个在建机电项目需求注册电气工程师（供配电）持证合作，可全职或挂靠，负责电气设计审核与现场技术指导，急聘。',
+      desc: '机电安装工程专业承包一级企业，多个在建机电项目需求注册电气工程师（供配电）持证合作，可全职或项目合作，负责电气设计审核与现场技术指导，急聘。',
       /* —— 20 新字段 —— */
       jobType: '证书合作（可转全职）',
       certLevel: '不分等级', certMajor: '供配电',
@@ -4585,7 +4595,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 6 万/年',
         projectBonus: '项目奖金约 3 万/年',
         annualBonus: '年终绩效约 2 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥22,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥22,000；全职含上述全部结构'
       },
       qual: '需求方持「机电安装工程专业承包一级」，电气岗位可入册，平台核验执业证书。',
       certType: '电气工程师', registerStatus: '初始注册', socialSecurity: '可配合', titleLevel: '中级职称',
@@ -4652,7 +4662,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥18,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥18,000；全职含上述全部结构'
       },
       qual: '需求方持「建筑行业（建筑工程）甲级」设计资质，暖通岗位可入册，平台核验执业证书。',
       certType: '公用设备工程师', registerStatus: '已注册', socialSecurity: '可配合', titleLevel: '中级职称',
@@ -4719,7 +4729,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 6 万/年',
         projectBonus: '项目奖金约 3 万/年',
         annualBonus: '年终绩效约 2 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥25,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥25,000；全职含上述全部结构'
       },
       qual: '需求方持「工程勘察专业甲级」资质，岩土岗位可入册，平台核验执业证书。',
       certType: '土木工程师（岩土）', registerStatus: '可转注册', socialSecurity: '可配合', titleLevel: '高级职称',
@@ -4786,7 +4796,7 @@ window.MOCK = (function () {
         certSubsidy: '证书补贴 4 万/年',
         projectBonus: '项目奖金约 2 万/年',
         annualBonus: '年终绩效约 0 万/年',
-        note: '证书合作（挂靠）按证书单独计费，参考 ¥16,000；全职含上述全部结构'
+        note: '证书项目合作按证书单独计费，参考 ¥16,000；全职含上述全部结构'
       },
       qual: '需求方持「城乡规划编制甲级」资质，规划岗位可入册，平台核验执业证书。',
       certType: '城乡规划师', registerStatus: '未注册', socialSecurity: '可配合', titleLevel: '中级职称',
@@ -5682,26 +5692,26 @@ window.MOCK = (function () {
         },
         files: [{ name: '用车说明.docx', size: '18KB', summary: '含车次、租期、结算方式说明，完整内容解锁后查看。' }]
       },
-      /* 4) franchise-demand 加盟/挂靠意向 #1 */
+      /* 4) franchise-demand 项目合作意向 #1 */
       {
         id: 'B-FD-01', typeKey: 'franchise-demand', bizKey: 'franchise', role: 'demand', detailLevel: 'brief',
-        cat: '资质招商', title: '个人带项目 寻求建筑工程总包一级公司 单项目合作/资质挂靠 川内',
-        subCate: '挂靠意向', sub: '单项目合作', location: '成都市·武侯区', city: '成都',
+        cat: '资质招商', title: '个人带项目 寻求建筑工程总包一级公司 单项目合作 川内',
+        subCate: '项目合作意向', sub: '单项目合作', location: '成都市·武侯区', city: '成都',
         price: '', budget: '面议', unit: '',
         desc: '手上有房建标段意向，寻求施工总承包一级或市政一级总公司谈单项目合作，可接受合理管理费与保证金，希望流程透明、对公走账。',
         detail: '手上有房建标段意向，寻求施工总承包一级或市政一级总公司谈单项目合作，可接受合理管理费与保证金，希望流程透明、对公走账。',
-        tags: ['单项目合作', '找挂靠', '川内'],
+        tags: ['单项目合作', '找项目合作', '川内'],
         contact: { name: '蒋先生', phone: '135****3321', wechat: 'jiangxz99' },
         address: '', privacyContact: true, verified: false, status: 'active', ts: nowTs, updatedAt: nowTs, match: 89, views: 97,
         aiAnalysis: {
-          text: '个人带项目 寻求建筑工程总包一级公司 单项目合作/资质挂靠 川内',
-          tags: [{ k: '品类', v: '资质招商' }, { k: '地区', v: '四川' }, { k: '意向', v: '单项目合作/挂靠' }, { k: '期望资质', v: '施工总承包一级' }],
-          summary: '系统判定为「加盟或单项目挂靠-需求」意向，已为你匹配可开放合作的总公司，解锁后可对接招商负责人。',
+          text: '个人带项目 寻求建筑工程总包一级公司 单项目合作 川内',
+          tags: [{ k: '品类', v: '资质招商' }, { k: '地区', v: '四川' }, { k: '意向', v: '单项目合作' }, { k: '期望资质', v: '施工总承包一级' }],
+          summary: '系统判定为「项目合作-需求」意向，已为你匹配可开放合作的总公司，解锁后可对接招商负责人。',
           matchCount: 4
         },
         files: [{ name: '项目意向说明.pdf', size: '42KB', summary: '项目概况与合作诉求说明，完整内容解锁后查看。' }]
       },
-      /* 5) franchise-demand 加盟/挂靠意向 #2 */
+      /* 5) franchise-demand 项目合作意向 #2 */
       {
         id: 'B-FD-02', typeKey: 'franchise-demand', bizKey: 'franchise', role: 'demand', detailLevel: 'brief',
         cat: '资质招商', title: '区县施工队 想加盟消防/装修公司 拿区域授权 长期合作',
@@ -5715,7 +5725,7 @@ window.MOCK = (function () {
         aiAnalysis: {
           text: '区县施工队 想加盟消防/装修公司 拿区域授权 长期合作',
           tags: [{ k: '品类', v: '资质招商' }, { k: '地区', v: '南充' }, { k: '意向', v: '区域加盟' }, { k: '方向', v: '消防/装修' }],
-          summary: '系统判定为「加盟或单项目挂靠-需求」意向，已匹配开放加盟的品牌总部，解锁后可查看加盟政策。',
+          summary: '系统判定为「项目合作-需求」意向，已匹配开放加盟的品牌总部，解锁后可查看加盟政策。',
           matchCount: 2
         },
         files: []

@@ -103,14 +103,14 @@ window.DataBus = (function () {
         mobile:'13800001234', avatar:'陈', tag:'入驻企业 · 建筑', status:'resident',
         identity:{ personal:'verified', enterprise:'resident', entryTypes:['construction'] },
         auth:{ realname:{ok:true,ts:now-DAY*30,name:'陈建国',idNo:'',mobile:'138****1234',idMask:''}, enterprise:{ok:true,expireAt:now+YEAR,co:'四川省××建设有限公司',code:'91510100MA6×××12X',legal:'陈建国',shortName:'川×建设',nameBasis:'品牌简称',nameProof:[],region:'四川省·成都市',registeredAddress:'成都市武侯区天府大道北段1700号',address:'成都市武侯区天府大道北段1700号',contactName:'陈建国',contactPhone:'13800001234',contactWechat:'cj_franchise',dimensions:{business:{status:'approved',submittedAt:now-DAY*60,files:[{name:'营业执照'}]},legal:{status:'approved',submittedAt:now-DAY*58,files:[{name:'法定代表人身份证'}]},qualification:{status:'approved',submittedAt:now-DAY*55,files:[{name:'建筑工程施工总承包贰级证书'},{name:'市政公用工程施工总承包叁级证书'}]},bank:{status:'approved',submittedAt:now-DAY*50,files:[{name:'开户许可证'}]},office:{status:'approved',submittedAt:now-DAY*48,files:[{name:'办公场所证明'}]}}}, personalQual:{ok:false,list:[]}, enterpriseQual:{ok:true,list:['建筑业企业资质 · 建筑工程施工总承包贰级']}, qual:{ok:true,list:['建筑业企业资质 · 建筑工程施工总承包贰级']}, payment:{ok:true,ts:now-DAY*60} },
-        entry:{ type:'construction', types:['construction'], orderId:'EN20260601001', status:'active', active:true, paidAt:now-DAY*60, expireAt:now+YEAR, depositType:'basic', depositPaid:5000, fee:2980, contact:'陈建国', tel:'13800001234', scope:'房屋建筑工程 · 市政公用工程 · 建筑装修装饰工程 · 机电设备安装工程 · 建筑幕墙工程 · 钢结构工程 · 地基基础工程 · 环保工程 · 城市及道路照明工程 · 特种工程（结构补强）', qualifications:[{name:'建筑工程施工总承包',level:'贰级',no:'D2510××××',expireAt:'2027-12-31',image:''},{name:'市政公用工程施工总承包',level:'叁级',no:'D3510××××',expireAt:'2026-06-30',image:''}], intro:{founded:'2008',capital:'5000',staffSize:'101-500人',desc:'四川省××建设有限公司成立于2008年，是一家集房屋建筑、市政公用、装饰装修、机电安装于一体的综合性建筑施工企业。公司注册资本5000万元，拥有建筑工程施工总承包贰级、市政公用工程施工总承包叁级等多项资质。现有员工300余人，其中高级工程师20人，一级建造师15人，二级建造师30人。公司先后承建了成都天府新区多个重点项目，累计施工面积超过200万平方米，工程合格率100%，多次获得"四川省优质工程奖"、"成都市安全文明工地"等荣誉。公司秉承"质量第一、信誉至上"的经营理念，致力于为客户提供优质、高效、安全的建筑服务。'}, cases:[{name:'成都天府新区××商业综合体项目',type:'房屋建筑',amount:'32000',startDate:'2023-03-01',endDate:'2025-06-30',desc:'项目位于成都天府新区核心商务区，总建筑面积约18万平方米，包含两栋甲级写字楼、一栋商业裙楼及地下三层车库。我司承担总承包施工，涵盖基坑支护、主体结构、机电安装、装饰装修全流程。项目采用BIM技术进行全过程管理，荣获2024年度四川省建设工程"天府杯"银奖。施工期间实现零安全事故，主体结构提前45天封顶。',images:[]},{name:'成都市××市政道路改造工程',type:'市政公用',amount:'8600',startDate:'2022-05-01',endDate:'2023-11-30',desc:'项目对成都市武侯区三条主干道进行综合改造，道路总长4.2公里，包含路面翻新、雨污管网分流、绿化景观提升、照明系统更新及交通设施完善。施工期间采用半幅通行方案，最大限度减少对市民出行的影响。项目竣工验收评定为优良工程。',images:[]}], address:{province:'四川省',city:'成都市',district:'武侯区',detail:'天府大道北段××号××大厦15楼'}, website:'https://www.sc-jianshe.example.com', attachments:[] },
+        entry:{ type:'construction', types:['construction'], orderId:'EN20260601001', status:'active', active:true, paidAt:now-DAY*60, expireAt:now+YEAR, fee:2980, contact:'陈建国', tel:'13800001234', scope:'房屋建筑工程 · 市政公用工程 · 建筑装修装饰工程 · 机电设备安装工程 · 建筑幕墙工程 · 钢结构工程 · 地基基础工程 · 环保工程 · 城市及道路照明工程 · 特种工程（结构补强）', qualifications:[{name:'建筑工程施工总承包',level:'贰级',no:'D2510××××',expireAt:'2027-12-31',image:''},{name:'市政公用工程施工总承包',level:'叁级',no:'D3510××××',expireAt:'2026-06-30',image:''}], intro:{founded:'2008',capital:'5000',staffSize:'101-500人',desc:'四川省××建设有限公司成立于2008年，是一家集房屋建筑、市政公用、装饰装修、机电安装于一体的综合性建筑施工企业。公司注册资本5000万元，拥有建筑工程施工总承包贰级、市政公用工程施工总承包叁级等多项资质。现有员工300余人，其中高级工程师20人，一级建造师15人，二级建造师30人。公司先后承建了成都天府新区多个重点项目，累计施工面积超过200万平方米，工程合格率100%，多次获得"四川省优质工程奖"、"成都市安全文明工地"等荣誉。公司秉承"质量第一、信誉至上"的经营理念，致力于为客户提供优质、高效、安全的建筑服务。'}, cases:[{name:'成都天府新区××商业综合体项目',type:'房屋建筑',amount:'32000',startDate:'2023-03-01',endDate:'2025-06-30',desc:'项目位于成都天府新区核心商务区，总建筑面积约18万平方米，包含两栋甲级写字楼、一栋商业裙楼及地下三层车库。我司承担总承包施工，涵盖基坑支护、主体结构、机电安装、装饰装修全流程。项目采用BIM技术进行全过程管理，荣获2024年度四川省建设工程"天府杯"银奖。施工期间实现零安全事故，主体结构提前45天封顶。',images:[]},{name:'成都市××市政道路改造工程',type:'市政公用',amount:'8600',startDate:'2022-05-01',endDate:'2023-11-30',desc:'项目对成都市武侯区三条主干道进行综合改造，道路总长4.2公里，包含路面翻新、雨污管网分流、绿化景观提升、照明系统更新及交通设施完善。施工期间采用半幅通行方案，最大限度减少对市民出行的影响。项目竣工验收评定为优良工程。',images:[]}], address:{province:'四川省',city:'成都市',district:'武侯区',detail:'天府大道北段××号××大厦15楼'}, website:'https://www.sc-jianshe.example.com', attachments:[] },
         balance:{ balance:1286.50, frozen:200, totalIn:13486.50 },
         credits:{ balance:2350, quota:{ month:'', used:0 } } },
       { id:'u2', name:'李雅', company:'四川××工程服务有限公司', account:'liya@engchain.cn', pwd:'demo8888',
         mobile:'13700002345', avatar:'李', tag:'入驻企业 · 服务商', status:'resident',
         identity:{ personal:'verified', enterprise:'resident', entryTypes:['agency'] },
         auth:{ realname:{ok:true,ts:now-DAY*45}, enterprise:{ok:true,expireAt:now+YEAR}, personalQual:{ok:false,list:[]}, enterpriseQual:{ok:true,list:['房地产经纪机构备案','工程造价咨询乙级']}, qual:{ok:true,list:['房地产经纪机构备案','工程造价咨询乙级']}, payment:{ok:true,ts:now-DAY*40} },
-        entry:{ type:'agency', types:['agency'], orderId:'EN20260615001', status:'active', active:true, paidAt:now-DAY*40, expireAt:now+YEAR, depositType:'engineering', depositPaid:20000 },
+        entry:{ type:'agency', types:['agency'], orderId:'EN20260615001', status:'active', active:true, paidAt:now-DAY*40, expireAt:now+YEAR },
         balance:{ balance:8600, frozen:1200, totalIn:51200 },
         credits:{ balance:1200, quota:{ month:'', used:0 } } },
       { id:'u3', name:'王强', company:'××工程咨询有限公司', account:'wangqiang@engchain.cn', pwd:'demo8888',
@@ -185,7 +185,7 @@ window.DataBus = (function () {
           enterpriseQual:{ok:true,list:['平台运营资质']},
           qual:{ok:true,list:['平台运营管理员资质']},
           payment:{ok:true,ts:now-DAY*365} },
-        entry:{ type:'construction', types:['construction','agency'], orderId:'PLAT-0001', status:'active', active:true, paidAt:now-DAY*365, expireAt:now+YEAR, depositType:'basic', depositPaid:0, fee:0, contact:'周平台', tel:'13000000000', scope:'平台运营治理', qualifications:[], intro:{founded:'2026',capital:'-',staffSize:'平台方',desc:'工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。'}, cases:[], address:{province:'四川省',city:'成都市',district:'高新区',detail:'平台路1号'}, website:'', attachments:[] },
+        entry:{ type:'construction', types:['construction','agency'], orderId:'PLAT-0001', status:'active', active:true, paidAt:now-DAY*365, expireAt:now+YEAR, fee:0, contact:'周平台', tel:'13000000000', scope:'平台运营治理', qualifications:[], intro:{founded:'2026',capital:'-',staffSize:'平台方',desc:'工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。'}, cases:[], address:{province:'四川省',city:'成都市',district:'高新区',detail:'平台路1号'}, website:'', attachments:[] },
         balance:{ balance:0, frozen:0, totalIn:0 },
         credits:{ balance:0, quota:{ month:'', used:0 } } }
     ];
@@ -403,9 +403,8 @@ window.DataBus = (function () {
            App 端（同源 iframe）经 storage 事件 / preview refreshAll 即时派生；非当前登录仅写用户表，
            下次登录 login(id) 时自然读到新状态。 */
   var ENTRYFEE_KEY = 'engchain-entry-fees';
-  /* [M4-4] 旧企业合伙人 partner 已摘除；TYPE_LABEL/DEPOSIT_TYPE 仅保留建筑/服务商（个人合伙人走 auth.partner，不在此表） */
+  /* [M4-4] 旧企业合伙人 partner 已摘除；TYPE_LABEL 仅保留建筑/服务商（个人合伙人走 auth.partner，不在此表） */
   var TYPE_LABEL = { construction: '建筑企业', agency: '服务商企业' };
-  var DEPOSIT_TYPE = { construction: 'basic', agency: 'engineering' };
   function statusOf(u) {
     if (u.banned) return 'banned';
     /* v3.0：优先使用 identity 结构化字段，回退旧字段兼容 */
@@ -618,16 +617,11 @@ window.DataBus = (function () {
     var fee = entryFeeOf(type);
     var t = Date.now();
     var orderId = 'EN2026' + String(t).slice(-5);
-    var dep = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.deposit) ? MOCK.business.commission.deposit : { basic: 5000, engineering: 20000, high: 50000 };
     var prevE = u.entry || {};
     var prevTypes = (prevE.types && prevE.types.length) ? prevE.types : (prevE.type ? [prevE.type] : []);
     if (prevTypes.indexOf(type) < 0) prevTypes.push(type);
-    /* [FIX BM-007] 修复：原终审凭空写 depositPaid=5000/20000/50000（未真实缴纳）。
-       现取 entryApply 时记录的 depositAmount（已冻结），终审时从 BalanceStore.frozen 划转至实缴。 */
-    var depTypeFinal = prevE.depositType || DEPOSIT_TYPE[type] || 'basic';
-    var depAmountFinal = Math.round(((typeof prevE.depositAmount === 'number') ? prevE.depositAmount : (dep[depTypeFinal] || 0)) * 100) / 100;
-    try { if (window.BalanceStore && depAmountFinal > 0 && current() && current().id === u.id) BalanceStore.commitDeposit(depAmountFinal, '入驻保证金转正 · ' + entryLabel(type)); } catch (eCommit) { console.warn('commitDeposit error', eCommit); }
-    u.entry = { type: type, types: prevTypes, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: depTypeFinal, depositAmount: depAmountFinal, depositPaid: depAmountFinal, auditPass: type === 'partner', firstBy: prevE.firstBy || '', firstAt: prevE.firstAt || 0, submittedAt: prevE.submittedAt || 0, contact: prevE.contact || '', tel: prevE.tel || '', scope: prevE.scope || '', fee: prevE.fee || fee };
+    /* 入驻不收取保证金：终审只确认入驻生效，不产生保证金冻结、划转或流水。 */
+    u.entry = { type: type, types: prevTypes, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, auditPass: type === 'partner', firstBy: prevE.firstBy || '', firstAt: prevE.firstAt || 0, submittedAt: prevE.submittedAt || 0, contact: prevE.contact || '', tel: prevE.tel || '', scope: prevE.scope || '', fee: prevE.fee || fee };
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     var fees = [];
@@ -645,15 +639,11 @@ window.DataBus = (function () {
     var fee = entryFeeOf(type);
     var t = Date.now();
     var orderId = 'EN2026' + String(t).slice(-5);
-    var dep = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.deposit) ? MOCK.business.commission.deposit : { basic: 5000, engineering: 20000, high: 50000 };
     var prevE2 = u.entry || {};
     var prevTypes2 = (prevE2.types && prevE2.types.length) ? prevE2.types : (prevE2.type ? [prevE2.type] : []);
     if (prevTypes2.indexOf(type) < 0) prevTypes2.push(type);
-    /* [FIX BM-007] 同上：单级直通审批也从已冻结保证金划转，不凭空写 depositPaid。 */
-    var depTypeAppr = prevE2.depositType || DEPOSIT_TYPE[type] || 'basic';
-    var depAmountAppr = Math.round(((typeof prevE2.depositAmount === 'number') ? prevE2.depositAmount : (dep[depTypeAppr] || 0)) * 100) / 100;
-    try { if (window.BalanceStore && depAmountAppr > 0 && current() && current().id === u.id) BalanceStore.commitDeposit(depAmountAppr, '入驻保证金转正 · ' + entryLabel(type)); } catch (eCommit2) { console.warn('commitDeposit error', eCommit2); }
-    u.entry = { type: type, types: prevTypes2, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, depositType: depTypeAppr, depositAmount: depAmountAppr, depositPaid: depAmountAppr, auditPass: type === 'partner', submittedAt: prevE2.submittedAt || 0, contact: prevE2.contact || '', tel: prevE2.tel || '', scope: prevE2.scope || '', fee: prevE2.fee || fee };
+    /* 单级直通审批同样不涉及保证金。 */
+    u.entry = { type: type, types: prevTypes2, orderId: orderId, status: 'active', active: true, paidAt: t, expireAt: t + YEAR, auditPass: type === 'partner', submittedAt: prevE2.submittedAt || 0, contact: prevE2.contact || '', tel: prevE2.tel || '', scope: prevE2.scope || '', fee: prevE2.fee || fee };
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     var fees = [];
@@ -672,8 +662,8 @@ window.DataBus = (function () {
     u.entry.status = 'rejected'; u.entry.note = note || '资料不齐，请补充后重新提交'; u.entry.active = false;
     u.entry.rejectLevel = level || (prevStatus === 'first_ok' ? 'final' : 'first');
     u.entry.rejectedAt = Date.now();
-    /* [FIX BM-006] 修复：原入驻驳回不退费。已支付入驻费且未退款时退回 BalanceStore；
-       已冻结保证金一并解冻。 */
+    /* [FIX BM-006] 修复：原入驻驳回不退费。已支付入驻费且未退款时退回 BalanceStore。
+       入驻不收保证金，驳回只需退入驻费。 */
     if (!u.entry.feeRefunded) {
       var entryFee = Math.round((u.entry.fee || 0) * 100) / 100;
       if (entryFee > 0) {
@@ -687,12 +677,6 @@ window.DataBus = (function () {
           }
         } catch (eEntryRef) { console.warn('entryReject fee refund error', eEntryRef); }
         u.entry.feeRefunded = true;
-      }
-      var depAmt = Math.round((u.entry.depositAmount || 0) * 100) / 100;
-      if (depAmt > 0) {
-        try { if (window.BalanceStore) BalanceStore.unfreezeDeposit(depAmt, '入驻驳回 · 保证金解冻'); } catch (eDep) { console.warn('entryReject unfreeze error', eDep); }
-        u.entry.depositAmount = 0;
-        u.entry.depositPaid = 0;
       }
     }
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
@@ -819,10 +803,6 @@ window.DataBus = (function () {
     /* [FIX BM-009] 余额判断统一用 BalanceStore.available()（=balance-frozen），排除冻结资金 */
     if (fee && window.BalanceStore && BalanceStore.available() < fee) return { error: '余额不足，请先充值后再支付入驻费' };
     var t = Date.now();
-    /* [FIX BM-007] 保证金项选择：payload.depositType 决定保证金档位，提交时真实冻结 */
-    var depCfg = (window.MOCK && MOCK.business && MOCK.business.commission && MOCK.business.commission.deposit) ? MOCK.business.commission.deposit : { basic: 5000, engineering: 20000, high: 50000 };
-    var depTypeChosen = payload.depositType || DEPOSIT_TYPE[type] || 'basic';
-    var depAmountChosen = Math.round((depCfg[depTypeChosen] || 0) * 100) / 100;
     if (fee && window.BalanceStore) {
       /* [FIX BM-008] 入驻费经 BalanceStore.consume 扣减并写 logs type='entry' */
       var consumeR = BalanceStore.consume(fee, 'entry', { method: 'balance', remark: '入驻费 · ' + entryLabel(type) });
@@ -832,23 +812,11 @@ window.DataBus = (function () {
     } else if (fee && u.balance) {
       u.balance.balance = Math.round((u.balance.balance - fee) * 100) / 100;
     }
-    /* [FIX BM-007] 冻结保证金（partner 免费审核制不收保证金） */
-    if (type !== 'partner' && depAmountChosen > 0 && window.BalanceStore) {
-      var fr = BalanceStore.freezeDeposit(depAmountChosen, '入驻保证金冻结 · ' + entryLabel(type));
-      if (!fr) {
-        /* 保证金不足：回滚已扣入驻费 */
-        if (fee && window.BalanceStore) BalanceStore.refund(fee, '保证金不足 · 入驻费回滚', { method: 'balance' });
-        return { error: '保证金可用余额不足，请先充值' };
-      }
-      var bsF = BalanceStore.read();
-      u.balance = u.balance || {}; u.balance.balance = bsF.balance; u.balance.frozen = bsF.frozen;
-    }
     /* 保留历史已申请/已入驻类型（含并行类型与驳回重提场景） */
     var prevTypes = (u.entry && u.entry.types && u.entry.types.length) ? u.entry.types.slice() : (u.entry && u.entry.type ? [u.entry.type] : []);
     var types = prevTypes.indexOf(type) < 0 ? prevTypes.concat(type) : prevTypes;
     u.entry = { type: type, types: types, orderId: null, status: 'pending', active: false,
       paidAt: (type === 'partner') ? 0 : t, fee: fee || 0,
-      depositType: depTypeChosen, depositAmount: depAmountChosen, depositPaid: 0,
       contact: payload.contact || '', tel: payload.tel || '', scope: payload.scope || '',
       qualifications: payload.qualifications || [],
       intro: payload.intro || { founded: '', capital: '', staffSize: '', desc: '' },
@@ -861,7 +829,7 @@ window.DataBus = (function () {
     recomputeIdentity(u); u.status = statusOf(u); u.tag = tagOf(u);
     saveUsersPatch(u);
     syncSnapshotIfCurrent(u);
-    audit('提交入驻申请', '入驻审核', u.name, entryLabel(type) + (fee ? ' · 入驻费 ¥' + fee : ' · 后台审核制') + (depAmountChosen ? ' · 保证金冻结 ¥' + depAmountChosen : ''));
+    audit('提交入驻申请', '入驻审核', u.name, entryLabel(type) + (fee ? ' · 入驻费 ¥' + fee : ' · 后台审核制'));
     return { ok: true, entry: u.entry };
   }
   /* [FIX BM-033] 封禁时冻结全部可用余额并写 logs，解封时恢复；
@@ -948,7 +916,7 @@ window.DataBus = (function () {
       { id:'SU009', cat:'服务商', dir:'supply', title:'建筑资质升级代办 施工总承包二升一 全程服务', company:'四川××工程服务有限公司', location:'成都·高新', amount:'¥68,000', publisher:'u2', status:'on', ts:t(1), note:'' },
       { id:'SU010', cat:'服务商', dir:'supply', title:'安许代办/资质分立 西南区域 承诺制办理', company:'××企业管理咨询有限公司', location:'成都·武侯', amount:'¥25,000', publisher:'u2', status:'rejected', ts:t(6), note:'材料真实性存疑，请补充安许有效期证明' },
       { id:'SU011', cat:'资质招商', dir:'supply', title:'电力工程施工总承包一级 寻分公司合作', company:'贵州黔电电力工程有限公司', location:'贵阳·观山湖', amount:'10-30万/年', publisher:'u1', status:'on', ts:t(2), note:'' },
-      { id:'SU012', cat:'资质招商', dir:'supply', title:'建筑工程施工总承包一级 联营/分公司挂靠', company:'四川××建设集团有限公司', location:'成都·青羊', amount:'面议', publisher:'u3', status:'on', ts:t(5), note:'' },
+      { id:'SU012', cat:'资质招商', dir:'supply', title:'建筑工程施工总承包一级 联营/分公司合作', company:'四川××建设集团有限公司', location:'成都·青羊', amount:'面议', publisher:'u3', status:'on', ts:t(5), note:'' },
       { id:'SU013', cat:'建企买卖', dir:'supply', title:'公路工程施工总承包二级 建企整体转让', company:'××路桥建设工程有限公司', location:'成都·双流', amount:'¥580,000', publisher:'u1', status:'on', ts:t(3), note:'' },
       { id:'SU014', cat:'建企买卖', dir:'demand', title:'收购 水利水电施工总承包三级 带安许 川内', company:'成都××投资有限公司', location:'成都·成华', amount:'¥300,000', publisher:'u5', status:'pending', ts:t(0), note:'' },
       { id:'SU015', cat:'招聘', dir:'demand', title:'招聘 一级建造师（建筑工程） 成都 全职', company:'四川××建设有限公司', location:'成都·高新', amount:'薪资面议', publisher:'u1', status:'on', ts:t(1), note:'' },
@@ -963,7 +931,7 @@ window.DataBus = (function () {
       { id:'SU024', cat:'求职', dir:'supply', title:'造价工程师（一级） 10 年经验 全职/项目制', company:'李×（个人）', location:'成都·天府新区', amount:'面议', publisher:'u4', status:'pending', ts:t(0), note:'' },
       { id:'SU025', cat:'运输', dir:'demand', title:'成都双流物流园项目 需 混凝土罐车 6 台 租赁或承包均可', company:'成都××物流园区建设有限公司', location:'成都·双流', amount:'按台班', publisher:'u5', status:'pending', ts:t(0), note:'' },
       { id:'SU026', cat:'运输', dir:'supply', title:'供应 砂石/土方运输车队 自有车辆 全国调度 可开票', company:'四川××运输服务有限公司', location:'成都·新津', amount:'按车次', publisher:'u1', status:'on', ts:t(3), note:'' },
-      { id:'SU027', cat:'资质招商', dir:'demand', title:'寻 建筑工程施工总承包一级 分公司加盟/单项目挂靠', company:'成都××工程项目管理有限公司', location:'成都·武侯', amount:'面议', publisher:'u3', status:'pending', ts:t(0), note:'' },
+      { id:'SU027', cat:'资质招商', dir:'demand', title:'寻 建筑工程施工总承包一级 分公司加盟/项目合作', company:'成都××工程项目管理有限公司', location:'成都·武侯', amount:'面议', publisher:'u3', status:'pending', ts:t(0), note:'' },
       { id:'SU028', cat:'服务商', dir:'demand', title:'需 建筑资质新办/安许代办 服务商 川内企业', company:'成都××建设工程有限公司', location:'成都·青羊', amount:'面议', publisher:'u5', status:'pending', ts:t(0), note:'' }
     ];
   }
@@ -2041,7 +2009,7 @@ window.DataBus = (function () {
       type: type, types: prevTypes, orderId: null,
       status: stage === 'first_ok' ? 'first_ok' : 'pending', active: false,
       paidAt: 0, expireAt: 0,
-      fee: 0, depositType: DEPOSIT_TYPE[type] || 'basic', depositAmount: 0, depositPaid: 0,
+      fee: 0,
       contact: u.company || '演示联系人', tel: u.mobile || '', scope: '演示经营范围',
       submittedAt: t, note: '',
       intro: { founded: '2018', capital: '500万', staffSize: '30人', desc: '演示企业，用于审核联动' },

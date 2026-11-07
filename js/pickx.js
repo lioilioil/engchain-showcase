@@ -31,8 +31,9 @@
   var CSS = [
     '.pickx-wrap{position:relative;}',
     /* 触发框 */
-    '.pickx-trigger{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line,#e3e4e6);border-radius:8px;background:var(--bg-card,#fff);color:var(--text-1,#1c1c1e);font-size:12.5px;line-height:1.5;cursor:pointer;outline:none;transition:border-color .2s,box-shadow .2s;text-align:left;}',
+    '.pickx-trigger{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:12px 11px;min-height:44px;border:1px solid var(--line,#e3e4e6);border-radius:8px;background:var(--bg-card,#fff);color:var(--text-1,#1c1c1e);font-size:12.5px;line-height:1.5;cursor:pointer;outline:none;transition:border-color .2s,box-shadow .2s,transform .1s;text-align:left;}',
     '.pickx-trigger:hover{border-color:var(--primary-dim,#4d8de0);}',
+    '.pickx-trigger:active{transform:scale(.985);}',
     '.pickx-trigger:focus,.pickx-trigger.open{border-color:var(--primary-dim,#4d8de0);box-shadow:0 0 0 3px var(--primary-soft,rgba(77,141,224,.14));}',
     '.pickx-trigger .pickx-value{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
     '.pickx-trigger .pickx-placeholder{color:var(--text-3,#9a9ba1);}',
@@ -55,9 +56,11 @@
     '.pickx-list{flex:1;overflow-y:auto;padding:4px;overscroll-behavior:contain;}',
     '.pickx-list::-webkit-scrollbar{width:5px;}',
     '.pickx-list::-webkit-scrollbar-thumb{background:var(--line,#e3e4e6);border-radius:3px;}',
-    '.pickx-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:12.5px;color:var(--text-1,#1c1c1e);cursor:pointer;user-select:none;line-height:1.4;}',
+    '.pickx-item{display:flex;align-items:center;gap:8px;padding:11px 12px;min-height:44px;border-radius:8px;font-size:12.5px;color:var(--text-1,#1c1c1e);cursor:pointer;user-select:none;line-height:1.4;}',
     '.pickx-item:hover{background:var(--primary-soft,rgba(77,141,224,.1));}',
-    '.pickx-item.active{background:var(--primary-soft,rgba(77,141,224,.14));}',
+    '.pickx-item.active{background:var(--primary-soft,rgba(77,141,224,.14));box-shadow:inset 0 0 0 1px var(--accent-line,rgba(77,141,224,.35));}',
+    /* combo-list-fix：已选项淡蓝底 + 品牌色文字（定稿 §2.2） */
+    '.pickx-item.selected{background:var(--primary-soft,rgba(77,141,224,.12));}',
     '.pickx-item.selected .pickx-item-text{color:var(--primary-dim,#4d8de0);font-weight:600;}',
     '.pickx-item .pickx-check{flex:none;width:14px;height:14px;color:var(--primary,#2f6fd0);opacity:0;}',
     '.pickx-item.selected .pickx-check{opacity:1;}',
@@ -73,7 +76,7 @@
     /* 空态 / 申请 / 自定义 / 相似条 */
     '.pickx-empty{padding:14px 10px;text-align:center;font-size:11.5px;color:var(--text-3,#9a9ba1);line-height:1.6;}',
     '.pickx-footer{padding:6px 8px;border-top:1px solid var(--line,#e3e4e6);flex:none;font-size:11px;}',
-    '.pickx-footer a{color:var(--primary-dim,#4d8de0);text-decoration:none;cursor:pointer;display:block;padding:6px 8px;border-radius:8px;font-size:11.5px;}',
+    '.pickx-footer a{color:var(--primary-dim,#4d8de0);text-decoration:none;cursor:pointer;display:block;padding:11px 12px;min-height:40px;border-radius:8px;font-size:11.5px;}',
     '.pickx-footer a:hover{background:var(--primary-soft,rgba(77,141,224,.1));}',
     '.pickx-simbar{padding:7px 10px;margin:0;border-bottom:1px dashed var(--line,#e3e4e6);font-size:11.5px;color:var(--primary-dim,#4d8de0);cursor:pointer;flex:none;}',
     '.pickx-simbar:hover{background:var(--primary-soft,rgba(77,141,224,.1));}',
@@ -81,7 +84,8 @@
     '.pickx-badge.pending{background:rgba(192,68,42,.12);color:var(--warning-ink,#A8321C);}',
     '.pickx-pending-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:12.5px;color:var(--text-2,#555);cursor:default;user-select:none;}',
     '.pickx-pending-item .pickx-pending-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-    '.pickx-pending-cancel{flex:none;width:18px;height:18px;border-radius:50%;border:none;background:transparent;color:var(--text-3,#9a9ba1);font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}',
+    '.pickx-pending-cancel{position:relative;flex:none;width:18px;height:18px;border-radius:50%;border:none;background:transparent;color:var(--text-3,#9a9ba1);font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}',
+    '.pickx-pending-cancel::after{content:"";position:absolute;inset:-8px;}',
     '.pickx-pending-cancel:hover{color:var(--danger,#d44c47);background:rgba(212,76,71,.08);}',
     /* 空态引导（品名未选子类） */
     '.pickx-guide{padding:14px 12px;}',
@@ -93,10 +97,12 @@
     /* 面板底部次级入口（申请收录） */
     '.pickx-footer a.pickx-request-name{color:var(--text-2,#555);font-weight:500;}',
     '.pickx-footer a.pickx-request-name:hover{color:var(--primary-dim,#4d8de0);background:var(--primary-soft,rgba(77,141,224,.1));}',
-    /* 组合框（品名）：input 即触发框 */
+    /* 组合框（品名）：input 即触发框；caret 命中区 30×44，视觉箭头距右缘 11px（与 Select 对齐），展开仅 rotate(180deg) */
     '.pickx-combo-wrap{position:relative;}',
-    '.pickx-combo-wrap .pickx-combo-caret{position:absolute;right:11px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-3,#9a9ba1);pointer-events:none;}',
-    '.pickx-combo-wrap.open .pickx-combo-caret{transform:translateY(-50%) rotate(180deg);}'
+    '.pickx-combo-wrap .pickx-combo-caret{position:absolute;right:0;top:0;bottom:0;width:30px;display:flex;align-items:center;justify-content:flex-end;padding-right:11px;pointer-events:auto;cursor:pointer;color:var(--text-3,#9a9ba1);}',
+    /* combo-list-fix：rotate 作用于内部 svg 自身中心，caret span 容器不动，展开/收起 SVG 位置 0 偏移 */
+    '.pickx-combo-caret svg{transition:transform .18s;}',
+    '.pickx-combo-wrap.open .pickx-combo-caret svg{transform:rotate(180deg);transform-origin:center center;}'
   ].join('\n');
   var _style = doc.createElement('style');
   _style.textContent = CSS;
@@ -194,6 +200,7 @@
     }
   }
   PickXSelect.prototype._buildPanel = function () {
+    var self = this;
     var panel = makeEl('div', 'pickx-panel');
     if (this.opts.searchable !== false && this.dataFn().length > this.searchThreshold) {
       var sw = makeEl('div', 'pickx-search');
@@ -211,10 +218,15 @@
     if (optsHas(this, 'requestLink')) {
       var a = makeEl('a', '', '没有合适的子类？申请新增');
       a.href = 'javascript:void(0)';
-      a.addEventListener('click', function (e) {
+      /* FORM-FIX 问题1：footer 动作迁 mousedown（防移动端吞 click），关面板后 rAF 再开 sheet（时序解耦） */
+      a.addEventListener('mousedown', function (e) {
+        e.preventDefault();
         e.stopPropagation();
         self.close();
-        if (self.opts.onRequest) self.opts.onRequest();
+        if (self.opts.onRequest) {
+          var cb = self.opts.onRequest;
+          global.requestAnimationFrame(function () { cb(); });
+        }
       });
       footer.appendChild(a);
     }
@@ -264,19 +276,29 @@
       else if (e.key === 'Enter') { e.preventDefault(); self._pickHighlight(); }
       else if (e.key === 'Escape') { self.close(); self.trigger.focus(); }
     });
-    /* 点击外部关闭；滚动（滚动容器内）即关闭 */
+    /* 点击外部关闭；页面滚动即关闭（面板自身列表滚动豁免） */
     doc.addEventListener('mousedown', function (e) {
-      if (self.open && !self.panel.contains(e.target) && e.target !== self.trigger && !self.trigger.contains(e.target)) self.close();
+      if (!self.open) return;
+      if (self.panel.contains(e.target)) return;
+      if (e.target === self.trigger || self.trigger.contains(e.target)) return;
+      self.close();
     });
     if (optsHas(this, 'closeOnScroll')) {
-      doc.addEventListener('scroll', function () { if (self.open) self.close(); }, true);
+      doc.addEventListener('scroll', function (e) {
+        if (!self.open) return;
+        if (e.target === self.panel || (e.target && e.target.closest && e.target.closest('.pickx-list'))) return;
+        self.close();
+      }, true);
     }
   };
   PickXSelect.prototype._open = function () {
     if (!this._panelReady) return;
+    /* refpop-category-fix：参考弹窗打开期间禁止展开任何 PickX 面板 */
+    var _rp = document.getElementById('ref-pop');
+    if (_rp && _rp.classList.contains('show')) return;
     closeAll(this);
     var rect = this.trigger.getBoundingClientRect();
-    var ph = Math.min(340, global.innerHeight - 24);
+    var ph = Math.min(380, global.innerHeight - 24);
     var up = (rect.bottom + ph > global.innerHeight - 8) && (rect.top > ph + 8);
     this.panel.style.left = Math.max(8, Math.min(rect.left, global.innerWidth - 220)) + 'px';
     this.panel.style.top = (up ? rect.top - 8 : rect.bottom + 4) + 'px';
@@ -288,6 +310,8 @@
     this._render();
     this.panel.classList.add('open');
     this.trigger.classList.add('open');
+    this.trigger.setAttribute('aria-haspopup', 'listbox');
+    this.trigger.setAttribute('aria-expanded', 'true');
     this.open = true;
     _openPanel = this;
     glassify(this.panel);
@@ -389,6 +413,7 @@
     if (!this.open) return;
     this.panel.classList.remove('open');
     this.trigger.classList.remove('open');
+    this.trigger.setAttribute('aria-expanded', 'false');
     this.open = false;
     if (_openPanel === this) _openPanel = null;
     unglass();
@@ -416,7 +441,21 @@
     if (this.host && this.input) {
       this.host.classList.add('pickx-combo-wrap');
       var caret = makeEl('span', 'pickx-combo-caret', CARET_SVG);
+      this.caretEl = caret;
       this.host.appendChild(caret);
+      /* ROOTCAUSE 问题2：caret 锚定 input 盒而非整个 host（host 含上方 label + 下方 origin/chips 行，
+         top:0/bottom:0 撑满 host 会使垂直中心偏移 ~18px）；打开面板/窗口尺寸变化时重新贴合 */
+      var fitCaret = function () {
+        var inp = self.input;
+        if (!inp) return;
+        caret.style.top = inp.offsetTop + 'px';
+        caret.style.bottom = 'auto';
+        caret.style.height = inp.offsetHeight + 'px';
+      };
+      self._fitCaret = fitCaret;
+      fitCaret();
+      if (window.requestAnimationFrame) window.requestAnimationFrame(fitCaret);
+      window.addEventListener('resize', fitCaret);
       this._buildPanel();
       this._bind();
     }
@@ -438,9 +477,11 @@
     var self = this;
     this.input.addEventListener('focus', function () { self._open(); });
     this.input.addEventListener('click', function (e) { e.stopPropagation(); if (!self.open) self._open(); });
-    this.input.addEventListener('input', function () {
-      if (!self.open) self._open();
-      self.query = this.value;
+    this.input.addEventListener('input', function (e) {
+      /* refpop-category-fix：仅真实用户输入（isTrusted）自动展开；弹窗内点选即填入的合成 dispatch input 不展开面板 */
+      if (!self.open && e.isTrusted) self._open();
+      /* combo-list-fix：仅真实键入设 query 过滤；合成 dispatch（弹窗点选/回填）不设 query，保持全量 */
+      if (e.isTrusted) self.query = this.value;
       self._render();
     });
     this.input.addEventListener('keydown', function (e) {
@@ -453,7 +494,13 @@
         /* 无候选时 Enter = 自定义品名确认（用户主权：未命中可自定义） */
         else { e.preventDefault(); self._confirmCustom(); }
       }
-      else if (e.key === 'Escape') { self.close(); }
+      else if (e.key === 'Escape') { self.close(); self.input.focus(); }
+    });
+    /* caret 命中区点击：toggle 收起（展开态点箭头收起；未展开态交给 input focus 自然开） */
+    if (this.caretEl) this.caretEl.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (self.open) self.close();
+      else self.input.focus();
     });
     this.listEl.addEventListener('mousedown', function (e) { e.preventDefault(); });
     this.listEl.addEventListener('click', function (e) {
@@ -475,29 +522,48 @@
       var sim = e.target.closest ? e.target.closest('.pickx-simbar') : null;
       if (sim && self._simCache && self._simCache.name) { self._applySimilar(self._simCache.name); }
     });
-    this.footerEl.addEventListener('click', function (e) {
+    /* FORM-FIX 问题1：Combo footer 动作同迁 mousedown（防移动端吞 click） */
+    this.footerEl.addEventListener('mousedown', function (e) {
       var req = e.target.closest ? e.target.closest('.pickx-request-name') : null;
       if (req) {
+        e.preventDefault();
         e.stopPropagation();
+        self.close();
         var q = (self.input.value || '').trim();
-        if (self.opts.onRequestName) self.opts.onRequestName(q);
+        if (self.opts.onRequestName) {
+          var cb = self.opts.onRequestName;
+          global.requestAnimationFrame(function () { cb(q); });
+        }
         return;
       }
       var a = e.target.closest ? e.target.closest('.pickx-use-custom') : null;
-      if (a) { self._confirmCustom(); }
+      if (a) { e.preventDefault(); e.stopPropagation(); self._confirmCustom(); }
     });
     doc.addEventListener('mousedown', function (e) {
-      if (self.open && !self.panel.contains(e.target) && e.target !== self.input && !self.host.contains(e.target)) self.close();
+      if (!self.open) return;
+      if (self.panel.contains(e.target)) return;
+      if (e.target === self.input || self.input.contains(e.target)) return;
+      self.close();
     });
     if (optsHas(this, 'closeOnScroll')) {
-      doc.addEventListener('scroll', function () { if (self.open) self.close(); }, true);
+      doc.addEventListener('scroll', function (e) {
+        if (!self.open) return;
+        if (e.target === self.panel || (e.target && e.target.closest && e.target.closest('.pickx-list'))) return;
+        self.close();
+      }, true);
     }
   };
   PickXCombo.prototype._open = function () {
     if (!this._panelReady) return;
+    /* refpop-category-fix：参考弹窗打开期间禁止展开任何 PickX 面板 */
+    var _rp = document.getElementById('ref-pop');
+    if (_rp && _rp.classList.contains('show')) return;
+    /* combo-list-fix：展开=全量视图，清空上次键入/选中残留的过滤 query（点击/聚焦/键盘展开均全量） */
+    this.query = '';
+    if (this._fitCaret) this._fitCaret();
     closeAll(this);
     var rect = this.input.getBoundingClientRect();
-    var ph = Math.min(300, global.innerHeight - 24);
+    var ph = Math.min(340, global.innerHeight - 24);
     var up = (rect.bottom + ph > global.innerHeight - 8) && (rect.top > ph + 8);
     this.panel.style.left = Math.max(8, Math.min(rect.left, global.innerWidth - 240)) + 'px';
     this.panel.style.top = (up ? rect.top - 8 : rect.bottom + 4) + 'px';
@@ -507,6 +573,8 @@
     this._render();
     this.panel.classList.add('open');
     this.host.classList.add('open');
+    this.input.setAttribute('aria-haspopup', 'listbox');
+    this.input.setAttribute('aria-expanded', 'true');
     this.open = true;
     _openPanel = this;
     glassify(this.panel);
@@ -578,6 +646,9 @@
       }
       var it = makeEl('div', 'pickx-item');
       it.dataset.g = f.g; it.dataset.v = f.v;
+      /* combo-list-fix：已选项（value===当前输入值）加 .selected 高亮 */
+      var isSel = (self.input && self.input.value === f.v);
+      if (isSel) it.classList.add('selected');
       it.innerHTML = CHECK_SVG + '<span class="pickx-item-text">' + esc(f.v) + '</span>' +
         (g.badge ? '<span class="pickx-badge ' + esc(g.badgeCls || '') + '">' + esc(g.badge) + '</span>' : '');
       self.listEl.appendChild(it);
@@ -594,6 +665,9 @@
     }
     this.footerEl.innerHTML = '';
     this.highlight = Math.min(this.highlight, flat.length - 1);
+    /* combo-list-fix：已选项滚动到可视区中央 */
+    var selEl = this.listEl.querySelector('.pickx-item.selected');
+    if (selEl && selEl.scrollIntoView) { try { selEl.scrollIntoView({ block: 'center' }); } catch (eScroll) {} }
   };
   PickXCombo.prototype._markHighlight = function () {
     var els = this.listEl.querySelectorAll('.pickx-item');
@@ -628,6 +702,7 @@
     if (!this.open) return;
     this.panel.classList.remove('open');
     this.host.classList.remove('open');
+    this.input.setAttribute('aria-expanded', 'false');
     this.open = false;
     if (_openPanel === this) _openPanel = null;
     unglass();

@@ -26,14 +26,16 @@
 (function (global) {
   'use strict';
 
+  /* 分组顺序（2026-11-05 用户指定）：建筑企业 → 人才 → 服务商 → 材料 → 设备 → 劳务 → 运输；
+     「其他」组暂缺——现有 16 类已全部归入以下 7 组，无游离类型可挂，待用户确认是否新增。 */
   var GROUPS = [
+    { name: '建筑企业', keys: ['franchise-supply', 'franchise-demand', 'trade-supply', 'trade-demand'] },
+    { name: '人才', keys: ['personnel-demand', 'talent-supply'] },
+    { name: '服务商', keys: ['agency-supply', 'agency-demand'] },
     { name: '材料', keys: ['material-supply', 'material-demand'] },
     { name: '设备', keys: ['equipment-supply', 'equipment-demand'] },
     { name: '劳务', keys: ['labor-supply', 'labor-demand'] },
-    { name: '运输', keys: ['transport-supply', 'transport-demand'] },
-    { name: '建筑企业', keys: ['franchise-supply', 'franchise-demand', 'trade-supply', 'trade-demand'] },
-    { name: '人才', keys: ['personnel-demand', 'talent-supply'] },
-    { name: '服务商', keys: ['agency-supply', 'agency-demand'] }
+    { name: '运输', keys: ['transport-supply', 'transport-demand'] }
   ];
 
   var SVG = {
@@ -163,6 +165,9 @@
 
   function open(opts) {
     opts = opts || {};
+    /* refpop-category-fix：参考弹窗打开期间禁止打开类型选择器 */
+    var _rp = document.getElementById('ref-pop');
+    if (_rp && _rp.classList.contains('show')) return;
     if (openSheet) close();
     injectStyle();
 

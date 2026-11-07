@@ -158,7 +158,7 @@ function renderEntry(){
     else acts='<button class="pf-btn ghost" onclick="window.entryAct(\''+u.id+'\',\'reopen\')">重新提交</button>';
     return '<div class="pf-card">'+
       '<div class="pf-top"><b>'+u.name+'</b><span class="pf-st" style="color:'+stc+';">'+enStatus(e.status)+'</span></div>'+
-      '<div class="pf-meta">申请：'+entryLabel(type)+' · 入驻费 '+fmt(e.fee||0)+' · 认证保证金 '+fmt(e.depositAmount||0)+'</div>'+
+      '<div class="pf-meta">申请：'+entryLabel(type)+' · 入驻费 '+fmt(e.fee||0)+' · '+(e.cycle==='yearly'?'年度订阅':'一次性')+'</div>'+
       '<div class="pf-meta">提交于 '+ftime(e.submittedAt||e.paidAt)+' · 联系人 '+(e.contact||u.name)+' · '+(e.tel||'—')+'</div>'+
       (e.note?'<div class="pf-meta" style="color:var(--danger);">驳回原因：'+e.note+'</div>':'')+
       '<div class="pf-acts">'+acts+'</div></div>';
@@ -326,16 +326,22 @@ window.demandRestore=function(id){
 
 /* [PHASE 0] 纠纷仲裁 / 佣金报表 / 资金监管已下线：平台不参与交易资金，不提供资金监管与佣金结算。 */
 
-/* ========== 认证年审（Phase 0 新增）：深度认证服务商年审管理 ========== */
+/* ========== 认证年审：企业认证年费与年度复审（与入驻费分开核算） ========== */
 function renderCert(){
   var body=document.getElementById('pf-body');if(!body)return;
-  var et={};
-  try{et=(window.MOCK&&MOCK.business&&MOCK.business.entryTypes&&MOCK.business.entryTypes.agency)||{};}catch(e){}
-  var deepFee=Number(et.fee)||0, yearlyFee=Number(et.yearly&&et.yearly.price)||0;
+  /* 认证费只读认证配置 certification.enterprise（¥999/年，成熟期标准价），当期实付走 ModeStore.certFee()。
+     入驻费（建筑 ¥3,999 / 服务商 ¥2,999）是另一笔钱，在「入驻审核」模块按申请记录展示，本模块不读取、不摊分。 */
+  var certStd=0,certNow=0,endAt='';
+  try{certStd=Number((window.MOCK&&MOCK.business&&MOCK.business.certification&&MOCK.business.certification.enterprise)||0)||0;}catch(e){}
+  try{endAt=(window.MOCK&&MOCK.business&&MOCK.business.breakin&&MOCK.business.breakin.endAt)||'';}catch(e){}
+  try{certNow=(window.ModeStore&&ModeStore.certFee)?(Number(ModeStore.certFee())||0):certStd;}catch(e){certNow=certStd;}
+  var feeLine='企业认证 '+fmt(certStd)+'/年 · 个人实名与个人资质免费';
+  if(certNow!==certStd){feeLine+=' · 破冰期以权益赠送全免，本期实付 '+fmt(certNow)+'/年'+(endAt?('（截止 '+endAt+'）'):'');}
   var html='<div class="pf-card" style="border-color:rgba(176, 138, 60, .35);">'+
-    '<div class="pf-top"><b>认证分层</b><span class="pf-st" style="color:var(--primary-dim);">平台信任规则</span></div>'+
-    '<div class="pf-meta">基础认证：免费（实名与资质核验）· 深度认证：'+fmt(deepFee)+'/年 · 年审 '+fmt(yearlyFee)+'/年</div>'+
-    '<div class="pf-meta">年审内容：人工能力评估 / 征信评估 / 案例核验；年审不合格清退，违规扣认证保证金。</div></div>';
+    '<div class="pf-top"><b>企业认证（年费）</b><span class="pf-st" style="color:var(--primary-dim);">平台信任规则</span></div>'+
+    '<div class="pf-meta">'+feeLine+'</div>'+
+    '<div class="pf-meta">认证与入驻是两笔独立收费：认证收的是主体核验与背书（本模块），入驻费收的是发布与经营权益（见「入驻审核」模块，建筑 ¥3,999 / 服务商 ¥2,999），两者不互相包含、不互相抵扣。</div>'+
+    '<div class="pf-meta">年度复审：人工能力评估 / 征信评估 / 案例核验；复审不合格清退，取消认证标识并下架服务。</div></div>';
   var sellers=[],seen={};
   try{
     var items=(window.SupplyStore&&SupplyStore.read)?SupplyStore.read().items:[];
@@ -343,7 +349,7 @@ function renderCert(){
       if((s.bizKey||'')==='agency'&&s.publisher&&!seen[s.publisher]){seen[s.publisher]=1;sellers.push(s.publisher);}
     });
   }catch(e){}
-  if(!sellers.length){body.innerHTML=html+'<div class="pf-empty">暂无深度认证服务商，入驻并发布服务后展示</div>';return;}
+  if(!sellers.length){body.innerHTML=html+'<div class="pf-empty">暂无企业认证服务商，入驻并发布服务后展示</div>';return;}
   var renews={};try{renews=JSON.parse(localStorage.getItem('engchain-cert-renew')||'{}');}catch(e){}
   body.innerHTML=html+sellers.map(function(sid){
     var st=renews[sid];
@@ -354,7 +360,7 @@ function renderCert(){
       :'<button class="pf-btn gold" onclick="window.certAct(\''+sid+'\',\'pass\')">通过年审</button>'+(st!=='removed'?'<button class="pf-btn ghost" onclick="window.certAct(\''+sid+'\',\'remove\')">清退</button>':'<button class="pf-btn" onclick="window.certAct(\''+sid+'\',\'renew\')">恢复</button>');
     return '<div class="pf-card">'+
       '<div class="pf-top"><b>'+bname(sid)+'</b><span class="pf-st" style="color:'+stc+';">'+stt+'</span></div>'+
-      '<div class="pf-meta">深度认证服务商 · 年审 '+fmt(yearlyFee)+'/年</div>'+
+      '<div class="pf-meta">企业认证 · 年费 '+fmt(certStd)+'/年（入驻费另计，不进本行）</div>'+
       '<div class="pf-acts">'+acts+'</div></div>';
   }).join('');
 }
@@ -369,13 +375,13 @@ window.certAct=function(sid,act){
     }catch(e){}
     var nm=bname(sid);
     if(act==='pass'){
-      try{DataBus.pushDirectMessage(sid,'年审已通过','您的深度认证年审已通过，认证继续有效。');}catch(e){}
+      try{DataBus.pushDirectMessage(sid,'年审已通过','您的企业认证年度复审已通过，认证继续有效。');}catch(e){}
       try{DataBus.audit('年审通过','平台运营台',nm,'');}catch(e){}
       if(window.UI)UI.toast('年审已通过','ok');
     }else if(act==='remove'){
-      try{DataBus.pushDirectMessage(sid,'认证已被清退','您的深度认证未通过年审，已被清退，认证保证金按规则扣罚。');}catch(e){}
-      try{DataBus.audit('年审清退','平台运营台',nm,'扣划认证保证金');}catch(e){}
-      if(window.UI)UI.toast('已清退，认证保证金按规则扣罚','ok');
+      try{DataBus.pushDirectMessage(sid,'认证已被清退','您的企业认证未通过年度复审，已被清退，认证标识取消、服务下架。');}catch(e){}
+      try{DataBus.audit('年审清退','平台运营台',nm,'取消认证标识并下架服务');}catch(e){}
+      if(window.UI)UI.toast('已清退，认证标识已取消','ok');
     }else{
       try{DataBus.audit('年审恢复','平台运营台',nm,'恢复待年审');}catch(e){}
       if(window.UI)UI.toast('已恢复为待年审','ok');
@@ -383,7 +389,7 @@ window.certAct=function(sid,act){
     renderStats();renderCert();renderAudit();
   };
   if(act==='remove'){
-    pfConfirm('清退该认证服务商','清退后该服务商深度认证失效，已发布的服务将下架，并按规则扣划认证保证金。确认清退？',doAct);
+    pfConfirm('清退该认证服务商','清退后该服务商企业认证失效，已发布的服务将下架，认证标识取消。确认清退？',doAct);
     return;
   }
   doAct();

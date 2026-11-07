@@ -24,7 +24,7 @@ const seedUsers = [
     },
     entry: {
       type: 'construction', types: ['construction'], orderId: 'EN20260601001', status: 'active', active: true,
-      paidAt: now - DAY * 60, expireAt: now + YEAR, depositType: 'basic', depositPaid: 5000, fee: 2980,
+      paidAt: now - DAY * 60, expireAt: now + YEAR, fee: 2980,
       contact: '陈建国', tel: '13800001234',
       scope: '房屋建筑工程 · 市政公用工程 · 建筑装修装饰工程 · 机电设备安装工程 · 建筑幕墙工程 · 钢结构工程 · 地基基础工程 · 环保工程 · 城市及道路照明工程 · 特种工程（结构补强）',
       qualifications: [
@@ -57,7 +57,7 @@ const seedUsers = [
       qual: { ok: true, list: ['房地产经纪机构备案', '工程造价咨询乙级'] },
       payment: { ok: true, ts: now - DAY * 40 }
     },
-    entry: { type: 'agency', types: ['agency'], orderId: 'EN20260615001', status: 'active', active: true, paidAt: now - DAY * 40, expireAt: now + YEAR, depositType: 'engineering', depositPaid: 20000 },
+    entry: { type: 'agency', types: ['agency'], orderId: 'EN20260615001', status: 'active', active: true, paidAt: now - DAY * 40, expireAt: now + YEAR },
     balance: { balance: 8600, frozen: 1200, totalIn: 51200 },
     credits: { balance: 1200, quota: { month: '', used: 0 } }
   },
@@ -219,7 +219,7 @@ const seedUsers = [
       qual: { ok: true, list: ['平台运营管理员资质'] },
       payment: { ok: true, ts: now - DAY * 365 }
     },
-    entry: { type: 'construction', types: ['construction', 'agency'], orderId: 'PLAT-0001', status: 'active', active: true, paidAt: now - DAY * 365, expireAt: now + YEAR, depositType: 'basic', depositPaid: 0, fee: 0, contact: '周平台', tel: '13000000000', scope: '平台运营治理', qualifications: [], intro: { founded: '2026', capital: '-', staffSize: '平台方', desc: '工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。' }, cases: [], address: { province: '四川省', city: '成都市', district: '高新区', detail: '平台路1号' }, website: '', attachments: [] },
+    entry: { type: 'construction', types: ['construction', 'agency'], orderId: 'PLAT-0001', status: 'active', active: true, paidAt: now - DAY * 365, expireAt: now + YEAR, fee: 0, contact: '周平台', tel: '13000000000', scope: '平台运营治理', qualifications: [], intro: { founded: '2026', capital: '-', staffSize: '平台方', desc: '工程链平台内部运营账号，拥有全部功能权限，用于演示平台治理视角。' }, cases: [], address: { province: '四川省', city: '成都市', district: '高新区', detail: '平台路1号' }, website: '', attachments: [] },
     balance: { balance: 0, frozen: 0, totalIn: 0 },
     credits: { balance: 0, quota: { month: '', used: 0 } }
   }

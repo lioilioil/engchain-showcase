@@ -73,14 +73,14 @@
     },
     accountTypes: {
       available: '可用余额', withdraw_frozen: '提现冻结', escrow: '交易托管', intent: '意向金',
-      deposit: '履约保证金', rebate_frozen: '返佣冻结', platform_income: '平台收入'
+      deposit: '转让诚意保证金', rebate_frozen: '返佣冻结', platform_income: '平台收入'
     },
     credits: { deduct: { pointsToYuan: 100, capRate: 0.1 } },
     invoice: { taxRate: 0.06 },
     clue: { validDays: 7 },
     commission: {
       settleCycle: 'T+1',
-      deposit: { basic: 5000, engineering: 20000, high: 50000, note: '服务商履约保证金分级，后台可配' },
+      deposit: { basic: 5000, engineering: 20000, high: 50000, note: '未启用：入驻不收取保证金，档位仅保留结构' },
       intent: { rate: 0.2, tiers: [100, 500, 800, 5000], note: '买方意向金：成交价×20% 就近取档（100/500/800/5000），锁定需求+保障平台佣金，服务启动前可退，启动后抵扣服务费' },
       actions: [
         { id: 'warn', label: '警告' }, { id: 'ban7', label: '禁聊 7 天' }, { id: 'ban30', label: '二次禁聊 30 天' },

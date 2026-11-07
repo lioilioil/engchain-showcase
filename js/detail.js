@@ -236,8 +236,8 @@ window.DETAIL = (function () {
     if (!found) return { ok: false, reason: 'deposit_not_found' };
     var depAmount = amount || found.amount;
     var s = BalanceStore.read();
-    /* 冻结金额转为平台收入：frozen -= amount，同时 balance -= amount（成交没收，钱归平台不再退回用户），
-       与 BalanceStore.commitDeposit 对齐；30 天未成交退款路径仍只解 frozen。 */
+    /* 冻结金额转为平台收入：frozen -= amount，同时 balance -= amount（成交没收，钱归平台不再退回用户）；
+       30 天未成交退款路径仍只解 frozen。注：入驻保证金已取消，此处仅服务建企买卖的诚意保证金。 */
     s.frozen = Math.max(0, Math.round((s.frozen - depAmount) * 100) / 100);
     s.balance = Math.max(0, Math.round((s.balance - depAmount) * 100) / 100);
     s.logs.unshift({ type: 'trade_deposit_committed', amount: -depAmount, method: 'deposit', reason: '建企买卖成交保证金扣除', ts: now, ref: ref, buyerId: buyerId || '', sellerId: sellerId || '' });
@@ -2108,31 +2108,61 @@ window.DETAIL = (function () {
     return h + '</div>';
   }
     function talentHero(r) {
-    var tags = '';
-    if (r.verified) tags += '<span class="th-tag is-verified"><svg class="ic"><use href="#i-check"/></svg>证书已核验</span>';
-    tags += '<span class="th-tag is-gold">' + cfgText((r.certLevel || '') + r.certType) + '</span>';
-    if (r.currentStatus) tags += '<span class="th-tag ' + (r.currentStatus.indexOf('离职') > -1 ? 'is-left' : 'is-active') + '">' + r.currentStatus + '</span>';
     var es = r.expectedSalary || {};
-    var metrics = [];
-    if (r.workYears || r.experience) metrics.push({ label: '工作年限', value: (r.workYears || r.experience) + '年' });
-    if (r.location) metrics.push({ label: '所在城市', value: r.location });
-    if (es.salaryRange) metrics.push({ label: '期望薪资', value: es.salaryRange });
-    if (r.resumeActive) metrics.push({ label: '求职状态', value: r.resumeActive });
-    var metricsHtml = metrics.map(function (m) {
-      return '<div class="th-metric"><div class="thm-val">' + m.value + '</div><div class="thm-label">' + m.label + '</div></div>';
-    }).join('');
-    return '<div class="talent-hero">' +
-      '<div class="th-bg"></div>' +
-      '<div class="th-content">' +
-        '<div class="th-top">' +
-          '<div class="th-avatar">' + (r.avatar || '') + '</div>' +
-          '<div class="th-info">' +
-            '<div class="th-name">' + r.nameMasked + '<span class="th-note">完整姓名付费可见</span></div>' +
-            '<div class="th-title">' + r.title + '</div>' +
-            '<div class="th-tags">' + tags + '</div>' +
-          '</div>' +
+    var certLabel = cfgText((r.certLevel || '') + r.certType);
+    var isLeft = (r.currentStatus || '').indexOf('离职') > -1;
+
+    /* 顶部认证行 */
+    var statusRow = '<div class="th2-status">';
+    if (r.verified) {
+      statusRow += '<span class="th2-verified"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>证书已核验</span>';
+    }
+    if (r.resumeActive) {
+      statusRow += '<span class="th2-active">' + r.resumeActive + '</span>';
+    }
+    statusRow += '</div>';
+
+    /* 主体行：头像 + 信息 */
+    var mainRow = '<div class="th2-main">' +
+      '<div class="th2-avatar">' + (r.avatar || '') + '</div>' +
+      '<div class="th2-info">' +
+        '<div class="th2-name-row">' +
+          '<span class="th2-name">' + r.nameMasked + '</span>' +
+          '<span class="th2-lock">姓名付费可见</span>' +
         '</div>' +
-        '<div class="th-metrics">' + metricsHtml + '</div>' +
+        '<div class="th2-title">' + cfgText(r.title) + '</div>' +
+        '<div class="th2-badges">' +
+          '<span class="th2-cert-gold">' + certLabel + '</span>' +
+          (r.titleLevel ? '<span class="th2-cert-sub">' + cfgText(r.titleLevel) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+    /* 关键数据三栏 */
+    var stats = [];
+    if (r.workYears || r.experience) stats.push({ label: '工作年限', value: (r.workYears || r.experience) });
+    if (r.location) stats.push({ label: '所在城市', value: r.location });
+    if (es.salaryRange) stats.push({ label: '期望年薪', value: es.salaryRange });
+    var statsHtml = stats.map(function (s, i) {
+      var divider = i > 0 ? '<div class="th2-divider"></div>' : '';
+      return divider + '<div class="th2-stat">' +
+        '<div class="th2-stat-val">' + s.value + '</div>' +
+        '<div class="th2-stat-label">' + s.label + '</div>' +
+      '</div>';
+    }).join('');
+
+    /* 底部状态条 */
+    var footRow = '<div class="th2-foot">' +
+      '<span class="th2-foot-dot ' + (isLeft ? 'is-left' : 'is-active') + '"></span>' +
+      '<span class="th2-foot-text">' + cfgText(r.currentStatus) + '</span>' +
+    '</div>';
+
+    return '<div class="talent-hero th2">' +
+      '<div class="th2-bg"></div>' +
+      '<div class="th2-inner">' +
+        statusRow + mainRow +
+        '<div class="th2-stats">' + statsHtml + '</div>' +
+        footRow +
       '</div>' +
     '</div>';
   }
@@ -2785,8 +2815,8 @@ window.DETAIL = (function () {
         '<div class="ds-text">本项为收购方发布的收购 / 控股建筑企业意向登记，不构成要约。解锁后可查看发布方联系方式并与转让经纪对接；平台仅提供撮合与信息核验，不参与具体交易。</div>' +
         '<a class="demand-export-btn" href="../trade/index.html?openDelegate=1">联系转让经纪 · 了解收购流程</a>');
     } else if (resolved && resolved.typeKey === 'franchise-demand') {
-      __demandExtras = sec('挂靠 / 合作说明',
-        '<div class="ds-text">本项为个人/项目方的合作或挂靠意向，平台按区域与资质等级撮合匹配，对接前请核实对方主体资质与合同条款。</div>' +
+      __demandExtras = sec('合作模式说明',
+        '<div class="ds-text">本项为个人/项目方的项目合作意向，平台按区域与资质等级撮合匹配，对接前请核实对方主体资质与合同条款。</div>' +
         '<a class="demand-export-btn" href="../franchise/index.html">查看可合作招商方</a>');
     }
     var __bodyHtml = __demandExtras + t.sections(rec, c) + certHtml + guaranteeSec(rec) + relatedSec(rec);

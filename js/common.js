@@ -1665,7 +1665,58 @@ window.UI = (function () {
     return base + '?scenario=' + encodeURIComponent(scene) + '&role=' + encodeURIComponent(role);
   }
 
-  return { base, toast, sheet, dialog, dropdown, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchAccess, pinWorkbenchScene, workbenchHref };
+  /* ---- 单位/推荐面板公共视口定位（UNIT-FIX 公共化）：
+     fixed 面板、水平左对齐 input 左缘（右缘放不下右对齐、左缘贴 8px）、垂直默认下方（放不下翻上方 .above）；
+     面板宽=max(input 宽,240px)、max-height=min(320px, vh-24)；
+     箭头 --arrow-x 按 input 水平中心相对面板左缘计算（16~panelW-16 钳制），随对齐方向自动指向 input。 */
+  /* ③ 视口变化（resize/软键盘弹起/旋转）时面板仍打开则防抖重算定位与箭头；
+     120ms 防抖等布局落定，避免 resize 连发中用瞬时 rect 计算 */
+  var __unitTrack = null, __unitResizeBound = false, __unitTimer = 0;
+  function __unitViewportRecalc() {
+    if (!__unitTrack) return;
+    if (!__unitTrack.panel.classList.contains('show')) return;
+    /* 静默窗：视口变化引发重流的 scroll 事件不触发「页面滚动即关闭」，由重算接管（editor scroll-close 守卫读取） */
+    stateStore.__unitQuietUntil = Date.now() + 350;
+    if (__unitTimer) clearTimeout(__unitTimer);
+    __unitTimer = setTimeout(function () {
+      __unitTimer = 0;
+      if (__unitTrack && __unitTrack.panel.classList.contains('show')) positionUnitPanel(__unitTrack.input, __unitTrack.panel);
+    }, 120);
+  }
+  function positionUnitPanel(inputEl, panelEl) {
+    var rect = inputEl.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var panelW = Math.max(rect.width, 240);
+    var maxH = Math.min(320, vh - 24);
+    /* D-1 修复：右对齐改用 style.right 绝对定位（避免 left 计算受 border/盒模型影响产生 ~13px 偏差） */
+    var alignRight = (rect.left + panelW > vw - 8);
+    var x = alignRight ? (rect.right - panelW) : rect.left;
+    if (!alignRight && x < 8) x = 8;
+    var below = (rect.bottom + 8 + maxH) < vh;
+    var y = below ? (rect.bottom + 8) : Math.max(8, rect.top - maxH - 8);
+    if (alignRight) {
+      panelEl.style.right = (vw - rect.right) + 'px';
+      panelEl.style.left = 'auto';
+    } else {
+      panelEl.style.left = x + 'px';
+      panelEl.style.right = 'auto';
+    }
+    panelEl.style.top = y + 'px';
+    panelEl.style.width = panelW + 'px';
+    panelEl.style.maxHeight = maxH + 'px';
+    panelEl.classList.toggle('above', !below);
+    var arrowX = Math.max(16, Math.min(panelW - 16, rect.left - x + rect.width / 2));
+    panelEl.style.setProperty('--arrow-x', arrowX + 'px');
+    /* ③ 登记跟踪并绑定视口变化监听（仅绑一次；关闭后 handler 自检 .show 跳过） */
+    __unitTrack = { input: inputEl, panel: panelEl };
+    if (!__unitResizeBound) {
+      window.addEventListener('resize', __unitViewportRecalc);
+      window.addEventListener('orientationchange', __unitViewportRecalc);
+      __unitResizeBound = true;
+    }
+  }
+
+  return { base, toast, sheet, dialog, dropdown, openKefu, back, statusBar, dynamicIsland, money, esc, theme, state: stateStore, closeSheet, tabbar, pageTransition, icon, catIcon, certCard, certArchive, certExpanded, certModal, cityPicker, cityData: CITY_DATA, cityLookup: ALL_CITIES, currentUserId, isOwner, homeUrl, countUp, haptic, workbenchAccess, pinWorkbenchScene, workbenchHref, positionUnitPanel: positionUnitPanel };
 })();
 
 /* ============================================================================
@@ -2187,7 +2238,7 @@ window.Cards = (function () {
       '</div>' + thumbHtml(s) + '</div>';
   }
 
-  /* ---- 资质招商：供应态(franchise-supply) / 需求态(franchise-demand 挂靠意向) ---- */
+  /* ---- 资质招商：供应态(franchise-supply) / 需求态(franchise-demand 项目合作意向) ---- */
   function franchise(s, ctx) {
     var isDemand = ctx && ctx.role === 'demand';
     if (isDemand) {

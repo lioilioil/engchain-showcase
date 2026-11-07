@@ -129,7 +129,6 @@ onMounted(loadUser)
                 <el-descriptions-item label="状态">{{ user.entry.status }}</el-descriptions-item>
                 <el-descriptions-item label="订单号">{{ user.entry.orderId || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="入驻费">¥{{ user.entry.fee || 0 }}</el-descriptions-item>
-                <el-descriptions-item label="保证金">{{ user.entry.depositType || '-' }} · ¥{{ user.entry.depositPaid || 0 }}</el-descriptions-item>
                 <el-descriptions-item label="到期时间" v-if="user.entry.expireAt">
                   {{ new Date(user.entry.expireAt).toLocaleDateString() }}
                 </el-descriptions-item>

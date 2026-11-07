@@ -993,17 +993,37 @@
   function scopeBodyHtml() {
     var esc = global.V3.ui.esc;
     var B = (window.MOCK && window.MOCK.business) ? window.MOCK.business : {};
-    var cert = (B.certification && typeof B.certification.enterprise === "number") ? B.certification.enterprise : 999;
+    var certStd = (B.certification && typeof B.certification.enterprise === "number") ? B.certification.enterprise : 999;
+    /* 认证费按阶段取价：破冰期 ¥0 / 成熟期标准价。
+       注意：本页脚本链不加载 js/stores.js，window.ModeStore 在运行时不存在，
+       因此这里按与 ModeStore 同源的规则自读 engchain-mode 与 breakin.endAt
+       （同一存储键、同一截止日语义，缺省破冰期），避免退回“永远是破冰期/永远是标准价”的假状态。 */
+    var MODE_KEY = "engchain-mode";
+    function phaseBreakin() {
+      var b = B.breakin || {};
+      if (!b.enabled) return false;
+      var phase = "breakin";
+      try {
+        var raw = global.localStorage.getItem(MODE_KEY) || global.localStorage.getItem(MODE_KEY + "-state");
+        if (raw) { var p = JSON.parse(raw); if (p && p.phase) phase = p.phase; }
+      } catch (e) {}
+      if (phase !== "breakin") return false;
+      var end = b.endAt ? new Date(String(b.endAt) + "T23:59:59").getTime() : 0;
+      if (end && !isNaN(end) && Date.now() > end) return false;
+      return true;
+    }
+    var breakinPhase = phaseBreakin();
+    var cert = (breakinPhase && typeof B.breakin.certification === "number") ? B.breakin.certification : certStd;
     var et = B.entryTypes || {};
     var cFee = (et.construction && typeof et.construction.fee === "number") ? et.construction.fee : 3999;
     var aFee = (et.agency && typeof et.agency.fee === "number") ? et.agency.fee : 2999;
     var bi = (B.breakin && B.breakin.entry) ? B.breakin.entry : {};
-    var breakin = !!(B.breakin && B.breakin.enabled &&
-      (!window.ModeStore || !ModeStore.isBreakIn || ModeStore.isBreakIn()));
+    var breakin = breakinPhase;
     var cEnt = (breakin && typeof bi.construction === "number") ? bi.construction : cFee;
     var aEnt = (breakin && typeof bi.agency === "number") ? bi.agency : aFee;
     function money(v) { return v > 0 ? ("¥" + Number(v).toLocaleString()) : "¥0"; }
-    var certTxt = cert > 0 ? (money(cert) + "/年") : "¥0 · 免费审核制";
+    var endAt = (breakin && window.MOCK && MOCK.business && MOCK.business.breakin && MOCK.business.breakin.endAt) || "";
+    var certTxt = cert > 0 ? (money(cert) + "/年") : ("¥0 · 破冰期限免" + (endAt ? ("（至 " + endAt + "，标准价 " + money(certStd) + "/年）") : ("（标准价 " + money(certStd) + "/年）")));
     var entTxt = "建筑 " + money(cEnt) + (cEnt > 0 ? "" : " 限免") + " / 服务商 " + money(aEnt) + " 每次" +
       (breakin ? "（破冰期体验价）" : "");
     return '<div class="uc-scope__row"><div class="k">计入合格消费</div><ul>' +
@@ -1014,7 +1034,7 @@
       "</ul></div>" +
       '<div class="uc-scope__row uc-scope__row--off"><div class="k">不计入合格消费</div><ul>' +
       "<li>余额 / 积分充值</li>" +
-      "<li>履约保证金（可退押金）</li>" +
+      "<li>转让诚意保证金（冻结、可退）</li>" +
       "<li>退款 / 售后订单（返佣追回）</li>" +
       "<li>免费项：个人实名认证 · 个人合伙人 · 省代入驻（¥0）</li>" +
       "</ul></div>";

@@ -28,7 +28,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <span class="ap-banner-ic"><svg class="ic"><use href="#i-company"/></svg></span>
       <div>
         <div class="fw-700 fs-15">企业工商认证</div>
-        <div class="text-3 fs-12" style="margin-top:2px;">认证费 ¥999/年 · 工商三要素核验 + 人工复核 · 有效期 365 天</div>
+        <div class="text-3 fs-12" style="margin-top:2px;" id="fee-banner">认证费 · 工商三要素核验 + 人工复核 · 有效期 365 天</div>
       </div>
     </div>
 
@@ -154,7 +154,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           <span class="fw-600 fs-14">认证费（年费）</span>
           <span class="fw-700 fs-17" style="color:var(--primary);" id="fee-txt">¥999</span>
         </div>
-        <div class="text-3 fs-12" style="line-height:1.7;">包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。</div>
+        <div class="text-3 fs-12" style="line-height:1.7;" id="fee-note">包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。</div>
       </div>
 
       <!-- [FEAT 9.2-3] 多维资质核验：可选维度 -->
@@ -185,7 +185,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         </div>
       </div>
 
-      <div class="fixed-cta ae-cta" data-lg-cta="bar"><button class="btn btn-primary btn-block btn-lg" id="pay-btn">支付 ¥999 提交审核</button></div>
+      <div class="fixed-cta ae-cta" data-lg-cta="bar"><button class="btn btn-primary btn-block btn-lg" id="pay-btn">提交审核</button></div>
     </div>
 
     <!-- 审核中态 -->
@@ -255,7 +255,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       <div class="card ae-fee" id="renew-card">
         <div class="fw-600 fs-14" style="margin-bottom:6px;">认证有效期</div>
         <div class="text-3 fs-12" style="line-height:1.7;margin-bottom:12px;" id="expire-note"></div>
-        <button class="btn btn-ghost btn-block" id="renew-btn" onclick="renew()">续费一年 ¥999</button>
+        <button class="btn btn-ghost btn-block" id="renew-btn" onclick="renew()">续费一年</button>
       </div>
     </div>
   </div>
@@ -267,13 +267,23 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
 <script src="../../js/databus.js"></script>
 <script>
 (function(){window.__ROOT__='../../';
-var fee=(typeof MOCK.business.certification.enterprise==='number')?MOCK.business.certification.enterprise:999;
-var feeTxt=fee>0?('¥'+fee):'免费';
+/* 认证费按平台阶段取价（单一来源 ModeStore.certFee）：破冰期读 breakin.certification（¥0），
+   成熟期读 certification.enterprise（¥999/年）；与共创页 feeLabel、金额文档 §2.1 同一口径。
+   破冰期文案一律带“限时减免 + 标准价”，避免用户把限免读成永久定价。 */
+var stdFee=(typeof MOCK.business.certification.enterprise==='number')?MOCK.business.certification.enterprise:999;
+var fee=(window.ModeStore&&ModeStore.certFee)?ModeStore.certFee():stdFee;
+var feeStdTxt='¥'+Number(stdFee).toLocaleString();
+var feeTxt=fee>0?('¥'+Number(fee).toLocaleString()):'¥0';
+var endTxt=(window.ModeStore&&ModeStore.breakinEndAt)?ModeStore.breakinEndAt():'';
 document.getElementById('fee-txt').textContent=feeTxt;
-document.getElementById('pay-btn').textContent=fee>0?('支付 ¥'+fee+' 提交审核'):'免费提交审核';
-/* 续费按钮金额联动数据源（certification.enterprise），与 fee 逻辑一致 */
+document.getElementById('pay-btn').textContent=fee>0?('支付 ¥'+Number(fee).toLocaleString()+' 提交审核'):'提交审核（破冰期限时减免）';
+var _fBanner=document.getElementById('fee-banner');
+if(_fBanner){_fBanner.textContent=fee>0?('认证费 '+feeStdTxt+'/年 · 工商三要素核验 + 人工复核 · 有效期 365 天'):('认证费 ¥0（破冰期限时减免'+(endTxt?('至 '+endTxt):'')+' · 标准价 '+feeStdTxt+'/年）· 工商三要素核验 + 人工复核 · 有效期 365 天');}
+var _fNote=document.getElementById('fee-note');
+if(_fNote){_fNote.textContent=fee>0?'包含工商三要素核验、信用代码校验、企业认证标识；到期前可续费保持状态。':('破冰期限时减免，本期实付 ¥0；'+(endTxt?('到期日 '+endTxt+' 后'):'成熟期')+'按标准价 '+feeStdTxt+'/年 执行，通过后有效期 365 天，到期前可续费。');}
+/* 续费与首次提交同价（按当前阶段取价） */
 var renewBtn=document.getElementById('renew-btn');
-if(renewBtn){renewBtn.textContent=fee>0?('续费一年 ¥'+Number(fee).toLocaleString()):'免费续期（当前认证免费）';}
+if(renewBtn){renewBtn.textContent=fee>0?('续费一年 ¥'+Number(fee).toLocaleString()):'续费一年（破冰期限时减免）';}
 var st=UI.state.get();
 function fmtD(t){if(!t)return '—';var d=new Date(t);return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function cur(){return AuthStore.read();}
@@ -393,7 +403,7 @@ function fillReview(a){
     rvRow('企业名称',a.enterprise.co||'—')+rvRow('企业简称',a.enterprise.shortName||'—')+
     rvRow('命名依据',basisLabel(a.enterprise.nameBasis))+rvRow('信用代码',a.enterprise.code||'—')+
     rvRow('提交时间',fmtD(a.enterprise.submittedAt))+rvRow('预计完成','3 个工作日内')+
-    rvRow('认证费','¥'+(a.enterprise.fee||fee));
+    rvRow('认证费',(typeof a.enterprise.fee==='number')?(a.enterprise.fee>0?('¥'+Number(a.enterprise.fee).toLocaleString()):'¥0（破冰期限免）'):('¥'+Number(fee).toLocaleString()));
   /* E1-18：渲染各认证维度审核状态（已提交/审核中/已通过） */
   try{
     var dd=AuthStore.dimensionStatus(), box=document.getElementById('rv-dims');
