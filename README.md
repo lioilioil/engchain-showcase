@@ -2,24 +2,23 @@
 
 > 建筑行业供需匹配平台 · 纯前端静态 Demo（HTML + JS Mock 数据层）
 >
-> **商用成熟度：已交付（2026-10-23）**——省级总代体系 S0–S5 六阶段补齐完成（交互零残留/视觉系统收口/后台主题对齐/旅程导览 9 节点/商用文案/全量终验 R-01~R-18），四套冒烟全绿，红线零回退，达商用专业级演示水平。详见《省级总代体系-商用成熟度补齐执行计划-v1.md》§7 发布结论书。
+> **商用成熟度：已交付（2026-10-23）**——省级总代体系 S0–S5 六阶段补齐完成（交互零残留/视觉系统收口/后台主题对齐/省代合作工作台 13 页/商用文案/全量终验 R-01~R-18），四套冒烟全绿，红线零回退。过程文档《省级总代体系-商用成熟度补齐执行计划-v1.md》已随 2026-10-28 归档移出仓库。
 
 ---
 
 ## 快速开始
 
 ```bash
-# 起本地服务（带缓存）
-python serve_cached.py 8767
-
-# 或起无缓存版（改代码后实时生效）
-python serve_nocache.py 8766
+# 仓库根目录即站点根，起任意静态服务器即可（示例用 Python 内置）
+python -m http.server 8767
 ```
 
-打开浏览器访问：
-- **前端 App**：`http://127.0.0.1:8767/home.html`
-- **管理后台（新版 Vue3）**：进入 `admin-vue/` 执行 `npm run dev`，访问终端输出地址（默认 `http://127.0.0.1:5173/`），演示账号 `admin/admin123`（超管）、`viewer/viewer123`（只读）
-- 旧版静态管理后台（`admin-20261009/`）已于 2026-10-12 随非 demo 文件一并归档至 `D:\Engchain3.0-archive\engchain-cleanup-20261012\archive\admin-20261009\`，仅作历史参考
+打开浏览器访问 `http://127.0.0.1:8767/`：
+
+- **前端 App**：`/home.html`；原型总览 `/preview.html`（含演示场景切换器）；认证引导入口 `/index.html`
+- **管理后台（Vue3 源码）**：进入 `admin-vue/` 执行 `npm ci && npm run dev`，访问终端输出地址（默认 `http://127.0.0.1:5173/`），演示账号 `admin/admin123`（超管）、`viewer/viewer123`（只读）
+- **管理后台（构建副本）**：`admin/` 为 `admin-vue` 的构建产物，Pages 直接伺服，无需构建
+- 本机的 `serve_cached.py`（带缓存 + gzip）/ `serve_nocache.py`（无缓存）属本地开发工具，`.gitignore` 全局排除 `*.py`，不随仓库发布；旧版静态后台 `admin-20261009/` 已于 2026-10-12 归档至 `D:\Engchain3.0-archive\engchain-cleanup-20261012\`，仅作历史参考
 
 ---
 
@@ -39,33 +38,33 @@ python serve_nocache.py 8766
 | u11（代理演示场景，非独立登录） | 四川省级总代（active，n/21） | 两分区台账、充值不进、frozen/settled/冲减、法定税、自身余额、O4 已签、团队 admin+member、叠加个人合伙人示例、清理日志样例；由 agent-demo 播种/重置 |
 | u12（代理演示场景，非独立登录） | 成都二级（approved，约定20%） | 本人约定所得、冻结退款、冲减、法定税、已签、自身余额、团队；由 agent-demo 播种/重置 |
 
-> 代理演示场景（u11/u12）通过 preview.html 演示切换器播种写入 `engchain-province-agents`/`engchain-sub-agents` 等代理键（v3 工作台/二级页已并入 App 骨架，P0–P4 已完成，页内不再有 ⚙ 自绘演示浮层），硬刷新可还原；不覆盖 u9/u10 等既有种子。
+> 代理演示数据（u11 四川省级总代 / u12 成都二级）由 `preview.html` 的演示场景切换写入 `engchain-province-agents` / `engchain-sub-agents` 等代理键，硬刷新可还原；不覆盖 u9/u10 等既有种子。
 >
-> **原型演示身份（D5 权限差异演示）**：自原「我的」页移出，仅保留在演示播种区（preview.html 演示切换器说明 + 本 README），省代成品页面零 dev 文案。播种方式：在 preview.html 左侧「演示场景」区的「省代 v3」下拉选择 **省代总代 · 正常态**（u11 四川省级总代）或 **二级企业 · 正常态**（u12 成都二级），随后于演示窗口内进入「身份详情」视图，即可在 **老板/管理员 ↔ 员工** 之间切换演示角色，验证 D5 权限差异：员工仅可发码 / 跟进 / 登记传凭证；不可签协议、改比例、确认平账、查看自留、全量导出，仅看本人名下线索。
+> **身份联动**：在「演示场景」选择 **省级总代 · 已开通/已暂停** 或 **二级合作 · 已绑定** 后进入工作台，即以该域管理员身份打开；选择其它身份时工作台显示无权限占位。在工作台「设置 → 身份卡」可切换 **管理员 / 法定代表人 / 员工**（仅本域 3 个身份），`preview.html` 与「我的」页同步显示同一身份；员工权限收窄（可发码 / 跟进 / 登记传凭证，不可签协议、改比例、确认平账、查看自留、全量导出）。
 
-### 省级总代体系 · 完整旅程导览（13 节点）
+### 省级总代体系 · 合作工作台（13 个独立页）
 
-> 在 `preview.html` 左侧「完整旅程导览 · 省级总代体系」分组同步呈现；演示切换器按播种键选择场景后沿路径走查。
+> 入口 `pages/province-agent/uni/pages/home.html`；页间为真实链接（无 hash 路由），底部 tabbar 三主入口：工作台 / 消息 / 设置。
 
-| # | 旅程节点 | 目标路径 | 播种键（演示切换器） | 预期落点 |
-|---|---|---|---|---|
-| 1 | 游客 → 注册 | `index.html`（App 首页游客态） | `guest` | 游客未登录态 → 注册 → 登录态+账号建立（u6） |
-| 2 | 注册 → 个人实名认证 | `pages/profile/auth-personal.html` | `registered` | realname 轨道点亮 |
-| 3 | 实名 → 企业工商认证 | `pages/profile/auth-enterprise.html` | `realname` | enterprise 轨道点亮 |
-| 4 | 企业认证 → 入驻申请（省代 ¥0） | `pages/profile/entry-form.html?type=provinceAgent` | `enterprise` | 入驻资料·省代提交 → rev_province_pending 待初审 |
-| 5 | 后台审核开通 | `pages/province-agent/index.html` | `rev_province_pending` → 后台省代开通/审核通过 | province_agent_active（身份卡已生效） |
-| 6 | 总代工作台（身份/省/名额/看板） | `pages/province-agent/index.html` | `province_agent_active`（u11 四川总代） | 授权省四川省/名额 n·cap/约定所得 hero/二级列表 |
-| 7 | 发起二级合作（待平台审核） | `pages/province-agent/index.html` | `rev_sub_pending`（u11 发起） | 二级卡片待审核/协议未签约 |
-| 8 | 二级签署（总代→二级→签回） | `pages/province-agent/sub.html` | `sub_agent_active`（u12 陈二级） | 约定 20%·已签·本人约定所得/自身余额 |
-| 9 | 台账 / 税务 / 打印（商用闭环） | `pages/province-agent/tax-guide.html` | `province_agent_active` | 两分区台账（T+7 冻结/结算/冲减/税列）→ 税说明法定预扣 → 打印 A4 |
-| 10 | 招商中心（招商码/海报导出） | `pages/province-agent/recruit.html` | `province_agent_active` | 招商码（一总代一有效码）+ 省独家海报 3 主题 + 话术包（合规硬门）→ Canvas 导出 |
-| 11 | 企业自助申请（双轨路径②） | `pages/province-agent/apply.html` | `province_agent_active` | 招商码→企业申请（同省锁定/隔离声明）→ 总代初审 20% → 平台终审 → 自动发起 O4 → 二级签署 |
-| 12 | 二级授权网络（名额/授权链） | `pages/province-agent/network.html` | `province_agent_active` | 两层授权链（总代根→二级公司）+ 名额使用率（含 pending 占用）+ 多态状态 + 聚合约定所得 |
-| 13 | 经营数据中心（总代/二级） | `pages/province-agent/data-center.html` | `province_agent_active` | 月度趋势（近 12 月柱线）/二级贡献排行/比例变更历史/退款冲减统计/月度对账单（打印+CSV）；二级视角：本人趋势/消费构成/冻结到期 |
+| # | 页面 | 路径 | 内容 |
+|---|---|---|---|
+| 1 | 工作台 | `pages/province-agent/uni/pages/home.html` | 身份条、财务卡（省代总盘 / 自留）、待办、合作档案、邀请获客与招二级入口 |
+| 2 | 经营与渠道 | `pages/province-agent/uni/pages/invite-code.html` | 按成员组织的渠道码卡、复制链接（话术库 + 推广渠道）、推广海报、作废与恢复 |
+| 3 | 获客记录 | `pages/province-agent/uni/pages/invite-records.html` | 线索列表、筛选、跟进、阶段推进 |
+| 4 | 获客转化 | `pages/province-agent/uni/pages/invite-stats.html` | 漏斗与转化数据 |
+| 5 | 对账中心（省代） | `pages/province-agent/uni/pages/reconcile.html` | 登记 / 确认 / 冲销 / 平账（仅省代域） |
+| 6 | 对账中心（二级） | `pages/province-agent/uni/pages/reconcile-sub.html` | 二级域对账与分账确认 |
+| 7 | 对账历史 | `pages/province-agent/uni/pages/reconcile-history.html` | 历史对账记录 |
+| 8 | 经营台账 | `pages/province-agent/uni/pages/ledger.html` | 冻结 / 结算 / 冲减 / 税列与打印 |
+| 9 | 专用设置 | `pages/province-agent/uni/pages/settings.html` | 身份卡、比例、协议与通知设置 |
+| 10 | 消息中心 | `pages/province-agent/uni/pages/messages.html` | 平台与业务通知 |
+| 11 | 二级合作 | `pages/province-agent/uni/pages/subs.html` | 二级列表、签约状态、约定所得 |
+| 12 | 团队管理 | `pages/province-agent/uni/pages/team.html` | 成员与权限 |
+| 13 | 合作协议 | `pages/province-agent/uni/pages/agreement.html` | 协议签署与归档 |
 
-> 运营规则与 FAQ：`pages/province-agent/rules.html`（招募资格/比例变更/签约八条/终止清退状态机/合规边界/测算免责 + 10 条 FAQ，与税务说明互链）。
+> 旧版 v3 工作台（`pages/province-agent/` 根目录下的 index/sub/tax-guide/recruit/apply/network/data-center/rules 等页面）已于 2026-10-28 归档移出仓库，仅 `v3/js/` 的场景与存储脚本仍被 uni 页面引用。
 
-> 红线说明：个人合伙人返佣/提现、base/limited、franchise ¥29,800、自身钱包等红线页仅作对照演示，不在本旅程主路径内操作。
+> 红线说明：个人合伙人返佣/提现、base/limited、招商加盟信息解锁（积分 49/39/29，加盟费由招商企业对公收取、平台不代收）、自身钱包等红线页仅作对照演示，不在合作工作台主路径内操作。
 
 后台管理员：右上角用户菜单 → 切换身份 → 选对应角色
 
@@ -80,17 +79,17 @@ python serve_nocache.py 8766
 ```
 Engchain3.0/
 ├── home.html              # 前端 App 首页
-├── preview.html           # 原型总览入口
+├── preview.html           # 原型总览入口（含演示场景切换器）
 ├── index.html             # 认证引导入口
-├── engchain-showcase/     # 全屏展示模式（preview 的“无边框”入口）
-├── serve_cached.py        # 本地服务（带缓存）
-├── serve_nocache.py       # 本地服务（无缓存）
+├── showcase.html          # 全屏展示模式
 │
-├── admin-vue/             # 管理后台（Vue3 新版，12 组 41 项功能，npm run dev 启动）
+├── admin-vue/             # 管理后台源码（Vue3，12 组 41 项功能，npm run dev 启动）
 │   ├── src/               # 源码（views/components/store/router 分层）
-│   └── ...                # 详见 engchain-vue3-admin Skill
+│   └── ...
+├── admin/                 # 管理后台构建产物（Pages 直接伺服，npm run build 可再生）
+├── platform-docs/         # 平台说明文档（自包含 HTML + 6 张 archify 图解）
 │
-├── pages/                 # 前端 App（136 个页面文件）
+├── pages/                 # 前端 App（187 个页面文件 / 30 个子目录）
 │   ├── auth/              # 登录/注册
 │   ├── profile/           # 个人中心/认证/入驻
 │   ├── supply/            # 供需发布/详情
@@ -98,7 +97,10 @@ Engchain3.0/
 │   ├── wallet/            # 钱包/充值/提现/积分
 │   ├── distribution/      # 分销中心
 │   ├── esign/             # 电子签
+│   ├── province-agent/    # 省代合作工作台（uni 13 页 + v3 脚本）
 │   └── ...
+│
+├── css/  assets/  vendor/ # 样式、静态资源、第三方库（液态玻璃两套实现）
 │
 └── js/                    # 数据层（核心）
     ├── data.js            # MOCK 种子数据（用户/企业/供需/定价）
@@ -109,6 +111,8 @@ Engchain3.0/
     ├── detail.js          # 供需/建企买卖详情/解锁/转让诚意保证金
     └── common.js          # 通用工具（UI/格式化/事件）
 ```
+
+> `serve_cached.py` / `serve_nocache.py` / `serve_demo.py` / `engchain_control.py`、`style.json`、`.dsh/`、`ui-design-runs/` 均属本机工具与运行产物，已在 `.gitignore` 中排除（`*.py` 全局忽略），不随仓库发布。
 
 ---
 
@@ -159,7 +163,7 @@ DataBus.orderCalc(amt)    // 订单计费口径（平台不抽佣，恒为 0）
 - ✅ 平台只做信息匹配，**不碰交易资金**
 - ✅ **不抽佣**（commission._phase0.tradingEnabled = false）
 - ✅ **交易类收费与资金托管已下线**（不抽佣、不代收代付，mediation 模块已清理）
-- ✅ 收入来源：入驻费 + 信息解锁（¥29.9）+ 增值服务
+- ✅ 收入来源：企业认证（首次核验 ¥999 / 年度年审 ¥599/年）+ 入驻与续费 + 信息解锁（积分）+ 订阅与增值服务（破冰期认证与入驻减免为 ¥0，标准价照常展示）
 
 ---
 
@@ -182,4 +186,4 @@ DataBus.orderCalc(amt)    // 订单计费口径（平台不抽佣，恒为 0）
 
 ---
 
-*最后更新：2026-10-26*
+*最后更新：2026-11-09*
