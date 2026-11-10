@@ -93,11 +93,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
             </div>
             <div class="form-field">
               <label for="f-subname"><svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>品名 <span class="req">*</span></label>
-              <input class="input" id="f-subname" maxlength="30" placeholder="选择或输入品名，如 C30商品混凝土" autocomplete="off" list="subname-list">
-              <datalist id="subname-list"></datalist>
-              <div class="subname-sim" id="subname-sim"></div>
+              <input class="input" id="f-subname" maxlength="30" placeholder="选择或输入品名，如 C30商品混凝土" autocomplete="off">
               <div class="subname-origin" id="subname-origin"></div>
-              <div class="subcat-request"><a href="javascript:void(0)" id="subname-request-link">没有合适的品名？申请新增</a></div>
               <div class="pending-chips" id="pending-subname-chips"></div>
               <div class="field-error" id="err-sub">请填写品名</div>
             </div>
@@ -2579,8 +2576,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     /* ---- 品名：可输可选组合下拉（datalist / 相似名行停用，面板内分组承担） ---- */
     if (!window.__pickx.subname && fields.sub) {
       fields.sub.removeAttribute('list');
-      var dl = $('subname-list'); if (dl) dl.innerHTML = '';
-      var simEl = $('subname-sim'); if (simEl) simEl.style.display = 'none';
       window.__pickx.subname = new PickX.Combo({
         input: fields.sub,
         host: fields.sub.parentElement,
@@ -2664,28 +2659,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       dl.appendChild(o);
     });
   }
-  /* 品名相似度去重提示：命中词库近似名时给出「是否指 X？」引导，避免同物异名泛滥 */
-  function bindSubnameSim() {
-    /* PickX 组合框接管：相似名引导移入面板内，原行内提示停用 */
-    if (window.__pickx && window.__pickx.subname) return;
-    var inp = fields.sub, sim = $('subname-sim');
-    if (!inp || !sim) return;
-    var lastVal = '';
-    inp.addEventListener('input', function () {
-      var v = inp.value.trim();
-      if (v === lastVal) return; lastVal = v;
-      sim.innerHTML = ''; sim.classList.remove('show');
-      if (!v || !window.EngchainCatalog || !EngchainCatalog.similarName) return;
-      var r = EngchainCatalog.similarName(fields.category.value, fields.subcat ? fields.subcat.value : '', v);
-      if (r && r.hit && r.name !== v) {
-        var a = document.createElement('a');
-        a.href = 'javascript:void(0)';
-        a.textContent = '是否指「' + r.name + '」？';
-        a.addEventListener('click', function () { inp.value = r.name; lastVal = r.name; sim.innerHTML = ''; sim.classList.remove('show'); inp.dispatchEvent(new Event('input')); scheduleAutoSave(); });
-        sim.appendChild(a); sim.classList.add('show');
-      }
-    });
-  }
   function updateCategoryPlaceholders() {
     var cat = fields.category.value;
     if (!cat && TYPE_DEF) cat = TYPE_DEF.cat || '';
@@ -2698,7 +2671,6 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (fields.subcat) fields.subcat.value = '';
       if (fields.sub) fields.sub.value = '';
       if (window.__pickx && window.__pickx.subcat) window.__pickx.subcat.setValue('');
-      var simEl = $('subname-sim'); if (simEl) { simEl.innerHTML = ''; simEl.classList.remove('show'); }
       refreshPendingUI();
       refreshSubnameOrigin();
       if (cat === '建企买卖' && role === 'demand') {
@@ -2898,10 +2870,9 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     updateNextButton();
     scheduleAutoSave();
   });
-  /* 子类联动：切换子类刷新品名联想库（datalist）；未选子类时品名库为空 */
+  /* 子类联动：切换子类刷新品名联想库（PickX 面板分组）；未选子类时品名库为空 */
   if (fields.subcat) fields.subcat.addEventListener('change', function () {
     renderSubnameList();
-    var simEl = $('subname-sim'); if (simEl) { simEl.innerHTML = ''; simEl.classList.remove('show'); }
     refreshPendingUI();
     refreshSubnameOrigin();
     updateCategoryPlaceholders();
@@ -2909,20 +2880,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     updateNextButton();
     scheduleAutoSave();
   });
-  /* 品名输入联想 + 相似度去重提示 */
-  bindSubnameSim();
   /* 「申请新增子类」入口：打开申请弹层，写入本地待审池（MVP 落 localStorage，后台页后续接入） */
   var reqLink = $('subcat-request-link');
   if (reqLink) reqLink.addEventListener('click', function (e) {
     e.preventDefault();
     openPendingSheet('subcat');
-  });
-  /* 「申请收录品名」入口：与子类共用同一弹层，自动带上当前品类+子类 */
-  var reqSubLink = $('subname-request-link');
-  if (reqSubLink) reqSubLink.addEventListener('click', function (e) {
-    e.preventDefault();
-    var cur = fields.sub ? fields.sub.value.trim() : '';
-    openPendingSheet('subname', cur || '');
   });
   // 建企买卖四要素：选择/输入即刷新下一步状态（四要素现位于首个专业分页，不再固定 step2）
   if (fields.tradeQualCat) fields.tradeQualCat.addEventListener('change', function () {
