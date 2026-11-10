@@ -168,10 +168,18 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
                 <label class="pm-opt" data-val="negotiable"><span class="pm-radio"></span>面议</label>
               </div></div>
             <div class="form-field">
-              <div class="price-range" id="price-range">
-                <input class="input" id="f-price" inputmode="decimal" placeholder="最低价" autocomplete="off">
+              <div class="price-range collapsed" id="price-range">
+                <input class="input" id="f-price" inputmode="decimal" placeholder="价格" autocomplete="off">
                 <span class="pr-dash">～</span>
-                <input class="input" id="f-price-max" inputmode="decimal" placeholder="最高价" autocomplete="off">
+                <div class="price-max-wrap" id="price-max-wrap">
+                  <input class="input" id="f-price-max" inputmode="decimal" placeholder="最高价" autocomplete="off">
+                  <button type="button" class="pr-toggle pr-toggle-close" id="pr-toggle-close" title="收起为单一价格" aria-label="收起为单一价格">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                  <button type="button" class="pr-toggle pr-toggle-add" id="pr-toggle-add" title="展开为价格区间" aria-label="展开为价格区间">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  </button>
+                </div>
                 <div class="unit-picker price-unit-picker" id="price-unit-picker">
                   <div class="unit-input-wrap">
                     <input class="input" id="f-price-unit" maxlength="10" placeholder="单位" autocomplete="off" aria-haspopup="listbox" aria-expanded="false" title="选择或输入价格单位，如 元/方、万元">
@@ -701,7 +709,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   /* ===== 角色设置 ===== */
   function setRole() {
     $('nav-title').textContent = role === 'demand' ? '发布需求' : '发布供应';
-    fields.price.placeholder = '最低价';
+    var pRange = $('price-range');
+    fields.price.placeholder = (pRange && pRange.classList.contains('collapsed')) ? '价格' : '最低价';
     var pmaxEl = $('f-price-max'); if (pmaxEl) pmaxEl.placeholder = '最高价';
     applyCategorySide();
   }
@@ -1919,6 +1928,26 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var o = e.target.closest('.pm-opt'); if (!o) return;
       applyMode(o.dataset.val);
     });
+    /* 单一价格 ↔ 区间价格切换 */
+    var btnClose = $('pr-toggle-close'), btnAdd = $('pr-toggle-add');
+    var savedMaxForRange = '';
+    function setRangeMode(on) {
+      rangeEl.classList.toggle('collapsed', !on);
+      if (on) {
+        /* 展开为区间：恢复之前的最高价，placeholder 提示最低价 */
+        if (maxEl) { maxEl.value = savedMaxForRange || maxEl.value; maxEl.disabled = minEl.disabled; }
+        minEl.placeholder = '最低价';
+      } else {
+        /* 收起为单一价格：暂存并清空最高价，placeholder 改回「价格」 */
+        if (maxEl) { savedMaxForRange = maxEl.value; maxEl.value = ''; }
+        minEl.placeholder = '价格';
+      }
+      minEl.dispatchEvent(new Event('input'));
+    }
+    if (btnClose) btnClose.addEventListener('click', function (e) { e.preventDefault(); setRangeMode(false); });
+    if (btnAdd) btnAdd.addEventListener('click', function (e) { e.preventDefault(); setRangeMode(true); });
+    window.__setRangeMode = setRangeMode;
+    window.__isRangeMode = function () { return !rangeEl.classList.contains('collapsed'); };
     window.__setPriceMode = applyMode;
     window.__syncPriceMode = function () {
       if (minEl.value.trim() === '面议') { applyMode('negotiable'); }
@@ -2239,14 +2268,16 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         if (n !== this.value) this.value = n;
       });
     });
-    /* FIELD-RULES P0：价格区间联动——最高价低于最低价时报错 */
+    /* FIELD-RULES P0：价格区间联动——单一价格(collapsed)时不校验；区间模式下必须 min < max */
     function checkPriceRange() {
       var minEl = fields.price, maxEl = $('f-price-max');
       if (!minEl || !maxEl || minEl.disabled || maxEl.disabled) return;
+      /* 单一价格模式：max 框已隐藏，跳过比较 */
+      if (window.__isRangeMode && !window.__isRangeMode()) { maxEl.classList.remove('error'); return; }
       var mn = parseFloat(minEl.value), mx = parseFloat(maxEl.value);
-      var bad = (!isNaN(mn) && !isNaN(mx) && mx < mn);
+      var bad = (!isNaN(mn) && !isNaN(mx) && mx <= mn);
       if (bad) {
-        if (!maxEl.classList.contains('error')) UI.toast('最高价不能低于最低价', 'warn');
+        if (!maxEl.classList.contains('error')) UI.toast('最高价必须大于最低价', 'warn');
         maxEl.classList.add('error');
       } else {
         maxEl.classList.remove('error');
@@ -3713,9 +3744,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       var priceParts = priceStr.split('～');
       fields.price.value = priceParts[0].trim();
       if (pmaxEl) pmaxEl.value = (priceParts[1] || '').trim();
+      if (window.__setRangeMode) window.__setRangeMode(true);
     } else {
       fields.price.value = priceStr;
       if (pmaxEl) pmaxEl.value = '';
+      if (window.__setRangeMode) window.__setRangeMode(false);
     }
     fields.spec.value = d.spec || '';
     fields.delivery.value = d.delivery || '';
