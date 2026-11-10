@@ -1971,16 +1971,16 @@ window.DataBus = (function () {
     /* [M4-4] 旧企业合伙人 resident_partner 场景已摘除（u8 回退为实名普通用户）；个人合伙人 partner 场景保留 */
 
     /* ---- 省级代理体系终态（数据走 AgentDemo.seed() 真实播种：两分区/T+7/税列/团队/O4，余额不动） ---- */
-    province_agent_active: { label: '省级总代 · 已开通（四川 · active）', group: 'start', base: 'u11', workbench: 'active',
+    province_agent_active: { label: '省级总代 · 已开通（四川）', group: 'start', base: 'u11', workbench: 'active',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已开通' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
         grantUnionPartner();
       } },
-    sub_agent_active: { label: '二级合作 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12', workbench: 'sub-active',
+    sub_agent_active: { label: '二级合作企业 · 已绑定（成都 · 约定20% · 已签）', group: 'start', base: 'u12', workbench: 'sub-active',
       ensure: { name: '陈二级', company: '成都××合作公司', mobile: '139****0012', tag: '二级合作 · 已绑定' },
       build: function () { if (window.AgentDemo) AgentDemo.seed(); } },
-    province_agent_suspended: { label: '省级总代 · 已暂停（锁顶 · 台账只读）', group: 'start', base: 'u11', workbench: 'suspended',
+    province_agent_suspended: { label: '省级总代 · 已暂停（仅可查看）', group: 'start', base: 'u11', workbench: 'suspended',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已暂停' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
@@ -1988,7 +1988,9 @@ window.DataBus = (function () {
         var S = window.AgentStore;
         if (S) { var p = S.getProvince('pa-u11'); if (p) { p.status = 'suspended'; p.statusLog = p.statusLog || []; p.statusLog.push({ operator: 'admin', at: Date.now(), reason: '演示暂停', fromStatus: 'active', toStatus: 'suspended' }); S.saveProvince(p); } }
       } },
-    province_agent_terminated: { label: '省级总代 · 已终止（只读独立块）', group: 'start', base: 'u11', workbench: 'suspended',
+    /* 终止态不写工作台场景键：工作台侧没有 terminated 种子，且准入闸门按账号状态拒入，
+       写 suspended 只会让面板把"终止"说成"暂停"（2026-11-10 修正） */
+    province_agent_terminated: { label: '省级总代 · 已终止（工作台不可进入）', group: 'start', base: 'u11',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代 · 已终止' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
@@ -2063,37 +2065,39 @@ window.DataBus = (function () {
   };
 
   /* ---------------- 演示场景 ↔ 工作台联动（栈 A → 栈 B） ----------------
-     账号层是【账号身份】的权威，工作台场景键是【工作台】的权威。
-     正向：应用演示场景时同步写工作台场景键，并清空工作台状态缓存，使其下次启动按新场景
-           重新播种（含该场景默认身份：省代→管理员 / 二级→管理员）。
-     反向：工作台切场景/身份后写 engchain-workbench-echo / engchain-workbench-intent，
-           preview 侧栏与 profile 身份胶囊读取回声；跨域切换的意图由 applyPendingWorkbench()
-           在账号层下次启动时补应用（见 boot 处调用）。
-     非代理身份（游客/注册/认证/入驻/申请审核…）仍写省代默认场景，但这只是数据层归一；
-     准入已由工作台页的准入闸门（uni-shared.js boot，2026-11-02）按账号资格拦截：
-     这类身份进入工作台会看到无权限占位，不再因为场景键被复位而"看起来能进"。 */
+     账号层是【账号身份】的权威，工作台场景键是【工作台视图】的权威。
+     正向：仅当该场景声明了 workbench（省代/二级代理域演示）时，才写工作台场景键、
+           清空工作台状态缓存并写默认身份回声，使其下次启动按新场景重新播种。
+           账号身份类场景（游客/注册/认证/入驻/申请审核/驳回/平台内部）不触碰工作台键：
+           它们与工作台无关，此前无条件写 active 会让面板把"游客"回声成"省代"，并顺带删掉
+           工作台 85KB 业务状态（2026-11-10 修正）。
+     反向：工作台侧在 boot 与切场景/身份时写 engchain-workbench-echo（带 uid），preview
+           侧栏与 profile 身份胶囊读取回声；跨域切换的意图由 applyPendingWorkbench() 补应用。
+     展示口径：面板的"工作台身份"不再直接信回声，而是由 UI.workbenchAccess()（与工作台页
+           同一闸门）+ UI.pinWorkbenchScene() 派生，回声只提供身份后缀。 */
   var WB_SCENARIO_KEY = 'engchain-v3-demo-scenario';
   var WB_STATE_KEY = 'engchain-v3-demo-state-v1';
-  var WB_IDENTITY_KEY = 'engchain-v3-demo-identity';
   var WB_ECHO_KEY = 'engchain-workbench-echo';
   var WB_INTENT_KEY = 'engchain-workbench-intent';
 
   function workbenchSceneOf(demoKey) {
     var sc = DEMO_SCENARIOS[demoKey];
-    return (sc && sc.workbench) || 'active';
+    /* 未声明工作台域 → ''（不再兜底 'active'：兜底会让身份类场景伪造省代回声） */
+    return (sc && sc.workbench) || '';
   }
 
   function syncWorkbench(demoKey) {
     var wb = workbenchSceneOf(demoKey);
+    if (!wb) return '';                    /* 与工作台无关的场景：不写键、不清缓存、不写回声 */
     var isSub = wb.indexOf('sub-') === 0;
     try {
       localStorage.setItem(WB_SCENARIO_KEY, wb);
-      localStorage.removeItem(WB_STATE_KEY);
-      localStorage.removeItem(WB_IDENTITY_KEY);
-      localStorage.removeItem(WB_INTENT_KEY);   /* 账号层已自行应用，撤销待办意图 */
+      localStorage.removeItem(WB_STATE_KEY);   /* 重播：同一场景键也可能要求恢复干净基线 */
+      localStorage.removeItem(WB_INTENT_KEY);  /* 账号层已自行应用，撤销待办意图 */
       localStorage.setItem(WB_ECHO_KEY, JSON.stringify({
         scene: wb, identity: isSub ? 'sub_admin' : 'admin',
-        mode: isSub ? 'sub' : 'province', at: Date.now()
+        mode: isSub ? 'sub' : 'province', uid: (DEMO_SCENARIOS[demoKey] || {}).base || '',
+        at: Date.now()
       }));
     } catch (e) {}
     return wb;
@@ -2159,14 +2163,40 @@ window.DataBus = (function () {
        c) profile 的弹窗干脆不做反推，恒定落在占位项。
      改为"应用时记账、读取时验签"：applyDemoScenario() 落 {key, sig, at}，
      读取时签名必须与当前状态一致才认——页面内/后台任何真实操作改动了身份、认证、
-     入驻或工作台场景域，记忆立即失效，不会把真实推进误标回某个预设场景。
+     入驻、或省代/二级记录状态，记忆立即失效，不会把真实推进误标回某个预设场景。
+     工作台视图（场景键/主题/团队身份）刻意不进签名：它不改变账号身份。
      重置会连这条记忆一起清掉（resetAll 删除全部 engchain-* 键）。 */
   var DEMO_KEY = 'engchain-demo-scenario';
 
-  /* 身份签名（preview 的 curIdentitySig 直接委托到这里，全站只此一份口径），
-     并在五轨道/认证/入驻之外补上工作台场景域：
-     同一 base 账号的多个场景（如省代 active / suspended）身份签名完全相同，
-     只有场景域能把它们分开。 */
+  /* 代理记录读取（按 uid 精确匹配；只读，不写任何数据） */
+  function agentRecord(key, uid) {
+    if (!uid) return null;
+    try {
+      var l = JSON.parse(LS.getItem(key) || '[]');
+      if (!Array.isArray(l)) return null;
+      for (var i = 0; i < l.length; i++) {
+        if (l[i] && l[i].uid === uid) return l[i];
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+  function agentRecordStatus(key, uid) {
+    var r = agentRecord(key, uid);
+    return r ? String(r.status || '') : '';
+  }
+  /* 候选场景必须属于当前账号：否则"认出"某个预设后再点它会把账号切到别人身上 */
+  function scenarioBelongsTo(key, uid) {
+    var sc = DEMO_SCENARIOS[key];
+    return !!(sc && sc.base === uid);
+  }
+
+  /* 身份签名（preview 的 curIdentitySig 直接委托到这里，全站只此一份口径）。
+     组成＝账号身份的全部可变化维度：uid + 五轨道 + 入驻类型/阶段 + 各认证域 status
+           + 省代/二级记录 status（按 uid 精确匹配）。
+     刻意不含工作台场景键：场景键是【视图】，切主题/切身份/开工作台都只改视图，
+     不能据此判定"演示场景变了"（2026-11-10 修正：此前含 wb，导致工作台一活动，
+     审核中/驳回等无关预设的记忆就被作废）；反过来，后台改代理状态必须让记忆失效，
+     否则暂停/终止后下拉仍显示"已开通"。 */
   function demoScenarioSig() {
     try {
       var cu = current();
@@ -2177,16 +2207,16 @@ window.DataBus = (function () {
       }
       var e = (window.EntryStore && window.EntryStore.read) ? (window.EntryStore.read() || {}) : {};
       var a = (window.AuthStore && window.AuthStore.read) ? (window.AuthStore.read() || {}) : {};
-      var wb = '';
-      try { wb = LS.getItem(WB_SCENARIO_KEY) || ''; } catch (err) {}
       function s(k) { return st[k] || 'locked'; }
-      return [ cu ? cu.id : '?',
+      var uid = cu ? cu.id : '';
+      return [ uid,
         s('realname'), s('personal-entry'), s('partner'), s('enterprise'), s('entry'),
         e.type || '', e.status || '',
         (a.personalEntry && a.personalEntry.status) || '',
         (a.partner && a.partner.status) || '',
         (a.enterprise && a.enterprise.status) || '',
-        wb ].join('|');
+        agentRecordStatus('engchain-province-agents', uid),
+        agentRecordStatus('engchain-sub-agents', uid) ].join('|');
     } catch (err) { return ''; }
   }
 
@@ -2224,12 +2254,49 @@ window.DataBus = (function () {
   };
   var DEMO_TRACKS = ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'];
 
+  /* 代理域 / 省代申请态反推（2026-11-10 新增）：这些状态由代理记录 status 唯一确定，
+     不依赖场景键，也不依赖记忆。只在状态唯一且候选场景的 base 就是当前账号时才返回；
+     同一账号同时满足多个预设（如省代 active 且名下有二级待审）时不猜，交回占位项。 */
+  function inferByAgent(cu) {
+    var uid = cu && cu.id;
+    if (!uid) return '';
+    /* "省代已开通 + 名下二级申请待审"是组合态，不对应任何单一预设：
+       此时认成"省级总代 · 已开通"会掩盖待审申请，点回该选项还会把它重置掉 → 返回占位。 */
+    try {
+      var subs = JSON.parse(LS.getItem('engchain-sub-agents') || '[]');
+      if (Array.isArray(subs)) {
+        for (var i = 0; i < subs.length; i++) {
+          if (subs[i] && subs[i].parentUid === uid && String(subs[i].status || '') === 'pending') return '';
+        }
+      }
+    } catch (e0) {}
+    var pa = agentRecord('engchain-province-agents', uid);
+    var paStatus = pa ? String(pa.status || '') : '';
+    if (paStatus === 'active' && scenarioBelongsTo('province_agent_active', uid)) return 'province_agent_active';
+    if (paStatus === 'suspended' && scenarioBelongsTo('province_agent_suspended', uid)) return 'province_agent_suspended';
+    if (paStatus === 'terminated' && scenarioBelongsTo('province_agent_terminated', uid)) return 'province_agent_terminated';
+    if (paStatus === 'pending') {
+      var k = (pa && pa.firstBy) ? 'rev_province_first' : 'rev_province_pending';
+      return scenarioBelongsTo(k, uid) ? k : '';
+    }
+    if (paStatus === 'rejected' && scenarioBelongsTo('rej_province', uid)) return 'rej_province';
+    var sbStatus = agentRecordStatus('engchain-sub-agents', uid);
+    if (sbStatus === 'approved' && scenarioBelongsTo('sub_agent_active', uid)) return 'sub_agent_active';
+    return '';
+  }
+
   function inferDemoScenario() {
     if (typeof window.deriveIdentityStates !== 'function') return '';
     try {
       var cu = current();
+      /* 1. 代理域/省代申请态：状态确定即可认，代理演示账号（u11/u12）此前完全没有条目 */
+      var agentKey = inferByAgent(cu);
+      if (agentKey) return agentKey;
+      /* 2. 干净种子起点态：九个种子账号"没被动过的样子"。
+         候选场景的 base 必须就是当前账号（历史上 u8 会被认成 u5 的 realname 预设，
+         点一下就会切走账号，属同一类"认错"） */
       var exp = cu && DEMO_SEED_SIG[cu.id];
-      if (!exp) return '';
+      if (!exp || !scenarioBelongsTo(exp.key, cu.id)) return '';
       var st = (window.deriveIdentityStates() || {}).states || {};
       var e = (window.EntryStore && window.EntryStore.read) ? (window.EntryStore.read() || {}) : {};
       for (var i = 0; i < DEMO_TRACKS.length; i++) {

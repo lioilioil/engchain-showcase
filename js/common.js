@@ -1644,7 +1644,10 @@ window.UI = (function () {
     var echo = wbRead('engchain-workbench-echo', null);
     var echoScene = (echo && echo.scene) ? String(echo.scene) : '';
     var echoSub = echoScene ? wbSceneMode(echoScene) === 'sub' : false;
-    var echoAllowed = !!(echoScene && access.ok && (echoSub ? access.canSub : access.canProvince));
+    /* 回声必须属于当前账号（writeEcho 会带 uid）；旧版无 uid 的回声按"不可信"处理，
+       回落到账号默认身份，避免把上一个账号的法代/员工后缀带进新账号。 */
+    var echoAllowed = !!(echoScene && access.ok && (echoSub ? access.canSub : access.canProvince)
+      && String(echo.uid || '') === String(access.uid || ''));
     var isSub;
     if (!access.ok) isSub = !!opts.isSub;
     else if (echoAllowed) isSub = echoSub;

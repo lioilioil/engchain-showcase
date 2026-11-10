@@ -589,10 +589,10 @@
   }
 
   /* ---------- 与账号层（栈 A：engchain-state / preview / profile）联动的回声键 ----------
-     分工：工作台场景键是【工作台】的权威；账号层场景（DataBus.DEMO_SCENARIOS）是【账号】的权威。
-     正向：账号层应用演示场景时直接写工作台场景键（见 js/databus.js syncWorkbench）。
-     反向：工作台切场景/身份后写回声键，preview 侧栏与 profile 身份胶囊随即显示工作台身份；
-           跨域切换（省代↔二级）另写意图键，账号层下次启动时补应用对应演示场景。
+     分工：工作台场景键是【工作台视图】的权威；账号层场景（DataBus.DEMO_SCENARIOS）是【账号】的权威。
+     正向：账号层应用代理域演示场景时直接写工作台场景键（见 js/databus.js syncWorkbench）。
+     反向：工作台 boot / 切场景 / 切身份时写回声键（带 uid），preview 侧栏与 profile 身份胶囊
+           随即显示"工作台此刻真实呈现的身份"；跨域切换另写意图键，账号层下次启动时补应用。
      团队角色（法代/员工）在账号层无对应概念，只在下发时的 identity 字段中体现。 */
   var ECHO_KEY = "engchain-workbench-echo";
   var INTENT_KEY = "engchain-workbench-intent";
@@ -608,9 +608,11 @@
     if (!ctx) return;
     try {
       var scene = global.V3.store.currentScenario();
-      global.localStorage.setItem("engchain-v3-demo-identity", ctx.identity);
+      var a = accessOf();
       global.localStorage.setItem(ECHO_KEY, JSON.stringify({
-        scene: scene, identity: ctx.identity, label: ctx.identityLabel, mode: ctx.mode, at: Date.now()
+        scene: scene, identity: ctx.identity, label: ctx.identityLabel, mode: ctx.mode,
+        uid: (a && a.uid) || '',        /* 回声绑定账号：账号层据此拒绝跨账号残留 */
+        at: Date.now()
       }));
       if (prevMode && prevMode !== ctx.mode) {
         global.localStorage.setItem(INTENT_KEY, JSON.stringify({ demoKey: demoKeyOf(scene), at: Date.now() }));
@@ -881,6 +883,7 @@
     if (fresh && fresh.mode === desiredMode(key)) ctx = buildCtx(fresh);
     else ctx = buildCtx(global.V3.store.reset(global.V3.scenarios.seedByScenario(key), key));
     applyTheme(readTheme());
+    writeEcho();                       /* 场景键变 → 回声跟着变，账号层不再显示旧场景 */
     renderCurrent();
   }
   function onStorage(e) {
@@ -937,6 +940,9 @@
     }
     applyTheme(readTheme());
     ctx = buildCtx(state);
+    /* 打开工作台即刷新回声：回声表示"本页此刻真实呈现的身份"，而不是"最后一次切换"。
+       此前只有切场景/切身份才写，后台改状态后回声会一直停在旧值（2026-11-10 修正）。 */
+    writeEcho();
 
     /* 跨页联动：账号态 / 场景键 / 主题权威值 storage 事件 */
     global.addEventListener("storage", onStorage);

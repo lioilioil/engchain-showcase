@@ -799,7 +799,7 @@ html, body { margin:0; padding:0; background:var(--bg); }
     agency:       { label: '服务商入驻', badge: '金V', cls: 'goldV' },
     /* [M4-4] 旧企业合伙人 partner 已摘除；省代走代理体系单独徽标；二级合作为新体系档位（非个人合伙人紫） */
     provinceAgent:{ label: '省级总代', badge: '授权', cls: 'exclusive' },
-    subAgent:    { label: '二级合作', badge: '授权', cls: 'exclusive' }
+    subAgent:    { label: '二级合作企业', badge: '授权', cls: 'exclusive' }
   };
   function entryBadgeHtml(type) {
     return window.IdBadge ? IdBadge.render(type, 'md') : '';
@@ -958,7 +958,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
     return UI.workbenchHref({ isSub: !isProvince });
   }
 
-  /* 工作台身份回声：工作台切身份后写入，个人中心据此显示团队角色后缀（法代/员工） */
+  /* 工作台身份回声：工作台 boot/切身份后写入，个人中心据此显示团队角色后缀（法代/员工）。
+     回声必须属于当前账号（带 uid）且域一致，否则视为跨账号残留，不显示后缀。 */
   function workbenchEcho() {
     try { return JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (e) { return null; }
   }
@@ -968,6 +969,8 @@ html, body { margin:0; padding:0; background:var(--bg); }
     var e = workbenchEcho();
     if (!e) return '';
     if (e.mode !== (isProvince ? 'province' : 'sub')) return '';
+    var cu = (window.DataBus && DataBus.current) ? DataBus.current() : null;
+    if (!cu || String(e.uid || '') !== String(cu.id || '')) return '';
     return WB_ROLE_LABEL[e.identity] || '';
   }
 

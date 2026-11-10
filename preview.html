@@ -608,7 +608,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         进入新版管理后台
       </a>
 
-      <!-- 固定展示：五轨道身份 × 状态场景选择器（起点/审核中/驳回，与认证中心"身份成长路径"同构）；标题行点击展开/收起状态详情，默认收起 -->
+      <!-- 固定展示：五轨道身份 × 状态场景选择器（起点/审核中/驳回/平台内部，与认证中心"身份成长路径"同构）；标题行点击展开/收起状态详情，默认收起 -->
       <div class="pv-quick collapsed" id="pv-quick">
         <div class="pv-row" id="pv-quick-hd" role="button" aria-expanded="false" title="点击展开/收起状态详情">
           <span class="k">演示场景</span>
@@ -618,10 +618,10 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
           </span>
         </div>
         <div class="pv-note" id="status-note"></div>
-        <!-- 工作台身份回声：工作台侧切场景/身份后写入 engchain-workbench-echo，此处回显（反向联动） -->
+        <!-- 工作台身份回声：由「准入 + 场景键 + 回声 uid」派生（见 renderWbIdentity），不再单靠回声 -->
         <div class="pv-note" id="pv-wb-identity"></div>
         <!-- 原型演示身份（D5 权限差异演示）落位说明：自「我的」移出的演示能力，仅在本播种区说明，省代成品页面零 dev 文案 -->
-        <div class="pv-note" id="demo-identity-note"><b>身份联动（双向）：</b>在上方「演示场景」选择 <b>省级总代 · 已开通/已暂停</b> 或 <b>二级合作 · 已绑定</b> 时，工作台会同步切换到对应域并以该域管理员身份打开；选择其它身份（游客/注册/认证/入驻…）时，工作台页会如实显示 <b>无权限占位</b>（仅省代 / 二级身份可进入，不再回退到省代场景）。反向：在工作台「设置 → 身份卡」切换 <b>管理员 / 法定代表人 / 员工</b>（仅本域 3 个身份）后，回到本页与「我的」会显示同一身份。</div>
+        <div class="pv-note" id="demo-identity-note"><b>身份联动（双向）：</b>上方「演示场景」只负责账号身份。选择 <b>省级总代 · 已开通/已暂停</b> 或 <b>二级合作企业 · 已绑定</b> 时，工作台同步切到对应域并以该域管理员身份打开；其余身份（游客/注册/认证/入驻/审核中/已驳回/平台内部）不会改动工作台，工作台页按账号资格显示 <b>无权限占位</b>。<b>省级总代 · 已终止</b> 属不可进入：工作台页显示「合作已终止」占位，不提供只读块。反向：在工作台「设置 → 身份卡」切换 <b>管理员 / 法定代表人 / 员工</b>（仅本域 3 个身份）后，本处「工作台身份」随之更新；「我的」只在代理标签后追加 <b>法定代表人 / 员工</b> 后缀。</div>
       </div>
     </div>
 
@@ -1906,12 +1906,12 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     done:['已点亮','#1f9d6b','rgba(31,157,107,.14)'],
     locked:['未解锁','var(--text-3)','transparent']
   };
-  var PRIMARY_LABEL = { guest:'游客（未登录）', registered:'注册会员', realname:'实名用户', pro:'认证个人人才', partner:'认证个人合伙人', enterprise:'企业认证', resident:'企业入驻', provinceAgent:'省级总代', subAgent:'二级合作' };
+  var PRIMARY_LABEL = { guest:'游客（未登录）', registered:'注册会员', realname:'实名用户', pro:'认证个人人才', partner:'认证个人合伙人', enterprise:'企业认证', resident:'企业入驻', provinceAgent:'省级总代', subAgent:'二级合作企业' };
   function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
   var selScenario = document.getElementById('sel-scenario');
   /* value="" 占位项：当前为页面内/后台真实操作产生的非预设状态（权威状态看下方五轨道徽章），
-     不属于 20 个预设场景；选中它不触发任何切换。 */
+     不属于 27 个预设场景；选中它不触发任何切换。 */
   var LIVE_OPTION_HTML = '<option value="">页面内实时状态（非预设场景）</option>';
   function renderScenarioOptions(){
     var list = (window.DataBus && DataBus.demoScenarioList) ? DataBus.demoScenarioList() : [];
@@ -1931,18 +1931,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     return '¥' + v.toLocaleString('zh-CN', { minimumFractionDigits: dec, maximumFractionDigits: 2 });
   }
 
-  /* 种子起点态反推表已上收到 DataBus.inferDemoScenario()：preview 与「我的·演示设置」
-     共用同一份口径，避免两处各写一张表、各自猜错。 */
+  /* 场景识别已上收到数据层 DataBus.inferDemoScenario()（代理态 / 省代申请态 / 种子起点态三层）：
+     preview 与「我的·演示设置」共用同一份口径，避免两处各写一张表、各自猜错。 */
   var lastScenarioKey = '', lastScenarioSig = '';
   /* 当前身份签名：全站只此一份口径，由数据层 DataBus.demoScenarioSig() 提供
-     （uid + 五轨道 + 入驻类型/审核阶段 + 各认证域 status + 工作台场景域）。
+     （uid + 五轨道 + 入驻类型/审核阶段 + 各认证域 status + 省代/二级记录 status）。
+     不含工作台场景键——视图变化不代表演示场景变化。
      不再在页面里另写一份——两处口径一旦分叉，就会出现"这边认得、那边不认得"。 */
   function curIdentitySig(){
     return (window.DataBus && DataBus.demoScenarioSig) ? DataBus.demoScenarioSig() : '';
   }
   /* 反向同步下拉：最近一次面板所选且签名未变 → 保持；数据层的场景记忆验签通过 → 回显该场景；
      干净种子起点态 → 回显起点；其余 → 占位项。
-     记忆优先于种子反推：代理演示账号（u11/u12）不在种子表里，只能靠记忆回显。 */
+     记忆优先于种子反推：代理演示账号（u11/u12）与省代申请态由数据层按代理记录反推，
+     不在这张种子表里。 */
   function syncScenarioSelect(){
     if (!selScenario || !selScenario.options || !selScenario.options.length) return;
     var sig = curIdentitySig();
@@ -1972,7 +1974,7 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     }).join('');
     /* 省级总代/二级合作为叠加资格位：主身份文案按 agent 位优先显名，回退五轨道主身份，不渲染英文枚举 */
     var agentMeta = (ds && ds.idy && ds.idy.agent) || {};
-    var agentLabel = agentMeta.isProvinceAgent ? '省级总代' : (agentMeta.isSubAgent ? '二级合作' : '');
+    var agentLabel = agentMeta.isProvinceAgent ? '省级总代' : (agentMeta.isSubAgent ? '二级合作企业' : '');
     var primaryText = agentLabel || PRIMARY_LABEL[idy.primary] || idy.primary;
     document.getElementById('status-note').innerHTML =
       '<div style="margin-bottom:4px;color:var(--text-2);">当前主身份 · <b style="color:var(--text-1);">'+escAttr(primaryText)+'</b>　已点亮 <b style="color:var(--text-1);">'+(ds?ds.doneN:0)+'</b>/5</div>'
@@ -1982,26 +1984,53 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     renderWbIdentity();
   }
 
-  /* 反向联动回显：工作台当前场景 + 身份（由工作台切场景/切身份时写入 engchain-workbench-echo） */
+  /* 反向联动回显：工作台当前场景 + 身份（由工作台 boot / 切场景 / 切身份时写入 engchain-workbench-echo） */
   var WB_SCENE_LABEL = {
-    active: '省级总代 · 生效中', suspended: '省级总代 · 已暂停（只读）',
+    active: '省级总代 · 生效中', suspended: '省级总代 · 已暂停（仅可查看）',
     dark: '省级总代 · 生效中', empty: '省级总代 · 空数据',
-    'sub-active': '二级合作企业 · 生效中', 'sub-readonly': '二级合作企业 · 只读',
+    'sub-active': '二级合作企业 · 生效中', 'sub-readonly': '二级合作企业 · 已暂停（仅可查看）',
     'sub-dark': '二级合作企业 · 生效中', 'sub-empty': '二级合作企业 · 空数据'
   };
   var WB_ID_LABEL = {
     admin: '管理员', legal_rep: '法定代表人', staff: '员工',
     sub_admin: '管理员', sub_legal: '法定代表人', sub_staff: '员工'
   };
+  /* 工作台身份（2026-11-10 重写）：不再直接信回声，而是与工作台页同一套判定派生。
+     ① 准入：UI.workbenchAccess()（省代 active|suspended；二级 approved|suspended）。
+        无权限时如实显示原因，绝不出现"省级总代 · 生效中"这类与准入相矛盾的文案。
+     ② 场景：UI.pinWorkbenchScene() 把场景键收敛到账号可用域（含暂停只读），与 boot 同源。
+     ③ 身份后缀：回声仅当 scene 与 uid 都对得上才采用，否则用该域默认管理员。 */
+  var WB_DENY_LABEL = {
+    guest: '游客未登录', nologin: '未登录', pending: '入驻审核中',
+    rejected: '入驻申请未通过', terminated: '合作已终止', revoked: '资质已撤销',
+    nouser: '账号未完成入驻', none: '非代理身份'
+  };
+  function readWbEcho(){
+    try { return JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (err) { return null; }
+  }
   function renderWbIdentity(){
     var el = document.getElementById('pv-wb-identity');
     if (!el) return;
-    var e = null;
-    try { e = JSON.parse(localStorage.getItem('engchain-workbench-echo') || 'null'); } catch (err) {}
-    if (!e || !e.scene) { el.innerHTML = ''; return; }
-    var scene = WB_SCENE_LABEL[e.scene] || e.scene;
-    var who = WB_ID_LABEL[e.identity] || '';
-    el.innerHTML = '<b>工作台身份：</b>' + escAttr(scene) + (who ? ' · ' + escAttr(who) : '')
+    var acc = (window.UI && UI.workbenchAccess) ? UI.workbenchAccess() : null;
+    if (!acc) { el.innerHTML = ''; return; }
+    if (!acc.ok) {
+      var why = WB_DENY_LABEL[acc.reason] || '当前身份没有工作台权限';
+      el.innerHTML = '<b>工作台身份：</b>无权限 · ' + escAttr(why)
+        + '　<span style="color:var(--text-3);">（工作台页为无权限占位）</span>';
+      return;
+    }
+    var reqKey = '';
+    try { reqKey = localStorage.getItem('engchain-v3-demo-scenario') || ''; } catch (err) {}
+    var scene = (window.UI && UI.pinWorkbenchScene) ? UI.pinWorkbenchScene(acc, reqKey) : reqKey;
+    var sceneText = WB_SCENE_LABEL[scene] || '工作台场景（' + scene + '）';
+    var e = readWbEcho();
+    var dom = scene.indexOf('sub-') === 0 ? 'sub' : 'province';
+    var who = '';
+    if (e && e.scene === scene && String(e.uid || '') === String(acc.uid || '')) {
+      who = WB_ID_LABEL[e.identity] || '';
+    }
+    if (!who) who = '管理员';
+    el.innerHTML = '<b>工作台身份：</b>' + escAttr(sceneText) + ' · ' + escAttr(who)
       + '　<span style="color:var(--text-3);">（在工作台「设置 → 身份卡」可切换）</span>';
   }
 
