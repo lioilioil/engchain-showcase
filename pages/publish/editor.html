@@ -3291,6 +3291,37 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   };
   /* 省份列表（多选面板用） */
   var CITY_PROVINCES = Object.keys(cityData);
+  /* 全国城市总数（数据层：34 省 / 359 个地级市或直辖市下辖区） */
+  var TOTAL_CITIES = (function () {
+    var n = 0;
+    CITY_PROVINCES.forEach(function (p) { n += Object.keys(cityData[p] || {}).length; });
+    return n;
+  })();
+  /* 聚合已选区域：返回 { tier, text, chips }，tier: empty|few|mid|national */
+  function summarizeRegions(picked) {
+    picked = picked || [];
+    var n = picked.length;
+    if (!n) return { tier: 'empty', n: 0, chips: [] };
+    var provSet = {};
+    picked.forEach(function (s) { var i = s.indexOf('·'); if (i > -1) provSet[s.slice(0, i)] = true; });
+    var provCount = Object.keys(provSet).length;
+    /* 全国档双条件：城市≥320 且 省覆盖≥30 */
+    if (n >= 320 && provCount >= 30) {
+      /* 计算缺失清单 */
+      var missing = [];
+      CITY_PROVINCES.forEach(function (p) {
+        Object.keys(cityData[p] || {}).forEach(function (c) {
+          var full = p + '·' + c;
+          if (picked.indexOf(full) === -1) missing.push(full);
+        });
+      });
+      return { tier: 'national', n: n, missing: missing, provCount: provCount, chips: [] };
+    }
+    /* 少档：逐个列 */
+    if (n <= 8) return { tier: 'few', n: n, chips: picked.slice(), provCount: provCount };
+    /* 中档：前 6 + 折叠 */
+    return { tier: 'mid', n: n, chips: picked.slice(0, 6), rest: picked.slice(6), provCount: provCount };
+  }
   function renderCityList() {
     var list = $('city-list');
     list.innerHTML = '';
@@ -3399,6 +3430,21 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     var items = [];
     if (regionLevel === 'province') items = CITY_PROVINCES;
     else if (regionLevel === 'city' && regionSelection.province) items = Object.keys(cityData[regionSelection.province] || {});
+    if (regionLevel === 'province') {
+      /* 全国行：吸顶，三态 toggle */
+      var nw = document.createElement('button');
+      nw.type = 'button';
+      nw.className = 'nationwide-row';
+      nw.setAttribute('role', 'option');
+      var nNw = regionSelection.picked.length;
+      if (nNw >= TOTAL_CITIES) nw.classList.add('full');
+      else if (nNw > 0) nw.classList.add('partial');
+      nw.innerHTML = '<span class="nw-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>'
+        + '<span class="nw-text">全国 · 一键覆盖所有城市<small>追加式：已选城市保留，未选城市自动加入</small></span>'
+        + '<span class="nw-badge">' + (nNw >= TOTAL_CITIES ? '已全覆盖 ✓' : (nNw > 0 ? '已选 ' + nNw + '/' + TOTAL_CITIES : '未选')) + '</span>';
+      nw.addEventListener('click', toggleNationwide);
+      list.appendChild(nw);
+    }
     items.forEach(function (item) {
       var el = document.createElement('button');
       el.type = 'button';
@@ -3408,10 +3454,11 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
         el.classList.toggle('selected', regionSelection.province === item);
         el.textContent = item;
         var cnt = pickedCountOfProvince(item);
+        var totalP = Object.keys(cityData[item] || {}).length;
         if (cnt > 0) {
           var badge = document.createElement('span');
           badge.className = 'region-prov-cnt';
-          badge.textContent = '已选 ' + cnt;
+          badge.textContent = (cnt >= totalP) ? '全省已覆盖' : '已选 ' + cnt + '/' + totalP;
           el.appendChild(badge);
         }
         el.addEventListener('click', function () {
@@ -3428,6 +3475,24 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       list.appendChild(el);
     });
   }
+  function toggleNationwide() {
+    var n = regionSelection.picked.length;
+    if (n >= TOTAL_CITIES) {
+      /* 已全选 → 清空 */
+      regionSelection.picked = [];
+    } else {
+      /* 未全选 → 追加所有未选 */
+      var set = {};
+      regionSelection.picked.forEach(function (x) { set[x] = true; });
+      CITY_PROVINCES.forEach(function (p) {
+        Object.keys(cityData[p] || {}).forEach(function (c) {
+          var full = p + '·' + c;
+          if (!set[full]) regionSelection.picked.push(full);
+        });
+      });
+    }
+    renderRegionList(); renderRegionPicked();
+  }
   function toggleRegionCity(full) {
     var idx = regionSelection.picked.indexOf(full);
     if (idx > -1) regionSelection.picked.splice(idx, 1);
@@ -3443,14 +3508,20 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
   function renderRegionPicked() {
     var box = $('region-picked');
     if (box) {
-      box.innerHTML = regionSelection.picked.length
-        ? regionSelection.picked.map(function (p) {
-            return '<span class="region-pick-chip">' + p + '<button type="button" class="region-pick-chip-x" data-city="' + p + '" aria-label="移除 ' + p + '">&times;</button></span>';
-          }).join('')
-        : '<span class="region-chip-empty">尚未选择城市，可跨省份多选</span>';
-      box.querySelectorAll('.region-pick-chip-x').forEach(function (xbtn) {
-        xbtn.addEventListener('click', function () { removePickedRegion(xbtn.getAttribute('data-city')); });
-      });
+      var picked = regionSelection.picked;
+      if (!picked.length) {
+        box.innerHTML = '<span class="region-chip-empty">尚未选择城市，可跨省份多选</span>';
+      } else if (picked.length > 20) {
+        /* 大数量聚合：不渲染 359 个 chip，只显示摘要，详情在 Step2 展开 */
+        box.innerHTML = '<span class="region-pick-chip region-chip--national">已选全国 ' + picked.length + ' 城，可点省份单独取消</span>';
+      } else {
+        box.innerHTML = picked.map(function (p) {
+          return '<span class="region-pick-chip">' + p + '<button type="button" class="region-pick-chip-x" data-city="' + p + '" aria-label="移除 ' + p + '">&times;</button></span>';
+        }).join('');
+        box.querySelectorAll('.region-pick-chip-x').forEach(function (xbtn) {
+          xbtn.addEventListener('click', function () { removePickedRegion(xbtn.getAttribute('data-city')); });
+        });
+      }
     }
     var st = $('region-stats');
     if (st) st.textContent = '已选 ' + regionSelection.picked.length + ' 个城市 · 可跨省份多选，选完点「确定」';
@@ -3459,30 +3530,83 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
     $('region-mask').classList.remove('show');
     $('region-panel').classList.remove('show');
   }
-  /* 同步已选开放城市到 Step2：chips 展示与增删（数量行已删除，不再回写 f-qty/f-unit；区域以 hidden 输入与 regions 数组为准） */
+  /* 同步已选开放城市到 Step2：按 summarizeRegions 分档聚合，避免 359 chip 撑爆 */
   function syncRegionChips() {
     var box = $('region-chips');
     if (!box) return;
     var arr = (PV._openRegions || []).slice();
-    if (arr.length) {
-      box.innerHTML = '';
-      arr.forEach(function (c) {
+    box.innerHTML = '';
+    if (!arr.length) {
+      box.innerHTML = '<span class="region-chip-empty">尚未选择开放城市，点击右侧按钮添加（可一次选择多个城市）</span>';
+    } else {
+      var sum = summarizeRegions(arr);
+      /* 用户经营地：若在缺失清单里，排最前并打标 */
+      var homeCity = '';
+      try {
+        var ea = (typeof EntryStore !== 'undefined' && EntryStore.address) ? EntryStore.address : null;
+        if (ea && ea.province && ea.city) homeCity = ea.province + '·' + ea.city;
+      } catch (e) {}
+      if (sum.tier === 'national') {
+        /* 全国档：一个大 chip，点 × 清空全部 */
+        var miss = sum.missing.slice();
+        if (homeCity && miss.indexOf(homeCity) > -1) {
+          miss.splice(miss.indexOf(homeCity), 1);
+          miss.unshift(homeCity);
+        }
         var s = document.createElement('span');
-        s.className = 'region-chip';
-        s.textContent = c;
+        s.className = 'region-chip region-chip--national';
+        var missText = miss.length ? '，暂未覆盖 ' + miss.length + ' 城（含 ' + miss.slice(0, 3).join('、') + (miss.length > 3 ? ' 等' : '') + '）' : '，已全覆盖';
+        s.innerHTML = '全国开放（' + sum.n + ' 城' + missText + '）';
+        if (homeCity && arr.indexOf(homeCity) === -1) s.classList.add('region-chip--home');
         var x = document.createElement('button');
         x.type = 'button'; x.className = 'region-chip-x';
-        x.setAttribute('aria-label', '移除 ' + c);
+        x.setAttribute('aria-label', '清空全部');
         x.innerHTML = '&times;';
         x.addEventListener('click', function () {
-          PV._openRegions = PV._openRegions.filter(function (v) { return v !== c; });
+          PV._openRegions = [];
           syncRegionChips(); updateNextButton(); scheduleAutoSave();
         });
         s.appendChild(x);
         box.appendChild(s);
-      });
-    } else {
-      box.innerHTML = '<span class="region-chip-empty">尚未选择开放城市，点击右侧按钮添加（可一次选择多个城市）</span>';
+      } else if (sum.tier === 'few') {
+        sum.chips.forEach(function (c) {
+          var s2 = document.createElement('span');
+          s2.className = 'region-chip';
+          if (c === homeCity) s2.classList.add('region-chip--home');
+          s2.textContent = c;
+          var x2 = document.createElement('button');
+          x2.type = 'button'; x2.className = 'region-chip-x';
+          x2.setAttribute('aria-label', '移除 ' + c);
+          x2.innerHTML = '&times;';
+          x2.addEventListener('click', function () {
+            PV._openRegions = PV._openRegions.filter(function (v) { return v !== c; });
+            syncRegionChips(); updateNextButton(); scheduleAutoSave();
+          });
+          s2.appendChild(x2);
+          box.appendChild(s2);
+        });
+      } else {
+        /* 中档：前 6 个 + 折叠 chip */
+        sum.chips.forEach(function (c) {
+          var s3 = document.createElement('span');
+          s3.className = 'region-chip'; s3.textContent = c;
+          var x3 = document.createElement('button');
+          x3.type = 'button'; x3.className = 'region-chip-x';
+          x3.setAttribute('aria-label', '移除 ' + c);
+          x3.innerHTML = '&times;';
+          x3.addEventListener('click', function () {
+            PV._openRegions = PV._openRegions.filter(function (v) { return v !== c; });
+            syncRegionChips(); updateNextButton(); scheduleAutoSave();
+          });
+          s3.appendChild(x3);
+          box.appendChild(s3);
+        });
+        var more = document.createElement('span');
+        more.className = 'region-chip region-chip--more';
+        more.textContent = '+ ' + (sum.n - 6) + ' 城';
+        more.title = sum.rest.join('\n');
+        box.appendChild(more);
+      }
     }
     var hid = $('f-open-regions');
     if (hid) hid.value = arr.join('|');
