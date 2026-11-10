@@ -1607,7 +1607,17 @@ window.UI = (function () {
     var states = [paStatus, sbStatus];
     var byReason = ['pending', 'rejected', 'terminated', 'revoked'];
     for (var r = 0; r < byReason.length; r++) {
-      if (states.indexOf(byReason[r]) > -1) { out.reason = byReason[r]; return out; }
+      if (states.indexOf(byReason[r]) > -1) {
+        out.reason = byReason[r];
+        /* 终止是终态：后台把状态改成 terminated 后，即便用户没动过演示面板，也立刻丢弃该账号
+           的工作台场景键/状态机(85KB)/待办意图/回声（2026-11-10「后台终止也立即清」）。
+           冻结在这里而不是 recheckAccess，是因为所有页面（预览/我的/工作台）都经由本函数
+           判定准入；且 pending/rejected 阶段不触发，boot 播种过程的中间态不会被误清。 */
+        if (out.reason === 'terminated') {
+          try { if (window.DataBus && DataBus.clearWorkbenchStack) DataBus.clearWorkbenchStack(); } catch (err) {}
+        }
+        return out;
+      }
     }
     return out;
   }

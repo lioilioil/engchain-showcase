@@ -2434,6 +2434,7 @@ window.DataBus = (function () {
     /* 演示场景 ↔ 工作台联动（预览侧栏 / 个人中心读取回声与补应用意图） */
     applyPendingWorkbench: applyPendingWorkbench,
     workbenchSceneOf: workbenchSceneOf,
+    clearWorkbenchStack: clearWorkbenchStack,
     WB_ECHO_KEY: WB_ECHO_KEY, WB_SCENARIO_KEY: WB_SCENARIO_KEY,
     isPlatformStaff: isPlatformStaff,
     /* v2.0：内存缓存管理 */
