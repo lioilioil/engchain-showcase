@@ -2030,7 +2030,7 @@ window.DataBus = (function () {
         var rec = r && r.record;
         if (rec && S) { rec.firstBy = '运营初审'; rec.firstAt = Date.now(); rec.firstNote = '资料初审通过，待终审'; S.saveProvince(rec); }
       } },
-    rev_sub_pending: { label: '二级申请 · 待平台审核（总代发起）', group: 'review', base: 'u11',
+    rev_sub_pending: { label: '省级总代 · 二级申请待平台审核（四川）', group: 'review', base: 'u11',
       ensure: { name: '林总代', company: '四川××省级代理有限公司', mobile: '139****0011', tag: '省级总代' },
       build: function () {
         if (window.AgentDemo) AgentDemo.seed();
@@ -2269,24 +2269,27 @@ window.DataBus = (function () {
   var DEMO_TRACKS = ['realname', 'personal-entry', 'partner', 'enterprise', 'entry'];
 
   /* 代理域 / 省代申请态反推（2026-11-10 新增）：这些状态由代理记录 status 唯一确定，
-     不依赖场景键，也不依赖记忆。只在状态唯一且候选场景的 base 就是当前账号时才返回；
-     同一账号同时满足多个预设（如省代 active 且名下有二级待审）时不猜，交回占位项。 */
+     不依赖场景键，也不依赖记忆。只在状态唯一且候选场景的 base 就是当前账号时才返回。
+     省代 active + 名下二级待审是"一个主体（省代）+ 一个在办事项"，对应 rev_sub_pending
+     这一个预设（2026-11-10 起该预设的文案就按省代口吻描述），不再交回占位项。 */
   function inferByAgent(cu) {
     var uid = cu && cu.id;
     if (!uid) return '';
-    /* "省代已开通 + 名下二级申请待审"是组合态，不对应任何单一预设：
-       此时认成"省级总代 · 已开通"会掩盖待审申请，点回该选项还会把它重置掉 → 返回占位。 */
+    var hasPendingSub = false;
     try {
       var subs = JSON.parse(LS.getItem('engchain-sub-agents') || '[]');
       if (Array.isArray(subs)) {
         for (var i = 0; i < subs.length; i++) {
-          if (subs[i] && subs[i].parentUid === uid && String(subs[i].status || '') === 'pending') return '';
+          if (subs[i] && subs[i].parentUid === uid && String(subs[i].status || '') === 'pending') { hasPendingSub = true; break; }
         }
       }
     } catch (e0) {}
     var pa = agentRecord('engchain-province-agents', uid);
     var paStatus = pa ? String(pa.status || '') : '';
-    if (paStatus === 'active' && scenarioBelongsTo('province_agent_active', uid)) return 'province_agent_active';
+    if (paStatus === 'active') {
+      if (hasPendingSub && scenarioBelongsTo('rev_sub_pending', uid)) return 'rev_sub_pending';
+      if (scenarioBelongsTo('province_agent_active', uid)) return 'province_agent_active';
+    }
     if (paStatus === 'suspended' && scenarioBelongsTo('province_agent_suspended', uid)) return 'province_agent_suspended';
     if (paStatus === 'terminated' && scenarioBelongsTo('province_agent_terminated', uid)) return 'province_agent_terminated';
     if (paStatus === 'pending') {
