@@ -14,8 +14,9 @@ Engchain3.0 平台说明文档。目录内为自包含静态 HTML，浏览器直
 | `data-layer-architecture.html` | 图解：数据层架构 | — |
 | `cert-phase-pricing.html` | 图解：两期定价与阶段切换（第二章 图 2-1） | — |
 | `cert-money-path.html` | 图解：认证与入驻的资金路径（第二章 图 2-2） | — |
+| `fig-*.png` | 6 张图解的打印版位图（2400px 宽），供文档打印使用，屏幕上不显示 | — |
 
-前 4 个图解文件由 `engchain-user-system.html` 以 iframe 引用，后 2 个由 `engchain-money-model.html` 引用，均须同目录存放，否则文档内图示区域为空。
+前 4 个图解文件由 `engchain-user-system.html` 以 iframe 引用，后 2 个由 `engchain-money-model.html` 引用；6 张 `fig-*-print.png` 与对应图解同名配对（如 `fig-cert-phase-pricing-print.png` ↔ `cert-phase-pricing.html`）。均须同目录存放：缺图解 HTML，屏幕上的图解区为空；缺 PNG，打印时的图页为空。
 
 ## 口径
 
@@ -28,7 +29,8 @@ Engchain3.0 平台说明文档。目录内为自包含静态 HTML，浏览器直
 
 两份主文档共用同一套版式与交互层（暖白纸面、墨黑正文、衬线标题、直角细框），没有渐变胶囊与彩色标签。
 
-- **A4 打印**：`@page` 设为 A4、页边距 17/15/16mm；标题与表头不落在页尾，表格允许跨页但单行不劈开，`§12` 参数总表用固定列宽避免配置项被逐字符折断。打印时侧栏、工具栏、进度条、横滑提示全部隐藏，iframe 图解替换为图注加一行"交互图解，打印版略去"的提示。
+- **A4 打印**：正文 `@page` 设为 A4、页边距 17/15/16mm；标题与表头不落在页尾，表格允许跨页但单行不劈开，`§12` 参数总表用固定列宽避免配置项被逐字符折断。打印时侧栏、工具栏、进度条、横滑提示全部隐藏。
+- **图解打印**：6 张 archify 图解全部进打印版，每张独占一页横向 A4（命名页 `@page figpage{size:A4 landscape}` 配 `.fig{page:figpage;break-before:page;break-after:page}`）。图页只保留画布、图例与图注，阅读器的顶栏、搜索框、标题区与节点索引侧栏不出现；图注沿用正文原有的图号与说明。打印版用同目录 `fig-*-print.png`，屏幕仍显示 iframe 交互版（`.fig-print` 只在打印态显示）。位图由 `?embed=1&theme=light` 离屏 2 倍渲染、按内容裁边导出，2400px 宽，铺满页宽约合 220dpi。页数不设上限：金额文档 23 页（2 张图页）、用户文档 22 页（4 张图页）。
 - **屏幕**：≥1280px 为侧栏目录 + 正文双栏；1024–1279px 侧栏收窄；≤1023px 侧栏收为抽屉（含章节筛选与关闭按钮）；≤767px 单栏，宽表横向滚动并显示滑动提示。
 - **交互**：顶部阅读进度条、目录滚动高亮、章节锚点复制、正文字号 A−/A＋（记忆在同浏览器 `localStorage`）、PDF/打印按钮、回到顶部。
 
@@ -41,6 +43,7 @@ Copy-Item -LiteralPath "D:\Engchain3.0-archive\engchain-user-system-doc-20261105
 Copy-Item -LiteralPath "D:\Engchain3.0-archive\engchain-user-system-doc-20261105\engchain-money-model.html" -Destination "D:\Engchain3.0\platform-docs\" -Force
 Copy-Item -LiteralPath "D:\Engchain3.0-archive\engchain-user-system-doc-20261105\cert-phase-pricing.html" -Destination "D:\Engchain3.0\platform-docs\" -Force
 Copy-Item -LiteralPath "D:\Engchain3.0-archive\engchain-user-system-doc-20261105\cert-money-path.html" -Destination "D:\Engchain3.0\platform-docs\" -Force
+Get-ChildItem -LiteralPath "D:\Engchain3.0-archive\engchain-user-system-doc-20261105" -Filter "fig-*-print.png" | Copy-Item -Destination "D:\Engchain3.0\platform-docs\" -Force
 git -C D:\Engchain3.0 add platform-docs
 git -C D:\Engchain3.0 commit -m "docs: 更新平台说明文档" -- platform-docs
 git -C D:\Engchain3.0 push
