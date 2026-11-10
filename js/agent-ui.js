@@ -59,14 +59,15 @@
   }
   function agAnimate(scope) { agRise(scope); agCountUp(scope); }
 
-  /* ---------- 状态词典（H-04：中文 + 语义色，禁止渲染英文枚举） ---------- */
+  /* ---------- 状态词典（H-04：中文 + 语义色，禁止渲染英文枚举）
+     status 词按定稿词表：active=已开通、revoked=资质已撤销（旧的短式异写一律废止） ---------- */
   var STATUS_LABEL = {
-    active: ['已生效', 'ag-st-active'],
+    active: ['已开通', 'ag-st-active'],
     pending: ['待审核', 'ag-st-pending'],
     suspended: ['已暂停', 'ag-st-suspended'],
     rejected: ['已驳回', 'ag-st-terminated'],
     terminated: ['已终止', 'ag-st-terminated'],
-    revoked: ['已清退', 'ag-st-revoked'],
+    revoked: ['资质已撤销', 'ag-st-revoked'],
     approved: ['已通过', 'ag-st-active'],
     removed: ['已解除', 'ag-st-removed']
   };
@@ -512,7 +513,7 @@
     if (me && (isTerminated || sealed)) {
       var termTitle, termDesc;
       if (me.status === 'revoked') {
-        termTitle = '账号已清退';
+        termTitle = '账号已撤销资质';
         termDesc = '违规清退为不可逆状态，无恢复入口；台账与协议转为只读，不再产生新的约定/自留分成。';
       } else if (me.status === 'terminated') {
         termTitle = '账号已解约 · 已终止';

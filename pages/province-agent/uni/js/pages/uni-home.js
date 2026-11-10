@@ -11,6 +11,14 @@
   "use strict";
   var store = window.V3.store, ui = window.V3.ui;
 
+  /* 账号状态词（定稿词表）：省代 active=已开通，二级 approved=已绑定；其余状态两域共用。
+     统一走这里，避免页面里再写死「生效中」这类与预览/我的不一致的说法。 */
+  function acctTxt(ctx, st) {
+    var sub = ctx && ctx.mode === "sub";
+    var d = sub ? (ui.ACCT_SUB || ui.ACCT) : ui.ACCT;
+    return (d && d[st]) || (sub ? "已绑定" : "已开通");
+  }
+
   /* 员工视角动态脱敏：付款/对账类通知带企业级金额，不对员工下发。
      员工只保留协议、合作进展这类非财务通知。 */
   function feedForStaff(state) {
@@ -44,7 +52,7 @@
         return {
           company: s.profile.name,
           roleLine: "省级总代 · 编号 " + s.profile.authNo,
-          badge: ui.ACCT[s.profile.status] || "生效中",
+          badge: acctTxt(ctx, s.profile.status),
           badgeCls: "ok",
           metaL: "授权编号 " + s.profile.authNo,
           metaR: "合作自 " + s.profile.since,
@@ -108,7 +116,7 @@
         return {
           company: s.profile.name,
           roleLine: "员工 · " + my + "（渠道专员）",
-          badge: ui.ACCT[s.profile.status] || "生效中",
+          badge: acctTxt(ctx, s.profile.status),
           badgeCls: "ok",
           metaL: "授权编号 " + s.profile.authNo,
           metaR: "合作自 " + s.profile.since,
@@ -148,7 +156,7 @@
         return {
           company: s.profile.name,
           roleLine: "上级总代 · " + (s.parent ? s.parent.name.replace(/（.*）/, "") : "—"),
-          badge: ui.ACCT[s.profile.status] || "生效中",
+          badge: acctTxt(ctx, s.profile.status),
           badgeCls: "ok",
           metaL: "约定比例 " + Math.round((s.parent ? s.parent.ratioToSub : 0) * 100) + "%",
           metaR: "合作自 " + (s.parent ? s.parent.since : s.profile.since),
@@ -206,7 +214,7 @@
         return {
           company: s.profile.name,
           roleLine: "企业成员 · " + my + "（渠道专员）",
-          badge: ui.ACCT[s.profile.status] || "生效中",
+          badge: acctTxt(ctx, s.profile.status),
           badgeCls: "ok",
           metaL: "约定比例 " + Math.round((par.ratioToSub || 0) * 100) + "%",
           metaR: "合作自 " + (par.since || s.profile.since),
@@ -358,11 +366,11 @@
     if (ctx.mode === "province") {
       if (id === "staff") {
         rows = [["姓名", ctx.staffName], ["职务", "渠道专员"], ["所属企业", s.profile.name],
-        ["合作状态", ui.ACCT[s.profile.status]], ["授权编号", s.profile.authNo],
+        ["合作状态", acctTxt(ctx, s.profile.status)], ["授权编号", s.profile.authNo],
         ["权限说明", "仅本人渠道码与本人线索；对账/审批/比例/协议仅管理员"]];
       } else {
         /* admin / legal_rep：省代企业档案（法代只读，仅多一行身份标注） */
-        rows = [["企业名称", s.profile.name], ["联系人", s.profile.contact], ["合作状态", ui.ACCT[s.profile.status]],
+        rows = [["企业名称", s.profile.name], ["联系人", s.profile.contact], ["合作状态", acctTxt(ctx, s.profile.status)],
         ["授权编号", s.profile.authNo], ["统一社会信用代码", s.profile.uscc], ["法定代表人", s.profile.legalPerson],
         ["合作起始", s.profile.since], ["地址", s.profile.address]];
         if (id === "legal_rep") rows.push(["当前身份", "法定代表人 · 只读视图"]);
@@ -370,7 +378,7 @@
     } else {
       if (id === "sub_staff") {
         rows = [["姓名", ctx.staffName], ["职务", "渠道专员"], ["所属企业", s.profile.name],
-        ["合作状态", ui.ACCT[s.profile.status]], ["合作编号", s.profile.authNo],
+        ["合作状态", acctTxt(ctx, s.profile.status)], ["合作编号", s.profile.authNo],
         ["上级总代", par.name || "—"], ["权限说明", "仅本人渠道码与本人线索；对账/异议/团队仅企业管理员"]];
       } else {
         /* sub_admin / sub_legal */

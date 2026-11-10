@@ -636,7 +636,7 @@
       var mine = listMyApplications(opts.uid, opts);
       if (!mine.length) { container.innerHTML = '<div class="ag-empty"><div class="ag-empty__title">暂无省级总代申请</div>'
         + '<div class="ag-empty__sub">提交省级总代（省代）申请后，进度将在此展示。</div></div>'; return; }
-      var statusMap = { pending: ['待审核', 'ag-st-pending'], active: ['已生效', 'ag-st-active'], suspended: ['已暂停', 'ag-st-suspended'], rejected: ['已驳回', 'ag-st-terminated'], terminated: ['已终止', 'ag-st-terminated'], revoked: ['已清退', 'ag-st-revoked'], approved: ['已通过', 'ag-st-active'] };
+      var statusMap = { pending: ['待审核', 'ag-st-pending'], active: ['已开通', 'ag-st-active'], suspended: ['已暂停', 'ag-st-suspended'], rejected: ['已驳回', 'ag-st-terminated'], terminated: ['已终止', 'ag-st-terminated'], revoked: ['资质已撤销', 'ag-st-revoked'], approved: ['已通过', 'ag-st-active'] };
       var provOpts = PROVINCE_LIST.map(function(p){return '<option value="'+p+'">'+p+'</option>';}).join('');
       container.innerHTML = '<section class="ag-card"><h3>我的省级总代申请</h3>' +
         mine.map(function (a) {
@@ -658,7 +658,7 @@
               + '</select><div class="ag-field-err"></div></div>'
               + '<div class="ag-actions" style="margin-top:8px;"><button class="ag-btn ag-btn--primary ag-btn--sm" onclick="AgentApply._resubmitForm(\'' + a.id + '\')">补资料并重新提交</button></div>')
             : '';
-          /* P0-5：已生效卡补「进入工作台」CTA（suspended 仍可进入只读视图） */
+          /* P0-5：已开通卡补「进入工作台」CTA（suspended 仍可进入只读视图） */
           var activeCta = (a.status === 'active' || a.status === 'suspended')
             ? '<div class="ag-actions" style="margin-top:8px;"><a class="ag-btn ag-btn--primary ag-btn--sm" href="../province-agent/uni/pages/home.html">进入工作台</a></div>'
             : '';

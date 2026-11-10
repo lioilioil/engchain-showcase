@@ -420,7 +420,7 @@
 
     /* 只读：除主题/角色演示切换外一律拒绝 */
     if (c.readonly && type !== "theme/set" && type !== "role/set") {
-      return fail("账号已暂停，仅可查看");
+      return fail("账号已暂停（仅可查看）");
     }
 
     switch (type) {

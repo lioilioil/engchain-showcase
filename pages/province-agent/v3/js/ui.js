@@ -207,7 +207,10 @@
   /* 文案映射 */
   var STAGE = { registered: "已注册", onboarded: "已入驻", paid: "已消费", repaid: "已复购", lost: "已流失" };
   var STAGE_BADGE = { registered: "v3-badge--pending", onboarded: "v3-badge--active", paid: "v3-badge--gold", repaid: "v3-badge--active", lost: "v3-badge--neutral" };
-  var ACCT = { active: "生效中", suspended: "已暂停", terminated: "已终止", revoked: "已撤销", sealed: "已封存", pending: "待生效" };
+  /* 账号状态词：与「预览侧栏 / 我的」定稿词表一致（已开通 / 已暂停 / 已终止 / 资质已撤销）；
+     二级域按词表用「已绑定」（合作企业绑定到上级省代），其余状态两域共用 */
+  var ACCT = { active: "已开通", suspended: "已暂停", terminated: "已终止", revoked: "资质已撤销", sealed: "已封存", pending: "待生效" };
+  var ACCT_SUB = { active: "已绑定", suspended: "已暂停", terminated: "已终止", revoked: "资质已撤销", sealed: "已封存", pending: "待生效" };
   var ACCT_BADGE = { active: "v3-badge--active", suspended: "v3-badge--suspended", terminated: "v3-badge--terminated", revoked: "v3-badge--revoked", sealed: "v3-badge--sealed", pending: "v3-badge--pending" };
   var REG = { pending_confirm: "待确认", confirmed: "已确认", disputed: "有异议", void: "已作废" };
   var REG_BADGE = { pending_confirm: "v3-badge--pending", confirmed: "v3-badge--active", disputed: "v3-badge--suspended", void: "v3-badge--neutral" };
@@ -245,6 +248,6 @@
     toast: toast, openSheet: openSheet, openModal: openModal, openCenter: openCenter, closeAll: closeAll,
     fileToVoucher: fileToVoucher, previewVoucher: previewVoucher,
     emptySvg: emptySvg, emptyHtml: emptyHtml,
-    STAGE: STAGE, STAGE_BADGE: STAGE_BADGE, ACCT: ACCT, ACCT_BADGE: ACCT_BADGE, REG: REG, REG_BADGE: REG_BADGE
+    STAGE: STAGE, STAGE_BADGE: STAGE_BADGE, ACCT: ACCT, ACCT_SUB: ACCT_SUB, ACCT_BADGE: ACCT_BADGE, REG: REG, REG_BADGE: REG_BADGE
   };
 })();
