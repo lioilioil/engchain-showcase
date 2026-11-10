@@ -318,6 +318,7 @@ window.DataBus = (function () {
     try { if (window.CreditStore && CreditStore.reset) CreditStore.reset(); } catch (e) {}
     if (window.UI && UI.state) UI.state.set({ loggedIn: false, status: 'guest', member: false, demoOverride: null, displayOrgId: null, currentOrgId: null, orgRole: '', orgName: '', company: '' });
     try { LS.removeItem('engchain-unlocked'); } catch (e) {}
+    clearWorkbenchStack();   /* 切走即重置：退出登录同样丢弃工作台场景键/状态机/回声 */
     window.dispatchEvent(new CustomEvent('engchain:login', { detail: { id: 'u7' } }));
     audit('退出登录', '账号', '', '当前账号已登出');
     return true;
@@ -2080,6 +2081,18 @@ window.DataBus = (function () {
   var WB_ECHO_KEY = 'engchain-workbench-echo';
   var WB_INTENT_KEY = 'engchain-workbench-intent';
 
+  /* 清空工作台栈（场景键 / 状态机 / 待办意图 / 回声）。
+     [P0-1 → 口径修正 2026-11-10] 账号离开代理身份（选到非代理场景或退出登录）即重置：
+     不把上一个代理身份的场景键、85KB 状态机和"最后一张身份卡"留给下一个账号。 */
+  function clearWorkbenchStack() {
+    try {
+      localStorage.removeItem(WB_SCENARIO_KEY);
+      localStorage.removeItem(WB_STATE_KEY);
+      localStorage.removeItem(WB_INTENT_KEY);
+      localStorage.removeItem(WB_ECHO_KEY);
+    } catch (e) {}
+  }
+
   function workbenchSceneOf(demoKey) {
     var sc = DEMO_SCENARIOS[demoKey];
     /* 未声明工作台域 → ''（不再兜底 'active'：兜底会让身份类场景伪造省代回声） */
@@ -2088,7 +2101,8 @@ window.DataBus = (function () {
 
   function syncWorkbench(demoKey) {
     var wb = workbenchSceneOf(demoKey);
-    if (!wb) return '';                    /* 与工作台无关的场景：不写键、不清缓存、不写回声 */
+    /* 与工作台无关的场景：不写键、不写回声，并清空工作台栈（切走即重置） */
+    if (!wb) { clearWorkbenchStack(); return ''; }
     var isSub = wb.indexOf('sub-') === 0;
     try {
       localStorage.setItem(WB_SCENARIO_KEY, wb);
