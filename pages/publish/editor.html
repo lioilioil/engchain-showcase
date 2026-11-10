@@ -1320,10 +1320,8 @@ rm();var b=document.createElement("base");b.href=base;b.setAttribute("data-ef","
       if (empty) errors.push(key);
       _markRequired(key, quiet, empty);
     });
-    /* FIELD-RULES P0：描述低字数引导（提交态 toast，不硬拦） */
-    if (step === 1 && fields.desc && fields.desc.value.trim().length > 0 && fields.desc.value.trim().length < 20) {
-      try { UI.toast('再补充 1-2 句关键信息更容易被匹配（建议 20 字以上）', 'warn'); } catch (e) {}
-    }
+    /* FIELD-RULES P0：描述低字数引导只在失焦时提示（见 f-desc blur 监听），
+       这里不做 toast，避免输入过程中高频打扰。提交时由 __ecCheckDescLen 兜底。 */
     /* 手机号格式验证（联系发布步）：3-4-4 展示带空格，校验用纯数字 */
     if (isContactStep(step)) {
       var phoneRawV = (fields.contactPhone.dataset && fields.contactPhone.dataset.phoneRaw) || fields.contactPhone.value.replace(/\s+/g, '');
@@ -11854,6 +11852,22 @@ fillData = function(d) {
   if (tEl) tEl.addEventListener('input', upd);
   if (dEl) dEl.addEventListener('input', upd);
   upd();
+  /* 低字数引导：仅在失焦时检查一次，达到 20 字后不再重复提醒 */
+  var __descWarned = false;
+  if (dEl) {
+    dEl.addEventListener('focus', function () { __descWarned = false; });
+    dEl.addEventListener('input', function () {
+      if (dEl.value.trim().length >= 20) __descWarned = false;
+    });
+    dEl.addEventListener('blur', function () {
+      if (__descWarned) return;
+      var n = dEl.value.trim().length;
+      if (n > 0 && n < 20) {
+        try { UI.toast('再补充 1-2 句关键信息更容易被匹配（当前 ' + n + ' 字，建议 20 字以上）', 'warn'); } catch (e) {}
+        __descWarned = true;
+      }
+    });
+  }
   /* 提交链钩子：描述低于20字时 toast 引导（不硬拦） */
   document.addEventListener('submit:lowdesc', function () {});
   window.__ecCheckDescLen = function () {
